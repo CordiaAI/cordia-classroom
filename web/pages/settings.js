@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import { useRequireAuth } from '../lib/auth';
 import { apiErrorMessage, apiFetch, cacheUserIdentity, getUserEmail } from '../lib/api';
 import FeedbackModal from '../components/FeedbackModal';
+import LearningStylePicker from '../components/LearningStylePicker';
+import { useLearningStyle } from '../lib/learningStyle';
 
 export default function SettingsPage() {
   const { ready } = useRequireAuth();
@@ -23,6 +25,17 @@ export default function SettingsPage() {
 
   // Feedback modal
   const [showFeedback, setShowFeedback] = useState(false);
+
+  // Study style
+  const { learningStyle, saveStyle } = useLearningStyle();
+  const [savingStyle, setSavingStyle] = useState(false);
+
+  async function chooseStyle(style) {
+    setSavingStyle(true);
+    const data = await saveStyle(style);
+    setSavingStyle(false);
+    setMessage(data?.enabled ? 'Study style saved.' : apiErrorMessage(data?.detail, 'Could not save your study style.'));
+  }
 
   useEffect(() => {
     if (!ready) return;
@@ -123,6 +136,7 @@ export default function SettingsPage() {
 
   const sections = [
     { key: 'subscription', label: 'Subscription' },
+    ...(learningStyle?.enabled ? [{ key: 'study', label: 'Study style' }] : []),
     { key: 'appearance', label: 'Appearance' },
     { key: 'account', label: 'Account' },
   ];
@@ -238,6 +252,21 @@ export default function SettingsPage() {
                 {theme === 'dark' ? 'Dark' : 'Light'}
               </button>
             </div>
+          </div>
+        )}
+
+        {activeSection === 'study' && learningStyle?.enabled && (
+          <div className="settings-section">
+            <div className="settings-label">How do you like to study?</div>
+            <div className="settings-desc">
+              Guides and Tutor start with this. Every study tool stays available whatever you pick.
+            </div>
+            <LearningStylePicker value={learningStyle.style} onSelect={chooseStyle} disabled={savingStyle} />
+            {learningStyle.style && (
+              <button type="button" className="btn-outline" onClick={() => chooseStyle(null)} disabled={savingStyle}>
+                Use Classroom's standard view
+              </button>
+            )}
           </div>
         )}
 

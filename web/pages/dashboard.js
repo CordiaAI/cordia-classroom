@@ -9,6 +9,7 @@ import AILoadingSphere from '../components/AILoadingSphere';
 import StudyWorkspaceFrame from '../components/StudyWorkspaceFrame';
 import CalendarDashboard from '../components/CalendarDashboard';
 import DashboardOverview from '../components/DashboardOverview';
+import LearningStylePrompt from '../components/LearningStylePrompt';
 import { organizeDashboardGuides } from '../lib/dashboardOrganization';
 
 export default function Dashboard({ timerState, setTimerState }) {
@@ -422,6 +423,7 @@ export default function Dashboard({ timerState, setTimerState }) {
   return (
     <StudyWorkspaceFrame classes={organized.classes} classRail={workspaceClassRail} section="dashboard" timerState={timerState} setTimerState={setTimerState}>
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
+      <LearningStylePrompt />
       <div>
         {loadErrorBanner}
         <DashboardOverview folders={folders} guides={guides} stats={stats} navigate={path => router.push(path)} />

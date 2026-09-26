@@ -7,6 +7,8 @@ import useSessionTracker from '../../lib/useSessionTracker';
 import AILoadingSphere from '../../components/AILoadingSphere';
 import FlashcardViewer from '../../components/FlashcardViewer';
 import QuizMode from '../../components/QuizMode';
+import StudyAidPanel from '../../components/StudyAidPanel';
+import { useLearningStyle } from '../../lib/learningStyle';
 
 export default function GuidePage() {
   const router = useRouter();
@@ -21,6 +23,8 @@ export default function GuidePage() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const prevRevealed = useRef(0);
+  const { learningStyle } = useLearningStyle();
+  const [openAid, setOpenAid] = useState(null);
 
   useEffect(() => {
     if (ready && id) {
@@ -238,6 +242,14 @@ export default function GuidePage() {
                     <img src={pair.image} alt="Study image" style={{ display: 'block', maxWidth: '100%', maxHeight: 300, borderRadius: 6, marginTop: 10, border: '1px solid var(--border-subtle)' }} />
                   )}
                 </div>
+                {learningStyle?.enabled && revealedQs.has(i) && openAid !== pair.index && (
+                  <button type="button" className="study-aid-open" onClick={() => setOpenAid(pair.index)}>
+                    Learn it your way
+                  </button>
+                )}
+                {learningStyle?.enabled && openAid === pair.index && (
+                  <StudyAidPanel guideId={id} number={pair.index} style={learningStyle.style} onClose={() => setOpenAid(null)} />
+                )}
               </div>
             ))
           )}

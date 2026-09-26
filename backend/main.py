@@ -33,7 +33,7 @@ from services.llm import (
     analyze_images_for_slides, generate_practice_guide, generate_verified_practice_set,
     study_guide_is_complete, study_guide_to_flashcards,
 )
-from routers import auth, folders, guides, stats, search, quiz, billing, nclex, exam, feedback, smart_notes, calendar, tutor
+from routers import auth, folders, guides, stats, search, quiz, billing, nclex, exam, feedback, smart_notes, calendar, tutor, learning
 from auth_utils import get_user_id
 from database import get_supabase
 from routers.billing import check_usage, record_usage
@@ -154,6 +154,16 @@ app.include_router(feedback.router)
 app.include_router(smart_notes.router)
 app.include_router(calendar.router)
 app.include_router(tutor.router)
+app.include_router(learning.router)
+
+def _style_instruction(user_id: str) -> str:
+    """Tutor presentation for the student's chosen study style; empty when none is chosen or styles are off."""
+    try:
+        from services.learning_styles import active_style, tutor_style_instruction
+        return tutor_style_instruction(active_style(get_supabase(), user_id))
+    except Exception:
+        return ""
+
 
 def _learning_guidance(user_id: str) -> str:
     try:
@@ -906,6 +916,7 @@ async def chat(body: ChatRequest, request: Request, authorization: str = Header(
         usage = check_usage(user_id, "lightweight")
         guidance = "\n".join(filter(None, [
             _learning_guidance(user_id),
+            _style_instruction(user_id),
             tutor_skill_instruction(active_skill),
             TUTOR_SAFETY_POLICY,
         ]))

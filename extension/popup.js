@@ -177,7 +177,8 @@ function addTutorMessage(role, text) {
   tutorMessages.querySelector('.tutor-empty')?.remove();
   const message = document.createElement('p');
   message.className = `tutor-message ${role}`;
-  message.textContent = text;
+  // Diagrams render in Classroom; the side panel shows a pointer instead of raw diagram code.
+  message.textContent = String(text || '').replace(/```mermaid[\s\S]*?```/g, '[Diagram: open this Tutor chat in Classroom to see it]');
   tutorMessages.appendChild(message);
   tutorMessages.scrollTop = tutorMessages.scrollHeight;
 }

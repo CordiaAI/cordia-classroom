@@ -3122,3 +3122,42 @@ input:focus, textarea:focus, select:focus { border-color: var(--olive) !importan
   .create-flow-footer { align-items: flex-start; flex-direction: column; }
   .create-flow-footer .create-submit-btn { width: 100%; }
 }
+
+/* ── Study styles ───────────────────────────────────────────── */
+.learning-style-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 14px 0; }
+.learning-style-option { display: grid; gap: 4px; padding: 14px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--surface); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; }
+.learning-style-option span { color: var(--text-secondary); font-size: 0.8rem; }
+.learning-style-option:hover, .learning-style-option.selected { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+.learning-style-prompt-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(20, 20, 16, 0.45); }
+.learning-style-prompt { width: min(640px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: 24px; border-radius: 20px; background: var(--surface); box-shadow: var(--shadow-lg); }
+.learning-style-prompt h2 { margin: 0 0 6px; }
+.learning-style-prompt p { margin: 0; color: var(--text-secondary); }
+.learning-style-skip { margin-top: 4px; }
+.study-aid-open { margin: 6px 16px 12px; padding: 6px 12px; border: 1px solid var(--accent); border-radius: 999px; background: transparent; color: var(--accent); font: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+.study-aid-panel { margin: 4px 16px 16px; padding: 14px; border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--surface); }
+.study-aid-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 12px; }
+.study-aid-tab { padding: 6px 12px; border: 1px solid var(--border-subtle); border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.study-aid-tab.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.study-aid-close { margin-left: auto; border: 0; background: transparent; color: var(--text-muted); font-size: 1.3rem; cursor: pointer; }
+.study-aid-diagram { overflow-x: auto; margin: 8px 0 12px; }
+.study-aid-diagram svg { max-width: 100%; height: auto; }
+.study-aid-diagram-fallback { white-space: pre-wrap; font-size: 0.75rem; color: var(--text-secondary); }
+.study-aid-caption, .study-aid-status { color: var(--text-secondary); font-size: 0.85rem; }
+.study-aid-error { color: var(--error, #b42318); font-size: 0.85rem; }
+.study-aid-script, .study-aid-example { line-height: 1.55; }
+.study-aid-task { margin: 12px 0 6px; }
+.study-aid-notes { margin: 0 0 10px; padding-left: 18px; line-height: 1.5; }
+.study-aid-terms { display: grid; gap: 6px; margin: 0 0 10px; }
+.study-aid-terms dt { font-weight: 700; }
+.study-aid-terms dd { margin: 0; color: var(--text-secondary); }
+.study-aid-blanks { display: grid; gap: 8px; margin: 8px 0; }
+.study-aid-blank { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.study-aid-blank input { flex: 1 1 180px; min-width: 0; padding: 7px 10px; border: 1px solid var(--border-subtle); border-radius: 8px; font: inherit; }
+.study-aid-blank em { font-style: normal; font-size: 0.8rem; }
+.study-aid-blank em.correct, .study-aid-feedback.got_it strong { color: var(--success, #2f7d32); }
+.study-aid-blank em.incorrect, .study-aid-feedback.not_yet strong { color: var(--error, #b42318); }
+.study-aid-attempt textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid var(--border-subtle); border-radius: 10px; font: inherit; resize: vertical; }
+.study-aid-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.study-aid-feedback { line-height: 1.5; }
+.study-aid-mix { display: grid; gap: 18px; }
+.cordia-tutor-text { display: block; white-space: pre-wrap; }
