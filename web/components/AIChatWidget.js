@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
+import MermaidDiagram from './MermaidDiagram';
+
+// Tutor replies may include ```mermaid blocks; render them as diagrams and keep the rest as text.
+function TutorMessageText({ text }) {
+  const parts = String(text || '').split(/```mermaid\s*\n([\s\S]*?)```/);
+  if (parts.length === 1) return text;
+  return parts.map((part, index) => (index % 2 === 1
+    ? <MermaidDiagram key={index} code={part.trim()} label="Tutor diagram" />
+    : part.trim() && <span key={index} className="cordia-tutor-text">{part.trim()}</span>));
+}
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const MAX_MESSAGES = 30;
@@ -287,7 +297,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
                 Based on {message.source.title}
               </button>
             )}
-            {message.text}
+            <TutorMessageText text={message.text} />
             {(message.evidence || []).map(item => (
               <button key={item.url} type="button" className="cordia-tutor-evidence" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}>
                 {item.title || item.url}

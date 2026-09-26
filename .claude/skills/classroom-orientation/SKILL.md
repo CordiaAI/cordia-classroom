@@ -31,6 +31,12 @@ npm run build --prefix web
 ```
 Baseline (2026-09-26, main 416e039): 111 Python tests pass, 10/12 node tests pass (2 = env-only Playwright), web build passes. CI green on main.
 
+## Study styles (learning styles, added 2026-09-26)
+- Student picks a VARK style (`learning_preferences` table); per-question aids cached in `study_aids`. Code: `backend/services/learning_styles.py`, `backend/routers/learning.py`, `web/components/StudyAidPanel.js`.
+- Off switch: backend env `LEARNING_STYLES_ENABLED=false` (hides UI, Tutor unchanged). No style chosen = today's behavior.
+- Rules: styles never change the saved guide text, facts, or NCLEX/exam formats; never label the student; Mermaid is always built server-side from validated nodes and rendered with `securityLevel: 'strict'`.
+- Next (release 2): stable concept IDs + delayed Retain recall to score Tutor approaches (+1/0/−1) within the chosen style.
+
 ## State snapshot (2026-09-26 — refresh when stale)
 - Work lands mostly as direct commits to `main` (recent revert pairs for visual redesigns).
 - Draft PR #23 (`claude/wonderful-faraday-1dp3p2`, drop legacy autostudyai.online CORS) is 12 behind; rebase before merging or its diff reverts newer main work.

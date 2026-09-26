@@ -59,9 +59,7 @@ def _build_learning_profile(attempts: list, sessions: list) -> dict:
         "strongest_observed_format": FORMAT_NAMES[strongest[2]] if strongest and ready else None,
         "generation_guidance": guidance,
         "message": (
-            f"Your strongest observed format is {FORMAT_NAMES[strongest[2]]}."
-            if strongest and ready
-            else "Keep using different study modes so Cordia can compare what works."
+            "Cordia is matching question difficulty to your recent Retain results."
             if ready
             else f"Complete {3 - len(scores)} more quiz{'zes' if 3 - len(scores) != 1 else ''} so Cordia can adapt."
         ),

@@ -110,7 +110,7 @@ function MermaidDiagram({ code }) {
     if (!code || !ref.current) return;
     setError(false);
     import('mermaid').then(({ default: mermaid }) => {
-      mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+      mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'strict' });
       const id = 'mermaid-' + Date.now();
       mermaid.render(id, code).then(({ svg }) => {
         if (ref.current) ref.current.innerHTML = svg;
