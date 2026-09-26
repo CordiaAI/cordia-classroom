@@ -31,12 +31,14 @@ export default function PracticeWorkspace() {
   const [guide, setGuide] = useState(null);
   const [upload, setUpload] = useState(null);
   const [problems, setProblems] = useState([]);
+  const [practiceInfo, setPracticeInfo] = useState(null);
   const [problemIndex, setProblemIndex] = useState(0);
   const [tool, setTool] = useState('pen');
   const [workText, setWorkText] = useState({});
   const [tokens, setTokens] = useState({});
   const [answers, setAnswers] = useState({});
   const [revealed, setRevealed] = useState({});
+  const [evaluations, setEvaluations] = useState({});
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
@@ -94,9 +96,11 @@ export default function PracticeWorkspace() {
     });
     if (Array.isArray(data?.problems) && data.problems.length === 10) {
       setProblems(data.problems);
+      setPracticeInfo({ subjectArea: data.subject_area, domain: data.domain, truthNote: data.truth_note });
       setProblemIndex(0);
       setAnswers({});
       setRevealed({});
+      setEvaluations({});
       setTokens({});
       setWorkText({});
       drawings.current = {};
@@ -122,6 +126,7 @@ export default function PracticeWorkspace() {
       if (!response.ok || !data?.text) throw new Error(apiErrorMessage(data?.detail, 'This file could not be read.'));
       setUpload({ title: file.name, content: data.text });
       setProblems([]);
+      setPracticeInfo(null);
       setProblemIndex(0);
       drawings.current = {};
     } catch (uploadError) {
@@ -197,6 +202,23 @@ export default function PracticeWorkspace() {
     setTokens(all => ({ ...all, [problemIndex]: [] }));
   }
 
+  function reviewAnswer(event) {
+    event.preventDefault();
+    if (!current) return;
+    let evaluation = null;
+    if (current.verification?.status === 'verified' && Number.isFinite(Number(current.expected_value))) {
+      const matches = String(answers[problemIndex] || '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi);
+      const submitted = matches?.length ? Number(matches[matches.length - 1]) : NaN;
+      const expected = Number(current.expected_value);
+      const tolerance = Math.max(Number(current.tolerance || 0), Math.abs(expected) * 1e-9, 1e-9);
+      evaluation = Number.isFinite(submitted) && Math.abs(submitted - expected) <= tolerance
+        ? { status: 'correct', message: 'Correct — the result matches the independently checked calculation.' }
+        : { status: 'retry', message: 'Not yet. Compare your setup with the worked solution, then try the next variation.' };
+    }
+    setEvaluations(all => ({ ...all, [problemIndex]: evaluation }));
+    setRevealed(all => ({ ...all, [problemIndex]: true }));
+  }
+
   if (!guide && !error) {
     return <div className="practice-loading"><AILoadingSphere size={92} /><p>Loading practice workspace…</p></div>;
   }
@@ -207,7 +229,7 @@ export default function PracticeWorkspace() {
         <div>
           <button type="button" className="create-back-link" onClick={() => router.push('/guide/' + guideId)}>Back to study guide</button>
           <h1>Practice workspace</h1>
-          <p>Work through 10 source-grounded problems without leaving your material.</p>
+          <p>{practiceInfo?.subjectArea ? `${practiceInfo.subjectArea} practice` : 'Work through 10 source-grounded activities without leaving your material.'}</p>
         </div>
         <div className="practice-source-actions">
           <input ref={fileRef} type="file" hidden accept=".pdf,.docx,.pptx,.txt" onChange={event => useUploadedFile(event.target.files?.[0])} />
@@ -227,7 +249,15 @@ export default function PracticeWorkspace() {
           <div className="practice-problem-heading">
             <div>
               <span>Problem {problems.length ? problemIndex + 1 : 0} of {problems.length || 10}</span>
+              {current?.practice_type && <small className="practice-kind">{current.practice_type.replace('_', ' ')}</small>}
               <h2>{current?.prompt || 'Generate a set to begin.'}</h2>
+              {current?.starter_code && <pre className="practice-code"><code>{current.starter_code}</code></pre>}
+              {current?.test_cases?.length > 0 && (
+                <div className="practice-tests">
+                  <strong>Acceptance tests</strong>
+                  <ul>{current.test_cases.map((test, index) => <li key={index}><code>{test}</code></li>)}</ul>
+                </div>
+              )}
             </div>
             {problems.length > 0 && (
               <div className="practice-nav">
@@ -282,22 +312,34 @@ export default function PracticeWorkspace() {
             <h2>{sourceTitle}</h2>
           </header>
           <div className="practice-source-copy">{sourceText || 'No readable source material is available.'}</div>
-          <form className="practice-answer" onSubmit={event => { event.preventDefault(); if (current) setRevealed(all => ({ ...all, [problemIndex]: true })); }}>
+          <form className="practice-answer" onSubmit={reviewAnswer}>
             <label htmlFor="practice-answer-input">Your answer</label>
             <textarea
               id="practice-answer-input"
               value={answers[problemIndex] || ''}
               onChange={event => setAnswers(all => ({ ...all, [problemIndex]: event.target.value }))}
-              placeholder="Enter your final answer…"
+              placeholder={current?.answer_format || 'Enter your answer and reasoning…'}
               disabled={!current}
             />
-            <button type="submit" className="btn" disabled={!current || !answers[problemIndex]?.trim()}>Check answer</button>
+            <button type="submit" className="btn" disabled={!current || !answers[problemIndex]?.trim()}>
+              {current?.verification?.status === 'verified' ? 'Check answer' : 'Review answer'}
+            </button>
             {revealed[problemIndex] && (
               <div className="practice-solution" role="status">
-                <strong>Expected answer</strong>
+                {evaluations[problemIndex] && (
+                  <div className={`practice-evaluation ${evaluations[problemIndex].status}`}>{evaluations[problemIndex].message}</div>
+                )}
+                <div className="practice-verification-row">
+                  <strong>{current.verification?.label || 'Source-grounded reference'}</strong>
+                  <span>{current.practice_type?.replace('_', ' ')}</span>
+                </div>
                 <p>{current.answer}</p>
+                {current.worked_solution && <p className="practice-worked"><strong>Why:</strong> {current.worked_solution}</p>}
+                {current.source_basis && <blockquote>Source basis: “{current.source_basis}”</blockquote>}
+                {current.verification?.detail && <small>{current.verification.detail}</small>}
               </div>
             )}
+            {practiceInfo?.truthNote && <p className="practice-truth-note">{practiceInfo.truthNote}</p>}
           </form>
         </aside>
       </section>

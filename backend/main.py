@@ -30,7 +30,7 @@ from services.text_processing import (
 from services.llm import (
     generate_notes_ai, generate_study_guide,
     generate_flashcards, answer_question, explain_retain_answer,
-    analyze_images_for_slides, generate_practice_guide,
+    analyze_images_for_slides, generate_practice_guide, generate_verified_practice_set,
     study_guide_is_complete, study_guide_to_flashcards,
 )
 from routers import auth, folders, guides, stats, search, quiz, billing, nclex, exam, feedback, smart_notes, calendar, tutor
@@ -623,13 +623,14 @@ async def create_practice_set(
     content = _sanitize_text(body.content, MAX_CONTENT_LENGTH)
     title = (body.title or "Uploaded study material").strip() or "Uploaded study material"
     source = {"type": "upload", "title": title}
+    domain = ""
 
     if body.guide_id:
         if not re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}', body.guide_id, re.IGNORECASE):
             raise HTTPException(status_code=400, detail="That study guide link is not valid.")
         result = (
             get_supabase().table("study_guides")
-            .select("id,title,study_guide,notes")
+            .select("id,title,study_guide,notes,domain")
             .eq("id", body.guide_id)
             .eq("user_id", user_id)
             .limit(1)
@@ -638,34 +639,36 @@ async def create_practice_set(
         if not result.data:
             raise HTTPException(status_code=404, detail="That study guide is no longer available.")
         guide = result.data[0]
-        content = _sanitize_text(
-            guide.get("study_guide") or _plain_context(guide.get("notes") or ""),
-            MAX_CONTENT_LENGTH,
-        )
+        content = _sanitize_text("\n\n".join(filter(None, [
+            _plain_context(guide.get("notes") or ""),
+            guide.get("study_guide") or "",
+        ])), MAX_CONTENT_LENGTH)
         title = guide.get("title") or "Study Guide"
+        domain = guide.get("domain") or ""
         source = {"type": "study_guide", "id": guide["id"], "title": title}
 
     if not content.strip():
         raise HTTPException(status_code=400, detail="Add a study guide or upload readable study material first.")
 
     usage = check_usage(user_id, "build")
-    generated = await run_in_threadpool(
-        generate_practice_guide,
+    practice = await run_in_threadpool(
+        generate_verified_practice_set,
         content,
         _learning_guidance(user_id),
+        domain,
     )
-    problems = study_guide_to_flashcards(generated or "")
-    if len(problems) < 10:
-        raise HTTPException(status_code=502, detail="Cordia could not create all 10 practice problems. Please try again.")
+    problems = practice.get("problems", []) if isinstance(practice, dict) else []
+    if len(problems) != 10:
+        raise HTTPException(status_code=502, detail="Cordia could not verify a complete 10-problem set from this material. Please try another source or add more detail.")
 
     record_usage(user_id, "build", usage)
     return {
         "title": f"{title} — Practice",
         "source": source,
-        "problems": [
-            {"id": index + 1, "prompt": pair["front"], "answer": pair["back"]}
-            for index, pair in enumerate(problems[:10])
-        ],
+        "subject_area": practice.get("subject_area") or domain or "General study",
+        "domain": practice.get("domain") or domain or "general",
+        "truth_note": practice.get("truth_note"),
+        "problems": problems,
     }
 
 

@@ -134,14 +134,31 @@ class TutorContractTests(unittest.TestCase):
     @patch("main._learning_guidance", return_value="")
     @patch("main.record_usage")
     @patch("main.check_usage", return_value={"used": 0})
-    @patch("main.generate_practice_guide")
+    @patch("main.generate_verified_practice_set")
     @patch("main.get_user_id", return_value="student-1")
     def test_practice_endpoint_returns_exactly_ten_source_grounded_problems(self, _auth, generate, _usage, record, _guidance):
-        generate.return_value = "\n".join(
-            line
-            for index in range(1, 11)
-            for line in (f"Q{index}: Solve source problem {index}.", f"A{index}: Source answer {index}.")
-        )
+        generate.return_value = {
+            "subject_area": "Biology",
+            "domain": "health",
+            "truth_note": "Source-grounded references",
+            "problems": [
+                {
+                    "id": index,
+                    "prompt": f"Apply source concept {index}.",
+                    "answer": f"Source answer {index}.",
+                    "worked_solution": "Use the cited mechanism.",
+                    "source_basis": "Mitosis creates two cells.",
+                    "practice_type": "scenario",
+                    "answer_format": "Explain",
+                    "starter_code": None,
+                    "test_cases": [],
+                    "expected_value": None,
+                    "tolerance": None,
+                    "verification": {"status": "source_grounded", "label": "Source-grounded reference"},
+                }
+                for index in range(1, 11)
+            ],
+        }
         db, _table = self.guide_db()
         with patch("main.get_supabase", return_value=db):
             response = self.client.post(

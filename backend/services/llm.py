@@ -6,6 +6,9 @@ Uses OpenAI GPT-4o for intelligent content processing.
 import os
 import logging
 import re
+import ast
+import json
+import math
 from typing import List, Optional
 try:
     from openai import OpenAI
@@ -432,44 +435,244 @@ def generate_study_guide_from_notes(html_content: str) -> str:
         return "[Error generating study guide]"
 
 
-def generate_practice_guide(context: str, learning_guidance: str = "") -> str:
-    """Create ten source-grounded practice problems in the canonical Q/A format."""
+_PRACTICE_KINDS = {
+    "calculation", "word_problem", "code", "debugging", "scenario",
+    "analysis", "explanation", "design", "recall",
+}
+
+
+def _practice_json(raw: str) -> dict:
+    """Parse one JSON object without accepting prose around it."""
+    raw = (raw or "").strip()
+    if raw.startswith("```"):
+        raw = raw.split("```", 2)[1]
+        if raw.lstrip().startswith("json"):
+            raw = raw.lstrip()[4:]
+    try:
+        parsed = json.loads(raw.strip())
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _normalized_source(value: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", value or "")).strip().casefold()
+
+
+def _safe_numeric_eval(expression: str) -> float:
+    """Evaluate model-supplied arithmetic without names, calls, or code execution."""
+    if not expression or len(expression) > 240:
+        raise ValueError("Invalid calculation")
+    tree = ast.parse(expression, mode="eval")
+
+    def evaluate(node):
+        if isinstance(node, ast.Expression):
+            return evaluate(node.body)
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            return float(node.value)
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+            value = evaluate(node.operand)
+            return value if isinstance(node.op, ast.UAdd) else -value
+        if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow, ast.Mod)):
+            left, right = evaluate(node.left), evaluate(node.right)
+            if isinstance(node.op, ast.Add): return left + right
+            if isinstance(node.op, ast.Sub): return left - right
+            if isinstance(node.op, ast.Mult): return left * right
+            if isinstance(node.op, ast.Div): return left / right
+            if isinstance(node.op, ast.Mod): return left % right
+            if abs(right) > 12 or abs(left) > 1e9:
+                raise ValueError("Unsafe exponent")
+            return left ** right
+        raise ValueError("Unsupported calculation")
+
+    result = evaluate(tree)
+    if not math.isfinite(result) or abs(result) > 1e15:
+        raise ValueError("Invalid calculation result")
+    return result
+
+
+def validate_practice_set(payload: dict, context: str, limit: int = 10) -> dict:
+    """Keep only self-contained items whose cited basis exists in the selected source.
+
+    Numeric answers receive deterministic arithmetic verification. Other domains are
+    explicitly labeled as source-grounded references, never as objectively graded truth.
+    """
+    source = _normalized_source(context)
+    validated = []
+    for candidate in payload.get("problems", []) if isinstance(payload, dict) else []:
+        if not isinstance(candidate, dict):
+            continue
+        prompt = str(candidate.get("prompt") or "").strip()
+        answer = str(candidate.get("answer") or "").strip()
+        solution = str(candidate.get("worked_solution") or "").strip()
+        basis = str(candidate.get("source_basis") or "").strip()
+        if not prompt or not answer or not solution or len(prompt) > 1800 or len(answer) > 2400:
+            continue
+        if len(basis) < 8 or _normalized_source(basis) not in source:
+            continue
+
+        kind = str(candidate.get("practice_type") or "explanation").strip().lower()
+        if kind not in _PRACTICE_KINDS:
+            kind = "explanation"
+        method = str(candidate.get("verification_method") or "source").strip().lower()
+        verification = {
+            "status": "source_grounded",
+            "label": "Source-grounded reference",
+            "detail": "The reference was checked against the cited passage. Judge reasoning against the evidence, not exact wording.",
+        }
+        expected_value = None
+        tolerance = None
+        if method == "calculation":
+            calculation = candidate.get("calculation") or {}
+            try:
+                expected_value = float(calculation.get("expected_value"))
+                tolerance = max(0.0, min(float(calculation.get("tolerance", 0.001)), 1e6))
+                computed = _safe_numeric_eval(str(calculation.get("expression") or ""))
+            except (TypeError, ValueError, ZeroDivisionError, OverflowError):
+                continue
+            if not math.isclose(computed, expected_value, rel_tol=1e-9, abs_tol=max(tolerance, 1e-9)):
+                continue
+            verification = {
+                "status": "verified",
+                "label": "Calculation checked",
+                "detail": "The numeric result was recomputed by Cordia from the supplied values.",
+            }
+        elif method == "code_review":
+            verification = {
+                "status": "review_required",
+                "label": "Test-guided reference",
+                "detail": "The solution is source-grounded and includes tests, but code is not executed on Cordia's server.",
+            }
+
+        tests = candidate.get("test_cases") if isinstance(candidate.get("test_cases"), list) else []
+        validated.append({
+            "id": len(validated) + 1,
+            "prompt": prompt,
+            "answer": answer,
+            "worked_solution": solution,
+            "practice_type": kind,
+            "answer_format": str(candidate.get("answer_format") or "Explain your reasoning").strip()[:180],
+            "source_basis": basis[:500],
+            "starter_code": str(candidate.get("starter_code") or "").strip()[:6000] or None,
+            "test_cases": [str(test).strip()[:500] for test in tests[:6] if str(test).strip()],
+            "expected_value": expected_value,
+            "tolerance": tolerance,
+            "verification": verification,
+        })
+        if len(validated) == limit:
+            break
+
+    return {
+        "subject_area": str(payload.get("subject_area") or "General study").strip()[:100],
+        "domain": str(payload.get("domain") or "general").strip()[:50],
+        "problems": validated,
+        "truth_note": (
+            "Cordia only marks deterministic calculations as correct or incorrect. "
+            "Conceptual and code responses use source-grounded references so the app does not pretend a model judgment is known truth. "
+            "Those references inherit the accuracy of the selected material."
+        ),
+    }
+
+
+def generate_verified_practice_set(context: str, learning_guidance: str = "", domain: str = "") -> dict:
+    """Generate, independently review, and locally validate a universal practice set."""
     client = get_openai_client()
     if not client:
-        return "[Error: OpenAI API key not configured]"
+        return {}
 
     guidance = (
         f"\nAdapt the presentation using this learning guidance: {learning_guidance}"
         if learning_guidance else ""
     )
-    prompt = f"""Create exactly 10 practice problems or realistic scenarios from the source material below.
-Match the work to the subject: calculations and derivations for math, engineering, chemistry, finance, or accounting; code or debugging tasks for computing; and applied scenarios for conceptual material.
-Each problem must be solvable from the source. You may vary numbers when the source provides the method, but include every value needed to solve the problem.
-Include one concise answer that shows the essential reasoning. Do not introduce unsupported facts.{guidance}
+    domain_hint = domain or "infer the academic or professional area from the source"
+    prompt = f"""Create 14 candidate practice activities from the selected learning material.
+The declared domain is: {domain_hint}.
+
+Adapt the actual work to the field:
+- mathematics, physics, chemistry, finance, and quantitative engineering: calculations, derivations, error analysis, and self-contained word problems, even when the source is theoretical;
+- computing: code writing, debugging, output tracing, algorithm choice, and tests; put code in starter_code rather than prose;
+- engineering: design decisions, constraints, trade-offs, calculations, and realistic word problems;
+- health sciences: source-bounded cases, prioritization, and mechanism reasoning; never invent clinical guidance;
+- law, business, and social science: source-bounded scenarios, decisions, arguments, and evidence analysis;
+- humanities and languages: interpretation, comparison, production, correction, and evidence-based explanation;
+- any other field: reproduce the authentic action a learner or practitioner performs, not a disguised definition quiz.
+
+Every activity must be answerable from the SOURCE plus values explicitly supplied in its prompt. When the source only provides theory, create an application that uses that theory without inventing external facts. Include a short VERBATIM source excerpt in source_basis. For a numeric item, provide a plain arithmetic expression using only numbers and + - * / ** ( ) that recomputes the expected value. For code, include starter code, a reference solution, and concrete test cases, but use code_review because the server will not execute generated code. Conceptual answers must use a rubric/reference and source verification, not claims of exact grading.{guidance}
 
 SOURCE:
 {context[:25000]}
 
-Return only this repeated format:
-Q1: [practice problem]
-A1: [source-grounded answer and essential reasoning on one line]
-Continue through Q10/A10. Do not return fewer or more than 10 pairs.
+Return one JSON object only:
+{{
+  "subject_area": "specific field",
+  "domain": "quantitative|computing|engineering|health|law|business|humanities|language|general",
+  "problems": [{{
+    "practice_type": "calculation|word_problem|code|debugging|scenario|analysis|explanation|design|recall",
+    "prompt": "self-contained task",
+    "answer_format": "what the student should submit",
+    "answer": "reference or exact answer",
+    "worked_solution": "steps and reasoning",
+    "source_basis": "short verbatim excerpt from SOURCE",
+    "verification_method": "calculation|source|code_review|rubric",
+    "calculation": {{"expression": "(12*4)/3", "expected_value": 16, "tolerance": 0.001}},
+    "starter_code": null,
+    "test_cases": []
+  }}]
+}}
 """
     try:
-        response = client.chat.completions.create(
+        draft_response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You create rigorous, source-grounded practice problems for students."},
+                {"role": "system", "content": "You design authentic practice for any academic or professional field. Return valid JSON only."},
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=4000,
-            temperature=0.2,
+            response_format={"type": "json_object"},
+            max_tokens=9000,
+            temperature=0.35,
         )
-        result, _ = _postprocess_study_guide(response.choices[0].message.content.strip())
-        return result if re.search(r'^Q\d+:', result, re.MULTILINE) else "[Error generating practice guide]"
+        draft = _practice_json(draft_response.choices[0].message.content)
+        if not draft.get("problems"):
+            return {}
+
+        review_prompt = f"""Audit these candidate practice activities against the source.
+Correct an answer only when the source and supplied prompt values establish it. Reject any item that needs outside facts, cites a non-verbatim source_basis, is ambiguous, or claims objective correctness without a deterministic calculation. Preserve authentic code, math, engineering, scenario, and analysis practice. Return the best 10 items using the exact same JSON structure. Do not merely approve the draft.
+
+SOURCE:
+{context[:25000]}
+
+CANDIDATES:
+{json.dumps(draft, ensure_ascii=False)[:26000]}
+"""
+        review_response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are an independent answer-key auditor. Reject unsupported certainty. Return valid JSON only."},
+                {"role": "user", "content": review_prompt},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=9000,
+            temperature=0,
+        )
+        reviewed = _practice_json(review_response.choices[0].message.content)
+        result = validate_practice_set(reviewed, context, limit=10)
+        return result if len(result["problems"]) == 10 else {}
     except Exception as e:
-        logger.error(f"Error generating practice guide: {e}")
+        logger.error(f"Error generating verified practice set: {e}")
+        return {}
+
+
+def generate_practice_guide(context: str, learning_guidance: str = "") -> str:
+    """Compatibility wrapper for Tutor-created practice guides."""
+    practice = generate_verified_practice_set(context, learning_guidance)
+    if not practice.get("problems"):
         return "[Error generating practice guide]"
+    lines = []
+    for index, problem in enumerate(practice["problems"], start=1):
+        prompt = re.sub(r"\s+", " ", problem["prompt"]).strip()
+        answer = re.sub(r"\s+", " ", f"{problem['answer']} {problem['worked_solution']}").strip()
+        lines.extend((f"Q{index}: {prompt}", f"A{index}: {answer}"))
+    return "\n".join(lines)
 
 
 def study_guide_to_flashcards(content: str) -> list:

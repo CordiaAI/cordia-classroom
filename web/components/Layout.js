@@ -7,7 +7,8 @@ import { useRouter } from 'next/router';
 
 export default function Layout({ children, timerState, setTimerState }) {
   const router = useRouter();
-  const pageOwnsTools = ['/dashboard', '/smartnotes', '/flashcards', '/create'].includes(router.pathname);
+  const pageOwnsTools = ['/dashboard', '/smartnotes', '/flashcards', '/create'].includes(router.pathname)
+    || router.pathname.startsWith('/practice');
   const pageOwnsTutor = router.pathname === '/dashboard'
     && (!router.query.view || router.query.view === 'guides');
   const activeGuideId = router.query.guideId || (router.pathname === '/guide/[id]' ? router.query.id : '');

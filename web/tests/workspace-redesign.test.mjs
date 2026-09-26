@@ -8,7 +8,16 @@ test('top navigation exposes focused study destinations without a separate Class
   const sidebar = await source('components/Sidebar.js');
   const labels = [...sidebar.matchAll(/\{ label: '([^']+)'/g)].map(match => match[1]);
 
-  assert.deepEqual(labels, ['Dashboard', 'Study Guides', 'Calendar', 'SmartNotes']);
+  assert.deepEqual(labels, ['Dashboard', 'Study Guides', 'Calendar', 'SmartNotes', 'Practice']);
+});
+
+test('Practice is a visible hub that reuses the existing study modes', async () => {
+  const practice = await source('pages/practice/index.js');
+
+  assert.match(practice, /Turn studying into doing/);
+  assert.match(practice, /router\.push\(`\/practice\/\$\{selectedGuide\.id\}`\)/);
+  assert.match(practice, /router\.push\(`\/flashcards\/study\?guideId=\$\{selectedGuide\.id\}`\)/);
+  assert.match(practice, /router\.push\(`\/quiz\/\$\{selectedGuide\.id\}`\)/);
 });
 
 test('dashboard routes use the shared workspace and retire the separate Classes view', async () => {

@@ -82,6 +82,34 @@ export default function ClassroomVisualSystem() {
         -webkit-backdrop-filter: blur(30px) saturate(1.25) !important;
       }
 
+      :root:not([data-theme="dark"]) :is(
+      .profile-menu,
+      .account-menu-panel,
+      .class-guide-popover,
+      .modal,
+      .sn-modal,
+      .feedback-modal,
+      .upgrade-dialog,
+      .oauth-callback-card) {
+        background: #ffffff !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
+      [data-theme="dark"] :is(
+      .profile-menu,
+      .account-menu-panel,
+      .class-guide-popover,
+      .modal,
+      .sn-modal,
+      .feedback-modal,
+      .upgrade-dialog,
+      .oauth-callback-card) {
+        background: var(--surface-raised) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+      }
+
       .btn,
       .overview-primary,
       .feedback-header-button,
