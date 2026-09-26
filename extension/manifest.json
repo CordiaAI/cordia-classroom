@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CordiaClassroom",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "description": "Capture study material and create a CordiaClassroom study guide.",
   "homepage_url": "https://classroom.cordiacode.com",
   "minimum_chrome_version": "114",
