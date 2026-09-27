@@ -18,6 +18,10 @@ export default function ClassroomVisualSystem() {
         --line: rgba(17, 18, 15, 0.13);
         --border-default: rgba(17, 18, 15, 0.13);
         --border-subtle: rgba(17, 18, 15, 0.09);
+        --muted-ink: #3f423b;
+        --text-secondary: #2f322c;
+        --window-outline: #11120f;
+        --window-shadow: 0 2px 0 rgba(17, 18, 15, 0.9), 0 14px 30px rgba(17, 18, 15, 0.16);
       }
 
       body,
@@ -74,10 +78,18 @@ export default function ClassroomVisualSystem() {
       .sn-modal,
       .feedback-modal,
       .upgrade-dialog,
-      .oauth-callback-card) {
+      .oauth-callback-card,
+      .study-rail-card,
+      .practice-problem-panel,
+      .dashboard-class-rail,
+      .quiz-card,
+      .nclex-card,
+      .sn-card,
+      .flashcard,
+      .extension-install-step) {
         background: rgba(255, 255, 255, 0.70) !important;
-        border-color: rgba(17, 18, 15, 0.14) !important;
-        box-shadow: 0 18px 52px rgba(17, 18, 15, 0.10) !important;
+        border: 1px solid var(--window-outline) !important;
+        box-shadow: var(--window-shadow) !important;
         backdrop-filter: blur(30px) saturate(1.25) !important;
         -webkit-backdrop-filter: blur(30px) saturate(1.25) !important;
       }
@@ -186,6 +198,12 @@ export default function ClassroomVisualSystem() {
 
       .dashboard-workspace-grid.without-classes .dashboard-center-column {
         padding-left: 74px;
+      }
+
+      /* Room for window shadows so the scrolling rail never clips them into a grey band. */
+      .dashboard-study-rail {
+        background: transparent !important;
+        padding: 4px 10px 18px 4px;
       }
 
       .overview-snapshot {

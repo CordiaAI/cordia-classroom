@@ -90,8 +90,7 @@ export default function GuidePage() {
 
   if (!guide) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 16 }}>
-      <AILoadingSphere size={100} />
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.9em' }}>Loading study guide...</p>
+      <AILoadingSphere />
     </div>
   );
 
