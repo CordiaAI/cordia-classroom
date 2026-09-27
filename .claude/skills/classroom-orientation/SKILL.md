@@ -42,6 +42,12 @@ Baseline (2026-09-26, main 416e039): 111 Python tests pass, 10/12 node tests pas
 - Two steps: `classify_practice_area` picks an area from `backend/services/practice_areas.py`, then `generate_verified_practice_set` generates 10 problems with that area's system prompt. New area = new dict entry.
 - The model **interprets** the material. Never gate problems on word-for-word citation matching; Jackson rejected that ("no production app does verbatim match"). Only numeric answers get a deterministic recompute, and a mismatch downgrades to "reference", never drops the item.
 
+## Backend rules learned in production (2026-09-27)
+- One uvicorn worker, 1 CPU: an `async def` route that calls OpenAI/Supabase/parsing synchronously freezes every other request. Use plain `def` (FastAPI threads it) or `run_in_threadpool`.
+- Parse model JSON with `response_format={"type": "json_object"}` or `_loads_model_json`; math guides contain LaTeX backslashes that break plain `json.loads`.
+- Dates shown to users must use the client's `tz_offset`; server `date.today()` is UTC.
+- Schema drift check: compare code `.select/.eq/insert` columns against `information_schema.columns` (Supabase MCP) whenever a route 500s with `42703`.
+
 ## State snapshot (2026-09-26 — refresh when stale)
 - Work lands mostly as direct commits to `main` (recent revert pairs for visual redesigns).
 - Draft PR #23 (`claude/wonderful-faraday-1dp3p2`, drop legacy autostudyai.online CORS) is 12 behind; rebase before merging or its diff reverts newer main work.
