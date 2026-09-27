@@ -54,6 +54,12 @@ Baseline (2026-09-26, main 416e039): 111 Python tests pass, 10/12 node tests pas
 - Dates shown to users must use the client's `tz_offset`; server `date.today()` is UTC.
 - Schema drift check: compare code `.select/.eq/insert` columns against `information_schema.columns` (Supabase MCP) whenever a route 500s with `42703`.
 
+## Extension capture rules (audit 2026-09-27)
+- Capture order in `extension/content.js`: selection → embedded document (iframe/embed/object, or the tab itself) → page text if ≥400 chars → linked document (nav/header/footer links ignored). Text reading walks open shadow roots and same-origin frames; `background.js` adds cross-origin frame text for thin pages.
+- Any capture change must pass `tests/extension-capture-matrix.test.cjs` (real extension, 13 LMS-shaped pages). In cloud sessions run it with `executablePath: '/opt/pw-browsers/chromium'` and `--headless=new` (CI uses `channel: 'chromium'`).
+- A document the extension found but can't use must error clearly, never silently become a screenshot. Scanned PDFs are OCR'd server-side (`transcribe_document_pages`).
+- Bump `extension/manifest.json` version and `tests/extension-load.test.cjs` together; Web Store upload is a zip with `manifest.json` at the root.
+
 ## State snapshot (2026-09-26 — refresh when stale)
 - Work lands mostly as direct commits to `main` (recent revert pairs for visual redesigns).
 - Draft PR #23 (`claude/wonderful-faraday-1dp3p2`, drop legacy autostudyai.online CORS) is 12 behind; rebase before merging or its diff reverts newer main work.
