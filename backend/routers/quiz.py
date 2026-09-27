@@ -115,6 +115,18 @@ def _balanced_distractors(answer: str, generated: list, fallback: list) -> list:
     return accepted[:3]
 
 
+def _save_quiz(supabase, guide_id: str, user_id: str, questions: list) -> None:
+    """Attach the quiz to its guide so returning to Retain shows the same questions."""
+    try:
+        supabase.table("study_guides") \
+            .update({"quiz_questions": questions}) \
+            .eq("id", guide_id) \
+            .eq("user_id", user_id) \
+            .execute()
+    except Exception as cache_err:
+        logger.warning(f"Failed to cache quiz questions for guide {guide_id}: {cache_err}")
+
+
 def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False):
     """Load or generate a Retain quiz, optionally replacing saved distractors."""
     try:
@@ -133,9 +145,9 @@ def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False)
 
         plan = get_user_plan(user_id)["plan"]
 
-        # A paid quiz is generated once, then remains attached to its guide.
+        # A quiz is generated once, then stays attached to its guide until the user regenerates it.
         cached = result.data[0].get("quiz_questions")
-        if plan == "classroom_plus" and cached and not regenerate:
+        if cached and not regenerate:
             return {"questions": cached}
 
         study_guide_text = result.data[0].get("study_guide", "")
@@ -155,6 +167,7 @@ def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False)
                     status_code=400,
                     detail="At least two distinct study-guide answers are needed for Retain",
                 )
+            _save_quiz(supabase, guide_id, user_id, questions)
             return {"questions": questions}
 
         usage = check_usage(user_id, "lightweight")
@@ -165,7 +178,7 @@ def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False)
         qa_text = "\n".join(f"Q: {p['question']}\nA: {p['answer']}" for p in qa_pairs)
 
         prompt = f"""For each Q&A pair below, generate exactly 3 plausible but WRONG answer choices.
-Return as JSON array where each element has:
+Return a JSON object {{"items": [...]}} with one element per Q&A pair, in order, where each element has:
 - "distractors": [wrong1, wrong2, wrong3]
 
 CRITICAL RULES — follow every one:
@@ -177,7 +190,7 @@ CRITICAL RULES — follow every one:
 
 {qa_text}
 
-Return ONLY a JSON array, no other text:"""
+Return ONLY the JSON object, no other text:"""
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -187,21 +200,24 @@ Return ONLY a JSON array, no other text:"""
             ],
             max_tokens=4096,
             temperature=0.5,
+            response_format={"type": "json_object"},
         )
 
-        raw = response.choices[0].message.content.strip()
-        json_match = re.search(r'\[.*\]', raw, re.DOTALL)
-        if not json_match:
-            raise HTTPException(status_code=500, detail="Failed to generate quiz options")
-
-        distractors_list = json.loads(json_match.group())
+        # JSON mode keeps escaping valid (e.g. LaTeX backslashes in math guides).
+        # If the AI reply is still unusable, fall back to guide-derived options instead of failing.
+        try:
+            distractors_list = json.loads(response.choices[0].message.content or "{}").get("items", [])
+        except (json.JSONDecodeError, AttributeError):
+            logger.warning(f"Unusable distractor JSON for guide {guide_id}; using guide-derived options")
+            distractors_list = []
+        if not isinstance(distractors_list, list):
+            distractors_list = []
 
         questions = []
         for i, pair in enumerate(qa_pairs):
-            if i >= len(distractors_list):
-                break
             correct_answer = pair["answer"]
-            generated = distractors_list[i].get("distractors", [])
+            item = distractors_list[i] if i < len(distractors_list) and isinstance(distractors_list[i], dict) else {}
+            generated = item.get("distractors", [])
             if not isinstance(generated, list):
                 generated = []
             distractors = _balanced_distractors(
@@ -223,15 +239,9 @@ Return ONLY a JSON array, no other text:"""
         if not questions:
             raise HTTPException(status_code=502, detail="Could not create balanced Retain options")
 
-        # Cache generated questions so future Retain clicks load instantly
-        try:
-            supabase.table("study_guides") \
-                .update({"quiz_questions": questions}) \
-                .eq("id", guide_id) \
-                .eq("user_id", user_id) \
-                .execute()
-        except Exception as cache_err:
-            logger.warning(f"Failed to cache quiz questions for guide {guide_id}: {cache_err}")
+        # Never cache the fallback, so the next visit retries the AI distractors.
+        if distractors_list:
+            _save_quiz(supabase, guide_id, user_id, questions)
 
         record_usage(user_id, "lightweight", usage)
         return {"questions": questions}

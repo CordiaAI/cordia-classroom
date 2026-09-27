@@ -248,7 +248,7 @@ async def render_pptx(request: Request, file: UploadFile = None, authorization: 
 
 @app.post("/extract-file-text")
 @limiter.limit("20/minute")
-async def extract_file_text(request: Request, file: UploadFile = None, authorization: str = Header(default="")):
+def extract_file_text(request: Request, file: UploadFile = None, authorization: str = Header(default="")):
     """Extract plain text from uploaded PDF, DOCX, PPTX, or TXT file."""
     import io
     try:
@@ -257,7 +257,7 @@ async def extract_file_text(request: Request, file: UploadFile = None, authoriza
             raise HTTPException(status_code=400, detail="No file uploaded")
 
         filename = (file.filename or "").lower()
-        content_bytes = await file.read()
+        content_bytes = file.file.read()
 
         if len(content_bytes) > 20 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File too large (max 20MB)")
@@ -429,7 +429,7 @@ def list_domains():
 
 @app.post("/ingest", response_model=IngestResponse)
 @limiter.limit("30/minute")
-async def ingest(body: IngestRequest, request: Request, authorization: str = Header(default="")):
+def ingest(body: IngestRequest, request: Request, authorization: str = Header(default="")):
     """
     Ingest page content for processing.
     Requires authentication. Rate limited.
@@ -502,7 +502,7 @@ async def ingest(body: IngestRequest, request: Request, authorization: str = Hea
 
 @app.post("/generate", response_model=GenerateResponse)
 @limiter.limit("15/minute")
-async def generate(body: GenerateRequest, request: Request, authorization: str = Header(default="")):
+def generate(body: GenerateRequest, request: Request, authorization: str = Header(default="")):
     """
     Generate study materials from ingested content.
     Requires authentication. Rate limited.
@@ -684,7 +684,7 @@ async def create_practice_set(
 
 @app.post("/chat", response_model=ChatResponse)
 @limiter.limit("30/minute")
-async def chat(body: ChatRequest, request: Request, authorization: str = Header(default="")):
+def chat(body: ChatRequest, request: Request, authorization: str = Header(default="")):
     """
     Answer questions about the content.
     Requires authentication. Rate limited.

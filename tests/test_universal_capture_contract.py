@@ -40,13 +40,13 @@ class UniversalCaptureContractTests(unittest.TestCase):
 
     def test_image_only_ingest_uses_vision_before_building_review_sections(self):
         source = (ROOT / "backend" / "main.py").read_text(encoding="utf-8")
-        ingest = source[source.index("async def ingest"):source.index("@app.post(\"/generate\"")]
+        ingest = source[source.index("def ingest("):source.index("@app.post(\"/generate\"")]
         self.assertIn("analyze_images_for_slides(images_data", ingest)
         self.assertLess(ingest.index("analyze_images_for_slides(images_data"), ingest.index("build_review_sections(content)"))
 
     def test_screenshot_vision_output_is_not_reanalyzed_during_generation(self):
         source = (ROOT / "backend" / "main.py").read_text(encoding="utf-8")
-        ingest = source[source.index("async def ingest"):source.index("@app.post(\"/generate\"")]
+        ingest = source[source.index("def ingest("):source.index("@app.post(\"/generate\"")]
         self.assertIn("images_data = []", ingest)
 
     @patch("main.get_user_id", return_value="student-1")

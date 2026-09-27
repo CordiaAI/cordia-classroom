@@ -5,11 +5,10 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from services.llm import validate_practice_set
+from services.llm import _loads_model_json, validate_practice_set
 
 
 class PracticeContractTests(unittest.TestCase):
-    source = "Ohm's law states that voltage equals current multiplied by resistance. A stack uses last-in, first-out order."
 
     def problem(self, **updates):
         item = {
@@ -28,18 +27,23 @@ class PracticeContractTests(unittest.TestCase):
         return item
 
     def test_numeric_answer_is_verified_by_local_calculation(self):
-        result = validate_practice_set({"subject_area": "Electrical engineering", "problems": [self.problem()]}, self.source)
+        result = validate_practice_set({"subject_area": "Electrical engineering", "problems": [self.problem()]})
         problem = result["problems"][0]
         self.assertEqual(problem["verification"]["status"], "verified")
         self.assertEqual(problem["expected_value"], 12.0)
 
-    def test_incorrect_numeric_key_is_rejected(self):
+    def test_mismatched_numeric_key_is_kept_but_not_auto_graded(self):
         problem = self.problem(calculation={"expression": "3*4", "expected_value": 14, "tolerance": 0.001})
-        result = validate_practice_set({"problems": [problem]}, self.source)
-        self.assertEqual(result["problems"], [])
+        result = validate_practice_set({"problems": [problem]})
+        self.assertEqual(result["problems"][0]["verification"]["status"], "reference")
+        self.assertIsNone(result["problems"][0]["expected_value"])
 
-    def test_unsupported_source_basis_is_rejected(self):
-        result = validate_practice_set({"problems": [self.problem(source_basis="Kirchhoff's current law")]}, self.source)
+    def test_source_basis_is_not_required_to_match_material_verbatim(self):
+        result = validate_practice_set({"problems": [self.problem(source_basis="Ohm's law applied to a resistor")]})
+        self.assertEqual(len(result["problems"]), 1)
+
+    def test_incomplete_problem_is_dropped(self):
+        result = validate_practice_set({"problems": [self.problem(worked_solution="")]})
         self.assertEqual(result["problems"], [])
 
     def test_code_is_test_guided_not_falsely_marked_verified(self):
@@ -54,9 +58,15 @@ class PracticeContractTests(unittest.TestCase):
             starter_code="def pop(items):\n    pass",
             test_cases=["pop([1, 2]) == 2"],
         )
-        result = validate_practice_set({"problems": [problem]}, self.source)
+        result = validate_practice_set({"problems": [problem]})
         self.assertEqual(result["problems"][0]["verification"]["status"], "review_required")
 
+
+class ModelJsonTests(unittest.TestCase):
+    def test_unescaped_latex_backslashes_parse(self):
+        raw = r'[{"stem": "Given \( a \) and \\( b \\)\n", "q": "\"x\""}]'
+        self.assertEqual(_loads_model_json(raw)[0]["stem"], "Given \\( a \\) and \\( b \\)\n")
+        self.assertEqual(_loads_model_json(raw)[0]["q"], '"x"')
 
 if __name__ == "__main__":
     unittest.main()
