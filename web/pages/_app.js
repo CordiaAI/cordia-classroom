@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import { scheduleProactiveRefresh, getToken } from '../lib/api';
+import { Analytics } from '@vercel/analytics/react';
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
@@ -38,7 +39,7 @@ export default function App({ Component, pageProps }) {
   );
 
   if (isLoginPage) {
-    return <>{brandHead}<Component {...pageProps} /></>;
+    return <>{brandHead}<Component {...pageProps} /><Analytics /></>;
   }
 
   return (
@@ -47,6 +48,7 @@ export default function App({ Component, pageProps }) {
       <Layout timerState={timerState} setTimerState={setTimerState}>
         <Component {...pageProps} timerState={timerState} setTimerState={setTimerState} />
       </Layout>
+      <Analytics />
     </>
   );
 }
