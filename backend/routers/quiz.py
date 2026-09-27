@@ -115,6 +115,18 @@ def _balanced_distractors(answer: str, generated: list, fallback: list) -> list:
     return accepted[:3]
 
 
+def _save_quiz(supabase, guide_id: str, user_id: str, questions: list) -> None:
+    """Attach the quiz to its guide so returning to Retain shows the same questions."""
+    try:
+        supabase.table("study_guides") \
+            .update({"quiz_questions": questions}) \
+            .eq("id", guide_id) \
+            .eq("user_id", user_id) \
+            .execute()
+    except Exception as cache_err:
+        logger.warning(f"Failed to cache quiz questions for guide {guide_id}: {cache_err}")
+
+
 def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False):
     """Load or generate a Retain quiz, optionally replacing saved distractors."""
     try:
@@ -133,9 +145,9 @@ def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False)
 
         plan = get_user_plan(user_id)["plan"]
 
-        # A paid quiz is generated once, then remains attached to its guide.
+        # A quiz is generated once, then stays attached to its guide until the user regenerates it.
         cached = result.data[0].get("quiz_questions")
-        if plan == "classroom_plus" and cached and not regenerate:
+        if cached and not regenerate:
             return {"questions": cached}
 
         study_guide_text = result.data[0].get("study_guide", "")
@@ -155,6 +167,7 @@ def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False)
                     status_code=400,
                     detail="At least two distinct study-guide answers are needed for Retain",
                 )
+            _save_quiz(supabase, guide_id, user_id, questions)
             return {"questions": questions}
 
         usage = check_usage(user_id, "lightweight")
@@ -226,16 +239,9 @@ Return ONLY the JSON object, no other text:"""
         if not questions:
             raise HTTPException(status_code=502, detail="Could not create balanced Retain options")
 
-        # Cache AI-built questions so future Retain clicks load instantly (never cache the fallback).
+        # Never cache the fallback, so the next visit retries the AI distractors.
         if distractors_list:
-            try:
-                supabase.table("study_guides") \
-                    .update({"quiz_questions": questions}) \
-                    .eq("id", guide_id) \
-                    .eq("user_id", user_id) \
-                    .execute()
-            except Exception as cache_err:
-                logger.warning(f"Failed to cache quiz questions for guide {guide_id}: {cache_err}")
+            _save_quiz(supabase, guide_id, user_id, questions)
 
         record_usage(user_id, "lightweight", usage)
         return {"questions": questions}

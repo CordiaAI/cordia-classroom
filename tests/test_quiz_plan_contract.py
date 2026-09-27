@@ -40,8 +40,8 @@ class QuizPlanContractTests(unittest.TestCase):
         database.table.return_value = query
         return database, query
 
-    def test_free_quiz_uses_other_guide_answers_without_ai_or_cache_write(self):
-        database, query = self._database({"study_guide": GUIDE, "quiz_questions": [{"old": True}]})
+    def test_free_quiz_uses_other_guide_answers_and_saves_it(self):
+        database, query = self._database({"study_guide": GUIDE, "quiz_questions": None})
         with patch.object(quiz, "get_user_id", return_value="student-1"), \
              patch.object(quiz, "get_supabase", return_value=database), \
              patch.object(quiz, "get_user_plan", return_value={"plan": "free"}), \
@@ -52,8 +52,19 @@ class QuizPlanContractTests(unittest.TestCase):
         first = result["questions"][0]
         self.assertEqual(set(first["options"]), {"Alpha", "Beta", "Gamma", "Delta"})
         self.assertEqual(first["options"][first["correct_index"]], "Alpha")
-        self.assertIsNone(query.updated)
+        self.assertEqual(query.updated, {"quiz_questions": result["questions"]})
         openai.assert_not_called()
+
+    def test_free_quiz_reuses_the_saved_quiz(self):
+        cached = [{"question": "Saved?", "options": ["Yes", "No"], "correct_index": 0}]
+        database, query = self._database({"study_guide": GUIDE, "quiz_questions": cached})
+        with patch.object(quiz, "get_user_id", return_value="student-1"), \
+             patch.object(quiz, "get_supabase", return_value=database), \
+             patch.object(quiz, "get_user_plan", return_value={"plan": "free"}):
+            result = quiz.generate_quiz(GUIDE_ID, "Bearer token")
+
+        self.assertEqual(result["questions"], cached)
+        self.assertIsNone(query.updated)
 
     def test_length_outliers_are_replaced_with_balanced_guide_answers(self):
         distractors = quiz._balanced_distractors(
