@@ -2,6 +2,7 @@
 
 import os
 import re
+import json
 import html
 import logging
 import traceback
@@ -19,7 +20,8 @@ from starlette.concurrency import run_in_threadpool
 from schemas import (
     IngestRequest, IngestResponse,
     GenerateRequest, GenerateResponse,
-    ChatRequest, ChatResponse, PracticeRequest, PracticeGradeRequest
+    ChatRequest, ChatResponse, PracticeRequest, PracticeGradeRequest,
+    PracticeProgressRequest, PracticeRecognizeRequest,
 )
 from services.text_processing import (
     clean_text, chunk_text,
@@ -30,7 +32,7 @@ from services.text_processing import (
 from services.llm import (
     generate_notes_ai, generate_study_guide,
     generate_flashcards, answer_question, explain_retain_answer,
-    analyze_images_for_slides, generate_practice_guide, generate_verified_practice_set, grade_practice_answer,
+    analyze_images_for_slides, generate_practice_guide, generate_verified_practice_set, grade_practice_answer, recognize_handwriting,
     study_guide_is_complete, study_guide_to_flashcards,
 )
 from routers import auth, folders, guides, stats, search, quiz, billing, nclex, exam, feedback, smart_notes, calendar, tutor, learning
@@ -44,6 +46,7 @@ from services.pptx_rendering import (
     render_pptx_to_pdf,
 )
 from services.tutor_sessions import (
+    append_tutor_message,
     claim_tutor_turn,
     complete_tutor_turn,
     fail_tutor_turn,
@@ -670,7 +673,7 @@ async def create_practice_set(
         raise HTTPException(status_code=502, detail="Cordia could not verify a complete 10-problem set from this material. Please try another source or add more detail.")
 
     record_usage(user_id, "build", usage)
-    return {
+    practice_set = {
         "title": f"{title} — Practice",
         "source": source,
         "subject_area": practice.get("subject_area") or domain or "General study",
@@ -678,17 +681,70 @@ async def create_practice_set(
         "truth_note": practice.get("truth_note"),
         "problems": problems,
     }
+    if source.get("type") == "study_guide":
+        # A new set replaces the guide's saved set and clears its progress.
+        get_supabase().table("study_guides").update({"practice_state": {**practice_set, "progress": {}}}) \
+            .eq("id", source["id"]).eq("user_id", user_id).execute()
+    return practice_set
+
+
+def _owned_guide_practice(guide_id: str, user_id: str):
+    if not re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}', guide_id or "", re.IGNORECASE):
+        raise HTTPException(status_code=400, detail="That study guide link is not valid.")
+    result = get_supabase().table("study_guides").select("id, practice_state") \
+        .eq("id", guide_id).eq("user_id", user_id).limit(1).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="That study guide is no longer available.")
+    return result.data[0].get("practice_state")
+
+
+@app.get("/practice/{guide_id}/state")
+def get_practice_state(guide_id: str, authorization: str = Header(default="")):
+    """Return the guide's saved practice set and progress, or null when none exists."""
+    return {"practice": _owned_guide_practice(guide_id, get_user_id(authorization))}
+
+
+@app.put("/practice/{guide_id}/state")
+@limiter.limit("120/minute")
+def save_practice_progress(guide_id: str, body: PracticeProgressRequest, request: Request, authorization: str = Header(default="")):
+    """Save answers, results, and typed work for the guide's current practice set."""
+    user_id = get_user_id(authorization)
+    practice = _owned_guide_practice(guide_id, user_id)
+    if not practice:
+        raise HTTPException(status_code=404, detail="Generate a practice set first.")
+    if len(json.dumps(body.progress)) > 200_000:
+        raise HTTPException(status_code=413, detail="Practice progress is too large to save.")
+    get_supabase().table("study_guides").update({"practice_state": {**practice, "progress": body.progress}}) \
+        .eq("id", guide_id).eq("user_id", user_id).execute()
+    return {"saved": True}
 
 
 @app.post("/practice/grade")
 @limiter.limit("60/minute")
 def grade_practice(body: PracticeGradeRequest, request: Request, authorization: str = Header(default="")):
     """Mark one practice answer right or wrong, with an explanation when it is wrong."""
-    get_user_id(authorization)
-    result = grade_practice_answer(body.prompt, body.reference, body.worked_solution, body.student_answer)
+    user_id = get_user_id(authorization)
+    result = grade_practice_answer(body.prompt, body.reference, body.worked_solution, body.student_answer, body.work)
     if not result:
         raise HTTPException(status_code=502, detail="Cordia could not check this answer. Please try again.")
+    if not result["correct"] and result["explanation"]:
+        # The Tutor replies to a missed answer; the page only shows Right / Not quite.
+        try:
+            append_tutor_message(user_id, result["explanation"])
+        except Exception as e:
+            logger.warning(f"Could not post practice feedback to Tutor: {e}")
     return result
+
+
+@app.post("/practice/recognize")
+@limiter.limit("20/minute")
+def recognize_practice_handwriting(body: PracticeRecognizeRequest, request: Request, authorization: str = Header(default="")):
+    """Turn a drawing from the practice workspace into clean typed text."""
+    get_user_id(authorization)
+    text = recognize_handwriting(body.image)
+    if text is None:
+        raise HTTPException(status_code=502, detail="Cordia could not read this drawing. Please try again.")
+    return {"text": text}
 
 
 @app.post("/chat", response_model=ChatResponse)

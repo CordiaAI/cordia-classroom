@@ -5,7 +5,8 @@ import { useRequireAuth } from '../../lib/auth';
 import AILoadingSphere from '../../components/AILoadingSphere';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const SYMBOLS = ['+', '−', '×', '÷', '=', 'x²', '√', 'Σ', '→'];
+const SYMBOLS = ['+', '−', '×', '÷', '=', '√', 'π', 'Σ', '→'];
+const drawingsKey = guideId => `practiceDrawings:${guideId}`;
 
 function readableText(value) {
   return String(value || '')
@@ -41,6 +42,9 @@ export default function PracticeWorkspace() {
   const [evaluations, setEvaluations] = useState({});
   const [grading, setGrading] = useState(false);
   const [shownBlocks, setShownBlocks] = useState({});
+  const [reported, setReported] = useState({});
+  const [tidying, setTidying] = useState(false);
+  const restoring = useRef(false);
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
@@ -52,6 +56,42 @@ export default function PracticeWorkspace() {
       else setError(apiErrorMessage(data?.detail, 'This study guide could not be loaded.'));
     });
   }, [ready, guideId]);
+
+  useEffect(() => {
+    if (!ready || !guideId) return;
+    apiFetch('/practice/' + guideId + '/state').then(data => {
+      const saved = data?.practice;
+      if (!Array.isArray(saved?.problems) || saved.problems.length !== 10) return;
+      const progress = saved.progress || {};
+      restoring.current = true;
+      setProblems(saved.problems);
+      setPracticeInfo({ subjectArea: saved.subject_area, domain: saved.domain, truthNote: saved.truth_note });
+      setProblemIndex(Math.min(9, Math.max(0, Number(progress.problemIndex) || 0)));
+      setAnswers(progress.answers || {});
+      setEvaluations(progress.evaluations || {});
+      setRevealed(progress.revealed || {});
+      setWorkText(progress.workText || {});
+      setTokens(progress.tokens || {});
+      setReported(progress.reported || {});
+      try { drawings.current = JSON.parse(localStorage.getItem(drawingsKey(guideId)) || '{}'); } catch { drawings.current = {}; }
+    });
+  }, [ready, guideId]);
+
+  // Save progress for guide-based sets (uploads are temporary) a moment after each change.
+  useEffect(() => {
+    if (upload || !guideId || problems.length !== 10) return;
+    if (restoring.current) {
+      restoring.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      apiFetch('/practice/' + guideId + '/state', {
+        method: 'PUT',
+        body: JSON.stringify({ progress: { problemIndex, answers, evaluations, revealed, workText, tokens, reported } }),
+      });
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [problemIndex, answers, evaluations, revealed, workText, tokens, reported, problems, upload, guideId]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -106,7 +146,9 @@ export default function PracticeWorkspace() {
       setEvaluations({});
       setTokens({});
       setWorkText({});
+      setReported({});
       drawings.current = {};
+      try { localStorage.removeItem(drawingsKey(guideId)); } catch {}
     } else {
       setError(apiErrorMessage(data?.detail, 'Cordia could not create the practice set.'));
     }
@@ -146,28 +188,35 @@ export default function PracticeWorkspace() {
   }
 
   function beginDraw(event) {
-    if (tool !== 'pen') return;
+    if (tool !== 'pen' && tool !== 'eraser') return;
     drawing.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
     const p = point(event);
     const context = canvasRef.current.getContext('2d');
+    context.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
     context.strokeStyle = '#11120f';
-    context.lineWidth = 2.4;
+    context.lineWidth = tool === 'eraser' ? 22 : 2.4;
     context.beginPath();
     context.moveTo(p.x, p.y);
   }
 
   function moveDraw(event) {
-    if (!drawing.current || tool !== 'pen') return;
+    if (!drawing.current || (tool !== 'pen' && tool !== 'eraser')) return;
     const p = point(event);
     const context = canvasRef.current.getContext('2d');
     context.lineTo(p.x, p.y);
     context.stroke();
   }
 
+  function saveDrawings() {
+    try { localStorage.setItem(drawingsKey(guideId), JSON.stringify(drawings.current)); } catch {}
+  }
+
   function endDraw() {
+    if (!drawing.current) return;
     drawing.current = false;
     if (canvasRef.current) drawings.current[problemIndex] = canvasRef.current.toDataURL();
+    saveDrawings();
   }
 
   function changeProblem(nextIndex) {
@@ -175,12 +224,53 @@ export default function PracticeWorkspace() {
     setProblemIndex(Math.max(0, Math.min(problems.length - 1, nextIndex)));
   }
 
-  function addSymbol(symbol) {
-    const next = { id: Date.now() + Math.random(), value: symbol, x: 48 + currentTokens.length * 12, y: 54 + currentTokens.length * 10 };
+  function addSymbol(symbol, kind = 'symbol') {
+    const next = { id: Date.now() + Math.random(), kind, value: symbol, x: 48 + currentTokens.length * 12, y: 54 + currentTokens.length * 10 };
     setTokens(all => ({ ...all, [problemIndex]: [...(all[problemIndex] || []), next] }));
   }
 
+  function updateToken(token, value) {
+    setTokens(all => ({ ...all, [problemIndex]: (all[problemIndex] || []).map(item => item.id === token.id ? { ...item, value } : item) }));
+  }
+
+  function removeToken(token) {
+    setTokens(all => ({ ...all, [problemIndex]: (all[problemIndex] || []).filter(item => item.id !== token.id) }));
+  }
+
+  // Turn the handwriting on this problem's canvas into typed text (vision model).
+  async function tidyHandwriting() {
+    const canvas = canvasRef.current;
+    if (!canvas || !drawings.current[problemIndex]) return;
+    const index = problemIndex;
+    setTidying(true);
+    setError('');
+    const flat = document.createElement('canvas');
+    flat.width = canvas.width;
+    flat.height = canvas.height;
+    const context = flat.getContext('2d');
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, flat.width, flat.height);
+    context.drawImage(canvas, 0, 0);
+    const data = await apiFetch('/practice/recognize', {
+      method: 'POST',
+      timeoutMs: 60000,
+      body: JSON.stringify({ image: flat.toDataURL('image/png') }),
+    });
+    setTidying(false);
+    if (typeof data?.text !== 'string') {
+      setError(apiErrorMessage(data?.detail, 'Cordia could not read this drawing.'));
+      return;
+    }
+    if (!data.text) return;
+    setWorkText(all => ({ ...all, [index]: [all[index], data.text].filter(Boolean).join('\n') }));
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    delete drawings.current[index];
+    saveDrawings();
+    setTool('type');
+  }
+
   function beginTokenDrag(event, token) {
+    if (event.target.tagName === 'INPUT') return;
     const rect = boardRef.current.getBoundingClientRect();
     drag.current = { id: token.id, offsetX: event.clientX - rect.left - token.x, offsetY: event.clientY - rect.top - token.y };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -201,6 +291,7 @@ export default function PracticeWorkspace() {
     const canvas = canvasRef.current;
     if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
     delete drawings.current[problemIndex];
+    saveDrawings();
     setWorkText(all => ({ ...all, [problemIndex]: '' }));
     setTokens(all => ({ ...all, [problemIndex]: [] }));
   }
@@ -218,6 +309,7 @@ export default function PracticeWorkspace() {
         reference: current.answer,
         worked_solution: current.worked_solution || '',
         student_answer: studentAnswer,
+        work: workText[index] || '',
       }),
     });
     setGrading(false);
@@ -227,6 +319,34 @@ export default function PracticeWorkspace() {
     }
     setEvaluations(all => ({ ...all, [index]: { status: data.correct ? 'correct' : 'retry', message: data.explanation } }));
     setRevealed(all => ({ ...all, [index]: true }));
+    // The Tutor posts its reply to a missed answer; open it so the student sees it.
+    if (!data.correct) window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { guideId, refresh: true } }));
+  }
+
+  async function reportGrade() {
+    const evaluation = evaluations[problemIndex];
+    if (!current || !evaluation || reported[problemIndex]) return;
+    const index = problemIndex;
+    const message = [
+      'Practice grading reported as incorrect.',
+      `Task: ${current.prompt}`,
+      `Student answer: ${answers[index] || ''}`,
+      `Reference answer: ${current.answer}`,
+      `Cordia said: ${evaluation.status === 'correct' ? 'Right' : 'Not quite'}${evaluation.message ? ` — ${evaluation.message}` : ''}`,
+    ].join('\n').slice(0, 2000);
+    const data = await apiFetch('/feedback', {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+        category: 'incorrect_content',
+        page_path: '/practice/' + guideId,
+        app_version: process.env.NEXT_PUBLIC_APP_VERSION || null,
+        context: { guide_id: guideId, question_id: `practice-${index + 1}` },
+        client_request_id: crypto.randomUUID(),
+      }),
+    });
+    if (data?.submitted) setReported(all => ({ ...all, [index]: true }));
+    else setError(apiErrorMessage(data?.detail, 'Your report could not be sent. Please try again.'));
   }
 
   if (!guide && !error) {
@@ -279,9 +399,13 @@ export default function PracticeWorkspace() {
 
           <div className="practice-toolbar" aria-label="Workspace tools">
             <button type="button" className={tool === 'pen' ? 'active' : ''} onClick={() => setTool('pen')}>Draw</button>
+            <button type="button" className={tool === 'eraser' ? 'active' : ''} onClick={() => setTool('eraser')}>Eraser</button>
             <button type="button" className={tool === 'type' ? 'active' : ''} onClick={() => setTool('type')}>Type</button>
             <span className="practice-toolbar-divider" />
             {SYMBOLS.map(symbol => <button type="button" key={symbol} onClick={() => addSymbol(symbol)} aria-label={`Add ${symbol}`}>{symbol}</button>)}
+            <button type="button" onClick={() => addSymbol('', 'exp')} aria-label="Add exponent" title="Exponent: drag next to a number, then type the power">xⁿ</button>
+            <button type="button" onClick={() => addSymbol('', 'text')} aria-label="Add text tile" title="Typed tile you can drag anywhere">Aa</button>
+            <button type="button" onClick={tidyHandwriting} disabled={tidying || !current} title="Turn your handwriting into clean typed text">{tidying ? 'Reading…' : 'Tidy handwriting'}</button>
             <button type="button" className="practice-clear" onClick={clearWork}>Clear</button>
           </div>
 
@@ -302,16 +426,27 @@ export default function PracticeWorkspace() {
               onPointerCancel={endDraw}
             />
             {currentTokens.map(token => (
-              <button
-                type="button"
+              <div
                 key={token.id}
-                className="practice-token"
+                className={`practice-token practice-token-${token.kind || 'symbol'}`}
                 style={{ left: token.x, top: token.y }}
                 onPointerDown={event => beginTokenDrag(event, token)}
                 onPointerMove={event => moveToken(event, token)}
                 onPointerUp={() => { drag.current = null; }}
-                aria-label={`Drag ${token.value}`}
-              >{token.value}</button>
+                onDoubleClick={() => removeToken(token)}
+                title="Drag to move · double-click to remove"
+              >
+                {token.kind === 'exp' || token.kind === 'text' ? (
+                  <input
+                    value={token.value}
+                    onChange={event => updateToken(token, event.target.value)}
+                    placeholder={token.kind === 'exp' ? 'n' : 'type'}
+                    size={Math.max(1, token.value.length || 1)}
+                    aria-label={token.kind === 'exp' ? 'Exponent' : 'Text tile'}
+                    autoFocus
+                  />
+                ) : token.value}
+              </div>
             ))}
           </div>
 
@@ -329,8 +464,13 @@ export default function PracticeWorkspace() {
             </button>
             {evaluations[problemIndex] && (
               <div className={`practice-evaluation ${evaluations[problemIndex].status}`} role="status">
-                <strong>{evaluations[problemIndex].status === 'correct' ? 'Right' : 'Wrong'}</strong>
-                {evaluations[problemIndex].message && <span> — {evaluations[problemIndex].message}</span>}
+                <strong>{evaluations[problemIndex].status === 'correct' ? 'Right!' : 'Not quite'}</strong>
+                <span>{evaluations[problemIndex].status === 'correct'
+                  ? (evaluations[problemIndex].message ? ` — ${evaluations[problemIndex].message}` : '')
+                  : ' — your Tutor left you a note.'}</span>
+                <button type="button" className="practice-report" onClick={reportGrade} disabled={reported[problemIndex]}>
+                  {reported[problemIndex] ? 'Reported — thanks' : 'Report incorrect answer'}
+                </button>
               </div>
             )}
             {revealed[problemIndex] && (

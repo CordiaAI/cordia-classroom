@@ -126,3 +126,12 @@ class PracticeGradeRequest(BaseModel):
     reference: str = Field(..., min_length=1, max_length=4000)
     worked_solution: str = Field(default="", max_length=6000)
     student_answer: str = Field(..., min_length=1, max_length=4000)
+    work: str = Field(default="", max_length=6000)
+
+
+class PracticeProgressRequest(BaseModel):
+    progress: dict = Field(default_factory=dict)
+
+
+class PracticeRecognizeRequest(BaseModel):
+    image: str = Field(..., min_length=30, max_length=3_000_000, pattern=r"^data:image/(png|jpeg);base64,")

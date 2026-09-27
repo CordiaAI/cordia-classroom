@@ -139,6 +139,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   useEffect(() => {
     const prefill = event => {
       const detail = event.detail || {};
+      if (detail.refresh) refreshSessionRef.current?.();
       if (detail.guideId) setContextKey(`guide:${detail.guideId}`);
       if (detail.skill) setSkillOverride(detail.skill);
       if (detail.retainContext) setRetainContext(detail.retainContext);
