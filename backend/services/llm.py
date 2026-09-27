@@ -618,6 +618,38 @@ def grade_practice_answer(prompt: str, reference: str, worked_solution: str, stu
     return {"correct": parsed["correct"], "explanation": str(parsed.get("explanation") or "").strip()[:1200]}
 
 
+def transcribe_document_pages(page_images: list, max_pages: int = 20) -> str:
+    """OCR for scanned documents: transcribe each page image (data URLs), in page order."""
+    client = get_openai_client()
+    if not client or not page_images:
+        return ""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def transcribe(data_url):
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": [
+                    {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
+                    {"type": "text", "text": (
+                        "Transcribe all text on this document page exactly, keeping headings, lists, "
+                        "and math (plain symbols). Briefly describe any diagram or chart in brackets. "
+                        "Return only the transcription, or an empty response if the page is blank."
+                    )},
+                ]}],
+                max_tokens=1800,
+                temperature=0,
+            )
+            return (response.choices[0].message.content or "").strip()
+        except Exception as e:
+            logger.error(f"Page transcription failed: {e}")
+            return ""
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        pages = list(pool.map(transcribe, page_images[:max_pages]))
+    return "\n\n".join(f"--- Page {i} ---\n{text}" for i, text in enumerate(pages, 1) if text)
+
+
 def recognize_handwriting(image_data_url: str):
     """Transcribe a handwritten workspace drawing into clean text; None when it can't be read."""
     client = get_openai_client()

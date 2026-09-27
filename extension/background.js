@@ -3,13 +3,7 @@ const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 
-function storageGet(keys) {
-  return new Promise(resolve => chrome.storage.local.get(keys, resolve));
-}
-
-function storageSet(values) {
-  return new Promise(resolve => chrome.storage.local.set(values, resolve));
-}
+const storageGet = keys => new Promise(resolve => chrome.storage.local.get(keys, resolve));
 
 async function apiFetch(path, options = {}, retry = true) {
   const auth = await storageGet(['authToken']);
@@ -75,7 +69,7 @@ async function validateClassroomAuth() {
 async function ensureScraper(tabId) {
   try {
     const ready = await chrome.tabs.sendMessage(tabId, { action: 'ping' });
-    if (ready?.scraperVersion === 1) return;
+    if (ready?.scraperVersion === 2) return;
   } catch (_) { /* Inject below. */ }
   await chrome.scripting.executeScript({ target: { tabId }, files: ['vendor/Readability.js', 'content.js'] });
 }
@@ -115,6 +109,11 @@ async function extractDocument(source) {
   return responseData(await apiFetch('/extract-file-text', { method: 'POST', body: form }), 'Document extraction failed.');
 }
 
+async function frameTexts(tabId) { // text in cross-origin frames (external tools, published docs)
+  const frames = await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, func: () => (window === top ? '' : document.body?.innerText || '') }).catch(() => []);
+  return frames.map(frame => frame.result?.trim()).filter(Boolean);
+}
+
 async function scrapePage() {
   const tab = await activeWebTab();
   await ensureScraper(tab.id);
@@ -126,6 +125,7 @@ async function scrapePage() {
     });
     return { text: extracted.text, title: source.filename || tab.title || 'Study document', url: source.url, sourceType: 'file', tabId: tab.id };
   }
+  if (!source.selected && (source.text || '').length < 400) source.text = [source.text, ...await frameTexts(tab.id)].join('\n\n').trim();
   if (!source.text?.trim()) throw new Error('No readable page content was found.');
   return {
     text: source.text.trim(),
