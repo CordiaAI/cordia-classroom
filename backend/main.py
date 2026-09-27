@@ -19,7 +19,7 @@ from starlette.concurrency import run_in_threadpool
 from schemas import (
     IngestRequest, IngestResponse,
     GenerateRequest, GenerateResponse,
-    ChatRequest, ChatResponse, PracticeRequest
+    ChatRequest, ChatResponse, PracticeRequest, PracticeGradeRequest
 )
 from services.text_processing import (
     clean_text, chunk_text,
@@ -30,7 +30,7 @@ from services.text_processing import (
 from services.llm import (
     generate_notes_ai, generate_study_guide,
     generate_flashcards, answer_question, explain_retain_answer,
-    analyze_images_for_slides, generate_practice_guide, generate_verified_practice_set,
+    analyze_images_for_slides, generate_practice_guide, generate_verified_practice_set, grade_practice_answer,
     study_guide_is_complete, study_guide_to_flashcards,
 )
 from routers import auth, folders, guides, stats, search, quiz, billing, nclex, exam, feedback, smart_notes, calendar, tutor, learning
@@ -678,6 +678,17 @@ async def create_practice_set(
         "truth_note": practice.get("truth_note"),
         "problems": problems,
     }
+
+
+@app.post("/practice/grade")
+@limiter.limit("60/minute")
+def grade_practice(body: PracticeGradeRequest, request: Request, authorization: str = Header(default="")):
+    """Mark one practice answer right or wrong, with an explanation when it is wrong."""
+    get_user_id(authorization)
+    result = grade_practice_answer(body.prompt, body.reference, body.worked_solution, body.student_answer)
+    if not result:
+        raise HTTPException(status_code=502, detail="Cordia could not check this answer. Please try again.")
+    return result
 
 
 @app.post("/chat", response_model=ChatResponse)

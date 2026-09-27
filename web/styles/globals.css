@@ -781,6 +781,10 @@ input::placeholder { color: var(--text-muted); }
 .practice-evaluation { margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; font-size: 0.78rem; font-weight: 750; line-height: 1.4; }
 .practice-evaluation.correct { background: #e8f2e4; color: #2f5d2b; }
 .practice-evaluation.retry { background: #f7e9e4; color: #8b3e33; }
+.practice-answer-inline { margin-top: 16px; padding: 0; border-top: 0; }
+.practice-source-hint { margin: 0; padding: 12px 24px 0; color: var(--text-muted); font-size: 0.75rem; }
+.practice-source-block { margin: 0 0 14px; cursor: pointer; transition: filter 0.2s ease; }
+.practice-source-block.is-blurred { filter: blur(5px); user-select: none; }
 .practice-truth-note { margin: 2px 1px 0; color: var(--text-secondary); font-size: 0.7rem; line-height: 1.45; }
 
 @media (max-width: 980px) {

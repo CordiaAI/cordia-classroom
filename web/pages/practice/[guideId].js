@@ -39,6 +39,8 @@ export default function PracticeWorkspace() {
   const [answers, setAnswers] = useState({});
   const [revealed, setRevealed] = useState({});
   const [evaluations, setEvaluations] = useState({});
+  const [grading, setGrading] = useState(false);
+  const [shownBlocks, setShownBlocks] = useState({});
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
@@ -82,6 +84,7 @@ export default function PracticeWorkspace() {
   const sourceText = readableText(upload?.content || guide?.study_guide || guide?.notes);
   const current = problems[problemIndex];
   const currentTokens = tokens[problemIndex] || [];
+  const sourceBlocks = sourceText ? sourceText.split(/\n\s*\n/).filter(block => block.trim()) : [];
 
   async function generateProblems() {
     if (!guide && !upload) return;
@@ -202,21 +205,28 @@ export default function PracticeWorkspace() {
     setTokens(all => ({ ...all, [problemIndex]: [] }));
   }
 
-  function reviewAnswer(event) {
+  async function checkAnswer(event) {
     event.preventDefault();
-    if (!current) return;
-    let evaluation = null;
-    if (current.verification?.status === 'verified' && Number.isFinite(Number(current.expected_value))) {
-      const matches = String(answers[problemIndex] || '').replace(/,/g, '').match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi);
-      const submitted = matches?.length ? Number(matches[matches.length - 1]) : NaN;
-      const expected = Number(current.expected_value);
-      const tolerance = Math.max(Number(current.tolerance || 0), Math.abs(expected) * 1e-9, 1e-9);
-      evaluation = Number.isFinite(submitted) && Math.abs(submitted - expected) <= tolerance
-        ? { status: 'correct', message: 'Correct — the result matches the independently checked calculation.' }
-        : { status: 'retry', message: 'Not yet. Compare your setup with the worked solution, then try the next variation.' };
+    const studentAnswer = String(answers[problemIndex] || '').trim();
+    if (!current || !studentAnswer) return;
+    const index = problemIndex;
+    setGrading(true);
+    const data = await apiFetch('/practice/grade', {
+      method: 'POST',
+      body: JSON.stringify({
+        prompt: current.prompt,
+        reference: current.answer,
+        worked_solution: current.worked_solution || '',
+        student_answer: studentAnswer,
+      }),
+    });
+    setGrading(false);
+    if (typeof data?.correct !== 'boolean') {
+      setEvaluations(all => ({ ...all, [index]: { status: 'retry', message: apiErrorMessage(data?.detail, 'Cordia could not check this answer. Please try again.') } }));
+      return;
     }
-    setEvaluations(all => ({ ...all, [problemIndex]: evaluation }));
-    setRevealed(all => ({ ...all, [problemIndex]: true }));
+    setEvaluations(all => ({ ...all, [index]: { status: data.correct ? 'correct' : 'retry', message: data.explanation } }));
+    setRevealed(all => ({ ...all, [index]: true }));
   }
 
   if (!guide && !error) {
@@ -304,6 +314,33 @@ export default function PracticeWorkspace() {
               >{token.value}</button>
             ))}
           </div>
+
+          <form className="practice-answer practice-answer-inline" onSubmit={checkAnswer}>
+            <label htmlFor="practice-answer-input">Your answer</label>
+            <textarea
+              id="practice-answer-input"
+              value={answers[problemIndex] || ''}
+              onChange={event => setAnswers(all => ({ ...all, [problemIndex]: event.target.value }))}
+              placeholder={current?.answer_format || 'Enter your answer…'}
+              disabled={!current}
+            />
+            <button type="submit" className="btn" disabled={!current || grading || !answers[problemIndex]?.trim()}>
+              {grading ? 'Checking…' : 'Check answer'}
+            </button>
+            {evaluations[problemIndex] && (
+              <div className={`practice-evaluation ${evaluations[problemIndex].status}`} role="status">
+                <strong>{evaluations[problemIndex].status === 'correct' ? 'Right' : 'Wrong'}</strong>
+                {evaluations[problemIndex].message && <span> — {evaluations[problemIndex].message}</span>}
+              </div>
+            )}
+            {revealed[problemIndex] && (
+              <div className="practice-solution">
+                <div className="practice-verification-row"><strong>Answer</strong></div>
+                <p>{current.answer}</p>
+                {current.worked_solution && <p className="practice-worked"><strong>Why:</strong> {current.worked_solution}</p>}
+              </div>
+            )}
+          </form>
         </article>
 
         <aside className="practice-source-panel">
@@ -311,36 +348,17 @@ export default function PracticeWorkspace() {
             <span>Source material</span>
             <h2>{sourceTitle}</h2>
           </header>
-          <div className="practice-source-copy">{sourceText || 'No readable source material is available.'}</div>
-          <form className="practice-answer" onSubmit={reviewAnswer}>
-            <label htmlFor="practice-answer-input">Your answer</label>
-            <textarea
-              id="practice-answer-input"
-              value={answers[problemIndex] || ''}
-              onChange={event => setAnswers(all => ({ ...all, [problemIndex]: event.target.value }))}
-              placeholder={current?.answer_format || 'Enter your answer and reasoning…'}
-              disabled={!current}
-            />
-            <button type="submit" className="btn" disabled={!current || !answers[problemIndex]?.trim()}>
-              {current?.verification?.status === 'verified' ? 'Check answer' : 'Review answer'}
-            </button>
-            {revealed[problemIndex] && (
-              <div className="practice-solution" role="status">
-                {evaluations[problemIndex] && (
-                  <div className={`practice-evaluation ${evaluations[problemIndex].status}`}>{evaluations[problemIndex].message}</div>
-                )}
-                <div className="practice-verification-row">
-                  <strong>{current.verification?.label || 'Source-grounded reference'}</strong>
-                  <span>{current.practice_type?.replace('_', ' ')}</span>
-                </div>
-                <p>{current.answer}</p>
-                {current.worked_solution && <p className="practice-worked"><strong>Why:</strong> {current.worked_solution}</p>}
-                {current.source_basis && <blockquote>Based on: {current.source_basis}</blockquote>}
-                {current.verification?.detail && <small>{current.verification.detail}</small>}
-              </div>
-            )}
-            {practiceInfo?.truthNote && <p className="practice-truth-note">{practiceInfo.truthNote}</p>}
-          </form>
+          <p className="practice-source-hint">Double-click a section to reveal it.</p>
+          <div className="practice-source-copy">
+            {sourceBlocks.length ? sourceBlocks.map((block, index) => (
+              <p
+                key={index}
+                className={shownBlocks[index] ? 'practice-source-block' : 'practice-source-block is-blurred'}
+                onDoubleClick={() => setShownBlocks(all => ({ ...all, [index]: !all[index] }))}
+                title={shownBlocks[index] ? 'Double-click to hide' : 'Double-click to reveal'}
+              >{block}</p>
+            )) : 'No readable source material is available.'}
+          </div>
         </aside>
       </section>
     </main>
