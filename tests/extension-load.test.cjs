@@ -14,7 +14,7 @@ async function main() {
     if (!worker) worker = await context.waitForEvent('serviceworker');
     const extensionId = new URL(worker.url()).host;
     const manifest = await worker.evaluate(() => chrome.runtime.getManifest());
-    assert.equal(manifest.version, '1.9.3');
+    assert.equal(manifest.version, '1.9.4');
     assert.equal(manifest.name, 'CordiaClassroom');
     assert.equal(manifest.action.default_icon['128'], 'icon128.png');
     assert.deepEqual(manifest.host_permissions, ['<all_urls>']);

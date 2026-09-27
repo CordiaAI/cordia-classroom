@@ -150,7 +150,10 @@ async function makeStudyGuide() {
     await capture();
     try {
       await scrape();
-    } catch (_) {
+    } catch (scrapeError) {
+      // A document we found but couldn't use (too large, unreadable) must not silently
+      // become a screenshot of one visible page; only protected pages fall back.
+      if (/^(The document|Document)/.test(scrapeError?.message || '')) throw scrapeError;
       step('scrape', 'skipped');
       announce('The page is protected. Using the visible capture instead…', 'working');
     }

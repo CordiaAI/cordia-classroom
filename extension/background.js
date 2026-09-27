@@ -1,5 +1,5 @@
 const API = 'https://autostudy-ai.fly.dev';
-const MAX_FILE_BYTES = 20 * 1024 * 1024;
+const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 
@@ -105,9 +105,9 @@ async function extractDocument(source) {
   const response = await fetch(safeDocumentUrl(source.url), { credentials: 'include', redirect: 'follow' });
   if (!response.ok) throw new Error(`Document download failed (${response.status}).`);
   const size = Number(response.headers.get('content-length') || 0);
-  if (size > MAX_FILE_BYTES) throw new Error('The document is larger than 20 MB.');
+  if (size > MAX_FILE_BYTES) throw new Error('The document is larger than 50 MB.');
   const blob = await response.blob();
-  if (!blob.size || blob.size > MAX_FILE_BYTES) throw new Error('The document is empty or larger than 20 MB.');
+  if (!blob.size || blob.size > MAX_FILE_BYTES) throw new Error('The document is empty or larger than 50 MB.');
   const form = new FormData();
   form.append('file', new File([blob], filenameFor(source, response), {
     type: blob.type || response.headers.get('content-type') || 'application/octet-stream',
@@ -121,7 +121,9 @@ async function scrapePage() {
   const source = await chrome.tabs.sendMessage(tab.id, { action: 'scrapePage' });
   if (!source) throw new Error('The page scraper returned no content.');
   if (source.kind === 'file') {
-    const extracted = await extractDocument(source);
+    const extracted = await extractDocument(source).catch(error => {
+      throw new Error(/^The document/.test(error?.message) ? error.message : `The document could not be read: ${error?.message}`);
+    });
     return { text: extracted.text, title: source.filename || tab.title || 'Study document', url: source.url, sourceType: 'file', tabId: tab.id };
   }
   if (!source.text?.trim()) throw new Error('No readable page content was found.');
