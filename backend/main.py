@@ -260,8 +260,8 @@ def extract_file_text(request: Request, file: UploadFile = None, authorization: 
         filename = (file.filename or "").lower()
         content_bytes = file.file.read()
 
-        if len(content_bytes) > 20 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="File too large (max 20MB)")
+        if len(content_bytes) > 50 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large (max 50MB)")
 
         text = ""
 
