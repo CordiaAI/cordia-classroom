@@ -58,20 +58,47 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     });
   }, [providedGuides]);
 
+  // Poll fast only while a Tutor action is running; slow when idle; never while the tab is hidden.
+  const sessionStatusRef = useRef('idle');
+  const refreshSessionRef = useRef(null);
   useEffect(() => {
     let active = true;
+    let timer = null;
+    let inFlight = false;
     async function refresh() {
+      window.clearTimeout(timer);
+      if (document.hidden || inFlight) return;
+      inFlight = true;
       const next = await apiFetch('/tutor/session');
-      if (!active || !next?.id) return;
-      setSession(next);
+      inFlight = false;
+      if (!active) return;
+      if (next?.id) {
+        sessionStatusRef.current = next.status || 'idle';
+        setSession(next);
+      }
+      timer = window.setTimeout(refresh, sessionStatusRef.current === 'idle' ? 20000 : 3000);
+    }
+    refreshSessionRef.current = refresh;
+    function onVisible() {
+      if (!document.hidden) refresh();
     }
     refresh();
-    const timer = window.setInterval(refresh, 3000);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
     return () => {
       active = false;
-      window.clearInterval(timer);
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
     };
   }, []);
+
+  useEffect(() => {
+    const status = session?.status || 'idle';
+    const wasIdle = sessionStatusRef.current === 'idle';
+    sessionStatusRef.current = status;
+    if (wasIdle && status !== 'idle') refreshSessionRef.current?.();
+  }, [session?.status]);
 
   useEffect(() => {
     const observation = session?.browser_observation || {};
