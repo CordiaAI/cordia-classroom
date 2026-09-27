@@ -32,6 +32,12 @@ npm run build --prefix web
 ```
 Baseline (2026-09-26, main 416e039): 111 Python tests pass, 10/12 node tests pass (2 = env-only Playwright), web build passes. CI green on main.
 
+## Deploying the backend from a cloud session
+- Install the CLI (works through the proxy, ~10s): `curl -sSL https://fly.io/install.sh | FLYCTL_INSTALL=$HOME/.fly sh`, then use `$HOME/.fly/bin/flyctl`.
+- Auth comes from the `FLY_API_TOKEN` environment variable (deploy token for app `autostudy-ai`, set by the owner in the cloud environment settings). Never ask for the token in chat.
+- Deploy only merged `main`: `cd backend && $HOME/.fly/bin/flyctl deploy --remote-only`, then check `flyctl logs --no-tail` and `GET /` health.
+- Without the token, tell the owner to run `cd backend && fly deploy` on their computer.
+
 ## Study styles (learning styles, added 2026-09-26)
 - Student picks a VARK style (`learning_preferences` table); per-question aids cached in `study_aids`. Code: `backend/services/learning_styles.py`, `backend/routers/learning.py`, `web/components/StudyAidPanel.js`.
 - Off switch: backend env `LEARNING_STYLES_ENABLED=false` (hides UI, Tutor unchanged). No style chosen = today's behavior.
