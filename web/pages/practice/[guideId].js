@@ -350,7 +350,7 @@ export default function PracticeWorkspace() {
   }
 
   if (!guide && !error) {
-    return <div className="practice-loading"><AILoadingSphere size={92} /><p>Loading practice workspace…</p></div>;
+    return <div className="practice-loading"><AILoadingSphere /></div>;
   }
 
   return (

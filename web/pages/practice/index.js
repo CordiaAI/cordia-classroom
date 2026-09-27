@@ -103,8 +103,7 @@ export default function PracticeHub() {
   if (!ready || loading) {
     return (
       <div className="practice-loading">
-        <AILoadingSphere size={92} />
-        <p>Opening your practice library...</p>
+        <AILoadingSphere />
         <style jsx>{`
           .practice-loading { min-height: 65vh; display: grid; place-content: center; justify-items: center; gap: 14px; color: var(--text-muted); }
           .practice-loading p { margin: 0; font-weight: 650; }
