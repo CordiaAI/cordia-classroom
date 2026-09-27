@@ -1,13 +1,11 @@
 import Head from 'next/head';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { responseJson } from '../lib/api';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { supabaseAuth } from '../lib/supabase';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
-  const [accessToken, setAccessToken] = useState('');
+  const [recovery, setRecovery] = useState(null);
   const [tokenError, setTokenError] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,12 +19,13 @@ export default function ResetPasswordPage() {
     const hash = window.location.hash.substring(1);
     const params = new URLSearchParams(hash);
     const token = params.get('access_token');
+    const refresh = params.get('refresh_token');
     const type = params.get('type');
-    if (!token || type !== 'recovery') {
+    if (!token || !refresh || type !== 'recovery') {
       setTokenError(true);
       return;
     }
-    setAccessToken(token);
+    setRecovery({ access_token: token, refresh_token: refresh });
   }, []);
 
   async function handleSubmit(e) {
@@ -36,22 +35,16 @@ export default function ResetPasswordPage() {
       setError('Passwords do not match');
       return;
     }
-    try {
-      const resp = await fetch(API + '/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access_token: accessToken, new_password: newPassword })
-      });
-      const data = await responseJson(resp);
-      if (resp.ok) {
-        setSuccess(true);
-        setTimeout(() => router.push('/'), 3000);
-      } else {
-        setError(data.detail || 'Reset failed. The link may have expired.');
-      }
-    } catch {
-      setError('Cannot connect to server');
+    const auth = supabaseAuth();
+    const { error: sessionError } = await auth.setSession(recovery);
+    const { error: updateError } = sessionError ? { error: sessionError } : await auth.updateUser({ password: newPassword });
+    await auth.signOut({ scope: 'local' });
+    if (updateError) {
+      setError(updateError.message || 'Reset failed. The link may have expired.');
+      return;
     }
+    setSuccess(true);
+    setTimeout(() => router.push('/'), 3000);
   }
 
   const EyeOpen = () => (

@@ -2,85 +2,108 @@ import Head from 'next/head';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import AcademicInfinityMark from '../components/AcademicInfinityMark';
-import { getToken, responseJson, setToken, scheduleProactiveRefresh } from '../lib/api';
+import { getToken, setToken, scheduleProactiveRefresh } from '../lib/api';
+import { supabaseAuth } from '../lib/supabase';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+function GoogleLogo() {
+  return (
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 48 48">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
+  );
+}
+
+function profileFromForm(form) {
+  const educationLevel = String(form.get('education_level') || '');
+  return {
+    name: String(form.get('name') || '').trim(),
+    education_level: educationLevel,
+    university: String(form.get('school') || '').trim(),
+    major: educationLevel === 'university' ? String(form.get('major') || '').trim() : '',
+  };
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState('');
-  const [passwordMode, setPasswordMode] = useState(false);
+  const [isSignup, setIsSignup] = useState(false);
+  const [educationLevel, setEducationLevel] = useState('university');
+  const [confirmationSent, setConfirmationSent] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (getToken()) router.push('/dashboard');
   }, []);
 
+  function finishSession(session) {
+    setToken(session.access_token, session.user?.email, session.refresh_token, session.user?.user_metadata?.name);
+    scheduleProactiveRefresh();
+    router.push('/dashboard');
+  }
+
   async function handleForgotSubmit(event) {
     event.preventDefault();
     setError('');
     const email = String(new FormData(event.currentTarget).get('email') || '').trim().toLowerCase();
-
-    try {
-      const response = await fetch(`${API}/auth/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      if (response.ok) setForgotSent(true);
-      else setError((await responseJson(response)).detail || 'Unable to send reset email.');
-    } catch {
-      setError('Service unavailable. Try again in a moment.');
-    }
+    await supabaseAuth().resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
+    setForgotSent(true);
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
-
+    setConfirmationSent(false);
     const form = new FormData(event.currentTarget);
-    const body = {
-      email: String(form.get('email') || '').trim().toLowerCase(),
-      password: String(form.get('password') || ''),
-    };
-
+    const email = String(form.get('email') || '').trim().toLowerCase();
+    const password = String(form.get('password') || '');
+    if (!email || !password) {
+      setError('Enter your email and password, or continue with Google.');
+      return;
+    }
+    setBusy(true);
     try {
-      const response = await fetch(`${API}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await responseJson(response);
-
-      if (response.ok && data.access_token) {
-        setToken(data.access_token, data.email, data.refresh_token, data.name);
-        scheduleProactiveRefresh();
-        router.push('/dashboard');
+      if (isSignup) {
+        const { data, error: signUpError } = await supabaseAuth().signUp({
+          email,
+          password,
+          options: { data: profileFromForm(form), emailRedirectTo: `${window.location.origin}/auth/callback` },
+        });
+        if (signUpError) throw signUpError;
+        if (data.session) finishSession(data.session);
+        else setConfirmationSent(true);
       } else {
-        const detail = (Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail)?.replace(/^Value error,\s*/, '');
-        const reference = data.request_id ? ` Reference: ${data.request_id}` : '';
-        setError(response.status === 401
-          ? `That email and password did not match. Try again or reset your password.${reference}`
-          : detail || 'Authentication failed.');
+        const { data, error: signInError } = await supabaseAuth().signInWithPassword({ email, password });
+        if (signInError) throw signInError;
+        finishSession(data.session);
       }
-    } catch {
-      setError('Service unavailable. Try again in a moment.');
+    } catch (authError) {
+      setError(authError?.message || 'Authentication failed.');
+    } finally {
+      setBusy(false);
     }
   }
 
-  async function continueWithGoogle() {
-    setOauthLoading(true);
+  async function continueWithGoogle(event) {
     setError('');
-    try {
-      const response = await fetch(`${API}/auth/oauth/google`);
-      const data = await responseJson(response);
-      if (!response.ok || !data?.url) throw new Error(data?.detail || 'Google sign-in could not start.');
-      window.location.assign(data.url);
-    } catch (oauthError) {
+    const form = event.currentTarget.form;
+    // Google can't carry school details, so the callback saves them after sign-in.
+    if (isSignup && form) {
+      if (!form.reportValidity()) return;
+      try { sessionStorage.setItem('pendingProfile', JSON.stringify(profileFromForm(new FormData(form)))); } catch {}
+    }
+    setBusy(true);
+    const { error: oauthError } = await supabaseAuth().signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+    if (oauthError) {
       setError(oauthError.message || 'Google sign-in could not start.');
-      setOauthLoading(false);
+      setBusy(false);
     }
   }
 
@@ -90,8 +113,9 @@ export default function LoginPage() {
     setError('');
   }
 
-  function selectPasswordMode(enabled) {
-    setPasswordMode(enabled);
+  function selectMode(signup) {
+    setIsSignup(signup);
+    setConfirmationSent(false);
     setError('');
   }
 
@@ -133,36 +157,53 @@ export default function LoginPage() {
               </div>
             ) : (
               <div className="login-form-wrap">
-                <h2 className="login-form-title">Sign in</h2>
-                <button type="button" className="login-oauth-button" onClick={continueWithGoogle} disabled={oauthLoading}>
-                  <span aria-hidden="true">G</span>
-                  {oauthLoading ? 'Opening Google…' : 'Continue with Google'}
-                </button>
-                <p className="login-switch-text">New to CordiaClassroom? Continue with Google to create your account.</p>
-                {error && !passwordMode && <p className="login-form-error" role="alert">{error}</p>}
+                <h2 className="login-form-title">{isSignup ? 'Create account' : 'Sign in'}</h2>
+                <div className="login-mode-tabs" role="tablist" aria-label="Account access">
+                  <button type="button" role="tab" aria-selected={!isSignup} className={!isSignup ? 'active' : ''} onClick={() => selectMode(false)}>Sign in</button>
+                  <button type="button" role="tab" aria-selected={isSignup} className={isSignup ? 'active' : ''} onClick={() => selectMode(true)}>Create account</button>
+                </div>
 
-                {passwordMode ? (
-                  <>
-                    <div className="login-or"><span>existing email account</span></div>
-                    <form onSubmit={handleSubmit}>
+                <form key={isSignup ? 'signup' : 'login'} onSubmit={handleSubmit}>
+                  {isSignup && (
+                    <>
                       <div className="login-input-row">
-                        <input name="email" type="email" className="login-underline-input" placeholder="Email" autoComplete="email" required />
+                        <input name="name" type="text" className="login-underline-input" placeholder="Full name" autoComplete="name" required />
                       </div>
                       <div className="login-input-row">
-                        <input name="password" type="password" className="login-underline-input" placeholder="Password" autoComplete="current-password" minLength={8} required />
+                        <select name="education_level" className="login-underline-input" value={educationLevel} onChange={event => setEducationLevel(event.target.value)} required>
+                          <option value="university">University or college</option>
+                          <option value="high_school">High school</option>
+                        </select>
                       </div>
-                      <div className="login-forgot"><a href="#" onClick={(event) => { event.preventDefault(); setForgotMode(true); setError(''); }}>Forgot password?</a></div>
-                      {error && <p className="login-form-error" role="alert">{error}</p>}
-                      <button type="submit" className="btn login-cta-btn">Sign in</button>
-                    </form>
-                    <p className="login-switch-text"><a href="#" onClick={(event) => { event.preventDefault(); selectPasswordMode(false); }}>Hide email sign-in</a></p>
-                  </>
-                ) : (
-                  <p className="login-switch-text">
-                    Signed up with email and password before?{' '}
-                    <a href="#" onClick={(event) => { event.preventDefault(); selectPasswordMode(true); }}>Sign in with email</a>
-                  </p>
-                )}
+                      <div className="login-input-row">
+                        <input name="school" type="text" className="login-underline-input" placeholder={educationLevel === 'university' ? 'University' : 'High school'} autoComplete="organization" required />
+                      </div>
+                      {educationLevel === 'university' && (
+                        <div className="login-input-row">
+                          <input name="major" type="text" className="login-underline-input" placeholder="Major or area of study" required />
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <button type="button" className="login-oauth-button" onClick={continueWithGoogle} disabled={busy}>
+                    <GoogleLogo />
+                    {isSignup ? 'Sign up with Google' : 'Continue with Google'}
+                  </button>
+                  <div className="login-or"><span>or use email</span></div>
+
+                  <div className="login-input-row">
+                    <input name="email" type="email" className="login-underline-input" placeholder="Email" autoComplete="email" />
+                  </div>
+                  <div className="login-input-row">
+                    <input name="password" type="password" className="login-underline-input" placeholder="Password" autoComplete={isSignup ? 'new-password' : 'current-password'} minLength={8} />
+                  </div>
+
+                  {!isSignup && <div className="login-forgot"><a href="#" onClick={(event) => { event.preventDefault(); setForgotMode(true); setError(''); }}>Forgot password?</a></div>}
+                  {error && <p className="login-form-error" role="alert">{error}</p>}
+                  {confirmationSent && <p className="login-success">Account created. Check your email to confirm it.</p>}
+                  <button type="submit" className="btn login-cta-btn" disabled={busy}>{isSignup ? 'Create account' : 'Sign in'}</button>
+                </form>
               </div>
             )}
           </section>
