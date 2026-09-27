@@ -126,7 +126,6 @@ export default function ClassroomVisualSystem() {
 
       .btn-green,
       .tutor-dock-toggle,
-      .tutor-drawer-toggle,
       .calendar-connect-form button {
         background: #394434 !important;
         color: #ffffff !important;
