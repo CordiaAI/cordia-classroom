@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { setToken, scheduleProactiveRefresh } from '../../lib/api';
+import { apiFetch, setToken, scheduleProactiveRefresh } from '../../lib/api';
 
 function tokenEmail(token) {
   try {
@@ -27,13 +27,23 @@ export default function OAuthCallback() {
       return;
     }
     if (!accessToken || !refreshToken) {
-      setError('Google sign-in did not return a Classroom session. Please try again.');
+      setError('Sign-in did not return a Classroom session. Please try again.');
       return;
     }
     setToken(accessToken, tokenEmail(accessToken), refreshToken);
     scheduleProactiveRefresh();
     window.history.replaceState({}, document.title, '/auth/callback');
-    router.replace('/dashboard');
+
+    // School details entered before "Sign up with Google" (Google can't carry them).
+    let pending = null;
+    try {
+      pending = sessionStorage.getItem('pendingProfile');
+      sessionStorage.removeItem('pendingProfile');
+    } catch {}
+    const saveProfile = pending
+      ? apiFetch('/auth/profile', { method: 'PATCH', body: pending }).catch(() => null)
+      : Promise.resolve();
+    saveProfile.finally(() => router.replace('/dashboard'));
   }, [router]);
 
   return (
