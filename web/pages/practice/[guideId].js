@@ -335,7 +335,7 @@ export default function PracticeWorkspace() {
                 </div>
                 <p>{current.answer}</p>
                 {current.worked_solution && <p className="practice-worked"><strong>Why:</strong> {current.worked_solution}</p>}
-                {current.source_basis && <blockquote>Source basis: “{current.source_basis}”</blockquote>}
+                {current.source_basis && <blockquote>Based on: {current.source_basis}</blockquote>}
                 {current.verification?.detail && <small>{current.verification.detail}</small>}
               </div>
             )}
