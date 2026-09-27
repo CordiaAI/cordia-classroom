@@ -338,6 +338,17 @@ def queue_browser_command(user_id: str, turn: dict, command_type: str, goal: str
     return command
 
 
+def append_tutor_message(user_id: str, text: str):
+    """Post a Tutor reply outside a chat turn (e.g. feedback on a missed practice answer)."""
+    row = get_or_create_tutor_session(user_id)
+    messages = list(row.get("messages") or [])
+    messages.append({"role": "ai", "text": text})
+    get_supabase().table("tutor_sessions").update({
+        "messages": messages[-MAX_SESSION_MESSAGES:],
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", row["id"]).eq("user_id", user_id).execute()
+
+
 def wait_for_browser_result(user_id: str, turn: dict, answer: str):
     messages = list(turn.get("messages") or [])
     messages.append({"role": "ai", "text": answer})

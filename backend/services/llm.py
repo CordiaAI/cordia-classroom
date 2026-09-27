@@ -580,7 +580,7 @@ def validate_practice_set(payload: dict, limit: int = 10) -> dict:
     }
 
 
-def grade_practice_answer(prompt: str, reference: str, worked_solution: str, student_answer: str) -> dict:
+def grade_practice_answer(prompt: str, reference: str, worked_solution: str, student_answer: str, work: str = "") -> dict:
     """Mark a student's practice answer right or wrong against the reference, explaining any miss."""
     client = get_openai_client()
     if not client:
@@ -593,13 +593,16 @@ def grade_practice_answer(prompt: str, reference: str, worked_solution: str, stu
                     "You grade one practice answer. Judge meaning, not wording: an answer is correct "
                     "if it would earn full credit from a fair teacher (equivalent code, forms, units, "
                     "or phrasing count). Minor typos that do not change meaning are fine. If it is "
-                    "wrong or incomplete, explain in 1-3 sentences what is wrong and why, addressed "
-                    "to the student. If correct, confirm briefly. "
+                    "wrong or incomplete, reply like a warm, encouraging tutor in 2-3 sentences: start "
+                    "with 'Not quite.', say specifically what their answer or work shows they did, and "
+                    "point to what to check or change, without just handing over the answer. If correct, "
+                    "confirm briefly. "
                     'Return JSON: {"correct": true|false, "explanation": "..."}'
                 )},
                 {"role": "user", "content": (
                     f"TASK:\n{prompt[:3000]}\n\nREFERENCE ANSWER:\n{reference[:3000]}\n\n"
                     f"WORKED SOLUTION:\n{worked_solution[:3000]}\n\nSTUDENT ANSWER:\n{student_answer[:3000]}"
+                    f"\n\nSTUDENT'S TYPED WORK:\n{work[:3000] or '(none)'}"
                 )},
             ],
             response_format={"type": "json_object"},
@@ -613,6 +616,34 @@ def grade_practice_answer(prompt: str, reference: str, worked_solution: str, stu
     if not isinstance(parsed.get("correct"), bool):
         return {}
     return {"correct": parsed["correct"], "explanation": str(parsed.get("explanation") or "").strip()[:1200]}
+
+
+def recognize_handwriting(image_data_url: str):
+    """Transcribe a handwritten workspace drawing into clean text; None when it can't be read."""
+    client = get_openai_client()
+    if not client:
+        return None
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": (
+                    "Transcribe the handwriting in this image exactly as written, keeping its line "
+                    "breaks and layout. Write math with plain symbols and Unicode superscripts or ^ "
+                    "(e.g. 5³, x^n), fractions as a/b. Do not solve, correct, or add anything. "
+                    'Return JSON: {"text": "..."} with an empty string if nothing is written.'
+                )},
+                {"role": "user", "content": [{"type": "image_url", "image_url": {"url": image_data_url, "detail": "high"}}]},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=800,
+            temperature=0,
+        )
+        parsed = _practice_json(response.choices[0].message.content)
+    except Exception as e:
+        logger.error(f"Error recognizing handwriting: {e}")
+        return None
+    return str(parsed.get("text") or "").strip()[:6000]
 
 
 def classify_practice_area(context: str, declared_domain: str = "") -> dict:
