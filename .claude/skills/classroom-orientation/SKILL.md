@@ -38,6 +38,10 @@ Baseline (2026-09-26, main 416e039): 111 Python tests pass, 10/12 node tests pas
 - Rules: styles never change the saved guide text, facts, or NCLEX/exam formats; never label the student; Mermaid is always built server-side from validated nodes and rendered with `securityLevel: 'strict'`.
 - Next (release 2): stable concept IDs + delayed Retain recall to score Tutor approaches (+1/0/−1) within the chosen style.
 
+## Practice problems (owner direction, 2026-09-27)
+- Two steps: `classify_practice_area` picks an area from `backend/services/practice_areas.py`, then `generate_verified_practice_set` generates 10 problems with that area's system prompt. New area = new dict entry.
+- The model **interprets** the material. Never gate problems on word-for-word citation matching; Jackson rejected that ("no production app does verbatim match"). Only numeric answers get a deterministic recompute, and a mismatch downgrades to "reference", never drops the item.
+
 ## State snapshot (2026-09-26 — refresh when stale)
 - Work lands mostly as direct commits to `main` (recent revert pairs for visual redesigns).
 - Draft PR #23 (`claude/wonderful-faraday-1dp3p2`, drop legacy autostudyai.online CORS) is 12 behind; rebase before merging or its diff reverts newer main work.
