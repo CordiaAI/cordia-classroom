@@ -97,7 +97,8 @@ class ExtensionCaptureContractTests(unittest.TestCase):
     def test_custom_extension_code_is_small(self):
         self.assertLess(len(self.worker.splitlines()), 220)
         self.assertLess(len(self.panel.splitlines()), 290)
-        self.assertLess(len(self.scraper.splitlines()), 130)
+        # 170: shadow-DOM/frame text, Google export, and capture ordering (2026-09-27 capture audit).
+        self.assertLess(len(self.scraper.splitlines()), 170)
 
 
 if __name__ == "__main__":

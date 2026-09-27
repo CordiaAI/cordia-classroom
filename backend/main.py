@@ -33,6 +33,7 @@ from services.llm import (
     generate_notes_ai, generate_study_guide,
     generate_flashcards, answer_question, explain_retain_answer,
     analyze_images_for_slides, generate_practice_guide, generate_verified_practice_set, grade_practice_answer, recognize_handwriting,
+    transcribe_document_pages,
     study_guide_is_complete, study_guide_to_flashcards,
 )
 from routers import auth, folders, guides, stats, search, quiz, billing, nclex, exam, feedback, smart_notes, calendar, tutor, learning
@@ -289,6 +290,23 @@ def extract_file_text(request: Request, file: UploadFile = None, authorization: 
                 raise
             except Exception:
                 raise HTTPException(status_code=422, detail="Could not extract text from PDF. Use a text-based PDF.")
+            if len(text.strip()) < 200:
+                # Scanned PDF (no text layer): transcribe each page's scan with vision.
+                import base64 as _b64
+                page_images = []
+                for page in reader.pages[:20]:
+                    try:
+                        scans = [image for image in page.images if image.name.lower().endswith((".jpg", ".jpeg", ".png"))]
+                    except Exception:
+                        scans = []
+                    if scans:
+                        scan = max(scans, key=lambda image: len(image.data))
+                        mime = "image/png" if scan.name.lower().endswith(".png") else "image/jpeg"
+                        page_images.append(f"data:{mime};base64,{_b64.b64encode(scan.data).decode()}")
+                if page_images:
+                    usage = check_usage(user_id, "lightweight")
+                    text = transcribe_document_pages(page_images) or text
+                    record_usage(user_id, "lightweight", usage)
 
         elif filename.endswith(".docx"):
                     try:
@@ -298,7 +316,13 @@ def extract_file_text(request: Request, file: UploadFile = None, authorization: 
                             raise HTTPException(status_code=500, detail="python-docx is not installed.")
                         Document = docx.Document
                         doc = Document(io.BytesIO(content_bytes))
-                        text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+                        lines = [p.text for p in doc.paragraphs if p.text.strip()]
+                        for table in doc.tables:
+                            for row in table.rows:
+                                cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                                if cells:
+                                    lines.append(" | ".join(dict.fromkeys(cells)))
+                        text = "\n".join(lines)
                     except HTTPException:
                         raise
                     except Exception:
@@ -317,9 +341,20 @@ def extract_file_text(request: Request, file: UploadFile = None, authorization: 
                 marked_parts = []
                 for slide_num, slide in enumerate(prs.slides, 1):
                     shape_texts = []
-                    for shape in slide.shapes:
-                        if hasattr(shape, "text") and shape.text.strip():
+                    shapes = list(slide.shapes)
+                    while shapes:
+                        shape = shapes.pop(0)
+                        if getattr(shape, "shape_type", None) == 6:  # group: read the shapes inside it
+                            shapes[:0] = list(shape.shapes)
+                        elif getattr(shape, "has_table", False) and shape.has_table:
+                            for row in shape.table.rows:
+                                cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                                if cells:
+                                    shape_texts.append(" | ".join(cells))
+                        elif hasattr(shape, "text") and shape.text.strip():
                             shape_texts.append(shape.text.strip())
+                    if slide.has_notes_slide and slide.notes_slide.notes_text_frame.text.strip():
+                        shape_texts.append("Notes: " + slide.notes_slide.notes_text_frame.text.strip())
                     slides_out.append({"number": slide_num, "texts": shape_texts})
                     if shape_texts:
                         # Embed "--- Slide N ---" markers so is_slideshow_content()
