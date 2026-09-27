@@ -3,7 +3,7 @@ uvicorn
 pydantic[email]
 python-dotenv
 openai
-PyJWT
+PyJWT[crypto]
 supabase
 slowapi
 bleach
