@@ -1989,10 +1989,11 @@ input::placeholder { color: var(--text-muted); }
   left: 0;
   z-index: 80;
   display: flex;
-  transform: translateX(calc(-100% + 61px));
-  transition: transform var(--motion-smooth);
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition: transform var(--motion-smooth), visibility 0s linear 0.3s;
 }
-.tutor-drawer-shell.is-open { transform: translateX(0); }
+.tutor-drawer-shell.is-open { transform: translateX(0); visibility: visible; transition: transform var(--motion-smooth), visibility 0s; }
 .tutor-drawer {
   position: relative;
   width: var(--tutor-width);
@@ -2009,21 +2010,34 @@ input::placeholder { color: var(--text-muted); }
 .tutor-resize-handle { position: absolute; inset: 0 -4px 0 auto; width: 10px; cursor: ew-resize; touch-action: none; }
 .tutor-resize-handle:focus-visible { outline: 3px solid color-mix(in srgb, var(--olive) 30%, transparent); outline-offset: -4px; }
 .tutor-drawer-toggle {
-  align-self: flex-start;
-  margin-top: 18px;
-  padding: 10px 13px;
-  border: 1px solid var(--line);
-  border-left: 0;
-  border-radius: 0 13px 13px 0;
-  background: var(--olive);
-  color: white;
-  box-shadow: var(--shadow-card);
-  font: inherit;
-  font-size: 0.75rem;
-  font-weight: 700;
+  position: fixed;
+  left: 18px;
+  top: 110px;
+  z-index: 81;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #11120f;
+  color: #fff;
+  box-shadow: 0 10px 26px rgba(17, 18, 15, 0.28);
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  font-weight: 680;
+  letter-spacing: -0.04em;
   cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
 }
-.tutor-drawer-toggle:hover { transform: translateY(-1px); box-shadow: var(--shadow-float); }
+.tutor-drawer-toggle:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(17, 18, 15, 0.34); }
+.tutor-drawer-toggle:focus-visible { outline: 3px solid color-mix(in srgb, #11120f 30%, transparent); outline-offset: 3px; }
+.tutor-drawer-toggle.is-hidden { opacity: 0; transform: scale(0.8); pointer-events: none; }
+.main-content { transition: padding-left var(--motion-smooth); }
+@media (min-width: 641px) {
+  body.tutor-open .main-content { padding-left: calc(var(--tutor-offset, 360px) + 24px); }
+}
 
 .tutor-dock { width: 100%; }
 .tutor-dock-toggle {
