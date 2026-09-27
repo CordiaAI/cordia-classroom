@@ -1,16 +1,14 @@
 """
 Authentication router for CordiaClassroom.
-Handles user signup, login, and session management via Supabase Auth.
+Handles login and session management via Supabase Auth. New accounts are created only through Google OAuth.
 """
 
 import re
 import os
 import time
 import logging
-import requests as http_requests
 from collections import defaultdict
 from fastapi import APIRouter, HTTPException, Request, Header
-from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator
 from database import get_supabase, get_auth_supabase
 
@@ -19,7 +17,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 # In-memory brute force protection — separate counters for auth vs refresh
 # so that automatic token refresh calls don't eat into the login quota.
-_auth_attempts = defaultdict(list)    # login/signup: IP -> [timestamps]
+_auth_attempts = defaultdict(list)    # login: IP -> [timestamps]
 _refresh_attempts = defaultdict(list) # token refresh: IP -> [timestamps]
 MAX_AUTH_ATTEMPTS = 10
 MAX_REFRESH_ATTEMPTS = 30
@@ -46,56 +44,6 @@ def _check_rate_limit(request: Request, store: defaultdict, max_attempts: int):
     if len(store[ip]) >= max_attempts:
         raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
     store[ip].append(now)
-
-
-class SignupRequest(BaseModel):
-    email: EmailStr
-    password: str
-    name: Optional[str] = None
-    university: Optional[str] = None
-    major: Optional[str] = None
-
-    @field_validator("password")
-    @classmethod
-    def validate_password(cls, v):
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
-        if len(v) > 128:
-            raise ValueError("Password too long")
-        if not re.search(r'[A-Z]', v):
-            raise ValueError("Password must contain an uppercase letter")
-        if not re.search(r'[a-z]', v):
-            raise ValueError("Password must contain a lowercase letter")
-        if not re.search(r'[0-9]', v):
-            raise ValueError("Password must contain a number")
-        return v
-
-    @field_validator("email")
-    @classmethod
-    def validate_email_length(cls, v):
-        if len(v) > 254:
-            raise ValueError("Email too long")
-        return v
-
-    @field_validator("name")
-    @classmethod
-    def validate_name(cls, v):
-        if v is not None:
-            v = v.strip()
-            if len(v) > 200:
-                raise ValueError("Name too long")
-            return v if v else None
-        return v
-
-    @field_validator("university", "major")
-    @classmethod
-    def validate_optional_field(cls, v):
-        if v is not None:
-            v = v.strip()
-            if len(v) > 300:
-                raise ValueError("Field value too long")
-            return v if v else None
-        return v
 
 
 class LoginRequest(BaseModel):
@@ -157,73 +105,6 @@ def google_oauth():
     except Exception as error:
         logger.error("Google OAuth start failed: %s", type(error).__name__)
         raise HTTPException(status_code=503, detail="Google sign-in is not configured yet.")
-
-
-@router.post("/signup", response_model=AuthResponse)
-def signup(request: SignupRequest, req: Request):
-    """Create a new user account. Rate limited."""
-    _check_rate_limit(req, _auth_attempts, MAX_AUTH_ATTEMPTS)
-    try:
-        result = get_auth_supabase().auth.sign_up({
-            "email": request.email,
-            "password": request.password,
-            "options": {"data": {
-                "name": request.name,
-                "university": request.university,
-                "major": request.major,
-            }},
-        })
-
-        if not result.user:
-            raise HTTPException(status_code=400, detail="Signup failed")
-
-        # Store profile data in user_profiles table for Make.com integration
-        try:
-            profile_data = {
-                "id": result.user.id,
-                "email": request.email,
-                "name": request.name,
-                "university": request.university,
-                "major": request.major,
-            }
-            get_supabase().table("user_profiles").insert(profile_data).execute()
-        except Exception as profile_err:
-            # Don't fail signup if profile insert fails — user is already created
-            logger.warning(f"Failed to save user profile: {profile_err}")
-
-        # Notify Make.com webhook with new user data
-        try:
-            make_url = os.getenv("MAKE_WEBHOOK_URL", "")
-            make_api_key = os.getenv("MAKE_API_KEY", "")
-            if make_url:
-                http_requests.post(
-                    make_url,
-                    json={
-                        "name": request.name,
-                        "email": request.email,
-                        "university": request.university,
-                        "major": request.major,
-                    },
-                    headers={"x-make-apikey": make_api_key} if make_api_key else {},
-                    timeout=5,
-                )
-        except Exception as make_err:
-            # Don't fail signup if Make.com call fails
-            logger.warning(f"Failed to notify Make.com: {make_err}")
-
-        return AuthResponse(
-            user_id=result.user.id,
-            email=result.user.email,
-            access_token=result.session.access_token if result.session else "",
-            refresh_token=result.session.refresh_token if result.session else "",
-            name=_display_name(result.user),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Signup error: {e}")
-        raise HTTPException(status_code=400, detail="Signup failed. Email may already be in use.")
 
 
 @router.post("/login", response_model=AuthResponse)

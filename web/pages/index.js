@@ -9,8 +9,7 @@ const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState('');
-  const [isSignup, setIsSignup] = useState(false);
-  const [confirmationSent, setConfirmationSent] = useState(false);
+  const [passwordMode, setPasswordMode] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
@@ -40,17 +39,15 @@ export default function LoginPage() {
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
-    setConfirmationSent(false);
 
     const form = new FormData(event.currentTarget);
     const body = {
       email: String(form.get('email') || '').trim().toLowerCase(),
       password: String(form.get('password') || ''),
     };
-    if (isSignup) body.name = String(form.get('name') || '').trim();
 
     try {
-      const response = await fetch(`${API}/auth/${isSignup ? 'signup' : 'login'}`, {
+      const response = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -61,8 +58,6 @@ export default function LoginPage() {
         setToken(data.access_token, data.email, data.refresh_token, data.name);
         scheduleProactiveRefresh();
         router.push('/dashboard');
-      } else if (response.ok && isSignup) {
-        setConfirmationSent(true);
       } else {
         const detail = (Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail)?.replace(/^Value error,\s*/, '');
         const reference = data.request_id ? ` Reference: ${data.request_id}` : '';
@@ -95,9 +90,8 @@ export default function LoginPage() {
     setError('');
   }
 
-  function selectMode(signup) {
-    setIsSignup(signup);
-    setConfirmationSent(false);
+  function selectPasswordMode(enabled) {
+    setPasswordMode(enabled);
     setError('');
   }
 
@@ -139,40 +133,36 @@ export default function LoginPage() {
               </div>
             ) : (
               <div className="login-form-wrap">
-                <h2 className="login-form-title">{isSignup ? 'Create account' : 'Sign in'}</h2>
+                <h2 className="login-form-title">Sign in</h2>
                 <button type="button" className="login-oauth-button" onClick={continueWithGoogle} disabled={oauthLoading}>
                   <span aria-hidden="true">G</span>
                   {oauthLoading ? 'Opening Google…' : 'Continue with Google'}
                 </button>
-                <div className="login-or"><span>or use email</span></div>
-                <div className="login-mode-tabs" role="tablist" aria-label="Account access">
-                  <button type="button" role="tab" aria-selected={!isSignup} className={!isSignup ? 'active' : ''} onClick={() => selectMode(false)}>Sign in</button>
-                  <button type="button" role="tab" aria-selected={isSignup} className={isSignup ? 'active' : ''} onClick={() => selectMode(true)}>Create account</button>
-                </div>
+                <p className="login-switch-text">New to CordiaClassroom? Continue with Google to create your account.</p>
+                {error && !passwordMode && <p className="login-form-error" role="alert">{error}</p>}
 
-                <form key={isSignup ? 'signup' : 'login'} onSubmit={handleSubmit}>
-                  {isSignup && (
-                    <div className="login-input-row">
-                      <input name="name" type="text" className="login-underline-input" placeholder="Full name" autoComplete="name" required />
-                    </div>
-                  )}
-                  <div className="login-input-row">
-                    <input name="email" type="email" className="login-underline-input" placeholder="Email" autoComplete="email" required />
-                  </div>
-                  <div className="login-input-row">
-                    <input name="password" type="password" className="login-underline-input" placeholder="Password" autoComplete={isSignup ? 'new-password' : 'current-password'} minLength={8} required />
-                  </div>
-
-                  {!isSignup && <div className="login-forgot"><a href="#" onClick={(event) => { event.preventDefault(); setForgotMode(true); setError(''); }}>Forgot password?</a></div>}
-                  {error && <p className="login-form-error" role="alert">{error}</p>}
-                  {confirmationSent && <p className="login-success">Account created. Check your email to confirm it.</p>}
-                  <button type="submit" className="btn login-cta-btn">{isSignup ? 'Create account' : 'Sign in'}</button>
-                </form>
-
-                <p className="login-switch-text">
-                  {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
-                  <a href="#" onClick={(event) => { event.preventDefault(); selectMode(!isSignup); }}>{isSignup ? 'Sign in' : 'Sign up'}</a>
-                </p>
+                {passwordMode ? (
+                  <>
+                    <div className="login-or"><span>existing email account</span></div>
+                    <form onSubmit={handleSubmit}>
+                      <div className="login-input-row">
+                        <input name="email" type="email" className="login-underline-input" placeholder="Email" autoComplete="email" required />
+                      </div>
+                      <div className="login-input-row">
+                        <input name="password" type="password" className="login-underline-input" placeholder="Password" autoComplete="current-password" minLength={8} required />
+                      </div>
+                      <div className="login-forgot"><a href="#" onClick={(event) => { event.preventDefault(); setForgotMode(true); setError(''); }}>Forgot password?</a></div>
+                      {error && <p className="login-form-error" role="alert">{error}</p>}
+                      <button type="submit" className="btn login-cta-btn">Sign in</button>
+                    </form>
+                    <p className="login-switch-text"><a href="#" onClick={(event) => { event.preventDefault(); selectPasswordMode(false); }}>Hide email sign-in</a></p>
+                  </>
+                ) : (
+                  <p className="login-switch-text">
+                    Signed up with email and password before?{' '}
+                    <a href="#" onClick={(event) => { event.preventDefault(); selectPasswordMode(true); }}>Sign in with email</a>
+                  </p>
+                )}
               </div>
             )}
           </section>
