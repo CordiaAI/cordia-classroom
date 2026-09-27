@@ -5,7 +5,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
-from services.llm import validate_practice_set
+from services.llm import _loads_model_json, validate_practice_set
 
 
 class PracticeContractTests(unittest.TestCase):
@@ -61,6 +61,12 @@ class PracticeContractTests(unittest.TestCase):
         result = validate_practice_set({"problems": [problem]})
         self.assertEqual(result["problems"][0]["verification"]["status"], "review_required")
 
+
+class ModelJsonTests(unittest.TestCase):
+    def test_unescaped_latex_backslashes_parse(self):
+        raw = r'[{"stem": "Given \( a \) and \\( b \\)\n", "q": "\"x\""}]'
+        self.assertEqual(_loads_model_json(raw)[0]["stem"], "Given \\( a \\) and \\( b \\)\n")
+        self.assertEqual(_loads_model_json(raw)[0]["q"], '"x"')
 
 if __name__ == "__main__":
     unittest.main()

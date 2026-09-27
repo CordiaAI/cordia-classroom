@@ -443,6 +443,19 @@ _PRACTICE_KINDS = {
 }
 
 
+_JSON_ESCAPE = re.compile(r'\\(.?)', re.S)
+
+
+def _loads_model_json(raw: str):
+    """json.loads that tolerates LaTeX-style backslashes (e.g. \\( a \\)) models leave unescaped."""
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return json.loads(_JSON_ESCAPE.sub(
+            lambda m: m.group(0) if m.group(1) and m.group(1) in '"\\/bfnrtu' else "\\\\" + m.group(1), raw
+        ))
+
+
 def _practice_json(raw: str) -> dict:
     """Parse one JSON object without accepting prose around it."""
     raw = (raw or "").strip()
@@ -451,7 +464,7 @@ def _practice_json(raw: str) -> dict:
         if raw.lstrip().startswith("json"):
             raw = raw.lstrip()[4:]
     try:
-        parsed = json.loads(raw.strip())
+        parsed = _loads_model_json(raw.strip())
     except (TypeError, json.JSONDecodeError):
         return {}
     return parsed if isinstance(parsed, dict) else {}
@@ -904,12 +917,12 @@ Do NOT stop until every Q&A pair has a corresponding NCLEX question."""
 
         # Attempt to parse; if truncated mid-JSON, recover completed objects
         try:
-            questions = _json.loads(raw)
+            questions = _loads_model_json(raw)
         except _json.JSONDecodeError:
             last_complete = raw.rfind('},')
             if last_complete > 0:
                 try:
-                    questions = _json.loads(raw[:last_complete + 1] + ']')
+                    questions = _loads_model_json(raw[:last_complete + 1] + ']')
                 except _json.JSONDecodeError:
                     logger.error("Could not recover partial NCLEX JSON")
                     return []
@@ -1028,12 +1041,12 @@ Do NOT stop until every Q&A pair has a corresponding practice question."""
 
         # Parse JSON, recover if truncated
         try:
-            questions = _json.loads(raw)
+            questions = _loads_model_json(raw)
         except _json.JSONDecodeError:
             last_complete = raw.rfind('},')
             if last_complete > 0:
                 try:
-                    questions = _json.loads(raw[:last_complete + 1] + ']')
+                    questions = _loads_model_json(raw[:last_complete + 1] + ']')
                 except _json.JSONDecodeError:
                     logger.error("Could not recover partial practice questions JSON")
                     return []
@@ -1170,12 +1183,12 @@ Do NOT stop until every Q&A pair has a corresponding exam question."""
 
         # Parse JSON, recover if truncated
         try:
-            questions = _json.loads(raw)
+            questions = _loads_model_json(raw)
         except _json.JSONDecodeError:
             last_complete = raw.rfind('},')
             if last_complete > 0:
                 try:
-                    questions = _json.loads(raw[:last_complete + 1] + ']')
+                    questions = _loads_model_json(raw[:last_complete + 1] + ']')
                 except _json.JSONDecodeError:
                     logger.error(f"Could not recover partial {exam_mode_id} exam JSON")
                     return []

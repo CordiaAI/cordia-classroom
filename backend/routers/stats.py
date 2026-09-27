@@ -182,49 +182,44 @@ def get_streak(authorization: str = Header(default=""), tz_offset: int = 0):
             }
 
         streak = result.data[0]
-        last_date = date.fromisoformat(streak["last_study_date"]) if streak["last_study_date"] else None
-        studied_today = last_date == user_today
 
-        current = streak["current_streak"]
-        if last_date and last_date < user_today - timedelta(days=1):
-            current = 0
-
-        # Sunday-aligned week: find most recent Sunday
-        # weekday(): Mon=0 .. Sun=6  →  days_since_sunday = (weekday+1)%7
-        days_since_sunday = (user_today.weekday() + 1) % 7
-        sunday = user_today - timedelta(days=days_since_sunday)
-        saturday = sunday + timedelta(days=6)
-
-        # Convert local day boundaries to UTC for querying
-        utc_start = datetime(sunday.year, sunday.month, sunday.day) - timedelta(minutes=tz_offset)
-        utc_end = datetime(saturday.year, saturday.month, saturday.day, 23, 59, 59) - timedelta(minutes=tz_offset)
-
+        # Study sessions are the source of truth; bucket them by the user's local day so the
+        # streak, week dots, and "studied today" agree (streak rows are written in server UTC).
+        window_start = datetime(user_today.year, user_today.month, user_today.day) - timedelta(days=400, minutes=tz_offset)
         sessions = supabase.table("study_sessions") \
             .select("started_at") \
             .eq("user_id", user_id) \
-            .gte("started_at", utc_start.isoformat()) \
-            .lte("started_at", utc_end.isoformat()) \
+            .gte("started_at", window_start.isoformat()) \
+            .order("started_at", desc=True) \
+            .limit(5000) \
             .execute()
 
-        # Convert each session's UTC timestamp to the user's local date
         active_days = set()
         for s in (sessions.data or []):
             ts = s["started_at"]
             try:
                 utc_dt = datetime.fromisoformat(ts.replace("Z", "+00:00").replace("+00:00", ""))
-                local_dt = utc_dt + timedelta(minutes=tz_offset)
-                active_days.add(str(local_dt.date()))
+                active_days.add((utc_dt + timedelta(minutes=tz_offset)).date())
             except (ValueError, AttributeError):
-                active_days.add(ts[:10])
+                continue
 
+        studied_today = user_today in active_days
+        day = user_today if studied_today else user_today - timedelta(days=1)
+        current = 0
+        while day in active_days:
+            current += 1
+            day -= timedelta(days=1)
+
+        # Sunday-aligned week: weekday() Mon=0 .. Sun=6  →  days_since_sunday = (weekday+1)%7
+        sunday = user_today - timedelta(days=(user_today.weekday() + 1) % 7)
         week = []
         for i in range(7):
             d = sunday + timedelta(days=i)
-            week.append({"date": str(d), "active": str(d) in active_days})
+            week.append({"date": str(d), "active": d in active_days})
 
         return {
             "current_streak": current,
-            "longest_streak": streak["longest_streak"],
+            "longest_streak": max(streak["longest_streak"] or 0, current),
             "last_study_date": streak["last_study_date"],
             "studied_today": studied_today,
             "week": week
