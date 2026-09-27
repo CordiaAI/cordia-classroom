@@ -580,6 +580,41 @@ def validate_practice_set(payload: dict, limit: int = 10) -> dict:
     }
 
 
+def grade_practice_answer(prompt: str, reference: str, worked_solution: str, student_answer: str) -> dict:
+    """Mark a student's practice answer right or wrong against the reference, explaining any miss."""
+    client = get_openai_client()
+    if not client:
+        return {}
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": (
+                    "You grade one practice answer. Judge meaning, not wording: an answer is correct "
+                    "if it would earn full credit from a fair teacher (equivalent code, forms, units, "
+                    "or phrasing count). Minor typos that do not change meaning are fine. If it is "
+                    "wrong or incomplete, explain in 1-3 sentences what is wrong and why, addressed "
+                    "to the student. If correct, confirm briefly. "
+                    'Return JSON: {"correct": true|false, "explanation": "..."}'
+                )},
+                {"role": "user", "content": (
+                    f"TASK:\n{prompt[:3000]}\n\nREFERENCE ANSWER:\n{reference[:3000]}\n\n"
+                    f"WORKED SOLUTION:\n{worked_solution[:3000]}\n\nSTUDENT ANSWER:\n{student_answer[:3000]}"
+                )},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=300,
+            temperature=0,
+        )
+        parsed = _practice_json(response.choices[0].message.content)
+    except Exception as e:
+        logger.error(f"Error grading practice answer: {e}")
+        return {}
+    if not isinstance(parsed.get("correct"), bool):
+        return {}
+    return {"correct": parsed["correct"], "explanation": str(parsed.get("explanation") or "").strip()[:1200]}
+
+
 def classify_practice_area(context: str, declared_domain: str = "") -> dict:
     """Step 1: identify the area of study so step 2 can use that area's practice prompt."""
     client = get_openai_client()
@@ -626,10 +661,10 @@ MATERIAL:
 Return one JSON object:
 {{
   "problems": [{{
-    "practice_type": "calculation|word_problem|code|debugging|scenario|analysis|explanation|design|recall",
+    "practice_type": "calculation|word_problem|code|debugging|scenario|analysis|design",
     "prompt": "self-contained task",
     "answer_format": "what the student should submit",
-    "answer": "reference answer",
+    "answer": "the correct answer, as short as possible",
     "worked_solution": "steps and reasoning",
     "source_basis": "the concept or section of the material this practices",
     "verification_method": "calculation|code_review|rubric|source",

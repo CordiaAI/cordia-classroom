@@ -119,3 +119,10 @@ class PracticeRequest(BaseModel):
     guide_id: Optional[str] = Field(default=None, max_length=36)
     content: str = Field(default="", max_length=500_000)
     title: Optional[str] = Field(default=None, max_length=200)
+
+
+class PracticeGradeRequest(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=4000)
+    reference: str = Field(..., min_length=1, max_length=4000)
+    worked_solution: str = Field(default="", max_length=6000)
+    student_answer: str = Field(..., min_length=1, max_length=4000)

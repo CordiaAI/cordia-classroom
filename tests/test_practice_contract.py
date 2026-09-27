@@ -5,6 +5,9 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
+from unittest.mock import MagicMock, patch
+
+import services.llm as llm
 from services.llm import _loads_model_json, validate_practice_set
 
 
@@ -67,6 +70,20 @@ class ModelJsonTests(unittest.TestCase):
         raw = r'[{"stem": "Given \( a \) and \\( b \\)\n", "q": "\"x\""}]'
         self.assertEqual(_loads_model_json(raw)[0]["stem"], "Given \\( a \\) and \\( b \\)\n")
         self.assertEqual(_loads_model_json(raw)[0]["q"], '"x"')
+
+class PracticeGradingTests(unittest.TestCase):
+    def grade(self, reply):
+        client = MagicMock()
+        client.chat.completions.create.return_value.choices[0].message.content = reply
+        with patch.object(llm, "get_openai_client", return_value=client):
+            return llm.grade_practice_answer("Declare an int array nums of size 5.", "int nums[5];", "", "int nums[4];")
+
+    def test_wrong_answer_returns_explanation(self):
+        result = self.grade('{"correct": false, "explanation": "The size must be 5, not 4."}')
+        self.assertEqual(result, {"correct": False, "explanation": "The size must be 5, not 4."})
+
+    def test_unusable_grade_returns_empty(self):
+        self.assertEqual(self.grade('{"correct": "maybe"}'), {})
 
 if __name__ == "__main__":
     unittest.main()

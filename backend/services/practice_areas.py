@@ -10,9 +10,12 @@ PRACTICE_BASE = (
     "built from the study material they provide. Interpret the material: problems must test "
     "what it teaches, but you may write new scenarios, values, and examples that apply it. "
     "Never contradict the material and never rely on facts it does not support. "
-    "Every problem must be self-contained, have one defensible reference answer, and include "
-    "a worked solution a student can learn from. Vary difficulty from direct application to "
-    "multi-step reasoning. Return valid JSON only."
+    "Every problem must be a task the student performs, never a recall or definition question: "
+    "do not ask 'What is X?', 'Define X', or 'Explain what X means'. Ask them to write, compute, "
+    "declare, apply, fix, choose, or decide something (e.g. 'Declare an integer array named nums "
+    "with 5 elements', not 'What is an array?'). Each task has one short answer that can be "
+    "judged right or wrong, plus a worked solution a student can learn from. Vary difficulty "
+    "from direct application to multi-step reasoning. Return valid JSON only."
 )
 
 PRACTICE_AREAS = {
