@@ -54,6 +54,10 @@ Baseline (2026-09-26, main 416e039): 111 Python tests pass, 10/12 node tests pas
 - Every Q must stand alone: never "What is the task in Problem 4?" or "Slide 5". Worked examples/practice problems become "how do you apply the method" questions (rule in `_build_study_guide_prompt`, next to the assignments rule it narrows).
 - A generation fix can't be verified from a cloud session (no OpenAI key; running code on Fly via ssh is blocked). Say so and ask Jackson to regenerate the guide.
 
+## OpenAI models (owner decision, 2026-09-28)
+- Uses gpt-4o and gpt-4o-mini only. OpenAI data sharing is OFF (Jackson turned it off), so all tokens are billed.
+- Switching to gpt-5-mini/nano was proposed and deferred: "don't change what's working". Needs temperature/max_tokens changes and a real quality check Jackson must run. Don't raise it again unless cost or quality comes up.
+
 ## Backend rules learned in production (2026-09-27)
 - One uvicorn worker, 1 CPU: an `async def` route that calls OpenAI/Supabase/parsing synchronously freezes every other request. Use plain `def` (FastAPI threads it) or `run_in_threadpool`.
 - Parse model JSON with `response_format={"type": "json_object"}` or `_loads_model_json`; math guides contain LaTeX backslashes that break plain `json.loads`.
