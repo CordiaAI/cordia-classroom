@@ -130,6 +130,7 @@ CRITICAL RULES:
 • ONLY use information that is explicitly stated in the text below.
 • NEVER invent, assume, or hallucinate any facts, terms, or answers.
 • Academic assignments, rubrics, learning objectives, exam topics, and required deliverables ARE educational content. Turn them into questions about what the student must understand or complete.
+• Worked examples, practice problems, and case studies teach a method: ask how to apply that method (with the given values, rules, or tables) and answer with the steps and result the text supports. Every question must stand alone — never refer to the source's labels such as "Problem 4", "Example 2", "Slide 5", or "the table above".
 • If the text contains no educational content (e.g., only navigation menus, UI elements, or unrelated text), respond with exactly: "NO_EDUCATIONAL_CONTENT"
 • Every answer MUST be directly supported by the text provided.
 • NEVER generate a question where the answer is "no additional information is provided" or similar — if the text doesn't explain a term, skip it.
