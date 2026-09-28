@@ -49,7 +49,7 @@ class PptxRenderHardeningTests(unittest.TestCase):
 
     def test_endpoint_offloads_blocking_conversion(self):
         source = (BACKEND / "main.py").read_text(encoding="utf-8")
-        self.assertIn("await run_in_threadpool(render_pptx_to_pdf, content_bytes)", source)
+        self.assertIn("await run_in_threadpool(render_pptx_to_pdf, content_bytes, suffix)", source)
 
 
 if __name__ == "__main__":

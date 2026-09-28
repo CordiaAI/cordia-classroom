@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { authHeaders, authOnlyHeaders, responseJson } from '../lib/api';
+import { authHeaders, authorizedFetch, responseJson } from '../lib/api';
 import StudyWorkspaceFrame from '../components/StudyWorkspaceFrame';
 import { organizeDashboardGuides } from '../lib/dashboardOrganization';
 
@@ -123,7 +123,9 @@ function MermaidDiagram({ code }) {
 }
 
 // Office docs that need backend extraction (browser cannot render natively)
-const EXTRACT_EXTS = new Set(['docx', 'pptx', 'doc', 'odt', 'ods', 'odp']);
+const EXTRACT_EXTS = new Set(['docx', 'doc', 'odt', 'ods']);
+// Presentations render to a scrollable PDF of the real slides (server-side LibreOffice).
+const SLIDE_EXTS = new Set(['pptx', 'ppt', 'odp']);
 // Plain-text formats readable client-side via FileReader
 const TEXT_EXTS = new Set([
   'txt', 'md', 'markdown', 'csv', 'tsv', 'log',
@@ -261,7 +263,7 @@ function FileViewer({ file, guideContent }) {
     let cancelled = false;
     let renderedUrl = null;
 
-    if (ext === 'pptx') {
+    if (SLIDE_EXTS.has(ext)) {
       setExtracting(true);
 
       async function loadPptx() {
@@ -269,11 +271,7 @@ function FileViewer({ file, guideContent }) {
         try {
           const renderData = new FormData();
           renderData.append('file', file);
-          const renderResponse = await fetch(API + '/render-pptx', {
-            method: 'POST',
-            headers: authOnlyHeaders(),
-            body: renderData,
-          });
+          const renderResponse = await authorizedFetch('/render-pptx', { method: 'POST', body: renderData });
 
           if (renderResponse.ok) {
             const pdfBlob = await renderResponse.blob();
@@ -298,11 +296,7 @@ function FileViewer({ file, guideContent }) {
 
         const extractData = new FormData();
         extractData.append('file', file);
-        const extractResponse = await fetch(API + '/extract-file-text', {
-          method: 'POST',
-          headers: authOnlyHeaders(),
-          body: extractData,
-        });
+        const extractResponse = await authorizedFetch('/extract-file-text', { method: 'POST', body: extractData });
         const data = await responseJson(extractResponse).catch(() => ({}));
         if (cancelled) return;
         if (!extractResponse.ok) throw new Error(data.detail || 'Could not read this presentation.');
@@ -326,7 +320,7 @@ function FileViewer({ file, guideContent }) {
       setExtracting(true);
       const fd = new FormData();
       fd.append('file', file);
-      fetch(API + '/extract-file-text', { method: 'POST', headers: authOnlyHeaders(), body: fd })
+      authorizedFetch('/extract-file-text', { method: 'POST', body: fd })
         .then(async r => {
           const data = await responseJson(r).catch(() => ({}));
           if (cancelled) return;
@@ -362,7 +356,7 @@ function FileViewer({ file, guideContent }) {
 
   const ext = file.name.split('.').pop().toLowerCase();
 
-  if (extracting) return <div className="sn-viewer-empty"><p>{ext === 'pptx' ? 'Preparing visual preview' : 'Reading'} {file.name}…</p></div>;
+  if (extracting) return <div className="sn-viewer-empty"><p>{SLIDE_EXTS.has(ext) ? 'Preparing slides' : 'Reading'} {file.name}…</p></div>;
 
   if (slidesData !== null) return (
     <div className="sn-slide-fallback">
@@ -388,7 +382,7 @@ function FileViewer({ file, guideContent }) {
 
   if (!objectUrl) return null;
 
-  if (ext === 'pdf' || ext === 'pptx') return <iframe src={objectUrl} className="sn-iframe" title={file.name} />;
+  if (ext === 'pdf' || SLIDE_EXTS.has(ext)) return <iframe src={objectUrl} className="sn-iframe" title={file.name} />;
   if (IMAGE_EXTS.has(ext)) return <img src={objectUrl} className="sn-viewer-img" alt={file.name} />;
   if (VIDEO_EXTS.has(ext)) return <video src={objectUrl} controls className="sn-viewer-video" />;
   if (AUDIO_EXTS.has(ext)) return <audio src={objectUrl} controls style={{ width: '100%', padding: 16 }} />;

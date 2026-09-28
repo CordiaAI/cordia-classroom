@@ -41,8 +41,8 @@ class PptxRenderEndpointTests(unittest.TestCase):
     def test_rejects_non_pptx_filename(self):
         self.assertEqual(self.post_file(name="lecture.txt").status_code, 400)
 
-    def test_rejects_file_larger_than_twenty_megabytes(self):
-        content = b"x" * (20 * 1024 * 1024 + 1)
+    def test_rejects_file_larger_than_fifty_megabytes(self):
+        content = b"x" * (50 * 1024 * 1024 + 1)
         self.assertEqual(self.post_file(content=content).status_code, 400)
 
     def test_maps_render_error_to_unprocessable_entity(self):

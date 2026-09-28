@@ -224,17 +224,18 @@ async def render_pptx(request: Request, file: UploadFile = None, authorization: 
         raise HTTPException(status_code=400, detail="No file uploaded")
 
     filename = (file.filename or "").lower()
-    if not filename.endswith(".pptx"):
-        raise HTTPException(status_code=400, detail="Unsupported file type. Use PPTX.")
+    suffix = next((ext for ext in (".pptx", ".ppt", ".odp") if filename.endswith(ext)), None)
+    if not suffix:
+        raise HTTPException(status_code=400, detail="Unsupported file type. Use PPTX, PPT, or ODP.")
 
     content_bytes = await file.read()
-    if len(content_bytes) > 20 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="File too large (max 20MB)")
+    if len(content_bytes) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 50MB)")
     if not content_bytes:
         raise HTTPException(status_code=400, detail="File is empty")
 
     try:
-        pdf_bytes = await run_in_threadpool(render_pptx_to_pdf, content_bytes)
+        pdf_bytes = await run_in_threadpool(render_pptx_to_pdf, content_bytes, suffix)
     except PptxRenderTimeout as exc:
         raise HTTPException(status_code=504, detail=str(exc)) from exc
     except PptxRenderUnavailable as exc:
