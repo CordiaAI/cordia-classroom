@@ -193,6 +193,15 @@ async function _doRefresh() {
   return false;
 }
 
+// For binary responses (e.g. rendered PDFs) and uploads: same 401 refresh as apiFetch,
+// returns the raw Response, and applies no short timeout.
+export async function authorizedFetch(path, options = {}) {
+  const request = () => fetch(API + path, { ...options, headers: { ...authOnlyHeaders(), ...options.headers } });
+  const response = await request();
+  if (response.status === 401 && await tryRefreshToken()) return request();
+  return response;
+}
+
 export async function apiFetch(path, options = {}) {
   if (typeof window === 'undefined' || !getToken()) return null;
   try {

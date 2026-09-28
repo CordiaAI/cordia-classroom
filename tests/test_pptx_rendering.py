@@ -35,7 +35,7 @@ class PptxRenderingTests(unittest.TestCase):
         self.assertEqual(result, b"%PDF-1.7 rendered")
         self.assertFalse(observed["directory"].exists())
         self.assertEqual(observed["args"][0], "soffice")
-        self.assertEqual(observed["kwargs"]["timeout"], 30)
+        self.assertEqual(observed["kwargs"]["timeout"], 90)
         self.assertFalse(observed["kwargs"]["shell"])
 
     def test_rejects_invalid_pdf_output(self):

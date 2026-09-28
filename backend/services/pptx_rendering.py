@@ -17,11 +17,11 @@ class PptxRenderUnavailable(PptxRenderError):
     """Raised when the LibreOffice executable is unavailable."""
 
 
-def render_pptx_to_pdf(content_bytes: bytes) -> bytes:
-    """Convert PPTX bytes to PDF bytes without persisting either file."""
+def render_pptx_to_pdf(content_bytes: bytes, suffix: str = ".pptx") -> bytes:
+    """Convert presentation bytes (.pptx, .ppt, .odp) to PDF bytes without persisting either file."""
     with TemporaryDirectory(prefix="autostudy-pptx-") as directory:
         workdir = Path(directory)
-        source = workdir / "presentation.pptx"
+        source = workdir / f"presentation{suffix}"
         output = workdir / "presentation.pdf"
         source.write_bytes(content_bytes)
 
@@ -42,7 +42,7 @@ def render_pptx_to_pdf(content_bytes: bytes) -> bytes:
                 args,
                 check=False,
                 capture_output=True,
-                timeout=30,
+                timeout=90,  # large image-heavy decks on a cold, single-CPU machine
                 shell=False,
             )
         except subprocess.TimeoutExpired as exc:

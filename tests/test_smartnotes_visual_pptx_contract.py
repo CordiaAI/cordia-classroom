@@ -10,9 +10,8 @@ GLOBALS = ROOT / "web" / "styles" / "globals.css"
 class SmartNotesVisualPptxContractTests(unittest.TestCase):
     def test_pptx_uses_visual_render_endpoint_and_pdf_blob(self):
         source = SMARTNOTES.read_text(encoding="utf-8")
-        self.assertIn("API + '/render-pptx'", source)
+        self.assertIn("authorizedFetch('/render-pptx'", source)
         self.assertIn("renderResponse.blob()", source)
-        self.assertIn("headers: authOnlyHeaders()", source)
         self.assertIn("URL.revokeObjectURL", source)
 
     def test_visual_failure_has_readable_scrolling_slide_fallback(self):
