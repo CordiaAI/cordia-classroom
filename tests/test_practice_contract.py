@@ -36,10 +36,31 @@ class PracticeContractTests(unittest.TestCase):
         self.assertEqual(problem["expected_value"], 12.0)
 
     def test_mismatched_numeric_key_is_kept_but_not_auto_graded(self):
-        problem = self.problem(calculation={"expression": "3*4", "expected_value": 14, "tolerance": 0.001})
+        problem = self.problem(
+            answer="14 volts",
+            worked_solution="Use V = I × R, so V = 14 volts.",
+            calculation={"expression": "3*4", "expected_value": 14, "tolerance": 0.001},
+        )
         result = validate_practice_set({"problems": [problem]})
         self.assertEqual(result["problems"][0]["verification"]["status"], "reference")
         self.assertIsNone(result["problems"][0]["expected_value"])
+
+    def test_mistyped_answer_is_corrected_to_the_recomputed_value(self):
+        # Reported case: key said 54 while the expression and worked solution gave 45.
+        problem = self.problem(
+            prompt="Speed is 4t^2 + 2t m/s. Find the distance traveled from t = 0 to t = 3.",
+            answer="54",
+            worked_solution="Integrate: [4/3 t^3 + t^2] from 0 to 3 = 36 + 9 = 45.",
+            calculation={"expression": "4/3*27 + 9", "expected_value": 54, "tolerance": 0.001},
+        )
+        result = validate_practice_set({"problems": [problem]})["problems"][0]
+        self.assertEqual(result["answer"], "45")
+        self.assertEqual(result["expected_value"], 45.0)
+        self.assertEqual(result["verification"]["status"], "verified")
+
+    def test_answer_units_are_kept_when_the_number_is_corrected(self):
+        problem = self.problem(answer="21 volts")
+        self.assertEqual(validate_practice_set({"problems": [problem]})["problems"][0]["answer"], "12 volts")
 
     def test_source_basis_is_not_required_to_match_material_verbatim(self):
         result = validate_practice_set({"problems": [self.problem(source_basis="Ohm's law applied to a resistor")]})
