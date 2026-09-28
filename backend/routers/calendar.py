@@ -154,7 +154,8 @@ def _events(text: str) -> list[dict]:
             current[key] = value.strip()
 
     now = datetime.now(timezone.utc)
-    start = (now - timedelta(days=1)).date()
+    # A week back so the current week view is complete in every time zone.
+    start = (now - timedelta(days=7)).date()
     end = (now + timedelta(days=90)).date()
     return sorted(
         (item for item in items if start <= datetime.fromisoformat(item["due_at"]).date() <= end),

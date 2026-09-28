@@ -24,6 +24,39 @@ function dueLabel(item) {
     + (item.all_day ? '' : ` · ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
 }
 
+function startOfWeek(date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  start.setDate(start.getDate() - start.getDay());
+  return start;
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+// "Today" is the student's local day, not the server's UTC day.
+function localDueToday(items) {
+  const today = new Date().toDateString();
+  return items.filter(item => new Date(item?.due_at || '').toDateString() === today);
+}
+
+function timeLabel(item) {
+  if (item.all_day) return 'All day';
+  return new Date(item.due_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function weekSummary(items) {
+  if (!items.length) return 'Nothing due this week.';
+  const tests = items.filter(item => item.type === 'exam' || item.type === 'quiz').length;
+  const parts = [`${items.length} due this week`];
+  if (tests) parts.push(`${tests} ${tests === 1 ? 'exam or quiz' : 'exams and quizzes'}`);
+  const next = items.find(item => dateValue(item) >= Date.now());
+  if (next) parts.push(`next: ${next.title} (${new Date(next.due_at).toLocaleDateString([], { weekday: 'short' })})`);
+  return parts.join(' · ');
+}
+
 function notifyDueToday(items, userId) {
   const reminderKey = accountKey(REMINDER_KEY, userId);
   if (typeof window === 'undefined' || !reminderKey || !('Notification' in window) || localStorage.getItem(reminderKey) !== 'on' || Notification.permission !== 'granted') return;
@@ -44,6 +77,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
   const [error, setError] = useState('');
   const [reminders, setReminders] = useState(false);
   const [userId, setUserId] = useState('');
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
 
   useEffect(() => {
     const accountId = getUserId();
@@ -69,9 +103,10 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
   function applyCalendar(data, accountId) {
     if (!data?.connected || !Array.isArray(data.items)) return false;
     setConnected(true);
+    const today = localDueToday(data.items);
     setItems(data.items);
-    setDueToday(Array.isArray(data.due_today) ? data.due_today : []);
-    notifyDueToday(data.due_today || [], accountId);
+    setDueToday(today);
+    notifyDueToday(today, accountId);
     return true;
   }
 
@@ -231,40 +266,69 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     );
   }
 
-  const rows = list => list.length ? list.map(item => (
-    <a className="calendar-agenda-row" key={item.id} href={item.url || undefined} target={item.url ? '_blank' : undefined} rel={item.url ? 'noreferrer' : undefined}>
-      <span className={`calendar-kind calendar-kind-${item.type}`}>{item.type}</span>
-      <span className="calendar-agenda-copy">
+  const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+  const weekEnd = addDays(weekStart, 7).getTime();
+  const weekItems = items
+    .filter(item => dateValue(item) >= weekStart.getTime() && dateValue(item) < weekEnd)
+    .sort((a, b) => dateValue(a) - dateValue(b));
+  const todayKey = new Date().toDateString();
+  const rangeLabel = `${days[0].toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${days[6].toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+
+  function itemCard(item) {
+    const past = dateValue(item) < Date.now() && new Date(item.due_at).toDateString() !== todayKey;
+    const body = (
+      <>
+        <span className="calendar-item-meta">
+          <span className={`calendar-kind calendar-kind-${item.type}`}>{item.type}</span>
+          <small>{timeLabel(item)}</small>
+        </span>
         <strong>{item.title}</strong>
-        <small>{dueLabel(item)}{item.course ? ` · ${item.course}` : ''}</small>
-      </span>
-      {item.url && <span aria-hidden="true">↗</span>}
-    </a>
-  )) : <p className="canvas-empty">Nothing here right now.</p>;
+        {item.course && <small>{item.course}</small>}
+      </>
+    );
+    const className = `calendar-item${past ? ' calendar-item-past' : ''}`;
+    return item.url
+      ? <a key={item.id} className={className} href={item.url} target="_blank" rel="noreferrer" title={`Open in Canvas: ${item.title}`}>{body}</a>
+      : <div key={item.id} className={className}>{body}</div>;
+  }
 
   return (
     <section className="canvas-dashboard calendar-dashboard">
       <header className="canvas-dashboard-header">
         <div>
           <span className="calendar-eyebrow">Canvas calendar</span>
-          <h2>Your deadlines</h2>
+          <h2>Week of {rangeLabel}</h2>
+          <p className="calendar-week-summary">{weekSummary(weekItems)}</p>
         </div>
         <div className="calendar-actions">
+          <div className="calendar-week-nav">
+            <button type="button" className="btn-outline" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week">‹</button>
+            <button type="button" className="btn-outline" onClick={() => setWeekStart(startOfWeek(new Date()))}>This week</button>
+            <button type="button" className="btn-outline" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week">›</button>
+          </div>
           <button type="button" className="btn-outline" onClick={toggleReminders}>{reminders ? 'Reminders on' : 'Enable reminders'}</button>
           <button type="button" className="btn-outline" onClick={() => refresh()} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button>
           <button type="button" className="calendar-disconnect" onClick={disconnect}>Disconnect</button>
         </div>
       </header>
       {error && <div className="canvas-inline-error" role="alert">{error}</div>}
-      <div className="calendar-columns">
-        <section className="calendar-column calendar-today">
-          <header><h3>Due today</h3><span>{dueToday.length}</span></header>
-          {rows(dueToday)}
-        </section>
-        <section className="calendar-column">
-          <header><h3>Upcoming</h3><span>{upcoming.length}</span></header>
-          {rows(upcoming)}
-        </section>
+      <div className="calendar-week">
+        {days.map(day => {
+          const dayItems = weekItems.filter(item => new Date(item.due_at).toDateString() === day.toDateString());
+          const isToday = day.toDateString() === todayKey;
+          return (
+            <section key={day.toISOString()} className={`calendar-day${isToday ? ' calendar-day-today' : ''}`} aria-label={day.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}>
+              <header>
+                <span>{day.toLocaleDateString([], { weekday: 'short' })}</span>
+                <strong>{day.getDate()}</strong>
+                {isToday && <em>Due today</em>}
+              </header>
+              <div className="calendar-day-items">
+                {dayItems.length ? dayItems.map(itemCard) : <p className="calendar-day-empty">—</p>}
+              </div>
+            </section>
+          );
+        })}
       </div>
     </section>
   );
