@@ -74,14 +74,17 @@ export default function Sidebar() {
     router.push('/');
   }
 
-  const displayName = name || (email ? email.split('@')[0] : 'Your profile');
-  const initials = displayName
-    .split(/\s+/)
-    .filter(Boolean)
+  // Initials come only from the real name, or from the email's local part
+  // ("jane.doe" -> JD). Until identity loads the avatar stays blank; a placeholder
+  // label must never be turned into initials.
+  const emailName = email ? email.split('@')[0] : '';
+  const displayName = name || emailName;
+  const initials = (name ? name.split(/\s+/) : emailName.split(/[._-]+/))
+    .filter(part => /^[a-z]/i.test(part))
     .slice(0, 2)
     .map(part => part[0])
     .join('')
-    .toUpperCase() || 'CC';
+    .toUpperCase();
 
   return (
     <>
@@ -110,7 +113,7 @@ export default function Sidebar() {
           {menuOpen && (
             <div className="account-menu-panel" role="menu" aria-label="Account menu">
               <div className="account-menu-identity">
-                <strong>{displayName}</strong>
+                <strong>{displayName || 'Your account'}</strong>
                 <span>{email || 'CordiaClassroom account'}</span>
               </div>
               <button type="button" role="menuitem" onClick={() => router.push('/settings')}>Your profile</button>
