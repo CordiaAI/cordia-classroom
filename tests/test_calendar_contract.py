@@ -34,6 +34,24 @@ END:VCALENDAR
         self.assertFalse(items[0]["all_day"])
         self.assertTrue(items[1]["all_day"])
 
+    def test_parser_keeps_earlier_days_of_the_current_week(self):
+        earlier = (datetime.now(timezone.utc) - timedelta(days=6)).strftime("%Y%m%d")
+        stale = (datetime.now(timezone.utc) - timedelta(days=9)).strftime("%Y%m%d")
+        feed = f"""BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:earlier
+SUMMARY:Lab 1
+DTSTART;VALUE=DATE:{earlier}
+END:VEVENT
+BEGIN:VEVENT
+UID:stale
+SUMMARY:Lab 0
+DTSTART;VALUE=DATE:{stale}
+END:VEVENT
+END:VCALENDAR
+"""
+        self.assertEqual([item["id"] for item in _events(feed)], ["earlier"])
+
 
 if __name__ == "__main__":
     unittest.main()

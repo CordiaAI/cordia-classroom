@@ -502,6 +502,21 @@ def _safe_numeric_eval(expression: str) -> float:
     return result
 
 
+_NUMBER = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
+
+
+def _numbers_in(text: str) -> list:
+    return [float(match.replace(",", "")) for match in _NUMBER.findall(text or "")]
+
+
+def _answer_with_value(answer: str, value: float, tolerance: float) -> str:
+    """Make the shown answer agree with the recomputed value (the model can mistype its own key)."""
+    if any(math.isclose(value, number, rel_tol=1e-3, abs_tol=max(tolerance, 1e-9)) for number in _numbers_in(answer)):
+        return answer
+    shown = f"{value:.10g}"
+    return _NUMBER.sub(shown, answer, count=1) if _NUMBER.search(answer) else f"{shown} {answer}".strip()
+
+
 def validate_practice_set(payload: dict, limit: int = 10) -> dict:
     """Keep complete problems and shape them for the Practice page.
 
@@ -535,8 +550,12 @@ def validate_practice_set(payload: dict, limit: int = 10) -> dict:
                 value = float(calculation.get("expected_value"))
                 tol = max(0.0, min(float(calculation.get("tolerance", 0.001)), 1e6))
                 computed = _safe_numeric_eval(str(calculation.get("expression") or ""))
-                if math.isclose(computed, value, rel_tol=1e-9, abs_tol=max(tol, 1e-9)):
-                    expected_value, tolerance = value, tol
+                matches = lambda number: math.isclose(computed, number, rel_tol=1e-9, abs_tol=max(tol, 1e-9))
+                solution_numbers = _numbers_in(solution)
+                # The recomputed value is trusted when the key or the worked solution's result agrees.
+                if matches(value) or (solution_numbers and matches(solution_numbers[-1])):
+                    answer = _answer_with_value(answer, computed, tol)
+                    expected_value, tolerance = computed, tol
                     verification = {
                         "status": "verified",
                         "label": "Calculation checked",
