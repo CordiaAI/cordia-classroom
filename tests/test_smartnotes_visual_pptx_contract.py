@@ -22,6 +22,19 @@ class SmartNotesVisualPptxContractTests(unittest.TestCase):
         self.assertIn(".sn-slide-card", css)
         self.assertIn("overflow-y: auto", css)
 
+    def test_every_page_renders_in_a_scrollable_viewer(self):
+        source = SMARTNOTES.read_text(encoding="utf-8")
+        viewer = (ROOT / "web" / "components" / "PdfPages.js").read_text(encoding="utf-8")
+        self.assertIn("<PdfPages url={objectUrl}", source)
+        self.assertIn("doc.numPages", viewer)
+        self.assertIn("IntersectionObserver", viewer)
+
+    def test_failed_save_is_reported_and_blocks_guide_generation(self):
+        source = SMARTNOTES.read_text(encoding="utf-8")
+        self.assertIn("if (!response.ok) message = saveErrorMessage(response.status);", source)
+        self.assertIn("const saveProblem = await doSave();", source)
+        self.assertIn("onPaste={onPaperPaste}", source)
+
 
 if __name__ == "__main__":
     unittest.main()

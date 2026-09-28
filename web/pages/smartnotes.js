@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { authHeaders, authorizedFetch, responseJson } from '../lib/api';
 import StudyWorkspaceFrame from '../components/StudyWorkspaceFrame';
+import PdfPages from '../components/PdfPages';
 import { organizeDashboardGuides } from '../lib/dashboardOrganization';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -56,6 +57,39 @@ function applyWordRules(word) {
 
 function escHtml(t) {
   return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+const PASTE_TAGS = new Set(['P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'H1', 'H2', 'H3', 'UL', 'OL', 'LI']);
+const PASTE_BLOCKS = new Set(['DIV', 'SECTION', 'ARTICLE', 'TR', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE']);
+
+// Pasted pages and transcripts carry heavy inline styling (often several times the text
+// size). Keep only the structure the notes and study-guide prompt use, with no attributes.
+function cleanPastedHtml(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  function walk(node) {
+    if (node.nodeType === Node.TEXT_NODE) return escHtml(node.textContent.replace(/\s+/g, ' '));
+    if (node.nodeType !== Node.ELEMENT_NODE || ['SCRIPT', 'STYLE', 'META', 'LINK', 'TITLE'].includes(node.tagName)) return '';
+    const inner = Array.from(node.childNodes).map(walk).join('');
+    if (node.tagName === 'BR') return '<br>';
+    if (PASTE_TAGS.has(node.tagName)) {
+      const tag = node.tagName.toLowerCase();
+      return inner.trim() ? `<${tag}>${inner}</${tag}>` : '';
+    }
+    return PASTE_BLOCKS.has(node.tagName) && inner.trim() ? `<p>${inner}</p>` : inner;
+  }
+  return walk(doc.body);
+}
+
+function plainTextToHtml(text) {
+  return text.replace(/\r\n?/g, '\n').split('\n')
+    .map(line => line.trim() ? `<p>${escHtml(line)}</p>` : '')
+    .join('');
+}
+
+function saveErrorMessage(status) {
+  if (status === 401) return 'Your session expired. Sign in again to save this note.';
+  if (status === 413 || status === 422) return 'This note is too large to save. Split it into two notes.';
+  return 'Could not save this note. Check your connection and try again.';
 }
 
 function getBlock(node, root) {
@@ -382,7 +416,7 @@ function FileViewer({ file, guideContent }) {
 
   if (!objectUrl) return null;
 
-  if (ext === 'pdf' || SLIDE_EXTS.has(ext)) return <iframe src={objectUrl} className="sn-iframe" title={file.name} />;
+  if (ext === 'pdf' || SLIDE_EXTS.has(ext)) return <PdfPages url={objectUrl} title={file.name} />;
   if (IMAGE_EXTS.has(ext)) return <img src={objectUrl} className="sn-viewer-img" alt={file.name} />;
   if (VIDEO_EXTS.has(ext)) return <video src={objectUrl} controls className="sn-viewer-video" />;
   if (AUDIO_EXTS.has(ext)) return <audio src={objectUrl} controls style={{ width: '100%', padding: 16 }} />;
@@ -653,7 +687,8 @@ function SmartNotesEditor() {
   const router = useRouter();
   const [noteId, setNoteId] = useState(null);
   const [title, setTitle] = useState('Untitled Notes');
-  const [saveStatus, setSaveStatus] = useState(''); // '' | 'saving' | 'saved'
+  const [saveStatus, setSaveStatus] = useState(''); // '' | 'saving' | 'saved' | 'error'
+  const [saveError, setSaveError] = useState('');
   const [notes, setNotes] = useState([]); // session list
   const [showNotesList, setShowNotesList] = useState(false);
 
@@ -777,28 +812,37 @@ function SmartNotesEditor() {
   }
 
   // ── Save helper — sends content to backend, updates lastSavedRef ────────
+  // Resolves to '' when the note is saved (or unchanged), otherwise to a readable error.
+  // A failed save leaves lastSavedRef untouched so the next autosave retries it.
   const doSave = useCallback(async (opts = {}) => {
-    if (!paperRef.current || !noteIdRef.current) return;
+    if (!paperRef.current || !noteIdRef.current) return '';
     const content = paperRef.current.innerHTML;
-    if (content === lastSavedRef.current && titleRef.current === lastSavedTitleRef.current && !opts.force) return;
+    const title = titleRef.current;
+    if (content === lastSavedRef.current && title === lastSavedTitleRef.current && !opts.force) return '';
     setSaveStatus('saving');
+    let message = '';
     try {
-      const init = {
+      const response = await authorizedFetch('/smart_notes/' + noteIdRef.current, {
         method: 'PUT',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: titleRef.current, content }),
-      };
-      if (opts.keepalive) init.keepalive = true;
-      await fetch(API + '/smart_notes/' + noteIdRef.current, init);
-      lastSavedRef.current = content;
-      lastSavedTitleRef.current = titleRef.current;
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus(s => s === 'saved' ? '' : s), 1500);
-      fetchNotes(); // refresh sidebar list so title changes appear immediately
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content }),
+      });
+      if (!response.ok) message = saveErrorMessage(response.status);
     } catch {
-      setSaveStatus('error');
-      setTimeout(() => setSaveStatus(''), 2000);
+      message = saveErrorMessage(0);
     }
+    if (message) {
+      setSaveStatus('error');
+      setSaveError(message);
+      return message;
+    }
+    lastSavedRef.current = content;
+    lastSavedTitleRef.current = title;
+    setSaveError('');
+    setSaveStatus('saved');
+    setTimeout(() => setSaveStatus(s => s === 'saved' ? '' : s), 1500);
+    fetchNotes(); // refresh sidebar list so title changes appear immediately
+    return '';
   }, [fetchNotes]);
 
   // ── Autosave (debounced 1s after a keypress) ────────────────────────────
@@ -929,6 +973,18 @@ function SmartNotesEditor() {
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
+  }
+
+  function onPaperPaste(event) {
+    const data = event.clipboardData;
+    if (!data) return;
+    const html = data.getData('text/html');
+    const text = data.getData('text/plain');
+    if (!html && !text) return; // images and files keep the browser default
+    event.preventDefault();
+    const cleaned = (html && cleanPastedHtml(html)) || plainTextToHtml(text || '');
+    if (cleaned) document.execCommand('insertHTML', false, cleaned);
+    scheduleSave();
   }
 
   // ── Paper keyboard handler ───────────────────────────────────────────────
@@ -1358,7 +1414,13 @@ function SmartNotesEditor() {
     setPreviewError('');
     setConvertingGuide(true);
     try {
-      await doSave(); // ensure latest content is in DB before backend reads it
+      // The backend reads the saved note, so a failed save must stop here with its reason.
+      const saveProblem = await doSave();
+      if (saveProblem) {
+        setPreviewError(saveProblem);
+        setGuidePreview({ title: '', study_guide: '', pairs: [] });
+        return;
+      }
       const resp = await fetch(API + '/smart_notes/' + noteIdRef.current + '/study_guide', {
         method: 'POST',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
@@ -1444,7 +1506,7 @@ function SmartNotesEditor() {
             spellCheck={false}
           />
           <span className={`sn-status ${saveStatus}`}>
-            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : ''}
+            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? saveError : ''}
           </span>
         </div>
         <div className="sn-header-right">
@@ -1543,6 +1605,7 @@ function SmartNotesEditor() {
             suppressContentEditableWarning
             onKeyDown={onPaperKeyDown}
             onKeyUp={onPaperKeyUp}
+            onPaste={onPaperPaste}
             data-placeholder="Start typing your notes here…"
             spellCheck={false}
           />
