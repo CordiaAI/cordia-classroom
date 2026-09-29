@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from typing import List
 from database import get_supabase
 from services.llm import get_openai_client
+from services.llm_calls import chat
 from auth_utils import get_user_id
 from routers.billing import check_usage, get_user_plan, record_usage
 
@@ -192,13 +193,11 @@ CRITICAL RULES — follow every one:
 
 Return ONLY the JSON object, no other text:"""
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
+        response = chat(client, "quiz_distractors",
             messages=[
                 {"role": "system", "content": "Generate quiz distractors. Return valid JSON only."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=4096,
             temperature=0.5,
             response_format={"type": "json_object"},
         )
