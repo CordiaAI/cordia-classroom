@@ -29,6 +29,7 @@ from services.text_processing import (
     format_slideshow_text, inject_image_descriptions,
     inject_page_image_descriptions, build_review_sections
 )
+from services.llm_calls import chat
 from services.llm import (
     generate_notes_ai, generate_study_guide,
     generate_flashcards, answer_question, explain_retain_answer,
@@ -392,8 +393,7 @@ def extract_file_text(request: Request, file: UploadFile = None, authorization: 
                 mime = mime_map.get(ext, "image/jpeg")
                 b64 = _b64.b64encode(content_bytes).decode()
                 usage = check_usage(user_id, "lightweight")
-                response = client.chat.completions.create(
-                    model="gpt-4o",
+                response = chat(client, "image_extraction",
                     messages=[{
                         "role": "user",
                         "content": [
@@ -408,7 +408,6 @@ def extract_file_text(request: Request, file: UploadFile = None, authorization: 
                             )}
                         ]
                     }],
-                    max_tokens=2000,
                 )
                 text = (response.choices[0].message.content or "").strip()
                 if "NO_EDUCATIONAL_CONTENT" in text:

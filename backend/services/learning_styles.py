@@ -13,13 +13,13 @@ import re
 from typing import List, Optional
 
 from services.llm import _practice_json, get_openai_client
+from services.llm_calls import chat
 
 logger = logging.getLogger(__name__)
 
 STYLES = ("visual", "aural", "read_write", "kinesthetic", "multimodal")
 AID_MODES = ("visual", "aural", "read_write", "kinesthetic")
 CHECKED_MODES = ("aural", "kinesthetic")
-AID_MODEL = "gpt-4o-mini"
 
 TUTOR_STYLE_INSTRUCTIONS = {
     "visual": (
@@ -250,13 +250,11 @@ def generate_study_aid(mode: str, item: dict, related: List[dict]) -> Optional[d
     if not client or mode not in VALIDATORS:
         return None
     try:
-        response = client.chat.completions.create(
-            model=AID_MODEL,
+        response = chat(client, "study_aid",
             messages=[
                 {"role": "system", "content": f"You create a study aid for one item from a student's study guide.\n{GROUNDING_RULES}\n\n{MODE_PROMPTS[mode]}"},
                 {"role": "user", "content": _source_block(item, related)},
             ],
-            max_tokens=700,
             temperature=0.3,
             response_format={"type": "json_object"},
         )
@@ -285,10 +283,8 @@ def check_attempt(item: dict, task: str, expected: str, attempt: str) -> Optiona
         f"STUDENT ATTEMPT\n{attempt}"
     )
     try:
-        response = client.chat.completions.create(
-            model=AID_MODEL,
+        response = chat(client, "study_aid_check",
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            max_tokens=250,
             temperature=0.2,
             response_format={"type": "json_object"},
         )

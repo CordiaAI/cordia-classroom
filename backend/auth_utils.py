@@ -9,6 +9,7 @@ import logging
 import jwt
 from fastapi import HTTPException
 from database import get_auth_supabase
+from services.models import current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,7 @@ def get_user_id(authorization: str) -> str:
         logger.info(f"Rejected token: {e}")
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     if user_id:
+        current_user_id.set(user_id)
         return user_id
 
     try:
@@ -79,6 +81,7 @@ def get_user_id(authorization: str) -> str:
         result = supabase.auth.get_user(token)
         if not result.user:
             raise HTTPException(status_code=401, detail="Invalid token")
+        current_user_id.set(result.user.id)
         return result.user.id
     except HTTPException:
         raise

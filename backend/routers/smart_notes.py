@@ -7,6 +7,7 @@ from database import get_supabase
 from auth_utils import get_user_id
 from routers.billing import check_usage, record_usage
 from services.llm import study_guide_is_complete, study_guide_to_flashcards
+from services.llm_calls import chat
 
 _UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
@@ -261,9 +262,7 @@ def generate_diagram(request: DiagramRequest, authorization: str = Header(defaul
 
         usage = check_usage(user_id, "lightweight")
         client = OpenAI(api_key=api_key)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            max_tokens=2000,
+        response = chat(client, "smart_notes_diagram",
             messages=[{
                 "role": "system",
                 "content": (
