@@ -3,6 +3,9 @@ import { useRouter } from 'next/router';
 import { authHeaders, authorizedFetch, responseJson } from '../lib/api';
 import StudyWorkspaceFrame from '../components/StudyWorkspaceFrame';
 import PdfPages from '../components/PdfPages';
+import GuidedTour from '../components/GuidedTour';
+import { saveOnboardingStep } from '../lib/onboarding';
+import { SMARTNOTES_TOUR } from '../lib/tours';
 import { organizeDashboardGuides } from '../lib/dashboardOrganization';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -1408,6 +1411,16 @@ function SmartNotesEditor() {
     router.push('/smartnotes?id=' + id);
   }
 
+  async function finishSmartNotesTour(outcome) {
+    if (outcome === 'skipped') {
+      await saveOnboardingStep('done');
+      router.replace('/smartnotes?id=' + noteIdRef.current, undefined, { shallow: true });
+      return;
+    }
+    await saveOnboardingStep('practice');
+    router.push('/practice?tour=1');
+  }
+
   async function handleConvertToGuide() {
     setShowNotesList(false);
     if (!noteIdRef.current) return;
@@ -1495,6 +1508,7 @@ function SmartNotesEditor() {
 
   return (
     <div className="sn-page">
+      {router.query.tour === '1' && noteId && <GuidedTour steps={SMARTNOTES_TOUR} onFinish={finishSmartNotesTour} />}
       {/* Header bar */}
       <div className="sn-header">
         <div className="sn-header-left">

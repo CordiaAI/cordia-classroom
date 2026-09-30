@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
 import MermaidDiagram from './MermaidDiagram';
+import { useLearningStyle } from '../lib/learningStyle';
 
 // Tutor replies may include ```mermaid blocks; render them as diagrams and keep the rest as text.
 function TutorMessageText({ text }) {
@@ -10,6 +11,11 @@ function TutorMessageText({ text }) {
   return parts.map((part, index) => (index % 2 === 1
     ? <MermaidDiagram key={index} code={part.trim()} label="Tutor diagram" />
     : part.trim() && <span key={index} className="cordia-tutor-text">{part.trim()}</span>));
+}
+
+// Spoken text drops diagram code so read-aloud only says the explanation.
+function speakableText(text) {
+  return String(text || '').replace(/```mermaid[\s\S]*?```/g, ' ').replace(/[*_`#>]/g, '').replace(/\s+/g, ' ').trim();
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -42,6 +48,45 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [localError, setLocalError] = useState('');
+  const { learningStyle } = useLearningStyle();
+  const [listening, setListening] = useState(false);
+  const [speakingIndex, setSpeakingIndex] = useState(-1);
+  const recognitionRef = useRef(null);
+  const Recognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+  const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
+  // Voice tools are for students who chose to study by listening and talking.
+  const voice = learningStyle?.style === 'aural';
+
+  useEffect(() => () => {
+    recognitionRef.current?.stop();
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+  }, []);
+
+  function toggleMic() {
+    if (listening) { recognitionRef.current?.stop(); return; }
+    const recognition = new Recognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.onresult = event => {
+      const spoken = Array.from(event.results).map(result => result[0].transcript).join(' ').trim();
+      if (spoken) setInput(previous => (previous ? previous + ' ' : '') + spoken);
+    };
+    recognition.onerror = () => setListening(false);
+    recognition.onend = () => setListening(false);
+    recognitionRef.current = recognition;
+    setListening(true);
+    recognition.start();
+  }
+
+  function toggleSpeech(index, text) {
+    window.speechSynthesis.cancel();
+    if (speakingIndex === index) { setSpeakingIndex(-1); return; }
+    const utterance = new SpeechSynthesisUtterance(speakableText(text));
+    utterance.rate = 0.95;
+    utterance.onend = () => setSpeakingIndex(current => (current === index ? -1 : current));
+    window.speechSynthesis.speak(utterance);
+    setSpeakingIndex(index);
+  }
   const fileRef = useRef(null);
   const endRef = useRef(null);
   const appliedPreferred = useRef('');
@@ -326,6 +371,11 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
               </button>
             )}
             <TutorMessageText text={message.text} />
+            {voice && canSpeak && message.role !== 'user' && message.text && (
+              <button type="button" className="cordia-tutor-speak" onClick={() => toggleSpeech(index, message.text)} aria-pressed={speakingIndex === index}>
+                {speakingIndex === index ? 'Stop' : 'Listen'}
+              </button>
+            )}
             {(message.evidence || []).map(item => (
               <button key={item.url} type="button" className="cordia-tutor-evidence" onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}>
                 {item.title || item.url}
@@ -343,7 +393,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         <div ref={endRef} />
       </div>
 
-      <div className="cordia-tutor-input">
+      <div className={`cordia-tutor-input${voice && Recognition ? ' has-mic' : ''}`}>
         <textarea
           value={input}
           onChange={event => setInput(event.target.value)}
@@ -357,6 +407,18 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
           disabled={!canSubmit || busy || remaining <= 0 || !session}
           rows="2"
         />
+        {voice && Recognition && (
+          <button
+            type="button"
+            className={`cordia-tutor-mic${listening ? ' is-listening' : ''}`}
+            onClick={toggleMic}
+            disabled={!canSubmit || busy || remaining <= 0 || !session}
+            aria-label={listening ? 'Stop listening' : 'Ask by voice'}
+            aria-pressed={listening}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5" fill="currentColor" /><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5" stroke="currentColor" strokeWidth="1.4" fill="none" /></svg>
+          </button>
+        )}
         <button type="button" onClick={sendMessage} disabled={!canSubmit || busy || !input.trim() || remaining <= 0 || !session} aria-label="Send">
           ↑
         </button>
