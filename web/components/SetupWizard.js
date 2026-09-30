@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/router';
 import LearningStylePicker from './LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
-import { loadOnboarding, saveOnboardingStep, smartNotesTourUrl } from '../lib/onboarding';
+import { loadOnboarding, practiceTourUrl, saveOnboardingStep, smartNotesTourUrl } from '../lib/onboarding';
 
 const STORE_URL = 'https://chromewebstore.google.com/detail/autostudyai/eddmfjcnfjfbaknmeccjbjdgpeipjbaf';
 const ORDER = ['style', 'extension', 'extension_use', 'create', 'smartnotes', 'practice'];
@@ -72,6 +72,12 @@ export default function SetupWizard() {
     router.push(path);
   }
 
+  async function startPracticeTour() {
+    setBusy(true);
+    await saveOnboardingStep('practice');
+    router.push(await practiceTourUrl());
+  }
+
   async function startSmartNotesTour() {
     setBusy(true);
     await saveOnboardingStep('smartnotes');
@@ -137,7 +143,7 @@ export default function SetupWizard() {
     practice: {
       title: 'Practice what you learned',
       body: <p className="setup-wizard-lead">A quick tour of Practice: generating problems, revealing your guide when stuck, and getting help from the Tutor.</p>,
-      actions: <button type="button" className="btn" onClick={() => leaveFor('/practice?tour=1', 'practice')} disabled={busy}>Show me Practice</button>,
+      actions: <button type="button" className="btn" onClick={startPracticeTour} disabled={busy}>Show me Practice</button>,
     },
   };
   const page = pages[step];
