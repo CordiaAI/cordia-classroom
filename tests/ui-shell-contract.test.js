@@ -38,6 +38,6 @@ assert.match(appPage, /application-name" content="CordiaClassroom"/);
 assert.match(appPage, /og:site_name" content="CordiaClassroom"/);
 assert.doesNotMatch(documentPage, /autostudy/i);
 assert.match(nextConfig, /type: 'host', value: 'autostudyai\.online'/);
-assert.match(nextConfig, /https:\/\/classroom\.cordiacode\.com\/\:path\*/);
+assert.match(nextConfig, /https:\/\/classroom\.cordiaai\.io\/\:path\*/);
 
 console.log('UI shell contract passed');

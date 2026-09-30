@@ -3,4 +3,4 @@ User-agent: *
 Allow: /
 
 # The link to your sitemap (Update this to your live URL)
-Sitemap: https://classroom.cordiacode.com/sitemap.xml
+Sitemap: https://classroom.cordiaai.io/sitemap.xml

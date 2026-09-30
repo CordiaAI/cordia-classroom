@@ -5,7 +5,7 @@ module.exports = {
     return [{
       source: '/:path*',
       has: [{ type: 'host', value: 'autostudyai.online' }],
-      destination: 'https://classroom.cordiacode.com/:path*',
+      destination: 'https://classroom.cordiaai.io/:path*',
       permanent: true,
     }];
   },

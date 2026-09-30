@@ -94,7 +94,7 @@ class BillingContractTests(unittest.TestCase):
         prices = {
             "STRIPE_CLASSROOM_PLUS_MONTHLY_PRICE_ID": "price_monthly",
             "STRIPE_CLASSROOM_PLUS_YEARLY_PRICE_ID": "price_yearly",
-            "FRONTEND_URL": "https://classroom.cordiacode.com/",
+            "FRONTEND_URL": "https://classroom.cordiaai.io/",
         }
         for interval, expected_price in (("monthly", "price_monthly"), ("yearly", "price_yearly")):
             with self.subTest(interval=interval):
@@ -119,7 +119,7 @@ class BillingContractTests(unittest.TestCase):
                 self.assertEqual(params["subscription_data"]["metadata"]["user_id"], "user-1")
                 self.assertEqual(
                     params["success_url"],
-                    "https://classroom.cordiacode.com/settings?billing=success"
+                    "https://classroom.cordiaai.io/settings?billing=success"
                     "&session_id={CHECKOUT_SESSION_ID}",
                 )
 
@@ -224,7 +224,7 @@ class BillingContractTests(unittest.TestCase):
         with (
             patch.dict(
                 os.environ,
-                {"FRONTEND_URL": "https://classroom.cordiacode.com/"},
+                {"FRONTEND_URL": "https://classroom.cordiaai.io/"},
                 clear=True,
             ),
             patch.object(billing, "get_user_id", return_value="user-1"),
@@ -235,7 +235,7 @@ class BillingContractTests(unittest.TestCase):
         self.assertEqual(result, {"url": "https://portal.test"})
         stripe_client.billing_portal.Session.create.assert_called_once_with(
             customer="cus_existing",
-            return_url="https://classroom.cordiacode.com/settings?section=subscription",
+            return_url="https://classroom.cordiaai.io/settings?section=subscription",
         )
 
     def test_subscription_update_upserts_by_user(self):

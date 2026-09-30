@@ -12,12 +12,19 @@ description: Use at the start of any CordiaClassroom (AutoStudyai repo) coding s
 - Say what it means for the product and what decision is needed, not the git mechanics.
 - Jackson's model: code gets pushed to GitHub, then goes live (Vercel does it automatically; the backends need a manual deploy).
 
+## Domains (rebrand to cordiaai.io, 2026-09-30)
+- Primary: `https://classroom.cordiaai.io` (canonical, og:url, sitemap, robots, privacy/terms, extension homepage/popup/saved-guide links, support@cordiaai.io). Fly secret `FRONTEND_URL` = this (drives Stripe success/return URLs + a CORS extra origin).
+- **Legacy `https://classroom.cordiacode.com` must keep working until extension v2.0 is live in the Chrome Web Store**: it stays in `ALLOWED_ORIGINS`, extension `content_scripts.matches` and the `background.js` tab query. Do not remove it anywhere before then.
+- Extension v2.0.0 zip for the Web Store: `extension/dist/cordia-classroom-extension-2.0.0.zip` (manifest.json at zip root; rebuild with `cd extension && zip -qr dist/<name>.zip . -x 'dist/*' README.md`). API stays on `autostudy-ai.fly.dev`.
+- Do NOT rename localStorage keys (users would lose drafts). `autostudyai.online` still redirects (next.config.js) to the new domain.
+- GitHub remote is `CordiaAI/cordia-classroom` (moved from ItzJLaugh/AutoStudyai).
+
 ## Layout
 - `extension/` — MV3 extension (`content.js`, `background.js`, `popup.js`, `asai-bridge.js`, `vendor/Readability.js`).
 - `pptx-bundle/pptx-parser.js` — locked PPTX parser bundle; `backend/services/pptx_rendering.py` renders PPTX server-side.
 - `backend/` — FastAPI on Fly (`main.py`, `routers/*`, `services/llm.py`, `services/text_processing.py`, `domains/*.json`).
 - `web/` — Next.js pages router (Vercel auto-deploy on push to main).
-- **Deploying the backend from a cloud session:** install flyctl (`curl -sL https://fly.io/install.sh | sh`, then `export PATH=/root/.fly/bin:$PATH`), then `cd backend && flyctl deploy --remote-only --depot=false`. Plain `fly deploy` fails here because the proxy breaks the default Depot builder's TLS. `FLY_API_TOKEN` is already in the env. Verify with `flyctl logs --no-tail` and a 200 from https://autostudy-ai.fly.dev/.
+- **Deploying the backend from a cloud session (you CAN; never tell Jackson you can't):** install flyctl (`curl -sL https://fly.io/install.sh | sh`, then `export PATH=/root/.fly/bin:$PATH`), then `cd backend && flyctl deploy --remote-only --depot=false`. Plain `fly deploy` fails here because the proxy breaks the default Depot builder's TLS. `FLY_API_TOKEN` is already in the env. Verify with `flyctl logs --no-tail` and a 200 from https://autostudy-ai.fly.dev/.
 - `supabase/migrations/` — timestamped SQL; no full schema baseline exists yet.
 - `tests/` — Python `unittest` contracts + node contracts; `web/tests/*.mjs`.
 
