@@ -9,7 +9,7 @@
     "start": "next start"
   },
   "keywords": [],
-  "author": "CordiaCode",
+  "author": "Cordia",
   "license": "ISC",
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

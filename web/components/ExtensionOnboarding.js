@@ -4,7 +4,7 @@ const STORE_URL =
   'https://chromewebstore.google.com/detail/autostudyai/eddmfjcnfjfbaknmeccjbjdgpeipjbaf';
 
 // The extension stamps this attribute on <html> once its content script runs on
-// classroom.cordiacode.com. See extension/asai-bridge.js + manifest content_scripts.
+// classroom.cordiaai.io. See extension/asai-bridge.js + manifest content_scripts.
 const INSTALL_MARKER_ATTR = 'data-asai-extension';
 
 const STEPS = [
@@ -274,7 +274,7 @@ function Scene({ scene }) {
         <div className="asai-browser-bar">
           <span className="asai-tl asai-tl-r" /><span className="asai-tl asai-tl-y" /><span className="asai-tl asai-tl-g" />
           <div className="asai-url">
-            {scene === 'platform' ? 'classroom.cordiacode.com' : 'canvas.university.edu/lecture'}
+            {scene === 'platform' ? 'classroom.cordiaai.io' : 'canvas.university.edu/lecture'}
           </div>
           {/* Extension icon in toolbar */}
           <div className={'asai-ext-icon' + (scene === 'toolbar' ? ' highlight' : '')}>🧩</div>

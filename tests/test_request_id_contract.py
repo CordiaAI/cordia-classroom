@@ -29,6 +29,15 @@ class RequestIdContractTests(unittest.TestCase):
 
         self.assertIn("X-Request-ID", response.headers["access-control-expose-headers"])
 
+    def test_both_classroom_domains_pass_cors_preflight(self):
+        for origin in ("https://classroom.cordiaai.io", "https://classroom.cordiacode.com"):
+            with self.subTest(origin=origin):
+                response = self.client.options("/", headers={
+                    "Origin": origin,
+                    "Access-Control-Request-Method": "POST",
+                })
+                self.assertEqual(response.headers["access-control-allow-origin"], origin)
+
     def test_unhandled_error_is_logged_without_exposing_internals(self):
         request = Request({"type": "http", "method": "GET", "path": "/private", "headers": []})
 

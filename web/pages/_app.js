@@ -32,8 +32,8 @@ export default function App({ Component, pageProps }) {
       <meta property="og:site_name" content="CordiaClassroom" />
       <meta property="og:title" content="CordiaClassroom" />
       <meta property="og:description" content="Turn course material into focused study guides, notes, flashcards, and practice." />
-      <meta property="og:image" content="https://classroom.cordiacode.com/cordia-classroom-icon.png" />
-      <meta property="og:url" content="https://classroom.cordiacode.com" />
+      <meta property="og:image" content="https://classroom.cordiaai.io/cordia-classroom-icon.png" />
+      <meta property="og:url" content="https://classroom.cordiaai.io" />
       <meta name="twitter:card" content="summary" />
     </Head>
   );

@@ -12,7 +12,7 @@ Chrome side-panel extension that captures student-approved educational content a
 ## Usage
 
 1. Navigate to any educational webpage (LMS, article, documentation)
-2. Sign in once at **classroom.cordiacode.com**; the extension reuses that session
+2. Sign in once at **classroom.cordiaai.io**; the extension reuses that session
 3. Click the CordiaClassroom extension icon
 4. Ask the same **Cordia Tutor** used in Classroom, or open **Capture** and click **Read this study material**
 5. Review generated guides, notes, and cards without leaving the side panel

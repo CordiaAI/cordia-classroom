@@ -39,7 +39,7 @@ async function activeWebTab() {
 }
 
 async function syncClassroomAuth(forceRefresh = false) {
-  const tabs = await chrome.tabs.query({ url: 'https://classroom.cordiacode.com/*' });
+  const tabs = await chrome.tabs.query({ url: ['https://classroom.cordiaai.io/*', 'https://classroom.cordiacode.com/*'] });
   for (const tab of tabs) {
     try {
       return await chrome.tabs.sendMessage(tab.id, { action: 'syncCordiaAuth', forceRefresh });
@@ -182,7 +182,7 @@ async function saveStudyGuide(message) {
     }),
   }), 'The guide was generated but could not be saved.');
   if (!saved?.guide?.id) throw new Error('CordiaClassroom did not confirm the saved guide.');
-  const guideUrl = `https://classroom.cordiacode.com/guide/${encodeURIComponent(saved.guide.id)}`;
+  const guideUrl = `https://classroom.cordiaai.io/guide/${encodeURIComponent(saved.guide.id)}`;
   let redirected = false;
   try {
     if (message.tabId) {

@@ -70,7 +70,7 @@ async function initAuth() {
   makeButton.disabled = !state.authenticated;
   tutorInput.disabled = !state.authenticated;
   tutorSend.disabled = !state.authenticated;
-  connectLink.href = 'https://classroom.cordiacode.com';
+  connectLink.href = 'https://classroom.cordiaai.io';
   connectLink.textContent = 'Connect';
   connectLink.hidden = state.authenticated;
   announce(state.authenticated

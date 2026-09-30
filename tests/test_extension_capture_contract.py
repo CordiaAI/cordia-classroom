@@ -27,7 +27,7 @@ class ExtensionCaptureContractTests(unittest.TestCase):
         self.assertIn("if (!saved?.guide?.id)", self.worker)
         self.assertIn("chrome.tabs.update(message.tabId", self.worker)
         self.assertIn("chrome.tabs.create({ url: guideUrl })", self.worker)
-        self.assertIn("classroom.cordiacode.com/guide/", self.worker)
+        self.assertIn("classroom.cordiaai.io/guide/", self.worker)
         self.assertIn('id="save-bubble"', self.html)
         self.assertIn('Save to Classroom', self.html)
 
@@ -35,6 +35,14 @@ class ExtensionCaptureContractTests(unittest.TestCase):
         self.assertEqual(self.manifest["host_permissions"], ["<all_urls>"])
         self.assertNotIn("optional_host_permissions", self.manifest)
         self.assertNotIn("addHostAccessRequest", self.worker)
+
+    def test_extension_bridges_both_classroom_domains_until_old_one_retires(self):
+        domains = ["https://classroom.cordiaai.io/*", "https://classroom.cordiacode.com/*"]
+        self.assertEqual(self.manifest["content_scripts"][0]["matches"], domains)
+        for pattern in domains:
+            self.assertIn(pattern, self.worker)
+        self.assertEqual(self.manifest["homepage_url"], "https://classroom.cordiaai.io")
+        self.assertEqual(self.manifest["version"], "2.0.0")
 
     def test_capture_permission_failure_falls_back_to_page_reading(self):
         self.assertIn("step('capture', 'skipped')", self.panel)

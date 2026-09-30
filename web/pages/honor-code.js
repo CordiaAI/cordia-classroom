@@ -69,7 +69,7 @@ export default function HonorCode() {
         </Section>
 
         <Section title="6. Reporting Concerns">
-          <p>If you believe CordiaClassroom is being used in violation of academic integrity policies, or if you have concerns about the platform's impact on academic honesty, please contact us at support@cordiacode.com.</p>
+          <p>If you believe CordiaClassroom is being used in violation of academic integrity policies, or if you have concerns about the platform's impact on academic honesty, please contact us at support@cordiaai.io.</p>
         </Section>
 
         <div style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid var(--border-subtle)' }}>
