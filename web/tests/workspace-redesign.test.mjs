@@ -11,13 +11,15 @@ test('top navigation exposes focused study destinations without a separate Class
   assert.deepEqual(labels, ['Dashboard', 'Study Guides', 'Calendar', 'SmartNotes', 'Practice']);
 });
 
-test('Practice is a visible hub that reuses the existing study modes', async () => {
-  const practice = await source('pages/practice/index.js');
+test('Practice opens straight into the workspace with a study guide picker', async () => {
+  const hub = await source('pages/practice/index.js');
+  const workspace = await source('components/PracticeWorkspace.js');
 
-  assert.match(practice, /Turn studying into doing/);
-  assert.match(practice, /router\.push\(`\/practice\/\$\{selectedGuide\.id\}`\)/);
-  assert.match(practice, /router\.push\(`\/flashcards\/study\?guideId=\$\{selectedGuide\.id\}`\)/);
-  assert.match(practice, /router\.push\(`\/quiz\/\$\{selectedGuide\.id\}`\)/);
+  assert.match(hub, /PracticeWorkspace/);
+  assert.doesNotMatch(hub, /Turn studying into doing/);
+  assert.match(workspace, /className="practice-guide-picker"/);
+  assert.match(workspace, /router\.push\('\/practice\/' \+ value\)/);
+  assert.match(workspace, /Create guide or upload file/);
 });
 
 test('dashboard routes use the shared workspace and retire the separate Classes view', async () => {

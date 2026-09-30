@@ -23,10 +23,10 @@ export async function smartNotesTourUrl() {
   return id ? `/smartnotes?id=${encodeURIComponent(id)}&tour=1` : '/smartnotes';
 }
 
-// The Practice tour runs on the real workspace: the student's latest study guide, or a
-// placeholder workspace when they have none yet.
+// The Practice tour runs on the real workspace: the student's latest study guide, or the
+// workspace with no guide chosen when they have none yet.
 export async function practiceTourUrl() {
   const list = await apiFetch('/guides?limit=1');
   const id = list?.guides?.[0]?.id;
-  return id ? `/practice/${encodeURIComponent(id)}?tour=1` : '/practice/tour';
+  return id ? `/practice/${encodeURIComponent(id)}?tour=1` : '/practice?tour=1';
 }

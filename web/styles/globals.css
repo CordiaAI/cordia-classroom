@@ -733,6 +733,10 @@ input::placeholder { color: var(--text-muted); }
 .practice-header h1 { margin: 10px 0 4px; font-size: clamp(2rem, 4vw, 3.5rem); letter-spacing: -0.055em; }
 .practice-header p { margin: 0; color: var(--text-secondary); }
 .practice-source-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.practice-source-actions { align-items: center; }
+.practice-guide-picker select { max-width: 280px; min-height: 40px; padding: 8px 34px 8px 14px; border: 1px solid var(--border-default); border-radius: 12px; background: var(--surface-raised); color: var(--ink); font: inherit; font-size: 0.85rem; font-weight: 650; cursor: pointer; }
+.practice-guide-picker select:focus-visible { outline: 3px solid color-mix(in srgb, var(--olive) 30%, transparent); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .practice-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr); min-height: calc(100vh - 235px); gap: 18px; }
 .practice-problem-panel,
 .practice-source-panel { min-width: 0; border: 1px solid var(--border-subtle); border-radius: 26px; background: var(--surface); box-shadow: var(--shadow-lg); overflow: hidden; }

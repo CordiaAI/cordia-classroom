@@ -31,7 +31,7 @@ const guidePage = read('web', 'pages', 'guide', '[id].js');
 const folderPage = read('web', 'pages', 'folder', '[id].js');
 const nextConfig = read('web', 'next.config.js');
 const retainPage = read('web', 'pages', 'quiz', '[guideId].js');
-const practicePage = read('web', 'pages', 'practice', '[guideId].js');
+const practicePage = read('web', 'components', 'PracticeWorkspace.js');
 const oauthCallback = read('web', 'pages', 'auth', 'callback.js');
 
 assert.match(navigation, /className="top-navigation"/);

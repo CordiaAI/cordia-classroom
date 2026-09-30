@@ -20,9 +20,14 @@ export const SMARTNOTES_TOUR = [
   },
 ];
 
-// Runs on the real Practice workspace. Students without a study guide see the same
-// workspace with placeholder source text (practice/tour), and nothing is generated or saved.
+// Runs on the real Practice workspace, with or without a study guide chosen.
 export const PRACTICE_TOUR = [
+  {
+    target: '.practice-guide-picker',
+    side: 'left',
+    title: 'Choose a study guide',
+    text: 'Pick the study guide you want to practice. No guides yet? Choose Create guide or upload file.',
+  },
   {
     target: '.practice-source-actions .btn',
     side: 'left',

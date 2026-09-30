@@ -35,8 +35,8 @@ class SetupWizardContractTests(unittest.TestCase):
         # The Practice tour runs on the real workspace, never the hub.
         onboarding = (ROOT / "web" / "lib" / "onboarding.js").read_text(encoding="utf-8")
         self.assertIn("/practice/${encodeURIComponent(id)}?tour=1", onboarding)
-        self.assertIn("'/practice/tour'", onboarding)
-        self.assertNotIn("GuidedTour", (ROOT / "web" / "pages" / "practice" / "index.js").read_text(encoding="utf-8"))
+        self.assertIn("'/practice?tour=1'", onboarding)
+        self.assertIn(".practice-guide-picker", tours)
         self.assertIn('onClick={next}', tour)
         self.assertIn("overlaps(box, outline)", tour)
 
