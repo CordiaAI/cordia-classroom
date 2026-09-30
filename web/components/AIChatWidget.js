@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
 import MermaidDiagram from './MermaidDiagram';
 import { useLearningStyle } from '../lib/learningStyle';
+import ExplanationPreference from './ExplanationPreference';
 
 // Tutor replies may include ```mermaid blocks; render them as diagrams and keep the rest as text.
 function TutorMessageText({ text }) {
@@ -48,6 +49,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [explainOpen, setExplainOpen] = useState(false);
   const { learningStyle } = useLearningStyle();
   const [listening, setListening] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState(-1);
@@ -353,6 +355,14 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         <button type="button" className="cordia-tutor-attach" onClick={() => fileRef.current?.click()} disabled={extracting}>
           {extracting ? 'Reading file…' : 'Attach study material'}
         </button>
+        <button type="button" className="cordia-tutor-explain-toggle" onClick={() => setExplainOpen(open => !open)} aria-expanded={explainOpen}>
+          How should I explain things?
+        </button>
+        {explainOpen && (
+          <div className="cordia-tutor-explain-panel">
+            <ExplanationPreference compact onSaved={() => setTimeout(() => setExplainOpen(false), 900)} />
+          </div>
+        )}
       </header>
 
       <div className="cordia-tutor-messages" aria-live="polite">

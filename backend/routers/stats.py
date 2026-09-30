@@ -18,69 +18,75 @@ _UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/stats", tags=["stats"])
 
-FORMAT_NAMES = {
-    "flashcard": "recall cards",
-    "quiz": "practice questions",
-    "read": "concise explanations",
-}
+def _build_learning_profile(scores: list) -> dict:
+    """Question difficulty for new guides, practice, and Tutor, from every graded result.
 
-
-def _build_learning_profile(attempts: list, sessions: list) -> dict:
-    scores = [row.get("score") for row in attempts if isinstance(row.get("score"), (int, float))]
+    Adapts from the first result: one quiz, Retain round, or Practice set is enough.
+    """
+    scores = [score for score in scores if isinstance(score, (int, float))]
     average = round(sum(scores) / len(scores)) if scores else None
     guidance = "Use a balanced mix of direct recall and application questions."
     if average is not None and average < 70:
         guidance = "Start with short foundational recall questions before application questions."
     elif average is not None and average >= 85:
         guidance = "Favor application and comparison questions while preserving source wording."
+    return {"evidence_count": len(scores), "average": average, "generation_guidance": guidance}
 
-    formats_by_guide = {}
-    for session in sessions:
-        guide_id = session.get("guide_id")
-        mode = session.get("session_type")
-        if guide_id and mode in FORMAT_NAMES:
-            formats_by_guide.setdefault(guide_id, set()).add(mode)
 
-    format_scores = {mode: [] for mode in FORMAT_NAMES}
-    for attempt in attempts:
-        for mode in formats_by_guide.get(attempt.get("guide_id"), set()):
-            if isinstance(attempt.get("score"), (int, float)):
-                format_scores[mode].append(attempt["score"])
-    observed = [
-        (sum(values) / len(values), len(values), mode)
-        for mode, values in format_scores.items() if len(values) >= 2
-    ]
-    strongest = max(observed, default=None)
-    ready = len(scores) >= 3
+def _student_results(user_id: str) -> dict:
+    """Graded quiz/Retain attempts and Practice sets with the questions they came from."""
+    supabase = get_supabase()
+    attempts = (
+        supabase.table("quiz_attempts")
+        .select("guide_id, score, answers, completed_at")
+        .eq("user_id", user_id)
+        .order("completed_at", desc=True)
+        .limit(50)
+        .execute()
+    ).data or []
+    guide_ids = sorted({row["guide_id"] for row in attempts if row.get("guide_id")})
+    quiz_guides = []
+    if guide_ids:
+        quiz_guides = (
+            supabase.table("study_guides").select("id, quiz_questions")
+            .eq("user_id", user_id).in_("id", guide_ids).execute()
+        ).data or []
+    practiced = (
+        supabase.table("study_guides").select("id, practice_state")
+        .eq("user_id", user_id).not_.is_("practice_state", "null")
+        .order("created_at", desc=True).limit(50).execute()
+    ).data or []
+    sessions = (
+        supabase.table("study_sessions").select("session_type, started_at")
+        .eq("user_id", user_id).order("started_at", desc=True).limit(200).execute()
+    ).data or []
     return {
-        "status": "active" if ready else "collecting",
-        "quiz_average": average,
-        "evidence_count": len(scores),
-        "strongest_observed_format": FORMAT_NAMES[strongest[2]] if strongest and ready else None,
-        "generation_guidance": guidance,
-        "message": (
-            "Cordia is matching question difficulty to your recent Retain results."
-            if ready
-            else f"Complete {3 - len(scores)} more quiz{'zes' if 3 - len(scores) != 1 else ''} so Cordia can adapt."
-        ),
+        "attempts": attempts,
+        "questions": {row["id"]: row.get("quiz_questions") for row in quiz_guides},
+        "practice": [row.get("practice_state") for row in practiced],
+        "sessions": sessions,
     }
 
 
+def _graded_items(data: dict) -> tuple:
+    """(per-question results, per-set scores) across quizzes, Retain, and Practice."""
+    from services.study_insights import practice_results, quiz_results
+    results, scores = [], []
+    for attempt in data["attempts"]:
+        results.extend(quiz_results(attempt, data["questions"].get(attempt.get("guide_id"))))
+        if isinstance(attempt.get("score"), (int, float)):
+            scores.append(attempt["score"])
+    for state in data["practice"]:
+        graded = practice_results(state)
+        results.extend(graded)
+        if graded:
+            scores.append(round(100 * sum(1 for _, correct in graded if correct) / len(graded)))
+    return results, scores
+
+
 def learning_profile_for_user(user_id: str) -> dict:
-    supabase = get_supabase()
-    attempts = supabase.table("quiz_attempts") \
-        .select("guide_id, score, completed_at") \
-        .eq("user_id", user_id) \
-        .order("completed_at", desc=True) \
-        .limit(50) \
-        .execute()
-    sessions = supabase.table("study_sessions") \
-        .select("guide_id, session_type, started_at") \
-        .eq("user_id", user_id) \
-        .order("started_at", desc=True) \
-        .limit(200) \
-        .execute()
-    return _build_learning_profile(attempts.data or [], sessions.data or [])
+    _, scores = _graded_items(_student_results(user_id))
+    return _build_learning_profile(scores)
 
 
 class LogSessionRequest(BaseModel):
@@ -296,15 +302,19 @@ def get_overview(authorization: str = Header(default="")):
     return overview
 
 
-@router.get("/learning-profile")
-def get_learning_profile(authorization: str = Header(default="")):
+@router.get("/insights")
+def get_study_insights(authorization: str = Header(default="")):
+    """Strengths, weak spots, and research-backed study tips from the student's own results."""
+    from services.study_insights import build_insights
     try:
-        return learning_profile_for_user(get_user_id(authorization))
+        data = _student_results(get_user_id(authorization))
+        results, _ = _graded_items(data)
+        return build_insights(results, data["sessions"])
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error building learning profile: {e}")
-        raise HTTPException(status_code=500, detail="Failed to build learning profile")
+        logger.error(f"Error building study insights: {e}")
+        raise HTTPException(status_code=500, detail="Could not load your study insights")
 
 
 @router.post("/log-session")

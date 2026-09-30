@@ -161,10 +161,14 @@ app.include_router(tutor.router)
 app.include_router(learning.router)
 
 def _style_instruction(user_id: str) -> str:
-    """Tutor presentation for the student's chosen study style; empty when none is chosen or styles are off."""
+    """Tutor presentation: the chosen study style and the student's own explanation request."""
     try:
-        from services.learning_styles import active_style, tutor_style_instruction
-        return tutor_style_instruction(active_style(get_supabase(), user_id))
+        from services.learning_styles import active_style, explanation_instruction, load_preference, tutor_style_instruction
+        supabase = get_supabase()
+        return "\n".join(filter(None, [
+            tutor_style_instruction(active_style(supabase, user_id)),
+            explanation_instruction(load_preference(supabase, user_id).get("explain_preference")),
+        ]))
     except Exception:
         return ""
 
