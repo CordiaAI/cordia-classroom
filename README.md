@@ -121,7 +121,7 @@ In `services/llm.py`:
 - [x] Study guide generation with varied question types
 - [x] Flashcard generation
 - [x] Slideshow detection (Canvas, Google Slides, PowerPoint)
-- [ ] Export to Anki/Quizlet format
+- [ ] Export format
 - [ ] Spaced repetition scheduling
 - [x] Persistent storage (Supabase Postgres)
 - [x] User accounts and saved study sets
