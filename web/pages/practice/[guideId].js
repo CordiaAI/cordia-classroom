@@ -3,10 +3,26 @@ import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import AILoadingSphere from '../../components/AILoadingSphere';
+import GuidedTour from '../../components/GuidedTour';
+import { saveOnboardingStep } from '../../lib/onboarding';
+import { PRACTICE_TOUR } from '../../lib/tours';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const SYMBOLS = ['+', '−', '×', '÷', '=', '√', 'π', 'Σ', '→'];
 const drawingsKey = guideId => `practiceDrawings:${guideId}`;
+// /practice/tour: the setup tour for students with no study guide yet. Nothing is loaded,
+// generated, or saved; the source panel shows placeholder text.
+const TOUR_ID = 'tour';
+const TOUR_GUIDE = {
+  id: TOUR_ID,
+  title: 'Your study guide',
+  study_guide: [
+    'Q1: Your study guide questions appear here while you practice.',
+    'A1: Each answer stays blurred until you double-click it, so you try first.',
+    'Q2: Use the source only after an honest attempt.',
+    'A2: Reveal one section at a time to check the exact idea you need.',
+  ].join('\n\n'),
+};
 
 function readableText(value) {
   return String(value || '')
@@ -48,9 +64,12 @@ export default function PracticeWorkspace() {
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
+  const demo = guideId === TOUR_ID;
+  const touring = demo || router.query.tour === '1';
 
   useEffect(() => {
     if (!ready || !guideId) return;
+    if (demo) { setGuide(TOUR_GUIDE); return; }
     apiFetch('/guides/' + guideId).then(data => {
       if (data?.guide) setGuide(data.guide);
       else setError(apiErrorMessage(data?.detail, 'This study guide could not be loaded.'));
@@ -58,7 +77,7 @@ export default function PracticeWorkspace() {
   }, [ready, guideId]);
 
   useEffect(() => {
-    if (!ready || !guideId) return;
+    if (!ready || !guideId || demo) return;
     apiFetch('/practice/' + guideId + '/state').then(data => {
       const saved = data?.practice;
       if (!Array.isArray(saved?.problems) || saved.problems.length !== 10) return;
@@ -79,7 +98,7 @@ export default function PracticeWorkspace() {
 
   // Save progress for guide-based sets (uploads are temporary) a moment after each change.
   useEffect(() => {
-    if (upload || !guideId || problems.length !== 10) return;
+    if (upload || !guideId || demo || problems.length !== 10) return;
     if (restoring.current) {
       restoring.current = false;
       return;
@@ -126,8 +145,14 @@ export default function PracticeWorkspace() {
   const currentTokens = tokens[problemIndex] || [];
   const sourceBlocks = sourceText ? sourceText.split(/\n\s*\n/).filter(block => block.trim()) : [];
 
+  async function finishTour() {
+    await saveOnboardingStep('done');
+    if (demo) router.replace('/practice');
+    else router.replace('/practice/' + guideId, undefined, { shallow: true });
+  }
+
   async function generateProblems() {
-    if (!guide && !upload) return;
+    if ((!guide && !upload) || demo) return;
     setLoading(true);
     setError('');
     const data = await apiFetch('/practice', {
@@ -355,15 +380,16 @@ export default function PracticeWorkspace() {
 
   return (
     <main className="practice-page fade-in">
+      {touring && guide && <GuidedTour steps={PRACTICE_TOUR} onFinish={finishTour} />}
       <header className="practice-header">
         <div>
-          <button type="button" className="create-back-link" onClick={() => router.push('/guide/' + guideId)}>Back to study guide</button>
+          <button type="button" className="create-back-link" onClick={() => router.push(demo ? '/practice' : '/guide/' + guideId)}>{demo ? 'Back to Practice' : 'Back to study guide'}</button>
           <h1>Practice workspace</h1>
           <p>{practiceInfo?.subjectArea ? `${practiceInfo.subjectArea} practice` : 'Work through 10 source-grounded activities without leaving your material.'}</p>
         </div>
         <div className="practice-source-actions">
           <input ref={fileRef} type="file" hidden accept=".pdf,.docx,.pptx,.txt" onChange={event => useUploadedFile(event.target.files?.[0])} />
-          <button type="button" className="btn-outline" onClick={() => fileRef.current?.click()} disabled={extracting}>
+          <button type="button" className="btn-outline" onClick={() => fileRef.current?.click()} disabled={extracting || demo}>
             {extracting ? 'Reading file…' : 'Use another file'}
           </button>
           <button type="button" className="btn" onClick={generateProblems} disabled={loading || !sourceText}>

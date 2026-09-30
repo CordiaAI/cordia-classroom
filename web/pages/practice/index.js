@@ -4,9 +4,6 @@ import AILoadingSphere from '../../components/AILoadingSphere';
 import { apiErrorMessage, apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import { formatDate } from '../../lib/formatters';
-import GuidedTour from '../../components/GuidedTour';
-import { saveOnboardingStep } from '../../lib/onboarding';
-import { PRACTICE_TOUR } from '../../lib/tours';
 
 const practiceModes = [
   {
@@ -115,14 +112,8 @@ export default function PracticeHub() {
     );
   }
 
-  async function finishTour() {
-    await saveOnboardingStep('done');
-    router.replace('/practice', undefined, { shallow: true });
-  }
-
   return (
     <div className="practice-hub fade-in">
-      {router.query.tour === '1' && <GuidedTour steps={PRACTICE_TOUR} onFinish={finishTour} />}
       <section className="practice-hero">
         <div className="practice-hero-copy">
           <span className="practice-eyebrow">Practice</span>

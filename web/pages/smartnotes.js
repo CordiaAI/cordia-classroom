@@ -4,7 +4,7 @@ import { authHeaders, authorizedFetch, responseJson } from '../lib/api';
 import StudyWorkspaceFrame from '../components/StudyWorkspaceFrame';
 import PdfPages from '../components/PdfPages';
 import GuidedTour from '../components/GuidedTour';
-import { saveOnboardingStep } from '../lib/onboarding';
+import { practiceTourUrl, saveOnboardingStep } from '../lib/onboarding';
 import { SMARTNOTES_TOUR } from '../lib/tours';
 import { organizeDashboardGuides } from '../lib/dashboardOrganization';
 
@@ -1418,7 +1418,7 @@ function SmartNotesEditor() {
       return;
     }
     await saveOnboardingStep('practice');
-    router.push('/practice?tour=1');
+    router.push(await practiceTourUrl());
   }
 
   async function handleConvertToGuide() {

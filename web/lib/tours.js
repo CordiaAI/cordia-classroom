@@ -20,28 +20,36 @@ export const SMARTNOTES_TOUR = [
   },
 ];
 
+// Runs on the real Practice workspace. Students without a study guide see the same
+// workspace with placeholder source text (practice/tour), and nothing is generated or saved.
 export const PRACTICE_TOUR = [
   {
-    target: '.practice-hero',
-    side: 'right',
-    title: 'Practice',
-    text: 'Practice is where you turn a study guide into problems you actually work through, not just reread.',
-  },
-  {
-    target: ['.practice-mode-list', '.practice-empty'],
+    target: '.practice-source-actions .btn',
     side: 'left',
     title: 'Generate problems',
-    text: 'Pick a study guide, open Work it out, then click Generate problems to get new problems built from your material.',
+    text: 'Click Generate 10 problems to get new problems built from your study guide. Regenerate anytime for a fresh set.',
   },
   {
-    target: '.practice-loop',
+    target: '.practice-board',
     side: 'right',
-    title: 'Reveal only when stuck',
-    text: 'In the workspace your study guide sits blurred beside the problems. Try first, then double-click a section to reveal it.',
+    title: 'Work it out',
+    text: 'This is your workspace: draw, type, drop in symbols and exponents, or click Tidy handwriting to turn it into clean text.',
   },
   {
-    target: ['.tutor-drawer-toggle', '.tutor-dock-toggle', '.practice-loop'],
+    target: '.practice-answer',
+    side: 'right',
+    title: 'Check your answer',
+    text: 'Type your final answer here and click Check answer to see if you got it right.',
+  },
+  {
+    target: '.practice-source-panel',
     side: 'left',
+    title: 'Reveal only when stuck',
+    text: 'Your study guide sits here, blurred. Try the problem first, then double-click a section to reveal it.',
+  },
+  {
+    target: ['.tutor-drawer-toggle', '.tutor-dock-toggle'],
+    side: 'right',
     title: 'Wrong answers get explained',
     text: 'When an answer is wrong, Cordia sends a prompt to your Tutor, which explains what went wrong and how to fix it.',
   },
