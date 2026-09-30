@@ -34,6 +34,13 @@ class StyleUpdate(BaseModel):
     style: Optional[StyleName] = None
 
 
+OnboardingStep = Literal["style", "extension", "extension_use", "create", "smartnotes", "practice", "done"]
+
+
+class OnboardingUpdate(BaseModel):
+    step: OnboardingStep
+
+
 class StudyAidRequest(BaseModel):
     guide_id: str = Field(..., max_length=36)
     number: int = Field(..., ge=1, le=10000)
@@ -82,6 +89,41 @@ def set_learning_style(body: StyleUpdate, authorization: str = Header(default=""
         logger.error(f"Could not save learning style: {e}")
         raise HTTPException(status_code=500, detail="Could not save your study style")
     return {"enabled": True, "style": body.style, "prompted": True, "styles": list(STYLES)}
+
+
+@router.get("/onboarding")
+def get_onboarding(authorization: str = Header(default="")):
+    """Where the student is in the setup wizard. A missing row means they have not seen it."""
+    user_id = get_user_id(authorization)
+    try:
+        rows = (
+            get_supabase().table("onboarding_progress")
+            .select("step, completed_at")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        ).data
+    except Exception as e:
+        # Never block the app on the wizard: report it finished when progress is unreadable.
+        logger.warning(f"Onboarding progress unavailable: {e}")
+        return {"step": "done", "completed": True}
+    row = rows[0] if rows else {}
+    return {"step": row.get("step") or "style", "completed": bool(row.get("completed_at"))}
+
+
+@router.put("/onboarding")
+def set_onboarding(body: OnboardingUpdate, authorization: str = Header(default="")):
+    user_id = get_user_id(authorization)
+    now = datetime.now(timezone.utc).isoformat()
+    record = {"user_id": user_id, "step": body.step, "updated_at": now}
+    if body.step == "done":
+        record["completed_at"] = now
+    try:
+        get_supabase().table("onboarding_progress").upsert(record).execute()
+    except Exception as e:
+        logger.error(f"Could not save onboarding progress: {e}")
+        raise HTTPException(status_code=500, detail="Could not save your setup progress")
+    return {"step": body.step, "completed": body.step == "done"}
 
 
 def _owned_item(user_id: str, guide_id: str, number: int):
