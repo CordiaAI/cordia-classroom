@@ -158,13 +158,16 @@ async function askTutor(message) {
     body: JSON.stringify({
       question: message.question,
       content: message.content,
+      // The side panel holds the conversation; the server checks it still fits the model.
+      history: Array.isArray(message.history) ? message.history : [],
+      rich_text: true,
       mode: 'short',
       context_title: message.contextTitle || 'Current study material',
       context_url: /^https?:/i.test(message.contextUrl || '') ? message.contextUrl : null,
     }),
   }), 'Cordia Tutor could not answer that question.');
-  if (!answer?.answer) throw new Error('Cordia Tutor returned no answer.');
-  return answer;
+  if (answer?.answer) return answer;
+  throw new Error('Cordia Tutor returned no answer.');
 }
 
 async function saveStudyGuide(message) {

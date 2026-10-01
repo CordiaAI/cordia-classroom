@@ -4,7 +4,7 @@ All inputs are constrained at the schema level (defense in depth).
 """
 
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional
+from typing import List, Literal, Optional
 from urllib.parse import urlparse
 
 
@@ -73,6 +73,12 @@ class RetainExplanationContext(BaseModel):
     correct_answer: str = Field(..., min_length=1, max_length=2_000)
 
 
+class ChatTurn(BaseModel):
+    """One earlier message of a client-held conversation (the extension side panel)."""
+    role: Literal["user", "assistant"]
+    text: str = Field(..., max_length=20_000)
+
+
 class ChatRequest(BaseModel):
     """Request for chat Q&A."""
     question: str = Field(..., min_length=1, max_length=2_000)
@@ -87,6 +93,10 @@ class ChatRequest(BaseModel):
     skill: Optional[str] = Field(default=None, max_length=30)
     class_id: Optional[str] = Field(default=None, max_length=36)
     retain_context: Optional[RetainExplanationContext] = None
+    # Clients without a server session send the conversation so far; checked against the model's memory.
+    history: List[ChatTurn] = Field(default_factory=list, max_length=400)
+    # Clients that render bold, numbered steps, and grey explanation lines.
+    rich_text: bool = False
 
     @field_validator("mode")
     @classmethod

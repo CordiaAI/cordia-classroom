@@ -787,6 +787,17 @@ def recognize_practice_handwriting(body: PracticeRecognizeRequest, request: Requ
     return {"text": text}
 
 
+# The Tutor model's context window (gpt-4o-mini: 128k tokens), less room for its reply and
+# instructions. Estimated at ~3.5 characters per token, which errs on the side of stopping early.
+TUTOR_CONTEXT_TOKENS = int(os.getenv("CLASSROOM_TUTOR_CONTEXT_TOKENS", "128000"))
+TUTOR_RESERVED_TOKENS = 6_000
+CONTEXT_FULL = "context_window_full"
+
+
+def _estimated_tokens(*texts: str) -> int:
+    return int(sum(len(text or "") for text in texts) / 3.5) + 1
+
+
 @app.post("/chat", response_model=ChatResponse)
 @limiter.limit("30/minute")
 def chat(body: ChatRequest, request: Request, authorization: str = Header(default="")):
@@ -1039,13 +1050,20 @@ def chat(body: ChatRequest, request: Request, authorization: str = Header(defaul
             )
         else:
             previous_messages = (session_turn or {}).get("messages") or []
+            client_history = [turn.model_dump() for turn in body.history] if not session_turn else []
+            if client_history:
+                used = _estimated_tokens(content[:25000], guidance, question, *(turn["text"] for turn in client_history))
+                if used > TUTOR_CONTEXT_TOKENS - TUTOR_RESERVED_TOKENS:
+                    raise HTTPException(status_code=413, detail=CONTEXT_FULL)
             answer = answer_question(
                 question=question,
                 context=content,
                 mode=body.mode,
                 learning_guidance=guidance,
-                conversation=previous_messages[:-1],
+                conversation=client_history or previous_messages[:-1],
                 allow_clarification=active_skill in {"explain", "retain", None},
+                rich_text=body.rich_text,
+                full_history=bool(client_history),
             )
 
         record_usage(user_id, "lightweight", usage)

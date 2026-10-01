@@ -31,7 +31,10 @@
   <section class="card tutor-card" aria-labelledby="tutor-title">
     <div class="tutor-heading">
       <div><small>ASK ABOUT THIS PAGE</small><strong id="tutor-title">Cordia Tutor</strong></div>
-      <span class="tutor-context">Current material</span>
+      <div class="tutor-actions">
+        <button id="tutor-new" class="tutor-new" type="button">New chat</button>
+        <button id="tutor-size" class="tutor-size" type="button" aria-pressed="false">Maximize chat</button>
+      </div>
     </div>
     <div id="tutor-messages" class="tutor-messages" aria-live="polite">
       <p class="tutor-empty">Ask for an explanation, example, or quick check.</p>
@@ -52,6 +55,7 @@
     <div><small>Ready for Classroom</small><strong id="guide-title"></strong></div>
     <button id="save-guide">Save to Classroom</button>
   </section>
+  <script src="tutor-chat.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
