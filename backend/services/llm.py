@@ -1378,6 +1378,16 @@ BACK: [Answer]
         return []
 
 
+RICH_TEXT_FORMAT = """
+Format the answer for a chat panel that shows simple formatting:
+- Open with one short sentence that answers directly, in a friendly, conversational voice.
+- Use **bold** for the main points and key terms.
+- For any method, calculation, or multi-step process, number each step on its own line as "1. **Step title using the correct technical term**", put the work for that step on the next line, then add one line starting with "> " that explains the step in one or two plain, high-level sentences.
+- Write math with real symbols such as ≡ × ÷ − ⁻¹ ² ³ √ ≤ ≥ ≠ π → and "mod"; never use LaTeX, dollar signs, or backslash commands.
+- Use short "- " bullets for lists. No tables or headings.
+- When it feels natural, end with one short question that checks understanding or invites a follow-up."""
+
+
 def answer_question(
     question: str,
     context: str,
@@ -1385,10 +1395,13 @@ def answer_question(
     learning_guidance: str = "",
     conversation: Optional[List[dict]] = None,
     allow_clarification: bool = False,
+    rich_text: bool = False,
+    full_history: bool = False,
 ) -> str:
     """
     Answer a question using the provided context.
-    Modes: short, detailed, example
+    Modes: short, detailed, example. rich_text asks for the side panel's readable format;
+    full_history keeps the whole conversation (the caller has checked it fits the model).
     """
     client = get_openai_client()
     if not client:
@@ -1427,6 +1440,10 @@ def answer_question(
         )
         feature = "tutor_short"
 
+    if rich_text and allow_clarification:
+        system_prompt += RICH_TEXT_FORMAT
+        feature = "tutor_rich"
+
     if learning_guidance:
         system_prompt += (
             "\nAdapt how you organize the explanation using this observed learning guidance: "
@@ -1442,11 +1459,12 @@ Answer based on the context above:"""
 
     try:
         messages = [{"role": "system", "content": system_prompt}]
-        for message in (conversation or [])[-6:]:
+        earlier = conversation or []
+        for message in (earlier if full_history else earlier[-6:]):
             role = "assistant" if message.get("role") in {"ai", "assistant"} else "user"
             text = str(message.get("text") or "").strip()
             if text:
-                messages.append({"role": role, "content": text[:2_000]})
+                messages.append({"role": role, "content": text if full_history else text[:2_000]})
         messages.append({"role": "user", "content": prompt})
         response = chat(client, feature,
             messages=messages,

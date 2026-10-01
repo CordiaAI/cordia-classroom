@@ -34,6 +34,10 @@ class StyleUpdate(BaseModel):
     style: Optional[StyleName] = None
 
 
+class ExplanationPreference(BaseModel):
+    text: str = Field(default="", max_length=500)
+
+
 OnboardingStep = Literal["style", "extension", "extension_use", "create", "smartnotes", "practice", "done"]
 
 
@@ -89,6 +93,29 @@ def set_learning_style(body: StyleUpdate, authorization: str = Header(default=""
         logger.error(f"Could not save learning style: {e}")
         raise HTTPException(status_code=500, detail="Could not save your study style")
     return {"enabled": True, "style": body.style, "prompted": True, "styles": list(STYLES)}
+
+
+@router.get("/explanation-preference")
+def get_explanation_preference(authorization: str = Header(default="")):
+    """How the student asked the Tutor to explain things (empty when never set)."""
+    user_id = get_user_id(authorization)
+    return {"text": load_preference(get_supabase(), user_id).get("explain_preference") or ""}
+
+
+@router.put("/explanation-preference")
+def set_explanation_preference(body: ExplanationPreference, authorization: str = Header(default="")):
+    user_id = get_user_id(authorization)
+    text = " ".join(body.text.split())
+    try:
+        get_supabase().table("learning_preferences").upsert({
+            "user_id": user_id,
+            "explain_preference": text or None,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+    except Exception as e:
+        logger.error(f"Could not save explanation preference: {e}")
+        raise HTTPException(status_code=500, detail="Could not save how you like things explained")
+    return {"text": text}
 
 
 @router.get("/onboarding")

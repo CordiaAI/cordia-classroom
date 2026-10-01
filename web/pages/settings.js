@@ -5,11 +5,18 @@ import { apiErrorMessage, apiFetch, cacheUserIdentity, getUserEmail } from '../l
 import FeedbackModal from '../components/FeedbackModal';
 import LearningStylePicker from '../components/LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
+import ExplanationPreference from '../components/ExplanationPreference';
+import StudyInsights from '../components/StudyInsights';
 
 export default function SettingsPage() {
   const { ready } = useRequireAuth();
   const router = useRouter();
   const [activeSection, setActiveSection] = useState('subscription');
+
+  // /settings?section=learning opens a section directly (e.g. from the dashboard insights card).
+  useEffect(() => {
+    if (router.isReady && router.query.section) setActiveSection(String(router.query.section));
+  }, [router.isReady, router.query.section]);
   const [email, setEmail] = useState('');
 
   // Billing state
@@ -136,7 +143,7 @@ export default function SettingsPage() {
 
   const sections = [
     { key: 'subscription', label: 'Subscription' },
-    ...(learningStyle?.enabled ? [{ key: 'study', label: 'Study style' }] : []),
+    { key: 'learning', label: 'Learning' },
     { key: 'appearance', label: 'Appearance' },
     { key: 'account', label: 'Account' },
   ];
@@ -255,7 +262,19 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {activeSection === 'study' && learningStyle?.enabled && (
+        {activeSection === 'learning' && (
+          <div className="settings-section">
+            <ExplanationPreference />
+          </div>
+        )}
+
+        {activeSection === 'learning' && (
+          <div className="settings-section">
+            <StudyInsights />
+          </div>
+        )}
+
+        {activeSection === 'learning' && learningStyle?.enabled && (
           <div className="settings-section">
             <div className="settings-label">How do you like to study?</div>
             <div className="settings-desc">

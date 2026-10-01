@@ -60,6 +60,7 @@ FEATURES = {
     "retain_explain": CallSpec(BUILD, 500),
     # LIGHT
     "tutor_clarify": CallSpec(LIGHT, 500),
+    "tutor_rich": CallSpec(LIGHT, 1400),
     "tutor_example": CallSpec(LIGHT, 300),
     "tutor_detailed": CallSpec(LIGHT, 700),
     "tutor_short": CallSpec(LIGHT, 200),

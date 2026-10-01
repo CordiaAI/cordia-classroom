@@ -176,15 +176,12 @@ function studyContext() {
   return state.sections.map(section => `${section.heading || ''}\n${section.text || ''}`).join('\n\n').trim();
 }
 
-function addTutorMessage(role, text) {
-  tutorMessages.querySelector('.tutor-empty')?.remove();
-  const message = document.createElement('p');
-  message.className = `tutor-message ${role}`;
-  // Diagrams render in Classroom; the side panel shows a pointer instead of raw diagram code.
-  message.textContent = String(text || '').replace(/```mermaid[\s\S]*?```/g, '[Diagram: open this Tutor chat in Classroom to see it]');
-  tutorMessages.appendChild(message);
-  tutorMessages.scrollTop = tutorMessages.scrollHeight;
-}
+const tutorChat = window.CordiaTutorChat.createChat({
+  messages: tutorMessages,
+  card: document.querySelector('.tutor-card'),
+  sizeButton: document.getElementById('tutor-size'),
+  newChatButton: document.getElementById('tutor-new'),
+});
 
 async function ensureTutorContext() {
   if (studyContext()) return;
@@ -203,25 +200,31 @@ async function askTutor(event) {
   const question = tutorInput.value.trim();
   if (!question || tutorSend.disabled) return;
   if (!state.authenticated) return initAuth();
-  addTutorMessage('user', question);
+  const history = tutorChat.history();
+  tutorChat.add('user', question);
   tutorInput.value = '';
   tutorSend.disabled = true;
   announce('Cordia is reading the current material…', 'working');
+  const stopThinking = tutorChat.thinking();
   try {
     await ensureTutorContext();
     const response = await runtime({
       action: 'askTutor',
       question,
+      history,
       content: studyContext(),
       contextTitle: state.source?.title || 'Current study material',
       contextUrl: state.source?.url || '',
     });
     if (!response?.success) throw new Error(response?.error || 'Cordia Tutor could not answer that question.');
-    addTutorMessage('assistant', response.answer);
+    stopThinking();
+    tutorChat.add('assistant', response.answer);
     announce('Tutor answer ready.', 'ready');
   } catch (error) {
-    addTutorMessage('assistant', error.message || 'I could not answer that yet.');
-    announce(error.message || 'Cordia Tutor could not answer that question.', 'error');
+    stopThinking();
+    if (error.message === 'context_window_full') tutorChat.contextFull();
+    else tutorChat.add('assistant', error.message || 'I could not answer that yet.', { remember: false });
+    announce(error.message === 'context_window_full' ? 'Start a new chat to keep going.' : error.message || 'Cordia Tutor could not answer that question.', 'error');
   } finally {
     tutorSend.disabled = false;
     tutorInput.focus();

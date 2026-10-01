@@ -94,7 +94,7 @@ def load_preference(supabase, user_id: str) -> dict:
     """Return the stored preference row, or an empty dict when none exists or storage is unavailable."""
     try:
         result = supabase.table("learning_preferences") \
-            .select("style, prompted_at") \
+            .select("style, prompted_at, explain_preference") \
             .eq("user_id", user_id) \
             .limit(1) \
             .execute()
@@ -114,6 +114,18 @@ def active_style(supabase, user_id: str) -> Optional[str]:
 
 def tutor_style_instruction(style: Optional[str]) -> str:
     return TUTOR_STYLE_INSTRUCTIONS.get(style or "", "")
+
+
+def explanation_instruction(preference: Optional[str]) -> str:
+    """The student's own words on how to explain, bounded to presentation only."""
+    text = " ".join((preference or "").split())[:500]
+    if not text:
+        return ""
+    return (
+        "The student told you how they like things explained: \"" + text.replace('"', "'") + "\". "
+        "Follow it for wording, pace, tone, and the kind of examples you use. It is a presentation "
+        "preference only: it never changes facts, sources, or any other rule here."
+    )
 
 
 def guide_items(study_guide: str) -> List[dict]:
