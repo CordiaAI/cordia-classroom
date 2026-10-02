@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useRequireAuth } from '../lib/auth';
 import { apiErrorMessage, apiFetch, cacheUserIdentity, getUserEmail } from '../lib/api';
+import { FEATURE_COPY, FREE_SUMMARY, METERED, PRICES, PRO_BENEFITS, PRO_NAME, resetLabel } from '../lib/plans';
 import FeedbackModal from '../components/FeedbackModal';
 import LearningStylePicker from '../components/LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
@@ -59,7 +60,7 @@ export default function SettingsPage() {
       setActiveSection('subscription');
       const sessionId = typeof router.query.session_id === 'string' ? router.query.session_id : '';
       if (sessionId) {
-        setMessage('Confirming your CordiaClassroom Plus subscription...');
+        setMessage('Confirming your CordiaClassroom Pro subscription...');
         confirmCheckout(sessionId);
       } else {
         setMessage('Checkout returned without a confirmation reference. Checking your plan...');
@@ -79,8 +80,8 @@ export default function SettingsPage() {
     });
     if (data?.plan === 'classroom_plus') {
       setStatus(data);
-      if (data.billing_interval) setBillingInterval(data.billing_interval);
-      setMessage('CordiaClassroom Plus is active.');
+      if (PRICES[data.billing_interval]) setBillingInterval(data.billing_interval);
+      setMessage('CordiaClassroom Pro is active.');
       router.replace('/settings?section=subscription', undefined, { shallow: true });
     } else {
       setMessage(apiErrorMessage(data?.detail, 'We could not confirm this Checkout session. Please contact support.'));
@@ -94,7 +95,7 @@ export default function SettingsPage() {
     const data = await apiFetch('/billing/status');
     if (data) {
       setStatus(data);
-      if (data.billing_interval) setBillingInterval(data.billing_interval);
+      if (PRICES[data.billing_interval]) setBillingInterval(data.billing_interval);
     }
     setLoading(false);
   }
@@ -134,12 +135,20 @@ export default function SettingsPage() {
   if (!ready) return null;
 
   const isPlus = status?.plan === 'classroom_plus';
-  const buildsUsed = status?.builds_used ?? 0;
-  const buildsLimit = status?.builds_limit ?? 3;
-  const actionsUsed = status?.lightweight_actions_used ?? 0;
-  const actionsLimit = status?.lightweight_actions_limit ?? 30;
-  const buildsPct = Math.min(100, (buildsUsed / buildsLimit) * 100);
-  const actionsPct = Math.min(100, (actionsUsed / actionsLimit) * 100);
+  const onTrial = Boolean(status?.on_trial);
+  const selected = PRICES[billingInterval] || PRICES.monthly;
+
+  async function handleStartTrial() {
+    setUpgrading(true);
+    const data = await apiFetch('/billing/start-trial', { method: 'POST' });
+    if (data?.plan === 'classroom_plus') {
+      setStatus(data);
+      setMessage('Your 7-day Pro trial has started. No card needed, and it ends on its own.');
+    } else {
+      setMessage(apiErrorMessage(data?.detail, 'The trial could not start. Please try again.'));
+    }
+    setUpgrading(false);
+  }
 
   const sections = [
     { key: 'subscription', label: 'Subscription' },
@@ -176,22 +185,34 @@ export default function SettingsPage() {
               <>
                 <div className="billing-current-plan">
                   <div className="plan-badge" data-plan={isPlus ? 'plus' : 'free'}>
-                    {isPlus ? 'CordiaClassroom Plus' : 'Free'}
+                    {onTrial ? `${PRO_NAME} · trial` : isPlus ? PRO_NAME : 'Free'}
                   </div>
                   <div className="plan-usage">
-                    <span>{buildsUsed} of {buildsLimit} complete study builds used</span>
-                    <div className="usage-bar">
-                      <div className="usage-bar-fill" style={{ width: buildsPct + '%', background: buildsPct >= 100 ? 'var(--error)' : 'var(--accent)' }} />
-                    </div>
-                    <span>{actionsUsed} of {actionsLimit} quick study actions used</span>
-                    <div className="usage-bar">
-                      <div className="usage-bar-fill" style={{ width: actionsPct + '%', background: actionsPct >= 100 ? 'var(--error)' : 'var(--accent)' }} />
-                    </div>
+                    {METERED.map(feature => {
+                      const item = status?.features?.[feature];
+                      if (!item) return null;
+                      const pct = item.limit ? Math.min(100, (item.used / item.limit) * 100) : 0;
+                      return (
+                        <div key={feature}>
+                          <span>{item.used} of {item.limit} {FEATURE_COPY[feature].label} used this month</span>
+                          <div className="usage-bar">
+                            <div className="usage-bar-fill" style={{ width: pct + '%', background: pct >= 100 ? 'var(--error)' : 'var(--accent)' }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {status?.resets_at && <span className="plan-resets">Resets {resetLabel(status.resets_at)}</span>}
                   </div>
-                  {isPlus && status?.period_end && (
+                  {onTrial && status?.trial_ends_at && (
+                    <div className="plan-renews">Trial ends {new Date(status.trial_ends_at).toLocaleDateString()}. You will not be charged unless you subscribe.</div>
+                  )}
+                  {isPlus && !onTrial && status?.period_end && (
                     <div className="plan-renews">
                       {status.cancel_at_period_end ? 'Access ends' : 'Renews'} {new Date(status.period_end).toLocaleDateString()}
                     </div>
+                  )}
+                  {status?.past_due && (
+                    <div className="plan-renews plan-warning">Your last payment failed. Update your card to keep Pro.</div>
                   )}
                 </div>
 
@@ -200,35 +221,31 @@ export default function SettingsPage() {
                     <div className="plan-name">Free</div>
                     <div className="plan-price">$0 <span>/month</span></div>
                     <ul className="plan-features">
-                      <li>3 complete study builds each month</li>
-                      <li>30 quick study actions each month</li>
-                      <li>Notes, study guides &amp; flashcards</li>
-                      <li>Save guides to dashboard</li>
+                      {FREE_SUMMARY.map(item => <li key={item}>{item}</li>)}
                     </ul>
                     {!isPlus && <div className="plan-current-label">Current plan</div>}
                   </div>
 
                   <div className={'plan-card plan-card-pro' + (isPlus ? ' plan-card-current' : '')}>
-                    <div className="plan-name">CordiaClassroom Plus</div>
-                    {!isPlus && (
+                    <div className="plan-name">{PRO_NAME}</div>
+                    {(!isPlus || onTrial) && (
                       <div className="billing-toggle" aria-label="Billing interval">
-                        <button className={billingInterval === 'monthly' ? 'active' : ''} onClick={() => setBillingInterval('monthly')}>Monthly</button>
-                        <button className={billingInterval === 'yearly' ? 'active' : ''} onClick={() => setBillingInterval('yearly')}>Yearly · save $23.89</button>
+                        {Object.entries(PRICES).map(([key, option]) => (
+                          <button key={key} className={billingInterval === key ? 'active' : ''} onClick={() => setBillingInterval(key)}>
+                            {option.label}{option.note ? ` · ${option.note.toLowerCase()}` : ''}
+                          </button>
+                        ))}
                       </div>
                     )}
                     <div className="plan-price">
-                      {billingInterval === 'monthly' ? '$6.99' : '$59.99'}
-                      <span>/{billingInterval === 'monthly' ? 'month' : 'year'}</span>
+                      {selected.price}
+                      <span>/{selected.per}</span>
                     </div>
                     <ul className="plan-features">
-                      <li>25 complete study builds each month</li>
-                      <li>250 quick study actions each month</li>
-                      <li>Tutor replies, quiz regeneration, diagrams &amp; image reading</li>
-                      <li>Everything in Free</li>
-                      <li>Secure billing management through Stripe</li>
-                      <li>Cancel anytime</li>
+                      {PRO_BENEFITS.map(item => <li key={item}>{item}</li>)}
+                      <li>Cancel anytime · secure billing through Stripe</li>
                     </ul>
-                    {isPlus ? (
+                    {isPlus && !onTrial ? (
                       <div className="plan-actions">
                         <div className="plan-current-label">Current plan</div>
                         <button className="btn-manage" onClick={handleManageBilling} disabled={managing}>
@@ -236,9 +253,16 @@ export default function SettingsPage() {
                         </button>
                       </div>
                     ) : (
-                      <button className="btn-upgrade" onClick={handleUpgrade} disabled={upgrading}>
-                        {upgrading ? 'Opening secure checkout...' : 'Choose Plus · ' + (billingInterval === 'monthly' ? '$6.99/month' : '$59.99/year')}
-                      </button>
+                      <div className="plan-actions">
+                        <button className="btn-upgrade" onClick={handleUpgrade} disabled={upgrading}>
+                          {upgrading ? 'Opening secure checkout...' : `${onTrial ? 'Subscribe' : 'Choose Pro'} · ${selected.price}/${selected.per}`}
+                        </button>
+                        {status?.trial_available && (
+                          <button className="btn-manage" onClick={handleStartTrial} disabled={upgrading}>
+                            Try Pro free for 7 days · no card
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

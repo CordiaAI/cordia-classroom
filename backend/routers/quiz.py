@@ -14,7 +14,7 @@ from database import get_supabase
 from services.llm import get_openai_client
 from services.llm_calls import chat
 from auth_utils import get_user_id
-from routers.billing import check_usage, get_user_plan, record_usage
+from services.entitlements import record, remaining, require
 
 _UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
@@ -144,7 +144,6 @@ def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False)
         if not result.data:
             raise HTTPException(status_code=404, detail="Guide not found")
 
-        plan = get_user_plan(user_id)["plan"]
 
         # A quiz is generated once, then stays attached to its guide until the user regenerates it.
         cached = result.data[0].get("quiz_questions")
@@ -161,7 +160,12 @@ def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False)
 
         qa_pairs = qa_pairs[:50]
 
-        if plan != "classroom_plus":
+        # AI distractors are a Pro feature; free accounts get one AI quiz a month as a
+        # preview, then guide-derived options. An explicit regenerate at 0 opens the upgrade.
+        use_ai = remaining(user_id, "ai_quiz") > 0
+        if not use_ai and regenerate:
+            require(user_id, "ai_quiz")
+        if not use_ai:
             questions = _standard_questions(qa_pairs)
             if not questions:
                 raise HTTPException(
@@ -171,7 +175,7 @@ def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False)
             _save_quiz(supabase, guide_id, user_id, questions)
             return {"questions": questions}
 
-        usage = check_usage(user_id, "lightweight")
+        require(user_id, "ai_quiz")
         client = get_openai_client()
         if not client:
             raise HTTPException(status_code=500, detail="AI service unavailable")
@@ -242,7 +246,7 @@ Return ONLY the JSON object, no other text:"""
         if distractors_list:
             _save_quiz(supabase, guide_id, user_id, questions)
 
-        record_usage(user_id, "lightweight", usage)
+        record(user_id, "ai_quiz")
         return {"questions": questions}
 
     except HTTPException:

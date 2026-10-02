@@ -61,8 +61,8 @@ class UniversalCaptureContractTests(unittest.TestCase):
         self.assertEqual(response.json()["sections"][0]["text"], "Cells divide through mitosis.")
 
     @patch("main._learning_guidance", return_value="")
-    @patch("main.record_usage")
-    @patch("main.check_usage", return_value={"used": 0})
+    @patch("main.record")
+    @patch("main.require", return_value={"used": 0})
     @patch("main.generate_study_guide", return_value="Q1: What is mitosis?\nA1: Cell division.")
     @patch("main.generate_notes_ai", return_value=["Study note"])
     @patch("main.get_user_id", return_value="student-1")
@@ -89,8 +89,8 @@ class UniversalCaptureContractTests(unittest.TestCase):
         self.assertFalse(study_guide_is_complete(guide))
 
     @patch("main._learning_guidance", return_value="")
-    @patch("main.record_usage")
-    @patch("main.check_usage", return_value={"used": 0})
+    @patch("main.record")
+    @patch("main.require", return_value={"used": 0})
     @patch("main.generate_study_guide", return_value="Q1: What is mitosis?\nA1: Cell division.\nQ2: What follows?")
     @patch("main.generate_notes_ai", return_value=[])
     @patch("main.get_user_id", return_value="student-1")
@@ -105,8 +105,8 @@ class UniversalCaptureContractTests(unittest.TestCase):
         record.assert_not_called()
 
     @patch("main._learning_guidance", return_value="")
-    @patch("main.record_usage")
-    @patch("main.check_usage", return_value={"used": 0})
+    @patch("main.record")
+    @patch("main.require", return_value={"used": 0})
     @patch("main.generate_study_guide", return_value="[Error generating study guide]")
     @patch("main.generate_notes_ai", return_value=[])
     @patch("main.get_user_id", return_value="student-1")
@@ -121,8 +121,8 @@ class UniversalCaptureContractTests(unittest.TestCase):
         record.assert_not_called()
 
     @patch("main._learning_guidance", return_value="")
-    @patch("main.record_usage")
-    @patch("main.check_usage", return_value={"used": 0})
+    @patch("main.record")
+    @patch("main.require", return_value={"used": 0})
     @patch("main.generate_study_guide", return_value="Q1: What is required?\nA1: A deployment diagram.")
     @patch("main.generate_notes_ai", return_value=[])
     @patch("main.get_user_id", return_value="student-1")

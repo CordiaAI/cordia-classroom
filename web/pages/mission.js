@@ -24,7 +24,7 @@ export default function MissionPage() {
     },
     {
       title: 'The Cost',
-      description: 'Start free with 3 complete study builds and 30 lightweight AI actions each month. CordiaClassroom Plus includes 25 builds and 250 actions for $6.99 monthly or $59.99 yearly. There is no automatic trial conversion.',
+      description: 'Start free with 3 study guides, 10 tutor prompts and 5 Learn My Way views each month. CordiaClassroom Pro is $9.99 a month or $29 a semester. Try Pro free for 7 days with no card; the trial never turns into a charge on its own.',
     },
     {
       title: 'Users Are "Cofounders"',

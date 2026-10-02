@@ -5,7 +5,7 @@ from pydantic import BaseModel, field_validator
 from typing import Optional
 from database import get_supabase
 from auth_utils import get_user_id
-from routers.billing import check_usage, record_usage
+from services.entitlements import record, require
 from services.llm import study_guide_is_complete, study_guide_to_flashcards
 from services.llm_calls import chat
 
@@ -215,7 +215,7 @@ def generate_study_guide_from_note(note_id: str, authorization: str = Header(def
             raise HTTPException(status_code=400, detail="Note is empty — add some content first")
 
         from services.llm import generate_study_guide_from_notes
-        usage = check_usage(user_id, "build")
+        require(user_id, "guide")
         study_guide = generate_study_guide_from_notes(html_content)
 
         if not study_guide:
@@ -234,7 +234,7 @@ def generate_study_guide_from_note(note_id: str, authorization: str = Header(def
         title = (note.get("title") or "Untitled Notes").strip()
         suggested_title = title if title.lower().endswith("study guide") else f"{title} — Study Guide"
 
-        record_usage(user_id, "build", usage)
+        record(user_id, "guide")
         return {
             "title": suggested_title,
             "study_guide": study_guide,
@@ -260,7 +260,7 @@ def generate_diagram(request: DiagramRequest, authorization: str = Header(defaul
         if not api_key:
             return {"mermaid": None}
 
-        usage = check_usage(user_id, "lightweight")
+        require(user_id, "light")
         client = OpenAI(api_key=api_key)
         response = chat(client, "smart_notes_diagram",
             messages=[{
@@ -288,7 +288,7 @@ def generate_diagram(request: DiagramRequest, authorization: str = Header(defaul
         text = re.sub(r'\s*```$', '', text).strip()
         if not text or 'NO_DIAGRAM' in text:
             return {"mermaid": None}
-        record_usage(user_id, "lightweight", usage)
+        record(user_id, "light")
         return {"mermaid": text}
 
     except HTTPException:

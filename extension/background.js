@@ -29,6 +29,7 @@ async function responseData(response, fallback) {
   const detail = data?.detail;
   const error = new Error((typeof detail === 'string' ? detail : detail?.message) || fallback);
   error.status = response.status;
+  if (response.status === 402 && detail?.code === 'limit_reached') error.limit = detail;
   throw error;
 }
 
@@ -143,10 +144,17 @@ async function extractEducationalContent(message) {
   }), 'Educational-content extraction failed.');
 }
 
+async function billingStatus() {
+  return responseData(await apiFetch('/billing/status'), 'Classroom could not load your plan.');
+}
+
 async function createStudyGuide(message) {
   const generated = await responseData(await apiFetch('/generate', {
     method: 'POST',
-    body: JSON.stringify({ content: message.content, images: message.images || [], notes: true, study_guide: true, flashcards: true }),
+    body: JSON.stringify({
+      content: message.content, images: message.images || [], notes: true, study_guide: true, flashcards: true,
+      request_id: message.requestId || null,
+    }),
   }), 'Study-guide generation failed.');
   if (!generated.study_guide) throw new Error('The server returned no study guide.');
   return generated;
@@ -202,7 +210,7 @@ async function saveStudyGuide(message) {
   return { savedGuide: saved.guide, guideUrl, redirected };
 }
 
-const ACTIONS = { captureScreen, scrapePage, extractEducationalContent, createStudyGuide, saveStudyGuide, askTutor };
+const ACTIONS = { captureScreen, scrapePage, extractEducationalContent, createStudyGuide, saveStudyGuide, askTutor, billingStatus };
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.action === 'syncClassroomAuth') {
@@ -217,6 +225,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!action) return false;
   action(message)
     .then(data => sendResponse({ success: true, ...data }))
-    .catch(error => sendResponse({ success: false, error: error.message, status: error.status || 0 }));
+    .catch(error => sendResponse({ success: false, error: error.message, status: error.status || 0, limit: error.limit || null }));
   return true;
 });

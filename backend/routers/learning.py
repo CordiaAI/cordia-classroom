@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from auth_utils import get_user_id
 from database import get_supabase
-from routers.billing import check_usage, record_usage
+from services.entitlements import record, require
 from services.learning_styles import (
     STYLES,
     check_attempt,
@@ -191,7 +191,7 @@ def create_study_aid(body: StudyAidRequest, authorization: str = Header(default=
     if cached:
         return public_aid(body.mode, cached)
 
-    usage = check_usage(user_id, "lightweight")
+    require(user_id, "learn_my_way")
     content = generate_study_aid(body.mode, item, related)
     if not content:
         raise HTTPException(status_code=502, detail="Cordia could not build this view right now. Please try again.")
@@ -205,7 +205,7 @@ def create_study_aid(body: StudyAidRequest, authorization: str = Header(default=
         }, on_conflict="user_id,guide_id,item_key,mode").execute()
     except Exception as e:
         logger.warning(f"Study aid cache write failed: {e}")
-    record_usage(user_id, "lightweight", usage)
+    record(user_id, "learn_my_way")
     return public_aid(body.mode, content)
 
 
@@ -216,9 +216,9 @@ def check_study_aid(body: StudyAidCheck, authorization: str = Header(default="")
     item, _ = _owned_item(user_id, body.guide_id, body.number)
     cached = _cached_aid(user_id, body.guide_id, item_key(item), body.mode) or {}
     task = cached.get("task") or "Explain this idea in your own words."
-    usage = check_usage(user_id, "lightweight")
+    require(user_id, "light")
     result = check_attempt(item, task, cached.get("task_answer") or "", body.attempt.strip())
     if not result:
         raise HTTPException(status_code=502, detail="Cordia could not check this right now. Please try again.")
-    record_usage(user_id, "lightweight", usage)
+    record(user_id, "light")
     return result

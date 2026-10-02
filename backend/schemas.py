@@ -56,6 +56,8 @@ class GenerateRequest(BaseModel):
     study_guide: bool = True
     flashcards: bool = False
     domain: Optional[str] = Field(default=None, max_length=30)
+    # Client-generated id reused on retries so one guide is never charged twice.
+    request_id: Optional[str] = Field(default=None, max_length=64)
 
 
 class GenerateResponse(BaseModel):

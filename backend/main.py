@@ -40,7 +40,7 @@ from services.llm import (
 from routers import auth, folders, guides, stats, search, quiz, billing, nclex, exam, feedback, smart_notes, calendar, tutor, learning
 from auth_utils import get_user_id
 from database import get_supabase
-from routers.billing import check_usage, record_usage
+from services.entitlements import record, require
 from services.pptx_rendering import (
     PptxRenderError,
     PptxRenderTimeout,
@@ -311,9 +311,9 @@ def extract_file_text(request: Request, file: UploadFile = None, authorization: 
                         mime = "image/png" if scan.name.lower().endswith(".png") else "image/jpeg"
                         page_images.append(f"data:{mime};base64,{_b64.b64encode(scan.data).decode()}")
                 if page_images:
-                    usage = check_usage(user_id, "lightweight")
+                    require(user_id, "light")
                     text = transcribe_document_pages(page_images) or text
-                    record_usage(user_id, "lightweight", usage)
+                    record(user_id, "light")
 
         elif filename.endswith(".docx"):
                     try:
@@ -397,7 +397,7 @@ def extract_file_text(request: Request, file: UploadFile = None, authorization: 
                 }
                 mime = mime_map.get(ext, "image/jpeg")
                 b64 = _b64.b64encode(content_bytes).decode()
-                usage = check_usage(user_id, "lightweight")
+                require(user_id, "light")
                 response = chat(client, "image_extraction",
                     messages=[{
                         "role": "user",
@@ -417,7 +417,7 @@ def extract_file_text(request: Request, file: UploadFile = None, authorization: 
                 text = (response.choices[0].message.content or "").strip()
                 if "NO_EDUCATIONAL_CONTENT" in text:
                     raise HTTPException(status_code=422, detail="No educational content found in this image.")
-                record_usage(user_id, "lightweight", usage)
+                record(user_id, "light")
             except HTTPException:
                 raise
             except Exception as e:
@@ -504,11 +504,11 @@ def ingest(body: IngestRequest, request: Request, authorization: str = Header(de
         # Screenshot-only capture has no DOM text. Transcribe visual material before
         # selection so it reaches the same student review step as page text.
         if images_data and content.strip() == "[Screenshot fallback]":
-            usage = check_usage(user_id, "lightweight")
+            require(user_id, "light")
             image_descriptions = analyze_images_for_slides(images_data)
             visual_text = "\n\n".join(image_descriptions.values()) if image_descriptions else ""
             if visual_text:
-                record_usage(user_id, "lightweight", usage)
+                record(user_id, "light")
                 content = visual_text
                 # The transcription is now the reviewable source. Do not retain
                 # the screenshot for a second vision pass during generation.
@@ -557,7 +557,7 @@ def generate(body: GenerateRequest, request: Request, authorization: str = Heade
             raise HTTPException(status_code=422, detail="Select at least one study section")
 
         # Validate allowance after the reviewed source text is valid.
-        usage = check_usage(user_id, "build")
+        require(user_id, "guide")
 
         # Preserve structured slideshow handling for direct API clients that send
         # the original slide markup. Reviewed browser captures use plain text.
@@ -648,7 +648,7 @@ def generate(body: GenerateRequest, request: Request, authorization: str = Heade
                 raise HTTPException(status_code=422, detail="CordiaClassroom could not build flashcards from this material.")
             logger.info(f"Created {len(flashcards)} flashcards")
 
-        record_usage(user_id, "build", usage)
+        record(user_id, "guide", body.request_id)
         return GenerateResponse(
             notes=notes_str,
             study_guide=study_guide,
@@ -701,7 +701,7 @@ async def create_practice_set(
     if not content.strip():
         raise HTTPException(status_code=400, detail="Add a study guide or upload readable study material first.")
 
-    usage = check_usage(user_id, "build")
+    require(user_id, "practice")
     practice = await run_in_threadpool(
         generate_verified_practice_set,
         content,
@@ -712,7 +712,7 @@ async def create_practice_set(
     if len(problems) != 10:
         raise HTTPException(status_code=502, detail="Cordia could not verify a complete 10-problem set from this material. Please try another source or add more detail.")
 
-    record_usage(user_id, "build", usage)
+    record(user_id, "practice")
     practice_set = {
         "title": f"{title} — Practice",
         "source": source,
@@ -959,7 +959,7 @@ def chat(body: ChatRequest, request: Request, authorization: str = Header(defaul
             re.IGNORECASE,
         ))
         if wants_practice:
-            usage = check_usage(user_id, "build")
+            require(user_id, "practice")
             practice = generate_practice_guide(content, _learning_guidance(user_id))
             if not practice or practice.startswith("[Error"):
                 raise HTTPException(status_code=502, detail="Cordia could not create practice problems from this material")
@@ -982,7 +982,7 @@ def chat(body: ChatRequest, request: Request, authorization: str = Header(defaul
             created = get_supabase().table("study_guides").insert(payload).execute()
             if not created.data:
                 raise HTTPException(status_code=500, detail="Practice guide could not be saved")
-            record_usage(user_id, "build", usage)
+            record(user_id, "practice")
             saved = created.data[0]
             location = " in the same class" if saved.get("folder_id") else " in Study Guides"
             return finish(ChatResponse(
@@ -993,7 +993,7 @@ def chat(body: ChatRequest, request: Request, authorization: str = Header(defaul
             ))
 
         if active_skill == "build_guide":
-            usage = check_usage(user_id, "build")
+            require(user_id, "guide")
             chunks = chunk_text(clean_text(content))
             study_guide = generate_study_guide(
                 chunks,
@@ -1019,7 +1019,7 @@ def chat(body: ChatRequest, request: Request, authorization: str = Header(defaul
             created = get_supabase().table("study_guides").insert(payload).execute()
             if not created.data:
                 raise HTTPException(status_code=500, detail="Study guide could not be saved")
-            record_usage(user_id, "build", usage)
+            record(user_id, "guide")
             saved = created.data[0]
             location = " in the same class" if saved.get("folder_id") else " in Study Guides"
             return finish(ChatResponse(
@@ -1029,7 +1029,7 @@ def chat(body: ChatRequest, request: Request, authorization: str = Header(defaul
                 source=source,
             ))
 
-        usage = check_usage(user_id, "lightweight")
+        require(user_id, "tutor")
         guidance = "\n".join(filter(None, [
             _learning_guidance(user_id),
             _style_instruction(user_id),
@@ -1066,7 +1066,7 @@ def chat(body: ChatRequest, request: Request, authorization: str = Header(defaul
                 full_history=bool(client_history),
             )
 
-        record_usage(user_id, "lightweight", usage)
+        record(user_id, "tutor")
         return finish(ChatResponse(answer=answer, source=source))
 
     except HTTPException as error:
