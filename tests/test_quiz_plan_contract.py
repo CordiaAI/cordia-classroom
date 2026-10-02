@@ -44,7 +44,7 @@ class QuizPlanContractTests(unittest.TestCase):
         database, query = self._database({"study_guide": GUIDE, "quiz_questions": None})
         with patch.object(quiz, "get_user_id", return_value="student-1"), \
              patch.object(quiz, "get_supabase", return_value=database), \
-             patch.object(quiz, "get_user_plan", return_value={"plan": "free"}), \
+             patch.object(quiz, "remaining", return_value=0), \
              patch.object(quiz, "get_openai_client") as openai:
             result = quiz.generate_quiz(GUIDE_ID, "Bearer token")
 
@@ -60,7 +60,7 @@ class QuizPlanContractTests(unittest.TestCase):
         database, query = self._database({"study_guide": GUIDE, "quiz_questions": cached})
         with patch.object(quiz, "get_user_id", return_value="student-1"), \
              patch.object(quiz, "get_supabase", return_value=database), \
-             patch.object(quiz, "get_user_plan", return_value={"plan": "free"}):
+             patch.object(quiz, "remaining", return_value=0):
             result = quiz.generate_quiz(GUIDE_ID, "Bearer token")
 
         self.assertEqual(result["questions"], cached)
@@ -80,7 +80,7 @@ class QuizPlanContractTests(unittest.TestCase):
         database, query = self._database({"study_guide": GUIDE, "quiz_questions": cached})
         with patch.object(quiz, "get_user_id", return_value="student-1"), \
              patch.object(quiz, "get_supabase", return_value=database), \
-             patch.object(quiz, "get_user_plan", return_value={"plan": "classroom_plus"}), \
+             patch.object(quiz, "remaining", return_value=5), \
              patch.object(quiz, "get_openai_client") as openai:
             result = quiz.generate_quiz(GUIDE_ID, "Bearer token")
 
@@ -102,15 +102,15 @@ class QuizPlanContractTests(unittest.TestCase):
         usage = {"builds_used": 0, "lightweight_actions_used": 0}
         with patch.object(quiz, "get_user_id", return_value="student-1"), \
              patch.object(quiz, "get_supabase", return_value=database), \
-             patch.object(quiz, "get_user_plan", return_value={"plan": "classroom_plus"}), \
-             patch.object(quiz, "check_usage", return_value=usage), \
-             patch.object(quiz, "record_usage") as record_usage, \
+             patch.object(quiz, "remaining", return_value=5), \
+             patch.object(quiz, "require"), \
+             patch.object(quiz, "record") as record_usage, \
              patch.object(quiz, "get_openai_client", return_value=client):
             result = quiz.generate_quiz(GUIDE_ID, "Bearer token")
 
         self.assertEqual(len(result["questions"]), 4)
         self.assertEqual(query.updated, {"quiz_questions": result["questions"]})
-        record_usage.assert_called_once_with("student-1", "lightweight", usage)
+        record_usage.assert_called_once_with("student-1", "ai_quiz")
         prompt = client.chat.completions.create.call_args.kwargs["messages"][1]["content"]
         self.assertIn("incorrect terminology", prompt)
         self.assertIn("missing or altering one essential factor", prompt)
@@ -124,9 +124,9 @@ class QuizPlanContractTests(unittest.TestCase):
         usage = {"builds_used": 0, "lightweight_actions_used": 0}
         with patch.object(quiz, "get_user_id", return_value="student-1"), \
              patch.object(quiz, "get_supabase", return_value=database), \
-             patch.object(quiz, "get_user_plan", return_value={"plan": "classroom_plus"}), \
-             patch.object(quiz, "check_usage", return_value=usage), \
-             patch.object(quiz, "record_usage"), \
+             patch.object(quiz, "remaining", return_value=5), \
+             patch.object(quiz, "require"), \
+             patch.object(quiz, "record"), \
              patch.object(quiz, "get_openai_client", return_value=client):
             result = quiz.generate_quiz(GUIDE_ID, "Bearer token")
 
@@ -148,9 +148,9 @@ class QuizPlanContractTests(unittest.TestCase):
         usage = {"builds_used": 0, "lightweight_actions_used": 0}
         with patch.object(quiz, "get_user_id", return_value="student-1"), \
              patch.object(quiz, "get_supabase", return_value=database), \
-             patch.object(quiz, "get_user_plan", return_value={"plan": "classroom_plus"}), \
-             patch.object(quiz, "check_usage", return_value=usage), \
-             patch.object(quiz, "record_usage"), \
+             patch.object(quiz, "remaining", return_value=5), \
+             patch.object(quiz, "require"), \
+             patch.object(quiz, "record"), \
              patch.object(quiz, "get_openai_client", return_value=client):
             result = quiz.regenerate_quiz(GUIDE_ID, "Bearer token")
 

@@ -122,7 +122,7 @@ class StyleRouteTests(unittest.TestCase):
             self.assertEqual(aid.status_code, 404)
 
     @patch("routers.learning.generate_study_aid")
-    @patch("routers.learning.check_usage")
+    @patch("routers.learning.require")
     @patch("routers.learning.get_user_id", return_value="student-1")
     def test_cached_aid_is_returned_without_charging_or_generating(self, _user, usage, generate):
         stub = supabase_with([{"id": GUIDE_ID, "study_guide": GUIDE}], cached_rows=[{"content": {"script": "Hi", "task": "Explain"}}])
@@ -133,8 +133,8 @@ class StyleRouteTests(unittest.TestCase):
         usage.assert_not_called()
         generate.assert_not_called()
 
-    @patch("routers.learning.record_usage")
-    @patch("routers.learning.check_usage", return_value={"used": 0})
+    @patch("routers.learning.record")
+    @patch("routers.learning.require", return_value={"used": 0})
     @patch("routers.learning.generate_study_aid", return_value={"example": "e", "task": "t", "task_answer": "hidden"})
     @patch("routers.learning.get_user_id", return_value="student-1")
     def test_new_aid_is_generated_from_the_owned_item_and_cached(self, _user, generate, _usage, record):

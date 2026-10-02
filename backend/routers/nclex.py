@@ -11,7 +11,7 @@ from typing import List
 from database import get_supabase
 from services.llm import generate_nclex_questions
 from auth_utils import get_user_id
-from routers.billing import check_usage, record_usage
+from services.entitlements import record, require
 
 _UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
@@ -67,7 +67,7 @@ def generate_nclex(guide_id: str, authorization: str = Header(default="")):
         if cached:
             return {"questions": cached, "cached": True}
 
-        usage = check_usage(user_id, "build")
+        require(user_id, "nclex")
         questions = generate_nclex_questions(combined)
 
         if not questions:
@@ -81,7 +81,7 @@ def generate_nclex(guide_id: str, authorization: str = Header(default="")):
         except Exception as save_err:
             logger.warning(f"Failed to cache NCLEX questions: {save_err}")
 
-        record_usage(user_id, "build", usage)
+        record(user_id, "nclex")
         return {"questions": questions, "cached": False}
 
     except HTTPException:

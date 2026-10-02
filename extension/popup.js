@@ -17,10 +17,39 @@ const tutorInput = document.getElementById('tutor-input');
 const tutorSend = document.getElementById('tutor-send');
 const tutorMessages = document.getElementById('tutor-messages');
 
+const UPGRADE_URL = 'https://classroom.cordiaai.io/settings?section=subscription&upgrade=1';
+const upgradeSheet = document.getElementById('upgrade-sheet');
+const upgradeTitle = document.getElementById('upgrade-title');
+const upgradeBody = document.getElementById('upgrade-body');
+const LIMIT_TITLES = {
+  guide: "You've used your 3 free study guides",
+  tutor: "You've used your 10 free tutor prompts",
+};
+
+// Every 402 from Classroom opens the same upgrade sheet, wherever it came from.
 function runtime(message) {
   return new Promise(resolve => chrome.runtime.sendMessage(message, response => {
-    resolve(chrome.runtime.lastError ? { success: false, error: chrome.runtime.lastError.message } : response);
+    const result = chrome.runtime.lastError ? { success: false, error: chrome.runtime.lastError.message } : response;
+    if (result?.limit) showUpgrade(result.limit);
+    resolve(result);
   }));
+}
+
+function showUpgrade(limit = {}) {
+  upgradeTitle.textContent = LIMIT_TITLES[limit.feature] || limit.message || 'Upgrade to CordiaClassroom Pro';
+  const resets = limit.resets_at ? new Date(limit.resets_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+  upgradeBody.textContent = `Pro gives you unlimited guides from any page, unlimited Cordia Tutor, and guides that adapt to how you learn.${resets ? ` Your free plan resets ${resets}.` : ''}`;
+  upgradeSheet.hidden = false;
+}
+
+async function refreshPlan() {
+  const plan = await runtime({ action: 'billingStatus' });
+  state.guidesLeft = plan?.success ? plan.features?.guide?.remaining : null;
+  if (state.guidesLeft === 0) {
+    makeButton.textContent = 'Get Pro to make more guides';
+  } else {
+    makeButton.textContent = 'Make study guide';
+  }
 }
 
 function storage(keys) {
@@ -76,6 +105,7 @@ async function initAuth() {
   announce(state.authenticated
     ? `Connected${auth.userEmail ? ` as ${auth.userEmail}` : ''}. Ready.`
     : (auth?.error || 'Connect CordiaClassroom to make and save a guide.'), state.authenticated ? 'ready' : 'warning');
+  if (state.authenticated) await refreshPlan();
 }
 
 async function capture() {
@@ -126,7 +156,11 @@ async function generate() {
   step('create', 'active');
   announce('Writing the study guide…', 'working');
   const content = state.sections.map(section => `${section.heading}\n${section.text}`).join('\n\n');
-  const response = await runtime({ action: 'createStudyGuide', content, images: state.images });
+  if (state.requestSource !== content) {
+    state.requestSource = content;
+    state.requestId = crypto.randomUUID();
+  }
+  const response = await runtime({ action: 'createStudyGuide', content, images: state.images, requestId: state.requestId });
   if (!response?.success) throw new Error(response?.error || 'Study-guide creation failed.');
   if (!response.study_guide) throw new Error('The server returned no study guide.');
   state.generated = response;
@@ -136,6 +170,8 @@ async function generate() {
 
 async function makeStudyGuide() {
   if (!state.authenticated) return initAuth();
+  // Out of free guides: show the upgrade before spending the student's time on capture.
+  if (state.guidesLeft === 0) return showUpgrade({ feature: 'guide' });
   makeButton.disabled = true;
   saveBubble.hidden = true;
   saveBubble.classList.remove('saved');
@@ -255,6 +291,8 @@ async function saveStudyGuide() {
   }
   saveBubble.classList.add('saved');
   saveButton.textContent = 'Saved';
+  state.requestSource = null;
+  refreshPlan();
   if (response.redirected) {
     announce('Saved. Opening your guide in CordiaClassroom…', 'ready');
   } else {
@@ -275,3 +313,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
 window.addEventListener('focus', initAuth);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) initAuth(); });
 initAuth();
+
+document.getElementById('upgrade-open').addEventListener('click', () => {
+  chrome.tabs.create({ url: UPGRADE_URL });
+});
+document.getElementById('upgrade-close').addEventListener('click', () => {
+  upgradeSheet.hidden = true;
+});

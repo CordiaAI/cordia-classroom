@@ -39,8 +39,8 @@ class TutorContractTests(unittest.TestCase):
         return db, table
 
     @patch("main._learning_guidance", return_value="")
-    @patch("main.record_usage")
-    @patch("main.check_usage", return_value={"used": 0})
+    @patch("main.record")
+    @patch("main.require", return_value={"used": 0})
     @patch("main.answer_question", return_value="Mitosis is cell division.")
     @patch("main.get_user_id", return_value="student-1")
     def test_tutor_grounds_answer_in_owned_guide(self, _auth, answer, _usage, _record, _guidance):
@@ -58,8 +58,8 @@ class TutorContractTests(unittest.TestCase):
         self.assertEqual(answer.call_args.kwargs["context"], "Q1: What is mitosis?\nA1: Cell division.")
 
     @patch("main._learning_guidance", return_value="")
-    @patch("main.record_usage")
-    @patch("main.check_usage", return_value={"used": 0})
+    @patch("main.record")
+    @patch("main.require", return_value={"used": 0})
     @patch("main.explain_retain_answer", return_value="Mitosis makes matching body cells; meiosis makes sex cells with half the chromosomes.")
     @patch("main.get_user_id", return_value="student-1")
     def test_retain_explanation_binds_selected_and_correct_answers(self, _auth, explain, _usage, _record, _guidance):
@@ -107,8 +107,8 @@ class TutorContractTests(unittest.TestCase):
         self.assertIn("What is mitosis?", explain.call_args.kwargs["context"])
 
     @patch("main._learning_guidance", return_value="")
-    @patch("main.record_usage")
-    @patch("main.check_usage", return_value={"used": 0})
+    @patch("main.record")
+    @patch("main.require", return_value={"used": 0})
     @patch("main.answer_question", return_value="The selected source explains recursion.")
     @patch("main.get_user_id", return_value="student-1")
     def test_tutor_uses_selected_material_when_saved_guide_content_is_empty(self, _auth, answer, _usage, _record, _guidance):
@@ -132,8 +132,8 @@ class TutorContractTests(unittest.TestCase):
         self.assertEqual(answer.call_args.kwargs["context"], "Recursion needs a base case.")
 
     @patch("main._learning_guidance", return_value="")
-    @patch("main.record_usage")
-    @patch("main.check_usage", return_value={"used": 0})
+    @patch("main.record")
+    @patch("main.require", return_value={"used": 0})
     @patch("main.generate_verified_practice_set")
     @patch("main.get_user_id", return_value="student-1")
     def test_practice_endpoint_returns_exactly_ten_source_grounded_problems(self, _auth, generate, _usage, record, _guidance):
@@ -174,8 +174,8 @@ class TutorContractTests(unittest.TestCase):
         record.assert_called_once()
 
     @patch("main._learning_guidance", return_value="")
-    @patch("main.record_usage")
-    @patch("main.check_usage", return_value={"used": 0})
+    @patch("main.record")
+    @patch("main.require", return_value={"used": 0})
     @patch("main.generate_practice_guide", return_value="Q1: Apply mitosis.\nA1: Cell division.")
     @patch("main.get_user_id", return_value="student-1")
     def test_tutor_creates_practice_guide_in_source_class(self, _auth, _generate, _usage, record, _guidance):
@@ -204,8 +204,8 @@ class TutorContractTests(unittest.TestCase):
         record.assert_called_once()
 
     @patch("main._learning_guidance", return_value="")
-    @patch("main.record_usage")
-    @patch("main.check_usage", return_value={"used": 0})
+    @patch("main.record")
+    @patch("main.require", return_value={"used": 0})
     @patch("main.generate_practice_guide", return_value="Q1: Apply recursion.\nA1: Use a base case.")
     @patch("main.get_user_id", return_value="student-1")
     def test_tutor_creates_practice_guide_from_owned_smartnote(self, _auth, generate, _usage, _record, _guidance):
@@ -246,8 +246,8 @@ class TutorContractTests(unittest.TestCase):
         self.assertNotIn("source_guide_id", payload)
 
     @patch("main._learning_guidance", return_value="")
-    @patch("main.record_usage")
-    @patch("main.check_usage", return_value={"used": 0})
+    @patch("main.record")
+    @patch("main.require", return_value={"used": 0})
     @patch("main.answer_question", return_value="Shared answer")
     @patch("main.get_user_id", return_value="student-1")
     def test_tutor_message_returns_the_same_shared_session(self, _auth, _answer, _usage, _record, _guidance):
@@ -451,8 +451,8 @@ class TutorContractTests(unittest.TestCase):
              patch("main.claim_tutor_turn", return_value=turn), \
              patch("main.complete_tutor_turn", return_value=completed), \
              patch("main.public_tutor_session", return_value={"id": "session-1", "status": "idle"}), \
-             patch("main.check_usage", return_value={"used": 0}), \
-             patch("main.record_usage"), \
+             patch("main.require", return_value={"used": 0}), \
+             patch("main.record"), \
              patch("main._learning_guidance", return_value=""), \
              patch("main.generate_study_guide", return_value="Q1: What is a proposition?\nA1: A declarative statement."), \
              patch("main.study_guide_to_flashcards", return_value=[{"front": "What is a proposition?", "back": "A declarative statement."}]), \

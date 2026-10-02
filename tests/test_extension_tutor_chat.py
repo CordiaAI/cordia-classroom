@@ -18,8 +18,8 @@ BASE = {"question": "Now find the inverse of 5 mod 26", "content": "Modular inve
 
 @patch("main._style_instruction", return_value="")
 @patch("main._learning_guidance", return_value="")
-@patch("main.record_usage")
-@patch("main.check_usage", return_value={"used": 0})
+@patch("main.record")
+@patch("main.require", return_value={"used": 0})
 @patch("main.get_user_id", return_value="student-1")
 class ExtensionTutorChatTests(unittest.TestCase):
     def setUp(self):

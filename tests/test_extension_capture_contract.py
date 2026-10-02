@@ -42,7 +42,7 @@ class ExtensionCaptureContractTests(unittest.TestCase):
         for pattern in domains:
             self.assertIn(pattern, self.worker)
         self.assertEqual(self.manifest["homepage_url"], "https://classroom.cordiaai.io")
-        self.assertEqual(self.manifest["version"], "2.0.1")
+        self.assertEqual(self.manifest["version"], "2.1.0")
 
     def test_capture_permission_failure_falls_back_to_page_reading(self):
         self.assertIn("step('capture', 'skipped')", self.panel)
@@ -104,8 +104,8 @@ class ExtensionCaptureContractTests(unittest.TestCase):
 
     def test_custom_extension_code_is_small(self):
         # 230: the Tutor sends the side panel's conversation history (2026-10-01).
-        self.assertLess(len(self.worker.splitlines()), 230)
-        self.assertLess(len(self.panel.splitlines()), 290)
+        self.assertLess(len(self.worker.splitlines()), 250)
+        self.assertLess(len(self.panel.splitlines()), 340)
         # 170: shadow-DOM/frame text, Google export, and capture ordering (2026-09-27 capture audit).
         self.assertLess(len(self.scraper.splitlines()), 170)
 

@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import UpgradeModal from '../components/UpgradeModal';
 import { scheduleProactiveRefresh, getToken } from '../lib/api';
 import { Analytics } from '@vercel/analytics/react';
 
@@ -48,6 +49,7 @@ export default function App({ Component, pageProps }) {
       <Layout timerState={timerState} setTimerState={setTimerState}>
         <Component {...pageProps} timerState={timerState} setTimerState={setTimerState} />
       </Layout>
+      <UpgradeModal />
       <Analytics />
     </>
   );

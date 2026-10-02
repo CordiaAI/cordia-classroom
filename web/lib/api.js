@@ -1,8 +1,27 @@
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export const REQUEST_TIMEOUT_MS = 15000;
+// AI generation routinely takes 20-60s. Aborting early charged students for guides they
+// never received, so these routes wait up to two minutes.
+export const AI_TIMEOUT_MS = 120000;
+const AI_ROUTES = /^\/(generate|practice|chat|extract-file-text|render-pptx|ingest|quiz\/|nclex\/|exam\/|learning\/study-aids|smart_notes\/)/;
+
+export const LIMIT_EVENT = 'cordia:limit';
+export const UPGRADE_EVENT = 'cordia:upgrade';
+
+// Opens the global upgrade window from anywhere (buttons, locked features, banners).
+export function openUpgrade(detail = {}) {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(UPGRADE_EVENT, { detail }));
+}
+
+function announceLimit(resp, data) {
+  if (resp.status !== 402 || typeof window === 'undefined') return;
+  const detail = data?.detail && typeof data.detail === 'object' ? data.detail : { message: data?.detail };
+  window.dispatchEvent(new CustomEvent(LIMIT_EVENT, { detail }));
+}
 
 async function fetchWithTimeout(url, options = {}) {
-  const { timeoutMs = REQUEST_TIMEOUT_MS, ...fetchOptions } = options;
+  const defaultTimeout = AI_ROUTES.test(String(url).replace(API, '')) ? AI_TIMEOUT_MS : REQUEST_TIMEOUT_MS;
+  const { timeoutMs = defaultTimeout, ...fetchOptions } = options;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   if (options.signal) options.signal.addEventListener('abort', () => controller.abort(), { once: true });
@@ -197,8 +216,11 @@ async function _doRefresh() {
 // returns the raw Response, and applies no short timeout.
 export async function authorizedFetch(path, options = {}) {
   const request = () => fetch(API + path, { ...options, headers: { ...authOnlyHeaders(), ...options.headers } });
-  const response = await request();
-  if (response.status === 401 && await tryRefreshToken()) return request();
+  let response = await request();
+  if (response.status === 401 && await tryRefreshToken()) response = await request();
+  if (response.status === 402) {
+    response.clone().json().then(data => announceLimit(response, data)).catch(() => {});
+  }
   return response;
 }
 
@@ -225,7 +247,9 @@ export async function apiFetch(path, options = {}) {
       }
     }
 
-    return responseJson(resp);
+    const data = await responseJson(resp);
+    announceLimit(resp, data);
+    return data;
   } catch (e) {
     console.error('API fetch error:', path, e);
     return null;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { apiFetch, getToken, responseJson } from '../lib/api';
+import { apiFetch, getToken, openUpgrade, responseJson } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -26,6 +26,15 @@ export default function CreateGuidePage() {
   const [error, setError] = useState('');
   const [upgradeUrl, setUpgradeUrl] = useState('');
   const fileInputRef = useRef(null);
+  // Reused when the same source is retried so one guide is never charged twice.
+  const requestRef = useRef({ source: null, id: null });
+  function requestIdFor(source) {
+    if (requestRef.current.source !== source) {
+      const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
+      requestRef.current = { source, id };
+    }
+    return requestRef.current.id;
+  }
 
   useEffect(() => {
     if (router.query.editGuideId) return;
@@ -174,12 +183,12 @@ export default function CreateGuidePage() {
       setStatus('generating');
       const generated = await apiFetch('/generate', {
         method: 'POST',
-        body: JSON.stringify({ content: source, notes: generateNotes, study_guide: true, flashcards: generateFlashcards }),
+        body: JSON.stringify({ content: source, notes: generateNotes, study_guide: true, flashcards: generateFlashcards, request_id: requestIdFor(source) }),
       });
-      if (!generated) throw new Error('Failed to generate study materials. You may have reached your usage limit.');
+      if (!generated) throw new Error('The guide took too long to come back. Try again; you will not be charged twice.');
       if (generated.detail) {
         const detail = typeof generated.detail === 'string' ? generated.detail : generated.detail.message;
-        setUpgradeUrl(generated.detail.upgrade_url || '');
+        setUpgradeUrl(generated.detail.code === 'limit_reached' ? 'modal' : (generated.detail.upgrade_url || ''));
         throw new Error(detail || 'Study guide generation failed.');
       }
       if (!generated.study_guide || generated.study_guide.startsWith('[Error')) {
@@ -204,6 +213,7 @@ export default function CreateGuidePage() {
       });
       if (!saved?.guide) throw new Error('Failed to save guide.');
       localStorage.removeItem(SOURCE_DRAFT_KEY);
+      requestRef.current = { source: null, id: null };
       router.push('/guide/' + saved.guide.id);
     } catch (caught) {
       setError(caught.message || 'Something went wrong. Please try again.');
@@ -233,7 +243,7 @@ export default function CreateGuidePage() {
       {isLoading && <div className="create-banner create-banner-info">{statusMessages[status]}</div>}
       {error && <div className="create-banner create-banner-error" role="alert">
         <span>{error}</span>
-        {upgradeUrl && <button type="button" onClick={() => router.push(upgradeUrl)}>View plans</button>}
+        {upgradeUrl && <button type="button" onClick={() => (upgradeUrl === 'modal' ? openUpgrade({ feature: 'guide' }) : router.push(upgradeUrl))}>View plans</button>}
       </div>}
 
       <form className="create-flow-card" onSubmit={handleCreate}>
