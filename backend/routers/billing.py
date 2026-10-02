@@ -174,8 +174,12 @@ def _handle_subscription_event(subscription: dict) -> None:
         user_id = rows.data[0]["user_id"]
     current = subscription_row(user_id) or {}
     current_id = current.get("stripe_subscription_id")
-    # Events from an old/replaced subscription never overwrite the current one.
-    if current_id and current_id != subscription.get("id") and subscription.get("status") not in ACTIVE_STATUSES:
+    # Events from an old/replaced subscription never overwrite the current one. A late
+    # event from a trial the student already replaced by paying is ignored too.
+    replaced_trial = (subscription.get("metadata") or {}).get("kind") == "trial"
+    if current_id and current_id != subscription.get("id") and (
+        subscription.get("status") not in ACTIVE_STATUSES or replaced_trial
+    ):
         return
     _upsert_from_subscription(subscription, user_id)
 

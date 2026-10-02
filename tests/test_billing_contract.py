@@ -151,6 +151,12 @@ class BillingRouteTests(unittest.TestCase):
                                                 "metadata": {"user_id": "user-1"}})
         billing._upsert_from_subscription.assert_not_called()
 
+    def test_a_late_trialing_event_never_replaces_the_paid_subscription(self):
+        with patch.object(billing, "subscription_row", return_value=row(stripe_subscription_id="sub_paid")):
+            billing._handle_subscription_event({"id": "sub_trial", "status": "trialing",
+                                                "metadata": {"user_id": "user-1", "kind": "trial"}})
+        billing._upsert_from_subscription.assert_not_called()
+
 
 class PricingSurfaceTests(unittest.TestCase):
     def test_settings_offers_monthly_and_semester_at_new_prices(self):
