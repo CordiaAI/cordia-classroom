@@ -59,7 +59,6 @@ export default function ClassroomVisualSystem() {
       .continue-card,
       .recent-material,
       .overview-snapshot,
-      .quick-actions button,
       .sn-card-paper,
       .sn-paper,
       .settings-section,

@@ -90,15 +90,10 @@ def _price_id(interval: str) -> str:
 
 
 def _interval_of(price: dict) -> Optional[str]:
-    lookup = price.get("lookup_key")
+    """Which Pro plan a Stripe price is, matched exactly by lookup key or configured id."""
     for name, key in LOOKUP_KEYS.items():
-        if lookup == key or price.get("id") == os.getenv(PRICE_ENV[name]):
+        if price.get("lookup_key") == key or (price.get("id") and price.get("id") == os.getenv(PRICE_ENV[name])):
             return name
-    recurring = price.get("recurring") or {}
-    if recurring.get("interval") == "month":
-        return "semester" if recurring.get("interval_count") == 4 else "monthly"
-    if recurring.get("interval") == "year":
-        return "yearly"  # legacy subscriptions only
     return None
 
 
