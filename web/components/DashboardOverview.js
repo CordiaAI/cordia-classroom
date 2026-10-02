@@ -16,10 +16,6 @@ export default function DashboardOverview({ folders, guides, stats, navigate }) 
   const current = overview.continueGuide;
   const progress = Math.round(Number(current?.read_progress || 0) * 100);
 
-  function openTutor() {
-    window.dispatchEvent(new CustomEvent('cordia:tutor-prompt'));
-  }
-
   return (
     <div className="student-overview fade-in">
       <header className="overview-heading">
@@ -61,12 +57,6 @@ export default function DashboardOverview({ folders, guides, stats, navigate }) 
 
         <CalendarDashboard compact onOpenCalendar={() => navigate('/dashboard?view=calendar')} />
       </div>
-
-      <section className="quick-actions" aria-label="Quick actions">
-        <button type="button" onClick={() => navigate('/create')}><span aria-hidden="true">＋</span><strong>Create guide</strong><small>Build from notes or files</small></button>
-        <button type="button" onClick={() => navigate('/smartnotes')}><span aria-hidden="true">✦</span><strong>SmartNotes</strong><small>Write and organize ideas</small></button>
-        <button type="button" onClick={openTutor}><span aria-hidden="true">↗</span><strong>Ask Cordia Tutor</strong><small>Explain your material</small></button>
-      </section>
 
       <section className="recent-material">
         <header>
@@ -120,11 +110,6 @@ export default function DashboardOverview({ folders, guides, stats, navigate }) 
         .continue-progress { height: 6px; max-width: 420px; margin: 20px 0 0; overflow: hidden; border-radius: 999px; background: var(--bg-hover); }
         .continue-progress span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
         .overview-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
-        .quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-        .quick-actions button { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 2px 12px; align-items: center; min-width: 0; padding: 17px; border: 1px solid var(--border-default); border-radius: 20px; color: var(--ink); background: var(--surface); text-align: left; cursor: pointer; box-shadow: 0 8px 24px rgba(35, 39, 31, .06); }
-        .quick-actions button > span { grid-row: 1 / 3; display: grid; width: 42px; height: 42px; place-items: center; border-radius: 13px; background: var(--bg-hover); color: var(--accent); font-size: 1.1rem; font-weight: 800; }
-        .quick-actions strong { overflow: hidden; font-size: .92rem; text-overflow: ellipsis; white-space: nowrap; }
-        .quick-actions small { overflow: hidden; color: var(--text-muted); font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
         .recent-material { padding: 24px; }
         .recent-material > header { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 14px; }
         .recent-material h2 { margin: 4px 0 0; font-size: 1.45rem; letter-spacing: -.035em; }
@@ -143,7 +128,6 @@ export default function DashboardOverview({ folders, guides, stats, navigate }) 
         .overview-stat span { color: var(--text-muted); font-size: .7rem; font-weight: 650; }
         @media (max-width: 940px) {
           .overview-priority-grid { grid-template-columns: 1fr; }
-          .quick-actions { grid-template-columns: 1fr; }
           .overview-heading { align-items: flex-start; flex-direction: column; }
         }
         @media (max-width: 620px) {
