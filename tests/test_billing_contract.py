@@ -32,20 +32,24 @@ class PlanResolutionTests(unittest.TestCase):
         self.assertNotIn("extension_guide", entitlements.FEATURES)
 
     def test_active_trialing_and_manual_rows_are_pro(self):
-        self.assertEqual(entitlements.plan_for(row(), NOW), "pro")
-        self.assertEqual(entitlements.plan_for(row(status="trialing"), NOW), "pro")
-        self.assertEqual(entitlements.plan_for(row(source="manual", stripe_subscription_id=None), NOW), "pro")
+        self.assertEqual(entitlements.plan_for(row()), "pro")
+        self.assertEqual(entitlements.plan_for(row(status="trialing")), "pro")
+        self.assertEqual(entitlements.plan_for(row(source="manual", stripe_subscription_id=None)), "pro")
 
     def test_canceled_or_missing_rows_are_free(self):
-        self.assertEqual(entitlements.plan_for(None, NOW), "free")
-        self.assertEqual(entitlements.plan_for(row(status="canceled"), NOW), "free")
-        self.assertEqual(entitlements.plan_for(row(plan="free"), NOW), "free")
+        self.assertEqual(entitlements.plan_for(None), "free")
+        self.assertEqual(entitlements.plan_for(row(status="canceled")), "free")
+        self.assertEqual(entitlements.plan_for(row(plan="free")), "free")
 
-    def test_past_due_keeps_pro_for_three_days_only(self):
-        recent = row(status="past_due", current_period_start=(NOW - timedelta(days=2)).isoformat())
-        stale = row(status="past_due", current_period_start=(NOW - timedelta(days=4)).isoformat())
-        self.assertEqual(entitlements.plan_for(recent, NOW), "pro")
-        self.assertEqual(entitlements.plan_for(stale, NOW), "free")
+    def test_pro_follows_stripe_while_it_retries_a_failed_payment(self):
+        self.assertEqual(entitlements.plan_for(row(status="past_due")), "pro")
+        self.assertEqual(entitlements.plan_for(row(status="unpaid")), "free")
+        self.assertEqual(entitlements.plan_for(row(status="incomplete_expired")), "free")
+
+    def test_plan_interval_is_matched_exactly_never_guessed(self):
+        self.assertEqual(billing._interval_of({"lookup_key": "classroom_pro_monthly"}), "monthly")
+        self.assertEqual(billing._interval_of({"lookup_key": "classroom_pro_semester"}), "semester")
+        self.assertIsNone(billing._interval_of({"id": "price_old", "recurring": {"interval": "year"}}))
 
 
 class EnforcementTests(unittest.TestCase):

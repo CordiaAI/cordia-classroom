@@ -6,7 +6,7 @@ Enforcement:  require() before the AI call, record() only after it succeeds.
 """
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -16,7 +16,9 @@ from database import get_supabase
 PRO = "classroom_plus"
 PRO_PLAN_NAMES = {"pro", "classroom_plus"}
 ACTIVE_STATUSES = {"active", "trialing"}
-PAST_DUE_GRACE = timedelta(days=3)
+# Stripe keeps a subscription past_due while it retries a failed payment, then cancels it
+# (Dashboard > Billing > Revenue recovery). Pro lasts exactly as long as Stripe says.
+PRO_STATUSES = ACTIVE_STATUSES | {"past_due"}
 TRIAL_DAYS = 7
 
 # Monthly limits. "guide" is shared by every creation path: web create, extension,
@@ -88,19 +90,11 @@ def subscription_row(user_id: str) -> Optional[dict]:
     return rows.data[0] if rows.data else None
 
 
-def plan_for(row: Optional[dict], now: Optional[datetime] = None) -> str:
+def plan_for(row: Optional[dict]) -> str:
     """'pro' or 'free'. Paid, promo, trial and manual grants all resolve here."""
-    now = now or _now()
     if not row or row.get("plan") not in PRO_PLAN_NAMES:
         return "free"
-    status = row.get("status")
-    if status in ACTIVE_STATUSES:
-        return "pro"
-    if status == "past_due":
-        started = _ts(row.get("current_period_start"))
-        if started and now < started + PAST_DUE_GRACE:
-            return "pro"
-    return "free"
+    return "pro" if row.get("status") in PRO_STATUSES else "free"
 
 
 def usage_counts(user_id: str, month: Optional[str] = None) -> dict:
@@ -118,7 +112,7 @@ def entitlement(user_id: str) -> dict:
     """Everything the UI needs: plan, trial state, and per-feature remaining counts."""
     now = _now()
     row = subscription_row(user_id) or {}
-    plan = plan_for(row, now)
+    plan = plan_for(row)
     unlimited = user_id in _unlimited_ids()
     limits = LIMITS[plan]
     used = usage_counts(user_id)
