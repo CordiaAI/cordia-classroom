@@ -1,189 +1,85 @@
 import { useState } from 'react';
 import { apiFetch } from '../lib/api';
+import { advance, createSession, currentCard, firstAttempts, progress, recordResults } from '../lib/retainEngine.mjs';
+import { FillCard, MatchingCard, McCard, WrittenCard } from './RetainCards';
 
-// Retain mode learning system:
-// Phase 1 — all questions shown once. Correct → mastered. Wrong → review queue.
-// Phase 2 — review queue shown once more. Correct or wrong → done (max 2 attempts).
-
-export default function QuizMode({ questions, guideId, onComplete }) {
-  const total = questions.length;
-
-  // deck of original indices for phase 1
-  const [phase, setPhase] = useState('learn'); // 'learn' | 'review' | 'done'
-  const [learnIndex, setLearnIndex] = useState(0);
-  const [reviewQueue, setReviewQueue] = useState([]);
-  const [reviewIndex, setReviewIndex] = useState(0);
-  const [masteredCount, setMasteredCount] = useState(0);
-  const [selected, setSelected] = useState(null);
+// Retain: every idea is asked once in its best-fitting format. A miss must then be answered
+// right two more times, a few questions apart, before it clears. The score is first-try only.
+export default function QuizMode({ questions, cards, types, guideId, onRestart }) {
+  const [session, setSession] = useState(() => createSession(questions, cards, types));
   const [answered, setAnswered] = useState(false);
-  const [allAnswers, setAllAnswers] = useState([]);
   const [score, setScore] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const card = currentCard(session);
+  const stats = progress(session);
 
-  const currentQ = phase === 'learn'
-    ? questions[learnIndex]
-    : phase === 'review'
-      ? questions[reviewQueue[reviewIndex]]
-      : null;
-
-  const currentOriginalIndex = phase === 'learn'
-    ? learnIndex
-    : reviewQueue[reviewIndex];
-
-  function selectOption(i) {
-    if (answered || !currentQ) return;
-    setSelected(i);
+  function onResult(results) {
+    setSession(current => recordResults(current, currentCard(current), results));
     setAnswered(true);
-
-    const isCorrect = i === currentQ.correct_index;
-    const newAnswer = {
-      question_index: currentOriginalIndex,
-      selected_index: i,
-      is_correct: isCorrect,
-    };
-    setAllAnswers([...allAnswers, newAnswer]);
-    if (!isCorrect) {
-      window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', {
-        detail: {
-          guideId,
-          skill: 'retain',
-          prompt: 'Can you explain why my answer does not work and help me understand the difference?',
-          retainContext: {
-            question: currentQ.question,
-            options: currentQ.options,
-            selected_answer: currentQ.options[i],
-            correct_answer: currentQ.options[currentQ.correct_index],
-          },
-        },
-      }));
-    }
   }
 
-  function advance() {
-    const lastAnswer = allAnswers[allAnswers.length - 1];
-    const isCorrect = lastAnswer ? lastAnswer.is_correct : false;
-    const updatedAnswers = allAnswers;
-
-    // Reset per-question UI state
-    if (phase === 'learn') {
-      const newMastered = isCorrect ? masteredCount + 1 : masteredCount;
-      const newReviewQueue = isCorrect ? reviewQueue : [...reviewQueue, learnIndex];
-      setMasteredCount(newMastered);
-
-      const nextLearnIndex = learnIndex + 1;
-      if (nextLearnIndex < total) {
-        setReviewQueue(newReviewQueue);
-        setLearnIndex(nextLearnIndex);
-        setSelected(null);
-        setAnswered(false);
-      } else {
-        if (newReviewQueue.length > 0) {
-          setReviewQueue(newReviewQueue);
-          setPhase('review');
-          setReviewIndex(0);
-        } else {
-          finishSession(updatedAnswers);
-        }
-        setSelected(null);
-        setAnswered(false);
-      }
-    } else {
-      if (isCorrect) setMasteredCount(m => m + 1);
-      const nextReviewIndex = reviewIndex + 1;
-      if (nextReviewIndex < reviewQueue.length) {
-        setReviewIndex(nextReviewIndex);
-      } else {
-        finishSession(updatedAnswers);
-      }
-      setSelected(null);
-      setAnswered(false);
-    }
-  }
-
-  async function finishSession(finalAnswers) {
-    setPhase('done');
-    const data = await apiFetch('/quiz/' + guideId + '/submit', {
-      method: 'POST',
-      body: JSON.stringify({ answers: finalAnswers }),
-    });
-    setScore(data);
-    if (onComplete) onComplete(data);
-  }
-
-  function restart() {
-    setPhase('learn');
-    setLearnIndex(0);
-    setReviewQueue([]);
-    setReviewIndex(0);
-    setMasteredCount(0);
-    setSelected(null);
+  async function onNext() {
+    const next = advance(session);
+    setSession(next);
     setAnswered(false);
-    setAllAnswers([]);
-    setScore(null);
+    if (!currentCard(next)) {
+      setSaving(true);
+      const data = await apiFetch(`/quiz/${guideId}/submit`, {
+        method: 'POST',
+        body: JSON.stringify({ attempts: firstAttempts(next) }),
+      });
+      setSaving(false);
+      setScore(typeof data?.score === 'number' ? data : { error: data?.detail || 'Your score could not be saved.' });
+    }
   }
 
-  // Results screen
-  if (phase === 'done') {
+  // A written answer that can't be checked right now is asked as multiple choice instead.
+  function switchType(type) {
+    setSession(current => ({
+      ...current,
+      queue: current.queue.map((item, index) => (index === current.position ? { ...item, type, id: current.nextId } : item)),
+      nextId: current.nextId + 1,
+    }));
+  }
+
+  if (!card) {
+    const finalStats = progress(session);
     return (
       <div className="quiz-result">
-        <div className="quiz-score">{score ? score.score : masteredCount > 0 ? Math.round((masteredCount / total) * 100) : 0}%</div>
+        <div className="quiz-score">{score?.score ?? Math.round((finalStats.firstTryRight / Math.max(1, finalStats.total)) * 100)}%</div>
         <div className="quiz-score-label">Retain Score</div>
-        <div className="quiz-breakdown">
-          {masteredCount} of {total} mastered
-        </div>
-        {reviewQueue.length === 0 && (
-          <div style={{ marginTop: 8, fontSize: '0.85em', color: 'var(--accent)' }}>
-            Perfect — mastered all on first attempt!
-          </div>
+        <div className="quiz-breakdown">{finalStats.firstTryRight} of {finalStats.total} right on the first try</div>
+        {finalStats.missedMastered > 0 && (
+          <div className="retain-mastered-note">You mastered {finalStats.missedMastered} question{finalStats.missedMastered === 1 ? '' : 's'} you missed at first.</div>
         )}
+        {finalStats.firstTryRight === finalStats.total && <div className="retain-mastered-note">Perfect — every question right on the first try!</div>}
+        {saving && <p className="retain-hint">Saving your score…</p>}
+        {score?.error && <p className="retain-action-error" role="alert">{score.error}</p>}
         <div className="completion-actions" style={{ marginTop: 20 }}>
-          <button className="btn" onClick={restart}>Retry</button>
+          <button className="btn" onClick={onRestart}>Study again</button>
           <button className="btn-outline" onClick={() => window.history.back()}>Back to Guide</button>
         </div>
       </div>
     );
   }
 
-  if (!currentQ) return null;
-
-  const progressPct = Math.round((masteredCount / total) * 100);
-  const isCorrectAnswer = answered && selected === currentQ.correct_index;
-  function optionClass(i) {
-    if (!answered) return 'quiz-option' + (selected === i ? ' selected' : '');
-    if (i === currentQ.correct_index) {
-      return 'quiz-option ' + (isCorrectAnswer ? 'correct-shine' : 'correct-glow');
-    }
-    if (i === selected) return 'quiz-option wrong-shake';
-    return 'quiz-option disabled';
-  }
-
-  const isReview = phase === 'review';
-
+  const props = { card, guideId, onResult, onNext };
   return (
     <div className="quiz-question-card">
       <div className="retain-status-bar">
-        <span className="retain-mastered">{masteredCount} / {total} mastered</span>
-        {isReview && (
-          <span className="retain-review-badge">Review: {reviewQueue.length - reviewIndex} left</span>
-        )}
+        <span className="retain-mastered">{stats.cleared} / {stats.total} cleared</span>
+        {stats.toClear > 0 && <span className="retain-review-badge">{stats.toClear} to practice again</span>}
       </div>
       <div className="progress-bar-container" style={{ marginBottom: 16 }}>
-        <div className="progress-bar-fill" style={{ width: progressPct + '%' }} />
+        <div className="progress-bar-fill" style={{ width: Math.round((stats.cleared / Math.max(1, stats.total)) * 100) + '%' }} />
       </div>
-      {isReview && (
-        <div className="retain-review-label">Reviewing — get it right this time!</div>
+      {card.reask && !answered && (
+        <div className="retain-review-label">You missed this one — get it right {session.concepts[card.concepts[0]].needs} more time{session.concepts[card.concepts[0]].needs === 1 ? '' : 's'} to clear it.</div>
       )}
-      <div className="quiz-question-text">{currentQ.question}</div>
-      {currentQ.options.map((opt, i) => (
-        <button key={i} className={optionClass(i)} onClick={() => selectOption(i)}>
-          {opt}
-        </button>
-      ))}
-
-      {answered && (
-        <button className="quiz-gotit-btn" onClick={advance}>
-          Got it!
-        </button>
-      )}
+      {card.type === 'matching' && <MatchingCard key={card.id} {...props} questions={questions} />}
+      {card.type === 'fill' && <FillCard key={card.id} {...props} question={questions[card.concepts[0]]} />}
+      {card.type === 'written' && <WrittenCard key={card.id} {...props} question={questions[card.concepts[0]]} onSwitch={switchType} />}
+      {card.type === 'mc' && <McCard key={card.id} {...props} question={questions[card.concepts[0]]} />}
     </div>
   );
 }

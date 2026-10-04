@@ -634,6 +634,43 @@ def grade_practice_answer(prompt: str, reference: str, worked_solution: str, stu
     return {"correct": parsed["correct"], "explanation": str(parsed.get("explanation") or "").strip()[:1200]}
 
 
+def grade_written_answer(question: str, reference: str, student_answer: str) -> dict:
+    """Mark a Retain written answer against the guide's answer: full, partial or no credit."""
+    client = get_openai_client()
+    if not client:
+        return {}
+    try:
+        response = chat(client, "retain_grade",
+            messages=[
+                {"role": "system", "content": (
+                    "You mark one short written answer against the study guide's answer, for any "
+                    "subject. Judge meaning, not wording: paraphrases, synonyms and minor typos are "
+                    "fine. Use only the guide's answer as the standard; never reward or require facts "
+                    "it does not contain. Verdicts: \"right\" if the answer covers the guide answer's "
+                    "essential points; \"partial\" if it gets some essential points but misses or "
+                    "confuses others; \"wrong\" if it misses the main idea or is incorrect. In 1-2 "
+                    "encouraging sentences, say what was right and, if not right, what was missing, "
+                    "without restating the whole answer. "
+                    'Return JSON: {"verdict": "right"|"partial"|"wrong", "explanation": "..."}'
+                )},
+                {"role": "user", "content": (
+                    f"QUESTION:\n{question[:2000]}\n\nGUIDE ANSWER:\n{reference[:3000]}"
+                    f"\n\nSTUDENT ANSWER:\n{student_answer[:3000]}"
+                )},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+        parsed = _practice_json(response.choices[0].message.content)
+    except Exception as e:
+        logger.error(f"Error grading written Retain answer: {e}")
+        return {}
+    credit = {"right": 1.0, "partial": 0.5, "wrong": 0.0}.get(str(parsed.get("verdict") or "").lower())
+    if credit is None:
+        return {}
+    return {"credit": credit, "explanation": str(parsed.get("explanation") or "").strip()[:800]}
+
+
 def transcribe_document_pages(page_images: list, max_pages: int = 20) -> str:
     """OCR for scanned documents: transcribe each page image (data URLs), in page order."""
     client = get_openai_client()

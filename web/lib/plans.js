@@ -15,6 +15,7 @@ export const FEATURE_COPY = {
   ai_quiz: { label: 'AI Retain quizzes', title: 'AI Retain is a Pro feature', pro: 'Smarter Retain quizzes with tougher answer choices' },
   nclex: { label: 'NCLEX sets', title: 'NCLEX mode is a Pro feature', pro: 'NCLEX-style questions from your own material' },
   exam: { label: 'practice exams', title: 'Practice exams are a Pro feature', pro: 'Full practice exams from your guides' },
+  retain_types: { label: 'Pro Retain sessions', title: 'Matching and fill in the blank are Pro', pro: 'Quiz yourself with matching and fill in the blank, not just multiple choice' },
   light: { label: 'AI reading actions', title: "You've reached this month's AI reading limit", pro: 'Read photos, scans and diagrams without limits' },
 };
 
