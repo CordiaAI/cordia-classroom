@@ -9,12 +9,13 @@ import random
 import logging
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Literal, Optional
 from database import get_supabase
-from services.llm import get_openai_client
+from services.llm import get_openai_client, grade_written_answer
 from services.llm_calls import chat
 from auth_utils import get_user_id
-from services.entitlements import record, remaining, require
+from services import retain
+from services.entitlements import plan_for, record, remaining, require, subscription_row
 
 _UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
@@ -35,8 +36,27 @@ class QuizAnswer(BaseModel):
     is_correct: bool = False
 
 
+class RetainAttempt(BaseModel):
+    """A first try at one idea; the server re-checks it against the saved question."""
+    concept: int = Field(..., ge=0, le=100)
+    type: Literal["mc", "written", "fill", "matching"]
+    response: str = Field(default="", max_length=4000)
+    credit: Optional[float] = None
+    token: Optional[str] = Field(default=None, max_length=128)
+
+
 class QuizSubmission(BaseModel):
-    answers: List[QuizAnswer] = Field(..., max_length=50)
+    answers: List[QuizAnswer] = Field(default_factory=list, max_length=50)
+    attempts: List[RetainAttempt] = Field(default_factory=list, max_length=100)
+
+
+class SessionRequest(BaseModel):
+    types: List[Literal["mc", "written", "fill", "matching"]] = Field(default_factory=lambda: ["mc"], max_length=4)
+
+
+class WrittenAnswer(BaseModel):
+    concept: int = Field(..., ge=0, le=100)
+    answer: str = Field(..., min_length=1, max_length=4000)
 
 
 def _parse_qa_pairs(text: str) -> list:
@@ -268,19 +288,99 @@ def regenerate_quiz(guide_id: str, authorization: str = Header(default="")):
     return _quiz_for_guide(guide_id, authorization, regenerate=True)
 
 
+def _saved_questions(supabase, guide_id: str, user_id: str) -> list:
+    result = supabase.table("study_guides").select("quiz_questions") \
+        .eq("id", guide_id).eq("user_id", user_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Guide not found")
+    questions = result.data[0].get("quiz_questions")
+    if not isinstance(questions, list) or not questions:
+        raise HTTPException(status_code=409, detail="Start Retain again to load this guide's questions")
+    return questions
+
+
+@router.post("/{guide_id}/session")
+def start_session(guide_id: str, body: SessionRequest, authorization: str = Header(default="")):
+    """The questions plus which format asks each idea, from the types the student turned on."""
+    questions = _quiz_for_guide(guide_id, authorization)["questions"]
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+    saved = supabase.table("study_guides").select("quiz_questions").eq("id", guide_id).eq("user_id", user_id).execute()
+    if not (saved.data and saved.data[0].get("quiz_questions") == questions):
+        # Answers are checked against the saved questions, so a session always starts from them.
+        _save_quiz(supabase, guide_id, user_id, questions)
+    cards = retain.plan_session(questions, body.types)
+    uses_pro_types = any(card["type"] in retain.PRO_TYPES for card in cards)
+    if uses_pro_types:
+        require(user_id, "retain_types")
+        record(user_id, "retain_types")
+    return {
+        "questions": questions,
+        "cards": cards,
+        "types": sorted({card["type"] for card in cards}),
+        "pro": plan_for(subscription_row(user_id)) == "pro",
+    }
+
+
+@router.post("/{guide_id}/grade")
+def grade_written(guide_id: str, body: WrittenAnswer, authorization: str = Header(default="")):
+    """Mark one written answer with full, partial or no credit, signed so the score can be trusted."""
+    _validate_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    questions = _saved_questions(get_supabase(), guide_id, user_id)
+    if body.concept >= len(questions):
+        raise HTTPException(status_code=400, detail="Unknown question")
+    question = questions[body.concept]
+    require(user_id, "light")
+    result = grade_written_answer(question.get("question", ""), retain.concept_answer(question), body.answer.strip())
+    if not result:
+        raise HTTPException(status_code=502, detail="Cordia could not check this answer right now. Please try again.")
+    record(user_id, "light")
+    credit = result["credit"]
+    return {
+        "credit": credit,
+        "explanation": result["explanation"],
+        "answer": retain.concept_answer(question),
+        "token": retain.sign_grade(user_id, guide_id, body.concept, credit),
+    }
+
+
+def _checked_attempts(supabase, guide_id: str, user_id: str, attempts: list) -> list:
+    """First try per idea, re-checked on the server; returns the stored answer records."""
+    questions = _saved_questions(supabase, guide_id, user_id)
+    checked, seen = [], set()
+    for attempt in attempts:
+        if attempt.concept in seen or attempt.concept >= len(questions):
+            continue
+        seen.add(attempt.concept)
+        credit = retain.first_try_credit(questions[attempt.concept], attempt.model_dump(), user_id, guide_id)
+        checked.append({
+            "question_index": attempt.concept,
+            "type": attempt.type,
+            "credit": credit,
+            "is_correct": credit == 1.0,
+        })
+    return checked
+
+
 @router.post("/{guide_id}/submit")
 def submit_quiz(guide_id: str, submission: QuizSubmission, authorization: str = Header(default="")):
-    """Submit quiz answers and save results."""
+    """Save a finished session. The score is first-try credit; practice after a miss never lowers it."""
     try:
         _validate_uuid(guide_id, "guide ID")
         user_id = get_user_id(authorization)
         supabase = get_supabase()
 
-        total = len(submission.answers)
+        if submission.attempts:
+            answers = _checked_attempts(supabase, guide_id, user_id, submission.attempts)
+        else:  # sessions started before question types shipped
+            answers = [a.model_dump() for a in submission.answers]
+        total = len(answers)
         if total == 0:
             raise HTTPException(status_code=400, detail="No answers submitted")
-        correct = sum(1 for a in submission.answers if a.is_correct)
-        score = round((correct / total) * 100)
+        correct = sum(1 for a in answers if a["is_correct"])
+        earned = sum(a.get("credit", 1.0 if a["is_correct"] else 0.0) for a in answers)
+        score = round((earned / total) * 100)
 
         supabase.table("quiz_attempts").insert({
             "user_id": user_id,
@@ -288,7 +388,7 @@ def submit_quiz(guide_id: str, submission: QuizSubmission, authorization: str = 
             "score": score,
             "total_questions": total,
             "correct_answers": correct,
-            "answers": [a.model_dump() for a in submission.answers]
+            "answers": answers,
         }).execute()
 
         # Log study session
@@ -304,7 +404,7 @@ def submit_quiz(guide_id: str, submission: QuizSubmission, authorization: str = 
         from routers.stats import _update_streak
         _update_streak(user_id)
 
-        return {"score": score, "total": total, "correct": correct}
+        return {"score": score, "total": total, "correct": correct, "earned": earned}
 
     except HTTPException:
         raise

@@ -6,7 +6,6 @@ import { parseQAPairs, parseNotes, formatDate } from '../../lib/formatters';
 import useSessionTracker from '../../lib/useSessionTracker';
 import AILoadingSphere from '../../components/AILoadingSphere';
 import FlashcardViewer from '../../components/FlashcardViewer';
-import QuizMode from '../../components/QuizMode';
 import StudyAidPanel from '../../components/StudyAidPanel';
 import { useLearningStyle } from '../../lib/learningStyle';
 
