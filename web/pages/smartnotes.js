@@ -7,6 +7,7 @@ import GuidedTour from '../components/GuidedTour';
 import { practiceTourUrl, saveOnboardingStep } from '../lib/onboarding';
 import { SMARTNOTES_TOUR } from '../lib/tours';
 import { organizeDashboardGuides } from '../lib/dashboardOrganization';
+import { useFileDropZone } from '../lib/fileDrop';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -716,8 +717,17 @@ function SmartNotesEditor() {
   const [viewerFile, setViewerFile] = useState(null);
   const [guideList, setGuideList] = useState([]);
   const [guideContent, setGuideContent] = useState(null);
-  const [viewerDragOver, setViewerDragOver] = useState(false);
   const fileInputRef = useRef(null);
+  const viewerWrapRef = useRef(null);
+  // A file dropped anywhere on the page opens in the material viewer.
+  const viewerDragOver = useFileDropZone({
+    priority: 2,
+    getElement: () => viewerWrapRef.current,
+    onFiles: files => {
+      setGuideContent(null);
+      setViewerFile(files[0]);
+    },
+  });
 
   // Class/folder assignment
   const [folders, setFolders] = useState([]);
@@ -1350,25 +1360,6 @@ function SmartNotesEditor() {
     e.target.value = '';
   }
 
-  function handleViewerDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-    setViewerDragOver(true);
-  }
-
-  function handleViewerDragLeave(e) {
-    if (!e.currentTarget.contains(e.relatedTarget)) setViewerDragOver(false);
-  }
-
-  function handleViewerDrop(e) {
-    e.preventDefault();
-    setViewerDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    setGuideContent(null);
-    setViewerFile(file);
-  }
-
   function handleGuideSelect(e) {
     const guide = guideList.find(g => g.id === e.target.value);
     if (!guide) return;
@@ -1631,10 +1622,8 @@ function SmartNotesEditor() {
 
         {/* Top-right: class material viewer */}
         <div
+          ref={viewerWrapRef}
           className={`sn-viewer-wrap${viewerDragOver ? ' sn-viewer-drag' : ''}`}
-          onDragOver={handleViewerDragOver}
-          onDragLeave={handleViewerDragLeave}
-          onDrop={handleViewerDrop}
         >
           <div className="sn-viewer-toolbar">
             <span className="sn-panel-label">Class Material</span>

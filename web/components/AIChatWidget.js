@@ -4,6 +4,7 @@ import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib
 import MermaidDiagram from './MermaidDiagram';
 import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from './ExplanationPreference';
+import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 
 // Tutor replies may include ```mermaid blocks; render them as diagrams and keep the rest as text.
 function TutorMessageText({ text }) {
@@ -90,7 +91,18 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     setSpeakingIndex(index);
   }
   const fileRef = useRef(null);
+  const rootRef = useRef(null);
   const endRef = useRef(null);
+  // Files dropped on the Tutor, or anywhere on a page with no upload box of its
+  // own, are attached here; a closed Tutor opens to show the attachment.
+  const attachDropActive = useFileDropZone({
+    priority: 1,
+    getElement: () => rootRef.current,
+    onFiles: (files, { direct }) => {
+      if (!direct) window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: {} }));
+      attachFile(files[0]);
+    },
+  });
   const appliedPreferred = useRef('');
 
   useEffect(() => {
@@ -229,7 +241,12 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   }
 
   async function attachFile(file) {
-    if (!file) return;
+    if (!file || extracting) return;
+    const unsupported = unsupportedFileMessage(file);
+    if (unsupported) {
+      setLocalError(unsupported);
+      return;
+    }
     setExtracting(true);
     setLocalError('');
     const formData = new FormData();
@@ -313,7 +330,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   }
 
   return (
-    <section className="cordia-tutor" aria-label="Cordia tutor">
+    <section ref={rootRef} className="cordia-tutor" aria-label="Cordia tutor">
       <header className="cordia-tutor-header">
         <div className="cordia-tutor-title-row">
           <strong>Cordia Tutor</strong>
@@ -351,9 +368,9 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
             Browser unavailable. Open the Chrome side panel, choose an existing guide or SmartNote, or attach a file below.
           </p>
         )}
-        <input ref={fileRef} type="file" accept=".pdf,.docx,.pptx,.txt,.md,.csv,.jpg,.jpeg,.png,.webp" onChange={event => attachFile(event.target.files?.[0])} hidden />
-        <button type="button" className="cordia-tutor-attach" onClick={() => fileRef.current?.click()} disabled={extracting}>
-          {extracting ? 'Reading file…' : 'Attach study material'}
+        <input ref={fileRef} type="file" accept="*" onChange={event => attachFile(event.target.files?.[0])} hidden />
+        <button type="button" className={'cordia-tutor-attach' + (attachDropActive ? ' drop-target-active' : '')} onClick={() => fileRef.current?.click()} disabled={extracting}>
+          {extracting ? 'Reading file…' : attachDropActive ? 'Drop to attach' : 'Attach study material'}
         </button>
         <button type="button" className="cordia-tutor-explain-toggle" onClick={() => setExplainOpen(open => !open)} aria-expanded={explainOpen}>
           How should I explain things?
