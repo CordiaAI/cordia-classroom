@@ -82,3 +82,11 @@ Baseline (2026-09-26, main 416e039): 111 Python tests pass, 10/12 node tests pas
 - Draft PR #23 (`claude/wonderful-faraday-1dp3p2`, drop legacy autostudyai.online CORS) is 12 behind; rebase before merging or its diff reverts newer main work.
 - `feat/classroom-production-readiness` has 13 unique unmerged commits (RLS hardening, Tutor grounding, provenance) — likely superseded partly; needs owner decision.
 - `master` is a stale May 2026 branch (2 unique commits); everything else is merged → safe to delete.
+
+## Feedback round decisions (owner, 2026-10-05)
+- Uploads: drop anywhere on the page, but route to the right upload box (olive-dark outline on the box while dragging). Unsupported types (zip, video until built) show a clear "not supported" message.
+- Multi-file: max 5 files, Create + Tutor only (SmartNotes viewer stays one file). After upload, a "select files you want to combine into a study guide" picker repeats until every file is used. Respect the model's context window; never silently truncate.
+- Create page = two windows (manual text | file drop). If both filled, ask whether to include the manual text with the file guide. Generation keeps running while the user browses; small infinity-logo loader top-right.
+- Top bar on every page, next to profile: "Install Classroom SideBar" button (black/grey + dark-olive layered wave around the outline), hidden when the extension is installed; links to https://chromewebstore.google.com/detail/cordiaclassroom (owner confirmed this link). Profile-menu "Chrome extension" item goes away.
+- Canvas: the ICS feed has no completion data. Owner wants the fewest student steps; the extension (already `<all_urls>`) can read Canvas planner/to-do status with the student's own logged-in session. Due-today items glow yellow (grid + list); left list becomes an auto-checked to-do list; checked items dissolve with a 5s undo.
+- Quizlet import: dropped by owner — do not raise again until they bring it back.
