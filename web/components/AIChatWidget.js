@@ -20,6 +20,30 @@ function speakableText(text) {
   return String(text || '').replace(/```mermaid[\s\S]*?```/g, ' ').replace(/[*_`#>]/g, '').replace(/\s+/g, ' ').trim();
 }
 
+const MAX_ATTACHMENTS = 5;
+// The Tutor model reads this much of the selected material (context[:25000] in backend/services/llm.py).
+const TUTOR_CONTEXT_CHARS = 25_000;
+
+// Gives every attached file a fair share of what the Tutor can read, so one long
+// file cannot crowd out the others. Returns the combined text and trimmed file names.
+function combineAttachments(files) {
+  if (files.length === 1) return { content: files[0].content, trimmed: files[0].content.length > TUTOR_CONTEXT_CHARS ? [files[0].title] : [] };
+  const headers = files.map(file => `${file.title}\n\n`);
+  let budget = TUTOR_CONTEXT_CHARS - headers.join('').length - 2 * (files.length - 1);
+  const shares = new Array(files.length).fill(0);
+  // Shortest files first: each takes what it needs up to an even split of what is left.
+  const order = files.map((_, index) => index).sort((a, b) => files[a].content.length - files[b].content.length);
+  order.forEach((index, position) => {
+    const share = Math.max(0, Math.floor(budget / (order.length - position)));
+    shares[index] = Math.min(files[index].content.length, share);
+    budget -= shares[index];
+  });
+  return {
+    content: files.map((file, index) => headers[index] + file.content.slice(0, shares[index])).join('\n\n'),
+    trimmed: files.filter((file, index) => shares[index] < file.content.length).map(file => file.title),
+  };
+}
+
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const MAX_MESSAGES = 30;
 const SKILL_PROGRESS = {
@@ -39,7 +63,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const [notes, setNotes] = useState([]);
   const [classes, setClasses] = useState([]);
   const [contextKey, setContextKey] = useState('');
-  const [attachment, setAttachment] = useState(null);
+  const [attachments, setAttachments] = useState([]);
   const [browserMaterial, setBrowserMaterial] = useState(null);
   const [session, setSession] = useState(null);
   const [skillOverride, setSkillOverride] = useState('');
@@ -100,7 +124,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     getElement: () => rootRef.current,
     onFiles: (files, { direct }) => {
       if (!direct) window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: {} }));
-      attachFile(files[0]);
+      attachFiles(files);
     },
   });
   const appliedPreferred = useRef('');
@@ -178,10 +202,15 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   }, [session?.browser_content_available, session?.browser_content_revision, session?.browser_observation?.url, browserMaterial?.revision, browserMaterial?.content]);
 
   const guides = providedGuides || loadedGuides;
+  const combinedAttachments = combineAttachments(attachments);
+  const attachedMaterial = {
+    title: attachments.map(file => file.title).join(' + ').slice(0, 300),
+    content: combinedAttachments.content,
+  };
   const materials = [
     ...guides.map(item => ({ ...item, kind: 'guide', key: `guide:${item.id}` })),
     ...notes.map(item => ({ ...item, kind: 'note', key: `note:${item.id}` })),
-    ...(attachment ? [{ ...attachment, kind: 'attachment', key: 'attachment' }] : []),
+    ...(attachments.length ? [{ ...attachedMaterial, kind: 'attachment', key: 'attachment' }] : []),
     ...(session?.browser_content_available ? [{ ...(browserMaterial || {}), title: browserMaterial?.title || 'Captured browser material', kind: 'browser', key: 'browser' }] : []),
   ];
 
@@ -240,29 +269,48 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     else setLocalError(next?.detail || 'Could not change Tutor skill.');
   }
 
-  async function attachFile(file) {
-    if (!file || extracting) return;
-    const unsupported = unsupportedFileMessage(file);
-    if (unsupported) {
-      setLocalError(unsupported);
-      return;
-    }
+  async function attachFiles(list) {
+    const picked = Array.from(list || []);
+    if (!picked.length || extracting) return;
+    const problems = [];
+    const readable = picked.filter(file => {
+      const unsupported = unsupportedFileMessage(file);
+      if (unsupported) problems.push(unsupported);
+      return !unsupported;
+    });
+    const room = MAX_ATTACHMENTS - attachments.length;
+    if (readable.length > room) problems.push(`The Tutor can hold up to ${MAX_ATTACHMENTS} files at a time.`);
+    const toRead = readable.slice(0, Math.max(room, 0));
+    setLocalError(problems.join(' '));
+    if (fileRef.current) fileRef.current.value = '';
+    if (!toRead.length) return;
     setExtracting(true);
-    setLocalError('');
-    const formData = new FormData();
-    formData.append('file', file);
-    try {
-      const response = await fetch(API + '/extract-file-text', { method: 'POST', headers: authOnlyHeaders(), body: formData });
-      const data = await responseJson(response);
-      if (!response.ok || !data?.text) throw new Error(apiErrorMessage(data?.detail, 'Could not read this file.'));
-      setAttachment({ title: file.name, content: data.text });
-      setContextKey('attachment');
-    } catch (error) {
-      setLocalError(error.message || 'Could not read this file.');
-    } finally {
-      setExtracting(false);
-      if (fileRef.current) fileRef.current.value = '';
+    const added = [];
+    for (const file of toRead) {
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const response = await fetch(API + '/extract-file-text', { method: 'POST', headers: authOnlyHeaders(), body: formData });
+        const data = await responseJson(response);
+        if (!response.ok || !data?.text) throw new Error(apiErrorMessage(data?.detail, 'Could not read this file.'));
+        added.push({ id: `${file.name}:${file.size}:${file.lastModified}`, title: file.name, content: data.text });
+      } catch (error) {
+        problems.push(`${file.name}: ${error.message || 'Could not read this file.'}`);
+      }
     }
+    setLocalError(problems.join(' '));
+    if (added.length) {
+      setAttachments(current => {
+        const seen = new Set(current.map(file => file.id));
+        return [...current, ...added.filter(file => !seen.has(file.id))].slice(0, MAX_ATTACHMENTS);
+      });
+      setContextKey('attachment');
+    }
+    setExtracting(false);
+  }
+
+  function removeAttachment(id) {
+    setAttachments(current => current.filter(file => file.id !== id));
   }
 
   async function sendMessage() {
@@ -354,7 +402,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
           {notes.length > 0 && <optgroup label="SmartNotes">
             {notes.map(item => <option key={item.id} value={`note:${item.id}`}>{item.title || 'Untitled note'}</option>)}
           </optgroup>}
-          {attachment && <optgroup label="Attached file"><option value="attachment">{attachment.title}</option></optgroup>}
+          {attachments.length > 0 && <optgroup label={attachments.length === 1 ? 'Attached file' : 'Attached files'}><option value="attachment">{attachments.length === 1 ? attachments[0].title : `${attachments.length} attached files`}</option></optgroup>}
           {session?.browser_content_available && <optgroup label="Browser"><option value="browser">{browserMaterial?.title || 'Captured browser material'}</option></optgroup>}
         </select>
         {needsTargetClass && (
@@ -368,9 +416,22 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
             Browser unavailable. Open the Chrome side panel, choose an existing guide or SmartNote, or attach a file below.
           </p>
         )}
-        <input ref={fileRef} type="file" accept="*" onChange={event => attachFile(event.target.files?.[0])} hidden />
-        <button type="button" className={'cordia-tutor-attach' + (attachDropActive ? ' drop-target-active' : '')} onClick={() => fileRef.current?.click()} disabled={extracting}>
-          {extracting ? 'Reading file…' : attachDropActive ? 'Drop to attach' : 'Attach study material'}
+        {attachments.length > 0 && (
+          <ul className="cordia-tutor-attachments" aria-label="Attached files">
+            {attachments.map(file => (
+              <li key={file.id}>
+                <span>{file.title}</span>
+                <button type="button" onClick={() => removeAttachment(file.id)} aria-label={`Remove ${file.title}`}>×</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {contextKey === 'attachment' && combinedAttachments.trimmed.length > 0 && (
+          <p className="cordia-tutor-attach-note">The Tutor reads about {TUTOR_CONTEXT_CHARS.toLocaleString()} characters at a time, so only the start of {combinedAttachments.trimmed.join(', ')} is included. Remove a file to give the others more room.</p>
+        )}
+        <input ref={fileRef} type="file" accept="*" multiple onChange={event => attachFiles(event.target.files)} hidden />
+        <button type="button" className={'cordia-tutor-attach' + (attachDropActive ? ' drop-target-active' : '')} onClick={() => fileRef.current?.click()} disabled={extracting || attachments.length >= MAX_ATTACHMENTS}>
+          {extracting ? 'Reading files…' : attachDropActive ? 'Drop to attach' : attachments.length >= MAX_ATTACHMENTS ? `${MAX_ATTACHMENTS} files attached` : attachments.length ? 'Attach another file' : 'Attach study material'}
         </button>
         <button type="button" className="cordia-tutor-explain-toggle" onClick={() => setExplainOpen(open => !open)} aria-expanded={explainOpen}>
           How should I explain things?
