@@ -3351,3 +3351,23 @@ a.calendar-item:hover { border-color: var(--ink); transform: translateY(-1px); }
   box-shadow: 0 0 0 6px var(--accent-glow) !important;
   transition: outline-color 0.15s ease, box-shadow 0.15s ease;
 }
+
+/* Create: multi-file list and "combine into a guide" picker */
+.create-file-list { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.create-file-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 0.8rem; }
+.create-file-list li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.create-file-list button { border: none; background: none; color: var(--muted-ink); font-size: 1.05rem; line-height: 1; cursor: pointer; }
+.create-file-list button:hover:not(:disabled) { color: var(--ink); }
+.create-batch-dialog { max-width: 480px; width: calc(100% - 32px); }
+.create-batch-list { display: grid; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
+.create-batch-list label { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font-size: 0.86rem; color: var(--text-primary); }
+.create-batch-list label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.create-batch-list input { accent-color: var(--olive); }
+.create-batch-warning { color: var(--red, #b42318) !important; }
+
+/* Tutor: attached files */
+.cordia-tutor-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.cordia-tutor-attachments li { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 6px 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 0.68rem; font-weight: 600; }
+.cordia-tutor-attachments li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.cordia-tutor-attachments button { border: none; background: none; color: var(--muted-ink); font-size: 0.9rem; line-height: 1; cursor: pointer; padding: 0 2px; }
+.cordia-tutor-attach-note { margin: 0; color: var(--muted-ink); font-size: 0.68rem; line-height: 1.4; }

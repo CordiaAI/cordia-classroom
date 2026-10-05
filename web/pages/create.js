@@ -7,6 +7,17 @@ import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const MANUAL_DRAFT_KEY = 'autostudy_manual_draft';
 const SOURCE_DRAFT_KEY = 'autostudy_text_draft';
+const MAX_FILES = 5;
+// /generate keeps at most this much source text (MAX_CONTENT_LENGTH in backend/main.py).
+const MAX_SOURCE_CHARS = 500_000;
+
+function fileKey(file) {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function baseName(file) {
+  return file.name.replace(/\.[^.]+$/, '');
+}
 
 export default function CreateGuidePage() {
   const router = useRouter();
@@ -16,7 +27,10 @@ export default function CreateGuidePage() {
   const [content, setContent] = useState('');
   const [sourceUrl, setSourceUrl] = useState('');
   const [externalSourceId, setExternalSourceId] = useState('');
-  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadFiles, setUploadFiles] = useState([]);
+  // Files are combined into guides in rounds: pick some, build a guide, pick from the rest.
+  const [batch, setBatch] = useState(null); // { files, selected: Set<key>, created: [{ id, title }] }
+  const fileTexts = useRef(new Map());
   const [manualPairs, setManualPairs] = useState([{ term: '', definition: '' }, { term: '', definition: '' }]);
   const [cardCount, setCardCount] = useState('');
   const [folders, setFolders] = useState([]);
@@ -110,17 +124,29 @@ export default function CreateGuidePage() {
       : previous.slice(0, size));
   }, []);
 
-  function selectFile(file) {
-    if (!file) return;
-    const unsupported = unsupportedFileMessage(file);
-    if (unsupported) {
-      setError(unsupported);
-      return;
-    }
-    setUploadFile(file);
+  function selectFiles(list) {
+    const picked = Array.from(list || []);
+    if (!picked.length) return;
+    const problems = [];
+    const readable = picked.filter(file => {
+      const unsupported = unsupportedFileMessage(file);
+      if (unsupported) problems.push(unsupported);
+      return !unsupported;
+    });
+    const seen = new Set(uploadFiles.map(fileKey));
+    const merged = [...uploadFiles, ...readable.filter(file => !seen.has(fileKey(file)))];
+    if (merged.length > MAX_FILES) problems.push(`You can add up to ${MAX_FILES} files at a time, so only the first ${MAX_FILES} were kept.`);
+    const next = merged.slice(0, MAX_FILES);
+    setError(problems.join(' '));
+    if (!next.length) return;
+    setUploadFiles(next);
     setInputMode('pdf');
-    setError('');
-    if (!title.trim()) setTitle(file.name.replace(/\.[^.]+$/, ''));
+  }
+
+  function removeFile(file) {
+    const next = uploadFiles.filter(item => fileKey(item) !== fileKey(file));
+    setUploadFiles(next);
+    if (!next.length && inputMode === 'pdf') setInputMode('text');
   }
 
   const uploadDropActive = useFileDropZone({
@@ -128,12 +154,12 @@ export default function CreateGuidePage() {
     priority: 2,
     getElement: () => uploadBoxRef.current || formRef.current,
     onFiles: files => {
-      if (!['extracting', 'generating', 'saving'].includes(status)) selectFile(files[0]);
+      if (!['extracting', 'generating', 'saving'].includes(status) && !batch) selectFiles(files);
     },
   });
 
   function switchToManual() {
-    setInputMode(mode => mode === 'manual' ? (uploadFile ? 'pdf' : 'text') : 'manual');
+    setInputMode(mode => mode === 'manual' ? (uploadFiles.length ? 'pdf' : 'text') : 'manual');
     setError('');
   }
 
@@ -143,7 +169,7 @@ export default function CreateGuidePage() {
 
   function resolvedTitle() {
     if (title.trim()) return title.trim();
-    if (uploadFile?.name) return uploadFile.name.replace(/\.[^.]+$/, '');
+    if (uploadFiles.length) return uploadFiles.map(baseName).join(' + ').slice(0, 120);
     const firstLine = content.split('\n').map(line => line.trim()).find(Boolean);
     return firstLine?.slice(0, 72) || 'New Study Guide';
   }
@@ -171,19 +197,68 @@ export default function CreateGuidePage() {
     router.push('/guide/' + saved.guide.id);
   }
 
-  async function extractFile() {
-    if (!uploadFile) return '';
-    setStatus('extracting');
+  async function extractText(file) {
+    const key = fileKey(file);
+    if (fileTexts.current.has(key)) return fileTexts.current.get(key);
     const formData = new FormData();
-    formData.append('file', uploadFile);
+    formData.append('file', file);
     const response = await fetch(API + '/extract-file-text', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + (getToken() || '') },
       body: formData,
     });
     const data = await responseJson(response);
-    if (!response.ok || !data.text) throw new Error(data.detail || 'Could not read this file.');
+    if (!response.ok || !data.text) throw new Error(`${file.name}: ${data.detail || 'Could not read this file.'}`);
+    fileTexts.current.set(key, data.text);
     return data.text;
+  }
+
+  function combinedSource(files) {
+    if (files.length === 1) return fileTexts.current.get(fileKey(files[0])) || '';
+    return files.map(file => `${baseName(file)}\n\n${fileTexts.current.get(fileKey(file)) || ''}`).join('\n\n');
+  }
+
+  // Generates and saves one guide; returns the saved guide.
+  async function generateGuide(source, guideTitle, sourceTitle, sourceType) {
+    setStatus('generating');
+    const generated = await apiFetch('/generate', {
+      method: 'POST',
+      body: JSON.stringify({ content: source, notes: generateNotes, study_guide: true, flashcards: generateFlashcards, request_id: requestIdFor(source) }),
+    });
+    if (!generated) throw new Error('The guide took too long to come back. Try again; you will not be charged twice.');
+    if (generated.detail) {
+      const detail = typeof generated.detail === 'string' ? generated.detail : generated.detail.message;
+      setUpgradeUrl(generated.detail.code === 'limit_reached' ? 'modal' : (generated.detail.upgrade_url || ''));
+      throw new Error(detail || 'Study guide generation failed.');
+    }
+    if (!generated.study_guide || generated.study_guide.startsWith('[Error')) {
+      throw new Error('CordiaClassroom could not build a guide from this material.');
+    }
+
+    setStatus('saving');
+    const saved = await apiFetch('/guides', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: guideTitle,
+        notes: generated.notes || null,
+        study_guide: generated.study_guide || null,
+        flashcards: generated.flashcards || null,
+        source_url: sourceType === 'file' ? null : sourceUrl || null,
+        external_source_id: sourceType === 'file' ? null : externalSourceId || null,
+        source_type: sourceType,
+        source_title: sourceTitle,
+        source_id: sourceType === 'file' ? null : externalSourceId || null,
+        ...(selectedFolder ? { folder_id: selectedFolder } : {}),
+      }),
+    });
+    if (!saved?.guide) throw new Error('Failed to save guide.');
+    requestRef.current = { source: null, id: null };
+    return saved.guide;
+  }
+
+  function failWith(caught) {
+    setError(caught.message || 'Something went wrong. Please try again.');
+    setStatus('error');
   }
 
   async function handleCreate(event) {
@@ -192,49 +267,66 @@ export default function CreateGuidePage() {
     setUpgradeUrl('');
     try {
       if (inputMode === 'manual') return await saveManualGuide();
-      const source = inputMode === 'pdf' ? await extractFile() : content.trim();
+      if (inputMode === 'pdf') {
+        setStatus('extracting');
+        for (const file of uploadFiles) await extractText(file);
+        if (uploadFiles.length > 1) {
+          setStatus('');
+          setBatch({ files: uploadFiles, selected: new Set(uploadFiles.map(fileKey)), created: [] });
+          return;
+        }
+      }
+      const source = inputMode === 'pdf' ? combinedSource(uploadFiles) : content.trim();
       if (source.length < 10) {
         setError('Add a little more study material before creating your guide.');
+        setStatus('');
         return;
       }
-      setStatus('generating');
-      const generated = await apiFetch('/generate', {
-        method: 'POST',
-        body: JSON.stringify({ content: source, notes: generateNotes, study_guide: true, flashcards: generateFlashcards, request_id: requestIdFor(source) }),
-      });
-      if (!generated) throw new Error('The guide took too long to come back. Try again; you will not be charged twice.');
-      if (generated.detail) {
-        const detail = typeof generated.detail === 'string' ? generated.detail : generated.detail.message;
-        setUpgradeUrl(generated.detail.code === 'limit_reached' ? 'modal' : (generated.detail.upgrade_url || ''));
-        throw new Error(detail || 'Study guide generation failed.');
+      if (source.length > MAX_SOURCE_CHARS) {
+        setError(`This material is too long for one study guide (${source.length.toLocaleString()} of ${MAX_SOURCE_CHARS.toLocaleString()} characters). Split it into smaller parts.`);
+        setStatus('');
+        return;
       }
-      if (!generated.study_guide || generated.study_guide.startsWith('[Error')) {
-        throw new Error('CordiaClassroom could not build a guide from this material.');
-      }
-
-      setStatus('saving');
-      const saved = await apiFetch('/guides', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: resolvedTitle(),
-          notes: generated.notes || null,
-          study_guide: generated.study_guide || null,
-          flashcards: generated.flashcards || null,
-          source_url: sourceUrl || null,
-          external_source_id: externalSourceId || null,
-          source_type: uploadFile ? 'file' : sourceUrl ? 'webpage' : 'pasted_text',
-          source_title: uploadFile?.name || resolvedTitle(),
-          source_id: externalSourceId || null,
-          ...(selectedFolder ? { folder_id: selectedFolder } : {}),
-        }),
-      });
-      if (!saved?.guide) throw new Error('Failed to save guide.');
+      const isFile = inputMode === 'pdf';
+      const guide = await generateGuide(source, resolvedTitle(), isFile ? uploadFiles[0].name : resolvedTitle(), isFile ? 'file' : sourceUrl ? 'webpage' : 'pasted_text');
       localStorage.removeItem(SOURCE_DRAFT_KEY);
-      requestRef.current = { source: null, id: null };
-      router.push('/guide/' + saved.guide.id);
+      router.push('/guide/' + guide.id);
     } catch (caught) {
-      setError(caught.message || 'Something went wrong. Please try again.');
-      setStatus('error');
+      failWith(caught);
+    }
+  }
+
+  function toggleBatchFile(file) {
+    setBatch(current => {
+      const selected = new Set(current.selected);
+      const key = fileKey(file);
+      if (selected.has(key)) selected.delete(key); else selected.add(key);
+      return { ...current, selected };
+    });
+  }
+
+  async function createBatchGuide() {
+    const chosen = batch.files.filter(file => batch.selected.has(fileKey(file)));
+    const rest = batch.files.filter(file => !batch.selected.has(fileKey(file)));
+    const source = combinedSource(chosen);
+    if (source.length > MAX_SOURCE_CHARS) return;
+    setError('');
+    setUpgradeUrl('');
+    try {
+      const allAtOnce = !rest.length && !batch.created.length;
+      const guideTitle = allAtOnce && title.trim() ? title.trim() : chosen.map(baseName).join(' + ').slice(0, 120);
+      const guide = await generateGuide(source, guideTitle, chosen.map(file => file.name).join(', ').slice(0, 300), 'file');
+      const created = [...batch.created, { id: guide.id, title: guideTitle }];
+      setStatus('');
+      if (!rest.length) {
+        setBatch(null);
+        router.push(created.length === 1 ? '/guide/' + guide.id : '/dashboard?view=guides');
+        return;
+      }
+      setUploadFiles(rest);
+      setBatch({ files: rest, selected: new Set(rest.map(fileKey)), created });
+    } catch (caught) {
+      failWith(caught);
     }
   }
 
@@ -242,9 +334,11 @@ export default function CreateGuidePage() {
 
   const isLoading = ['extracting', 'generating', 'saving'].includes(status);
   const validManualPair = manualPairs.some(pair => pair.term.trim() && pair.definition.trim());
-  const canSubmit = !isLoading && (inputMode === 'manual' ? validManualPair : inputMode === 'pdf' ? !!uploadFile : content.trim().length >= 10);
+  const canSubmit = !isLoading && !batch && (inputMode === 'manual' ? validManualPair : inputMode === 'pdf' ? uploadFiles.length > 0 : content.trim().length >= 10);
+  const batchChosen = batch ? batch.files.filter(file => batch.selected.has(fileKey(file))) : [];
+  const batchChars = batch ? combinedSource(batchChosen).length : 0;
   const statusMessages = {
-    extracting: 'Reading your file…',
+    extracting: uploadFiles.length > 1 ? 'Reading your files…' : 'Reading your file…',
     generating: 'Building your study guide…',
     saving: 'Saving your guide…',
   };
@@ -276,11 +370,21 @@ export default function CreateGuidePage() {
                 disabled={isLoading}
               />
               <div className="create-source-divider"><span>or</span></div>
-              <button ref={uploadBoxRef} type="button" className={'create-upload-button' + (uploadFile ? ' selected' : '') + (uploadDropActive ? ' drop-target-active' : '')} onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
-                <span>{uploadDropActive ? 'Drop to add this file' : uploadFile ? uploadFile.name : 'Choose or drop a PDF, PowerPoint, Word file, image, or text file'}</span>
-                <small>{uploadFile ? 'Click or drop to replace this file' : 'Drag a file anywhere on this page'}</small>
+              <button ref={uploadBoxRef} type="button" className={'create-upload-button' + (uploadFiles.length ? ' selected' : '') + (uploadDropActive ? ' drop-target-active' : '')} onClick={() => fileInputRef.current?.click()} disabled={isLoading || uploadFiles.length >= MAX_FILES}>
+                <span>{uploadDropActive ? 'Drop to add files' : uploadFiles.length >= MAX_FILES ? `${MAX_FILES} files added (the most at once)` : uploadFiles.length ? 'Add another file' : 'Choose or drop PDFs, PowerPoints, Word files, images, or text files'}</span>
+                <small>{`Up to ${MAX_FILES} files · drag anywhere on this page`}</small>
               </button>
-              <input ref={fileInputRef} type="file" accept="*" onChange={event => { selectFile(event.target.files?.[0]); event.target.value = ''; }} hidden />
+              {uploadFiles.length > 0 && (
+                <ul className="create-file-list">
+                  {uploadFiles.map(file => (
+                    <li key={fileKey(file)}>
+                      <span>{file.name}</span>
+                      <button type="button" onClick={() => removeFile(file)} disabled={isLoading} aria-label={`Remove ${file.name}`}>×</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <input ref={fileInputRef} type="file" accept="*" multiple onChange={event => { selectFiles(event.target.files); event.target.value = ''; }} hidden />
             </section>
 
             <section className="create-details-section">
@@ -323,6 +427,37 @@ export default function CreateGuidePage() {
           <button type="submit" className="btn create-submit-btn" disabled={!canSubmit}>{isLoading ? statusMessages[status] : router.query.editGuideId ? 'Update study guide' : 'Create study guide'}</button>
         </footer>
       </form>
+
+      {batch && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog create-batch-dialog" role="dialog" aria-modal="true" aria-labelledby="create-batch-title">
+            <h3 id="create-batch-title">Select files you want to combine into a study guide</h3>
+            {batch.created.length > 0 && <p>Created {batch.created.map(item => `“${item.title}”`).join(', ')}. Choose files for the next guide.</p>}
+            <ul className="create-batch-list">
+              {batch.files.map(file => (
+                <li key={fileKey(file)}>
+                  <label>
+                    <input type="checkbox" checked={batch.selected.has(fileKey(file))} onChange={() => toggleBatchFile(file)} disabled={isLoading} />
+                    <span>{file.name}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+            {batchChars > MAX_SOURCE_CHARS && <p className="create-batch-warning" role="alert">These files are too long to combine into one guide ({batchChars.toLocaleString()} of {MAX_SOURCE_CHARS.toLocaleString()} characters). Select fewer files; the rest will be offered next.</p>}
+            {isLoading && <p>{statusMessages[status]}</p>}
+            {error && <p className="create-batch-warning" role="alert">{error}</p>}
+            <div className="confirm-actions">
+              <button type="button" className="btn-outline" disabled={isLoading} onClick={() => {
+                if (batch.created.length) router.push(batch.created.length === 1 ? '/guide/' + batch.created[0].id : '/dashboard?view=guides');
+                setBatch(null);
+              }}>{batch.created.length ? 'Done' : 'Cancel'}</button>
+              <button type="button" className="btn" disabled={isLoading || !batchChosen.length || batchChars > MAX_SOURCE_CHARS} onClick={createBatchGuide}>
+                {isLoading ? statusMessages[status] : batchChosen.length === batch.files.length ? 'Create study guide' : `Create guide from ${batchChosen.length} file${batchChosen.length === 1 ? '' : 's'}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
