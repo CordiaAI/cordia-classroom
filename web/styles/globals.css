@@ -1262,7 +1262,7 @@ input::placeholder { color: var(--text-muted); }
 }
 .sn-viewer-controls { display: flex; align-items: center; gap: 6px; }
 .sn-viewer-body { flex: 1; overflow: hidden; position: relative; min-height: 0; }
-.sn-viewer-drag { box-shadow: 0 0 0 2px var(--accent) !important; }
+.sn-viewer-drag { box-shadow: 0 0 0 2px var(--olive-hover) !important; }
 .sn-viewer-drop-overlay {
   position: absolute; inset: 0; z-index: 10;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -3342,4 +3342,12 @@ a.calendar-item:hover { border-color: var(--ink); transform: translateY(-1px); }
 .guided-tour-skip { border: 0; background: transparent; color: var(--text-secondary); font: 650 0.74rem/1 var(--font-sans); cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .setup-wizard[data-phase], .guided-tour-outline, .guided-tour-callout { animation: none; transition: none; }
+}
+
+/* Upload box that will receive a file dragged anywhere on the page */
+.drop-target-active {
+  outline: 2px solid var(--olive-hover) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px var(--accent-glow) !important;
+  transition: outline-color 0.15s ease, box-shadow 0.15s ease;
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { apiFetch, getToken, openUpgrade, responseJson } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
+import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const MANUAL_DRAFT_KEY = 'autostudy_manual_draft';
@@ -26,6 +27,8 @@ export default function CreateGuidePage() {
   const [error, setError] = useState('');
   const [upgradeUrl, setUpgradeUrl] = useState('');
   const fileInputRef = useRef(null);
+  const uploadBoxRef = useRef(null);
+  const formRef = useRef(null);
   // Reused when the same source is retried so one guide is never charged twice.
   const requestRef = useRef({ source: null, id: null });
   function requestIdFor(source) {
@@ -109,11 +112,25 @@ export default function CreateGuidePage() {
 
   function selectFile(file) {
     if (!file) return;
+    const unsupported = unsupportedFileMessage(file);
+    if (unsupported) {
+      setError(unsupported);
+      return;
+    }
     setUploadFile(file);
     setInputMode('pdf');
     setError('');
     if (!title.trim()) setTitle(file.name.replace(/\.[^.]+$/, ''));
   }
+
+  const uploadDropActive = useFileDropZone({
+    enabled: ready,
+    priority: 2,
+    getElement: () => uploadBoxRef.current || formRef.current,
+    onFiles: files => {
+      if (!['extracting', 'generating', 'saving'].includes(status)) selectFile(files[0]);
+    },
+  });
 
   function switchToManual() {
     setInputMode(mode => mode === 'manual' ? (uploadFile ? 'pdf' : 'text') : 'manual');
@@ -246,7 +263,7 @@ export default function CreateGuidePage() {
         {upgradeUrl && <button type="button" onClick={() => (upgradeUrl === 'modal' ? openUpgrade({ feature: 'guide' }) : router.push(upgradeUrl))}>View plans</button>}
       </div>}
 
-      <form className="create-flow-card" onSubmit={handleCreate}>
+      <form ref={formRef} className={'create-flow-card' + (uploadDropActive && inputMode === 'manual' ? ' drop-target-active' : '')} onSubmit={handleCreate}>
         {inputMode !== 'manual' ? (
           <>
             <section className="create-source-section">
@@ -259,11 +276,11 @@ export default function CreateGuidePage() {
                 disabled={isLoading}
               />
               <div className="create-source-divider"><span>or</span></div>
-              <button type="button" className={'create-upload-button' + (uploadFile ? ' selected' : '')} onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
-                <span>{uploadFile ? uploadFile.name : 'Choose a PDF, PowerPoint, Word file, or text file'}</span>
-                <small>{uploadFile ? 'Click to replace this file' : 'Any class material works'}</small>
+              <button ref={uploadBoxRef} type="button" className={'create-upload-button' + (uploadFile ? ' selected' : '') + (uploadDropActive ? ' drop-target-active' : '')} onClick={() => fileInputRef.current?.click()} disabled={isLoading}>
+                <span>{uploadDropActive ? 'Drop to add this file' : uploadFile ? uploadFile.name : 'Choose or drop a PDF, PowerPoint, Word file, image, or text file'}</span>
+                <small>{uploadFile ? 'Click or drop to replace this file' : 'Drag a file anywhere on this page'}</small>
               </button>
-              <input ref={fileInputRef} type="file" accept="*" onChange={event => selectFile(event.target.files?.[0])} hidden />
+              <input ref={fileInputRef} type="file" accept="*" onChange={event => { selectFile(event.target.files?.[0]); event.target.value = ''; }} hidden />
             </section>
 
             <section className="create-details-section">
