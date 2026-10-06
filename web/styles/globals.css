@@ -2485,7 +2485,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--olive) !importan
 .top-navigation-brand { display: inline-flex; align-items: center; gap: 12px; color: var(--ink); font-size: 1.3rem; font-weight: 680; letter-spacing: -0.04em; text-decoration: none; }
 .top-navigation-beta { margin-left: -7px; color: var(--muted-ink); font-size: 0.54em; font-weight: 620; letter-spacing: 0; text-transform: lowercase; }
 .top-navigation-mark { width: 42px; height: 34px; color: var(--olive); }
-.top-navigation-links { min-width: 0; display: flex; align-items: center; gap: 5px; }
+.top-navigation-links { min-width: 0; display: flex; align-items: center; gap: 5px; overflow-x: auto; scrollbar-width: none; }
+.top-navigation-links::-webkit-scrollbar { display: none; }
 .top-navigation-links button { padding: 9px 13px; border: 0; border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 0.86rem; font-weight: 560; white-space: nowrap; cursor: pointer; }
 .top-navigation-links button:hover { color: var(--ink); background: var(--bg-hover); }
 .top-navigation-links button.active { color: var(--olive-hover); background: var(--accent-glow); font-weight: 700; }
@@ -2589,6 +2590,12 @@ input:focus, textarea:focus, select:focus { border-color: var(--olive) !importan
 [data-theme="dark"] .extension-banner-badge { background: #30372d; color: #c5d5bb; }
 [data-theme="dark"] input::placeholder,
 [data-theme="dark"] textarea::placeholder { color: #a8aca1; opacity: 1; }
+
+@media (max-width: 1280px) {
+  .top-navigation { gap: 14px; padding-inline: 20px; }
+  .top-navigation-links { gap: 0; }
+  .top-navigation-links button { padding-inline: 8px; }
+}
 
 @media (max-width: 1080px) {
   .top-navigation { gap: 20px; padding-inline: 24px; }

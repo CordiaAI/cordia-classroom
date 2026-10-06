@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
+import InstallSidebarButton from './InstallSidebarButton';
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', match: '/dashboard' },
@@ -105,6 +106,7 @@ export default function Sidebar() {
 
       <div className="top-navigation-actions">
         <button type="button" className="feedback-header-button" onClick={() => setShowFeedback(true)}>Feedback</button>
+        <InstallSidebarButton />
         <div className="account-menu" ref={menuRef}>
           <button type="button" className="account-avatar" onClick={() => setMenuOpen(open => !open)} aria-expanded={menuOpen} aria-haspopup="menu" aria-label="Open account menu">
             {initials}
@@ -118,7 +120,6 @@ export default function Sidebar() {
               </div>
               <button type="button" role="menuitem" onClick={() => router.push('/settings')}>Your profile</button>
               <button type="button" role="menuitem" onClick={() => router.push('/billing')}>Billing</button>
-              <button type="button" role="menuitem" onClick={() => router.push('/install-extension')}>Chrome extension</button>
               {canReviewFeedback && <button type="button" role="menuitem" onClick={() => router.push('/feedback-review')}>Review feedback</button>}
               <div className="account-theme-row">
                 <span>Appearance</span>
