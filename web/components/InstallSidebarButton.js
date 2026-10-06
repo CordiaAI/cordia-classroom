@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
+import { EXTENSION_STORE_URL } from '../lib/extension';
 
-const STORE_URL = 'https://chromewebstore.google.com/detail/cordiaclassroom';
 const MARKER = 'data-asai-extension';
 
 // The extension stamps data-asai-extension="ready" on <html> (extension/asai-bridge.js)
@@ -25,7 +25,7 @@ export default function InstallSidebarButton() {
 
   return (
     <div className="install-sidebar">
-      <a className="install-sidebar-button" href={STORE_URL} target="_blank" rel="noopener noreferrer">
+      <a className="install-sidebar-button" href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer">
         <span className="install-sidebar-wave install-sidebar-wave-ink" aria-hidden="true" />
         <span className="install-sidebar-wave install-sidebar-wave-olive" aria-hidden="true" />
         <span className="install-sidebar-label">Install Classroom SideBar</span>
