@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { EXTENSION_STORE_URL } from '../lib/extension';
 
-
 // The extension stamps this attribute on <html> once its content script runs on
 // classroom.cordiaai.io. See extension/asai-bridge.js + manifest content_scripts.
 const INSTALL_MARKER_ATTR = 'data-asai-extension';

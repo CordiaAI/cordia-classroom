@@ -2,7 +2,6 @@ import { useRequireAuth } from '../lib/auth';
 import AcademicInfinityMark from '../components/AcademicInfinityMark';
 import { EXTENSION_STORE_URL } from '../lib/extension';
 
-
 export default function InstallExtensionPage() {
   const { ready } = useRequireAuth();
   if (!ready) return null;
