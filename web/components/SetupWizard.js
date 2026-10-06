@@ -4,8 +4,8 @@ import { useRouter } from 'next/router';
 import LearningStylePicker from './LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
 import { loadOnboarding, practiceTourUrl, saveOnboardingStep, smartNotesTourUrl } from '../lib/onboarding';
+import { EXTENSION_STORE_URL } from '../lib/extension';
 
-const STORE_URL = 'https://chromewebstore.google.com/detail/autostudyai/eddmfjcnfjfbaknmeccjbjdgpeipjbaf';
 const ORDER = ['style', 'extension', 'extension_use', 'create', 'smartnotes', 'practice'];
 const TRANSITION_MS = 260;
 
@@ -103,7 +103,7 @@ export default function SetupWizard() {
           ? <p className="setup-wizard-note">Extensions install from Chrome on a computer. You can add it later from the account menu.</p>
           : installed
             ? <p className="setup-wizard-done">✓ The extension is installed.</p>
-            : <a className="btn setup-wizard-store" href={STORE_URL} target="_blank" rel="noreferrer">Open Chrome Web Store <span aria-hidden="true">↗</span></a>}
+            : <a className="btn setup-wizard-store" href={EXTENSION_STORE_URL} target="_blank" rel="noreferrer">Open Chrome Web Store <span aria-hidden="true">↗</span></a>}
         <div className="setup-wizard-warning" role="note">
           <p>Some .edu email accounts won&apos;t allow extension installs. No worries:</p>
           <ol>

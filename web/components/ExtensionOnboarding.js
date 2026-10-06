@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-
-const STORE_URL =
-  'https://chromewebstore.google.com/detail/autostudyai/eddmfjcnfjfbaknmeccjbjdgpeipjbaf';
+import { EXTENSION_STORE_URL } from '../lib/extension';
 
 // The extension stamps this attribute on <html> once its content script runs on
 // classroom.cordiaai.io. See extension/asai-bridge.js + manifest content_scripts.
@@ -99,7 +97,7 @@ export default function ExtensionOnboarding({ open, onClose }) {
   }, [open]);
 
   const openStore = useCallback(() => {
-    window.open(STORE_URL, '_blank', 'noopener,noreferrer');
+    window.open(EXTENSION_STORE_URL, '_blank', 'noopener,noreferrer');
     setStoreOpened(true);
   }, []);
 

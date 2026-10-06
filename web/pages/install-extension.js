@@ -1,7 +1,6 @@
 import { useRequireAuth } from '../lib/auth';
 import AcademicInfinityMark from '../components/AcademicInfinityMark';
-
-const STORE_URL = 'https://chromewebstore.google.com/detail/autostudyai/eddmfjcnfjfbaknmeccjbjdgpeipjbaf';
+import { EXTENSION_STORE_URL } from '../lib/extension';
 
 export default function InstallExtensionPage() {
   const { ready } = useRequireAuth();
@@ -24,7 +23,7 @@ export default function InstallExtensionPage() {
           <div>
             <h2>Download it from the Chrome Web Store</h2>
             <p>Open the listing, then select <strong>Add to Chrome</strong>.</p>
-            <a className="extension-install-store-link" href={STORE_URL} target="_blank" rel="noreferrer">
+            <a className="extension-install-store-link" href={EXTENSION_STORE_URL} target="_blank" rel="noreferrer">
               Open CordiaClassroom in Chrome Web Store <span aria-hidden="true">↗</span>
             </a>
           </div>
@@ -66,7 +65,7 @@ export default function InstallExtensionPage() {
 
       <div className="extension-install-footer">
         <p>Installed already? Open any course material and click the CordiaClassroom icon to begin.</p>
-        <a className="btn" href={STORE_URL} target="_blank" rel="noreferrer">Open Chrome Web Store</a>
+        <a className="btn" href={EXTENSION_STORE_URL} target="_blank" rel="noreferrer">Open Chrome Web Store</a>
       </div>
 
       <style jsx>{`
