@@ -4,6 +4,8 @@ import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib
 import MermaidDiagram from './MermaidDiagram';
 import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from './ExplanationPreference';
+import AcademicInfinityMark from './AcademicInfinityMark';
+import WorkspaceIcon from './WorkspaceIcon';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 
 // Tutor replies may include ```mermaid blocks; render them as diagrams and keep the rest as text.
@@ -265,7 +267,8 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
 
   const messages = session?.messages || [];
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = endRef.current?.closest('.cordia-tutor-messages');
+    container?.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
   }, [messages.length, loading]);
 
   const material = materials.find(item => item.key === contextKey);
@@ -402,11 +405,13 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     <section ref={rootRef} className="cordia-tutor" aria-label="Cordia tutor">
       <header className="cordia-tutor-header">
         <div className="cordia-tutor-title-row">
-          <strong>Cordia Tutor</strong>
+          <strong><AcademicInfinityMark className="tutor-brand-mark" />Cordia Tutor</strong>
           <span className={`cordia-browser-status${session?.browser_available ? ' is-online' : ''}`}>
             {session?.browser_available ? 'Browser available' : 'Browser unavailable'}
           </span>
         </div>
+        <details className="tutor-context-controls">
+        <summary>Study context <span>⌄</span></summary>
         <select value={skillOverride} onChange={changeSkill} aria-label="Tutor skill" disabled={!session || busy}>
           <option value="">Auto · {session?.skills?.find(item => item.id === session?.active_skill)?.label || 'Explain'}</option>
           {(session?.skills || [{ id: 'explain', label: 'Explain' }]).map(item => (
@@ -462,15 +467,18 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
             <ExplanationPreference compact onSaved={() => setTimeout(() => setExplainOpen(false), 900)} />
           </div>
         )}
+        </details>
       </header>
 
       <div className="cordia-tutor-messages" aria-live="polite">
         {messages.length === 0 && (
-          <p>{material
-            ? `Ask about ${material.title || 'this material'}.`
-            : selectedSkill?.requires_context === false
-              ? 'Ask Cordia to work with the current browser page.'
-              : 'Choose a guide, SmartNote, or file to begin.'}</p>
+          <div className="tutor-welcome">
+            <h3>Let's make it clear.</h3>
+            <p>{material ? `How can I help you with ${material.title || 'your material'} today?` : 'What would you like to understand today?'}</p>
+            <div className="tutor-starter-actions">
+              {[{ label: 'Explain this concept in simpler terms', prompt: 'Explain the key concepts in this material in simple terms.', icon: 'tutor' }, { label: 'Create a study guide from this document', prompt: 'Create a study guide from this material.', icon: 'study' }, { label: 'Generate practice questions', prompt: 'Generate practice questions from this material.', icon: 'practice' }, { label: 'Make flashcards for key points', prompt: 'Make flashcards for the key points in this material.', icon: 'flashcards' }].map(action => <button type="button" key={action.icon} onClick={() => setInput(action.prompt)}><WorkspaceIcon name={action.icon} /><span>{action.label}</span></button>)}
+            </div>
+          </div>
         )}
         {messages.map((message, index) => (
           <div key={`${index}-${message.role}`} className={`cordia-tutor-message ${message.role}`}>

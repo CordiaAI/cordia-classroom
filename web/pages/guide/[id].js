@@ -5,8 +5,8 @@ import { useRequireAuth } from '../../lib/auth';
 import { parseQAPairs, parseNotes, formatDate } from '../../lib/formatters';
 import useSessionTracker from '../../lib/useSessionTracker';
 import AILoadingSphere from '../../components/AILoadingSphere';
-import FlashcardViewer from '../../components/FlashcardViewer';
 import StudyAidPanel from '../../components/StudyAidPanel';
+import StudyDocument from '../../components/StudyDocument';
 import { useLearningStyle } from '../../lib/learningStyle';
 
 export default function GuidePage() {
@@ -67,15 +67,6 @@ export default function GuidePage() {
     if (data) setGuide(prev => ({ ...prev, is_bookmarked: data.is_bookmarked }));
   }
 
-  function toggleQA(index) {
-    setRevealedQs(prev => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
-  }
-
   if (loadError && !guide) return (
     <div className="empty-state" role="alert">
       <h2>Study guide unavailable</h2>
@@ -102,11 +93,6 @@ export default function GuidePage() {
     || (guide.source_type === 'smartnote' && guide.source_id ? `/smartnotes?id=${guide.source_id}` : '')
     || (guide.source_type === 'study_guide' && guide.source_id ? `/guide/${guide.source_id}` : '');
   const fcProgress = guide.flashcard_progress || {};
-  const readPct = Math.round((guide.read_progress || 0) * 100);
-  const fcPct = flashcards.length > 0 && fcProgress.known
-    ? Math.round((fcProgress.known.length / flashcards.length) * 100) : 0;
-  const bestQuiz = quizHistory.length > 0 ? Math.max(...quizHistory.map(a => a.score)) : null;
-
   const tabs = [
     { key: 'guide', label: 'Study Guide' },
     { key: 'notes', label: 'Notes' },
@@ -116,7 +102,7 @@ export default function GuidePage() {
   ];
 
   return (
-    <div className="fade-in">
+    <article className="guide-reader-window">
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
         <div>
@@ -175,83 +161,35 @@ export default function GuidePage() {
         </div>
       </div>
 
-      {/* Progress overview */}
-      <div className="guide-progress">
-        <div className="guide-progress-item">
-          <div className="guide-progress-label">Read Progress</div>
-          <div className="progress-bar-container"><div className="progress-bar-fill" style={{ width: readPct + '%' }} /></div>
-          <div className="guide-progress-value" style={{ marginTop: 4 }}>{readPct}%</div>
-        </div>
-        <div className="guide-progress-item">
-          <div className="guide-progress-label">Flashcard Mastery</div>
-          <div className="progress-bar-container"><div className="progress-bar-fill green" style={{ width: fcPct + '%' }} /></div>
-          <div className="guide-progress-value" style={{ marginTop: 4 }}>{fcPct}%</div>
-        </div>
-        <div className="guide-progress-item">
-          <div className="guide-progress-label">Best Retain Score</div>
-          <div className="guide-progress-value" style={{ fontSize: '1.2em' }}>{bestQuiz !== null ? bestQuiz + '%' : '--'}</div>
-        </div>
-      </div>
-
       {/* Tabs */}
       <div className="tabs" style={{ alignItems: 'flex-end' }}>
         {tabs.map(tab => (
           <button
             key={tab.key}
             className={'tab-btn' + (activeTab === tab.key ? ' active' : '')}
+            aria-pressed={activeTab === tab.key}
             onClick={() => setActiveTab(tab.key)}
           >
             {tab.label}
           </button>
         ))}
-        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.6em', color: 'var(--accent)', marginBottom: 3, whiteSpace: 'nowrap', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            For nursing/medical students
-          </span>
-          <button
-            className={'tab-btn' + (activeTab === 'nclex' ? ' active' : '')}
-            onClick={() => setActiveTab('nclex')}
-            style={{
-              color: activeTab === 'nclex' ? '#fff' : 'var(--accent)',
-              borderColor: 'var(--accent-secondary)',
-              background: activeTab === 'nclex' ? 'var(--accent-secondary)' : 'transparent',
-            }}
-          >
-            NCLEX Mode
-          </button>
-        </div>
+        <details className="reader-more-tools">
+          <summary>More</summary>
+          <button type="button" className="tab-btn" onClick={() => setActiveTab('nclex')}>NCLEX Mode</button>
+        </details>
       </div>
 
+      <div key={activeTab} className="study-tab-content">
       {/* Tab content */}
       {activeTab === 'guide' && (
-        <div>
-          {qaPairs.length === 0 ? (
-            <div className="guide-content">{guide.study_guide || 'No study guide content.'}</div>
-          ) : (
-            qaPairs.map((pair, i) => (
-              <div key={i} className="qa-item">
-                <div className="qa-question" onClick={() => toggleQA(i)}>
-                  <span><strong>Q{pair.index}:</strong> {pair.question}</span>
-                  <span className={'qa-chevron' + (revealedQs.has(i) ? ' open' : '')}>{'\u25BC'}</span>
-                </div>
-                <div className={'qa-answer' + (revealedQs.has(i) ? ' visible' : '')}>
-                  {pair.answer}
-                  {pair.image && (
-                    <img src={pair.image} alt="Study image" style={{ display: 'block', maxWidth: '100%', maxHeight: 300, borderRadius: 6, marginTop: 10, border: '1px solid var(--border-subtle)' }} />
-                  )}
-                </div>
-                {learningStyle?.enabled && revealedQs.has(i) && openAid !== pair.index && (
-                  <button type="button" className="study-aid-open" onClick={() => setOpenAid(pair.index)}>
-                    Learn it your way
-                  </button>
-                )}
-                {learningStyle?.enabled && openAid === pair.index && (
-                  <StudyAidPanel guideId={id} number={pair.index} style={learningStyle.style} onClose={() => setOpenAid(null)} />
-                )}
-              </div>
-            ))
-          )}
-        </div>
+        <>
+          <StudyDocument key={guide.id} guide={guide} readSections={revealedQs} onLearn={learningStyle?.enabled ? index => setOpenAid(qaPairs[index].index) : undefined} onRead={index => {
+            setRevealedQs(previous => new Set([...previous, index]));
+          }} />
+          {learningStyle?.enabled && qaPairs.length > 0 && <div className="reader-learning-aids">
+            {openAid && <StudyAidPanel guideId={id} number={openAid} style={learningStyle.style} onClose={() => setOpenAid(null)} />}
+          </div>}
+        </>
       )}
 
       {activeTab === 'notes' && (
@@ -359,6 +297,7 @@ export default function GuidePage() {
           </button>
         </div>
       )}
-    </div>
+      </div>
+    </article>
   );
 }

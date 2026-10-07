@@ -682,6 +682,9 @@ function NotesIndex({ router, timerState, setTimerState }) {
 // ─── Page entry — routes between index and editor based on ?id ───────────────
 export default function SmartNotesPage({ timerState, setTimerState }) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted || !router.isReady) return null;
   if (router.isReady && !router.query.id) return <NotesIndex router={router} timerState={timerState} setTimerState={setTimerState} />;
   return <SmartNotesEditor />;
 }

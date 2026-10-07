@@ -22,15 +22,17 @@ for (const token of ['--canvas:', '--surface:', '--ink:', '--olive:']) {
 }
 assert.match(styles, /prefers-reduced-motion/);
 assert.match(sidebar, /label: 'SmartNotes'/);
-assert.doesNotMatch(sidebar, /label: 'Notes'/);
+assert.match(sidebar, /label: 'Notes', href: '\/smartnotes'/);
 for (const label of ['Appearance', 'Your profile', 'Billing', 'Feedback', 'Sign out']) {
   assert.ok(sidebar.includes(label), `missing profile action ${label}`);
 }
 assert.match(dashboard, /router\.replace\('\/smartnotes'\)/);
 assert.match(login, /AcademicInfinityMark/);
 assert.match(install, /AcademicInfinityMark/);
-assert.match(styles, /--font-sans: -apple-system/);
-assert.doesNotMatch(styles, /text-transform:\s*uppercase/);
+const classroomStyles = read('web', 'styles', 'classroom.css');
+assert.match(classroomStyles, /--font-sans: 'Manrope'/);
+assert.match(classroomStyles, /--font-display: 'Newsreader'/);
+assert.doesNotMatch(classroomStyles, /text-transform:\s*uppercase/);
 assert.doesNotMatch(documentPage, /Cormorant\+Garamond/);
 assert.match(documentPage, /cordia-classroom\.ico/);
 assert.match(documentPage, /cordia-classroom-icon\.png/);

@@ -157,13 +157,13 @@ export default function FlashcardViewer({ flashcards, guideId, onComplete }) {
         <div className="progress-bar-fill" style={{ width: (correctCount / total * 100) + '%' }} />
       </div>
 
-      <div className="flashcard-container" onClick={flip}>
+      <div className="flashcard-container" onClick={flip} role="button" tabIndex={0} aria-label={isFlipped ? 'Show question' : 'Reveal answer'} aria-pressed={isFlipped} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); flip(); } }}>
         <div className={'flashcard-inner' + (isFlipped ? ' flipped' : '')}>
-          <div className="flashcard-face flashcard-front">
+          <div className="flashcard-face flashcard-front" aria-hidden={isFlipped}>
             <div className="flashcard-label">Question</div>
             {card.front}
           </div>
-          <div className="flashcard-face flashcard-back">
+          <div className="flashcard-face flashcard-back" aria-hidden={!isFlipped}>
             <div className="flashcard-label">Answer</div>
             {card.back}
             {card.image && (

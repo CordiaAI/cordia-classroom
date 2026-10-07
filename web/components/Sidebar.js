@@ -4,13 +4,23 @@ import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } fro
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
 import InstallSidebarButton from './InstallSidebarButton';
+import WorkspaceIcon from './WorkspaceIcon';
 
 const navItems = [
-  { label: 'Dashboard', href: '/dashboard', match: '/dashboard' },
-  { label: 'Study Guides', href: '/dashboard?view=guides', match: 'view=guides' },
-  { label: 'Calendar', href: '/dashboard?view=calendar', match: 'view=calendar' },
-  { label: 'SmartNotes', href: '/smartnotes', match: '/smartnotes' },
-  { label: 'Practice', href: '/practice', match: '/practice' },
+  { label: 'Home', href: '/dashboard', match: '/dashboard' },
+  { label: 'Study', href: '/dashboard?view=guides', match: 'view=guides' },
+  { label: 'Tutor', action: 'tutor', match: 'tutor' },
+  { label: 'Notes', href: '/smartnotes', match: '/smartnotes' },
+  { label: 'Profile', href: '/settings', match: '/settings' },
+];
+const railItems = [
+  { label: 'Home', icon: 'home', href: '/dashboard', match: '/dashboard' },
+  { label: 'Study Guides', icon: 'study', href: '/dashboard?view=guides', match: 'view=guides' },
+  { label: 'Tutor', icon: 'tutor', action: 'tutor', match: 'tutor' },
+  { label: 'SmartNotes', icon: 'notes', href: '/smartnotes', match: '/smartnotes' },
+  { label: 'Flashcards', icon: 'flashcards', href: '/flashcards', match: '/flashcards' },
+  { label: 'Practice', icon: 'practice', href: '/practice', match: '/practice' },
+  { label: 'Calendar', icon: 'calendar', href: '/dashboard?view=calendar', match: 'view=calendar' },
 ];
 
 export default function Sidebar() {
@@ -22,6 +32,49 @@ export default function Sidebar() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [canReviewFeedback, setCanReviewFeedback] = useState(false);
   const menuRef = useRef(null);
+  const navRef = useRef(null);
+  const [indicator, setIndicator] = useState({ left: 0, width: 0 });
+  const [collapsed, setCollapsed] = useState(false);
+  const [tutorActive, setTutorActive] = useState(false);
+
+  useEffect(() => {
+    setCollapsed(localStorage.getItem('cordiaRailCollapsed') === 'true');
+    setTutorActive(localStorage.getItem('cordiaTutorOpen') === 'true');
+    const updateTutor = event => setTutorActive(Boolean(event.detail?.open));
+    window.addEventListener('cordia:tutor-visibility', updateTutor);
+    return () => window.removeEventListener('cordia:tutor-visibility', updateTutor);
+  }, []);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const measure = () => {
+      const selected = nav.querySelector('button.active');
+      setIndicator(selected ? { left: selected.offsetLeft, width: selected.offsetWidth } : { left: 0, width: 0 });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(nav);
+    document.fonts.ready.then(measure);
+    return () => observer.disconnect();
+  }, [router.asPath, tutorActive]);
+
+  function openDestination(item) {
+    if (item.action === 'tutor') {
+      const inlineTutor = document.querySelector('.study-scene-tutor');
+      if (inlineTutor) {
+        inlineTutor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        inlineTutor.querySelector('textarea')?.focus({ preventScroll: true });
+      } else window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: {} }));
+    }
+    else router.push(item.href);
+  }
+
+  function toggleRail() {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem('cordiaRailCollapsed', String(next));
+  }
 
   useEffect(() => {
     setEmail(getUserEmail() || '');
@@ -58,8 +111,10 @@ export default function Sidebar() {
   }, [router.events]);
 
   function isActive(item) {
+    if (item.match === 'tutor') return tutorActive;
+    if (tutorActive && navItems.includes(item)) return false;
     if (item.match === '/dashboard') return router.pathname === '/dashboard' && !router.query.view;
-    if (item.match === 'view=guides') return (router.pathname === '/dashboard' && router.query.view === 'guides') || router.pathname.startsWith('/flashcards') || router.pathname === '/create';
+    if (item.match === 'view=guides') return (router.pathname === '/dashboard' && router.query.view === 'guides') || router.pathname.startsWith('/flashcards') || router.pathname === '/create' || router.pathname.startsWith('/guide/');
     if (item.match.startsWith('view=')) return router.pathname === '/dashboard' && router.query.view === item.match.split('=')[1];
     return router.pathname.startsWith(item.match);
   }
@@ -89,24 +144,24 @@ export default function Sidebar() {
 
   return (
     <>
+      <a className="workspace-skip-link" href="#classroom-main">Skip to study content</a>
       <header className="top-navigation">
       <a className="top-navigation-brand" href="/dashboard" aria-label="CordiaClassroom dashboard">
         <AcademicInfinityMark className="top-navigation-mark" />
-        <span>CordiaClassroom</span>
+        <span className="cordia-wordmark">cordia</span>
         <small className="top-navigation-beta">beta</small>
       </a>
 
-      <nav className="top-navigation-links" aria-label="Primary navigation">
+      <nav ref={navRef} className="top-navigation-links" aria-label="Primary navigation">
         {navItems.map(item => (
-          <button key={item.label} type="button" className={isActive(item) ? 'active' : ''} onClick={() => router.push(item.href)}>
+          <button key={item.label} type="button" className={isActive(item) ? 'active' : ''} aria-current={isActive(item) ? 'page' : undefined} onClick={() => openDestination(item)}>
             {item.label}
           </button>
         ))}
+        <span className="navigation-indicator" aria-hidden="true" style={{ transform: `translateX(${indicator.left}px)`, width: indicator.width }} />
       </nav>
 
       <div className="top-navigation-actions">
-        <button type="button" className="feedback-header-button" onClick={() => setShowFeedback(true)}>Feedback</button>
-        <InstallSidebarButton />
         <div className="account-menu" ref={menuRef}>
           <button type="button" className="account-avatar" onClick={() => setMenuOpen(open => !open)} aria-expanded={menuOpen} aria-haspopup="menu" aria-label="Open account menu">
             {initials}
@@ -120,6 +175,8 @@ export default function Sidebar() {
               </div>
               <button type="button" role="menuitem" onClick={() => router.push('/settings')}>Your profile</button>
               <button type="button" role="menuitem" onClick={() => router.push('/billing')}>Billing</button>
+              <button type="button" role="menuitem" onClick={() => setShowFeedback(true)}>Feedback</button>
+              <InstallSidebarButton />
               {canReviewFeedback && <button type="button" role="menuitem" onClick={() => router.push('/feedback-review')}>Review feedback</button>}
               <div className="account-theme-row">
                 <span>Appearance</span>
@@ -131,17 +188,16 @@ export default function Sidebar() {
           )}
         </div>
       </div>
-        <style jsx>{`
-          .top-navigation-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
-          .feedback-header-button { min-height: 42px; padding: 0 17px; border: 0; border-radius: 12px; background: #11120f; color: #fff; box-shadow: 0 8px 20px rgba(17, 18, 15, 0.16); font: inherit; font-size: 0.78rem; font-weight: 750; cursor: pointer; }
-          .feedback-header-button:hover { transform: translateY(-1px); background: #2a2c27; box-shadow: 0 11px 24px rgba(17, 18, 15, 0.2); }
-          .feedback-header-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--olive) 30%, transparent); outline-offset: 2px; }
-          @media (max-width: 720px) {
-            .top-navigation-actions { gap: 7px; }
-            .feedback-header-button { min-height: 40px; padding: 0 13px; font-size: 0.72rem; }
-          }
-        `}</style>
+
       </header>
+      <aside className={`workspace-rail${collapsed ? ' is-collapsed' : ''}`} aria-label="Classroom sidebar">
+        <div className="workspace-rail-heading"><span>Classroom</span><button type="button" onClick={toggleRail} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!collapsed}><WorkspaceIcon name="chevron" /></button></div>
+        <button type="button" className="rail-create" onClick={() => router.push('/create')} title={collapsed ? 'New study guide' : undefined}><WorkspaceIcon name="upload" /><span>New study guide</span></button>
+        <nav aria-label="Study navigation">
+          {railItems.map(item => <button key={item.label} type="button" className={isActive(item) ? 'active' : ''} aria-current={isActive(item) ? 'page' : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={() => openDestination(item)}><WorkspaceIcon name={item.icon} /><span>{item.label}</span></button>)}
+        </nav>
+        <div className="workspace-rail-footer"><span>Your space to understand.</span><button type="button" onClick={() => router.push('/settings')} aria-label="Your profile" title={collapsed ? 'Your profile' : undefined}><WorkspaceIcon name="profile" /><span>Your profile</span></button></div>
+      </aside>
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
     </>
   );

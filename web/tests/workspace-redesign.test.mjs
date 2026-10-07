@@ -6,9 +6,10 @@ const source = relativePath => readFile(new URL(`../${relativePath}`, import.met
 
 test('top navigation exposes focused study destinations without a separate Classes page', async () => {
   const sidebar = await source('components/Sidebar.js');
-  const labels = [...sidebar.matchAll(/\{ label: '([^']+)'/g)].map(match => match[1]);
+  const navigation = sidebar.split('const navItems = [')[1].split('];')[0];
+  const labels = [...navigation.matchAll(/\{ label: '([^']+)'/g)].map(match => match[1]);
 
-  assert.deepEqual(labels, ['Dashboard', 'Study Guides', 'Calendar', 'SmartNotes', 'Practice']);
+  assert.deepEqual(labels, ['Home', 'Study', 'Tutor', 'Notes', 'Profile']);
 });
 
 test('Practice opens straight into the workspace with a study guide picker', async () => {
@@ -32,13 +33,12 @@ test('dashboard routes use the shared workspace and retire the separate Classes 
   assert.doesNotMatch(dashboard, /My Classes/);
 });
 
-test('class rail and docked Tutor share only the dashboard and guide layouts', async () => {
+test('study surfaces share one floating window and keep optional tools folded away', async () => {
   const frame = await source('components/StudyWorkspaceFrame.js');
 
-  assert.match(frame, /section === 'dashboard' \|\| section === 'guides'/);
-  assert.match(frame, /<TutorDrawer docked \/>/);
-  assert.match(frame, /dashboard-left-stack/);
-  assert.match(frame, /without-classes/);
+  assert.match(frame, /reference-workspace-window/);
+  assert.match(frame, /<details className="reference-study-tools">/);
+  assert.doesNotMatch(frame, /TutorDrawer|DashboardClassRail/);
 });
 
 test('Study Guides owns the Flashcards destination and creation action', async () => {
