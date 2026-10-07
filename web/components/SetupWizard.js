@@ -5,6 +5,7 @@ import LearningStylePicker from './LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
 import { loadOnboarding, practiceTourUrl, saveOnboardingStep, smartNotesTourUrl } from '../lib/onboarding';
 import { EXTENSION_STORE_URL } from '../lib/extension';
+import AcademicInfinityMark from './AcademicInfinityMark';
 
 const ORDER = ['style', 'extension', 'extension_use', 'create', 'smartnotes', 'practice'];
 const TRANSITION_MS = 260;
@@ -48,7 +49,7 @@ export default function SetupWizard() {
 
   if (!progress || progress.completed || !step || typeof document === 'undefined') return null;
 
-  // Collapse the window into its center, swap the page, then open it back out.
+  // Ease the current step away, then reveal the next within the same glass window.
   function goTo(nextStep) {
     saveOnboardingStep(nextStep);
     setPhase('out');
@@ -152,9 +153,10 @@ export default function SetupWizard() {
     <div className="setup-wizard-backdrop">
       <section className="setup-wizard" data-phase={phase} role="dialog" aria-modal="true" aria-labelledby="setup-wizard-title">
         <header className="setup-wizard-header">
-          <span className="setup-wizard-progress">Step {position + 1} of {steps.length}</span>
+          <div className="setup-wizard-brand"><AcademicInfinityMark /><span>cordia</span></div>
           <button type="button" className="setup-wizard-skip" onClick={finish} disabled={busy}>Skip setup</button>
         </header>
+        <span className="setup-wizard-progress">Your classroom · Step {position + 1} of {steps.length}</span>
         <h2 id="setup-wizard-title">{page.title}</h2>
         <div className="setup-wizard-body">{page.body}</div>
         <footer className="setup-wizard-footer">

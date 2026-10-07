@@ -42,9 +42,12 @@ test('Classroom glass workspace renders responsively and preserves study interac
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     const errors = [];
+    const onboardingWrites = [];
     page.on('pageerror', error => errors.push(`${new URL(page.url()).pathname}: ${error.message}`));
     await page.route('http://localhost:8000/**', route => {
       const resource = new URL(route.request().url()).pathname;
+      if (resource === '/onboarding' && route.request().method() === 'PUT') onboardingWrites.push(route.request().postDataJSON().step);
+      if (resource === '/learning-style' && route.request().method() === 'PUT') fixtures[resource] = { ...fixtures[resource], ...route.request().postDataJSON() };
       return route.fulfill({ json: fixtures[resource] || { ok: true }, headers: { 'Access-Control-Allow-Origin': '*' } });
     });
     async function visit(route) {
@@ -229,6 +232,36 @@ test('Classroom glass workspace renders responsively and preserves study interac
     await page.waitForFunction(() => getComputedStyle(document.querySelector('.study-scene-tutor')).opacity === '1');
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     await page.screenshot({ path: path.join(output, 'home-dark.png'), fullPage: true });
+    fixtures['/onboarding'] = { completed: false, step: 'style' };
+    fixtures['/learning-style'] = { enabled: true, style: null, prompted: false };
+    await visit('/dashboard');
+    const wizard = page.getByRole('dialog', { name: 'How do you like to study?' });
+    await wizard.waitFor();
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.setup-wizard')).opacity === '1');
+    await page.screenshot({ path: path.join(output, 'setup-light.png') });
+    await wizard.getByRole('radio', { name: /^Visual/ }).click();
+    await page.waitForFunction(() => document.querySelector('.setup-wizard [role="radio"]').getAttribute('aria-checked') === 'true');
+    await wizard.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Add the Chrome extension' }).waitFor();
+    assert.ok(onboardingWrites.includes('extension'), 'advancing setup must save the step');
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await wizard.waitFor();
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+    await page.waitForFunction(() => getComputedStyle(document.querySelector('.setup-wizard')).opacity === '1');
+    assert.equal(await wizard.evaluate(element => getComputedStyle(element).color), 'rgb(255, 255, 255)');
+    await page.screenshot({ path: path.join(output, 'setup-dark.png') });
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      await noOverflow(`setup ${width}`);
+      assert.ok(await wizard.evaluate(element => {
+        const bounds = element.getBoundingClientRect();
+        return bounds.top >= 0 && bounds.bottom <= innerHeight;
+      }), 'setup must fit on mobile and scroll inside its window');
+      if (width === 390) await page.screenshot({ path: path.join(output, 'setup-mobile.png') });
+    }
+    await page.getByRole('button', { name: 'Skip setup' }).click();
+    await wizard.waitFor({ state: 'hidden' });
+    assert.ok(onboardingWrites.includes('done'), 'skipping setup must save completion');
     assert.deepEqual(errors, [], 'frontend must not throw browser exceptions');
   } finally {
     await browser.close();

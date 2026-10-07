@@ -3297,8 +3297,6 @@ a.calendar-item:hover { border-color: var(--ink); transform: translateY(-1px); }
 
 /* === Setup wizard ====================================================== */
 /* Solid surfaces: the shared --surface is translucent glass in the light theme. */
-.setup-wizard, .guided-tour-callout, .setup-wizard .learning-style-option { background: #ffffff !important; }
-[data-theme='dark'] :is(.setup-wizard, .guided-tour-callout, .setup-wizard .learning-style-option) { background: var(--surface-raised) !important; }
 .setup-wizard .learning-style-option { background: var(--surface-raised); }
 .setup-wizard .style-example { background: var(--bg-hover, #f3f3ef); }
 .setup-wizard-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(17, 18, 15, 0.38); backdrop-filter: blur(14px) saturate(0.9); }
