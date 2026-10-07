@@ -4,7 +4,8 @@ Plans:  Pro Monthly $9.99 (lookup key classroom_pro_monthly)
         Pro Semester $29 / 4 months (lookup key classroom_pro_semester)
 Trial:  7 days, no card, one per account. Created server-side and set to cancel
         itself at trial end, so it can never turn into a charge on its own.
-Promo:  CLASSROOMBETA etc. are entered at Checkout (allow_promotion_codes).
+Promo:  Codes live only in the Stripe dashboard and are entered at Checkout
+        (allow_promotion_codes). Never write a code into this repository.
 
 Stripe is the source of truth; every change reaches user_subscriptions through
 _upsert_from_subscription(), whether it came from Checkout, the trial endpoint or
