@@ -491,17 +491,18 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
   .reference-study-tools .dashboard-study-rail { grid-template-columns: minmax(0,1fr); }
 }
 .tutor-drawer-toggle { width: auto; min-width: 96px; height: 52px; padding: 12px 16px; }
-.landing-document-preview { height: min(680px, calc(100svh - 180px)); min-height: 480px; min-width: 0; }
+.landing-document-preview { width: min(1080px,100%); height: min(680px, calc(100svh - 100px)); min-height: 480px; min-width: 0; margin: 0 auto; scroll-margin-top: 24px; }
 .login-page { justify-content: flex-start; }
-.login-page .login-split { margin: 142px auto 70px; min-height: calc(100svh - 210px); grid-template-columns: minmax(0,1fr) minmax(420px,1.2fr); gap: 8vw; }
+.login-page .login-split { margin: 122px auto 64px; min-height: calc(100svh - 186px); grid-template-columns: minmax(0,1fr) minmax(360px,.85fr); gap: 8vw; }
 .landing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 28px; margin-top: 32px; }
 .landing-actions .scene-continue { min-width: 180px; text-decoration: none; }
 .landing-actions > a:last-child { font-size: .76rem; display: flex; gap: 12px; align-items: center; }
-.login-page > .login-panel-right { width: min(460px,100%); margin: 40px auto 70px; scroll-margin-top: 35px; }
+.login-split > .login-panel-right { width: min(460px,100%); justify-self: end; scroll-margin-top: 24px; }
 .main-content .settings-page .settings-tabs { display: flex; flex-direction: column; background: transparent; border: 0; border-right: 1px solid var(--line); border-radius: 0; box-shadow: none; padding: 0 20px 0 0; }
 .main-content .settings-page > .settings-section { background: transparent; box-shadow: none; border: 0; padding: 0; }
 @media (max-width: 820px) {
-  .login-page .login-split { grid-template-columns: minmax(0,1fr); margin-top: 120px; min-height: 0; gap: 36px; }
+  .login-page .login-split { grid-template-columns: minmax(0,1fr); margin-top: 100px; min-height: 0; gap: 48px; }
+  .login-split > .login-panel-right { order: -1; justify-self: center; }
   .landing-document-preview { height: 540px; }
 }
 @media (max-width: 620px) {

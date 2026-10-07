@@ -65,11 +65,24 @@ test('Classroom glass workspace renders responsively and preserves study interac
     assert.equal(await page.locator('.login-panel-right').count(), 1);
     assert.equal(await page.evaluate(() => getComputedStyle(document.body).fontFamily.includes('Manrope')), true);
     await noOverflow('desktop login');
-    assert.ok(await page.evaluate(() => document.querySelector('.login-brand-name').getBoundingClientRect().right < document.querySelector('.landing-document-preview').getBoundingClientRect().left), 'brand and document window must remain separate');
+    assert.ok(await page.evaluate(() => document.querySelector('.login-brand-name').getBoundingClientRect().right < document.querySelector('.login-panel-right').getBoundingClientRect().left), 'brand and account window must remain separate');
+    async function accountInViewport() {
+      assert.ok(await page.evaluate(() => {
+        const panel = document.querySelector('.login-panel-right').getBoundingClientRect();
+        return panel.top >= 0 && panel.bottom <= innerHeight;
+      }), 'sign-in window must fit in the first viewport');
+    }
+    await accountInViewport();
     await page.screenshot({ path: path.join(output, 'login-desktop.png') });
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await accountInViewport();
+    await page.screenshot({ path: path.join(output, 'login-laptop.png') });
     for (const width of [320, 390, 768]) {
       await page.setViewportSize({ width, height: 844 });
       await noOverflow(`login ${width}`);
+      await page.evaluate(() => scrollTo(0, 0));
+      await accountInViewport();
+      if (width === 390) await page.screenshot({ path: path.join(output, 'login-mobile.png') });
       await page.getByRole('tab', { name: 'Create account' }).click();
       assert.equal(await page.getByRole('textbox', { name: 'Full name' }).count(), 1);
       await noOverflow(`signup ${width}`);
@@ -117,6 +130,7 @@ test('Classroom glass workspace renders responsively and preserves study interac
     const primary = page.getByRole('navigation', { name: 'Primary navigation' });
     await primary.getByRole('button', { name: 'Notes', exact: true }).click();
     await page.waitForURL('**/smartnotes');
+    await page.waitForFunction(() => [...document.querySelectorAll('.top-navigation-links button')].some(button => button.textContent.trim() === 'Notes' && button.getAttribute('aria-current') === 'page'));
     assert.equal(await primary.getByRole('button', { name: 'Notes', exact: true }).getAttribute('aria-current'), 'page');
     assert.equal(await primary.getByRole('button', { name: 'Tutor', exact: true }).getAttribute('aria-current'), null);
     await page.waitForFunction(() => {
