@@ -8,7 +8,7 @@ const navigation = read('web', 'components', 'Sidebar.js');
 const modal = read('web', 'components', 'FeedbackModal.js');
 const review = read('web', 'pages', 'feedback-review.js');
 
-assert.match(navigation, /className="feedback-header-button"/);
+assert.match(navigation, /role="menuitem" onClick=\{\(\) => setShowFeedback\(true\)\}/);
 assert.match(navigation, />Feedback<\/button>/);
 assert.match(navigation, /\/feedback\/reviewer-status/);
 assert.match(navigation, /canReviewFeedback &&/);

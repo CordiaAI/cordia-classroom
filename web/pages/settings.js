@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useRequireAuth } from '../lib/auth';
-import { apiErrorMessage, apiFetch, cacheUserIdentity, getUserEmail } from '../lib/api';
+import { apiErrorMessage, apiFetch, cacheUserIdentity, getUserEmail, getUserName } from '../lib/api';
 import { FEATURE_COPY, FREE_SUMMARY, METERED, PRICES, PRO_BENEFITS, PRO_NAME, resetLabel } from '../lib/plans';
 import FeedbackModal from '../components/FeedbackModal';
 import LearningStylePicker from '../components/LearningStylePicker';
@@ -12,7 +12,8 @@ import StudyInsights from '../components/StudyInsights';
 export default function SettingsPage() {
   const { ready } = useRequireAuth();
   const router = useRouter();
-  const [activeSection, setActiveSection] = useState('subscription');
+  const [activeSection, setActiveSection] = useState('account');
+  const [profileName, setProfileName] = useState('');
 
   // /settings?section=learning opens a section directly (e.g. from the dashboard insights card).
   useEffect(() => {
@@ -48,10 +49,12 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!ready) return;
     setEmail(getUserEmail() || '');
+    setProfileName(getUserName() || '');
     apiFetch('/auth/me').then(identity => {
       if (!identity?.user_id) return;
       cacheUserIdentity(identity);
       setEmail(identity.email || '');
+      setProfileName(identity.name || '');
     });
     const saved = localStorage.getItem('theme') || 'light';
     setTheme(saved);
@@ -151,16 +154,16 @@ export default function SettingsPage() {
   }
 
   const sections = [
-    { key: 'subscription', label: 'Subscription' },
+    { key: 'account', label: 'Profile' },
     { key: 'learning', label: 'Learning' },
     { key: 'appearance', label: 'Appearance' },
-    { key: 'account', label: 'Account' },
+    { key: 'subscription', label: 'Subscription' },
   ];
 
   return (
     <>
       <div className="settings-page">
-        <h2>Settings</h2>
+        <header className="profile-window-heading"><h2>My profile</h2><p>Make this space your own.</p></header>
 
         <div className="settings-tabs">
           {sections.map(s => (
@@ -316,12 +319,12 @@ export default function SettingsPage() {
         {/* Account Section */}
         {activeSection === 'account' && (
           <div className="settings-section">
-            <div className="settings-row">
-              <div>
-                <div className="settings-label">Email</div>
-                <div className="settings-desc">{email || 'Not available'}</div>
-              </div>
+            <div className="profile-identity">
+              <div className="profile-portrait" aria-hidden="true">{profileName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase()}</div>
+              <div><span>Name</span><strong>{profileName || 'Your account'}</strong><span>Email</span><strong>{email || 'Not available'}</strong></div>
+              <button type="button" className="btn-outline" onClick={() => setActiveSection('subscription')}>Manage plan</button>
             </div>
+            <div className="profile-preferences"><h3>Learning preferences</h3><ExplanationPreference /></div>
             <div className="settings-row">
               <div>
                 <div className="settings-label">Send Feedback</div>

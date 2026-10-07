@@ -2,6 +2,8 @@ import Head from 'next/head';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import AcademicInfinityMark from '../components/AcademicInfinityMark';
+import StudyDocument from '../components/StudyDocument';
+import WorkspaceIcon from '../components/WorkspaceIcon';
 import { getToken, setToken, scheduleProactiveRefresh } from '../lib/api';
 import { supabaseAuth } from '../lib/supabase';
 
@@ -127,18 +129,24 @@ export default function LoginPage() {
         <link rel="canonical" href="https://classroom.cordiaai.io" />
       </Head>
 
-      <main className="login-page" style={{ '--login-backdrop': "url('/login-learning-backdrop.webp')" }}>
+      <main className="login-page" style={{ '--login-backdrop': "url('/classroom-clouds.webp')" }}>
+        <header className="login-navigation">
+          <a href="/" className="login-wordmark" aria-label="CordiaClassroom home"><AcademicInfinityMark className="top-navigation-mark" /><span>cordia</span></a>
+          <nav aria-label="Public navigation"><a href="/mission">Our approach</a><a href="#classroom-sign-in">Sign in <span aria-hidden="true">↗</span></a></nav>
+        </header>
         <div className="login-split">
           <section className="login-panel-left">
             <div className="login-brand-mark">
-              <AcademicInfinityMark className="login-academic-mark" />
-              <div className="login-brand-name">CordiaClassroom <small>beta</small></div>
-              <h1 className="login-editorial-title">Learn from anything.</h1>
-              <p className="login-brand-tagline">Capture educational material from any page and turn it into a focused study workspace.</p>
+              <span className="login-eyebrow">A little focus. A deeper understanding.</span>
+              <div className="login-brand-name">Cordia<br />Classroom</div>
+              <h1 className="login-editorial-title">Your space to learn.</h1>
+              <p className="login-brand-tagline">Turn your course material into notes, study guides, flashcards, and understanding — built around the way you learn.</p>
+              <div className="landing-actions"><a className="scene-continue" href="#classroom-sign-in" onClick={() => selectMode(true)}>Get started <WorkspaceIcon name="arrow" /></a><a href="#classroom-preview">Explore the workspace <span>↓</span></a></div>
             </div>
           </section>
-
-          <section className="login-panel-right">
+          <div id="classroom-preview" className="landing-document-preview"><StudyDocument guide={{ title: 'Relations and Functions', className: 'Explore Cordia Classroom', study_guide: 'Q1: Relations\nA1: A relation from a set A to a set B is a subset of the Cartesian product A × B. It describes how elements of one set connect to another.\nQ2: Functions\nA2: A function from A to B is a relation in which each element of A is associated with exactly one element of B.\nQ3: A simple example\nA3: If A = {1, 2, 3} and f(x) = x², then f maps each input to one output: 1 → 1, 2 → 4, and 3 → 9.' }} /></div>
+        </div>
+          <section id="classroom-sign-in" className="login-panel-right" aria-label="Classroom account access">
             {forgotMode ? (
               <div className="login-form-wrap">
                 <h2 className="login-form-title">Reset password</h2>
@@ -207,7 +215,6 @@ export default function LoginPage() {
               </div>
             )}
           </section>
-        </div>
       </main>
     </>
   );
