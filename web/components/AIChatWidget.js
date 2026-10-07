@@ -6,6 +6,7 @@ import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from './ExplanationPreference';
 import AcademicInfinityMark from './AcademicInfinityMark';
 import WorkspaceIcon from './WorkspaceIcon';
+import TutorSelect from './TutorSelect';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 
 // Tutor replies may include ```mermaid blocks; render them as diagrams and keep the rest as text.
@@ -281,8 +282,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const busy = loading || (session?.status && session.status !== 'idle');
   const progressLabel = SKILL_PROGRESS[session?.active_skill] || 'Cordia is working…';
 
-  async function changeSkill(event) {
-    const nextSkill = event.target.value;
+  async function changeSkill(nextSkill) {
     setSkillOverride(nextSkill);
     if (!session?.id || !nextSkill) return;
     const next = await apiFetch('/tutor/session/skill', {
@@ -412,31 +412,21 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         </div>
         <details className="tutor-context-controls">
         <summary>Study context <span>⌄</span></summary>
-        <select value={skillOverride} onChange={changeSkill} aria-label="Tutor skill" disabled={!session || busy}>
-          <option value="">Auto · {session?.skills?.find(item => item.id === session?.active_skill)?.label || 'Explain'}</option>
-          {(session?.skills || [{ id: 'explain', label: 'Explain' }]).map(item => (
-            <option key={item.id} value={item.id} disabled={item.available === false}>
-              {item.available === false ? `${item.label} — coming soon` : item.label}
-            </option>
-          ))}
-        </select>
-        <select value={contextKey} onChange={event => setContextKey(event.target.value)} aria-label="Study material">
-          {materials.length === 0 && <option value="">Choose study material</option>}
-          {guides.length > 0 && <optgroup label="Study Guides">
-            {guides.map(item => <option key={item.id} value={`guide:${item.id}`}>{item.title || 'Untitled guide'}</option>)}
-          </optgroup>}
-          {notes.length > 0 && <optgroup label="SmartNotes">
-            {notes.map(item => <option key={item.id} value={`note:${item.id}`}>{item.title || 'Untitled note'}</option>)}
-          </optgroup>}
-          {attachments.length > 0 && <optgroup label={attachments.length === 1 ? 'Attached file' : 'Attached files'}><option value="attachment">{attachments.length === 1 ? attachments[0].title : `${attachments.length} attached files`}</option></optgroup>}
-          {session?.browser_content_available && <optgroup label="Browser"><option value="browser">{browserMaterial?.title || 'Captured browser material'}</option></optgroup>}
-        </select>
-        {needsTargetClass && (
-          <select value={targetClassId} onChange={event => setTargetClassId(event.target.value)} aria-label="Destination class">
-            <option value="">Choose destination class</option>
-            {classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
-        )}
+        <TutorSelect label="Tutor skill" value={skillOverride} onChange={changeSkill} disabled={!session || busy} options={[
+          { value: '', label: `Auto · ${session?.skills?.find(item => item.id === session?.active_skill)?.label || 'Explain'}` },
+          ...(session?.skills || [{ id: 'explain', label: 'Explain' }]).map(item => ({ value: item.id, label: item.available === false ? `${item.label} — coming soon` : item.label, disabled: item.available === false })),
+        ]} />
+        <TutorSelect label="Study material" value={contextKey} onChange={setContextKey} options={[
+          ...(materials.length === 0 ? [{ value: '', label: 'Choose study material' }] : []),
+          ...guides.map(item => ({ value: `guide:${item.id}`, label: item.title || 'Untitled guide', group: 'Study Guides' })),
+          ...notes.map(item => ({ value: `note:${item.id}`, label: item.title || 'Untitled note', group: 'SmartNotes' })),
+          ...(attachments.length ? [{ value: 'attachment', label: attachments.length === 1 ? attachments[0].title : `${attachments.length} attached files`, group: 'Attached files' }] : []),
+          ...(session?.browser_content_available ? [{ value: 'browser', label: browserMaterial?.title || 'Captured browser material', group: 'Browser' }] : []),
+        ]} />
+        {needsTargetClass && <TutorSelect label="Destination class" value={targetClassId} onChange={setTargetClassId} options={[
+          { value: '', label: 'Choose destination class' },
+          ...classes.map(item => ({ value: item.id, label: item.name })),
+        ]} />}
         {!session?.browser_available && ['capture', 'find_material'].includes(selectedSkillId) && (
           <p className="cordia-browser-fallback">
             Browser unavailable. Open the Chrome side panel, choose an existing guide or SmartNote, or attach a file below.
