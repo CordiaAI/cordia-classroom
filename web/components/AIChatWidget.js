@@ -129,17 +129,38 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   });
   const appliedPreferred = useRef('');
 
+  // The Tutor stays mounted across pages, so guides and notes made elsewhere (Create,
+  // SmartNotes, the extension) are reloaded on navigation and when the tab regains focus.
   useEffect(() => {
-    Promise.all([
-      providedGuides ? null : apiFetch('/guides?limit=50'),
-      apiFetch('/smart_notes'),
-      apiFetch('/folders'),
-    ]).then(([guideData, noteData, folderData]) => {
-      if (Array.isArray(guideData?.guides)) setLoadedGuides(guideData.guides);
-      if (Array.isArray(noteData?.notes)) setNotes(noteData.notes);
-      if (Array.isArray(folderData?.folders)) setClasses(folderData.folders);
-    });
-  }, [providedGuides]);
+    let active = true;
+    let lastLoad = 0;
+    function loadMaterials() {
+      lastLoad = Date.now();
+      Promise.all([
+        providedGuides ? null : apiFetch('/guides?limit=50'),
+        apiFetch('/smart_notes'),
+        apiFetch('/folders'),
+      ]).then(([guideData, noteData, folderData]) => {
+        if (!active) return;
+        if (Array.isArray(guideData?.guides)) setLoadedGuides(guideData.guides);
+        if (Array.isArray(noteData?.notes)) setNotes(noteData.notes);
+        if (Array.isArray(folderData?.folders)) setClasses(folderData.folders);
+      });
+    }
+    function onFocus() {
+      if (!document.hidden && Date.now() - lastLoad > 15000) loadMaterials();
+    }
+    loadMaterials();
+    router.events.on('routeChangeComplete', loadMaterials);
+    document.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      active = false;
+      router.events.off('routeChangeComplete', loadMaterials);
+      document.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [providedGuides, router.events]);
 
   // Poll fast only while a Tutor action is running; slow when idle; never while the tab is hidden.
   const sessionStatusRef = useRef('idle');
@@ -222,7 +243,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
       return;
     }
     if (!materials.some(item => item.key === contextKey)) setContextKey(materials[0]?.key || '');
-  }, [materials.length, contextKey, preferredGuideId, preferredNoteId]);
+  }, [guides, notes, attachments.length, materials.length, contextKey, preferredGuideId, preferredNoteId]);
 
   useEffect(() => {
     const prefill = event => {

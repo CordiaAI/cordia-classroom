@@ -84,7 +84,7 @@ export default function AILoadingSphere({ size = 100, label = 'Loading...' }) {
           </use>
         </g>
       </svg>
-      <p>{label}</p>
+      {label && <p>{label}</p>}
 
       <style jsx>{`
         .cordia-loader { display: grid; justify-items: center; gap: 22px; }
