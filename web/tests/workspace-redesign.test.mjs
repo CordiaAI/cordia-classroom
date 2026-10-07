@@ -49,13 +49,15 @@ test('Study Guides owns the Flashcards destination and creation action', async (
   assert.match(dashboard, /New study guide/);
 });
 
-test('create page starts with one source-first flow and keeps manual creation optional', async () => {
+test('create page shows manual and upload windows side by side with one Create button', async () => {
   const create = await source('pages/create.js');
 
-  assert.match(create, /Add your study material/);
-  assert.match(create, /Build manually/);
+  assert.match(create, /Manual Study Guide/);
+  assert.match(create, /Upload Files/);
   assert.match(create, /Create study guide/);
-  assert.doesNotMatch(create, /create-tabs|Paste Text|Upload File/);
+  assert.match(create, /include the manual study guide text in the same study guide as the file upload/);
+  assert.match(create, /startGuideJob/);
+  assert.doesNotMatch(create, /create-tabs|Paste Text/);
 });
 
 test('SmartNotes library uses the shared workspace frame', async () => {
