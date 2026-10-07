@@ -36,11 +36,15 @@ export default function Sidebar() {
   const [indicator, setIndicator] = useState({ left: 0, width: 0 });
   const [collapsed, setCollapsed] = useState(false);
   const [tutorActive, setTutorActive] = useState(false);
+  const [tutorSelected, setTutorSelected] = useState(false);
 
   useEffect(() => {
     setCollapsed(localStorage.getItem('cordiaRailCollapsed') === 'true');
     setTutorActive(localStorage.getItem('cordiaTutorOpen') === 'true');
-    const updateTutor = event => setTutorActive(Boolean(event.detail?.open));
+    const updateTutor = event => {
+      setTutorActive(Boolean(event.detail?.open));
+      setTutorSelected(Boolean(event.detail?.open));
+    };
     window.addEventListener('cordia:tutor-visibility', updateTutor);
     return () => window.removeEventListener('cordia:tutor-visibility', updateTutor);
   }, []);
@@ -57,7 +61,7 @@ export default function Sidebar() {
     observer.observe(nav);
     document.fonts.ready.then(measure);
     return () => observer.disconnect();
-  }, [router.asPath, tutorActive]);
+  }, [router.asPath, tutorActive, tutorSelected]);
 
   function openDestination(item) {
     if (item.action === 'tutor') {
@@ -65,9 +69,12 @@ export default function Sidebar() {
       if (inlineTutor) {
         inlineTutor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         inlineTutor.querySelector('textarea')?.focus({ preventScroll: true });
-      } else window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: {} }));
+      } else window.dispatchEvent(new CustomEvent('cordia:tutor-toggle'));
     }
-    else router.push(item.href);
+    else {
+      setTutorSelected(false);
+      router.push(item.href);
+    }
   }
 
   function toggleRail() {
@@ -99,7 +106,7 @@ export default function Sidebar() {
       if (event.key === 'Escape') setMenuOpen(false);
       if (event.type === 'mousedown' && menuRef.current && !menuRef.current.contains(event.target)) setMenuOpen(false);
     }
-    const closeOnRoute = () => setMenuOpen(false);
+    const closeOnRoute = () => { setMenuOpen(false); setTutorSelected(false); };
     document.addEventListener('keydown', closeOnDocument);
     document.addEventListener('mousedown', closeOnDocument);
     router.events.on('routeChangeStart', closeOnRoute);
@@ -111,8 +118,8 @@ export default function Sidebar() {
   }, [router.events]);
 
   function isActive(item) {
-    if (item.match === 'tutor') return tutorActive;
-    if (tutorActive && navItems.includes(item)) return false;
+    if (item.match === 'tutor') return tutorActive && (!navItems.includes(item) || tutorSelected);
+    if (tutorActive && tutorSelected && navItems.includes(item)) return false;
     if (item.match === '/dashboard') return router.pathname === '/dashboard' && !router.query.view;
     if (item.match === 'view=guides') return (router.pathname === '/dashboard' && router.query.view === 'guides') || router.pathname.startsWith('/flashcards') || router.pathname === '/create' || router.pathname.startsWith('/guide/');
     if (item.match.startsWith('view=')) return router.pathname === '/dashboard' && router.query.view === item.match.split('=')[1];

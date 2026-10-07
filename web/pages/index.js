@@ -144,8 +144,6 @@ export default function LoginPage() {
               <div className="landing-actions"><a className="scene-continue" href="#classroom-sign-in" onClick={() => selectMode(true)}>Get started <WorkspaceIcon name="arrow" /></a><a href="#classroom-preview">Explore the workspace <span>↓</span></a></div>
             </div>
           </section>
-          <div id="classroom-preview" className="landing-document-preview"><StudyDocument guide={{ title: 'Relations and Functions', className: 'Explore Cordia Classroom', study_guide: 'Q1: Relations\nA1: A relation from a set A to a set B is a subset of the Cartesian product A × B. It describes how elements of one set connect to another.\nQ2: Functions\nA2: A function from A to B is a relation in which each element of A is associated with exactly one element of B.\nQ3: A simple example\nA3: If A = {1, 2, 3} and f(x) = x², then f maps each input to one output: 1 → 1, 2 → 4, and 3 → 9.' }} /></div>
-        </div>
           <section id="classroom-sign-in" className="login-panel-right" aria-label="Classroom account access">
             {forgotMode ? (
               <div className="login-form-wrap">
@@ -215,6 +213,8 @@ export default function LoginPage() {
               </div>
             )}
           </section>
+        </div>
+        <div id="classroom-preview" className="landing-document-preview"><StudyDocument guide={{ title: 'Relations and Functions', className: 'Explore Cordia Classroom', study_guide: 'Q1: Relations\nA1: A relation from a set A to a set B is a subset of the Cartesian product A × B. It describes how elements of one set connect to another.\nQ2: Functions\nA2: A function from A to B is a relation in which each element of A is associated with exactly one element of B.\nQ3: A simple example\nA3: If A = {1, 2, 3} and f(x) = x², then f maps each input to one output: 1 → 1, 2 → 4, and 3 → 9.' }} /></div>
       </main>
     </>
   );

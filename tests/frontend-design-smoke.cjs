@@ -33,6 +33,7 @@ const fixtures = {
   '/billing/status': { plan: 'free', usage: {} },
   '/tutor/session': { id: 'design-session', status: 'idle', active_skill: 'explain', browser_available: false, messages: [], skills: [{ id: 'explain', label: 'Explain', available: true, requires_context: true }] },
 };
+fixtures['/tutor/session/skill'] = fixtures['/tutor/session'];
 
 test('Classroom glass workspace renders responsively and preserves study interactions', { skip: !base, timeout: 120000 }, async () => {
   const browser = await chromium.launch({ executablePath: process.env.CORDIA_BROWSER_PATH || undefined, headless: true });
@@ -64,11 +65,24 @@ test('Classroom glass workspace renders responsively and preserves study interac
     assert.equal(await page.locator('.login-panel-right').count(), 1);
     assert.equal(await page.evaluate(() => getComputedStyle(document.body).fontFamily.includes('Manrope')), true);
     await noOverflow('desktop login');
-    assert.ok(await page.evaluate(() => document.querySelector('.login-brand-name').getBoundingClientRect().right < document.querySelector('.landing-document-preview').getBoundingClientRect().left), 'brand and document window must remain separate');
+    assert.ok(await page.evaluate(() => document.querySelector('.login-brand-name').getBoundingClientRect().right < document.querySelector('.login-panel-right').getBoundingClientRect().left), 'brand and account window must remain separate');
+    async function accountInViewport() {
+      assert.ok(await page.evaluate(() => {
+        const panel = document.querySelector('.login-panel-right').getBoundingClientRect();
+        return panel.top >= 0 && panel.bottom <= innerHeight;
+      }), 'sign-in window must fit in the first viewport');
+    }
+    await accountInViewport();
     await page.screenshot({ path: path.join(output, 'login-desktop.png') });
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await accountInViewport();
+    await page.screenshot({ path: path.join(output, 'login-laptop.png') });
     for (const width of [320, 390, 768]) {
       await page.setViewportSize({ width, height: 844 });
       await noOverflow(`login ${width}`);
+      await page.evaluate(() => scrollTo(0, 0));
+      await accountInViewport();
+      if (width === 390) await page.screenshot({ path: path.join(output, 'login-mobile.png') });
       await page.getByRole('tab', { name: 'Create account' }).click();
       assert.equal(await page.getByRole('textbox', { name: 'Full name' }).count(), 1);
       await noOverflow(`signup ${width}`);
@@ -113,6 +127,44 @@ test('Classroom glass workspace renders responsively and preserves study interac
     await page.waitForFunction(() => document.querySelector('.guide-reader-window').getBoundingClientRect().right + 16 <= document.querySelector('.tutor-drawer').getBoundingClientRect().left);
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     await page.screenshot({ path: path.join(output, 'study-tutor-light.png'), fullPage: true });
+    const primary = page.getByRole('navigation', { name: 'Primary navigation' });
+    await primary.getByRole('button', { name: 'Notes', exact: true }).click();
+    await page.waitForURL('**/smartnotes');
+    await page.waitForFunction(() => [...document.querySelectorAll('.top-navigation-links button')].some(button => button.textContent.trim() === 'Notes' && button.getAttribute('aria-current') === 'page'));
+    assert.equal(await primary.getByRole('button', { name: 'Notes', exact: true }).getAttribute('aria-current'), 'page');
+    assert.equal(await primary.getByRole('button', { name: 'Tutor', exact: true }).getAttribute('aria-current'), null);
+    await page.waitForFunction(() => {
+      const selected = document.querySelector('.top-navigation-links button[aria-current="page"]').getBoundingClientRect();
+      const underline = document.querySelector('.navigation-indicator').getBoundingClientRect();
+      return Math.abs(underline.left - selected.left) < 1 && Math.abs(underline.width - selected.width) < 1;
+    });
+    assert.equal(await page.locator('.tutor-drawer').getAttribute('aria-hidden'), 'false');
+    const sidebarTutor = page.getByRole('navigation', { name: 'Study navigation' }).getByRole('button', { name: 'Tutor', exact: true });
+    await sidebarTutor.click();
+    await page.waitForFunction(() => document.querySelector('.tutor-drawer').getAttribute('aria-hidden') === 'true');
+    await sidebarTutor.click();
+    await page.waitForFunction(() => document.querySelector('.tutor-drawer').getAttribute('aria-hidden') === 'false');
+    await page.locator('.tutor-context-controls summary').click();
+    await page.getByRole('button', { name: 'Tutor skill', exact: true }).click();
+    const skillOptions = page.getByRole('listbox', { name: 'Tutor skill', exact: true });
+    await skillOptions.waitFor();
+    assert.equal(await skillOptions.evaluate(element => getComputedStyle(element).gap), '6px');
+    const delays = await skillOptions.getByRole('option').evaluateAll(elements => elements.map(element => getComputedStyle(element).animationDelay));
+    assert.notEqual(delays[0], delays[1], 'dropdown choices enter in order');
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await page.getByRole('button', { name: 'Study material', exact: true }).click();
+    await page.getByRole('listbox', { name: 'Study material', exact: true }).getByRole('option').first().click();
+    await page.getByRole('button', { name: 'How should I explain things?' }).click();
+    assert.equal(await page.locator('.cordia-tutor .explain-preference p').evaluate(element => getComputedStyle(element).color), 'rgb(23, 27, 24)');
+    assert.equal(await page.locator('.cordia-tutor .explain-preference textarea').evaluate(element => getComputedStyle(element).fontWeight), '550');
+    await page.screenshot({ path: path.join(output, 'tutor-context-options.png') });
+    await page.getByRole('button', { name: 'Tutor skill', exact: true }).click();
+    await page.getByRole('listbox', { name: 'Tutor skill', exact: true }).waitFor();
+    await page.waitForFunction(() => [...document.querySelectorAll('.tutor-select-option')].every(element => getComputedStyle(element).opacity === '1' && getComputedStyle(element).transform === 'matrix(1, 0, 0, 1, 0, 0)'));
+    await page.screenshot({ path: path.join(output, 'tutor-dropdown-light.png') });
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('.tutor-drawer').getAttribute('aria-hidden'), 'false', 'Escape closes the dropdown before the Tutor');
     await page.getByRole('button', { name: 'Close Cordia Tutor', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('.tutor-drawer')?.getAttribute('aria-hidden') === 'true');
     await page.getByRole('button', { name: 'Open account menu' }).click();
@@ -120,6 +172,9 @@ test('Classroom glass workspace renders responsively and preserves study interac
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
     assert.equal(await page.evaluate(() => localStorage.getItem('theme')), 'dark');
     await page.keyboard.press('Escape');
+    await primary.getByRole('button', { name: 'Study', exact: true }).click();
+    await page.locator('.draggable-guide').filter({ hasText: 'Relations and Functions' }).click();
+    await page.locator('.guide-reader-window').waitFor();
     await page.waitForFunction(() => !document.body.classList.contains('tutor-open') && getComputedStyle(document.querySelector('.main-content')).paddingRight === '30px');
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     await page.screenshot({ path: path.join(output, 'study-dark.png'), fullPage: true });
@@ -131,6 +186,7 @@ test('Classroom glass workspace renders responsively and preserves study interac
     await page.getByRole('button', { name: 'Open Cordia Tutor', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('.tutor-drawer')?.getAttribute('aria-hidden') === 'false');
     await noOverflow('mobile Tutor');
+    assert.ok(await page.locator('.tutor-drawer .cordia-tutor-input').evaluate(element => element.getBoundingClientRect().bottom <= innerHeight), 'expanded context controls must keep the mobile question field visible');
     await page.screenshot({ path: path.join(output, 'study-tutor-mobile.png'), fullPage: true });
     await page.getByRole('button', { name: 'Close Cordia Tutor', exact: true }).first().click();
     await visit('/flashcards/study?guideId=design-guide');

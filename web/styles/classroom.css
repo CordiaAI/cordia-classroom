@@ -491,17 +491,18 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
   .reference-study-tools .dashboard-study-rail { grid-template-columns: minmax(0,1fr); }
 }
 .tutor-drawer-toggle { width: auto; min-width: 96px; height: 52px; padding: 12px 16px; }
-.landing-document-preview { height: min(680px, calc(100svh - 180px)); min-height: 480px; min-width: 0; }
+.landing-document-preview { width: min(1080px,100%); height: min(680px, calc(100svh - 100px)); min-height: 480px; min-width: 0; margin: 0 auto; scroll-margin-top: 24px; }
 .login-page { justify-content: flex-start; }
-.login-page .login-split { margin: 142px auto 70px; min-height: calc(100svh - 210px); grid-template-columns: minmax(0,1fr) minmax(420px,1.2fr); gap: 8vw; }
+.login-page .login-split { margin: 122px auto 64px; min-height: calc(100svh - 186px); grid-template-columns: minmax(0,1fr) minmax(360px,.85fr); gap: 8vw; }
 .landing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 28px; margin-top: 32px; }
 .landing-actions .scene-continue { min-width: 180px; text-decoration: none; }
 .landing-actions > a:last-child { font-size: .76rem; display: flex; gap: 12px; align-items: center; }
-.login-page > .login-panel-right { width: min(460px,100%); margin: 40px auto 70px; scroll-margin-top: 35px; }
+.login-split > .login-panel-right { width: min(460px,100%); justify-self: end; scroll-margin-top: 24px; }
 .main-content .settings-page .settings-tabs { display: flex; flex-direction: column; background: transparent; border: 0; border-right: 1px solid var(--line); border-radius: 0; box-shadow: none; padding: 0 20px 0 0; }
 .main-content .settings-page > .settings-section { background: transparent; box-shadow: none; border: 0; padding: 0; }
 @media (max-width: 820px) {
-  .login-page .login-split { grid-template-columns: minmax(0,1fr); margin-top: 120px; min-height: 0; gap: 36px; }
+  .login-page .login-split { grid-template-columns: minmax(0,1fr); margin-top: 100px; min-height: 0; gap: 48px; }
+  .login-split > .login-panel-right { order: -1; justify-self: center; }
   .landing-document-preview { height: 540px; }
 }
 @media (max-width: 620px) {
@@ -516,3 +517,34 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 [data-theme='dark'] :is(.top-navigation-mark, .tutor-brand-mark) { filter: brightness(0) invert(1); }
 [data-theme='dark'] .class-tile-cover { background-image: linear-gradient(135deg, rgba(36,39,44,.7), rgba(47,50,56,.85)), url('/classroom-clouds.webp'); }
 [data-theme='dark'] .class-tile-cover > span { color: #fff; }
+/* Tutor controls share the sidebar's crisp type and tactile glass surfaces. */
+.cordia-tutor :is(.tutor-context-controls summary, .cordia-tutor-attach, .cordia-tutor-explain-toggle, .explain-preference label, .explain-preference p, .explain-preference textarea, .explain-preference small) { color: var(--ink); font-family: var(--font-sans); font-weight: 550; }
+.cordia-tutor .tutor-context-controls summary { font-size: .78rem; padding-block: 10px; }
+.cordia-tutor .cordia-tutor-message.user { color: var(--ink); font-weight: 500; }
+.cordia-tutor .explain-preference textarea::placeholder { color: var(--text-secondary); opacity: 1; font-weight: 500; }
+.cordia-tutor .cordia-tutor-explain-panel { margin-top: 10px; }
+.tutor-select { position: relative; margin-bottom: 10px; min-width: 0; }
+.tutor-select:has([role='listbox']) { z-index: 30; }
+.tutor-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--ink); text-align: left; font: 550 .8rem/1.45 var(--font-sans); cursor: pointer; }
+.tutor-select-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tutor-select-trigger svg { flex: 0 0 16px; transition: transform 180ms ease; }
+.tutor-select-trigger[aria-expanded='true'] svg { transform: rotate(180deg); }
+.tutor-select-trigger:disabled { cursor: default; opacity: .55; }
+.tutor-select-options { position: absolute; top: calc(100% + 6px); left: 0; right: 0; display: flex; flex-direction: column; gap: 6px; max-height: min(280px, 40svh); overflow-y: auto; overscroll-behavior: contain; padding: 8px; border: 1px solid var(--glass-edge); border-radius: 14px; background: var(--surface-raised); box-shadow: var(--shadow-lg); scrollbar-width: thin; }
+.tutor-select-option { position: relative; display: flex; flex-direction: column; align-items: flex-start; flex-shrink: 0; gap: 3px; min-height: 44px; padding: 11px 30px 11px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); text-align: left; font: 550 .8rem/1.45 var(--font-sans); cursor: pointer; animation: tutor-option-fall 380ms var(--option-delay, 0ms) both; }
+.tutor-select-option > span { overflow-wrap: anywhere; }
+.tutor-select-option small { font: 550 .6rem/1.4 var(--font-sans); color: var(--text-secondary); }
+.tutor-select-option[aria-selected='true'], .tutor-select-option:hover { background: var(--accent-glow); border-color: var(--olive); }
+.tutor-select-option:focus-visible { outline-offset: -3px; }
+.tutor-select-option:disabled { opacity: .5; cursor: default; }
+.tutor-select-option .tutor-select-check { position: absolute; top: 12px; right: 10px; }
+@keyframes tutor-option-fall { 0% { opacity: 0; transform: translateY(-12px); } 60% { opacity: 1; transform: translateY(3px); } 82% { transform: translateY(-1px); } 100% { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .tutor-select-option { animation: none; } }
+.cordia-tutor :is(.cordia-tutor-attach, .cordia-tutor-explain-toggle, .explain-preference p, .explain-preference textarea) { font-size: .78rem; line-height: 1.55; }
+.cordia-tutor .explain-preference label { font-size: .82rem; font-weight: 650; }
+.cordia-tutor :is(.cordia-tutor-attach, .cordia-tutor-explain-toggle) { padding: 9px 12px; margin-right: 6px; margin-bottom: 6px; }
+/* Expanded controls scroll within the pane so the question field stays visible. */
+.cordia-tutor-header { flex-shrink: 0; max-height: 65%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.cordia-tutor-messages { min-height: 0; }
+.cordia-tutor-input { flex-shrink: 0; }
+.tutor-select-options { position: static; margin-top: 6px; }

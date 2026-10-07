@@ -25,6 +25,12 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
   }, []);
 
   useEffect(() => {
+    const toggle = () => changeOpen(!open);
+    window.addEventListener('cordia:tutor-toggle', toggle);
+    return () => window.removeEventListener('cordia:tutor-toggle', toggle);
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
     const closeOnEscape = event => {
       if (event.key !== 'Escape') return;
