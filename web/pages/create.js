@@ -110,6 +110,9 @@ export default function CreateGuidePage() {
   const uploadBoxRef = useRef(null);
   const pageRef = useRef(null);
   const startedJobs = useRef(new Set());
+  const termInputs = useRef([]);
+  const answerInputs = useRef([]);
+  const [focusTerm, setFocusTerm] = useState(null);
   // Reused when the same source is retried so one guide is never charged twice.
   const requestRef = useRef({ source: null, id: null });
   const jobs = useGuideJobs();
@@ -241,6 +244,27 @@ export default function CreateGuidePage() {
       if (!busy && !batch && !choiceOpen) selectFiles(files);
     },
   });
+
+  useEffect(() => {
+    if (focusTerm === null) return;
+    termInputs.current[focusTerm]?.focus();
+    setFocusTerm(null);
+  }, [focusTerm, manualPairs.length]);
+
+  // Enter in a question moves to its answer; Enter in an answer starts the next card.
+  function handleCardKey(event, index, field) {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    if (field === 'term') {
+      answerInputs.current[index]?.focus();
+      return;
+    }
+    const next = manualPairs[index + 1];
+    if (!next || next.term.trim()) {
+      setManualPairs(pairs => [...pairs.slice(0, index + 1), { term: '', definition: '' }, ...pairs.slice(index + 1)]);
+    }
+    setFocusTerm(index + 1);
+  }
 
   function updatePair(index, field, value) {
     setManualPairs(previous => previous.map((pair, pairIndex) => pairIndex === index ? { ...pair, [field]: value } : pair));
@@ -430,9 +454,9 @@ export default function CreateGuidePage() {
               <div className="create-card" key={index}>
                 <div className="create-card-num">{index + 1}</div>
                 <div className="create-card-body">
-                  <input className="create-card-input create-card-term" value={pair.term} onChange={event => updatePair(index, 'term', event.target.value)} placeholder="Question or term" />
+                  <input ref={element => { termInputs.current[index] = element; }} onKeyDown={event => handleCardKey(event, index, 'term')} className="create-card-input create-card-term" value={pair.term} onChange={event => updatePair(index, 'term', event.target.value)} placeholder="Question or term" />
                   <div className="create-card-divider" />
-                  <input className="create-card-input create-card-def" value={pair.definition} onChange={event => updatePair(index, 'definition', event.target.value)} placeholder="Answer or definition" />
+                  <input ref={element => { answerInputs.current[index] = element; }} onKeyDown={event => handleCardKey(event, index, 'definition')} className="create-card-input create-card-def" value={pair.definition} onChange={event => updatePair(index, 'definition', event.target.value)} placeholder="Answer or definition" />
                 </div>
                 {manualPairs.length > 1 && <button type="button" className="create-card-remove" onClick={() => setManualPairs(pairs => pairs.filter((_, pairIndex) => pairIndex !== index))} aria-label="Remove card">×</button>}
               </div>
