@@ -3378,3 +3378,35 @@ a.calendar-item:hover { border-color: var(--ink); transform: translateY(-1px); }
 .cordia-tutor-attachments li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
 .cordia-tutor-attachments button { border: none; background: none; color: var(--muted-ink); font-size: 0.9rem; line-height: 1; cursor: pointer; padding: 0 2px; }
 .cordia-tutor-attach-note { margin: 0; color: var(--muted-ink); font-size: 0.68rem; line-height: 1.4; }
+
+/* Create: two windows (manual | upload) with one Create button on top */
+.create-split-page { width: min(1180px, 100%); margin-inline: auto; display: grid; gap: 18px; }
+.create-split-top { display: grid; justify-items: center; gap: 6px; }
+.create-split-submit { min-width: 240px; padding: 14px 34px; font-size: 1rem; }
+.create-split-hint { color: var(--muted-ink); font-size: 0.78rem; font-weight: 600; }
+.create-split-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.create-split-grid.is-single { grid-template-columns: minmax(0, 760px); justify-content: center; }
+.create-window { display: grid; gap: 12px; padding: 22px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); box-shadow: var(--shadow-card); transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.create-window.is-active { border-color: color-mix(in srgb, var(--olive) 45%, var(--line)); box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-card); }
+.create-window-title { margin: 0; color: var(--ink); font-size: clamp(1.5rem, 2.4vw, 2rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
+.create-window-sub { margin: -4px 0 4px; color: var(--muted-ink); font-size: 0.84rem; }
+.create-dropbox { display: grid; place-items: center; align-content: center; gap: 6px; width: 100%; aspect-ratio: 1 / 1; max-height: 340px; padding: 20px; border: 2px dashed color-mix(in srgb, var(--ink) 22%, var(--line)); border-radius: 18px; background: var(--sand, var(--bg-hover)); color: var(--ink); font: inherit; text-align: center; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease; }
+.create-dropbox:hover:not(:disabled) { border-color: var(--olive); }
+.create-dropbox:disabled { cursor: not-allowed; opacity: 0.7; }
+.create-dropbox strong { font-size: 1rem; font-weight: 750; }
+.create-dropbox span { color: var(--muted-ink); font-size: 0.78rem; }
+.create-dropbox.drop-target-active { border-style: solid; border-color: var(--olive-hover); }
+.create-paste { display: grid; gap: 6px; color: var(--ink); font-size: 0.8rem; font-weight: 700; }
+.create-paste .create-textarea { min-height: 120px; font-weight: 400; }
+.create-split-settings { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 18px; align-items: end; padding: 18px 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.create-split-settings > label { display: grid; gap: 6px; color: var(--ink); font-size: 0.78rem; font-weight: 700; }
+.create-split-settings .create-checks { grid-column: 1 / -1; margin: 0; }
+.create-choice-actions { display: grid; gap: 8px; }
+.create-choice-actions .btn, .create-choice-actions .btn-outline { width: 100%; }
+.create-choice-cancel { border: 0; background: none; color: var(--muted-ink); font: inherit; font-size: 0.82rem; cursor: pointer; padding: 6px; }
+@media (max-width: 860px) {
+  .create-split-grid, .create-split-settings { grid-template-columns: minmax(0, 1fr); }
+  .create-dropbox { aspect-ratio: auto; min-height: 180px; }
+  .create-window { padding: 18px; }
+}
+.create-split-page .create-back-link { margin-bottom: 0; justify-self: start; }
