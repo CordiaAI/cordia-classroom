@@ -7,15 +7,41 @@ import ExplanationPreference from './ExplanationPreference';
 import AcademicInfinityMark from './AcademicInfinityMark';
 import WorkspaceIcon from './WorkspaceIcon';
 import TutorSelect from './TutorSelect';
+import AILoadingSphere from './AILoadingSphere';
+import { inlineParts, parseTutorAnswer } from '../lib/tutorFormat.mjs';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 
 // Tutor replies may include ```mermaid blocks; render them as diagrams and keep the rest as text.
-function TutorMessageText({ text }) {
+function TutorMessageText({ text, plain = false }) {
+  if (plain) return <span className="cordia-tutor-text">{text}</span>;
   const parts = String(text || '').split(/```mermaid\s*\n([\s\S]*?)```/);
-  if (parts.length === 1) return text;
   return parts.map((part, index) => (index % 2 === 1
     ? <MermaidDiagram key={index} code={part.trim()} label="Tutor diagram" />
-    : part.trim() && <span key={index} className="cordia-tutor-text">{part.trim()}</span>));
+    : part.trim() && <TutorAnswer key={index} text={part} />));
+}
+
+function TutorInline({ text }) {
+  return inlineParts(text).map((part, index) => (part.bold ? <strong key={index}>{part.text}</strong> : part.text));
+}
+
+const TUTOR_LINE_CLASS = { paragraph: '', bullet: 'tutor-bullet', note: 'tutor-note', work: 'tutor-work' };
+
+// Bold main points, numbered steps with the work beneath, bullets, and plain-language notes.
+function TutorAnswer({ text }) {
+  const line = (block, index) => <p key={index} className={TUTOR_LINE_CLASS[block.type] || undefined}><TutorInline text={block.text} /></p>;
+  return (
+    <div className="cordia-tutor-answer">
+      {parseTutorAnswer(text).map((block, index) => (block.type === 'step' ? (
+        <div key={index} className="tutor-step">
+          <span className="tutor-step-number">{block.number}</span>
+          <div>
+            <p className="tutor-step-title"><TutorInline text={block.title} /></p>
+            {block.children.map(line)}
+          </div>
+        </div>
+      ) : line(block, index)))}
+    </div>
+  );
 }
 
 // Spoken text drops diagram code so read-aloud only says the explanation.
@@ -75,6 +101,9 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const [retainContext, setRetainContext] = useState(null);
   const [savedDraft, setSavedDraft] = useState('');
   const [loading, setLoading] = useState(false);
+  // While a question is in flight the server copy of the session lags behind this one,
+  // so background refreshes must not replace it (that erased the student's new message).
+  const sendingRef = useRef(false);
   const [extracting, setExtracting] = useState(false);
   const [localError, setLocalError] = useState('');
   const [explainOpen, setExplainOpen] = useState(false);
@@ -179,7 +208,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
       const next = await apiFetch('/tutor/session');
       inFlight = false;
       if (!active) return;
-      if (next?.id) {
+      if (next?.id && !sendingRef.current) {
         sessionStatusRef.current = next.status || 'idle';
         setSession(next);
       }
@@ -342,6 +371,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     if (!question || !canSubmit || busy || remaining <= 0 || !session?.id) return;
     setInput('');
     setLocalError('');
+    sendingRef.current = true;
     setLoading(true);
     setSession(current => ({
       ...current,
@@ -369,8 +399,10 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         retain_context: retainContext || undefined,
         class_id: needsTargetClass ? targetClassId : material?.folder_id || undefined,
         mode: 'short',
+        rich_text: true,
       }),
     });
+    sendingRef.current = false;
     if (data?.action === 'created_guide' && !providedGuides) {
       const refreshed = await apiFetch('/guides?limit=50');
       if (Array.isArray(refreshed?.guides)) {
@@ -477,7 +509,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
                 Based on {message.source.title}
               </button>
             )}
-            <TutorMessageText text={message.text} />
+            <TutorMessageText text={message.text} plain={message.role === 'user'} />
             {voice && canSpeak && message.role !== 'user' && message.text && (
               <button type="button" className="cordia-tutor-speak" onClick={() => toggleSpeech(index, message.text)} aria-pressed={speakingIndex === index}>
                 {speakingIndex === index ? 'Stop' : 'Listen'}
@@ -495,7 +527,12 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
             )}
           </div>
         ))}
-        {busy && messages.at(-1)?.role === 'user' && <div className="cordia-tutor-message ai" role="status">{progressLabel}</div>}
+        {busy && messages.at(-1)?.role === 'user' && (
+          <div className="cordia-tutor-message ai tutor-thinking">
+            <AILoadingSphere size={14} label="" />
+            <span>{progressLabel}</span>
+          </div>
+        )}
         {localError && <div className="cordia-tutor-message error">{localError}</div>}
         <div ref={endRef} />
       </div>

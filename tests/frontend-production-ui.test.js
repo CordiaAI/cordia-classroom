@@ -82,6 +82,12 @@ assert.match(calendarDashboard, /Connect calendar/);
 assert.doesNotMatch(calendarDashboard, /CanvasConnectionWizard|canvas-token-wizard|\/profile\/settings|Pipedream/);
 assert.doesNotMatch(styles, /\.canvas-wizard-overlay|\.canvas-token-wizard/);
 assert.match(tutor, /Cordia Tutor/);
+// Web Tutor: readable answers, the student's message stays visible, and a live loader bubble.
+assert.match(tutor, /rich_text: true/);
+assert.match(tutor, /parseTutorAnswer\(text\)/);
+assert.match(tutor, /next\?\.id && !sendingRef\.current/);
+assert.match(tutor, /tutor-thinking/);
+assert.match(tutor, /<AILoadingSphere/);
 assert.match(tutor, /apiFetch\('\/smart_notes'\)/);
 assert.match(tutor, /guide_id: material\.id/);
 assert.match(tutor, /note_id: material\.id/);
