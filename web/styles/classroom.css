@@ -193,8 +193,23 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .cordia-tutor-header select { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; font-size: .73rem; padding: 9px; color: var(--ink); }
 .cordia-tutor-attach, .cordia-tutor-explain-toggle { color: var(--text-secondary); background: transparent; border-color: var(--line); font-size: .68rem; }
 .cordia-tutor-messages { padding: 20px; }
-.cordia-tutor-message { background: var(--reading-surface); border: 1px solid var(--line); border-radius: 14px; line-height: 1.7; }
-.cordia-tutor-message.user { background: var(--accent-glow); border-color: transparent; }
+.cordia-tutor-message { background: var(--reading-surface); border: 1px solid var(--line); border-radius: 14px; line-height: 1.6; }
+/* Chat bubbles: the student's message is a solid accent bubble on the right, Cordia's a raised card on the left. */
+.cordia-tutor-message.ai { align-self: flex-start; max-width: 92%; padding: 12px 14px; border-radius: 4px 16px 16px 16px; background: var(--sand); border-color: var(--line); box-shadow: var(--shadow-sm); }
+.cordia-tutor-message.user { align-self: flex-end; max-width: 82%; padding: 10px 14px; border-radius: 16px 16px 4px 16px; background: var(--accent-strong); border-color: transparent; }
+.cordia-tutor .cordia-tutor-message.user { color: var(--accent-on); }
+.cordia-tutor-message.tutor-thinking { display: flex; align-items: center; gap: 10px; color: var(--muted-ink); font-weight: 600; }
+.cordia-tutor-message.tutor-thinking .cordia-loader { gap: 0; }
+.cordia-tutor-answer p { margin: 0 0 8px; }
+.cordia-tutor-answer p:last-child { margin-bottom: 0; }
+.cordia-tutor-answer strong { font-weight: 700; color: var(--ink); }
+.cordia-tutor-answer .tutor-bullet { position: relative; padding-left: 16px; }
+.cordia-tutor-answer .tutor-bullet::before { content: '•'; position: absolute; left: 3px; color: var(--accent-strong); font-weight: 700; }
+.cordia-tutor-answer .tutor-note { padding-left: 10px; border-left: 2px solid var(--line); color: var(--muted-ink); font-size: .95em; }
+.cordia-tutor-answer .tutor-step { display: grid; grid-template-columns: 22px 1fr; gap: 8px; margin: 10px 0; }
+.cordia-tutor-answer .tutor-step-number { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-strong); color: var(--accent-on); font-size: .72rem; font-weight: 700; }
+.cordia-tutor-answer .tutor-step-title { margin-bottom: 4px; }
+.cordia-tutor-answer .tutor-work { font-family: var(--font-mono, ui-monospace, monospace); font-size: .92em; white-space: pre-wrap; }
 .cordia-tutor-input { margin: 12px; padding: 8px; border: 1px solid var(--glass-edge); border-radius: 15px; background: var(--reading-surface); }
 .cordia-tutor-input textarea { background: transparent; border: 0; color: var(--ink); }
 .cordia-tutor-input > button { border-radius: 50%; background: var(--accent-strong); color: white; }
@@ -520,7 +535,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 /* Tutor controls share the sidebar's crisp type and tactile glass surfaces. */
 .cordia-tutor :is(.tutor-context-controls summary, .cordia-tutor-attach, .cordia-tutor-explain-toggle, .explain-preference label, .explain-preference p, .explain-preference textarea, .explain-preference small) { color: var(--ink); font-family: var(--font-sans); font-weight: 550; }
 .cordia-tutor .tutor-context-controls summary { font-size: .78rem; padding-block: 10px; }
-.cordia-tutor .cordia-tutor-message.user { color: var(--ink); font-weight: 500; }
+.cordia-tutor .cordia-tutor-message.user { font-weight: 500; }
 .cordia-tutor .explain-preference textarea::placeholder { color: var(--text-secondary); opacity: 1; font-weight: 500; }
 .cordia-tutor .cordia-tutor-explain-panel { margin-top: 10px; }
 .tutor-select { position: relative; margin-bottom: 10px; min-width: 0; }
