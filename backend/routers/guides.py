@@ -65,19 +65,25 @@ class SaveGuideRequest(BaseModel):
         return v
 
 
+# Columns for list screens: everything except the large text and question sets.
+SUMMARY_COLUMNS = "id,folder_id,title,source_url,created_at,is_bookmarked,read_progress,source_type,source_title,domain,flashcards"
+
+
 @router.get("")
-def list_guides(folder_id: Optional[str] = None, limit: int = 50, offset: int = 0, authorization: str = Header(default="")):
-    """List guides, optionally filtered by folder. Paginated."""
+def list_guides(folder_id: Optional[str] = None, limit: int = 50, offset: int = 0, fields: str = "", authorization: str = Header(default="")):
+    """List guides, optionally filtered by folder. Paginated.
+    fields=summary returns list metadata plus flashcard_count, without guide text."""
     try:
         user_id = get_user_id(authorization)
         supabase = get_supabase()
+        summary = fields == "summary"
 
-        # Enforce pagination bounds
-        limit = max(1, min(limit, 100))
+        # Enforce pagination bounds (summaries are small, so a whole library fits)
+        limit = max(1, min(limit, 500 if summary else 100))
         offset = max(0, offset)
 
         query = supabase.table("study_guides") \
-            .select("*") \
+            .select(SUMMARY_COLUMNS if summary else "*") \
             .eq("user_id", user_id)
 
         if folder_id:
@@ -88,7 +94,12 @@ def list_guides(folder_id: Optional[str] = None, limit: int = 50, offset: int = 
             .range(offset, offset + limit - 1) \
             .execute()
 
-        return {"guides": result.data}
+        guides = result.data or []
+        if summary:
+            for guide in guides:
+                cards = guide.pop("flashcards", None)
+                guide["flashcard_count"] = len(cards) if isinstance(cards, list) else 0
+        return {"guides": guides}
 
     except HTTPException:
         raise

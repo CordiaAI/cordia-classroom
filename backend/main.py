@@ -11,6 +11,7 @@ from uuid import uuid4
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Header, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, Response
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -105,6 +106,8 @@ app.add_middleware(
     expose_headers=["X-Request-ID"],
     max_age=600,
 )
+# Guide text compresses several-fold; small responses are left alone.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
 # Shared response metadata and security headers
@@ -664,7 +667,7 @@ def generate(body: GenerateRequest, request: Request, authorization: str = Heade
 
 @app.post("/practice")
 @limiter.limit("10/minute")
-async def create_practice_set(
+def create_practice_set(
     body: PracticeRequest,
     request: Request,
     authorization: str = Header(default=""),
@@ -702,12 +705,7 @@ async def create_practice_set(
         raise HTTPException(status_code=400, detail="Add a study guide or upload readable study material first.")
 
     require(user_id, "practice")
-    practice = await run_in_threadpool(
-        generate_verified_practice_set,
-        content,
-        _learning_guidance(user_id),
-        domain,
-    )
+    practice = generate_verified_practice_set(content, _learning_guidance(user_id), domain)
     problems = practice.get("problems", []) if isinstance(practice, dict) else []
     if len(problems) != 10:
         raise HTTPException(status_code=502, detail="Cordia could not verify a complete 10-problem set from this material. Please try another source or add more detail.")

@@ -8,6 +8,7 @@ import json
 import logging
 from datetime import date, datetime, timedelta
 from fastapi import APIRouter, HTTPException, Header, Request
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from database import get_supabase
@@ -349,9 +350,17 @@ async def beacon_session(request: Request):
     """Log a session via navigator.sendBeacon (fires on page unload).
     Parses raw body since sendBeacon may send as text/plain."""
     try:
-        body = await request.body()
-        data = json.loads(body)
+        data = json.loads(await request.body())
+    except Exception:
+        return {"logged": False}
+    # Database writes run in a worker thread so they never stall other requests.
+    return await run_in_threadpool(_log_beacon_session, data)
 
+
+def _log_beacon_session(data) -> dict:
+    try:
+        if not isinstance(data, dict):
+            return {"logged": False}
         auth = data.get("authorization", "")
         if not auth:
             return {"logged": False}

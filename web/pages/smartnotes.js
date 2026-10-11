@@ -8,6 +8,7 @@ import { practiceTourUrl, saveOnboardingStep } from '../lib/onboarding';
 import { SMARTNOTES_TOUR } from '../lib/tours';
 import { organizeDashboardGuides } from '../lib/dashboardOrganization';
 import { useFileDropZone } from '../lib/fileDrop';
+import { sanitizeHtml } from '../lib/sanitizeHtml';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -248,7 +249,7 @@ function StudyGuidePreviewModal({ preview, title, setTitle, error, saving, onClo
 function GuideViewer({ html }) {
   const pairs = parseGuideQA(html);
   if (pairs.length === 0) {
-    return <div className="sn-guide-viewer" dangerouslySetInnerHTML={{ __html: html }} />;
+    return <div className="sn-guide-viewer" dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }} />;
   }
   return (
     <div className="sn-guide-qa-viewer">
@@ -554,9 +555,9 @@ function NotesIndex({ router, timerState, setTimerState }) {
 
   function previewText(html) {
     if (!html) return '';
-    const div = document.createElement('div');
-    div.innerHTML = html;
-    return (div.innerText || '').trim().slice(0, 200);
+    // Parsed in an inert document so saved HTML can never run code while building a preview.
+    const doc = new DOMParser().parseFromString(sanitizeHtml(html), 'text/html');
+    return (doc.body.textContent || '').trim().slice(0, 200);
   }
 
   function fmtDate(iso) {
@@ -819,7 +820,7 @@ function SmartNotesEditor() {
       setFolderId(data.note.folder_id || '');
       if (paperRef.current) {
         paperRef.current.innerHTML = data.note.content && data.note.content.trim()
-          ? data.note.content
+          ? sanitizeHtml(data.note.content)
           : '<p><br></p>';
         lastSavedRef.current = paperRef.current.innerHTML;
         lastSavedTitleRef.current = data.note.title || 'Untitled Notes';

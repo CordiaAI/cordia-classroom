@@ -84,7 +84,7 @@ export default function Dashboard({ timerState, setTimerState }) {
     try {
       const results = await Promise.allSettled([
         apiFetch('/folders'),
-        apiFetch('/guides'),
+        apiFetch('/guides?fields=summary&limit=500'),
         apiFetch('/stats/overview'),
       ]);
       const value = index => results[index].status === 'fulfilled' ? results[index].value : null;
