@@ -105,10 +105,6 @@ Baseline (2026-09-26, main 416e039): 111 Python tests pass, 10/12 node tests pas
 - Study Guides page (`dashboard.js` view=guides, 2026-10-11): class tile grid removed; two boxes — "Classes" (collapsible class rows with their guides, drag a guide onto a class to move it) and "Not in a class" (unsorted guides; drop here to remove from a class). Class open/closed state in `localStorage.cordiaOpenClasses`. `.guide-row` is already taken by another page's CSS; the library rows use `.library-guide-row`.
 
 ## Open production gaps (code review 2026-10-11; remove each line once fixed)
-- `GET /guides` returns `select("*")` (full guide text + flashcards) for 50 guides; dashboard, flashcards, Practice and the Tutor (reloads on every navigation) all pull it. Needs a summary field list; `/chat` already re-reads a guide's text by `guide_id`.
-- Dashboard asks `/guides` with the default limit 50 (backend caps at 100): students with more guides silently lose the older ones and "All (N)" is wrong.
-- No `GZipMiddleware` on the FastAPI app; large JSON goes uncompressed.
-- `web/pages/smartnotes.js` `GuideViewer` renders guide HTML with `dangerouslySetInnerHTML` unsanitized (AI output from scraped pages) while the session token sits in localStorage → stored-XSS risk.
-- `POST /practice` (async) runs a Supabase query on the event loop; `POST /stats/beacon` (async) does insert + streak update on the event loop.
+- Fixed 2026-10-11: list screens use `GET /guides?fields=summary` (no guide text, `flashcard_count`, limit up to 500); GZip on; `/practice` sync; beacon DB work in a thread; SmartNotes HTML goes through `web/lib/sanitizeHtml.js`. Use `fields=summary` for any new list screen.
 - CORS allows any `https://*.vercel.app` and any `chrome-extension://` origin with credentials; narrow to this project's preview pattern and the extension ID.
 - AI routes in routers (exam, nclex, quiz, learning, smart_notes) have allowance checks but no rate limit; exam/nclex/quiz "generate" are GET requests that spend tokens.

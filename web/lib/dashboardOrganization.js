@@ -25,7 +25,7 @@ function createDashboardOverview(folders, guides) {
 
   return {
     continueGuide: inProgress || sorted[0] || null,
-    reviewGuide: sorted.find(guide => Array.isArray(guide?.flashcards) && guide.flashcards.length > 0) || null,
+    reviewGuide: sorted.find(guide => (Array.isArray(guide?.flashcards) && guide.flashcards.length > 0) || Number(guide?.flashcard_count) > 0) || null,
     recentGuides: sorted.slice(0, 4).map(guide => ({
       ...guide,
       className: folderNames.get(guide.folder_id) || 'No class',

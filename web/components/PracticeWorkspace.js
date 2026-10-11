@@ -57,7 +57,7 @@ export default function PracticeWorkspace() {
 
   useEffect(() => {
     if (!ready) return;
-    apiFetch('/guides?limit=50').then(data => setGuideOptions(Array.isArray(data?.guides) ? data.guides : []));
+    apiFetch('/guides?fields=summary&limit=500').then(data => setGuideOptions(Array.isArray(data?.guides) ? data.guides : []));
   }, [ready]);
 
   useEffect(() => {

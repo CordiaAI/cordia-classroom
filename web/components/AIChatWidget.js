@@ -169,7 +169,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     function loadMaterials() {
       lastLoad = Date.now();
       Promise.all([
-        providedGuides ? null : apiFetch('/guides?limit=50'),
+        providedGuides ? null : apiFetch('/guides?fields=summary&limit=200'),
         apiFetch('/smart_notes'),
         apiFetch('/folders'),
       ]).then(([guideData, noteData, folderData]) => {
@@ -404,7 +404,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     });
     sendingRef.current = false;
     if (data?.action === 'created_guide' && !providedGuides) {
-      const refreshed = await apiFetch('/guides?limit=50');
+      const refreshed = await apiFetch('/guides?fields=summary&limit=200');
       if (Array.isArray(refreshed?.guides)) {
         setLoadedGuides(refreshed.guides);
         setContextKey(`guide:${data.guide.id}`);

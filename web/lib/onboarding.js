@@ -26,7 +26,7 @@ export async function smartNotesTourUrl() {
 // The Practice tour runs on the real workspace: the student's latest study guide, or the
 // workspace with no guide chosen when they have none yet.
 export async function practiceTourUrl() {
-  const list = await apiFetch('/guides?limit=1');
+  const list = await apiFetch('/guides?fields=summary&limit=1');
   const id = list?.guides?.[0]?.id;
   return id ? `/practice/${encodeURIComponent(id)}?tour=1` : '/practice?tour=1';
 }
