@@ -4,15 +4,44 @@ import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib
 import MermaidDiagram from './MermaidDiagram';
 import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from './ExplanationPreference';
+import AcademicInfinityMark from './AcademicInfinityMark';
+import WorkspaceIcon from './WorkspaceIcon';
+import TutorSelect from './TutorSelect';
+import AILoadingSphere from './AILoadingSphere';
+import { inlineParts, parseTutorAnswer } from '../lib/tutorFormat.mjs';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 
 // Tutor replies may include ```mermaid blocks; render them as diagrams and keep the rest as text.
-function TutorMessageText({ text }) {
+function TutorMessageText({ text, plain = false }) {
+  if (plain) return <span className="cordia-tutor-text">{text}</span>;
   const parts = String(text || '').split(/```mermaid\s*\n([\s\S]*?)```/);
-  if (parts.length === 1) return text;
   return parts.map((part, index) => (index % 2 === 1
     ? <MermaidDiagram key={index} code={part.trim()} label="Tutor diagram" />
-    : part.trim() && <span key={index} className="cordia-tutor-text">{part.trim()}</span>));
+    : part.trim() && <TutorAnswer key={index} text={part} />));
+}
+
+function TutorInline({ text }) {
+  return inlineParts(text).map((part, index) => (part.bold ? <strong key={index}>{part.text}</strong> : part.text));
+}
+
+const TUTOR_LINE_CLASS = { paragraph: '', bullet: 'tutor-bullet', note: 'tutor-note', work: 'tutor-work' };
+
+// Bold main points, numbered steps with the work beneath, bullets, and plain-language notes.
+function TutorAnswer({ text }) {
+  const line = (block, index) => <p key={index} className={TUTOR_LINE_CLASS[block.type] || undefined}><TutorInline text={block.text} /></p>;
+  return (
+    <div className="cordia-tutor-answer">
+      {parseTutorAnswer(text).map((block, index) => (block.type === 'step' ? (
+        <div key={index} className="tutor-step">
+          <span className="tutor-step-number">{block.number}</span>
+          <div>
+            <p className="tutor-step-title"><TutorInline text={block.title} /></p>
+            {block.children.map(line)}
+          </div>
+        </div>
+      ) : line(block, index)))}
+    </div>
+  );
 }
 
 // Spoken text drops diagram code so read-aloud only says the explanation.
@@ -72,6 +101,9 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const [retainContext, setRetainContext] = useState(null);
   const [savedDraft, setSavedDraft] = useState('');
   const [loading, setLoading] = useState(false);
+  // While a question is in flight the server copy of the session lags behind this one,
+  // so background refreshes must not replace it (that erased the student's new message).
+  const sendingRef = useRef(false);
   const [extracting, setExtracting] = useState(false);
   const [localError, setLocalError] = useState('');
   const [explainOpen, setExplainOpen] = useState(false);
@@ -176,7 +208,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
       const next = await apiFetch('/tutor/session');
       inFlight = false;
       if (!active) return;
-      if (next?.id) {
+      if (next?.id && !sendingRef.current) {
         sessionStatusRef.current = next.status || 'idle';
         setSession(next);
       }
@@ -265,7 +297,8 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
 
   const messages = session?.messages || [];
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = endRef.current?.closest('.cordia-tutor-messages');
+    container?.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
   }, [messages.length, loading]);
 
   const material = materials.find(item => item.key === contextKey);
@@ -278,8 +311,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const busy = loading || (session?.status && session.status !== 'idle');
   const progressLabel = SKILL_PROGRESS[session?.active_skill] || 'Cordia is working…';
 
-  async function changeSkill(event) {
-    const nextSkill = event.target.value;
+  async function changeSkill(nextSkill) {
     setSkillOverride(nextSkill);
     if (!session?.id || !nextSkill) return;
     const next = await apiFetch('/tutor/session/skill', {
@@ -339,6 +371,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     if (!question || !canSubmit || busy || remaining <= 0 || !session?.id) return;
     setInput('');
     setLocalError('');
+    sendingRef.current = true;
     setLoading(true);
     setSession(current => ({
       ...current,
@@ -366,8 +399,10 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         retain_context: retainContext || undefined,
         class_id: needsTargetClass ? targetClassId : material?.folder_id || undefined,
         mode: 'short',
+        rich_text: true,
       }),
     });
+    sendingRef.current = false;
     if (data?.action === 'created_guide' && !providedGuides) {
       const refreshed = await apiFetch('/guides?limit=50');
       if (Array.isArray(refreshed?.guides)) {
@@ -402,36 +437,28 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     <section ref={rootRef} className="cordia-tutor" aria-label="Cordia tutor">
       <header className="cordia-tutor-header">
         <div className="cordia-tutor-title-row">
-          <strong>Cordia Tutor</strong>
+          <strong><AcademicInfinityMark className="tutor-brand-mark" />Cordia Tutor</strong>
           <span className={`cordia-browser-status${session?.browser_available ? ' is-online' : ''}`}>
             {session?.browser_available ? 'Browser available' : 'Browser unavailable'}
           </span>
         </div>
-        <select value={skillOverride} onChange={changeSkill} aria-label="Tutor skill" disabled={!session || busy}>
-          <option value="">Auto · {session?.skills?.find(item => item.id === session?.active_skill)?.label || 'Explain'}</option>
-          {(session?.skills || [{ id: 'explain', label: 'Explain' }]).map(item => (
-            <option key={item.id} value={item.id} disabled={item.available === false}>
-              {item.available === false ? `${item.label} — coming soon` : item.label}
-            </option>
-          ))}
-        </select>
-        <select value={contextKey} onChange={event => setContextKey(event.target.value)} aria-label="Study material">
-          {materials.length === 0 && <option value="">Choose study material</option>}
-          {guides.length > 0 && <optgroup label="Study Guides">
-            {guides.map(item => <option key={item.id} value={`guide:${item.id}`}>{item.title || 'Untitled guide'}</option>)}
-          </optgroup>}
-          {notes.length > 0 && <optgroup label="SmartNotes">
-            {notes.map(item => <option key={item.id} value={`note:${item.id}`}>{item.title || 'Untitled note'}</option>)}
-          </optgroup>}
-          {attachments.length > 0 && <optgroup label={attachments.length === 1 ? 'Attached file' : 'Attached files'}><option value="attachment">{attachments.length === 1 ? attachments[0].title : `${attachments.length} attached files`}</option></optgroup>}
-          {session?.browser_content_available && <optgroup label="Browser"><option value="browser">{browserMaterial?.title || 'Captured browser material'}</option></optgroup>}
-        </select>
-        {needsTargetClass && (
-          <select value={targetClassId} onChange={event => setTargetClassId(event.target.value)} aria-label="Destination class">
-            <option value="">Choose destination class</option>
-            {classes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
-        )}
+        <details className="tutor-context-controls">
+        <summary>Study context <span>⌄</span></summary>
+        <TutorSelect label="Tutor skill" value={skillOverride} onChange={changeSkill} disabled={!session || busy} options={[
+          { value: '', label: `Auto · ${session?.skills?.find(item => item.id === session?.active_skill)?.label || 'Explain'}` },
+          ...(session?.skills || [{ id: 'explain', label: 'Explain' }]).map(item => ({ value: item.id, label: item.available === false ? `${item.label} — coming soon` : item.label, disabled: item.available === false })),
+        ]} />
+        <TutorSelect label="Study material" value={contextKey} onChange={setContextKey} options={[
+          ...(materials.length === 0 ? [{ value: '', label: 'Choose study material' }] : []),
+          ...guides.map(item => ({ value: `guide:${item.id}`, label: item.title || 'Untitled guide', group: 'Study Guides' })),
+          ...notes.map(item => ({ value: `note:${item.id}`, label: item.title || 'Untitled note', group: 'SmartNotes' })),
+          ...(attachments.length ? [{ value: 'attachment', label: attachments.length === 1 ? attachments[0].title : `${attachments.length} attached files`, group: 'Attached files' }] : []),
+          ...(session?.browser_content_available ? [{ value: 'browser', label: browserMaterial?.title || 'Captured browser material', group: 'Browser' }] : []),
+        ]} />
+        {needsTargetClass && <TutorSelect label="Destination class" value={targetClassId} onChange={setTargetClassId} options={[
+          { value: '', label: 'Choose destination class' },
+          ...classes.map(item => ({ value: item.id, label: item.name })),
+        ]} />}
         {!session?.browser_available && ['capture', 'find_material'].includes(selectedSkillId) && (
           <p className="cordia-browser-fallback">
             Browser unavailable. Open the Chrome side panel, choose an existing guide or SmartNote, or attach a file below.
@@ -462,15 +489,18 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
             <ExplanationPreference compact onSaved={() => setTimeout(() => setExplainOpen(false), 900)} />
           </div>
         )}
+        </details>
       </header>
 
       <div className="cordia-tutor-messages" aria-live="polite">
         {messages.length === 0 && (
-          <p>{material
-            ? `Ask about ${material.title || 'this material'}.`
-            : selectedSkill?.requires_context === false
-              ? 'Ask Cordia to work with the current browser page.'
-              : 'Choose a guide, SmartNote, or file to begin.'}</p>
+          <div className="tutor-welcome">
+            <h3>Let's make it clear.</h3>
+            <p>{material ? `How can I help you with ${material.title || 'your material'} today?` : 'What would you like to understand today?'}</p>
+            <div className="tutor-starter-actions">
+              {[{ label: 'Explain this concept in simpler terms', prompt: 'Explain the key concepts in this material in simple terms.', icon: 'tutor' }, { label: 'Create a study guide from this document', prompt: 'Create a study guide from this material.', icon: 'study' }, { label: 'Generate practice questions', prompt: 'Generate practice questions from this material.', icon: 'practice' }, { label: 'Make flashcards for key points', prompt: 'Make flashcards for the key points in this material.', icon: 'flashcards' }].map(action => <button type="button" key={action.icon} onClick={() => setInput(action.prompt)}><WorkspaceIcon name={action.icon} /><span>{action.label}</span></button>)}
+            </div>
+          </div>
         )}
         {messages.map((message, index) => (
           <div key={`${index}-${message.role}`} className={`cordia-tutor-message ${message.role}`}>
@@ -479,7 +509,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
                 Based on {message.source.title}
               </button>
             )}
-            <TutorMessageText text={message.text} />
+            <TutorMessageText text={message.text} plain={message.role === 'user'} />
             {voice && canSpeak && message.role !== 'user' && message.text && (
               <button type="button" className="cordia-tutor-speak" onClick={() => toggleSpeech(index, message.text)} aria-pressed={speakingIndex === index}>
                 {speakingIndex === index ? 'Stop' : 'Listen'}
@@ -497,7 +527,12 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
             )}
           </div>
         ))}
-        {busy && messages.at(-1)?.role === 'user' && <div className="cordia-tutor-message ai" role="status">{progressLabel}</div>}
+        {busy && messages.at(-1)?.role === 'user' && (
+          <div className="cordia-tutor-message ai tutor-thinking">
+            <AILoadingSphere size={14} label="" />
+            <span>{progressLabel}</span>
+          </div>
+        )}
         {localError && <div className="cordia-tutor-message error">{localError}</div>}
         <div ref={endRef} />
       </div>

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import AIChatWidget from './AIChatWidget';
+import AcademicInfinityMark from './AcademicInfinityMark';
 
 const MIN_WIDTH = 300;
 const MAX_WIDTH = 520;
 const OPEN_KEY = 'cordiaTutorOpen';
 
-export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '', docked = false }) {
+export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '' }) {
   const [open, setOpen] = useState(false);
   const [width, setWidth] = useState(360);
   const toggleRef = useRef(null);
@@ -24,6 +25,12 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
   }, []);
 
   useEffect(() => {
+    const toggle = () => changeOpen(!open);
+    window.addEventListener('cordia:tutor-toggle', toggle);
+    return () => window.removeEventListener('cordia:tutor-toggle', toggle);
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
     const closeOnEscape = event => {
       if (event.key !== 'Escape') return;
@@ -34,19 +41,18 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [open]);
 
-  // Open drawer pushes the page content over instead of covering it.
+  // Reserve space beside the reading window on wide screens.
   useEffect(() => {
-    if (docked) return;
     const body = document.body;
     body.classList.toggle('tutor-open', open);
     body.style.setProperty('--tutor-offset', `${width}px`);
     return () => body.classList.remove('tutor-open');
-  }, [open, width, docked]);
+  }, [open, width]);
 
   // Clicking empty space closes the Tutor; clicking anything you can use (buttons,
   // fields, the drawing board, links) keeps it open so you can work beside it.
   useEffect(() => {
-    if (docked || !open) return;
+    if (!open) return;
     const closeOnEmptyClick = event => {
       const target = event.target;
       if (!(target instanceof Element)) return;
@@ -56,11 +62,12 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
     };
     document.addEventListener('pointerdown', closeOnEmptyClick);
     return () => document.removeEventListener('pointerdown', closeOnEmptyClick);
-  }, [open, docked]);
+  }, [open]);
 
   function changeOpen(next) {
     setOpen(next);
     localStorage.setItem(OPEN_KEY, String(next));
+    window.dispatchEvent(new CustomEvent('cordia:tutor-visibility', { detail: { open: next } }));
   }
 
   function changeWidth(next) {
@@ -72,11 +79,11 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
   function startResize(event) {
     event.preventDefault();
     const move = pointerEvent => {
-      const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, pointerEvent.clientX));
+      const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, window.innerWidth - pointerEvent.clientX - 20));
       setWidth(next);
     };
     const stop = pointerEvent => {
-      changeWidth(pointerEvent.clientX);
+      changeWidth(window.innerWidth - pointerEvent.clientX - 20);
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', stop);
     };
@@ -95,31 +102,13 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
     changeWidth(next);
   }
 
-  if (docked) {
-    return (
-      <section className={`tutor-dock${open ? ' is-open' : ''}`} aria-label="Cordia Tutor">
-        <button
-          ref={toggleRef}
-          type="button"
-          className="tutor-dock-toggle"
-          onClick={() => changeOpen(!open)}
-          aria-controls="cordia-tutor-dock"
-          aria-expanded={open}
-        >
-          <span>Tutor</span>
-          <span aria-hidden="true">{open ? '−' : '+'}</span>
-        </button>
-        <div id="cordia-tutor-dock" className="tutor-dock-panel" aria-hidden={!open} inert={!open}>
-          <AIChatWidget preferredGuideId={preferredGuideId} preferredNoteId={preferredNoteId} />
-        </div>
-      </section>
-    );
-  }
 
   return (
     <>
+      {open && <button type="button" className="tutor-backdrop" aria-label="Dismiss Tutor overlay" onClick={() => { changeOpen(false); toggleRef.current?.focus(); }} />}
       <div ref={shellRef} className={`tutor-drawer-shell${open ? ' is-open' : ''}`} style={{ '--tutor-width': `${width}px` }}>
       <aside id="cordia-tutor-drawer" className="tutor-drawer" aria-label="Cordia Tutor" aria-hidden={!open} inert={!open}>
+        <button type="button" className="tutor-close" aria-label="Close Cordia Tutor" onClick={() => { changeOpen(false); toggleRef.current?.focus(); }}>×</button>
         <AIChatWidget preferredGuideId={preferredGuideId} preferredNoteId={preferredNoteId} />
         <div className="tutor-resize-handle" role="separator" aria-label="Resize Tutor" aria-orientation="vertical" aria-valuemin={MIN_WIDTH} aria-valuemax={MAX_WIDTH} aria-valuenow={width} tabIndex="0" onKeyDown={resizeWithKeyboard} onPointerDown={startResize} />
       </aside>
@@ -134,7 +123,7 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
         aria-label="Open Cordia Tutor"
         tabIndex={open ? -1 : 0}
       >
-        Tutor
+        <AcademicInfinityMark className="tutor-brand-mark" /> Tutor
       </button>
     </>
   );

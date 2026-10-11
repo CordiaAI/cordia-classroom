@@ -214,34 +214,29 @@ export default function Dashboard({ timerState, setTimerState }) {
       <button type="button" className="btn-outline" onClick={loadData}>Try again</button>
     </div>
   );
-  const workspaceClassRail = {
-    newFolderName,
-    setNewFolderName,
-    showNewFolder,
-    setShowNewFolder,
-    createFolder,
-    openFolder: folderId => router.push('/folder/' + folderId),
-    openGuide: guideId => router.push('/guide/' + guideId),
-    onDragOver,
-    onDragLeave,
-    onDrop,
-    dropTargetId,
-  };
-
   // ============== STUDY GUIDES VIEW ==============
   if (view === 'guides') {
     const filteredGuides = getFilteredGuides();
     return (
-      <StudyWorkspaceFrame classes={organized.classes} classRail={workspaceClassRail} section="guides" timerState={timerState} setTimerState={setTimerState}>
+      <StudyWorkspaceFrame section="guides" timerState={timerState} setTimerState={setTimerState}>
         <div className="fade-in study-library">
           {loadErrorBanner}
           <div className="study-library-header">
             <div>
-              <h1>Study Guides</h1>
-              <p>Everything you have captured or created, ready to review.</p>
+              <h1>My classes</h1>
+              <p>All your study materials, organized and enhanced by Cordia.</p>
             </div>
             <button className="btn" onClick={() => router.push('/create')}>New study guide</button>
           </div>
+          <div className="classroom-class-grid">
+            {organized.classes.map(entry => <button type="button" className="classroom-class-tile" key={entry.folder.id} onClick={() => router.push('/folder/' + entry.folder.id)} onDragOver={event => onDragOver(event, entry.folder.id)} onDragLeave={event => onDragLeave(event, entry.folder.id)} onDrop={event => onDrop(event, entry.folder.id)}>
+              <span className="class-tile-cover"><span>{entry.folder.name.slice(0, 1)}</span></span>
+              <strong>{entry.folder.name}</strong><small>{entry.guides.length} study {entry.guides.length === 1 ? 'guide' : 'guides'}</small>
+              <span className="class-tile-progress"><span style={{ width: `${Math.round(entry.guides.reduce((sum, guide) => sum + (guide.read_progress || 0), 0) / Math.max(1, entry.guides.length) * 100)}%` }} /></span>
+            </button>)}
+            <button type="button" className="classroom-add-class" onClick={() => setShowNewFolder(true)}><span>+</span><strong>Add class</strong><small>A space for your course material.</small></button>
+          </div>
+          {showNewFolder && <form className="classroom-new-class" onSubmit={event => { event.preventDefault(); createFolder(); }}><input autoFocus aria-label="Class name" placeholder="Class name" value={newFolderName} onChange={event => setNewFolderName(event.target.value)} /><button type="submit" className="btn">Create class</button><button type="button" className="btn-outline" onClick={() => setShowNewFolder(false)}>Cancel</button></form>}
           <div className="study-library-tabs" role="tablist" aria-label="Study library">
             <button type="button" className="active" role="tab" aria-selected="true">Study guides</button>
             <button type="button" role="tab" aria-selected="false" onClick={() => router.push('/flashcards')}>Flashcards</button>
@@ -420,7 +415,7 @@ export default function Dashboard({ timerState, setTimerState }) {
 
   // ============== DEFAULT DASHBOARD VIEW ==============
   return (
-    <StudyWorkspaceFrame classes={organized.classes} classRail={workspaceClassRail} section="dashboard" timerState={timerState} setTimerState={setTimerState}>
+    <div className="classroom-home">
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
       <SetupWizard />
       <div>
@@ -429,6 +424,6 @@ export default function Dashboard({ timerState, setTimerState }) {
       </div>
       {toast && <div className={'toast toast-' + toast.type}>{toast.message}</div>}
       {contextMenu && renderContextMenu()}
-    </StudyWorkspaceFrame>
+    </div>
   );
 }

@@ -61,3 +61,14 @@ class RichAnswerPromptTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WebTutorAnswerTests(unittest.TestCase):
+    def test_tutor_asked_again_must_teach_differently_in_short_sentences(self):
+        client = MagicMock()
+        client.chat.completions.create.return_value.choices = [MagicMock(message=MagicMock(content="ok"))]
+        with patch("services.llm.get_openai_client", return_value=client):
+            answer_question("explain that again", "ctx", allow_clarification=True, rich_text=True)
+        system = client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+        self.assertIn("never repeat or lightly reword your earlier answer", system)
+        self.assertIn("Keep every sentence short", system)

@@ -242,7 +242,9 @@ class SharedTutorSessionContractTests(unittest.TestCase):
         self.assertNotIn("tutorSession", panel)
         self.assertIn("apiFetch('/tutor/session')", web_tutor)
         self.assertIn("session_id: session.id", web_tutor)
-        self.assertIn('aria-label="Destination class"', web_tutor)
+        self.assertIn('<TutorSelect label="Destination class"', web_tutor)
+        tutor_select = (ROOT / "web" / "components" / "TutorSelect.js").read_text(encoding="utf-8")
+        self.assertIn("aria-label={label}", tutor_select)
         self.assertIn("needsTargetClass ? targetClassId", web_tutor)
 
     def test_session_schema_is_one_per_user_and_user_scoped(self):
