@@ -3408,3 +3408,33 @@ a.calendar-item:hover { border-color: var(--ink); transform: translateY(-1px); }
   .create-window { padding: 18px; }
 }
 .create-split-page .create-back-link { margin-bottom: 0; justify-self: start; }
+
+/* Study Guides page: classes box | not-in-a-class box */
+.guide-boxes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; margin-top: 6px; }
+.guide-box { display: grid; gap: 10px; padding: 18px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow-card); transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.guide-box.is-drop-target, .guide-class.is-drop-target { border-color: var(--olive-hover); box-shadow: 0 0 0 3px var(--accent-glow); }
+.guide-box-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.guide-box-header h2 { margin: 0; color: var(--ink); font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; }
+.guide-box-add { border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.76rem; font-weight: 700; cursor: pointer; }
+.guide-box-add:hover { border-color: var(--olive); }
+.guide-box-empty { margin: 4px 2px; color: var(--muted-ink); font-size: 0.8rem; }
+.guide-class { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.guide-class-head { display: flex; align-items: center; gap: 6px; padding-right: 8px; }
+.guide-class-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 12px 12px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.guide-class-toggle:hover { background: var(--bg-hover); }
+.guide-class-toggle strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9rem; font-weight: 700; }
+.guide-class-toggle small { flex: 0 0 auto; margin-left: auto; color: var(--muted-ink); font-size: 0.72rem; }
+.guide-chevron { flex: 0 0 auto; display: inline-block; width: 12px; color: var(--muted-ink); font-size: 1.1rem; line-height: 1; transition: transform 0.15s ease; }
+.guide-chevron.is-open { transform: rotate(90deg); }
+.guide-class-open { flex: 0 0 auto; border: 0; border-radius: 999px; padding: 5px 10px; background: none; color: var(--olive-hover); font: inherit; font-size: 0.72rem; font-weight: 700; cursor: pointer; }
+.guide-class-open:hover { background: var(--accent-glow); }
+.guide-class-list { display: grid; gap: 6px; padding: 4px 10px 10px; border-top: 1px solid var(--line); }
+.library-guide-row { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-radius: 12px; background: var(--bg-hover, transparent); cursor: pointer; transition: background 0.15s ease; }
+.library-guide-row:hover { background: var(--accent-glow); }
+.library-guide-row.dragging { opacity: 0.5; }
+.library-guide-row-main { flex: 1; min-width: 0; }
+.library-guide-row-main h3 { margin: 0 0 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-size: 0.88rem; font-weight: 650; }
+.library-guide-row-main p { margin: 0; display: flex; align-items: center; gap: 8px; color: var(--muted-ink); font-size: 0.7rem; }
+.library-guide-row-progress { display: inline-flex; align-items: center; gap: 4px; }
+.library-guide-row-delete { color: var(--error); opacity: 0.55; font-size: 0.95em; }
+@media (max-width: 860px) { .guide-boxes { grid-template-columns: minmax(0, 1fr); } }
