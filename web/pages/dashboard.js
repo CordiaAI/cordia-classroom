@@ -31,7 +31,25 @@ export default function Dashboard({ timerState, setTimerState }) {
   const [toast, setToast] = useState(null);
   const [guidesFilter, setGuidesFilter] = useState('all'); // all, bookmarked, unassigned
   const [guidesSort, setGuidesSort] = useState('recent'); // recent, title, progress
+  const [openClasses, setOpenClasses] = useState(() => new Set());
+  const [unclassifiedOpen, setUnclassifiedOpen] = useState(true);
   const contextRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('cordiaOpenClasses') || '[]');
+      if (Array.isArray(saved)) setOpenClasses(new Set(saved));
+    } catch {}
+  }, []);
+
+  function toggleClass(folderId) {
+    setOpenClasses(current => {
+      const next = new Set(current);
+      if (next.has(folderId)) next.delete(folderId); else next.add(folderId);
+      try { localStorage.setItem('cordiaOpenClasses', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (ready && router.query.view === 'notes') router.replace('/smartnotes');
@@ -149,7 +167,7 @@ export default function Dashboard({ timerState, setTimerState }) {
     });
     if (data?.updated) {
       setGuides(guides.map(g => g.id === guideId ? { ...g, folder_id: folderId } : g));
-      const folderName = folders.find(f => f.id === folderId)?.name || 'folder';
+      const folderName = folderId ? folders.find(f => f.id === folderId)?.name || 'class' : 'No class';
       showToast('Moved to ' + folderName);
     }
     setDragGuideId(null);
@@ -189,7 +207,6 @@ export default function Dashboard({ timerState, setTimerState }) {
   function getFilteredGuides() {
     let filtered = [...guides];
     if (guidesFilter === 'bookmarked') filtered = filtered.filter(g => g.is_bookmarked);
-    if (guidesFilter === 'unassigned') filtered = filtered.filter(g => !g.folder_id);
     if (guidesSort === 'title') filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
     else if (guidesSort === 'progress') filtered.sort((a, b) => (b.read_progress || 0) - (a.read_progress || 0));
     // 'recent' is default from API
@@ -217,6 +234,47 @@ export default function Dashboard({ timerState, setTimerState }) {
   // ============== STUDY GUIDES VIEW ==============
   if (view === 'guides') {
     const filteredGuides = getFilteredGuides();
+    const organizedFiltered = organizeDashboardGuides(folders, filteredGuides);
+    const visibleClasses = guidesFilter === 'bookmarked'
+      ? organizedFiltered.classes.filter(entry => entry.guides.length)
+      : organizedFiltered.classes;
+    const renderGuideRow = guide => (
+      <div
+        key={guide.id}
+        className={'library-guide-row draggable-guide' + (dragGuideId === guide.id ? ' dragging' : '')}
+        draggable
+        onDragStart={e => onDragStart(e, guide.id)}
+        onDragEnd={onDragEnd}
+        onClick={() => router.push('/guide/' + guide.id)}
+        onContextMenu={e => onGuideContextMenu(e, guide)}
+      >
+        <div className="library-guide-row-main">
+          <h3>{guide.title}</h3>
+          <p>
+            <span className="timestamp">{formatDate(guide.created_at)}</span>
+            {guide.read_progress > 0 && (
+              <span className="library-guide-row-progress">
+                <span className="mini-progress">
+                  <span className="mini-progress-fill" style={{ width: Math.round((guide.read_progress || 0) * 100) + '%' }} />
+                </span>
+                {Math.round((guide.read_progress || 0) * 100)}%
+              </span>
+            )}
+          </p>
+        </div>
+        <button className={'bookmark-btn' + (guide.is_bookmarked ? ' active' : '')} onClick={e => toggleBookmark(guide.id, e)} aria-label={guide.is_bookmarked ? 'Remove bookmark' : 'Bookmark'}>
+          {guide.is_bookmarked ? '\u2605' : '\u2606'}
+        </button>
+        <button
+          className="bookmark-btn library-guide-row-delete"
+          title="Delete guide"
+          aria-label="Delete guide"
+          onClick={e => { e.stopPropagation(); if (window.confirm('Delete "' + guide.title + '"?')) deleteGuide(guide.id); }}
+        >
+          &#128465;
+        </button>
+      </div>
+    );
     return (
       <StudyWorkspaceFrame section="guides" timerState={timerState} setTimerState={setTimerState}>
         <div className="fade-in study-library">
@@ -228,15 +286,6 @@ export default function Dashboard({ timerState, setTimerState }) {
             </div>
             <button className="btn" onClick={() => router.push('/create')}>New study guide</button>
           </div>
-          <div className="classroom-class-grid">
-            {organized.classes.map(entry => <button type="button" className="classroom-class-tile" key={entry.folder.id} onClick={() => router.push('/folder/' + entry.folder.id)} onDragOver={event => onDragOver(event, entry.folder.id)} onDragLeave={event => onDragLeave(event, entry.folder.id)} onDrop={event => onDrop(event, entry.folder.id)}>
-              <span className="class-tile-cover"><span>{entry.folder.name.slice(0, 1)}</span></span>
-              <strong>{entry.folder.name}</strong><small>{entry.guides.length} study {entry.guides.length === 1 ? 'guide' : 'guides'}</small>
-              <span className="class-tile-progress"><span style={{ width: `${Math.round(entry.guides.reduce((sum, guide) => sum + (guide.read_progress || 0), 0) / Math.max(1, entry.guides.length) * 100)}%` }} /></span>
-            </button>)}
-            <button type="button" className="classroom-add-class" onClick={() => setShowNewFolder(true)}><span>+</span><strong>Add class</strong><small>A space for your course material.</small></button>
-          </div>
-          {showNewFolder && <form className="classroom-new-class" onSubmit={event => { event.preventDefault(); createFolder(); }}><input autoFocus aria-label="Class name" placeholder="Class name" value={newFolderName} onChange={event => setNewFolderName(event.target.value)} /><button type="submit" className="btn">Create class</button><button type="button" className="btn-outline" onClick={() => setShowNewFolder(false)}>Cancel</button></form>}
           <div className="study-library-tabs" role="tablist" aria-label="Study library">
             <button type="button" className="active" role="tab" aria-selected="true">Study guides</button>
             <button type="button" role="tab" aria-selected="false" onClick={() => router.push('/flashcards')}>Flashcards</button>
@@ -251,13 +300,11 @@ export default function Dashboard({ timerState, setTimerState }) {
             </button>
           </div>
 
-        {/* Filters & Sort */}
         <div className="guides-toolbar">
           <div className="filter-pills">
             {[
               { key: 'all', label: 'All (' + guides.length + ')' },
               { key: 'bookmarked', label: '★ Bookmarked' },
-              { key: 'unassigned', label: 'No Class' },
             ].map(f => (
               <button
                 key={f.key}
@@ -281,57 +328,58 @@ export default function Dashboard({ timerState, setTimerState }) {
 
         {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
 
-        {filteredGuides.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state-icon">&#128214;</div>
-            {guidesFilter !== 'all' ? 'No guides match this filter.' : 'No study guides yet. Use the Chrome extension to capture content!'}
-          </div>
-        ) : (
-          filteredGuides.map(guide => (
-            <div
-              key={guide.id}
-              className={'card draggable-guide' + (dragGuideId === guide.id ? ' dragging' : '')}
-              draggable
-              onDragStart={e => onDragStart(e, guide.id)}
-              onDragEnd={onDragEnd}
-              onClick={() => router.push('/guide/' + guide.id)}
-              onContextMenu={e => onGuideContextMenu(e, guide)}
-            >
-              <div className="card-row">
-                <div className="drag-handle" title="Drag to move">&#9776;</div>
-                <div style={{ flex: 1 }}>
-                  <h3>{guide.title}</h3>
-                  <p>
-                    <span className="guide-folder-tag">
-                      {folders.find(f => f.id === guide.folder_id)?.name || 'No class'}
-                    </span>
-                    {' | '}
-                    <span className="timestamp">{formatDate(guide.created_at)}</span>
-                    {guide.read_progress > 0 && (
-                      <span style={{ marginLeft: 8 }}>
-                        <span className="mini-progress">
-                          <span className="mini-progress-fill" style={{ width: Math.round((guide.read_progress || 0) * 100) + '%' }} />
-                        </span>
-                        {Math.round((guide.read_progress || 0) * 100)}%
-                      </span>
-                    )}
-                  </p>
+        <div className="guide-boxes">
+          <section className="guide-box" aria-labelledby="guide-box-classes">
+            <header className="guide-box-header">
+              <h2 id="guide-box-classes">Classes</h2>
+              <button type="button" className="guide-box-add" onClick={() => setShowNewFolder(true)}>+ Add class</button>
+            </header>
+            {showNewFolder && <form className="classroom-new-class" onSubmit={event => { event.preventDefault(); createFolder(); }}><input autoFocus aria-label="Class name" placeholder="Class name" value={newFolderName} onChange={event => setNewFolderName(event.target.value)} /><button type="submit" className="btn">Create class</button><button type="button" className="btn-outline" onClick={() => setShowNewFolder(false)}>Cancel</button></form>}
+            {visibleClasses.length === 0 && <p className="guide-box-empty">{guidesFilter === 'bookmarked' ? 'No bookmarked guides in your classes.' : 'No classes yet. Add one to organize your guides.'}</p>}
+            {visibleClasses.map(entry => {
+              const open = openClasses.has(entry.folder.id) || guidesFilter === 'bookmarked';
+              return (
+                <div key={entry.folder.id} className={'guide-class' + (dropTargetId === entry.folder.id ? ' is-drop-target' : '')} onDragOver={event => onDragOver(event, entry.folder.id)} onDragLeave={event => onDragLeave(event, entry.folder.id)} onDrop={event => onDrop(event, entry.folder.id)}>
+                  <div className="guide-class-head">
+                    <button type="button" className="guide-class-toggle" onClick={() => toggleClass(entry.folder.id)} aria-expanded={open}>
+                      <span className={'guide-chevron' + (open ? ' is-open' : '')} aria-hidden="true">›</span>
+                      <strong>{entry.folder.name}</strong>
+                      <small>{entry.guides.length} {entry.guides.length === 1 ? 'guide' : 'guides'}</small>
+                    </button>
+                    <button type="button" className="guide-class-open" onClick={() => router.push('/folder/' + entry.folder.id)}>Open</button>
+                  </div>
+                  {open && (
+                    <div className="guide-class-list">
+                      {entry.guides.length ? entry.guides.map(renderGuideRow) : <p className="guide-box-empty">No study guides yet. Drag one here.</p>}
+                    </div>
+                  )}
                 </div>
-                <button className={'bookmark-btn' + (guide.is_bookmarked ? ' active' : '')} onClick={e => toggleBookmark(guide.id, e)}>
-                  {guide.is_bookmarked ? '\u2605' : '\u2606'}
-                </button>
-                <button
-                  className="bookmark-btn"
-                  style={{ color: 'var(--error)', opacity: 0.55, fontSize: '0.95em' }}
-                  title="Delete guide"
-                  onClick={e => { e.stopPropagation(); if (window.confirm('Delete "' + guide.title + '"?')) deleteGuide(guide.id); }}
-                >
-                  &#128465;
+              );
+            })}
+          </section>
+
+          <section className={'guide-box' + (dropTargetId === 'none' ? ' is-drop-target' : '')} aria-labelledby="guide-box-unclassified" onDragOver={event => onDragOver(event, 'none')} onDragLeave={event => onDragLeave(event, 'none')} onDrop={event => onDrop(event, null)}>
+            <header className="guide-box-header">
+              <h2 id="guide-box-unclassified">Not in a class</h2>
+            </header>
+            <div className="guide-class">
+              <div className="guide-class-head">
+                <button type="button" className="guide-class-toggle" onClick={() => setUnclassifiedOpen(open => !open)} aria-expanded={unclassifiedOpen}>
+                  <span className={'guide-chevron' + (unclassifiedOpen ? ' is-open' : '')} aria-hidden="true">›</span>
+                  <strong>Unsorted study guides</strong>
+                  <small>{organizedFiltered.unclassified.length} {organizedFiltered.unclassified.length === 1 ? 'guide' : 'guides'}</small>
                 </button>
               </div>
+              {unclassifiedOpen && (
+                <div className="guide-class-list">
+                  {organizedFiltered.unclassified.length
+                    ? organizedFiltered.unclassified.map(renderGuideRow)
+                    : <p className="guide-box-empty">{guides.length ? 'Every guide is in a class.' : 'No study guides yet. Create one or use the Chrome extension.'}</p>}
+                </div>
+              )}
             </div>
-          ))
-        )}
+          </section>
+        </div>
 
         {toast && <div className={'toast toast-' + toast.type}>{toast.message}</div>}
         {contextMenu && renderContextMenu()}
