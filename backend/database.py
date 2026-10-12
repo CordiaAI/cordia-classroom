@@ -5,12 +5,48 @@ Handles connection to Supabase for user data, folders, and study guides.
 
 import os
 import logging
+import httpx
 from supabase import create_client, Client
 from supabase.lib.client_options import SyncClientOptions
 
 logger = logging.getLogger(__name__)
 
 _supabase_client = None
+
+# A pooled connection to Supabase that went stale while idle fails with "Server
+# disconnected"; the same request succeeds on a fresh connection. Retry once, but
+# only when it can't duplicate a write: connection never opened (any request), or
+# the connection dropped mid-request on a read or an idempotent change.
+_RETRY_ANY = (httpx.ConnectError, httpx.ConnectTimeout)
+_RETRY_IDEMPOTENT = (httpx.RemoteProtocolError, httpx.ReadError, httpx.WriteError)
+_IDEMPOTENT_METHODS = {"GET", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"}
+
+
+class RetryOnceTransport(httpx.BaseTransport):
+    def __init__(self, inner: httpx.BaseTransport):
+        self.inner = inner
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        try:
+            return self.inner.handle_request(request)
+        except _RETRY_ANY as exc:
+            logger.warning(f"Supabase connection failed ({exc}); retrying {request.method} once")
+        except _RETRY_IDEMPOTENT as exc:
+            if request.method not in _IDEMPOTENT_METHODS:
+                raise
+            logger.warning(f"Supabase connection dropped ({exc}); retrying {request.method} once")
+        return self.inner.handle_request(request)
+
+    def close(self) -> None:
+        self.inner.close()
+
+
+def _add_retry(session: httpx.Client) -> None:
+    if not isinstance(session._transport, RetryOnceTransport):
+        session._transport = RetryOnceTransport(session._transport)
+    for pattern, transport in list(session._mounts.items()):
+        if transport is not None and not isinstance(transport, RetryOnceTransport):
+            session._mounts[pattern] = RetryOnceTransport(transport)
 
 
 def get_supabase() -> Client:
@@ -23,6 +59,7 @@ def get_supabase() -> Client:
             logger.error("SUPABASE_URL or Supabase service-role key not set")
             raise ValueError("Supabase credentials not configured")
         _supabase_client = create_client(url, key)
+        _add_retry(_supabase_client.postgrest.session)
         logger.info("Supabase DB client initialized")
     return _supabase_client
 
