@@ -5,7 +5,8 @@ import re
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Depends
+from rate_limit import ai_rate_limit
 from pydantic import BaseModel, Field
 
 from auth_utils import get_user_id
@@ -181,7 +182,7 @@ def _cached_aid(user_id: str, guide_id: str, key: str, mode: str) -> Optional[di
     return (result.data or [{}])[0].get("content")
 
 
-@router.post("/study-aids")
+@router.post("/study-aids", dependencies=[Depends(ai_rate_limit(max_calls=20))])
 def create_study_aid(body: StudyAidRequest, authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     _require_enabled()

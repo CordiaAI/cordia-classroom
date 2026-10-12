@@ -6,7 +6,8 @@ from study guide content using few-shot examples from domain config files.
 
 import re
 import logging
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
+from rate_limit import ai_rate_limit
 from pydantic import BaseModel, Field
 from typing import List
 from database import get_supabase
@@ -38,7 +39,7 @@ class ExamSubmission(BaseModel):
     answers: List[ExamAnswer] = Field(..., max_length=200)
 
 
-@router.get("/{guide_id}/generate")
+@router.get("/{guide_id}/generate", dependencies=[Depends(ai_rate_limit())])
 def generate_exam(
     guide_id: str,
     domain: str,

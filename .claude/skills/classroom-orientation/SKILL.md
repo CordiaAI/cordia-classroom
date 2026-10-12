@@ -106,5 +106,4 @@ Baseline (2026-09-26, main 416e039): 111 Python tests pass, 10/12 node tests pas
 
 ## Open production gaps (code review 2026-10-11; remove each line once fixed)
 - Fixed 2026-10-11: list screens use `GET /guides?fields=summary` (no guide text, `flashcard_count`, limit up to 500); GZip on; `/practice` sync; beacon DB work in a thread; SmartNotes HTML goes through `web/lib/sanitizeHtml.js`. Use `fields=summary` for any new list screen.
-- CORS allows any `https://*.vercel.app` and any `chrome-extension://` origin with credentials; narrow to this project's preview pattern and the extension ID.
-- AI routes in routers (exam, nclex, quiz, learning, smart_notes) have allowance checks but no rate limit; exam/nclex/quiz "generate" are GET requests that spend tokens.
+- Fixed 2026-10-12: CORS only allows the published extension ID (+ Fly secret `EXTENSION_IDS` for unpacked dev builds) and `cordia-classroom[-…-itzjlaughs-projects].vercel.app`. AI routes in routers use `Depends(ai_rate_limit())` from `backend/rate_limit.py` (10/min per student per route; study aids 20). Those GET routes need the student's token, so link previews can't trigger them.

@@ -5,7 +5,8 @@ Generates clinical scenario MCQ and SATA questions with rationales from study gu
 
 import re
 import logging
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
+from rate_limit import ai_rate_limit
 from pydantic import BaseModel, Field
 from typing import List
 from database import get_supabase
@@ -35,7 +36,7 @@ class NCLEXSubmission(BaseModel):
     answers: List[NCLEXAnswer] = Field(..., max_length=200)
 
 
-@router.get("/{guide_id}/generate")
+@router.get("/{guide_id}/generate", dependencies=[Depends(ai_rate_limit())])
 def generate_nclex(guide_id: str, authorization: str = Header(default="")):
     """Generate NCLEX-style questions from a saved study guide."""
     try:
