@@ -121,6 +121,11 @@ export default function UpgradeModal() {
   if (mode === 'trial_ended') {
     title = 'Your Pro trial has ended';
     body = 'You are back on the free plan. Nothing was charged. Want to keep Pro?';
+  } else if (mode === 'limit' && isPro && limit?.plan === 'free') {
+    // The limit was hit under the free plan, but the status check just found (or
+    // reconnected) the student's Pro subscription.
+    title = `Your ${PRO_NAME} plan is active`;
+    body = 'We found your subscription and connected it to this account. Close this and try that again.';
   } else if (mode === 'limit') {
     title = copy?.title || "You've reached a free limit";
     const resets = resetLabel(limit?.resets_at);
