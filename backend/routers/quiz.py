@@ -7,7 +7,8 @@ import re
 import json
 import random
 import logging
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
+from rate_limit import ai_rate_limit
 from pydantic import BaseModel, Field
 from typing import List, Literal, Optional
 from database import get_supabase
@@ -276,13 +277,13 @@ Return ONLY the JSON object, no other text:"""
         raise HTTPException(status_code=500, detail="Failed to generate quiz")
 
 
-@router.get("/{guide_id}/generate")
+@router.get("/{guide_id}/generate", dependencies=[Depends(ai_rate_limit())])
 def generate_quiz(guide_id: str, authorization: str = Header(default="")):
     """Load the saved Pro Retain quiz or build an instant free quiz."""
     return _quiz_for_guide(guide_id, authorization)
 
 
-@router.post("/{guide_id}/regenerate")
+@router.post("/{guide_id}/regenerate", dependencies=[Depends(ai_rate_limit())])
 def regenerate_quiz(guide_id: str, authorization: str = Header(default="")):
     """Replace the current distractors using the user's plan rules."""
     return _quiz_for_guide(guide_id, authorization, regenerate=True)
@@ -299,7 +300,7 @@ def _saved_questions(supabase, guide_id: str, user_id: str) -> list:
     return questions
 
 
-@router.post("/{guide_id}/session")
+@router.post("/{guide_id}/session", dependencies=[Depends(ai_rate_limit())])
 def start_session(guide_id: str, body: SessionRequest, authorization: str = Header(default="")):
     """The questions plus which format asks each idea, from the types the student turned on."""
     questions = _quiz_for_guide(guide_id, authorization)["questions"]

@@ -96,10 +96,20 @@ ALLOWED_ORIGINS = [
 if os.getenv("FRONTEND_URL"):
     ALLOWED_ORIGINS.append(os.getenv("FRONTEND_URL"))
 
+# Only the published extension (plus any IDs in EXTENSION_IDS, e.g. an unpacked dev build)
+# and this project's own Vercel previews may call the API from a browser.
+EXTENSION_IDS = ["eddmfjcnfjfbaknmeccjbjdgpeipjbaf"] + [
+    value.strip() for value in os.getenv("EXTENSION_IDS", "").split(",") if re.fullmatch(r"[a-p]{32}", value.strip())
+]
+ALLOWED_ORIGIN_REGEX = (
+    r"chrome-extension://(" + "|".join(EXTENSION_IDS) + r")"
+    r"|https://cordia-classroom(-[a-z0-9-]+-itzjlaughs-projects)?\.vercel\.app"
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"chrome-extension://.*|https://.*\.vercel\.app",
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],

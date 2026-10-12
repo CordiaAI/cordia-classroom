@@ -1,6 +1,7 @@
 import re
 import logging
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Depends
+from rate_limit import ai_rate_limit
 from pydantic import BaseModel, field_validator
 from typing import Optional
 from database import get_supabase
@@ -189,7 +190,7 @@ def delete_note(note_id: str, authorization: str = Header(default="")):
         raise HTTPException(status_code=500, detail="Failed to delete note")
 
 
-@router.post("/{note_id}/study_guide")
+@router.post("/{note_id}/study_guide", dependencies=[Depends(ai_rate_limit())])
 def generate_study_guide_from_note(note_id: str, authorization: str = Header(default="")):
     """Generate a preview study guide from a SmartNote's content.
     Does NOT save to study_guides — the frontend shows a preview and the
@@ -250,7 +251,7 @@ def generate_study_guide_from_note(note_id: str, authorization: str = Header(def
         raise HTTPException(status_code=500, detail="Failed to generate study guide")
 
 
-@router.post("/diagram")
+@router.post("/diagram", dependencies=[Depends(ai_rate_limit())])
 def generate_diagram(request: DiagramRequest, authorization: str = Header(default="")):
     try:
         user_id = get_user_id(authorization)
