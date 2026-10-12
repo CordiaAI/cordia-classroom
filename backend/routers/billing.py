@@ -14,6 +14,7 @@ a webhook.
 
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
@@ -107,14 +108,92 @@ def _customer_id(user_id: str) -> Optional[str]:
     return row.get("stripe_customer_id") if row else None
 
 
+def _customer_exists(customer_id: str) -> bool:
+    """False when the saved customer was deleted or belongs to another Stripe account/mode."""
+    try:
+        customer = _stripe().Customer.retrieve(customer_id)
+    except stripe.InvalidRequestError:
+        return False
+    return not getattr(customer, "deleted", False)
+
+
 def _ensure_customer(user_id: str, email: Optional[str] = None) -> str:
     existing = _customer_id(user_id)
-    if existing:
+    if existing and _customer_exists(existing):
         return existing
+    if existing:
+        logger.warning(f"Saved Stripe customer {existing} for user {user_id[:8]} no longer exists; creating a new one")
     params = {"metadata": {"user_id": user_id}}
     if email:
         params["email"] = email
-    return _stripe().Customer.create(**params).id
+    customer_id = _stripe().Customer.create(**params).id
+    get_supabase().table("user_subscriptions").upsert(
+        {"user_id": user_id, "stripe_customer_id": customer_id}, on_conflict="user_id"
+    ).execute()
+    return customer_id
+
+
+# Paid subscriptions that never reached the account (made before user_id metadata, or
+# saved under a customer this account no longer points to) are found by email.
+_SYNC_TTL_SECONDS = 600
+_last_sync: dict = {}
+
+
+def _pro_product_ids() -> set:
+    ids = set()
+    for interval in LOOKUP_KEYS:
+        try:
+            product = _stripe().Price.retrieve(_price_id(interval)).product
+            ids.add(product if isinstance(product, str) else product.id)
+        except Exception as e:
+            logger.warning(f"Could not resolve the {interval} Pro product: {e}")
+    return ids
+
+
+def _is_pro_subscription(subscription: dict, pro_products: set) -> bool:
+    if (subscription.get("metadata") or {}).get("product") == PRO:
+        return True
+    for item in (subscription.get("items") or {}).get("data") or []:
+        price = item.get("price") or {}
+        product = price.get("product")
+        product = product if isinstance(product, str) else (product or {}).get("id")
+        if _interval_of(price) or product in pro_products:
+            return True
+    return False
+
+
+def sync_pro_from_stripe(user_id: str, force: bool = False) -> bool:
+    """Link an active Pro subscription under this account's email. True when one was linked."""
+    now = time.monotonic()
+    if not force and now - _last_sync.get(user_id, -_SYNC_TTL_SECONDS) < _SYNC_TTL_SECONDS:
+        return False
+    _last_sync[user_id] = now
+    email = _user_email(user_id)
+    if not email:
+        return False
+    try:
+        api = _stripe()
+        pro_products = None
+        for customer in api.Customer.list(email=email, limit=10).data:
+            for subscription in api.Subscription.list(customer=customer.id, status="all", limit=20).data:
+                subscription = _plain(subscription)
+                if subscription.get("status") not in ACTIVE_STATUSES:
+                    continue
+                if pro_products is None:
+                    pro_products = _pro_product_ids()
+                if not _is_pro_subscription(subscription, pro_products):
+                    continue
+                _upsert_from_subscription(subscription, user_id)
+                metadata = subscription.get("metadata") or {}
+                if metadata.get("user_id") != user_id:
+                    api.Subscription.modify(subscription["id"], metadata={**metadata, "user_id": user_id})
+                logger.info(f"Linked Stripe subscription {subscription['id']} to user {user_id[:8]} by email")
+                return True
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Stripe email lookup failed for user {user_id[:8]}: {e}")
+    return False
 
 
 def _user_email(user_id: str) -> Optional[str]:
@@ -220,16 +299,21 @@ def _activate_checkout(session: dict, user_id: str) -> dict:
 
 @router.get("/status")
 def billing_status(authorization: str = Header(default="")):
-    return entitlement(get_user_id(authorization))
+    user_id = get_user_id(authorization)
+    if plan_for(subscription_row(user_id)) != "pro" and os.getenv("STRIPE_SECRET_KEY"):
+        sync_pro_from_stripe(user_id)
+    return entitlement(user_id)
 
 
 @router.post("/create-checkout-session")
 def create_checkout_session(body: CheckoutRequest, authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     row = subscription_row(user_id)
+    if plan_for(row) != "pro" and sync_pro_from_stripe(user_id, force=True):
+        row = subscription_row(user_id)
     on_trial = bool(row and row.get("status") == "trialing" and row.get("pro_trial_started_at"))
     if plan_for(row) == "pro" and not on_trial:
-        raise HTTPException(status_code=409, detail="Pro is already active")
+        raise HTTPException(status_code=409, detail="Pro is already active on this account. Refresh the page.")
 
     return_path = _safe_path(body.return_path, "/settings?section=subscription")
     sep = "&" if "?" in return_path else "?"
@@ -245,7 +329,7 @@ def create_checkout_session(body: CheckoutRequest, authorization: str = Header(d
         "allow_promotion_codes": True,
     }
     customer_id = row.get("stripe_customer_id") if row else None
-    if customer_id:
+    if customer_id and _customer_exists(customer_id):
         params["customer"] = customer_id
     return {"url": _stripe().checkout.Session.create(**params).url}
 
@@ -255,20 +339,26 @@ def start_trial(authorization: str = Header(default="")):
     """7-day Pro trial, no card. It cancels itself at the end; it never bills."""
     user_id = get_user_id(authorization)
     row = subscription_row(user_id)
+    if plan_for(row) != "pro" and sync_pro_from_stripe(user_id, force=True):
+        return entitlement(user_id)
     if plan_for(row) == "pro":
-        raise HTTPException(status_code=409, detail="Pro is already active")
+        raise HTTPException(status_code=409, detail="Pro is already active on this account. Refresh the page.")
     if row and row.get("pro_trial_started_at"):
         raise HTTPException(status_code=409, detail="Your free trial has already been used")
 
-    customer_id = _ensure_customer(user_id, _user_email(user_id))
-    subscription = _stripe().Subscription.create(
-        customer=customer_id,
-        items=[{"price": _price_id("monthly")}],
-        trial_period_days=TRIAL_DAYS,
-        cancel_at_period_end=True,
-        trial_settings={"end_behavior": {"missing_payment_method": "cancel"}},
-        metadata={"user_id": user_id, "product": PRO, "kind": "trial"},
-    )
+    try:
+        customer_id = _ensure_customer(user_id, _user_email(user_id))
+        subscription = _stripe().Subscription.create(
+            customer=customer_id,
+            items=[{"price": _price_id("monthly")}],
+            trial_period_days=TRIAL_DAYS,
+            cancel_at_period_end=True,
+            trial_settings={"end_behavior": {"missing_payment_method": "cancel"}},
+            metadata={"user_id": user_id, "product": PRO, "kind": "trial"},
+        )
+    except stripe.StripeError as e:
+        logger.error(f"Trial could not start for user {user_id[:8]}: {e}")
+        raise HTTPException(status_code=502, detail="The trial could not start right now. Please try again in a minute.")
     _upsert_from_subscription(_plain(subscription), user_id)
     return entitlement(user_id)
 
