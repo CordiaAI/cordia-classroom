@@ -70,9 +70,17 @@ class GenerateResponse(BaseModel):
 class RetainExplanationContext(BaseModel):
     """The exact answered Retain question a Tutor explanation refers to."""
     question: str = Field(..., min_length=1, max_length=2_000)
-    options: List[str] = Field(..., min_length=2, max_length=10)
+    # Empty for written and fill-in answers; two or more for multiple choice.
+    options: List[str] = Field(default_factory=list, max_length=10)
     selected_answer: str = Field(..., min_length=1, max_length=2_000)
     correct_answer: str = Field(..., min_length=1, max_length=2_000)
+
+    @field_validator("options")
+    @classmethod
+    def validate_options(cls, v):
+        if len(v) == 1:
+            raise ValueError("a multiple-choice question needs at least two options")
+        return v
 
 
 class ChatTurn(BaseModel):
