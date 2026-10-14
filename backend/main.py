@@ -103,7 +103,7 @@ EXTENSION_IDS = ["eddmfjcnfjfbaknmeccjbjdgpeipjbaf"] + [
 ]
 ALLOWED_ORIGIN_REGEX = (
     r"chrome-extension://(" + "|".join(EXTENSION_IDS) + r")"
-    r"|https://cordia-classroom(-[a-z0-9-]+-itzjlaughs-projects)?\.vercel\.app"
+    r"|https://cordia-classroom(-[a-z0-9-]+-(itzjlaughs-projects|cordia-ai))?\.vercel\.app"
 )
 
 app.add_middleware(

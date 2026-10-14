@@ -25,6 +25,7 @@ class CorsOriginTests(unittest.TestCase):
         self.assertTrue(self.allowed("https://classroom.cordiaai.io"))
         self.assertTrue(self.allowed("chrome-extension://eddmfjcnfjfbaknmeccjbjdgpeipjbaf"))
         self.assertTrue(self.allowed("https://cordia-classroom-git-main-itzjlaughs-projects.vercel.app"))
+        self.assertTrue(self.allowed("https://cordia-classroom-git-claude-wizardly-mendel-nfmcrg-cordia-ai.vercel.app"))
         self.assertTrue(self.allowed("https://cordia-classroom.vercel.app"))
 
     def test_other_extensions_and_vercel_apps_are_refused(self):
