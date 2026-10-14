@@ -109,6 +109,42 @@ class TutorContractTests(unittest.TestCase):
     @patch("main._learning_guidance", return_value="")
     @patch("main.record")
     @patch("main.require", return_value={"used": 0})
+    @patch("main.explain_retain_answer", return_value="A full answer names what mitosis does.")
+    @patch("main.get_user_id", return_value="student-1")
+    def test_retain_explanation_accepts_written_answers_without_choices(self, _auth, explain, _usage, _record, _guidance):
+        db, _table = self.guide_db()
+        turn = {"id": "session-1", "run_id": "run-1", "active_skill": "retain", "conversation_version": 2,
+                "messages": [{"role": "user", "text": "Please explain my missed answer."}]}
+        with patch("main.get_supabase", return_value=db), \
+             patch("main.claim_tutor_turn", return_value=turn), \
+             patch("main.complete_tutor_turn", return_value={**turn, "status": "idle", "conversation_version": 3}), \
+             patch("main.public_tutor_session", return_value={"id": "session-1", "conversation_version": 3}):
+            response = self.client.post(
+                "/chat",
+                headers={"Authorization": "Bearer test"},
+                json={
+                    "question": "Please explain my missed answer.",
+                    "content": "",
+                    "guide_id": self.guide_id,
+                    "session_id": "session-1",
+                    "conversation_version": 2,
+                    "skill": "retain",
+                    "retain_context": {
+                        "question": "What is mitosis?",
+                        "options": [],
+                        "selected_answer": "n/a",
+                        "correct_answer": "Cell division.",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(explain.call_args.kwargs["options"], [])
+        self.assertEqual(explain.call_args.kwargs["selected_answer"], "n/a")
+
+    @patch("main._learning_guidance", return_value="")
+    @patch("main.record")
+    @patch("main.require", return_value={"used": 0})
     @patch("main.answer_question", return_value="The selected source explains recursion.")
     @patch("main.get_user_id", return_value="student-1")
     def test_tutor_uses_selected_material_when_saved_guide_content_is_empty(self, _auth, answer, _usage, _record, _guidance):

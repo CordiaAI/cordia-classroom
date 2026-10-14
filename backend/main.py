@@ -103,7 +103,7 @@ EXTENSION_IDS = ["eddmfjcnfjfbaknmeccjbjdgpeipjbaf"] + [
 ]
 ALLOWED_ORIGIN_REGEX = (
     r"chrome-extension://(" + "|".join(EXTENSION_IDS) + r")"
-    r"|https://cordia-classroom(-[a-z0-9-]+-itzjlaughs-projects)?\.vercel\.app"
+    r"|https://cordia-classroom(-[a-z0-9-]+-(itzjlaughs-projects|cordia-ai))?\.vercel\.app"
 )
 
 app.add_middleware(
@@ -221,7 +221,7 @@ def _verified_retain_context(body: ChatRequest, content: str):
         return None
     if not body.guide_id:
         raise HTTPException(status_code=400, detail="A Retain explanation requires its study guide")
-    if retain.selected_answer not in retain.options or retain.correct_answer not in retain.options:
+    if retain.options and (retain.selected_answer not in retain.options or retain.correct_answer not in retain.options):
         raise HTTPException(status_code=400, detail="Retain answers do not match the question choices")
     if retain.selected_answer == retain.correct_answer:
         raise HTTPException(status_code=400, detail="This Retain answer is already correct")
