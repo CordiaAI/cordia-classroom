@@ -97,7 +97,15 @@ def plan_for(row: Optional[dict]) -> str:
     """'pro' or 'free'. Paid, promo, trial and manual grants all resolve here."""
     if not row or row.get("plan") not in PRO_PLAN_NAMES:
         return "free"
-    return "pro" if row.get("status") in PRO_STATUSES else "free"
+    if row.get("status") not in PRO_STATUSES:
+        return "free"
+    # A no-card trial ends at pro_trial_ends_at even if Stripe's end-of-trial webhook
+    # is late or missed: never keep Pro past the trial end, and never charge.
+    if row.get("status") == "trialing" and row.get("pro_trial_started_at"):
+        trial_ends = _ts(row.get("pro_trial_ends_at"))
+        if trial_ends and trial_ends <= _now():
+            return "free"
+    return "pro"
 
 
 def usage_counts(user_id: str, month: Optional[str] = None) -> dict:
