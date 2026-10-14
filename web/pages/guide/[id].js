@@ -183,12 +183,13 @@ export default function GuidePage() {
       {/* Tab content */}
       {activeTab === 'guide' && (
         <>
-          <StudyDocument key={guide.id} guide={guide} readSections={revealedQs} onLearn={learningStyle?.enabled ? index => setOpenAid(qaPairs[index].index) : undefined} onRead={index => {
+          <StudyDocument key={guide.id} guide={guide} readSections={revealedQs} onLearn={learningStyle?.enabled ? index => setOpenAid(qaPairs[index].index) : undefined} renderAid={index => (
+            learningStyle?.enabled && openAid && qaPairs[index]?.index === openAid
+              ? <StudyAidPanel guideId={id} number={openAid} style={learningStyle.style} onClose={() => setOpenAid(null)} />
+              : null
+          )} onRead={index => {
             setRevealedQs(previous => new Set([...previous, index]));
           }} />
-          {learningStyle?.enabled && qaPairs.length > 0 && <div className="reader-learning-aids">
-            {openAid && <StudyAidPanel guideId={id} number={openAid} style={learningStyle.style} onClose={() => setOpenAid(null)} />}
-          </div>}
         </>
       )}
 

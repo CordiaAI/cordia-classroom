@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { parseQAPairs, parseNotes } from '../lib/formatters';
 import WorkspaceIcon from './WorkspaceIcon';
 
-export default function StudyDocument({ guide, onOpen, onRead, onLearn, readSections }) {
+export default function StudyDocument({ guide, onOpen, onRead, onLearn, renderAid, readSections }) {
   const [page, setPage] = useState(0);
   const [scale, setScale] = useState(100);
   const windowRef = useRef(null);
@@ -43,6 +43,7 @@ export default function StudyDocument({ guide, onOpen, onRead, onLearn, readSect
               {pair.image && <img src={pair.image} alt={`Illustration for ${pair.question}`} />}
               {onRead && <button className="document-read" type="button" aria-pressed={readSections?.has(page * 3 + index) || false} onClick={() => onRead(page * 3 + index)}>{readSections?.has(page * 3 + index) ? 'Read' : 'Mark as read'} <span>✓</span></button>}
               {onLearn && <button className="document-read" type="button" onClick={() => onLearn(page * 3 + index)}>Learn it your way <span>→</span></button>}
+              {renderAid?.(page * 3 + index)}
             </section>
           )) : guide?.study_guide ? <p className="document-prose">{guide.study_guide}</p> : notes.length ? notes.map((note, index) => <p key={index}>{note}</p>) : <div className="document-empty"><WorkspaceIcon name="upload" /><h3>Your next discovery starts here.</h3><p>Bring in your course material. Cordia will help you turn it into understanding.</p>{onOpen && <button type="button" className="btn" onClick={onOpen}>Add study material <WorkspaceIcon name="arrow" /></button>}</div>}
         </article>

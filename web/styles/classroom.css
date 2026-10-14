@@ -405,7 +405,6 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .guide-reader-window .tabs { margin: 0 12px 18px; }
 .guide-reader-window .tabs > div { display: none !important; }
 .guide-reader-window .study-document-window { border: 0; background: transparent; backdrop-filter: none; box-shadow: none; height: min(720px, calc(100svh - 230px)); min-height: 470px; padding: 0; }
-.reader-learning-aids { margin-top: 16px; }
 @media (max-width: 1250px) {
   .classroom-study-scene { grid-template-columns: minmax(200px,.8fr) minmax(370px,1.4fr) minmax(275px,1fr); gap: 20px; }
   .is-study-home .main-content { padding-inline: 24px; }
