@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useRequireAuth } from '../lib/auth';
-import { apiErrorMessage, apiFetch, cacheUserIdentity, getUserEmail, getUserName } from '../lib/api';
+import { apiErrorMessage, apiFetch, cacheUserIdentity, getUserEmail, getUserName, openUpgrade } from '../lib/api';
 import { FEATURE_COPY, FREE_SUMMARY, METERED, PRICES, PRO_BENEFITS, PRO_NAME, resetLabel } from '../lib/plans';
 import FeedbackModal from '../components/FeedbackModal';
 import LearningStylePicker from '../components/LearningStylePicker';
@@ -123,7 +123,7 @@ export default function SettingsPage() {
     if (data?.url) {
       window.location.href = data.url;
     } else {
-      setMessage('Could not open billing management. Please try again.');
+      setMessage(apiErrorMessage(data?.detail, 'Could not open billing management. Please try again.'));
       setManaging(false);
     }
   }
@@ -257,12 +257,18 @@ export default function SettingsPage() {
                       </div>
                     ) : (
                       <div className="plan-actions">
-                        <button className="btn-upgrade" onClick={handleUpgrade} disabled={upgrading}>
-                          {upgrading ? 'Opening secure checkout...' : `${onTrial ? 'Subscribe' : 'Choose Pro'} · ${selected.price}/${selected.per}`}
-                        </button>
-                        {status?.trial_available && (
-                          <button className="btn-manage" onClick={handleStartTrial} disabled={upgrading}>
-                            Try Pro free for 7 days · no card
+                        {status?.trial_available ? (
+                          <>
+                            <button className="btn-upgrade" onClick={() => openUpgrade()} disabled={upgrading}>
+                              Start 7-day free trial · no card
+                            </button>
+                            <button className="btn-manage" onClick={handleUpgrade} disabled={upgrading}>
+                              {upgrading ? 'Opening secure checkout...' : `Or subscribe now · ${selected.price}/${selected.per}`}
+                            </button>
+                          </>
+                        ) : (
+                          <button className="btn-upgrade" onClick={handleUpgrade} disabled={upgrading}>
+                            {upgrading ? 'Opening secure checkout...' : `${onTrial ? 'Subscribe' : 'Choose Pro'} · ${selected.price}/${selected.per}`}
                           </button>
                         )}
                       </div>

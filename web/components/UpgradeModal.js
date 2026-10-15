@@ -115,6 +115,8 @@ export default function UpgradeModal() {
   const onTrial = Boolean(status?.on_trial);
   const canTrial = Boolean(status?.trial_available) && mode !== 'trial_ended';
   const price = PRICES[interval];
+  const trialEnds = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    .toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
   let title = `Upgrade to ${PRO_NAME}`;
   let body = 'Get more out of every class.';
@@ -167,15 +169,21 @@ export default function UpgradeModal() {
                   ))}
                 </div>
                 {error && <div className="upgrade-error">{error}</div>}
+                {canTrial && (
+                  <p className="upgrade-highlight">
+                    Your free 7-day Pro trial ends on <strong>{trialEnds}</strong>. It will <strong>not</strong> start a paid
+                    subscription. When it ends you go back to the Free plan and lose Pro features. No card needed.
+                  </p>
+                )}
                 <div className="upgrade-actions">
-                  <button className="btn-upgrade" onClick={checkout} disabled={Boolean(busy)}>
-                    {busy === 'checkout' ? 'Opening secure checkout...' : `Get Pro · ${price.price}/${price.per}`}
-                  </button>
                   {canTrial && (
-                    <button className="btn-outline" onClick={startTrial} disabled={Boolean(busy)}>
-                      {busy === 'trial' ? 'Starting...' : 'Try Pro free for 7 days · no card'}
+                    <button className="btn-upgrade" onClick={startTrial} disabled={Boolean(busy)}>
+                      {busy === 'trial' ? 'Starting...' : 'Start my free 7-day trial'}
                     </button>
                   )}
+                  <button className={canTrial ? 'btn-outline' : 'btn-upgrade'} onClick={checkout} disabled={Boolean(busy)}>
+                    {busy === 'checkout' ? 'Opening secure checkout...' : `${canTrial ? 'Or subscribe now' : 'Get Pro'} · ${price.price}/${price.per}`}
+                  </button>
                   <button className="upgrade-later" onClick={close}>Not now</button>
                 </div>
                 <p className="upgrade-fineprint">Have a promo code? Add it at checkout. Cancel anytime.</p>
