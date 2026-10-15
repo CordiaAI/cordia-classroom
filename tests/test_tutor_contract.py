@@ -38,14 +38,14 @@ class TutorContractTests(unittest.TestCase):
         db.table.return_value = table
         return db, table
 
-    @patch("main._learning_guidance", return_value="")
-    @patch("main.record")
-    @patch("main.require", return_value={"used": 0})
-    @patch("main.answer_question", return_value="Mitosis is cell division.")
-    @patch("main.get_user_id", return_value="student-1")
+    @patch("routers.chat.learning_guidance", return_value="")
+    @patch("routers.chat.record")
+    @patch("routers.chat.require", return_value={"used": 0})
+    @patch("routers.chat.answer_question", return_value="Mitosis is cell division.")
+    @patch("routers.chat.get_user_id", return_value="student-1")
     def test_tutor_grounds_answer_in_owned_guide(self, _auth, answer, _usage, _record, _guidance):
         db, _table = self.guide_db()
-        with patch("main.get_supabase", return_value=db):
+        with patch("routers.chat.get_supabase", return_value=db):
             response = self.client.post(
                 "/chat",
                 headers={"Authorization": "Bearer test"},
@@ -57,11 +57,11 @@ class TutorContractTests(unittest.TestCase):
         self.assertEqual(response.json()["source"], {"type": "study_guide", "id": self.guide_id, "title": "Biology"})
         self.assertEqual(answer.call_args.kwargs["context"], "Q1: What is mitosis?\nA1: Cell division.")
 
-    @patch("main._learning_guidance", return_value="")
-    @patch("main.record")
-    @patch("main.require", return_value={"used": 0})
-    @patch("main.explain_retain_answer", return_value="Mitosis makes matching body cells; meiosis makes sex cells with half the chromosomes.")
-    @patch("main.get_user_id", return_value="student-1")
+    @patch("routers.chat.learning_guidance", return_value="")
+    @patch("routers.chat.record")
+    @patch("routers.chat.require", return_value={"used": 0})
+    @patch("routers.chat.explain_retain_answer", return_value="Mitosis makes matching body cells; meiosis makes sex cells with half the chromosomes.")
+    @patch("routers.chat.get_user_id", return_value="student-1")
     def test_retain_explanation_binds_selected_and_correct_answers(self, _auth, explain, _usage, _record, _guidance):
         db, _table = self.guide_db()
         turn = {
@@ -76,10 +76,10 @@ class TutorContractTests(unittest.TestCase):
             ],
         }
         completed = {**turn, "status": "idle", "conversation_version": 3}
-        with patch("main.get_supabase", return_value=db), \
-             patch("main.claim_tutor_turn", return_value=turn), \
-             patch("main.complete_tutor_turn", return_value=completed), \
-             patch("main.public_tutor_session", return_value={"id": "session-1", "conversation_version": 3}):
+        with patch("routers.chat.get_supabase", return_value=db), \
+             patch("routers.chat.claim_tutor_turn", return_value=turn), \
+             patch("routers.chat.complete_tutor_turn", return_value=completed), \
+             patch("routers.chat.public_tutor_session", return_value={"id": "session-1", "conversation_version": 3}):
             response = self.client.post(
                 "/chat",
                 headers={"Authorization": "Bearer test"},
@@ -106,19 +106,19 @@ class TutorContractTests(unittest.TestCase):
         self.assertEqual(explain.call_args.kwargs["conversation"], turn["messages"][:-1])
         self.assertIn("What is mitosis?", explain.call_args.kwargs["context"])
 
-    @patch("main._learning_guidance", return_value="")
-    @patch("main.record")
-    @patch("main.require", return_value={"used": 0})
-    @patch("main.explain_retain_answer", return_value="A full answer names what mitosis does.")
-    @patch("main.get_user_id", return_value="student-1")
+    @patch("routers.chat.learning_guidance", return_value="")
+    @patch("routers.chat.record")
+    @patch("routers.chat.require", return_value={"used": 0})
+    @patch("routers.chat.explain_retain_answer", return_value="A full answer names what mitosis does.")
+    @patch("routers.chat.get_user_id", return_value="student-1")
     def test_retain_explanation_accepts_written_answers_without_choices(self, _auth, explain, _usage, _record, _guidance):
         db, _table = self.guide_db()
         turn = {"id": "session-1", "run_id": "run-1", "active_skill": "retain", "conversation_version": 2,
                 "messages": [{"role": "user", "text": "Please explain my missed answer."}]}
-        with patch("main.get_supabase", return_value=db), \
-             patch("main.claim_tutor_turn", return_value=turn), \
-             patch("main.complete_tutor_turn", return_value={**turn, "status": "idle", "conversation_version": 3}), \
-             patch("main.public_tutor_session", return_value={"id": "session-1", "conversation_version": 3}):
+        with patch("routers.chat.get_supabase", return_value=db), \
+             patch("routers.chat.claim_tutor_turn", return_value=turn), \
+             patch("routers.chat.complete_tutor_turn", return_value={**turn, "status": "idle", "conversation_version": 3}), \
+             patch("routers.chat.public_tutor_session", return_value={"id": "session-1", "conversation_version": 3}):
             response = self.client.post(
                 "/chat",
                 headers={"Authorization": "Bearer test"},
@@ -142,11 +142,11 @@ class TutorContractTests(unittest.TestCase):
         self.assertEqual(explain.call_args.kwargs["options"], [])
         self.assertEqual(explain.call_args.kwargs["selected_answer"], "n/a")
 
-    @patch("main._learning_guidance", return_value="")
-    @patch("main.record")
-    @patch("main.require", return_value={"used": 0})
-    @patch("main.answer_question", return_value="The selected source explains recursion.")
-    @patch("main.get_user_id", return_value="student-1")
+    @patch("routers.chat.learning_guidance", return_value="")
+    @patch("routers.chat.record")
+    @patch("routers.chat.require", return_value={"used": 0})
+    @patch("routers.chat.answer_question", return_value="The selected source explains recursion.")
+    @patch("routers.chat.get_user_id", return_value="student-1")
     def test_tutor_uses_selected_material_when_saved_guide_content_is_empty(self, _auth, answer, _usage, _record, _guidance):
         db, table = self.guide_db()
         table.execute.side_effect = [MagicMock(data=[{
@@ -157,7 +157,7 @@ class TutorContractTests(unittest.TestCase):
             "notes": None,
             "source_url": None,
         }])]
-        with patch("main.get_supabase", return_value=db):
+        with patch("routers.chat.get_supabase", return_value=db):
             response = self.client.post(
                 "/chat",
                 headers={"Authorization": "Bearer test"},
@@ -167,7 +167,7 @@ class TutorContractTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(answer.call_args.kwargs["context"], "Recursion needs a base case.")
 
-    @patch("main._learning_guidance", return_value="")
+    @patch("main.learning_guidance", return_value="")
     @patch("main.record")
     @patch("main.require", return_value={"used": 0})
     @patch("main.generate_verified_practice_set")
@@ -209,11 +209,11 @@ class TutorContractTests(unittest.TestCase):
         self.assertIn("mitosis", generate.call_args.args[0])
         record.assert_called_once()
 
-    @patch("main._learning_guidance", return_value="")
-    @patch("main.record")
-    @patch("main.require", return_value={"used": 0})
-    @patch("main.generate_practice_guide", return_value="Q1: Apply mitosis.\nA1: Cell division.")
-    @patch("main.get_user_id", return_value="student-1")
+    @patch("routers.chat.learning_guidance", return_value="")
+    @patch("routers.chat.record")
+    @patch("routers.chat.require", return_value={"used": 0})
+    @patch("routers.chat.generate_practice_guide", return_value="Q1: Apply mitosis.\nA1: Cell division.")
+    @patch("routers.chat.get_user_id", return_value="student-1")
     def test_tutor_creates_practice_guide_in_source_class(self, _auth, _generate, _usage, record, _guidance):
         created = {
             "id": "22222222-2222-4222-8222-222222222222",
@@ -221,7 +221,7 @@ class TutorContractTests(unittest.TestCase):
             "folder_id": "folder-1",
         }
         db, table = self.guide_db(created)
-        with patch("main.get_supabase", return_value=db):
+        with patch("routers.chat.get_supabase", return_value=db):
             response = self.client.post(
                 "/chat",
                 headers={"Authorization": "Bearer test"},
@@ -239,11 +239,11 @@ class TutorContractTests(unittest.TestCase):
         self.assertEqual(payload["flashcards"], [{"front": "Apply mitosis.", "back": "Cell division."}])
         record.assert_called_once()
 
-    @patch("main._learning_guidance", return_value="")
-    @patch("main.record")
-    @patch("main.require", return_value={"used": 0})
-    @patch("main.generate_practice_guide", return_value="Q1: Apply recursion.\nA1: Use a base case.")
-    @patch("main.get_user_id", return_value="student-1")
+    @patch("routers.chat.learning_guidance", return_value="")
+    @patch("routers.chat.record")
+    @patch("routers.chat.require", return_value={"used": 0})
+    @patch("routers.chat.generate_practice_guide", return_value="Q1: Apply recursion.\nA1: Use a base case.")
+    @patch("routers.chat.get_user_id", return_value="student-1")
     def test_tutor_creates_practice_guide_from_owned_smartnote(self, _auth, generate, _usage, _record, _guidance):
         note_id = "33333333-3333-4333-8333-333333333333"
         note_table = MagicMock()
@@ -265,7 +265,7 @@ class TutorContractTests(unittest.TestCase):
         db = MagicMock()
         db.table.side_effect = lambda name: note_table if name == "smart_notes" else guide_table
 
-        with patch("main.get_supabase", return_value=db):
+        with patch("routers.chat.get_supabase", return_value=db):
             response = self.client.post(
                 "/chat",
                 headers={"Authorization": "Bearer test"},
@@ -281,11 +281,11 @@ class TutorContractTests(unittest.TestCase):
         self.assertEqual(payload["source_id"], note_id)
         self.assertNotIn("source_guide_id", payload)
 
-    @patch("main._learning_guidance", return_value="")
-    @patch("main.record")
-    @patch("main.require", return_value={"used": 0})
-    @patch("main.answer_question", return_value="Shared answer")
-    @patch("main.get_user_id", return_value="student-1")
+    @patch("routers.chat.learning_guidance", return_value="")
+    @patch("routers.chat.record")
+    @patch("routers.chat.require", return_value={"used": 0})
+    @patch("routers.chat.answer_question", return_value="Shared answer")
+    @patch("routers.chat.get_user_id", return_value="student-1")
     def test_tutor_message_returns_the_same_shared_session(self, _auth, _answer, _usage, _record, _guidance):
         db, _table = self.guide_db()
         turn = {
@@ -301,10 +301,10 @@ class TutorContractTests(unittest.TestCase):
             "conversation_version": 3,
             "messages": turn["messages"] + [{"role": "ai", "text": "Shared answer"}],
         }
-        with patch("main.get_supabase", return_value=db), \
-             patch("main.claim_tutor_turn", return_value=turn) as claim, \
-             patch("main.complete_tutor_turn", return_value=completed), \
-             patch("main.public_tutor_session", return_value={"id": "session-1", "conversation_version": 3}) as public:
+        with patch("routers.chat.get_supabase", return_value=db), \
+             patch("routers.chat.claim_tutor_turn", return_value=turn) as claim, \
+             patch("routers.chat.complete_tutor_turn", return_value=completed), \
+             patch("routers.chat.public_tutor_session", return_value={"id": "session-1", "conversation_version": 3}) as public:
             response = self.client.post(
                 "/chat",
                 headers={"Authorization": "Bearer test"},
@@ -324,7 +324,7 @@ class TutorContractTests(unittest.TestCase):
         claim.assert_called_once()
         public.assert_called_once_with(completed)
 
-    @patch("main.get_user_id", return_value="student-1")
+    @patch("routers.chat.get_user_id", return_value="student-1")
     def test_capture_skill_queues_the_existing_extension_flow(self, _auth):
         turn = {
             "id": "session-1",
@@ -336,10 +336,10 @@ class TutorContractTests(unittest.TestCase):
             "browser_last_seen_at": datetime.now(timezone.utc).isoformat(),
         }
         waiting = {**turn, "status": "waiting_browser", "conversation_version": 4}
-        with patch("main.claim_tutor_turn", return_value=turn), \
-             patch("main.queue_browser_command", return_value={"id": "command-1"}) as queue, \
-             patch("main.wait_for_browser_result", return_value=waiting) as wait, \
-             patch("main.public_tutor_session", side_effect=[
+        with patch("routers.chat.claim_tutor_turn", return_value=turn), \
+             patch("routers.chat.queue_browser_command", return_value={"id": "command-1"}) as queue, \
+             patch("routers.chat.wait_for_browser_result", return_value=waiting) as wait, \
+             patch("routers.chat.public_tutor_session", side_effect=[
                  {"browser_available": True},
                  {"id": "session-1", "status": "waiting_browser", "conversation_version": 4},
              ]):
@@ -361,7 +361,7 @@ class TutorContractTests(unittest.TestCase):
         queue.assert_called_once_with("student-1", turn, "capture_current_page", "Read this page")
         wait.assert_called_once()
 
-    @patch("main.get_user_id", return_value="student-1")
+    @patch("routers.chat.get_user_id", return_value="student-1")
     def test_find_material_searches_only_the_approved_active_page(self, _auth):
         turn = {
             "id": "session-1",
@@ -373,10 +373,10 @@ class TutorContractTests(unittest.TestCase):
             "browser_last_seen_at": datetime.now(timezone.utc).isoformat(),
         }
         waiting = {**turn, "status": "waiting_browser"}
-        with patch("main.claim_tutor_turn", return_value=turn), \
-             patch("main.queue_browser_command", return_value={"id": "command-2"}) as queue, \
-             patch("main.wait_for_browser_result", return_value=waiting), \
-             patch("main.public_tutor_session", side_effect=[
+        with patch("routers.chat.claim_tutor_turn", return_value=turn), \
+             patch("routers.chat.queue_browser_command", return_value={"id": "command-2"}) as queue, \
+             patch("routers.chat.wait_for_browser_result", return_value=waiting), \
+             patch("routers.chat.public_tutor_session", side_effect=[
                  {"browser_available": True},
                  {"id": "session-1", "status": "waiting_browser", "conversation_version": 7},
              ]):
@@ -398,7 +398,7 @@ class TutorContractTests(unittest.TestCase):
             "student-1", turn, "find_material_current_page", "Find Exam 1 review material"
         )
 
-    @patch("main.get_user_id", return_value="student-1")
+    @patch("routers.chat.get_user_id", return_value="student-1")
     def test_plan_without_selected_material_points_to_calendar_dashboard(self, _auth):
         turn = {
             "id": "session-1",
@@ -407,9 +407,9 @@ class TutorContractTests(unittest.TestCase):
             "conversation_version": 9,
             "messages": [{"role": "user", "text": "Plan my week"}],
         }
-        with patch("main.claim_tutor_turn", return_value=turn), \
-             patch("main.complete_tutor_turn", return_value={**turn, "status": "idle", "conversation_version": 10}), \
-             patch("main.public_tutor_session", return_value={"id": "session-1", "status": "idle"}):
+        with patch("routers.chat.claim_tutor_turn", return_value=turn), \
+             patch("routers.chat.complete_tutor_turn", return_value={**turn, "status": "idle", "conversation_version": 10}), \
+             patch("routers.chat.public_tutor_session", return_value={"id": "session-1", "status": "idle"}):
             response = self.client.post(
                 "/chat",
                 headers={"Authorization": "Bearer test"},
@@ -426,7 +426,7 @@ class TutorContractTests(unittest.TestCase):
         self.assertEqual(response.json()["action"], "opened_plan_help")
         self.assertIn("calendar reminders", response.json()["answer"])
 
-    @patch("main.get_user_id", return_value="student-1")
+    @patch("routers.chat.get_user_id", return_value="student-1")
     def test_organize_requires_and_uses_explicit_destination_class(self, _auth):
         target_class = "55555555-5555-4555-8555-555555555555"
         db, _table = self.guide_db()
@@ -438,11 +438,11 @@ class TutorContractTests(unittest.TestCase):
             "messages": [{"role": "user", "text": "Move this guide"}],
         }
         completed = {**turn, "status": "idle", "conversation_version": 12}
-        with patch("main.get_supabase", return_value=db), \
-             patch("main.claim_tutor_turn", return_value=turn), \
+        with patch("routers.chat.get_supabase", return_value=db), \
+             patch("routers.chat.claim_tutor_turn", return_value=turn), \
              patch("main.guides.move_guide", return_value={"updated": True}) as move, \
-             patch("main.complete_tutor_turn", return_value=completed), \
-             patch("main.public_tutor_session", return_value={"id": "session-1", "status": "idle"}):
+             patch("routers.chat.complete_tutor_turn", return_value=completed), \
+             patch("routers.chat.public_tutor_session", return_value={"id": "session-1", "status": "idle"}):
             response = self.client.post(
                 "/chat",
                 headers={"Authorization": "Bearer test"},
@@ -462,7 +462,7 @@ class TutorContractTests(unittest.TestCase):
         self.assertEqual(move.call_args.args[0], self.guide_id)
         self.assertEqual(move.call_args.args[1].folder_id, target_class)
 
-    @patch("main.get_user_id", return_value="student-1")
+    @patch("routers.chat.get_user_id", return_value="student-1")
     def test_browser_material_guide_uses_explicitly_selected_class(self, _auth):
         class_id = "66666666-6666-4666-8666-666666666666"
         turn = {
@@ -483,16 +483,16 @@ class TutorContractTests(unittest.TestCase):
         db = MagicMock()
         db.table.return_value = table
 
-        with patch("main.get_supabase", return_value=db), \
-             patch("main.claim_tutor_turn", return_value=turn), \
-             patch("main.complete_tutor_turn", return_value=completed), \
-             patch("main.public_tutor_session", return_value={"id": "session-1", "status": "idle"}), \
-             patch("main.require", return_value={"used": 0}), \
-             patch("main.record"), \
-             patch("main._learning_guidance", return_value=""), \
-             patch("main.generate_study_guide", return_value="Q1: What is a proposition?\nA1: A declarative statement."), \
-             patch("main.study_guide_to_flashcards", return_value=[{"front": "What is a proposition?", "back": "A declarative statement."}]), \
-             patch("main.study_guide_is_complete", return_value=True):
+        with patch("routers.chat.get_supabase", return_value=db), \
+             patch("routers.chat.claim_tutor_turn", return_value=turn), \
+             patch("routers.chat.complete_tutor_turn", return_value=completed), \
+             patch("routers.chat.public_tutor_session", return_value={"id": "session-1", "status": "idle"}), \
+             patch("routers.chat.require", return_value={"used": 0}), \
+             patch("routers.chat.record"), \
+             patch("routers.chat.learning_guidance", return_value=""), \
+             patch("routers.chat.generate_study_guide", return_value="Q1: What is a proposition?\nA1: A declarative statement."), \
+             patch("routers.chat.study_guide_to_flashcards", return_value=[{"front": "What is a proposition?", "back": "A declarative statement."}]), \
+             patch("routers.chat.study_guide_is_complete", return_value=True):
             response = self.client.post(
                 "/chat",
                 headers={"Authorization": "Bearer test"},

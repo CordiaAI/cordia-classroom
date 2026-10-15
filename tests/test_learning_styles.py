@@ -9,9 +9,8 @@ from fastapi.testclient import TestClient
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
-import main
 from main import app
-from services import learning_styles
+from services import guidance, learning_styles
 from services.learning_styles import (
     find_item,
     guide_items,
@@ -158,12 +157,14 @@ class StyleRouteTests(unittest.TestCase):
 
 
 class TutorStyleTests(unittest.TestCase):
-    @patch("main.get_supabase", return_value=MagicMock())
+    @patch("services.guidance.get_supabase", return_value=MagicMock())
     def test_tutor_guidance_includes_only_the_chosen_style(self, _supabase):
-        with patch("services.learning_styles.active_style", return_value="aural"):
-            self.assertIn("talking things through", main._style_instruction("student-1"))
-        with patch("services.learning_styles.active_style", return_value=None):
-            self.assertEqual(main._style_instruction("student-1"), "")
+        with patch("services.guidance.active_style", return_value="aural"), \
+             patch("services.guidance.load_preference", return_value={}):
+            self.assertIn("talking things through", guidance.style_instruction("student-1"))
+        with patch("services.guidance.active_style", return_value=None), \
+             patch("services.guidance.load_preference", return_value={}):
+            self.assertEqual(guidance.style_instruction("student-1"), "")
 
 
 if __name__ == "__main__":

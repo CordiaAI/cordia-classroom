@@ -60,7 +60,7 @@ class UniversalCaptureContractTests(unittest.TestCase):
         self.assertNotIn("content_id", response.json())
         self.assertEqual(response.json()["sections"][0]["text"], "Cells divide through mitosis.")
 
-    @patch("main._learning_guidance", return_value="")
+    @patch("main.learning_guidance", return_value="")
     @patch("main.record")
     @patch("main.require", return_value={"used": 0})
     @patch("main.generate_study_guide", return_value="Q1: What is mitosis?\nA1: Cell division.")
@@ -88,7 +88,7 @@ class UniversalCaptureContractTests(unittest.TestCase):
         )
         self.assertFalse(study_guide_is_complete(guide))
 
-    @patch("main._learning_guidance", return_value="")
+    @patch("main.learning_guidance", return_value="")
     @patch("main.record")
     @patch("main.require", return_value={"used": 0})
     @patch("main.generate_study_guide", return_value="Q1: What is mitosis?\nA1: Cell division.\nQ2: What follows?")
@@ -104,7 +104,7 @@ class UniversalCaptureContractTests(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "CordiaClassroom received an incomplete guide. Please try again.")
         record.assert_not_called()
 
-    @patch("main._learning_guidance", return_value="")
+    @patch("main.learning_guidance", return_value="")
     @patch("main.record")
     @patch("main.require", return_value={"used": 0})
     @patch("main.generate_study_guide", return_value="[Error generating study guide]")
@@ -120,7 +120,7 @@ class UniversalCaptureContractTests(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "CordiaClassroom could not build a guide from this material.")
         record.assert_not_called()
 
-    @patch("main._learning_guidance", return_value="")
+    @patch("main.learning_guidance", return_value="")
     @patch("main.record")
     @patch("main.require", return_value={"used": 0})
     @patch("main.generate_study_guide", return_value="Q1: What is required?\nA1: A deployment diagram.")
