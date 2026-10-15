@@ -22,7 +22,7 @@ description: Use at the start of any CordiaClassroom (AutoStudyai repo) coding s
 ## Layout
 - `extension/` — MV3 extension (`content.js`, `background.js`, `popup.js`, `asai-bridge.js`, `vendor/Readability.js`).
 - `pptx-bundle/pptx-parser.js` — locked PPTX parser bundle; `backend/services/pptx_rendering.py` renders PPTX server-side.
-- `backend/` — FastAPI on Fly (`main.py`, `routers/*`, `services/llm.py`, `services/text_processing.py`, `domains/*.json`).
+- `backend/` — FastAPI on Fly (`main.py`, `routers/*`, `services/llm.py`, `services/text_processing.py`). `domains/` and the `/exam` router were removed 2026-10-15 (unused; `study_guides.domain` column is always null — drop in a migration).
 - `web/` — Next.js pages router (Vercel auto-deploy on push to main).
 - **Deploying the backend from a cloud session (you CAN; never tell Jackson you can't):** install flyctl (`curl -sL https://fly.io/install.sh | sh`, then `export PATH=/root/.fly/bin:$PATH`), then `cd backend && flyctl deploy --remote-only --depot=false`. Plain `fly deploy` fails here because the proxy breaks the default Depot builder's TLS. `FLY_API_TOKEN` is already in the env. Verify with `flyctl logs --no-tail` and a 200 from https://autostudy-ai.fly.dev/.
 - `supabase/migrations/` — timestamped SQL; no full schema baseline exists yet.
