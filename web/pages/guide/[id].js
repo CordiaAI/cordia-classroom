@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import BodyPortal from '../../components/BodyPortal';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
@@ -49,6 +50,7 @@ function MakeCard({ front: initialFront, onSave, onClose }) {
   const [back, setBack] = useState('');
   const [saving, setSaving] = useState(false);
   return (
+    <BodyPortal>
     <div className="c-scrim" onClick={onClose}>
       <form className="c-sheet make-card" role="dialog" aria-modal="true" aria-labelledby="make-card-title" onClick={event => event.stopPropagation()} onSubmit={async event => { event.preventDefault(); setSaving(true); await onSave({ front: front.trim(), back: back.trim() }); setSaving(false); }}>
         <header className="c-sheet-head">
@@ -66,6 +68,7 @@ function MakeCard({ front: initialFront, onSave, onClose }) {
         `}</style>
       </form>
     </div>
+    </BodyPortal>
   );
 }
 

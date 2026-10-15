@@ -8,7 +8,7 @@ import useSessionTracker from '../lib/useSessionTracker';
 import { createDashboardOverview } from '../lib/dashboardOrganization';
 import { loadStudyQueue } from '../lib/studyQueue';
 import { lastGuide } from '../lib/userStore';
-import { markUsed, useProgress } from '../lib/progress';
+import { markUsed, unmarkUsed, useProgress } from '../lib/progress';
 import { activeStep, dayOneFinished, startWalkthrough, walkthroughEvent } from '../lib/walkthrough';
 import { streakWithFreeze } from '../lib/activity';
 import { loadOnboarding, saveOnboardingStep } from '../lib/onboarding';
@@ -92,7 +92,11 @@ export default function Today({ timerState, setTimerState }) {
     loadStudyQueue().then(setQueue);
     apiFetch('/stats/insights').then(data => { setInsights(data); if (data?.answered) markUsed('quiz'); });
     apiFetch('/smart_notes').then(data => { if (data?.notes?.length) markUsed('notes'); });
-    apiFetch('/calendar/connection').then(data => { setCalendar(data); if (data?.connected) markUsed('calendar'); });
+    apiFetch('/calendar/connection').then(data => {
+      setCalendar(data);
+      if (data?.connected) markUsed('calendar');
+      else if (data && !data.detail && data.connected === false) unmarkUsed('calendar');
+    });
     apiFetch('/onboarding/checklist').then(data => {
       if (data?.practice) markUsed('practice');
       if (data?.learn_your_way) markUsed('explain');

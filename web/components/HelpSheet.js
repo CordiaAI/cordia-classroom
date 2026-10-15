@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
 import { Inbox, MessageSquareText, Play, Puzzle, X } from 'lucide-react';
 import { EXTENSION_STORE_URL } from '../lib/extension';
@@ -24,6 +25,7 @@ export default function HelpSheet({ onClose, onFeedback, canReviewFeedback }) {
   }
 
   return (
+    <BodyPortal>
     <div className="c-scrim" onClick={onClose}>
       <section className="c-sheet help-sheet" role="dialog" aria-modal="true" aria-labelledby="help-title" onClick={event => event.stopPropagation()}>
         <header className="c-sheet-head">
@@ -50,5 +52,6 @@ export default function HelpSheet({ onClose, onFeedback, canReviewFeedback }) {
         .help-links { display: flex; gap: 20px; margin-top: 24px; font: 600 13px/1 var(--font-sans); }
       `}</style>
     </div>
+    </BodyPortal>
   );
 }

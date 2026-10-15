@@ -107,6 +107,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const sendingRef = useRef(false);
   const [extracting, setExtracting] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [explainOpen, setExplainOpen] = useState(false);
   const { learningStyle } = useLearningStyle();
   const [listening, setListening] = useState(false);
@@ -351,7 +352,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     const room = MAX_ATTACHMENTS - attachments.length;
     if (readable.length > room) problems.push(`The Tutor can hold up to ${MAX_ATTACHMENTS} files at a time.`);
     const toRead = readable.slice(0, Math.max(room, 0));
-    setLocalError(problems.join(' '));
+    setLocalError([...new Set(problems)].join(' '));
     if (fileRef.current) fileRef.current.value = '';
     if (!toRead.length) return;
     setExtracting(true);
@@ -365,10 +366,10 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         if (!response.ok || !data?.text) throw new Error(apiErrorMessage(data?.detail, 'Could not read this file.'));
         added.push({ id: `${file.name}:${file.size}:${file.lastModified}`, title: file.name, content: data.text });
       } catch (error) {
-        problems.push(`${file.name}: ${error.message || 'Could not read this file.'}`);
+        problems.push(toRead.length > 1 ? 'Some files could not be read.' : 'This file could not be read.');
       }
     }
-    setLocalError(problems.join(' '));
+    setLocalError([...new Set(problems)].join(' '));
     if (added.length) {
       setAttachments(current => {
         const seen = new Set(current.map(file => file.id));
@@ -469,8 +470,10 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
             ...(session?.browser_content_available ? [{ value: 'browser', label: browserMaterial?.title || 'Browser page', group: 'Browser' }] : []),
           ]} />
         </div>
-        <details className="tutor-context-controls">
+        <details className="tutor-context-controls" open={optionsOpen} onToggle={event => setOptionsOpen(event.currentTarget.open)}>
         <summary><SlidersHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />Options</summary>
+        {/* Rendered only while Options is open: closed, these controls sat invisibly over "Ask anything". */}
+        {optionsOpen && <>
         <TutorSelect label="Tutor skill" value={skillOverride} onChange={changeSkill} disabled={!session || busy} options={[
           { value: '', label: `Auto · ${session?.skills?.find(item => item.id === session?.active_skill)?.label || 'Explain'}` },
           ...(session?.skills || [{ id: 'explain', label: 'Explain' }]).map(item => ({ value: item.id, label: item.available === false ? `${item.label} — coming soon` : item.label, disabled: item.available === false })),
@@ -509,6 +512,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
             <ExplanationPreference compact onSaved={() => setTimeout(() => setExplainOpen(false), 900)} />
           </div>
         )}
+        </>}
         </details>
       </header>
 

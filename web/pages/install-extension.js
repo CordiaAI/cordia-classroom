@@ -77,7 +77,7 @@ export default function InstallExtensionPage() {
         .extension-install-hero p:last-child { color: var(--text-secondary); line-height: 1.55; max-width: 590px; }
         .extension-install-steps { list-style: none; counter-reset: none; display: grid; gap: 14px; padding: 0; margin: 0; }
         .extension-install-step { display: grid; grid-template-columns: 36px 1fr; gap: 14px; padding: 20px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--bg-secondary); box-shadow: var(--shadow-sm); }
-        .extension-install-number { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: var(--bg-deepest); font-size: max(13px, 0.86em); font-weight: 800; }
+        .extension-install-number { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--olive); color: var(--on-olive); font-size: max(13px, 0.86em); font-weight: 800; }
         h2 { font-size: max(13px, 1.04em); margin: 4px 0 6px; color: var(--text-primary); }
         .extension-install-step p { color: var(--text-secondary); font-size: max(13px, 0.9em); line-height: 1.55; }
         .extension-install-store-link { display: inline-flex; gap: 6px; align-items: center; margin-top: 13px; padding: 8px 12px; border-radius: 12px; background: var(--accent-glow); color: var(--accent); font-size: max(13px, 0.86em); font-weight: 700; }

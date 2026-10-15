@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { setThemePreference } from '../lib/theme';
 import { useRouter } from 'next/router';
 import { useRequireAuth } from '../lib/auth';
 import { apiErrorMessage, apiFetch, cacheUserIdentity, getUserEmail, getUserName, openUpgrade } from '../lib/api';
@@ -150,8 +151,7 @@ export default function SettingsPage() {
 
   function setAppearance(next) {
     setTheme(next);
-    localStorage.setItem('theme', next);
-    document.documentElement.setAttribute('data-theme', next);
+    setThemePreference(next);
   }
 
   if (!ready) return null;

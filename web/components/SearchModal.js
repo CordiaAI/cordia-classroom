@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
 import { BookOpen, Layers, NotebookPen, Search, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
@@ -76,6 +77,7 @@ export default function SearchModal({ onClose }) {
   const GROUP = { guide: 'Guides', card: 'Cards', note: 'Notes' };
 
   return (
+    <BodyPortal>
     <div className="c-scrim c-search-scrim" onClick={onClose}>
       <div className="c-sheet c-search-sheet" role="dialog" aria-modal="true" aria-label="Search" onClick={event => event.stopPropagation()}>
         <div className="c-row">
@@ -117,5 +119,6 @@ export default function SearchModal({ onClose }) {
         @media (max-width: 767px) { .c-search-scrim { place-items: end stretch; padding-top: 0; } }
       `}</style>
     </div>
+    </BodyPortal>
   );
 }

@@ -98,8 +98,8 @@ export const MINI = {
 // Which real action counts as using each feature (ticks Learn Cordia, hides its dot).
 const FEATURE_EVENTS = {
   'guide-ready': 'add', explain: 'explain', 'card-made': 'card', 'quiz-started': 'quiz', ask: 'ask',
-  'card-flipped': 'cards', 'practice-opened': 'practice', 'calendar-opened': 'calendar', 'focus-started': 'focus',
-  'notes-opened': 'notes', 'insights-opened': 'insights', 'grove-opened': 'grove',
+  'card-flipped': 'cards', 'practice-opened': 'practice', 'calendar-connected': 'calendar', 'focus-started': 'focus',
+  'note-written': 'notes', 'insights-opened': 'insights', 'grove-opened': 'grove',
 };
 
 export const FEATURES = Object.keys(MINI);

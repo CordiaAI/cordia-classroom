@@ -7,24 +7,29 @@ import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import UpgradeModal from '../components/UpgradeModal';
 import { scheduleProactiveRefresh, getToken } from '../lib/api';
+import { applyTheme, syncThemeFromAccount } from '../lib/theme';
+import { useProgress } from '../lib/progress';
 import { Analytics } from '@vercel/analytics/react';
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
-  // Public pages render without the signed-in shell.
-  const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password'].includes(router.pathname);
+  // Public pages render without the signed-in shell. Pricing gets the app nav when signed in.
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => { setSignedIn(Boolean(getToken())); }, [router.pathname]);
+  const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password'].includes(router.pathname)
+    && !(router.pathname === '/pricing' && signedIn);
 
   // Authentication pages stay light; workspace routes honor the saved preference.
-  useEffect(() => {
-    const saved = typeof window !== 'undefined' && localStorage.getItem('theme');
-    const theme = ['/', '/login', '/signup', '/pricing', '/reset-password'].includes(router.pathname) ? 'light' : saved || 'light';
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [router.pathname]);
+  useEffect(() => { applyTheme(router.pathname); }, [router.pathname]);
 
-  // Start proactive token refresh if already logged in
+  // Start proactive token refresh if already logged in; the account's saved theme wins over the cache.
   useEffect(() => {
-    if (getToken()) scheduleProactiveRefresh();
+    if (!getToken()) return;
+    scheduleProactiveRefresh();
   }, []);
+  // The account's saved theme replaces the local cache as soon as the account loads.
+  const progress = useProgress();
+  useEffect(() => { if (progress.theme) syncThemeFromAccount(); }, [progress.theme]);
   const [timerState, setTimerState] = useState({
     mode: 'focus', minutes: 25, seconds: 0, isRunning: false
   });

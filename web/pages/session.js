@@ -36,6 +36,11 @@ export default function StudySession() {
   }, [ready]);
 
   const cards = queue ? [...queue.cards, ...queue.misses] : [];
+  // Nothing to flip: Start goes straight into the first open practice set, not a menu.
+  const directPractice = queue && !cards.length && queue.practice.length ? queue.practice[0].guideId : '';
+  useEffect(() => {
+    if (directPractice) router.replace('/practice/' + directPractice);
+  }, [directPractice, router]);
 
   const onFinish = useCallback(async ({ known, missed, seconds }) => {
     const byGuide = new Map();
@@ -74,7 +79,7 @@ export default function StudySession() {
   }, [cards, queue]);
 
   if (!ready) return null;
-  if (!queue) {
+  if (!queue || directPractice) {
     return (
       <div className="session-skeleton" aria-busy="true" aria-label="Loading">
         <div className="c-skeleton" style={{ height: 52, borderRadius: 999 }} />

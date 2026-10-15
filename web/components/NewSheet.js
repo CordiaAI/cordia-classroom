@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
 import {
   ArrowLeft, ClipboardPaste, FileImage, FileText, Link as LinkIcon, Mic, Presentation, Sparkles, Square, Upload, X,
@@ -301,6 +302,7 @@ export default function NewSheet() {
   const option = NEW_OPTIONS.find(item => item.mode === mode);
 
   return (
+    <BodyPortal>
     <div className="c-scrim" onClick={close}>
       <section ref={sheetRef} className="c-sheet new-sheet" role="dialog" aria-modal="true" aria-labelledby="new-sheet-title" onClick={event => event.stopPropagation()}>
         <header className="c-sheet-head">
@@ -408,7 +410,7 @@ export default function NewSheet() {
         .new-files li span { flex: 1; min-width: 0; }
         .new-text { min-height: 200px; }
         .new-record { display: grid; justify-items: center; gap: 10px; justify-self: center; width: 128px; height: 128px; align-content: center; border: 0; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 600 15px/1 var(--font-sans); cursor: pointer; }
-        .new-record.is-on { background: var(--error); }
+        .new-record.is-on { background: var(--error-solid); }
         .new-class { max-width: 280px; }
         .new-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 20px; }
         .new-error { margin: 16px 0 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
@@ -417,5 +419,6 @@ export default function NewSheet() {
         .new-headings li.is-current { background: var(--olive-tint); }
       `}</style>
     </div>
+    </BodyPortal>
   );
 }

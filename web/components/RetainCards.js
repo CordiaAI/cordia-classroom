@@ -52,7 +52,8 @@ function NextButton({ onNext, missed }) {
 
 export function McCard({ card, question, guideId, onResult, onNext }) {
   const answer = conceptAnswer(question);
-  const [options] = useState(() => (card.reask ? shuffled(question.options, card.id) : question.options));
+  // Always shuffled, so the right answer's position never gives it away (saved quizzes kept it first).
+  const [options] = useState(() => shuffled(question.options || [], Math.floor(Math.random() * 233280)));
   const [selected, setSelected] = useState(null);
 
   function choose(option) {

@@ -137,16 +137,12 @@ export function apiErrorMessage(detail, fallback = 'Something went wrong. Please
   return message;
 }
 
+// The request id stays on the data for support tools; students never see it in a message.
 function addRequestReference(data, response) {
   if (response.ok || !data || typeof data !== 'object' || Array.isArray(data)) return data;
   const requestId = response.headers.get('X-Request-ID');
   if (!requestId) return data;
-  const suffix = ` Reference: ${requestId}`;
-  return {
-    ...data,
-    request_id: requestId,
-    detail: typeof data.detail === 'string' ? `${data.detail}${suffix}` : data.detail,
-  };
+  return { ...data, request_id: requestId };
 }
 
 export async function responseJson(response) {

@@ -59,6 +59,7 @@
   --radius: var(--r-input);
   --radius-lg: var(--r-card);
   --error-bg: rgba(180, 35, 24, 0.08);
+  --error-solid: #B42318;
   --success-bg: rgba(57, 114, 75, 0.1);
   color-scheme: light;
 }
@@ -92,6 +93,9 @@
   --bg-tertiary: var(--card-sunk);
   --border-default: var(--line);
   --border-subtle: var(--line);
+  --error: #FF8A80;
+  --error-bg: #3A2222;
+  --success-bg: rgba(195, 207, 182, 0.14);
   color-scheme: dark;
 }
 
@@ -138,7 +142,7 @@ a { color: var(--olive-ink); }
   transition: background 150ms var(--ease), transform 90ms var(--ease), box-shadow 150ms var(--ease);
 }
 .c-btn:hover, .btn:hover { text-decoration: none; }
-.c-btn:disabled, .btn:disabled, .btn-outline:disabled { opacity: .45; cursor: default; }
+.c-btn:disabled, .btn:disabled, .btn-outline:disabled { opacity: 1; background: var(--card-sunk); border-color: var(--line); color: var(--muted); box-shadow: none; cursor: default; }
 .c-btn--primary, .btn, .btn-green { background: var(--olive); color: var(--on-olive); border-color: var(--olive); box-shadow: none; }
 .c-btn--primary:hover:not(:disabled), .btn:hover:not(:disabled) { background: var(--olive-press); border-color: var(--olive-press); }
 .c-btn--primary:active:not(:disabled), .btn:active:not(:disabled) { background: var(--olive-press); transform: scale(.98); }
@@ -550,3 +554,85 @@ body:has(.about) .c-fab { display: none; }
   .sn-header-left { width: 100%; }
   .sn-title-input { width: 100%; min-width: 0; font-size: 24px; }
 }
+
+/* ---------- Liquid glass (visual only: no sizes, spacing or positions change here) ---------- */
+:root {
+  --lg-card: rgba(255, 255, 252, 0.55);
+  --lg-panel: rgba(255, 255, 252, 0.72);
+  --lg-menu: rgba(255, 255, 252, 0.88);
+  --lg-edge: rgba(255, 255, 255, 0.60);
+  --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.90);
+  --lg-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  --lg-filter: blur(24px) saturate(170%);
+}
+[data-theme='dark'] {
+  --lg-card: rgba(39, 42, 48, 0.55);
+  --lg-panel: rgba(39, 42, 48, 0.72);
+  --lg-menu: rgba(39, 42, 48, 0.88);
+  --lg-edge: rgba(255, 255, 255, 0.10);
+  --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* Backdrop behind the app in both themes. Light keeps the pale clouds; dark gets a static,
+   softly blurred field of deep olive and charcoal so glass has something to show. */
+[data-theme='dark'] body::before {
+  opacity: 1;
+  inset: -120px;
+  background:
+    radial-gradient(55% 48% at 16% 20%, #2B3327 0%, #2B3327 35%, transparent 75%),
+    radial-gradient(44% 40% at 84% 28%, #1E2125 0%, #1E2125 40%, transparent 78%),
+    radial-gradient(58% 50% at 66% 84%, #2B3327 0%, #2B3327 35%, transparent 75%),
+    radial-gradient(40% 34% at 10% 88%, #1E2125 0%, transparent 72%),
+    #1A1D20;
+  background-blend-mode: normal;
+  filter: blur(80px);
+}
+
+/* Cards (the note paper keeps its cream paper look in both themes) */
+.c-card,
+:is(.card, .folder-card, .stat-card, .dashboard-class-rail, .study-rail-card, .canvas-dashboard, .compact-calendar, .continue-card, .recent-material, .overview-snapshot, .settings-section, .create-window, .create-card, .practice-source-panel, .practice-main, .practice-problem-panel, .quiz-card, .quiz-question-card, .nclex-card, .completion-card, .guide-reader-window),
+.sn-viewer-wrap, .sn-diagram-wrap,
+.extension-install-hero, .extension-install-step, .extension-install-footer {
+  background: var(--lg-card) !important;
+  border-color: var(--lg-edge) !important;
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
+}
+
+/* Nav, sheets and the Tutor panel */
+.c-topbar, .c-tabbar, .c-sheet, .tutor-drawer, .tutor-drawer.c-glass,
+:root:not([data-theme='dark']) .tutor-drawer.c-glass,
+[data-theme='light'] .c-sheet, :root:not([data-theme='dark']) .c-sheet {
+  background: var(--lg-panel);
+  border-color: var(--lg-edge);
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+}
+.c-sheet, .tutor-drawer { box-shadow: var(--lg-highlight), var(--lg-shadow); }
+.c-topbar { box-shadow: var(--lg-highlight), 0 1px 0 var(--line); }
+.c-tabbar { box-shadow: var(--lg-highlight); }
+
+/* Menus and popovers: dense enough that page text never shows through. */
+.c-menu, .c-search-results, .tutor-select-options, .sn-notes-dropdown, .account-menu-panel {
+  background: var(--lg-menu) !important;
+  border-color: var(--lg-edge) !important;
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .c-card, .c-topbar, .c-tabbar, .c-sheet, .tutor-drawer, .c-menu, .tutor-select-options, .sn-notes-dropdown { background: var(--card) !important; }
+}
+
+/* Calendar in dark mode: the today header is olive with white text (it was white on white),
+   and the type chips get dark-theme tints instead of light pastels. */
+[data-theme='dark'] .calendar-day-today { background: rgba(195, 207, 182, 0.06); }
+[data-theme='dark'] .calendar-day-today > header { background: var(--olive); }
+[data-theme='dark'] .calendar-kind { background: rgba(195, 207, 182, 0.16); color: #C3CFB6; }
+[data-theme='dark'] .calendar-kind-exam, [data-theme='dark'] .calendar-kind-quiz { background: rgba(255, 170, 130, 0.16); color: #FFB899; }
+[data-theme='dark'] .calendar-kind-project { background: rgba(170, 168, 230, 0.18); color: #CFCDF7; }
+
+/* Note cards and the note page are cream paper in both themes, so their text stays paper ink. */
+[data-theme='dark'] .sn-card-paper .sn-card-preview { color: #2d2540; }

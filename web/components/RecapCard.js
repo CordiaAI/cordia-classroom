@@ -35,7 +35,8 @@ export default function RecapCard({ guides, folders, since, cardsStudied = 0 }) 
     const topId = Object.entries(byFolder).sort((a, b) => b[1] - a[1])[0]?.[0];
     return {
       hours: Math.round((minutes / 60) * 10) / 10,
-      cards: cards || cardsStudied,
+      // The account's own count (same /stats/overview Today uses); this device's log only as a fallback.
+      cards: cardsStudied || cards,
       topClass: folders.find(folder => folder.id === topId)?.name || '–',
     };
   }, [guides, folders, since, progress.grove, cardsStudied]);

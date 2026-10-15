@@ -2,6 +2,18 @@ import { useEffect, useState } from 'react';
 import { Bell, BellOff, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, ExternalLink, RefreshCw, Unlink } from 'lucide-react';
 import { apiErrorMessage, apiFetch, getUserId } from '../lib/api';
 import { walkthroughEvent } from '../lib/walkthrough';
+import { CanvasCalendarFeed, CanvasCalendarNav, CanvasFeedLink } from './CanvasShots';
+
+// Checked before Connect: a Canvas calendar feed is an https (or webcal) link ending in .ics.
+export function feedLinkProblem(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  let url;
+  try { url = new URL(text.replace(/^webcal:\/\//i, 'https://')); } catch { return 'That is not a link. Paste the whole link from Canvas.'; }
+  if (url.protocol !== 'https:') return 'The link should start with https://';
+  if (!/\.ics$/i.test(url.pathname)) return 'Use the Calendar Feed link that ends in .ics.';
+  return '';
+}
 
 const FEED_KEY = 'cordiaCanvasCalendarFeed';
 const REMINDER_KEY = 'cordiaCalendarReminders';
@@ -194,10 +206,11 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
       );
     }
     const steps = [
-      { label: 'Open Canvas', icon: ExternalLink },
-      { label: 'Copy link', icon: ClipboardCopy },
-      { label: 'Paste here', icon: ClipboardPaste },
+      { label: 'Open Canvas', icon: ExternalLink, shot: <CanvasCalendarNav />, line: 'Open Canvas Calendar' },
+      { label: 'Copy link', icon: ClipboardCopy, shot: <CanvasCalendarFeed />, line: 'Click Calendar Feed in the right sidebar' },
+      { label: 'Paste here', icon: ClipboardPaste, shot: <CanvasFeedLink />, line: 'Copy the link ending in .ics' },
     ];
+    const linkProblem = feedLinkProblem(feedUrl);
     return (
       <section className="c-card cal-connect" aria-label="Connect Canvas calendar">
         <ol className="cal-steps">
@@ -206,16 +219,19 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
               <span className="cal-step-num" aria-hidden="true">{index + 1}</span>
               <step.icon size={24} strokeWidth={1.75} aria-hidden="true" />
               <span>{step.label}</span>
+              <div className="cal-step-shot">{step.shot}</div>
+              <p className="cal-step-line">{step.line}</p>
             </li>
           ))}
         </ol>
-        <form className="cal-form" onSubmit={event => { event.preventDefault(); if (feedUrl.trim()) connect(feedUrl.trim()); }}>
+        <form className="cal-form" onSubmit={event => { event.preventDefault(); if (feedUrl.trim() && !linkProblem) connect(feedUrl.trim().replace(/^webcal:\/\//i, 'https://')); }}>
           <label className="c-field cal-field">
             <span>Calendar feed link</span>
-            <input className="c-input" type="url" value={feedUrl} onChange={event => setFeedUrl(event.target.value)} placeholder="https://" data-spot="calendar-feed" />
+            <input className="c-input" type="text" inputMode="url" value={feedUrl} onChange={event => setFeedUrl(event.target.value)} placeholder="https://" data-spot="calendar-feed" aria-invalid={Boolean(linkProblem)} aria-describedby={linkProblem ? 'cal-link-problem' : undefined} />
           </label>
-          <button type="submit" className="c-btn c-btn--primary" disabled={loading || !feedUrl.trim()}>{loading ? 'Checking…' : 'Connect'}</button>
+          <button type="submit" className="c-btn c-btn--primary" disabled={loading || !feedUrl.trim() || Boolean(linkProblem)}>{loading ? 'Checking…' : 'Connect'}</button>
         </form>
+        {linkProblem && <p id="cal-link-problem" className="canvas-inline-error" role="alert">{linkProblem}</p>}
         {error && <div className="canvas-inline-error" role="alert">{error}</div>}
         <style jsx>{`
           .cal-connect { display: grid; gap: 24px; padding: 28px; }
@@ -223,9 +239,11 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
           .cal-steps li { display: grid; justify-items: center; gap: 10px; padding: 20px 12px; border-radius: var(--r-card); background: var(--card-sunk); font: 600 15px/1.2 var(--font-sans); text-align: center; }
           .cal-steps :global(.lucide) { color: var(--olive-ink); }
           .cal-step-num { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 700 13px/1 var(--font-sans); }
+          .cal-step-shot { width: 100%; border-radius: var(--r-input); overflow: hidden; }
+          .cal-step-line { margin: 0; font: 600 13px/1.4 var(--font-sans); color: var(--ink); }
           .cal-form { display: flex; align-items: flex-end; gap: 8px; }
           .cal-field { flex: 1; }
-          @media (max-width: 767px) { .cal-steps { grid-template-columns: 1fr; } .cal-steps li { grid-template-columns: auto auto 1fr; justify-items: start; align-items: center; padding: 14px; } .cal-form { flex-direction: column; align-items: stretch; } }
+          @media (max-width: 767px) { .cal-steps { grid-template-columns: 1fr; } .cal-steps li { grid-template-columns: auto auto 1fr; justify-items: start; align-items: center; padding: 14px; } .cal-step-shot, .cal-step-line { grid-column: 1 / -1; } .cal-form { flex-direction: column; align-items: stretch; } }
         `}</style>
       </section>
     );

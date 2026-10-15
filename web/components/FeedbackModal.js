@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
 import { apiFetch } from '../lib/api';
 
@@ -99,6 +100,7 @@ export default function FeedbackModal({ onClose }) {
   }
 
   return (
+    <BodyPortal>
     <div className="feedback-overlay" onMouseDown={event => {
       if (event.target === event.currentTarget) onClose();
     }}>
@@ -159,8 +161,8 @@ export default function FeedbackModal({ onClose }) {
       </section>
 
       <style jsx>{`
-        .feedback-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(23, 25, 21, 0.45); backdrop-filter: blur(7px); }
-        .feedback-modal { width: min(540px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; padding: 30px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface-raised); color: var(--ink); box-shadow: var(--shadow-float); }
+        .feedback-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(23, 27, 24, .28); }
+        .feedback-modal { width: min(540px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; padding: 30px; border: 1px solid var(--line); border-radius: 20px; background: var(--lg-panel); -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); border-color: var(--lg-edge); color: var(--ink); box-shadow: var(--lg-highlight), var(--lg-shadow); }
         .feedback-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
         .feedback-kicker { margin: 0 0 8px; color: var(--olive); font-size: 13px; font-weight: 800; letter-spacing: 0.16em; }
         h2 { margin: 0; color: var(--ink); font-size: max(13px, clamp(1.65rem, 4vw, 2.15rem)); line-height: 1.05; letter-spacing: -0.045em; }
@@ -192,5 +194,6 @@ export default function FeedbackModal({ onClose }) {
         @media (prefers-reduced-motion: reduce) { .feedback-overlay, .feedback-modal { animation: none; transition: none; } }
       `}</style>
     </div>
+    </BodyPortal>
   );
 }

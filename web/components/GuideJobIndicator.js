@@ -40,7 +40,7 @@ export default function GuideJobIndicator() {
         .guide-job span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .guide-job-running :global(.cordia-loader) { gap: 0; }
         .guide-job-running :global(.cordia-loader svg) { filter: none; }
-        .guide-job-error span { white-space: normal; color: var(--red, #b42318); }
+        .guide-job-error span { white-space: normal; color: var(--error); }
         .guide-job-open { flex: 0 0 auto; padding: 5px 11px; border: 0; border-radius: 999px; background: #11120f; color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
         .guide-job-dismiss { flex: 0 0 auto; border: 0; background: none; color: var(--muted-ink); font-size: 1rem; line-height: 1; cursor: pointer; }
         @media (max-width: 720px) { .guide-jobs { top: auto; bottom: 16px; right: 16px; } }

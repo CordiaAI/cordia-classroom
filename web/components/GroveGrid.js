@@ -29,8 +29,8 @@ export default function GroveGrid({ guides, since }) {
       <style jsx>{`
         .grove-grid { display: grid; gap: 12px; padding: 20px; scroll-margin-top: calc(var(--bar-h) + 16px); }
         ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 16px; }
-        li { display: grid; justify-items: center; gap: 4px; text-align: center; }
-        .grove-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: 600 13px/1.3 var(--font-sans); }
+        li { display: grid; justify-items: center; gap: 4px; min-width: 0; text-align: center; }
+        .grove-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 100%; overflow-wrap: anywhere; font: 600 13px/1.3 var(--font-sans); }
       `}</style>
     </section>
   );

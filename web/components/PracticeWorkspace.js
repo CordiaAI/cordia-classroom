@@ -73,17 +73,22 @@ export default function PracticeWorkspace() {
       const saved = data?.practice;
       if (!Array.isArray(saved?.problems) || saved.problems.length !== 10) return;
       const progress = saved.progress || {};
+      // Each visit starts fresh: only problems already answered right keep their work.
+      // Unsolved problems open blank, without the last answer or its "Not quite" result.
+      const solved = Object.keys(progress.evaluations || {}).filter(index => progress.evaluations[index]?.status === 'correct');
+      const keep = (map = {}) => Object.fromEntries(Object.entries(map).filter(([index]) => solved.includes(index)));
+      const firstOpen = saved.problems.findIndex((_, index) => !solved.includes(String(index)));
       restoring.current = true;
       setProblems(saved.problems);
       setPracticeInfo({ subjectArea: saved.subject_area, domain: saved.domain, truthNote: saved.truth_note });
-      setProblemIndex(Math.min(9, Math.max(0, Number(progress.problemIndex) || 0)));
-      setAnswers(progress.answers || {});
-      setEvaluations(progress.evaluations || {});
-      setRevealed(progress.revealed || {});
-      setWorkText(progress.workText || {});
-      setTokens(progress.tokens || {});
+      setProblemIndex(firstOpen === -1 ? 0 : firstOpen);
+      setAnswers(keep(progress.answers));
+      setEvaluations(keep(progress.evaluations));
+      setRevealed(keep(progress.revealed));
+      setWorkText(keep(progress.workText));
+      setTokens(keep(progress.tokens));
       setReported(progress.reported || {});
-      try { drawings.current = JSON.parse(localStorage.getItem(drawingsKey(guideId)) || '{}'); } catch { drawings.current = {}; }
+      try { drawings.current = keep(JSON.parse(localStorage.getItem(drawingsKey(guideId)) || '{}')); } catch { drawings.current = {}; }
     });
   }, [ready, guideId]);
 

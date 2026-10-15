@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import BodyPortal from '../components/BodyPortal';
+import { mermaidConfig } from '../components/MermaidDiagram';
 import { useRouter } from 'next/router';
 import { authHeaders, authorizedFetch, responseJson } from '../lib/api';
 import { ChevronDown, FilePlus2, FileUp, NotebookPen, Sparkles, X as XIcon } from 'lucide-react';
@@ -146,7 +148,7 @@ function MermaidDiagram({ code }) {
     if (!code || !ref.current) return;
     setError(false);
     import('mermaid').then(({ default: mermaid }) => {
-      mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'strict' });
+      mermaid.initialize(mermaidConfig());
       const id = 'mermaid-' + Date.now();
       mermaid.render(id, code).then(({ svg }) => {
         if (ref.current) ref.current.innerHTML = svg;
@@ -201,6 +203,7 @@ function StudyGuidePreviewModal({ preview, title, setTitle, error, saving, onClo
   if (!preview) return null;
   const hasPairs = preview.pairs && preview.pairs.length > 0;
   return (
+    <BodyPortal>
     <div className="c-scrim" onClick={onClose}>
       <div className="c-sheet sn-modal" role="dialog" aria-modal="true" aria-label="Guide preview" onClick={e => e.stopPropagation()}>
         <div className="sn-modal-header">
@@ -241,6 +244,7 @@ function StudyGuidePreviewModal({ preview, title, setTitle, error, saving, onClo
         </div>
       </div>
     </div>
+    </BodyPortal>
   );
 }
 
@@ -459,17 +463,10 @@ function NotesIndex({ router, timerState, setTimerState }) {
   const folderById = Object.fromEntries(folders.map(f => [f.id, f]));
   useEffect(() => { walkthroughEvent('notes-opened'); }, []);
 
-  async function handleNew() {
-    try {
-      const resp = await fetch(API + '/smart_notes', {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Untitled Notes' }),
-      });
-      walkthroughEvent('note-created');
-      const data = await responseJson(resp);
-      if (data.note) router.push('/smartnotes?id=' + data.note.id);
-    } catch {}
+  // A new note is only saved once it has text or a title (see doSave), so empty notes never pile up.
+  function handleNew() {
+    walkthroughEvent('note-created');
+    router.push('/smartnotes?id=new');
   }
 
   async function handleSelectNoteForGuide(note) {
@@ -676,6 +673,26 @@ function SmartNotesEditor() {
   const [saveError, setSaveError] = useState('');
   const [notes, setNotes] = useState([]); // session list
   const [showNotesList, setShowNotesList] = useState(false);
+  const notesPickerRef = useRef(null);
+  const notesTriggerRef = useRef(null);
+  // The notes dropdown closes on Escape (focus returns to its button) and on any outside click.
+  useEffect(() => {
+    if (!showNotesList) return undefined;
+    function onKey(event) {
+      if (event.key !== 'Escape') return;
+      setShowNotesList(false);
+      notesTriggerRef.current?.focus();
+    }
+    function onPointer(event) {
+      if (!notesPickerRef.current?.contains(event.target)) setShowNotesList(false);
+    }
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer);
+    };
+  }, [showNotesList]);
 
   // Diagram / visualize
   const [mermaidCode, setMermaidCode] = useState(null);
@@ -731,7 +748,9 @@ function SmartNotesEditor() {
   // ── Init: load existing note (parent only renders editor when ?id is present)
   useEffect(() => {
     const { id } = router.query;
-    if (id && String(id) !== String(noteIdRef.current)) {
+    if (id === 'new') {
+      if (noteIdRef.current || !paperRef.current?.innerHTML) startBlankNote();
+    } else if (id && String(id) !== String(noteIdRef.current)) {
       loadNote(id);
     }
   }, [router.isReady, router.query.id]);
@@ -762,32 +781,68 @@ function SmartNotesEditor() {
 
   useEffect(() => { fetchNotes(); }, [noteId, fetchNotes]);
 
-  async function createNote() {
-    try {
-      const resp = await fetch(API + '/smart_notes', {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Untitled Notes' }),
-      });
-      const data = await responseJson(resp);
-      if (data.note) {
-        noteIdRef.current = data.note.id;
-        setNoteId(data.note.id);
-        // Ensure the paper has a starting <p> block so first-line typing has a wrapper
-        if (paperRef.current && !paperRef.current.innerHTML.trim()) {
-          paperRef.current.innerHTML = '<p><br></p>';
+  // A blank editor with no saved note behind it yet.
+  function startBlankNote() {
+    noteIdRef.current = null;
+    titleRef.current = 'Untitled Notes';
+    folderIdRef.current = '';
+    setNoteId(null);
+    setTitle('Untitled Notes');
+    setFolderId('');
+    if (paperRef.current) {
+      paperRef.current.innerHTML = '<p><br></p>';
+      lastSavedRef.current = paperRef.current.innerHTML;
+      setHasText(false);
+    }
+    lastSavedTitleRef.current = 'Untitled Notes';
+  }
+
+  // The note is created on the server the first time it has something in it.
+  const creatingRef = useRef(null);
+  function noteIsEmpty() {
+    const text = paperRef.current?.innerText?.trim() || '';
+    const title = (titleRef.current || '').trim();
+    return !text && (!title || title === 'Untitled Notes');
+  }
+  async function ensureNote() {
+    if (noteIdRef.current) return noteIdRef.current;
+    if (noteIsEmpty()) return null;
+    if (!creatingRef.current) {
+      creatingRef.current = (async () => {
+        try {
+          const resp = await fetch(API + '/smart_notes', {
+            method: 'POST',
+            headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: titleRef.current || 'Untitled Notes' }),
+          });
+          const data = await responseJson(resp);
+          if (!data?.note) return null;
+          noteIdRef.current = data.note.id;
+          setNoteId(data.note.id);
+          walkthroughEvent('note-written');
+          if (folderIdRef.current) {
+            await fetch(API + '/smart_notes/' + data.note.id, {
+              method: 'PUT',
+              headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+              body: JSON.stringify({ folder_id: folderIdRef.current }),
+            }).catch(() => {});
+          }
+          window.history.replaceState(window.history.state, '', '/smartnotes?id=' + data.note.id);
+          return data.note.id;
+        } catch {
+          return null;
+        } finally {
+          creatingRef.current = null;
         }
-        lastSavedRef.current = paperRef.current?.innerHTML || '';
-        lastSavedTitleRef.current = 'Untitled Notes';
-        window.history.replaceState({}, '', '/smartnotes?id=' + data.note.id);
-      }
-    } catch {}
+      })();
+    }
+    return creatingRef.current;
   }
 
   async function loadNote(id) {
     try {
       const resp = await fetch(API + '/smart_notes/' + id, { headers: authHeaders() });
-      if (!resp.ok) { createNote(); return; }
+      if (!resp.ok) { startBlankNote(); return; }
       const data = await responseJson(resp);
       noteIdRef.current = data.note.id;
       titleRef.current  = data.note.title || 'Untitled Notes';
@@ -810,7 +865,8 @@ function SmartNotesEditor() {
   // Resolves to '' when the note is saved (or unchanged), otherwise to a readable error.
   // A failed save leaves lastSavedRef untouched so the next autosave retries it.
   const doSave = useCallback(async (opts = {}) => {
-    if (!paperRef.current || !noteIdRef.current) return '';
+    if (!paperRef.current) return '';
+    if (!noteIdRef.current && !(await ensureNote())) return '';
     const content = paperRef.current.innerHTML;
     const title = titleRef.current;
     if (content === lastSavedRef.current && title === lastSavedTitleRef.current && !opts.force) return '';
@@ -843,7 +899,6 @@ function SmartNotesEditor() {
   // ── Autosave (debounced 1s after a keypress) ────────────────────────────
   const scheduleSave = useCallback(() => {
     clearTimeout(saveTimer.current);
-    if (!noteIdRef.current) return;
     saveTimer.current = setTimeout(() => doSave(), 1000);
   }, [doSave]);
 
@@ -875,7 +930,9 @@ function SmartNotesEditor() {
   useEffect(() => {
     function flushSave() {
       clearTimeout(saveTimer.current);
-      if (!noteIdRef.current || !paperRef.current) return;
+      if (!paperRef.current) return;
+      // A note that was never saved and has text: create it now (SPA navigation keeps this running).
+      if (!noteIdRef.current) { if (!noteIsEmpty()) doSave(); return; }
       const content = paperRef.current.innerHTML;
       const title = titleRef.current;
       const contentChanged = content !== lastSavedRef.current;
@@ -902,7 +959,7 @@ function SmartNotesEditor() {
     const newId = e.target.value;
     folderIdRef.current = newId;
     setFolderId(newId);
-    if (!noteIdRef.current) return;
+    if (!noteIdRef.current) return; // saved with the note when it is first created
     try {
       await fetch(API + '/smart_notes/' + noteIdRef.current, {
         method: 'PUT',
@@ -1353,16 +1410,10 @@ function SmartNotesEditor() {
 
   // ── New session — flush current, then create+navigate to fresh note ──────
   async function handleNewNote() {
+    setShowNotesList(false);
     await doSave();
-    try {
-      const resp = await fetch(API + '/smart_notes', {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Untitled Notes' }),
-      });
-      const data = await responseJson(resp);
-      if (data.note) router.push('/smartnotes?id=' + data.note.id);
-    } catch {}
+    startBlankNote();
+    router.push('/smartnotes?id=new');
   }
 
   async function handleDeleteNote(id, e) {
@@ -1388,6 +1439,7 @@ function SmartNotesEditor() {
 
   async function handleConvertToGuide() {
     setShowNotesList(false);
+    await ensureNote();
     if (!noteIdRef.current) return;
     setPreviewError('');
     setConvertingGuide(true);
@@ -1509,8 +1561,9 @@ function SmartNotesEditor() {
           >
             {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? 'Error' : 'Save'}
           </button>
-          <div className="sn-notes-picker">
+          <div className="sn-notes-picker" ref={notesPickerRef}>
             <button
+              ref={notesTriggerRef}
               className={`c-btn c-btn--secondary sn-notes-dropdown-trigger${showNotesList ? ' open' : ''}`}
               onClick={() => setShowNotesList(v => !v)}
               aria-expanded={showNotesList}

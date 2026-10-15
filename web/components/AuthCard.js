@@ -216,10 +216,10 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
         .auth-checks { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
         .auth-checks li { display: inline-flex; align-items: center; gap: 4px; font: 600 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: #636B65; }
         .auth-checks li.is-ok { color: #39724B; }
-        .auth-checks li.is-bad { color: #B42318; }
+        .auth-checks li.is-bad { color: var(--error); }
         .auth-link { justify-self: start; height: 32px; padding: 0; border: 0; background: none; color: #536149; font: 600 13px/1 var(--font-sans); cursor: pointer; }
         .auth-forgot { justify-self: end; margin-top: -6px; }
-        .auth-error { margin: 0; color: #B42318; font: 600 15px/1.35 var(--font-sans); }
+        .auth-error { margin: 0; color: var(--error); font: 600 15px/1.35 var(--font-sans); }
         .auth-notice { margin: 0; color: #39724B; font: 600 15px/1.35 var(--font-sans); }
         .auth-submit { height: 48px; border: 0; border-radius: 999px; background: #536149; color: #FFFFFF; font: 600 15px/1 var(--font-sans); cursor: pointer; }
         .auth-submit:hover:not(:disabled) { box-shadow: 0 8px 24px rgba(39, 54, 49, .18); }

@@ -14,7 +14,7 @@ function shuffledOrder(length) {
 
 export function askAboutCard(card, guideId) {
   window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', {
-    detail: { guideId: card.guideId || guideId, prompt: `Explain this question: ${card.front}` },
+    detail: { guideId: card.guideId || guideId, prompt: `Explain this question: ${card.front}`, send: true },
   }));
 }
 

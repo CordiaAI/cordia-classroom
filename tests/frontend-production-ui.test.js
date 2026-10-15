@@ -52,7 +52,7 @@ assert.match(api, /localStorage\.getItem\('userName'\) \|\| tokenIdentity\(\)\.n
 assert.match(api, /metadata\.given_name/);
 assert.match(api, /localStorage\.removeItem\('userName'\)/);
 assert.match(api, /response\.headers\.get\('X-Request-ID'\)/);
-assert.match(api, /Reference:/);
+assert.doesNotMatch(api, /Reference: \$\{/);
 assert.doesNotMatch(authCard, /\/auth\/(signup|login|oauth|forgot-password)/);
 assert.match(authCard, /supabaseAuth\(\)\.signInWithOAuth/);
 assert.match(authCard, /#4285F4/);

@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { dayKey, readActivity } from '../lib/activity';
 
-const WEEKS = 53;
 
 function level(minutes) {
   if (!minutes) return 0;
@@ -16,9 +15,12 @@ export default function Heatmap({ serverWeek = [] }) {
   const log = useMemo(() => readActivity(), []);
   const [picked, setPicked] = useState(null);
   const serverActive = new Set(serverWeek.filter(day => day.active).map(day => day.date));
+  // The past 12 months, ending today (columns start on Sunday). It opens scrolled to today.
   const today = new Date();
   const start = new Date(today);
-  start.setDate(start.getDate() - (WEEKS - 1) * 7 - today.getDay());
+  start.setFullYear(start.getFullYear() - 1);
+  start.setDate(start.getDate() + 1);
+  start.setDate(start.getDate() - start.getDay());
   const days = [];
   for (let cursor = new Date(start); cursor <= today; cursor.setDate(cursor.getDate() + 1)) {
     const key = dayKey(cursor);
@@ -34,11 +36,11 @@ export default function Heatmap({ serverWeek = [] }) {
         <h2 id="heat-title" className="c-section-title">Year</h2>
         <span className="c-meta">{total} days</span>
       </header>
-      <div className="heat-scroll">
+      <div className="heat-scroll" ref={node => { if (node) node.scrollLeft = node.scrollWidth; }}>
         <div className="heat-grid" role="group" aria-label="Study days this year">
           {days.map(day => {
             const shade = day.active ? Math.max(1, level(day.minutes)) : 0;
-            const label = `${day.date.toLocaleDateString([], { month: 'short', day: 'numeric' })}: ${day.minutes ? `${Math.round(day.minutes)} min` : day.active ? 'studied' : 'no study'}`;
+            const label = `${day.date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}: ${day.minutes ? `${Math.round(day.minutes)} min` : day.active ? 'studied' : 'no study'}`;
             return (
               <button
                 key={day.key}
@@ -55,7 +57,7 @@ export default function Heatmap({ serverWeek = [] }) {
       </div>
       {pickedDay && (
         <div className="heat-day" role="status">
-          <strong>{pickedDay.date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</strong>
+          <strong>{pickedDay.date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</strong>
           <span className="c-meta">{Math.round(pickedDay.minutes)} min{pickedDay.entry?.c ? ` · ${pickedDay.entry.c} cards` : ''}</span>
           {pickedDay.entry?.g && Object.values(pickedDay.entry.g).length > 0 ? (
             <ul>{Object.entries(pickedDay.entry.g).map(([key, guide]) => <li key={key}><span className="c-truncate">{guide.n || 'Guide'}</span><span className="c-meta">{Math.round(guide.m)} min</span></li>)}</ul>
