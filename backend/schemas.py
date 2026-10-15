@@ -65,6 +65,8 @@ class GenerateResponse(BaseModel):
     notes: Optional[str] = None
     study_guide: Optional[str] = None
     flashcards: Optional[List[dict]] = None
+    # A 2-6 word topic title for the new guide, or None when one could not be made.
+    title: Optional[str] = None
 
 
 class RetainExplanationContext(BaseModel):

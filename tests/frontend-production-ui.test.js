@@ -82,7 +82,7 @@ assert.match(dashboard, /role="alert"/);
 assert.match(calendarDashboard, /apiErrorMessage\(data\?\.detail/);
 // Cards have no resize handles; one soft shadow; three radii.
 assert.doesNotMatch(styles, /resize: (horizontal|vertical|both)/);
-assert.match(system, /--shadow: 0 8px 24px rgba\(39, 54, 49, 0\.08\)/);
+assert.match(system, /--shadow: 0 16px 40px rgba\(0, 0, 0, 0\.18\)/);
 assert.match(system, /\.workspace-rail[^{]*\{ display: none !important; \}/);
 assert.match(calendarDashboard, /Notification\.requestPermission/);
 assert.match(calendarDashboard, /\{loading \? 'Checking…' : 'Connect'\}/);
@@ -99,7 +99,7 @@ assert.match(tutor, /rich_text: true/);
 assert.match(tutor, /parseTutorAnswer\(text\)/);
 assert.match(tutor, /next\?\.id && !sendingRef\.current/);
 assert.match(tutor, /tutor-thinking/);
-assert.match(tutor, /<AILoadingSphere/);
+assert.match(tutor, /className="tutor-typing"/);
 assert.match(tutor, /apiFetch\('\/smart_notes'\)/);
 assert.match(tutor, /guide_id: material\.id/);
 assert.match(tutor, /note_id: material\.id/);

@@ -24,7 +24,7 @@ for (const token of ['--canvas:', '--surface:', '--ink:', '--olive:']) {
 }
 assert.match(styles, /prefers-reduced-motion/);
 // The redesign's exact tokens: one olive accent, glass for accents only.
-for (const token of ['--canvas: #EDF2F4', '--ink: #171B18', '--muted: #636B65', '--olive: #536149', '--olive-press: #3D4937', '--glass: rgba(255, 255, 252, 0.73)', '--glass-edge: rgba(255, 255, 255, 0.85)', '--line: rgba(34, 49, 41, 0.12)']) {
+for (const token of ['--canvas: #EDF2F4', '--ink: #171B18', '--muted: #636B65', '--olive: #536149', '--olive-press: #3D4937', '--glass: rgba(255, 255, 252, 0.74)', '--glass-edge: rgba(255, 255, 255, 0.60)', '--line: rgba(34, 49, 41, 0.12)']) {
   assert.ok(system.includes(token), `missing design token ${token}`);
 }
 assert.match(system, /prefers-reduced-motion/);
@@ -32,12 +32,13 @@ assert.match(system, /backdrop-filter: blur\(24px\) saturate\(160%\)/);
 // One nav: five places, each a real route.
 const nav = sidebar.split('const navItems = [')[1].split('];')[0];
 assert.deepEqual([...nav.matchAll(/label: '([^']+)', href: '([^']+)'/g)].map(match => `${match[1]} ${match[2]}`), ['Today /dashboard', 'Library /library', 'Tutor /tutor', 'Notes /smartnotes', 'Calendar /calendar']);
-for (const label of ['Profile', 'Appearance', 'Plan', 'Help', 'Sign out']) {
+for (const label of ['Profile', 'Appearance', 'Chrome extension', 'Plan', 'Help', 'Sign out']) {
   assert.ok(sidebar.includes(`/>${label}</button>`), `missing account menu item ${label}`);
 }
 assert.match(dashboard, /notes: '\/smartnotes'/);
 assert.match(publicPage, /AcademicInfinityMark/);
-assert.match(install, /AcademicInfinityMark/);
+assert.match(install, /Chrome extension/);
+assert.match(install, /watchExtension/);
 const classroomStyles = read('web', 'styles', 'classroom.css');
 assert.match(classroomStyles, /--font-sans: 'Manrope'/);
 assert.match(classroomStyles, /--font-display: 'Newsreader'/);

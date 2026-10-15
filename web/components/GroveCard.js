@@ -1,50 +1,29 @@
-import { useRouter } from 'next/router';
-import { TreeDeciduous } from 'lucide-react';
-import GroveTree from './GroveTree';
-import PulseDot from './PulseDot';
+import Link from 'next/link';
+import GroveTree, { STAGES, groveStage, nextStageLabel } from './GroveTree';
 import { groveKey, useProgress } from '../lib/progress';
 import { walkthroughEvent } from '../lib/walkthrough';
 
-// Today's glimpse of the grove: one tree per recent guide.
-export default function GroveCard({ guides, planting = false }) {
-  const router = useRouter();
+// Today's glimpse of the grove: the tallest tree and how far to its next stage.
+export default function GroveCard({ guides }) {
   const progress = useProgress();
-  const recent = guides.slice(0, 6);
-  if (!recent.length) return null;
-
-  function open() {
-    walkthroughEvent('grove-opened');
-    router.push('/settings?section=grove');
-  }
-
+  if (!guides.length) return null;
+  const ranked = guides.map(guide => ({ guide, minutes: progress.grove[groveKey(guide.id)] || 0 })).sort((a, b) => b.minutes - a.minutes);
+  const top = ranked[0];
+  const next = nextStageLabel(top.minutes);
   return (
-    <section className="c-card grove-card" aria-labelledby="grove-title" data-spot="grove">
-      <header className="c-row">
-        <TreeDeciduous size={20} strokeWidth={1.75} aria-hidden="true" />
-        <h2 id="grove-title" className="c-section-title">Grove</h2>
-        <PulseDot feature="grove" />
-        <span className="c-spacer" />
-        <button type="button" className="c-btn c-btn--quiet" onClick={open}>Open</button>
-      </header>
-      <ul className="grove-row">
-        {recent.map((guide, index) => {
-          const key = groveKey(guide.id);
-          return (
-            <li key={guide.id} className={planting && index === 0 ? 'is-planting' : ''} title={guide.title}>
-              <GroveTree minutes={progress.grove[key] || 0} rings={progress.rings[key] || 0} size={72} title={guide.title} />
-            </li>
-          );
-        })}
-      </ul>
-      <style jsx>{`
-        .grove-card { display: grid; gap: 8px; padding: 16px 20px; }
-        .grove-card :global(header > .lucide) { color: var(--olive-ink); }
-        .grove-row { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; overflow-x: auto; }
-        .grove-row li { flex: 0 0 auto; }
-        .is-planting { animation: plant 900ms cubic-bezier(.34, 1.56, .64, 1) both; transform-origin: 50% 90%; }
-        @keyframes plant { from { transform: scale(.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @media (prefers-reduced-motion: reduce) { .is-planting { animation: none; } }
+    <Link href="/grove" className="c-card grove-card" data-spot="grove" onClick={() => walkthroughEvent('grove-opened')}>
+      <GroveTree minutes={top.minutes} size={88} title={`${top.guide.title}, ${STAGES[groveStage(top.minutes)].name}`} />
+      <span className="grove-card-text">
+        <span className="c-section-title">Grove</span>
+        <span className="grove-card-guide c-truncate">{top.guide.title}</span>
+        <span className="c-meta">{next || STAGES[groveStage(top.minutes)].name}</span>
+      </span>
+      <style jsx global>{`
+        .grove-card { display: flex; align-items: center; gap: 16px; padding: 16px 24px 16px 16px; color: var(--ink); text-decoration: none; min-width: 0; }
+        .grove-card:hover { text-decoration: none; }
+        .grove-card-text { display: grid; gap: 4px; min-width: 0; }
+        .grove-card-guide { font: 500 15px/1.3 var(--font-sans); }
       `}</style>
-    </section>
+    </Link>
   );
 }

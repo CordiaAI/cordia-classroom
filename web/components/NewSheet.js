@@ -48,8 +48,8 @@ export function NewOptions({ onPick, onSample }) {
         .new-option { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 128px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 17px/1 var(--font-sans); cursor: pointer; transition: border-color 150ms, transform 90ms; }
         .new-option:hover { border-color: var(--olive); }
         .new-option:active { transform: scale(.98); }
-        .new-option :global(.lucide) { color: var(--olive-ink); }
-        .new-sample { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; border: 1px dashed var(--olive); border-radius: var(--r-card); background: var(--olive-tint); color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer; }
+        .new-option :global(.lucide) { color: currentColor; }
+        .new-sample { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; border: 1px dashed var(--olive); border-radius: var(--r-card); background: var(--hover); color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer; }
       `}</style>
     </div>
   );
@@ -398,8 +398,8 @@ export default function NewSheet() {
         .new-sheet { width: min(560px, 100%); }
         .new-panel { display: grid; gap: 16px; }
         .new-drop { display: grid; justify-items: center; gap: 12px; width: 100%; padding: 32px 16px; border: 2px dashed var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); cursor: pointer; font: 600 17px/1.2 var(--font-sans); }
-        .new-drop:hover, .new-drop.is-over { border-color: var(--olive); background: var(--olive-tint); }
-        .new-drop :global(.lucide) { color: var(--olive-ink); }
+        .new-drop:hover, .new-drop.is-over { border-color: var(--olive); background: var(--hover); }
+        .new-drop :global(.lucide) { color: currentColor; }
         .new-formats { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font: 600 13px/1 var(--font-sans); color: var(--muted); }
         .new-formats > span { display: inline-flex; align-items: center; gap: 6px; }
         .new-formats :global(.lucide) { color: var(--muted); }
@@ -414,7 +414,7 @@ export default function NewSheet() {
         .new-error { margin: 16px 0 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
         .new-headings { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; min-height: 160px; }
         .new-headings li { padding: 10px 14px; border-radius: var(--r-input); font: 600 19px/1.3 var(--font-display); color: var(--ink); animation: c-rise 300ms var(--ease) both; }
-        .new-headings li.is-current { background: var(--olive-tint); }
+        .new-headings li.is-current { background: var(--hover); }
       `}</style>
     </div>
   );

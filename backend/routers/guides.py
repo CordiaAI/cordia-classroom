@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from database import get_supabase
 from auth_utils import get_user_id
+from fastapi import Depends
+from rate_limit import ai_rate_limit
 
 _UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
@@ -428,3 +430,17 @@ def update_read_progress(guide_id: str, request: ReadProgressRequest, authorizat
     except Exception as e:
         logger.error(f"Error updating read progress: {e}")
         raise HTTPException(status_code=500, detail="Failed to update progress")
+
+
+@router.post("/{guide_id}/title", dependencies=[Depends(ai_rate_limit())])
+def suggest_guide_title(guide_id: str, authorization: str = Header(default="")):
+    """Suggest a 2-6 word topic title for an existing guide. Saving it stays the client's choice."""
+    _validate_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    result = get_supabase().table("study_guides").select("study_guide, notes") \
+        .eq("id", guide_id).eq("user_id", user_id).limit(1).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Guide not found")
+    from services.llm import generate_guide_title
+    title = generate_guide_title(result.data[0].get("study_guide") or "", result.data[0].get("notes") or "")
+    return {"title": title or None}

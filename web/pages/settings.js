@@ -8,7 +8,8 @@ import LearningStylePicker from '../components/LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from '../components/ExplanationPreference';
 import StudyInsights from '../components/StudyInsights';
-import { Check, CreditCard, Moon, Sun } from 'lucide-react';
+import { Check, CreditCard, Monitor, Moon, Sun } from 'lucide-react';
+import { setThemePreference, themePreference } from '../lib/theme';
 import GroveGrid from '../components/GroveGrid';
 import Heatmap from '../components/Heatmap';
 import RecapCard from '../components/RecapCard';
@@ -50,7 +51,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState('');
 
   // Theme state
-  const [theme, setTheme] = useState('light');
+  const [theme, setTheme] = useState('system');
 
   // Feedback modal
   const [showFeedback, setShowFeedback] = useState(false);
@@ -76,8 +77,7 @@ export default function SettingsPage() {
       setEmail(identity.email || '');
       setProfileName(identity.name || '');
     });
-    const saved = localStorage.getItem('theme') || 'light';
-    setTheme(saved);
+    setTheme(themePreference());
 
     if (router.query.billing === 'success') {
       setActiveSection('plan');
@@ -150,8 +150,7 @@ export default function SettingsPage() {
 
   function setAppearance(next) {
     setTheme(next);
-    localStorage.setItem('theme', next);
-    document.documentElement.setAttribute('data-theme', next);
+    setThemePreference(next);
   }
 
   if (!ready) return null;
@@ -311,8 +310,9 @@ export default function SettingsPage() {
             <div className="c-card settings-row">
               <span className="c-section-title">Theme</span>
               <div className="c-seg" role="group" aria-label="Theme">
-                <button type="button" className={theme !== 'dark' ? 'is-active' : ''} aria-pressed={theme !== 'dark'} onClick={() => setAppearance('light')}><Sun size={18} strokeWidth={1.75} aria-hidden="true" /> Light</button>
-                <button type="button" className={theme === 'dark' ? 'is-active' : ''} aria-pressed={theme === 'dark'} onClick={() => setAppearance('dark')}><Moon size={18} strokeWidth={1.75} aria-hidden="true" /> Dark</button>
+                {[['system', 'System', Monitor], ['light', 'Light', Sun], ['dark', 'Dark', Moon]].map(([key, label, Icon]) => (
+                  <button key={key} type="button" className={theme === key ? 'is-active' : ''} aria-pressed={theme === key} onClick={() => setAppearance(key)}><Icon size={18} strokeWidth={1.75} aria-hidden="true" /> {label}</button>
+                ))}
               </div>
             </div>
           </div>
@@ -361,7 +361,7 @@ export default function SettingsPage() {
       <style jsx>{`
         .profile-page { width: min(920px, 100%); margin: 0 auto; }
         .profile-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }
-        .profile-message { padding: 14px 18px; border-radius: var(--r-card); background: var(--olive-tint); font-weight: 600; }
+        .profile-message { padding: 14px 18px; border-radius: var(--r-card); background: var(--hover); font-weight: 600; }
         .profile-section { animation: fadeIn 0.2s ease; }
         .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; flex-wrap: wrap; }
         .settings-row .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
@@ -387,7 +387,7 @@ export default function SettingsPage() {
         .billing-toggle { justify-self: start; }
         .plan-features { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
         .plan-features li { display: flex; gap: 8px; align-items: flex-start; }
-        .plan-features :global(.lucide) { color: var(--olive-ink); margin-top: 2px; }
+        .plan-features :global(.lucide) { color: currentColor; margin-top: 2px; }
         .plan-current-label { color: var(--olive-ink); font-weight: 700; }
         .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
         @media (max-width: 767px) { .billing-plans { grid-template-columns: 1fr; } .me-card { flex-wrap: wrap; } }

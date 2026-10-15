@@ -1,32 +1,26 @@
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Brain, ChevronRight, Flame, Layers, NotebookPen, PencilRuler, Play, Snowflake } from 'lucide-react';
+import { Flame, Play, Snowflake } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
 import { createDashboardOverview } from '../lib/dashboardOrganization';
 import { loadStudyQueue } from '../lib/studyQueue';
 import { lastGuide } from '../lib/userStore';
-import { markUsed, useProgress } from '../lib/progress';
+import { markUsed, updateProgress, useProgress } from '../lib/progress';
 import { activeStep, dayOneFinished, startWalkthrough, walkthroughEvent } from '../lib/walkthrough';
 import { streakWithFreeze } from '../lib/activity';
 import { loadOnboarding, saveOnboardingStep } from '../lib/onboarding';
 import { requestTip } from '../lib/tips';
-import ProgressRing from '../components/ProgressRing';
 import StudyTimer from '../components/StudyTimer';
 import StudyInsights from '../components/StudyInsights';
 import LearnCordia from '../components/LearnCordia';
 import AboutYou from '../components/AboutYou';
 import GroveCard from '../components/GroveCard';
-import PulseDot from '../components/PulseDot';
+import StudyDocument from '../components/StudyDocument';
+import AIChatWidget from '../components/AIChatWidget';
 
 const LEGACY_VIEWS = { guides: '/library', classes: '/library', calendar: '/calendar', notes: '/smartnotes' };
-
-function shortDate(value) {
-  const date = new Date(value || '');
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
 
 function plural(count, word) {
   return `${count} ${word}${count === 1 ? '' : 's'}`;
@@ -48,6 +42,7 @@ export default function Today({ timerState, setTimerState }) {
   const [calendar, setCalendar] = useState(null);
   const [onboarding, setOnboarding] = useState(null);
   const [streakInfo, setStreakInfo] = useState(null);
+  const [studyGuideFull, setStudyGuideFull] = useState(null);
   const progress = useProgress();
   const step = activeStep(progress.wt?.status === 'active' ? progress.wt : null);
 
@@ -84,6 +79,11 @@ export default function Today({ timerState, setTimerState }) {
       // New account, nothing made yet: the day-one walkthrough starts with "About you".
       if (onboardingData && !onboardingData.completed && !guideList.length && !progress.wt && !dayOneFinished()) startWalkthrough('day1');
       else if (onboardingData && !onboardingData.completed && guideList.length) saveOnboardingStep('done');
+      // Accounts from before the walkthrough skip day one and get the feature dots.
+      if ((onboardingData?.completed || guideList.length) && !progress.day1Status) updateProgress(() => ({ day1Status: 'existing' }));
+      const remembered = lastGuide();
+      const pick = (remembered && guideList.find(guide => guide.id === remembered.id)) || createDashboardOverview(foldersData?.folders, guideList).continueGuide;
+      if (pick) apiFetch('/guides/' + pick.id).then(data => { if (data?.guide) setStudyGuideFull(data.guide); });
       if (guideList.length) markUsed('add');
       if (statsData?.cards_studied) markUsed('cards');
     } finally {
@@ -121,32 +121,27 @@ export default function Today({ timerState, setTimerState }) {
 
   const overview = createDashboardOverview(folders, guides);
   const remembered = lastGuide();
-  const continueGuide = (remembered && guides.find(guide => guide.id === remembered.id)) || overview.continueGuide;
-  const continueHref = continueGuide
-    ? `/guide/${continueGuide.id}${remembered?.id === continueGuide.id && remembered.page ? `?page=${remembered.page + 1}` : ''}`
-    : null;
-  const toolGuide = continueGuide?.id;
-  const nothingDue = queue && !queue.cardTotal && !queue.misses.length && !queue.problems;
-  const dueItems = calendar?.connected
-    ? (calendar.items || []).filter(item => new Date(item.due_at).getTime() >= Date.now() - 86400000).sort((a, b) => new Date(a.due_at) - new Date(b.due_at)).slice(0, 3)
-    : [];
-  const tools = [
-    { label: 'Quiz', icon: Brain, href: toolGuide ? `/quiz/${toolGuide}` : '/library' },
-    { label: 'Cards', icon: Layers, href: '/library?tab=cards', tip: 'cards' },
-    { label: 'Practice', icon: PencilRuler, href: '/practice', spot: 'tool-practice', dot: 'practice' },
-    { label: 'Notes', icon: NotebookPen, href: '/smartnotes', dot: 'notes' },
-  ];
+  const studyGuide = (remembered && guides.find(guide => guide.id === remembered.id)) || overview.continueGuide;
+  const counts = queue ? [
+    [queue.cardTotal + queue.misses.length, 'card'],
+    [queue.problems, 'problem'],
+    [queue.minutes, 'min'],
+  ].filter(([count]) => count > 0).map(([count, word]) => (word === 'min' ? `${count} min` : plural(count, word))) : [];
+  const hasInsights = Boolean(insights?.strengths?.length || insights?.needs_work?.length);
 
   return (
     <div className="c-page today">
-      <header className="c-page-head">
-        <h1 className="c-title">Today</h1>
-        {streakInfo && (
-          <span className="today-streak" aria-label={`Streak: ${plural(streakInfo.days, 'day')}${streakInfo.frozenThisWeek ? ', freeze used this week' : ''}`}>
-            <Flame size={20} strokeWidth={1.75} aria-hidden="true" />{plural(streakInfo.days, 'day')}
-            {streakInfo.frozenThisWeek && <Snowflake size={16} strokeWidth={1.75} aria-hidden="true" className="today-freeze" />}
-          </span>
-        )}
+      <header className="today-head">
+        <h1 className="today-title">Today</h1>
+        <div className="today-head-right">
+          <LearnCordia />
+          {streakInfo && streakInfo.days > 0 && (
+            <span className="today-streak" aria-label={`Streak: ${plural(streakInfo.days, 'day')}${streakInfo.frozenThisWeek ? ', freeze used this week' : ''}`}>
+              <Flame size={20} strokeWidth={1.75} aria-hidden="true" />{plural(streakInfo.days, 'day')}
+              {streakInfo.frozenThisWeek && <Snowflake size={16} strokeWidth={1.75} aria-hidden="true" />}
+            </span>
+          )}
+        </div>
       </header>
 
       {loadError && (
@@ -156,95 +151,59 @@ export default function Today({ timerState, setTimerState }) {
         </div>
       )}
 
-      <section className="c-glass today-start" aria-label="Start">
-        <ul className="today-counts" aria-live="polite">
-          <li><strong>{queue ? queue.cardTotal + queue.misses.length : '–'}</strong><span>cards</span></li>
-          <li><strong>{queue ? queue.problems : '–'}</strong><span>problems</span></li>
-          <li><strong>{queue ? queue.minutes : '–'}</strong><span>min</span></li>
-        </ul>
-        <button type="button" className="c-btn c-btn--primary c-btn--lg today-start-btn" data-spot="start" onClick={() => { walkthroughEvent('start'); router.push('/session'); }} disabled={!queue || nothingDue}>
-          <Play size={20} strokeWidth={1.75} aria-hidden="true" />Start
-        </button>
-      </section>
-
-      {continueGuide && (
-        <section className="c-section" aria-labelledby="continue-title">
-          <h2 id="continue-title" className="c-section-title">Continue</h2>
-          <Link href={continueHref} className="c-card today-continue">
-            <ProgressRing value={continueGuide.read_progress} size={40} label={false} />
-            <span className="today-continue-title c-truncate">{continueGuide.title}</span>
-            <span className="c-meta">{Math.round((continueGuide.read_progress || 0) * 100)}%</span>
-            <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
-          </Link>
+      {counts.length > 0 && (
+        <section className="c-card today-start" aria-label="Start">
+          <p className="today-counts">{counts.join(' · ')}</p>
+          <button type="button" className="c-btn c-btn--primary today-start-btn" data-spot="start" onClick={() => { walkthroughEvent('start'); router.push('/session'); }}>
+            <Play size={20} strokeWidth={1.75} aria-hidden="true" />Start
+          </button>
         </section>
       )}
 
-      <nav className="today-tools" aria-label="Tools">
-        {tools.map(tool => (
-          <div key={tool.label} className="today-tool-wrap">
-            <Link href={tool.href} className="c-card today-tool" data-tip={tool.tip} data-spot={tool.spot}>
-              <tool.icon size={28} strokeWidth={1.75} aria-hidden="true" />
-              <span>{tool.label}</span>
-            </Link>
-            {tool.dot && <span className="today-dot"><PulseDot feature={tool.dot} /></span>}
-          </div>
-        ))}
-      </nav>
-
-      {dueItems.length > 0 && (
-        <section className="c-section" aria-labelledby="due-title">
-          <div className="c-row">
-            <h2 id="due-title" className="c-section-title">Due soon</h2>
-            <span className="c-spacer" />
-            <Link href="/calendar" className="c-btn c-btn--quiet">Calendar</Link>
-          </div>
-          <div className="c-card c-list">
-            {dueItems.map(item => (
-              <a key={item.id} className="c-list-row" href={item.url || '/calendar'} target={item.url ? '_blank' : undefined} rel={item.url ? 'noreferrer' : undefined}>
-                <span className="c-grow c-truncate">{item.title}</span>
-                <span className="c-meta">{shortDate(item.due_at)}</span>
-              </a>
-            ))}
+      {studyGuide && studyGuideFull?.id === studyGuide.id && (
+        <section className="today-space" aria-label="Study space">
+          <StudyDocument
+            compact
+            guide={studyGuideFull}
+            label={folders.find(folder => folder.id === studyGuide.folder_id)?.name || studyGuideFull.title}
+            onOpen={() => router.push('/guide/' + studyGuide.id)}
+          />
+          <div className="c-card today-tutor">
+            <AIChatWidget preferredGuideId={studyGuide.id} compact />
           </div>
         </section>
       )}
 
-      <GroveCard guides={guides} planting={step?.id === 'today' || step?.id === 'start'} />
-
-      <div className="today-pair">
+      <div className="today-row">
+        <GroveCard guides={guides} />
         <StudyTimer timerState={timerState} setTimerState={setTimerState} />
-        <StudyInsights compact />
+        {hasInsights && <StudyInsights compact />}
       </div>
 
-      {dayOneFinished(progress) || !progress.wt ? <LearnCordia hideWhenComplete /> : null}
-
-      <style jsx>{`
-        .today-streak { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: var(--r-pill); background: var(--card); border: 1px solid var(--line); font: 600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
-        .today-streak :global(.lucide) { color: var(--ink); }
-        .today-streak :global(.today-freeze) { color: var(--olive-ink); }
-        .today-tool-wrap { position: relative; display: grid; }
-        .today-dot { position: absolute; top: 8px; right: 8px; }
-        .today-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius: var(--r-card); background: var(--error-bg); color: var(--error); font-weight: 600; }
-        .today-start { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px; border-radius: var(--r-card); flex-wrap: wrap; }
-        .today-counts { list-style: none; margin: 0; padding: 0; display: flex; gap: 32px; }
-        .today-counts li { display: grid; gap: 2px; }
-        .today-counts strong { font: 600 32px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
-        .today-counts span { font: 500 15px/1 var(--font-sans); }
-        .today-start-btn { min-width: 160px; }
-        :global(.today-continue) { display: flex; align-items: center; gap: 16px; padding: 14px 18px; color: var(--ink); text-decoration: none; }
-        :global(.today-continue:hover) { text-decoration: none; border-color: var(--olive); }
-        .today-continue-title { flex: 1 1 auto; min-width: 0; font: 600 17px/1.3 var(--font-display); }
-        .today-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-        :global(.today-tool) { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 112px; color: var(--ink); text-decoration: none; font: 600 15px/1 var(--font-sans); }
-        :global(.today-tool:hover) { text-decoration: none; border-color: var(--olive); }
-        :global(.today-tool .lucide) { color: var(--olive-ink); }
-        .today-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      <style jsx global>{`
+        .today { gap: 24px; }
+        .today-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+        .today-title { margin: 0; font: 500 56px/1 var(--font-display); letter-spacing: -0.025em; }
+        .today-head-right { display: flex; align-items: center; gap: 8px; }
+        .today-streak { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge); font: 600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .today-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius: 20px; background: var(--error-bg); color: var(--error); font-weight: 600; }
+        .today-start { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 16px 16px 28px; flex-wrap: wrap; }
+        .today-counts { margin: 0; font: 600 17px/1.3 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .today-start-btn { min-width: 140px; }
+        .today-space { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); gap: 16px; height: min(680px, calc(100svh - 300px)); min-height: 520px; }
+        .today-tutor { display: flex; min-width: 0; overflow: hidden; }
+        .today-tutor .cordia-tutor { flex: 1; min-width: 0; }
+        .today-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; align-items: stretch; }
+        @media (max-width: 1023px) {
+          .today-space { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0; }
+          .today-space .doc { height: 560px; }
+          .today-tutor { height: 520px; }
+        }
         @media (max-width: 767px) {
-          .today-start { padding: 20px; }
-          .today-counts { gap: 20px; }
+          .today-title { font-size: 44px; }
+          .today-start { padding: 16px; }
           .today-start-btn { width: 100%; }
-          .today-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-          .today-pair { grid-template-columns: 1fr; }
+          .today-space .doc { height: auto; }
         }
       `}</style>
     </div>

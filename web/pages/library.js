@@ -342,7 +342,7 @@ export default function LibraryPage() {
         .library .lib-group.is-drop { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
         .library .lib-group-head { display: flex; align-items: center; gap: 4px; }
         .library .lib-group-toggle { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; height: 52px; padding: 0 12px; border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink); cursor: pointer; text-align: left; }
-        .library .lib-group-toggle:hover { background: var(--olive-tint); }
+        .library .lib-group-toggle:hover { background: var(--hover); }
         .library .lib-group-toggle .lucide { transition: transform 150ms var(--ease); }
         .library .lib-group-toggle .is-closed { transform: rotate(-90deg); }
         .library .lib-list { list-style: none; margin: 0; padding: 0; }

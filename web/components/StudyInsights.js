@@ -33,7 +33,6 @@ export default function StudyInsights({ compact = false }) {
   return (
     <section className={`c-card insights-card${compact ? ' compact' : ''}`} aria-labelledby="insights-title" data-tip={compact ? 'insights' : undefined} data-spot={compact ? 'insights' : undefined}>
       <header className="c-row">
-        <ChartColumn size={20} strokeWidth={1.75} aria-hidden="true" />
         <h2 id="insights-title" className="c-section-title">Insights</h2>
         {compact && <PulseDot feature="insights" />}
         {compact && <><span className="c-spacer" /><button type="button" className="c-btn c-btn--quiet" onClick={() => { walkthroughEvent('insights-opened'); router.push('/settings?section=learning'); }}>Open</button></>}
@@ -55,7 +54,7 @@ export default function StudyInsights({ compact = false }) {
       )}
       <style jsx>{`
         .insights-card { display: grid; gap: 12px; padding: 20px; align-content: start; }
-        .insights-card :global(header .lucide) { color: var(--olive-ink); }
+        .insights-card :global(header .lucide) { color: currentColor; }
         .insight-list, .insight-tips { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
         .insights-card :global(.insight-row) { display: flex; align-items: center; gap: 10px; min-height: 36px; font: 600 15px/1.3 var(--font-sans); }
         .insights-card :global(.insight-row span:nth-child(2)) { flex: 1; min-width: 0; }

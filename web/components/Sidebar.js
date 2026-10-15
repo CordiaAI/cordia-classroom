@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  CalendarDays, CircleHelp, CreditCard, Library, LogOut, MessageCircle, NotebookPen, Palette, Plus, Search, Sun, User,
+  CalendarDays, CircleHelp, CreditCard, Library, LogOut, MessageCircle, NotebookPen, Palette, Plus, Puzzle, Search, Sun, User,
 } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
@@ -21,7 +21,7 @@ const navItems = [
 ];
 
 // Guide, flashcard, Retain and Practice screens all live inside Library.
-const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice', '/nclex', '/folder', '/create', '/session'];
+const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice', '/nclex', '/folder', '/create', '/session', '/grove'];
 
 export function activeNavHref(pathname) {
   if (pathname === '/dashboard') return '/dashboard';
@@ -120,7 +120,7 @@ export default function Sidebar() {
     .map(part => part[0])
     .join('')
     .toUpperCase();
-  const onProfile = router.pathname === '/settings' || router.pathname === '/billing';
+  const onProfile = router.pathname === '/settings' || router.pathname === '/billing' || router.pathname === '/install-extension';
 
   return (
     <>
@@ -157,6 +157,7 @@ export default function Sidebar() {
               <div ref={menuRef} className="c-menu c-account-menu" role="menu" aria-label="Account" onKeyDown={menuKeys}>
                 <button type="button" role="menuitem" onClick={() => go('/settings')}><User size={20} strokeWidth={1.75} aria-hidden="true" />Profile</button>
                 <button type="button" role="menuitem" onClick={() => go('/settings?section=appearance')}><Palette size={20} strokeWidth={1.75} aria-hidden="true" />Appearance</button>
+                <button type="button" role="menuitem" onClick={() => go('/install-extension')}><Puzzle size={20} strokeWidth={1.75} aria-hidden="true" />Chrome extension</button>
                 <button type="button" role="menuitem" onClick={() => go('/settings?section=plan')}><CreditCard size={20} strokeWidth={1.75} aria-hidden="true" />Plan</button>
                 <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setShowHelp(true); }}><CircleHelp size={20} strokeWidth={1.75} aria-hidden="true" />Help</button>
                 <hr />
@@ -169,8 +170,10 @@ export default function Sidebar() {
 
       <nav className="c-tabbar" aria-label="Primary">
         {navItems.map(item => (
-          <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-spot={item.spot}>
-            <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
+          <Link key={item.href} href={item.href} className={item.href === '/tutor' ? 'c-tab-tutor' : undefined} aria-current={active === item.href ? 'page' : undefined} data-spot={item.spot}>
+            {item.href === '/tutor'
+              ? <span className="c-tab-tutor-circle" aria-hidden="true"><item.icon size={24} strokeWidth={1.75} /></span>
+              : <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />}
             {item.label}
           </Link>
         ))}

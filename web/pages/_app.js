@@ -8,6 +8,7 @@ import Layout from '../components/Layout';
 import UpgradeModal from '../components/UpgradeModal';
 import { scheduleProactiveRefresh, getToken } from '../lib/api';
 import { Analytics } from '@vercel/analytics/react';
+import { applyTheme } from '../lib/theme';
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
@@ -16,9 +17,12 @@ export default function App({ Component, pageProps }) {
 
   // Authentication pages stay light; workspace routes honor the saved preference.
   useEffect(() => {
-    const saved = typeof window !== 'undefined' && localStorage.getItem('theme');
-    const theme = ['/', '/login', '/signup', '/pricing', '/reset-password'].includes(router.pathname) ? 'light' : saved || 'light';
-    document.documentElement.setAttribute('data-theme', theme);
+    const publicPage = ['/', '/login', '/signup', '/pricing', '/reset-password'].includes(router.pathname);
+    applyTheme(undefined, publicPage);
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const follow = () => applyTheme(undefined, publicPage);
+    media.addEventListener?.('change', follow);
+    return () => media.removeEventListener?.('change', follow);
   }, [router.pathname]);
 
   // Start proactive token refresh if already logged in

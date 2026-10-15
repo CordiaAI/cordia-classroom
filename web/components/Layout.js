@@ -12,7 +12,7 @@ const WIDE = ['/guide/[id]', '/practice', '/practice/[guideId]', '/smartnotes', 
 export default function Layout({ children, timerState, setTimerState }) {
   const router = useRouter();
   // The Tutor page shows the Tutor full size, so the side panel stays out of the way there.
-  const pageOwnsTutor = router.pathname === '/tutor';
+  const pageOwnsTutor = router.pathname === '/tutor' || router.pathname === '/dashboard';
   const activeGuideId = router.query.guideId || (router.pathname === '/guide/[id]' ? router.query.id : '');
   const activeNoteId = router.pathname === '/smartnotes' ? router.query.id : '';
   // Remount the page when the material changes (guide A -> guide B), not on every query tweak.

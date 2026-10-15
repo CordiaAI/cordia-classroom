@@ -394,7 +394,7 @@ export default function PracticeWorkspace() {
           .practice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
           :global(.practice-guide) { display: grid; align-content: space-between; gap: 16px; min-height: 112px; padding: 18px; color: var(--ink); text-decoration: none; font: 600 17px/1.3 var(--font-display); }
           :global(.practice-guide:hover) { text-decoration: none; border-color: var(--olive); }
-          :global(.practice-guide .lucide) { color: var(--olive-ink); }
+          :global(.practice-guide .lucide) { color: currentColor; }
         `}</style>
       </div>
     );

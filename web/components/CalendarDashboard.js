@@ -221,7 +221,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
           .cal-connect { display: grid; gap: 24px; padding: 28px; }
           .cal-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
           .cal-steps li { display: grid; justify-items: center; gap: 10px; padding: 20px 12px; border-radius: var(--r-card); background: var(--card-sunk); font: 600 15px/1.2 var(--font-sans); text-align: center; }
-          .cal-steps :global(.lucide) { color: var(--olive-ink); }
+          .cal-steps :global(.lucide) { color: currentColor; }
           .cal-step-num { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 700 13px/1 var(--font-sans); }
           .cal-form { display: flex; align-items: flex-end; gap: 8px; }
           .cal-field { flex: 1; }

@@ -111,7 +111,7 @@ export default function RecapCard({ guides, folders, since, cardsStudied = 0 }) 
         .recap { display: grid; gap: 16px; padding: 20px; border-radius: var(--r-card); }
         .recap-stats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
         .recap-stats li { display: grid; gap: 4px; min-width: 0; }
-        .recap-stats strong { font: 600 32px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--olive-ink); }
+        .recap-stats strong { font: 600 32px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .recap-stats .recap-class { font: 600 19px/1.2 var(--font-display); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .recap-trees { display: flex; flex-wrap: wrap; gap: 4px; min-height: 64px; }
       `}</style>

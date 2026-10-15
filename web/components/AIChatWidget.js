@@ -8,7 +8,6 @@ import { ArrowUp, BookOpen, Layers, MessageCircle, Paperclip, PencilRuler, Slide
 import { lastGuide } from '../lib/userStore';
 import { walkthroughEvent } from '../lib/walkthrough';
 import TutorSelect from './TutorSelect';
-import AILoadingSphere from './AILoadingSphere';
 import { inlineParts, parseTutorAnswer } from '../lib/tutorFormat.mjs';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 
@@ -87,7 +86,7 @@ const SKILL_PROGRESS = {
   organize: 'Organizing study material…',
 };
 
-export default function AIChatWidget({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '' }) {
+export default function AIChatWidget({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '', compact = false }) {
   const router = useRouter();
   const [loadedGuides, setLoadedGuides] = useState([]);
   const [notes, setNotes] = useState([]);
@@ -107,7 +106,6 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const sendingRef = useRef(false);
   const [extracting, setExtracting] = useState(false);
   const [localError, setLocalError] = useState('');
-  const [explainOpen, setExplainOpen] = useState(false);
   const { learningStyle } = useLearningStyle();
   const [listening, setListening] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState(-1);
@@ -305,7 +303,11 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     return () => window.removeEventListener('cordia:tutor-prompt', prefill);
   }, []);
 
-  const messages = session?.messages || [];
+  const allMessages = session?.messages || [];
+  // The Tutor opens to an empty chat: earlier turns stay on the server but are not shown.
+  const shownFrom = useRef(null);
+  if (shownFrom.current === null && session?.id) shownFrom.current = allMessages.length;
+  const messages = allMessages.slice(Math.min(shownFrom.current ?? 0, allMessages.length));
   useEffect(() => {
     const container = endRef.current?.closest('.cordia-tutor-messages');
     container?.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
@@ -317,7 +319,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const hasRequiredContext = (Boolean(material) && (material.kind !== 'browser' || Boolean(material.content))) || selectedSkill?.requires_context === false;
   const needsTargetClass = selectedSkillId === 'organize';
   const canSubmit = hasRequiredContext && (!needsTargetClass || Boolean(targetClassId));
-  const remaining = MAX_MESSAGES - messages.filter(message => message.role === 'user').length;
+  const remaining = MAX_MESSAGES - allMessages.filter(message => message.role === 'user').length;
   const busy = loading || (session?.status && session.status !== 'idle');
   const progressLabel = SKILL_PROGRESS[session?.active_skill] || 'Cordia is working…';
 
@@ -452,25 +454,41 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   }
 
   return (
-    <section ref={rootRef} className="cordia-tutor" aria-label="Cordia tutor">
+    <section ref={rootRef} className={'cordia-tutor' + (compact ? ' is-compact' : '')} aria-label="Cordia tutor">
       <header className="cordia-tutor-header">
         <div className="cordia-tutor-title-row">
           <MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />
           <strong>Tutor</strong>
           {session?.browser_available && <span className="cordia-browser-status is-online" aria-label="Browser connected" title="Browser connected" />}
         </div>
+        <ExplanationPreference inline />
         <div className="cordia-tutor-context" aria-label="Context">
-          <BookOpen size={16} strokeWidth={1.75} aria-hidden="true" />
-          <TutorSelect label="Study material" value={contextKey} onChange={setContextKey} options={[
-            ...(materials.length === 0 ? [{ value: '', label: 'No material' }] : []),
+          <TutorSelect label="Study material" value={contextKey} onChange={value => { if (value === '__upload') fileRef.current?.click(); else setContextKey(value); }} options={[
+            { value: '__upload', label: extracting ? 'Reading…' : attachDropActive ? 'Drop files' : 'Upload file', group: 'Files', disabled: extracting || attachments.length >= MAX_ATTACHMENTS },
+            ...(attachments.length ? [{ value: 'attachment', label: attachments.length === 1 ? attachments[0].title : `${attachments.length} files`, group: 'Files' }] : []),
             ...guides.map(item => ({ value: `guide:${item.id}`, label: item.title || 'Untitled guide', group: 'Guides' })),
             ...notes.map(item => ({ value: `note:${item.id}`, label: item.title || 'Untitled note', group: 'Notes' })),
-            ...(attachments.length ? [{ value: 'attachment', label: attachments.length === 1 ? attachments[0].title : `${attachments.length} files`, group: 'Files' }] : []),
             ...(session?.browser_content_available ? [{ value: 'browser', label: browserMaterial?.title || 'Browser page', group: 'Browser' }] : []),
+            ...(materials.length === 0 ? [{ value: '', label: 'No material' }] : []),
           ]} />
+          <input ref={fileRef} type="file" accept="*" multiple onChange={event => attachFiles(event.target.files)} hidden />
         </div>
+        {attachments.length > 0 && (
+          <ul className="cordia-tutor-attachments" aria-label="Attached files">
+            {attachments.map(file => (
+              <li key={file.id}>
+                <Paperclip size={16} strokeWidth={1.75} aria-hidden="true" />
+                <span className="c-truncate">{file.title}</span>
+                <button type="button" className="c-icon-btn" onClick={() => removeAttachment(file.id)} aria-label={`Remove ${file.title}`}><CloseIcon size={18} strokeWidth={1.75} aria-hidden="true" /></button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {contextKey === 'attachment' && combinedAttachments.trimmed.length > 0 && (
+          <p className="cordia-tutor-attach-note" role="status">Trimmed: {combinedAttachments.trimmed.join(', ')}</p>
+        )}
         <details className="tutor-context-controls">
-        <summary><SlidersHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />Options</summary>
+        <summary className="c-icon-btn" aria-label="Options" title="Options"><SlidersHorizontal size={20} strokeWidth={1.75} aria-hidden="true" /></summary>
         <TutorSelect label="Tutor skill" value={skillOverride} onChange={changeSkill} disabled={!session || busy} options={[
           { value: '', label: `Auto · ${session?.skills?.find(item => item.id === session?.active_skill)?.label || 'Explain'}` },
           ...(session?.skills || [{ id: 'explain', label: 'Explain' }]).map(item => ({ value: item.id, label: item.available === false ? `${item.label} — coming soon` : item.label, disabled: item.available === false })),
@@ -483,31 +501,6 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
           <p className="cordia-browser-fallback">
             Browser unavailable. Open the Chrome side panel, choose an existing guide or SmartNote, or attach a file below.
           </p>
-        )}
-        {attachments.length > 0 && (
-          <ul className="cordia-tutor-attachments" aria-label="Attached files">
-            {attachments.map(file => (
-              <li key={file.id}>
-                <span>{file.title}</span>
-                <button type="button" className="c-icon-btn" onClick={() => removeAttachment(file.id)} aria-label={`Remove ${file.title}`}><CloseIcon size={18} strokeWidth={1.75} aria-hidden="true" /></button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {contextKey === 'attachment' && combinedAttachments.trimmed.length > 0 && (
-          <p className="cordia-tutor-attach-note" role="status">Trimmed: {combinedAttachments.trimmed.join(', ')}</p>
-        )}
-        <input ref={fileRef} type="file" accept="*" multiple onChange={event => attachFiles(event.target.files)} hidden />
-        <button type="button" className={'cordia-tutor-attach' + (attachDropActive ? ' drop-target-active' : '')} onClick={() => fileRef.current?.click()} disabled={extracting || attachments.length >= MAX_ATTACHMENTS}>
-          <Paperclip size={18} strokeWidth={1.75} aria-hidden="true" />{extracting ? 'Reading…' : attachDropActive ? 'Drop' : attachments.length >= MAX_ATTACHMENTS ? `${MAX_ATTACHMENTS} files` : 'Attach'}
-        </button>
-        <button type="button" className="cordia-tutor-explain-toggle" onClick={() => setExplainOpen(open => !open)} aria-expanded={explainOpen}>
-          Explain style
-        </button>
-        {explainOpen && (
-          <div className="cordia-tutor-explain-panel">
-            <ExplanationPreference compact onSaved={() => setTimeout(() => setExplainOpen(false), 900)} />
-          </div>
         )}
         </details>
       </header>
@@ -553,7 +546,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         ))}
         {busy && messages.at(-1)?.role === 'user' && (
           <div className="cordia-tutor-message ai tutor-thinking">
-            <AILoadingSphere size={14} label="" />
+            <span className="tutor-typing" aria-hidden="true"><i /><i /><i /></span>
             <span>{progressLabel}</span>
           </div>
         )}

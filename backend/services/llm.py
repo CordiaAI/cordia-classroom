@@ -824,6 +824,52 @@ def generate_practice_guide(context: str, learning_guidance: str = "") -> str:
     return "\n".join(lines)
 
 
+_TITLE_JUNK = re.compile(r"\b(study guide|guide|notes|lecture|slides?|chapter \d+|week \d+|untitled)\b", re.IGNORECASE)
+
+
+def clean_guide_title(raw: str) -> str:
+    """Tidy a model-written title: 2-6 words, Title Case, no file extension, date or quotes."""
+    title = re.sub(r"\.(pdf|docx?|pptx?|txt|md|rtf|png|jpe?g|webp|heic)\b", "", str(raw or ""), flags=re.IGNORECASE)
+    title = re.sub(r"\b\d{1,4}[/-]\d{1,2}([/-]\d{2,4})?\b", "", title)
+    title = re.sub(r"[\"'`*_#:]+", " ", title)
+    title = re.sub(r"[+_]+", " ", title)
+    title = re.sub(r"\s+", " ", title).strip(" .-,")
+    words = title.split()
+    if len(words) > 6:
+        words = words[:6]
+    small = {"a", "an", "and", "as", "at", "but", "by", "for", "in", "of", "on", "or", "the", "to", "vs", "via"}
+    cased = [w if (w.isupper() and len(w) > 1) else (w.lower() if i and w.lower() in small else w[:1].upper() + w[1:]) for i, w in enumerate(words)]
+    return " ".join(cased)
+
+
+def generate_guide_title(study_guide: str, notes: str = "") -> str:
+    """Name the topic of a finished guide in 2-6 words. Returns '' when no title can be made."""
+    client = get_openai_client()
+    material = (study_guide or "")[:6000] + "\n" + (notes or "")[:1500]
+    if not client or not material.strip():
+        return ""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.2,
+            max_tokens=24,
+            messages=[
+                {"role": "system", "content": "You name study material. Reply with only the title."},
+                {"role": "user", "content": (
+                    "Write a 2-6 word Title Case title that names the specific topic of this study material, "
+                    "the way a student would label it. Use names, works, concepts or events that appear in it. "
+                    "No file names, dates, quotes, or words like 'Study Guide' or 'Notes'.\n\n" + material
+                )},
+            ],
+        )
+        title = clean_guide_title(response.choices[0].message.content)
+    except Exception as e:
+        logger.warning(f"Guide title generation failed: {e}")
+        return ""
+    stripped = _TITLE_JUNK.sub("", title).strip()
+    return title if len(title.split()) >= 2 and stripped else ""
+
+
 def study_guide_to_flashcards(content: str) -> list:
     """Return unique, complete pairs from the canonical Q/A guide format."""
     pairs = []

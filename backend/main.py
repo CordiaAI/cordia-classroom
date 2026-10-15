@@ -36,7 +36,7 @@ from services.llm import (
     generate_flashcards, answer_question, explain_retain_answer,
     analyze_images_for_slides, generate_practice_guide, generate_verified_practice_set, grade_practice_answer, recognize_handwriting,
     transcribe_document_pages,
-    study_guide_is_complete, study_guide_to_flashcards,
+    study_guide_is_complete, study_guide_to_flashcards, generate_guide_title,
 )
 from routers import auth, folders, guides, stats, search, quiz, billing, nclex, exam, feedback, smart_notes, calendar, tutor, learning
 from auth_utils import get_user_id
@@ -662,10 +662,12 @@ def generate(body: GenerateRequest, request: Request, authorization: str = Heade
             logger.info(f"Created {len(flashcards)} flashcards")
 
         record(user_id, "guide", body.request_id)
+        title = generate_guide_title(study_guide, notes_str or "") if study_guide else ""
         return GenerateResponse(
             notes=notes_str,
             study_guide=study_guide,
-            flashcards=flashcards
+            flashcards=flashcards,
+            title=title or None,
         )
 
     except HTTPException:

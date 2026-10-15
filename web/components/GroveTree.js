@@ -1,58 +1,92 @@
-// An olive tree that grows with study minutes. Calm, flat shapes in the olive palette.
+// An olive tree that grows with study minutes: Seed, Sprout, Sapling, Tree, Olive tree.
+// Flat olive-palette shapes; olive leaves are long and narrow, set in pairs.
+export const STAGES = [
+  { name: 'Seed', minutes: 0 },
+  { name: 'Sprout', minutes: 10 },
+  { name: 'Sapling', minutes: 30 },
+  { name: 'Tree', minutes: 60 },
+  { name: 'Olive tree', minutes: 120 },
+];
+
 export function groveStage(minutes = 0) {
-  if (minutes < 5) return 0;
-  if (minutes < 20) return 1;
-  if (minutes < 60) return 2;
-  if (minutes < 150) return 3;
-  return 4;
+  let stage = 0;
+  STAGES.forEach((item, index) => { if (minutes >= item.minutes) stage = index; });
+  return stage;
+}
+
+// "12 min to Tree" for the next stage, or '' when fully grown.
+export function nextStageLabel(minutes = 0) {
+  const next = STAGES[groveStage(minutes) + 1];
+  return next ? `${Math.max(1, Math.ceil(next.minutes - minutes))} min to ${next.name}` : '';
 }
 
 const LEAF = 'var(--olive)';
 const TRUNK = 'var(--olive-press)';
 
-function Canopy({ stage }) {
+function Leaf({ x, y, angle, length = 9, opacity = 1 }) {
+  return <ellipse cx={x} cy={y} rx={length} ry={length * 0.28} fill={LEAF} opacity={opacity} transform={`rotate(${angle} ${x} ${y})`} />;
+}
+
+// Leaf pairs along a branch from (x1,y1) to (x2,y2).
+function Branch({ x1, y1, x2, y2, width = 2, leaves = 3, length = 8 }) {
+  const items = [];
+  for (let i = 1; i <= leaves; i += 1) {
+    const t = i / (leaves + 0.4);
+    const x = x1 + (x2 - x1) * t;
+    const y = y1 + (y2 - y1) * t;
+    const base = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
+    items.push(<Leaf key={`a${i}`} x={x - 3} y={y - 3} angle={base - 40} length={length} opacity={0.92} />);
+    items.push(<Leaf key={`b${i}`} x={x + 3} y={y - 2} angle={base + 40} length={length} opacity={0.78} />);
+  }
+  return <g><path d={`M${x1} ${y1} L${x2} ${y2}`} stroke={TRUNK} strokeWidth={width} strokeLinecap="round" />{items}</g>;
+}
+
+function Stage({ stage }) {
   if (stage === 0) {
     return <>
-      <path d="M50 78 C50 70 50 66 50 62" stroke={TRUNK} strokeWidth="2.5" strokeLinecap="round" fill="none" />
-      <ellipse cx="44" cy="62" rx="6" ry="3" fill={LEAF} transform="rotate(-25 44 62)" />
-      <ellipse cx="56" cy="60" rx="6" ry="3" fill={LEAF} opacity=".8" transform="rotate(25 56 60)" />
+      <ellipse cx="50" cy="82" rx="6" ry="4" fill={TRUNK} />
+      <path d="M50 79 q1 -3 3 -4" stroke={LEAF} strokeWidth="1.6" fill="none" strokeLinecap="round" />
     </>;
   }
   if (stage === 1) {
     return <>
-      <path d="M50 80 C50 68 50 58 50 48" stroke={TRUNK} strokeWidth="3" strokeLinecap="round" fill="none" />
-      <path d="M50 62 C44 58 40 56 36 56" stroke={TRUNK} strokeWidth="2" strokeLinecap="round" fill="none" />
-      {[[50, 46, 0], [38, 54, -30], [58, 54, 30], [44, 50, -15]].map(([x, y, r], i) => <ellipse key={i} cx={x} cy={y} rx="7" ry="3.2" fill={LEAF} opacity={i % 2 ? 0.75 : 1} transform={`rotate(${r} ${x} ${y})`} />)}
+      <path d="M50 84 C50 76 49 70 50 64" stroke={TRUNK} strokeWidth="2" fill="none" strokeLinecap="round" />
+      <Leaf x={44} y={63} angle={-30} length={7} />
+      <Leaf x={56} y={62} angle={30} length={7} opacity={0.8} />
     </>;
   }
-  const size = stage === 2 ? 16 : stage === 3 ? 22 : 27;
-  const top = stage === 2 ? 46 : stage === 3 ? 40 : 36;
+  if (stage === 2) {
+    return <>
+      <path d="M50 84 C50 72 49 60 50 46" stroke={TRUNK} strokeWidth="2.6" fill="none" strokeLinecap="round" />
+      <Branch x1={50} y1={66} x2={36} y2={56} leaves={2} />
+      <Branch x1={50} y1={60} x2={63} y2={50} leaves={2} />
+      <Leaf x={46} y={46} angle={-60} length={7} />
+      <Leaf x={54} y={45} angle={60} length={7} opacity={0.8} />
+    </>;
+  }
+  const full = stage === 4;
   return <>
-    <path d={`M48 82 C49 72 47 62 50 ${top + 8} M50 66 C56 62 60 58 64 54`} stroke={TRUNK} strokeWidth={stage === 2 ? 3.5 : 5} strokeLinecap="round" fill="none" />
-    <ellipse cx="50" cy={top} rx={size} ry={size * 0.72} fill={LEAF} opacity=".55" />
-    <ellipse cx={50 - size * 0.45} cy={top + 3} rx={size * 0.6} ry={size * 0.45} fill={LEAF} opacity=".8" />
-    <ellipse cx={50 + size * 0.5} cy={top + 1} rx={size * 0.55} ry={size * 0.42} fill={LEAF} opacity=".9" />
-    <ellipse cx="50" cy={top - size * 0.3} rx={size * 0.55} ry={size * 0.4} fill={LEAF} />
-    {stage === 4 && [[40, top + 2], [57, top - 4], [62, top + 6], [47, top - 8], [33, top + 6]].map(([x, y], i) => <circle key={i} cx={x} cy={y} r="2.2" fill={TRUNK} />)}
+    <path d={`M47 84 C49 74 46 64 50 ${full ? 50 : 54} M50 66 C54 62 56 60 58 57`} stroke={TRUNK} strokeWidth={full ? 4.5 : 3.6} fill="none" strokeLinecap="round" />
+    <Branch x1={50} y1={56} x2={28} y2={40} width={2} leaves={3} length={9} />
+    <Branch x1={50} y1={54} x2={72} y2={38} width={2} leaves={3} length={9} />
+    <Branch x1={50} y1={52} x2={46} y2={22} width={2} leaves={3} length={9} />
+    <Branch x1={52} y1={60} x2={76} y2={56} width={1.6} leaves={2} length={8} />
+    <Branch x1={48} y1={60} x2={24} y2={58} width={1.6} leaves={2} length={8} />
+    {full && [[33, 44], [66, 40], [44, 30], [70, 55], [28, 58], [55, 26]].map(([x, y], i) => <circle key={i} cx={x} cy={y} r="2.1" fill={TRUNK} />)}
   </>;
 }
 
-export default function GroveTree({ minutes = 0, rings = 0, size = 96, newRing = false, title }) {
+export default function GroveTree({ minutes = 0, size = 96, title, grow = false }) {
   const stage = groveStage(minutes);
-  const shown = Math.min(rings, 6);
   return (
-    <svg className="grove-tree" width={size} height={size} viewBox="0 0 100 100" role="img" aria-label={title || `Tree, ${Math.round(minutes)} minutes`}>
-      {Array.from({ length: shown }, (_, index) => {
-        const isNew = newRing && index === shown - 1;
-        return <ellipse key={index} className={isNew ? 'grove-ring is-new' : 'grove-ring'} cx="50" cy="84" rx={14 + index * 5} ry={3 + index * 1.1} fill="none" stroke="var(--olive)" strokeOpacity={0.18 + 0.05 * index} strokeWidth="1.2" />;
-      })}
-      <ellipse cx="50" cy="84" rx="16" ry="3.2" fill="var(--olive)" opacity=".18" />
-      <Canopy stage={stage} />
+    <svg className={'grove-tree' + (grow ? ' is-growing' : '')} width={size} height={size} viewBox="0 0 100 100" role="img" aria-label={title || `${STAGES[stage].name}, ${Math.round(minutes)} minutes`}>
+      <path d="M20 85 Q50 81 80 85" stroke="var(--line)" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+      <Stage stage={stage} />
       <style jsx>{`
         .grove-tree { display: block; overflow: visible; }
-        .grove-ring.is-new { transform-origin: 50px 84px; animation: ring-in 900ms cubic-bezier(.34, 1.56, .64, 1) both; }
-        @keyframes ring-in { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @media (prefers-reduced-motion: reduce) { .grove-ring.is-new { animation: none; } }
+        .grove-tree.is-growing { transform-origin: 50% 85%; animation: tree-grow 220ms cubic-bezier(.2, .8, .2, 1) both; }
+        @keyframes tree-grow { from { transform: scale(.92); opacity: .4; } to { transform: scale(1); opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) { .grove-tree.is-growing { animation: none; } }
       `}</style>
     </svg>
   );
