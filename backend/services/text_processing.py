@@ -3,9 +3,9 @@ Text processing utilities for content extraction and cleaning.
 Handles LMS content, slideshows, and general educational material.
 """
 
-import html
 import re
 import logging
+from html.parser import HTMLParser
 from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -399,9 +399,36 @@ def inject_page_image_descriptions(text: str, image_descriptions: dict) -> str:
     return text
 
 
+class _HtmlText(HTMLParser):
+    """Collects text; block-level tags become line breaks. One pass, so input size can't blow up the cost."""
+    BLOCKS = {"p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "br"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+
+    def _break(self, tag):
+        if tag in self.BLOCKS:
+            self.parts.append("\n")
+
+    def handle_starttag(self, tag, attrs):
+        self._break(tag)
+
+    def handle_endtag(self, tag):
+        self._break(tag)
+
+    def handle_startendtag(self, tag, attrs):
+        self._break(tag)
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+
 def html_to_text(text: str) -> str:
-    """SmartNote HTML as plain text for AI context: block tags become line breaks, the rest is dropped."""
-    if not re.search(r"<[^>]+>", text or ""):
+    """SmartNote HTML as plain text for AI context."""
+    if "<" not in (text or ""):
         return text
-    text = re.sub(r"</?(?:p|div|li|h[1-6]|blockquote|br)[^>]*>", "\n", text, flags=re.IGNORECASE)
-    return html.unescape(re.sub(r"<[^>]+>", "", text))
+    parser = _HtmlText()
+    parser.feed(text)
+    parser.close()
+    return "".join(parser.parts)
