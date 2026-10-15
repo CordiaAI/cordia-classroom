@@ -625,7 +625,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .setup-wizard-features strong { font-weight: 650; line-height: 1.35; }
 .setup-wizard-features p { color: var(--text-secondary); font-size: .85rem; line-height: 1.6; }
 .setup-wizard-features .setup-wizard-link { margin-top: auto; align-self: flex-start; color: var(--olive); text-decoration: none; font-weight: 600; }
-.setup-wizard-tag { color: var(--olive); font: 650 .7rem/1.4 var(--font-sans); letter-spacing: .08em; text-transform: uppercase; }
+.setup-wizard-tag { color: var(--olive); font: 650 .7rem/1.4 var(--font-sans); letter-spacing: .02em; }
 @media (max-width: 760px) { .setup-wizard-features { grid-template-columns: 1fr; } }
 
 /* Dashboard getting-started checklist */

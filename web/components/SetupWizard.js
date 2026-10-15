@@ -125,8 +125,9 @@ export default function SetupWizard() {
           <li><span className="setup-wizard-num">3</span><div><strong>Click the Cordia icon → Make study guide</strong><span>It saves straight to your Classroom.</span></div></li>
         </ol>
         {!installed && <details className="setup-wizard-help">
-          <summary>School account blocks extensions?</summary>
+          <summary>Some .edu email accounts won&apos;t allow extension installs</summary>
           <p>On the Chrome Web Store, click your profile picture (top right), switch to your personal Google account, then add it.</p>
+          <button type="button" className="setup-wizard-link" onClick={() => leaveFor('/install-extension', 'first_guide')} disabled={busy}>Full install guide</button>
         </details>}
       </>,
       actions: <>

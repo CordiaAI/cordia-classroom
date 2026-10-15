@@ -24,6 +24,7 @@ const fixtures = {
   '/learning-style': { enabled: false, style: null, prompted: true },
   '/learning-preference': {},
   '/onboarding': { completed: true, step: 'done' },
+  '/onboarding/checklist': { extension_guide: true, learn_your_way: true, practice: true, smartnote: true },
   '/stats/overview': { total_guides: 1, total_flashcards: 1, avg_quiz_score: 80, minutes_today: 24 },
   '/stats/streak': { current_streak: 6, studied_today: true, week: [] },
   '/stats/insights': { strengths: [], needs_work: [], tips: [], total_answered: 0 },
@@ -242,8 +243,8 @@ test('Classroom glass workspace renders responsively and preserves study interac
     await wizard.getByRole('radio', { name: /^Visual/ }).click();
     await page.waitForFunction(() => document.querySelector('.setup-wizard [role="radio"]').getAttribute('aria-checked') === 'true');
     await wizard.getByRole('button', { name: 'Continue', exact: true }).click();
-    await page.getByRole('dialog', { name: 'Add the Chrome extension' }).waitFor();
-    assert.ok(onboardingWrites.includes('extension'), 'advancing setup must save the step');
+    await page.getByRole('dialog', { name: 'Make guides in one click' }).waitFor();
+    assert.ok(onboardingWrites.includes('first_guide'), 'advancing setup must save the step');
     await page.getByRole('button', { name: 'Back', exact: true }).click();
     await wizard.waitFor();
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
@@ -259,8 +260,11 @@ test('Classroom glass workspace renders responsively and preserves study interac
       }), 'setup must fit on mobile and scroll inside its window');
       if (width === 390) await page.screenshot({ path: path.join(output, 'setup-mobile.png') });
     }
-    await page.getByRole('button', { name: 'Skip setup' }).click();
-    await wizard.waitFor({ state: 'hidden' });
+    await wizard.getByRole('button', { name: 'Continue', exact: true }).click();
+    const extensionStep = page.getByRole('dialog', { name: 'Make guides in one click' });
+    await extensionStep.waitFor();
+    await page.getByRole('button', { name: 'Do this later' }).click();
+    await extensionStep.waitFor({ state: 'hidden' });
     assert.ok(onboardingWrites.includes('done'), 'skipping setup must save completion');
     assert.deepEqual(errors, [], 'frontend must not throw browser exceptions');
   } finally {
