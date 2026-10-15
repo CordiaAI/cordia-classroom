@@ -16,15 +16,18 @@ test('one navigation: five places, URL-driven active state, Library owns study s
   assert.doesNotMatch(sidebar, /workspace-rail/);
 });
 
-test('Practice asks for a guide before showing the workspace', async () => {
+test('Practice asks for a guide, then runs fresh with History', async () => {
   const hub = await source('pages/practice/index.js');
   const workspace = await source('components/PracticeWorkspace.js');
+  const problem = await source('components/PracticeProblem.js');
 
   assert.match(hub, /PracticeWorkspace/);
-  assert.match(workspace, /if \(!guideId && !upload\)/);
-  assert.match(workspace, /className="practice-grid practice-guide-picker"/);
-  assert.match(workspace, /Create guide or upload file/);
-  assert.match(workspace, /\{problems\.length \? problemIndex \+ 1 : 0\} \/ \{problems\.length \|\| 10\}/);
+  assert.match(workspace, /if \(!guideId\)/);
+  assert.match(workspace, /data-spot="practice-picker"/);
+  assert.match(workspace, /History/);
+  assert.doesNotMatch(workspace, /Upload/);
+  assert.match(problem, /export function answerTool/);
+  assert.match(problem, /'Correct' : 'Not quite'/);
 });
 
 test('old dashboard views redirect to their own routes', async () => {
@@ -56,17 +59,16 @@ test('Library holds guides and cards with Undo on delete', async () => {
   assert.match(undo, /export const UNDO_MS = 6000/);
 });
 
-test('create keeps manual cards and the file picker with one Create button', async () => {
+test('/create opens the New sheet; cards are made in the sheet', async () => {
   const create = await source('pages/create.js');
+  const sheet = await source('components/NewSheet.js');
   const shared = await source('lib/guideCreate.js');
 
-  assert.match(create, /Write cards/);
-  assert.match(create, /Upload/);
-  assert.match(create, /isEdit \? 'Update' : 'Create'/);
-  assert.match(create, /Add your cards\?/);
-  assert.match(create, /startGuideJob/);
+  assert.match(create, /openNewSheet/);
+  assert.match(sheet, /Make cards myself/);
+  assert.match(sheet, /async function saveCards/);
+  assert.match(sheet, /startGuideJob/);
   assert.match(shared, /export async function generateAndSave/);
-  assert.doesNotMatch(create, /create-tabs|Paste Text/);
 });
 
 test('New sheet offers Upload, Paste, Link, Record and a sample', async () => {

@@ -19,10 +19,8 @@ assert.match(help, /canReviewFeedback &&/);
 for (const category of ['bug', 'suggestion', 'incorrect_content', 'account_payment', 'other']) {
   assert.ok(modal.includes(`['${category}'`));
 }
-assert.match(modal, /role="dialog"/);
-assert.match(modal, /aria-modal="true"/);
-assert.match(modal, /event\.key === 'Escape'/);
-assert.match(modal, /event\.key !== 'Tab'/);
+// Escape, focus trap and focus return come from the shared Sheet.
+assert.match(modal, /<Sheet onClose=\{onClose\}/);
 assert.match(modal, /maxLength=\{2000\}/);
 assert.match(modal, /requestIdRef/);
 assert.match(modal, /submittingRef/);

@@ -65,7 +65,7 @@ export default function FolderPage() {
     setContextMenu(null);
     setConfirm({
       title: 'Delete guide?',
-      message: '',
+      message: 'This can\'t be undone.',
       onConfirm: async () => {
         await apiFetch('/guides/' + guideId, { method: 'DELETE' });
         setGuides(guides.filter(g => g.id !== guideId));
@@ -78,7 +78,7 @@ export default function FolderPage() {
   function deleteFolder() {
     setConfirm({
       title: 'Delete class?',
-      message: '',
+      message: 'This can\'t be undone.',
       onConfirm: async () => {
         await apiFetch('/folders/' + id, { method: 'DELETE' });
         router.push('/library');
@@ -164,7 +164,7 @@ export default function FolderPage() {
       )}
       {toast && <div className="c-toast" role="status"><span>{toast.message}</span></div>}
       <style jsx>{`
-        :global(.folder-row-link) { display: flex; align-items: baseline; gap: 12px; min-width: 0; color: var(--ink); text-decoration: none; }
+        :global(.folder-row-link) { display: flex; align-items: baseline; gap: 12px; min-width: 0; min-height: 44px; padding: 10px 0; box-sizing: border-box; color: var(--ink); text-decoration: none; }
         .folder-row-title { font: 600 17px/1.3 var(--font-display); min-width: 0; }
       `}</style>
     </div>

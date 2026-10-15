@@ -17,6 +17,7 @@ import StudyInsights from '../components/StudyInsights';
 import LearnCordia from '../components/LearnCordia';
 import AboutYou from '../components/AboutYou';
 import GroveCard from '../components/GroveCard';
+import DueSoon from '../components/DueSoon';
 import StudyDocument from '../components/StudyDocument';
 import AIChatWidget from '../components/AIChatWidget';
 
@@ -91,8 +92,8 @@ export default function Today({ timerState, setTimerState }) {
     }
     loadStudyQueue().then(setQueue);
     apiFetch('/stats/insights').then(data => { setInsights(data); if (data?.answered) markUsed('quiz'); });
-    apiFetch('/smart_notes').then(data => { if (data?.notes?.length) markUsed('notes'); });
-    apiFetch('/calendar/connection').then(data => { setCalendar(data); if (data?.connected) markUsed('calendar'); });
+    apiFetch('/smart_notes').then(data => { if (data?.notes?.some(note => String(note.content || '').replace(/<[^>]+>/g, '').trim())) markUsed('note-written'); });
+    apiFetch('/calendar/connection').then(data => { setCalendar(data); if (data?.connected) markUsed('calendar-connected'); });
     apiFetch('/onboarding/checklist').then(data => {
       if (data?.practice) markUsed('practice');
       if (data?.learn_your_way) markUsed('explain');
@@ -123,10 +124,10 @@ export default function Today({ timerState, setTimerState }) {
   const remembered = lastGuide();
   const studyGuide = (remembered && guides.find(guide => guide.id === remembered.id)) || overview.continueGuide;
   const counts = queue ? [
-    [queue.cardTotal + queue.misses.length, 'card'],
+    [queue.cardTotal + queue.misses.length, 'card due'],
     [queue.problems, 'problem'],
     [queue.minutes, 'min'],
-  ].filter(([count]) => count > 0).map(([count, word]) => (word === 'min' ? `${count} min` : plural(count, word))) : [];
+  ].filter(([count]) => count > 0).map(([count, word]) => (word === 'min' ? `${count} min` : word === 'card due' ? `${plural(count, 'card')} due` : plural(count, word))) : [];
   const hasInsights = Boolean(insights?.strengths?.length || insights?.needs_work?.length);
 
   return (
@@ -159,6 +160,8 @@ export default function Today({ timerState, setTimerState }) {
           </button>
         </section>
       )}
+
+      {calendar?.connected && <DueSoon items={calendar.items || []} folders={folders} />}
 
       {studyGuide && studyGuideFull?.id === studyGuide.id && (
         <section className="today-space" aria-label="Study space">
@@ -193,13 +196,13 @@ export default function Today({ timerState, setTimerState }) {
         .today-space { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr); gap: 16px; height: min(680px, calc(100svh - 300px)); min-height: 520px; }
         .today-tutor { display: flex; min-width: 0; overflow: hidden; }
         .today-tutor .cordia-tutor { flex: 1; min-width: 0; }
-        .today-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; align-items: stretch; }
+        .today-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
         @media (max-width: 1023px) {
           .today-space { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0; }
           .today-space .doc { height: 560px; }
           .today-tutor { height: 520px; }
         }
-        @media (max-width: 767px) {
+        @media (max-width: 1023px) {
           .today-title { font-size: 44px; }
           .today-start { padding: 16px; }
           .today-start-btn { width: 100%; }

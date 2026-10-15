@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api';
 import { MessageCircle } from 'lucide-react';
 import { requestTip } from '../lib/tips';
@@ -50,10 +50,28 @@ function NextButton({ onNext, missed }) {
   );
 }
 
+function seedFrom(text) {
+  let hash = 7;
+  for (const char of String(text)) hash = (hash * 31 + char.charCodeAt(0)) % 233280;
+  return hash;
+}
+
 export function McCard({ card, question, guideId, onResult, onNext }) {
   const answer = conceptAnswer(question);
-  const [options] = useState(() => (card.reask ? shuffled(question.options, card.id) : question.options));
+  // Always shuffled so the right answer's position (and the generator's habits) give nothing away.
+  const [options] = useState(() => shuffled(question.options, seedFrom(`${card.id}:${question.question}`)));
   const [selected, setSelected] = useState(null);
+
+  // Keys 1-4 pick an option.
+  useEffect(() => {
+    const onKey = event => {
+      if (selected !== null || event.target.closest?.('input, textarea, [contenteditable="true"]')) return;
+      const number = Number(event.key);
+      if (number >= 1 && number <= options.length) { event.preventDefault(); choose(options[number - 1]); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected, options]);
 
   function choose(option) {
     if (selected !== null) return;
@@ -73,8 +91,10 @@ export function McCard({ card, question, guideId, onResult, onNext }) {
   return (
     <>
       <div className="quiz-question-text">{question.question}</div>
-      {options.map(option => (
-        <button key={option} type="button" className={optionClass(option)} onClick={() => choose(option)}>{option}</button>
+      {options.map((option, index) => (
+        <button key={option} type="button" className={optionClass(option)} onClick={() => choose(option)} aria-keyshortcuts={String(index + 1)}>
+          <kbd className="quiz-key" aria-hidden="true">{index + 1}</kbd>{option}
+        </button>
       ))}
       {selected !== null && <NextButton onNext={onNext} missed={selected !== answer} />}
     </>

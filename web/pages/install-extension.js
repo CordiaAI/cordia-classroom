@@ -1,53 +1,46 @@
 import { useEffect, useState } from 'react';
-import { Check, Download, MousePointerClick, Pin } from 'lucide-react';
+import { Check, Download } from 'lucide-react';
 import { useRequireAuth } from '../lib/auth';
-import { EXTENSION_STORE_URL, watchExtension } from '../lib/extension';
+import { EXTENSION_STORE_URL, extensionInstalled } from '../lib/extension';
+import StepGuide from '../components/StepGuide';
+import { ChromeAddToChrome, ChromeCapture, ChromePin } from '../components/Illustrations';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 
-const STEPS = [
-  { title: 'Add to Chrome', icon: Download, text: 'Open the Chrome Web Store listing and choose Add to Chrome.' },
-  { title: 'Pin it', icon: Pin, text: 'Open the puzzle-piece menu in the toolbar and pin CordiaClassroom.' },
-  { title: 'Capture a page', icon: MousePointerClick, text: 'On any course page, open the extension and make a guide.' },
-];
-
+// Show, then tell: three steps with the real screens and the exact button circled.
 export default function InstallExtensionPage() {
   const { ready } = useRequireAuth();
   const [installed, setInstalled] = useState(false);
 
-  useEffect(() => watchExtension(() => setInstalled(true)), []);
+  useEffect(() => {
+    const check = () => setInstalled(extensionInstalled());
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-asai-extension'] });
+    const onMessage = event => { if (event.source === window && event.data?.type === 'ASAI_EXTENSION_READY') setInstalled(true); };
+    window.addEventListener('message', onMessage);
+    return () => { observer.disconnect(); window.removeEventListener('message', onMessage); };
+  }, []);
 
   if (!ready) return null;
-
   return (
     <div className="c-page ext">
       <header className="c-page-head">
         <h1 className="c-title">Chrome extension</h1>
-        {installed ? (
-          <span className="ext-installed" role="status"><Check {...ICON} />Installed</span>
-        ) : (
-          <a className="c-btn c-btn--primary" href={EXTENSION_STORE_URL} target="_blank" rel="noreferrer">Add to Chrome</a>
-        )}
+        {installed && <span className="ext-installed" role="status"><Check {...ICON} />Installed</span>}
       </header>
-
-      <ol className="ext-steps">
-        {STEPS.map((step, index) => (
-          <li key={step.title} className="c-card ext-step">
-            <span className="ext-num" aria-hidden="true">{index + 1}</span>
-            <h2><step.icon {...ICON} />{step.title}</h2>
-            <p>{step.text}</p>
-          </li>
-        ))}
-      </ol>
-
+      <StepGuide label="Install the Chrome extension" steps={[
+        {
+          visual: <ChromeAddToChrome />,
+          text: 'Click Add to Chrome in the Chrome Web Store.',
+          action: !installed && <a className="c-btn c-btn--primary" href={EXTENSION_STORE_URL} target="_blank" rel="noreferrer"><Download {...ICON} />Add to Chrome</a>,
+        },
+        { visual: <ChromePin />, text: 'Open the puzzle piece, then pin CordiaClassroom.' },
+        { visual: <ChromeCapture />, text: 'On a course page, click Make study guide.' },
+      ]} />
       <style jsx>{`
-        .ext-installed { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 999px; background: var(--success-bg); color: var(--success); font: 600 15px/1 var(--font-sans); }
-        .ext-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-        .ext-step { display: grid; align-content: start; gap: 12px; padding: 24px; }
-        .ext-num { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--olive); color: #fff; font: 600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
-        h2 { display: flex; align-items: center; gap: 8px; margin: 0; font: 600 17px/1.3 var(--font-sans); }
-        p { margin: 0; font: 500 15px/1.5 var(--font-sans); }
-        @media (max-width: 767px) { .ext-steps { grid-template-columns: minmax(0, 1fr); } }
+        .ext-installed { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 999px; background: var(--success-bg); color: var(--ink); font: 600 15px/1 var(--font-sans); }
+        .ext-installed :global(.lucide) { color: var(--success); }
       `}</style>
     </div>
   );

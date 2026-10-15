@@ -17,3 +17,11 @@ export const FEATURE_LIST = [
   { id: 'insights', label: 'Insights', icon: ChartColumn },
   { id: 'grove', label: 'Grove', icon: TreeDeciduous },
 ];
+
+// Some features only count once really used: Calendar when a feed is connected, Notes when
+// a note has text. (Older accounts were ticked just for opening those pages.)
+const USED_KEY = { calendar: 'calendar-connected', notes: 'note-written' };
+
+export function featureUsed(progress, id) {
+  return (progress?.used || []).includes(USED_KEY[id] || id);
+}

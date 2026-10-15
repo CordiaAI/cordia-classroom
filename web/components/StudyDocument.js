@@ -106,7 +106,7 @@ export default function StudyDocument({
                   <div className="doc-section-actions">
                     {onRead && (
                       <button type="button" className={'c-btn c-btn--quiet' + (read ? ' is-read' : '')} aria-pressed={Boolean(read)} onClick={() => onRead(index)}>
-                        <Check {...ICON} />Got it
+                        <Check {...ICON} />{read ? 'Read' : 'Mark read'}
                       </button>
                     )}
                     {onExplain && (
@@ -154,7 +154,7 @@ export default function StudyDocument({
         .doc:fullscreen { height: 100vh; padding: 24px; border-radius: 0; }
         .doc-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 4px 8px 12px; }
         .doc-label { display: flex; align-items: center; gap: 10px; min-width: 0; font: 500 13px/1.3 var(--font-sans); }
-        .doc-actions { display: flex; gap: 4px; }
+        .doc-actions { display: flex; gap: 8px; }
         .doc-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 16px; }
         .doc-body:not(:has(.doc-thumbs)) { grid-template-columns: minmax(0, 1fr); }
         .doc-thumbs { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding: 4px 2px; }
@@ -175,12 +175,12 @@ export default function StudyDocument({
         .doc-num { flex: 0 0 auto; min-width: 20px; font-variant-numeric: tabular-nums; }
         .doc-section p { margin: 0 0 4px 32px; white-space: pre-wrap; }
         .doc-section img { max-width: 100%; margin-left: 32px; border-radius: 12px; }
-        .doc-section-actions { display: flex; gap: 4px; margin-left: 20px; }
+        .doc-section-actions { display: flex; gap: 8px; margin-left: 20px; }
         .doc-section-actions .is-read { color: var(--success); }
         .doc-prose { white-space: pre-wrap; max-width: 68ch; }
         .doc-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 4px 0 108px; }
         .doc-body:not(:has(.doc-thumbs)) + .doc-foot { padding-left: 4px; }
-        .doc-pager, .doc-zoom { display: flex; align-items: center; gap: 4px; }
+        .doc-pager, .doc-zoom { display: flex; align-items: center; gap: 8px; }
         .doc-select { position: fixed; display: flex; min-width: 0; gap: 2px; z-index: 150; }
         .doc-select [role='menuitem'] { width: auto; }
         @media (max-width: 1023px) {
@@ -189,7 +189,7 @@ export default function StudyDocument({
           .doc-foot { padding-left: 4px; }
           .doc-zoom { display: none; }
         }
-        @media (max-width: 767px) {
+        @media (max-width: 1023px) {
           .doc { height: auto; min-height: 0; padding: 8px; }
           .doc-paper { padding: 24px 18px; overflow: visible; }
           .doc-title { font-size: 28px; }

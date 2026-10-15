@@ -141,12 +141,8 @@ function addRequestReference(data, response) {
   if (response.ok || !data || typeof data !== 'object' || Array.isArray(data)) return data;
   const requestId = response.headers.get('X-Request-ID');
   if (!requestId) return data;
-  const suffix = ` Reference: ${requestId}`;
-  return {
-    ...data,
-    request_id: requestId,
-    detail: typeof data.detail === 'string' ? `${data.detail}${suffix}` : data.detail,
-  };
+  // Kept for support logs; never shown in the message (no "Reference: ..." in the UI).
+  return { ...data, request_id: requestId };
 }
 
 export async function responseJson(response) {

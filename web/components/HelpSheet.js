@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Inbox, MessageSquareText, Play, Puzzle, X } from 'lucide-react';
+import { GraduationCap, Inbox, MessageSquareText, Play, Puzzle, X } from 'lucide-react';
+import { Sheet } from './Overlay';
 import { EXTENSION_STORE_URL } from '../lib/extension';
 import { setWalkthrough } from '../lib/walkthrough';
-import { LearnList } from './LearnCordia';
+import { openLearnCordia } from './LearnCordia';
 
 export default function HelpSheet({ onClose, onFeedback, canReviewFeedback }) {
   const router = useRouter();
@@ -11,10 +12,7 @@ export default function HelpSheet({ onClose, onFeedback, canReviewFeedback }) {
 
   useEffect(() => {
     setInstalled(document.documentElement.getAttribute('data-asai-extension') === 'ready');
-    const onKey = event => { if (event.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
 
   async function replayDayOne() {
     onClose();
@@ -24,15 +22,13 @@ export default function HelpSheet({ onClose, onFeedback, canReviewFeedback }) {
   }
 
   return (
-    <div className="c-scrim" onClick={onClose}>
-      <section className="c-sheet help-sheet" role="dialog" aria-modal="true" aria-labelledby="help-title" onClick={event => event.stopPropagation()}>
+    <Sheet onClose={onClose} labelledBy="help-title" className="help-sheet">
         <header className="c-sheet-head">
           <h2 id="help-title" className="c-title">Help</h2>
           <button type="button" className="c-icon-btn" onClick={onClose} aria-label="Close help"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         </header>
-        <h3 className="c-section-title">Learn Cordia</h3>
-        <LearnList onBeforeShow={onClose} />
         <div className="help-actions">
+          <button type="button" className="c-btn c-btn--secondary" onClick={() => { onClose(); openLearnCordia(); }}><GraduationCap size={20} strokeWidth={1.75} aria-hidden="true" />Learn Cordia</button>
           <button type="button" className="c-btn c-btn--secondary" onClick={replayDayOne}><Play size={20} strokeWidth={1.75} aria-hidden="true" />Replay tour</button>
           <button type="button" className="c-btn c-btn--secondary" onClick={onFeedback}><MessageSquareText size={20} strokeWidth={1.75} aria-hidden="true" />Feedback</button>
           {!installed && <a className="c-btn c-btn--secondary" href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer"><Puzzle size={20} strokeWidth={1.75} aria-hidden="true" />Get extension</a>}
@@ -43,12 +39,12 @@ export default function HelpSheet({ onClose, onFeedback, canReviewFeedback }) {
           <a href="/terms">Terms</a>
           <a href="/honor-code">Honor code</a>
         </nav>
-      </section>
-      <style jsx>{`
-        .help-sheet { width: min(720px, 100%); }
-        .help-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      <style jsx global>{`
+        .help-sheet { width: min(560px, 100%); }
+        .help-actions { display: flex; flex-wrap: wrap; gap: 8px; }
         .help-links { display: flex; gap: 20px; margin-top: 24px; font: 600 13px/1 var(--font-sans); }
+        .help-links a { color: var(--ink); }
       `}</style>
-    </div>
+    </Sheet>
   );
 }

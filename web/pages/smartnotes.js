@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { authHeaders, authorizedFetch, responseJson } from '../lib/api';
-import { ChevronDown, FilePlus2, FileUp, NotebookPen, Sparkles, X as XIcon } from 'lucide-react';
+import { Bold, ChevronDown, FilePlus2, FileText, FileUp, GraduationCap, Heading2, Highlighter, LayoutGrid, Link2, List, ListChecks, NotebookPen, Plus, Sparkles, Workflow, X, X as XIcon } from 'lucide-react';
+import { Popover, Sheet } from '../components/Overlay';
 import { walkthroughEvent } from '../lib/walkthrough';
 import PdfPages from '../components/PdfPages';
+import MermaidDiagram from '../components/MermaidDiagram';
 import { useFileDropZone } from '../lib/fileDrop';
 import { sanitizeHtml } from '../lib/sanitizeHtml';
 
@@ -138,25 +140,6 @@ function countEmptyBefore(block) {
 }
 
 // ─── Mermaid renderer (lazy-loaded) ─────────────────────────────────────────
-function MermaidDiagram({ code }) {
-  const ref = useRef(null);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    if (!code || !ref.current) return;
-    setError(false);
-    import('mermaid').then(({ default: mermaid }) => {
-      mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'strict' });
-      const id = 'mermaid-' + Date.now();
-      mermaid.render(id, code).then(({ svg }) => {
-        if (ref.current) ref.current.innerHTML = svg;
-      }).catch(() => setError(true));
-    });
-  }, [code]);
-
-  if (error) return <p className="sn-diagram-placeholder">Diagram could not be rendered.</p>;
-  return <div ref={ref} className="sn-diagram-render" />;
-}
 
 // Office docs that need backend extraction (browser cannot render natively)
 const EXTRACT_EXTS = new Set(['docx', 'doc', 'odt', 'ods']);
@@ -201,8 +184,7 @@ function StudyGuidePreviewModal({ preview, title, setTitle, error, saving, onClo
   if (!preview) return null;
   const hasPairs = preview.pairs && preview.pairs.length > 0;
   return (
-    <div className="c-scrim" onClick={onClose}>
-      <div className="c-sheet sn-modal" role="dialog" aria-modal="true" aria-label="Guide preview" onClick={e => e.stopPropagation()}>
+    <Sheet onClose={onClose} label="Guide preview" className="sn-modal">
         <div className="sn-modal-header">
           <input
             className="c-input sn-modal-title-input"
@@ -230,7 +212,6 @@ function StudyGuidePreviewModal({ preview, title, setTitle, error, saving, onClo
         </div>
         <div className="sn-modal-footer">
           <button className="c-btn c-btn--quiet sn-modal-cancel" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="c-btn c-btn--secondary sn-modal-edit" onClick={onEdit} disabled={saving || !hasPairs}>Edit</button>
           <button
             className="c-btn c-btn--primary sn-modal-approve"
             onClick={onApprove}
@@ -239,8 +220,7 @@ function StudyGuidePreviewModal({ preview, title, setTitle, error, saving, onClo
             {saving ? 'Saving…' : 'Save guide'}
           </button>
         </div>
-      </div>
-    </div>
+    </Sheet>
   );
 }
 
@@ -428,6 +408,13 @@ function FileViewer({ file, guideContent }) {
 }
 
 // ─── Notes Index — grid of saved notes with stacked-paper preview ────────────
+function previewText(html) {
+  if (!html) return '';
+  // Parsed in an inert document so saved HTML can never run code while building a preview.
+  const doc = new DOMParser().parseFromString(sanitizeHtml(html), 'text/html');
+  return (doc.body.textContent || '').trim().slice(0, 200);
+}
+
 function NotesIndex({ router, timerState, setTimerState }) {
   const [notes, setNotes] = useState([]);
   const [folders, setFolders] = useState([]);
@@ -460,16 +447,8 @@ function NotesIndex({ router, timerState, setTimerState }) {
   useEffect(() => { walkthroughEvent('notes-opened'); }, []);
 
   async function handleNew() {
-    try {
-      const resp = await fetch(API + '/smart_notes', {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Untitled Notes' }),
-      });
-      walkthroughEvent('note-created');
-      const data = await responseJson(resp);
-      if (data.note) router.push('/smartnotes?id=' + data.note.id);
-    } catch {}
+    walkthroughEvent('note-created');
+    router.push('/smartnotes?id=new');
   }
 
   async function handleSelectNoteForGuide(note) {
@@ -552,12 +531,6 @@ function NotesIndex({ router, timerState, setTimerState }) {
     router.push('/create');
   }
 
-  function previewText(html) {
-    if (!html) return '';
-    // Parsed in an inert document so saved HTML can never run code while building a preview.
-    const doc = new DOMParser().parseFromString(sanitizeHtml(html), 'text/html');
-    return (doc.body.textContent || '').trim().slice(0, 200);
-  }
 
   function fmtDate(iso) {
     if (!iso) return '';
@@ -680,7 +653,16 @@ function SmartNotesEditor() {
   // Diagram / visualize
   const [mermaidCode, setMermaidCode] = useState(null);
   const [diagramLoading, setDiagramLoading] = useState(false);
-  const [visualizeMode, setVisualizeMode] = useState(false);
+  const [rail, setRail] = useState(null); // null | 'material' | 'diagram' | 'closed'
+  const [selectionBox, setSelectionBox] = useState(null);
+  const [classOpen, setClassOpen] = useState(false);
+  const [newClassName, setNewClassName] = useState('');
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const classRef = useRef(null);
+  const notesRef = useRef(null);
+  const linkRef = useRef(null);
+  const linkRange = useRef(null);
 
   // "Turn into Study Guide" preview modal
   const [convertingGuide, setConvertingGuide] = useState(false);
@@ -689,10 +671,6 @@ function SmartNotesEditor() {
   const [previewError, setPreviewError] = useState('');
   const [savingGuide, setSavingGuide] = useState(false);
 
-  // Resize state
-  const [colWidth, setColWidth] = useState(320);
-  const [topPx, setTopPx] = useState(null); // null = CSS default 1fr
-  const layoutRef = useRef(null);
 
   // File viewer
   const [viewerFile, setViewerFile] = useState(null);
@@ -725,8 +703,6 @@ function SmartNotesEditor() {
   const lastSavedRef = useRef('');       // last saved content snapshot
   const lastSavedTitleRef = useRef('Untitled Notes'); // last saved title snapshot
 
-  // Multi-page illusion: how many "filled pages" are behind the front paper (0–2)
-  const [pageCount, setPageCount] = useState(0);
 
   // ── Init: load existing note (parent only renders editor when ?id is present)
   useEffect(() => {
@@ -785,6 +761,19 @@ function SmartNotesEditor() {
   }
 
   async function loadNote(id) {
+    if (id === 'new') {
+      noteIdRef.current = null;
+      titleRef.current = 'Untitled Notes';
+      folderIdRef.current = '';
+      setNoteId(null);
+      setTitle('Untitled Notes');
+      setFolderId('');
+      setHasText(false);
+      if (paperRef.current) paperRef.current.innerHTML = '<p><br></p>';
+      lastSavedRef.current = '<p><br></p>';
+      lastSavedTitleRef.current = 'Untitled Notes';
+      return;
+    }
     try {
       const resp = await fetch(API + '/smart_notes/' + id, { headers: authHeaders() });
       if (!resp.ok) { createNote(); return; }
@@ -810,10 +799,29 @@ function SmartNotesEditor() {
   // Resolves to '' when the note is saved (or unchanged), otherwise to a readable error.
   // A failed save leaves lastSavedRef untouched so the next autosave retries it.
   const doSave = useCallback(async (opts = {}) => {
-    if (!paperRef.current || !noteIdRef.current) return '';
+    if (!paperRef.current) return '';
     const content = paperRef.current.innerHTML;
     const title = titleRef.current;
     if (content === lastSavedRef.current && title === lastSavedTitleRef.current && !opts.force) return '';
+    const empty = !paperRef.current.innerText.trim();
+    // Never save an empty note: a new note exists only once it has text.
+    if (!noteIdRef.current) {
+      if (empty) return '';
+      try {
+        const created = await responseJson(await fetch(API + '/smart_notes', {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: title || 'Untitled Notes', ...(folderIdRef.current ? { folder_id: folderIdRef.current } : {}) }),
+        }));
+        if (!created?.note?.id) return '';
+        noteIdRef.current = created.note.id;
+        setNoteId(created.note.id);
+        window.history.replaceState({}, '', '/smartnotes?id=' + created.note.id);
+        walkthroughEvent('note-written');
+      } catch {
+        return '';
+      }
+    }
     setSaveStatus('saving');
     let message = '';
     try {
@@ -843,7 +851,6 @@ function SmartNotesEditor() {
   // ── Autosave (debounced 1s after a keypress) ────────────────────────────
   const scheduleSave = useCallback(() => {
     clearTimeout(saveTimer.current);
-    if (!noteIdRef.current) return;
     saveTimer.current = setTimeout(() => doSave(), 1000);
   }, [doSave]);
 
@@ -853,24 +860,6 @@ function SmartNotesEditor() {
     return () => clearInterval(pollTimer.current);
   }, [doSave]);
 
-  // ── Multi-page illusion — track scrollHeight, add ghost pages as content grows
-  useEffect(() => {
-    const paper = paperRef.current;
-    if (!paper) return;
-    function update() {
-      const visible = paper.clientHeight || 1;
-      // Each "filled page" = one extra visible-height of content beyond the first
-      const filled = Math.max(0, Math.floor((paper.scrollHeight - 16) / visible) - 1);
-      setPageCount(Math.min(filled, 2)); // cap at 2 ghost pages
-    }
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(paper);
-    const mo = new MutationObserver(update);
-    mo.observe(paper, { childList: true, subtree: true, characterData: true });
-    return () => { ro.disconnect(); mo.disconnect(); };
-  }, []);
-
   // ── Flush save on unmount (SPA navigation) and beforeunload (tab close) ──
   useEffect(() => {
     function flushSave() {
@@ -878,6 +867,11 @@ function SmartNotesEditor() {
       if (!noteIdRef.current || !paperRef.current) return;
       const content = paperRef.current.innerHTML;
       const title = titleRef.current;
+      // An emptied, untitled note is removed rather than kept as "Untitled Notes".
+      if (!paperRef.current.innerText.trim() && (!title || title === 'Untitled Notes')) {
+        fetch(API + '/smart_notes/' + noteIdRef.current, { method: 'DELETE', headers: authHeaders(), keepalive: true }).catch(() => {});
+        return;
+      }
       const contentChanged = content !== lastSavedRef.current;
       const titleChanged = title !== lastSavedTitleRef.current;
       if (!contentChanged && !titleChanged) return;
@@ -911,63 +905,6 @@ function SmartNotesEditor() {
       });
       fetchNotes();
     } catch {}
-  }
-
-  // ── Visualize: send highlighted text to diagram API ─────────────────────
-  function handleVisualize() {
-    setVisualizeMode(v => !v);
-  }
-
-  async function handleCheckmark() {
-    const selectedText = window.getSelection()?.toString()?.trim();
-    if (!selectedText || selectedText.length < 5) return;
-    setVisualizeMode(false);
-    setDiagramLoading(true);
-    try {
-      const resp = await fetch(API + '/smart_notes/diagram', {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: selectedText }),
-      });
-      const data = await responseJson(resp);
-      setMermaidCode(data.mermaid || null);
-    } catch {}
-    setDiagramLoading(false);
-  }
-
-  // ── Resize handlers ──────────────────────────────────────────────────────
-  function onVDragStart(e) {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = colWidth;
-    const onMove = (me) => {
-      if (!layoutRef.current) return;
-      const dx = startX - me.clientX;
-      const maxW = layoutRef.current.offsetWidth - 340;
-      setColWidth(Math.max(200, Math.min(startWidth + dx, maxW)));
-    };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }
-
-  function onHDragStart(e) {
-    e.preventDefault();
-    const onMove = (me) => {
-      if (!layoutRef.current) return;
-      const rect = layoutRef.current.getBoundingClientRect();
-      const newTop = Math.max(100, Math.min(me.clientY - rect.top, rect.height - 8 - 100));
-      setTopPx(newTop);
-    };
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
   }
 
   function onPaperPaste(event) {
@@ -1354,15 +1291,8 @@ function SmartNotesEditor() {
   // ── New session — flush current, then create+navigate to fresh note ──────
   async function handleNewNote() {
     await doSave();
-    try {
-      const resp = await fetch(API + '/smart_notes', {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Untitled Notes' }),
-      });
-      const data = await responseJson(resp);
-      if (data.note) router.push('/smartnotes?id=' + data.note.id);
-    } catch {}
+    setShowNotesList(false);
+    router.push('/smartnotes?id=new');
   }
 
   async function handleDeleteNote(id, e) {
@@ -1471,203 +1401,240 @@ function SmartNotesEditor() {
     router.push('/create');
   }
 
+  // ── Formatting bar ──────────────────────────────────────────────────────
+  function format(command, value = null) {
+    paperRef.current?.focus();
+    if (command === 'heading') {
+      const block = document.queryCommandValue('formatBlock');
+      document.execCommand('formatBlock', false, /h2/i.test(block) ? 'p' : 'h2');
+    } else if (command === 'highlight') {
+      const selection = window.getSelection();
+      if (!selection?.rangeCount || selection.isCollapsed) return;
+      const range = selection.getRangeAt(0);
+      const mark = document.createElement('mark');
+      try { range.surroundContents(mark); } catch { document.execCommand('insertHTML', false, `<mark>${escHtml(selection.toString())}</mark>`); }
+    } else if (command === 'checklist') {
+      const selection = window.getSelection();
+      const text = selection?.toString() || '';
+      const items = (text ? text.split(/\n+/) : ['']).map(line => `<li>${escHtml(line) || '<br>'}</li>`).join('');
+      document.execCommand('insertHTML', false, `<ul class="sn-check">${items}</ul>`);
+    } else if (command === 'link') {
+      if (value) document.execCommand('createLink', false, value);
+    } else {
+      document.execCommand(command, false, value);
+    }
+    setHasText(Boolean(paperRef.current?.innerText.trim()));
+    scheduleSave();
+  }
+
+  function onPaperClick(event) {
+    const item = event.target.closest?.('.sn-check > li');
+    if (!item) return;
+    const rect = item.getBoundingClientRect();
+    if (event.clientX - rect.left > 28) return;
+    item.classList.toggle('is-checked');
+    scheduleSave();
+  }
+
+  // "Make diagram" floats over a text selection in the editor.
+  useEffect(() => {
+    function check() {
+      const selection = window.getSelection();
+      const text = selection?.toString().trim();
+      if (!text || text.length < 5 || !selection.rangeCount || !paperRef.current?.contains(selection.anchorNode)) { setSelectionBox(null); return; }
+      const rect = selection.getRangeAt(0).getBoundingClientRect();
+      setSelectionBox({ top: Math.max(8, rect.top - 52), left: Math.min(window.innerWidth - 180, Math.max(8, rect.left + rect.width / 2 - 80)), text });
+    }
+    const later = () => setTimeout(check, 0);
+    document.addEventListener('mouseup', later);
+    document.addEventListener('keyup', later);
+    return () => { document.removeEventListener('mouseup', later); document.removeEventListener('keyup', later); };
+  }, []);
+
+  async function makeDiagram() {
+    const text = selectionBox?.text;
+    setSelectionBox(null);
+    if (!text) return;
+    setRail('diagram');
+    setDiagramLoading(true);
+    try {
+      const resp = await fetch(API + '/smart_notes/diagram', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text }),
+      });
+      const data = await responseJson(resp);
+      setMermaidCode(data.mermaid || null);
+    } catch {}
+    setDiagramLoading(false);
+  }
+
+  async function addClass(event) {
+    event.preventDefault();
+    const name = newClassName.trim();
+    if (!name) return;
+    const data = await responseJson(await fetch(API + '/folders', { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }));
+    if (data?.folder) {
+      setFolders(list => [data.folder, ...list]);
+      setNewClassName('');
+      setClassOpen(false);
+      handleFolderChange({ target: { value: data.folder.id } });
+    }
+  }
+
+  const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
+  const currentFolder = folders.find(folder => folder.id === folderId);
+  const materialOpen = rail === 'material' || Boolean(viewerFile || guideContent) && rail !== 'closed';
+
   return (
     <div className="sn-page">
-      {/* Header bar */}
-      <div className="sn-header">
-        <div className="sn-header-left">
-          <input
-            className="sn-title-input"
-            value={title}
-            onChange={e => { titleRef.current = e.target.value; setTitle(e.target.value); scheduleSave(); }}
-            placeholder="Title"
-            aria-label="Note title"
-            spellCheck={false}
-          />
-          <span className={`sn-status ${saveStatus}`}>
-            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? saveError : ''}
-          </span>
-        </div>
-        <div className="sn-header-right">
-          <select
-            aria-label="Class"
-            className="c-select sn-class-select"
-            value={folderId}
-            onChange={handleFolderChange}
-          >
-            <option value="">No class</option>
-            {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-          </select>
+      <header className="sn-head">
+        <input
+          className="sn-title-input"
+          value={title}
+          onChange={e => { titleRef.current = e.target.value; setTitle(e.target.value); scheduleSave(); }}
+          placeholder="Title"
+          aria-label="Note title"
+          spellCheck={false}
+        />
+        <span className={`sn-status ${saveStatus}`} role="status">
+          {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? saveError : ''}
+        </span>
+        <div className="sn-head-tools">
+          <div className="c-menu-wrap">
+            <button ref={classRef} type="button" className="c-btn c-btn--secondary sn-class-btn" onClick={() => setClassOpen(v => !v)} aria-haspopup="listbox" aria-expanded={classOpen}>
+              <GraduationCap {...ICON} /><span className="c-truncate">{currentFolder?.name || 'No class'}</span><ChevronDown size={16} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+            <Popover open={classOpen} onClose={() => setClassOpen(false)} anchorRef={classRef} align="left" role="listbox" label="Class" className="sn-pop">
+              <button type="button" role="option" aria-selected={!folderId} onClick={() => { handleFolderChange({ target: { value: '' } }); setClassOpen(false); }}>No class</button>
+              {folders.map(folder => (
+                <button key={folder.id} type="button" role="option" aria-selected={folder.id === folderId} onClick={() => { handleFolderChange({ target: { value: folder.id } }); setClassOpen(false); }}>{folder.name}</button>
+              ))}
+              <form className="sn-pop-add" onSubmit={addClass}>
+                <input className="c-input" value={newClassName} onChange={event => setNewClassName(event.target.value)} placeholder="Add class" aria-label="New class name" />
+                <button type="submit" className="c-btn c-btn--secondary" disabled={!newClassName.trim()}><Plus {...ICON} />Add</button>
+              </form>
+            </Popover>
+          </div>
           {hasText && (
-            <button className="c-btn c-btn--secondary sn-convert-header-btn" onClick={handleConvertToGuide} disabled={convertingGuide}>
-              <Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />{convertingGuide ? 'Building…' : 'Turn into guide'}
+            <button type="button" className="c-btn c-btn--secondary" onClick={handleConvertToGuide} disabled={convertingGuide}>
+              <Sparkles {...ICON} />{convertingGuide ? 'Building…' : 'Turn into guide'}
             </button>
           )}
-          <button
-            className={`c-btn c-btn--primary sn-save-btn${saveStatus === 'saving' ? ' saving' : saveStatus === 'saved' ? ' saved' : saveStatus === 'error' ? ' error' : ''}`}
-            onClick={() => doSave({ force: true })}
-          >
-            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? 'Error' : 'Save'}
-          </button>
-          <div className="sn-notes-picker">
-            <button
-              className={`c-btn c-btn--secondary sn-notes-dropdown-trigger${showNotesList ? ' open' : ''}`}
-              onClick={() => setShowNotesList(v => !v)}
-              aria-expanded={showNotesList}
-            >
-              <NotebookPen size={20} strokeWidth={1.75} aria-hidden="true" />Notes<ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" />
+          <div className="c-menu-wrap">
+            <button ref={notesRef} type="button" className="c-btn c-btn--secondary" onClick={() => setShowNotesList(v => !v)} aria-haspopup="menu" aria-expanded={showNotesList}>
+              <NotebookPen {...ICON} />All notes<ChevronDown size={16} strokeWidth={1.75} aria-hidden="true" />
             </button>
-            {showNotesList && (
-              <div className="sn-notes-dropdown">
-                <div className="sn-notes-dropdown-header">
-                  <span className="sn-panel-label">Notes</span>
-                  <button className="c-btn c-btn--quiet sn-new-btn" onClick={handleNewNote}>New note</button>
-                </div>
-                <div
-                  className={'sn-notes-item sn-notes-item--back'}
-                  onClick={async () => { setShowNotesList(false); await doSave(); router.push('/smartnotes'); }}
-                >
-                  All notes
-                </div>
-                {notes.map(n => (
-                  <div
-                    key={n.id}
-                    className={'sn-notes-item' + (n.id === noteId ? ' active' : '')}
-                    onClick={() => handleSwitchNote(n.id)}
-                  >
-                    {n.title || 'Untitled Notes'}
-                  </div>
-                ))}
-                {notes.length === 0 && <div className="sn-notes-item muted">0 notes</div>}
-              </div>
-            )}
+            <Popover open={showNotesList} onClose={() => setShowNotesList(false)} anchorRef={notesRef} label="All notes" className="sn-pop">
+              <button type="button" role="menuitem" onClick={handleNewNote}><Plus {...ICON} />New note</button>
+              <button type="button" role="menuitem" onClick={async () => { setShowNotesList(false); await doSave(); router.push('/smartnotes'); }}><LayoutGrid {...ICON} />All notes</button>
+              <hr />
+              {notes.filter(n => n.id === noteId || previewText(n.content) || (n.title && n.title !== 'Untitled Notes')).map(n => (
+                <button key={n.id} type="button" role="menuitem" aria-current={n.id === noteId ? 'true' : undefined} onClick={() => { setShowNotesList(false); handleSwitchNote(n.id); }}>
+                  <span className="c-truncate">{n.title || 'Untitled'}</span>
+                </button>
+              ))}
+            </Popover>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* 3-panel resizable grid */}
-      <div
-        className="sn-layout"
-        ref={layoutRef}
-        style={{
-          gridTemplateColumns: `1fr 8px ${colWidth}px`,
-          gridTemplateRows: topPx !== null ? `${topPx}px 8px 1fr` : '1fr 8px 1fr',
-        }}
-      >
-        {/* Left: notes paper — spans all 3 rows */}
-        <div className="sn-paper-wrap">
-          <div className="sn-paper-label-row">
-            <span className="sn-panel-label">Notes</span>
-            {visualizeMode && (
-              <button
-                className="sn-visualize-confirm"
-                onClick={handleCheckmark}
-                title="Generate diagram from highlighted text"
-              >
-                ✓
-              </button>
-            )}
+      <div className={'sn-body' + (materialOpen || rail === 'diagram' ? ' has-panel' : '')}>
+        <section className="sn-editor" aria-label="Note">
+          <div className="sn-format" role="toolbar" aria-label="Formatting">
+            <button type="button" className="c-icon-btn" onMouseDown={e => e.preventDefault()} onClick={() => format('heading')} aria-label="Heading" title="Heading"><Heading2 {...ICON} /></button>
+            <button type="button" className="c-icon-btn" onMouseDown={e => e.preventDefault()} onClick={() => format('bold')} aria-label="Bold" title="Bold"><Bold {...ICON} /></button>
+            <button type="button" className="c-icon-btn" onMouseDown={e => e.preventDefault()} onClick={() => format('insertUnorderedList')} aria-label="List" title="List"><List {...ICON} /></button>
+            <button type="button" className="c-icon-btn" onMouseDown={e => e.preventDefault()} onClick={() => format('checklist')} aria-label="Checklist" title="Checklist"><ListChecks {...ICON} /></button>
+            <button type="button" className="c-icon-btn" onMouseDown={e => e.preventDefault()} onClick={() => format('highlight')} aria-label="Highlight" title="Highlight"><Highlighter {...ICON} /></button>
+            <div className="c-menu-wrap">
+              <button ref={linkRef} type="button" className="c-icon-btn" onMouseDown={e => { e.preventDefault(); const sel = window.getSelection(); linkRange.current = sel?.rangeCount ? sel.getRangeAt(0).cloneRange() : null; }} onClick={() => setLinkOpen(true)} aria-label="Link" title="Link"><Link2 {...ICON} /></button>
+              <Popover open={linkOpen} onClose={() => setLinkOpen(false)} anchorRef={linkRef} align="left" role="dialog" label="Link" className="sn-pop">
+                <form className="sn-pop-add" onSubmit={event => {
+                  event.preventDefault();
+                  const url = linkUrl.trim();
+                  setLinkOpen(false);
+                  if (!/^https?:\/\//i.test(url)) return;
+                  const sel = window.getSelection();
+                  if (linkRange.current) { sel.removeAllRanges(); sel.addRange(linkRange.current); }
+                  format('link', url);
+                  setLinkUrl('');
+                }}>
+                  <input className="c-input" value={linkUrl} onChange={event => setLinkUrl(event.target.value)} placeholder="https://" aria-label="Link address" autoFocus />
+                  <button type="submit" className="c-btn c-btn--secondary" disabled={!/^https?:\/\/\S+/i.test(linkUrl.trim())}>Add</button>
+                </form>
+              </Popover>
+            </div>
           </div>
-          <div className={`sn-paper-stage sn-paper-stage--p${pageCount}`}>
-            {/* Ghost pages behind — appear as content fills */}
-            <div className="sn-ghost-page sn-ghost-page-3" aria-hidden="true" />
-            <div className="sn-ghost-page sn-ghost-page-2" aria-hidden="true" />
           <div
             ref={paperRef}
-            className={`sn-paper${visualizeMode ? ' sn-paper--visualize' : ''}`}
+            className="sn-paper"
             contentEditable
             suppressContentEditableWarning
             onKeyDown={onPaperKeyDown}
             onKeyUp={onPaperKeyUp}
             onPaste={onPaperPaste}
+            onClick={onPaperClick}
             data-placeholder="Start typing"
-            spellCheck={false}
+            spellCheck
+            aria-label="Note text"
+            role="textbox"
+            aria-multiline="true"
           />
-          </div>
-        </div>
+        </section>
 
-        {/* Vertical drag divider */}
-        <div className="sn-v-divider" onMouseDown={onVDragStart} />
-
-        {/* Top-right: class material viewer */}
-        <div
-          ref={viewerWrapRef}
-          className={`sn-viewer-wrap${viewerDragOver ? ' sn-viewer-drag' : ''}`}
-        >
-          <div className="sn-viewer-toolbar">
-            <span className="sn-panel-label">Material</span>
-            <div className="sn-viewer-controls">
-              <button className="c-btn c-btn--secondary sn-open-btn" onClick={() => fileInputRef.current?.click()}>
-                <FileUp size={20} strokeWidth={1.75} aria-hidden="true" />Open
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="*/*"
-                onChange={handleFileSelect}
-                style={{ display: 'none' }}
-              />
-              {guideList.length > 0 && (
-                <select className="c-select sn-guide-select" onChange={handleGuideSelect} defaultValue="" aria-label="Show a guide">
-                  <option value="" disabled>Guide</option>
-                  {guideList.map(g => (
-                    <option key={g.id} value={g.id}>{g.title}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-          </div>
-          <div className="sn-viewer-body">
-            {!viewerFile && !guideContent && (
-              <div className="sn-viewer-empty">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.35">
-                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                </svg>
-                <p>Drop a file</p>
+        {(materialOpen || rail === 'diagram') && (
+          <aside className="sn-panel" aria-label={rail === 'diagram' ? 'Diagram' : 'Material'} ref={viewerWrapRef}>
+            <header className="sn-panel-head">
+              <h2 className="c-section-title">{rail === 'diagram' ? 'Diagram' : 'Material'}</h2>
+              <button type="button" className="c-icon-btn" onClick={() => setRail('closed')} aria-label="Close panel" title="Close panel"><X {...ICON} /></button>
+            </header>
+            {rail === 'diagram' ? (
+              <div className="sn-diagram">
+                {diagramLoading ? <div className="c-skeleton" style={{ height: 200, borderRadius: 16 }} />
+                  : mermaidCode ? <MermaidDiagram code={mermaidCode} />
+                    : (
+                      <ol className="sn-howto">
+                        <li><span className="sn-howto-num">1</span>Highlight text in your note</li>
+                        <li><span className="sn-howto-num">2</span>Click Make diagram</li>
+                      </ol>
+                    )}
               </div>
+            ) : (
+              <>
+                <div className="sn-material-controls">
+                  <label className="sn-material-label" htmlFor="sn-source">Source</label>
+                  <div className="sn-material-row">
+                    <select id="sn-source" className="c-input sn-source-select" onChange={handleGuideSelect} defaultValue="">
+                      <option value="" disabled>Pick a guide</option>
+                      {guideList.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
+                    </select>
+                    <button type="button" className="c-btn c-btn--secondary" onClick={() => fileInputRef.current?.click()}><FileUp {...ICON} />Open file</button>
+                  </div>
+                </div>
+                <div className="sn-viewer-body">
+                  {viewerDragOver && <div className="sn-viewer-drop-overlay"><p>Drop</p></div>}
+                  <FileViewer file={viewerFile} guideContent={guideContent} />
+                </div>
+              </>
             )}
-            {viewerDragOver && (
-              <div className="sn-viewer-drop-overlay">
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-                <p>Drop</p>
-              </div>
-            )}
-            <FileViewer file={viewerFile} guideContent={guideContent} />
-          </div>
-        </div>
+          </aside>
+        )}
 
-        {/* Horizontal drag divider */}
-        <div className="sn-h-divider" onMouseDown={onHDragStart} />
-
-        {/* Bottom-right: diagram */}
-        <div className="sn-diagram-wrap">
-          <div className="sn-diagram-toolbar">
-            <span className="sn-panel-label">Diagram</span>
-            <button
-              className={`c-btn c-btn--secondary sn-visualize-btn${visualizeMode ? ' active' : ''}`}
-              onClick={handleVisualize}
-            >
-              {visualizeMode ? 'Cancel' : 'Visualize'}
-            </button>
-          </div>
-          <div className="sn-diagram-body">
-            {diagramLoading && (
-              <div className="sn-diagram-placeholder">Drawing…</div>
-            )}
-            {!diagramLoading && mermaidCode && (
-              <MermaidDiagram code={mermaidCode} />
-            )}
-            {!diagramLoading && !mermaidCode && (
-              <div className="sn-diagram-placeholder">
-                <p>Visualize → highlight → ✓</p>
-              </div>
-            )}
-          </div>
-        </div>
-
+        {!(materialOpen || rail === 'diagram') && (
+          <nav className="sn-rail" aria-label="Side panels">
+            <button type="button" className="sn-rail-btn" onClick={() => setRail('material')} aria-label="Material" title="Material"><FileText {...ICON} /><span>Material</span></button>
+            <button type="button" className="sn-rail-btn" onClick={() => setRail('diagram')} aria-label="Diagram" title="Diagram"><Workflow {...ICON} /><span>Diagram</span></button>
+          </nav>
+        )}
+        <input ref={fileInputRef} type="file" accept="*/*" onChange={event => { handleFileSelect(event); setRail('material'); }} hidden />
       </div>
+
+      {selectionBox && (
+        <div className="c-menu sn-select-menu" style={{ top: selectionBox.top, left: selectionBox.left }} role="menu" aria-label="Selection" onMouseDown={event => event.preventDefault()}>
+          <button type="button" role="menuitem" onClick={makeDiagram}><Workflow {...ICON} />Make diagram</button>
+        </div>
+      )}
 
       <StudyGuidePreviewModal
         preview={guidePreview}

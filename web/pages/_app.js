@@ -1,6 +1,7 @@
 import '../styles/globals.css';
 import '../styles/classroom.css';
 import '../styles/system.css';
+import '../styles/tokens.css';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
@@ -8,19 +9,25 @@ import Layout from '../components/Layout';
 import UpgradeModal from '../components/UpgradeModal';
 import { scheduleProactiveRefresh, getToken } from '../lib/api';
 import { Analytics } from '@vercel/analytics/react';
-import { applyTheme } from '../lib/theme';
+import { applyTheme, syncThemeFromAccount } from '../lib/theme';
+import { loadProgress } from '../lib/progress';
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
   // Public pages render without the signed-in shell.
-  const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password'].includes(router.pathname);
+  // Pricing and Approach are public, but signed-in students see them inside the app.
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => { setSignedIn(Boolean(getToken())); }, [router.pathname]);
+  const isLoginPage = ['/', '/login', '/signup', '/auth/callback', '/reset-password'].includes(router.pathname)
+    || (['/pricing', '/mission'].includes(router.pathname) && !signedIn);
 
   // Authentication pages stay light; workspace routes honor the saved preference.
   useEffect(() => {
-    const publicPage = ['/', '/login', '/signup', '/pricing', '/reset-password'].includes(router.pathname);
+    const publicPage = ['/', '/login', '/signup', '/reset-password'].includes(router.pathname) || (['/pricing', '/mission'].includes(router.pathname) && !getToken());
     applyTheme(undefined, publicPage);
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const follow = () => applyTheme(undefined, publicPage);
+    if (getToken()) loadProgress().then(() => syncThemeFromAccount(publicPage));
     media.addEventListener?.('change', follow);
     return () => media.removeEventListener?.('change', follow);
   }, [router.pathname]);

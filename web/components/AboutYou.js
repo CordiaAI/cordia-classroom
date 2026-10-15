@@ -73,7 +73,7 @@ export default function AboutYou() {
         .about-group :global(.about-chip) { height: 44px; padding: 0 18px; font-size: 15px; }
         .about-other { margin-top: 4px; }
         .about-next { justify-self: start; min-width: 180px; }
-        @media (max-width: 767px) { .about-next { width: 100%; } }
+        @media (max-width: 1023px) { .about-next { width: 100%; } }
       `}</style>
     </form>
   );

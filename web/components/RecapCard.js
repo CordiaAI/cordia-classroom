@@ -1,10 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
 import { Share2 } from 'lucide-react';
 import GroveTree from './GroveTree';
+import { themeColor } from '../lib/themeColor';
 import { groveKey, useProgress } from '../lib/progress';
 import { dayKey, readActivity, semesterName } from '../lib/activity';
 
-const HEX = { 'var(--olive-press)': '#3D4937', 'var(--olive)': '#536149' };
+// The share image uses the current theme's resolved token colours.
+const TOKENS = ['--olive-press', '--olive', '--line', '--canvas', '--field', '--ink', '--muted'];
 
 function escapeXml(text) {
   return String(text).replace(/[<>&"']/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[char]));
@@ -35,7 +37,8 @@ export default function RecapCard({ guides, folders, since, cardsStudied = 0 }) 
     const topId = Object.entries(byFolder).sort((a, b) => b[1] - a[1])[0]?.[0];
     return {
       hours: Math.round((minutes / 60) * 10) / 10,
-      cards: cards || cardsStudied,
+      // The server count is the one Today and Insights use; the local log is a fallback.
+      cards: cardsStudied || cards,
       topClass: folders.find(folder => folder.id === topId)?.name || '–',
     };
   }, [guides, folders, since, progress.grove, cardsStudied]);
@@ -49,21 +52,21 @@ export default function RecapCard({ guides, folders, since, cardsStudied = 0 }) 
       const height = 1080;
       const treeMarkup = [...(treesRef.current?.querySelectorAll('svg') || [])].map((svg, index) => {
         let inner = svg.innerHTML;
-        for (const [variable, hex] of Object.entries(HEX)) inner = inner.split(variable).join(hex);
+        for (const name of TOKENS) inner = inner.split(`var(${name})`).join(themeColor(name));
         const x = 90 + (index % 4) * 230;
         const y = 560 + Math.floor(index / 4) * 210;
         return `<svg x="${x}" y="${y}" width="200" height="200" viewBox="0 0 100 100">${inner.replace(/<style[\s\S]*?<\/style>/g, '')}</svg>`;
       }).join('');
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-        <rect width="100%" height="100%" fill="#EDF2F4"/>
-        <rect x="48" y="48" width="${width - 96}" height="${height - 96}" rx="40" fill="#FFFFFC"/>
-        <text x="96" y="160" font-family="Georgia, serif" font-size="64" font-weight="600" fill="#171B18">${escapeXml(name)} in Cordia</text>
-        <text x="96" y="300" font-family="Helvetica, Arial, sans-serif" font-size="96" font-weight="700" fill="#536149">${stats.hours}</text>
-        <text x="96" y="350" font-family="Helvetica, Arial, sans-serif" font-size="32" fill="#171B18">hours</text>
-        <text x="420" y="300" font-family="Helvetica, Arial, sans-serif" font-size="96" font-weight="700" fill="#536149">${stats.cards}</text>
-        <text x="420" y="350" font-family="Helvetica, Arial, sans-serif" font-size="32" fill="#171B18">cards</text>
-        <text x="96" y="450" font-family="Helvetica, Arial, sans-serif" font-size="32" fill="#636B65">Top class</text>
-        <text x="96" y="500" font-family="Georgia, serif" font-size="44" font-weight="600" fill="#171B18">${escapeXml(stats.topClass)}</text>
+        <rect width="100%" height="100%" fill="${themeColor('--canvas')}"/>
+        <rect x="48" y="48" width="${width - 96}" height="${height - 96}" rx="40" fill="${themeColor('--field')}"/>
+        <text x="96" y="160" font-family="Georgia, serif" font-size="64" font-weight="600" fill="${themeColor('--ink')}">${escapeXml(name)} in Cordia</text>
+        <text x="96" y="300" font-family="Helvetica, Arial, sans-serif" font-size="96" font-weight="700" fill="${themeColor('--olive')}">${stats.hours}</text>
+        <text x="96" y="350" font-family="Helvetica, Arial, sans-serif" font-size="32" fill="${themeColor('--ink')}">hours</text>
+        <text x="420" y="300" font-family="Helvetica, Arial, sans-serif" font-size="96" font-weight="700" fill="${themeColor('--olive')}">${stats.cards}</text>
+        <text x="420" y="350" font-family="Helvetica, Arial, sans-serif" font-size="32" fill="${themeColor('--ink')}">cards</text>
+        <text x="96" y="450" font-family="Helvetica, Arial, sans-serif" font-size="32" fill="${themeColor('--muted')}">Top class</text>
+        <text x="96" y="500" font-family="Georgia, serif" font-size="44" font-weight="600" fill="${themeColor('--ink')}">${escapeXml(stats.topClass)}</text>
         ${treeMarkup}
       </svg>`;
       const image = new Image();

@@ -25,11 +25,17 @@ export default function SettingsPage() {
   // Old links (subscription, grove) land on the tab that now holds them.
   const SECTION_ALIASES = { subscription: 'plan', grove: 'account', profile: 'account' };
   useEffect(() => {
-    if (!router.isReady || !router.query.section) return;
-    const section = String(router.query.section);
+    if (!router.isReady) return;
+    const section = String(router.query.section || 'account');
     setActiveSection(SECTION_ALIASES[section] || section);
     if (section === 'grove') setTimeout(() => document.getElementById('grove')?.scrollIntoView({ block: 'start' }), 400);
   }, [router.isReady, router.query.section]);
+
+  // Each tab has its own URL so Back returns to the previous tab.
+  function selectSection(key) {
+    setActiveSection(key);
+    router.push({ pathname: '/settings', query: key === 'account' ? {} : { section: key } }, undefined, { shallow: true, scroll: false });
+  }
   const [library, setLibrary] = useState({ guides: [], folders: [], streak: null, overview: null });
   useEffect(() => {
     if (!ready) return;
@@ -186,7 +192,7 @@ export default function SettingsPage() {
     if (next === null) return;
     event.preventDefault();
     const target = sections[(next + sections.length) % sections.length];
-    setActiveSection(target.key);
+    selectSection(target.key);
     document.getElementById(`tab-${target.key}`)?.focus();
   }
 
@@ -205,7 +211,7 @@ export default function SettingsPage() {
               aria-selected={activeSection === section.key}
               aria-controls={`panel-${section.key}`}
               tabIndex={activeSection === section.key ? 0 : -1}
-              onClick={() => setActiveSection(section.key)}
+              onClick={() => selectSection(section.key)}
             >
               {section.label}
             </button>
@@ -359,17 +365,18 @@ export default function SettingsPage() {
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
       <style jsx>{`
-        .profile-page { width: min(920px, 100%); margin: 0 auto; }
+        .profile-page { width: 100%; }
         .profile-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }
         .profile-message { padding: 14px 18px; border-radius: var(--r-card); background: var(--hover); font-weight: 600; }
         .profile-section { animation: fadeIn 0.2s ease; }
         .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; flex-wrap: wrap; }
         .settings-row .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
         .settings-card { display: grid; gap: 12px; padding: 20px; }
-        .settings-links { display: flex; gap: 20px; font: 600 13px/1 var(--font-sans); }
+        .settings-links { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 600 13px/1 var(--font-sans); }
+        .settings-links :global(a) { display: inline-flex; align-items: center; min-height: 44px; }
         .me-card { display: flex; align-items: center; gap: 16px; padding: 20px; }
         .me-avatar { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 700 19px/1 var(--font-sans); }
-        .me-names { display: grid; gap: 2px; flex: 1; min-width: 0; }
+        .me-names { display: grid; gap: 2px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
         .me-names strong { font: 600 19px/1.2 var(--font-display); }
         .billing-current-plan { display: grid; gap: 12px; padding: 20px; margin-bottom: 16px; }
         .plan-badge { justify-self: start; padding: 6px 14px; border-radius: var(--r-pill); background: var(--card-sunk); font-weight: 700; }
@@ -390,7 +397,7 @@ export default function SettingsPage() {
         .plan-features :global(.lucide) { color: currentColor; margin-top: 2px; }
         .plan-current-label { color: var(--olive-ink); font-weight: 700; }
         .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        @media (max-width: 767px) { .billing-plans { grid-template-columns: 1fr; } .me-card { flex-wrap: wrap; } }
+        @media (max-width: 1023px) { .billing-plans { grid-template-columns: 1fr; } .me-card { flex-wrap: wrap; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </>

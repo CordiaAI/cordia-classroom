@@ -39,7 +39,7 @@ export default function Walkthrough() {
   const [coarse, setCoarse] = useState(false);
 
   useEffect(() => {
-    setCoarse(window.matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && window.innerWidth < 768));
+    setCoarse(window.matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && window.innerWidth < 1024));
   }, []);
 
   function finish(status) {
@@ -108,7 +108,7 @@ export default function Walkthrough() {
         <button type="button" className="c-btn c-btn--secondary" onClick={() => finish('skipped')}>Skip</button>
         <style jsx>{`
           .wt-resume { position: fixed; z-index: 380; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; gap: 8px; padding: 6px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge); backdrop-filter: blur(24px) saturate(160%); box-shadow: var(--shadow); }
-          @media (max-width: 767px) { .wt-resume { bottom: calc(var(--tabbar-h) + 84px); } }
+          @media (max-width: 1023px) { .wt-resume { bottom: calc(var(--tabbar-h) + 84px); } }
         `}</style>
       </div>
     );

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { BookOpen, Layers, NotebookPen, Search, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { Sheet } from './Overlay';
 
 function plain(html) {
   return String(html || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
@@ -66,7 +67,6 @@ export default function SearchModal({ onClose }) {
   }
 
   function onKeyDown(event) {
-    if (event.key === 'Escape') onClose();
     if (event.key === 'ArrowDown') { event.preventDefault(); setActive(index => Math.min(results.length - 1, index + 1)); }
     if (event.key === 'ArrowUp') { event.preventDefault(); setActive(index => Math.max(0, index - 1)); }
     if (event.key === 'Enter' && results[active]) go(results[active]);
@@ -76,8 +76,7 @@ export default function SearchModal({ onClose }) {
   const GROUP = { guide: 'Guides', card: 'Cards', note: 'Notes' };
 
   return (
-    <div className="c-scrim c-search-scrim" onClick={onClose}>
-      <div className="c-sheet c-search-sheet" role="dialog" aria-modal="true" aria-label="Search" onClick={event => event.stopPropagation()}>
+    <Sheet onClose={onClose} label="Search" className="c-search-sheet" scrimClassName="c-search-scrim">
         <div className="c-row">
           <label className="c-search">
             <Search size={20} strokeWidth={1.75} aria-hidden="true" />
@@ -103,8 +102,7 @@ export default function SearchModal({ onClose }) {
           })}
           {query.trim() && !results.length && <li className="c-meta c-search-none">No results</li>}
         </ul>
-      </div>
-      <style jsx>{`
+      <style jsx global>{`
         .c-search-scrim { place-items: start center; padding-top: 12vh; }
         .c-search-sheet { width: min(600px, 100%); padding: 12px; }
         .c-search-results { list-style: none; margin: 0; padding: 0; max-height: 60vh; overflow: auto; }
@@ -112,10 +110,10 @@ export default function SearchModal({ onClose }) {
         .c-search-group { padding: 10px 12px 4px; }
         .c-search-hit { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink); font: 600 15px/1.3 var(--font-sans); text-align: left; cursor: pointer; }
         .c-search-hit.is-active { background: var(--hover); }
-        .c-search-hit :global(.c-meta) { margin-left: auto; max-width: 40%; }
+        .c-search-hit .c-meta { margin-left: auto; max-width: 40%; }
         .c-search-none { padding: 16px 12px; }
-        @media (max-width: 767px) { .c-search-scrim { place-items: end stretch; padding-top: 0; } }
+        @media (max-width: 1023px) { .c-search-scrim { place-items: end stretch; padding-top: 0; } }
       `}</style>
-    </div>
+    </Sheet>
   );
 }

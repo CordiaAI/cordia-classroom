@@ -1,570 +1,246 @@
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/router';
-import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
-import { useRequireAuth } from '../lib/auth';
-import AILoadingSphere from './AILoadingSphere';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ChevronLeft, ChevronRight, Eraser, Eye, Flag, MessageCircle, PenLine, PencilRuler, RefreshCw, Sparkles, Trash2, Type, Upload, Wand2 } from 'lucide-react';
+import { useRouter } from 'next/router';
+import { ArrowLeft, History, PencilRuler, Play, RefreshCw, Sparkles } from 'lucide-react';
+import { apiErrorMessage, apiFetch } from '../lib/api';
+import { useRequireAuth } from '../lib/auth';
+import { openNewSheet } from '../lib/newSheet';
 import { walkthroughEvent } from '../lib/walkthrough';
+import PracticeProblem from './PracticeProblem';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const SYMBOLS = ['+', '−', '×', '÷', '=', '√', 'π', 'Σ', '→'];
-const drawingsKey = guideId => `practiceDrawings:${guideId}`;
+const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
+const historyKey = guideId => `practiceHistory:${guideId}`;
 
 function readableText(value) {
   return String(value || '')
     .replace(/<\/?(?:p|div|li|h[1-6]|blockquote|br)[^>]*>/gi, '\n')
     .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
+    .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
     .trim();
 }
 
-// The Practice tab. /practice opens it with no guide chosen; /practice/{guideId} opens a guide.
-export default function PracticeWorkspace() {
+function readHistory(guideId) {
+  try { return JSON.parse(localStorage.getItem(historyKey(guideId)) || '[]'); } catch { return []; }
+}
+
+function writeHistory(guideId, list) {
+  try { localStorage.setItem(historyKey(guideId), JSON.stringify(list.slice(0, 20))); } catch { /* storage blocked */ }
+}
+
+function shortDate(iso) {
+  return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+// Practice: pick a guide, then a fresh run through its 10 problems. Past runs are in History.
+export default function PracticeWorkspace({ guideId: guideIdProp, embedded = false }) {
   const router = useRouter();
-  const guideId = router.query.guideId || null;
+  const guideId = guideIdProp || router.query.guideId || null;
   const { ready } = useRequireAuth();
-  const canvasRef = useRef(null);
-  const boardRef = useRef(null);
-  const drawing = useRef(false);
-  const drawings = useRef({});
-  const drag = useRef(null);
-  const fileRef = useRef(null);
   const [guide, setGuide] = useState(null);
-  const [upload, setUpload] = useState(null);
-  const [problems, setProblems] = useState([]);
-  const [practiceInfo, setPracticeInfo] = useState(null);
-  const [problemIndex, setProblemIndex] = useState(0);
-  const [tool, setTool] = useState('pen');
-  const [workText, setWorkText] = useState({});
-  const [tokens, setTokens] = useState({});
-  const [answers, setAnswers] = useState({});
-  const [revealed, setRevealed] = useState({});
-  const [evaluations, setEvaluations] = useState({});
-  const [grading, setGrading] = useState(false);
-  const [shownBlocks, setShownBlocks] = useState({});
-  const [reported, setReported] = useState({});
-  const [tidying, setTidying] = useState(false);
-  const restoring = useRef(false);
-  const [loading, setLoading] = useState(false);
-  const [extracting, setExtracting] = useState(false);
-  const [error, setError] = useState('');
   const [guideOptions, setGuideOptions] = useState(null);
+  const [saved, setSaved] = useState(undefined);
+  const [problems, setProblems] = useState([]);
+  const [running, setRunning] = useState(false);
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [evaluations, setEvaluations] = useState({});
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || guideId) return;
     apiFetch('/guides?fields=summary&limit=500').then(data => setGuideOptions(Array.isArray(data?.guides) ? data.guides : []));
-  }, [ready]);
+  }, [ready, guideId]);
 
   useEffect(() => {
     if (!ready || !guideId) return;
+    setRunning(false);
+    setHistory(readHistory(guideId));
     apiFetch('/guides/' + guideId).then(data => {
       if (data?.guide) setGuide(data.guide);
-      else setError(apiErrorMessage(data?.detail, 'This study guide could not be loaded.'));
+      else setError(apiErrorMessage(data?.detail, "Couldn't open this guide."));
     });
-  }, [ready, guideId]);
-
-  useEffect(() => {
-    if (!ready || !guideId) return;
     apiFetch('/practice/' + guideId + '/state').then(data => {
-      const saved = data?.practice;
-      if (!Array.isArray(saved?.problems) || saved.problems.length !== 10) return;
-      const progress = saved.progress || {};
-      restoring.current = true;
-      setProblems(saved.problems);
-      setPracticeInfo({ subjectArea: saved.subject_area, domain: saved.domain, truthNote: saved.truth_note });
-      setProblemIndex(Math.min(9, Math.max(0, Number(progress.problemIndex) || 0)));
-      setAnswers(progress.answers || {});
-      setEvaluations(progress.evaluations || {});
-      setRevealed(progress.revealed || {});
-      setWorkText(progress.workText || {});
-      setTokens(progress.tokens || {});
-      setReported(progress.reported || {});
-      try { drawings.current = JSON.parse(localStorage.getItem(drawingsKey(guideId)) || '{}'); } catch { drawings.current = {}; }
+      const practice = data?.practice;
+      setSaved(Array.isArray(practice?.problems) && practice.problems.length ? practice : null);
     });
+    walkthroughEvent('practice-opened');
   }, [ready, guideId]);
 
-  // Save progress for guide-based sets (uploads are temporary) a moment after each change.
+  // Progress is saved so Today knows which problems are still open.
   useEffect(() => {
-    if (upload || !guideId || problems.length !== 10) return;
-    if (restoring.current) {
-      restoring.current = false;
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      apiFetch('/practice/' + guideId + '/state', {
-        method: 'PUT',
-        body: JSON.stringify({ progress: { problemIndex, answers, evaluations, revealed, workText, tokens, reported } }),
-      });
-    }, 1200);
-    return () => window.clearTimeout(timer);
-  }, [problemIndex, answers, evaluations, revealed, workText, tokens, reported, problems, upload, guideId]);
+    if (!running || !guideId || !problems.length) return undefined;
+    const timer = setTimeout(() => {
+      apiFetch('/practice/' + guideId + '/state', { method: 'PUT', body: JSON.stringify({ progress: { problemIndex: index, answers, evaluations } }) });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [running, index, answers, evaluations, problems, guideId]);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const board = boardRef.current;
-    if (!canvas || !board) return;
-    const resize = () => {
-      const rect = board.getBoundingClientRect();
-      const ratio = window.devicePixelRatio || 1;
-      const snapshot = drawings.current[problemIndex] || '';
-      canvas.width = Math.max(1, Math.round(rect.width * ratio));
-      canvas.height = Math.max(1, Math.round(rect.height * ratio));
-      canvas.style.width = rect.width + 'px';
-      canvas.style.height = rect.height + 'px';
-      const context = canvas.getContext('2d');
-      context.setTransform(ratio, 0, 0, ratio, 0, 0);
-      context.lineCap = 'round';
-      context.lineJoin = 'round';
-      if (snapshot) {
-        const image = new Image();
-        image.onload = () => context.drawImage(image, 0, 0, rect.width, rect.height);
-        image.src = snapshot;
-      }
-    };
-    resize();
-    window.addEventListener('resize', resize);
-    return () => window.removeEventListener('resize', resize);
-  }, [problemIndex, problems.length]);
+  function archive(practice) {
+    const evals = practice?.progress?.evaluations || {};
+    const done = Object.values(evals).filter(item => item?.status === 'correct' || item?.status === 'retry');
+    if (!done.length) return;
+    const entry = { at: practice.updated_at || new Date().toISOString(), correct: done.filter(item => item.status === 'correct').length, total: practice.problems.length };
+    const next = [entry, ...readHistory(guideId)];
+    writeHistory(guideId, next);
+    setHistory(next);
+  }
 
-  const sourceTitle = upload?.title || guide?.title || 'Study material';
-  const sourceText = readableText(upload?.content || guide?.study_guide || guide?.notes);
-  const current = problems[problemIndex];
-  const currentTokens = tokens[problemIndex] || [];
-  const sourceBlocks = sourceText ? sourceText.split(/\n\s*\n/).filter(block => block.trim()) : [];
+  function begin(list) {
+    setProblems(list);
+    setIndex(0);
+    setAnswers({});
+    setEvaluations({});
+    setRunning(true);
+  }
 
-  async function generateProblems() {
-    if (!guide && !upload) return;
+  function start() {
+    archive(saved);
+    begin(saved.problems);
+  }
+
+  async function newSet() {
+    if (saved) archive(saved);
     setLoading(true);
     setError('');
-    const data = await apiFetch('/practice', {
-      method: 'POST',
-      timeoutMs: 120000,
-      body: JSON.stringify(upload
-        ? { content: upload.content, title: upload.title }
-        : { guide_id: guide.id }),
-    });
-    if (Array.isArray(data?.problems) && data.problems.length === 10) {
-      setProblems(data.problems);
-      setPracticeInfo({ subjectArea: data.subject_area, domain: data.domain, truthNote: data.truth_note });
-      setProblemIndex(0);
-      setAnswers({});
-      setRevealed({});
-      setEvaluations({});
-      setTokens({});
-      setWorkText({});
-      setReported({});
-      drawings.current = {};
-      try { localStorage.removeItem(drawingsKey(guideId)); } catch {}
-    } else {
-      setError(apiErrorMessage(data?.detail, 'Cordia could not create the practice set.'));
-    }
+    const data = await apiFetch('/practice', { method: 'POST', timeoutMs: 120000, body: JSON.stringify({ guide_id: guideId }) });
     setLoading(false);
-  }
-
-  async function useUploadedFile(file) {
-    if (!file) return;
-    setExtracting(true);
-    setError('');
-    const form = new FormData();
-    form.append('file', file);
-    try {
-      const response = await fetch(API + '/extract-file-text', {
-        method: 'POST',
-        headers: authOnlyHeaders(),
-        body: form,
-      });
-      const data = await responseJson(response);
-      if (!response.ok || !data?.text) throw new Error(apiErrorMessage(data?.detail, 'This file could not be read.'));
-      setUpload({ title: file.name, content: data.text });
-      setProblems([]);
-      setPracticeInfo(null);
-      setProblemIndex(0);
-      drawings.current = {};
-    } catch (uploadError) {
-      setError(uploadError.message || 'This file could not be read.');
-    } finally {
-      setExtracting(false);
-      if (fileRef.current) fileRef.current.value = '';
+    if (Array.isArray(data?.problems) && data.problems.length) {
+      setSaved({ problems: data.problems });
+      begin(data.problems);
+    } else {
+      setError(apiErrorMessage(data?.detail, "Couldn't make a practice set. Try again."));
     }
   }
 
-  function point(event) {
-    const rect = canvasRef.current.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  function finish() {
+    const correct = Object.values(evaluations).filter(item => item?.status === 'correct').length;
+    const next = [{ at: new Date().toISOString(), correct, total: problems.length }, ...history];
+    writeHistory(guideId, next);
+    setHistory(next);
+    setSaved(current => current && { ...current, progress: {} });
+    setRunning(false);
   }
 
-  function beginDraw(event) {
-    if (tool !== 'pen' && tool !== 'eraser') return;
-    drawing.current = true;
-    walkthroughEvent('practice-drew');
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const p = point(event);
-    const context = canvasRef.current.getContext('2d');
-    context.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
-    context.strokeStyle = '#11120f';
-    context.lineWidth = tool === 'eraser' ? 22 : 2.4;
-    context.beginPath();
-    context.moveTo(p.x, p.y);
-  }
+  const sourceBlocks = useMemo(() => readableText(guide?.study_guide || guide?.notes).split(/\n\s*\n/).filter(block => block.trim()), [guide]);
 
-  function moveDraw(event) {
-    if (!drawing.current || (tool !== 'pen' && tool !== 'eraser')) return;
-    const p = point(event);
-    const context = canvasRef.current.getContext('2d');
-    context.lineTo(p.x, p.y);
-    context.stroke();
-  }
+  if (!ready) return null;
 
-  function saveDrawings() {
-    try { localStorage.setItem(drawingsKey(guideId), JSON.stringify(drawings.current)); } catch {}
-  }
-
-  function endDraw() {
-    if (!drawing.current) return;
-    drawing.current = false;
-    if (canvasRef.current) drawings.current[problemIndex] = canvasRef.current.toDataURL();
-    saveDrawings();
-  }
-
-  function changeProblem(nextIndex) {
-    if (canvasRef.current) drawings.current[problemIndex] = canvasRef.current.toDataURL();
-    setProblemIndex(Math.max(0, Math.min(problems.length - 1, nextIndex)));
-  }
-
-  function addSymbol(symbol, kind = 'symbol') {
-    const next = { id: Date.now() + Math.random(), kind, value: symbol, x: 48 + currentTokens.length * 12, y: 54 + currentTokens.length * 10 };
-    setTokens(all => ({ ...all, [problemIndex]: [...(all[problemIndex] || []), next] }));
-  }
-
-  function updateToken(token, value) {
-    setTokens(all => ({ ...all, [problemIndex]: (all[problemIndex] || []).map(item => item.id === token.id ? { ...item, value } : item) }));
-  }
-
-  function removeToken(token) {
-    setTokens(all => ({ ...all, [problemIndex]: (all[problemIndex] || []).filter(item => item.id !== token.id) }));
-  }
-
-  // Turn the handwriting on this problem's canvas into typed text (vision model).
-  async function tidyHandwriting() {
-    const canvas = canvasRef.current;
-    if (!canvas || !drawings.current[problemIndex]) return;
-    const index = problemIndex;
-    setTidying(true);
-    setError('');
-    const flat = document.createElement('canvas');
-    flat.width = canvas.width;
-    flat.height = canvas.height;
-    const context = flat.getContext('2d');
-    context.fillStyle = '#fff';
-    context.fillRect(0, 0, flat.width, flat.height);
-    context.drawImage(canvas, 0, 0);
-    const data = await apiFetch('/practice/recognize', {
-      method: 'POST',
-      timeoutMs: 60000,
-      body: JSON.stringify({ image: flat.toDataURL('image/png') }),
-    });
-    setTidying(false);
-    if (typeof data?.text !== 'string') {
-      setError(apiErrorMessage(data?.detail, 'Cordia could not read this drawing.'));
-      return;
-    }
-    if (!data.text) return;
-    setWorkText(all => ({ ...all, [index]: [all[index], data.text].filter(Boolean).join('\n') }));
-    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-    delete drawings.current[index];
-    saveDrawings();
-    setTool('type');
-  }
-
-  function beginTokenDrag(event, token) {
-    if (event.target.tagName === 'INPUT') return;
-    const rect = boardRef.current.getBoundingClientRect();
-    drag.current = { id: token.id, offsetX: event.clientX - rect.left - token.x, offsetY: event.clientY - rect.top - token.y };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function moveToken(event, token) {
-    if (drag.current?.id !== token.id) return;
-    const rect = boardRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(rect.width - 48, event.clientX - rect.left - drag.current.offsetX));
-    const y = Math.max(0, Math.min(rect.height - 40, event.clientY - rect.top - drag.current.offsetY));
-    setTokens(all => ({
-      ...all,
-      [problemIndex]: (all[problemIndex] || []).map(item => item.id === token.id ? { ...item, x, y } : item),
-    }));
-  }
-
-  function clearWork() {
-    const canvas = canvasRef.current;
-    if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-    delete drawings.current[problemIndex];
-    saveDrawings();
-    setWorkText(all => ({ ...all, [problemIndex]: '' }));
-    setTokens(all => ({ ...all, [problemIndex]: [] }));
-  }
-
-  async function checkAnswer(event) {
-    event.preventDefault();
-    const studentAnswer = String(answers[problemIndex] || '').trim();
-    if (!current || !studentAnswer) return;
-    const index = problemIndex;
-    setGrading(true);
-    const data = await apiFetch('/practice/grade', {
-      method: 'POST',
-      body: JSON.stringify({
-        prompt: current.prompt,
-        reference: current.answer,
-        worked_solution: current.worked_solution || '',
-        student_answer: studentAnswer,
-        work: workText[index] || '',
-      }),
-    });
-    setGrading(false);
-    if (typeof data?.correct !== 'boolean') {
-      setEvaluations(all => ({ ...all, [index]: { status: 'retry', message: apiErrorMessage(data?.detail, 'Cordia could not check this answer. Please try again.') } }));
-      return;
-    }
-    setEvaluations(all => ({ ...all, [index]: { status: data.correct ? 'correct' : 'retry', message: data.explanation } }));
-    setRevealed(all => ({ ...all, [index]: true }));
-    // The Tutor posts its reply to a missed answer; open it so the student sees it.
-    if (!data.correct) window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { guideId, refresh: true } }));
-  }
-
-  async function reportGrade() {
-    const evaluation = evaluations[problemIndex];
-    if (!current || !evaluation || reported[problemIndex]) return;
-    const index = problemIndex;
-    const message = [
-      'Practice grading reported as incorrect.',
-      `Task: ${current.prompt}`,
-      `Student answer: ${answers[index] || ''}`,
-      `Reference answer: ${current.answer}`,
-      `Cordia said: ${evaluation.status === 'correct' ? 'Right' : 'Not quite'}${evaluation.message ? ` — ${evaluation.message}` : ''}`,
-    ].join('\n').slice(0, 2000);
-    const data = await apiFetch('/feedback', {
-      method: 'POST',
-      body: JSON.stringify({
-        message,
-        category: 'incorrect_content',
-        page_path: '/practice/' + guideId,
-        app_version: process.env.NEXT_PUBLIC_APP_VERSION || null,
-        context: { guide_id: guideId, question_id: `practice-${index + 1}` },
-        client_request_id: crypto.randomUUID(),
-      }),
-    });
-    if (data?.submitted) setReported(all => ({ ...all, [index]: true }));
-    else setError(apiErrorMessage(data?.detail, 'Your report could not be sent. Please try again.'));
-  }
-
-  if (guideId && !guide && !error) {
-    return <div className="practice-loading"><AILoadingSphere /></div>;
-  }
-
-  const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
-
-  // Pick a guide first; the workspace appears only once there is material.
-  if (!guideId && !upload) {
+  // Pick a guide first.
+  if (!guideId) {
     return (
       <div className="c-page practice-pick">
-        <header className="c-page-head">
-          <h1 className="c-title">Practice</h1>
-          <input ref={fileRef} type="file" hidden accept=".pdf,.docx,.pptx,.txt" onChange={event => useUploadedFile(event.target.files?.[0])} />
-          <button type="button" className="c-btn c-btn--secondary" onClick={() => fileRef.current?.click()} disabled={extracting}><Upload {...ICON} />{extracting ? 'Reading…' : 'Upload'}</button>
-        </header>
-        {error && <div className="retain-action-error" role="alert">{error}</div>}
+        <header className="c-page-head"><h1 className="c-title">Practice</h1></header>
         {!guideOptions ? (
-          <div className="practice-grid">{[0, 1, 2, 3].map(index => <div key={index} className="c-skeleton" style={{ height: 112, borderRadius: 20 }} />)}</div>
+          <div className="practice-grid">{[0, 1, 2, 3].map(key => <div key={key} className="c-skeleton" style={{ height: 112, borderRadius: 20 }} />)}</div>
         ) : guideOptions.length ? (
-          <div className="practice-grid practice-guide-picker" data-spot="practice-picker">
+          <div className="practice-grid" data-spot="practice-picker">
             {guideOptions.map(option => (
-              <Link key={option.id} href={'/practice/' + option.id} className="c-card practice-guide">
-                <PencilRuler size={24} strokeWidth={1.75} aria-hidden="true" />
+              <Link key={option.id} href={'/guide/' + option.id + '?tab=practice'} className="c-card practice-guide">
+                <PencilRuler {...ICON} />
                 <span>{option.title || 'Untitled guide'}</span>
               </Link>
             ))}
           </div>
         ) : (
-          <div className="c-empty"><button type="button" className="c-btn c-btn--primary" onClick={() => router.push('/create')}>Create guide or upload file</button></div>
+          <div className="c-empty"><button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet()}>Add material</button></div>
         )}
-        <style jsx>{`
+        <style jsx global>{`
           .practice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-          :global(.practice-guide) { display: grid; align-content: space-between; gap: 16px; min-height: 112px; padding: 18px; color: var(--ink); text-decoration: none; font: 600 17px/1.3 var(--font-display); }
-          :global(.practice-guide:hover) { text-decoration: none; border-color: var(--olive); }
-          :global(.practice-guide .lucide) { color: currentColor; }
+          .practice-guide { display: grid; align-content: space-between; gap: 16px; min-height: 112px; padding: 18px; color: var(--ink); text-decoration: none; font: 500 17px/1.3 var(--font-display); }
+          .practice-guide:hover { text-decoration: none; border-color: var(--olive); }
         `}</style>
       </div>
     );
   }
 
+  const current = problems[index];
+  const last = index >= problems.length - 1;
+
   return (
-    <main className="practice-page">
-      <header className="c-page-head practice-head">
-        <div className="c-row practice-title-row">
-          <button type="button" className="c-icon-btn" onClick={() => router.push(guideId ? '/guide/' + guideId : '/practice')} aria-label="Back"><ArrowLeft {...ICON} /></button>
-          <h1 className="c-title">Practice</h1>
-          <span className="c-section-title c-truncate practice-source-name">{sourceTitle}</span>
-        </div>
-        <div className="c-row">
-          <input ref={fileRef} type="file" hidden accept=".pdf,.docx,.pptx,.txt" onChange={event => useUploadedFile(event.target.files?.[0])} />
-          <button type="button" className="c-btn c-btn--quiet" onClick={() => fileRef.current?.click()} disabled={extracting}><Upload {...ICON} />{extracting ? 'Reading…' : 'Upload'}</button>
-          <button type="button" className={'c-btn ' + (problems.length ? 'c-btn--secondary' : 'c-btn--primary')} onClick={generateProblems} disabled={loading || !sourceText}>
-            {problems.length ? <RefreshCw {...ICON} /> : <Sparkles {...ICON} />}
-            {loading ? 'Creating…' : problems.length ? 'Regenerate' : 'Generate'}
-          </button>
-        </div>
-      </header>
+    <div className={'practice' + (embedded ? ' is-embedded' : ' c-page')}>
+      {!embedded && (
+        <header className="practice-head">
+          <button type="button" className="c-icon-btn" onClick={() => router.push('/guide/' + guideId)} aria-label="Back to guide" title="Back to guide"><ArrowLeft {...ICON} /></button>
+          <h1 className="c-title c-truncate">{guide?.title || 'Practice'}</h1>
+        </header>
+      )}
+      {error && <p className="practice-error" role="alert">{error}</p>}
 
-      {error && <div className="retain-action-error" role="alert">{error}</div>}
-
-      <section className="practice-layout">
-        <article className="c-card practice-problem-panel">
-          <div className="practice-problem-heading">
-            <div>
-              <div className="c-row">
-                <span className="c-meta">{problems.length ? problemIndex + 1 : 0} / {problems.length || 10}</span>
-                {current?.practice_type && <span className="c-meta practice-kind">{current.practice_type.replace('_', ' ')}</span>}
-              </div>
-              <h2 className="practice-prompt">{current?.prompt || (loading ? 'Creating…' : 'Generate')}</h2>
-              {current?.starter_code && <pre className="practice-code"><code>{current.starter_code}</code></pre>}
-              {current?.test_cases?.length > 0 && (
-                <div className="practice-tests">
-                  <strong>Tests</strong>
-                  <ul>{current.test_cases.map((test, index) => <li key={index}><code>{test}</code></li>)}</ul>
-                </div>
-              )}
+      {running && current ? (
+        <div className="practice-layout">
+          <div className="practice-main">
+            <div className="c-bar practice-progress" role="progressbar" aria-label="Progress" aria-valuemin={0} aria-valuemax={problems.length} aria-valuenow={index + 1}>
+              <span style={{ width: `${((index + (evaluations[index] ? 1 : 0)) / problems.length) * 100}%` }} />
             </div>
-            {problems.length > 0 && (
-              <div className="c-row">
-                <button type="button" className="c-icon-btn" onClick={() => changeProblem(problemIndex - 1)} disabled={problemIndex === 0} aria-label="Previous problem"><ChevronLeft {...ICON} /></button>
-                <button type="button" className="c-icon-btn" onClick={() => changeProblem(problemIndex + 1)} disabled={problemIndex === problems.length - 1} aria-label="Next problem"><ChevronRight {...ICON} /></button>
-              </div>
-            )}
-          </div>
-
-          <div className="practice-toolbar" role="toolbar" aria-label="Workspace tools">
-            <div className="c-seg" role="group" aria-label="Tool">
-              <button type="button" className={tool === 'pen' ? 'is-active' : ''} aria-pressed={tool === 'pen'} onClick={() => setTool('pen')}><PenLine {...ICON} /> Draw</button>
-              <button type="button" className={tool === 'eraser' ? 'is-active' : ''} aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')}><Eraser {...ICON} /> Erase</button>
-              <button type="button" className={tool === 'type' ? 'is-active' : ''} aria-pressed={tool === 'type'} onClick={() => setTool('type')}><Type {...ICON} /> Type</button>
-            </div>
-            <div className="practice-symbols">
-              {SYMBOLS.map(symbol => <button type="button" className="c-icon-btn" key={symbol} onClick={() => addSymbol(symbol)} aria-label={`Add ${symbol}`}>{symbol}</button>)}
-              <button type="button" className="c-icon-btn" onClick={() => addSymbol('', 'exp')} aria-label="Add exponent">xⁿ</button>
-              <button type="button" className="c-icon-btn" onClick={() => addSymbol('', 'text')} aria-label="Add text tile">Aa</button>
-            </div>
-            <button type="button" className="c-btn c-btn--quiet" onClick={tidyHandwriting} disabled={tidying || !current}><Wand2 {...ICON} />{tidying ? 'Reading…' : 'Tidy'}</button>
-            <button type="button" className="c-icon-btn" onClick={clearWork} aria-label="Clear work"><Trash2 {...ICON} /></button>
-          </div>
-
-          <div ref={boardRef} className="practice-board" data-tool={tool} data-spot="practice-canvas">
-            <textarea
-              aria-label="Typed work"
-              value={workText[problemIndex] || ''}
-              onChange={event => setWorkText(all => ({ ...all, [problemIndex]: event.target.value }))}
-              placeholder={tool === 'type' ? 'Type here' : ''}
-              readOnly={tool !== 'type'}
+            <PracticeProblem
+              key={index}
+              problem={current}
+              index={index}
+              total={problems.length}
+              guideId={guideId}
+              answer={answers[index] || ''}
+              onAnswer={value => setAnswers(all => ({ ...all, [index]: value }))}
+              evaluation={evaluations[index]}
+              onEvaluate={value => setEvaluations(all => ({ ...all, [index]: value }))}
+              onNext={last ? finish : () => setIndex(value => value + 1)}
+              nextLabel={last ? 'Finish' : 'Next'}
             />
-            <canvas
-              ref={canvasRef}
-              aria-label="Drawing workspace"
-              onPointerDown={beginDraw}
-              onPointerMove={moveDraw}
-              onPointerUp={endDraw}
-              onPointerCancel={endDraw}
-            />
-            {currentTokens.map(token => (
-              <div
-                key={token.id}
-                className={`practice-token practice-token-${token.kind || 'symbol'}`}
-                style={{ left: token.x, top: token.y }}
-                onPointerDown={event => beginTokenDrag(event, token)}
-                onPointerMove={event => moveToken(event, token)}
-                onPointerUp={() => { drag.current = null; }}
-                onDoubleClick={() => removeToken(token)}
-              >
-                {token.kind === 'exp' || token.kind === 'text' ? (
-                  <input
-                    value={token.value}
-                    onChange={event => updateToken(token, event.target.value)}
-                    placeholder={token.kind === 'exp' ? 'n' : 'type'}
-                    size={Math.max(1, token.value.length || 1)}
-                    aria-label={token.kind === 'exp' ? 'Exponent' : 'Text tile'}
-                    autoFocus
-                  />
-                ) : token.value}
-              </div>
-            ))}
           </div>
-
-          <form className="practice-answer practice-answer-inline" onSubmit={checkAnswer}>
-            <label htmlFor="practice-answer-input">Your answer</label>
-            <textarea
-              id="practice-answer-input"
-              className="c-input"
-              value={answers[problemIndex] || ''}
-              onChange={event => setAnswers(all => ({ ...all, [problemIndex]: event.target.value }))}
-              placeholder={current?.answer_format || 'Answer'}
-              disabled={!current}
-            />
-            <button type="submit" className="c-btn c-btn--primary" disabled={!current || grading || !answers[problemIndex]?.trim()}>
-              {grading ? 'Checking…' : 'Check answer'}
-            </button>
-            {evaluations[problemIndex] && (
-              <div className={`practice-evaluation ${evaluations[problemIndex].status}`} role="status">
-                <strong>{evaluations[problemIndex].status === 'correct' ? 'Right' : 'Not quite'}</strong>
-                {evaluations[problemIndex].status === 'correct' && evaluations[problemIndex].message && <span>{evaluations[problemIndex].message}</span>}
-                {evaluations[problemIndex].status !== 'correct' && (
-                  <button type="button" className="c-btn c-btn--quiet" onClick={() => window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { guideId, refresh: true } }))}><MessageCircle {...ICON} />Ask</button>
-                )}
-                <button type="button" className="c-btn c-btn--quiet practice-report" onClick={reportGrade} disabled={reported[problemIndex]}>
-                  <Flag {...ICON} />{reported[problemIndex] ? 'Reported' : 'Report'}
-                </button>
-              </div>
-            )}
-            {revealed[problemIndex] && (
-              <div className="practice-solution">
-                <strong>Answer</strong>
-                <p>{current.answer}</p>
-                {current.worked_solution && <p className="practice-worked"><strong>Why</strong> {current.worked_solution}</p>}
-              </div>
-            )}
-          </form>
-        </article>
-
-        <aside className="c-card practice-source-panel" aria-label="Source material">
-          <header className="c-row">
+          <aside className="c-card practice-source" aria-label="Source">
             <h2 className="c-section-title">Source</h2>
-            <span className="c-spacer" />
-            <button type="button" className="c-btn c-btn--quiet" onClick={() => setShownBlocks(all => (Object.keys(all).length >= sourceBlocks.length ? {} : Object.fromEntries(sourceBlocks.map((_, index) => [index, true]))))}><Eye {...ICON} />{Object.keys(shownBlocks).length >= sourceBlocks.length && sourceBlocks.length ? 'Hide' : 'Reveal'}</button>
-          </header>
-          <div className="practice-source-copy">
-            {sourceBlocks.length ? sourceBlocks.map((block, index) => (
-              <p
-                key={index}
-                className={shownBlocks[index] ? 'practice-source-block' : 'practice-source-block is-blurred'}
-                onDoubleClick={() => setShownBlocks(all => ({ ...all, [index]: !all[index] }))}
-                title={shownBlocks[index] ? 'Double-click to hide' : 'Double-click to reveal'}
-              >{block}</p>
-            )) : <p className="c-meta">0 sections</p>}
-          </div>
-        </aside>
-      </section>
-      <style jsx>{`
-        .practice-page { display: grid; gap: 20px; }
-        .practice-title-row { min-width: 0; flex: 1; }
-        .practice-source-name { font-family: var(--font-display); min-width: 0; }
-        .practice-prompt { margin: 8px 0 0; font: 600 22px/1.35 var(--font-display); }
-        .practice-kind { text-transform: capitalize; }
-        .practice-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-        .practice-toolbar .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
-        .practice-symbols { display: flex; flex-wrap: wrap; gap: 2px; }
-        .practice-symbols :global(.c-icon-btn) { font: 600 15px/1 var(--font-sans); }
-        .practice-evaluation { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+            <div className="practice-source-copy">
+              {sourceBlocks.map((block, key) => <p key={key}>{block}</p>)}
+            </div>
+          </aside>
+        </div>
+      ) : (
+        <section className="c-card practice-start" aria-label="Practice">
+          {saved === undefined ? (
+            <div className="c-skeleton" style={{ height: 52, borderRadius: 999 }} />
+          ) : (
+            <div className="practice-start-actions">
+              {saved && <button type="button" className="c-btn c-btn--primary" onClick={start}><Play {...ICON} />Start</button>}
+              <button type="button" className={'c-btn ' + (saved ? 'c-btn--secondary' : 'c-btn--primary')} onClick={newSet} disabled={loading}>
+                {saved ? <RefreshCw {...ICON} /> : <Sparkles {...ICON} />}{loading ? 'Making…' : 'New set'}
+              </button>
+            </div>
+          )}
+          {history.length > 0 && (
+            <div className="practice-history">
+              <h2 className="c-section-title"><History {...ICON} />History</h2>
+              <ul>
+                {history.map((item, key) => (
+                  <li key={key}><span>{shortDate(item.at)}</span><span className="practice-score">{item.correct} / {item.total}</span></li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
+
+      <style jsx global>{`
+        .practice { display: grid; gap: 16px; }
+        .practice-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .practice-error { margin: 0; padding: 12px 16px; border-radius: 12px; background: var(--error-bg); color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+        .practice-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: 16px; align-items: start; }
+        .practice-main { display: grid; gap: 12px; min-width: 0; }
+        .practice-progress span { transition: width 200ms ease-out; }
+        .practice-source { position: sticky; top: calc(var(--bar-h) + 16px); max-height: calc(100vh - var(--bar-h) - 32px); overflow: auto; display: grid; align-content: start; gap: 8px; padding: 20px; }
+        .practice-source h2 { margin: 0; }
+        .practice-source-copy p { margin: 0 0 12px; font: 400 16px/1.6 var(--font-display); color: var(--ink); white-space: pre-wrap; }
+        .practice-start { display: grid; gap: 24px; padding: 24px; }
+        .practice-start-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .practice-history h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+        .practice-history ul { list-style: none; margin: 0; padding: 0; display: grid; }
+        .practice-history li { display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line); font: 500 15px/1.3 var(--font-sans); color: var(--ink); }
+        .practice-score { font-variant-numeric: tabular-nums; font-weight: 700; }
+        @media (max-width: 1023px) {
+          .practice-layout { grid-template-columns: minmax(0, 1fr); }
+          .practice-source { position: static; max-height: none; }
+        }
       `}</style>
-    </main>
+    </div>
   );
 }

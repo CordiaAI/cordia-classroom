@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, ClipboardPaste, FileImage, FileText, Link as LinkIcon, Mic, Presentation, Sparkles, Square, Upload, X,
+  ArrowLeft, ClipboardPaste, FileDown, FileImage, FileText, Globe, Layers, Link as LinkIcon, Mic, MonitorPlay, Plus, Presentation, Sparkles, Square, Trash2, Upload, X,
 } from 'lucide-react';
+import { Sheet } from './Overlay';
 import { apiFetch } from '../lib/api';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 import { dismissGuideJob, startGuideJob, useGuideJobs } from '../lib/guideJobs';
-import { MAX_SOURCE_CHARS, baseName, combinedSource, extractFileText, fileKey, generateAndSave, newRequestId } from '../lib/guideCreate';
+import { MAX_SOURCE_CHARS, baseName, combinedSource, extractFileText, fileKey, generateAndSave, newRequestId, pairsToCards, pairsToGuide } from '../lib/guideCreate';
+import StepGuide from './StepGuide';
+import { MicAllow } from './Illustrations';
 import { NEW_SHEET_EVENT } from '../lib/newSheet';
 import { SAMPLE_GUIDE, SAMPLE_HEADINGS } from '../lib/sampleGuide';
 import { walkthroughEvent } from '../lib/walkthrough';
@@ -109,6 +112,9 @@ export default function NewSheet() {
   const [shown, setShown] = useState(0);
   const [jobId, setJobId] = useState(null);
   const [recording, setRecording] = useState(false);
+  const [cards, setCards] = useState([{ term: '', definition: '' }]);
+  const [cardTitle, setCardTitle] = useState('');
+  const [editGuideId, setEditGuideId] = useState(null);
   const fileInput = useRef(null);
   const dropRef = useRef(null);
   const sheetRef = useRef(null);
@@ -121,6 +127,18 @@ export default function NewSheet() {
       setOpen(true);
       setMode(event.detail?.mode || '');
       setError('');
+      setEditGuideId(event.detail?.guideId || null);
+      if (event.detail?.mode === 'cards' && event.detail?.guideId) {
+        apiFetch('/guides/' + event.detail.guideId).then(data => {
+          const guide = data?.guide;
+          if (!guide) return;
+          setCardTitle(guide.title || '');
+          setCards([...(guide.flashcards || []).map(card => ({ term: card.front || '', definition: card.back || '', image: card.image })), { term: '', definition: '' }]);
+        });
+      } else if (event.detail?.mode === 'cards') {
+        setCardTitle('');
+        setCards([{ term: '', definition: '' }]);
+      }
       walkthroughEvent('new-opened');
     }
     window.addEventListener(NEW_SHEET_EVENT, onOpen);
@@ -130,11 +148,7 @@ export default function NewSheet() {
   useEffect(() => {
     if (!open) return undefined;
     apiFetch('/folders').then(data => setFolders(data?.folders || []));
-    const onKey = event => { if (event.key === 'Escape') close(); };
-    window.addEventListener('keydown', onKey);
-    sheetRef.current?.querySelector('button, input, textarea')?.focus();
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, mode]);
+  }, [open]);
 
   // Headings appear one by one while the guide is written.
   useEffect(() => {
@@ -294,19 +308,37 @@ export default function NewSheet() {
     setJobId(id);
   }
 
+  async function saveCards() {
+    if (!fullCards.length) return;
+    setStatus('saving');
+    setError('');
+    const saved = await apiFetch(editGuideId ? '/guides/' + editGuideId : '/guides', {
+      method: editGuideId ? 'PATCH' : 'POST',
+      body: JSON.stringify(editGuideId
+        ? { flashcards: pairsToCards(fullCards) }
+        : { title: cardTitle.trim() || 'Cards', study_guide: pairsToGuide(fullCards), flashcards: pairsToCards(fullCards), ...(folderId ? { folder_id: folderId } : {}) }),
+    });
+    setStatus('idle');
+    if (!saved?.guide) { setError("Couldn't save the cards. Try again."); return; }
+    const target = '/guide/' + saved.guide.id + '?tab=cards';
+    close();
+    router.push(target);
+  }
+
   if (!open) return null;
-  const ready = mode === 'upload' ? files.length > 0
+  const fullCards = cards.filter(card => card.term.trim() && card.definition.trim());
+  const ready = mode === 'cards' ? fullCards.length > 0 : mode === 'upload' ? files.length > 0
     : mode === 'link' ? /^https?:\/\/\S+\.\S+/.test(url.trim())
       : text.trim().length >= 10;
   const option = NEW_OPTIONS.find(item => item.mode === mode);
 
   return (
-    <div className="c-scrim" onClick={close}>
-      <section ref={sheetRef} className="c-sheet new-sheet" role="dialog" aria-modal="true" aria-labelledby="new-sheet-title" onClick={event => event.stopPropagation()}>
+    <Sheet onClose={close} labelledBy="new-sheet-title" className="new-sheet">
+      <div ref={sheetRef} className="new-sheet-body">
         <header className="c-sheet-head">
           <div className="c-row">
             {mode && status === 'idle' && <button type="button" className="c-icon-btn" onClick={() => { setMode(''); setError(''); }} aria-label="Back"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>}
-            <h2 id="new-sheet-title" className="c-title">{status === 'building' ? 'Building' : 'New guide'}</h2>
+            <h2 id="new-sheet-title" className="c-title">{status === 'building' ? 'Building' : mode === 'cards' ? (editGuideId ? 'Edit cards' : 'New cards') : 'New guide'}</h2>
           </div>
           <button type="button" className="c-icon-btn" onClick={close} aria-label="Close"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         </header>
@@ -351,6 +383,14 @@ export default function NewSheet() {
               </label>
             )}
             {mode === 'link' && (
+              <ul className="new-sources" aria-label="Works with">
+                <li><Globe size={20} strokeWidth={1.75} aria-hidden="true" />Web page</li>
+                <li><MonitorPlay size={20} strokeWidth={1.75} aria-hidden="true" />YouTube</li>
+                <li><FileText size={20} strokeWidth={1.75} aria-hidden="true" />Google Docs</li>
+                <li><FileDown size={20} strokeWidth={1.75} aria-hidden="true" />PDF link</li>
+              </ul>
+            )}
+            {mode === 'link' && (
               <label className="c-field">
                 <span className="sr-only">Link</span>
                 <input className="c-input" type="url" inputMode="url" value={url} onChange={event => setUrl(event.target.value)} placeholder="https://" autoFocus onKeyDown={event => { if (event.key === 'Enter' && ready) create(); }} />
@@ -358,6 +398,7 @@ export default function NewSheet() {
             )}
             {mode === 'record' && (
               <>
+                {!recording && !text && <StepGuide label="Microphone" steps={[{ visual: <MicAllow />, text: 'When your browser asks, click Allow.' }]} />}
                 <button type="button" className={'new-record' + (recording ? ' is-on' : '')} onClick={toggleRecording} aria-pressed={recording}>
                   {recording ? <Square size={28} strokeWidth={1.75} aria-hidden="true" /> : <Mic size={28} strokeWidth={1.75} aria-hidden="true" />}
                   <span>{recording ? 'Stop' : 'Record'}</span>
@@ -370,7 +411,27 @@ export default function NewSheet() {
                 )}
               </>
             )}
-            {folders.length > 0 && (
+            {mode === 'cards' && (
+              <div className="new-cards">
+                <label className="c-field">
+                  <span>Title</span>
+                  <input className="c-input" value={cardTitle} onChange={event => setCardTitle(event.target.value)} placeholder="Cards" />
+                </label>
+                <ol className="new-card-list">
+                  {cards.map((card, index) => (
+                    <li key={index} className="new-card-row">
+                      <span className="c-meta new-card-num">{index + 1}</span>
+                      <input className="c-input" value={card.term} onChange={event => setCards(list => list.map((item, i) => (i === index ? { ...item, term: event.target.value } : item)))} placeholder="Term" aria-label={`Card ${index + 1} term`} />
+                      <input className="c-input" value={card.definition} onChange={event => setCards(list => list.map((item, i) => (i === index ? { ...item, definition: event.target.value } : item)))} placeholder="Definition" aria-label={`Card ${index + 1} definition`}
+                        onKeyDown={event => { if (event.key === 'Enter' && index === cards.length - 1) { event.preventDefault(); setCards(list => [...list, { term: '', definition: '' }]); } }} />
+                      <button type="button" className="c-icon-btn" onClick={() => setCards(list => (list.length > 1 ? list.filter((_, i) => i !== index) : [{ term: '', definition: '' }]))} aria-label={`Remove card ${index + 1}`}><Trash2 size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+                    </li>
+                  ))}
+                </ol>
+                <button type="button" className="c-btn c-btn--secondary new-card-add" onClick={() => setCards(list => [...list, { term: '', definition: '' }])}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />Add card</button>
+              </div>
+            )}
+            {mode !== 'cards' && folders.length > 0 && (
               <label className="c-field new-class">
                 <span>Class</span>
                 <select className="c-select" value={folderId} onChange={event => setFolderId(event.target.value)}>
@@ -386,16 +447,16 @@ export default function NewSheet() {
 
         {mode && mode !== 'sample' && status !== 'building' && (
           <div className="new-foot">
-            <button type="button" className="c-btn c-btn--quiet" onClick={() => { close(); router.push('/create'); }}>Write cards</button>
-            <button type="button" className="c-btn c-btn--primary" onClick={create} disabled={!ready || status !== 'idle'}>
+            {mode !== 'cards' ? <button type="button" className="c-btn c-btn--quiet" onClick={() => { setMode('cards'); setEditGuideId(null); setCards([{ term: '', definition: '' }]); setCardTitle(''); }}><Layers size={20} strokeWidth={1.75} aria-hidden="true" />Make cards myself</button> : <span />}
+            <button type="button" className="c-btn c-btn--primary" onClick={mode === 'cards' ? saveCards : create} disabled={!ready || status !== 'idle'}>
               {option && <option.icon size={20} strokeWidth={1.75} aria-hidden="true" />}
-              {status === 'reading' ? 'Reading…' : 'Create'}
+              {status === 'reading' ? 'Reading…' : status === 'saving' ? 'Saving…' : mode === 'cards' ? 'Save' : 'Create'}
             </button>
           </div>
         )}
-      </section>
+      </div>
       <style jsx>{`
-        .new-sheet { width: min(560px, 100%); }
+        :global(.new-sheet) { width: min(560px, 100%); }
         .new-panel { display: grid; gap: 16px; }
         .new-drop { display: grid; justify-items: center; gap: 12px; width: 100%; padding: 32px 16px; border: 2px dashed var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); cursor: pointer; font: 600 17px/1.2 var(--font-sans); }
         .new-drop:hover, .new-drop.is-over { border-color: var(--olive); background: var(--hover); }
@@ -410,12 +471,20 @@ export default function NewSheet() {
         .new-record { display: grid; justify-items: center; gap: 10px; justify-self: center; width: 128px; height: 128px; align-content: center; border: 0; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 600 15px/1 var(--font-sans); cursor: pointer; }
         .new-record.is-on { background: var(--error); }
         .new-class { max-width: 280px; }
+        .new-sources { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+        .new-sources li { display: grid; justify-items: center; gap: 6px; padding: 12px 4px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); font: 600 13px/1.2 var(--font-sans); color: var(--ink); text-align: center; }
+        .new-cards { display: grid; gap: 12px; }
+        .new-card-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 50vh; overflow: auto; }
+        .new-card-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1.4fr) 44px; gap: 8px; align-items: center; }
+        .new-card-num { text-align: right; font-variant-numeric: tabular-nums; }
+        .new-card-add { justify-self: start; }
+        @media (max-width: 639px) { .new-card-row { grid-template-columns: 20px minmax(0, 1fr) 44px; } .new-card-row input:nth-of-type(2) { grid-column: 2; } .new-sources { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         .new-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 20px; }
         .new-error { margin: 16px 0 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
         .new-headings { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; min-height: 160px; }
         .new-headings li { padding: 10px 14px; border-radius: var(--r-input); font: 600 19px/1.3 var(--font-display); color: var(--ink); animation: c-rise 300ms var(--ease) both; }
         .new-headings li.is-current { background: var(--hover); }
       `}</style>
-    </div>
+    </Sheet>
   );
 }

@@ -14,7 +14,7 @@ class WalkthroughContractTests(unittest.TestCase):
         source = read("components", "Spotlight.js")
         self.assertIn("createPortal(", source)
         self.assertIn("document.body", source)
-        self.assertIn("rgba(23, 27, 24, 0.4)", source)
+        self.assertIn("background: var(--scrim)", source)  # 40% dim, from tokens.css
         self.assertIn(">Skip</button>", source)
         self.assertIn("prefers-reduced-motion", source)
 

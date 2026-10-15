@@ -14,14 +14,14 @@ function shuffledOrder(length) {
 
 export function askAboutCard(card, guideId) {
   window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', {
-    detail: { guideId: card.guideId || guideId, prompt: `Explain this question: ${card.front}` },
+    detail: { guideId: card.guideId || guideId, prompt: `Explain this card: ${card.front}`, send: true },
   }));
 }
 
 // One flashcard session. Missed cards go to the back of the queue until known.
 // cards: [{ front, back, image?, guideId? }]. onFinish({ known: [i], missed: [i], seconds }).
 export default function FlashcardViewer({
-  flashcards, guideId, title, onBack, onFinish, onExit, starred, onToggleStar, onEdit, finishExtra,
+  flashcards, guideId, title, onBack, onFinish, onExit, starred, onToggleStar, onEdit, finishExtra, embedded = false,
 }) {
   const total = flashcards.length;
   const [queue, setQueue] = useState(() => flashcards.map((_, index) => index));
@@ -119,15 +119,15 @@ export default function FlashcardViewer({
   return (
     <div className="fc">
       <div className="c-glass fc-bar" role="toolbar" aria-label="Flashcards">
-        <button type="button" className="c-icon-btn" onClick={onBack} aria-label="Back"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
-        <span className="fc-name c-truncate">{title}</span>
-        <button type="button" className="c-icon-btn" onClick={shuffle} aria-label="Shuffle" disabled={done}><Shuffle size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+        {!embedded && <button type="button" className="c-icon-btn" onClick={onBack} aria-label="Back" title="Back"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>}
+        <span className="fc-name c-truncate">{embedded ? `${Math.min(total, known.length + 1)} / ${total}` : title}</span>
+        <button type="button" className="c-icon-btn" onClick={shuffle} aria-label="Shuffle" title="Shuffle" disabled={done}><Shuffle size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         {onToggleStar && (
-          <button type="button" className={'c-icon-btn' + (starred ? ' is-starred' : '')} onClick={onToggleStar} aria-pressed={Boolean(starred)} aria-label={starred ? 'Unstar' : 'Star'}>
+          <button type="button" className={'c-icon-btn' + (starred ? ' is-starred' : '')} onClick={onToggleStar} aria-pressed={Boolean(starred)} aria-label={starred ? 'Unstar' : 'Star'} title={starred ? 'Unstar' : 'Star'}>
             <Star size={20} strokeWidth={1.75} aria-hidden="true" fill={starred ? 'currentColor' : 'none'} />
           </button>
         )}
-        {onEdit && <button type="button" className="c-icon-btn" onClick={onEdit} aria-label="Edit"><Pencil size={20} strokeWidth={1.75} aria-hidden="true" /></button>}
+        {onEdit && <button type="button" className="c-icon-btn" onClick={onEdit} aria-label="Edit cards" title="Edit cards"><Pencil size={20} strokeWidth={1.75} aria-hidden="true" /></button>}
         <button type="button" className="c-btn c-btn--quiet fc-ask" onClick={() => card && askAboutCard(card, guideId)} disabled={done}>
           <MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />Ask
         </button>
@@ -184,8 +184,10 @@ export default function FlashcardViewer({
         </>
       )}
       <style jsx>{`
-        .fc { display: grid; gap: 20px; width: min(760px, 100%); margin: 0 auto; }
-        .fc-bar { position: sticky; top: calc(var(--bar-h) + 12px); z-index: 20; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: var(--r-pill); }
+        .fc { display: grid; gap: 20px; width: 100%; }
+        .fc-card, .fc-progress, .fc-actions { width: min(760px, 100%); margin-inline: auto; }
+        .fc-bar { position: sticky; top: calc(var(--bar-h) + 12px); z-index: 20; display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: var(--r-pill); }
+        .fc-name { font-variant-numeric: tabular-nums; }
         .fc-name { flex: 1; min-width: 0; padding: 0 8px; font: 600 17px/1.2 var(--font-display); }
         .fc-bar :global(.is-starred) { color: var(--olive-ink); }
         .fc-progress { display: flex; align-items: center; gap: 12px; }
@@ -199,7 +201,7 @@ export default function FlashcardViewer({
         .is-flipped .fc-back { transform: rotateY(0); }
         .fc-actions { display: flex; justify-content: center; gap: 12px; }
         .fc-actions :global(.c-btn) { min-width: 150px; }
-        @media (max-width: 767px) {
+        @media (max-width: 1023px) {
           .fc-bar { top: 64px; }
           .fc-card { min-height: 300px; }
           .fc-actions :global(.c-btn) { flex: 1; min-width: 0; }

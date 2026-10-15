@@ -83,7 +83,7 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
           <div className="spot-dim" style={{ top: hole.top, left: hole.right, right: 0, height: hole.bottom - hole.top }} />
           <div className="spot-ring" style={{ top: hole.top, left: hole.left, width: hole.right - hole.left, height: hole.bottom - hole.top }} />
         </>
-      ) : !passive && <div className="spot-dim" style={{ inset: 0, background: 'rgba(23,27,24,.12)', pointerEvents: 'none' }} />}
+      ) : !passive && <div className="spot-dim" style={{ inset: 0, background: 'var(--hover)', pointerEvents: 'none' }} />}
 
       {label && (
         <div className={`spot-label arrow-${arrow}`} style={labelStyle} role="status" aria-live="polite">
@@ -96,8 +96,8 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
 
       <style jsx>{`
         .spot { position: fixed; inset: 0; z-index: 400; pointer-events: none; }
-        .spot-dim { position: fixed; background: rgba(23, 27, 24, 0.4); pointer-events: auto; }
-        .spot-ring { position: fixed; border-radius: 12px; box-shadow: 0 0 0 2px #536149, 0 0 0 8px rgba(83, 97, 73, 0.28), 0 0 32px 8px rgba(83, 97, 73, 0.35); pointer-events: none; transition: top 200ms var(--ease), left 200ms var(--ease), width 200ms var(--ease), height 200ms var(--ease); }
+        .spot-dim { position: fixed; background: var(--scrim); pointer-events: auto; }
+        .spot-ring { position: fixed; border-radius: 12px; box-shadow: 0 0 0 2px var(--olive), 0 0 0 8px var(--spot-glow), 0 0 32px 8px var(--spot-glow); pointer-events: none; transition: top 200ms var(--ease), left 200ms var(--ease), width 200ms var(--ease), height 200ms var(--ease); }
         .spot-label {
           position: fixed; display: flex; align-items: center; gap: 12px; padding: 10px 16px; max-width: calc(100vw - 32px);
           border-radius: 999px; pointer-events: auto;
@@ -107,7 +107,7 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
           color: var(--ink); font: 600 17px/1.2 var(--font-sans); white-space: nowrap;
           animation: spot-in 220ms var(--ease) both;
         }
-        :global(:root:not([data-theme='dark'])) .spot-label { background: rgba(255, 255, 252, 0.92); }
+        .spot-label { background: var(--glass-strong); }
         .spot-label::after { content: ''; position: absolute; left: 50%; width: 14px; height: 14px; transform: translateX(-50%) rotate(45deg); background: inherit; border: inherit; }
         .spot-label.arrow-up::after { top: -8px; border-right: 0; border-bottom: 0; }
         .spot-label.arrow-down::after { bottom: -8px; border-left: 0; border-top: 0; }
@@ -124,10 +124,10 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
           color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer;
         }
         .spot-skip.is-left { right: auto; left: 12px; }
-        @media (min-width: 768px) { .spot-skip { top: auto; bottom: 24px; right: 24px; } .spot-skip.is-left { left: 24px; } }
+        @media (min-width: 1024px) { .spot-skip { top: auto; bottom: 24px; right: 24px; } .spot-skip.is-left { left: 24px; } }
         .spot-finish { height: 36px; min-height: 36px; }
         @keyframes spot-in { from { opacity: 0; } to { opacity: 1; } }
-        @media (max-width: 767px) { .spot :global(.spot-dots i) { display: none; } .spot :global(.spot-dots .c-meta) { margin-left: 0; } .spot-label { font-size: 15px; } }
+        @media (max-width: 1023px) { .spot :global(.spot-dots i) { display: none; } .spot :global(.spot-dots .c-meta) { margin-left: 0; } .spot-label { font-size: 15px; } }
         @media (prefers-reduced-motion: reduce) { .spot-ring { transition: none; } .spot-label { animation: none; } }
       `}</style>
     </div>,

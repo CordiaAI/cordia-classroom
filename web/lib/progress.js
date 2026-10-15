@@ -5,7 +5,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './supabase';
 // Walkthrough, feature-use and Grove progress, saved per student on the server in
 // their Supabase account metadata (key "cordia"), with a local copy for speed and
 // offline use. It rides in the access token, so it stays small (no logs here).
-const EMPTY = { v: 1, at: 0, wt: null, day1Status: null, done: [], used: [], tips: [], grove: {}, rings: {}, freeze: [], first: 0 };
+const EMPTY = { v: 1, at: 0, theme: null, renamed: [], wt: null, day1Status: null, done: [], used: [], tips: [], grove: {}, rings: {}, freeze: [], first: 0 };
 const LOCAL = 'cordiaProgress';
 let state = { ...EMPTY };
 let loadedFor = '';
@@ -36,8 +36,10 @@ function merge(a, b) {
     ...b,
     at: Math.max(a?.at || 0, b?.at || 0),
     wt: newer?.wt ?? null,
+    theme: newer?.theme ?? a?.theme ?? b?.theme ?? null,
     day1Status: a?.day1Status || b?.day1Status || null,
     done: union(a?.done, b?.done),
+    renamed: union(a?.renamed, b?.renamed),
     used: union(a?.used, b?.used),
     tips: union(a?.tips, b?.tips),
     grove: maxMap(a?.grove, b?.grove),

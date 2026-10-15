@@ -19,7 +19,7 @@ export function unsupportedFileMessage(file) {
   const kind = /^video\//.test(type) || /\.(mp4|mov|m4v|avi|mkv|webm|wmv|flv|mpeg|mpg|3gp)$/i.test(name) ? 'Video'
     : /^audio\//.test(type) || /\.(mp3|wav|m4a|aac|ogg|flac|wma|aiff?)$/i.test(name) ? 'Audio'
       : 'This file type';
-  return `${kind} files are not supported yet (${name}). Try a PDF, PowerPoint, Word, image, or text file.`;
+  return `${kind} files don't work yet. Try a PDF, slides or text.`;
 }
 
 function hasFiles(event) {

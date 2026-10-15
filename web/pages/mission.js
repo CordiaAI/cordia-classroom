@@ -1,69 +1,50 @@
-import { useRequireAuth } from '../lib/auth';
+import { useEffect, useState } from 'react';
+import { BookOpen, MessageCircle, MousePointerClick, ShieldCheck, Stethoscope, Users } from 'lucide-react';
+import PublicPage from '../components/PublicPage';
+import { getToken } from '../lib/api';
+import { PRICES } from '../lib/plans';
 
-export default function MissionPage() {
-  const { ready } = useRequireAuth();
-  if (!ready) return null;
+const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 
-  const features = [
-    {
-      title: 'Instant Extraction',
-      description: 'Open your course material, click the CordiaClassroom icon, and use the Tutor side panel to capture the page or find related material. Cordia keeps the source attached to what it creates.',
-    },
-    {
-      title: 'NCLEX Question Generation',
-      subtitle: 'Nursing User Group (More specific user groups to be added soon!)',
-      description: 'There is no other platform that offers NCLEX question generation. CordiaClassroom allows for you to use the material you are learning to generate NCLEX questions. This task is used to assist Nursing students in making study guides exactly like their exams with two button clicks.',
-    },
-    {
-      title: 'CordiaClassroom Never Allows the AI to Search for Answers on the Web!',
-      description: 'The main issue with simply asking an LLM to create a study guide is that the answers and questions are NOT DIRECTLY from your class material. CordiaClassroom makes this super simple and easy. It only uses the context that was captured as its knowledge! This way it is the exact material from your classes.',
-    },
-    {
-      title: 'One Cordia Tutor',
-      description: 'The Classroom Tutor and Chrome side panel share the same conversation, selected class, source material, learning guidance, and active skill so work can continue across both interfaces.',
-    },
-    {
-      title: 'The Cost',
-      description: 'Start free with 3 study guides, 10 tutor prompts and 5 Learn My Way views each month. CordiaClassroom Pro is $9.99 a month or $29 a semester. Try Pro free for 7 days with no card; the trial never turns into a charge on its own.',
-    },
-    {
-      title: 'Users Are "Cofounders"',
-      description: 'Got a new recommendation or said something along the lines of "I wish it would do this?" Send feedback! Our goal is to get your recommendation ASAP! This is a college study platform made for the people.',
-    },
-  ];
+const SECTIONS = [
+  { icon: BookOpen, title: 'Only your material', text: 'Guides, cards and quizzes come from what you add. Cordia never searches the web for answers, so everything matches your class.' },
+  { icon: MousePointerClick, title: 'Capture in a click', text: 'Open a course page, click the Chrome extension and make a guide. The source stays attached.' },
+  { icon: MessageCircle, title: 'One Tutor', text: 'The Tutor in Cordia and in the Chrome side panel share one conversation, one class and one set of sources.' },
+  { icon: Stethoscope, title: 'NCLEX for nursing', text: 'Nursing material gets NCLEX-style questions written from your own notes.' },
+  { icon: ShieldCheck, title: 'Fair pricing', text: `Free covers 3 guides, 10 Tutor questions and 5 Explain views a month. Pro is ${PRICES.monthly.price} a month or ${PRICES.semester.price} a semester. The 7-day trial needs no card and never turns into a charge.` },
+  { icon: Users, title: 'Built with students', text: 'A college student started Cordia for college students. Send feedback from Help; it shapes what comes next.' },
+];
 
+function Content() {
   return (
-    <div className="fade-in" style={{ maxWidth: 760 }}>
-      <h2 style={{ marginBottom: 4 }}>CordiaClassroom Features</h2>
-      <p style={{ color: 'var(--text-muted)', fontSize: 15, marginBottom: 28, lineHeight: 1.6 }}>
-        CordiaClassroom was built by a college student, for college students. Our mission is to make studying smarter, faster, and more accessible for every student — regardless of major or learning style.
-      </p>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {features.map((f, i) => (
-          <div key={i} style={{
-            background: 'var(--bg-secondary)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '20px 24px',
-          }}>
-            <h3 style={{ fontSize: '1.05em', marginBottom: 4, color: 'var(--text-primary)' }}>
-              {f.title}
-            </h3>
-            {f.subtitle && (
-              <span style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                {f.subtitle}
-              </span>
-            )}
-            <p style={{ color: 'var(--text-secondary)', fontSize: 15, lineHeight: 1.6, marginTop: 8 }}>
-              {f.description}
-            </p>
-          </div>
+    <article className="mission">
+      <h1 className="c-title">Approach</h1>
+      <div className="mission-grid">
+        {SECTIONS.map(section => (
+          <section key={section.title} className="c-card mission-card">
+            <h2><section.icon {...ICON} />{section.title}</h2>
+            <p>{section.text}</p>
+          </section>
         ))}
       </div>
-      <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 15, marginTop: 24, fontStyle: 'italic' }}>
-        Founder - Jackson Laughlin
-      </p>
-    </div>
+      <p className="mission-sign">Jackson Laughlin, founder</p>
+      <style jsx global>{`
+        .mission { display: grid; gap: 24px; }
+        .mission .c-title { margin: 0; }
+        .mission-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+        .mission-card { display: grid; align-content: start; gap: 8px; padding: 24px; color: var(--ink); }
+        .mission-card h2 { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 17px/1.3 var(--font-sans); color: var(--ink); }
+        .mission-card p { margin: 0; font: 500 15px/1.6 var(--font-sans); color: var(--ink); }
+        .mission-sign { margin: 0; font: 500 17px/1.4 var(--font-display); color: var(--ink); }
+      `}</style>
+    </article>
   );
+}
+
+export default function MissionPage() {
+  const [signedIn, setSignedIn] = useState(null);
+  useEffect(() => setSignedIn(Boolean(getToken())), []);
+  if (signedIn === null) return null;
+  if (signedIn) return <div className="c-page"><Content /></div>;
+  return <PublicPage title="Approach — CordiaClassroom" description="How Cordia Classroom works and what it promises." path="/mission"><Content /></PublicPage>;
 }

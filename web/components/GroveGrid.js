@@ -1,5 +1,6 @@
 import GroveTree from './GroveTree';
 import { groveKey, useProgress } from '../lib/progress';
+import { cleanTitle, looksAutomatic } from '../lib/guideTitle';
 
 // The semester's grove: one tree per guide made since the semester began.
 export default function GroveGrid({ guides, since }) {
@@ -19,7 +20,7 @@ export default function GroveGrid({ guides, since }) {
             return (
               <li key={guide.id}>
                 <GroveTree minutes={minutes} rings={progress.rings[key] || 0} size={96} title={`${guide.title}, ${Math.round(minutes)} minutes`} />
-                <span className="grove-name">{guide.title}</span>
+                <span className="grove-name" title={guide.title}>{looksAutomatic(guide.title) ? cleanTitle(guide.title) : guide.title}</span>
                 <span className="c-meta">{Math.round(minutes)} min</span>
               </li>
             );
@@ -28,9 +29,9 @@ export default function GroveGrid({ guides, since }) {
       ) : <p className="c-meta">0 trees</p>}
       <style jsx>{`
         .grove-grid { display: grid; gap: 12px; padding: 20px; scroll-margin-top: calc(var(--bar-h) + 16px); }
-        ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 16px; }
-        li { display: grid; justify-items: center; gap: 4px; text-align: center; }
-        .grove-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: 600 13px/1.3 var(--font-sans); }
+        ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, 128px); justify-content: space-between; gap: 16px; }
+        li { display: grid; justify-items: center; align-content: start; gap: 4px; width: 128px; text-align: center; min-width: 0; }
+        .grove-name { width: 128px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font: 600 13px/1.3 var(--font-sans); color: var(--ink); }
       `}</style>
     </section>
   );

@@ -108,6 +108,7 @@ export default function LibraryPage() {
   function deleteClass(folder) {
     setConfirm({
       title: `Delete ${folder.name}?`,
+      message: "This can't be undone.",
       onConfirm: async () => {
         await apiFetch('/folders/' + folder.id, { method: 'DELETE' });
         setConfirm(null);
@@ -332,7 +333,7 @@ export default function LibraryPage() {
         </div>
       )}
       {!pending && toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
-      {confirm && <ConfirmDialog title={confirm.title} confirmLabel="Delete" onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
+      {confirm && <ConfirmDialog title={confirm.title} message={confirm.message} confirmLabel="Delete" onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
 
       <style jsx global>{`
         .library .lib-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius: var(--r-card); background: var(--error-bg); color: var(--error); font-weight: 600; }
@@ -340,22 +341,22 @@ export default function LibraryPage() {
         .library .lib-new-class { display: flex; gap: 8px; align-items: center; max-width: 480px; }
         .library .lib-group { padding: 6px; }
         .library .lib-group.is-drop { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
-        .library .lib-group-head { display: flex; align-items: center; gap: 4px; }
+        .library .lib-group-head { display: flex; align-items: center; gap: 8px; }
         .library .lib-group-toggle { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; height: 52px; padding: 0 12px; border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink); cursor: pointer; text-align: left; }
         .library .lib-group-toggle:hover { background: var(--hover); }
         .library .lib-group-toggle .lucide { transition: transform 150ms var(--ease); }
         .library .lib-group-toggle .is-closed { transform: rotate(-90deg); }
-        .library .lib-list { list-style: none; margin: 0; padding: 0; }
+        .library .lib-list { list-style: none; margin: 4px 0 0; padding: 0; }
         .library .lib-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 4px 4px 4px 12px; border-top: 1px solid var(--line); }
         .library .lib-row.is-dragging { opacity: .5; }
-        .library .lib-row-link { display: flex; align-items: baseline; gap: 12px; flex: 1; min-width: 0; color: var(--ink); text-decoration: none; padding: 10px 0; }
+        .library .lib-row-link { display: flex; align-items: baseline; gap: 12px; flex: 1; min-width: 0; min-height: 44px; color: var(--ink); text-decoration: none; padding: 10px 0; box-sizing: border-box; }
         .library .lib-row-link:hover { text-decoration: none; }
         .library .lib-row-link:hover .lib-row-title { text-decoration: underline; }
         .library .lib-row-title, .library .lib-row-title { font: 600 17px/1.3 var(--font-display); min-width: 0; }
         .library .lib-rename { flex: 1; min-width: 0; }
         .library .lib-star.is-on { color: var(--olive-ink); }
         .library .lib-empty-group { padding: 8px 16px 14px; margin: 0; }
-        @media (max-width: 767px) { .library .lib-row-link { flex-direction: column; gap: 2px; } }
+        @media (max-width: 1023px) { .library .lib-row-link { flex-direction: column; gap: 2px; } }
       `}</style>
     </div>
   );

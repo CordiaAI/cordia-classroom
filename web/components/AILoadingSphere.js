@@ -49,9 +49,9 @@ export default function AILoadingSphere({ size = 100, label = 'Loading...' }) {
             <image href={LOGO} width="512" height="323" filter={`url(#${id}-white)`} />
           </mask>
           <linearGradient id={`${id}-glow`} x1="0" x2="1">
-            <stop offset="0" stopColor="#ffffff" stopOpacity="0" />
-            <stop offset="0.5" stopColor="#ffffff" stopOpacity="0.9" />
-            <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+            <stop offset="0" style={{ stopColor: 'var(--on-olive)' }} stopOpacity="0" />
+            <stop offset="0.5" style={{ stopColor: 'var(--on-olive)' }} stopOpacity="0.9" />
+            <stop offset="1" style={{ stopColor: 'var(--on-olive)' }} stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -59,7 +59,7 @@ export default function AILoadingSphere({ size = 100, label = 'Loading...' }) {
         <g filter={`url(#${id}-goo)`}>
           <image href={LOGO} width="512" height="323" filter={`url(#${id}-ink)`} />
           {BUBBLES.map((offset, index) => (
-            <circle key={offset} r="0" fill="#11120f">
+            <circle key={offset} r="0" style={{ fill: 'var(--ink)' }}>
               <animateMotion dur={`${DURATION}s`} repeatCount="indefinite" begin={`-${(offset * DURATION).toFixed(2)}s`}>
                 <mpath href={`#${id}-trace`} />
               </animateMotion>
@@ -88,13 +88,13 @@ export default function AILoadingSphere({ size = 100, label = 'Loading...' }) {
 
       <style jsx>{`
         .cordia-loader { display: grid; justify-items: center; gap: 22px; }
-        .cordia-loader svg { overflow: visible; filter: drop-shadow(0 18px 26px rgba(17, 18, 15, 0.2)); }
+        .cordia-loader svg { overflow: visible; filter: none; }
         .cordia-loader :global(.cordia-loader-wave) {
           fill: none; stroke-width: 40; stroke-linecap: round; opacity: 0.55;
           stroke-dasharray: 110 890;
         }
         .cordia-loader p {
-          margin: 0; color: #11120f; font-family: var(--font-sans); font-size: 1.05rem;
+          margin: 0; color: var(--olive-ink); font-family: var(--font-sans); font-size: 1.05rem;
           font-weight: 650; letter-spacing: -0.02em; animation: cordia-breathe 1.8s ease-in-out infinite;
         }
         @keyframes cordia-breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }

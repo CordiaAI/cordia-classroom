@@ -4,7 +4,9 @@ import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib
 import MermaidDiagram from './MermaidDiagram';
 import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from './ExplanationPreference';
-import { ArrowUp, BookOpen, Layers, MessageCircle, Paperclip, PencilRuler, SlidersHorizontal, X as CloseIcon } from 'lucide-react';
+import { ArrowUp, BookOpen, History, Layers, MessageCircle, Paperclip, PencilRuler, SlidersHorizontal, X as CloseIcon } from 'lucide-react';
+import { Sheet } from './Overlay';
+import { archiveChat, readChatHistory } from '../lib/tutorHistory';
 import { lastGuide } from '../lib/userStore';
 import { walkthroughEvent } from '../lib/walkthrough';
 import TutorSelect from './TutorSelect';
@@ -306,7 +308,13 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const allMessages = session?.messages || [];
   // The Tutor opens to an empty chat: earlier turns stay on the server but are not shown.
   const shownFrom = useRef(null);
-  if (shownFrom.current === null && session?.id) shownFrom.current = allMessages.length;
+  if (shownFrom.current === null && session?.id) {
+    shownFrom.current = allMessages.length;
+    // Earlier turns aren't shown; they live in History.
+    if (allMessages.length) archiveChat(allMessages);
+  }
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyItem, setHistoryItem] = useState(null);
   const messages = allMessages.slice(Math.min(shownFrom.current ?? 0, allMessages.length));
   useEffect(() => {
     const container = endRef.current?.closest('.cordia-tutor-messages');
@@ -351,9 +359,9 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
       return !unsupported;
     });
     const room = MAX_ATTACHMENTS - attachments.length;
-    if (readable.length > room) problems.push(`The Tutor can hold up to ${MAX_ATTACHMENTS} files at a time.`);
+    if (readable.length > room) problems.push(`Up to ${MAX_ATTACHMENTS} files at a time.`);
     const toRead = readable.slice(0, Math.max(room, 0));
-    setLocalError(problems.join(' '));
+    setLocalError(problems[0] || '');
     if (fileRef.current) fileRef.current.value = '';
     if (!toRead.length) return;
     setExtracting(true);
@@ -364,13 +372,16 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
       try {
         const response = await fetch(API + '/extract-file-text', { method: 'POST', headers: authOnlyHeaders(), body: formData });
         const data = await responseJson(response);
-        if (!response.ok || !data?.text) throw new Error(apiErrorMessage(data?.detail, 'Could not read this file.'));
+        if (!response.ok || !data?.text) throw new Error('unreadable');
         added.push({ id: `${file.name}:${file.size}:${file.lastModified}`, title: file.name, content: data.text });
-      } catch (error) {
-        problems.push(`${file.name}: ${error.message || 'Could not read this file.'}`);
+      } catch {
+        problems.push(/^image\//.test(file.type) || /\.(png|jpe?g|heic|webp|gif)$/i.test(file.name)
+          ? "Couldn't read that image. Try a PDF or paste the text."
+          : "Couldn't read that file. Try a PDF or paste the text.");
       }
     }
-    setLocalError(problems.join(' '));
+    // One short message, never a list of filenames.
+    setLocalError([...new Set(problems)][0] || '');
     if (added.length) {
       setAttachments(current => {
         const seen = new Set(current.map(file => file.id));
@@ -460,8 +471,8 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
           <MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />
           <strong>Tutor</strong>
           {session?.browser_available && <span className="cordia-browser-status is-online" aria-label="Browser connected" title="Browser connected" />}
+          <button type="button" className="c-icon-btn cordia-tutor-history-btn" onClick={() => setHistoryOpen(true)} aria-label="Chat history"><History size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         </div>
-        <ExplanationPreference inline />
         <div className="cordia-tutor-context" aria-label="Context">
           <TutorSelect label="Study material" value={contextKey} onChange={value => { if (value === '__upload') fileRef.current?.click(); else setContextKey(value); }} options={[
             { value: '__upload', label: extracting ? 'Reading…' : attachDropActive ? 'Drop files' : 'Upload file', group: 'Files', disabled: extracting || attachments.length >= MAX_ATTACHMENTS },
@@ -473,6 +484,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
           ]} />
           <input ref={fileRef} type="file" accept="*" multiple onChange={event => attachFiles(event.target.files)} hidden />
         </div>
+        <ExplanationPreference inline />
         {attachments.length > 0 && (
           <ul className="cordia-tutor-attachments" aria-label="Attached files">
             {attachments.map(file => (
@@ -485,7 +497,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
           </ul>
         )}
         {contextKey === 'attachment' && combinedAttachments.trimmed.length > 0 && (
-          <p className="cordia-tutor-attach-note" role="status">Trimmed: {combinedAttachments.trimmed.join(', ')}</p>
+          <p className="cordia-tutor-attach-note" role="status">Long files were shortened</p>
         )}
         <details className="tutor-context-controls">
         <summary className="c-icon-btn" aria-label="Options" title="Options"><SlidersHorizontal size={20} strokeWidth={1.75} aria-hidden="true" /></summary>
@@ -588,6 +600,26 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         )}
       </div>
       {remaining <= 3 && <small className="c-meta cordia-tutor-limit">{Math.max(remaining, 0)} left</small>}
+      <Sheet open={historyOpen} onClose={() => { setHistoryOpen(false); setHistoryItem(null); }} labelledBy="tutor-history-title" className="tutor-history">
+        <header className="c-sheet-head">
+          <h2 id="tutor-history-title" className="c-title">{historyItem ? historyItem.title : 'History'}</h2>
+          <button type="button" className="c-icon-btn" onClick={() => (historyItem ? setHistoryItem(null) : setHistoryOpen(false))} aria-label={historyItem ? 'Back to history' : 'Close'}><CloseIcon size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+        </header>
+        {historyItem ? (
+          <div className="tutor-history-chat">
+            {historyItem.messages.map((message, index) => <div key={index} className={`cordia-tutor-message ${message.role}`}><TutorMessageText text={message.text} plain={message.role === 'user'} /></div>)}
+          </div>
+        ) : (() => {
+          const items = historyOpen ? readChatHistory() : [];
+          return items.length ? (
+            <ul className="tutor-history-list">
+              {items.map((item, index) => (
+                <li key={index}><button type="button" onClick={() => setHistoryItem(item)}><span className="c-truncate">{item.title}</span><span className="c-meta">{new Date(item.at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span></button></li>
+              ))}
+            </ul>
+          ) : <p className="tutor-history-empty">No past chats</p>;
+        })()}
+      </Sheet>
     </section>
   );
 }

@@ -29,10 +29,10 @@ export function Landing({ mode = 'signin', path = '/' }) {
       </div>
       <style jsx>{`
         .landing { display: grid; grid-template-columns: minmax(0, 1fr) 400px; align-items: center; gap: 48px; min-height: calc(100vh - 64px - 128px); }
-        .landing-brand-name { font: 600 22px/1.15 var(--font-display); color: #536149; margin-bottom: 20px; }
-        .landing-title { margin: 0; font: 600 clamp(44px, 7vw, 88px)/1.02 var(--font-display); letter-spacing: -0.02em; color: #171B18; }
-        .landing-hero :global(.landing-cta) { display: inline-flex; align-items: center; gap: 8px; height: 48px; margin-top: 32px; padding: 0 24px; border-radius: 999px; background: #536149; color: #fff; font: 600 15px/1 var(--font-sans); text-decoration: none; }
-        @media (max-width: 860px) { .landing { grid-template-columns: 1fr; gap: 32px; min-height: 0; } .landing-hero :global(.landing-cta) { display: none; } }
+        .landing-brand-name { font: 600 22px/1.15 var(--font-display); color: var(--olive-ink); margin-bottom: 20px; }
+        .landing-title { margin: 0; font: 600 clamp(44px, 7vw, 88px)/1.02 var(--font-display); letter-spacing: -0.02em; color: var(--ink); }
+        .landing-hero :global(.landing-cta) { display: inline-flex; align-items: center; gap: 8px; height: 48px; margin-top: 32px; padding: 0 24px; border-radius: 999px; background: var(--olive); color: var(--on-olive); font: 600 15px/1 var(--font-sans); text-decoration: none; }
+        @media (max-width: 1023px) { .landing { grid-template-columns: 1fr; gap: 32px; min-height: 0; } .landing-hero :global(.landing-cta) { display: none; } }
       `}</style>
     </PublicPage>
   );

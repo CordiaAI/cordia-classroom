@@ -1,8 +1,18 @@
-// Theme: 'system' (default) follows the device; 'light' or 'dark' is the student's pick.
+import { getProgress, updateProgress } from './progress';
+
+// Theme: 'system' (default), 'light' or 'dark'. The account is the source of truth
+// (progress.theme, saved in Supabase user metadata); localStorage is a cache read
+// before first paint (pages/_document.js). Nothing else may change it.
+const KEY = 'theme';
+
 export function themePreference() {
   if (typeof window === 'undefined') return 'system';
-  const saved = localStorage.getItem('theme');
-  return saved === 'light' || saved === 'dark' ? saved : 'system';
+  try {
+    const saved = localStorage.getItem(KEY);
+    return saved === 'light' || saved === 'dark' ? saved : 'system';
+  } catch {
+    return 'system';
+  }
 }
 
 export function resolvedTheme(preference = themePreference()) {
@@ -12,11 +22,25 @@ export function resolvedTheme(preference = themePreference()) {
 
 export function applyTheme(preference = themePreference(), forceLight = false) {
   if (typeof document === 'undefined') return;
-  document.documentElement.setAttribute('data-theme', forceLight ? 'light' : resolvedTheme(preference));
+  const next = forceLight ? 'light' : resolvedTheme(preference);
+  if (document.documentElement.getAttribute('data-theme') !== next) document.documentElement.setAttribute('data-theme', next);
+}
+
+function cache(preference) {
+  try { localStorage.setItem(KEY, preference); } catch { /* storage blocked */ }
 }
 
 export function setThemePreference(preference) {
-  if (preference === 'system') localStorage.removeItem('theme');
-  else localStorage.setItem('theme', preference);
+  cache(preference);
+  updateProgress(() => ({ theme: preference }));
   applyTheme(preference);
+}
+
+// After the account loads: the saved choice wins over the cache.
+export function syncThemeFromAccount(forceLight = false) {
+  const saved = getProgress().theme;
+  if ((saved === 'system' || saved === 'light' || saved === 'dark') && saved !== themePreference()) {
+    cache(saved);
+    applyTheme(saved, forceLight);
+  }
 }

@@ -2,8 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, BookOpen, Brain, Download, ExternalLink, Layers, MessageCircle, NotebookText, PencilRuler, Pencil, Star, Stethoscope, SquarePen, Trash2, X,
+  ArrowLeft, BookOpen, Brain, Download, Layers, MessageCircle, NotebookText, PencilRuler, Pencil, Star, Stethoscope, Trash2, X,
 } from 'lucide-react';
+import QuizPanel from '../../components/QuizPanel';
+import CardsPanel from '../../components/CardsPanel';
+import PracticeWorkspace from '../../components/PracticeWorkspace';
+import { aiTitleFor, cleanTitle, looksAutomatic, markRenamed } from '../../lib/guideTitle';
 import { apiErrorMessage, apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import { parseQAPairs, parseNotes } from '../../lib/formatters';
@@ -11,6 +15,7 @@ import useSessionTracker from '../../lib/useSessionTracker';
 import StudyAidPanel from '../../components/StudyAidPanel';
 import StudyDocument from '../../components/StudyDocument';
 import Menu from '../../components/Menu';
+import { Sheet } from '../../components/Overlay';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useLearningStyle } from '../../lib/learningStyle';
 import { rememberGuidePage, rememberLastGuide } from '../../lib/userStore';
@@ -49,23 +54,24 @@ function MakeCard({ front: initialFront, onSave, onClose }) {
   const [back, setBack] = useState('');
   const [saving, setSaving] = useState(false);
   return (
-    <div className="c-scrim" onClick={onClose}>
-      <form className="c-sheet make-card" role="dialog" aria-modal="true" aria-labelledby="make-card-title" onClick={event => event.stopPropagation()} onSubmit={async event => { event.preventDefault(); setSaving(true); await onSave({ front: front.trim(), back: back.trim() }); setSaving(false); }}>
+    <Sheet onClose={onClose} labelledBy="make-card-title" className="make-card-sheet">
+      <form className="make-card" onSubmit={async event => { event.preventDefault(); setSaving(true); await onSave({ front: front.trim(), back: back.trim() }); setSaving(false); }}>
         <header className="c-sheet-head">
           <h2 id="make-card-title" className="c-title">New card</h2>
-          <button type="button" className="c-icon-btn" onClick={onClose} aria-label="Close"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+          <button type="button" className="c-icon-btn" onClick={onClose} aria-label="Close" title="Close"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         </header>
         <label className="c-field"><span>Front</span><textarea className="c-input" value={front} onChange={event => setFront(event.target.value)} rows={3} /></label>
         <label className="c-field"><span>Back</span><textarea className="c-input" value={back} onChange={event => setBack(event.target.value)} rows={3} autoFocus /></label>
         <div className="make-card-foot"><button type="submit" data-spot="card-save" className="c-btn c-btn--primary" disabled={saving || !front.trim() || !back.trim()}>{saving ? 'Saving…' : 'Save'}</button></div>
         <style jsx>{`
-          .make-card { display: grid; gap: 16px; width: min(520px, 100%); }
+          :global(.make-card-sheet) { width: min(520px, 100%); }
+          .make-card { display: grid; gap: 16px; }
           .make-card .c-sheet-head { margin-bottom: 0; }
           .make-card textarea { min-height: 88px; }
           .make-card-foot { display: flex; justify-content: flex-end; }
         `}</style>
       </form>
-    </div>
+    </Sheet>
   );
 }
 
@@ -76,7 +82,12 @@ export default function GuidePage() {
   useSessionTracker('read', id || null);
   const [guide, setGuide] = useState(null);
   const [loadError, setLoadError] = useState('');
-  const [view, setView] = useState('read');
+  const TABS = ['read', 'summary', 'quiz', 'cards', 'practice'];
+  const view = TABS.includes(router.query.tab) ? router.query.tab : 'read';
+  function setView(tab) {
+    const { tab: _ignored, page: _page, ...rest } = router.query;
+    router.push({ pathname: router.pathname, query: tab === 'read' ? { ...rest } : { ...rest, tab } }, undefined, { shallow: true, scroll: false });
+  }
   const [page, setPage] = useState(0);
   const [revealed, setRevealed] = useState(new Set());
   const [renaming, setRenaming] = useState(null);
@@ -125,6 +136,7 @@ export default function GuidePage() {
     const data = await apiFetch('/guides/' + id);
     if (data?.guide) {
       setGuide(data.guide);
+      aiTitleFor(data.guide).then(title => { if (title) setGuide(current => ({ ...current, title })); });
       rememberLastGuide({ id: data.guide.id, title: data.guide.title, page: Number(router.query.page) > 0 ? Number(router.query.page) - 1 : 0 });
       walkthroughEvent('guide-open');
     } else {
@@ -150,7 +162,7 @@ export default function GuidePage() {
     setRenaming(null);
     if (!title || title === guide.title) return;
     const data = await apiFetch('/guides/' + id + '/rename', { method: 'PATCH', body: JSON.stringify({ title }) });
-    if (data?.title) setGuide(current => ({ ...current, title: data.title }));
+    if (data?.title) { setGuide(current => ({ ...current, title: data.title })); markRenamed(id); }
   }
 
   async function deleteGuide() {
@@ -197,18 +209,14 @@ export default function GuidePage() {
   const pairs = parseQAPairs(guide.study_guide);
   const notes = parseNotes(guide.notes);
   const cardCount = guide.flashcards?.length || 0;
-  const sourceTitle = guide.source_title || (guide.source_url ? 'Source' : '');
-  const externalSourceUrl = /^https?:\/\//i.test(guide.source_url || '') ? guide.source_url : '';
-  const sourceHref = externalSourceUrl
-    || (guide.source_type === 'smartnote' && guide.source_id ? `/smartnotes?id=${guide.source_id}` : '')
-    || (guide.source_type === 'study_guide' && guide.source_id ? `/guide/${guide.source_id}` : '');
+  const title = looksAutomatic(guide.title) ? cleanTitle(guide.title) : guide.title;
   const explainWithAid = Boolean(learningStyle?.enabled);
   const pills = [
     { key: 'read', label: 'Read', icon: BookOpen, view: 'read' },
-    { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill' },
-    { key: 'cards', label: 'Cards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: cardCount, spot: 'cards-pill' },
-    { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id },
-    { key: 'notes', label: 'Notes', icon: NotebookText, view: 'notes' },
+    { key: 'summary', label: 'Summary', icon: NotebookText, view: 'summary' },
+    { key: 'quiz', label: 'Quiz', icon: Brain, view: 'quiz', spot: 'quiz-pill' },
+    { key: 'cards', label: 'Cards', icon: Layers, view: 'cards', count: cardCount || undefined, spot: 'cards-pill' },
+    { key: 'practice', label: 'Practice', icon: PencilRuler, view: 'practice' },
     ...(isNursing(guide) ? [{ key: 'nclex', label: 'NCLEX', icon: Stethoscope, href: '/nclex/' + id }] : []),
     { key: 'ask', label: 'Ask', icon: MessageCircle, spot: 'ask-pill', onClick: () => { walkthroughEvent('ask'); ask(id, ''); } },
   ];
@@ -223,7 +231,7 @@ export default function GuidePage() {
           </form>
         ) : (
           <h1 className="c-title guide-title">
-            <button type="button" className="guide-title-btn" onClick={() => setRenaming(guide.title)} aria-label={`${guide.title}, rename`}>{guide.title}</button>
+            <button type="button" className="guide-title-btn" onClick={() => setRenaming(title)} aria-label={`${title}, rename`}>{title}</button>
           </h1>
         )}
         <button type="button" className={'c-icon-btn' + (guide.is_bookmarked ? ' guide-starred' : '')} onClick={toggleStar} aria-pressed={Boolean(guide.is_bookmarked)} aria-label={guide.is_bookmarked ? 'Unstar' : 'Star'}>
@@ -232,26 +240,17 @@ export default function GuidePage() {
         <Menu
           label="Guide actions"
           items={[
-            { label: 'Edit', icon: SquarePen, onSelect: () => router.push('/create?editGuideId=' + id) },
-            { label: 'Rename', icon: Pencil, onSelect: () => setRenaming(guide.title) },
+            { label: 'Rename', icon: Pencil, onSelect: () => setRenaming(title) },
             { label: 'Export', icon: Download, onSelect: () => exportGuide(guide) },
             { label: 'Delete', icon: Trash2, danger: true, onSelect: () => setConfirmDelete(true) },
           ]}
         />
       </header>
-      {sourceTitle && (
-        <span className="guide-src">
-          {sourceHref
-            ? <a href={sourceHref} target={externalSourceUrl ? '_blank' : undefined} rel={externalSourceUrl ? 'noopener noreferrer' : undefined}><ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />{sourceTitle}</a>
-            : sourceTitle}
-        </span>
-      )}
-
-      <nav className="c-pills" aria-label="Study this guide">
+      <nav className="c-pills guide-pills" aria-label="Study this guide">
         {pills.map(pill => {
           const content = <><pill.icon size={20} strokeWidth={1.75} aria-hidden="true" />{pill.label}{pill.count !== undefined && <span className="c-meta">{pill.count}</span>}</>;
           if (pill.href) return <Link key={pill.key} className="c-pill" href={pill.href} data-spot={pill.spot}>{content}</Link>;
-          if (pill.view) return <button key={pill.key} type="button" className="c-pill" aria-current={view === pill.view ? 'page' : undefined} onClick={() => setView(pill.view)}>{content}</button>;
+          if (pill.view) return <button key={pill.key} type="button" className="c-pill" data-spot={pill.spot} aria-current={view === pill.view ? 'page' : undefined} onClick={() => setView(pill.view)}>{content}</button>;
           return <button key={pill.key} type="button" className="c-pill" data-spot={pill.spot} onClick={pill.onClick}>{content}</button>;
         })}
       </nav>
@@ -273,30 +272,34 @@ export default function GuidePage() {
             : null)}
           onSelection={onSelection}
         />
-      ) : (
-        <section className="c-card guide-notes" aria-label="Notes">
-          {notes.length ? <ul className="c-study">{notes.map((note, index) => <li key={index}>{note}</li>)}</ul> : <p className="c-meta">0 notes</p>}
+      ) : view === 'summary' ? (
+        <section className="c-card guide-summary" aria-label="Summary">
+          {notes.length ? <ul className="guide-summary-list">{notes.map((note, index) => <li key={index}>{note}</li>)}</ul> : <p className="guide-summary-empty">No summary</p>}
         </section>
+      ) : view === 'quiz' ? (
+        <QuizPanel guideId={id} onDone={() => setView('read')} />
+      ) : view === 'cards' ? (
+        <CardsPanel guide={guide} onStar={toggleStar} />
+      ) : (
+        <PracticeWorkspace guideId={id} embedded />
       )}
 
       {cardDraft !== null && <MakeCard front={cardDraft} onSave={saveCard} onClose={() => setCardDraft(null)} />}
-      {confirmDelete && <ConfirmDialog title={`Delete ${guide.title}?`} onConfirm={deleteGuide} onCancel={() => setConfirmDelete(false)} />}
+      {confirmDelete && <ConfirmDialog title={`Delete ${title}?`} message="Its cards and quiz go with it. This can't be undone." onConfirm={deleteGuide} onCancel={() => setConfirmDelete(false)} />}
       {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
 
       <style jsx>{`
         .guide { gap: 16px; }
         .guide-head { display: flex; align-items: center; gap: 8px; }
         .guide-title { flex: 1 1 auto; min-width: 0; }
-        .guide-title-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; cursor: text; border-radius: var(--r-input); }
+        .guide-title-btn { max-width: 100%; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; cursor: text; border-radius: var(--r-input); }
         .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
         .guide-rename { flex: 1 1 auto; min-width: 0; }
         .guide-title-input { font: 600 28px/1.1 var(--font-display); height: 52px; }
         .guide-head :global(.guide-starred) { color: var(--olive-ink); }
-        .guide-src { margin: -8px 0 0 48px; font: 600 13px/1.4 var(--font-sans); }
-        .guide-src a { display: inline-flex; align-items: center; gap: 6px; }
-        .guide-notes { padding: 32px 40px; }
-        .guide-notes ul { margin: 0; padding-left: 20px; display: grid; gap: 12px; }
-        @media (max-width: 767px) { .guide-src { margin-left: 0; } .guide-notes { padding: 24px 18px; } }
+        .guide-summary { padding: clamp(24px, 4vw, 48px) 24px; }
+        .guide-summary-list { max-width: 68ch; margin: 0 auto; padding-left: 20px; display: grid; gap: 14px; font: 400 19px/1.6 var(--font-display); color: var(--ink); }
+        .guide-summary-empty { margin: 0; text-align: center; font: 600 17px/1.4 var(--font-sans); }
       `}</style>
     </article>
   );

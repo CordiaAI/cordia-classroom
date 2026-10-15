@@ -48,7 +48,7 @@ export default function SessionFinish({ guideId, guideTitle, cards, accuracy, mi
         .finish-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
         @keyframes finish-in { from { opacity: 0; } to { opacity: 1; } }
         @media (prefers-reduced-motion: reduce) { .finish { animation: none; } }
-        @media (max-width: 767px) { .finish-stats { gap: 24px; } }
+        @media (max-width: 1023px) { .finish-stats { gap: 24px; } }
       `}</style>
     </section>
   );

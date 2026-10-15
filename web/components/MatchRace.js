@@ -99,7 +99,7 @@ export default function MatchRace({ questions, guideId, onRestart, onDone }) {
         .race-tile.is-picked { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
         .race-tile.is-cleared { opacity: .25; cursor: default; }
         .race-tile.is-wrong { border-color: var(--error); }
-        @media (max-width: 767px) { .race-tile { min-height: 56px; font-size: 13px; } .race-tile.is-answer { font-size: 15px; } }
+        @media (max-width: 1023px) { .race-tile { min-height: 56px; font-size: 13px; } .race-tile.is-answer { font-size: 15px; } }
       `}</style>
     </section>
   );

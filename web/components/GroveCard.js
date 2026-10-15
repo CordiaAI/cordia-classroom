@@ -3,27 +3,25 @@ import GroveTree, { STAGES, groveStage, nextStageLabel } from './GroveTree';
 import { groveKey, useProgress } from '../lib/progress';
 import { walkthroughEvent } from '../lib/walkthrough';
 
-// Today's glimpse of the grove: the tallest tree and how far to its next stage.
+// Today's Grove row: the largest tree (48px), how far to its next stage, Open.
 export default function GroveCard({ guides }) {
   const progress = useProgress();
   if (!guides.length) return null;
-  const ranked = guides.map(guide => ({ guide, minutes: progress.grove[groveKey(guide.id)] || 0 })).sort((a, b) => b.minutes - a.minutes);
-  const top = ranked[0];
-  const next = nextStageLabel(top.minutes);
+  const top = guides.map(guide => ({ guide, minutes: progress.grove[groveKey(guide.id)] || 0 })).sort((a, b) => b.minutes - a.minutes)[0];
+  const stage = STAGES[groveStage(top.minutes)].name;
   return (
-    <Link href="/grove" className="c-card grove-card" data-spot="grove" onClick={() => walkthroughEvent('grove-opened')}>
-      <GroveTree minutes={top.minutes} size={88} title={`${top.guide.title}, ${STAGES[groveStage(top.minutes)].name}`} />
-      <span className="grove-card-text">
+    <section className="c-card grove-row" aria-label="Grove" data-spot="grove">
+      <GroveTree minutes={top.minutes} size={48} title={`${top.guide.title}, ${stage}`} />
+      <span className="grove-row-text">
         <span className="c-section-title">Grove</span>
-        <span className="grove-card-guide c-truncate">{top.guide.title}</span>
-        <span className="c-meta">{next || STAGES[groveStage(top.minutes)].name}</span>
+        <span className="c-meta">{nextStageLabel(top.minutes) || stage}</span>
       </span>
+      <Link href="/grove" className="c-btn c-btn--secondary" onClick={() => walkthroughEvent('grove-opened')}>Open</Link>
       <style jsx global>{`
-        .grove-card { display: flex; align-items: center; gap: 16px; padding: 16px 24px 16px 16px; color: var(--ink); text-decoration: none; min-width: 0; }
-        .grove-card:hover { text-decoration: none; }
-        .grove-card-text { display: grid; gap: 4px; min-width: 0; }
-        .grove-card-guide { font: 500 15px/1.3 var(--font-sans); }
+        .grove-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px 12px 12px; min-width: 0; }
+        .grove-row-text { flex: 1; display: grid; gap: 2px; min-width: 0; }
+        .grove-row-text .c-section-title { margin: 0; }
       `}</style>
-    </Link>
+    </section>
   );
 }

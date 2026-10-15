@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { Check, X } from 'lucide-react';
+import { Sheet } from './Overlay';
 import { apiErrorMessage, apiFetch, getToken, LIMIT_EVENT, UPGRADE_EVENT } from '../lib/api';
 import { FEATURE_COPY, FREE_SUMMARY, PRICES, PRO_BENEFITS, PRO_NAME, resetLabel } from '../lib/plans';
 
@@ -119,7 +121,7 @@ export default function UpgradeModal() {
     .toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
   let title = `Upgrade to ${PRO_NAME}`;
-  let body = 'Get more out of every class.';
+  let body = '';
   if (mode === 'trial_ended') {
     title = 'Your Pro trial has ended';
     body = 'You are back on the free plan. Nothing was charged. Want to keep Pro?';
@@ -133,93 +135,82 @@ export default function UpgradeModal() {
     const resets = resetLabel(limit?.resets_at);
     body = isPro && !onTrial
       ? `You've reached this month's fair-use limit for ${copy?.label || 'this feature'}. It resets ${resets}.`
-      : `${limit?.message || ''}${resets ? ` Your free plan resets ${resets}.` : ''}`.trim();
+      : resets ? `Resets ${resets}.` : '';
   }
 
   return (
     <>
       {toast && (
-        <div className="upgrade-toast" role="status" onClick={() => setToast('')}>{toast}</div>
-      )}
-      {open && (
-        <div className="upgrade-overlay" onClick={close}>
-          <div className="upgrade-dialog" role="dialog" aria-modal="true" aria-labelledby="upgrade-title" onClick={e => e.stopPropagation()}>
-            <button className="upgrade-close" aria-label="Close" onClick={close}>×</button>
-            <h3 id="upgrade-title">{title}</h3>
-            <p className="upgrade-body">{body}</p>
-            {copy?.pro && !(isPro && !onTrial) && <p className="upgrade-highlight">With Pro: {copy.pro}.</p>}
-
-            {!(isPro && !onTrial) && (
-              <>
-                <ul className="upgrade-benefits">
-                  {PRO_BENEFITS.map(item => <li key={item}>{item}</li>)}
-                </ul>
-                <div className="upgrade-intervals" role="radiogroup" aria-label="Billing">
-                  {Object.entries(PRICES).map(([key, option]) => (
-                    <button
-                      key={key}
-                      role="radio"
-                      aria-checked={interval === key}
-                      className={interval === key ? 'active' : ''}
-                      onClick={() => setPlanInterval(key)}
-                    >
-                      <strong>{option.price}</strong> / {option.per}
-                      {option.note && <span>{option.note}</span>}
-                    </button>
-                  ))}
-                </div>
-                {error && <div className="upgrade-error">{error}</div>}
-                {canTrial && (
-                  <p className="upgrade-highlight">
-                    Your free 7-day Pro trial ends on <strong>{trialEnds}</strong>. It will <strong>not</strong> start a paid
-                    subscription. When it ends you go back to the Free plan and lose Pro features. No card needed.
-                  </p>
-                )}
-                <div className="upgrade-actions">
-                  {canTrial && (
-                    <button className="btn-upgrade" onClick={startTrial} disabled={Boolean(busy)}>
-                      {busy === 'trial' ? 'Starting...' : 'Start my free 7-day trial'}
-                    </button>
-                  )}
-                  <button className={canTrial ? 'btn-outline' : 'btn-upgrade'} onClick={checkout} disabled={Boolean(busy)}>
-                    {busy === 'checkout' ? 'Opening secure checkout...' : `${canTrial ? 'Or subscribe now' : 'Get Pro'} · ${price.price}/${price.per}`}
-                  </button>
-                  <button className="upgrade-later" onClick={close}>Not now</button>
-                </div>
-                <p className="upgrade-fineprint">Have a promo code? Add it at checkout. Cancel anytime.</p>
-              </>
-            )}
-
-            {mode === 'upgrade' && !isPro && (
-              <details className="upgrade-free">
-                <summary>What's in Free</summary>
-                <ul>{FREE_SUMMARY.map(item => <li key={item}>{item}</li>)}</ul>
-              </details>
-            )}
-          </div>
+        <div className="c-toast" role="status">
+          <span>{toast}</span>
+          <button type="button" className="c-btn c-btn--quiet" onClick={() => setToast('')}>Close</button>
         </div>
       )}
-      <style jsx>{`
-        .upgrade-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.55); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
-        .upgrade-dialog { position: relative; width: 100%; max-width: 440px; max-height: 92vh; overflow-y: auto; background: var(--bg-card, #fff); color: var(--text-primary); border-radius: 20px; padding: 28px 24px 20px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25); }
-        .upgrade-close { position: absolute; top: 10px; right: 14px; border: none; background: none; font-size: 1.6rem; line-height: 1; cursor: pointer; color: var(--text-muted); }
-        h3 { margin: 0 0 8px; font-size: 1.3rem; }
-        .upgrade-body { margin: 0 0 10px; color: var(--text-secondary, var(--text-muted)); }
-        .upgrade-highlight { margin: 0 0 12px; font-weight: 600; }
-        .upgrade-benefits { margin: 0 0 16px; padding-left: 18px; }
-        .upgrade-benefits li { margin: 4px 0; }
-        .upgrade-intervals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
-        .upgrade-intervals button { border: 1.5px solid var(--border, #d0d5dd); background: transparent; border-radius: 12px; padding: 10px; cursor: pointer; color: inherit; text-align: left; }
-        .upgrade-intervals button.active { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
-        .upgrade-intervals span { display: block; font-size: 13px; color: var(--accent); margin-top: 2px; }
-        .upgrade-actions { display: flex; flex-direction: column; gap: 8px; }
-        .upgrade-actions .btn-upgrade { width: 100%; padding: 12px; border: none; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 700; cursor: pointer; }
-        .upgrade-actions .btn-outline { width: 100%; padding: 11px; }
-        .upgrade-later { border: none; background: none; color: var(--text-muted); cursor: pointer; padding: 6px; }
-        .upgrade-error { color: var(--error); margin-bottom: 10px; }
-        .upgrade-fineprint { margin: 10px 0 0; font-size: 13px; color: var(--text-muted); text-align: center; }
-        .upgrade-free { margin-top: 12px; font-size: 0.9rem; }
-        .upgrade-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2100; background: var(--text-primary, #111); color: var(--bg-card, #fff); padding: 12px 18px; border-radius: 12px; max-width: 90vw; cursor: pointer; }
+      <Sheet open={open} onClose={close} labelledBy="upgrade-title" className="upgrade-sheet">
+        <header className="c-sheet-head">
+          <h2 id="upgrade-title" className="upgrade-title">{title}</h2>
+          <button type="button" className="c-icon-btn" aria-label="Close" title="Close" onClick={close}><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+        </header>
+        {body && <p className="upgrade-body">{body}</p>}
+
+        {!(isPro && !onTrial) && (
+          <>
+            <ul className="upgrade-benefits">
+              {(copy?.pro ? [copy.pro, ...PRO_BENEFITS.filter(item => item !== copy.pro)] : PRO_BENEFITS).map(item => (
+                <li key={item}><Check size={18} strokeWidth={2} aria-hidden="true" />{item}</li>
+              ))}
+            </ul>
+            <div className="upgrade-intervals" role="radiogroup" aria-label="Billing">
+              {Object.entries(PRICES).map(([key, option]) => (
+                <button key={key} type="button" role="radio" aria-checked={interval === key} className={interval === key ? 'is-active' : ''} onClick={() => setPlanInterval(key)}>
+                  <span className="upgrade-price"><strong>{option.price}</strong> / {option.per}</span>
+                  {option.note && <span className="upgrade-save">{option.note}</span>}
+                </button>
+              ))}
+            </div>
+            {error && <p className="upgrade-error" role="alert">{error}</p>}
+            {canTrial && <p className="upgrade-terms">Trial ends {trialEnds}. No card. It never turns into a charge.</p>}
+            <div className="upgrade-actions">
+              {canTrial && (
+                <button type="button" className="c-btn c-btn--block upgrade-trial" onClick={startTrial} disabled={Boolean(busy)}>
+                  {busy === 'trial' ? 'Starting…' : 'Start my free 7-day trial'}
+                </button>
+              )}
+              <button type="button" className={'c-btn c-btn--block ' + (canTrial ? 'c-btn--secondary' : 'upgrade-trial')} onClick={checkout} disabled={Boolean(busy)}>
+                {busy === 'checkout' ? 'Opening checkout…' : `${canTrial ? 'Subscribe' : 'Get Pro'} · ${price.price}/${price.per}`}
+              </button>
+              <button type="button" className="c-btn c-btn--secondary c-btn--block" onClick={close}>Not now</button>
+            </div>
+          </>
+        )}
+
+        {mode === 'upgrade' && !isPro && (
+          <details className="upgrade-free">
+            <summary>What's in Free</summary>
+            <ul>{FREE_SUMMARY.map(item => <li key={item}>{item}</li>)}</ul>
+          </details>
+        )}
+      </Sheet>
+      <style jsx global>{`
+        .upgrade-sheet { width: min(460px, 100%); display: grid; gap: 16px; color: var(--ink); }
+        .upgrade-sheet .c-sheet-head { margin-bottom: 0; align-items: flex-start; }
+        .upgrade-title { margin: 0; font: 500 28px/1.15 var(--font-display); color: var(--ink); }
+        .upgrade-body { margin: 0; font: 500 15px/1.5 var(--font-sans); color: var(--ink); }
+        .upgrade-benefits { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+        .upgrade-benefits li { display: flex; gap: 10px; align-items: flex-start; font: 500 15px/1.4 var(--font-sans); color: var(--ink); }
+        .upgrade-benefits .lucide { color: var(--olive-ink); margin-top: 1px; }
+        .upgrade-intervals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .upgrade-intervals button { display: grid; gap: 4px; min-height: 64px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); text-align: left; cursor: pointer; font: 500 15px/1.2 var(--font-sans); }
+        .upgrade-intervals button.is-active { border: 2px solid var(--olive-ink); }
+        .upgrade-price strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+        .upgrade-save { font: 700 13px/1 var(--font-sans); color: var(--olive-ink); }
+        .upgrade-terms { margin: 0; font: 500 13px/1.45 var(--font-sans); color: var(--ink); }
+        .upgrade-actions { display: grid; gap: 8px; }
+        .upgrade-trial { background: var(--olive); border-color: var(--olive); color: var(--on-olive); }
+        .upgrade-trial:hover:not(:disabled) { background: var(--olive-press); border-color: var(--olive-press); }
+        .upgrade-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+        .upgrade-free { font: 500 15px/1.4 var(--font-sans); color: var(--ink); }
+        .upgrade-free summary { cursor: pointer; font-weight: 600; min-height: 40px; display: flex; align-items: center; }
       `}</style>
     </>
   );

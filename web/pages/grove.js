@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Upload } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
+import { cleanTitle, looksAutomatic } from '../lib/guideTitle';
 import GroveTree, { STAGES, groveStage } from '../components/GroveTree';
 import { groveKey, useProgress } from '../lib/progress';
 import { openNewSheet } from '../lib/newSheet';
@@ -43,7 +44,7 @@ export default function GrovePage() {
               <li key={guide.id}>
                 <Link href={'/guide/' + guide.id} className="grove-tile">
                   <GroveTree minutes={minutes} size={112} title={`${guide.title}, ${STAGES[groveStage(minutes)].name}`} />
-                  <span className="grove-tile-title">{guide.title}</span>
+                  <span className="grove-tile-title" title={guide.title}>{looksAutomatic(guide.title) ? cleanTitle(guide.title) : guide.title}</span>
                   <span className="c-meta">{STAGES[groveStage(minutes)].name}</span>
                 </Link>
               </li>
@@ -62,8 +63,8 @@ export default function GrovePage() {
         .grove-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 8px 16px; }
         .grove-tile { display: grid; justify-items: center; gap: 4px; padding: 16px 8px; border-radius: 20px; color: var(--ink); text-decoration: none; text-align: center; transition: background 160ms ease-out; }
         .grove-tile:hover { background: var(--hover); text-decoration: none; }
-        .grove-tile-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: 600 15px/1.3 var(--font-display); }
-        @media (max-width: 767px) {
+        .grove-tile-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; width: 100%; font: 600 15px/1.3 var(--font-display); }
+        @media (max-width: 1023px) {
           .grove-legend { border-radius: 20px; flex-wrap: wrap; justify-content: center; top: 64px; }
           .grove-legend li .grove-tree { display: none; }
           .grove-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -45,6 +45,15 @@ export async function loadStudyQueue({ practiceGuides = 5 } = {}) {
   const practice = recent
     .map((guide, index) => ({ guideId: guide.id, guideTitle: guide.title, open: openProblems(states[index]?.practice) }))
     .filter(item => item.open > 0);
+  // The open problems themselves, so Start can run them in the same session.
+  const practiceItems = [];
+  recent.forEach((guide, index) => {
+    const saved = states[index]?.practice;
+    const evaluations = saved?.progress?.evaluations || {};
+    (saved?.problems || []).forEach((problem, problemIndex) => {
+      if (evaluations[problemIndex]?.status !== 'correct') practiceItems.push({ kind: 'practice', guideId: guide.id, guideTitle: guide.title, problemIndex, problem, progress: saved.progress || {} });
+    });
+  });
   const problems = practice.reduce((sum, item) => sum + item.open, 0);
   const minutes = Math.max(1, Math.round(cards.length * 0.25 + misses.length * 0.5 + problems * 2));
   return {
@@ -53,6 +62,7 @@ export async function loadStudyQueue({ practiceGuides = 5 } = {}) {
     cardTotal: cards.length,
     misses,
     practice,
+    practiceItems: practiceItems.slice(0, 5),
     problems,
     minutes: cards.length || misses.length || problems ? minutes : 0,
   };

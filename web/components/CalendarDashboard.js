@@ -1,29 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Bell, BellOff, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, ExternalLink, RefreshCw, Unlink } from 'lucide-react';
+import { useRouter } from 'next/router';
+import { Bell, BellOff, BookOpen, CalendarCheck, ChevronLeft, ChevronRight, ExternalLink, GraduationCap, RefreshCw, Unlink, X } from 'lucide-react';
 import { apiErrorMessage, apiFetch, getUserId } from '../lib/api';
+import { dueLabel, folderForCode, splitTitle } from '../lib/calendarItems';
+import { openNewSheet } from '../lib/newSheet';
 import { walkthroughEvent } from '../lib/walkthrough';
+import ConfirmDialog from './ConfirmDialog';
+import Menu from './Menu';
+import { Sheet } from './Overlay';
+import StepGuide from './StepGuide';
+import { CanvasCalendarFeed, CanvasCalendarNav, CanvasFeedLink } from './Illustrations';
 
-const FEED_KEY = 'cordiaCanvasCalendarFeed';
+const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const REMINDER_KEY = 'cordiaCalendarReminders';
-
-function accountKey(key, userId) {
-  return userId ? `${key}:${userId}` : '';
-}
+const MAX_PER_DAY = 4;
+const KIND_LABEL = { exam: 'Exam', quiz: 'Quiz', project: 'Project', assignment: 'Assignment', event: 'Event', discussion: 'Discussion' };
 
 function dateValue(item) {
   const value = new Date(item?.due_at || '').getTime();
   return Number.isNaN(value) ? Number.MAX_SAFE_INTEGER : value;
-}
-
-function dueLabel(item) {
-  const date = new Date(item?.due_at || '');
-  if (Number.isNaN(date.getTime())) return 'Date unavailable';
-  const today = new Date();
-  if (date.toDateString() === today.toDateString()) {
-    return item.all_day ? 'Due today' : `Due today at ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-  }
-  return date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
-    + (item.all_day ? '' : ` · ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
 }
 
 function startOfWeek(date) {
@@ -38,317 +33,282 @@ function addDays(date, days) {
   return next;
 }
 
-// "Today" is the student's local day, not the server's UTC day.
-function localDueToday(items) {
-  const today = new Date().toDateString();
-  return items.filter(item => new Date(item?.due_at || '').toDateString() === today);
-}
-
 function timeLabel(item) {
-  if (item.all_day) return 'All day';
-  return new Date(item.due_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return item.all_day ? 'All day' : new Date(item.due_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-function weekSummary(items) {
-  const tests = items.filter(item => item.type === 'exam' || item.type === 'quiz').length;
-  return `${items.length} due${tests ? ` · ${tests} ${tests === 1 ? 'test' : 'tests'}` : ''}`;
+function kindTag(type) {
+  return type === 'exam' || type === 'quiz' ? 'exam' : type === 'project' ? 'project' : type === 'event' ? 'event' : 'assignment';
 }
 
 function notifyDueToday(items, userId) {
-  const reminderKey = accountKey(REMINDER_KEY, userId);
-  if (typeof window === 'undefined' || !reminderKey || !('Notification' in window) || localStorage.getItem(reminderKey) !== 'on' || Notification.permission !== 'granted') return;
-  items.forEach(item => {
-    const key = `cordiaCalendarNotified:${userId}:${item.id}:${new Date().toDateString()}`;
-    if (localStorage.getItem(key)) return;
-    new Notification('Due today in Canvas', { body: item.title, tag: key });
-    localStorage.setItem(key, '1');
+  const key = userId ? `${REMINDER_KEY}:${userId}` : '';
+  if (typeof window === 'undefined' || !key || !('Notification' in window) || localStorage.getItem(key) !== 'on' || Notification.permission !== 'granted') return;
+  const today = new Date().toDateString();
+  items.filter(item => new Date(item.due_at).toDateString() === today).forEach(item => {
+    const seen = `cordiaCalendarNotified:${userId}:${item.id}:${today}`;
+    if (localStorage.getItem(seen)) return;
+    new Notification('Due today', { body: splitTitle(item).title, tag: seen });
+    localStorage.setItem(seen, '1');
   });
 }
 
-export default function CalendarDashboard({ compact = false, onOpenCalendar = () => {} }) {
+// One event: its class chip, kind, time, Study and Open in Canvas.
+function EventSheet({ item, folders, onClose }) {
+  const router = useRouter();
+  const { title, code } = splitTitle(item);
+  const folder = folderForCode(folders, code);
+  return (
+    <Sheet onClose={onClose} labelledBy="event-title" className="cal-sheet">
+      <header className="c-sheet-head">
+        <h2 id="event-title" className="cal-sheet-title">{title}</h2>
+        <button type="button" className="c-icon-btn" onClick={onClose} aria-label="Close" title="Close"><X {...ICON} /></button>
+      </header>
+      <div className="cal-sheet-meta">
+        {code && <span className="class-chip">{code}</span>}
+        <span className={`cal-kind cal-kind-${kindTag(item.type)}`}>{KIND_LABEL[item.type] || 'Due'}</span>
+        <span className="cal-sheet-when">{dueLabel(item)}</span>
+      </div>
+      <div className="cal-sheet-actions">
+        <button type="button" className="c-btn c-btn--primary" onClick={() => { onClose(); if (folder) router.push('/folder/' + folder.id); else openNewSheet(); }}><BookOpen {...ICON} />Study</button>
+        {item.url && <a className="c-btn c-btn--secondary" href={item.url} target="_blank" rel="noreferrer"><ExternalLink {...ICON} />Open in Canvas</a>}
+      </div>
+    </Sheet>
+  );
+}
+
+function EventButton({ item, onPick, wide = false }) {
+  const { title, code } = splitTitle(item);
+  const past = dateValue(item) < Date.now() && new Date(item.due_at).toDateString() !== new Date().toDateString();
+  return (
+    <button type="button" className={'cal-item' + (past ? ' is-past' : '') + (wide ? ' is-wide' : '')} onClick={() => onPick(item)}>
+      <span className="cal-item-top">
+        <span className={`cal-kind cal-kind-${kindTag(item.type)}`}>{KIND_LABEL[item.type] || 'Due'}</span>
+        <span className="cal-item-time">{timeLabel(item)}</span>
+      </span>
+      <span className="cal-item-title">{title}</span>
+      {code && <span className="class-chip">{code}</span>}
+    </button>
+  );
+}
+
+function DaySheet({ day, items, onPick, onClose }) {
+  const label = day.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+  return (
+    <Sheet onClose={onClose} labelledBy="day-title" className="cal-sheet">
+      <header className="c-sheet-head">
+        <h2 id="day-title" className="cal-sheet-title">{label}</h2>
+        <button type="button" className="c-icon-btn" onClick={onClose} aria-label="Close" title="Close"><X {...ICON} /></button>
+      </header>
+      <ul className="cal-day-list">
+        {items.map(item => <li key={item.id}><EventButton item={item} onPick={onPick} wide /></li>)}
+      </ul>
+    </Sheet>
+  );
+}
+
+// The calendar feed connect guide: show the real screens, then the field.
+function ConnectGuide({ onConnected }) {
+  const [canvasUrl, setCanvasUrl] = useState('');
   const [feedUrl, setFeedUrl] = useState('');
-  const [connected, setConnected] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [found, setFound] = useState(null);
+  const [error, setError] = useState('');
+  const valid = /^https:\/\/\S+\.ics(\?\S*)?$/i.test(feedUrl.trim());
+  const host = (() => {
+    const text = canvasUrl.trim();
+    if (!text) return '';
+    try { return new URL(text.includes('://') ? text : 'https://' + text).origin; } catch { return ''; }
+  })();
+
+  async function connect(event) {
+    event.preventDefault();
+    if (!valid || checking) return;
+    setChecking(true);
+    setError('');
+    const data = await apiFetch('/calendar/connection', { method: 'POST', body: JSON.stringify({ url: feedUrl.trim() }) });
+    setChecking(false);
+    if (data?.connected && Array.isArray(data.items)) {
+      walkthroughEvent('calendar-connected');
+      setFound(data.items.length);
+      setTimeout(() => onConnected(data), 1200);
+    } else {
+      setError(apiErrorMessage(data?.detail, "That link didn't work. Copy the Calendar Feed link again."));
+    }
+  }
+
+  return (
+    <div className="cal-connect">
+      <StepGuide label="Connect your Canvas calendar" steps={[
+        {
+          visual: <CanvasCalendarNav />,
+          text: 'Open your Canvas Calendar.',
+          action: (
+            <form className="cal-open" onSubmit={event => { event.preventDefault(); if (host) window.open(host + '/calendar', '_blank', 'noopener,noreferrer'); }}>
+              <input className="c-input" value={canvasUrl} onChange={event => setCanvasUrl(event.target.value)} placeholder="school.instructure.com" aria-label="Your Canvas address" inputMode="url" />
+              <button type="submit" className="c-btn c-btn--secondary" disabled={!host}><ExternalLink {...ICON} />Open Canvas Calendar</button>
+            </form>
+          ),
+        },
+        { visual: <CanvasCalendarFeed />, text: 'In the right sidebar, click Calendar Feed.' },
+        { visual: <CanvasFeedLink />, text: 'Copy the link ending in .ics.' },
+      ]} />
+      <form className="c-card cal-form" onSubmit={connect}>
+        <label className="c-field cal-field">
+          <span>Calendar Feed link</span>
+          <input className="c-input" type="url" value={feedUrl} onChange={event => { setFeedUrl(event.target.value); setError(''); }} placeholder="https://…/feeds/calendars/….ics" data-spot="calendar-feed" aria-invalid={Boolean(feedUrl.trim()) && !valid} />
+        </label>
+        <button type="submit" className="c-btn c-btn--primary" disabled={!valid || checking}>{checking ? 'Checking…' : 'Connect'}</button>
+        {feedUrl.trim() && !valid && <p className="cal-hint" role="status">Use the https link that ends in .ics</p>}
+        {found !== null && <p className="cal-found" role="status"><CalendarCheck {...ICON} />Found {found} {found === 1 ? 'assignment' : 'assignments'}</p>}
+        {error && <p className="cal-error" role="alert">{error}</p>}
+      </form>
+      <section className="cal-gets" aria-labelledby="cal-gets-title">
+        <h2 id="cal-gets-title" className="c-section-title">What you get</h2>
+        <ul>
+          <li><CalendarCheck {...ICON} />Deadlines on Today</li>
+          <li><Bell {...ICON} />Reminders</li>
+          <li><GraduationCap {...ICON} />Exam study plans</li>
+        </ul>
+      </section>
+    </div>
+  );
+}
+
+export default function CalendarDashboard() {
+  const [connected, setConnected] = useState(null);
   const [items, setItems] = useState([]);
-  const [dueToday, setDueToday] = useState([]);
+  const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [reminders, setReminders] = useState(false);
   const [userId, setUserId] = useState('');
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [view, setView] = useState('week');
+  const [picked, setPicked] = useState(null);
+  const [dayOpen, setDayOpen] = useState(null);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     const accountId = getUserId();
-    const feedKey = accountKey(FEED_KEY, accountId);
-    const reminderKey = accountKey(REMINDER_KEY, accountId);
-
-    // Legacy keys were shared by every account in one browser. Never attach
-    // that feed URL to a different signed-in user.
-    localStorage.removeItem(FEED_KEY);
-    localStorage.removeItem(REMINDER_KEY);
-
     setUserId(accountId);
-    const saved = feedKey ? localStorage.getItem(feedKey) || '' : '';
-    setFeedUrl(saved);
-    setReminders(Boolean(reminderKey && localStorage.getItem(reminderKey) === 'on'));
-    if (saved) {
-      connect(saved, accountId);
-    } else {
-      refresh(accountId);
-    }
+    setReminders(Boolean(accountId && localStorage.getItem(`${REMINDER_KEY}:${accountId}`) === 'on'));
+    try { const saved = localStorage.getItem('cordiaCalendarView'); if (saved === 'list' || saved === 'week') setView(saved); } catch { /* optional */ }
+    apiFetch('/folders').then(data => setFolders(data?.folders || []));
+    refresh(accountId);
   }, []);
 
-  function applyCalendar(data, accountId) {
-    if (!data?.connected || !Array.isArray(data.items)) return false;
+  function apply(data, accountId = userId) {
     setConnected(true);
-    const today = localDueToday(data.items);
     setItems(data.items);
-    setDueToday(today);
-    notifyDueToday(today, accountId);
-    return true;
-  }
-
-  async function connect(url, accountId = userId) {
-    if (!url || !accountId) return;
-    setLoading(true);
-    setError('');
-    const data = await apiFetch('/calendar/connection', {
-      method: 'POST',
-      body: JSON.stringify({ url }),
-    });
-    if (applyCalendar(data, accountId)) {
-      walkthroughEvent('calendar-connected');
-      const feedKey = accountKey(FEED_KEY, accountId);
-      if (feedKey) localStorage.removeItem(feedKey);
-      setFeedUrl('');
-    } else {
-      setError(apiErrorMessage(data?.detail, 'Classroom could not read this calendar feed.'));
-    }
-    setLoading(false);
+    notifyDueToday(data.items, accountId);
   }
 
   async function refresh(accountId = userId) {
-    if (!accountId) return;
     setLoading(true);
     setError('');
     const data = await apiFetch('/calendar/connection');
-    if (data?.connected === false) {
-      setConnected(false);
-    } else if (!applyCalendar(data, accountId)) {
-      setError(apiErrorMessage(data?.detail, 'Classroom could not refresh this calendar feed.'));
-    }
     setLoading(false);
+    if (data?.connected === false) setConnected(false);
+    else if (data?.connected && Array.isArray(data.items)) apply(data, accountId);
+    else { setConnected(current => current ?? false); setError(apiErrorMessage(data?.detail, "Couldn't refresh the calendar.")); }
   }
 
   async function disconnect() {
-    setLoading(true);
-    setError('');
+    setConfirming(false);
     const data = await apiFetch('/calendar/connection', { method: 'DELETE' });
-    if (data?.connected !== false) {
-      setError(apiErrorMessage(data?.detail, 'Classroom could not disconnect this calendar.'));
-      setLoading(false);
-      return;
-    }
-    const feedKey = accountKey(FEED_KEY, userId);
-    if (feedKey) localStorage.removeItem(feedKey);
+    if (data?.connected !== false) { setError(apiErrorMessage(data?.detail, "Couldn't disconnect.")); return; }
     setConnected(false);
-    setFeedUrl('');
     setItems([]);
-    setDueToday([]);
-    setLoading(false);
   }
 
   async function toggleReminders() {
-    const reminderKey = accountKey(REMINDER_KEY, userId);
-    if (!reminderKey) {
-      setError('Sign in again before enabling reminders.');
-      return;
-    }
-    if (reminders) {
-      localStorage.removeItem(reminderKey);
-      setReminders(false);
-      return;
-    }
-    if (!('Notification' in window)) {
-      setError('This browser does not support desktop reminders. Your dashboard reminders will still work.');
-      return;
-    }
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      setError('Desktop reminders were not allowed. You can still review deadlines on this dashboard.');
-      return;
-    }
-    localStorage.setItem(reminderKey, 'on');
+    const key = `${REMINDER_KEY}:${userId}`;
+    if (reminders) { localStorage.removeItem(key); setReminders(false); return; }
+    if (!('Notification' in window)) { setError("This browser can't show reminders."); return; }
+    if (await Notification.requestPermission() !== 'granted') { setError('Reminders are blocked in this browser.'); return; }
+    localStorage.setItem(key, 'on');
     setReminders(true);
-    notifyDueToday(dueToday, userId);
+    notifyDueToday(items, userId);
   }
 
-  if (!connected) {
-    if (compact) {
-      return (
-        <section className="compact-calendar">
-          <header><h2>Due soon</h2></header>
-          {error && <div className="compact-calendar-error" role="alert">{error}</div>}
-          <button type="button" onClick={onOpenCalendar}>Connect</button>
-          <CompactStyles />
-        </section>
-      );
-    }
-    const steps = [
-      { label: 'Open Canvas', icon: ExternalLink },
-      { label: 'Copy link', icon: ClipboardCopy },
-      { label: 'Paste here', icon: ClipboardPaste },
-    ];
-    return (
-      <section className="c-card cal-connect" aria-label="Connect Canvas calendar">
-        <ol className="cal-steps">
-          {steps.map((step, index) => (
-            <li key={step.label}>
-              <span className="cal-step-num" aria-hidden="true">{index + 1}</span>
-              <step.icon size={24} strokeWidth={1.75} aria-hidden="true" />
-              <span>{step.label}</span>
-            </li>
-          ))}
-        </ol>
-        <form className="cal-form" onSubmit={event => { event.preventDefault(); if (feedUrl.trim()) connect(feedUrl.trim()); }}>
-          <label className="c-field cal-field">
-            <span>Calendar feed link</span>
-            <input className="c-input" type="url" value={feedUrl} onChange={event => setFeedUrl(event.target.value)} placeholder="https://" data-spot="calendar-feed" />
-          </label>
-          <button type="submit" className="c-btn c-btn--primary" disabled={loading || !feedUrl.trim()}>{loading ? 'Checking…' : 'Connect'}</button>
-        </form>
-        {error && <div className="canvas-inline-error" role="alert">{error}</div>}
-        <style jsx>{`
-          .cal-connect { display: grid; gap: 24px; padding: 28px; }
-          .cal-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-          .cal-steps li { display: grid; justify-items: center; gap: 10px; padding: 20px 12px; border-radius: var(--r-card); background: var(--card-sunk); font: 600 15px/1.2 var(--font-sans); text-align: center; }
-          .cal-steps :global(.lucide) { color: currentColor; }
-          .cal-step-num { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 700 13px/1 var(--font-sans); }
-          .cal-form { display: flex; align-items: flex-end; gap: 8px; }
-          .cal-field { flex: 1; }
-          @media (max-width: 767px) { .cal-steps { grid-template-columns: 1fr; } .cal-steps li { grid-template-columns: auto auto 1fr; justify-items: start; align-items: center; padding: 14px; } .cal-form { flex-direction: column; align-items: stretch; } }
-        `}</style>
-      </section>
-    );
+  function changeView(next) {
+    setView(next);
+    try { localStorage.setItem('cordiaCalendarView', next); } catch { /* optional */ }
   }
 
-  const todayIds = new Set(dueToday.map(item => item.id));
-  const upcoming = items
-    .filter(item => !todayIds.has(item.id) && dateValue(item) >= Date.now())
-    .sort((a, b) => dateValue(a) - dateValue(b))
-    .slice(0, 10);
-
-  if (compact) {
-    const agenda = [...dueToday, ...upcoming]
-      .sort((left, right) => dateValue(left) - dateValue(right))
-      .slice(0, 3);
-    return (
-      <section className="compact-calendar">
-        <header>
-          <h2>Due soon</h2>
-          <button type="button" className="compact-calendar-link" onClick={onOpenCalendar}>Calendar</button>
-        </header>
-        {error && <div className="compact-calendar-error" role="alert">{error}</div>}
-        <div className="compact-agenda">
-          {agenda.length ? agenda.map(item => (
-            <a key={item.id} href={item.url || undefined} target={item.url ? '_blank' : undefined} rel={item.url ? 'noreferrer' : undefined}>
-              <span className="compact-date">{dueLabel(item)}</span>
-              <strong>{item.title}</strong>
-              <small>{item.course || 'Canvas'}</small>
-            </a>
-          )) : <p>0 due</p>}
-        </div>
-        <CompactStyles />
-      </section>
-    );
-  }
+  if (connected === null) return <div className="c-skeleton" style={{ height: 420, borderRadius: 20 }} />;
+  if (!connected) return <ConnectGuide onConnected={data => apply(data)} />;
 
   const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
   const weekEnd = addDays(weekStart, 7).getTime();
-  const weekItems = items
-    .filter(item => dateValue(item) >= weekStart.getTime() && dateValue(item) < weekEnd)
-    .sort((a, b) => dateValue(a) - dateValue(b));
+  const sorted = [...items].sort((a, b) => dateValue(a) - dateValue(b));
+  const weekItems = sorted.filter(item => dateValue(item) >= weekStart.getTime() && dateValue(item) < weekEnd);
   const todayKey = new Date().toDateString();
   const rangeLabel = `${days[0].toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${days[6].toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+  const upcoming = sorted.filter(item => dateValue(item) >= new Date(new Date().setHours(0, 0, 0, 0)).getTime());
+  const listDays = [...new Set(upcoming.map(item => new Date(item.due_at).toDateString()))];
 
-  function itemCard(item) {
-    const past = dateValue(item) < Date.now() && new Date(item.due_at).toDateString() !== todayKey;
-    const body = (
-      <>
-        <span className="calendar-item-meta">
-          <span className={`calendar-kind calendar-kind-${item.type}`}>{item.type}</span>
-          <small>{timeLabel(item)}</small>
-        </span>
-        <strong>{item.title}</strong>
-        {item.course && <small>{item.course}</small>}
-      </>
-    );
-    const className = `calendar-item${past ? ' calendar-item-past' : ''}`;
-    return item.url
-      ? <a key={item.id} className={className} href={item.url} target="_blank" rel="noreferrer" title={`Open in Canvas: ${item.title}`}>{body}</a>
-      : <div key={item.id} className={className}>{body}</div>;
-  }
-
-  const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
   return (
-    <section className="calendar-dashboard">
+    <section className="cal">
       <header className="cal-head">
-        <div className="c-row">
-          <button type="button" className="c-icon-btn" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week"><ChevronLeft {...ICON} /></button>
-          <h2 className="c-section-title">{rangeLabel}</h2>
-          <button type="button" className="c-icon-btn" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week"><ChevronRight {...ICON} /></button>
-          <span className="c-meta">{weekSummary(weekItems)}</span>
+        <div className="cal-range">
+          <button type="button" className="c-icon-btn" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week" title="Previous week" disabled={view === 'list'}><ChevronLeft {...ICON} /></button>
+          <h2 className="c-section-title">{view === 'list' ? 'Upcoming' : rangeLabel}</h2>
+          <button type="button" className="c-icon-btn" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week" title="Next week" disabled={view === 'list'}><ChevronRight {...ICON} /></button>
+          {view === 'week' && weekStart.toDateString() !== startOfWeek(new Date()).toDateString() && (
+            <button type="button" className="c-btn c-btn--quiet" onClick={() => setWeekStart(startOfWeek(new Date()))}>This week</button>
+          )}
         </div>
-        <div className="c-row c-row--wrap">
-          <button type="button" className="c-btn c-btn--quiet" onClick={() => setWeekStart(startOfWeek(new Date()))}>This week</button>
-          <button type="button" className="c-btn c-btn--secondary" onClick={toggleReminders} aria-pressed={reminders}>{reminders ? <Bell {...ICON} /> : <BellOff {...ICON} />}Reminders</button>
-          <button type="button" className="c-icon-btn" onClick={() => refresh()} disabled={loading} aria-label="Refresh"><RefreshCw {...ICON} /></button>
-          <button type="button" className="c-icon-btn" onClick={disconnect} aria-label="Disconnect calendar"><Unlink {...ICON} /></button>
+        <div className="cal-tools">
+          <div className="c-seg" role="tablist" aria-label="View">
+            <button type="button" role="tab" aria-selected={view === 'week'} className={view === 'week' ? 'is-active' : ''} onClick={() => changeView('week')}>Week</button>
+            <button type="button" role="tab" aria-selected={view === 'list'} className={view === 'list' ? 'is-active' : ''} onClick={() => changeView('list')}>List</button>
+          </div>
+          <button type="button" className="c-icon-btn" onClick={toggleReminders} aria-pressed={reminders} aria-label={reminders ? 'Reminders on' : 'Reminders off'} title={reminders ? 'Reminders on' : 'Reminders off'}>{reminders ? <Bell {...ICON} /> : <BellOff {...ICON} />}</button>
+          <button type="button" className="c-icon-btn" onClick={() => refresh()} disabled={loading} aria-label="Refresh" title="Refresh"><RefreshCw {...ICON} /></button>
+          <Menu label="Calendar options" items={[{ label: 'Disconnect', icon: Unlink, danger: true, onSelect: () => setConfirming(true) }]} />
         </div>
-        <style jsx>{`
-          .cal-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-        `}</style>
       </header>
-      {error && <div className="canvas-inline-error" role="alert">{error}</div>}
-      <div className="calendar-week">
-        {days.map(day => {
-          const dayItems = weekItems.filter(item => new Date(item.due_at).toDateString() === day.toDateString());
-          const isToday = day.toDateString() === todayKey;
-          return (
-            <section key={day.toISOString()} className={`calendar-day${isToday ? ' calendar-day-today' : ''}`} aria-label={day.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}>
-              <header>
-                <span>{day.toLocaleDateString([], { weekday: 'short' })}</span>
-                <strong>{day.getDate()}</strong>
-                {isToday && <em>Today</em>}
-              </header>
-              <div className="calendar-day-items">
-                {dayItems.length ? dayItems.map(itemCard) : <p className="calendar-day-empty" aria-label="Nothing due">–</p>}
+      {error && <p className="cal-error" role="alert">{error}</p>}
+
+      {view === 'week' ? (
+        <div className="cal-week">
+          {days.map(day => {
+            const dayItems = weekItems.filter(item => new Date(item.due_at).toDateString() === day.toDateString());
+            const isToday = day.toDateString() === todayKey;
+            return (
+              <section key={day.toISOString()} className={'cal-day' + (isToday ? ' is-today' : '')} aria-label={day.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}>
+                <header className="cal-day-head">
+                  <span>{day.toLocaleDateString([], { weekday: 'short' })}</span>
+                  <strong>{day.getDate()}</strong>
+                </header>
+                <div className="cal-day-items">
+                  {dayItems.slice(0, MAX_PER_DAY).map(item => <EventButton key={item.id} item={item} onPick={setPicked} />)}
+                  {dayItems.length > MAX_PER_DAY && (
+                    <button type="button" className="c-btn c-btn--quiet cal-more" data-qa="calendar-more" onClick={() => setDayOpen({ day, items: dayItems })}>+{dayItems.length - MAX_PER_DAY} more</button>
+                  )}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="cal-list">
+          {listDays.length ? listDays.map(key => (
+            <section key={key} className="c-card cal-list-day" aria-label={key}>
+              <h3 className={'cal-list-date' + (key === todayKey ? ' is-today' : '')}>{dueLabel({ due_at: new Date(key).toISOString(), all_day: true })}</h3>
+              <div className="cal-list-items">
+                {upcoming.filter(item => new Date(item.due_at).toDateString() === key).map(item => <EventButton key={item.id} item={item} onPick={setPicked} wide />)}
               </div>
             </section>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
+          )) : <p className="cal-empty">Nothing due</p>}
+        </div>
+      )}
 
-function CompactStyles() {
-  return (
-    <style jsx global>{`
-      .compact-calendar { display: flex; min-width: 0; min-height: 255px; flex-direction: column; padding: 26px; border: 1px solid var(--border-default); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow-md); }
-      .compact-calendar header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-      .compact-eyebrow { color: var(--accent); font-size: 13px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-      .compact-calendar h2 { margin: 5px 0 0; font-size: 1.45rem; letter-spacing: -.04em; }
-      .compact-calendar > p, .compact-agenda > p { margin: 18px 0; color: var(--text-muted); line-height: 1.55; }
-      .compact-calendar > button { align-self: flex-start; margin-top: auto; padding: 10px 14px; border: 1px solid var(--border-default); border-radius: 12px; color: var(--ink); background: var(--bg-hover); font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
-      .compact-calendar-mark { display: grid; width: 43px; height: 43px; flex: 0 0 auto; place-items: center; border-radius: 12px; color: var(--accent); background: var(--bg-hover); font-weight: 850; }
-      .compact-calendar-link { flex: 0 0 auto; padding: 0; border: 0; color: var(--accent); background: transparent; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
-      .compact-agenda { display: grid; margin-top: 13px; }
-      .compact-agenda a { display: grid; min-width: 0; gap: 2px; padding: 11px 0; border-top: 1px solid var(--border-default); color: var(--ink); text-decoration: none; }
-      .compact-agenda strong { overflow: hidden; font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }
-      .compact-agenda small { overflow: hidden; color: var(--text-muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-      .compact-date { color: var(--accent); font-size: 13px; font-weight: 750; }
-      .compact-calendar-error { margin-top: 12px; color: var(--error); font-size: 13px; line-height: 1.4; }
-      @media (max-width: 620px) { .compact-calendar { min-height: 0; border-radius: 20px; padding: 22px; } }
-    `}</style>
+      {picked && <EventSheet item={picked} folders={folders} onClose={() => setPicked(null)} />}
+      {dayOpen && <DaySheet day={dayOpen.day} items={dayOpen.items} onPick={item => { setDayOpen(null); setPicked(item); }} onClose={() => setDayOpen(null)} />}
+      {confirming && <ConfirmDialog title="Disconnect Calendar?" message="Deadlines leave Today and Calendar." confirmLabel="Disconnect" onConfirm={disconnect} onCancel={() => setConfirming(false)} />}
+    </section>
   );
 }

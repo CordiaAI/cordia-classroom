@@ -9,6 +9,7 @@ import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
 import SearchModal from './SearchModal';
 import HelpSheet from './HelpSheet';
+import { Popover } from './Overlay';
 import { openNewSheet } from '../lib/newSheet';
 
 // One navigation: the same five places on the glass top bar and the mobile tab bar.
@@ -77,15 +78,7 @@ export default function Sidebar() {
   }, []);
 
   useEffect(() => {
-    if (!menuOpen) return;
-    menuRef.current?.querySelector('[role="menuitem"]')?.focus();
-    function close(event) {
-      if (event.type === 'keydown' && event.key === 'Escape') { setMenuOpen(false); avatarRef.current?.focus(); }
-      if (event.type === 'mousedown' && menuRef.current && !menuRef.current.contains(event.target) && !avatarRef.current.contains(event.target)) setMenuOpen(false);
-    }
-    document.addEventListener('keydown', close);
-    document.addEventListener('mousedown', close);
-    return () => { document.removeEventListener('keydown', close); document.removeEventListener('mousedown', close); };
+    if (menuOpen) requestAnimationFrame(() => menuRef.current?.querySelector('[role="menuitem"]')?.focus());
   }, [menuOpen]);
 
   useEffect(() => {
@@ -95,7 +88,7 @@ export default function Sidebar() {
   }, [router.events]);
 
   function menuKeys(event) {
-    const items = [...menuRef.current.querySelectorAll('[role="menuitem"]')];
+    const items = [...event.currentTarget.querySelectorAll('[role="menuitem"]')];
     const index = items.indexOf(document.activeElement);
     if (event.key === 'ArrowDown') { event.preventDefault(); items[(index + 1) % items.length]?.focus(); }
     if (event.key === 'ArrowUp') { event.preventDefault(); items[(index - 1 + items.length) % items.length]?.focus(); }
@@ -153,8 +146,8 @@ export default function Sidebar() {
             <button ref={avatarRef} type="button" className={'c-avatar' + (onProfile ? ' is-active' : '')} onClick={() => setMenuOpen(open => !open)} aria-expanded={menuOpen} aria-haspopup="menu" aria-label={initials ? `${initials} account menu` : 'Account menu'}>
               {initials || <User size={20} strokeWidth={1.75} aria-hidden="true" />}
             </button>
-            {menuOpen && (
-              <div ref={menuRef} className="c-menu c-account-menu" role="menu" aria-label="Account" onKeyDown={menuKeys}>
+            <Popover open={menuOpen} onClose={() => setMenuOpen(false)} anchorRef={avatarRef} className="c-account-menu" label="Account" onKeyDown={menuKeys}>
+              <div ref={menuRef} className="c-account-items">
                 <button type="button" role="menuitem" onClick={() => go('/settings')}><User size={20} strokeWidth={1.75} aria-hidden="true" />Profile</button>
                 <button type="button" role="menuitem" onClick={() => go('/settings?section=appearance')}><Palette size={20} strokeWidth={1.75} aria-hidden="true" />Appearance</button>
                 <button type="button" role="menuitem" onClick={() => go('/install-extension')}><Puzzle size={20} strokeWidth={1.75} aria-hidden="true" />Chrome extension</button>
@@ -163,7 +156,7 @@ export default function Sidebar() {
                 <hr />
                 <button type="button" role="menuitem" onClick={signOut}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" />Sign out</button>
               </div>
-            )}
+            </Popover>
           </div>
         </div>
       </header>
@@ -192,7 +185,7 @@ export default function Sidebar() {
       )}
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
       <style jsx>{`
-        .c-account-menu { right: 0; top: 48px; }
+        :global(.c-account-items) { display: grid; }
       `}</style>
     </>
   );
