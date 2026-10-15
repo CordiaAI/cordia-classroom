@@ -353,7 +353,7 @@ export default function LibraryPage() {
         :global(.lib-row-link:hover .lib-row-title) { text-decoration: underline; }
         .lib-row-title, :global(.lib-row-title) { font: 600 17px/1.3 var(--font-display); min-width: 0; }
         .lib-rename { flex: 1; min-width: 0; }
-        .lib-star.is-on { color: var(--warning); }
+        .lib-star.is-on { color: var(--olive-ink); }
         .lib-empty-group { padding: 8px 16px 14px; margin: 0; }
         @media (max-width: 767px) { :global(.lib-row-link) { flex-direction: column; gap: 2px; } }
       `}</style>

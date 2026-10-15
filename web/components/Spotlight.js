@@ -61,6 +61,11 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
     else { labelStyle = { top: hole.top - 14, left: centerX, transform: 'translate(-50%, -100%)' }; arrow = 'down'; }
   }
 
+  // Skip sits bottom-right on desktop and top-right on phones, and moves left if
+  // it would cover the spotlighted control.
+  const phone = vw < 768;
+  const skipLeft = hole && (phone ? hole.top < 72 && hole.right > vw - 140 : hole.bottom > vh - 84 && hole.right > vw - 160);
+
   const dots = (
     <span className="spot-dots" aria-label={`${index + 1} of ${total}`}>
       {Array.from({ length: total }, (_, dot) => <i key={dot} className={dot < index ? 'is-done' : dot === index ? 'is-now' : ''} />)}
@@ -87,7 +92,7 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
           {finishable && <button type="button" className="c-btn c-btn--quiet spot-finish" onClick={onFinish}>Done</button>}
         </div>
       )}
-      <button type="button" className="spot-skip" onClick={onSkip}>Skip</button>
+      <button type="button" className={'spot-skip' + (skipLeft ? ' is-left' : '')} onClick={onSkip}>Skip</button>
 
       <style jsx>{`
         .spot { position: fixed; inset: 0; z-index: 400; pointer-events: none; }
@@ -118,6 +123,8 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
           background: var(--glass); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
           color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer;
         }
+        .spot-skip.is-left { right: auto; left: 12px; }
+        @media (min-width: 768px) { .spot-skip { top: auto; bottom: 24px; right: 24px; } .spot-skip.is-left { left: 24px; } }
         .spot-finish { height: 36px; min-height: 36px; }
         @keyframes spot-in { from { opacity: 0; } to { opacity: 1; } }
         @media (max-width: 767px) { .spot-dots i { display: none; } .spot-dots .c-meta { margin-left: 0; } .spot-label { font-size: 15px; } }

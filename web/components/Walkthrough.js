@@ -39,7 +39,7 @@ export default function Walkthrough() {
   const [coarse, setCoarse] = useState(false);
 
   useEffect(() => {
-    setCoarse(window.matchMedia('(pointer: coarse)').matches);
+    setCoarse(window.matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && window.innerWidth < 768));
   }, []);
 
   function finish(status) {

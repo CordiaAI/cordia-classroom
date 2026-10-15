@@ -35,7 +35,7 @@ export default function MissionPage() {
   return (
     <div className="fade-in" style={{ maxWidth: 760 }}>
       <h2 style={{ marginBottom: 4 }}>CordiaClassroom Features</h2>
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.92em', marginBottom: 28, lineHeight: 1.6 }}>
+      <p style={{ color: 'var(--text-muted)', fontSize: 15, marginBottom: 28, lineHeight: 1.6 }}>
         CordiaClassroom was built by a college student, for college students. Our mission is to make studying smarter, faster, and more accessible for every student — regardless of major or learning style.
       </p>
 
@@ -51,17 +51,17 @@ export default function MissionPage() {
               {f.title}
             </h3>
             {f.subtitle && (
-              <span style={{ fontSize: '0.78em', color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 {f.subtitle}
               </span>
             )}
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.88em', lineHeight: 1.6, marginTop: 8 }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 15, lineHeight: 1.6, marginTop: 8 }}>
               {f.description}
             </p>
           </div>
         ))}
       </div>
-      <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85em', marginTop: 24, fontStyle: 'italic' }}>
+      <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 15, marginTop: 24, fontStyle: 'italic' }}>
         Founder - Jackson Laughlin
       </p>
     </div>

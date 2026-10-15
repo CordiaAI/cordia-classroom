@@ -171,7 +171,7 @@ export default function Today({ timerState, setTimerState }) {
         <section className="c-section" aria-labelledby="continue-title">
           <h2 id="continue-title" className="c-section-title">Continue</h2>
           <Link href={continueHref} className="c-card today-continue">
-            <ProgressRing value={continueGuide.read_progress} size={44} />
+            <ProgressRing value={continueGuide.read_progress} size={40} label={false} />
             <span className="today-continue-title c-truncate">{continueGuide.title}</span>
             <span className="c-meta">{Math.round((continueGuide.read_progress || 0) * 100)}%</span>
             <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
@@ -220,7 +220,7 @@ export default function Today({ timerState, setTimerState }) {
 
       <style jsx>{`
         .today-streak { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: var(--r-pill); background: var(--card); border: 1px solid var(--line); font: 600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
-        .today-streak :global(.lucide) { color: var(--warning); }
+        .today-streak :global(.lucide) { color: var(--ink); }
         .today-streak :global(.today-freeze) { color: var(--olive-ink); }
         .today-tool-wrap { position: relative; display: grid; }
         .today-dot { position: absolute; top: 8px; right: 8px; }

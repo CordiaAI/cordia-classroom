@@ -7,9 +7,11 @@ const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 
 const mark = read('web', 'components', 'AcademicInfinityMark.js');
 const styles = read('web', 'styles', 'globals.css');
+const system = read('web', 'styles', 'system.css');
 const sidebar = read('web', 'components', 'Sidebar.js');
 const dashboard = read('web', 'pages', 'dashboard.js');
 const login = read('web', 'pages', 'index.js');
+const publicPage = read('web', 'components', 'PublicPage.js');
 const install = read('web', 'pages', 'install-extension.js');
 const documentPage = read('web', 'pages', '_document.js');
 const appPage = read('web', 'pages', '_app.js');
@@ -21,13 +23,20 @@ for (const token of ['--canvas:', '--surface:', '--ink:', '--olive:']) {
   assert.ok(styles.includes(token), `missing visual token ${token}`);
 }
 assert.match(styles, /prefers-reduced-motion/);
-assert.match(sidebar, /label: 'SmartNotes'/);
-assert.match(sidebar, /label: 'Notes', href: '\/smartnotes'/);
-for (const label of ['Appearance', 'Your profile', 'Billing', 'Feedback', 'Sign out']) {
-  assert.ok(sidebar.includes(label), `missing profile action ${label}`);
+// The redesign's exact tokens: one olive accent, glass for accents only.
+for (const token of ['--canvas: #EDF2F4', '--ink: #171B18', '--muted: #636B65', '--olive: #536149', '--olive-press: #3D4937', '--glass: rgba(255, 255, 252, 0.73)', '--glass-edge: rgba(255, 255, 255, 0.85)', '--line: rgba(34, 49, 41, 0.12)']) {
+  assert.ok(system.includes(token), `missing design token ${token}`);
 }
-assert.match(dashboard, /router\.replace\('\/smartnotes'\)/);
-assert.match(login, /AcademicInfinityMark/);
+assert.match(system, /prefers-reduced-motion/);
+assert.match(system, /backdrop-filter: blur\(24px\) saturate\(160%\)/);
+// One nav: five places, each a real route.
+const nav = sidebar.split('const navItems = [')[1].split('];')[0];
+assert.deepEqual([...nav.matchAll(/label: '([^']+)', href: '([^']+)'/g)].map(match => `${match[1]} ${match[2]}`), ['Today /dashboard', 'Library /library', 'Tutor /tutor', 'Notes /smartnotes', 'Calendar /calendar']);
+for (const label of ['Profile', 'Appearance', 'Plan', 'Help', 'Sign out']) {
+  assert.ok(sidebar.includes(`/>${label}</button>`), `missing account menu item ${label}`);
+}
+assert.match(dashboard, /notes: '\/smartnotes'/);
+assert.match(publicPage, /AcademicInfinityMark/);
 assert.match(install, /AcademicInfinityMark/);
 const classroomStyles = read('web', 'styles', 'classroom.css');
 assert.match(classroomStyles, /--font-sans: 'Manrope'/);

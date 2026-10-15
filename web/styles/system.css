@@ -424,6 +424,9 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
   .c-glass, .c-topbar, .c-tabbar, .c-menu, .c-sheet, .c-tip, .c-pill { transition: none !important; }
 }
 
+/* The first-run form owns the screen; the floating New button would cover it. */
+body:has(.about) .c-fab { display: none; }
+
 /* Retired chrome */
 .workspace-rail, .reference-study-tools, .workspace-tools, .tutor-drawer-toggle, .top-navigation { display: none !important; }
 
@@ -533,3 +536,11 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
 .explain-preference textarea { width: 100%; min-height: 96px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-input); background: var(--card); color: var(--ink); font: 500 15px/1.5 var(--font-sans); resize: none; }
 .explain-preference-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .study-aid-panel, .study-aid { border-radius: var(--r-card); }
+
+/* Notes editor: three panels side by side on desktop, stacked on phones. */
+@media (max-width: 767px) {
+  .sn-layout { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: auto !important; }
+  .sn-v-divider, .sn-h-divider { display: none !important; }
+  .sn-paper-wrap, .sn-viewer-wrap, .sn-diagram-wrap { grid-column: 1 !important; grid-row: auto !important; min-width: 0; }
+  .sn-viewer-wrap, .sn-diagram-wrap { min-height: 320px; }
+}

@@ -31,7 +31,7 @@ class UniversalCaptureContractTests(unittest.TestCase):
     def test_capture_generation_does_not_depend_on_process_memory(self):
         source = (ROOT / "backend" / "main.py").read_text(encoding="utf-8")
         worker = (ROOT / "extension" / "background.js").read_text(encoding="utf-8")
-        create = (ROOT / "web" / "pages" / "create.js").read_text(encoding="utf-8")
+        create = (ROOT / "web" / "lib" / "guideCreate.js").read_text(encoding="utf-8")
         self.assertNotIn("InMemoryStorage", source)
         self.assertNotIn("content_id: message.contentId", worker)
         self.assertIn("content: message.content", worker)

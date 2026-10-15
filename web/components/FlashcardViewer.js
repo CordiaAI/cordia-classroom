@@ -187,7 +187,7 @@ export default function FlashcardViewer({
         .fc { display: grid; gap: 20px; width: min(760px, 100%); margin: 0 auto; }
         .fc-bar { position: sticky; top: calc(var(--bar-h) + 12px); z-index: 20; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: var(--r-pill); }
         .fc-name { flex: 1; min-width: 0; padding: 0 8px; font: 600 17px/1.2 var(--font-display); }
-        .fc-bar :global(.is-starred) { color: var(--warning); }
+        .fc-bar :global(.is-starred) { color: var(--olive-ink); }
         .fc-progress { display: flex; align-items: center; gap: 12px; }
         .fc-progress .c-bar { flex: 1; }
         .fc-card { position: relative; min-height: 340px; perspective: 1400px; cursor: pointer; border-radius: var(--r-card); }

@@ -291,7 +291,7 @@ export default function GuidePage() {
         .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
         .guide-rename { flex: 1 1 auto; min-width: 0; }
         .guide-title-input { font: 600 28px/1.1 var(--font-display); height: 52px; }
-        .guide-head :global(.guide-starred) { color: var(--warning); }
+        .guide-head :global(.guide-starred) { color: var(--olive-ink); }
         .guide-source { margin: -8px 0 0 48px; font: 600 13px/1.4 var(--font-sans); }
         .guide-source a { display: inline-flex; align-items: center; gap: 6px; }
         .guide-notes { padding: 32px 40px; }

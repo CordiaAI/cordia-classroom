@@ -5,13 +5,16 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 const navigation = read('web', 'components', 'Sidebar.js');
+const help = read('web', 'components', 'HelpSheet.js');
 const modal = read('web', 'components', 'FeedbackModal.js');
 const review = read('web', 'pages', 'feedback-review.js');
 
-assert.match(navigation, /role="menuitem" onClick=\{\(\) => setShowFeedback\(true\)\}/);
-assert.match(navigation, />Feedback<\/button>/);
+// Feedback lives under avatar > Help.
+assert.match(navigation, /role="menuitem" onClick=\{\(\) => \{ setMenuOpen\(false\); setShowHelp\(true\); \}\}/);
+assert.match(navigation, /onFeedback=\{\(\) => \{ setShowHelp\(false\); setShowFeedback\(true\); \}\}/);
+assert.match(help, /onClick=\{onFeedback\}>.*Feedback<\/button>/);
 assert.match(navigation, /\/feedback\/reviewer-status/);
-assert.match(navigation, /canReviewFeedback &&/);
+assert.match(help, /canReviewFeedback &&/);
 
 for (const category of ['bug', 'suggestion', 'incorrect_content', 'account_payment', 'other']) {
   assert.ok(modal.includes(`['${category}'`));
