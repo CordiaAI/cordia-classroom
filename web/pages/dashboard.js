@@ -10,6 +10,7 @@ import StudyWorkspaceFrame from '../components/StudyWorkspaceFrame';
 import CalendarDashboard from '../components/CalendarDashboard';
 import DashboardOverview from '../components/DashboardOverview';
 import SetupWizard from '../components/SetupWizard';
+import GettingStarted from '../components/GettingStarted';
 import { organizeDashboardGuides } from '../lib/dashboardOrganization';
 
 export default function Dashboard({ timerState, setTimerState }) {
@@ -279,6 +280,7 @@ export default function Dashboard({ timerState, setTimerState }) {
       <StudyWorkspaceFrame section="guides" timerState={timerState} setTimerState={setTimerState}>
         <div className="fade-in study-library">
           {loadErrorBanner}
+        <GettingStarted guides={guides} navigate={path => router.push(path)} />
           <div className="study-library-header">
             <div>
               <h1>My classes</h1>

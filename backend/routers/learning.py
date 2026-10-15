@@ -39,7 +39,7 @@ class ExplanationPreference(BaseModel):
     text: str = Field(default="", max_length=500)
 
 
-OnboardingStep = Literal["style", "extension", "extension_use", "create", "smartnotes", "practice", "done"]
+OnboardingStep = Literal["style", "first_guide", "unlocked", "extension", "extension_use", "create", "smartnotes", "practice", "done"]
 
 
 class OnboardingUpdate(BaseModel):
@@ -137,6 +137,27 @@ def get_onboarding(authorization: str = Header(default="")):
         return {"step": "done", "completed": True}
     row = rows[0] if rows else {}
     return {"step": row.get("step") or "style", "completed": bool(row.get("completed_at"))}
+
+
+@router.get("/onboarding/checklist")
+def get_onboarding_checklist(authorization: str = Header(default="")):
+    """Which high-value features the student has actually used, for the dashboard checklist."""
+    user_id = get_user_id(authorization)
+    sb = get_supabase()
+
+    def used(query) -> bool:
+        try:
+            return bool(query.limit(1).execute().data)
+        except Exception as e:
+            logger.warning(f"Checklist lookup failed: {e}")
+            return False
+
+    return {
+        "extension_guide": used(sb.table("study_guides").select("id").eq("user_id", user_id).eq("source_type", "webpage")),
+        "learn_your_way": used(sb.table("study_aids").select("id").eq("user_id", user_id)),
+        "practice": used(sb.table("study_guides").select("id").eq("user_id", user_id).not_.is_("practice_state", "null")),
+        "smartnote": used(sb.table("smart_notes").select("id").eq("user_id", user_id).neq("title", "My first notes")),
+    }
 
 
 @router.put("/onboarding")
