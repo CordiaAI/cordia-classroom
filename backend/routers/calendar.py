@@ -18,6 +18,19 @@ from database import get_supabase
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 MAX_FEED_BYTES = 2_000_000
+CANVAS_HOST = re.compile(r"[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}")
+CANVAS_FEED_PATH = re.compile(r"/feeds/calendars/(user_[A-Za-z0-9]+\.ics)")
+
+
+def canvas_feed_url(value: str) -> str:
+    """Only Canvas calendar-feed links are fetched; the URL is rebuilt from the checked host and feed name."""
+    parsed = urlparse(value.strip())
+    host = (parsed.hostname or "").lower()
+    path = CANVAS_FEED_PATH.fullmatch(parsed.path)
+    if (parsed.scheme != "https" or parsed.port or parsed.username or parsed.password
+            or not CANVAS_HOST.fullmatch(host) or not path):
+        raise ValueError("Use the Calendar Feed link from Canvas (it ends in .ics)")
+    return f"https://{host}/feeds/calendars/{path.group(1)}"
 
 
 class CalendarPreviewRequest(BaseModel):
@@ -26,10 +39,7 @@ class CalendarPreviewRequest(BaseModel):
     @field_validator("url")
     @classmethod
     def validate_url(cls, value):
-        parsed = urlparse(value.strip())
-        if parsed.scheme != "https" or not parsed.hostname:
-            raise ValueError("Use the HTTPS calendar-feed link from Canvas")
-        return value.strip()
+        return canvas_feed_url(value)
 
 
 def _public_url(value: str) -> str:
@@ -76,7 +86,11 @@ def _feed_session() -> requests.Session:
 
 
 def _download_feed(url: str) -> str:
-    current = _public_url(url)
+    try:
+        feed = canvas_feed_url(url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    current = _public_url(feed)
     with _feed_session() as session:
         return _follow_feed(session, current)
 

@@ -122,6 +122,23 @@ class CalendarFeedConnectionTests(unittest.TestCase):
                 conn.close()
             server.close()
 
+    def test_only_canvas_feed_links_are_accepted_and_rebuilt(self):
+        self.assertEqual(
+            calendar.canvas_feed_url(" https://USAOnline.SouthAlabama.edu/feeds/calendars/user_AbC123.ics "),
+            "https://usaonline.southalabama.edu/feeds/calendars/user_AbC123.ics",
+        )
+        for bad in (
+            "http://loyno.instructure.com/feeds/calendars/user_abc.ics",
+            "https://loyno.instructure.com/api/v1/users/self",
+            "https://loyno.instructure.com:8443/feeds/calendars/user_abc.ics",
+            "https://me:pw@loyno.instructure.com/feeds/calendars/user_abc.ics",
+            "https://169.254.169.254/feeds/calendars/user_abc.ics",
+            "https://localhost/feeds/calendars/user_abc.ics",
+            "https://loyno.instructure.com/feeds/calendars/user_abc.ics/../../admin",
+        ):
+            with self.assertRaises(ValueError, msg=bad):
+                calendar.canvas_feed_url(bad)
+
     def test_session_ignores_environment_proxies(self):
         self.assertFalse(calendar._feed_session().trust_env)
 
