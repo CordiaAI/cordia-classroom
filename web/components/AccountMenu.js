@@ -116,18 +116,19 @@ export default function AccountMenu({ open, onClose, anchorRef, items }) {
         ))}
       </div>
       <style jsx global>{`
-        .acct-bubbles { position: fixed; z-index: 160; display: flex; flex-direction: column; align-items: flex-end; gap: ${GAP}px; pointer-events: none; }
+        /* One column: every bubble as wide as the longest label (min 200px), right edge on the avatar's. */
+        .acct-bubbles { position: fixed; z-index: 160; display: grid; grid-template-columns: minmax(200px, max-content); gap: ${GAP}px; pointer-events: none; }
         .acct-bubbles.is-open, .acct-bubbles.is-opening { pointer-events: auto; }
         .acct-bubble {
-          position: relative; display: inline-flex; align-items: center; gap: 10px;
-          height: ${BUBBLE}px; padding: 0 18px 0 14px; border-radius: 999px;
+          position: relative; display: flex; align-items: center; justify-content: flex-start; gap: 12px; width: 100%;
+          height: ${BUBBLE}px; padding: 0 20px 0 16px; border-radius: 999px; text-align: left;
           background: var(--lg-menu); border: 1px solid var(--lg-edge);
           -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter);
           box-shadow: var(--lg-highlight), var(--lg-shadow);
-          color: var(--ink); font: 600 15px/1 var(--font-sans); white-space: nowrap; cursor: pointer;
+          color: var(--ink); font: 500 15px/1 var(--font-sans); white-space: nowrap; cursor: pointer;
           transition: background 160ms ease-out, border-color 160ms ease-out, transform 160ms ease-out, box-shadow 160ms ease-out;
         }
-        .acct-bubble .lucide { color: var(--ink); }
+        .acct-bubble .lucide { flex: 0 0 auto; width: 20px; height: 20px; color: var(--ink); }
         .acct-bubble.is-separated { margin-top: ${SIGN_OUT_EXTRA}px; }
         .acct-bubble:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
         .acct-bubble:active { transform: scale(.98); }

@@ -1,11 +1,10 @@
 import { getProgress, updateProgress } from './progress';
 
-// Four one-time tips (glass pill, 3 words max), each at its moment. A tap dismisses
+// Three one-time tips (glass pill, 3 words max), each at its moment. A tap dismisses
 // it for good; at most one per session, never during a walkthrough.
 export const TIPS = {
   ask: { text: 'Ask why', icon: 'MessageCircle' },
   calendar: { text: 'Add deadlines', icon: 'CalendarDays' },
-  break: { text: 'Take a break', icon: 'Timer' },
   insights: { text: 'Your weak spots', icon: 'ChartColumn' },
 };
 

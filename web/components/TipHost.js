@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { CalendarDays, ChartColumn, Lightbulb, MessageCircle, Timer, X } from 'lucide-react';
+import { CalendarDays, ChartColumn, Lightbulb, MessageCircle, X } from 'lucide-react';
 
-const ICONS = { CalendarDays, ChartColumn, MessageCircle, Timer };
+const ICONS = { CalendarDays, ChartColumn, MessageCircle };
 import { TIPS, TIP_EVENT, dismissTip, markTipShown } from '../lib/tips';
 
 const WAIT_MS = 4000;

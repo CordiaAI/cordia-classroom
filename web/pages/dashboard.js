@@ -114,8 +114,7 @@ export default function Today({ timerState, setTimerState }) {
   useEffect(() => {
     if (!queue || !stats || !progress.first) return;
     const visit = { days: Math.floor((Date.now() - progress.first) / 86400000) + 1 };
-    if ((stats.minutes_today || 0) >= 25) requestTip('break');
-    else if (visit.days >= 3 && calendar && !calendar.connected) requestTip('calendar');
+    if (visit.days >= 3 && calendar && !calendar.connected) requestTip('calendar');
     else if (visit.days >= 7 && insights?.answered) requestTip('insights');
   }, [queue, stats, calendar, insights, progress.first]);
 

@@ -640,3 +640,71 @@ body:has(.about) .c-fab { display: none; }
 
 /* Note cards and the note page are cream paper in both themes, so their text stays paper ink. */
 [data-theme='dark'] .sn-card-paper .sn-card-preview { color: #2d2540; }
+
+/* ---------- Hover, focus and press (one system for every control) ----------
+   Cause of "hover stopped working": the glass layer above sets card border, background and
+   shadow with !important, which overrode every card hover rule. These rules win over it.
+   Hover only where a mouse can hover; keyboard focus gets the same state plus the olive ring.
+   Nothing changes size: only color, shadow and transform. */
+:root { --hover-wash: rgba(255, 255, 255, 0.38); --hover-shadow: 0 18px 40px rgba(0, 0, 0, 0.2); --primary-glow: 0 0 0 4px rgba(83, 97, 73, 0.18), 0 8px 22px rgba(83, 97, 73, 0.32); }
+[data-theme='dark'] { --hover-wash: rgba(255, 255, 255, 0.06); --hover-shadow: 0 18px 40px rgba(0, 0, 0, 0.42); --primary-glow: 0 0 0 4px rgba(195, 207, 182, 0.16), 0 8px 22px rgba(83, 97, 73, 0.55); }
+
+:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .c-nav a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar):not(:disabled) {
+  cursor: pointer;
+  transition: background-color 160ms ease-out, border-color 160ms ease-out, box-shadow 160ms ease-out, color 160ms ease-out, transform 120ms ease-out;
+}
+:is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .lib-row, .sn-card, a.calendar-item, div.c-list-row:has(> a[href])) {
+  cursor: pointer;
+  transition: transform 180ms ease-out, box-shadow 180ms ease-out, border-color 180ms ease-out, background-color 180ms ease-out;
+}
+.c-icon-btn:not(:disabled) { cursor: pointer; transition: background-color 160ms ease-out, transform 120ms ease-out; }
+
+/* Buttons and pills: brighten (a wash over whatever color they have) and the edge brightens. */
+@media (hover: hover) {
+  :is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .c-nav a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar):not(:disabled):not(.is-current):hover {
+    border-color: var(--hover-edge) !important;
+    box-shadow: inset 0 0 0 100vmax var(--hover-wash), var(--lg-highlight) !important;
+    text-decoration: none;
+  }
+  /* Primary olive buttons keep their olive (no darkening) and get a soft olive glow. */
+  :is(.c-btn--primary, .btn, .btn-upgrade, .pricing-btn:not(.is-secondary):not(.is-current), .c-pill[aria-current='page'], .c-nav a[aria-current='page']):not(:disabled):hover {
+    background-color: var(--olive) !important;
+    border-color: var(--hover-edge) !important;
+    box-shadow: inset 0 0 0 100vmax rgba(255, 255, 255, 0.08), var(--primary-glow) !important;
+  }
+  /* Cards, tiles and rows that open something: lift 2px, glass edge brightens, deeper shadow. */
+  :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .lib-row, .sn-card, a.calendar-item, div.c-list-row:has(> a[href])):hover {
+    transform: translateY(-2px);
+    border-color: var(--hover-edge) !important;
+    box-shadow: var(--lg-highlight), var(--hover-shadow), inset 0 0 0 100vmax var(--hover-wash) !important;
+    text-decoration: none;
+  }
+  /* Icon buttons: a round tint behind the icon. */
+  .c-icon-btn:not(:disabled):hover { background-color: var(--olive-tint); }
+}
+
+/* Keyboard focus: the same state plus a 2px olive ring. */
+:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .c-nav a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar):not(:disabled):focus-visible {
+  border-color: var(--hover-edge) !important;
+  box-shadow: inset 0 0 0 100vmax var(--hover-wash), var(--lg-highlight) !important;
+  outline: 2px solid var(--olive); outline-offset: 2px;
+}
+:is(.c-btn--primary, .btn, .btn-upgrade):not(:disabled):focus-visible { background-color: var(--olive) !important; box-shadow: inset 0 0 0 100vmax rgba(255, 255, 255, 0.08), var(--primary-glow) !important; }
+:is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .sn-card, a.calendar-item):focus-visible,
+:is(.lib-row, div.c-list-row:has(> a[href])):focus-within:has(:focus-visible) {
+  transform: translateY(-2px);
+  border-color: var(--hover-edge) !important;
+  box-shadow: var(--lg-highlight), var(--hover-shadow), inset 0 0 0 100vmax var(--hover-wash) !important;
+  outline: 2px solid var(--olive); outline-offset: 2px;
+}
+.c-icon-btn:not(:disabled):focus-visible { background-color: var(--olive-tint); outline: 2px solid var(--olive); outline-offset: 2px; }
+[data-theme='dark'] :is(.c-btn, .c-pill, .c-chip, .c-icon-btn, a.c-card, button.c-card, a.c-list-row, .c-nav a, .lib-row, .sn-card, a.calendar-item):focus-visible { outline-color: var(--olive-ink); }
+
+/* Press: a small squeeze (cards keep their lift). */
+:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-nav a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .study-aid-tab, .c-icon-btn, .quiz-option, .c-avatar):not(:disabled):active { transform: scale(.98); }
+:is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .sn-card, a.calendar-item):active { transform: translateY(-2px) scale(.98); }
+
+/* Reduced motion: color change only, no lift or squeeze. */
+@media (prefers-reduced-motion: reduce) {
+  :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .lib-row, .sn-card, a.calendar-item, div.c-list-row:has(> a[href]), .c-btn, .btn, .c-pill, .c-chip, .c-icon-btn, .c-nav a, .quiz-option):is(:hover, :focus-visible, :focus-within, :active) { transform: none !important; }
+}

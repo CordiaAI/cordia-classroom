@@ -24,7 +24,7 @@ export default function StudyTimer({ timerState, setTimerState }) {
   const pad = value => String(value).padStart(2, '0');
 
   return (
-    <section className="c-card focus-card" aria-labelledby="timer-title" data-tip="break">
+    <section className="c-card focus-card" aria-labelledby="timer-title">
       <header className="c-row">
         <Timer size={20} strokeWidth={1.75} aria-hidden="true" />
         <h2 id="timer-title" className="c-section-title">Focus</h2>
