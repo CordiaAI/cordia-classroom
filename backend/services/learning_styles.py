@@ -18,8 +18,6 @@ from services.llm_calls import chat
 logger = logging.getLogger(__name__)
 
 STYLES = ("visual", "aural", "read_write", "kinesthetic", "multimodal")
-AID_MODES = ("visual", "aural", "read_write", "kinesthetic")
-CHECKED_MODES = ("aural", "kinesthetic")
 
 TUTOR_STYLE_INSTRUCTIONS = {
     "visual": (

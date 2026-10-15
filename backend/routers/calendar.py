@@ -274,8 +274,3 @@ def disconnect_calendar(authorization: str = Header(default="")):
     )
     return {"connected": False}
 
-
-@router.post("/preview")
-def preview_calendar(body: CalendarPreviewRequest, authorization: str = Header(default="")):
-    get_user_id(authorization)
-    return _calendar_payload(body.url)
