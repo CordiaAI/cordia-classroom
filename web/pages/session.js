@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { LoadingArea, Reveal, useLoadGate } from '../components/CordiaLoader';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { PencilRuler } from 'lucide-react';
@@ -30,6 +31,7 @@ export default function StudySession() {
   const router = useRouter();
   const { ready } = useRequireAuth();
   const [queue, setQueue] = useState(null);
+  const gate = useLoadGate(Boolean(queue));
 
   useEffect(() => {
     if (ready) loadStudyQueue().then(setQueue);
@@ -79,15 +81,8 @@ export default function StudySession() {
   }, [cards, queue]);
 
   if (!ready) return null;
-  if (!queue || directPractice) {
-    return (
-      <div className="session-skeleton" aria-busy="true" aria-label="Loading">
-        <div className="c-skeleton" style={{ height: 52, borderRadius: 999 }} />
-        <div className="c-skeleton" style={{ height: 340, borderRadius: 20 }} />
-        <style jsx>{`.session-skeleton { display: grid; gap: 20px; width: min(760px, 100%); margin: 0 auto; }`}</style>
-      </div>
-    );
-  }
+  if (!queue || directPractice || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading your session" />;
+
 
   if (!cards.length) {
     return (
@@ -101,6 +96,7 @@ export default function StudySession() {
   }
 
   return (
+    <Reveal phase={gate}>
     <FlashcardViewer
       flashcards={cards}
       title="Today"
@@ -108,5 +104,6 @@ export default function StudySession() {
       onFinish={onFinish}
       finishExtra={<PracticeList practice={queue.practice} />}
     />
+    </Reveal>
   );
 }

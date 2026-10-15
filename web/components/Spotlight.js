@@ -83,7 +83,7 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
           <div className="spot-dim" style={{ top: hole.top, left: hole.right, right: 0, height: hole.bottom - hole.top }} />
           <div className="spot-ring" style={{ top: hole.top, left: hole.left, width: hole.right - hole.left, height: hole.bottom - hole.top }} />
         </>
-      ) : !passive && <div className="spot-dim" style={{ inset: 0, background: 'rgba(23,27,24,.12)', pointerEvents: 'none' }} />}
+      ) : !passive && <div className="spot-dim" style={{ inset: 0, background: 'var(--scrim)', pointerEvents: 'none' }} />}
 
       {label && (
         <div className={`spot-label arrow-${arrow}`} style={labelStyle} role="status" aria-live="polite">
@@ -96,32 +96,32 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
 
       <style jsx>{`
         .spot { position: fixed; inset: 0; z-index: 400; pointer-events: none; }
-        .spot-dim { position: fixed; background: rgba(23, 27, 24, 0.4); pointer-events: auto; }
-        .spot-ring { position: fixed; border-radius: 12px; box-shadow: 0 0 0 2px #536149, 0 0 0 8px rgba(83, 97, 73, 0.28), 0 0 32px 8px rgba(83, 97, 73, 0.35); pointer-events: none; transition: top 200ms var(--ease), left 200ms var(--ease), width 200ms var(--ease), height 200ms var(--ease); }
+        .spot-dim { position: fixed; background: var(--spot-dim); pointer-events: auto; }
+        .spot-ring { position: fixed; border-radius:12px; box-shadow: 0 0 0 2px var(--olive), 0 0 0 8px var(--olive-tint), 0 0 32px 8px var(--olive-tint); pointer-events: none; transition: top var(--dur) var(--ease), left var(--dur) var(--ease), width var(--dur) var(--ease), height var(--dur) var(--ease); }
         .spot-label {
           position: fixed; display: flex; align-items: center; gap: 12px; padding: 10px 16px; max-width: calc(100vw - 32px);
-          border-radius: 999px; pointer-events: auto;
+          border-radius:999px; pointer-events: auto;
           background: var(--glass); border: 1px solid var(--glass-edge);
           -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
           box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow);
-          color: var(--ink); font: 600 17px/1.2 var(--font-sans); white-space: nowrap;
+          color: var(--ink); font:600 17px/1.15 var(--font-sans); white-space: nowrap;
           animation: spot-in 220ms var(--ease) both;
         }
-        :global(:root:not([data-theme='dark'])) .spot-label { background: rgba(255, 255, 252, 0.92); }
+        :global(:root:not([data-theme='dark'])) .spot-label { background: var(--surface-card); }
         .spot-label::after { content: ''; position: absolute; left: 50%; width: 14px; height: 14px; transform: translateX(-50%) rotate(45deg); background: inherit; border: inherit; }
         .spot-label.arrow-up::after { top: -8px; border-right: 0; border-bottom: 0; }
         .spot-label.arrow-down::after { bottom: -8px; border-left: 0; border-top: 0; }
         .spot-label.arrow-none::after { display: none; }
         .spot :global(.spot-dots) { display: inline-flex; align-items: center; gap: 4px; }
-        .spot :global(.spot-dots i) { width: 6px; height: 6px; border-radius: 999px; background: var(--line); }
+        .spot :global(.spot-dots i) { width: 6px; height: 6px; border-radius:999px; background: var(--line); }
         .spot :global(.spot-dots i.is-done) { background: var(--olive); opacity: .5; }
         .spot :global(.spot-dots i.is-now) { background: var(--olive); width: 16px; }
         .spot :global(.spot-dots .c-meta) { margin-left: 6px; }
         .spot-skip {
           position: fixed; top: 12px; right: 12px; height: 44px; padding: 0 20px; pointer-events: auto;
-          border-radius: 999px; border: 1px solid var(--glass-edge);
+          border-radius:999px; border: 1px solid var(--glass-edge);
           background: var(--glass); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
-          color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer;
+          color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer;
         }
         .spot-skip.is-left { right: auto; left: 12px; }
         @media (min-width: 768px) { .spot-skip { top: auto; bottom: 24px; right: 24px; } .spot-skip.is-left { left: 24px; } }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import BodyPortal from '../../components/BodyPortal';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -89,6 +90,7 @@ export default function GuidePage() {
   const [toast, setToast] = useState('');
   const prevRevealed = useRef(0);
   const { learningStyle } = useLearningStyle();
+  const gate = useLoadGate(Boolean(guide) || Boolean(loadError));
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -189,13 +191,7 @@ export default function GuidePage() {
     </div>
   );
 
-  if (!guide) return (
-    <div className="c-stack" aria-busy="true" aria-label="Loading guide">
-      <div className="c-skeleton" style={{ height: 44, width: '60%' }} />
-      <div className="c-skeleton" style={{ height: 44 }} />
-      <div className="c-skeleton" style={{ height: 420, borderRadius: 20 }} />
-    </div>
-  );
+  if (!guide || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading guide" />;
 
   const pairs = parseQAPairs(guide.study_guide);
   const notes = parseNotes(guide.notes);
@@ -217,6 +213,7 @@ export default function GuidePage() {
   ];
 
   return (
+    <Reveal phase={gate}>
     <article className="c-page guide">
       <header className="guide-head">
         <button type="button" className="c-icon-btn" onClick={() => (window.history.length > 1 ? router.back() : router.push('/library'))} aria-label="Back"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
@@ -290,17 +287,18 @@ export default function GuidePage() {
         .guide { gap: 16px; }
         .guide-head { display: flex; align-items: center; gap: 8px; }
         .guide-title { flex: 1 1 auto; min-width: 0; }
-        .guide-title-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; cursor: text; border-radius: var(--r-input); }
+        .guide-title-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing:-0.015em; text-align: left; cursor: text; border-radius:var(--r-input); }
         .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
         .guide-rename { flex: 1 1 auto; min-width: 0; }
-        .guide-title-input { font: 600 28px/1.1 var(--font-display); height: 52px; }
+        .guide-title-input { font:600 28px/1.15 var(--font-display); height: 52px; }
         .guide-head :global(.guide-starred) { color: var(--olive-ink); }
-        .guide-src { margin: -8px 0 0 48px; font: 600 13px/1.4 var(--font-sans); }
+        .guide-src { margin: -8px 0 0 48px; font:600 13px/1.5 var(--font-sans); }
         .guide-src a { display: inline-flex; align-items: center; gap: 6px; }
         .guide-notes { padding: 32px 40px; }
         .guide-notes ul { margin: 0; padding-left: 20px; display: grid; gap: 12px; }
         @media (max-width: 767px) { .guide-src { margin-left: 0; } .guide-notes { padding: 24px 18px; } }
       `}</style>
     </article>
+    </Reveal>
   );
 }

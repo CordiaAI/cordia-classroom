@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { SectionLoader } from '../components/CordiaLoader';
 import { setThemePreference } from '../lib/theme';
 import { useRouter } from 'next/router';
 import { useRequireAuth } from '../lib/auth';
@@ -218,7 +219,7 @@ export default function SettingsPage() {
         {activeSection === 'plan' && (
           <div className="profile-section" role="tabpanel" id="panel-plan" aria-labelledby="tab-plan">
             {loading ? (
-              <div className="c-skeleton" style={{ height: 160, borderRadius: 20 }} />
+              <SectionLoader height={160} label="Loading your plan" />
             ) : (
               <>
                 <div className="c-card billing-current-plan">
@@ -359,36 +360,36 @@ export default function SettingsPage() {
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
       <style jsx>{`
-        .profile-page { width: min(920px, 100%); margin: 0 auto; }
+        .profile-page { width: min(var(--page-max), 100%); margin: 0 auto; }
         .profile-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }
-        .profile-message { padding: 14px 18px; border-radius: var(--r-card); background: var(--olive-tint); font-weight: 600; }
+        .profile-message { padding: 14px 18px; border-radius:var(--r-card); background: var(--olive-tint); font-weight:600; }
         .profile-section { animation: fadeIn 0.2s ease; }
         .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; flex-wrap: wrap; }
         .settings-row .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
         .settings-card { display: grid; gap: 12px; padding: 20px; }
-        .settings-links { display: flex; gap: 20px; font: 600 13px/1 var(--font-sans); }
+        .settings-links { display: flex; gap: 20px; font:600 13px/1 var(--font-sans); }
         .me-card { display: flex; align-items: center; gap: 16px; padding: 20px; }
-        .me-avatar { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 700 19px/1 var(--font-sans); }
+        .me-avatar { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius:50%; background: var(--olive); color: var(--on-olive); font:600 20px/1 var(--font-sans); }
         .me-names { display: grid; gap: 2px; flex: 1; min-width: 0; }
-        .me-names strong { font: 600 19px/1.2 var(--font-display); }
+        .me-names strong { font:600 20px/1.15 var(--font-display); }
         .billing-current-plan { display: grid; gap: 12px; padding: 20px; margin-bottom: 16px; }
-        .plan-badge { justify-self: start; padding: 6px 14px; border-radius: var(--r-pill); background: var(--card-sunk); font-weight: 700; }
+        .plan-badge { justify-self: start; padding: 6px 14px; border-radius:var(--r-pill); background: var(--card-sunk); font-weight:600; }
         .plan-badge[data-plan="plus"] { background: var(--olive); color: var(--on-olive); }
         .plan-usage { display: grid; gap: 10px; }
         .plan-usage-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; }
         .plan-usage-row .c-bar { grid-column: 1 / -1; }
-        .plan-usage-label { text-transform: capitalize; font-weight: 600; }
-        .plan-warning { color: var(--error); font-weight: 600; }
+        .plan-usage-label { text-transform: capitalize; font-weight:600; }
+        .plan-warning { color: var(--error); font-weight:600; }
         .billing-plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
         .plan-card { display: grid; gap: 12px; align-content: start; min-width: 0; padding: 24px; }
         .plan-card-current { box-shadow: 0 0 0 2px var(--olive); }
-        .plan-price { font: 700 32px/1 var(--font-sans); }
-        .plan-price span { font-size: 15px; font-weight: 500; }
+        .plan-price { font:600 28px/1 var(--font-sans); }
+        .plan-price span { font-size: 15px; font-weight:500; }
         .billing-toggle { justify-self: start; }
         .plan-features { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
         .plan-features li { display: flex; gap: 8px; align-items: flex-start; }
         .plan-features :global(.lucide) { color: var(--olive-ink); margin-top: 2px; }
-        .plan-current-label { color: var(--olive-ink); font-weight: 700; }
+        .plan-current-label { color: var(--olive-ink); font-weight:600; }
         .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
         @media (max-width: 767px) { .billing-plans { grid-template-columns: 1fr; } .me-card { flex-wrap: wrap; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

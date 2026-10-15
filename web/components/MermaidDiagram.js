@@ -1,3 +1,4 @@
+import { cssVar } from '../lib/cssVar';
 import { useEffect, useRef, useState } from 'react';
 
 let renderCount = 0;
@@ -9,9 +10,9 @@ export function currentTheme() {
 // Light keeps Mermaid's neutral look; dark uses the page's own ink, card and olive colors.
 export function mermaidConfig(theme = currentTheme()) {
   if (theme !== 'dark') return { startOnLoad: false, theme: 'neutral', securityLevel: 'strict' };
-  const ink = '#FFFFFF';
-  const box = '#2F3238';
-  const line = '#C3CFB6';
+  const ink = cssVar('--ink');
+  const box = cssVar('--shot-frame');
+  const line = cssVar('--olive-ink');
   return {
     startOnLoad: false,
     securityLevel: 'strict',

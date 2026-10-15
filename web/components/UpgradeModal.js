@@ -205,26 +205,26 @@ export default function UpgradeModal() {
         </div>
       )}
       <style jsx>{`
-        .upgrade-overlay { position: fixed; inset: 0; background: rgba(23, 27, 24, .28); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
-        .upgrade-dialog { position: relative; width: 100%; max-width: 440px; max-height: 92vh; overflow-y: auto; background: var(--lg-panel); -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); border: 1px solid var(--lg-edge); color: var(--ink); border-radius: 20px; padding: 28px 24px 20px; box-shadow: var(--lg-highlight), var(--lg-shadow); }
-        .upgrade-close { position: absolute; top: 10px; right: 14px; border: none; background: none; font-size: 1.6rem; line-height: 1; cursor: pointer; color: var(--ink); }
-        h3 { margin: 0 0 8px; font-size: 1.3rem; color: var(--ink); }
+        .upgrade-overlay { position: fixed; inset: 0; background: var(--scrim); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 16px; }
+        .upgrade-dialog { position: relative; width: 100%; max-width: 440px; max-height: 92vh; overflow-y: auto; background: var(--lg-panel); -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); border: 1px solid var(--lg-edge); color: var(--ink); border-radius:20px; padding: 28px 24px 20px; box-shadow: var(--lg-highlight), var(--lg-shadow); }
+        .upgrade-close { position: absolute; top: 10px; right: 14px; border: none; background: none; font-size:28px; line-height:1; cursor: pointer; color: var(--ink); }
+        h3 { margin: 0 0 8px; font-size:20px; color: var(--ink); }
         .upgrade-body { margin: 0 0 10px; color: var(--ink); }
-        .upgrade-highlight { margin: 0 0 12px; font-weight: 600; }
+        .upgrade-highlight { margin: 0 0 12px; font-weight:600; }
         .upgrade-benefits { margin: 0 0 16px; padding-left: 18px; }
         .upgrade-benefits li { margin: 4px 0; }
         .upgrade-intervals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
-        .upgrade-intervals button { border: 1.5px solid var(--line); background: transparent; border-radius: 12px; padding: 10px; cursor: pointer; color: inherit; text-align: left; }
+        .upgrade-intervals button { border: 1.5px solid var(--line); background: transparent; border-radius:12px; padding: 10px; cursor: pointer; color: inherit; text-align: left; }
         .upgrade-intervals button.active { border-color: var(--olive-ink); box-shadow: 0 0 0 2px color-mix(in srgb, var(--olive-ink) 25%, transparent); }
         .upgrade-intervals span { display: block; font-size: 13px; color: var(--olive-ink); margin-top: 2px; }
         .upgrade-actions { display: flex; flex-direction: column; gap: 8px; }
-        .upgrade-actions .btn-upgrade { width: 100%; padding: 12px; border: none; border-radius: 12px; background: var(--olive); color: var(--on-olive); font-weight: 700; cursor: pointer; }
+        .upgrade-actions .btn-upgrade { width: 100%; padding: 12px; border: none; border-radius:12px; background: var(--olive); color: var(--on-olive); font-weight:600; cursor: pointer; }
         .upgrade-actions .btn-outline { width: 100%; padding: 11px; }
-        .upgrade-later { border: 1px solid var(--line); border-radius: 12px; background: transparent; color: var(--ink); font-weight: 600; cursor: pointer; padding: 6px; }
+        .upgrade-later { border: 1px solid var(--line); border-radius:12px; background: transparent; color: var(--ink); font-weight:600; cursor: pointer; padding: 6px; }
         .upgrade-error { color: var(--error); margin-bottom: 10px; }
         .upgrade-fineprint { margin: 10px 0 0; font-size: 13px; color: var(--muted); text-align: center; }
-        .upgrade-free { margin-top: 12px; font-size: 0.9rem; }
-        .upgrade-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2100; background: var(--ink); color: var(--canvas); padding: 12px 18px; border-radius: 12px; max-width: 90vw; cursor: pointer; }
+        .upgrade-free { margin-top: 12px; font-size:15px; }
+        .upgrade-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2100; background: var(--ink); color: var(--canvas); padding: 12px 18px; border-radius:12px; max-width: 90vw; cursor: pointer; }
       `}</style>
     </>
   );

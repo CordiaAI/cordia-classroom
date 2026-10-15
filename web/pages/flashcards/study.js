@@ -1,20 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
 import { apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import FlashcardViewer from '../../components/FlashcardViewer';
 import { walkthroughEvent } from '../../lib/walkthrough';
 
-function Skeleton() {
-  return (
-    <div className="fc-skeleton" aria-busy="true" aria-label="Loading cards">
-      <div className="c-skeleton" style={{ height: 52, borderRadius: 999 }} />
-      <div className="c-skeleton" style={{ height: 4 }} />
-      <div className="c-skeleton" style={{ height: 340, borderRadius: 20 }} />
-      <style jsx>{`.fc-skeleton { display: grid; gap: 20px; width: min(760px, 100%); margin: 0 auto; }`}</style>
-    </div>
-  );
-}
 
 export default function FlashcardStudy() {
   const router = useRouter();
@@ -22,6 +13,7 @@ export default function FlashcardStudy() {
   const { ready } = useRequireAuth();
   const [guide, setGuide] = useState(null);
   const [error, setError] = useState('');
+  const gate = useLoadGate(Boolean(guide) || Boolean(error));
 
   useEffect(() => {
     if (!ready || !guideId) return;
@@ -54,10 +46,11 @@ export default function FlashcardStudy() {
   const goBack = () => router.push('/guide/' + guideId);
 
   if (error) return <div className="c-empty"><p className="c-section-title" role="alert">{error}</p><button type="button" className="c-btn c-btn--secondary" onClick={() => router.push('/library?tab=cards')}>Back</button></div>;
-  if (!guide) return <Skeleton />;
+  if (!guide || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading cards" />;
   if (!guide.flashcards?.length) return <div className="c-empty"><p className="c-section-title">No cards</p><button type="button" className="c-btn c-btn--secondary" onClick={goBack}>Back</button></div>;
 
   return (
+    <Reveal phase={gate}>
     <FlashcardViewer
       flashcards={guide.flashcards}
       guideId={guideId}
@@ -68,5 +61,6 @@ export default function FlashcardStudy() {
       onBack={goBack}
       onFinish={onFinish}
     />
+    </Reveal>
   );
 }

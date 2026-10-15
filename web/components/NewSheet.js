@@ -46,11 +46,11 @@ export function NewOptions({ onPick, onSample }) {
       )}
       <style jsx>{`
         .new-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-        .new-option { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 128px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 17px/1 var(--font-sans); cursor: pointer; transition: border-color 150ms, transform 90ms; }
+        .new-option { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 128px; padding: 16px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 17px/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur), transform var(--dur); }
         .new-option:hover { border-color: var(--olive); }
         .new-option:active { transform: scale(.98); }
         .new-option :global(.lucide) { color: var(--olive-ink); }
-        .new-sample { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; border: 1px dashed var(--olive); border-radius: var(--r-card); background: var(--olive-tint); color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer; }
+        .new-sample { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; border: 1px dashed var(--olive); border-radius:var(--r-card); background: var(--olive-tint); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; }
       `}</style>
     </div>
   );
@@ -399,23 +399,23 @@ export default function NewSheet() {
       <style jsx>{`
         .new-sheet { width: min(560px, 100%); }
         .new-panel { display: grid; gap: 16px; }
-        .new-drop { display: grid; justify-items: center; gap: 12px; width: 100%; padding: 32px 16px; border: 2px dashed var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); cursor: pointer; font: 600 17px/1.2 var(--font-sans); }
+        .new-drop { display: grid; justify-items: center; gap: 12px; width: 100%; padding: 32px 16px; border: 2px dashed var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); cursor: pointer; font:600 17px/1.15 var(--font-sans); }
         .new-drop:hover, .new-drop.is-over { border-color: var(--olive); background: var(--olive-tint); }
         .new-drop :global(.lucide) { color: var(--olive-ink); }
-        .new-formats { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font: 600 13px/1 var(--font-sans); color: var(--muted); }
+        .new-formats { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font:600 13px/1 var(--font-sans); color: var(--muted); }
         .new-formats > span { display: inline-flex; align-items: center; gap: 6px; }
         .new-formats :global(.lucide) { color: var(--muted); }
         .new-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-        .new-files li { display: flex; align-items: center; gap: 10px; padding-left: 12px; border: 1px solid var(--line); border-radius: var(--r-input); background: var(--card); }
+        .new-files li { display: flex; align-items: center; gap: 10px; padding-left: 12px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); }
         .new-files li span { flex: 1; min-width: 0; }
         .new-text { min-height: 200px; }
-        .new-record { display: grid; justify-items: center; gap: 10px; justify-self: center; width: 128px; height: 128px; align-content: center; border: 0; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 600 15px/1 var(--font-sans); cursor: pointer; }
+        .new-record { display: grid; justify-items: center; gap: 10px; justify-self: center; width: 128px; height: 128px; align-content: center; border: 0; border-radius:50%; background: var(--olive); color: var(--on-olive); font:600 15px/1 var(--font-sans); cursor: pointer; }
         .new-record.is-on { background: var(--error-solid); }
         .new-class { max-width: 280px; }
         .new-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 20px; }
-        .new-error { margin: 16px 0 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+        .new-error { margin: 16px 0 0; color: var(--error); font:600 15px/1.5 var(--font-sans); }
         .new-headings { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; min-height: 160px; }
-        .new-headings li { padding: 10px 14px; border-radius: var(--r-input); font: 600 19px/1.3 var(--font-display); color: var(--ink); animation: c-rise 300ms var(--ease) both; }
+        .new-headings li { padding: 10px 14px; border-radius:var(--r-input); font:600 20px/1.15 var(--font-display); color: var(--ink); animation: c-rise 300ms var(--ease) both; }
         .new-headings li.is-current { background: var(--olive-tint); }
       `}</style>
     </div>

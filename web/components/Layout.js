@@ -22,7 +22,7 @@ export default function Layout({ children, timerState, setTimerState }) {
     <div className="app-shell">
       <Sidebar />
       <main id="classroom-main" className="main-content">
-        <div key={routeKey} className={'workspace-route' + (WIDE.includes(router.pathname) ? ' is-wide' : '')}>
+        <div key={routeKey} className={'workspace-route' + (WIDE.includes(router.pathname) && !(router.pathname === '/smartnotes' && !router.query.id) ? ' is-wide' : '')}>
           {children}
         </div>
       </main>

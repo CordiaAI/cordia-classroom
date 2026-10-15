@@ -1,6 +1,8 @@
 import '../styles/globals.css';
 import '../styles/classroom.css';
 import '../styles/system.css';
+import '../styles/refine.css';
+import '../styles/tokens.css';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';

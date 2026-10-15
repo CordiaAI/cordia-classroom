@@ -14,7 +14,8 @@ class WalkthroughContractTests(unittest.TestCase):
         source = read("components", "Spotlight.js")
         self.assertIn("createPortal(", source)
         self.assertIn("document.body", source)
-        self.assertIn("rgba(23, 27, 24, 0.4)", source)
+        self.assertIn("var(--spot-dim)", source)
+        self.assertIn("--spot-dim: rgba(23, 27, 24, 0.4)", read("styles", "tokens.css"))
         self.assertIn(">Skip</button>", source)
         self.assertIn("prefers-reduced-motion", source)
 
@@ -36,10 +37,13 @@ class WalkthroughContractTests(unittest.TestCase):
             self.assertIn(field, about)
             self.assertNotIn(field, auth)
 
-    def test_one_time_tips_are_the_four_agreed(self):
+    def test_one_time_tips_are_the_three_agreed(self):
         tips = read("lib", "tips.js")
-        for text in ("'Ask why'", "'Add deadlines'", "'Take a break'", "'Your weak spots'"):
+        for text in ("'Ask why'", "'Add deadlines'", "'Your weak spots'"):
             self.assertIn(text, tips)
+        # "Take a break" was removed everywhere (tip, 25-minute trigger, Focus card).
+        self.assertNotIn("Take a break", tips)
+        self.assertNotIn("requestTip('break')", read("pages", "dashboard.js"))
         self.assertNotIn("'Quiz yourself'", tips)
 
 

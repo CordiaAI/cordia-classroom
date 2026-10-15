@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
 import { apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -12,6 +13,7 @@ export default function NCLEXPage() {
   const [questions, setQuestions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const gate = useLoadGate(!loading);
 
   useEffect(() => {
     if (ready && guideId) loadNCLEX();
@@ -42,15 +44,7 @@ export default function NCLEXPage() {
     </header>
   );
 
-  if (loading) {
-    return (
-      <div className="c-page" aria-busy="true">
-        {head}
-        <div className="c-skeleton" style={{ height: 280, borderRadius: 20 }} />
-        <span className="c-meta" role="status">Writing questions…</span>
-      </div>
-    );
-  }
+  if (loading || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Writing questions" />;
 
   if (error) {
     return (
@@ -63,9 +57,11 @@ export default function NCLEXPage() {
   }
 
   return (
+    <Reveal phase={gate}>
     <div className="c-page">
       {head}
       <NCLEXQuizMode questions={questions} guideId={guideId} />
     </div>
+    </Reveal>
   );
 }

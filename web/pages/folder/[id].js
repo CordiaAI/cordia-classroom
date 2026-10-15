@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -20,6 +21,7 @@ export default function FolderPage() {
   const [confirm, setConfirm] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [toast, setToast] = useState(null);
+  const gate = useLoadGate(Boolean(folder) || Boolean(loadError));
   const contextRef = useRef(null);
 
   useEffect(() => {
@@ -118,11 +120,10 @@ export default function FolderPage() {
     </div>
   );
 
-  if (!folder) return (
-    <div className="c-stack" aria-busy="true"><div className="c-skeleton" style={{ height: 44, width: '40%' }} /><div className="c-skeleton" style={{ height: 240, borderRadius: 20 }} /></div>
-  );
+  if (!folder || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading class" />;
 
   return (
+    <Reveal phase={gate}>
     <div className="c-page">
       {confirm && <ConfirmDialog title={confirm.title} message={confirm.message} onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
       <header className="c-page-head">
@@ -165,8 +166,9 @@ export default function FolderPage() {
       {toast && <div className="c-toast" role="status"><span>{toast.message}</span></div>}
       <style jsx>{`
         :global(.folder-row-link) { display: flex; align-items: baseline; gap: 12px; min-width: 0; color: var(--ink); text-decoration: none; }
-        .folder-row-title { font: 600 17px/1.3 var(--font-display); min-width: 0; }
+        .folder-row-title { font:600 17px/1.15 var(--font-display); min-width: 0; }
       `}</style>
     </div>
+    </Reveal>
   );
 }

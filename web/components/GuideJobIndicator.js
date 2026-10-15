@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import AILoadingSphere from './AILoadingSphere';
+import CordiaLoader from './CordiaLoader';
 import { openUpgrade } from '../lib/api';
 import { dismissGuideJob, useGuideJobs } from '../lib/guideJobs';
 
@@ -16,7 +16,7 @@ export default function GuideJobIndicator() {
     <div className="guide-jobs" aria-live="polite">
       {running.length > 0 && (
         <div className="guide-job guide-job-running" role="status">
-          <AILoadingSphere size={15} label="" />
+          <CordiaLoader size={20} label="Making your guide" />
           <span>Building “{running[0].title}”{running.length > 1 ? ` + ${running.length - 1} more` : ''}…</span>
         </div>
       )}
@@ -36,13 +36,13 @@ export default function GuideJobIndicator() {
       ))}
       <style jsx>{`
         .guide-jobs { position: fixed; top: 86px; right: 20px; z-index: 95; display: grid; gap: 8px; justify-items: end; max-width: min(360px, calc(100vw - 32px)); }
-        .guide-job { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-card, 0 10px 26px rgba(17, 18, 15, 0.12)); color: var(--ink); font-size: 13px; font-weight: 640; }
+        .guide-job { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 12px; border: 1px solid var(--line); border-radius:12px; background: var(--surface); box-shadow:var(--shadow-card); color: var(--ink); font-size: 13px; font-weight:600; }
         .guide-job span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .guide-job-running :global(.cordia-loader) { gap: 0; }
         .guide-job-running :global(.cordia-loader svg) { filter: none; }
         .guide-job-error span { white-space: normal; color: var(--error); }
-        .guide-job-open { flex: 0 0 auto; padding: 5px 11px; border: 0; border-radius: 999px; background: #11120f; color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
-        .guide-job-dismiss { flex: 0 0 auto; border: 0; background: none; color: var(--muted-ink); font-size: 1rem; line-height: 1; cursor: pointer; }
+        .guide-job-open { flex: 0 0 auto; padding: 5px 11px; border: 0; border-radius:999px; background: var(--ink); color: var(--on-olive); font: inherit; font-size: 13px; cursor: pointer; }
+        .guide-job-dismiss { flex: 0 0 auto; border: 0; background: none; color: var(--muted-ink); font-size:15px; line-height:1; cursor: pointer; }
         @media (max-width: 720px) { .guide-jobs { top: auto; bottom: 16px; right: 16px; } }
       `}</style>
     </div>

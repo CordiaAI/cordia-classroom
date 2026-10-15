@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../components/CordiaLoader';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
@@ -46,6 +47,7 @@ export default function LibraryPage() {
   const [renaming, setRenaming] = useState(null); // { id, value }
   const [dragId, setDragId] = useState(null);
   const [dropId, setDropId] = useState(null);
+  const gate = useLoadGate(!loading || Boolean(loadError));
   const [toast, setToast] = useState('');
   const [confirm, setConfirm] = useState(null);
   const { pending, remove, undo } = useUndoDelete();
@@ -239,7 +241,9 @@ export default function LibraryPage() {
     );
   }
 
+  if (gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate} label="Loading Library" />;
   return (
+    <Reveal phase={gate}>
     <div className="c-page library">
       <header className="c-page-head">
         <h1 className="c-title">Library</h1>
@@ -282,9 +286,7 @@ export default function LibraryPage() {
             </form>
           )}
 
-          {loading ? (
-            <div className="c-stack">{[0, 1, 2].map(index => <div key={index} className="c-skeleton" style={{ height: 64 }} />)}</div>
-          ) : (
+          {loading ? null : (
             <div className="c-stack">
               {classes.map(entry => group({
                 id: entry.folder.id,
@@ -308,7 +310,7 @@ export default function LibraryPage() {
       ) : (
         <div className="c-card c-list">
           {!cardSets ? (
-            [0, 1, 2].map(index => <div key={index} className="c-list-row"><div className="c-skeleton" style={{ height: 24, flex: 1 }} /></div>)
+            <SectionLoader height={180} label="Loading cards" />
           ) : !cardSets.length ? (
             <div className="c-empty"><Layers size={32} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">No cards</span></div>
           ) : cardSets.map(guide => {
@@ -335,15 +337,15 @@ export default function LibraryPage() {
       {confirm && <ConfirmDialog title={confirm.title} confirmLabel="Delete" onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
 
       <style jsx global>{`
-        .library .lib-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius: var(--r-card); background: var(--error-bg); color: var(--error); font-weight: 600; }
+        .library .lib-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
         .library .lib-tools { display: flex; align-items: center; gap: 8px; }
         .library .lib-new-class { display: flex; gap: 8px; align-items: center; max-width: 480px; }
         .library .lib-group { padding: 6px; }
         .library .lib-group.is-drop { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
         .library .lib-group-head { display: flex; align-items: center; gap: 4px; }
-        .library .lib-group-toggle { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; height: 52px; padding: 0 12px; border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink); cursor: pointer; text-align: left; }
+        .library .lib-group-toggle { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; height: 52px; padding: 0 12px; border: 0; border-radius:var(--r-input); background: transparent; color: var(--ink); cursor: pointer; text-align: left; }
         .library .lib-group-toggle:hover { background: var(--olive-tint); }
-        .library .lib-group-toggle .lucide { transition: transform 150ms var(--ease); }
+        .library .lib-group-toggle .lucide { transition: transform var(--dur) var(--ease); }
         .library .lib-group-toggle .is-closed { transform: rotate(-90deg); }
         .library .lib-list { list-style: none; margin: 0; padding: 0; }
         .library .lib-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 4px 4px 4px 12px; border-top: 1px solid var(--line); }
@@ -351,12 +353,13 @@ export default function LibraryPage() {
         .library .lib-row-link { display: flex; align-items: baseline; gap: 12px; flex: 1; min-width: 0; color: var(--ink); text-decoration: none; padding: 10px 0; }
         .library .lib-row-link:hover { text-decoration: none; }
         .library .lib-row-link:hover .lib-row-title { text-decoration: underline; }
-        .library .lib-row-title, .library .lib-row-title { font: 600 17px/1.3 var(--font-display); min-width: 0; }
+        .library .lib-row-title, .library .lib-row-title { font:600 17px/1.15 var(--font-display); min-width: 0; }
         .library .lib-rename { flex: 1; min-width: 0; }
         .library .lib-star.is-on { color: var(--olive-ink); }
         .library .lib-empty-group { padding: 8px 16px 14px; margin: 0; }
         @media (max-width: 767px) { .library .lib-row-link { flex-direction: column; gap: 2px; } }
       `}</style>
     </div>
+    </Reveal>
   );
 }

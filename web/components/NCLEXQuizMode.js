@@ -140,7 +140,7 @@ export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
         <div className="completion-actions" style={{ marginTop: 20, gap: 8 }}>
           <button className="btn" onClick={retake}>Retake</button>
           {saveStatus === 'saved' ? (
-            <button className="btn" disabled style={{ opacity: 0.7 }}>Saved!</button>
+            <button className="btn" disabled style={{ opacity: 0.7 }}>Saved</button>
           ) : (
             <button className="btn" onClick={openSaveForm} disabled={showSave}>Save as Study Guide</button>
           )}

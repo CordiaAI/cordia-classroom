@@ -15,9 +15,10 @@ export function themePreference() {
   }
 }
 
-// Public pages stay light, except Pricing for a signed-in student (it shows the app nav).
+// Public pages stay light; Pricing and the policy pages follow the account's theme when signed in.
+const LIGHT_WHEN_SIGNED_OUT = ['/pricing', '/privacy', '/terms', '/honor-code', '/mission'];
 export function isLightOnly(pathname) {
-  if (pathname === '/pricing') {
+  if (LIGHT_WHEN_SIGNED_OUT.includes(pathname)) {
     try { return !localStorage.getItem('authToken'); } catch { return true; }
   }
   return LIGHT_ONLY.includes(pathname);

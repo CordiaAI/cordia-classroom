@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { cssVar } from '../lib/cssVar';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
-import AILoadingSphere from './AILoadingSphere';
+import { LoadingArea, SectionLoader } from './CordiaLoader';
 import Link from 'next/link';
 import { ArrowLeft, ChevronLeft, ChevronRight, Eraser, Eye, Flag, MessageCircle, PenLine, PencilRuler, RefreshCw, Sparkles, Trash2, Type, Upload, Wand2 } from 'lucide-react';
 import { walkthroughEvent } from '../lib/walkthrough';
@@ -210,7 +211,7 @@ export default function PracticeWorkspace() {
     const p = point(event);
     const context = canvasRef.current.getContext('2d');
     context.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
-    context.strokeStyle = '#11120f';
+    context.strokeStyle = cssVar('--paper-ink', 'black');
     context.lineWidth = tool === 'eraser' ? 22 : 2.4;
     context.beginPath();
     context.moveTo(p.x, p.y);
@@ -264,7 +265,7 @@ export default function PracticeWorkspace() {
     flat.width = canvas.width;
     flat.height = canvas.height;
     const context = flat.getContext('2d');
-    context.fillStyle = '#fff';
+    context.fillStyle = cssVar('--paper', 'white');
     context.fillRect(0, 0, flat.width, flat.height);
     context.drawImage(canvas, 0, 0);
     const data = await apiFetch('/practice/recognize', {
@@ -366,7 +367,7 @@ export default function PracticeWorkspace() {
   }
 
   if (guideId && !guide && !error) {
-    return <div className="practice-loading"><AILoadingSphere /></div>;
+    return <LoadingArea label="Loading practice" />;
   }
 
   const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
@@ -382,7 +383,7 @@ export default function PracticeWorkspace() {
         </header>
         {error && <div className="retain-action-error" role="alert">{error}</div>}
         {!guideOptions ? (
-          <div className="practice-grid">{[0, 1, 2, 3].map(index => <div key={index} className="c-skeleton" style={{ height: 112, borderRadius: 20 }} />)}</div>
+          <SectionLoader height={240} label="Loading guides" />
         ) : guideOptions.length ? (
           <div className="practice-grid practice-guide-picker" data-spot="practice-picker">
             {guideOptions.map(option => (
@@ -397,7 +398,7 @@ export default function PracticeWorkspace() {
         )}
         <style jsx>{`
           .practice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-          :global(.practice-guide) { display: grid; align-content: space-between; gap: 16px; min-height: 112px; padding: 18px; color: var(--ink); text-decoration: none; font: 600 17px/1.3 var(--font-display); }
+          :global(.practice-guide) { display: grid; align-content: space-between; gap: 16px; min-height: 112px; padding: 18px; color: var(--ink); text-decoration: none; font:600 17px/1.15 var(--font-display); }
           :global(.practice-guide:hover) { text-decoration: none; border-color: var(--olive); }
           :global(.practice-guide .lucide) { color: var(--olive-ink); }
         `}</style>
@@ -562,12 +563,12 @@ export default function PracticeWorkspace() {
         .practice-page { display: grid; gap: 20px; }
         .practice-title-row { min-width: 0; flex: 1; }
         .practice-source-name { font-family: var(--font-display); min-width: 0; }
-        .practice-prompt { margin: 8px 0 0; font: 600 22px/1.35 var(--font-display); }
+        .practice-prompt { margin: 8px 0 0; font:600 20px/1.15 var(--font-display); }
         .practice-kind { text-transform: capitalize; }
         .practice-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
         .practice-toolbar .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
         .practice-symbols { display: flex; flex-wrap: wrap; gap: 2px; }
-        .practice-symbols :global(.c-icon-btn) { font: 600 15px/1 var(--font-sans); }
+        .practice-symbols :global(.c-icon-btn) { font:600 15px/1 var(--font-sans); }
         .practice-evaluation { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
       `}</style>
     </main>

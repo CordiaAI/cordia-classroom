@@ -107,7 +107,7 @@ export default function Walkthrough() {
         <button type="button" className="c-btn c-btn--primary" onClick={() => router.push(route)}><Play size={20} strokeWidth={1.75} aria-hidden="true" />Resume</button>
         <button type="button" className="c-btn c-btn--secondary" onClick={() => finish('skipped')}>Skip</button>
         <style jsx>{`
-          .wt-resume { position: fixed; z-index: 380; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; gap: 8px; padding: 6px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-edge); backdrop-filter: blur(24px) saturate(160%); box-shadow: var(--shadow); }
+          .wt-resume { position: fixed; z-index: 380; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; gap: 8px; padding: 6px; border-radius:999px; background: var(--glass); border: 1px solid var(--glass-edge); backdrop-filter: blur(24px) saturate(160%); box-shadow: var(--shadow); }
           @media (max-width: 767px) { .wt-resume { bottom: calc(var(--tabbar-h) + 84px); } }
         `}</style>
       </div>

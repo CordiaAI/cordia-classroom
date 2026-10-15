@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Brain, ChevronRight, Flame, Layers, NotebookPen, PencilRuler, Play, Snowflake } from 'lucide-react';
@@ -20,6 +20,11 @@ import LearnCordia from '../components/LearnCordia';
 import AboutYou from '../components/AboutYou';
 import GroveCard from '../components/GroveCard';
 import PulseDot from '../components/PulseDot';
+import { LoadGate, SectionLoader } from '../components/CordiaLoader';
+import { useCachedPage } from '../lib/pageCache';
+
+const SLOW = Symbol('slow');
+const SLOW_MS = 4000;
 
 const LEGACY_VIEWS = { guides: '/library', classes: '/library', calendar: '/calendar', notes: '/smartnotes' };
 
@@ -37,17 +42,6 @@ export default function Today({ timerState, setTimerState }) {
   const { ready } = useRequireAuth();
   useSessionTracker('browse');
   const legacy = LEGACY_VIEWS[router.query.view];
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
-  const [folders, setFolders] = useState([]);
-  const [guides, setGuides] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [streak, setStreak] = useState(null);
-  const [queue, setQueue] = useState(null);
-  const [insights, setInsights] = useState(null);
-  const [calendar, setCalendar] = useState(null);
-  const [onboarding, setOnboarding] = useState(null);
-  const [streakInfo, setStreakInfo] = useState(null);
   const progress = useProgress();
   const step = activeStep(progress.wt?.status === 'active' ? progress.wt : null);
 
@@ -55,60 +49,68 @@ export default function Today({ timerState, setTimerState }) {
     if (ready && legacy) router.replace(legacy);
   }, [ready, legacy, router]);
 
-  useEffect(() => {
-    if (ready && !legacy) loadData();
-  }, [ready, legacy]);
-
-  async function loadData() {
-    setLoading(true);
-    setLoadError('');
-    try {
-      const tz = -new Date().getTimezoneOffset();
-      const results = await Promise.allSettled([
-        apiFetch('/folders'),
-        apiFetch('/guides?fields=summary&limit=500'),
-        apiFetch('/stats/overview'),
-        apiFetch('/stats/streak?tz_offset=' + tz),
-        loadOnboarding(),
-      ]);
-      const value = index => (results[index].status === 'fulfilled' ? results[index].value : null);
-      const [foldersData, guidesData, statsData, streakData, onboardingData] = [0, 1, 2, 3, 4].map(value);
-      const failure = [foldersData, guidesData, statsData].find(data => !data || data.detail);
-      if (failure) setLoadError(apiErrorMessage(failure?.detail, 'Some Classroom data could not be refreshed. Your saved work is unchanged.'));
-      if (Array.isArray(foldersData?.folders)) setFolders(foldersData.folders);
-      if (Array.isArray(guidesData?.guides)) setGuides(guidesData.guides);
-      if (statsData && !statsData.detail) setStats(statsData);
-      if (streakData && !streakData.detail) setStreak(streakData);
-      setOnboarding(onboardingData);
-      const guideList = guidesData?.guides || [];
-      // New account, nothing made yet: the day-one walkthrough starts with "About you".
-      if (onboardingData && !onboardingData.completed && !guideList.length && !progress.wt && !dayOneFinished()) startWalkthrough('day1');
-      else if (onboardingData && !onboardingData.completed && guideList.length) saveOnboardingStep('done');
-      if (guideList.length) markUsed('add');
-      if (statsData?.cards_studied) markUsed('cards');
-    } finally {
-      setLoading(false);
-    }
-    loadStudyQueue().then(setQueue);
-    apiFetch('/stats/insights').then(data => { setInsights(data); if (data?.answered) markUsed('quiz'); });
-    apiFetch('/smart_notes').then(data => { if (data?.notes?.length) markUsed('notes'); });
-    apiFetch('/calendar/connection').then(data => {
-      setCalendar(data);
-      if (data?.connected) markUsed('calendar');
-      else if (data && !data.detail && data.connected === false) unmarkUsed('calendar');
-    });
-    apiFetch('/onboarding/checklist').then(data => {
-      if (data?.practice) markUsed('practice');
-      if (data?.learn_your_way) markUsed('explain');
-    });
-  }
+  // Every source loads together and the page appears once, from cache when returning.
+  // The calendar feed can be slow: past 4 s the page shows and Due soon fills in on its own.
+  const { data, ready: loaded, update, refresh } = useCachedPage('today', async () => {
+    const tz = -new Date().getTimezoneOffset();
+    const safe = promise => promise.catch(() => null);
+    const calendarRequest = safe(apiFetch('/calendar/connection'));
+    const calendarOrSlow = Promise.race([calendarRequest, new Promise(resolve => setTimeout(() => resolve(SLOW), SLOW_MS))]);
+    const [foldersData, guidesData, statsData, streakData, onboardingData, queueData, insightsData, notesData, checklistData, calendarData] = await Promise.all([
+      safe(apiFetch('/folders')),
+      safe(apiFetch('/guides?fields=summary&limit=500')),
+      safe(apiFetch('/stats/overview')),
+      safe(apiFetch('/stats/streak?tz_offset=' + tz)),
+      safe(loadOnboarding()),
+      safe(loadStudyQueue()),
+      safe(apiFetch('/stats/insights')),
+      safe(apiFetch('/smart_notes')),
+      safe(apiFetch('/onboarding/checklist')),
+      calendarOrSlow,
+    ]);
+    const failure = [foldersData, guidesData, statsData].find(item => !item || item.detail);
+    const guideList = Array.isArray(guidesData?.guides) ? guidesData.guides : [];
+    // New account, nothing made yet: the day-one walkthrough starts with "About you".
+    if (onboardingData && !onboardingData.completed && !guideList.length && !progress.wt && !dayOneFinished()) startWalkthrough('day1');
+    else if (onboardingData && !onboardingData.completed && guideList.length) saveOnboardingStep('done');
+    if (guideList.length) markUsed('add');
+    if (statsData?.cards_studied) markUsed('cards');
+    if (insightsData?.answered) markUsed('quiz');
+    if (notesData?.notes?.length) markUsed('notes');
+    if (checklistData?.practice) markUsed('practice');
+    if (checklistData?.learn_your_way) markUsed('explain');
+    const applyCalendar = calendar => {
+      if (calendar?.connected) markUsed('calendar');
+      else if (calendar && !calendar.detail && calendar.connected === false) unmarkUsed('calendar');
+    };
+    if (calendarData === SLOW) calendarRequest.then(calendar => { applyCalendar(calendar); update(current => ({ ...current, calendar, calendarSlow: false })); });
+    else applyCalendar(calendarData);
+    return {
+      loadError: failure ? apiErrorMessage(failure?.detail, 'Some Classroom data could not be refreshed. Your saved work is unchanged.') : '',
+      folders: Array.isArray(foldersData?.folders) ? foldersData.folders : [],
+      guides: guideList,
+      stats: statsData && !statsData.detail ? statsData : null,
+      streak: streakData && !streakData.detail ? streakData : null,
+      onboarding: onboardingData,
+      // A slim copy of the study queue (the full one carries every card's text).
+      queue: queueData ? { cardTotal: queueData.cardTotal, misses: queueData.misses.map(() => 0), problems: queueData.problems, minutes: queueData.minutes, practice: queueData.practice } : null,
+      insights: insightsData,
+      calendar: calendarData === SLOW ? null : calendarData,
+      calendarSlow: calendarData === SLOW,
+    };
+  }, { enabled: ready && !legacy });
+  const loadError = data?.loadError || '';
+  const folders = data?.folders || [];
+  const guides = data?.guides || [];
+  const stats = data?.stats || null;
+  const streak = data?.streak || null;
+  const queue = data?.queue || null;
+  const insights = data?.insights || null;
+  const calendar = data?.calendar || null;
+  const calendarSlow = Boolean(data?.calendarSlow);
+  const streakInfo = streak ? streakWithFreeze(streak.week || [], streak.current_streak || 0) : null;
 
   useEffect(() => { if (ready && !legacy) walkthroughEvent('today-opened'); }, [ready, legacy]);
-
-  // One free freeze per week bridges a single missed day.
-  useEffect(() => {
-    if (streak) setStreakInfo(streakWithFreeze(streak.week || [], streak.current_streak || 0));
-  }, [streak]);
 
   // Feature tips, one per session, each at its moment.
   useEffect(() => {
@@ -141,6 +143,7 @@ export default function Today({ timerState, setTimerState }) {
   ];
 
   return (
+    <LoadGate ready={loaded} label="Loading Today">
     <div className="c-page today">
       <header className="c-page-head">
         <h1 className="c-title">Today</h1>
@@ -155,7 +158,7 @@ export default function Today({ timerState, setTimerState }) {
       {loadError && (
         <div className="today-error" role="alert">
           <span>{loadError}</span>
-          <button type="button" className="c-btn c-btn--secondary" onClick={loadData}>Retry</button>
+          <button type="button" className="c-btn c-btn--secondary" onClick={refresh}>Retry</button>
         </div>
       )}
 
@@ -194,7 +197,7 @@ export default function Today({ timerState, setTimerState }) {
         ))}
       </nav>
 
-      {dueItems.length > 0 && (
+      {(dueItems.length > 0 || calendarSlow) && (
         <section className="c-section" aria-labelledby="due-title">
           <div className="c-row">
             <h2 id="due-title" className="c-section-title">Due soon</h2>
@@ -202,6 +205,7 @@ export default function Today({ timerState, setTimerState }) {
             <Link href="/calendar" className="c-btn c-btn--quiet">Calendar</Link>
           </div>
           <div className="c-card c-list">
+            {calendarSlow && <SectionLoader height={3 * 61} label="Loading deadlines" />}
             {dueItems.map(item => (
               <a key={item.id} className="c-list-row" href={item.url || '/calendar'} target={item.url ? '_blank' : undefined} rel={item.url ? 'noreferrer' : undefined}>
                 <span className="c-grow c-truncate">{item.title}</span>
@@ -216,29 +220,29 @@ export default function Today({ timerState, setTimerState }) {
 
       <div className="today-pair">
         <StudyTimer timerState={timerState} setTimerState={setTimerState} />
-        <StudyInsights compact />
+        <StudyInsights compact data={insights} />
       </div>
 
       {dayOneFinished(progress) || !progress.wt ? <LearnCordia hideWhenComplete /> : null}
 
       <style jsx>{`
-        .today-streak { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: var(--r-pill); background: var(--card); border: 1px solid var(--line); font: 600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .today-streak { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius:var(--r-pill); background: var(--card); border: 1px solid var(--line); font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .today-streak :global(.lucide) { color: var(--ink); }
         .today-streak :global(.today-freeze) { color: var(--olive-ink); }
         .today-tool-wrap { position: relative; display: grid; }
         .today-dot { position: absolute; top: 8px; right: 8px; }
-        .today-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius: var(--r-card); background: var(--error-bg); color: var(--error); font-weight: 600; }
-        .today-start { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px; border-radius: var(--r-card); flex-wrap: wrap; }
+        .today-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
+        .today-start { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px; border-radius:var(--r-card); flex-wrap: wrap; }
         .today-counts { list-style: none; margin: 0; padding: 0; display: flex; gap: 32px; }
         .today-counts li { display: grid; gap: 2px; }
-        .today-counts strong { font: 600 32px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
-        .today-counts span { font: 500 15px/1 var(--font-sans); }
+        .today-counts strong { font:600 28px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .today-counts span { font:500 15px/1 var(--font-sans); }
         .today-start-btn { min-width: 160px; }
         :global(.today-continue) { display: flex; align-items: center; gap: 16px; padding: 14px 18px; color: var(--ink); text-decoration: none; }
         :global(.today-continue:hover) { text-decoration: none; border-color: var(--olive); }
-        .today-continue-title { flex: 1 1 auto; min-width: 0; font: 600 17px/1.3 var(--font-display); }
+        .today-continue-title { flex: 1 1 auto; min-width: 0; font:600 17px/1.15 var(--font-display); }
         .today-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-        :global(.today-tool) { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 112px; color: var(--ink); text-decoration: none; font: 600 15px/1 var(--font-sans); }
+        :global(.today-tool) { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 112px; color: var(--ink); text-decoration: none; font:600 15px/1 var(--font-sans); }
         :global(.today-tool:hover) { text-decoration: none; border-color: var(--olive); }
         :global(.today-tool .lucide) { color: var(--olive-ink); }
         .today-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
@@ -251,5 +255,6 @@ export default function Today({ timerState, setTimerState }) {
         }
       `}</style>
     </div>
+    </LoadGate>
   );
 }

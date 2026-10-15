@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import CordiaLoader, { SectionLoader } from '../components/CordiaLoader';
 import BodyPortal from '../components/BodyPortal';
 import { mermaidConfig } from '../components/MermaidDiagram';
 import { useRouter } from 'next/router';
 import { authHeaders, authorizedFetch, responseJson } from '../lib/api';
-import { ChevronDown, FilePlus2, FileUp, NotebookPen, Sparkles, X as XIcon } from 'lucide-react';
+import { Check, ChevronDown, FilePlus2, FileUp, NotebookPen, Sparkles, X as XIcon } from 'lucide-react';
 import { walkthroughEvent } from '../lib/walkthrough';
 import PdfPages from '../components/PdfPages';
 import { useFileDropZone } from '../lib/fileDrop';
@@ -397,7 +398,7 @@ function FileViewer({ file, guideContent }) {
 
   const ext = file.name.split('.').pop().toLowerCase();
 
-  if (extracting) return <div className="sn-viewer-empty"><p>{SLIDE_EXTS.has(ext) ? 'Preparing slides' : 'Reading'} {file.name}…</p></div>;
+  if (extracting) return <div className="sn-viewer-empty"><CordiaLoader size={20} label={SLIDE_EXTS.has(ext) ? 'Preparing slides' : 'Reading the file'} /></div>;
 
   if (slidesData !== null) return (
     <div className="sn-slide-fallback">
@@ -588,7 +589,7 @@ function NotesIndex({ router, timerState, setTimerState }) {
       </div>
       {selectMode && <p className="c-section-title" role="status">Pick a note</p>}
 
-      {loading && <div className="sn-grid">{[0, 1, 2].map(index => <div key={index} className="c-skeleton" style={{ height: 180, borderRadius: 20 }} />)}</div>}
+      {loading && <SectionLoader height={180} label="Loading notes" />}
 
       {!loading && notes.length === 0 && (
         <div className="c-empty">
@@ -1271,7 +1272,7 @@ function SmartNotesEditor() {
       const calloutMatch = lineText.match(/^!{2,3}\s+(.+)$/);
       if (calloutMatch) {
         e.preventDefault();
-        block.innerHTML = '<mark class="sn-callout">⚠ ' + escHtml(calloutMatch[1]) + '</mark>';
+        block.innerHTML = '<mark class="sn-callout">' + escHtml(calloutMatch[1]) + '</mark>';
         newParaAfter(block);
         return;
       }
@@ -1537,7 +1538,7 @@ function SmartNotesEditor() {
             spellCheck={false}
           />
           <span className={`sn-status ${saveStatus}`}>
-            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? saveError : ''}
+            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? saveError : ''}
           </span>
         </div>
         <div className="sn-header-right">
@@ -1559,7 +1560,7 @@ function SmartNotesEditor() {
             className={`c-btn c-btn--primary sn-save-btn${saveStatus === 'saving' ? ' saving' : saveStatus === 'saved' ? ' saved' : saveStatus === 'error' ? ' error' : ''}`}
             onClick={() => doSave({ force: true })}
           >
-            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? 'Error' : 'Save'}
+            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Error' : 'Save'}
           </button>
           <div className="sn-notes-picker" ref={notesPickerRef}>
             <button
@@ -1616,8 +1617,9 @@ function SmartNotesEditor() {
                 className="sn-visualize-confirm"
                 onClick={handleCheckmark}
                 title="Generate diagram from highlighted text"
+                aria-label="Make diagram"
               >
-                ✓
+                <Check aria-hidden="true" />
               </button>
             )}
           </div>
@@ -1714,7 +1716,7 @@ function SmartNotesEditor() {
             )}
             {!diagramLoading && !mermaidCode && (
               <div className="sn-diagram-placeholder">
-                <p>Visualize → highlight → ✓</p>
+                <p>Visualize → highlight → confirm</p>
               </div>
             )}
           </div>

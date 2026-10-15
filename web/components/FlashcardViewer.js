@@ -185,15 +185,15 @@ export default function FlashcardViewer({
       )}
       <style jsx>{`
         .fc { display: grid; gap: 20px; width: min(760px, 100%); margin: 0 auto; }
-        .fc-bar { position: sticky; top: calc(var(--bar-h) + 12px); z-index: 20; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: var(--r-pill); }
-        .fc-name { flex: 1; min-width: 0; padding: 0 8px; font: 600 17px/1.2 var(--font-display); }
+        .fc-bar { position: sticky; top: calc(var(--bar-h) + 12px); z-index: 20; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius:var(--r-pill); }
+        .fc-name { flex: 1; min-width: 0; padding: 0 8px; font:600 17px/1.15 var(--font-display); }
         .fc-bar :global(.is-starred) { color: var(--olive-ink); }
         .fc-progress { display: flex; align-items: center; gap: 12px; }
         .fc-progress .c-bar { flex: 1; }
-        .fc-card { position: relative; min-height: 340px; perspective: 1400px; cursor: pointer; border-radius: var(--r-card); }
-        .fc-face { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 12px; padding: 32px; overflow: auto; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); box-shadow: var(--shadow); backface-visibility: hidden; transition: transform 480ms var(--ease); text-align: center; }
-        .fc-face p { margin: 0; max-width: 34ch; font: 500 24px/1.4 var(--font-display); color: var(--ink); }
-        .fc-face img { max-width: 100%; max-height: 180px; object-fit: contain; border-radius: var(--r-input); }
+        .fc-card { position: relative; min-height: 340px; perspective: 1400px; cursor: pointer; border-radius:var(--r-card); }
+        .fc-face { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 12px; padding: 32px; overflow: auto; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); box-shadow: var(--shadow); backface-visibility: hidden; transition: transform var(--dur) var(--ease); text-align: center; }
+        .fc-face p { margin: 0; max-width: 34ch; font:500 20px/1.15 var(--font-display); color: var(--ink); }
+        .fc-face img { max-width: 100%; max-height: 180px; object-fit: contain; border-radius:var(--r-input); }
         .fc-back { transform: rotateY(180deg); }
         .is-flipped .fc-front { transform: rotateY(-180deg); }
         .is-flipped .fc-back { transform: rotateY(0); }

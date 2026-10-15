@@ -72,7 +72,7 @@ export default function TipHost() {
         <X size={18} strokeWidth={1.75} aria-hidden="true" />
       </button>
       <style jsx>{`
-        .c-tip-text { border: 0; background: transparent; color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer; padding: 0 2px; }
+        .c-tip-text { border: 0; background: transparent; color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; padding: 0 2px; }
         .c-tip :global(.c-icon-btn) { width: 32px; height: 32px; }
       `}</style>
     </div>

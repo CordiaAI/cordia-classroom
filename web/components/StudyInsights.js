@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SectionLoader } from './CordiaLoader';
 import { useRouter } from 'next/router';
 import { ChartColumn, TrendingDown, TrendingUp } from 'lucide-react';
 import { apiFetch } from '../lib/api';
@@ -16,15 +17,19 @@ function Row({ item, icon: Icon, tone }) {
 }
 
 // What the student gets right most and least often.
-export default function StudyInsights({ compact = false }) {
+// Pass `data` when the page already loaded it (Today), so the card never pops in on its own.
+export default function StudyInsights({ compact = false, data }) {
   const router = useRouter();
-  const [insights, setInsights] = useState(null);
+  const [loaded, setLoaded] = useState(null);
+  const normalize = value => (value && Array.isArray(value.tips) ? value : { answered: 0, strengths: [], needs_work: [], tips: [] });
+  const insights = data !== undefined ? normalize(data) : loaded;
 
   useEffect(() => {
+    if (data !== undefined) return undefined;
     let active = true;
-    apiFetch('/stats/insights').then(data => { if (active) setInsights(data && Array.isArray(data.tips) ? data : { answered: 0, strengths: [], needs_work: [], tips: [] }); });
+    apiFetch('/stats/insights').then(value => { if (active) setLoaded(normalize(value)); });
     return () => { active = false; };
-  }, []);
+  }, [data]);
 
   const strengths = insights?.strengths || [];
   const needsWork = insights?.needs_work || [];
@@ -39,7 +44,7 @@ export default function StudyInsights({ compact = false }) {
         {compact && <><span className="c-spacer" /><button type="button" className="c-btn c-btn--quiet" onClick={() => { walkthroughEvent('insights-opened'); router.push('/settings?section=learning'); }}>Open</button></>}
       </header>
       {!insights ? (
-        <div className="c-skeleton" style={{ height: 72 }} />
+        <SectionLoader height={72} label="Loading insights" />
       ) : !strengths.length && !needsWork.length ? (
         <button type="button" className="c-btn c-btn--quiet insights-empty" onClick={() => router.push('/library')}>Take a quiz</button>
       ) : (
@@ -57,7 +62,7 @@ export default function StudyInsights({ compact = false }) {
         .insights-card { display: grid; gap: 12px; padding: 20px; align-content: start; }
         .insights-card :global(header .lucide) { color: var(--olive-ink); }
         .insight-list, .insight-tips { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-        .insights-card :global(.insight-row) { display: flex; align-items: center; gap: 10px; min-height: 36px; font: 600 15px/1.3 var(--font-sans); }
+        .insights-card :global(.insight-row) { display: flex; align-items: center; gap: 10px; min-height: 36px; font:600 15px/1.5 var(--font-sans); }
         .insights-card :global(.insight-row span:nth-child(2)) { flex: 1; min-width: 0; }
         .insights-card :global(.insight-row.good .lucide) { color: var(--success); }
         .insights-card :global(.insight-row.work .lucide) { color: var(--warning); }

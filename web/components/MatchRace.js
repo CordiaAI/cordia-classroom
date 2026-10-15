@@ -90,12 +90,12 @@ export default function MatchRace({ questions, guideId, onRestart, onDone }) {
       <style jsx>{`
         .race { display: grid; gap: 16px; }
         .race-bar { display: flex; align-items: center; gap: 12px; }
-        .race-time { display: inline-flex; align-items: center; gap: 6px; font: 600 17px/1 var(--font-sans); font-variant-numeric: tabular-nums; min-width: 64px; }
+        .race-time { display: inline-flex; align-items: center; gap: 6px; font:600 17px/1 var(--font-sans); font-variant-numeric: tabular-nums; min-width: 64px; }
         .race-progress { flex: 1; }
         .race-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .race-col { display: grid; gap: 8px; align-content: start; }
-        .race-tile { min-height: 64px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-input); background: var(--card); color: var(--ink); font: 500 15px/1.35 var(--font-sans); text-align: left; cursor: pointer; transition: opacity 200ms, border-color 150ms; }
-        .race-tile.is-answer { font-family: var(--font-display); font-size: 16px; }
+        .race-tile { min-height: 64px; padding: 12px 14px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); color: var(--ink); font:500 15px/1.5 var(--font-sans); text-align: left; cursor: pointer; transition: opacity var(--dur), border-color var(--dur); }
+        .race-tile.is-answer { font-family: var(--font-display); font-size:15px; }
         .race-tile.is-picked { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
         .race-tile.is-cleared { opacity: .25; cursor: default; }
         .race-tile.is-wrong { border-color: var(--error); }

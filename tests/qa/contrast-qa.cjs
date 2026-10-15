@@ -21,7 +21,7 @@ const ROUTES = [
 ];
 const PUBLIC = new Set(['/', '/login', '/signup', '/privacy', '/terms', '/honor-code']);
 const POPUPS = [
-  { name: 'avatar-menu', route: '/dashboard', scope: '.c-account-menu', open: page => page.locator('.c-topbar .c-avatar').click() },
+  { name: 'avatar-menu', route: '/dashboard', scope: '.acct-bubbles', open: async page => { await page.locator('.c-topbar .c-avatar').click(); await page.waitForTimeout(500); } },
   { name: 'new-sheet', route: '/dashboard', scope: '.c-sheet', open: page => page.evaluate(() => window.dispatchEvent(new CustomEvent('cordia:new', { detail: { mode: '' } }))) },
   { name: 'help', route: '/dashboard', scope: '.c-sheet', open: async page => { await page.locator('.c-topbar .c-avatar').click(); await page.getByRole('menuitem', { name: 'Help' }).click(); } },
   { name: 'search', route: '/dashboard', scope: '.c-sheet', open: page => page.keyboard.press('Control+k') },

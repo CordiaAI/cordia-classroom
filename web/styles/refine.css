@@ -1,0 +1,99 @@
+/* Refinement layer: the same app, fewer and more consistent decisions.
+   Loaded after system.css and before tokens.css. No colors here, only tokens.
+   Type: 13, 15, 17, 20, 28, 40. Newsreader for titles; Manrope 500/600 for everything else. */
+
+/* ---------- Base ---------- */
+body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+:where(button, input, select, textarea, label, nav, .c-meta, .c-btn, .c-chip, .c-pill, kbd) { font-family: var(--font-sans); }
+::selection { background: var(--selection); }
+* { scrollbar-width: thin; scrollbar-color: var(--hover-edge) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--hover-edge); border-radius: var(--r-pill); }
+
+/* ---------- Type roles ---------- */
+/* Titles: Newsreader 600, slight negative tracking, balanced lines. */
+:is(.c-title, .pricing-title, .guide-title-btn, .guide-title-input, .c-section-title, .today-continue-title, .lib-row-title, .folder-row-title,
+  .sn-card-title, .reader-q, .quiz-question-text, .practice-prompt, .fc-face p, .today-counts strong, .recap-class, .me-names strong,
+  .c-brand > span, main h1:not(.sr-only), .public-main h1, .public-main h2, .public-main h3, .extension-install-step h2, .mission-page h2, .mission-page h3) {
+  font-family: var(--font-display) !important;
+  font-weight: 600 !important;
+  letter-spacing: var(--track-title) !important;
+  line-height: var(--lh-title) !important;
+  text-wrap: balance;
+}
+/* Page titles 40, section titles 20, card titles 17, questions 20, card faces and big numbers 28. */
+:is(.c-title, .pricing-title, .guide-title-btn, .guide-title-input, main h1:not(.sr-only), .public-main h1) { font-size: var(--fs-40) !important; }
+:is(.c-sheet .c-title, .c-sheet h2.c-title) { font-size: var(--fs-28) !important; }
+:is(.c-section-title, .public-main h2, .mission-page h2) { font-size: var(--fs-20) !important; }
+:is(.today-continue-title, .lib-row-title, .folder-row-title, .sn-card-title, .recap-class, .me-names strong, .extension-install-step h2, .public-main h3, .mission-page h3,
+  .today .c-list-row > .c-grow, .calendar-item strong) { font-family: var(--font-display) !important; font-weight: 600 !important; font-size: var(--fs-17) !important; letter-spacing: var(--track-title); line-height: var(--lh-title); }
+:is(.reader-q, .quiz-question-text, .practice-prompt) { font-size: var(--fs-20) !important; }
+:is(.fc-face p, .today-counts strong) { font-size: var(--fs-28) !important; font-variant-numeric: tabular-nums; }
+.c-brand > span { font-size: var(--fs-20) !important; }
+/* Reading text is body text: Manrope 17 at 1.5. */
+.c-study, .reader-a, .reader-prose, .reader-notes { font: 500 var(--fs-17)/var(--lh-body) var(--font-sans) !important; letter-spacing: 0; }
+.c-meta { font: 500 var(--fs-13)/var(--lh-body) var(--font-sans); color: var(--muted); font-variant-numeric: tabular-nums; }
+.focus-face { font-size: var(--fs-40) !important; }
+.sr-only { font-size: var(--fs-15) !important; }
+
+/* ---------- Color: olive only for the primary action, the active nav item and progress ---------- */
+.c-nav a[aria-current='page'], .c-tabbar a[aria-current='page'], .c-pill[aria-current='page'], .c-pill[aria-selected='true'] {
+  background: var(--olive-tint) !important; border-color: transparent !important; color: var(--olive-ink) !important; box-shadow: none !important;
+}
+:is(.c-nav a, .c-tabbar a, .c-pill)[aria-current='page'] .lucide { color: var(--olive-ink) !important; }
+.c-chip[aria-pressed='true'], .c-seg [aria-selected='true'], .c-seg .is-active { background: var(--surface-raised) !important; border-color: var(--hairline) !important; color: var(--ink) !important; }
+/* Chips: glass with muted text; only "Exam" carries a small olive dot. */
+.c-chip, .calendar-kind, [data-theme='dark'] .calendar-kind, [data-theme='dark'] .calendar-kind-exam, [data-theme='dark'] .calendar-kind-quiz, [data-theme='dark'] .calendar-kind-project,
+.calendar-kind-exam, .calendar-kind-quiz, .calendar-kind-project {
+  background: var(--surface-card) !important; border: 1px solid var(--hairline) !important; color: var(--muted) !important; border-radius: var(--r-input) !important;
+}
+.calendar-kind { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.calendar-kind-exam::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--olive-ink); flex: 0 0 auto; }
+
+/* ---------- Surfaces ---------- */
+.c-card { border: 1px solid var(--hairline); border-radius: var(--r-card); box-shadow: var(--shadow-card); }
+.c-card .c-card .c-card { background: transparent !important; border: 0 !important; box-shadow: none !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
+:is(.c-menu, .c-sheet, .tutor-select-options, .sn-notes-dropdown, .c-toast, .c-tip, .c-search-results, .upgrade-dialog, .feedback-modal) { box-shadow: var(--shadow-float) !important; border-color: var(--hairline) !important; }
+.c-sheet, .upgrade-dialog, .feedback-modal { border-radius: var(--r-panel) !important; }
+@media (max-width: 767px) { .c-sheet { border-radius: var(--r-panel) var(--r-panel) 0 0 !important; } }
+.c-list-row { border-radius: 0; }
+.c-menu { border-radius: var(--r-row) !important; }
+.c-menu [role='menuitem'], .c-menu > button, .c-menu > a { border-radius: var(--r-input); }
+
+/* ---------- Controls ---------- */
+.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .btn-upgrade, .pricing-btn {
+  height: 44px; min-height: 44px; padding: 0 20px; border-radius: var(--r-pill);
+  font: 600 var(--fs-15)/1 var(--font-sans) !important; letter-spacing: 0;
+}
+.c-btn--lg { height: 44px !important; min-height: 44px !important; padding: 0 20px !important; }
+.c-btn--sm { height: 36px !important; min-height: 36px !important; }
+.c-btn--secondary, .btn-outline, .btn-gray { background: var(--surface-raised); border: 1px solid var(--hairline); color: var(--ink); }
+.c-btn--quiet { background: transparent; border-color: transparent; color: var(--ink); }
+.c-btn--primary, .btn, .btn-green, .btn-upgrade { background: var(--olive); border-color: var(--olive); color: var(--on-olive); }
+.c-input, .c-select, input.c-input, select.c-select, .create-input, .create-select, .explain-inline-input {
+  border-radius: var(--r-input);
+}
+.c-input, .c-select { height: 44px; background: var(--surface-card); border: 1px solid var(--hairline); color: var(--ink); font: 500 var(--fs-15)/1.5 var(--font-sans); }
+textarea.c-input { height: auto; }
+:is(.c-input, .c-select, textarea, input[type='text'], input[type='email'], input[type='url'], input[type='search'], input[type='password']):focus-visible { outline: 2px solid var(--olive); outline-offset: 1px; }
+.c-chip { height: 36px; font: 500 var(--fs-13)/1 var(--font-sans) !important; }
+
+/* Icons: one Lucide set, 20px, 1.75 stroke, muted unless active. */
+svg.lucide { width: 20px; height: 20px; stroke-width: 1.75; color: var(--muted); }
+:is(.c-btn--primary, .btn, .btn-green, .btn-upgrade, .pricing-btn:not(.is-secondary):not(.is-current), [aria-pressed='true'], .is-used, [role='alert'], .c-toast) svg.lucide { color: currentColor; }
+.acct-bubble svg.lucide { color: var(--muted); }
+
+/* Icons and labels share one line. */
+:is(.c-btn, .c-chip, .c-pill, .c-nav a, .c-tabbar a, .c-row, .c-list-row, .c-menu [role='menuitem']) { align-items: center; }
+:is(.c-btn, .c-chip, .c-pill, .c-nav a, .c-menu [role='menuitem']) svg.lucide { display: block; flex: 0 0 auto; }
+
+/* ---------- Spacing: 8pt grid ---------- */
+.c-page { gap: 32px; }
+.c-section, .c-stack { gap: 16px; }
+.c-row { gap: 8px; }
+strong, b { font-weight: 600; }
+
+/* Card padding: 20px (rows 16px 20px; the reading page keeps its 40px page margins). */
+.grove-card, .plan-card, .pricing-card, .focus-card, .insights-card, .learn, .me-card, .recap, .grove-grid, .heat { padding: 20px !important; }
+.today-continue { padding: 16px 20px !important; border-radius: var(--r-row) !important; }

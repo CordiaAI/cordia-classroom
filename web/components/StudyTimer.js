@@ -46,7 +46,7 @@ export default function StudyTimer({ timerState, setTimerState }) {
       <style jsx>{`
         .focus-card { display: grid; gap: 14px; padding: 20px; align-content: start; }
         .focus-card :global(header .lucide) { color: var(--olive-ink); }
-        .focus-face { font: 600 44px/1 var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+        .focus-face { font:600 40px/1 var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing:0; }
         .focus-modes { justify-self: start; }
         .focus-modes button { padding: 0 14px; }
       `}</style>

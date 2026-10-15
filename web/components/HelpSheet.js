@@ -49,7 +49,7 @@ export default function HelpSheet({ onClose, onFeedback, canReviewFeedback }) {
         .help-sheet { width: min(720px, 100%); }
         .help-sheet :global(.learn) { box-shadow: none; }
         .help-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
-        .help-links { display: flex; gap: 20px; margin-top: 24px; font: 600 13px/1 var(--font-sans); }
+        .help-links { display: flex; gap: 20px; margin-top: 24px; font:600 13px/1 var(--font-sans); }
       `}</style>
     </div>
     </BodyPortal>

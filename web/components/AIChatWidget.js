@@ -8,7 +8,7 @@ import { ArrowUp, BookOpen, Layers, MessageCircle, Paperclip, PencilRuler, Slide
 import { lastGuide } from '../lib/userStore';
 import { walkthroughEvent } from '../lib/walkthrough';
 import TutorSelect from './TutorSelect';
-import AILoadingSphere from './AILoadingSphere';
+import CordiaLoader from './CordiaLoader';
 import { inlineParts, parseTutorAnswer } from '../lib/tutorFormat.mjs';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 
@@ -557,7 +557,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         ))}
         {busy && messages.at(-1)?.role === 'user' && (
           <div className="cordia-tutor-message ai tutor-thinking">
-            <AILoadingSphere size={14} label="" />
+            <CordiaLoader size={20} label="Thinking" />
             <span>{progressLabel}</span>
           </div>
         )}

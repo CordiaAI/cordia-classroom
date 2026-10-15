@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { Check } from 'lucide-react';
 
 export default function TutorSelect({ label, value, options, onChange, disabled = false }) {
   const [open, setOpen] = useState(false);
@@ -33,7 +34,7 @@ export default function TutorSelect({ label, value, options, onChange, disabled 
       </button>
       {open && !disabled && <div id={listId} className="tutor-select-options" role="listbox" aria-label={label} onKeyDown={navigate}>
         {options.map((option, index) => <button type="button" className="tutor-select-option" role="option" key={option.value} aria-selected={option.value === value} disabled={option.disabled} style={{ '--option-delay': `${Math.min(index, 24) * 35}ms` }} onClick={() => { onChange(option.value); close(); }}>
-          {option.group && <small>{option.group}</small>}<span>{option.label}</span>{option.value === value && <span className="tutor-select-check" aria-hidden="true">✓</span>}
+          {option.group && <small>{option.group}</small>}<span>{option.label}</span>{option.value === value && <Check className="tutor-select-check" aria-hidden="true" />}
         </button>)}
       </div>}
     </div>

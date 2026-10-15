@@ -10,7 +10,7 @@ from services import entitlements
 class LimitMessageTests(unittest.TestCase):
     def test_single_allowance_reads_naturally(self):
         self.assertEqual(entitlements.limit_message("practice", 1), "You've used your free practice set.")
-        self.assertEqual(entitlements.limit_message("ai_quiz", 1), "You've used your free AI Retain quiz.")
+        self.assertEqual(entitlements.limit_message("ai_quiz", 1), "You've used your free AI quiz.")
 
     def test_larger_allowance_keeps_count(self):
         self.assertEqual(entitlements.limit_message("guide", 5), "You've used all 5 study guides this month.")

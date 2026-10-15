@@ -68,14 +68,14 @@ export default function Heatmap({ serverWeek = [] }) {
         .heat { display: grid; gap: 12px; padding: 20px; }
         .heat-scroll { overflow-x: auto; padding: 2px; }
         .heat-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 12px); grid-auto-columns: 12px; gap: 3px; width: max-content; }
-        .heat-cell { width: 12px; height: 12px; padding: 0; border: 0; border-radius: 3px; background: var(--card-sunk); cursor: pointer; }
-        .heat-cell.l1 { background: rgba(83, 97, 73, .3); }
-        .heat-cell.l2 { background: rgba(83, 97, 73, .5); }
-        .heat-cell.l3 { background: rgba(83, 97, 73, .75); }
+        .heat-cell { width: 12px; height: 12px; padding: 0; border: 0; border-radius:12px; background: var(--card-sunk); cursor: pointer; }
+        .heat-cell.l1 { background: var(--surface-card); }
+        .heat-cell.l2 { background: var(--surface-card); }
+        .heat-cell.l3 { background: var(--surface-card); }
         .heat-cell.l4 { background: var(--olive); }
-        :global([data-theme='dark']) .heat-cell.l1 { background: rgba(195, 207, 182, .3); }
-        :global([data-theme='dark']) .heat-cell.l2 { background: rgba(195, 207, 182, .5); }
-        :global([data-theme='dark']) .heat-cell.l3 { background: rgba(195, 207, 182, .75); }
+        :global([data-theme='dark']) .heat-cell.l1 { background: var(--surface-card); }
+        :global([data-theme='dark']) .heat-cell.l2 { background: var(--surface-card); }
+        :global([data-theme='dark']) .heat-cell.l3 { background: var(--surface-card); }
         :global([data-theme='dark']) .heat-cell.l4 { background: var(--olive-ink); }
         .heat-cell.is-picked { outline: 2px solid var(--ink); outline-offset: 1px; }
         .heat-day { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }

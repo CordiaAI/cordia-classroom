@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import CordiaLoader from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
 import { apiFetch, openUpgrade } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -82,7 +83,7 @@ export default function QuizPage() {
       setSession({ ...data, cards: short ? data.cards.slice(0, 3) : data.cards, selected: chosen, race: race && !short, version: Date.now() });
       walkthroughEvent('quiz-started');
     }
-    else setError(data?.detail || 'Retain could not start. Make sure this guide has questions and answers.');
+    else setError(data?.detail || 'The quiz could not start. Make sure this guide has questions and answers.');
   }
 
   async function regenerate() {
@@ -142,7 +143,7 @@ export default function QuizPage() {
           </div>
           <p className="quiz-note">{race ? <><Timer size={20} strokeWidth={1.75} aria-hidden="true" />60 seconds</> : <><Repeat size={20} strokeWidth={1.75} aria-hidden="true" />Misses repeat</>}</p>
           <button type="button" className="c-btn c-btn--primary c-btn--lg quiz-start" data-spot="quiz-start" onClick={start} disabled={starting || !types.length || !guideId}>
-            <Play size={20} strokeWidth={1.75} aria-hidden="true" />{starting ? 'Preparing…' : 'Start'}
+            {starting ? <><CordiaLoader size={20} label="Preparing" />Preparing</> : <><Play size={20} strokeWidth={1.75} aria-hidden="true" />Start</>}
           </button>
           {history.length > 0 && (
             <section className="c-section" aria-labelledby="quiz-history">
@@ -161,17 +162,17 @@ export default function QuizPage() {
         </>
       )}
       <style jsx>{`
-        .quiz-page { width: min(760px, 100%); margin: 0 auto; }
+        .quiz-page { width: min(var(--page-max), 100%); margin: 0 auto; }
         .quiz-guide { margin: -12px 0 0; font-family: var(--font-display); }
         .quiz-modes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-        .quiz-mode { position: relative; display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 120px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow); }
+        .quiz-mode { position: relative; display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 120px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow); }
         .quiz-mode :global(.lucide) { color: var(--olive-ink); }
         .quiz-mode.is-on { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
         .quiz-mode :global(.quiz-lock) { position: absolute; top: 12px; right: 12px; color: var(--muted); }
-        .quiz-note { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; }
+        .quiz-note { display: flex; align-items: center; gap: 8px; margin: 0; font-weight:600; }
         .quiz-note :global(.lucide) { color: var(--olive-ink); }
         .quiz-start { justify-self: start; min-width: 180px; }
-        .quiz-past-score { font-weight: 600; font-variant-numeric: tabular-nums; }
+        .quiz-past-score { font-weight:600; font-variant-numeric: tabular-nums; }
         @media (max-width: 767px) { .quiz-modes { grid-template-columns: repeat(3, minmax(0, 1fr)); } .quiz-start { width: 100%; } }
       `}</style>
     </div>

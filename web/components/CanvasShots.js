@@ -1,5 +1,5 @@
 // Drawn copies of the three Canvas screens a student uses to find their calendar feed,
-// with the exact spot to click circled in olive. Colors follow the theme.
+// with the exact spot to click circled in olive. Colors are the --shot-* tokens (styles/tokens.css).
 const TEXT = { fontFamily: 'Manrope, Arial, sans-serif', fontWeight: 600 };
 
 function Mark({ cx, cy, rx = 30, ry = 22 }) {
@@ -17,25 +17,16 @@ function Browser({ url, children, height = 220, label }) {
       {children}
       <style jsx global>{`
         .canvas-shot { display: block; width: 100%; height: auto; }
-        .canvas-shot .shot-frame { fill: #FFFFFF; }
-        .canvas-shot .shot-edge { stroke: rgba(34, 49, 41, 0.18); }
-        .canvas-shot .shot-chrome { fill: #EEF1EC; }
-        .canvas-shot .shot-line-fill { fill: rgba(34, 49, 41, 0.2); }
-        .canvas-shot .shot-soft { fill: #F1F3EF; }
-        .canvas-shot .shot-nav { fill: #394B58; }
-        .canvas-shot .shot-nav-ink { fill: #FFFFFF; stroke: #FFFFFF; }
-        .canvas-shot .shot-text { fill: #171B18; }
-        .canvas-shot .shot-link { fill: #0B6BC2; }
-        .canvas-shot .shot-mark { stroke: #536149; }
-        [data-theme='dark'] .canvas-shot .shot-frame { fill: #2F3238; }
-        [data-theme='dark'] .canvas-shot .shot-edge { stroke: rgba(255, 255, 255, 0.16); }
-        [data-theme='dark'] .canvas-shot .shot-chrome { fill: #24272C; }
-        [data-theme='dark'] .canvas-shot .shot-line-fill { fill: rgba(255, 255, 255, 0.22); }
-        [data-theme='dark'] .canvas-shot .shot-soft { fill: #3A3E45; }
-        [data-theme='dark'] .canvas-shot .shot-nav { fill: #1E2A33; }
-        [data-theme='dark'] .canvas-shot .shot-text { fill: #FFFFFF; }
-        [data-theme='dark'] .canvas-shot .shot-link { fill: #8CC4FF; }
-        [data-theme='dark'] .canvas-shot .shot-mark { stroke: #C3CFB6; }
+        .canvas-shot .shot-frame { fill: var(--shot-frame); }
+        .canvas-shot .shot-edge { stroke: var(--shot-edge); }
+        .canvas-shot .shot-chrome { fill: var(--shot-chrome); }
+        .canvas-shot .shot-line-fill { fill: var(--shot-line); }
+        .canvas-shot .shot-soft { fill: var(--shot-soft); }
+        .canvas-shot .shot-nav { fill: var(--shot-nav); }
+        .canvas-shot .shot-nav-ink { fill: var(--shot-nav-ink); stroke: var(--shot-nav-ink); }
+        .canvas-shot .shot-text { fill: var(--shot-text); }
+        .canvas-shot .shot-link { fill: var(--shot-link); }
+        .canvas-shot .shot-mark { stroke: var(--shot-mark); }
       `}</style>
     </svg>
   );

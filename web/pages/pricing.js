@@ -40,18 +40,18 @@ export default function Pricing() {
         </section>
       </div>
       <style jsx>{`
-        .pricing-title { margin: 0 0 32px; font: 600 clamp(32px, 5vw, 56px)/1.05 var(--font-display); color: var(--ink); }
+        .pricing-title { margin: 0 0 32px; font:600 40px/1.15 var(--font-display); color: var(--ink); }
         .pricing-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; max-width: 880px; }
-        .pricing-card { display: grid; gap: 16px; align-content: start; padding: 28px; border-radius: 20px; color: var(--ink); background: var(--lg-card); border: 1px solid var(--lg-edge); -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); box-shadow: var(--lg-highlight), var(--lg-shadow); }
+        .pricing-card { display: grid; gap: 16px; align-content: start; padding: 28px; border-radius:20px; color: var(--ink); background: var(--lg-card); border: 1px solid var(--lg-edge); -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); box-shadow: var(--lg-highlight), var(--lg-shadow); }
         .pricing-card.is-pro { box-shadow: 0 0 0 2px var(--olive), var(--lg-highlight), var(--lg-shadow); }
-        .pricing-card h2 { margin: 0; font: 600 17px/1.2 var(--font-sans); color: var(--ink); }
-        .pricing-price { margin: 0; font: 700 40px/1 var(--font-sans); }
-        .pricing-price span { font-size: 15px; font-weight: 500; }
-        .pricing-alt { margin: -8px 0 0; color: var(--muted); font: 500 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .pricing-card h2 { margin: 0; font:600 17px/1.15 var(--font-sans); color: var(--ink); }
+        .pricing-price { margin: 0; font:600 40px/1 var(--font-sans); }
+        .pricing-price span { font-size: 15px; font-weight:500; }
+        .pricing-alt { margin: -8px 0 0; color: var(--muted); font:500 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .pricing-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-        .pricing-card li { display: flex; gap: 8px; align-items: flex-start; font: 500 15px/1.4 var(--font-sans); }
+        .pricing-card li { display: flex; gap: 8px; align-items: flex-start; font:500 15px/1.5 var(--font-sans); }
         .pricing-card li :global(.lucide) { color: var(--olive-ink); margin-top: 2px; flex: 0 0 auto; }
-        .pricing-card :global(.pricing-btn) { display: inline-flex; align-items: center; justify-content: center; height: 44px; border: 0; border-radius: 999px; background: var(--olive); color: var(--on-olive); font: 600 15px/1 var(--font-sans); text-decoration: none; cursor: pointer; }
+        .pricing-card :global(.pricing-btn) { display: inline-flex; align-items: center; justify-content: center; height: 44px; border: 0; border-radius:999px; background: var(--olive); color: var(--on-olive); font:600 15px/1 var(--font-sans); text-decoration: none; cursor: pointer; }
         .pricing-card :global(.pricing-btn.is-secondary) { background: var(--glass); color: var(--ink); border: 1px solid var(--line); }
         .pricing-card :global(.pricing-btn.is-current) { background: transparent; color: var(--ink); border: 1px solid var(--line); cursor: default; }
         @media (max-width: 720px) { .pricing-grid { grid-template-columns: 1fr; } }

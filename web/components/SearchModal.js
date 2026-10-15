@@ -112,7 +112,7 @@ export default function SearchModal({ onClose }) {
         .c-search-results { list-style: none; margin: 0; padding: 0; max-height: 60vh; overflow: auto; }
         .c-search-results:not(:empty) { margin-top: 8px; }
         .c-search-group { padding: 10px 12px 4px; }
-        .c-search-hit { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink); font: 600 15px/1.3 var(--font-sans); text-align: left; cursor: pointer; }
+        .c-search-hit { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius:var(--r-input); background: transparent; color: var(--ink); font:600 15px/1.5 var(--font-sans); text-align: left; cursor: pointer; }
         .c-search-hit.is-active { background: var(--olive-tint); }
         .c-search-hit :global(.c-meta) { margin-left: auto; max-width: 40%; }
         .c-search-none { padding: 16px 12px; }

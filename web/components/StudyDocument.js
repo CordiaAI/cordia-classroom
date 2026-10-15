@@ -123,15 +123,15 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
         .reader { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 20px; align-items: start; }
         .reader:not(:has(.reader-pages)) { grid-template-columns: minmax(0, 1fr); }
         .reader-pages { position: sticky; top: calc(var(--bar-h) + 16px); display: grid; gap: 8px; max-height: calc(100vh - var(--bar-h) - 40px); overflow: auto; padding: 2px; }
-        .reader-thumb { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-input); background: var(--card); color: var(--ink); text-align: left; cursor: pointer; }
+        .reader-thumb { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); color: var(--ink); text-align: left; cursor: pointer; }
         .reader-thumb.is-active { border-color: var(--olive); box-shadow: 0 0 0 1px var(--olive); }
-        .reader-thumb-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: 600 13px/1.35 var(--font-sans); }
+        .reader-thumb-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font:600 13px/1.5 var(--font-sans); }
         .reader-paper { padding: 40px 48px; min-width: 0; display: grid; justify-items: center; scroll-margin-top: calc(var(--bar-h) + 16px); }
         .reader-block { width: 100%; max-width: 68ch; padding: 8px 0 28px; }
         .reader-block + .reader-block { border-top: 1px solid var(--line); padding-top: 28px; }
-        .reader-q { display: flex; gap: 12px; align-items: baseline; margin: 0 0 12px; font: 600 22px/1.3 var(--font-display); letter-spacing: -0.01em; }
+        .reader-q { display: flex; gap: 12px; align-items: baseline; margin: 0 0 12px; font:600 20px/1.15 var(--font-display); letter-spacing:0; }
         .reader-a { margin: 0; white-space: pre-wrap; }
-        .reader-img { display: block; max-width: 100%; margin-top: 16px; border-radius: var(--r-input); }
+        .reader-img { display: block; max-width: 100%; margin-top: 16px; border-radius:var(--r-input); }
         .reader-actions { display: flex; gap: 4px; margin: 16px 0 0 -12px; }
         .reader-actions :global(.is-read) { color: var(--success); }
         .reader-prose, .reader-notes { white-space: pre-wrap; width: 100%; }
@@ -144,7 +144,7 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
         }
         @media (max-width: 767px) {
           .reader-paper { padding: 24px 18px; }
-          .reader-q { font-size: 19px; }
+          .reader-q { font-size:20px; }
         }
       `}</style>
     </section>
