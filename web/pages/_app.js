@@ -12,7 +12,7 @@ import { Analytics } from '@vercel/analytics/react';
 export default function App({ Component, pageProps }) {
   const router = useRouter();
   // Public pages render without the signed-in shell.
-  const isLoginPage = ['/', '/login', '/signup', '/pricing'].includes(router.pathname);
+  const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password'].includes(router.pathname);
 
   // Authentication pages stay light; workspace routes honor the saved preference.
   useEffect(() => {
@@ -36,9 +36,8 @@ export default function App({ Component, pageProps }) {
       <meta property="og:site_name" content="CordiaClassroom" />
       <meta property="og:title" content="CordiaClassroom" />
       <meta property="og:description" content="Turn course material into focused study guides, notes, flashcards, and practice." />
-      <meta property="og:image" content="https://classroom.cordiaai.io/cordia-classroom-icon.png" />
-      <meta property="og:url" content="https://classroom.cordiaai.io" />
-      <meta name="twitter:card" content="summary" />
+      <meta property="og:image" content="https://classroom.cordiaai.io/cordia-classroom-icon.png" key="og:image" />
+            <meta name="twitter:card" content="summary" />
     </Head>
   );
 

@@ -50,17 +50,3 @@ export function rememberRetainMisses(guideId, misses) {
 export function retainMisses() {
   return readUserValue('cordiaRetainMisses', {}) || {};
 }
-
-// Counts browser sessions and remembers the first day, for day-3 / day-7 tips.
-export function trackVisit() {
-  if (typeof window === 'undefined') return { sessions: 0, days: 0 };
-  const visit = readUserValue('cordiaVisits', null) || { sessions: 0, first: Date.now() };
-  try {
-    if (!sessionStorage.getItem('cordiaVisitCounted')) {
-      sessionStorage.setItem('cordiaVisitCounted', '1');
-      visit.sessions += 1;
-      writeUserValue('cordiaVisits', visit);
-    }
-  } catch {}
-  return { sessions: visit.sessions, days: Math.floor((Date.now() - visit.first) / 86400000) + 1 };
-}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
+import { ArrowLeft, Plus, Upload, X } from 'lucide-react';
 import { apiFetch, getToken, responseJson } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
@@ -153,7 +154,7 @@ export default function CreateGuidePage() {
     });
     const seen = new Set(uploadFiles.map(fileKey));
     const merged = [...uploadFiles, ...readable.filter(file => !seen.has(fileKey(file)))];
-    if (merged.length > MAX_FILES) problems.push(`You can add up to ${MAX_FILES} files at a time, so only the first ${MAX_FILES} were kept.`);
+    if (merged.length > MAX_FILES) problems.push(`Up to ${MAX_FILES} files.`);
     setError(problems.join(' '));
     setLastWindow('file');
     const next = merged.slice(0, MAX_FILES);
@@ -201,7 +202,7 @@ export default function CreateGuidePage() {
 
   async function saveManualGuide() {
     if (!completePairs.length) {
-      setError('Add at least one complete question and answer in the Manual Study Guide.');
+      setError('Add one full card.');
       return;
     }
     setStatus('saving');
@@ -309,8 +310,8 @@ export default function CreateGuidePage() {
     if (fileReady) return createFromSources({ includeManual: false });
     if (manualReady) return saveManualGuide();
     setError(lastWindow === 'manual'
-      ? 'Add at least one complete question and answer in the Manual Study Guide.'
-      : 'Add a file or paste some notes in Upload Files first.');
+      ? 'Add one full card.'
+      : 'Add a file or notes.');
   }
 
   function chooseSource(option) {
@@ -350,20 +351,20 @@ export default function CreateGuidePage() {
     : manualReady && fileReady ? 'both'
       : fileReady ? 'file'
         : manualReady ? 'manual' : lastWindow;
-  const createLabel = status === 'extracting' ? (uploadFiles.length > 1 ? 'Reading your files…' : 'Reading your file…')
-    : status === 'saving' ? 'Saving your guide…'
-      : isEdit ? 'Update study guide' : 'Create study guide';
-  const createHint = createFrom === 'both' ? 'From the Manual Study Guide and Upload Files'
-    : createFrom === 'manual' ? 'From the Manual Study Guide' : 'From Upload Files';
+  // Create study guide
+  const createLabel = status === 'extracting' ? 'Reading…'
+    : status === 'saving' ? 'Saving…'
+      : isEdit ? 'Update' : 'Create';
 
   return (
     <div ref={pageRef} className="fade-in create-split-page">
-      <button type="button" className="create-back-link" onClick={() => router.push('/dashboard?view=guides')}>Back to Study Guides</button>
-
-      <div className="create-split-top">
-        <button type="button" className="btn create-split-submit" onClick={handleCreate} disabled={busy || Boolean(batch)}>{createLabel}</button>
-        <span className="create-split-hint">{createHint}</span>
-      </div>
+      <header className="c-page-head create-head">
+        <div className="c-row">
+          <button type="button" className="c-icon-btn" onClick={() => router.push(isEdit ? '/guide/' + router.query.editGuideId : '/library')} aria-label="Back"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+          <h1 className="c-title">{isEdit ? 'Edit guide' : 'New guide'}</h1>
+        </div>
+        <button type="button" className="c-btn c-btn--primary create-split-submit" onClick={handleCreate} disabled={busy || Boolean(batch)}>{createLabel}</button>
+      </header>
 
       {error && <div className="create-banner create-banner-error" role="alert">
         <span>{error}</span>
@@ -375,23 +376,22 @@ export default function CreateGuidePage() {
           onFocusCapture={() => setLastWindow('manual')}
           onPointerDown={() => setLastWindow('manual')}
         >
-          <h2 className="create-window-title">Manual Study Guide</h2>
-          <p className="create-window-sub">Type the exact questions and answers you want to study.</p>
-          <div className="create-manual-header"><span>{completePairs.length} complete cards</span><label>Set size <input type="number" min="1" max="100" value={cardCount} onChange={event => setCardCount(event.target.value)} onBlur={() => applyCardCount(cardCount)} /></label></div>
+          <h2 className="c-section-title create-window-title">Write cards</h2>
+          <div className="create-manual-header"><span className="c-meta">{completePairs.length} cards</span><label>Size <input className="c-input" type="number" min="1" max="100" value={cardCount} onChange={event => setCardCount(event.target.value)} onBlur={() => applyCardCount(cardCount)} /></label></div>
           <div className="create-cards-list">
             {manualPairs.map((pair, index) => (
               <div className="create-card" key={index}>
                 <div className="create-card-num">{index + 1}</div>
                 <div className="create-card-body">
-                  <input ref={element => { termInputs.current[index] = element; }} onKeyDown={event => handleCardKey(event, index, 'term')} className="create-card-input create-card-term" value={pair.term} onChange={event => updatePair(index, 'term', event.target.value)} placeholder="Question or term" />
+                  <input ref={element => { termInputs.current[index] = element; }} onKeyDown={event => handleCardKey(event, index, 'term')} className="create-card-input create-card-term" value={pair.term} onChange={event => updatePair(index, 'term', event.target.value)} placeholder="Term" aria-label={`Term ${index + 1}`} />
                   <div className="create-card-divider" />
-                  <input ref={element => { answerInputs.current[index] = element; }} onKeyDown={event => handleCardKey(event, index, 'definition')} className="create-card-input create-card-def" value={pair.definition} onChange={event => updatePair(index, 'definition', event.target.value)} placeholder="Answer or definition" />
+                  <input ref={element => { answerInputs.current[index] = element; }} onKeyDown={event => handleCardKey(event, index, 'definition')} className="create-card-input create-card-def" value={pair.definition} onChange={event => updatePair(index, 'definition', event.target.value)} placeholder="Definition" aria-label={`Definition ${index + 1}`} />
                 </div>
-                {manualPairs.length > 1 && <button type="button" className="create-card-remove" onClick={() => setManualPairs(pairs => pairs.filter((_, pairIndex) => pairIndex !== index))} aria-label="Remove card">×</button>}
+                {manualPairs.length > 1 && <button type="button" className="create-card-remove" onClick={() => setManualPairs(pairs => pairs.filter((_, pairIndex) => pairIndex !== index))} aria-label={`Remove card ${index + 1}`}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>}
               </div>
             ))}
           </div>
-          <button type="button" className="create-add-card" onClick={() => setManualPairs(pairs => [...pairs, { term: '', definition: '' }])}>Add another card</button>
+          <button type="button" className="c-btn c-btn--quiet create-add-card" onClick={() => setManualPairs(pairs => [...pairs, { term: '', definition: '' }])}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />Add card</button>
         </section>
 
         {!isEdit && (
@@ -400,8 +400,7 @@ export default function CreateGuidePage() {
             onFocusCapture={() => setLastWindow('file')}
             onPointerDown={() => setLastWindow('file')}
           >
-            <h2 className="create-window-title">Upload Files</h2>
-            <p className="create-window-sub">PDFs, PowerPoints, Word files, images, or text. Up to {MAX_FILES} at once.</p>
+            <h2 className="c-section-title create-window-title">Upload</h2>
             <button
               ref={uploadBoxRef}
               type="button"
@@ -409,11 +408,8 @@ export default function CreateGuidePage() {
               onClick={() => fileInputRef.current?.click()}
               disabled={busy || uploadFiles.length >= MAX_FILES}
             >
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              <strong>{uploadDropActive ? 'Drop to add files' : uploadFiles.length >= MAX_FILES ? `${MAX_FILES} files added` : 'Click to choose files'}</strong>
-              <span>or drag and drop them anywhere on this page</span>
+              <Upload size={32} strokeWidth={1.75} aria-hidden="true" />
+              <strong>{uploadDropActive ? 'Drop' : uploadFiles.length >= MAX_FILES ? `${MAX_FILES} / ${MAX_FILES}` : 'Choose files'}</strong>
             </button>
             <input ref={fileInputRef} type="file" accept="*" multiple onChange={event => { selectFiles(event.target.files); event.target.value = ''; }} hidden />
             {uploadFiles.length > 0 && (
@@ -421,50 +417,49 @@ export default function CreateGuidePage() {
                 {uploadFiles.map(file => (
                   <li key={fileKey(file)}>
                     <span>{file.name}</span>
-                    <button type="button" onClick={() => removeFile(file)} disabled={busy} aria-label={`Remove ${file.name}`}>×</button>
+                    <button type="button" className="c-icon-btn" onClick={() => removeFile(file)} disabled={busy} aria-label={`Remove ${file.name}`}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
                   </li>
                 ))}
               </ul>
             )}
             <label className="create-paste">
-              <span>Or paste notes</span>
-              <textarea className="create-textarea" value={content} onChange={event => setContent(event.target.value)} placeholder="Lecture notes, textbook passages, slide text…" disabled={busy} />
+              <span>Paste</span>
+              <textarea className="c-input create-textarea" value={content} onChange={event => setContent(event.target.value)} placeholder="Paste notes" disabled={busy} />
             </label>
           </section>
         )}
       </div>
 
       <section className="create-split-settings">
-        <label><span>Title</span><input className="create-input" value={title} onChange={event => setTitle(event.target.value)} placeholder="Automatic title" disabled={busy} /></label>
-        <label><span>Class</span><select className="create-select" value={selectedFolder} onChange={event => setSelectedFolder(event.target.value)} disabled={busy}><option value="">No class</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select></label>
+        <label><span>Title</span><input className="c-input create-input" value={title} onChange={event => setTitle(event.target.value)} placeholder="Auto" disabled={busy} /></label>
+        <label><span>Class</span><select className="c-select create-select" value={selectedFolder} onChange={event => setSelectedFolder(event.target.value)} disabled={busy}><option value="">No class</option>{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select></label>
         {!isEdit && (
           <div className="create-checks">
-            <label className="create-check-label"><input type="checkbox" checked={generateNotes} onChange={event => setGenerateNotes(event.target.checked)} /> Include summary notes</label>
-            <label className="create-check-label"><input type="checkbox" checked={generateFlashcards} onChange={event => setGenerateFlashcards(event.target.checked)} /> Include flashcards</label>
+            <label className="create-check-label"><input type="checkbox" checked={generateNotes} onChange={event => setGenerateNotes(event.target.checked)} /> Notes</label>
+            <label className="create-check-label"><input type="checkbox" checked={generateFlashcards} onChange={event => setGenerateFlashcards(event.target.checked)} /> Cards</label>
           </div>
         )}
       </section>
 
       {choiceOpen && (
-        <div className="confirm-overlay">
-          <div className="confirm-dialog create-batch-dialog" role="dialog" aria-modal="true" aria-labelledby="create-choice-title">
-            <h3 id="create-choice-title">Include your manual cards?</h3>
-            <p>You may have uploaded a file AND written text in manual study guide. Would you like to include the manual study guide text in the same study guide as the file upload?</p>
+        <div className="c-scrim">
+          <div className="c-sheet create-batch-dialog" role="dialog" aria-modal="true" aria-labelledby="create-choice-title">
+            <h2 id="create-choice-title" className="c-section-title">Add your cards?</h2>
             <div className="create-choice-actions">
-              <button type="button" className="btn" onClick={() => chooseSource('both')}>Yes, include it</button>
-              <button type="button" className="btn-outline" onClick={() => chooseSource('manual')}>Generate from manual creator</button>
-              <button type="button" className="btn-outline" onClick={() => chooseSource('file')}>Generate from uploaded file</button>
-              <button type="button" className="create-choice-cancel" onClick={() => setChoiceOpen(false)}>Cancel</button>
+              <button type="button" className="c-btn c-btn--primary" onClick={() => chooseSource('both')}>Combine</button>
+              <button type="button" className="c-btn c-btn--secondary" onClick={() => chooseSource('manual')}>Cards only</button>
+              <button type="button" className="c-btn c-btn--secondary" onClick={() => chooseSource('file')}>File only</button>
+              <button type="button" className="c-btn c-btn--quiet" onClick={() => setChoiceOpen(false)}>Cancel</button>
             </div>
           </div>
         </div>
       )}
 
       {batch && (
-        <div className="confirm-overlay">
-          <div className="confirm-dialog create-batch-dialog" role="dialog" aria-modal="true" aria-labelledby="create-batch-title">
-            <h3 id="create-batch-title">Select files you want to combine into a study guide</h3>
-            {batch.queued.length > 0 && <p>Building {batch.queued.map(name => `“${name}”`).join(', ')} in the background. Choose files for the next guide.</p>}
+        <div className="c-scrim">
+          <div className="c-sheet create-batch-dialog" role="dialog" aria-modal="true" aria-labelledby="create-batch-title">
+            <h2 id="create-batch-title" className="c-section-title">Pick files</h2>
+            {batch.queued.length > 0 && <p className="c-meta" role="status">Building: {batch.queued.join(', ')}</p>}
             <ul className="create-batch-list">
               {batch.items.map(item => (
                 <li key={item.key}>
@@ -475,11 +470,11 @@ export default function CreateGuidePage() {
                 </li>
               ))}
             </ul>
-            {batchChars > MAX_SOURCE_CHARS && <p className="create-batch-warning" role="alert">These files are too long to combine into one guide ({batchChars.toLocaleString()} of {MAX_SOURCE_CHARS.toLocaleString()} characters). Select fewer files; the rest will be offered next.</p>}
+            {batchChars > MAX_SOURCE_CHARS && <p className="create-batch-warning" role="alert">Too long: {batchChars.toLocaleString()} / {MAX_SOURCE_CHARS.toLocaleString()} characters</p>}
             <div className="confirm-actions">
-              <button type="button" className="btn-outline" onClick={() => setBatch(null)}>{batch.queued.length ? 'Done' : 'Cancel'}</button>
-              <button type="button" className="btn" disabled={!batchChosen.length || batchChars > MAX_SOURCE_CHARS} onClick={queueBatchGuide}>
-                {batchChosen.length === batch.items.length ? 'Create study guide' : `Create guide from ${batchChosen.length} file${batchChosen.length === 1 ? '' : 's'}`}
+              <button type="button" className="c-btn c-btn--secondary" onClick={() => setBatch(null)}>{batch.queued.length ? 'Done' : 'Cancel'}</button>
+              <button type="button" className="c-btn c-btn--primary" disabled={!batchChosen.length || batchChars > MAX_SOURCE_CHARS} onClick={queueBatchGuide}>
+                Create
               </button>
             </div>
           </div>
