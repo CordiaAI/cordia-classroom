@@ -3,6 +3,7 @@ Text processing utilities for content extraction and cleaning.
 Handles LMS content, slideshows, and general educational material.
 """
 
+import html
 import re
 import logging
 from typing import List, Tuple
@@ -396,3 +397,11 @@ def inject_page_image_descriptions(text: str, image_descriptions: dict) -> str:
         text += "\n\n" + "\n\n".join(additions)
 
     return text
+
+
+def html_to_text(text: str) -> str:
+    """SmartNote HTML as plain text for AI context: block tags become line breaks, the rest is dropped."""
+    if not re.search(r"<[^>]+>", text or ""):
+        return text
+    text = re.sub(r"</?(?:p|div|li|h[1-6]|blockquote|br)[^>]*>", "\n", text, flags=re.IGNORECASE)
+    return html.unescape(re.sub(r"<[^>]+>", "", text))

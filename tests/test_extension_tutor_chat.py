@@ -8,24 +8,24 @@ from fastapi.testclient import TestClient
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
-import main
 from main import app
+from routers import chat
 from services.llm import answer_question
 
 AUTH = {"Authorization": "Bearer test"}
 BASE = {"question": "Now find the inverse of 5 mod 26", "content": "Modular inverses use the extended Euclidean algorithm.", "context_title": "Lecture"}
 
 
-@patch("main._style_instruction", return_value="")
-@patch("main._learning_guidance", return_value="")
-@patch("main.record")
-@patch("main.require", return_value={"used": 0})
-@patch("main.get_user_id", return_value="student-1")
+@patch("routers.chat.style_instruction", return_value="")
+@patch("routers.chat.learning_guidance", return_value="")
+@patch("routers.chat.record")
+@patch("routers.chat.require", return_value={"used": 0})
+@patch("routers.chat.get_user_id", return_value="student-1")
 class ExtensionTutorChatTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
 
-    @patch("main.answer_question", return_value="**Answer.**")
+    @patch("routers.chat.answer_question", return_value="**Answer.**")
     def test_side_panel_history_and_format_reach_the_model(self, answer, *_):
         history = [{"role": "user", "text": "Inverse of 7 mod 26?"}, {"role": "assistant", "text": "It is 15."}]
         response = self.client.post("/chat", headers=AUTH, json={**BASE, "history": history, "rich_text": True})
@@ -35,10 +35,10 @@ class ExtensionTutorChatTests(unittest.TestCase):
         self.assertTrue(kwargs["full_history"])
         self.assertTrue(kwargs["rich_text"])
 
-    @patch("main.answer_question")
+    @patch("routers.chat.answer_question")
     def test_conversation_past_the_model_memory_is_refused_with_a_clear_code(self, answer, *_):
         long_turn = {"role": "assistant", "text": "x" * 20_000}
-        with patch.object(main, "TUTOR_CONTEXT_TOKENS", 20_000):
+        with patch.object(chat, "TUTOR_CONTEXT_TOKENS", 20_000):
             response = self.client.post("/chat", headers=AUTH, json={**BASE, "history": [long_turn] * 4})
         self.assertEqual(response.status_code, 413)
         self.assertEqual(response.json()["detail"], "context_window_full")

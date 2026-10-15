@@ -3,7 +3,6 @@
 import os
 import re
 import json
-import html
 import logging
 import traceback
 from uuid import uuid4
@@ -13,34 +12,35 @@ from fastapi import FastAPI, HTTPException, Request, Header, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, Response
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.concurrency import run_in_threadpool
 
 from schemas import (
     IngestRequest, IngestResponse,
     GenerateRequest, GenerateResponse,
-    ChatRequest, ChatResponse, PracticeRequest, PracticeGradeRequest,
+    PracticeRequest, PracticeGradeRequest,
     PracticeProgressRequest, PracticeRecognizeRequest,
 )
 from services.text_processing import (
     clean_text, chunk_text,
     is_slideshow_content, extract_slideshow_content,
     format_slideshow_text, inject_image_descriptions,
-    inject_page_image_descriptions, build_review_sections
+    inject_page_image_descriptions, build_review_sections, html_to_text,
 )
 from services.llm import (
     generate_notes_ai, generate_study_guide,
-    generate_flashcards, answer_question, explain_retain_answer,
-    analyze_images_for_slides, generate_practice_guide, generate_verified_practice_set, grade_practice_answer, recognize_handwriting,
+    generate_flashcards,
+    analyze_images_for_slides, generate_verified_practice_set, grade_practice_answer, recognize_handwriting,
     transcribe_document_pages, transcribe_study_image,
     study_guide_is_complete, study_guide_to_flashcards,
 )
-from routers import auth, folders, guides, stats, search, quiz, billing, nclex, feedback, smart_notes, calendar, tutor, learning
+from rate_limit import limiter
+from routers import auth, chat, folders, guides, stats, search, quiz, billing, nclex, feedback, smart_notes, calendar, tutor, learning
 from auth_utils import get_user_id
 from database import get_supabase
 from services.entitlements import record, require
+from services.guidance import learning_guidance
 from services import file_extraction as files
 from services.pptx_rendering import (
     PptxRenderError,
@@ -48,17 +48,7 @@ from services.pptx_rendering import (
     PptxRenderUnavailable,
     render_pptx_to_pdf,
 )
-from services.tutor_sessions import (
-    append_tutor_message,
-    claim_tutor_turn,
-    complete_tutor_turn,
-    fail_tutor_turn,
-    public_tutor_session,
-    queue_browser_command,
-    TUTOR_SAFETY_POLICY,
-    tutor_skill_instruction,
-    wait_for_browser_result,
-)
+from services.tutor_sessions import append_tutor_message
 
 # Load environment variables
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
@@ -69,9 +59,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-# Rate limiter — keyed by IP address
-limiter = Limiter(key_func=get_remote_address)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -170,28 +157,8 @@ app.include_router(feedback.router)
 app.include_router(smart_notes.router)
 app.include_router(calendar.router)
 app.include_router(tutor.router)
+app.include_router(chat.router)
 app.include_router(learning.router)
-
-def _style_instruction(user_id: str) -> str:
-    """Tutor presentation: the chosen study style and the student's own explanation request."""
-    try:
-        from services.learning_styles import active_style, explanation_instruction, load_preference, tutor_style_instruction
-        supabase = get_supabase()
-        return "\n".join(filter(None, [
-            tutor_style_instruction(active_style(supabase, user_id)),
-            explanation_instruction(load_preference(supabase, user_id).get("explain_preference")),
-        ]))
-    except Exception:
-        return ""
-
-
-def _learning_guidance(user_id: str) -> str:
-    try:
-        from routers.stats import learning_profile_for_user
-        return learning_profile_for_user(user_id)["generation_guidance"]
-    except Exception:
-        return ""
-
 
 # === Input sanitization helpers ===
 MAX_CONTENT_LENGTH = 500_000  # 500KB max content
@@ -203,34 +170,6 @@ def _sanitize_text(text: str, max_length: int = MAX_CONTENT_LENGTH) -> str:
     if not text:
         return ""
     return text[:max_length]
-
-
-def _plain_context(text: str) -> str:
-    """Turn SmartNote HTML into readable model context without another parser."""
-    if not re.search(r"<[^>]+>", text or ""):
-        return text
-    text = re.sub(r"</?(?:p|div|li|h[1-6]|blockquote|br)[^>]*>", "\n", text, flags=re.IGNORECASE)
-    return html.unescape(re.sub(r"<[^>]+>", "", text))
-
-
-def _verified_retain_context(body: ChatRequest, content: str):
-    """Validate that a queued Retain explanation still belongs to the owned guide."""
-    retain = body.retain_context
-    if not retain:
-        return None
-    if not body.guide_id:
-        raise HTTPException(status_code=400, detail="A Retain explanation requires its study guide")
-    if retain.options and (retain.selected_answer not in retain.options or retain.correct_answer not in retain.options):
-        raise HTTPException(status_code=400, detail="Retain answers do not match the question choices")
-    if retain.selected_answer == retain.correct_answer:
-        raise HTTPException(status_code=400, detail="This Retain answer is already correct")
-
-    normalized_source = re.sub(r"\s+", " ", content).casefold()
-    normalized_question = re.sub(r"\s+", " ", retain.question).casefold()
-    normalized_answer = re.sub(r"\s+", " ", retain.correct_answer).casefold()
-    if normalized_question not in normalized_source or normalized_answer not in normalized_source:
-        raise HTTPException(status_code=409, detail="This Retain question no longer matches the selected guide")
-    return retain
 
 
 @app.post("/render-pptx")
@@ -472,7 +411,7 @@ def generate(body: GenerateRequest, request: Request, authorization: str = Heade
             study_guide = generate_study_guide(
                 chunks,
                 has_images=has_images,
-                learning_guidance=_learning_guidance(user_id),
+                learning_guidance=learning_guidance(user_id),
             )
             if not study_guide or study_guide.startswith("[Error"):
                 raise HTTPException(
@@ -537,7 +476,7 @@ def create_practice_set(
             raise HTTPException(status_code=404, detail="That study guide is no longer available.")
         guide = result.data[0]
         content = _sanitize_text("\n\n".join(filter(None, [
-            _plain_context(guide.get("notes") or ""),
+            html_to_text(guide.get("notes") or ""),
             guide.get("study_guide") or "",
         ])), MAX_CONTENT_LENGTH)
         title = guide.get("title") or "Study Guide"
@@ -548,7 +487,7 @@ def create_practice_set(
         raise HTTPException(status_code=400, detail="Add a study guide or upload readable study material first.")
 
     require(user_id, "practice")
-    practice = generate_verified_practice_set(content, _learning_guidance(user_id), domain)
+    practice = generate_verified_practice_set(content, learning_guidance(user_id), domain)
     problems = practice.get("problems", []) if isinstance(practice, dict) else []
     if len(problems) != 10:
         raise HTTPException(status_code=502, detail="Cordia could not verify a complete 10-problem set from this material. Please try another source or add more detail.")
@@ -630,296 +569,4 @@ def recognize_practice_handwriting(body: PracticeRecognizeRequest, request: Requ
 
 # The Tutor model's context window (gpt-4o-mini: 128k tokens), less room for its reply and
 # instructions. Estimated at ~3.5 characters per token, which errs on the side of stopping early.
-TUTOR_CONTEXT_TOKENS = int(os.getenv("CLASSROOM_TUTOR_CONTEXT_TOKENS", "128000"))
-TUTOR_RESERVED_TOKENS = 6_000
-CONTEXT_FULL = "context_window_full"
-
-
-def _estimated_tokens(*texts: str) -> int:
-    return int(sum(len(text or "") for text in texts) / 3.5) + 1
-
-
-@app.post("/chat", response_model=ChatResponse)
-@limiter.limit("30/minute")
-def chat(body: ChatRequest, request: Request, authorization: str = Header(default="")):
-    """
-    Answer questions about the content.
-    Requires authentication. Rate limited.
-    """
-    user_id = None
-    session_turn = None
-    try:
-        user_id = get_user_id(authorization)
-        logger.info(f"Chat from user={user_id[:8]}...")
-
-        question = _sanitize_text(body.question, MAX_QUESTION_LENGTH)
-        content = _sanitize_text(body.content, MAX_CONTENT_LENGTH)
-        request_content = content
-
-        if not question:
-            raise HTTPException(status_code=400, detail="Question is required")
-
-        if body.guide_id and body.note_id:
-            raise HTTPException(status_code=400, detail="Choose one study source")
-
-        guide = None
-        note = None
-        source = None
-        if body.guide_id:
-            if not re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}', body.guide_id, re.IGNORECASE):
-                raise HTTPException(status_code=400, detail="Invalid guide ID")
-            result = get_supabase().table("study_guides") \
-                .select("id,title,folder_id,study_guide,notes,source_url") \
-                .eq("id", body.guide_id) \
-                .eq("user_id", user_id) \
-                .execute()
-            if not result.data:
-                raise HTTPException(status_code=404, detail="Guide not found")
-            guide = result.data[0]
-            content = _sanitize_text(
-                guide.get("study_guide") or guide.get("notes") or request_content,
-                MAX_CONTENT_LENGTH,
-            )
-            source = {"type": "study_guide", "id": guide["id"], "title": guide.get("title") or "Study Guide"}
-        elif body.note_id:
-            if not re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}', body.note_id, re.IGNORECASE):
-                raise HTTPException(status_code=400, detail="Invalid note ID")
-            result = get_supabase().table("smart_notes") \
-                .select("id,title,folder_id,content") \
-                .eq("id", body.note_id) \
-                .eq("user_id", user_id) \
-                .execute()
-            if not result.data:
-                raise HTTPException(status_code=404, detail="Note not found")
-            note = result.data[0]
-            content = _sanitize_text(
-                _plain_context(note.get("content") or request_content),
-                MAX_CONTENT_LENGTH,
-            )
-            source = {"type": "smartnote", "id": note["id"], "title": note.get("title") or "SmartNote"}
-        elif body.context_title and content:
-            source = {
-                "type": "browser" if body.context_url else "file",
-                "title": body.context_title.strip() or "Attached file",
-            }
-            if body.context_url:
-                source["url"] = body.context_url
-
-        context_class_id = body.class_id or (guide or note or {}).get("folder_id")
-
-        if body.session_id:
-            session_turn = claim_tutor_turn(
-                user_id=user_id,
-                session_id=body.session_id,
-                expected_version=body.conversation_version,
-                message=question,
-                requested_skill=body.skill,
-                guide_id=body.guide_id,
-                class_id=context_class_id,
-            )
-
-        def finish(response: ChatResponse):
-            if not session_turn:
-                return response
-            row = complete_tutor_turn(
-                user_id,
-                session_turn,
-                response.model_dump(exclude_none=True),
-            )
-            return response.model_copy(update={
-                "skill": session_turn["active_skill"],
-                "session": public_tutor_session(row),
-            })
-
-        active_skill = session_turn.get("active_skill") if session_turn else body.skill
-        if active_skill in {"capture", "find_material"}:
-            if not session_turn or not public_tutor_session(session_turn)["browser_available"]:
-                return finish(ChatResponse(
-                    answer="Open the CordiaClassroom browser side panel, then try the browser request again.",
-                    action="browser_unavailable",
-                ))
-            command_type = "capture_current_page" if active_skill == "capture" else "find_material_current_page"
-            queue_browser_command(user_id, session_turn, command_type, question)
-            answer = (
-                "Working in the browser side panel now. Keep it open while I read the current page."
-                if active_skill == "capture"
-                else "Looking for relevant study material linked from the current page."
-            )
-            row = wait_for_browser_result(user_id, session_turn, answer)
-            return ChatResponse(
-                answer=answer,
-                action="browser_command_queued",
-                skill=active_skill,
-                session=public_tutor_session(row),
-            )
-
-        if active_skill == "plan":
-            if not content.strip():
-                return finish(ChatResponse(
-                    answer="Open Canvas calendar reminders on the Dashboard to review what is due today and what is coming next.",
-                    action="opened_plan_help",
-                ))
-
-        if active_skill == "organize":
-            if not (guide or note):
-                return finish(ChatResponse(answer="Choose a study guide or SmartNote to organize."))
-            if not body.class_id:
-                return finish(ChatResponse(answer="Choose the destination class before organizing this material."))
-            if guide:
-                guides.move_guide(
-                    guide["id"],
-                    guides.MoveGuideRequest(folder_id=body.class_id),
-                    authorization,
-                )
-            else:
-                smart_notes.update_note(
-                    note["id"],
-                    smart_notes.UpdateNoteRequest(folder_id=body.class_id),
-                    authorization,
-                )
-            return finish(ChatResponse(
-                answer=f"Moved {(source or {}).get('title') or 'the material'} to the selected class.",
-                action="organized_material",
-                source=source,
-            ))
-
-        if not content.strip():
-            if source:
-                return finish(ChatResponse(
-                    answer=f"{source.get('title') or 'The selected material'} is selected, but it does not contain readable study material yet. Add content or choose another source."
-                ))
-            return finish(ChatResponse(answer="Choose a study guide, SmartNote, or uploaded file before asking Cordia."))
-
-        # Validate mode
-        if body.mode not in ("short", "detailed", "example"):
-            raise HTTPException(status_code=400, detail="Invalid mode")
-
-        wants_practice = active_skill == "practice" or bool(re.search(
-            r'\b(create|make|generate|build)\b.*\bpractice\b.*\b(problems?|questions?|guide)\b',
-            question,
-            re.IGNORECASE,
-        ))
-        if wants_practice:
-            require(user_id, "practice")
-            practice = generate_practice_guide(content, _learning_guidance(user_id))
-            if not practice or practice.startswith("[Error"):
-                raise HTTPException(status_code=502, detail="Cordia could not create practice problems from this material")
-            practice_cards = study_guide_to_flashcards(practice)
-            if not practice_cards or not study_guide_is_complete(practice):
-                raise HTTPException(status_code=502, detail="Cordia received incomplete practice problems. Please try again.")
-            source_title = (source or {}).get("title") or "Study Material"
-            payload = {
-                "user_id": user_id,
-                "folder_id": context_class_id,
-                "title": f"{source_title} — Practice Problems",
-                "study_guide": practice,
-                "flashcards": practice_cards,
-                "source_type": (source or {}).get("type"),
-                "source_title": source_title,
-                "source_id": (source or {}).get("id"),
-            }
-            if guide:
-                payload.update(source_url=guide.get("source_url"), source_guide_id=guide["id"])
-            created = get_supabase().table("study_guides").insert(payload).execute()
-            if not created.data:
-                raise HTTPException(status_code=500, detail="Practice guide could not be saved")
-            record(user_id, "practice")
-            saved = created.data[0]
-            location = " in the same class" if saved.get("folder_id") else " in Study Guides"
-            return finish(ChatResponse(
-                answer=f"Created {saved['title']}{location}.",
-                action="created_guide",
-                guide={"id": saved["id"], "title": saved["title"], "folder_id": saved.get("folder_id")},
-                source=source,
-            ))
-
-        if active_skill == "build_guide":
-            require(user_id, "guide")
-            chunks = chunk_text(clean_text(content))
-            study_guide = generate_study_guide(
-                chunks,
-                learning_guidance=_learning_guidance(user_id),
-            )
-            flashcards = study_guide_to_flashcards(study_guide or "")
-            if not study_guide or not flashcards or not study_guide_is_complete(study_guide):
-                raise HTTPException(status_code=502, detail="Cordia could not build a complete guide from this material")
-            source_title = (source or {}).get("title") or "Study Material"
-            payload = {
-                "user_id": user_id,
-                "folder_id": context_class_id,
-                "title": f"{source_title} — Study Guide",
-                "study_guide": study_guide,
-                "flashcards": flashcards,
-                "source_type": (source or {}).get("type"),
-                "source_title": source_title,
-                "source_id": (source or {}).get("id"),
-                "source_url": (source or {}).get("url") or (guide or {}).get("source_url"),
-            }
-            if guide:
-                payload["source_guide_id"] = guide["id"]
-            created = get_supabase().table("study_guides").insert(payload).execute()
-            if not created.data:
-                raise HTTPException(status_code=500, detail="Study guide could not be saved")
-            record(user_id, "guide")
-            saved = created.data[0]
-            location = " in the same class" if saved.get("folder_id") else " in Study Guides"
-            return finish(ChatResponse(
-                answer=f"Created {saved['title']}{location}.",
-                action="created_guide",
-                guide={"id": saved["id"], "title": saved["title"], "folder_id": saved.get("folder_id")},
-                source=source,
-            ))
-
-        require(user_id, "tutor")
-        guidance = "\n".join(filter(None, [
-            _learning_guidance(user_id),
-            _style_instruction(user_id),
-            tutor_skill_instruction(active_skill),
-            TUTOR_SAFETY_POLICY,
-        ]))
-        retain_context = _verified_retain_context(body, content)
-        if retain_context:
-            previous_messages = (session_turn or {}).get("messages") or []
-            answer = explain_retain_answer(
-                question=retain_context.question,
-                options=retain_context.options,
-                selected_answer=retain_context.selected_answer,
-                correct_answer=retain_context.correct_answer,
-                context=content,
-                conversation=previous_messages[:-1],
-                learning_guidance=guidance,
-            )
-        else:
-            previous_messages = (session_turn or {}).get("messages") or []
-            client_history = [turn.model_dump() for turn in body.history] if not session_turn else []
-            if client_history:
-                used = _estimated_tokens(content[:25000], guidance, question, *(turn["text"] for turn in client_history))
-                if used > TUTOR_CONTEXT_TOKENS - TUTOR_RESERVED_TOKENS:
-                    raise HTTPException(status_code=413, detail=CONTEXT_FULL)
-            answer = answer_question(
-                question=question,
-                context=content,
-                mode=body.mode,
-                learning_guidance=guidance,
-                conversation=client_history or previous_messages[:-1],
-                allow_clarification=active_skill in {"explain", "retain", None},
-                rich_text=body.rich_text,
-                full_history=bool(client_history),
-            )
-
-        record(user_id, "tutor")
-        return finish(ChatResponse(answer=answer, source=source))
-
-    except HTTPException as error:
-        if user_id and session_turn:
-            fail_tutor_turn(user_id, session_turn, str(error.detail))
-        raise
-    except Exception as e:
-        if user_id and session_turn:
-            fail_tutor_turn(user_id, session_turn, "Unexpected Tutor error")
-        logger.error(f"Error in /chat: {e}\n{traceback.format_exc()}")
-        return JSONResponse(
-            status_code=500,
-            content={"answer": "Error processing your question. Please try again."}
-        )
 
