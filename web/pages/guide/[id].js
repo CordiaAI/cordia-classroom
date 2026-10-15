@@ -25,6 +25,13 @@ export default function GuidePage() {
   const { learningStyle } = useLearningStyle();
   const [openAid, setOpenAid] = useState(null);
 
+  // ?learn=1 (from the setup checklist) opens "Learn it your way" on the first question.
+  useEffect(() => {
+    if (router.query.learn !== '1' || !guide || !learningStyle?.enabled || openAid) return;
+    const first = parseQAPairs(guide.study_guide)[0];
+    if (first) setOpenAid(first.index);
+  }, [router.query.learn, guide, learningStyle?.enabled]);
+
   useEffect(() => {
     if (ready && id) {
       loadGuide();

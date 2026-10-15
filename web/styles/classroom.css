@@ -606,3 +606,41 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
   .setup-wizard-actions .btn { flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .setup-wizard[data-phase] { animation: none; } .setup-wizard :is(.learning-style-option,.setup-wizard-dots span) { transition: none; } }
+
+/* Setup wizard v2: one-click extension steps, feature cards */
+.setup-wizard-quick { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.setup-wizard-quick li { display: flex; gap: 14px; align-items: flex-start; padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--reading-surface); }
+.setup-wizard-quick li div { display: grid; gap: 6px; line-height: 1.5; }
+.setup-wizard-quick li span:not(.setup-wizard-num) { color: var(--text-secondary); font-size: .88rem; }
+.setup-wizard-quick li.done { border-color: var(--olive); }
+.setup-wizard-quick .setup-wizard-store { justify-self: start; margin-top: 4px; }
+.setup-wizard-num { flex-shrink: 0; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--surface); font: 650 .8rem/1 var(--font-sans); }
+.setup-wizard-quick li.done .setup-wizard-num { background: var(--olive); }
+.setup-wizard-help { margin-top: 14px; color: var(--text-secondary); font-size: .85rem; line-height: 1.6; }
+.setup-wizard-help summary { cursor: pointer; }
+.setup-wizard-help p { margin-top: 6px; }
+.setup-wizard-link { padding: 10px 0; background: none; border: 0; color: var(--text-secondary); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.setup-wizard-features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.setup-wizard-features article { display: flex; flex-direction: column; gap: 8px; padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--reading-surface); box-shadow: var(--shadow-sm); }
+.setup-wizard-features strong { font-weight: 650; line-height: 1.35; }
+.setup-wizard-features p { color: var(--text-secondary); font-size: .85rem; line-height: 1.6; }
+.setup-wizard-features .setup-wizard-link { margin-top: auto; align-self: flex-start; color: var(--olive); text-decoration: none; font-weight: 600; }
+.setup-wizard-tag { color: var(--olive); font: 650 .7rem/1.4 var(--font-sans); letter-spacing: .02em; }
+@media (max-width: 760px) { .setup-wizard-features { grid-template-columns: 1fr; } }
+
+/* Dashboard getting-started checklist */
+.getting-started { margin: 0 0 18px; padding: 18px 20px; border: 1px solid var(--glass-edge); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow-sm); }
+.getting-started header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.getting-started header div { display: flex; gap: 12px; align-items: baseline; }
+.getting-started header span { color: var(--muted-ink); font-size: .8rem; }
+.getting-started-close { background: none; border: 0; color: var(--muted-ink); font-size: 1.3rem; cursor: pointer; }
+.getting-started-bar { height: 4px; margin: 12px 0 10px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.getting-started-bar span { display: block; height: 100%; background: var(--olive); transition: width 300ms ease; }
+.getting-started ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.getting-started li button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--reading-surface); color: var(--ink); text-align: left; cursor: pointer; }
+.getting-started li button span:nth-child(2) { display: grid; gap: 2px; flex-grow: 1; }
+.getting-started li small { color: var(--text-secondary); font-size: .78rem; }
+.getting-started li.done button { opacity: .55; cursor: default; }
+.getting-started-check { flex-shrink: 0; display: grid; place-items: center; width: 20px; height: 20px; border: 1.5px solid var(--muted-ink); border-radius: 50%; font-size: .7rem; }
+.getting-started li.done .getting-started-check { border-color: var(--olive); background: var(--olive); color: var(--surface); }
+@media (max-width: 760px) { .getting-started ul { grid-template-columns: 1fr; } }

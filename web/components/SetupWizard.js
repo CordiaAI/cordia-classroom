@@ -4,10 +4,14 @@ import { useRouter } from 'next/router';
 import LearningStylePicker from './LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
 import { loadOnboarding, practiceTourUrl, saveOnboardingStep, smartNotesTourUrl } from '../lib/onboarding';
+import { STYLE_OPTIONS } from '../lib/learningStyle';
 import { EXTENSION_STORE_URL } from '../lib/extension';
 import AcademicInfinityMark from './AcademicInfinityMark';
 
-const ORDER = ['style', 'extension', 'extension_use', 'create', 'smartnotes', 'practice'];
+// Three screens: pick a style, make a first guide (extension first), see what most students miss.
+const ORDER = ['style', 'first_guide', 'unlocked'];
+// Accounts saved mid-way through the old six-step wizard resume at the closest new screen.
+const LEGACY = { extension: 'first_guide', extension_use: 'first_guide', create: 'first_guide', smartnotes: 'unlocked', practice: 'unlocked' };
 const TRANSITION_MS = 260;
 
 function extensionInstalled() {
@@ -19,6 +23,7 @@ function isPhone() {
 }
 
 // First-run setup, shown once per account (existing accounts included) and resumable.
+// Users who finish or skip it keep a dashboard checklist (GettingStarted) for the same features.
 // Rendered at the document root so no transformed page layout can move it off-center.
 export default function SetupWizard() {
   const router = useRouter();
@@ -44,7 +49,8 @@ export default function SetupWizard() {
 
   useEffect(() => {
     if (!progress || progress.completed || !learningStyle || step) return;
-    setStep(steps.includes(progress.step) ? progress.step : steps[0]);
+    const saved = LEGACY[progress.step] || progress.step;
+    setStep(steps.includes(saved) ? saved : steps[0]);
   }, [progress, learningStyle]);
 
   if (!progress || progress.completed || !step || typeof document === 'undefined') return null;
@@ -58,7 +64,7 @@ export default function SetupWizard() {
 
   function nextStep() {
     const position = steps.indexOf(step);
-    goTo(steps[position + 1] || 'practice');
+    goTo(steps[position + 1] || 'unlocked');
   }
 
   async function finish() {
@@ -75,76 +81,82 @@ export default function SetupWizard() {
 
   async function startPracticeTour() {
     setBusy(true);
-    await saveOnboardingStep('practice');
+    await saveOnboardingStep('done');
     router.push(await practiceTourUrl());
   }
 
   async function startSmartNotesTour() {
     setBusy(true);
-    await saveOnboardingStep('smartnotes');
+    await saveOnboardingStep('done');
     router.push(await smartNotesTourUrl());
   }
 
   const phone = isPhone();
   const position = steps.indexOf(step);
+  const chosen = STYLE_OPTIONS.find(option => option.id === learningStyle?.style);
   const pages = {
     style: {
       title: 'How do you like to study?',
       body: <>
-        <p className="setup-wizard-lead">Pick what feels right. You can change it anytime in Settings.</p>
+        <p className="setup-wizard-lead">Every study guide question gets a <strong>Learn it your way</strong> button that teaches it in this style. Change it anytime in Settings.</p>
         <LearningStylePicker value={learningStyle?.style || null} onSelect={style => saveStyle(style)} />
       </>,
       actions: <button type="button" className="btn" onClick={nextStep}>{learningStyle?.style ? 'Continue' : 'Skip for now'}</button>,
     },
-    extension: {
-      title: 'Add the Chrome extension',
+    first_guide: phone ? {
+      title: 'Make your first study guide',
+      body: <p className="setup-wizard-lead">Upload lecture slides, a PDF, or a doc. On a computer, the Chrome extension does this in one click from any Canvas page.</p>,
+      actions: <button type="button" className="btn" onClick={() => leaveFor('/create', 'unlocked')} disabled={busy}>Upload a file</button>,
+    } : {
+      title: 'Make guides in one click',
       body: <>
-        <p className="setup-wizard-lead">The extension turns any lecture page, slideshow, or PDF into a study guide in one click.</p>
-        {phone
-          ? <p className="setup-wizard-note">Extensions install from Chrome on a computer. You can add it later from the account menu.</p>
-          : installed
-            ? <p className="setup-wizard-done">✓ The extension is installed.</p>
-            : <a className="btn setup-wizard-store" href={EXTENSION_STORE_URL} target="_blank" rel="noreferrer">Open Chrome Web Store <span aria-hidden="true">↗</span></a>}
-        <div className="setup-wizard-warning" role="note">
-          <p>Some .edu email accounts won&apos;t allow extension installs. No worries:</p>
-          <ol>
-            <li>Click your Google profile picture in the top right of that page.</li>
-            <li>Select your personal account.</li>
-            <li>Install the extension!</li>
-          </ol>
-        </div>
+        <p className="setup-wizard-lead">Skip downloading and uploading. The extension reads the Canvas page, slides, or PDF you already have open.</p>
+        <ol className="setup-wizard-quick">
+          <li className={installed ? 'done' : ''}>
+            <span className="setup-wizard-num">{installed ? '✓' : '1'}</span>
+            <div>
+              <strong>{installed ? 'Extension added' : 'Add it to Chrome'}</strong>
+              {installed
+                ? <span>Pin it: puzzle-piece icon → pin CordiaClassroom.</span>
+                : <a className="btn setup-wizard-store" href={EXTENSION_STORE_URL} target="_blank" rel="noreferrer">Add to Chrome, free <span aria-hidden="true">↗</span></a>}
+            </div>
+          </li>
+          <li><span className="setup-wizard-num">2</span><div><strong>Open any lecture</strong><span>A Canvas page, slides, or a PDF in your browser.</span></div></li>
+          <li><span className="setup-wizard-num">3</span><div><strong>Click the Cordia icon → Make study guide</strong><span>It saves straight to your Classroom.</span></div></li>
+        </ol>
+        {!installed && <details className="setup-wizard-help">
+          <summary>Some .edu email accounts won&apos;t allow extension installs</summary>
+          <p>On the Chrome Web Store, click your profile picture (top right), switch to your personal Google account, then add it.</p>
+          <button type="button" className="setup-wizard-link" onClick={() => leaveFor('/install-extension', 'first_guide')} disabled={busy}>Full install guide</button>
+        </details>}
       </>,
-      actions: <button type="button" className="btn" onClick={nextStep}>Next</button>,
-    },
-    extension_use: {
-      title: 'Capture any lecture',
-      body: <ol className="setup-wizard-steps">
-        <li><strong>Pin it.</strong> Click Chrome&apos;s puzzle-piece icon, then the pin next to CordiaClassroom.</li>
-        <li><strong>Open your material.</strong> A Canvas page, lecture slides, a PDF, or a reading.</li>
-        <li><strong>Click the CordiaClassroom icon</strong>, then <strong>Make study guide</strong>, and save it to Classroom.</li>
-      </ol>,
       actions: <>
-        <button type="button" className="btn-outline" onClick={() => leaveFor('/install-extension', 'create')} disabled={busy}>Full install guide</button>
-        <button type="button" className="btn" onClick={nextStep}>Next</button>
+        <button type="button" className="setup-wizard-link" onClick={() => leaveFor('/create', 'unlocked')} disabled={busy}>Upload a file instead</button>
+        <button type="button" className="btn" onClick={nextStep}>{installed ? 'Next' : 'I added it'}</button>
       </>,
     },
-    create: {
-      title: 'No extension? No problem',
-      body: <p className="setup-wizard-lead">Or create a study guide by uploading a file (PDF, slides, or document) or by typing your material in manually.</p>,
-      actions: <>
-        <button type="button" className="btn-outline" onClick={() => leaveFor('/create', 'smartnotes')} disabled={busy}>Create a study guide</button>
-        <button type="button" className="btn" onClick={nextStep}>Next</button>
-      </>,
-    },
-    smartnotes: {
-      title: 'Take notes with SmartNotes',
-      body: <p className="setup-wizard-lead">A quick tour of the notes editor, the lecture file viewer, and visual diagrams. Click anywhere to move through it.</p>,
-      actions: <button type="button" className="btn" onClick={startSmartNotesTour} disabled={busy}>Show me SmartNotes</button>,
-    },
-    practice: {
-      title: 'Practice what you learned',
-      body: <p className="setup-wizard-lead">A quick tour of Practice: generating problems, revealing your guide when stuck, and getting help from the Tutor.</p>,
-      actions: <button type="button" className="btn" onClick={startPracticeTour} disabled={busy}>Show me Practice</button>,
+    unlocked: {
+      title: '3 things most students miss',
+      body: <div className="setup-wizard-features">
+        <article>
+          <span className="setup-wizard-tag">Learn it your way</span>
+          <strong>Stuck on a question? It re-teaches it {chosen ? `as ${chosen.label.toLowerCase()}` : 'your way'}.</strong>
+          <p>{chosen ? chosen.uses[chosen.uses.length - 1] + '.' : 'Diagrams, audio, notes, or real-life examples.'} Look for <em>Learn it your way →</em> under every guide question.</p>
+        </article>
+        <article>
+          <span className="setup-wizard-tag">Practice</span>
+          <strong>Math and problem sets, written from your class.</strong>
+          <p>New problems from your own material. Check each answer, reveal the guide when stuck, ask the Tutor why.</p>
+          <button type="button" className="setup-wizard-link" onClick={startPracticeTour} disabled={busy}>Show me →</button>
+        </article>
+        <article>
+          <span className="setup-wizard-tag">SmartNotes</span>
+          <strong>Type messy notes in lecture. Get a clean guide.</strong>
+          <p>One click turns your notes into a study guide, with diagrams and your lecture file side by side.</p>
+          <button type="button" className="setup-wizard-link" onClick={startSmartNotesTour} disabled={busy}>Show me →</button>
+        </article>
+      </div>,
+      actions: <button type="button" className="btn" onClick={finish} disabled={busy}>Go to my Classroom</button>,
     },
   };
   const page = pages[step];
@@ -154,7 +166,7 @@ export default function SetupWizard() {
       <section className="setup-wizard" data-phase={phase} role="dialog" aria-modal="true" aria-labelledby="setup-wizard-title">
         <header className="setup-wizard-header">
           <div className="setup-wizard-brand"><AcademicInfinityMark /><span>cordia</span></div>
-          <button type="button" className="setup-wizard-skip" onClick={finish} disabled={busy}>Skip setup</button>
+          {position > 0 && <button type="button" className="setup-wizard-skip" onClick={finish} disabled={busy}>Do this later</button>}
         </header>
         <span className="setup-wizard-progress">Your classroom · Step {position + 1} of {steps.length}</span>
         <h2 id="setup-wizard-title">{page.title}</h2>
