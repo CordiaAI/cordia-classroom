@@ -1,33 +1,32 @@
+import { useRouter } from 'next/router';
 import Sidebar from './Sidebar';
-import StreakCounter from './StreakCounter';
-import StudyTimer from './StudyTimer';
 import TutorDrawer from './TutorDrawer';
 import GuideJobIndicator from './GuideJobIndicator';
-import { useRouter } from 'next/router';
+import NewSheet from './NewSheet';
+import TipHost from './TipHost';
 
-export default function Layout({ children, timerState, setTimerState }) {
+const WIDE = ['/guide/[id]', '/practice', '/practice/[guideId]', '/smartnotes', '/calendar', '/tutor'];
+
+export default function Layout({ children }) {
   const router = useRouter();
-  const pageOwnsTools = ['/dashboard', '/smartnotes', '/flashcards', '/create', '/guide/[id]', '/settings'].includes(router.pathname)
-    || router.pathname.startsWith('/practice');
-  const pageOwnsTutor = router.pathname === '/dashboard' && !router.query.view;
+  // The Tutor page shows the Tutor full size, so the side panel stays out of the way there.
+  const pageOwnsTutor = router.pathname === '/tutor';
   const activeGuideId = router.query.guideId || (router.pathname === '/guide/[id]' ? router.query.id : '');
   const activeNoteId = router.pathname === '/smartnotes' ? router.query.id : '';
+  // Remount the page when the material changes (guide A -> guide B), not on every query tweak.
+  const routeKey = `${router.pathname}:${router.query.id || ''}:${router.query.guideId || ''}`;
 
   return (
-    <div className={`app-shell${router.pathname === '/dashboard' && !router.query.view ? ' is-study-home' : ''}`}>
+    <div className="app-shell">
       <Sidebar />
       <main id="classroom-main" className="main-content">
-        <div key={router.asPath} className="workspace-route">
-        {children}
-        {!pageOwnsTools && (
-          <section className="workspace-tools" aria-label="Study tools">
-            <StreakCounter />
-            <StudyTimer timerState={timerState} setTimerState={setTimerState} />
-          </section>
-        )}
+        <div key={routeKey} className={'workspace-route' + (WIDE.includes(router.pathname) ? ' is-wide' : '')}>
+          {children}
         </div>
       </main>
       <GuideJobIndicator />
+      <NewSheet />
+      <TipHost />
       {!pageOwnsTutor && <TutorDrawer preferredGuideId={activeGuideId} preferredNoteId={activeNoteId} />}
     </div>
   );

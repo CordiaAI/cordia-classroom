@@ -1,5 +1,6 @@
 import '../styles/globals.css';
 import '../styles/classroom.css';
+import '../styles/system.css';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
@@ -10,12 +11,13 @@ import { Analytics } from '@vercel/analytics/react';
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
-  const isLoginPage = router.pathname === '/';
+  // Public pages render without the signed-in shell.
+  const isLoginPage = ['/', '/login', '/signup', '/pricing'].includes(router.pathname);
 
   // Authentication pages stay light; workspace routes honor the saved preference.
   useEffect(() => {
     const saved = typeof window !== 'undefined' && localStorage.getItem('theme');
-    const theme = router.pathname === '/' || router.pathname === '/reset-password' ? 'light' : saved || 'light';
+    const theme = ['/', '/login', '/signup', '/pricing', '/reset-password'].includes(router.pathname) ? 'light' : saved || 'light';
     document.documentElement.setAttribute('data-theme', theme);
   }, [router.pathname]);
 

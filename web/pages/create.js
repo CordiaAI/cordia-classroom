@@ -4,85 +4,14 @@ import { apiFetch, getToken, responseJson } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 import { dismissGuideJob, startGuideJob, useGuideJobs } from '../lib/guideJobs';
+import { MAX_SOURCE_CHARS, baseName, combinedSource, fileKey, generateAndSave, newRequestId, pairsToCards, pairsToGuide } from '../lib/guideCreate';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const MANUAL_DRAFT_KEY = 'autostudy_manual_draft';
 const SOURCE_DRAFT_KEY = 'autostudy_text_draft';
 const MAX_FILES = 5;
-// /generate keeps at most this much source text (MAX_CONTENT_LENGTH in backend/main.py).
-const MAX_SOURCE_CHARS = 500_000;
 const PASTED_KEY = 'pasted-notes';
 const EMPTY_PAIRS = () => [{ term: '', definition: '' }, { term: '', definition: '' }];
-
-function fileKey(file) {
-  return `${file.name}:${file.size}:${file.lastModified}`;
-}
-
-function baseName(name) {
-  return name.replace(/\.[^.]+$/, '');
-}
-
-function newRequestId() {
-  return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
-}
-
-function combinedSource(items) {
-  if (items.length === 1) return items[0].text;
-  return items.map(item => `${baseName(item.name)}\n\n${item.text}`).join('\n\n');
-}
-
-function pairsToGuide(pairs, offset = 0) {
-  return pairs.map((pair, index) => `Q${offset + index + 1}: ${pair.term.trim()}\nA${offset + index + 1}: ${pair.definition.trim()}`).join('\n');
-}
-
-function pairsToCards(pairs) {
-  return pairs.map(pair => ({ front: pair.term.trim(), back: pair.definition.trim(), ...(pair.image ? { image: pair.image } : {}) }));
-}
-
-// Generates and saves one guide from source text. Runs as a background job, so it
-// only uses the values passed in, never page state.
-async function generateAndSave({ source, requestId, title, sourceTitle, sourceType, sourceUrl, externalSourceId, folderId, notes, flashcards, manualPairs }) {
-  const generated = await apiFetch('/generate', {
-    method: 'POST',
-    body: JSON.stringify({ content: source, notes, study_guide: true, flashcards, request_id: requestId }),
-  });
-  if (!generated) throw new Error('The guide took too long to come back. Try again; you will not be charged twice.');
-  if (generated.detail) {
-    const detail = typeof generated.detail === 'string' ? generated.detail : generated.detail.message;
-    const error = new Error(detail || 'Study guide generation failed.');
-    error.upgrade = generated.detail.code === 'limit_reached' || Boolean(generated.detail.upgrade_url);
-    throw error;
-  }
-  if (!generated.study_guide || generated.study_guide.startsWith('[Error')) {
-    throw new Error(`CordiaClassroom could not build “${title}” from this material.`);
-  }
-
-  let studyGuide = generated.study_guide;
-  let cards = generated.flashcards || null;
-  if (manualPairs?.length) {
-    const numbers = [...studyGuide.matchAll(/^Q(\d+):/gm)].map(match => Number(match[1]));
-    studyGuide = `${studyGuide.trimEnd()}\n${pairsToGuide(manualPairs, numbers.length ? Math.max(...numbers) : 0)}`;
-    if (flashcards) cards = [...(cards || []), ...pairsToCards(manualPairs)];
-  }
-
-  const saved = await apiFetch('/guides', {
-    method: 'POST',
-    body: JSON.stringify({
-      title,
-      notes: generated.notes || null,
-      study_guide: studyGuide,
-      flashcards: cards,
-      source_url: sourceUrl || null,
-      external_source_id: externalSourceId || null,
-      source_type: sourceType,
-      source_title: sourceTitle,
-      source_id: externalSourceId || null,
-      ...(folderId ? { folder_id: folderId } : {}),
-    }),
-  });
-  if (!saved?.guide) throw new Error(`Could not save “${title}”.`);
-  return saved.guide;
-}
 
 export default function CreateGuidePage() {
   const router = useRouter();

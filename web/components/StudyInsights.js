@@ -1,12 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { ChartColumn, TrendingDown, TrendingUp } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
-function Row({ item }) {
-  return <li><span>{item.label}</span><strong>{item.correct}/{item.total}</strong></li>;
+function Row({ item, icon: Icon, tone }) {
+  return (
+    <li className={`insight-row ${tone}`}>
+      <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
+      <span className="c-truncate">{item.label}</span>
+      <span className="c-meta">{item.correct}/{item.total}</span>
+    </li>
+  );
 }
 
-// What the student gets right and wrong most often, and what research suggests doing about it.
+// What the student gets right most and least often.
 export default function StudyInsights({ compact = false }) {
   const router = useRouter();
   const [insights, setInsights] = useState(null);
@@ -17,44 +24,42 @@ export default function StudyInsights({ compact = false }) {
     return () => { active = false; };
   }, []);
 
-  if (!insights) return <div className="study-insights"><strong>Your study insights</strong><p>Loading…</p></div>;
-
-  const { answered, strengths, needs_work: needsWork, tips } = insights;
-  const hasPatterns = strengths.length > 0 || needsWork.length > 0;
-  const shownTips = compact ? tips.slice(0, 1) : tips;
+  const strengths = insights?.strengths || [];
+  const needsWork = insights?.needs_work || [];
+  const limit = compact ? 2 : 10;
 
   return (
-    <div className={`study-insights${compact ? ' compact' : ''}`}>
-      <strong>Your study insights</strong>
-      {answered === 0 ? (
-        <p>Take a quiz, a Retain round, or a Practice set and I&apos;ll show what you&apos;re strongest at and what to work on.</p>
-      ) : !hasPatterns ? (
-        <p>Nice start! Answer a few more questions and I&apos;ll show your strengths and the spots to work on.</p>
+    <section className={`c-card insights-card${compact ? ' compact' : ''}`} aria-labelledby="insights-title" data-tip={compact ? 'insights' : undefined}>
+      <header className="c-row">
+        <ChartColumn size={20} strokeWidth={1.75} aria-hidden="true" />
+        <h2 id="insights-title" className="c-section-title">Insights</h2>
+      </header>
+      {!insights ? (
+        <div className="c-skeleton" style={{ height: 72 }} />
+      ) : !strengths.length && !needsWork.length ? (
+        <button type="button" className="c-btn c-btn--quiet insights-empty" onClick={() => router.push('/library')}>Take a quiz</button>
       ) : (
-        <>
-          {strengths.length > 0 && (
-            <div className="study-insights-group good">
-              <span>You usually get right</span>
-              <ul>{(compact ? strengths.slice(0, 1) : strengths).map(item => <Row key={item.kind} item={item} />)}</ul>
-            </div>
-          )}
-          {needsWork.length > 0 && (
-            <div className="study-insights-group work">
-              <span>Worth more practice</span>
-              <ul>{(compact ? needsWork.slice(0, 1) : needsWork).map(item => <Row key={item.kind} item={item} />)}</ul>
-            </div>
-          )}
-        </>
+        <ul className="insight-list">
+          {needsWork.slice(0, limit).map(item => <Row key={'w' + item.kind} item={item} icon={TrendingDown} tone="work" />)}
+          {strengths.slice(0, limit).map(item => <Row key={'s' + item.kind} item={item} icon={TrendingUp} tone="good" />)}
+        </ul>
       )}
-      {shownTips.length > 0 && (
-        <div className="study-insights-tips">
-          <span>Try this</span>
-          {shownTips.map(tip => <p key={tip.text}>{tip.text} <small>{tip.source}</small></p>)}
-        </div>
+      {!compact && insights?.tips?.length > 0 && (
+        <ul className="insight-tips">
+          {insights.tips.map(tip => <li key={tip.text}>{tip.text}</li>)}
+        </ul>
       )}
-      {compact && answered > 0 && (
-        <button type="button" className="study-insights-more" onClick={() => router.push('/settings?section=learning')}>See all insights</button>
-      )}
-    </div>
+      <style jsx>{`
+        .insights-card { display: grid; gap: 12px; padding: 20px; align-content: start; }
+        .insights-card :global(header .lucide) { color: var(--olive-ink); }
+        .insight-list, .insight-tips { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+        .insight-row { display: flex; align-items: center; gap: 10px; min-height: 36px; font: 600 15px/1.3 var(--font-sans); }
+        .insight-row span:nth-child(2) { flex: 1; min-width: 0; }
+        .insight-row.good :global(.lucide) { color: var(--success); }
+        .insight-row.work :global(.lucide) { color: var(--warning); }
+        .insight-tips li { padding: 10px 0; border-top: 1px solid var(--line); }
+        .insights-empty { justify-self: start; }
+      `}</style>
+    </section>
   );
 }

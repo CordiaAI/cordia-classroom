@@ -1,135 +1,109 @@
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
+import {
+  CalendarDays, CircleHelp, CreditCard, Library, LogOut, MessageCircle, NotebookPen, Palette, Plus, Search, Sun, User,
+} from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
-import InstallSidebarButton from './InstallSidebarButton';
-import WorkspaceIcon from './WorkspaceIcon';
+import SearchModal from './SearchModal';
+import HelpSheet from './HelpSheet';
+import { openNewSheet } from '../lib/newSheet';
 
+// One navigation: the same five places on the glass top bar and the mobile tab bar.
 const navItems = [
-  { label: 'Home', href: '/dashboard', match: '/dashboard' },
-  { label: 'Study', href: '/dashboard?view=guides', match: 'view=guides' },
-  { label: 'Tutor', action: 'tutor', match: 'tutor' },
-  { label: 'Notes', href: '/smartnotes', match: '/smartnotes' },
-  { label: 'Profile', href: '/settings', match: '/settings' },
+  { label: 'Today', href: '/dashboard', icon: Sun },
+  { label: 'Library', href: '/library', icon: Library },
+  { label: 'Tutor', href: '/tutor', icon: MessageCircle },
+  { label: 'Notes', href: '/smartnotes', icon: NotebookPen },
+  { label: 'Calendar', href: '/calendar', icon: CalendarDays },
 ];
-const railItems = [
-  { label: 'Home', icon: 'home', href: '/dashboard', match: '/dashboard' },
-  { label: 'Study Guides', icon: 'study', href: '/dashboard?view=guides', match: 'view=guides' },
-  { label: 'Tutor', icon: 'tutor', action: 'tutor', match: 'tutor' },
-  { label: 'SmartNotes', icon: 'notes', href: '/smartnotes', match: '/smartnotes' },
-  { label: 'Flashcards', icon: 'flashcards', href: '/flashcards', match: '/flashcards' },
-  { label: 'Practice', icon: 'practice', href: '/practice', match: '/practice' },
-  { label: 'Calendar', icon: 'calendar', href: '/dashboard?view=calendar', match: 'view=calendar' },
-];
+
+// Guide, flashcard, Retain and Practice screens all live inside Library.
+const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice', '/nclex', '/folder', '/create', '/session'];
+
+export function activeNavHref(pathname) {
+  if (pathname === '/dashboard') return '/dashboard';
+  if (LIBRARY_PATHS.some(path => pathname === path || pathname.startsWith(path + '/'))) return '/library';
+  if (pathname.startsWith('/tutor')) return '/tutor';
+  if (pathname.startsWith('/smartnotes')) return '/smartnotes';
+  if (pathname.startsWith('/calendar')) return '/calendar';
+  return '';
+}
+
+function isMac() {
+  return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
+}
 
 export default function Sidebar() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const [theme, setTheme] = useState('light');
   const [menuOpen, setMenuOpen] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [canReviewFeedback, setCanReviewFeedback] = useState(false);
+  const [shortcut, setShortcut] = useState('Ctrl K');
   const menuRef = useRef(null);
-  const navRef = useRef(null);
-  const [indicator, setIndicator] = useState({ left: 0, width: 0 });
-  const [collapsed, setCollapsed] = useState(false);
-  const [tutorActive, setTutorActive] = useState(false);
-  const [tutorSelected, setTutorSelected] = useState(false);
+  const avatarRef = useRef(null);
+  const active = activeNavHref(router.pathname);
 
   useEffect(() => {
-    setCollapsed(localStorage.getItem('cordiaRailCollapsed') === 'true');
-    setTutorActive(localStorage.getItem('cordiaTutorOpen') === 'true');
-    const updateTutor = event => {
-      setTutorActive(Boolean(event.detail?.open));
-      setTutorSelected(Boolean(event.detail?.open));
-    };
-    window.addEventListener('cordia:tutor-visibility', updateTutor);
-    return () => window.removeEventListener('cordia:tutor-visibility', updateTutor);
-  }, []);
-
-  useEffect(() => {
-    const nav = navRef.current;
-    if (!nav) return;
-    const measure = () => {
-      const selected = nav.querySelector('button.active');
-      setIndicator(selected ? { left: selected.offsetLeft, width: selected.offsetWidth } : { left: 0, width: 0 });
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(nav);
-    document.fonts.ready.then(measure);
-    return () => observer.disconnect();
-  }, [router.asPath, tutorActive, tutorSelected]);
-
-  function openDestination(item) {
-    if (item.action === 'tutor') {
-      const inlineTutor = document.querySelector('.study-scene-tutor');
-      if (inlineTutor) {
-        inlineTutor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        inlineTutor.querySelector('textarea')?.focus({ preventScroll: true });
-      } else window.dispatchEvent(new CustomEvent('cordia:tutor-toggle'));
-    }
-    else {
-      setTutorSelected(false);
-      router.push(item.href);
-    }
-  }
-
-  function toggleRail() {
-    const next = !collapsed;
-    setCollapsed(next);
-    localStorage.setItem('cordiaRailCollapsed', String(next));
-  }
-
-  useEffect(() => {
+    setShortcut(isMac() ? '⌘K' : 'Ctrl K');
     setEmail(getUserEmail() || '');
     setName(getUserName() || '');
-    setTheme(localStorage.getItem('theme') || 'light');
-
-    let active = true;
+    let alive = true;
     apiFetch('/auth/me').then(identity => {
-      if (!active || !identity?.user_id) return;
+      if (!alive || !identity?.user_id) return;
       cacheUserIdentity(identity);
       setEmail(identity.email || getUserEmail() || '');
       setName(identity.name || getUserName() || '');
     });
     apiFetch('/feedback/reviewer-status').then(result => {
-      if (active) setCanReviewFeedback(Boolean(result?.reviewer));
+      if (alive) setCanReviewFeedback(Boolean(result?.reviewer));
     });
-    return () => { active = false; };
+    const onKey = event => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setShowSearch(true);
+      }
+    };
+    const openSearch = () => setShowSearch(true);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('cordia:search', openSearch);
+    return () => { alive = false; window.removeEventListener('keydown', onKey); window.removeEventListener('cordia:search', openSearch); };
   }, []);
 
   useEffect(() => {
-    function closeOnDocument(event) {
-      if (event.key === 'Escape') setMenuOpen(false);
-      if (event.type === 'mousedown' && menuRef.current && !menuRef.current.contains(event.target)) setMenuOpen(false);
+    if (!menuOpen) return;
+    menuRef.current?.querySelector('[role="menuitem"]')?.focus();
+    function close(event) {
+      if (event.type === 'keydown' && event.key === 'Escape') { setMenuOpen(false); avatarRef.current?.focus(); }
+      if (event.type === 'mousedown' && menuRef.current && !menuRef.current.contains(event.target) && !avatarRef.current.contains(event.target)) setMenuOpen(false);
     }
-    const closeOnRoute = () => { setMenuOpen(false); setTutorSelected(false); };
-    document.addEventListener('keydown', closeOnDocument);
-    document.addEventListener('mousedown', closeOnDocument);
-    router.events.on('routeChangeStart', closeOnRoute);
-    return () => {
-      document.removeEventListener('keydown', closeOnDocument);
-      document.removeEventListener('mousedown', closeOnDocument);
-      router.events.off('routeChangeStart', closeOnRoute);
-    };
+    document.addEventListener('keydown', close);
+    document.addEventListener('mousedown', close);
+    return () => { document.removeEventListener('keydown', close); document.removeEventListener('mousedown', close); };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    const closeAll = () => { setMenuOpen(false); setShowSearch(false); };
+    router.events.on('routeChangeStart', closeAll);
+    return () => router.events.off('routeChangeStart', closeAll);
   }, [router.events]);
 
-  function isActive(item) {
-    if (item.match === 'tutor') return tutorActive && (!navItems.includes(item) || tutorSelected);
-    if (tutorActive && tutorSelected && navItems.includes(item)) return false;
-    if (item.match === '/dashboard') return router.pathname === '/dashboard' && !router.query.view;
-    if (item.match === 'view=guides') return (router.pathname === '/dashboard' && router.query.view === 'guides') || router.pathname.startsWith('/flashcards') || router.pathname === '/create' || router.pathname.startsWith('/guide/');
-    if (item.match.startsWith('view=')) return router.pathname === '/dashboard' && router.query.view === item.match.split('=')[1];
-    return router.pathname.startsWith(item.match);
+  function menuKeys(event) {
+    const items = [...menuRef.current.querySelectorAll('[role="menuitem"]')];
+    const index = items.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown') { event.preventDefault(); items[(index + 1) % items.length]?.focus(); }
+    if (event.key === 'ArrowUp') { event.preventDefault(); items[(index - 1 + items.length) % items.length]?.focus(); }
   }
 
-  function setAppearance(theme) {
-    localStorage.setItem('theme', theme);
-    document.documentElement.setAttribute('data-theme', theme);
-    setTheme(theme);
+  function go(path) {
+    setMenuOpen(false);
+    router.push(path);
   }
 
   function signOut() {
@@ -137,9 +111,7 @@ export default function Sidebar() {
     router.push('/');
   }
 
-  // Initials come only from the real name, or from the email's local part
-  // ("jane.doe" -> JD). Until identity loads the avatar stays blank; a placeholder
-  // label must never be turned into initials.
+  // Initials come only from the real name, or from the email's local part ("jane.doe" -> JD).
   const emailName = email ? email.split('@')[0] : '';
   const displayName = name || emailName;
   const initials = (name ? name.split(/\s+/) : emailName.split(/[._-]+/))
@@ -148,64 +120,77 @@ export default function Sidebar() {
     .map(part => part[0])
     .join('')
     .toUpperCase();
+  const onProfile = router.pathname === '/settings' || router.pathname === '/billing';
 
   return (
     <>
-      <a className="workspace-skip-link" href="#classroom-main">Skip to study content</a>
-      <header className="top-navigation">
-      <a className="top-navigation-brand" href="/dashboard" aria-label="CordiaClassroom dashboard">
-        <AcademicInfinityMark className="top-navigation-mark" />
-        <span className="cordia-wordmark">cordia</span>
-        <small className="top-navigation-beta">beta</small>
-      </a>
+      <a className="workspace-skip-link" href="#classroom-main">Skip to content</a>
+      <header className="c-topbar">
+        <Link className="c-brand" href="/dashboard" aria-label="Cordia Classroom, Today">
+          <AcademicInfinityMark className="top-navigation-mark" title="" />
+          <span>cordia</span>
+        </Link>
 
-      <nav ref={navRef} className="top-navigation-links" aria-label="Primary navigation">
-        {navItems.map(item => (
-          <button key={item.label} type="button" className={isActive(item) ? 'active' : ''} aria-current={isActive(item) ? 'page' : undefined} onClick={() => openDestination(item)}>
-            {item.label}
-          </button>
-        ))}
-        <span className="navigation-indicator" aria-hidden="true" style={{ transform: `translateX(${indicator.left}px)`, width: indicator.width }} />
-      </nav>
-
-      <div className="top-navigation-actions">
-        <div className="account-menu" ref={menuRef}>
-          <button type="button" className="account-avatar" onClick={() => setMenuOpen(open => !open)} aria-expanded={menuOpen} aria-haspopup="menu" aria-label="Open account menu">
-            {initials}
-          </button>
-
-          {menuOpen && (
-            <div className="account-menu-panel" role="menu" aria-label="Account menu">
-              <div className="account-menu-identity">
-                <strong>{displayName || 'Your account'}</strong>
-                <span>{email || 'CordiaClassroom account'}</span>
-              </div>
-              <button type="button" role="menuitem" onClick={() => router.push('/settings')}>Your profile</button>
-              <button type="button" role="menuitem" onClick={() => router.push('/billing')}>Billing</button>
-              <button type="button" role="menuitem" onClick={() => setShowFeedback(true)}>Feedback</button>
-              <InstallSidebarButton />
-              {canReviewFeedback && <button type="button" role="menuitem" onClick={() => router.push('/feedback-review')}>Review feedback</button>}
-              <div className="account-theme-row">
-                <span>Appearance</span>
-                <button type="button" className={theme === 'light' ? 'active' : ''} aria-pressed={theme === 'light'} onClick={() => setAppearance('light')}>Light</button>
-                <button type="button" className={theme === 'dark' ? 'active' : ''} aria-pressed={theme === 'dark'} onClick={() => setAppearance('dark')}>Dark</button>
-              </div>
-              <button type="button" role="menuitem" className="account-signout" onClick={signOut}>Sign out</button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      </header>
-      <aside className={`workspace-rail${collapsed ? ' is-collapsed' : ''}`} aria-label="Classroom sidebar">
-        <div className="workspace-rail-heading"><span>Classroom</span><button type="button" onClick={toggleRail} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!collapsed}><WorkspaceIcon name="chevron" /></button></div>
-        <button type="button" className="rail-create" onClick={() => router.push('/create')} title={collapsed ? 'New study guide' : undefined}><WorkspaceIcon name="upload" /><span>New study guide</span></button>
-        <nav aria-label="Study navigation">
-          {railItems.map(item => <button key={item.label} type="button" className={isActive(item) ? 'active' : ''} aria-current={isActive(item) ? 'page' : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={() => openDestination(item)}><WorkspaceIcon name={item.icon} /><span>{item.label}</span></button>)}
+        <nav className="c-nav" aria-label="Primary">
+          {navItems.map(item => (
+            <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.href === '/calendar' ? 'calendar' : undefined}>
+              <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
+              {item.label}
+            </Link>
+          ))}
         </nav>
-        <div className="workspace-rail-footer"><span>Your space to understand.</span><button type="button" onClick={() => router.push('/settings')} aria-label="Your profile" title={collapsed ? 'Your profile' : undefined}><WorkspaceIcon name="profile" /><span>Your profile</span></button></div>
-      </aside>
+
+        <div className="c-bar-actions">
+          <button type="button" className="c-btn c-btn--secondary c-searchbtn" onClick={() => setShowSearch(true)} aria-label="Search" aria-keyshortcuts={shortcut === '⌘K' ? 'Meta+K' : 'Control+K'}>
+            <Search size={20} strokeWidth={1.75} aria-hidden="true" />
+            <span>Search</span>
+            <kbd>{shortcut}</kbd>
+          </button>
+          <button type="button" className="c-btn c-btn--primary c-new-btn" onClick={() => openNewSheet()}>
+            <Plus size={20} strokeWidth={1.75} aria-hidden="true" />New
+          </button>
+          <div className="c-menu-wrap">
+            <button ref={avatarRef} type="button" className={'c-avatar' + (onProfile ? ' is-active' : '')} onClick={() => setMenuOpen(open => !open)} aria-expanded={menuOpen} aria-haspopup="menu" aria-label={`Account${displayName ? `: ${displayName}` : ''}`}>
+              {initials || <User size={20} strokeWidth={1.75} aria-hidden="true" />}
+            </button>
+            {menuOpen && (
+              <div ref={menuRef} className="c-menu c-account-menu" role="menu" aria-label="Account" onKeyDown={menuKeys}>
+                <button type="button" role="menuitem" onClick={() => go('/settings')}><User size={20} strokeWidth={1.75} aria-hidden="true" />Profile</button>
+                <button type="button" role="menuitem" onClick={() => go('/settings?section=appearance')}><Palette size={20} strokeWidth={1.75} aria-hidden="true" />Appearance</button>
+                <button type="button" role="menuitem" onClick={() => go('/settings?section=plan')}><CreditCard size={20} strokeWidth={1.75} aria-hidden="true" />Plan</button>
+                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setShowHelp(true); }}><CircleHelp size={20} strokeWidth={1.75} aria-hidden="true" />Help</button>
+                <hr />
+                <button type="button" role="menuitem" onClick={signOut}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" />Sign out</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <nav className="c-tabbar" aria-label="Primary">
+        {navItems.map(item => (
+          <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined}>
+            <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+      <button type="button" className="c-btn c-btn--primary c-fab" onClick={() => openNewSheet()}>
+        <Plus size={20} strokeWidth={1.75} aria-hidden="true" />New
+      </button>
+
+      {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
+      {showHelp && (
+        <HelpSheet
+          onClose={() => setShowHelp(false)}
+          onFeedback={() => { setShowHelp(false); setShowFeedback(true); }}
+          canReviewFeedback={canReviewFeedback}
+        />
+      )}
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+      <style jsx>{`
+        .c-account-menu { right: 0; top: 48px; }
+      `}</style>
     </>
   );
 }

@@ -1,55 +1,65 @@
 import { useEffect, useState } from 'react';
+import { Brain, CalendarDays, Check, Layers, MessageCircle, NotebookPen, Upload, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { readUserValue, writeUserValue } from '../lib/userStore';
+import { openNewSheet } from '../lib/newSheet';
 
-const DISMISS_KEY = 'cordia-getting-started-dismissed';
-
-// Persistent dashboard checklist: each item checks itself off from real usage, so students
-// who rushed through setup still find the extension, Learn it your way, Practice and SmartNotes.
-export default function GettingStarted({ guides, navigate }) {
-  const [used, setUsed] = useState(null);
+// Six first things, each ticked from real use. Dismissible, and gone once all are done.
+export default function GettingStarted({ guides, stats, insights, notesCount, calendarConnected, navigate }) {
+  const [tutorUsed, setTutorUsed] = useState(false);
   const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
-    try { setDismissed(localStorage.getItem(DISMISS_KEY) === '1'); } catch { setDismissed(false); }
-    let active = true;
-    apiFetch('/onboarding/checklist').then(data => { if (active && data && !data.detail) setUsed(data); });
-    return () => { active = false; };
+    setDismissed(Boolean(readUserValue('cordiaGetStartedDismissed', false)));
+    apiFetch('/tutor/session').then(session => {
+      setTutorUsed(Boolean(session?.messages?.some(message => message.role === 'user')));
+    });
   }, []);
 
-  if (!used || dismissed) return null;
   const latest = guides?.[0]?.id;
   const items = [
-    { key: 'extension_guide', label: 'Make a guide with the Chrome extension', hint: 'One click from any Canvas page', href: '/install-extension' },
-    { key: 'learn_your_way', label: 'Open “Learn it your way” on a question', hint: 'Re-teaches it in your style', href: latest ? `/guide/${latest}?learn=1` : '/create' },
-    { key: 'practice', label: 'Do a Practice set', hint: 'Problems written from your material', href: latest ? `/practice/${latest}?tour=1` : '/practice?tour=1' },
-    { key: 'smartnote', label: 'Turn notes into a guide with SmartNotes', hint: 'Type in lecture, study later', href: '/smartnotes' },
+    { key: 'material', label: 'Add material', icon: Upload, done: guides.length > 0, go: () => openNewSheet() },
+    { key: 'quiz', label: 'Take a quiz', icon: Brain, done: (insights?.answered || 0) > 0 || (stats?.avg_quiz_score || 0) > 0, go: () => navigate(latest ? `/quiz/${latest}` : '/library') },
+    { key: 'tutor', label: 'Ask the Tutor', icon: MessageCircle, done: tutorUsed, go: () => navigate('/tutor') },
+    { key: 'cards', label: 'Study cards', icon: Layers, done: (stats?.cards_studied || 0) > 0, go: () => navigate(latest ? `/flashcards/study?guideId=${latest}` : '/library?tab=cards') },
+    { key: 'calendar', label: 'Connect Calendar', icon: CalendarDays, done: calendarConnected, go: () => navigate('/calendar') },
+    { key: 'note', label: 'Write a note', icon: NotebookPen, done: notesCount > 0, go: () => navigate('/smartnotes') },
   ];
-  const done = items.filter(item => used[item.key]).length;
-  if (done === items.length) return null;
+  const done = items.filter(item => item.done).length;
+  if (dismissed || done === items.length) return null;
 
   function dismiss() {
-    try { localStorage.setItem(DISMISS_KEY, '1'); } catch {}
+    writeUserValue('cordiaGetStartedDismissed', true);
     setDismissed(true);
   }
 
   return (
-    <section className="getting-started" aria-label="Get the most out of Cordia">
-      <header>
-        <div><strong>Get the most out of Cordia</strong><span>{done} of {items.length} done</span></div>
-        <button type="button" className="getting-started-close" onClick={dismiss} aria-label="Hide checklist">×</button>
+    <section className="c-card started" aria-labelledby="started-title">
+      <header className="c-row">
+        <h2 id="started-title" className="c-section-title">Get started</h2>
+        <span className="c-meta">{done} of {items.length}</span>
+        <span className="c-spacer" />
+        <button type="button" className="c-icon-btn" onClick={dismiss} aria-label="Hide Get started"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
       </header>
-      <div className="getting-started-bar"><span style={{ width: `${(done / items.length) * 100}%` }} /></div>
-      <ul>
+      <ul className="started-grid">
         {items.map(item => (
-          <li key={item.key} className={used[item.key] ? 'done' : ''}>
-            <button type="button" onClick={() => navigate(item.href)} disabled={used[item.key]}>
-              <span className="getting-started-check">{used[item.key] ? '✓' : ''}</span>
-              <span><strong>{item.label}</strong><small>{item.hint}</small></span>
-              {!used[item.key] && <span aria-hidden="true">→</span>}
+          <li key={item.key}>
+            <button type="button" className={'started-item' + (item.done ? ' is-done' : '')} onClick={item.go} aria-label={`${item.label}${item.done ? ', done' : ''}`}>
+              <span className="started-check" aria-hidden="true">{item.done ? <Check size={18} strokeWidth={2} /> : <item.icon size={20} strokeWidth={1.75} />}</span>
+              <span>{item.label}</span>
             </button>
           </li>
         ))}
       </ul>
+      <style jsx>{`
+        .started { display: grid; gap: 12px; padding: 20px; }
+        .started-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+        .started-item { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--r-input); background: var(--card); color: var(--ink); font: 600 15px/1.2 var(--font-sans); text-align: left; cursor: pointer; }
+        .started-item:hover { border-color: var(--olive); }
+        .started-check { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
+        .is-done .started-check { background: var(--olive); color: var(--on-olive); }
+        @media (max-width: 767px) { .started-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      `}</style>
     </section>
   );
 }

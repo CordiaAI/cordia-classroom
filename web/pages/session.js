@@ -1,0 +1,107 @@
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { PencilRuler } from 'lucide-react';
+import { apiFetch } from '../lib/api';
+import { useRequireAuth } from '../lib/auth';
+import { loadStudyQueue } from '../lib/studyQueue';
+import { rememberRetainMisses, retainMisses } from '../lib/userStore';
+import FlashcardViewer from '../components/FlashcardViewer';
+
+function PracticeList({ practice }) {
+  if (!practice.length) return null;
+  return (
+    <div className="c-card c-list session-practice">
+      {practice.map(item => (
+        <div key={item.guideId} className="c-list-row">
+          <PencilRuler size={20} strokeWidth={1.75} aria-hidden="true" />
+          <span className="c-grow c-truncate">{item.guideTitle}</span>
+          <span className="c-meta">{item.open} {item.open === 1 ? 'problem' : 'problems'}</span>
+          <Link className="c-btn c-btn--primary" href={'/practice/' + item.guideId}>Practice</Link>
+        </div>
+      ))}
+      <style jsx>{`.session-practice { width: 100%; text-align: left; }`}</style>
+    </div>
+  );
+}
+
+// Today's Start: due flashcards, then Retain misses, then open practice problems.
+export default function StudySession() {
+  const router = useRouter();
+  const { ready } = useRequireAuth();
+  const [queue, setQueue] = useState(null);
+
+  useEffect(() => {
+    if (ready) loadStudyQueue().then(setQueue);
+  }, [ready]);
+
+  const cards = queue ? [...queue.cards, ...queue.misses] : [];
+
+  const onFinish = useCallback(async ({ known, missed, seconds }) => {
+    const byGuide = new Map();
+    const knownSet = new Set(known);
+    cards.forEach((card, index) => {
+      if (card.kind !== 'card') return;
+      const entry = byGuide.get(card.guideId) || { known: [], unknown: [] };
+      if (knownSet.has(index)) entry.known.push(card.index);
+      else if (missed.includes(index)) entry.unknown.push(card.index);
+      byGuide.set(card.guideId, entry);
+    });
+    const requests = [...byGuide.entries()].map(([guideId, entry]) => {
+      const guide = queue.guides.find(item => item.id === guideId);
+      const before = guide?.flashcard_progress || {};
+      const knownAll = [...new Set([...(before.known || []), ...entry.known])];
+      const unknownAll = [...new Set([...(before.unknown || []), ...entry.unknown])].filter(index => !knownAll.includes(index));
+      return apiFetch('/guides/' + guideId + '/flashcard-progress', {
+        method: 'PATCH',
+        body: JSON.stringify({ known: knownAll, unknown: unknownAll, last_studied: new Date().toISOString() }),
+      });
+    });
+    // Retain misses answered right here are cleared.
+    const stored = retainMisses();
+    const clearedByGuide = {};
+    cards.forEach((card, index) => {
+      if (card.kind === 'miss' && knownSet.has(index)) (clearedByGuide[card.guideId] ||= new Set()).add(card.position);
+    });
+    Object.entries(clearedByGuide).forEach(([guideId, positions]) => {
+      rememberRetainMisses(guideId, (stored[guideId] || []).filter((_, position) => !positions.has(position)));
+    });
+    requests.push(apiFetch('/stats/log-session', {
+      method: 'POST',
+      body: JSON.stringify({ session_type: 'flashcard', duration_seconds: seconds, metadata: { cards_studied: cards.length, cards_correct: known.length, mixed: true } }),
+    }));
+    await Promise.all(requests);
+  }, [cards, queue]);
+
+  if (!ready) return null;
+  if (!queue) {
+    return (
+      <div className="session-skeleton" aria-busy="true" aria-label="Loading">
+        <div className="c-skeleton" style={{ height: 52, borderRadius: 999 }} />
+        <div className="c-skeleton" style={{ height: 340, borderRadius: 20 }} />
+        <style jsx>{`.session-skeleton { display: grid; gap: 20px; width: min(760px, 100%); margin: 0 auto; }`}</style>
+      </div>
+    );
+  }
+
+  if (!cards.length) {
+    return (
+      <div className="c-page session-empty">
+        <h1 className="c-title">{queue.practice.length ? 'Practice' : 'All done'}</h1>
+        <PracticeList practice={queue.practice} />
+        <button type="button" className="c-btn c-btn--secondary" onClick={() => router.push('/dashboard')}>Today</button>
+        <style jsx>{`.session-empty { width: min(760px, 100%); margin: 0 auto; justify-items: start; }`}</style>
+      </div>
+    );
+  }
+
+  return (
+    <FlashcardViewer
+      flashcards={cards}
+      title="Today"
+      onBack={() => router.push('/dashboard')}
+      onFinish={onFinish}
+      finishExtra={<PracticeList practice={queue.practice} />}
+    />
+  );
+}

@@ -1,57 +1,152 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, ChevronLeft, ChevronRight, Layers, MessageCircle, Sparkles } from 'lucide-react';
 import { parseQAPairs, parseNotes } from '../lib/formatters';
-import WorkspaceIcon from './WorkspaceIcon';
+import { requestTip } from '../lib/tips';
 
-export default function StudyDocument({ guide, onOpen, onRead, onLearn, renderAid, readSections }) {
-  const [page, setPage] = useState(0);
-  const [scale, setScale] = useState(100);
-  const windowRef = useRef(null);
+const PER_PAGE = 3;
+
+// The reading view: page list on the left, the page in the middle. Each question
+// ends with Got it / Explain; selecting text offers Explain, Make card and Ask.
+export default function StudyDocument({ guide, page: controlledPage, onPageChange, onRead, onExplain, renderAid, readSections, onSelection }) {
+  const [localPage, setLocalPage] = useState(0);
+  const [selection, setSelection] = useState(null); // { text, top, left }
+  const paperRef = useRef(null);
   const pairs = parseQAPairs(guide?.study_guide);
   const notes = parseNotes(guide?.notes);
-  const pages = Math.max(1, Math.ceil(pairs.length / 3));
-  const visible = pairs.slice(page * 3, page * 3 + 3);
+  const pages = Math.max(1, Math.ceil(pairs.length / PER_PAGE));
+  const page = Math.min(pages - 1, Math.max(0, controlledPage ?? localPage));
+  const visible = pairs.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+
   function changePage(next) {
-    setPage(Math.max(0, Math.min(pages - 1, next)));
-    windowRef.current?.querySelector('.document-paper')?.scrollTo({ top: 0 });
+    const clamped = Math.max(0, Math.min(pages - 1, next));
+    if (onPageChange) onPageChange(clamped); else setLocalPage(clamped);
+    paperRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
   }
+
+  useEffect(() => {
+    if (!onSelection) return undefined;
+    function check() {
+      const current = window.getSelection();
+      const text = current?.toString().trim();
+      if (!text || !current.rangeCount || !paperRef.current?.contains(current.anchorNode)) { setSelection(null); return; }
+      const rect = current.getRangeAt(0).getBoundingClientRect();
+      setSelection({ text: text.slice(0, 600), top: Math.max(8, rect.top - 56), left: Math.min(window.innerWidth - 300, Math.max(8, rect.left + rect.width / 2 - 140)) });
+      requestTip('explain');
+    }
+    const onUp = () => setTimeout(check, 0);
+    const onScroll = () => setSelection(null);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('keyup', onUp);
+    document.addEventListener('touchend', onUp);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('keyup', onUp);
+      document.removeEventListener('touchend', onUp);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [onSelection]);
+
+  function act(kind) {
+    const text = selection?.text;
+    setSelection(null);
+    window.getSelection()?.removeAllRanges();
+    if (text) onSelection(kind, text);
+  }
+
   return (
-    <section ref={windowRef} className="study-document-window" aria-label="Study document">
-      <header className="document-toolbar">
-        <span className="document-course"><WorkspaceIcon name="study" />{guide?.className || 'Your study space'}</span>
-        <div className="document-toolbar-actions">
-          {onOpen && <button type="button" onClick={onOpen} aria-label="Open study guide"><WorkspaceIcon name="study" /></button>}
-          <button type="button" onClick={() => { if (document.fullscreenElement) document.exitFullscreen?.(); else windowRef.current?.requestFullscreen?.(); }} aria-label="Expand document">⛶</button>
-        </div>
-      </header>
-      <div className="document-body">
-        <nav className="document-thumbnails" aria-label="Document pages">
-          {Array.from({ length: pages }, (_, index) => (
-            <button key={index} type="button" className={page === index ? 'active' : ''} onClick={() => changePage(index)} aria-label={`Page ${index + 1}`} aria-current={page === index ? 'page' : undefined}>
-              <span className="thumbnail-number">{index + 1}</span>
-              <span className="thumbnail-paper"><strong>{guide?.title || 'Your first guide'}</strong>{pairs.slice(index * 3, index * 3 + 3).map(pair => <span key={pair.index}><b>{pair.question}</b>{pair.answer}</span>)}</span>
-            </button>
-          ))}
+    <section className="reader" aria-label="Study guide">
+      {pages > 1 && (
+        <nav className="reader-pages" aria-label="Pages">
+          {Array.from({ length: pages }, (_, index) => {
+            const first = pairs[index * PER_PAGE];
+            return (
+              <button key={index} type="button" className={'reader-thumb' + (page === index ? ' is-active' : '')} onClick={() => changePage(index)} aria-current={page === index ? 'page' : undefined} aria-label={`Page ${index + 1}`}>
+                <span className="c-meta">{index + 1}</span>
+                <span className="reader-thumb-text">{first?.question}</span>
+              </button>
+            );
+          })}
         </nav>
-        <article className="document-paper" style={{ '--document-scale': scale / 100 }}>
-          <div className="document-paper-label">Study guide <span>Page {page + 1} of {pages}</span></div>
-          <h2>{guide?.title || 'A little focus. A deeper understanding.'}</h2>
-          <div className="document-rule" />
-          {visible.length ? visible.map((pair, index) => (
-            <section className="document-section" key={pair.index}>
-              <h3><span>{page * 3 + index + 1}.</span>{pair.question}</h3>
-              <p>{pair.answer}</p>
-              {pair.image && <img src={pair.image} alt={`Illustration for ${pair.question}`} />}
-              {onRead && <button className="document-read" type="button" aria-pressed={readSections?.has(page * 3 + index) || false} onClick={() => onRead(page * 3 + index)}>{readSections?.has(page * 3 + index) ? 'Read' : 'Mark as read'} <span>✓</span></button>}
-              {onLearn && <button className="document-read" type="button" onClick={() => onLearn(page * 3 + index)}>Learn it your way <span>→</span></button>}
-              {renderAid?.(page * 3 + index)}
+      )}
+
+      <article ref={paperRef} className="c-card reader-paper">
+        {visible.length ? visible.map((pair, offset) => {
+          const index = page * PER_PAGE + offset;
+          const read = readSections?.has(index);
+          return (
+            <section className="reader-block" key={pair.index}>
+              <h2 className="reader-q"><span className="c-meta">{index + 1}</span>{pair.question}</h2>
+              <p className="c-study reader-a">{pair.answer}</p>
+              {pair.image && <img className="reader-img" src={pair.image} alt="" />}
+              {(onRead || onExplain) && (
+                <div className="reader-actions">
+                  {onRead && (
+                    <button type="button" className={'c-btn c-btn--quiet' + (read ? ' is-read' : '')} aria-pressed={Boolean(read)} onClick={() => onRead(index)}>
+                      <Check size={20} strokeWidth={1.75} aria-hidden="true" />Got it
+                    </button>
+                  )}
+                  {onExplain && (
+                    <button type="button" className="c-btn c-btn--quiet" onClick={() => onExplain(index)}>
+                      <Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain
+                    </button>
+                  )}
+                </div>
+              )}
+              {renderAid?.(index)}
             </section>
-          )) : guide?.study_guide ? <p className="document-prose">{guide.study_guide}</p> : notes.length ? notes.map((note, index) => <p key={index}>{note}</p>) : <div className="document-empty"><WorkspaceIcon name="upload" /><h3>Your next discovery starts here.</h3><p>Bring in your course material. Cordia will help you turn it into understanding.</p>{onOpen && <button type="button" className="btn" onClick={onOpen}>Add study material <WorkspaceIcon name="arrow" /></button>}</div>}
-        </article>
-      </div>
-      <footer className="document-footer">
-        <div><button type="button" aria-label="Previous page" disabled={!page} onClick={() => changePage(page - 1)}>‹</button><span>{page + 1} / {pages}</span><button type="button" aria-label="Next page" disabled={page >= pages - 1} onClick={() => changePage(page + 1)}>›</button></div>
-        <div><button type="button" aria-label="Zoom out" disabled={scale <= 80} onClick={() => setScale(value => value - 10)}>−</button><span>{scale}%</span><button type="button" aria-label="Zoom in" disabled={scale >= 140} onClick={() => setScale(value => value + 10)}>+</button></div>
-      </footer>
+          );
+        }) : guide?.study_guide ? (
+          <p className="c-study reader-prose">{guide.study_guide}</p>
+        ) : notes.length ? (
+          <ul className="c-study reader-notes">{notes.map((note, index) => <li key={index}>{note}</li>)}</ul>
+        ) : null}
+
+        {pages > 1 && (
+          <footer className="reader-foot">
+            <button type="button" className="c-icon-btn" aria-label="Previous page" disabled={!page} onClick={() => changePage(page - 1)}><ChevronLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+            <span className="c-meta">{page + 1} / {pages}</span>
+            <button type="button" className="c-icon-btn" aria-label="Next page" disabled={page >= pages - 1} onClick={() => changePage(page + 1)}><ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+          </footer>
+        )}
+      </article>
+
+      {selection && (
+        <div className="c-menu reader-select" style={{ top: selection.top, left: selection.left }} role="menu" aria-label="Selection" onMouseDown={event => event.preventDefault()}>
+          <button type="button" role="menuitem" onClick={() => act('explain')} data-tip="explain"><Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain</button>
+          <button type="button" role="menuitem" onClick={() => act('card')}><Layers size={20} strokeWidth={1.75} aria-hidden="true" />Make card</button>
+          <button type="button" role="menuitem" onClick={() => act('ask')}><MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />Ask</button>
+        </div>
+      )}
+
+      <style jsx>{`
+        .reader { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 20px; align-items: start; }
+        .reader:not(:has(.reader-pages)) { grid-template-columns: minmax(0, 1fr); }
+        .reader-pages { position: sticky; top: calc(var(--bar-h) + 16px); display: grid; gap: 8px; max-height: calc(100vh - var(--bar-h) - 40px); overflow: auto; padding: 2px; }
+        .reader-thumb { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-input); background: var(--card); color: var(--ink); text-align: left; cursor: pointer; }
+        .reader-thumb.is-active { border-color: var(--olive); box-shadow: 0 0 0 1px var(--olive); }
+        .reader-thumb-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: 600 13px/1.35 var(--font-sans); }
+        .reader-paper { padding: 40px 48px; min-width: 0; display: grid; justify-items: center; scroll-margin-top: calc(var(--bar-h) + 16px); }
+        .reader-block { width: 100%; max-width: 68ch; padding: 8px 0 28px; }
+        .reader-block + .reader-block { border-top: 1px solid var(--line); padding-top: 28px; }
+        .reader-q { display: flex; gap: 12px; align-items: baseline; margin: 0 0 12px; font: 600 22px/1.3 var(--font-display); letter-spacing: -0.01em; }
+        .reader-a { margin: 0; white-space: pre-wrap; }
+        .reader-img { display: block; max-width: 100%; margin-top: 16px; border-radius: var(--r-input); }
+        .reader-actions { display: flex; gap: 4px; margin: 16px 0 0 -12px; }
+        .reader-actions :global(.is-read) { color: var(--success); }
+        .reader-prose, .reader-notes { white-space: pre-wrap; width: 100%; }
+        .reader-foot { display: flex; align-items: center; gap: 12px; padding-top: 16px; }
+        .reader-select { position: fixed; display: flex; min-width: 0; gap: 2px; z-index: 150; }
+        .reader-select :global([role='menuitem']) { width: auto; }
+        @media (max-width: 1023px) {
+          .reader { grid-template-columns: minmax(0, 1fr); }
+          .reader-pages { display: none; }
+        }
+        @media (max-width: 767px) {
+          .reader-paper { padding: 24px 18px; }
+          .reader-q { font-size: 19px; }
+        }
+      `}</style>
     </section>
   );
 }

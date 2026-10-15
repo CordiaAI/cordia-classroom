@@ -1,479 +1,222 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { Brain, ChevronRight, Flame, Layers, NotebookPen, PencilRuler, Play } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
-import { formatDate } from '../lib/formatters';
 import useSessionTracker from '../lib/useSessionTracker';
-import SearchModal from '../components/SearchModal';
-import AILoadingSphere from '../components/AILoadingSphere';
-import StudyWorkspaceFrame from '../components/StudyWorkspaceFrame';
-import CalendarDashboard from '../components/CalendarDashboard';
-import DashboardOverview from '../components/DashboardOverview';
-import SetupWizard from '../components/SetupWizard';
+import { createDashboardOverview } from '../lib/dashboardOrganization';
+import { loadStudyQueue } from '../lib/studyQueue';
+import { lastGuide, trackVisit } from '../lib/userStore';
+import { loadOnboarding, saveOnboardingStep } from '../lib/onboarding';
+import { requestTip } from '../lib/tips';
+import ProgressRing from '../components/ProgressRing';
+import StudyTimer from '../components/StudyTimer';
+import StudyInsights from '../components/StudyInsights';
 import GettingStarted from '../components/GettingStarted';
-import { organizeDashboardGuides } from '../lib/dashboardOrganization';
+import FirstRun from '../components/FirstRun';
 
-export default function Dashboard({ timerState, setTimerState }) {
+const LEGACY_VIEWS = { guides: '/library', classes: '/library', calendar: '/calendar', notes: '/smartnotes' };
+
+function shortDate(value) {
+  const date = new Date(value || '');
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function plural(count, word) {
+  return `${count} ${word}${count === 1 ? '' : 's'}`;
+}
+
+export default function Today({ timerState, setTimerState }) {
   const router = useRouter();
   const { ready } = useRequireAuth();
   useSessionTracker('browse');
-  const view = router.query.view || null; // null = dashboard; guides/calendar = focused workspace views
+  const legacy = LEGACY_VIEWS[router.query.view];
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [folders, setFolders] = useState([]);
   const [guides, setGuides] = useState([]);
   const [stats, setStats] = useState(null);
-  const [newFolderName, setNewFolderName] = useState('');
-  const [showNewFolder, setShowNewFolder] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [dragGuideId, setDragGuideId] = useState(null);
-  const [dropTargetId, setDropTargetId] = useState(null);
-  const [contextMenu, setContextMenu] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [guidesFilter, setGuidesFilter] = useState('all'); // all, bookmarked, unassigned
-  const [guidesSort, setGuidesSort] = useState('recent'); // recent, title, progress
-  const [openClasses, setOpenClasses] = useState(() => new Set());
-  const [unclassifiedOpen, setUnclassifiedOpen] = useState(true);
-  const contextRef = useRef(null);
+  const [streak, setStreak] = useState(null);
+  const [queue, setQueue] = useState(null);
+  const [insights, setInsights] = useState(null);
+  const [notesCount, setNotesCount] = useState(0);
+  const [calendar, setCalendar] = useState(null);
+  const [onboarding, setOnboarding] = useState(null);
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('cordiaOpenClasses') || '[]');
-      if (Array.isArray(saved)) setOpenClasses(new Set(saved));
-    } catch {}
-  }, []);
-
-  function toggleClass(folderId) {
-    setOpenClasses(current => {
-      const next = new Set(current);
-      if (next.has(folderId)) next.delete(folderId); else next.add(folderId);
-      try { localStorage.setItem('cordiaOpenClasses', JSON.stringify([...next])); } catch {}
-      return next;
-    });
-  }
+    if (ready && legacy) router.replace(legacy);
+  }, [ready, legacy, router]);
 
   useEffect(() => {
-    if (ready && router.query.view === 'notes') router.replace('/smartnotes');
-    if (ready && router.query.view === 'classes') router.replace('/dashboard?view=guides');
-  }, [ready, router, router.query.view]);
-
-  useEffect(() => {
-    if (ready) {
-      setLoading(true);
-      loadData();
-    }
-    function onKey(e) {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); setShowSearch(true); }
-      if (e.key === 'Escape') setContextMenu(null);
-    }
-    function onClick(e) {
-      if (contextRef.current && !contextRef.current.contains(e.target)) setContextMenu(null);
-    }
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('click', onClick);
-    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('click', onClick); };
-  }, [ready, router.asPath]);
-
-  function showToast(message, type = 'success') {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 2500);
-  }
+    if (ready && !legacy) loadData();
+  }, [ready, legacy]);
 
   async function loadData() {
     setLoading(true);
     setLoadError('');
     try {
+      const tz = -new Date().getTimezoneOffset();
       const results = await Promise.allSettled([
         apiFetch('/folders'),
         apiFetch('/guides?fields=summary&limit=500'),
         apiFetch('/stats/overview'),
+        apiFetch('/stats/streak?tz_offset=' + tz),
+        loadOnboarding(),
       ]);
-      const value = index => results[index].status === 'fulfilled' ? results[index].value : null;
-      const foldersData = value(0);
-      const guidesData = value(1);
-      const statsData = value(2);
-      const responses = [foldersData, guidesData, statsData];
-      const failure = responses.find(data => !data || data.detail);
-      if (failure) {
-        setLoadError(apiErrorMessage(
-          failure?.detail,
-          'Some Classroom data could not be refreshed. Your saved work is unchanged.'
-        ));
-      }
+      const value = index => (results[index].status === 'fulfilled' ? results[index].value : null);
+      const [foldersData, guidesData, statsData, streakData, onboardingData] = [0, 1, 2, 3, 4].map(value);
+      const failure = [foldersData, guidesData, statsData].find(data => !data || data.detail);
+      if (failure) setLoadError(apiErrorMessage(failure?.detail, 'Some Classroom data could not be refreshed. Your saved work is unchanged.'));
       if (Array.isArray(foldersData?.folders)) setFolders(foldersData.folders);
       if (Array.isArray(guidesData?.guides)) setGuides(guidesData.guides);
       if (statsData && !statsData.detail) setStats(statsData);
+      if (streakData && !streakData.detail) setStreak(streakData);
+      setOnboarding(onboardingData);
+      // An account that already has guides is past first run.
+      if (onboardingData && !onboardingData.completed && guidesData?.guides?.length) saveOnboardingStep('done');
     } finally {
       setLoading(false);
     }
+    loadStudyQueue().then(setQueue);
+    apiFetch('/stats/insights').then(setInsights);
+    apiFetch('/smart_notes').then(data => setNotesCount(data?.notes?.length || 0));
+    apiFetch('/calendar/connection').then(setCalendar);
   }
 
-  async function createFolder() {
-    if (!newFolderName.trim()) return;
-    const data = await apiFetch('/folders', {
-      method: 'POST',
-      body: JSON.stringify({ name: newFolderName.trim() })
-    });
-    if (data?.folder) {
-      setFolders([data.folder, ...folders]);
-      setNewFolderName('');
-      setShowNewFolder(false);
-      showToast('Class created!');
-    }
-  }
+  // Feature tips, one per session, each at its moment.
+  useEffect(() => {
+    if (!queue || !stats) return;
+    const visit = trackVisit();
+    if (visit.sessions >= 2 && queue.cardTotal > 0) requestTip('cards', `${plural(queue.cardTotal, 'card')} due`);
+    else if ((stats.minutes_today || 0) >= 25) requestTip('break');
+    else if (visit.days >= 3 && calendar && !calendar.connected) requestTip('calendar');
+    else if (visit.days >= 7 && insights?.answered) requestTip('insights');
+  }, [queue, stats, calendar, insights]);
 
-  async function toggleBookmark(guideId, e) {
-    e.stopPropagation();
-    const data = await apiFetch('/guides/' + guideId + '/bookmark', { method: 'PATCH' });
-    if (data) {
-      setGuides(guides.map(g => g.id === guideId ? { ...g, is_bookmarked: data.is_bookmarked } : g));
-    }
-  }
+  if (!ready || legacy) return null;
 
-  // --- Drag & Drop ---
-  function onDragStart(e, guideId) {
-    setDragGuideId(guideId);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', guideId);
-    e.currentTarget.style.opacity = '0.5';
-  }
+  if (!loading && onboarding && !onboarding.completed && guides.length === 0) return <FirstRun />;
 
-  function onDragEnd(e) {
-    e.currentTarget.style.opacity = '1';
-    setDragGuideId(null);
-    setDropTargetId(null);
-  }
+  const overview = createDashboardOverview(folders, guides);
+  const remembered = lastGuide();
+  const continueGuide = (remembered && guides.find(guide => guide.id === remembered.id)) || overview.continueGuide;
+  const continueHref = continueGuide
+    ? `/guide/${continueGuide.id}${remembered?.id === continueGuide.id && remembered.page ? `?page=${remembered.page + 1}` : ''}`
+    : null;
+  const toolGuide = continueGuide?.id;
+  const nothingDue = queue && !queue.cardTotal && !queue.misses.length && !queue.problems;
+  const dueItems = calendar?.connected
+    ? (calendar.items || []).filter(item => new Date(item.due_at).getTime() >= Date.now() - 86400000).sort((a, b) => new Date(a.due_at) - new Date(b.due_at)).slice(0, 3)
+    : [];
+  const tools = [
+    { label: 'Quiz', icon: Brain, href: toolGuide ? `/quiz/${toolGuide}` : '/library' },
+    { label: 'Cards', icon: Layers, href: '/library?tab=cards', tip: 'cards' },
+    { label: 'Practice', icon: PencilRuler, href: '/practice' },
+    { label: 'Notes', icon: NotebookPen, href: '/smartnotes' },
+  ];
 
-  function onDragOver(e, folderId) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDropTargetId(folderId);
-  }
+  return (
+    <div className="c-page today">
+      <header className="c-page-head">
+        <h1 className="c-title">Today</h1>
+        {streak && (
+          <span className="today-streak" aria-label={`Streak: ${plural(streak.current_streak || 0, 'day')}`}>
+            <Flame size={20} strokeWidth={1.75} aria-hidden="true" />{plural(streak.current_streak || 0, 'day')}
+          </span>
+        )}
+      </header>
 
-  function onDragLeave(e, folderId) {
-    if (dropTargetId === folderId) setDropTargetId(null);
-  }
-
-  async function onDrop(e, folderId) {
-    e.preventDefault();
-    setDropTargetId(null);
-    const guideId = e.dataTransfer.getData('text/plain') || dragGuideId;
-    if (!guideId) return;
-    const guide = guides.find(g => g.id === guideId);
-    if (guide?.folder_id === folderId) return;
-
-    const data = await apiFetch('/guides/' + guideId + '/move', {
-      method: 'PATCH',
-      body: JSON.stringify({ folder_id: folderId })
-    });
-    if (data?.updated) {
-      setGuides(guides.map(g => g.id === guideId ? { ...g, folder_id: folderId } : g));
-      const folderName = folderId ? folders.find(f => f.id === folderId)?.name || 'class' : 'No class';
-      showToast('Moved to ' + folderName);
-    }
-    setDragGuideId(null);
-  }
-
-  // --- Context Menu ---
-  function onGuideContextMenu(e, guide) {
-    e.preventDefault();
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      guide
-    });
-  }
-
-  async function moveGuideToFolder(guideId, folderId) {
-    setContextMenu(null);
-    const data = await apiFetch('/guides/' + guideId + '/move', {
-      method: 'PATCH',
-      body: JSON.stringify({ folder_id: folderId })
-    });
-    if (data?.updated) {
-      setGuides(guides.map(g => g.id === guideId ? { ...g, folder_id: folderId } : g));
-      const folderName = folderId ? folders.find(f => f.id === folderId)?.name : 'No folder';
-      showToast('Moved to ' + folderName);
-    }
-  }
-
-  async function deleteGuide(guideId) {
-    setContextMenu(null);
-    await apiFetch('/guides/' + guideId, { method: 'DELETE' });
-    setGuides(guides.filter(g => g.id !== guideId));
-    showToast('Guide deleted', 'info');
-  }
-
-  // --- Guides filtering & sorting ---
-  function getFilteredGuides() {
-    let filtered = [...guides];
-    if (guidesFilter === 'bookmarked') filtered = filtered.filter(g => g.is_bookmarked);
-    if (guidesSort === 'title') filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-    else if (guidesSort === 'progress') filtered.sort((a, b) => (b.read_progress || 0) - (a.read_progress || 0));
-    // 'recent' is default from API
-    return filtered;
-  }
-
-  if (!ready || view === 'notes' || view === 'classes') return null;
-
-  // ============== LOADING STATE ==============
-  if (!ready || loading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 16 }}>
-        <AILoadingSphere />
-      </div>
-    );
-  }
-
-  const organized = organizeDashboardGuides(folders, guides);
-  const loadErrorBanner = loadError && (
-    <div className="canvas-inline-error" role="alert">
-      <span>{loadError}</span>
-      <button type="button" className="btn-outline" onClick={loadData}>Try again</button>
-    </div>
-  );
-  // ============== STUDY GUIDES VIEW ==============
-  if (view === 'guides') {
-    const filteredGuides = getFilteredGuides();
-    const organizedFiltered = organizeDashboardGuides(folders, filteredGuides);
-    const visibleClasses = guidesFilter === 'bookmarked'
-      ? organizedFiltered.classes.filter(entry => entry.guides.length)
-      : organizedFiltered.classes;
-    const renderGuideRow = guide => (
-      <div
-        key={guide.id}
-        className={'library-guide-row draggable-guide' + (dragGuideId === guide.id ? ' dragging' : '')}
-        draggable
-        onDragStart={e => onDragStart(e, guide.id)}
-        onDragEnd={onDragEnd}
-        onClick={() => router.push('/guide/' + guide.id)}
-        onContextMenu={e => onGuideContextMenu(e, guide)}
-      >
-        <div className="library-guide-row-main">
-          <h3>{guide.title}</h3>
-          <p>
-            <span className="timestamp">{formatDate(guide.created_at)}</span>
-            {guide.read_progress > 0 && (
-              <span className="library-guide-row-progress">
-                <span className="mini-progress">
-                  <span className="mini-progress-fill" style={{ width: Math.round((guide.read_progress || 0) * 100) + '%' }} />
-                </span>
-                {Math.round((guide.read_progress || 0) * 100)}%
-              </span>
-            )}
-          </p>
+      {loadError && (
+        <div className="today-error" role="alert">
+          <span>{loadError}</span>
+          <button type="button" className="c-btn c-btn--secondary" onClick={loadData}>Retry</button>
         </div>
-        <button className={'bookmark-btn' + (guide.is_bookmarked ? ' active' : '')} onClick={e => toggleBookmark(guide.id, e)} aria-label={guide.is_bookmarked ? 'Remove bookmark' : 'Bookmark'}>
-          {guide.is_bookmarked ? '\u2605' : '\u2606'}
-        </button>
-        <button
-          className="bookmark-btn library-guide-row-delete"
-          title="Delete guide"
-          aria-label="Delete guide"
-          onClick={e => { e.stopPropagation(); if (window.confirm('Delete "' + guide.title + '"?')) deleteGuide(guide.id); }}
-        >
-          &#128465;
-        </button>
-      </div>
-    );
-    return (
-      <StudyWorkspaceFrame section="guides" timerState={timerState} setTimerState={setTimerState}>
-        <div className="fade-in study-library">
-          {loadErrorBanner}
-        <GettingStarted guides={guides} navigate={path => router.push(path)} />
-          <div className="study-library-header">
-            <div>
-              <h1>My classes</h1>
-              <p>All your study materials, organized and enhanced by Cordia.</p>
-            </div>
-            <button className="btn" onClick={() => router.push('/create')}>New study guide</button>
-          </div>
-          <div className="study-library-tabs" role="tablist" aria-label="Study library">
-            <button type="button" className="active" role="tab" aria-selected="true">Study guides</button>
-            <button type="button" role="tab" aria-selected="false" onClick={() => router.push('/flashcards')}>Flashcards</button>
-          </div>
-          <div className="study-library-toolbar">
-            <button className="guides-search-trigger" onClick={() => setShowSearch(true)}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-              </svg>
-              Search guides...
-              <kbd>Ctrl+K</kbd>
-            </button>
-          </div>
+      )}
 
-        <div className="guides-toolbar">
-          <div className="filter-pills">
-            {[
-              { key: 'all', label: 'All (' + guides.length + ')' },
-              { key: 'bookmarked', label: '★ Bookmarked' },
-            ].map(f => (
-              <button
-                key={f.key}
-                className={'pill' + (guidesFilter === f.key ? ' pill-active' : '')}
-                onClick={() => setGuidesFilter(f.key)}
-              >
-                {f.label}
-              </button>
+      <section className="c-glass today-start" aria-label="Start">
+        <ul className="today-counts" aria-live="polite">
+          <li><strong>{queue ? queue.cardTotal + queue.misses.length : '–'}</strong><span>cards</span></li>
+          <li><strong>{queue ? queue.problems : '–'}</strong><span>problems</span></li>
+          <li><strong>{queue ? queue.minutes : '–'}</strong><span>min</span></li>
+        </ul>
+        <button type="button" className="c-btn c-btn--primary c-btn--lg today-start-btn" onClick={() => router.push('/session')} disabled={!queue || nothingDue}>
+          <Play size={20} strokeWidth={1.75} aria-hidden="true" />Start
+        </button>
+      </section>
+
+      {continueGuide && (
+        <section className="c-section" aria-labelledby="continue-title">
+          <h2 id="continue-title" className="c-section-title">Continue</h2>
+          <Link href={continueHref} className="c-card today-continue">
+            <ProgressRing value={continueGuide.read_progress} size={44} />
+            <span className="today-continue-title c-truncate">{continueGuide.title}</span>
+            <span className="c-meta">{Math.round((continueGuide.read_progress || 0) * 100)}%</span>
+            <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
+          </Link>
+        </section>
+      )}
+
+      <nav className="today-tools" aria-label="Tools">
+        {tools.map(tool => (
+          <Link key={tool.label} href={tool.href} className="c-card today-tool" data-tip={tool.tip}>
+            <tool.icon size={28} strokeWidth={1.75} aria-hidden="true" />
+            <span>{tool.label}</span>
+          </Link>
+        ))}
+      </nav>
+
+      {dueItems.length > 0 && (
+        <section className="c-section" aria-labelledby="due-title">
+          <div className="c-row">
+            <h2 id="due-title" className="c-section-title">Due soon</h2>
+            <span className="c-spacer" />
+            <Link href="/calendar" className="c-btn c-btn--quiet">Calendar</Link>
+          </div>
+          <div className="c-card c-list">
+            {dueItems.map(item => (
+              <a key={item.id} className="c-list-row" href={item.url || '/calendar'} target={item.url ? '_blank' : undefined} rel={item.url ? 'noreferrer' : undefined}>
+                <span className="c-grow c-truncate">{item.title}</span>
+                <span className="c-meta">{shortDate(item.due_at)}</span>
+              </a>
             ))}
           </div>
-          <select
-            className="sort-select"
-            value={guidesSort}
-            onChange={e => setGuidesSort(e.target.value)}
-          >
-            <option value="recent">Newest First</option>
-            <option value="title">Title A-Z</option>
-            <option value="progress">Read Progress</option>
-          </select>
-        </div>
+        </section>
+      )}
 
-        {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
-
-        <div className="guide-boxes">
-          <section className="guide-box" aria-labelledby="guide-box-classes">
-            <header className="guide-box-header">
-              <h2 id="guide-box-classes">Classes</h2>
-              <button type="button" className="guide-box-add" onClick={() => setShowNewFolder(true)}>+ Add class</button>
-            </header>
-            {showNewFolder && <form className="classroom-new-class" onSubmit={event => { event.preventDefault(); createFolder(); }}><input autoFocus aria-label="Class name" placeholder="Class name" value={newFolderName} onChange={event => setNewFolderName(event.target.value)} /><button type="submit" className="btn">Create class</button><button type="button" className="btn-outline" onClick={() => setShowNewFolder(false)}>Cancel</button></form>}
-            {visibleClasses.length === 0 && <p className="guide-box-empty">{guidesFilter === 'bookmarked' ? 'No bookmarked guides in your classes.' : 'No classes yet. Add one to organize your guides.'}</p>}
-            {visibleClasses.map(entry => {
-              const open = openClasses.has(entry.folder.id) || guidesFilter === 'bookmarked';
-              return (
-                <div key={entry.folder.id} className={'guide-class' + (dropTargetId === entry.folder.id ? ' is-drop-target' : '')} onDragOver={event => onDragOver(event, entry.folder.id)} onDragLeave={event => onDragLeave(event, entry.folder.id)} onDrop={event => onDrop(event, entry.folder.id)}>
-                  <div className="guide-class-head">
-                    <button type="button" className="guide-class-toggle" onClick={() => toggleClass(entry.folder.id)} aria-expanded={open}>
-                      <span className={'guide-chevron' + (open ? ' is-open' : '')} aria-hidden="true">›</span>
-                      <strong>{entry.folder.name}</strong>
-                      <small>{entry.guides.length} {entry.guides.length === 1 ? 'guide' : 'guides'}</small>
-                    </button>
-                    <button type="button" className="guide-class-open" onClick={() => router.push('/folder/' + entry.folder.id)}>Open</button>
-                  </div>
-                  {open && (
-                    <div className="guide-class-list">
-                      {entry.guides.length ? entry.guides.map(renderGuideRow) : <p className="guide-box-empty">No study guides yet. Drag one here.</p>}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </section>
-
-          <section className={'guide-box' + (dropTargetId === 'none' ? ' is-drop-target' : '')} aria-labelledby="guide-box-unclassified" onDragOver={event => onDragOver(event, 'none')} onDragLeave={event => onDragLeave(event, 'none')} onDrop={event => onDrop(event, null)}>
-            <header className="guide-box-header">
-              <h2 id="guide-box-unclassified">Not in a class</h2>
-            </header>
-            <div className="guide-class">
-              <div className="guide-class-head">
-                <button type="button" className="guide-class-toggle" onClick={() => setUnclassifiedOpen(open => !open)} aria-expanded={unclassifiedOpen}>
-                  <span className={'guide-chevron' + (unclassifiedOpen ? ' is-open' : '')} aria-hidden="true">›</span>
-                  <strong>Unsorted study guides</strong>
-                  <small>{organizedFiltered.unclassified.length} {organizedFiltered.unclassified.length === 1 ? 'guide' : 'guides'}</small>
-                </button>
-              </div>
-              {unclassifiedOpen && (
-                <div className="guide-class-list">
-                  {organizedFiltered.unclassified.length
-                    ? organizedFiltered.unclassified.map(renderGuideRow)
-                    : <p className="guide-box-empty">{guides.length ? 'Every guide is in a class.' : 'No study guides yet. Create one or use the Chrome extension.'}</p>}
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
-
-        {toast && <div className={'toast toast-' + toast.type}>{toast.message}</div>}
-        {contextMenu && renderContextMenu()}
-        </div>
-      </StudyWorkspaceFrame>
-    );
-  }
-
-  if (view === 'calendar') {
-    return (
-      <StudyWorkspaceFrame classes={organized.classes} section="calendar" timerState={timerState} setTimerState={setTimerState}>
-        {loadErrorBanner}
-        <div className="dashboard-desktop-header">
-          <div>
-            <h1>Calendar</h1>
-            <p>Review Canvas deadlines and control reminders from one place.</p>
-          </div>
-        </div>
-        <CalendarDashboard />
-      </StudyWorkspaceFrame>
-    );
-  }
-
-  // ============== CONTEXT MENU RENDERER ==============
-  function renderContextMenu() {
-    if (!contextMenu) return null;
-    const menuW = 260;
-    const menuH = 320;
-    const x = Math.max(8, Math.min(contextMenu.x, window.innerWidth - menuW - 8));
-    const y = Math.max(8, Math.min(contextMenu.y, window.innerHeight - menuH - 8));
-    return (
-      <div
-        ref={contextRef}
-        className="context-menu"
-        style={{ top: y, left: x }}
-      >
-        <div className="context-menu-header">{contextMenu.guide.title}</div>
-        <div className="context-menu-divider" />
-        <div className="context-menu-item" onClick={() => { router.push('/guide/' + contextMenu.guide.id); setContextMenu(null); }}>
-          &#128214; Open Guide
-        </div>
-        <div className="context-menu-item" onClick={() => { toggleBookmark(contextMenu.guide.id, { stopPropagation: () => {} }); setContextMenu(null); }}>
-          {contextMenu.guide.is_bookmarked ? '★ Remove Bookmark' : '☆ Add Bookmark'}
-        </div>
-        <div className="context-menu-item" onClick={() => {
-          const newTitle = prompt('Rename guide:', contextMenu.guide.title);
-          if (newTitle && newTitle.trim()) {
-            apiFetch('/guides/' + contextMenu.guide.id + '/rename', {
-              method: 'PATCH',
-              body: JSON.stringify({ title: newTitle.trim() })
-            }).then(data => { if (data?.title) loadData(); });
-          }
-          setContextMenu(null);
-        }}>
-          &#9998; Rename
-        </div>
-        <div className="context-menu-divider" />
-        <div className="context-menu-label">Move to Class:</div>
-        {contextMenu.guide.folder_id && (
-          <div className="context-menu-item" onClick={() => moveGuideToFolder(contextMenu.guide.id, null)}>
-            &#10060; Remove from class
-          </div>
-        )}
-        {folders.map(f => (
-          <div
-            key={f.id}
-            className={'context-menu-item' + (contextMenu.guide.folder_id === f.id ? ' context-menu-current' : '')}
-            onClick={() => contextMenu.guide.folder_id !== f.id && moveGuideToFolder(contextMenu.guide.id, f.id)}
-          >
-            &#128193; {f.name}
-            {contextMenu.guide.folder_id === f.id && ' ✓'}
-          </div>
-        ))}
-        <div className="context-menu-divider" />
-        <div className="context-menu-item context-menu-danger" onClick={() => deleteGuide(contextMenu.guide.id)}>
-          &#128465; Delete Guide
-        </div>
+      <div className="today-pair">
+        <StudyTimer timerState={timerState} setTimerState={setTimerState} />
+        <StudyInsights compact />
       </div>
-    );
-  }
 
-  // ============== DEFAULT DASHBOARD VIEW ==============
-  return (
-    <div className="classroom-home">
-      {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
-      <SetupWizard />
-      <div>
-        {loadErrorBanner}
-        <DashboardOverview folders={folders} guides={guides} stats={stats} navigate={path => router.push(path)} />
-      </div>
-      {toast && <div className={'toast toast-' + toast.type}>{toast.message}</div>}
-      {contextMenu && renderContextMenu()}
+      <GettingStarted guides={guides} stats={stats} insights={insights} notesCount={notesCount} calendarConnected={Boolean(calendar?.connected)} navigate={path => router.push(path)} />
+
+      <style jsx>{`
+        .today-streak { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: var(--r-pill); background: var(--card); border: 1px solid var(--line); font: 600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .today-streak :global(.lucide) { color: var(--warning); }
+        .today-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius: var(--r-card); background: var(--error-bg); color: var(--error); font-weight: 600; }
+        .today-start { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px; border-radius: var(--r-card); flex-wrap: wrap; }
+        .today-counts { list-style: none; margin: 0; padding: 0; display: flex; gap: 32px; }
+        .today-counts li { display: grid; gap: 2px; }
+        .today-counts strong { font: 600 32px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .today-counts span { font: 500 15px/1 var(--font-sans); }
+        .today-start-btn { min-width: 160px; }
+        :global(.today-continue) { display: flex; align-items: center; gap: 16px; padding: 14px 18px; color: var(--ink); text-decoration: none; }
+        :global(.today-continue:hover) { text-decoration: none; border-color: var(--olive); }
+        .today-continue-title { flex: 1 1 auto; min-width: 0; font: 600 17px/1.3 var(--font-display); }
+        .today-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+        :global(.today-tool) { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 112px; color: var(--ink); text-decoration: none; font: 600 15px/1 var(--font-sans); }
+        :global(.today-tool:hover) { text-decoration: none; border-color: var(--olive); }
+        :global(.today-tool .lucide) { color: var(--olive-ink); }
+        .today-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+        @media (max-width: 767px) {
+          .today-start { padding: 20px; }
+          .today-counts { gap: 20px; }
+          .today-start-btn { width: 100%; }
+          .today-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .today-pair { grid-template-columns: 1fr; }
+        }
+      `}</style>
     </div>
   );
 }
