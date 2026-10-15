@@ -143,31 +143,31 @@ export default function FeedbackReviewPage() {
       <style jsx>{`
         .feedback-review-page { max-width: 1240px; margin: 0 auto; color: var(--ink); }
         .feedback-review-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
-        .feedback-review-heading p { margin: 0 0 9px; color: var(--olive); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.16em; }
-        h1 { margin: 0; font-size: clamp(2.5rem, 6vw, 4.8rem); line-height: 0.95; letter-spacing: -0.06em; }
+        .feedback-review-heading p { margin: 0 0 9px; color: var(--olive); font-size: 13px; font-weight: 800; letter-spacing: 0.16em; }
+        h1 { margin: 0; font-size: max(13px, clamp(2.5rem, 6vw, 4.8rem)); line-height: 0.95; letter-spacing: -0.06em; }
         .feedback-review-heading span { display: block; max-width: 680px; margin-top: 15px; color: var(--text-secondary); line-height: 1.55; }
         .feedback-review-heading button { min-height: 44px; padding: 0 18px; border: 0; border-radius: 12px; background: #11120f; color: #fff; font: inherit; font-weight: 750; cursor: pointer; }
-        .feedback-filters { display: flex; gap: 12px; margin-bottom: 18px; padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow-card); }
-        label { display: grid; gap: 7px; color: var(--text-secondary); font-size: 0.72rem; font-weight: 750; }
-        select { min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--ink); font: inherit; }
-        .feedback-review-error, .feedback-review-empty { padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--text-secondary); box-shadow: var(--shadow-card); }
+        .feedback-filters { display: flex; gap: 12px; margin-bottom: 18px; padding: 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow-card); }
+        label { display: grid; gap: 7px; color: var(--text-secondary); font-size: 13px; font-weight: 750; }
+        select { min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font: inherit; }
+        .feedback-review-error, .feedback-review-empty { padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: var(--text-secondary); box-shadow: var(--shadow-card); }
         .feedback-review-error { color: #9e3737; font-weight: 650; }
         .feedback-review-workspace { display: grid; grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1.28fr); gap: 18px; align-items: start; }
         .feedback-review-list { max-height: 680px; overflow-y: auto; display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
-        .feedback-review-list button { width: 100%; display: grid; gap: 7px; padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); font: inherit; text-align: left; cursor: pointer; }
+        .feedback-review-list button { width: 100%; display: grid; gap: 7px; padding: 17px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); font: inherit; text-align: left; cursor: pointer; }
         .feedback-review-list button.selected { border-color: var(--olive); background: var(--accent-glow); }
-        .feedback-review-list span { color: var(--olive); font-size: 0.66rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+        .feedback-review-list span { color: var(--olive); font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
         .feedback-review-list strong { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 0.9rem; line-height: 1.42; }
-        .feedback-review-list small { color: var(--muted-ink); font-size: 0.68rem; }
-        .feedback-review-detail { padding: 28px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); box-shadow: var(--shadow-card); }
+        .feedback-review-list small { color: var(--muted-ink); font-size: 13px; }
+        .feedback-review-detail { padding: 28px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: var(--shadow-card); }
         .feedback-review-detail-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
-        .feedback-category { color: var(--olive); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+        .feedback-category { color: var(--olive); font-size: 13px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
         h2 { margin: 8px 0 0; font-size: 1.7rem; letter-spacing: -0.04em; }
         .feedback-review-message { margin: 28px 0; color: var(--ink); font-size: 1.06rem; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
         dl { display: grid; gap: 0; margin: 0; border-top: 1px solid var(--line); }
         dl div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 15px; padding: 12px 0; border-bottom: 1px solid var(--line); }
-        dt { color: var(--muted-ink); font-size: 0.72rem; font-weight: 750; }
-        dd { min-width: 0; margin: 0; color: var(--text-secondary); font-size: 0.78rem; overflow-wrap: anywhere; }
+        dt { color: var(--muted-ink); font-size: 13px; font-weight: 750; }
+        dd { min-width: 0; margin: 0; color: var(--text-secondary); font-size: 13px; overflow-wrap: anywhere; }
         @media (max-width: 780px) {
           .feedback-review-heading { align-items: flex-start; flex-direction: column; }
           .feedback-filters, .feedback-review-workspace { grid-template-columns: 1fr; }

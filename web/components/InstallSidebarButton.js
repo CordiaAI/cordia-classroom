@@ -66,17 +66,17 @@ export default function InstallSidebarButton() {
           align-items: center;
           min-height: 36px;
           padding: 0 15px;
-          border-radius: 10px;
+          border-radius: 12px;
           background: var(--surface);
           color: var(--ink);
-          font-size: 0.76rem;
+          font-size: 13px;
           font-weight: 750;
           white-space: nowrap;
           transition: background 0.15s ease;
         }
         .install-sidebar-button:hover .install-sidebar-label { background: var(--bg-hover); }
         .install-sidebar-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--olive) 30%, transparent); outline-offset: 2px; }
-        .install-sidebar-caption { color: var(--ink); font-size: 0.56rem; font-weight: 560; line-height: 1.25; text-align: center; }
+        .install-sidebar-caption { color: var(--ink); font-size: 13px; font-weight: 560; line-height: 1.25; text-align: center; }
         @keyframes install-sidebar-orbit { to { transform: rotate(360deg); } }
         @media (prefers-reduced-motion: reduce) { .install-sidebar-wave { animation: none; } }
         @media (max-width: 1180px) { .install-sidebar-caption { display: none; } }

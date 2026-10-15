@@ -197,7 +197,7 @@ export default function ExtensionOnboarding({ open, onClose }) {
           width: 100%; max-width: 520px;
           background: var(--card-bg, #fff);
           border: 1px solid var(--border, #e5e7eb);
-          border-radius: 18px;
+          border-radius: 20px;
           padding: 26px 26px 22px;
           box-shadow: 0 24px 60px rgba(0,0,0,0.35);
           animation: asai-rise 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -205,13 +205,13 @@ export default function ExtensionOnboarding({ open, onClose }) {
         @keyframes asai-rise { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .asai-onb-close {
           position: absolute; top: 12px; right: 14px;
-          background: none; border: none; font-size: 1.6em; line-height: 1;
+          background: none; border: none; font-size: max(13px, 1.6em); line-height: 1;
           color: var(--text-muted, #9ca3af); cursor: pointer;
         }
         .asai-onb-close:hover { color: var(--text-primary, #111); }
         .asai-onb-status {
           display: inline-flex; align-items: center; gap: 7px;
-          font-size: 0.72em; font-weight: 600;
+          font-size: max(13px, 0.72em); font-weight: 600;
           color: var(--text-muted, #6b7280);
           background: rgba(120,120,120,0.1);
           padding: 5px 11px; border-radius: 999px; margin-bottom: 14px;
@@ -225,21 +225,21 @@ export default function ExtensionOnboarding({ open, onClose }) {
         .asai-onb-status.is-installed .asai-onb-dot { background: #22c55e; animation: none; }
         @keyframes asai-pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
         .asai-onb-title {
-          font-size: 1.3em; font-weight: 800; letter-spacing: -0.02em;
+          font-size: max(13px, 1.3em); font-weight: 800; letter-spacing: -0.02em;
           margin: 0 0 6px; color: var(--text-primary, #111);
         }
         .asai-onb-lead {
-          font-size: 0.85em; line-height: 1.5; color: var(--text-muted, #6b7280);
+          font-size: max(13px, 0.85em); line-height: 1.5; color: var(--text-muted, #6b7280);
           margin: 0 0 16px;
         }
         .asai-onb-lead strong { color: var(--accent, #2563eb); }
         .asai-onb-stepinfo { text-align: center; margin: 16px 0 4px; }
         .asai-onb-stepnum {
-          font-size: 0.68em; font-weight: 700; letter-spacing: 0.06em;
+          font-size: max(13px, 0.68em); font-weight: 700; letter-spacing: 0.06em;
           text-transform: uppercase; color: var(--accent, #2563eb); margin-bottom: 4px;
         }
-        .asai-onb-stepinfo h3 { margin: 0 0 5px; font-size: 1.02em; font-weight: 700; color: var(--text-primary, #111); }
-        .asai-onb-stepinfo p { margin: 0; font-size: 0.84em; line-height: 1.5; color: var(--text-muted, #6b7280); }
+        .asai-onb-stepinfo h3 { margin: 0 0 5px; font-size: max(13px, 1.02em); font-weight: 700; color: var(--text-primary, #111); }
+        .asai-onb-stepinfo p { margin: 0; font-size: max(13px, 0.84em); line-height: 1.5; color: var(--text-muted, #6b7280); }
         .asai-onb-dots { display: flex; gap: 8px; justify-content: center; margin: 16px 0 18px; }
         .asai-onb-pdot {
           width: 9px; height: 9px; border-radius: 50%; border: none; cursor: pointer; padding: 0;
@@ -249,7 +249,7 @@ export default function ExtensionOnboarding({ open, onClose }) {
         .asai-onb-pdot.active { background: var(--accent, #2563eb); transform: scale(1.35); }
         .asai-onb-controls { display: flex; gap: 10px; justify-content: space-between; }
         .asai-onb-btn {
-          font-size: 0.85em; font-weight: 600; padding: 10px 18px; border-radius: 10px;
+          font-size: max(13px, 0.85em); font-weight: 600; padding: 10px 18px; border-radius: 12px;
           cursor: pointer; border: 1px solid transparent; transition: all 0.15s;
         }
         .asai-onb-btn-wide { flex: 1; }
@@ -257,7 +257,7 @@ export default function ExtensionOnboarding({ open, onClose }) {
         .asai-onb-btn-primary:hover { filter: brightness(1.08); }
         .asai-onb-btn-ghost { background: transparent; border-color: var(--border, #d1d5db); color: var(--text-primary, #111); }
         .asai-onb-btn-ghost:disabled { opacity: 0.4; cursor: default; }
-        .asai-onb-hint { text-align: center; font-size: 0.74em; color: var(--text-muted, #9ca3af); margin: 12px 0 0; }
+        .asai-onb-hint { text-align: center; font-size: max(13px, 0.74em); color: var(--text-muted, #9ca3af); margin: 12px 0 0; }
       `}</style>
     </div>
   );
@@ -339,12 +339,12 @@ function Scene({ scene }) {
         .asai-tl { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
         .asai-tl-r { background: #ff5f57; } .asai-tl-y { background: #febc2e; } .asai-tl-g { background: #28c840; }
         .asai-url {
-          flex: 1; margin-left: 8px; background: #fff; border-radius: 6px;
-          font-size: 0.62em; color: #6b7280; padding: 4px 9px;
+          flex: 1; margin-left: 8px; background: #fff; border-radius: 12px;
+          font-size: max(13px, 0.62em); color: #6b7280; padding: 4px 9px;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .asai-ext-icon {
-          font-size: 0.95em; padding: 2px 5px; border-radius: 6px; transition: all 0.3s;
+          font-size: max(13px, 0.95em); padding: 2px 5px; border-radius: 12px; transition: all 0.3s;
         }
         .asai-ext-icon.highlight {
           background: rgba(37,99,235,0.18);
@@ -355,9 +355,9 @@ function Scene({ scene }) {
         .asai-browser-body { position: relative; height: calc(100% - 30px); padding: 12px; }
 
         /* Slide mock */
-        .asai-slide { background: #fff; border-radius: 8px; padding: 12px; height: 100%; }
-        .asai-slide-title { width: 55%; height: 11px; border-radius: 4px; background: #c7d2fe; margin-bottom: 12px; }
-        .asai-slide-line { width: 100%; height: 7px; border-radius: 4px; background: #e5e7eb; margin-bottom: 7px; }
+        .asai-slide { background: #fff; border-radius: 12px; padding: 12px; height: 100%; }
+        .asai-slide-title { width: 55%; height: 11px; border-radius: 999px; background: #c7d2fe; margin-bottom: 12px; }
+        .asai-slide-line { width: 100%; height: 7px; border-radius: 999px; background: #e5e7eb; margin-bottom: 7px; }
         .asai-slide-line.short { width: 60%; }
 
         /* Chrome side-panel mock */
@@ -366,34 +366,34 @@ function Scene({ scene }) {
           background: #fff; border-left: 1px solid #e5e7eb;
           padding: 12px; box-shadow: -8px 0 20px rgba(0,0,0,0.12); text-align: left;
         }
-        .asai-sidepanel-title { font-size: 0.72em; font-weight: 800; color: #111; margin-bottom: 4px; }
-        .asai-sidepanel-skill { font-size: 0.58em; color: #5b684e; margin-bottom: 10px; }
+        .asai-sidepanel-title { font-size: max(13px, 0.72em); font-weight: 800; color: #111; margin-bottom: 4px; }
+        .asai-sidepanel-skill { font-size: max(13px, 0.58em); color: #5b684e; margin-bottom: 10px; }
         .asai-capture-btn {
           width: 100%; background: #2563eb; color: #fff; border: none;
-          border-radius: 7px; padding: 7px; font-size: 0.66em; font-weight: 700;
+          border-radius: 12px; padding: 7px; font-size: max(13px, 0.66em); font-weight: 700;
           animation: asai-glow 1.6s ease-in-out infinite;
         }
         @keyframes asai-glow { 0%,100% { box-shadow: 0 0 0 0 rgba(37,99,235,0.4); } 50% { box-shadow: 0 0 0 6px rgba(37,99,235,0); } }
-        .asai-sidepanel-status { font-size: 0.58em; color: #6b7280; margin-top: 8px; }
+        .asai-sidepanel-status { font-size: max(13px, 0.58em); color: #6b7280; margin-top: 8px; }
 
         /* Preview mock */
-        .asai-preview { background: #fff; border-radius: 8px; padding: 11px; height: 100%; }
-        .asai-preview-head { font-size: 0.66em; font-weight: 800; color: #111; margin-bottom: 9px; }
+        .asai-preview { background: #fff; border-radius: 12px; padding: 11px; height: 100%; }
+        .asai-preview-head { font-size: max(13px, 0.66em); font-weight: 800; color: #111; margin-bottom: 9px; }
         .asai-qa { margin-bottom: 8px; }
-        .asai-q { display: block; width: 70%; height: 7px; border-radius: 4px; background: #c7d2fe; margin-bottom: 4px; }
-        .asai-a { display: block; width: 100%; height: 6px; border-radius: 4px; background: #e5e7eb; }
+        .asai-q { display: block; width: 70%; height: 7px; border-radius: 999px; background: #c7d2fe; margin-bottom: 4px; }
+        .asai-a { display: block; width: 100%; height: 6px; border-radius: 999px; background: #e5e7eb; }
         .asai-a.short { width: 50%; }
         .asai-save-btn {
           margin-top: 4px; background: #16a34a; color: #fff; border: none;
-          border-radius: 7px; padding: 6px 12px; font-size: 0.64em; font-weight: 700; float: right;
+          border-radius: 12px; padding: 6px 12px; font-size: max(13px, 0.64em); font-weight: 700; float: right;
           animation: asai-glow 1.6s ease-in-out infinite;
         }
 
         /* Platform list mock */
         .asai-guidelist { display: flex; flex-direction: column; gap: 8px; }
         .asai-guide-row {
-          background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
-          padding: 10px 12px; font-size: 0.66em; color: #374151;
+          background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+          padding: 10px 12px; font-size: max(13px, 0.66em); color: #374151;
         }
         .asai-guide-row.target {
           border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.25);
@@ -402,7 +402,7 @@ function Scene({ scene }) {
 
         /* Cursor + per-scene travel paths */
         .asai-cursor {
-          position: absolute; font-size: 1.1em; color: #111;
+          position: absolute; font-size: max(13px, 1.1em); color: #111;
           filter: drop-shadow(0 1px 1px rgba(0,0,0,0.4));
           pointer-events: none; transform: rotate(-20deg);
         }
