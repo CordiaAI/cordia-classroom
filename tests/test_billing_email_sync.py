@@ -50,6 +50,12 @@ class EmailSyncTests(unittest.TestCase):
         self.assertFalse(linked)
         upsert.assert_not_called()
 
+    def test_a_subscription_tied_to_another_account_is_never_moved(self):
+        linked, upsert, api = self.run_sync([subscription("sub_theirs", metadata={"user_id": "user-2"})])
+        self.assertFalse(linked)
+        upsert.assert_not_called()
+        api.Subscription.modify.assert_not_called()
+
     def test_lookup_runs_at_most_once_per_window_unless_forced(self):
         self.run_sync([])
         _, _, api = self.run_sync([])

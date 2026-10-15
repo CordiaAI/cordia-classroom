@@ -183,8 +183,11 @@ def sync_pro_from_stripe(user_id: str, force: bool = False) -> bool:
                     pro_products = _pro_product_ids()
                 if not _is_pro_subscription(subscription, pro_products):
                     continue
-                _upsert_from_subscription(subscription, user_id)
                 metadata = subscription.get("metadata") or {}
+                # A subscription already tied to another account stays there; sharing an email never moves it.
+                if metadata.get("user_id") not in (None, "", user_id):
+                    continue
+                _upsert_from_subscription(subscription, user_id)
                 if metadata.get("user_id") != user_id:
                     api.Subscription.modify(subscription["id"], metadata={**metadata, "user_id": user_id})
                 logger.info(f"Linked Stripe subscription {subscription['id']} to user {user_id[:8]} by email")
