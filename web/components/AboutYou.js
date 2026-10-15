@@ -1,5 +1,7 @@
-import { useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowRight, Link2 } from 'lucide-react';
+import { canvasStatus } from '../lib/canvas';
+import CanvasConnectSheet from './CanvasConnectSheet';
 import { apiFetch } from '../lib/api';
 import { DAY_ONE, endWalkthrough, walkthroughEvent } from '../lib/walkthrough';
 import { saveOnboardingStep } from '../lib/onboarding';
@@ -14,10 +16,15 @@ export default function AboutYou() {
   const [major, setMajor] = useState('');
   const [otherMajor, setOtherMajor] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
+  const [canvasOpen, setCanvasOpen] = useState(false);
+  const [canvasConnected, setCanvasConnected] = useState(false);
+  useEffect(() => { canvasStatus().then(data => { setCanvasReady(Boolean(data)); setCanvasConnected(Boolean(data?.connected)); }); }, []);
 
   async function save(event) {
     event.preventDefault();
     setSaving(true);
+    try { localStorage.setItem('cordiaSchool', school.trim()); } catch { /* storage blocked */ }
     await apiFetch('/auth/profile', {
       method: 'PATCH',
       body: JSON.stringify({ education_level: level, university: school.trim(), major: level === 'university' ? major.trim() : '' }),
@@ -50,6 +57,15 @@ export default function AboutYou() {
         <span className="c-section-title">School</span>
         <input className="c-input" value={school} onChange={event => setSchool(event.target.value)} autoComplete="organization" placeholder={level === 'university' ? 'University' : 'High school'} />
       </label>
+
+      {canvasReady && level === 'university' && (
+        <div className="about-canvas">
+          {canvasConnected
+            ? <span className="c-chip about-chip" aria-pressed="true">Canvas connected</span>
+            : <button type="button" className="c-chip about-chip" onClick={() => setCanvasOpen(true)}><Link2 size={16} strokeWidth={1.75} aria-hidden="true" />Connect Canvas</button>}
+        </div>
+      )}
+      {canvasOpen && <CanvasConnectSheet school={school} onClose={() => setCanvasOpen(false)} onConnected={data => setCanvasConnected(Boolean(data?.connected))} />}
 
       {level === 'university' && (
         <fieldset className="about-group">

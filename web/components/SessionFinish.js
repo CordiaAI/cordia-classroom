@@ -3,6 +3,8 @@ import { RotateCcw } from 'lucide-react';
 import GroveTree from './GroveTree';
 import { addGrowth, addRing, getProgress, groveKey } from '../lib/progress';
 import { recordStudy } from '../lib/activity';
+import { apiFetch } from '../lib/api';
+import { canvasKnownAvailable } from '../lib/canvas';
 
 // The end of every session: the guide's tree gains a ring, plus three numbers.
 export default function SessionFinish({ guideId, guideTitle, cards, accuracy, minutes, kind, onRestart, onDone, doneSpot, children }) {
@@ -11,6 +13,8 @@ export default function SessionFinish({ guideId, guideTitle, cards, accuracy, mi
   useEffect(() => {
     recordStudy({ guideId, guideTitle, minutes, cards, right: Math.round((accuracy / 100) * cards), total: cards, kind });
     if (guideId) addGrowth(guideId, minutes);
+    // Saved class sets count you as a studier (ranking only); other guides no-op on the server.
+    if (guideId && canvasKnownAvailable() !== false) apiFetch(`/sharing/guides/${guideId}/studied`, { method: 'POST', body: JSON.stringify({ accuracy: Math.round(accuracy) }) });
     const rings = guideId ? addRing(guideId) : 0;
     const key = groveKey(guideId);
     setTree({ minutes: getProgress().grove[key] || minutes, rings });

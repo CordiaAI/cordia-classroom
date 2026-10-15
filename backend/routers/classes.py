@@ -200,7 +200,9 @@ def suggest(guide_id: str, authorization: str = Header(default="")):
     """One class for a new guide. At >= 90% with one plausible class it is filed automatically."""
     user_id = get_user_id(authorization)
     db = get_supabase()
-    guide = _guide(db, user_id, guide_id, "id,title,study_guide,notes,folder_id")
+    guide = _guide(db, user_id, guide_id, "id,title,study_guide,notes,folder_id,linked_set_id")
+    if guide.get("linked_set_id") or _guide_class(db, user_id, guide):
+        return {"suggestion": None}
     classes = _user_classes(db, user_id)
     if not classes:
         return {"suggestion": None}
@@ -209,8 +211,6 @@ def suggest(guide_id: str, authorization: str = Header(default="")):
     if not match:
         return {"suggestion": None}
     chosen = next(c for c in classes if c["id"] == match.class_id)
-    if guide.get("folder_id") and guide["folder_id"] == chosen.get("folder_id"):
-        return {"suggestion": None}
     out = {"class_id": chosen["id"], "code": chosen["code"], "name": chosen["name"], "confidence": match.confidence, "auto": match.auto}
     if match.auto:
         out["previous_folder_id"] = guide.get("folder_id")

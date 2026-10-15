@@ -22,7 +22,7 @@ const navItems = [
 ];
 
 // Guide, flashcard, Retain and Practice screens all live inside Library.
-const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice', '/nclex', '/folder', '/create', '/session'];
+const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice', '/nclex', '/folder', '/create', '/session', '/class'];
 
 export function activeNavHref(pathname) {
   if (pathname === '/dashboard') return '/dashboard';
