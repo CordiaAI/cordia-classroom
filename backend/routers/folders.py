@@ -35,12 +35,6 @@ class CreateFolderRequest(BaseModel):
         return v.strip()
 
 
-class FolderResponse(BaseModel):
-    id: str
-    name: str
-    created_at: str
-
-
 @router.get("")
 def list_folders(authorization: str = Header(default="")):
     """List all folders for the current user (capped at 200)."""

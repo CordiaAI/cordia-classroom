@@ -18,7 +18,6 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # so that automatic token refresh calls don't eat into the login quota.
 _auth_attempts = defaultdict(list)    # login: IP -> [timestamps]
 _refresh_attempts = defaultdict(list) # token refresh: IP -> [timestamps]
-MAX_AUTH_ATTEMPTS = 10
 MAX_REFRESH_ATTEMPTS = 30
 WINDOW_SECONDS = 300  # 5 minutes
 MAX_TRACKED_IPS = 10_000

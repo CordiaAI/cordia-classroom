@@ -16,7 +16,6 @@ import re
 import unicodedata
 
 TYPES = ("mc", "written", "fill", "matching")
-FREE_TYPES = {"mc", "written"}
 PRO_TYPES = {"fill", "matching"}
 CREDITS = (0.0, 0.5, 1.0)
 

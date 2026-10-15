@@ -30,7 +30,6 @@ from services.text_processing import (
     format_slideshow_text, inject_image_descriptions,
     inject_page_image_descriptions, build_review_sections
 )
-from services.llm_calls import chat
 from services.llm import (
     generate_notes_ai, generate_study_guide,
     generate_flashcards, answer_question, explain_retain_answer,
