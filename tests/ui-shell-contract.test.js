@@ -33,7 +33,7 @@ assert.match(system, /backdrop-filter: blur\(24px\) saturate\(160%\)/);
 const nav = sidebar.split('const navItems = [')[1].split('];')[0];
 assert.deepEqual([...nav.matchAll(/label: '([^']+)', href: '([^']+)'/g)].map(match => `${match[1]} ${match[2]}`), ['Today /dashboard', 'Library /library', 'Tutor /tutor', 'Notes /smartnotes', 'Calendar /calendar']);
 for (const label of ['Profile', 'Appearance', 'Plan', 'Help', 'Sign out']) {
-  assert.ok(sidebar.includes(`/>${label}</button>`), `missing account menu item ${label}`);
+  assert.ok(sidebar.includes(`label: '${label}'`), `missing account menu item ${label}`);
 }
 assert.match(dashboard, /notes: '\/smartnotes'/);
 assert.match(publicPage, /AcademicInfinityMark/);

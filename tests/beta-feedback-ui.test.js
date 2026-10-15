@@ -10,7 +10,7 @@ const modal = read('web', 'components', 'FeedbackModal.js');
 const review = read('web', 'pages', 'feedback-review.js');
 
 // Feedback lives under avatar > Help.
-assert.match(navigation, /role="menuitem" onClick=\{\(\) => \{ setMenuOpen\(false\); setShowHelp\(true\); \}\}/);
+assert.match(navigation, /{ key: 'help', label: 'Help', icon: CircleHelp, onSelect: \(\) => setShowHelp\(true\) }/);
 assert.match(navigation, /onFeedback=\{\(\) => \{ setShowHelp\(false\); setShowFeedback\(true\); \}\}/);
 assert.match(help, /onClick=\{onFeedback\}>.*Feedback<\/button>/);
 assert.match(navigation, /\/feedback\/reviewer-status/);
