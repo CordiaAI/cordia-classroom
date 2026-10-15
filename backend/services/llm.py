@@ -699,6 +699,28 @@ def transcribe_document_pages(page_images: list, max_pages: int = 20) -> str:
     return "\n\n".join(f"--- Page {i} ---\n{text}" for i, text in enumerate(pages, 1) if text)
 
 
+def transcribe_study_image(image_data_url: str) -> str:
+    """Transcribe an uploaded photo of notes, a page, or a whiteboard. Empty when it holds no study content."""
+    client = get_openai_client()
+    if not client:
+        raise RuntimeError("OpenAI API key not configured")
+    response = chat(client, "image_extraction",
+        messages=[{"role": "user", "content": [
+            {"type": "image_url", "image_url": {"url": image_data_url}},
+            {"type": "text", "text": (
+                "You are extracting educational content from an image (e.g. a photo of "
+                "notes, a textbook page, a whiteboard, or a diagram). Transcribe ALL "
+                "visible text exactly as written, then describe any diagrams, charts, "
+                "or formulas with enough detail to study from. Use clear headings where "
+                "visible. If the image contains no educational content, respond with "
+                "exactly: NO_EDUCATIONAL_CONTENT"
+            )},
+        ]}],
+    )
+    text = (response.choices[0].message.content or "").strip()
+    return "" if "NO_EDUCATIONAL_CONTENT" in text else text
+
+
 def recognize_handwriting(image_data_url: str):
     """Transcribe a handwritten workspace drawing into clean text; None when it can't be read."""
     client = get_openai_client()

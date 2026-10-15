@@ -23,14 +23,14 @@ class CalendarConnectionTests(unittest.TestCase):
             patch.object(calendar, "get_supabase", return_value=database),
         ):
             result = calendar.connect_calendar(
-                calendar.CalendarPreviewRequest(url="https://canvas.example.edu/feeds/calendars/token.ics"),
+                calendar.CalendarPreviewRequest(url="https://canvas.example.edu/feeds/calendars/user_Tok3n.ics"),
                 "Bearer token",
             )
 
         self.assertEqual(result, payload)
         saved = query.upsert.call_args.args[0]
         self.assertEqual(saved["user_id"], "user-1")
-        self.assertEqual(saved["feed_url"], "https://canvas.example.edu/feeds/calendars/token.ics")
+        self.assertEqual(saved["feed_url"], "https://canvas.example.edu/feeds/calendars/user_Tok3n.ics")
         self.assertNotIn("feed_url", result)
 
     def test_get_connection_returns_calendar_without_revealing_feed_url(self):

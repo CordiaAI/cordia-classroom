@@ -7,6 +7,9 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin, urlparse
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.connection import HTTPSConnection
+from urllib3.connectionpool import HTTPSConnectionPool
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
@@ -15,6 +18,20 @@ from database import get_supabase
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 MAX_FEED_BYTES = 2_000_000
+# Bounded repeats keep matching linear (CodeQL py/polynomial-redos); TLD letters rule out IP literals.
+CANVAS_HOST = re.compile(r"(?:[a-z0-9-]{1,63}\.){1,8}[a-z]{2,24}")
+CANVAS_FEED_PATH = re.compile(r"/feeds/calendars/(user_[A-Za-z0-9]+\.ics)")
+
+
+def canvas_feed_url(value: str) -> str:
+    """Only Canvas calendar-feed links are fetched; the URL is rebuilt from the checked host and feed name."""
+    parsed = urlparse(value.strip())
+    host = (parsed.hostname or "").lower()
+    path = CANVAS_FEED_PATH.fullmatch(parsed.path)
+    if (parsed.scheme != "https" or parsed.port or parsed.username or parsed.password
+            or not CANVAS_HOST.fullmatch(host) or not path):
+        raise ValueError("Use the Calendar Feed link from Canvas (it ends in .ics)")
+    return f"https://{host}/feeds/calendars/{path.group(1)}"
 
 
 class CalendarPreviewRequest(BaseModel):
@@ -23,10 +40,7 @@ class CalendarPreviewRequest(BaseModel):
     @field_validator("url")
     @classmethod
     def validate_url(cls, value):
-        parsed = urlparse(value.strip())
-        if parsed.scheme != "https" or not parsed.hostname:
-            raise ValueError("Use the HTTPS calendar-feed link from Canvas")
-        return value.strip()
+        return canvas_feed_url(value)
 
 
 def _public_url(value: str) -> str:
@@ -44,16 +58,56 @@ def _public_url(value: str) -> str:
     return value
 
 
+class _PublicOnlyConnection(HTTPSConnection):
+    """Checks the address the socket actually reached, so a second DNS answer can't point at a private host."""
+
+    def _new_conn(self):
+        sock = super()._new_conn()
+        if not ipaddress.ip_address(sock.getpeername()[0]).is_global:
+            sock.close()
+            raise ConnectionRefusedError("calendar feed resolved to a non-public address")
+        return sock
+
+
+class _PublicOnlyPool(HTTPSConnectionPool):
+    ConnectionCls = _PublicOnlyConnection
+
+
+class _PublicOnlyAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        super().init_poolmanager(*args, **kwargs)
+        self.poolmanager.pool_classes_by_scheme = {"https": _PublicOnlyPool}
+
+
+def _feed_session() -> requests.Session:
+    session = requests.Session()
+    session.trust_env = False  # never route a user-supplied URL through an environment proxy
+    session.mount("https://", _PublicOnlyAdapter())
+    return session
+
+
 def _download_feed(url: str) -> str:
-    current = _public_url(url)
+    try:
+        feed = canvas_feed_url(url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    current = _public_url(feed)
+    with _feed_session() as session:
+        return _follow_feed(session, current)
+
+
+def _follow_feed(session: requests.Session, current: str) -> str:
     for _ in range(4):
-        response = requests.get(
-            current,
-            headers={"Accept": "text/calendar", "User-Agent": "CordiaClassroom Calendar/1.0"},
-            timeout=10,
-            allow_redirects=False,
-            stream=True,
-        )
+        try:
+            response = session.get(
+                current,
+                headers={"Accept": "text/calendar", "User-Agent": "CordiaClassroom Calendar/1.0"},
+                timeout=10,
+                allow_redirects=False,
+                stream=True,
+            )
+        except requests.RequestException:
+            raise HTTPException(status_code=400, detail="Canvas could not open that calendar feed.")
         if response.is_redirect:
             location = response.headers.get("location")
             if not location:
