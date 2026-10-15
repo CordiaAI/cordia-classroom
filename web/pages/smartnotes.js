@@ -1,12 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { authHeaders, authorizedFetch, responseJson } from '../lib/api';
-import StudyWorkspaceFrame from '../components/StudyWorkspaceFrame';
+import { ChevronDown, FilePlus2, FileUp, NotebookPen, Sparkles, X as XIcon } from 'lucide-react';
+import { walkthroughEvent } from '../lib/walkthrough';
 import PdfPages from '../components/PdfPages';
-import GuidedTour from '../components/GuidedTour';
-import { practiceTourUrl, saveOnboardingStep } from '../lib/onboarding';
-import { SMARTNOTES_TOUR } from '../lib/tours';
-import { organizeDashboardGuides } from '../lib/dashboardOrganization';
 import { useFileDropZone } from '../lib/fileDrop';
 import { sanitizeHtml } from '../lib/sanitizeHtml';
 
@@ -204,14 +201,15 @@ function StudyGuidePreviewModal({ preview, title, setTitle, error, saving, onClo
   if (!preview) return null;
   const hasPairs = preview.pairs && preview.pairs.length > 0;
   return (
-    <div className="sn-modal-overlay" onClick={onClose}>
-      <div className="sn-modal" onClick={e => e.stopPropagation()}>
+    <div className="c-scrim" onClick={onClose}>
+      <div className="c-sheet sn-modal" role="dialog" aria-modal="true" aria-label="Guide preview" onClick={e => e.stopPropagation()}>
         <div className="sn-modal-header">
           <input
-            className="sn-modal-title-input"
+            className="c-input sn-modal-title-input"
+            aria-label="Guide title"
             value={title}
             onChange={e => setTitle(e.target.value)}
-            placeholder="Study guide title"
+            placeholder="Title"
             disabled={saving}
           />
         </div>
@@ -227,18 +225,18 @@ function StudyGuidePreviewModal({ preview, title, setTitle, error, saving, onClo
               ))}
             </div>
           ) : (
-            !error && <div className="sn-modal-empty">No questions generated.</div>
+            !error && <div className="sn-modal-empty">0 questions</div>
           )}
         </div>
         <div className="sn-modal-footer">
-          <button className="btn sn-modal-cancel" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="btn sn-modal-edit" onClick={onEdit} disabled={saving || !hasPairs}>Edit</button>
+          <button className="c-btn c-btn--quiet sn-modal-cancel" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="c-btn c-btn--secondary sn-modal-edit" onClick={onEdit} disabled={saving || !hasPairs}>Edit</button>
           <button
-            className="btn sn-modal-approve"
+            className="c-btn c-btn--primary sn-modal-approve"
             onClick={onApprove}
             disabled={saving || !hasPairs || !title.trim()}
           >
-            {saving ? 'Saving…' : 'Approve'}
+            {saving ? 'Saving…' : 'Save guide'}
           </button>
         </div>
       </div>
@@ -459,7 +457,7 @@ function NotesIndex({ router, timerState, setTimerState }) {
   }, []);
 
   const folderById = Object.fromEntries(folders.map(f => [f.id, f]));
-  const organized = organizeDashboardGuides(folders, guides);
+  useEffect(() => { walkthroughEvent('notes-opened'); }, []);
 
   async function handleNew() {
     try {
@@ -468,6 +466,7 @@ function NotesIndex({ router, timerState, setTimerState }) {
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Untitled Notes' }),
       });
+      walkthroughEvent('note-created');
       const data = await responseJson(resp);
       if (data.note) router.push('/smartnotes?id=' + data.note.id);
     } catch {}
@@ -572,53 +571,31 @@ function NotesIndex({ router, timerState, setTimerState }) {
   }
 
   return (
-    <StudyWorkspaceFrame
-      classes={organized.classes}
-      section="smartnotes"
-      timerState={timerState}
-      setTimerState={setTimerState}
-      classRail={{
-        allowCreate: false,
-        openFolder: folderId => router.push('/folder/' + folderId),
-        openGuide: guideId => router.push('/guide/' + guideId),
-      }}
-    >
-    <div className="sn-index">
-      <div className="sn-index-header">
-        <div>
-          <h1 className="sn-index-title">SmartNotes</h1>
-          <p className="sn-index-subtitle">
-            {selectMode
-              ? 'Click the note you want to turn into a study guide.'
-              : 'Your SmartNotes sessions — pick up where you left off, or start fresh.'}
-          </p>
-        </div>
-        <div className="sn-index-actions">
-          {selectMode ? (
-            <button className="btn sn-cancel-select-btn" onClick={() => setSelectMode(false)} disabled={!!convertingNoteId}>
-              Cancel
-            </button>
-          ) : (
-            <>
-              <button
-                className="btn sn-convert-header-btn"
-                onClick={() => setSelectMode(true)}
-                disabled={notes.length === 0}
-                title="Turn one of your notes into a study guide"
-              >
-                Turn into Study Guide
-              </button>
-              <button className="btn sn-save-btn" onClick={handleNew}>+ New Note</button>
-            </>
-          )}
-        </div>
+    <div className="sn-index c-page">
+      <div className="c-page-head">
+        <h1 className="c-title">Notes</h1>
+        {notes.length > 0 && (
+          <div className="c-row">
+            {selectMode ? (
+              <button className="c-btn c-btn--secondary" onClick={() => setSelectMode(false)} disabled={!!convertingNoteId}>Cancel</button>
+            ) : (
+              <>
+                {notes.some(n => previewText(n.content)) && (
+                  <button className="c-btn c-btn--quiet sn-convert-header-btn" onClick={() => setSelectMode(true)}><Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Turn into guide</button>
+                )}
+                <button className="c-btn c-btn--primary" onClick={handleNew} data-spot="note-new"><FilePlus2 size={20} strokeWidth={1.75} aria-hidden="true" />New note</button>
+              </>
+            )}
+          </div>
+        )}
       </div>
+      {selectMode && <p className="c-section-title" role="status">Pick a note</p>}
 
-      {loading && <div className="sn-index-empty">Loading…</div>}
+      {loading && <div className="sn-grid">{[0, 1, 2].map(index => <div key={index} className="c-skeleton" style={{ height: 180, borderRadius: 20 }} />)}</div>}
 
       {!loading && notes.length === 0 && (
-        <div className="sn-index-empty">
-          <p>No notes yet. Click <strong>+ New Note</strong> to start writing.</p>
+        <div className="c-empty">
+          <button className="c-btn c-btn--primary c-btn--lg" onClick={handleNew} data-spot="note-new"><FilePlus2 size={20} strokeWidth={1.75} aria-hidden="true" />New note</button>
         </div>
       )}
 
@@ -676,7 +653,6 @@ function NotesIndex({ router, timerState, setTimerState }) {
         onEdit={handleEditPreview}
       />
     </div>
-    </StudyWorkspaceFrame>
   );
 }
 
@@ -695,6 +671,7 @@ function SmartNotesEditor() {
   const router = useRouter();
   const [noteId, setNoteId] = useState(null);
   const [title, setTitle] = useState('Untitled Notes');
+  const [hasText, setHasText] = useState(false);
   const [saveStatus, setSaveStatus] = useState(''); // '' | 'saving' | 'saved' | 'error'
   const [saveError, setSaveError] = useState('');
   const [notes, setNotes] = useState([]); // session list
@@ -824,6 +801,7 @@ function SmartNotesEditor() {
           : '<p><br></p>';
         lastSavedRef.current = paperRef.current.innerHTML;
         lastSavedTitleRef.current = data.note.title || 'Untitled Notes';
+        setHasText(Boolean(paperRef.current.innerText.trim()));
       }
     } catch {}
   }
@@ -1001,12 +979,14 @@ function SmartNotesEditor() {
     event.preventDefault();
     const cleaned = (html && cleanPastedHtml(html)) || plainTextToHtml(text || '');
     if (cleaned) document.execCommand('insertHTML', false, cleaned);
+    setHasText(Boolean(paperRef.current?.innerText.trim()));
     scheduleSave();
   }
 
   // ── Paper keyboard handler ───────────────────────────────────────────────
   function onPaperKeyUp(e) {
     if (!paperRef.current) return;
+    setHasText(Boolean(paperRef.current.innerText.trim()));
     scheduleSave();
   }
 
@@ -1406,16 +1386,6 @@ function SmartNotesEditor() {
     router.push('/smartnotes?id=' + id);
   }
 
-  async function finishSmartNotesTour(outcome) {
-    if (outcome === 'skipped') {
-      await saveOnboardingStep('done');
-      router.replace('/smartnotes?id=' + noteIdRef.current, undefined, { shallow: true });
-      return;
-    }
-    await saveOnboardingStep('practice');
-    router.push(await practiceTourUrl());
-  }
-
   async function handleConvertToGuide() {
     setShowNotesList(false);
     if (!noteIdRef.current) return;
@@ -1503,7 +1473,6 @@ function SmartNotesEditor() {
 
   return (
     <div className="sn-page">
-      {router.query.tour === '1' && noteId && <GuidedTour steps={SMARTNOTES_TOUR} onFinish={finishSmartNotesTour} />}
       {/* Header bar */}
       <div className="sn-header">
         <div className="sn-header-left">
@@ -1511,7 +1480,8 @@ function SmartNotesEditor() {
             className="sn-title-input"
             value={title}
             onChange={e => { titleRef.current = e.target.value; setTitle(e.target.value); scheduleSave(); }}
-            placeholder="Note title..."
+            placeholder="Title"
+            aria-label="Note title"
             spellCheck={false}
           />
           <span className={`sn-status ${saveStatus}`}>
@@ -1520,49 +1490,44 @@ function SmartNotesEditor() {
         </div>
         <div className="sn-header-right">
           <select
-            className="sn-class-select"
+            aria-label="Class"
+            className="c-select sn-class-select"
             value={folderId}
             onChange={handleFolderChange}
-            title="Assign to class"
           >
             <option value="">No class</option>
             {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
           </select>
+          {hasText && (
+            <button className="c-btn c-btn--secondary sn-convert-header-btn" onClick={handleConvertToGuide} disabled={convertingGuide}>
+              <Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />{convertingGuide ? 'Building…' : 'Turn into guide'}
+            </button>
+          )}
           <button
-            className="btn sn-convert-header-btn"
-            onClick={handleConvertToGuide}
-            disabled={convertingGuide}
-            title="Turn this note into a study guide"
-          >
-            {convertingGuide ? 'Generating…' : 'Turn into Study Guide'}
-          </button>
-          <button
-            className={`btn sn-save-btn${saveStatus === 'saving' ? ' saving' : saveStatus === 'saved' ? ' saved' : saveStatus === 'error' ? ' error' : ''}`}
+            className={`c-btn c-btn--primary sn-save-btn${saveStatus === 'saving' ? ' saving' : saveStatus === 'saved' ? ' saved' : saveStatus === 'error' ? ' error' : ''}`}
             onClick={() => doSave({ force: true })}
           >
             {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? 'Error' : 'Save'}
           </button>
           <div className="sn-notes-picker">
             <button
-              className={`btn sn-open-btn sn-notes-dropdown-trigger${showNotesList ? ' open' : ''}`}
+              className={`c-btn c-btn--secondary sn-notes-dropdown-trigger${showNotesList ? ' open' : ''}`}
               onClick={() => setShowNotesList(v => !v)}
+              aria-expanded={showNotesList}
             >
-              <span>My Notes</span>
-              <svg className="sn-chevron" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-                <path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <NotebookPen size={20} strokeWidth={1.75} aria-hidden="true" />Notes<ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" />
             </button>
             {showNotesList && (
               <div className="sn-notes-dropdown">
                 <div className="sn-notes-dropdown-header">
-                  <span className="sn-panel-label">Sessions</span>
-                  <button className="sn-new-btn" onClick={handleNewNote}>+ New</button>
+                  <span className="sn-panel-label">Notes</span>
+                  <button className="c-btn c-btn--quiet sn-new-btn" onClick={handleNewNote}>New note</button>
                 </div>
                 <div
                   className={'sn-notes-item sn-notes-item--back'}
                   onClick={async () => { setShowNotesList(false); await doSave(); router.push('/smartnotes'); }}
                 >
-                  ← All notes
+                  All notes
                 </div>
                 {notes.map(n => (
                   <div
@@ -1573,7 +1538,7 @@ function SmartNotesEditor() {
                     {n.title || 'Untitled Notes'}
                   </div>
                 ))}
-                {notes.length === 0 && <div className="sn-notes-item muted">No sessions yet</div>}
+                {notes.length === 0 && <div className="sn-notes-item muted">0 notes</div>}
               </div>
             )}
           </div>
@@ -1592,7 +1557,7 @@ function SmartNotesEditor() {
         {/* Left: notes paper — spans all 3 rows */}
         <div className="sn-paper-wrap">
           <div className="sn-paper-label-row">
-            <span className="sn-panel-label">SmartNotes</span>
+            <span className="sn-panel-label">Notes</span>
             {visualizeMode && (
               <button
                 className="sn-visualize-confirm"
@@ -1615,7 +1580,7 @@ function SmartNotesEditor() {
             onKeyDown={onPaperKeyDown}
             onKeyUp={onPaperKeyUp}
             onPaste={onPaperPaste}
-            data-placeholder="Start typing your notes here…"
+            data-placeholder="Start typing"
             spellCheck={false}
           />
           </div>
@@ -1630,10 +1595,10 @@ function SmartNotesEditor() {
           className={`sn-viewer-wrap${viewerDragOver ? ' sn-viewer-drag' : ''}`}
         >
           <div className="sn-viewer-toolbar">
-            <span className="sn-panel-label">Class Material</span>
+            <span className="sn-panel-label">Material</span>
             <div className="sn-viewer-controls">
-              <button className="btn sn-open-btn" onClick={() => fileInputRef.current?.click()}>
-                Open File
+              <button className="c-btn c-btn--secondary sn-open-btn" onClick={() => fileInputRef.current?.click()}>
+                <FileUp size={20} strokeWidth={1.75} aria-hidden="true" />Open
               </button>
               <input
                 ref={fileInputRef}
@@ -1643,8 +1608,8 @@ function SmartNotesEditor() {
                 style={{ display: 'none' }}
               />
               {guideList.length > 0 && (
-                <select className="sn-guide-select" onChange={handleGuideSelect} defaultValue="">
-                  <option value="" disabled>View a study guide…</option>
+                <select className="c-select sn-guide-select" onChange={handleGuideSelect} defaultValue="" aria-label="Show a guide">
+                  <option value="" disabled>Guide</option>
                   {guideList.map(g => (
                     <option key={g.id} value={g.id}>{g.title}</option>
                   ))}
@@ -1658,7 +1623,7 @@ function SmartNotesEditor() {
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.35">
                   <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
                 </svg>
-                <p>Open or drag &amp; drop a PDF, PowerPoint, document, or image — or select a study guide above.</p>
+                <p>Drop a file</p>
               </div>
             )}
             {viewerDragOver && (
@@ -1666,7 +1631,7 @@ function SmartNotesEditor() {
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                 </svg>
-                <p>Drop to open</p>
+                <p>Drop</p>
               </div>
             )}
             <FileViewer file={viewerFile} guideContent={guideContent} />
@@ -1679,9 +1644,9 @@ function SmartNotesEditor() {
         {/* Bottom-right: diagram */}
         <div className="sn-diagram-wrap">
           <div className="sn-diagram-toolbar">
-            <span className="sn-panel-label">Visual Diagram</span>
+            <span className="sn-panel-label">Diagram</span>
             <button
-              className={`btn sn-open-btn sn-visualize-btn${visualizeMode ? ' active' : ''}`}
+              className={`c-btn c-btn--secondary sn-visualize-btn${visualizeMode ? ' active' : ''}`}
               onClick={handleVisualize}
             >
               {visualizeMode ? 'Cancel' : 'Visualize'}
@@ -1689,14 +1654,14 @@ function SmartNotesEditor() {
           </div>
           <div className="sn-diagram-body">
             {diagramLoading && (
-              <div className="sn-diagram-placeholder">Generating diagram…</div>
+              <div className="sn-diagram-placeholder">Drawing…</div>
             )}
             {!diagramLoading && mermaidCode && (
               <MermaidDiagram code={mermaidCode} />
             )}
             {!diagramLoading && !mermaidCode && (
               <div className="sn-diagram-placeholder">
-                <p>Click "Visualize", highlight text in your notes, then click ✓</p>
+                <p>Visualize → highlight → ✓</p>
               </div>
             )}
           </div>

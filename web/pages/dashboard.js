@@ -1,20 +1,25 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Brain, ChevronRight, Flame, Layers, NotebookPen, PencilRuler, Play } from 'lucide-react';
+import { Brain, ChevronRight, Flame, Layers, NotebookPen, PencilRuler, Play, Snowflake } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
 import { createDashboardOverview } from '../lib/dashboardOrganization';
 import { loadStudyQueue } from '../lib/studyQueue';
-import { lastGuide, trackVisit } from '../lib/userStore';
+import { lastGuide } from '../lib/userStore';
+import { markUsed, useProgress } from '../lib/progress';
+import { activeStep, dayOneFinished, startWalkthrough, walkthroughEvent } from '../lib/walkthrough';
+import { streakWithFreeze } from '../lib/activity';
 import { loadOnboarding, saveOnboardingStep } from '../lib/onboarding';
 import { requestTip } from '../lib/tips';
 import ProgressRing from '../components/ProgressRing';
 import StudyTimer from '../components/StudyTimer';
 import StudyInsights from '../components/StudyInsights';
-import GettingStarted from '../components/GettingStarted';
-import FirstRun from '../components/FirstRun';
+import LearnCordia from '../components/LearnCordia';
+import AboutYou from '../components/AboutYou';
+import GroveCard from '../components/GroveCard';
+import PulseDot from '../components/PulseDot';
 
 const LEGACY_VIEWS = { guides: '/library', classes: '/library', calendar: '/calendar', notes: '/smartnotes' };
 
@@ -40,9 +45,11 @@ export default function Today({ timerState, setTimerState }) {
   const [streak, setStreak] = useState(null);
   const [queue, setQueue] = useState(null);
   const [insights, setInsights] = useState(null);
-  const [notesCount, setNotesCount] = useState(0);
   const [calendar, setCalendar] = useState(null);
   const [onboarding, setOnboarding] = useState(null);
+  const [streakInfo, setStreakInfo] = useState(null);
+  const progress = useProgress();
+  const step = activeStep(progress.wt?.status === 'active' ? progress.wt : null);
 
   useEffect(() => {
     if (ready && legacy) router.replace(legacy);
@@ -73,30 +80,44 @@ export default function Today({ timerState, setTimerState }) {
       if (statsData && !statsData.detail) setStats(statsData);
       if (streakData && !streakData.detail) setStreak(streakData);
       setOnboarding(onboardingData);
-      // An account that already has guides is past first run.
-      if (onboardingData && !onboardingData.completed && guidesData?.guides?.length) saveOnboardingStep('done');
+      const guideList = guidesData?.guides || [];
+      // New account, nothing made yet: the day-one walkthrough starts with "About you".
+      if (onboardingData && !onboardingData.completed && !guideList.length && !progress.wt && !dayOneFinished()) startWalkthrough('day1');
+      else if (onboardingData && !onboardingData.completed && guideList.length) saveOnboardingStep('done');
+      if (guideList.length) markUsed('add');
+      if (statsData?.cards_studied) markUsed('cards');
     } finally {
       setLoading(false);
     }
     loadStudyQueue().then(setQueue);
-    apiFetch('/stats/insights').then(setInsights);
-    apiFetch('/smart_notes').then(data => setNotesCount(data?.notes?.length || 0));
-    apiFetch('/calendar/connection').then(setCalendar);
+    apiFetch('/stats/insights').then(data => { setInsights(data); if (data?.answered) markUsed('quiz'); });
+    apiFetch('/smart_notes').then(data => { if (data?.notes?.length) markUsed('notes'); });
+    apiFetch('/calendar/connection').then(data => { setCalendar(data); if (data?.connected) markUsed('calendar'); });
+    apiFetch('/onboarding/checklist').then(data => {
+      if (data?.practice) markUsed('practice');
+      if (data?.learn_your_way) markUsed('explain');
+    });
   }
+
+  useEffect(() => { if (ready && !legacy) walkthroughEvent('today-opened'); }, [ready, legacy]);
+
+  // One free freeze per week bridges a single missed day.
+  useEffect(() => {
+    if (streak) setStreakInfo(streakWithFreeze(streak.week || [], streak.current_streak || 0));
+  }, [streak]);
 
   // Feature tips, one per session, each at its moment.
   useEffect(() => {
-    if (!queue || !stats) return;
-    const visit = trackVisit();
-    if (visit.sessions >= 2 && queue.cardTotal > 0) requestTip('cards', `${plural(queue.cardTotal, 'card')} due`);
-    else if ((stats.minutes_today || 0) >= 25) requestTip('break');
+    if (!queue || !stats || !progress.first) return;
+    const visit = { days: Math.floor((Date.now() - progress.first) / 86400000) + 1 };
+    if ((stats.minutes_today || 0) >= 25) requestTip('break');
     else if (visit.days >= 3 && calendar && !calendar.connected) requestTip('calendar');
     else if (visit.days >= 7 && insights?.answered) requestTip('insights');
-  }, [queue, stats, calendar, insights]);
+  }, [queue, stats, calendar, insights, progress.first]);
 
   if (!ready || legacy) return null;
 
-  if (!loading && onboarding && !onboarding.completed && guides.length === 0) return <FirstRun />;
+  if (step?.screen === 'about') return <AboutYou />;
 
   const overview = createDashboardOverview(folders, guides);
   const remembered = lastGuide();
@@ -112,17 +133,18 @@ export default function Today({ timerState, setTimerState }) {
   const tools = [
     { label: 'Quiz', icon: Brain, href: toolGuide ? `/quiz/${toolGuide}` : '/library' },
     { label: 'Cards', icon: Layers, href: '/library?tab=cards', tip: 'cards' },
-    { label: 'Practice', icon: PencilRuler, href: '/practice' },
-    { label: 'Notes', icon: NotebookPen, href: '/smartnotes' },
+    { label: 'Practice', icon: PencilRuler, href: '/practice', spot: 'tool-practice', dot: 'practice' },
+    { label: 'Notes', icon: NotebookPen, href: '/smartnotes', dot: 'notes' },
   ];
 
   return (
     <div className="c-page today">
       <header className="c-page-head">
         <h1 className="c-title">Today</h1>
-        {streak && (
-          <span className="today-streak" aria-label={`Streak: ${plural(streak.current_streak || 0, 'day')}`}>
-            <Flame size={20} strokeWidth={1.75} aria-hidden="true" />{plural(streak.current_streak || 0, 'day')}
+        {streakInfo && (
+          <span className="today-streak" aria-label={`Streak: ${plural(streakInfo.days, 'day')}${streakInfo.frozenThisWeek ? ', freeze used this week' : ''}`}>
+            <Flame size={20} strokeWidth={1.75} aria-hidden="true" />{plural(streakInfo.days, 'day')}
+            {streakInfo.frozenThisWeek && <Snowflake size={16} strokeWidth={1.75} aria-hidden="true" className="today-freeze" />}
           </span>
         )}
       </header>
@@ -140,7 +162,7 @@ export default function Today({ timerState, setTimerState }) {
           <li><strong>{queue ? queue.problems : '–'}</strong><span>problems</span></li>
           <li><strong>{queue ? queue.minutes : '–'}</strong><span>min</span></li>
         </ul>
-        <button type="button" className="c-btn c-btn--primary c-btn--lg today-start-btn" onClick={() => router.push('/session')} disabled={!queue || nothingDue}>
+        <button type="button" className="c-btn c-btn--primary c-btn--lg today-start-btn" data-spot="start" onClick={() => { walkthroughEvent('start'); router.push('/session'); }} disabled={!queue || nothingDue}>
           <Play size={20} strokeWidth={1.75} aria-hidden="true" />Start
         </button>
       </section>
@@ -159,10 +181,13 @@ export default function Today({ timerState, setTimerState }) {
 
       <nav className="today-tools" aria-label="Tools">
         {tools.map(tool => (
-          <Link key={tool.label} href={tool.href} className="c-card today-tool" data-tip={tool.tip}>
-            <tool.icon size={28} strokeWidth={1.75} aria-hidden="true" />
-            <span>{tool.label}</span>
-          </Link>
+          <div key={tool.label} className="today-tool-wrap">
+            <Link href={tool.href} className="c-card today-tool" data-tip={tool.tip} data-spot={tool.spot}>
+              <tool.icon size={28} strokeWidth={1.75} aria-hidden="true" />
+              <span>{tool.label}</span>
+            </Link>
+            {tool.dot && <span className="today-dot"><PulseDot feature={tool.dot} /></span>}
+          </div>
         ))}
       </nav>
 
@@ -184,16 +209,21 @@ export default function Today({ timerState, setTimerState }) {
         </section>
       )}
 
+      <GroveCard guides={guides} planting={step?.id === 'today' || step?.id === 'start'} />
+
       <div className="today-pair">
         <StudyTimer timerState={timerState} setTimerState={setTimerState} />
         <StudyInsights compact />
       </div>
 
-      <GettingStarted guides={guides} stats={stats} insights={insights} notesCount={notesCount} calendarConnected={Boolean(calendar?.connected)} navigate={path => router.push(path)} />
+      {dayOneFinished(progress) || !progress.wt ? <LearnCordia hideWhenComplete /> : null}
 
       <style jsx>{`
         .today-streak { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: var(--r-pill); background: var(--card); border: 1px solid var(--line); font: 600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .today-streak :global(.lucide) { color: var(--warning); }
+        .today-streak :global(.today-freeze) { color: var(--olive-ink); }
+        .today-tool-wrap { position: relative; display: grid; }
+        .today-dot { position: absolute; top: 8px; right: 8px; }
         .today-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius: var(--r-card); background: var(--error-bg); color: var(--error); font-weight: 600; }
         .today-start { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px; border-radius: var(--r-card); flex-wrap: wrap; }
         .today-counts { list-style: none; margin: 0; padding: 0; display: flex; gap: 32px; }

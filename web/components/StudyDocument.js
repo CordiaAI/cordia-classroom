@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Layers, MessageCircle, Sparkles } from 'lucide-react';
 import { parseQAPairs, parseNotes } from '../lib/formatters';
-import { requestTip } from '../lib/tips';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 const PER_PAGE = 3;
 
@@ -31,7 +31,7 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
       if (!text || !current.rangeCount || !paperRef.current?.contains(current.anchorNode)) { setSelection(null); return; }
       const rect = current.getRangeAt(0).getBoundingClientRect();
       setSelection({ text: text.slice(0, 600), top: Math.max(8, rect.top - 56), left: Math.min(window.innerWidth - 300, Math.max(8, rect.left + rect.width / 2 - 140)) });
-      requestTip('explain');
+      walkthroughEvent('selection');
     }
     const onUp = () => setTimeout(check, 0);
     const onScroll = () => setSelection(null);
@@ -77,7 +77,7 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
           return (
             <section className="reader-block" key={pair.index}>
               <h2 className="reader-q"><span className="c-meta">{index + 1}</span>{pair.question}</h2>
-              <p className="c-study reader-a">{pair.answer}</p>
+              <p className="c-study reader-a" data-spot={offset === 0 ? 'reader-text' : undefined}>{pair.answer}</p>
               {pair.image && <img className="reader-img" src={pair.image} alt="" />}
               {(onRead || onExplain) && (
                 <div className="reader-actions">
@@ -87,7 +87,7 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
                     </button>
                   )}
                   {onExplain && (
-                    <button type="button" className="c-btn c-btn--quiet" onClick={() => onExplain(index)}>
+                    <button type="button" className="c-btn c-btn--quiet" data-spot={offset === 0 ? 'explain' : undefined} onClick={() => { walkthroughEvent('explain'); onExplain(index); }}>
                       <Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain
                     </button>
                   )}
@@ -113,8 +113,8 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
 
       {selection && (
         <div className="c-menu reader-select" style={{ top: selection.top, left: selection.left }} role="menu" aria-label="Selection" onMouseDown={event => event.preventDefault()}>
-          <button type="button" role="menuitem" onClick={() => act('explain')} data-tip="explain"><Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain</button>
-          <button type="button" role="menuitem" onClick={() => act('card')}><Layers size={20} strokeWidth={1.75} aria-hidden="true" />Make card</button>
+          <button type="button" role="menuitem" onClick={() => act('explain')}><Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain</button>
+          <button type="button" role="menuitem" data-spot="make-card" onClick={() => act('card')}><Layers size={20} strokeWidth={1.75} aria-hidden="true" />Make card</button>
           <button type="button" role="menuitem" onClick={() => act('ask')}><MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />Ask</button>
         </div>
       )}

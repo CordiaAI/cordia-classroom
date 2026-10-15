@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Bell, BellOff, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, ExternalLink, RefreshCw, Unlink } from 'lucide-react';
 import { apiErrorMessage, apiFetch, getUserId } from '../lib/api';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 const FEED_KEY = 'cordiaCanvasCalendarFeed';
 const REMINDER_KEY = 'cordiaCalendarReminders';
@@ -48,13 +50,8 @@ function timeLabel(item) {
 }
 
 function weekSummary(items) {
-  if (!items.length) return 'Nothing due this week.';
   const tests = items.filter(item => item.type === 'exam' || item.type === 'quiz').length;
-  const parts = [`${items.length} due this week`];
-  if (tests) parts.push(`${tests} ${tests === 1 ? 'exam or quiz' : 'exams and quizzes'}`);
-  const next = items.find(item => dateValue(item) >= Date.now());
-  if (next) parts.push(`next: ${next.title} (${new Date(next.due_at).toLocaleDateString([], { weekday: 'short' })})`);
-  return parts.join(' · ');
+  return `${items.length} due${tests ? ` · ${tests} ${tests === 1 ? 'test' : 'tests'}` : ''}`;
 }
 
 function notifyDueToday(items, userId) {
@@ -119,6 +116,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
       body: JSON.stringify({ url }),
     });
     if (applyCalendar(data, accountId)) {
+      walkthroughEvent('calendar-connected');
       const feedKey = accountKey(FEED_KEY, accountId);
       if (feedKey) localStorage.removeItem(feedKey);
       setFeedUrl('');
@@ -188,46 +186,47 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     if (compact) {
       return (
         <section className="compact-calendar">
-          <header>
-            <div>
-              <span className="compact-eyebrow">Upcoming</span>
-              <h2>Bring deadlines into view.</h2>
-            </div>
-            <span className="compact-calendar-mark" aria-hidden="true">31</span>
-          </header>
-          <p>Connect your Canvas calendar once to see assignments and due dates here.</p>
+          <header><h2>Due soon</h2></header>
           {error && <div className="compact-calendar-error" role="alert">{error}</div>}
-          <button type="button" onClick={onOpenCalendar}>Connect calendar</button>
+          <button type="button" onClick={onOpenCalendar}>Connect</button>
           <CompactStyles />
         </section>
       );
     }
+    const steps = [
+      { label: 'Open Canvas', icon: ExternalLink },
+      { label: 'Copy link', icon: ClipboardCopy },
+      { label: 'Paste here', icon: ClipboardPaste },
+    ];
     return (
-      <section className="canvas-dashboard calendar-connect-card">
-        <div className="calendar-mark" aria-hidden="true">31</div>
-        <div className="calendar-connect-copy">
-          <span className="calendar-eyebrow">Canvas calendar</span>
-          <h2>See what is due without connecting your Canvas account.</h2>
-          <ol className="calendar-steps">
-            <li><strong>Open Canvas Calendar</strong> and select Calendar Feed.</li>
-            <li><strong>Copy the feed link</strong> shown by Canvas.</li>
-            <li><strong>Paste it here</strong> to show due dates and reminders.</li>
-          </ol>
-          <div className="calendar-connect-form">
-            <input
-              type="url"
-              value={feedUrl}
-              onChange={event => setFeedUrl(event.target.value)}
-              placeholder="https://your-school.edu/feeds/calendars/..."
-              aria-label="Canvas calendar feed URL"
-            />
-            <button type="button" className="btn btn-green" onClick={() => connect(feedUrl.trim())} disabled={loading || !feedUrl.trim()}>
-              {loading ? 'Checking calendar…' : 'Connect calendar'}
-            </button>
-          </div>
-          <small>Your private feed link is saved to your Classroom account so deadlines reconnect automatically on your devices.</small>
-          {error && <div className="canvas-inline-error" role="alert">{error}</div>}
-        </div>
+      <section className="c-card cal-connect" aria-label="Connect Canvas calendar">
+        <ol className="cal-steps">
+          {steps.map((step, index) => (
+            <li key={step.label}>
+              <span className="cal-step-num" aria-hidden="true">{index + 1}</span>
+              <step.icon size={24} strokeWidth={1.75} aria-hidden="true" />
+              <span>{step.label}</span>
+            </li>
+          ))}
+        </ol>
+        <form className="cal-form" onSubmit={event => { event.preventDefault(); if (feedUrl.trim()) connect(feedUrl.trim()); }}>
+          <label className="c-field cal-field">
+            <span>Calendar feed link</span>
+            <input className="c-input" type="url" value={feedUrl} onChange={event => setFeedUrl(event.target.value)} placeholder="https://" data-spot="calendar-feed" />
+          </label>
+          <button type="submit" className="c-btn c-btn--primary" disabled={loading || !feedUrl.trim()}>{loading ? 'Checking…' : 'Connect'}</button>
+        </form>
+        {error && <div className="canvas-inline-error" role="alert">{error}</div>}
+        <style jsx>{`
+          .cal-connect { display: grid; gap: 24px; padding: 28px; }
+          .cal-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+          .cal-steps li { display: grid; justify-items: center; gap: 10px; padding: 20px 12px; border-radius: var(--r-card); background: var(--card-sunk); font: 600 15px/1.2 var(--font-sans); text-align: center; }
+          .cal-steps :global(.lucide) { color: var(--olive-ink); }
+          .cal-step-num { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 700 13px/1 var(--font-sans); }
+          .cal-form { display: flex; align-items: flex-end; gap: 8px; }
+          .cal-field { flex: 1; }
+          @media (max-width: 767px) { .cal-steps { grid-template-columns: 1fr; } .cal-steps li { grid-template-columns: auto auto 1fr; justify-items: start; align-items: center; padding: 14px; } .cal-form { flex-direction: column; align-items: stretch; } }
+        `}</style>
       </section>
     );
   }
@@ -245,11 +244,8 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     return (
       <section className="compact-calendar">
         <header>
-          <div>
-            <span className="compact-eyebrow">Upcoming</span>
-            <h2>Your next deadlines</h2>
-          </div>
-          <button type="button" className="compact-calendar-link" onClick={onOpenCalendar}>View calendar</button>
+          <h2>Due soon</h2>
+          <button type="button" className="compact-calendar-link" onClick={onOpenCalendar}>Calendar</button>
         </header>
         {error && <div className="compact-calendar-error" role="alert">{error}</div>}
         <div className="compact-agenda">
@@ -259,7 +255,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
               <strong>{item.title}</strong>
               <small>{item.course || 'Canvas'}</small>
             </a>
-          )) : <p>Nothing due soon. Your calendar is clear.</p>}
+          )) : <p>0 due</p>}
         </div>
         <CompactStyles />
       </section>
@@ -292,24 +288,25 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
       : <div key={item.id} className={className}>{body}</div>;
   }
 
+  const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
   return (
-    <section className="canvas-dashboard calendar-dashboard">
-      <header className="canvas-dashboard-header">
-        <div>
-          <span className="calendar-eyebrow">Canvas calendar</span>
-          <h2>Week of {rangeLabel}</h2>
-          <p className="calendar-week-summary">{weekSummary(weekItems)}</p>
+    <section className="calendar-dashboard">
+      <header className="cal-head">
+        <div className="c-row">
+          <button type="button" className="c-icon-btn" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week"><ChevronLeft {...ICON} /></button>
+          <h2 className="c-section-title">{rangeLabel}</h2>
+          <button type="button" className="c-icon-btn" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week"><ChevronRight {...ICON} /></button>
+          <span className="c-meta">{weekSummary(weekItems)}</span>
         </div>
-        <div className="calendar-actions">
-          <div className="calendar-week-nav">
-            <button type="button" className="btn-outline" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week">‹</button>
-            <button type="button" className="btn-outline" onClick={() => setWeekStart(startOfWeek(new Date()))}>This week</button>
-            <button type="button" className="btn-outline" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week">›</button>
-          </div>
-          <button type="button" className="btn-outline" onClick={toggleReminders}>{reminders ? 'Reminders on' : 'Enable reminders'}</button>
-          <button type="button" className="btn-outline" onClick={() => refresh()} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button>
-          <button type="button" className="calendar-disconnect" onClick={disconnect}>Disconnect</button>
+        <div className="c-row c-row--wrap">
+          <button type="button" className="c-btn c-btn--quiet" onClick={() => setWeekStart(startOfWeek(new Date()))}>This week</button>
+          <button type="button" className="c-btn c-btn--secondary" onClick={toggleReminders} aria-pressed={reminders}>{reminders ? <Bell {...ICON} /> : <BellOff {...ICON} />}Reminders</button>
+          <button type="button" className="c-icon-btn" onClick={() => refresh()} disabled={loading} aria-label="Refresh"><RefreshCw {...ICON} /></button>
+          <button type="button" className="c-icon-btn" onClick={disconnect} aria-label="Disconnect calendar"><Unlink {...ICON} /></button>
         </div>
+        <style jsx>{`
+          .cal-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+        `}</style>
       </header>
       {error && <div className="canvas-inline-error" role="alert">{error}</div>}
       <div className="calendar-week">
@@ -321,10 +318,10 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
               <header>
                 <span>{day.toLocaleDateString([], { weekday: 'short' })}</span>
                 <strong>{day.getDate()}</strong>
-                {isToday && <em>Due today</em>}
+                {isToday && <em>Today</em>}
               </header>
               <div className="calendar-day-items">
-                {dayItems.length ? dayItems.map(itemCard) : <p className="calendar-day-empty">—</p>}
+                {dayItems.length ? dayItems.map(itemCard) : <p className="calendar-day-empty" aria-label="Nothing due">–</p>}
               </div>
             </section>
           );

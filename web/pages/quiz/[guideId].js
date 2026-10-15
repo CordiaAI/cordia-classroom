@@ -3,15 +3,17 @@ import { useRouter } from 'next/router';
 import { apiFetch, openUpgrade } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import { PRO_TYPES, TYPE_LABELS } from '../../lib/retainEngine.mjs';
-import { ArrowLeft, Lock, ListChecks, PenLine, Play, RefreshCw, Repeat, TextCursorInput, Shuffle as MatchIcon } from 'lucide-react';
+import { ArrowLeft, Lock, ListChecks, PenLine, Play, RefreshCw, Repeat, TextCursorInput, Shuffle as PairsIcon, Timer } from 'lucide-react';
+import MatchRace from '../../components/MatchRace';
 import QuizMode from '../../components/QuizMode';
+import { inDayOne, walkthroughEvent } from '../../lib/walkthrough';
 
 // Short tile names; TYPE_LABELS stays the engine's own naming.
 const MODES = {
   mc: { label: 'Choice', icon: ListChecks },
   written: { label: 'Written', icon: PenLine },
   fill: { label: 'Fill in', icon: TextCursorInput },
-  matching: { label: 'Match', icon: MatchIcon },
+  matching: { label: 'Pairs', icon: PairsIcon },
 };
 const STORAGE_KEY = 'retainTypes';
 
@@ -37,6 +39,7 @@ export default function QuizPage() {
   const [error, setError] = useState('');
   const [history, setHistory] = useState([]);
   const [title, setTitle] = useState('');
+  const [race, setRace] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
@@ -65,12 +68,20 @@ export default function QuizPage() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* remembering is optional */ }
   }
 
+  useEffect(() => { if (ready && guideId) walkthroughEvent('quiz-opened'); }, [ready, guideId]);
+
   async function start() {
     setStarting(true);
     setError('');
-    const data = await apiFetch(`/quiz/${guideId}/session`, { method: 'POST', body: JSON.stringify({ types }) });
+    // The day-one walkthrough runs a short 3-question multiple-choice round.
+    const short = inDayOne('quiz-start');
+    const chosen = short || race ? ['mc'] : types;
+    const data = await apiFetch(`/quiz/${guideId}/session`, { method: 'POST', body: JSON.stringify({ types: chosen }) });
     setStarting(false);
-    if (data?.cards?.length) setSession({ ...data, selected: types, version: Date.now() });
+    if (data?.cards?.length) {
+      setSession({ ...data, cards: short ? data.cards.slice(0, 3) : data.cards, selected: chosen, race: race && !short, version: Date.now() });
+      walkthroughEvent('quiz-started');
+    }
     else setError(data?.detail || 'Retain could not start. Make sure this guide has questions and answers.');
   }
 
@@ -97,7 +108,9 @@ export default function QuizPage() {
       {title && <p className="c-section-title quiz-guide">{title}</p>}
       {error && <div className="retain-action-error" role="alert">{error}</div>}
 
-      {session ? (
+      {session?.race ? (
+        <MatchRace key={session.version} questions={session.questions} guideId={guideId} onRestart={() => setSession(null)} onDone={() => router.push('/guide/' + guideId)} />
+      ) : session ? (
         <QuizMode
           key={session.version}
           questions={session.questions}
@@ -105,6 +118,7 @@ export default function QuizPage() {
           types={session.selected}
           guideId={guideId}
           onRestart={() => setSession(null)}
+          onDone={() => { walkthroughEvent('guide-open'); router.push('/guide/' + guideId); }}
         />
       ) : (
         <>
@@ -112,18 +126,22 @@ export default function QuizPage() {
             {Object.keys(TYPE_LABELS).map(type => {
               const mode = MODES[type];
               const locked = PRO_TYPES.includes(type) && plan && !plan.pro && plan.left <= 0;
-              const on = types.includes(type);
+              const on = !race && types.includes(type);
               return (
-                <button key={type} type="button" className={'quiz-mode' + (on ? ' is-on' : '')} aria-pressed={on} onClick={() => toggle(type)} aria-label={`${mode.label}${locked ? ', Pro' : ''}`}>
+                <button key={type} type="button" className={'quiz-mode' + (on ? ' is-on' : '')} aria-pressed={on} onClick={() => { if (race) { setRace(false); if (types.includes(type)) return; } toggle(type); }} aria-label={`${mode.label}${locked ? ', Pro' : ''}`}>
                   <mode.icon size={28} strokeWidth={1.75} aria-hidden="true" />
                   <span>{mode.label}</span>
                   {PRO_TYPES.includes(type) && plan && !plan.pro && <Lock className="quiz-lock" size={16} strokeWidth={1.75} aria-hidden="true" />}
                 </button>
               );
             })}
+            <button type="button" className={'quiz-mode' + (race ? ' is-on' : '')} aria-pressed={race} onClick={() => setRace(value => !value)} aria-label="Match, 60 seconds">
+              <Timer size={28} strokeWidth={1.75} aria-hidden="true" />
+              <span>Match</span>
+            </button>
           </div>
-          <p className="quiz-note"><Repeat size={20} strokeWidth={1.75} aria-hidden="true" />Misses repeat</p>
-          <button type="button" className="c-btn c-btn--primary c-btn--lg quiz-start" onClick={start} disabled={starting || !types.length || !guideId}>
+          <p className="quiz-note">{race ? <><Timer size={20} strokeWidth={1.75} aria-hidden="true" />60 seconds</> : <><Repeat size={20} strokeWidth={1.75} aria-hidden="true" />Misses repeat</>}</p>
+          <button type="button" className="c-btn c-btn--primary c-btn--lg quiz-start" data-spot="quiz-start" onClick={start} disabled={starting || !types.length || !guideId}>
             <Play size={20} strokeWidth={1.75} aria-hidden="true" />{starting ? 'Preparing…' : 'Start'}
           </button>
           {history.length > 0 && (
@@ -145,7 +163,7 @@ export default function QuizPage() {
       <style jsx>{`
         .quiz-page { width: min(760px, 100%); margin: 0 auto; }
         .quiz-guide { margin: -12px 0 0; font-family: var(--font-display); }
-        .quiz-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+        .quiz-modes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
         .quiz-mode { position: relative; display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 120px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow); }
         .quiz-mode :global(.lucide) { color: var(--olive-ink); }
         .quiz-mode.is-on { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
@@ -154,7 +172,7 @@ export default function QuizPage() {
         .quiz-note :global(.lucide) { color: var(--olive-ink); }
         .quiz-start { justify-self: start; min-width: 180px; }
         .quiz-past-score { font-weight: 600; font-variant-numeric: tabular-nums; }
-        @media (max-width: 767px) { .quiz-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } .quiz-start { width: 100%; } }
+        @media (max-width: 767px) { .quiz-modes { grid-template-columns: repeat(3, minmax(0, 1fr)); } .quiz-start { width: 100%; } }
       `}</style>
     </div>
   );

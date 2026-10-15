@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Brain, CalendarDays, ChartColumn, Layers, Lightbulb, MessageCircle, PencilRuler, Sparkles, Timer, X } from 'lucide-react';
+import { CalendarDays, ChartColumn, Lightbulb, MessageCircle, Timer, X } from 'lucide-react';
 
-const ICONS = { Brain, CalendarDays, ChartColumn, Layers, MessageCircle, PencilRuler, Sparkles, Timer };
+const ICONS = { CalendarDays, ChartColumn, MessageCircle, Timer };
 import { TIPS, TIP_EVENT, dismissTip, markTipShown } from '../lib/tips';
 
 const WAIT_MS = 4000;
@@ -19,7 +19,7 @@ export default function TipHost() {
       if (!TIPS[id]) return;
       const started = Date.now();
       clearInterval(timer.current);
-      // The anchor can render a moment after the request (data still loading).
+          // The anchor can render a moment after the request (data still loading).
       timer.current = setInterval(() => {
         const target = document.querySelector(`[data-tip="${id}"]`);
         if (target && target.getClientRects().length) {

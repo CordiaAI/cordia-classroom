@@ -8,6 +8,11 @@ import LearningStylePicker from '../components/LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from '../components/ExplanationPreference';
 import StudyInsights from '../components/StudyInsights';
+import { Check, CreditCard, Moon, Sun } from 'lucide-react';
+import GroveGrid from '../components/GroveGrid';
+import Heatmap from '../components/Heatmap';
+import RecapCard from '../components/RecapCard';
+import { semesterStart } from '../lib/activity';
 
 export default function SettingsPage() {
   const { ready } = useRequireAuth();
@@ -16,9 +21,24 @@ export default function SettingsPage() {
   const [profileName, setProfileName] = useState('');
 
   // /settings?section=learning opens a section directly (e.g. from the dashboard insights card).
+  // Old links (subscription, grove) land on the tab that now holds them.
+  const SECTION_ALIASES = { subscription: 'plan', grove: 'account', profile: 'account' };
   useEffect(() => {
-    if (router.isReady && router.query.section) setActiveSection(String(router.query.section));
+    if (!router.isReady || !router.query.section) return;
+    const section = String(router.query.section);
+    setActiveSection(SECTION_ALIASES[section] || section);
+    if (section === 'grove') setTimeout(() => document.getElementById('grove')?.scrollIntoView({ block: 'start' }), 400);
   }, [router.isReady, router.query.section]);
+  const [library, setLibrary] = useState({ guides: [], folders: [], streak: null, overview: null });
+  useEffect(() => {
+    if (!ready) return;
+    Promise.all([
+      apiFetch('/guides?fields=summary&limit=500'),
+      apiFetch('/folders'),
+      apiFetch('/stats/streak?tz_offset=' + -new Date().getTimezoneOffset()),
+      apiFetch('/stats/overview'),
+    ]).then(([guides, folders, streak, overview]) => setLibrary({ guides: guides?.guides || [], folders: folders?.folders || [], streak, overview }));
+  }, [ready]);
   const [email, setEmail] = useState('');
 
   // Billing state
@@ -60,7 +80,7 @@ export default function SettingsPage() {
     setTheme(saved);
 
     if (router.query.billing === 'success') {
-      setActiveSection('subscription');
+      setActiveSection('plan');
       const sessionId = typeof router.query.session_id === 'string' ? router.query.session_id : '';
       if (sessionId) {
         setMessage('Confirming your CordiaClassroom Pro subscription...');
@@ -128,8 +148,7 @@ export default function SettingsPage() {
     }
   }
 
-  function toggleTheme() {
-    const next = theme === 'dark' ? 'light' : 'dark';
+  function setAppearance(next) {
     setTheme(next);
     localStorage.setItem('theme', next);
     document.documentElement.setAttribute('data-theme', next);
@@ -157,38 +176,54 @@ export default function SettingsPage() {
     { key: 'account', label: 'Profile' },
     { key: 'learning', label: 'Learning' },
     { key: 'appearance', label: 'Appearance' },
-    { key: 'subscription', label: 'Subscription' },
+    { key: 'plan', label: 'Plan' },
   ];
+  const since = semesterStart();
+  const initials = (profileName || email.split('@')[0] || '').split(/[\s._-]+/).filter(part => /^[a-z]/i.test(part)).slice(0, 2).map(part => part[0]).join('').toUpperCase();
+
+  function onTabKey(event) {
+    const index = sections.findIndex(section => section.key === activeSection);
+    const next = event.key === 'ArrowRight' ? index + 1 : event.key === 'ArrowLeft' ? index - 1 : null;
+    if (next === null) return;
+    event.preventDefault();
+    const target = sections[(next + sections.length) % sections.length];
+    setActiveSection(target.key);
+    document.getElementById(`tab-${target.key}`)?.focus();
+  }
 
   return (
     <>
-      <div className="settings-page">
-        <header className="profile-window-heading"><h2>My profile</h2><p>Make this space your own.</p></header>
+      <div className="c-page settings-page">
+        <header className="c-page-head"><h1 className="c-title">Profile</h1></header>
 
-        <div className="settings-tabs">
-          {sections.map(s => (
+        <div className="c-seg settings-tabs" role="tablist" aria-label="Profile" onKeyDown={onTabKey}>
+          {sections.map(section => (
             <button
-              key={s.key}
-              className={'settings-tab' + (activeSection === s.key ? ' active' : '')}
-              onClick={() => setActiveSection(s.key)}
+              key={section.key}
+              id={`tab-${section.key}`}
+              type="button"
+              role="tab"
+              aria-selected={activeSection === section.key}
+              aria-controls={`panel-${section.key}`}
+              tabIndex={activeSection === section.key ? 0 : -1}
+              onClick={() => setActiveSection(section.key)}
             >
-              {s.label}
+              {section.label}
             </button>
           ))}
         </div>
 
-        {message && <div className="settings-message">{message}</div>}
+        {message && <div className="settings-message" role="status">{message}</div>}
 
-        {/* Subscription Section */}
-        {activeSection === 'subscription' && (
-          <div className="settings-section">
+        {activeSection === 'plan' && (
+          <div className="settings-section" role="tabpanel" id="panel-plan" aria-labelledby="tab-plan">
             {loading ? (
-              <div className="settings-loading">Loading...</div>
+              <div className="c-skeleton" style={{ height: 160, borderRadius: 20 }} />
             ) : (
               <>
-                <div className="billing-current-plan">
+                <div className="c-card billing-current-plan">
                   <div className="plan-badge" data-plan={isPlus ? 'plus' : 'free'}>
-                    {onTrial ? `${PRO_NAME} · trial` : isPlus ? PRO_NAME : 'Free'}
+                    {onTrial ? 'Pro trial' : isPlus ? 'Pro' : 'Free'}
                   </div>
                   <div className="plan-usage">
                     {METERED.map(feature => {
@@ -196,46 +231,39 @@ export default function SettingsPage() {
                       if (!item) return null;
                       const pct = item.limit ? Math.min(100, (item.used / item.limit) * 100) : 0;
                       return (
-                        <div key={feature}>
-                          <span>{item.used} of {item.limit} {FEATURE_COPY[feature].label} used this month</span>
-                          <div className="usage-bar">
-                            <div className="usage-bar-fill" style={{ width: pct + '%', background: pct >= 100 ? 'var(--error)' : 'var(--accent)' }} />
-                          </div>
+                        <div key={feature} className="plan-usage-row">
+                          <span className="plan-usage-label">{FEATURE_COPY[feature].label}</span>
+                          <span className="c-meta">{item.used} / {item.limit}</span>
+                          <div className="c-bar"><span style={{ width: pct + '%', background: pct >= 100 ? 'var(--error)' : undefined }} /></div>
                         </div>
                       );
                     })}
-                    {status?.resets_at && <span className="plan-resets">Resets {resetLabel(status.resets_at)}</span>}
+                    {status?.resets_at && <span className="c-meta">Resets {resetLabel(status.resets_at)}</span>}
                   </div>
-                  {onTrial && status?.trial_ends_at && (
-                    <div className="plan-renews">Trial ends {new Date(status.trial_ends_at).toLocaleDateString()}. You will not be charged unless you subscribe.</div>
-                  )}
+                  {onTrial && status?.trial_ends_at && <span className="c-meta">Trial ends {new Date(status.trial_ends_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>}
                   {isPlus && !onTrial && status?.period_end && (
-                    <div className="plan-renews">
-                      {status.cancel_at_period_end ? 'Access ends' : 'Renews'} {new Date(status.period_end).toLocaleDateString()}
-                    </div>
+                    <span className="c-meta">{status.cancel_at_period_end ? 'Ends' : 'Renews'} {new Date(status.period_end).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
                   )}
-                  {status?.past_due && (
-                    <div className="plan-renews plan-warning">Your last payment failed. Update your card to keep Pro.</div>
-                  )}
+                  {status?.past_due && <div className="plan-warning" role="alert">Payment failed. Update your card.</div>}
                 </div>
 
                 <div className="billing-plans">
-                  <div className={'plan-card' + (!isPlus ? ' plan-card-current' : '')}>
-                    <div className="plan-name">Free</div>
+                  <div className={'c-card plan-card' + (!isPlus ? ' plan-card-current' : '')}>
+                    <h2 className="c-section-title">Free</h2>
                     <div className="plan-price">$0 <span>/month</span></div>
                     <ul className="plan-features">
-                      {FREE_SUMMARY.map(item => <li key={item}>{item}</li>)}
+                      {FREE_SUMMARY.map(item => <li key={item}><Check size={18} strokeWidth={2} aria-hidden="true" />{item}</li>)}
                     </ul>
-                    {!isPlus && <div className="plan-current-label">Current plan</div>}
+                    {!isPlus && <span className="plan-current-label">Current</span>}
                   </div>
 
-                  <div className={'plan-card plan-card-pro' + (isPlus ? ' plan-card-current' : '')}>
-                    <div className="plan-name">{PRO_NAME}</div>
+                  <div className={'c-card plan-card plan-card-pro' + (isPlus ? ' plan-card-current' : '')}>
+                    <h2 className="c-section-title">Pro</h2>
                     {(!isPlus || onTrial) && (
-                      <div className="billing-toggle" aria-label="Billing interval">
+                      <div className="c-seg billing-toggle" role="group" aria-label="Billing interval">
                         {Object.entries(PRICES).map(([key, option]) => (
-                          <button key={key} className={billingInterval === key ? 'active' : ''} onClick={() => setBillingInterval(key)}>
-                            {option.label}{option.note ? ` · ${option.note.toLowerCase()}` : ''}
+                          <button key={key} type="button" className={billingInterval === key ? 'is-active' : ''} aria-pressed={billingInterval === key} onClick={() => setBillingInterval(key)}>
+                            {option.label}
                           </button>
                         ))}
                       </div>
@@ -244,31 +272,29 @@ export default function SettingsPage() {
                       {selected.price}
                       <span>/{selected.per}</span>
                     </div>
+                    {selected.note && <span className="c-meta">{selected.note}</span>}
                     <ul className="plan-features">
-                      {PRO_BENEFITS.map(item => <li key={item}>{item}</li>)}
-                      <li>Cancel anytime · secure billing through Stripe</li>
+                      {PRO_BENEFITS.map(item => <li key={item}><Check size={18} strokeWidth={2} aria-hidden="true" />{item}</li>)}
                     </ul>
                     {isPlus && !onTrial ? (
                       <div className="plan-actions">
-                        <div className="plan-current-label">Current plan</div>
-                        <button className="btn-manage" onClick={handleManageBilling} disabled={managing}>
-                          {managing ? 'Opening...' : 'Manage billing'}
+                        <span className="plan-current-label">Current</span>
+                        <button type="button" className="c-btn c-btn--secondary" onClick={handleManageBilling} disabled={managing}>
+                          <CreditCard size={20} strokeWidth={1.75} aria-hidden="true" />{managing ? 'Opening…' : 'Manage'}
                         </button>
                       </div>
                     ) : (
                       <div className="plan-actions">
                         {status?.trial_available ? (
                           <>
-                            <button className="btn-upgrade" onClick={() => openUpgrade()} disabled={upgrading}>
-                              Start 7-day free trial · no card
-                            </button>
-                            <button className="btn-manage" onClick={handleUpgrade} disabled={upgrading}>
-                              {upgrading ? 'Opening secure checkout...' : `Or subscribe now · ${selected.price}/${selected.per}`}
+                            <button type="button" className="c-btn c-btn--primary" onClick={() => openUpgrade()} disabled={upgrading}>Start trial</button>
+                            <button type="button" className="c-btn c-btn--secondary" onClick={handleUpgrade} disabled={upgrading}>
+                              {upgrading ? 'Opening…' : 'Subscribe'}
                             </button>
                           </>
                         ) : (
-                          <button className="btn-upgrade" onClick={handleUpgrade} disabled={upgrading}>
-                            {upgrading ? 'Opening secure checkout...' : `${onTrial ? 'Subscribe' : 'Choose Pro'} · ${selected.price}/${selected.per}`}
+                          <button type="button" className="c-btn c-btn--primary" onClick={handleUpgrade} disabled={upgrading}>
+                            {upgrading ? 'Opening…' : onTrial ? 'Subscribe' : 'Choose Pro'}
                           </button>
                         )}
                       </div>
@@ -280,71 +306,52 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Appearance Section */}
         {activeSection === 'appearance' && (
-          <div className="settings-section">
-            <div className="settings-row">
-              <div>
-                <div className="settings-label">Theme</div>
-                <div className="settings-desc">Switch between dark and light mode</div>
+          <div className="settings-section" role="tabpanel" id="panel-appearance" aria-labelledby="tab-appearance">
+            <div className="c-card settings-row">
+              <span className="c-section-title">Theme</span>
+              <div className="c-seg" role="group" aria-label="Theme">
+                <button type="button" className={theme !== 'dark' ? 'is-active' : ''} aria-pressed={theme !== 'dark'} onClick={() => setAppearance('light')}><Sun size={18} strokeWidth={1.75} aria-hidden="true" /> Light</button>
+                <button type="button" className={theme === 'dark' ? 'is-active' : ''} aria-pressed={theme === 'dark'} onClick={() => setAppearance('dark')}><Moon size={18} strokeWidth={1.75} aria-hidden="true" /> Dark</button>
               </div>
-              <button className="theme-toggle" onClick={toggleTheme}>
-                {theme === 'dark' ? 'Dark' : 'Light'}
-              </button>
             </div>
           </div>
         )}
 
         {activeSection === 'learning' && (
-          <div className="settings-section">
-            <ExplanationPreference />
-          </div>
-        )}
-
-        {activeSection === 'learning' && (
-          <div className="settings-section">
+          <div className="settings-section c-stack" role="tabpanel" id="panel-learning" aria-labelledby="tab-learning">
+            <div className="c-card settings-card"><ExplanationPreference /></div>
+            {learningStyle?.enabled && (
+              <div className="c-card settings-card">
+                <h2 className="c-section-title">Study style</h2>
+                <LearningStylePicker value={learningStyle.style} onSelect={chooseStyle} disabled={savingStyle} />
+                {learningStyle.style && (
+                  <button type="button" className="c-btn c-btn--quiet" onClick={() => chooseStyle(null)} disabled={savingStyle}>Use standard</button>
+                )}
+              </div>
+            )}
             <StudyInsights />
           </div>
         )}
 
-        {activeSection === 'learning' && learningStyle?.enabled && (
-          <div className="settings-section">
-            <div className="settings-label">How do you like to study?</div>
-            <div className="settings-desc">
-              Guides and Tutor start with this. Every study tool stays available whatever you pick.
-            </div>
-            <LearningStylePicker value={learningStyle.style} onSelect={chooseStyle} disabled={savingStyle} />
-            {learningStyle.style && (
-              <button type="button" className="btn-outline" onClick={() => chooseStyle(null)} disabled={savingStyle}>
-                Use Classroom's standard view
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Account Section */}
         {activeSection === 'account' && (
-          <div className="settings-section">
-            <div className="profile-identity">
-              <div className="profile-portrait" aria-hidden="true">{profileName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase()}</div>
-              <div><span>Name</span><strong>{profileName || 'Your account'}</strong><span>Email</span><strong>{email || 'Not available'}</strong></div>
-              <button type="button" className="btn-outline" onClick={() => setActiveSection('subscription')}>Manage plan</button>
-            </div>
-            <div className="profile-preferences"><h3>Learning preferences</h3><ExplanationPreference /></div>
-            <div className="settings-row">
-              <div>
-                <div className="settings-label">Send Feedback</div>
-                <div className="settings-desc">Report a bug or suggest a feature</div>
+          <div className="settings-section c-stack" role="tabpanel" id="panel-account" aria-labelledby="tab-account">
+            <div className="c-card profile-identity">
+              <div className="profile-portrait" aria-hidden="true">{initials}</div>
+              <div className="profile-names">
+                <strong>{profileName || 'Your account'}</strong>
+                <span className="c-meta">{email}</span>
               </div>
-              <button className="btn-feedback" onClick={() => setShowFeedback(true)}>
-                Send Feedback
-              </button>
+              <button type="button" className="c-btn c-btn--secondary" onClick={() => setShowFeedback(true)}>Feedback</button>
             </div>
-            <div className="settings-links">
-              <a href="/privacy">Privacy Policy</a>
-              <a href="/terms">Terms of Service</a>
-              <a href="/honor-code">Honor Code</a>
-            </div>
+            <RecapCard guides={library.guides} folders={library.folders} since={since} cardsStudied={library.overview?.cards_studied || 0} />
+            <GroveGrid guides={library.guides} since={since} />
+            <Heatmap serverWeek={library.streak?.week || []} />
+            <nav className="settings-links" aria-label="Policies">
+              <a href="/privacy">Privacy</a>
+              <a href="/terms">Terms</a>
+              <a href="/honor-code">Honor code</a>
+            </nav>
           </div>
         )}
       </div>
@@ -353,54 +360,37 @@ export default function SettingsPage() {
 
       <style jsx>{`
         .settings-page { width: min(920px, 100%); margin: 0 auto; }
-        h2 { margin-bottom: 24px; font-size: max(13px, clamp(2.4rem, 4vw, 3.5rem)); font-weight: 700; letter-spacing: -0.055em; }
-        .settings-tabs { display: inline-flex; gap: 4px; margin-bottom: 22px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-sm); }
-        .settings-tab { background: none; border: none; color: var(--text-muted); font-size: 0.86rem; padding: 9px 15px; cursor: pointer; border-radius: 12px; font-weight: 600; }
-        .settings-tab:hover { color: var(--text-primary); background: var(--bg-hover); }
-        .settings-tab.active { color: var(--olive-hover); background: var(--accent-glow); }
-        .settings-message { background: var(--accent-glow); border: 1px solid var(--line); border-radius: 12px; padding: 13px 16px; margin-bottom: 22px; color: var(--text-primary); }
-        .settings-loading { color: var(--text-muted); }
-        .settings-section { padding: 28px; animation: fadeIn 0.2s ease; }
-        .settings-row { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--border-subtle); }
-        .settings-label { font-weight: 600; font-size: 0.95rem; color: var(--text-primary); }
-        .settings-desc { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
-        .theme-toggle { padding: 9px 18px; border-radius: 999px; border: 1px solid var(--border-default); background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-sm); cursor: pointer; font-size: 0.86rem; font-weight: 600; }
-        .theme-toggle:hover { border-color: var(--accent); transform: translateY(-1px); }
-        .btn-feedback { padding: 9px 18px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; font-size: 0.86rem; font-weight: 600; }
-        .btn-feedback:hover { background: var(--accent-glow); }
-        .settings-links { display: flex; gap: 16px; padding-top: 24px; margin-top: 8px; }
-        .settings-links a { font-size: 0.85rem; color: var(--text-muted); }
-        .settings-links a:hover { color: var(--accent); }
-
-        /* Billing styles (from billing page) */
-        .billing-current-plan { background: var(--bg-tertiary); border: 1px solid var(--line); border-radius: 20px; padding: 22px 24px; margin-bottom: 24px; }
-        .plan-badge { display: inline-block; padding: 4px 14px; border-radius: 20px; font-weight: 700; font-size: 0.9rem; background: var(--bg-tertiary); color: var(--text-muted); margin-bottom: 12px; }
-        .plan-badge[data-plan="plus"] { background: var(--accent); color: #fff; }
-        .plan-usage { font-size: 0.95rem; color: var(--text-secondary); }
-        .plan-usage span { display: block; margin-top: 8px; }
-        .usage-bar { height: 8px; background: var(--bg-tertiary); border-radius: 999px; margin-top: 8px; overflow: hidden; }
-        .usage-bar-fill { height: 100%; border-radius: 999px; transition: width 0.3s; }
-        .plan-renews { font-size: 0.85rem; color: var(--text-muted); margin-top: 8px; }
+        .settings-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }
+        .settings-message { padding: 14px 18px; border-radius: var(--r-card); background: var(--olive-tint); font-weight: 600; }
+        .settings-section { animation: fadeIn 0.2s ease; }
+        .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; flex-wrap: wrap; }
+        .settings-row .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
+        .settings-card { display: grid; gap: 12px; padding: 20px; }
+        .settings-links { display: flex; gap: 20px; font: 600 13px/1 var(--font-sans); }
+        .profile-identity { display: flex; align-items: center; gap: 16px; padding: 20px; }
+        .profile-portrait { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 700 19px/1 var(--font-sans); }
+        .profile-names { display: grid; gap: 2px; flex: 1; min-width: 0; }
+        .profile-names strong { font: 600 19px/1.2 var(--font-display); }
+        .billing-current-plan { display: grid; gap: 12px; padding: 20px; margin-bottom: 16px; }
+        .plan-badge { justify-self: start; padding: 6px 14px; border-radius: var(--r-pill); background: var(--card-sunk); font-weight: 700; }
+        .plan-badge[data-plan="plus"] { background: var(--olive); color: var(--on-olive); }
+        .plan-usage { display: grid; gap: 10px; }
+        .plan-usage-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; }
+        .plan-usage-row .c-bar { grid-column: 1 / -1; }
+        .plan-usage-label { text-transform: capitalize; font-weight: 600; }
+        .plan-warning { color: var(--error); font-weight: 600; }
         .billing-plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-        .plan-card { min-width: 0; border: 1px solid var(--border-default); border-radius: 20px; padding: 24px; background: var(--surface); box-shadow: var(--shadow-sm); }
-        .plan-card-pro { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
-        .plan-card-current { box-shadow: 0 0 0 3px var(--accent-glow); }
-        .plan-name { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; color: var(--text-primary); }
-        .plan-price { font-size: 2rem; font-weight: 800; margin-bottom: 16px; color: var(--text-primary); }
-        .plan-price span { font-size: 1rem; font-weight: 400; color: var(--text-muted); }
-        .billing-toggle { display: flex; gap: 6px; padding: 4px; margin: 12px 0; background: var(--bg-tertiary); border-radius: 12px; }
-        .billing-toggle button { flex: 1; border: 0; border-radius: 12px; padding: 8px 10px; background: transparent; color: var(--text-muted); cursor: pointer; }
-        .billing-toggle button.active { background: var(--bg-primary); color: var(--text-primary); box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
-        .plan-features { list-style: none !important; list-style-type: none !important; padding: 0 !important; margin: 0 0 20px; }
-        .plan-features li { list-style: none; list-style-type: none; padding: 6px 0; font-size: 0.9rem; color: var(--text-secondary); display: flex; align-items: baseline; gap: 6px; }
-        .plan-features li::before { content: "✓"; color: var(--accent); font-weight: 700; flex-shrink: 0; }
-        .plan-current-label { color: var(--accent); font-weight: 600; font-size: 0.9rem; margin-bottom: 8px; }
-        .btn-upgrade { width: 100%; padding: 12px; background: var(--ink); color: #fff; border: none; border-radius: 12px; box-shadow: 0 8px 20px rgba(17, 18, 15, .16); font-size: .92rem; font-weight: 650; cursor: pointer; }
-        .btn-upgrade:hover { background: #2a2c27; transform: translateY(-1px); }
-        .btn-upgrade:disabled { opacity: 0.6; cursor: default; }
-        .btn-manage { padding: 10px 16px; border: 1px solid var(--border-default); border-radius: 12px; background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-sm); cursor: pointer; }
-        .btn-manage:disabled { opacity: 0.6; cursor: default; }
-        @media (max-width: 600px) { .settings-section { padding: 20px; } .settings-tabs { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; } .settings-tab { padding-inline: 8px; } .settings-row { align-items: flex-start; flex-direction: column; } .billing-plans { grid-template-columns: 1fr; } }
+        .plan-card { display: grid; gap: 12px; align-content: start; min-width: 0; padding: 24px; }
+        .plan-card-current { box-shadow: 0 0 0 2px var(--olive); }
+        .plan-price { font: 700 32px/1 var(--font-sans); }
+        .plan-price span { font-size: 15px; font-weight: 500; }
+        .billing-toggle { justify-self: start; }
+        .plan-features { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+        .plan-features li { display: flex; gap: 8px; align-items: flex-start; }
+        .plan-features :global(.lucide) { color: var(--olive-ink); margin-top: 2px; }
+        .plan-current-label { color: var(--olive-ink); font-weight: 700; }
+        .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        @media (max-width: 767px) { .billing-plans { grid-template-columns: 1fr; } .profile-identity { flex-wrap: wrap; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </>

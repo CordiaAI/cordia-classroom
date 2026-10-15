@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, MessageCircle, Pencil, RotateCcw, Shuffle, Star } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Pencil, Shuffle, Star } from 'lucide-react';
+import { walkthroughEvent } from '../lib/walkthrough';
+import SessionFinish from './SessionFinish';
 
 function shuffledOrder(length) {
   const order = Array.from({ length }, (_, index) => index);
@@ -28,16 +30,19 @@ export default function FlashcardViewer({
   const [missed, setMissed] = useState(() => new Set());
   const [history, setHistory] = useState([]);
   const [done, setDone] = useState(false);
+  const [seconds, setSeconds] = useState(0);
   const started = useRef(Date.now());
   const cardRef = useRef(null);
 
   const current = queue[0];
+  useEffect(() => { if (flipped) walkthroughEvent('card-flipped'); }, [flipped]);
   const card = flashcards[current];
 
   const finish = useCallback((nextKnown, nextMissed) => {
+    const elapsed = Math.round((Date.now() - started.current) / 1000);
+    setSeconds(elapsed);
     setDone(true);
-    const seconds = Math.round((Date.now() - started.current) / 1000);
-    onFinish?.({ known: nextKnown, missed: [...nextMissed].filter(index => !nextKnown.includes(index)), seconds });
+    onFinish?.({ known: nextKnown, missed: [...nextMissed].filter(index => !nextKnown.includes(index)), seconds: elapsed });
   }, [onFinish]);
 
   function snapshot() {
@@ -129,20 +134,18 @@ export default function FlashcardViewer({
       </div>
 
       {done ? (
-        <section className="c-card fc-finish" aria-labelledby="fc-finish-title">
-          <Check size={32} strokeWidth={1.75} aria-hidden="true" />
-          <h2 id="fc-finish-title" className="c-title">Done</h2>
-          <ul className="fc-results">
-            <li><strong>{known.length}</strong><span>Correct</span></li>
-            <li><strong>{missed.size}</strong><span>Missed</span></li>
-            <li><strong>{total}</strong><span>Cards</span></li>
-          </ul>
+        <SessionFinish
+          guideId={guideId || flashcards[0]?.guideId}
+          guideTitle={title}
+          cards={total}
+          accuracy={((total - missed.size) / Math.max(1, total)) * 100}
+          minutes={seconds / 60}
+          kind="cards"
+          onRestart={restart}
+          onDone={onExit || onBack}
+        >
           {finishExtra}
-          <div className="c-row">
-            <button type="button" className="c-btn c-btn--secondary" onClick={restart}><RotateCcw size={20} strokeWidth={1.75} aria-hidden="true" />Restart</button>
-            <button type="button" className="c-btn c-btn--primary" onClick={onExit || onBack}>Done</button>
-          </div>
-        </section>
+        </SessionFinish>
       ) : (
         <>
           <div className="fc-progress">
@@ -151,6 +154,7 @@ export default function FlashcardViewer({
           </div>
           <div
             ref={cardRef}
+            data-spot="flashcard"
             className={'fc-card' + (flipped ? ' is-flipped' : '')}
             role="button"
             tabIndex={0}
@@ -195,11 +199,6 @@ export default function FlashcardViewer({
         .is-flipped .fc-back { transform: rotateY(0); }
         .fc-actions { display: flex; justify-content: center; gap: 12px; }
         .fc-actions :global(.c-btn) { min-width: 150px; }
-        .fc-finish { display: grid; justify-items: center; gap: 20px; padding: 40px 24px; text-align: center; }
-        .fc-finish > :global(.lucide) { color: var(--success); }
-        .fc-results { list-style: none; margin: 0; padding: 0; display: flex; gap: 40px; }
-        .fc-results li { display: grid; gap: 4px; }
-        .fc-results strong { font: 600 32px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         @media (max-width: 767px) {
           .fc-bar { top: 64px; }
           .fc-card { min-height: 300px; }

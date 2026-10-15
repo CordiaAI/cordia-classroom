@@ -4,10 +4,12 @@ import TutorDrawer from './TutorDrawer';
 import GuideJobIndicator from './GuideJobIndicator';
 import NewSheet from './NewSheet';
 import TipHost from './TipHost';
+import Walkthrough from './Walkthrough';
+import TimerEngine from './TimerEngine';
 
 const WIDE = ['/guide/[id]', '/practice', '/practice/[guideId]', '/smartnotes', '/calendar', '/tutor'];
 
-export default function Layout({ children }) {
+export default function Layout({ children, timerState, setTimerState }) {
   const router = useRouter();
   // The Tutor page shows the Tutor full size, so the side panel stays out of the way there.
   const pageOwnsTutor = router.pathname === '/tutor';
@@ -27,6 +29,8 @@ export default function Layout({ children }) {
       <GuideJobIndicator />
       <NewSheet />
       <TipHost />
+      <Walkthrough />
+      <TimerEngine timerState={timerState} setTimerState={setTimerState} />
       {!pageOwnsTutor && <TutorDrawer preferredGuideId={activeGuideId} preferredNoteId={activeNoteId} />}
     </div>
   );

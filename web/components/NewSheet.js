@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, ClipboardPaste, FileImage, FileText, Link as LinkIcon, Mic, Presentation, Square, Upload, X,
+  ArrowLeft, ClipboardPaste, FileImage, FileText, Link as LinkIcon, Mic, Presentation, Sparkles, Square, Upload, X,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 import { dismissGuideJob, startGuideJob, useGuideJobs } from '../lib/guideJobs';
 import { MAX_SOURCE_CHARS, baseName, combinedSource, extractFileText, fileKey, generateAndSave, newRequestId } from '../lib/guideCreate';
 import { NEW_SHEET_EVENT } from '../lib/newSheet';
+import { SAMPLE_GUIDE, SAMPLE_HEADINGS } from '../lib/sampleGuide';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 const MAX_FILES = 5;
 const ACCEPT = '.pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.rtf,.png,.jpg,.jpeg,.webp,.heic,image/*';
@@ -27,21 +29,27 @@ const FORMATS = [
 ];
 
 // The four big ways in. Used by the sheet and by the first-run screen.
-export function NewOptions({ onPick }) {
+export function NewOptions({ onPick, onSample }) {
   return (
-    <div className="new-options">
+    <div className="new-options" data-spot="new-options">
       {NEW_OPTIONS.map(option => (
         <button key={option.mode} type="button" className="new-option" onClick={() => onPick(option.mode)}>
           <option.icon size={28} strokeWidth={1.75} aria-hidden="true" />
           <span>{option.label}</span>
         </button>
       ))}
+      {onSample && (
+        <button type="button" className="new-sample" onClick={onSample}>
+          <Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Try a sample
+        </button>
+      )}
       <style jsx>{`
         .new-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
         .new-option { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 128px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 17px/1 var(--font-sans); cursor: pointer; transition: border-color 150ms, transform 90ms; }
         .new-option:hover { border-color: var(--olive); }
         .new-option:active { transform: scale(.98); }
         .new-option :global(.lucide) { color: var(--olive-ink); }
+        .new-sample { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; border: 1px dashed var(--olive); border-radius: var(--r-card); background: var(--olive-tint); color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer; }
       `}</style>
     </div>
   );
@@ -113,6 +121,7 @@ export default function NewSheet() {
       setOpen(true);
       setMode(event.detail?.mode || '');
       setError('');
+      walkthroughEvent('new-opened');
     }
     window.addEventListener(NEW_SHEET_EVENT, onOpen);
     return () => window.removeEventListener(NEW_SHEET_EVENT, onOpen);
@@ -143,6 +152,7 @@ export default function NewSheet() {
       dismissGuideJob(job.id);
       reset();
       setOpen(false);
+      walkthroughEvent('guide-ready');
       router.push('/guide/' + job.guideId);
     } else {
       setStatus('idle');
@@ -257,10 +267,31 @@ export default function NewSheet() {
         }),
       });
       setJobId(id);
+      walkthroughEvent('guide-building');
     } catch (caught) {
       setStatus('idle');
       setError(caught.message || 'Something went wrong.');
     }
+  }
+
+  // The sample needs no AI: its headings play in, then it is saved as a real guide.
+  function trySample() {
+    setError('');
+    setMode('sample');
+    setHeadings(SAMPLE_HEADINGS);
+    setShown(1);
+    setStatus('building');
+    walkthroughEvent('guide-building');
+    const id = startGuideJob({
+      title: SAMPLE_GUIDE.title,
+      run: async () => {
+        await new Promise(resolve => setTimeout(resolve, SAMPLE_HEADINGS.length * 900));
+        const saved = await apiFetch('/guides', { method: 'POST', body: JSON.stringify({ ...SAMPLE_GUIDE, ...(folderId ? { folder_id: folderId } : {}) }) });
+        if (!saved?.guide) throw new Error('The sample could not be saved.');
+        return saved.guide;
+      },
+    });
+    setJobId(id);
   }
 
   if (!open) return null;
@@ -281,13 +312,13 @@ export default function NewSheet() {
         </header>
 
         {status === 'building' ? (
-          <ol className="new-headings" aria-live="polite">
+          <ol className="new-headings" aria-live="polite" data-spot="new-headings">
             {headings.slice(0, shown).map((heading, index) => (
               <li key={heading + index} className={index === shown - 1 ? 'is-current' : ''}>{heading}</li>
             ))}
           </ol>
         ) : !mode ? (
-          <NewOptions onPick={setMode} />
+          <NewOptions onPick={setMode} onSample={trySample} />
         ) : (
           <div className="new-panel">
             {mode === 'upload' && (
@@ -353,7 +384,7 @@ export default function NewSheet() {
 
         {error && <p className="new-error" role="alert">{error}</p>}
 
-        {mode && status !== 'building' && (
+        {mode && mode !== 'sample' && status !== 'building' && (
           <div className="new-foot">
             <button type="button" className="c-btn c-btn--quiet" onClick={() => { close(); router.push('/create'); }}>Write cards</button>
             <button type="button" className="c-btn c-btn--primary" onClick={create} disabled={!ready || status !== 'idle'}>

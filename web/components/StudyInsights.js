@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { ChartColumn, TrendingDown, TrendingUp } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { walkthroughEvent } from '../lib/walkthrough';
+import PulseDot from './PulseDot';
 
 function Row({ item, icon: Icon, tone }) {
   return (
@@ -29,10 +31,12 @@ export default function StudyInsights({ compact = false }) {
   const limit = compact ? 2 : 10;
 
   return (
-    <section className={`c-card insights-card${compact ? ' compact' : ''}`} aria-labelledby="insights-title" data-tip={compact ? 'insights' : undefined}>
+    <section className={`c-card insights-card${compact ? ' compact' : ''}`} aria-labelledby="insights-title" data-tip={compact ? 'insights' : undefined} data-spot={compact ? 'insights' : undefined}>
       <header className="c-row">
         <ChartColumn size={20} strokeWidth={1.75} aria-hidden="true" />
         <h2 id="insights-title" className="c-section-title">Insights</h2>
+        {compact && <PulseDot feature="insights" />}
+        {compact && <><span className="c-spacer" /><button type="button" className="c-btn c-btn--quiet" onClick={() => { walkthroughEvent('insights-opened'); router.push('/settings?section=learning'); }}>Open</button></>}
       </header>
       {!insights ? (
         <div className="c-skeleton" style={{ height: 72 }} />

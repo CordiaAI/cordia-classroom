@@ -3,9 +3,9 @@ import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import AILoadingSphere from './AILoadingSphere';
-import GuidedTour from './GuidedTour';
-import { saveOnboardingStep } from '../lib/onboarding';
-import { PRACTICE_TOUR } from '../lib/tours';
+import Link from 'next/link';
+import { ArrowLeft, ChevronLeft, ChevronRight, Eraser, Eye, Flag, MessageCircle, PenLine, PencilRuler, RefreshCw, Sparkles, Trash2, Type, Upload, Wand2 } from 'lucide-react';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const SYMBOLS = ['+', '−', '×', '÷', '=', '√', 'π', 'Σ', '→'];
@@ -53,7 +53,6 @@ export default function PracticeWorkspace() {
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
   const [guideOptions, setGuideOptions] = useState(null);
-  const touring = router.query.tour === '1';
 
   useEffect(() => {
     if (!ready) return;
@@ -137,11 +136,6 @@ export default function PracticeWorkspace() {
   const currentTokens = tokens[problemIndex] || [];
   const sourceBlocks = sourceText ? sourceText.split(/\n\s*\n/).filter(block => block.trim()) : [];
 
-  async function finishTour() {
-    await saveOnboardingStep('done');
-    router.replace(guideId ? '/practice/' + guideId : '/practice', undefined, { shallow: true });
-  }
-
   async function generateProblems() {
     if (!guide && !upload) return;
     setLoading(true);
@@ -206,6 +200,7 @@ export default function PracticeWorkspace() {
   function beginDraw(event) {
     if (tool !== 'pen' && tool !== 'eraser') return;
     drawing.current = true;
+    walkthroughEvent('practice-drew');
     event.currentTarget.setPointerCapture(event.pointerId);
     const p = point(event);
     const context = canvasRef.current.getContext('2d');
@@ -365,40 +360,60 @@ export default function PracticeWorkspace() {
     else setError(apiErrorMessage(data?.detail, 'Your report could not be sent. Please try again.'));
   }
 
-  function chooseGuide(event) {
-    const value = event.target.value;
-    if (value === 'create') router.push('/create');
-    else if (value) router.push('/practice/' + value);
-  }
-
   if (guideId && !guide && !error) {
     return <div className="practice-loading"><AILoadingSphere /></div>;
   }
 
-  return (
-    <main className="practice-page fade-in">
-      {touring && (guide || !guideId) && <GuidedTour steps={PRACTICE_TOUR} onFinish={finishTour} />}
-      <header className="practice-header">
-        <div>
-          {guideId && <button type="button" className="create-back-link" onClick={() => router.push('/guide/' + guideId)}>Back to study guide</button>}
-          <h1>Practice workspace</h1>
-          <p>{practiceInfo?.subjectArea ? `${practiceInfo.subjectArea} practice` : 'Work through 10 source-grounded activities without leaving your material.'}</p>
-        </div>
-        <div className="practice-source-actions">
-          <label className="practice-guide-picker">
-            <span className="sr-only">Study guide</span>
-            <select value={upload ? '' : guideId || ''} onChange={chooseGuide} disabled={!guideOptions}>
-              <option value="" disabled>{!guideOptions ? 'Loading study guides…' : guideOptions.length ? 'Choose a study guide' : 'No study guides yet'}</option>
-              {(guideOptions || []).map(option => <option key={option.id} value={option.id}>{option.title || 'Untitled guide'}</option>)}
-              {guideOptions && guideOptions.length === 0 && <option value="create">Create guide or upload file</option>}
-            </select>
-          </label>
+  const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
+
+  // Pick a guide first; the workspace appears only once there is material.
+  if (!guideId && !upload) {
+    return (
+      <div className="c-page practice-pick">
+        <header className="c-page-head">
+          <h1 className="c-title">Practice</h1>
           <input ref={fileRef} type="file" hidden accept=".pdf,.docx,.pptx,.txt" onChange={event => useUploadedFile(event.target.files?.[0])} />
-          <button type="button" className="btn-outline" onClick={() => fileRef.current?.click()} disabled={extracting}>
-            {extracting ? 'Reading file…' : 'Use another file'}
-          </button>
-          <button type="button" className="btn" onClick={generateProblems} disabled={loading || !sourceText}>
-            {loading ? 'Creating 10 problems…' : problems.length ? 'Regenerate problems' : 'Generate 10 problems'}
+          <button type="button" className="c-btn c-btn--secondary" onClick={() => fileRef.current?.click()} disabled={extracting}><Upload {...ICON} />{extracting ? 'Reading…' : 'Upload'}</button>
+        </header>
+        {error && <div className="retain-action-error" role="alert">{error}</div>}
+        {!guideOptions ? (
+          <div className="practice-grid">{[0, 1, 2, 3].map(index => <div key={index} className="c-skeleton" style={{ height: 112, borderRadius: 20 }} />)}</div>
+        ) : guideOptions.length ? (
+          <div className="practice-grid practice-guide-picker" data-spot="practice-picker">
+            {guideOptions.map(option => (
+              <Link key={option.id} href={'/practice/' + option.id} className="c-card practice-guide">
+                <PencilRuler size={24} strokeWidth={1.75} aria-hidden="true" />
+                <span>{option.title || 'Untitled guide'}</span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="c-empty"><button type="button" className="c-btn c-btn--primary" onClick={() => router.push('/create')}>Create guide or upload file</button></div>
+        )}
+        <style jsx>{`
+          .practice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+          :global(.practice-guide) { display: grid; align-content: space-between; gap: 16px; min-height: 112px; padding: 18px; color: var(--ink); text-decoration: none; font: 600 17px/1.3 var(--font-display); }
+          :global(.practice-guide:hover) { text-decoration: none; border-color: var(--olive); }
+          :global(.practice-guide .lucide) { color: var(--olive-ink); }
+        `}</style>
+      </div>
+    );
+  }
+
+  return (
+    <main className="practice-page">
+      <header className="c-page-head practice-head">
+        <div className="c-row practice-title-row">
+          <button type="button" className="c-icon-btn" onClick={() => router.push(guideId ? '/guide/' + guideId : '/practice')} aria-label="Back"><ArrowLeft {...ICON} /></button>
+          <h1 className="c-title">Practice</h1>
+          <span className="c-section-title c-truncate practice-source-name">{sourceTitle}</span>
+        </div>
+        <div className="c-row">
+          <input ref={fileRef} type="file" hidden accept=".pdf,.docx,.pptx,.txt" onChange={event => useUploadedFile(event.target.files?.[0])} />
+          <button type="button" className="c-btn c-btn--quiet" onClick={() => fileRef.current?.click()} disabled={extracting}><Upload {...ICON} />{extracting ? 'Reading…' : 'Upload'}</button>
+          <button type="button" className={'c-btn ' + (problems.length ? 'c-btn--secondary' : 'c-btn--primary')} onClick={generateProblems} disabled={loading || !sourceText}>
+            {problems.length ? <RefreshCw {...ICON} /> : <Sparkles {...ICON} />}
+            {loading ? 'Creating…' : problems.length ? 'Regenerate' : 'Generate'}
           </button>
         </div>
       </header>
@@ -406,46 +421,51 @@ export default function PracticeWorkspace() {
       {error && <div className="retain-action-error" role="alert">{error}</div>}
 
       <section className="practice-layout">
-        <article className="practice-problem-panel">
+        <article className="c-card practice-problem-panel">
           <div className="practice-problem-heading">
             <div>
-              <span>Problem {problems.length ? problemIndex + 1 : 0} of {problems.length || 10}</span>
-              {current?.practice_type && <small className="practice-kind">{current.practice_type.replace('_', ' ')}</small>}
-              <h2>{current?.prompt || (sourceText ? 'Generate a set to begin.' : 'Choose a study guide to begin.')}</h2>
+              <div className="c-row">
+                <span className="c-meta">{problems.length ? problemIndex + 1 : 0} / {problems.length || 10}</span>
+                {current?.practice_type && <span className="c-meta practice-kind">{current.practice_type.replace('_', ' ')}</span>}
+              </div>
+              <h2 className="practice-prompt">{current?.prompt || (loading ? 'Creating…' : 'Generate')}</h2>
               {current?.starter_code && <pre className="practice-code"><code>{current.starter_code}</code></pre>}
               {current?.test_cases?.length > 0 && (
                 <div className="practice-tests">
-                  <strong>Acceptance tests</strong>
+                  <strong>Tests</strong>
                   <ul>{current.test_cases.map((test, index) => <li key={index}><code>{test}</code></li>)}</ul>
                 </div>
               )}
             </div>
             {problems.length > 0 && (
-              <div className="practice-nav">
-                <button type="button" onClick={() => changeProblem(problemIndex - 1)} disabled={problemIndex === 0} aria-label="Previous problem">←</button>
-                <button type="button" onClick={() => changeProblem(problemIndex + 1)} disabled={problemIndex === problems.length - 1} aria-label="Next problem">→</button>
+              <div className="c-row">
+                <button type="button" className="c-icon-btn" onClick={() => changeProblem(problemIndex - 1)} disabled={problemIndex === 0} aria-label="Previous problem"><ChevronLeft {...ICON} /></button>
+                <button type="button" className="c-icon-btn" onClick={() => changeProblem(problemIndex + 1)} disabled={problemIndex === problems.length - 1} aria-label="Next problem"><ChevronRight {...ICON} /></button>
               </div>
             )}
           </div>
 
-          <div className="practice-toolbar" aria-label="Workspace tools">
-            <button type="button" className={tool === 'pen' ? 'active' : ''} onClick={() => setTool('pen')}>Draw</button>
-            <button type="button" className={tool === 'eraser' ? 'active' : ''} onClick={() => setTool('eraser')}>Eraser</button>
-            <button type="button" className={tool === 'type' ? 'active' : ''} onClick={() => setTool('type')}>Type</button>
-            <span className="practice-toolbar-divider" />
-            {SYMBOLS.map(symbol => <button type="button" key={symbol} onClick={() => addSymbol(symbol)} aria-label={`Add ${symbol}`}>{symbol}</button>)}
-            <button type="button" onClick={() => addSymbol('', 'exp')} aria-label="Add exponent" title="Exponent: drag next to a number, then type the power">xⁿ</button>
-            <button type="button" onClick={() => addSymbol('', 'text')} aria-label="Add text tile" title="Typed tile you can drag anywhere">Aa</button>
-            <button type="button" onClick={tidyHandwriting} disabled={tidying || !current} title="Turn your handwriting into clean typed text">{tidying ? 'Reading…' : 'Tidy handwriting'}</button>
-            <button type="button" className="practice-clear" onClick={clearWork}>Clear</button>
+          <div className="practice-toolbar" role="toolbar" aria-label="Workspace tools">
+            <div className="c-seg" role="group" aria-label="Tool">
+              <button type="button" className={tool === 'pen' ? 'is-active' : ''} aria-pressed={tool === 'pen'} onClick={() => setTool('pen')}><PenLine {...ICON} /> Draw</button>
+              <button type="button" className={tool === 'eraser' ? 'is-active' : ''} aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')}><Eraser {...ICON} /> Erase</button>
+              <button type="button" className={tool === 'type' ? 'is-active' : ''} aria-pressed={tool === 'type'} onClick={() => setTool('type')}><Type {...ICON} /> Type</button>
+            </div>
+            <div className="practice-symbols">
+              {SYMBOLS.map(symbol => <button type="button" className="c-icon-btn" key={symbol} onClick={() => addSymbol(symbol)} aria-label={`Add ${symbol}`}>{symbol}</button>)}
+              <button type="button" className="c-icon-btn" onClick={() => addSymbol('', 'exp')} aria-label="Add exponent">xⁿ</button>
+              <button type="button" className="c-icon-btn" onClick={() => addSymbol('', 'text')} aria-label="Add text tile">Aa</button>
+            </div>
+            <button type="button" className="c-btn c-btn--quiet" onClick={tidyHandwriting} disabled={tidying || !current}><Wand2 {...ICON} />{tidying ? 'Reading…' : 'Tidy'}</button>
+            <button type="button" className="c-icon-btn" onClick={clearWork} aria-label="Clear work"><Trash2 {...ICON} /></button>
           </div>
 
-          <div ref={boardRef} className="practice-board" data-tool={tool}>
+          <div ref={boardRef} className="practice-board" data-tool={tool} data-spot="practice-canvas">
             <textarea
               aria-label="Typed work"
               value={workText[problemIndex] || ''}
               onChange={event => setWorkText(all => ({ ...all, [problemIndex]: event.target.value }))}
-              placeholder={tool === 'type' ? 'Type your work here…' : ''}
+              placeholder={tool === 'type' ? 'Type here' : ''}
               readOnly={tool !== 'type'}
             />
             <canvas
@@ -465,7 +485,6 @@ export default function PracticeWorkspace() {
                 onPointerMove={event => moveToken(event, token)}
                 onPointerUp={() => { drag.current = null; }}
                 onDoubleClick={() => removeToken(token)}
-                title="Drag to move · double-click to remove"
               >
                 {token.kind === 'exp' || token.kind === 'text' ? (
                   <input
@@ -485,41 +504,43 @@ export default function PracticeWorkspace() {
             <label htmlFor="practice-answer-input">Your answer</label>
             <textarea
               id="practice-answer-input"
+              className="c-input"
               value={answers[problemIndex] || ''}
               onChange={event => setAnswers(all => ({ ...all, [problemIndex]: event.target.value }))}
-              placeholder={current?.answer_format || 'Enter your answer…'}
+              placeholder={current?.answer_format || 'Answer'}
               disabled={!current}
             />
-            <button type="submit" className="btn" disabled={!current || grading || !answers[problemIndex]?.trim()}>
+            <button type="submit" className="c-btn c-btn--primary" disabled={!current || grading || !answers[problemIndex]?.trim()}>
               {grading ? 'Checking…' : 'Check answer'}
             </button>
             {evaluations[problemIndex] && (
               <div className={`practice-evaluation ${evaluations[problemIndex].status}`} role="status">
-                <strong>{evaluations[problemIndex].status === 'correct' ? 'Right!' : 'Not quite'}</strong>
-                <span>{evaluations[problemIndex].status === 'correct'
-                  ? (evaluations[problemIndex].message ? ` — ${evaluations[problemIndex].message}` : '')
-                  : ' — your Tutor left you a note.'}</span>
-                <button type="button" className="practice-report" onClick={reportGrade} disabled={reported[problemIndex]}>
-                  {reported[problemIndex] ? 'Reported — thanks' : 'Report incorrect answer'}
+                <strong>{evaluations[problemIndex].status === 'correct' ? 'Right' : 'Not quite'}</strong>
+                {evaluations[problemIndex].status === 'correct' && evaluations[problemIndex].message && <span>{evaluations[problemIndex].message}</span>}
+                {evaluations[problemIndex].status !== 'correct' && (
+                  <button type="button" className="c-btn c-btn--quiet" onClick={() => window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { guideId, refresh: true } }))}><MessageCircle {...ICON} />Ask</button>
+                )}
+                <button type="button" className="c-btn c-btn--quiet practice-report" onClick={reportGrade} disabled={reported[problemIndex]}>
+                  <Flag {...ICON} />{reported[problemIndex] ? 'Reported' : 'Report'}
                 </button>
               </div>
             )}
             {revealed[problemIndex] && (
               <div className="practice-solution">
-                <div className="practice-verification-row"><strong>Answer</strong></div>
+                <strong>Answer</strong>
                 <p>{current.answer}</p>
-                {current.worked_solution && <p className="practice-worked"><strong>Why:</strong> {current.worked_solution}</p>}
+                {current.worked_solution && <p className="practice-worked"><strong>Why</strong> {current.worked_solution}</p>}
               </div>
             )}
           </form>
         </article>
 
-        <aside className="practice-source-panel">
-          <header>
-            <span>Source material</span>
-            <h2>{sourceTitle}</h2>
+        <aside className="c-card practice-source-panel" aria-label="Source material">
+          <header className="c-row">
+            <h2 className="c-section-title">Source</h2>
+            <span className="c-spacer" />
+            <button type="button" className="c-btn c-btn--quiet" onClick={() => setShownBlocks(all => (Object.keys(all).length >= sourceBlocks.length ? {} : Object.fromEntries(sourceBlocks.map((_, index) => [index, true]))))}><Eye {...ICON} />{Object.keys(shownBlocks).length >= sourceBlocks.length && sourceBlocks.length ? 'Hide' : 'Reveal'}</button>
           </header>
-          <p className="practice-source-hint">Double-click a section to reveal it.</p>
           <div className="practice-source-copy">
             {sourceBlocks.length ? sourceBlocks.map((block, index) => (
               <p
@@ -528,10 +549,22 @@ export default function PracticeWorkspace() {
                 onDoubleClick={() => setShownBlocks(all => ({ ...all, [index]: !all[index] }))}
                 title={shownBlocks[index] ? 'Double-click to hide' : 'Double-click to reveal'}
               >{block}</p>
-            )) : (guideId || upload ? 'No readable source material is available.' : 'Choose a study guide above, or upload a file, to see it here.')}
+            )) : <p className="c-meta">0 sections</p>}
           </div>
         </aside>
       </section>
+      <style jsx>{`
+        .practice-page { display: grid; gap: 20px; }
+        .practice-title-row { min-width: 0; flex: 1; }
+        .practice-source-name { font-family: var(--font-display); min-width: 0; }
+        .practice-prompt { margin: 8px 0 0; font: 600 22px/1.35 var(--font-display); }
+        .practice-kind { text-transform: capitalize; }
+        .practice-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+        .practice-toolbar .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
+        .practice-symbols { display: flex; flex-wrap: wrap; gap: 2px; }
+        .practice-symbols :global(.c-icon-btn) { font: 600 15px/1 var(--font-sans); }
+        .practice-evaluation { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+      `}</style>
     </main>
   );
 }

@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { apiFetch, getToken } from './api';
+import { addGrowth } from './progress';
+import { recordStudy } from './activity';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -15,6 +17,21 @@ export default function useSessionTracker(sessionType = 'browse', guideId = null
   useEffect(() => {
     startRef.current = Date.now();
     loggedRef.current = false;
+    // Visible time on a guide grows its Grove tree; a hidden tab pauses growth.
+    let visibleMs = 0;
+    let visibleSince = document.hidden ? null : Date.now();
+    function onVisibility() {
+      if (document.hidden && visibleSince) { visibleMs += Date.now() - visibleSince; visibleSince = null; }
+      else if (!document.hidden && !visibleSince) visibleSince = Date.now();
+    }
+    document.addEventListener('visibilitychange', onVisibility);
+    function grow() {
+      if (!guideId || sessionType !== 'read') return;
+      if (visibleSince) { visibleMs += Date.now() - visibleSince; visibleSince = null; }
+      const minutes = Math.min(visibleMs, 3 * 3600000) / 60000;
+      if (minutes >= 0.25) { addGrowth(guideId, minutes); recordStudy({ guideId, minutes, kind: 'read' }); }
+      visibleMs = 0;
+    }
 
     // Log initial session to update streak
     const body = { session_type: sessionType, duration_seconds: 0 };
@@ -47,8 +64,14 @@ export default function useSessionTracker(sessionType = 'browse', guideId = null
 
     window.addEventListener('beforeunload', sendBeacon);
 
+    function onUnload() { grow(); sendBeacon(); }
+    window.removeEventListener('beforeunload', sendBeacon);
+    window.addEventListener('beforeunload', onUnload);
+
     return () => {
-      window.removeEventListener('beforeunload', sendBeacon);
+      window.removeEventListener('beforeunload', onUnload);
+      document.removeEventListener('visibilitychange', onVisibility);
+      grow();
       sendBeacon();
     };
   }, [sessionType, guideId]);

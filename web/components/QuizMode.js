@@ -1,18 +1,21 @@
 import { useState } from 'react';
 import { apiFetch } from '../lib/api';
 import { advance, createSession, currentCard, firstAttempts, progress, recordResults } from '../lib/retainEngine.mjs';
-import { Repeat, RotateCcw } from 'lucide-react';
+import { Repeat } from 'lucide-react';
+import SessionFinish from './SessionFinish';
 import { FillCard, MatchingCard, McCard, WrittenCard } from './RetainCards';
 import { rememberRetainMisses } from '../lib/userStore';
 import { conceptAnswer } from '../lib/retainEngine.mjs';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 // Retain: every idea is asked once in its best-fitting format. A miss must then be answered
 // right two more times, a few questions apart, before it clears. The score is first-try only.
-export default function QuizMode({ questions, cards, types, guideId, onRestart }) {
+export default function QuizMode({ questions, cards, types, guideId, onRestart, onDone }) {
   const [session, setSession] = useState(() => createSession(questions, cards, types));
   const [answered, setAnswered] = useState(false);
   const [score, setScore] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [startedAt] = useState(() => Date.now());
   const card = currentCard(session);
   const stats = progress(session);
 
@@ -29,6 +32,7 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart }
       // First-try misses come back in Today's Start session.
       const misses = firstAttempts(next).filter(item => item.credit < 1).map(item => ({ question: questions[item.concept]?.question || '', answer: conceptAnswer(questions[item.concept]) })).filter(item => item.question && item.answer);
       rememberRetainMisses(guideId, misses);
+      walkthroughEvent('quiz-done');
       setSaving(true);
       const data = await apiFetch(`/quiz/${guideId}/submit`, {
         method: 'POST',
@@ -50,20 +54,12 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart }
 
   if (!card) {
     const finalStats = progress(session);
+    const accuracy = score?.score ?? Math.round((finalStats.firstTryRight / Math.max(1, finalStats.total)) * 100);
     return (
-      <section className="c-card quiz-result" aria-labelledby="quiz-score">
-        <div id="quiz-score" className="quiz-score">{score?.score ?? Math.round((finalStats.firstTryRight / Math.max(1, finalStats.total)) * 100)}%</div>
-        <ul className="quiz-result-stats">
-          <li><strong>{finalStats.firstTryRight} / {finalStats.total}</strong><span>First try</span></li>
-          {finalStats.missedMastered > 0 && <li><strong>{finalStats.missedMastered}</strong><span>Mastered</span></li>}
-        </ul>
+      <SessionFinish guideId={guideId} cards={finalStats.total} accuracy={accuracy} minutes={(Date.now() - startedAt) / 60000} kind="quiz" onRestart={onRestart} onDone={onDone} doneSpot="quiz-done">
         {saving && <span className="c-meta" role="status">Saving…</span>}
         {score?.error && <p className="retain-action-error" role="alert">{score.error}</p>}
-        <div className="c-row">
-          <button type="button" className="c-btn c-btn--secondary" onClick={onRestart}><RotateCcw size={20} strokeWidth={1.75} aria-hidden="true" />Restart</button>
-          <button type="button" className="c-btn c-btn--primary" onClick={() => window.history.back()}>Done</button>
-        </div>
-      </section>
+      </SessionFinish>
     );
   }
 

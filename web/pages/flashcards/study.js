@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import FlashcardViewer from '../../components/FlashcardViewer';
+import { walkthroughEvent } from '../../lib/walkthrough';
 
 function Skeleton() {
   return (
@@ -25,7 +26,7 @@ export default function FlashcardStudy() {
   useEffect(() => {
     if (!ready || !guideId) return;
     apiFetch('/guides/' + guideId).then(data => {
-      if (data?.guide) setGuide(data.guide);
+      if (data?.guide) { setGuide(data.guide); walkthroughEvent('cards-opened'); }
       else setError('These cards could not be loaded.');
     });
   }, [ready, guideId]);

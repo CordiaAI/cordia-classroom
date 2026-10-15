@@ -1,48 +1,23 @@
-import { useEffect, useRef } from 'react';
 import { Pause, Play, RotateCcw, Timer } from 'lucide-react';
-import { apiFetch } from '../lib/api';
+import { TIMER_MODES } from './TimerEngine';
+import { walkthroughEvent } from '../lib/walkthrough';
+import PulseDot from './PulseDot';
 
-const MODES = {
-  focus: { label: 'Focus', minutes: 25 },
-  shortBreak: { label: 'Break', minutes: 5 },
-  longBreak: { label: 'Long', minutes: 15 },
-};
+const MODES = TIMER_MODES;
 
 export default function StudyTimer({ timerState, setTimerState }) {
-  const intervalRef = useRef(null);
   const { mode = 'focus', minutes = 25, seconds = 0, isRunning = false } = timerState || {};
 
-  useEffect(() => {
-    if (isRunning) {
-      intervalRef.current = setInterval(() => {
-        setTimerState(prev => {
-          if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
-          if (prev.minutes > 0) return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
-          clearInterval(intervalRef.current);
-          if (prev.mode === 'focus') {
-            apiFetch('/stats/log-session', {
-              method: 'POST',
-              body: JSON.stringify({ session_type: 'timer', duration_seconds: MODES.focus.minutes * 60, metadata: { mode: 'pomodoro' } }),
-            });
-          }
-          return { ...prev, isRunning: false, minutes: 0, seconds: 0 };
-        });
-      }, 1000);
-    }
-    return () => clearInterval(intervalRef.current);
-  }, [isRunning]);
-
   function toggle() {
+    if (!isRunning) walkthroughEvent('focus-started');
     setTimerState(prev => ({ ...prev, isRunning: !prev.isRunning }));
   }
 
   function reset() {
-    clearInterval(intervalRef.current);
     setTimerState(prev => ({ ...prev, isRunning: false, minutes: MODES[prev.mode || 'focus'].minutes, seconds: 0 }));
   }
 
   function setMode(next) {
-    clearInterval(intervalRef.current);
     setTimerState({ mode: next, minutes: MODES[next].minutes, seconds: 0, isRunning: false });
   }
 
@@ -53,6 +28,7 @@ export default function StudyTimer({ timerState, setTimerState }) {
       <header className="c-row">
         <Timer size={20} strokeWidth={1.75} aria-hidden="true" />
         <h2 id="timer-title" className="c-section-title">Focus</h2>
+        <PulseDot feature="focus" />
       </header>
       <div className="timer-face" role="timer" aria-live="off">{pad(minutes)}:{pad(seconds)}</div>
       <div className="c-seg timer-modes" role="tablist" aria-label="Timer length">
@@ -61,7 +37,7 @@ export default function StudyTimer({ timerState, setTimerState }) {
         ))}
       </div>
       <div className="c-row">
-        <button type="button" className="c-btn c-btn--primary" onClick={toggle}>
+        <button type="button" className="c-btn c-btn--primary" data-spot="focus-start" onClick={toggle}>
           {isRunning ? <Pause size={20} strokeWidth={1.75} aria-hidden="true" /> : <Play size={20} strokeWidth={1.75} aria-hidden="true" />}
           {isRunning ? 'Pause' : 'Start'}
         </button>

@@ -14,7 +14,7 @@ import Menu from '../../components/Menu';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useLearningStyle } from '../../lib/learningStyle';
 import { rememberGuidePage, rememberLastGuide } from '../../lib/userStore';
-import { requestTip } from '../../lib/tips';
+import { walkthroughEvent } from '../../lib/walkthrough';
 
 const NURSING_TERMS = ['nursing', 'nurse', 'nclex', 'patient', 'vital signs', 'medication administration', 'care plan', 'nursing diagnosis', 'iv therapy', 'delegation', 'scope of practice', 'sbar', 'discharge planning', 'wound care', 'fall prevention', 'infection control', 'postoperative', 'preoperative', 'lab values', 'contraindications'];
 
@@ -25,8 +25,8 @@ function isNursing(guide) {
   return NURSING_TERMS.filter(term => text.includes(term)).length >= 4;
 }
 
-function ask(guideId, prompt) {
-  window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { guideId, prompt } }));
+function ask(guideId, prompt, send = false) {
+  window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { guideId, prompt, send } }));
 }
 
 function exportGuide(guide) {
@@ -57,7 +57,7 @@ function MakeCard({ front: initialFront, onSave, onClose }) {
         </header>
         <label className="c-field"><span>Front</span><textarea className="c-input" value={front} onChange={event => setFront(event.target.value)} rows={3} /></label>
         <label className="c-field"><span>Back</span><textarea className="c-input" value={back} onChange={event => setBack(event.target.value)} rows={3} autoFocus /></label>
-        <div className="make-card-foot"><button type="submit" className="c-btn c-btn--primary" disabled={saving || !front.trim() || !back.trim()}>{saving ? 'Saving…' : 'Save'}</button></div>
+        <div className="make-card-foot"><button type="submit" data-spot="card-save" className="c-btn c-btn--primary" disabled={saving || !front.trim() || !back.trim()}>{saving ? 'Saving…' : 'Save'}</button></div>
         <style jsx>{`
           .make-card { display: grid; gap: 16px; width: min(520px, 100%); }
           .make-card .c-sheet-head { margin-bottom: 0; }
@@ -126,7 +126,7 @@ export default function GuidePage() {
     if (data?.guide) {
       setGuide(data.guide);
       rememberLastGuide({ id: data.guide.id, title: data.guide.title, page: Number(router.query.page) > 0 ? Number(router.query.page) - 1 : 0 });
-      requestTip('quiz');
+      walkthroughEvent('guide-open');
     } else {
       setLoadError(apiErrorMessage(data?.detail, 'This study guide could not be loaded.'));
     }
@@ -165,12 +165,13 @@ export default function GuidePage() {
       setGuide(current => ({ ...current, flashcards: data.guide.flashcards || flashcards }));
       setCardDraft(null);
       setToast('Card added');
+      walkthroughEvent('card-made');
     } else setToast(apiErrorMessage(data?.detail, 'Card not saved.'));
   }
 
   function onSelection(kind, text) {
-    if (kind === 'card') setCardDraft(text);
-    else if (kind === 'explain') ask(id, `Explain this more simply: "${text}"`);
+    if (kind === 'card') { setCardDraft(text); walkthroughEvent('make-card-open'); }
+    else if (kind === 'explain') ask(id, `Explain this more simply: "${text}"`, true);
     else ask(id, `About "${text}": `);
   }
 
@@ -204,12 +205,12 @@ export default function GuidePage() {
   const explainWithAid = Boolean(learningStyle?.enabled);
   const pills = [
     { key: 'read', label: 'Read', icon: BookOpen, view: 'read' },
-    { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, tip: 'quiz' },
-    { key: 'cards', label: 'Cards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: cardCount },
+    { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill' },
+    { key: 'cards', label: 'Cards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: cardCount, spot: 'cards-pill' },
     { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id },
     { key: 'notes', label: 'Notes', icon: NotebookText, view: 'notes' },
     ...(isNursing(guide) ? [{ key: 'nclex', label: 'NCLEX', icon: Stethoscope, href: '/nclex/' + id }] : []),
-    { key: 'ask', label: 'Ask', icon: MessageCircle, onClick: () => ask(id, '') },
+    { key: 'ask', label: 'Ask', icon: MessageCircle, spot: 'ask-pill', onClick: () => { walkthroughEvent('ask'); ask(id, ''); } },
   ];
 
   return (
@@ -249,9 +250,9 @@ export default function GuidePage() {
       <nav className="c-pills" aria-label="Study this guide">
         {pills.map(pill => {
           const content = <><pill.icon size={20} strokeWidth={1.75} aria-hidden="true" />{pill.label}{pill.count !== undefined && <span className="c-meta">{pill.count}</span>}</>;
-          if (pill.href) return <Link key={pill.key} className="c-pill" href={pill.href} data-tip={pill.tip}>{content}</Link>;
+          if (pill.href) return <Link key={pill.key} className="c-pill" href={pill.href} data-spot={pill.spot}>{content}</Link>;
           if (pill.view) return <button key={pill.key} type="button" className="c-pill" aria-current={view === pill.view ? 'page' : undefined} onClick={() => setView(pill.view)}>{content}</button>;
-          return <button key={pill.key} type="button" className="c-pill" onClick={pill.onClick}>{content}</button>;
+          return <button key={pill.key} type="button" className="c-pill" data-spot={pill.spot} onClick={pill.onClick}>{content}</button>;
         })}
       </nav>
 
@@ -265,7 +266,7 @@ export default function GuidePage() {
           onRead={index => setRevealed(previous => new Set([...previous, index]))}
           onExplain={index => {
             if (explainWithAid) setOpenAid(current => (current === pairs[index].index ? null : pairs[index].index));
-            else ask(id, `Explain this more simply: ${pairs[index].question}`);
+            else ask(id, `Explain this more simply: ${pairs[index].question}`, true);
           }}
           renderAid={index => (explainWithAid && openAid && pairs[index]?.index === openAid
             ? <StudyAidPanel guideId={id} number={openAid} style={learningStyle.style} onClose={() => setOpenAid(null)} />

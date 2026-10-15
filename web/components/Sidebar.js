@@ -13,11 +13,11 @@ import { openNewSheet } from '../lib/newSheet';
 
 // One navigation: the same five places on the glass top bar and the mobile tab bar.
 const navItems = [
-  { label: 'Today', href: '/dashboard', icon: Sun },
-  { label: 'Library', href: '/library', icon: Library },
-  { label: 'Tutor', href: '/tutor', icon: MessageCircle },
-  { label: 'Notes', href: '/smartnotes', icon: NotebookPen },
-  { label: 'Calendar', href: '/calendar', icon: CalendarDays },
+  { label: 'Today', href: '/dashboard', icon: Sun, spot: 'nav-today' },
+  { label: 'Library', href: '/library', icon: Library, spot: 'nav-library' },
+  { label: 'Tutor', href: '/tutor', icon: MessageCircle, spot: 'nav-tutor' },
+  { label: 'Notes', href: '/smartnotes', icon: NotebookPen, spot: 'nav-notes' },
+  { label: 'Calendar', href: '/calendar', icon: CalendarDays, spot: 'nav-calendar' },
 ];
 
 // Guide, flashcard, Retain and Practice screens all live inside Library.
@@ -133,7 +133,7 @@ export default function Sidebar() {
 
         <nav className="c-nav" aria-label="Primary">
           {navItems.map(item => (
-            <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.href === '/calendar' ? 'calendar' : undefined}>
+            <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.href === '/calendar' ? 'calendar' : undefined} data-spot={item.spot}>
               <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
               {item.label}
             </Link>
@@ -146,7 +146,7 @@ export default function Sidebar() {
             <span>Search</span>
             <kbd>{shortcut}</kbd>
           </button>
-          <button type="button" className="c-btn c-btn--primary c-new-btn" onClick={() => openNewSheet()}>
+          <button type="button" className="c-btn c-btn--primary c-new-btn" data-spot="new" onClick={() => openNewSheet()}>
             <Plus size={20} strokeWidth={1.75} aria-hidden="true" />New
           </button>
           <div className="c-menu-wrap">
@@ -169,13 +169,13 @@ export default function Sidebar() {
 
       <nav className="c-tabbar" aria-label="Primary">
         {navItems.map(item => (
-          <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined}>
+          <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-spot={item.spot}>
             <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
             {item.label}
           </Link>
         ))}
       </nav>
-      <button type="button" className="c-btn c-btn--primary c-fab" onClick={() => openNewSheet()}>
+      <button type="button" className="c-btn c-btn--primary c-fab" data-spot="new" onClick={() => openNewSheet()}>
         <Plus size={20} strokeWidth={1.75} aria-hidden="true" />New
       </button>
 
