@@ -39,7 +39,7 @@ const practicePage = read('web', 'components', 'PracticeWorkspace.js');
 const oauthCallback = read('web', 'pages', 'auth', 'callback.js');
 
 assert.match(navigation, /className="c-topbar"/);
-assert.match(navigation, /className="c-menu c-account-menu"/);
+assert.match(navigation, /<AccountMenu open=\{menuOpen\}/);
 assert.match(navigation, /className="c-tabbar"/);
 assert.doesNotMatch(layout, /className="app-layout"/);
 assert.match(dashboard, /Promise\.allSettled/);

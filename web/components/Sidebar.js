@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
@@ -9,6 +9,7 @@ import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
 import SearchModal from './SearchModal';
 import HelpSheet from './HelpSheet';
+import AccountMenu from './AccountMenu';
 import { openNewSheet } from '../lib/newSheet';
 
 // One navigation: the same five places on the glass top bar and the mobile tab bar.
@@ -46,7 +47,6 @@ export default function Sidebar() {
   const [showSearch, setShowSearch] = useState(false);
   const [canReviewFeedback, setCanReviewFeedback] = useState(false);
   const [shortcut, setShortcut] = useState('Ctrl K');
-  const menuRef = useRef(null);
   const avatarRef = useRef(null);
   const active = activeNavHref(router.pathname);
 
@@ -76,17 +76,11 @@ export default function Sidebar() {
     return () => { alive = false; window.removeEventListener('keydown', onKey); window.removeEventListener('cordia:search', openSearch); };
   }, []);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    menuRef.current?.querySelector('[role="menuitem"]')?.focus();
-    function close(event) {
-      if (event.type === 'keydown' && event.key === 'Escape') { setMenuOpen(false); avatarRef.current?.focus(); }
-      if (event.type === 'mousedown' && menuRef.current && !menuRef.current.contains(event.target) && !avatarRef.current.contains(event.target)) setMenuOpen(false);
-    }
-    document.addEventListener('keydown', close);
-    document.addEventListener('mousedown', close);
-    return () => { document.removeEventListener('keydown', close); document.removeEventListener('mousedown', close); };
-  }, [menuOpen]);
+  // Closing returns focus to the avatar (Escape, choosing an item); an outside click leaves focus where it landed.
+  const closeMenu = useCallback(refocus => {
+    setMenuOpen(false);
+    if (refocus) avatarRef.current?.focus({ preventScroll: true });
+  }, []);
 
   useEffect(() => {
     const closeAll = () => { setMenuOpen(false); setShowSearch(false); };
@@ -94,17 +88,13 @@ export default function Sidebar() {
     return () => router.events.off('routeChangeStart', closeAll);
   }, [router.events]);
 
-  function menuKeys(event) {
-    const items = [...menuRef.current.querySelectorAll('[role="menuitem"]')];
-    const index = items.indexOf(document.activeElement);
-    if (event.key === 'ArrowDown') { event.preventDefault(); items[(index + 1) % items.length]?.focus(); }
-    if (event.key === 'ArrowUp') { event.preventDefault(); items[(index - 1 + items.length) % items.length]?.focus(); }
-  }
-
-  function go(path) {
-    setMenuOpen(false);
-    router.push(path);
-  }
+  const accountItems = [
+    { key: 'profile', label: 'Profile', icon: User, onSelect: () => router.push('/settings') },
+    { key: 'appearance', label: 'Appearance', icon: Palette, onSelect: () => router.push('/settings?section=appearance') },
+    { key: 'plan', label: 'Plan', icon: CreditCard, onSelect: () => router.push('/settings?section=plan') },
+    { key: 'help', label: 'Help', icon: CircleHelp, onSelect: () => setShowHelp(true) },
+    { key: 'signout', label: 'Sign out', icon: LogOut, separated: true, onSelect: () => signOut() },
+  ];
 
   function signOut() {
     clearAuth();
@@ -153,16 +143,7 @@ export default function Sidebar() {
             <button ref={avatarRef} type="button" className={'c-avatar' + (onProfile ? ' is-active' : '')} onClick={() => setMenuOpen(open => !open)} aria-expanded={menuOpen} aria-haspopup="menu" aria-label={initials ? `${initials} account menu` : 'Account menu'}>
               {initials || <User size={20} strokeWidth={1.75} aria-hidden="true" />}
             </button>
-            {menuOpen && (
-              <div ref={menuRef} className="c-menu c-account-menu" role="menu" aria-label="Account" onKeyDown={menuKeys}>
-                <button type="button" role="menuitem" onClick={() => go('/settings')}><User size={20} strokeWidth={1.75} aria-hidden="true" />Profile</button>
-                <button type="button" role="menuitem" onClick={() => go('/settings?section=appearance')}><Palette size={20} strokeWidth={1.75} aria-hidden="true" />Appearance</button>
-                <button type="button" role="menuitem" onClick={() => go('/settings?section=plan')}><CreditCard size={20} strokeWidth={1.75} aria-hidden="true" />Plan</button>
-                <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setShowHelp(true); }}><CircleHelp size={20} strokeWidth={1.75} aria-hidden="true" />Help</button>
-                <hr />
-                <button type="button" role="menuitem" onClick={signOut}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" />Sign out</button>
-              </div>
-            )}
+            <AccountMenu open={menuOpen} onClose={closeMenu} anchorRef={avatarRef} items={accountItems} />
           </div>
         </div>
       </header>
@@ -188,9 +169,6 @@ export default function Sidebar() {
         />
       )}
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
-      <style jsx>{`
-        .c-account-menu { right: 0; top: 48px; }
-      `}</style>
     </>
   );
 }

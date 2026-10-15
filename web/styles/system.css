@@ -564,6 +564,9 @@ body:has(.about) .c-fab { display: none; }
   --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.90);
   --lg-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
   --lg-filter: blur(24px) saturate(170%);
+  /* Hover: surfaces brighten toward white and their glass edge brightens. */
+  --hover-light: #FFFFFF;
+  --hover-edge: rgba(255, 255, 255, 0.95);
 }
 [data-theme='dark'] {
   --lg-card: rgba(39, 42, 48, 0.55);
@@ -571,6 +574,7 @@ body:has(.about) .c-fab { display: none; }
   --lg-menu: rgba(39, 42, 48, 0.88);
   --lg-edge: rgba(255, 255, 255, 0.10);
   --lg-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --hover-edge: rgba(255, 255, 255, 0.24);
 }
 
 /* Backdrop behind the app in both themes. Light keeps the pale clouds; dark gets a static,
