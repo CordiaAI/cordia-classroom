@@ -150,7 +150,7 @@ def extract_slideshow_content(text: str) -> List[dict]:
 
         # Detect slide boundaries — matches both "--- Slide N ---" (extension format)
         # and plain "Slide N" (other sources)
-        if re.match(r'^-*\s*slide\s*\d+\s*-*\s*$', line, re.IGNORECASE):
+        if re.fullmatch(r'-*\s*slide\s*\d+\s*-*', line, re.IGNORECASE):
             if current_slide["content"]:
                 slides.append(current_slide)
             current_slide = {"title": "", "content": []}
