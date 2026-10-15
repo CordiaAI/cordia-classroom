@@ -42,8 +42,8 @@ export default function HelpSheet({ onClose, onFeedback, canReviewFeedback }) {
       <style jsx global>{`
         .help-sheet { width: min(560px, 100%); }
         .help-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-        .help-links { display: flex; gap: 20px; margin-top: 24px; font: 600 13px/1 var(--font-sans); }
-        .help-links a { color: var(--ink); }
+        .help-links { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 16px; font: 600 13px/1 var(--font-sans); }
+        .help-links a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; color: var(--ink); }
       `}</style>
     </Sheet>
   );

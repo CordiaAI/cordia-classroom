@@ -373,7 +373,7 @@ export default function SettingsPage() {
         .settings-row .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
         .settings-card { display: grid; gap: 12px; padding: 20px; }
         .settings-links { display: flex; flex-wrap: wrap; gap: 8px 20px; font: 600 13px/1 var(--font-sans); }
-        .settings-links :global(a) { display: inline-flex; align-items: center; min-height: 44px; }
+        .settings-links :global(a) { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; }
         .me-card { display: flex; align-items: center; gap: 16px; padding: 20px; }
         .me-avatar { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 700 19px/1 var(--font-sans); }
         .me-names { display: grid; gap: 2px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
