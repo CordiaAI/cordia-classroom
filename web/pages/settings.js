@@ -14,6 +14,9 @@ import GroveGrid from '../components/GroveGrid';
 import Heatmap from '../components/Heatmap';
 import RecapCard from '../components/RecapCard';
 import { semesterStart } from '../lib/activity';
+import CanvasSettings from '../components/CanvasSettings';
+import SharingSettings from '../components/SharingSettings';
+import { canvasStatus } from '../lib/canvas';
 
 export default function SettingsPage() {
   const { ready } = useRequireAuth();
@@ -31,6 +34,8 @@ export default function SettingsPage() {
     if (section === 'grove') setTimeout(() => document.getElementById('grove')?.scrollIntoView({ block: 'start' }), 400);
   }, [router.isReady, router.query.section]);
   const [library, setLibrary] = useState({ guides: [], folders: [], streak: null, overview: null });
+  const [canvasReady, setCanvasReady] = useState(false);
+  useEffect(() => { if (ready) canvasStatus().then(data => setCanvasReady(Boolean(data))); }, [ready]);
   useEffect(() => {
     if (!ready) return;
     Promise.all([
@@ -176,6 +181,7 @@ export default function SettingsPage() {
     { key: 'learning', label: 'Learning' },
     { key: 'appearance', label: 'Appearance' },
     { key: 'plan', label: 'Plan' },
+    ...(canvasReady || activeSection === 'canvas' ? [{ key: 'canvas', label: 'Canvas' }] : []),
   ];
   const since = semesterStart();
   const initials = (profileName || email.split('@')[0] || '').split(/[\s._-]+/).filter(part => /^[a-z]/i.test(part)).slice(0, 2).map(part => part[0]).join('').toUpperCase();
@@ -302,6 +308,13 @@ export default function SettingsPage() {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {activeSection === 'canvas' && (
+          <div className="profile-section c-stack" role="tabpanel" id="panel-canvas" aria-labelledby="tab-canvas">
+            <CanvasSettings school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} />
+            {canvasReady && <SharingSettings />}
           </div>
         )}
 

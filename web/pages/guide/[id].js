@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, BookOpen, Brain, Download, ExternalLink, Layers, MessageCircle, NotebookText, PencilRuler, Pencil, Star, Stethoscope, SquarePen, Trash2, X,
+  ArrowLeft, BookOpen, Brain, Download, ExternalLink, Layers, Lock, MessageCircle, NotebookText, PencilRuler, Pencil, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -11,6 +11,7 @@ import useSessionTracker from '../../lib/useSessionTracker';
 import StudyAidPanel from '../../components/StudyAidPanel';
 import StudyDocument from '../../components/StudyDocument';
 import Menu from '../../components/Menu';
+import ClassChip from '../../components/ClassChip';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useLearningStyle } from '../../lib/learningStyle';
 import { rememberGuidePage, rememberLastGuide } from '../../lib/userStore';
@@ -84,6 +85,7 @@ export default function GuidePage() {
   const [cardDraft, setCardDraft] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [toast, setToast] = useState('');
+  const [sharing, setSharing] = useState(null);
   const prevRevealed = useRef(0);
   const { learningStyle } = useLearningStyle();
 
@@ -120,8 +122,27 @@ export default function GuidePage() {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  async function loadSharing() {
+    const data = await apiFetch('/sharing/guides/' + id);
+    setSharing(data && 'visibility' in data ? data : null);
+  }
+
+  async function setVisibility(visibility) {
+    const data = await apiFetch('/sharing/guides/' + id, { method: 'PUT', body: JSON.stringify({ visibility }) });
+    if (data?.visibility) {
+      setSharing(current => ({ ...current, visibility: data.visibility, status: data.status }));
+      setToast(data.status === 'held' ? 'Held for review' : data.visibility === 'class' ? `Shared with ${sharing.class.code}` : 'Private');
+    } else setToast(apiErrorMessage(data?.detail, 'Could not change sharing'));
+  }
+
+  async function pullUpdate() {
+    const data = await apiFetch(`/sharing/guides/${id}/update`, { method: 'POST' });
+    if (data?.ok) { await loadGuide(); setSharing(current => ({ ...current, update_available: false })); setToast('Updated'); }
+  }
+
   async function loadGuide() {
     setLoadError('');
+    loadSharing();
     const data = await apiFetch('/guides/' + id);
     if (data?.guide) {
       setGuide(data.guide);
@@ -235,10 +256,19 @@ export default function GuidePage() {
             { label: 'Edit', icon: SquarePen, onSelect: () => router.push('/create?editGuideId=' + id) },
             { label: 'Rename', icon: Pencil, onSelect: () => setRenaming(guide.title) },
             { label: 'Export', icon: Download, onSelect: () => exportGuide(guide) },
+            ...(sharing?.class && !sharing.linked ? [sharing.class.sharing_blocked
+              ? { label: 'Sharing off', icon: Lock, disabled: true }
+              : sharing.visibility === 'class'
+                ? { label: 'Make private', icon: Lock, onSelect: () => setVisibility('private') }
+                : { label: `Share with ${sharing.class.code}`, icon: Users, onSelect: () => setVisibility('class') }] : []),
             { label: 'Delete', icon: Trash2, danger: true, onSelect: () => setConfirmDelete(true) },
           ]}
         />
       </header>
+      {sharing?.update_available && (
+        <button type="button" className="c-chip guide-update" onClick={pullUpdate}><RefreshCw size={16} strokeWidth={1.75} aria-hidden="true" />Update available</button>
+      )}
+      {!sharing?.linked && <ClassChip guideId={id} onFiled={() => loadSharing()} />}
       {sourceTitle && (
         <span className="guide-src">
           {sourceHref

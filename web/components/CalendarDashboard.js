@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Bell, BellOff, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, ExternalLink, RefreshCw, Unlink } from 'lucide-react';
+import { Bell, BellOff, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, ExternalLink, KeyRound, RefreshCw, Unlink } from 'lucide-react';
 import { apiErrorMessage, apiFetch, getUserId } from '../lib/api';
 import { walkthroughEvent } from '../lib/walkthrough';
+import { canvasStatus } from '../lib/canvas';
+import CanvasConnectSheet from './CanvasConnectSheet';
 
 const FEED_KEY = 'cordiaCanvasCalendarFeed';
 const REMINDER_KEY = 'cordiaCalendarReminders';
@@ -68,6 +70,9 @@ function notifyDueToday(items, userId) {
 export default function CalendarDashboard({ compact = false, onOpenCalendar = () => {} }) {
   const [feedUrl, setFeedUrl] = useState('');
   const [connected, setConnected] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
+  const [tokenOpen, setTokenOpen] = useState(false);
+  useEffect(() => { canvasStatus().then(data => setCanvasReady(Boolean(data) && !data.connected)); }, []);
   const [items, setItems] = useState([]);
   const [dueToday, setDueToday] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -217,8 +222,15 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
           <button type="submit" className="c-btn c-btn--primary" disabled={loading || !feedUrl.trim()}>{loading ? 'Checking…' : 'Connect'}</button>
         </form>
         {error && <div className="canvas-inline-error" role="alert">{error}</div>}
+        {canvasReady && (
+          <button type="button" className="c-btn c-btn--quiet cal-token" onClick={() => setTokenOpen(true)}>
+            <KeyRound size={20} strokeWidth={1.75} aria-hidden="true" />Connect Canvas
+          </button>
+        )}
+        {tokenOpen && <CanvasConnectSheet school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} onClose={() => setTokenOpen(false)} />}
         <style jsx>{`
           .cal-connect { display: grid; gap: 24px; padding: 28px; }
+          .cal-token { justify-self: start; margin: -12px 0 -8px -12px; }
           .cal-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
           .cal-steps li { display: grid; justify-items: center; gap: 10px; padding: 20px 12px; border-radius: var(--r-card); background: var(--card-sunk); font: 600 15px/1.2 var(--font-sans); text-align: center; }
           .cal-steps :global(.lucide) { color: currentColor; }

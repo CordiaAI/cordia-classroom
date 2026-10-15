@@ -3,6 +3,8 @@ import { RotateCcw } from 'lucide-react';
 import GroveTree, { STAGES, groveStage } from './GroveTree';
 import { addGrowth, getProgress, groveKey } from '../lib/progress';
 import { recordStudy } from '../lib/activity';
+import { apiFetch } from '../lib/api';
+import { canvasKnownAvailable } from '../lib/canvas';
 
 // One finish card for every session: the guide's tree (a new stage when earned) and
 // three numbers. A soft fade; no confetti.
@@ -14,6 +16,8 @@ export default function SessionFinish({ guideId, guideTitle, cards, accuracy, mi
     const key = groveKey(guideId);
     const before = getProgress().grove[key] || 0;
     if (guideId) addGrowth(guideId, minutes);
+    // Saved class sets count you as a studier (ranking only); other guides no-op on the server.
+    if (guideId && canvasKnownAvailable() !== false) apiFetch(`/sharing/guides/${guideId}/studied`, { method: 'POST', body: JSON.stringify({ accuracy: Math.round(accuracy) }) });
     const after = guideId ? before + minutes : 0;
     setTree({ minutes: after, grew: groveStage(after) > groveStage(before) });
   }, []);

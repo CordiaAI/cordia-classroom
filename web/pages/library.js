@@ -8,6 +8,8 @@ import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
 import { organizeDashboardGuides } from '../lib/dashboardOrganization';
+import { canvasStatus } from '../lib/canvas';
+import ClassesTab from '../components/ClassesTab';
 import { dueCount } from '../lib/studyQueue';
 import { useUndoDelete } from '../lib/undoDelete';
 import ProgressRing from '../components/ProgressRing';
@@ -31,7 +33,9 @@ export default function LibraryPage() {
   const router = useRouter();
   const { ready } = useRequireAuth();
   useSessionTracker('browse');
-  const tab = router.query.tab === 'cards' ? 'cards' : 'guides';
+  const tab = ['cards', 'classes'].includes(router.query.tab) ? router.query.tab : 'guides';
+  const [classesReady, setClassesReady] = useState(false);
+  useEffect(() => { if (ready) canvasStatus().then(data => setClassesReady(Boolean(data))); }, [ready]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [folders, setFolders] = useState([]);
@@ -246,12 +250,13 @@ export default function LibraryPage() {
         <div className="c-seg" role="tablist" aria-label="Library">
           <Link href="/library" role="tab" aria-selected={tab === 'guides'} className={tab === 'guides' ? 'is-active' : ''}>Guides</Link>
           <Link href="/library?tab=cards" role="tab" aria-selected={tab === 'cards'} className={tab === 'cards' ? 'is-active' : ''}>Cards</Link>
+          {(classesReady || tab === 'classes') && <Link href="/library?tab=classes" role="tab" aria-selected={tab === 'classes'} className={tab === 'classes' ? 'is-active' : ''}>Classes</Link>}
         </div>
       </header>
 
       {loadError && <div className="lib-error" role="alert"><span>{loadError}</span><button type="button" className="c-btn c-btn--secondary" onClick={loadData}>Retry</button></div>}
 
-      {tab === 'guides' ? (
+      {tab === 'classes' ? <ClassesTab /> : tab === 'guides' ? (
         <>
           <div className="lib-tools">
             <label className="c-search">

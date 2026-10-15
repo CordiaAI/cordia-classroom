@@ -6,6 +6,7 @@ import NewSheet from './NewSheet';
 import TipHost from './TipHost';
 import Walkthrough from './Walkthrough';
 import TimerEngine from './TimerEngine';
+import CanvasReminder from './CanvasReminder';
 
 const WIDE = ['/guide/[id]', '/practice', '/practice/[guideId]', '/smartnotes', '/calendar', '/tutor'];
 
@@ -29,6 +30,7 @@ export default function Layout({ children, timerState, setTimerState }) {
       <GuideJobIndicator />
       <NewSheet />
       <TipHost />
+      <CanvasReminder />
       <Walkthrough />
       <TimerEngine timerState={timerState} setTimerState={setTimerState} />
       {!pageOwnsTutor && <TutorDrawer preferredGuideId={activeGuideId} preferredNoteId={activeNoteId} />}

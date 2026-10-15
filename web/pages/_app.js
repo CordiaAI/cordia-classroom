@@ -13,11 +13,11 @@ import { applyTheme } from '../lib/theme';
 export default function App({ Component, pageProps }) {
   const router = useRouter();
   // Public pages render without the signed-in shell.
-  const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password'].includes(router.pathname);
+  const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password', '/instructors', '/copyright'].includes(router.pathname);
 
   // Authentication pages stay light; workspace routes honor the saved preference.
   useEffect(() => {
-    const publicPage = ['/', '/login', '/signup', '/pricing', '/reset-password'].includes(router.pathname);
+    const publicPage = ['/', '/login', '/signup', '/pricing', '/reset-password', '/instructors', '/copyright'].includes(router.pathname);
     applyTheme(undefined, publicPage);
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const follow = () => applyTheme(undefined, publicPage);
