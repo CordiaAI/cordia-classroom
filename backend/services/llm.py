@@ -116,15 +116,12 @@ def _generate_notes_fallback(content: str) -> List[str]:
                 notes.append(line)
     return notes[:15]
 
-def _build_study_guide_prompt(context: str, domain_context: str = "", learning_guidance: str = "") -> str:
+def _build_study_guide_prompt(context: str, learning_guidance: str = "") -> str:
     """Build the study guide generation prompt for a chunk of content."""
-    domain_block = ""
-    if domain_context:
-        domain_block = f"\n[DOMAIN CONTEXT]\n{domain_context}\n\n"
     learning_block = f"\n[QUESTION STYLE]\n{learning_guidance}\n" if learning_guidance else ""
 
     return f"""Create a study guide Q&A from the text below.
-{domain_block}{learning_block}
+{learning_block}
 
 CRITICAL RULES:
 • ONLY use information that is explicitly stated in the text below.
@@ -861,7 +858,7 @@ def study_guide_is_complete(content: str) -> bool:
     return found_pair and not awaiting_answer
 
 
-def generate_study_guide(chunks: List[str], has_images: bool = False, domain: Optional[str] = None, learning_guidance: str = "") -> str:
+def generate_study_guide(chunks: List[str], has_images: bool = False, learning_guidance: str = "") -> str:
     """
     Generate a comprehensive study guide with AI-generated questions and answers.
     Uses chunked generation: splits content into ~8000-char batches and makes
@@ -869,9 +866,6 @@ def generate_study_guide(chunks: List[str], has_images: bool = False, domain: Op
 
     Model comes from services.models (BUILD_MODEL regardless of length; the opt-in
     STUDY_GUIDE_COST_SAVER only downgrades short text-only batches).
-
-    When domain is set, injects domain-specific terminology and context to
-    steer vocabulary and focus without changing the core prompt rules.
     """
     client = get_openai_client()
     if not client:
@@ -908,19 +902,10 @@ def generate_study_guide(chunks: List[str], has_images: bool = False, domain: Op
         f"{len(batches)} batch(es), batch_chars=[{', '.join(str(len(b)) for b in batches)}]"
     )
 
-    # Load domain context once (empty string if no domain)
-    domain_context = ""
-    if domain:
-        from domains import get_study_guide_context
-        domain_context = get_study_guide_context(domain)
-        if domain_context:
-            logger.info(f"Study guide using domain context: {domain}")
-
     all_results = []
     for i, batch_text in enumerate(batches):
         prompt = _build_study_guide_prompt(
             batch_text[:30000],
-            domain_context=domain_context,
             learning_guidance=learning_guidance,
         )
         try:
@@ -1201,148 +1186,6 @@ Do NOT stop until every Q&A pair has a corresponding practice question."""
 
     except Exception as e:
         logger.error(f"Error generating practice questions: {e}")
-        return []
-
-
-def generate_exam_questions(content: str, domain_id: str, exam_mode_id: str) -> list:
-    """
-    Generate domain-specific exam questions using few-shot examples from domain config.
-    Generalized version that works for any domain with exam modes (NAPLEX, Bar, etc.).
-    Returns a list of question dicts with type, stem, options, correct_indices, rationale.
-    """
-    import re as _re
-    import json as _json
-    from domains import get_domain, get_exam_examples
-
-    client = get_openai_client()
-    if not client:
-        return []
-
-    domain = get_domain(domain_id)
-    if not domain:
-        logger.warning(f"Unknown domain '{domain_id}', falling back to generic practice questions")
-        return generate_practice_questions(content)
-
-    # Find the exam mode config
-    exam_mode = None
-    for mode in domain.get('exam_modes', []):
-        if mode['id'] == exam_mode_id:
-            exam_mode = mode
-            break
-    if not exam_mode:
-        logger.warning(f"Unknown exam mode '{exam_mode_id}' for domain '{domain_id}', falling back")
-        return generate_practice_questions(content)
-
-    context = content[:25000]
-
-    # Count Q&A pairs for target count
-    qa_matches = _re.findall(r'^Q\d+:', context, _re.MULTILINE)
-    n_pairs = len(qa_matches)
-
-    if n_pairs > 0:
-        count_instruction = (
-            f"The study guide below contains {n_pairs} Q&A pairs (Q1/A1, Q2/A2, …). "
-            f"Each pair represents ONE distinct concept. "
-            f"Generate exactly one exam question per Q&A pair — that means a minimum of {n_pairs} questions. "
-            f"Do NOT merge multiple Q&A pairs into a single question."
-        )
-    else:
-        count_instruction = (
-            "Identify every key concept, definition, process, and factual detail in the content. "
-            "Generate one exam question per identified item — do NOT group multiple items into one question."
-        )
-
-    # Build few-shot examples block from domain config
-    examples = get_exam_examples(domain_id, exam_mode_id)
-    examples_block = ""
-    if examples:
-        examples_json = _json.dumps(examples[:2], indent=2)
-        examples_block = f"\nHere are example questions in the correct style:\n{examples_json}\n\nGenerate questions in a similar style and format.\n"
-
-    prompt = f"""Create {exam_mode['display_name']} practice exam questions from the study material below.
-
-{count_instruction}
-
-QUESTION RULES:
-- Mix types: ~60% MCQ (4 options, 1 correct) and ~40% multi-select (5 options, 2-4 correct)
-- Each question should test understanding and application, not just memorization
-- Distractors must be plausible and relevant to the topic, not obviously wrong
-- ALL options (correct and incorrect) MUST be similar in length and level of detail — never make the correct answer longer or more specific than the distractors
-- Multi-select stems must end with "(Select all that apply)"
-- Rationale: 2-3 sentences — explain why correct answers are right AND why key distractors are wrong
-{examples_block}
-CONTENT:
-{context}
-
-Return ONLY a valid JSON array — no markdown, no extra text:
-[
-  {{
-    "type": "mcq",
-    "stem": "...",
-    "options": ["A", "B", "C", "D"],
-    "correct_indices": [1],
-    "rationale": "..."
-  }}
-]
-
-Do NOT stop until every Q&A pair has a corresponding exam question."""
-
-    system_persona = exam_mode.get('system_persona',
-        f"You are an expert {domain['display_name']} exam question writer.")
-
-    try:
-        response = chat(client, "exam_questions",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        f"{system_persona} "
-                        "You write one exam question for each Q&A pair in the study material — never fewer. "
-                        "Never merge multiple Q&A pairs into one question. "
-                        "Always return valid JSON only — no markdown, no extra text."
-                    )
-                },
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.6,
-        )
-        raw = response.choices[0].message.content.strip()
-
-        # Strip markdown code fences if present
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-
-        # Parse JSON, recover if truncated
-        try:
-            questions = _loads_model_json(raw)
-        except _json.JSONDecodeError:
-            last_complete = raw.rfind('},')
-            if last_complete > 0:
-                try:
-                    questions = _loads_model_json(raw[:last_complete + 1] + ']')
-                except _json.JSONDecodeError:
-                    logger.error(f"Could not recover partial {exam_mode_id} exam JSON")
-                    return []
-            else:
-                logger.error(f"{exam_mode_id} exam response was not valid JSON")
-                return []
-
-        # Validate structure
-        validated = []
-        for q in questions:
-            if not all(k in q for k in ("type", "stem", "options", "correct_indices", "rationale")):
-                continue
-            if q["type"] not in ("mcq", "sata"):
-                continue
-            validated.append(q)
-
-        logger.info(f"Generated {len(validated)} {exam_mode_id} exam questions for domain {domain_id}")
-        return validated
-
-    except Exception as e:
-        logger.error(f"Error generating {exam_mode_id} exam questions: {e}")
         return []
 
 

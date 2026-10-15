@@ -31,7 +31,6 @@ LIMITS = {
         "practice": 1,
         "ai_quiz": 1,
         "nclex": 1,
-        "exam": 1,
         "retain_types": 1,
         "light": 30,
     },
@@ -42,7 +41,6 @@ LIMITS = {
         "practice": 100,
         "ai_quiz": 200,
         "nclex": 50,
-        "exam": 50,
         "retain_types": 300,
         "light": 500,
     },
@@ -56,7 +54,6 @@ FEATURE_LABELS = {
     "practice": "practice sets",
     "ai_quiz": "AI Retain quizzes",
     "nclex": "NCLEX sets",
-    "exam": "practice exams",
     "retain_types": "Pro Retain sessions",
     "light": "AI reading actions",
 }

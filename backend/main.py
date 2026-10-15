@@ -38,7 +38,7 @@ from services.llm import (
     transcribe_document_pages,
     study_guide_is_complete, study_guide_to_flashcards,
 )
-from routers import auth, folders, guides, stats, search, quiz, billing, nclex, exam, feedback, smart_notes, calendar, tutor, learning
+from routers import auth, folders, guides, stats, search, quiz, billing, nclex, feedback, smart_notes, calendar, tutor, learning
 from auth_utils import get_user_id
 from database import get_supabase
 from services.entitlements import record, require
@@ -165,7 +165,6 @@ app.include_router(stats.router)
 app.include_router(search.router)
 app.include_router(quiz.router)
 app.include_router(nclex.router)
-app.include_router(exam.router)
 app.include_router(billing.router)
 app.include_router(feedback.router)
 app.include_router(smart_notes.router)
@@ -474,13 +473,6 @@ def health_check():
     return {"status": "ok", "version": "1.0.0"}
 
 
-@app.get("/domains")
-def list_domains():
-    """Return available academic domains and their exam modes."""
-    from domains import DOMAIN_LIST
-    return {"domains": DOMAIN_LIST}
-
-
 @app.post("/ingest", response_model=IngestResponse)
 @limiter.limit("30/minute")
 def ingest(body: IngestRequest, request: Request, authorization: str = Header(default="")):
@@ -638,7 +630,6 @@ def generate(body: GenerateRequest, request: Request, authorization: str = Heade
             study_guide = generate_study_guide(
                 chunks,
                 has_images=has_images,
-                domain=body.domain,
                 learning_guidance=_learning_guidance(user_id),
             )
             if not study_guide or study_guide.startswith("[Error"):

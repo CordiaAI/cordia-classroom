@@ -21,7 +21,6 @@ class IngestRequest(BaseModel):
     content: str = Field(..., min_length=1, max_length=500_000)
     content_type: str = Field(default="webpage", max_length=20)
     images: List[ImageData] = Field(default_factory=list, max_length=10)
-    domain: Optional[str] = Field(default=None, max_length=30)
 
     @field_validator("content_type")
     @classmethod
@@ -55,7 +54,6 @@ class GenerateRequest(BaseModel):
     notes: bool = True
     study_guide: bool = True
     flashcards: bool = False
-    domain: Optional[str] = Field(default=None, max_length=30)
     # Client-generated id reused on retries so one guide is never charged twice.
     request_id: Optional[str] = Field(default=None, max_length=64)
 
