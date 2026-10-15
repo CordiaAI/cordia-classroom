@@ -18,8 +18,18 @@ from database import get_supabase
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 MAX_FEED_BYTES = 2_000_000
-CANVAS_HOST = re.compile(r"[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}")
+HOST_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-")
 CANVAS_FEED_PATH = re.compile(r"/feeds/calendars/(user_[A-Za-z0-9]+\.ics)")
+
+
+def _is_domain_name(host: str) -> bool:
+    """A DNS name with an alphabetic top-level domain; never an IP literal."""
+    labels = host.split(".")
+    return (
+        len(host) <= 253 and len(labels) >= 2 and labels[-1].isalpha()
+        and all(0 < len(label) <= 63 and set(label) <= HOST_CHARS
+                and label[0] != "-" and label[-1] != "-" for label in labels)
+    )
 
 
 def canvas_feed_url(value: str) -> str:
@@ -28,7 +38,7 @@ def canvas_feed_url(value: str) -> str:
     host = (parsed.hostname or "").lower()
     path = CANVAS_FEED_PATH.fullmatch(parsed.path)
     if (parsed.scheme != "https" or parsed.port or parsed.username or parsed.password
-            or not CANVAS_HOST.fullmatch(host) or not path):
+            or not _is_domain_name(host) or not path):
         raise ValueError("Use the Calendar Feed link from Canvas (it ends in .ics)")
     return f"https://{host}/feeds/calendars/{path.group(1)}"
 
