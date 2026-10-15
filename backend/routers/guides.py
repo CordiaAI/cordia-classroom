@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from database import get_supabase
+from services.sharing import on_guide_changed
 from auth_utils import get_user_id
 from fastapi import Depends
 from rate_limit import ai_rate_limit
@@ -181,6 +182,8 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
         if not result.data:
             raise HTTPException(status_code=404, detail="Guide not found or no changes made")
 
+        if {"title", "study_guide", "flashcards"} & set(update_data):
+            on_guide_changed(supabase, user_id, guide_id)
         return {"guide": result.data[0]}
 
     except HTTPException:
@@ -274,6 +277,7 @@ def rename_guide(guide_id: str, request: RenameGuideRequest, authorization: str 
             .eq("user_id", user_id) \
             .execute()
 
+        on_guide_changed(supabase, user_id, guide_id)
         return {"title": request.title}
     except HTTPException:
         raise

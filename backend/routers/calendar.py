@@ -1,6 +1,7 @@
 """Account-scoped, read-only Canvas calendar feed connection."""
 
 import ipaddress
+import logging
 import re
 import socket
 from datetime import datetime, timedelta, timezone
@@ -14,6 +15,7 @@ from auth_utils import get_user_id
 from database import get_supabase
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
+logger = logging.getLogger(__name__)
 MAX_FEED_BYTES = 2_000_000
 
 
@@ -206,7 +208,38 @@ def connect_calendar(body: CalendarPreviewRequest, authorization: str = Header(d
         },
         on_conflict="user_id",
     ).execute()
+    try:
+        _import_classes(user_id, body.url, payload.get("items") or [])
+    except Exception as exc:
+        logger.warning(f"Calendar classes skipped: {type(exc).__name__}")
     return payload
+
+
+def _import_classes(user_id: str, url: str, items: list[dict]) -> None:
+    """Course codes in event titles ("Essay [MGT-300-102]") or locations become class memberships."""
+    from services.class_catalog import clean_term, normalize_course_code, school_name_from_domain
+    from services.class_db import add_membership, ensure_class, ensure_school
+
+    labels = set()
+    for item in items:
+        for label in re.findall(r"\[([^\]]{2,80})\]", item.get("title") or ""):
+            labels.add(label)
+        if item.get("course"):
+            labels.add(item["course"])
+    codes = {}
+    for label in labels:
+        normalized = normalize_course_code(label)
+        if normalized.code:
+            codes.setdefault(normalized.code, label)
+    if not codes:
+        return
+    host = (urlparse(url).hostname or "").lower()
+    db = get_supabase()
+    school = ensure_school(db, school_name_from_domain(host), host)
+    for raw in list(codes.values())[:20]:
+        class_row = ensure_class(db, school["id"], raw)
+        if class_row:
+            add_membership(db, user_id, class_row, clean_term(""), "calendar")
 
 
 @router.delete("/connection")

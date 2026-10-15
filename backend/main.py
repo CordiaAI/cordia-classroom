@@ -39,6 +39,9 @@ from services.llm import (
     study_guide_is_complete, study_guide_to_flashcards, generate_guide_title,
 )
 from routers import auth, folders, guides, stats, search, quiz, billing, nclex, exam, feedback, smart_notes, calendar, tutor, learning
+from routers import canvas, classes, admin, public_forms
+from services import log_scrub
+from fastapi.exceptions import RequestValidationError
 from auth_utils import get_user_id
 from database import get_supabase
 from services.entitlements import record, require
@@ -69,6 +72,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+log_scrub.install()
 
 # Rate limiter — keyed by IP address
 limiter = Limiter(key_func=get_remote_address)
@@ -85,6 +89,13 @@ app = FastAPI(
 # Attach rate limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, exc: RequestValidationError):
+    # Never echo submitted values back: a Canvas token could be among them.
+    errors = [{"loc": list(e.get("loc", ())), "msg": e.get("msg", ""), "type": e.get("type", "")} for e in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": errors})
 
 # CORS — restrict to known origins
 ALLOWED_ORIGINS = [
@@ -172,6 +183,10 @@ app.include_router(smart_notes.router)
 app.include_router(calendar.router)
 app.include_router(tutor.router)
 app.include_router(learning.router)
+app.include_router(canvas.router)
+app.include_router(classes.router)
+app.include_router(admin.router)
+app.include_router(public_forms.router)
 
 def _style_instruction(user_id: str) -> str:
     """Tutor presentation: the chosen study style and the student's own explanation request."""
