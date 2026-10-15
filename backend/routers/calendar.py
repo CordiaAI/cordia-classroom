@@ -7,6 +7,9 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urljoin, urlparse
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.connection import HTTPSConnection
+from urllib3.connectionpool import HTTPSConnectionPool
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
@@ -44,16 +47,52 @@ def _public_url(value: str) -> str:
     return value
 
 
+class _PublicOnlyConnection(HTTPSConnection):
+    """Checks the address the socket actually reached, so a second DNS answer can't point at a private host."""
+
+    def _new_conn(self):
+        sock = super()._new_conn()
+        if not ipaddress.ip_address(sock.getpeername()[0]).is_global:
+            sock.close()
+            raise ConnectionRefusedError("calendar feed resolved to a non-public address")
+        return sock
+
+
+class _PublicOnlyPool(HTTPSConnectionPool):
+    ConnectionCls = _PublicOnlyConnection
+
+
+class _PublicOnlyAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        super().init_poolmanager(*args, **kwargs)
+        self.poolmanager.pool_classes_by_scheme = {"https": _PublicOnlyPool}
+
+
+def _feed_session() -> requests.Session:
+    session = requests.Session()
+    session.trust_env = False  # never route a user-supplied URL through an environment proxy
+    session.mount("https://", _PublicOnlyAdapter())
+    return session
+
+
 def _download_feed(url: str) -> str:
     current = _public_url(url)
+    with _feed_session() as session:
+        return _follow_feed(session, current)
+
+
+def _follow_feed(session: requests.Session, current: str) -> str:
     for _ in range(4):
-        response = requests.get(
-            current,
-            headers={"Accept": "text/calendar", "User-Agent": "CordiaClassroom Calendar/1.0"},
-            timeout=10,
-            allow_redirects=False,
-            stream=True,
-        )
+        try:
+            response = session.get(
+                current,
+                headers={"Accept": "text/calendar", "User-Agent": "CordiaClassroom Calendar/1.0"},
+                timeout=10,
+                allow_redirects=False,
+                stream=True,
+            )
+        except requests.RequestException:
+            raise HTTPException(status_code=400, detail="Canvas could not open that calendar feed.")
         if response.is_redirect:
             location = response.headers.get("location")
             if not location:

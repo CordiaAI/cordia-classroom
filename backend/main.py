@@ -35,13 +35,14 @@ from services.llm import (
     generate_notes_ai, generate_study_guide,
     generate_flashcards, answer_question, explain_retain_answer,
     analyze_images_for_slides, generate_practice_guide, generate_verified_practice_set, grade_practice_answer, recognize_handwriting,
-    transcribe_document_pages,
+    transcribe_document_pages, transcribe_study_image,
     study_guide_is_complete, study_guide_to_flashcards,
 )
 from routers import auth, folders, guides, stats, search, quiz, billing, nclex, feedback, smart_notes, calendar, tutor, learning
 from auth_utils import get_user_id
 from database import get_supabase
 from services.entitlements import record, require
+from services import file_extraction as files
 from services.pptx_rendering import (
     PptxRenderError,
     PptxRenderTimeout,
@@ -270,201 +271,43 @@ async def render_pptx(request: Request, file: UploadFile = None, authorization: 
 @app.post("/extract-file-text")
 @limiter.limit("20/minute")
 def extract_file_text(request: Request, file: UploadFile = None, authorization: str = Header(default="")):
-    """Extract plain text from uploaded PDF, DOCX, PPTX, or TXT file."""
-    import io
-    try:
-        user_id = get_user_id(authorization)
-        if file is None:
-            raise HTTPException(status_code=400, detail="No file uploaded")
+    """Extract plain text from an uploaded PDF, DOCX, PPTX, image, or text file."""
+    user_id = get_user_id(authorization)
+    if file is None:
+        raise HTTPException(status_code=400, detail="No file uploaded")
+    extension = files.extension_of(file.filename)
+    data = files.read_upload(file)
 
-        filename = (file.filename or "").lower()
-        content_bytes = file.file.read()
-
-        if len(content_bytes) > 50 * 1024 * 1024:
-            raise HTTPException(status_code=400, detail="File too large (max 50MB)")
-
-        text = ""
-
-        if filename.endswith(".pdf"):
-            try:
-                import importlib
-                PdfReader = None
-                try:
-                    PyPDF2 = importlib.import_module("PyPDF2")
-                    PdfReader = PyPDF2.PdfReader
-                except ImportError:
-                    try:
-                        pypdf = importlib.import_module("pypdf")
-                        PdfReader = pypdf.PdfReader
-                    except ImportError:
-                        raise HTTPException(status_code=500, detail="Neither PyPDF2 nor pypdf is installed.")
-                reader = PdfReader(io.BytesIO(content_bytes))
-                parts = []
-                for page in reader.pages:
-                    extracted = page.extract_text()
-                    if extracted:
-                        parts.append(extracted)
-                text = "\n\n".join(parts)
-            except HTTPException:
-                raise
-            except Exception:
-                raise HTTPException(status_code=422, detail="Could not extract text from PDF. Use a text-based PDF.")
-            if len(text.strip()) < 200:
-                # Scanned PDF (no text layer): transcribe each page's scan with vision.
-                import base64 as _b64
-                page_images = []
-                for page in reader.pages[:20]:
-                    try:
-                        scans = [image for image in page.images if image.name.lower().endswith((".jpg", ".jpeg", ".png"))]
-                    except Exception:
-                        scans = []
-                    if scans:
-                        scan = max(scans, key=lambda image: len(image.data))
-                        mime = "image/png" if scan.name.lower().endswith(".png") else "image/jpeg"
-                        page_images.append(f"data:{mime};base64,{_b64.b64encode(scan.data).decode()}")
-                if page_images:
-                    require(user_id, "light")
-                    text = transcribe_document_pages(page_images) or text
-                    record(user_id, "light")
-
-        elif filename.endswith(".docx"):
-                    try:
-                        try:
-                            import docx  # type: ignore
-                        except ImportError:
-                            raise HTTPException(status_code=500, detail="python-docx is not installed.")
-                        Document = docx.Document
-                        doc = Document(io.BytesIO(content_bytes))
-                        lines = [p.text for p in doc.paragraphs if p.text.strip()]
-                        for table in doc.tables:
-                            for row in table.rows:
-                                cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
-                                if cells:
-                                    lines.append(" | ".join(dict.fromkeys(cells)))
-                        text = "\n".join(lines)
-                    except HTTPException:
-                        raise
-                    except Exception:
-                        raise HTTPException(status_code=422, detail="Could not read DOCX file.")
-
-        elif filename.endswith(".pptx"):
-            try:
-                try:
-                    import importlib
-                    pptx_mod = importlib.import_module("pptx")
-                    Presentation = pptx_mod.Presentation
-                except ImportError:
-                    raise HTTPException(status_code=500, detail="python-pptx is not installed.")
-                prs = Presentation(io.BytesIO(content_bytes))
-                slides_out = []
-                marked_parts = []
-                for slide_num, slide in enumerate(prs.slides, 1):
-                    shape_texts = []
-                    shapes = list(slide.shapes)
-                    while shapes:
-                        shape = shapes.pop(0)
-                        if getattr(shape, "shape_type", None) == 6:  # group: read the shapes inside it
-                            shapes[:0] = list(shape.shapes)
-                        elif getattr(shape, "has_table", False) and shape.has_table:
-                            for row in shape.table.rows:
-                                cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
-                                if cells:
-                                    shape_texts.append(" | ".join(cells))
-                        elif hasattr(shape, "text") and shape.text.strip():
-                            shape_texts.append(shape.text.strip())
-                    if slide.has_notes_slide and slide.notes_slide.notes_text_frame.text.strip():
-                        shape_texts.append("Notes: " + slide.notes_slide.notes_text_frame.text.strip())
-                    slides_out.append({"number": slide_num, "texts": shape_texts})
-                    if shape_texts:
-                        # Embed "--- Slide N ---" markers so is_slideshow_content()
-                        # detects this as slideshow content and routes it through
-                        # the slide-aware processing path in /generate.
-                        marked_parts.append(f"--- Slide {slide_num} ---\n" + "\n".join(shape_texts))
-                pptx_text = "\n\n".join(marked_parts)
-                return {"text": pptx_text[:500_000], "slides": slides_out}
-            except HTTPException:
-                raise
-            except Exception:
-                raise HTTPException(status_code=422, detail="Could not read PPTX file.")
-
-        elif filename.endswith((".txt", ".md", ".csv")):
-            try:
-                text = content_bytes.decode("utf-8", errors="ignore")
-            except Exception:
-                raise HTTPException(status_code=422, detail="Could not read text file.")
-
-        elif filename.endswith((".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif")):
-            # Image files — use GPT-4o vision to transcribe educational content
-            try:
-                from services.llm import get_openai_client
-                client = get_openai_client()
-                if not client:
-                    raise HTTPException(status_code=500, detail="AI service unavailable")
-                import base64 as _b64
-                ext = filename.rsplit(".", 1)[-1].lower()
-                mime_map = {
-                    "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
-                    "gif": "image/gif", "webp": "image/webp", "bmp": "image/bmp",
-                    "tiff": "image/tiff", "tif": "image/tiff",
-                }
-                mime = mime_map.get(ext, "image/jpeg")
-                b64 = _b64.b64encode(content_bytes).decode()
+    if extension == "pptx":
+        return files.pptx_slides(data)
+    if extension == "pdf":
+        reader = files.open_pdf(data)
+        text = files.pdf_text(reader)
+        if len(text.strip()) < 200:
+            scans = files.pdf_page_scans(reader)
+            if scans:
                 require(user_id, "light")
-                response = chat(client, "image_extraction",
-                    messages=[{
-                        "role": "user",
-                        "content": [
-                            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-                            {"type": "text", "text": (
-                                "You are extracting educational content from an image (e.g. a photo of "
-                                "notes, a textbook page, a whiteboard, or a diagram). Transcribe ALL "
-                                "visible text exactly as written, then describe any diagrams, charts, "
-                                "or formulas with enough detail to study from. Use clear headings where "
-                                "visible. If the image contains no educational content, respond with "
-                                "exactly: NO_EDUCATIONAL_CONTENT"
-                            )}
-                        ]
-                    }],
-                )
-                text = (response.choices[0].message.content or "").strip()
-                if "NO_EDUCATIONAL_CONTENT" in text:
-                    raise HTTPException(status_code=422, detail="No educational content found in this image.")
+                text = transcribe_document_pages(scans) or text
                 record(user_id, "light")
-            except HTTPException:
-                raise
-            except Exception as e:
-                logger.error(f"Image extraction failed: {e}")
-                raise HTTPException(status_code=422, detail="Could not extract content from image.")
+    elif extension == "docx":
+        text = files.docx_text(data)
+    elif extension in files.IMAGE_TYPES:
+        image_url = files.image_data_url(data, extension)
+        require(user_id, "light")
+        try:
+            text = transcribe_study_image(image_url)
+        except Exception as e:
+            logger.error(f"Image extraction failed: {e}")
+            raise HTTPException(status_code=422, detail="Could not extract content from image.")
+        if not text:
+            raise HTTPException(status_code=422, detail="No educational content found in this image.")
+        record(user_id, "light")
+    else:
+        text = files.plain_text(data, extension)
 
-        else:
-            # Universal fallback: try UTF-8 decode for any unknown extension.
-            # Works for json, yaml, html, xml, source code, etc.
-            decoded = None
-            try:
-                decoded = content_bytes.decode("utf-8", errors="strict")
-            except UnicodeDecodeError:
-                try:
-                    decoded = content_bytes.decode("latin-1", errors="ignore")
-                except Exception:
-                    decoded = None
-            if not decoded:
-                raise HTTPException(status_code=400, detail="This file type is not supported. Try PDF, DOCX, PPTX, an image, or a plain-text file.")
-            # Reject if content is mostly binary garbage
-            printable = sum(1 for c in decoded if c.isprintable() or c in "\n\r\t")
-            if len(decoded) > 0 and printable / len(decoded) < 0.85:
-                raise HTTPException(status_code=400, detail="This file appears to be a binary file with no readable text. Please upload a PDF, DOCX, PPTX, image, or text file.")
-            text = decoded
-
-        if not text or len(text.strip()) < 10:
-            raise HTTPException(status_code=422, detail="No readable text found in this file.")
-
-        return {"text": text[:500_000]}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in /extract-file-text: {e}")
-        raise HTTPException(status_code=500, detail="Failed to extract file text")
+    if len(text.strip()) < 10:
+        raise HTTPException(status_code=422, detail="No readable text found in this file.")
+    return {"text": text[:files.MAX_TEXT_CHARS]}
 
 
 @app.get("/")
