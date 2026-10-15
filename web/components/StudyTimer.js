@@ -24,14 +24,14 @@ export default function StudyTimer({ timerState, setTimerState }) {
   const pad = value => String(value).padStart(2, '0');
 
   return (
-    <section className="c-card timer-card" aria-labelledby="timer-title" data-tip="break">
+    <section className="c-card focus-card" aria-labelledby="timer-title" data-tip="break">
       <header className="c-row">
         <Timer size={20} strokeWidth={1.75} aria-hidden="true" />
         <h2 id="timer-title" className="c-section-title">Focus</h2>
         <PulseDot feature="focus" />
       </header>
-      <div className="timer-face" role="timer" aria-live="off">{pad(minutes)}:{pad(seconds)}</div>
-      <div className="c-seg timer-modes" role="tablist" aria-label="Timer length">
+      <div className="focus-face" role="timer" aria-live="off">{pad(minutes)}:{pad(seconds)}</div>
+      <div className="c-seg focus-modes" role="tablist" aria-label="Timer length">
         {Object.entries(MODES).map(([key, value]) => (
           <button key={key} type="button" role="tab" aria-selected={mode === key} onClick={() => setMode(key)}>{value.label}</button>
         ))}
@@ -44,11 +44,11 @@ export default function StudyTimer({ timerState, setTimerState }) {
         <button type="button" className="c-icon-btn" onClick={reset} aria-label="Reset timer"><RotateCcw size={20} strokeWidth={1.75} aria-hidden="true" /></button>
       </div>
       <style jsx>{`
-        .timer-card { display: grid; gap: 14px; padding: 20px; align-content: start; }
-        .timer-card :global(header .lucide) { color: var(--olive-ink); }
-        .timer-face { font: 600 44px/1 var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
-        .timer-modes { justify-self: start; }
-        .timer-modes button { padding: 0 14px; }
+        .focus-card { display: grid; gap: 14px; padding: 20px; align-content: start; }
+        .focus-card :global(header .lucide) { color: var(--olive-ink); }
+        .focus-face { font: 600 44px/1 var(--font-sans); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+        .focus-modes { justify-self: start; }
+        .focus-modes button { padding: 0 14px; }
       `}</style>
     </section>
   );

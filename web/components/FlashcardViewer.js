@@ -158,7 +158,7 @@ export default function FlashcardViewer({
             className={'fc-card' + (flipped ? ' is-flipped' : '')}
             role="button"
             tabIndex={0}
-            aria-label={flipped ? 'Show question' : 'Show answer'}
+            aria-roledescription="flashcard"
             aria-pressed={flipped}
             onClick={() => setFlipped(value => !value)}
           >

@@ -193,10 +193,10 @@ export default function SettingsPage() {
 
   return (
     <>
-      <div className="c-page settings-page">
+      <div className="c-page profile-page">
         <header className="c-page-head"><h1 className="c-title">Profile</h1></header>
 
-        <div className="c-seg settings-tabs" role="tablist" aria-label="Profile" onKeyDown={onTabKey}>
+        <div className="c-seg profile-tabs" role="tablist" aria-label="Profile" onKeyDown={onTabKey}>
           {sections.map(section => (
             <button
               key={section.key}
@@ -213,10 +213,10 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {message && <div className="settings-message" role="status">{message}</div>}
+        {message && <div className="profile-message" role="status">{message}</div>}
 
         {activeSection === 'plan' && (
-          <div className="settings-section" role="tabpanel" id="panel-plan" aria-labelledby="tab-plan">
+          <div className="profile-section" role="tabpanel" id="panel-plan" aria-labelledby="tab-plan">
             {loading ? (
               <div className="c-skeleton" style={{ height: 160, borderRadius: 20 }} />
             ) : (
@@ -307,7 +307,7 @@ export default function SettingsPage() {
         )}
 
         {activeSection === 'appearance' && (
-          <div className="settings-section" role="tabpanel" id="panel-appearance" aria-labelledby="tab-appearance">
+          <div className="profile-section" role="tabpanel" id="panel-appearance" aria-labelledby="tab-appearance">
             <div className="c-card settings-row">
               <span className="c-section-title">Theme</span>
               <div className="c-seg" role="group" aria-label="Theme">
@@ -319,7 +319,7 @@ export default function SettingsPage() {
         )}
 
         {activeSection === 'learning' && (
-          <div className="settings-section c-stack" role="tabpanel" id="panel-learning" aria-labelledby="tab-learning">
+          <div className="profile-section c-stack" role="tabpanel" id="panel-learning" aria-labelledby="tab-learning">
             <div className="c-card settings-card"><ExplanationPreference /></div>
             {learningStyle?.enabled && (
               <div className="c-card settings-card">
@@ -335,10 +335,10 @@ export default function SettingsPage() {
         )}
 
         {activeSection === 'account' && (
-          <div className="settings-section c-stack" role="tabpanel" id="panel-account" aria-labelledby="tab-account">
-            <div className="c-card profile-identity">
-              <div className="profile-portrait" aria-hidden="true">{initials}</div>
-              <div className="profile-names">
+          <div className="profile-section c-stack" role="tabpanel" id="panel-account" aria-labelledby="tab-account">
+            <div className="c-card me-card">
+              <div className="me-avatar" aria-hidden="true">{initials}</div>
+              <div className="me-names">
                 <strong>{profileName || 'Your account'}</strong>
                 <span className="c-meta">{email}</span>
               </div>
@@ -359,18 +359,18 @@ export default function SettingsPage() {
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
       <style jsx>{`
-        .settings-page { width: min(920px, 100%); margin: 0 auto; }
-        .settings-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }
-        .settings-message { padding: 14px 18px; border-radius: var(--r-card); background: var(--olive-tint); font-weight: 600; }
-        .settings-section { animation: fadeIn 0.2s ease; }
+        .profile-page { width: min(920px, 100%); margin: 0 auto; }
+        .profile-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }
+        .profile-message { padding: 14px 18px; border-radius: var(--r-card); background: var(--olive-tint); font-weight: 600; }
+        .profile-section { animation: fadeIn 0.2s ease; }
         .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; flex-wrap: wrap; }
         .settings-row .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
         .settings-card { display: grid; gap: 12px; padding: 20px; }
         .settings-links { display: flex; gap: 20px; font: 600 13px/1 var(--font-sans); }
-        .profile-identity { display: flex; align-items: center; gap: 16px; padding: 20px; }
-        .profile-portrait { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 700 19px/1 var(--font-sans); }
-        .profile-names { display: grid; gap: 2px; flex: 1; min-width: 0; }
-        .profile-names strong { font: 600 19px/1.2 var(--font-display); }
+        .me-card { display: flex; align-items: center; gap: 16px; padding: 20px; }
+        .me-avatar { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 700 19px/1 var(--font-sans); }
+        .me-names { display: grid; gap: 2px; flex: 1; min-width: 0; }
+        .me-names strong { font: 600 19px/1.2 var(--font-display); }
         .billing-current-plan { display: grid; gap: 12px; padding: 20px; margin-bottom: 16px; }
         .plan-badge { justify-self: start; padding: 6px 14px; border-radius: var(--r-pill); background: var(--card-sunk); font-weight: 700; }
         .plan-badge[data-plan="plus"] { background: var(--olive); color: var(--on-olive); }
@@ -390,7 +390,7 @@ export default function SettingsPage() {
         .plan-features :global(.lucide) { color: var(--olive-ink); margin-top: 2px; }
         .plan-current-label { color: var(--olive-ink); font-weight: 700; }
         .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        @media (max-width: 767px) { .billing-plans { grid-template-columns: 1fr; } .profile-identity { flex-wrap: wrap; } }
+        @media (max-width: 767px) { .billing-plans { grid-template-columns: 1fr; } .me-card { flex-wrap: wrap; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </>

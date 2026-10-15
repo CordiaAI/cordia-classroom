@@ -467,7 +467,7 @@ body:has(.about) .c-fab { display: none; }
 .cordia-tutor-message.error { color: var(--error); background: var(--error-bg); border-radius: var(--r-input); padding: 10px 14px; }
 .cordia-tutor-source, .cordia-tutor-evidence, .cordia-tutor-guide-link, .cordia-tutor-speak { display: inline-flex; align-items: center; min-height: 32px; margin: 0 6px 6px 0; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-pill); background: transparent; color: var(--olive-ink); font: 600 13px/1 var(--font-sans); cursor: pointer; }
 .tutor-welcome { display: grid; gap: 14px; padding: 8px 0; }
-.tutor-welcome h3 { margin: 0; font: 600 19px/1.2 var(--font-display); }
+.tutor-welcome h2 { margin: 0; font: 600 19px/1.2 var(--font-display); }
 .tutor-starter-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
 .tutor-starter-actions .c-chip { min-height: 36px; padding: 0 14px; }
 .cordia-tutor-input { display: flex; align-items: flex-end; gap: 8px; margin: 12px; padding: 6px 6px 6px 14px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); }
@@ -543,4 +543,10 @@ body:has(.about) .c-fab { display: none; }
   .sn-v-divider, .sn-h-divider { display: none !important; }
   .sn-paper-wrap, .sn-viewer-wrap, .sn-diagram-wrap { grid-column: 1 !important; grid-row: auto !important; min-width: 0; }
   .sn-viewer-wrap, .sn-diagram-wrap { min-height: 320px; }
+}
+@media (max-width: 767px) {
+  .sn-header, .sn-header-left, .sn-header-right { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+  .sn-header-right { gap: 8px; }
+  .sn-header-left { width: 100%; }
+  .sn-title-input { width: 100%; min-width: 0; font-size: 24px; }
 }

@@ -112,11 +112,11 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
         .spot-label.arrow-up::after { top: -8px; border-right: 0; border-bottom: 0; }
         .spot-label.arrow-down::after { bottom: -8px; border-left: 0; border-top: 0; }
         .spot-label.arrow-none::after { display: none; }
-        .spot-dots { display: inline-flex; align-items: center; gap: 4px; }
-        .spot-dots i { width: 6px; height: 6px; border-radius: 999px; background: var(--line); }
-        .spot-dots i.is-done { background: var(--olive); opacity: .5; }
-        .spot-dots i.is-now { background: var(--olive); width: 16px; }
-        .spot-dots .c-meta { margin-left: 6px; }
+        .spot :global(.spot-dots) { display: inline-flex; align-items: center; gap: 4px; }
+        .spot :global(.spot-dots i) { width: 6px; height: 6px; border-radius: 999px; background: var(--line); }
+        .spot :global(.spot-dots i.is-done) { background: var(--olive); opacity: .5; }
+        .spot :global(.spot-dots i.is-now) { background: var(--olive); width: 16px; }
+        .spot :global(.spot-dots .c-meta) { margin-left: 6px; }
         .spot-skip {
           position: fixed; top: 12px; right: 12px; height: 44px; padding: 0 20px; pointer-events: auto;
           border-radius: 999px; border: 1px solid var(--glass-edge);
@@ -127,7 +127,7 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
         @media (min-width: 768px) { .spot-skip { top: auto; bottom: 24px; right: 24px; } .spot-skip.is-left { left: 24px; } }
         .spot-finish { height: 36px; min-height: 36px; }
         @keyframes spot-in { from { opacity: 0; } to { opacity: 1; } }
-        @media (max-width: 767px) { .spot-dots i { display: none; } .spot-dots .c-meta { margin-left: 0; } .spot-label { font-size: 15px; } }
+        @media (max-width: 767px) { .spot :global(.spot-dots i) { display: none; } .spot :global(.spot-dots .c-meta) { margin-left: 0; } .spot-label { font-size: 15px; } }
         @media (prefers-reduced-motion: reduce) { .spot-ring { transition: none; } .spot-label { animation: none; } }
       `}</style>
     </div>,

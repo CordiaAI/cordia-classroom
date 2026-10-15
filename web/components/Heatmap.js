@@ -35,7 +35,7 @@ export default function Heatmap({ serverWeek = [] }) {
         <span className="c-meta">{total} days</span>
       </header>
       <div className="heat-scroll">
-        <div className="heat-grid" role="grid" aria-label="Study days this year">
+        <div className="heat-grid" role="group" aria-label="Study days this year">
           {days.map(day => {
             const shade = day.active ? Math.max(1, level(day.minutes)) : 0;
             const label = `${day.date.toLocaleDateString([], { month: 'short', day: 'numeric' })}: ${day.minutes ? `${Math.round(day.minutes)} min` : day.active ? 'studied' : 'no study'}`;

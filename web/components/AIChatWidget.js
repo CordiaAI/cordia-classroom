@@ -515,7 +515,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
       <div className="cordia-tutor-messages" aria-live="polite">
         {messages.length === 0 && (
           <div className="tutor-welcome">
-            <h3>Ask anything</h3>
+            <h2>Ask anything</h2>
             <div className="tutor-starter-actions">
               {[
                 { label: 'Explain', prompt: 'Explain the key concepts in this material in simple terms.', icon: MessageCircle },

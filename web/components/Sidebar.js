@@ -150,7 +150,7 @@ export default function Sidebar() {
             <Plus size={20} strokeWidth={1.75} aria-hidden="true" />New
           </button>
           <div className="c-menu-wrap">
-            <button ref={avatarRef} type="button" className={'c-avatar' + (onProfile ? ' is-active' : '')} onClick={() => setMenuOpen(open => !open)} aria-expanded={menuOpen} aria-haspopup="menu" aria-label={`Account${displayName ? `: ${displayName}` : ''}`}>
+            <button ref={avatarRef} type="button" className={'c-avatar' + (onProfile ? ' is-active' : '')} onClick={() => setMenuOpen(open => !open)} aria-expanded={menuOpen} aria-haspopup="menu" aria-label={initials ? `${initials} account menu` : 'Account menu'}>
               {initials || <User size={20} strokeWidth={1.75} aria-hidden="true" />}
             </button>
             {menuOpen && (

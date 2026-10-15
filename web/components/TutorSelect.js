@@ -28,7 +28,7 @@ export default function TutorSelect({ label, value, options, onChange, disabled 
   }
   return (
     <div className="tutor-select" ref={rootRef}>
-      <button ref={triggerRef} className="tutor-select-trigger" type="button" aria-label={label} aria-haspopup="listbox" aria-expanded={open && !disabled} aria-controls={listId} disabled={disabled} onClick={() => setOpen(!open)} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpen(true); } }}>
+      <button ref={triggerRef} className="tutor-select-trigger" type="button" aria-label={selected?.label ? `${selected.label}, ${label}` : label} aria-haspopup="listbox" aria-expanded={open && !disabled} aria-controls={listId} disabled={disabled} onClick={() => setOpen(!open)} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpen(true); } }}>
         <span>{selected?.label || label}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
       </button>
       {open && !disabled && <div id={listId} className="tutor-select-options" role="listbox" aria-label={label} onKeyDown={navigate}>

@@ -240,7 +240,7 @@ export default function GuidePage() {
         />
       </header>
       {sourceTitle && (
-        <span className="guide-source">
+        <span className="guide-src">
           {sourceHref
             ? <a href={sourceHref} target={externalSourceUrl ? '_blank' : undefined} rel={externalSourceUrl ? 'noopener noreferrer' : undefined}><ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />{sourceTitle}</a>
             : sourceTitle}
@@ -292,11 +292,11 @@ export default function GuidePage() {
         .guide-rename { flex: 1 1 auto; min-width: 0; }
         .guide-title-input { font: 600 28px/1.1 var(--font-display); height: 52px; }
         .guide-head :global(.guide-starred) { color: var(--olive-ink); }
-        .guide-source { margin: -8px 0 0 48px; font: 600 13px/1.4 var(--font-sans); }
-        .guide-source a { display: inline-flex; align-items: center; gap: 6px; }
+        .guide-src { margin: -8px 0 0 48px; font: 600 13px/1.4 var(--font-sans); }
+        .guide-src a { display: inline-flex; align-items: center; gap: 6px; }
         .guide-notes { padding: 32px 40px; }
         .guide-notes ul { margin: 0; padding-left: 20px; display: grid; gap: 12px; }
-        @media (max-width: 767px) { .guide-source { margin-left: 0; } .guide-notes { padding: 24px 18px; } }
+        @media (max-width: 767px) { .guide-src { margin-left: 0; } .guide-notes { padding: 24px 18px; } }
       `}</style>
     </article>
   );
