@@ -3,8 +3,10 @@
 const ALLOWED_TAGS = new Set([
   'p', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'b', 'em', 'i', 'u', 's', 'mark',
   'span', 'div', 'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'sub', 'sup', 'hr',
-  'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a',
+  'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'img',
 ]);
+// Images are kept only when they are Cordia visuals stored in our own public bucket.
+const VISUAL_SRC = /^https:\/\/[a-z0-9.-]+\/storage\/v1\/object\/public\/visuals\/[a-z0-9/]+\.svg$/i;
 const DROP_WITH_CONTENT = new Set(['script', 'style', 'iframe', 'object', 'embed', 'template', 'noscript', 'svg', 'math', 'form', 'input', 'button', 'textarea', 'select']);
 
 function escapeText(text) {
@@ -18,6 +20,7 @@ function clean(node, doc) {
     const tag = child.tagName.toLowerCase();
     if (DROP_WITH_CONTENT.has(tag)) { child.remove(); continue; }
     clean(child, doc);
+    if (tag === 'img' && !VISUAL_SRC.test(child.getAttribute('src') || '')) { child.remove(); continue; }
     if (!ALLOWED_TAGS.has(tag)) {
       child.replaceWith(...child.childNodes);
       continue;
@@ -26,7 +29,8 @@ function clean(node, doc) {
       const name = attr.name.toLowerCase();
       const keep = name === 'class'
         || (tag === 'a' && name === 'href' && /^(https?:|mailto:|#)/i.test(attr.value.trim()))
-        || ((tag === 'td' || tag === 'th') && (name === 'colspan' || name === 'rowspan'));
+        || ((tag === 'td' || tag === 'th') && (name === 'colspan' || name === 'rowspan'))
+        || (tag === 'img' && (name === 'src' || name === 'alt'));
       if (!keep) child.removeAttribute(attr.name);
     }
     if (tag === 'a') {

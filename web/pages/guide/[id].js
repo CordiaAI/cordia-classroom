@@ -269,7 +269,7 @@ export default function GuidePage() {
             else ask(id, `Explain this more simply: ${pairs[index].question}`, true);
           }}
           renderAid={index => (explainWithAid && openAid && pairs[index]?.index === openAid
-            ? <StudyAidPanel guideId={id} number={openAid} style={learningStyle.style} onClose={() => setOpenAid(null)} />
+            ? <StudyAidPanel guideId={id} number={openAid} style={learningStyle.style} onClose={() => setOpenAid(null)} section={{ ...pairs[index], before: pairs[index - 1], after: pairs[index + 1], guideTitle: guide.title }} />
             : null)}
           onSelection={onSelection}
         />

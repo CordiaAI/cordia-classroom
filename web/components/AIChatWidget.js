@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
 import MermaidDiagram from './MermaidDiagram';
+import NapkinVisual from './NapkinVisual';
 import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from './ExplanationPreference';
 import { ArrowUp, BookOpen, Layers, MessageCircle, Paperclip, PencilRuler, SlidersHorizontal, X as CloseIcon } from 'lucide-react';
@@ -13,11 +14,13 @@ import { inlineParts, parseTutorAnswer } from '../lib/tutorFormat.mjs';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 
 // Tutor replies may include ```mermaid blocks; render them as diagrams and keep the rest as text.
+// A diagram can become a Napkin visual of the reply's explanation (the diagram stays as fallback).
 function TutorMessageText({ text, plain = false }) {
   if (plain) return <span className="cordia-tutor-text">{text}</span>;
   const parts = String(text || '').split(/```mermaid\s*\n([\s\S]*?)```/);
+  const explanation = speakableText(text).slice(0, 2000);
   return parts.map((part, index) => (index % 2 === 1
-    ? <MermaidDiagram key={index} code={part.trim()} label="Tutor diagram" />
+    ? <NapkinVisual key={index} text={explanation} name="tutor-visual" fallback={() => <MermaidDiagram code={part.trim()} label="Tutor diagram" />} />
     : part.trim() && <TutorAnswer key={index} text={part} />));
 }
 

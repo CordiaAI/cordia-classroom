@@ -17,6 +17,7 @@ export const FEATURE_COPY = {
   exam: { label: 'practice exams', title: 'Practice exams are a Pro feature', pro: 'Full practice exams from your guides' },
   retain_types: { label: 'Pro quiz sessions', title: 'Matching and fill in the blank are Pro', pro: 'Quiz yourself with matching and fill in the blank, not just multiple choice' },
   lecture_minute: { label: 'recording minutes', title: "You've used this month's recording minutes", pro: 'Record up to 25 hours of lectures a month' },
+  visual: { label: 'visuals', title: "You've used this month's visuals", pro: 'Make up to 200 visuals a month for guides, notes and the Tutor' },
   light: { label: 'AI reading actions', title: "You've reached this month's AI reading limit", pro: 'Read photos, scans and diagrams without limits' },
 };
 

@@ -36,6 +36,8 @@ LIMITS = {
         "light": 30,
         # Lecture recording, counted in minutes of audio transcribed.
         "lecture_minute": 120,
+        # Napkin visuals, made and stored by the web app's /api/visual route.
+        "visual": 10,
     },
     "pro": {
         "guide": 100,
@@ -48,6 +50,7 @@ LIMITS = {
         "retain_types": 300,
         "light": 500,
         "lecture_minute": 1500,
+        "visual": 200,
     },
 }
 FEATURES = tuple(LIMITS["free"])
@@ -63,6 +66,7 @@ FEATURE_LABELS = {
     "retain_types": "Pro quiz sessions",
     "light": "AI reading actions",
     "lecture_minute": "recording minutes",
+    "visual": "visuals",
 }
 FEATURE_SINGULAR = {
     "guide": "study guide",
@@ -75,6 +79,7 @@ FEATURE_SINGULAR = {
     "retain_types": "Pro quiz session",
     "light": "AI reading action",
     "lecture_minute": "recording minute",
+    "visual": "visual",
 }
 
 

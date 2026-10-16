@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { AID_TABS, defaultAidTab } from '../lib/learningStyle';
 import MermaidDiagram from './MermaidDiagram';
+import NapkinVisual from './NapkinVisual';
 
 function normalize(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -130,7 +131,12 @@ function AidState({ state, children }) {
   return children(state.data);
 }
 
-function VisualAid({ guideId, number, cache }) {
+// Text for a Napkin visual of one guide section; the neighbouring sections are context only.
+function sectionText(pair) {
+  return pair?.question ? `${pair.question}\n${pair.answer || ''}`.trim() : '';
+}
+
+function VisualAid({ guideId, number, cache, section }) {
   const state = useStudyAid(guideId, number, 'visual', cache);
   const [practice, setPractice] = useState(false);
   return (
@@ -138,7 +144,16 @@ function VisualAid({ guideId, number, cache }) {
       {data => (
         <div>
           {data.caption && <p className="study-aid-caption">{data.caption}</p>}
-          <MermaidDiagram code={practice ? data.practice_mermaid : data.mermaid} label={data.caption || 'Concept diagram'} />
+          {practice || !section?.question
+            ? <MermaidDiagram code={practice ? data.practice_mermaid : data.mermaid} label={data.caption || 'Concept diagram'} />
+            : (
+              <NapkinVisual
+                text={sectionText(section)}
+                context={[section.guideTitle, sectionText(section.before), sectionText(section.after)].filter(Boolean).join('\n\n')}
+                name={`visual-${number}`}
+                fallback={() => <MermaidDiagram code={data.mermaid} label={data.caption || 'Concept diagram'} />}
+              />
+            )}
           {practice ? (
             <>
               <p className="study-aid-task"><strong>Your turn:</strong> fill in the numbered boxes from memory.</p>
@@ -231,7 +246,7 @@ function KinestheticAid({ guideId, number, cache }) {
 
 const AIDS = { visual: VisualAid, aural: AuralAid, read_write: ReadWriteAid, kinesthetic: KinestheticAid };
 
-export default function StudyAidPanel({ guideId, number, style, onClose }) {
+export default function StudyAidPanel({ guideId, number, style, onClose, section }) {
   const [tab, setTab] = useState(defaultAidTab(style));
   const cache = useRef({});
   const Aid = AIDS[tab];
@@ -254,11 +269,11 @@ export default function StudyAidPanel({ guideId, number, style, onClose }) {
       </div>
       {tab === 'mix' ? (
         <div className="study-aid-mix">
-          <VisualAid key={`${number}-visual`} guideId={guideId} number={number} cache={cache} />
+          <VisualAid key={`${number}-visual`} guideId={guideId} number={number} cache={cache} section={section} />
           <KinestheticAid key={`${number}-kinesthetic`} guideId={guideId} number={number} cache={cache} />
         </div>
       ) : (
-        <Aid key={`${number}-${tab}`} guideId={guideId} number={number} cache={cache} />
+        <Aid key={`${number}-${tab}`} guideId={guideId} number={number} cache={cache} section={section} />
       )}
     </section>
   );

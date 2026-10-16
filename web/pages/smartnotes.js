@@ -9,6 +9,7 @@ import { walkthroughEvent } from '../lib/walkthrough';
 import PdfPages from '../components/PdfPages';
 import { useFileDropZone } from '../lib/fileDrop';
 import { sanitizeHtml } from '../lib/sanitizeHtml';
+import NapkinVisual from '../components/NapkinVisual';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -159,6 +160,13 @@ function MermaidDiagram({ code }) {
 
   if (error) return <p className="sn-diagram-placeholder">Diagram could not be rendered.</p>;
   return <div ref={ref} className="sn-diagram-render" />;
+}
+
+// The built-in diagram for a highlight, drawn only when no Napkin visual is available.
+function BuiltInDiagram({ text, code, loading, draw }) {
+  useEffect(() => { if (!code) draw(text); }, [text]);
+  if (loading) return <div className="sn-diagram-placeholder"><CordiaLoader size={20} label="Drawing" /></div>;
+  return code ? <MermaidDiagram code={code} /> : null;
 }
 
 // Office docs that need backend extraction (browser cannot render natively)
@@ -699,6 +707,8 @@ function SmartNotesEditor() {
   const [mermaidCode, setMermaidCode] = useState(null);
   const [diagramLoading, setDiagramLoading] = useState(false);
   const [visualizeMode, setVisualizeMode] = useState(false);
+  const [visualSource, setVisualSource] = useState(null); // { text, context, key }
+  const visualAnchor = useRef(null);
 
   // "Turn into Study Guide" preview modal
   const [convertingGuide, setConvertingGuide] = useState(false);
@@ -976,21 +986,52 @@ function SmartNotesEditor() {
     setVisualizeMode(v => !v);
   }
 
-  async function handleCheckmark() {
-    const selectedText = window.getSelection()?.toString()?.trim();
+  // "Make diagram": a Napkin visual of the highlight (the rest of the note is context).
+  // If no visual can be made, the built-in diagram is drawn instead.
+  function handleCheckmark() {
+    const selection = window.getSelection();
+    const selectedText = selection?.toString()?.trim();
     if (!selectedText || selectedText.length < 5) return;
+    const paperText = paperRef.current?.innerText || '';
+    const at = paperText.indexOf(selectedText);
+    const context = at >= 0
+      ? `${paperText.slice(Math.max(0, at - 700), at)}\n${paperText.slice(at + selectedText.length, at + selectedText.length + 700)}`.trim()
+      : '';
+    let block = selection.rangeCount ? selection.getRangeAt(0).endContainer : null;
+    while (block && block.parentNode !== paperRef.current) block = block.parentNode;
+    visualAnchor.current = block || null;
     setVisualizeMode(false);
+    setMermaidCode(null);
+    setVisualSource({ text: selectedText, context, key: Date.now() });
+  }
+
+  async function drawBuiltInDiagram(text) {
     setDiagramLoading(true);
     try {
       const resp = await fetch(API + '/smart_notes/diagram', {
         method: 'POST',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: selectedText }),
+        body: JSON.stringify({ content: text }),
       });
       const data = await responseJson(resp);
       setMermaidCode(data.mermaid || null);
     } catch {}
     setDiagramLoading(false);
+  }
+
+  // "Use this" puts the visual into the note, after the highlighted paragraph.
+  function insertVisual(visual) {
+    const paper = paperRef.current;
+    if (!paper) return;
+    const img = document.createElement('img');
+    img.src = visual.url;
+    img.alt = visual.alt || 'Diagram';
+    img.className = `nv-inline nv-${visual.theme === 'dark' ? 'dark' : 'light'}`;
+    const anchor = visualAnchor.current && paper.contains(visualAnchor.current) ? visualAnchor.current : paper.lastChild;
+    if (anchor) anchor.parentNode.insertBefore(img, anchor.nextSibling);
+    else paper.appendChild(img);
+    setHasText(true);
+    scheduleSave();
   }
 
   // ── Resize handlers ──────────────────────────────────────────────────────
@@ -1708,13 +1749,18 @@ function SmartNotesEditor() {
             </button>
           </div>
           <div className="sn-diagram-body">
-            {diagramLoading && (
-              <div className="sn-diagram-placeholder">Drawing…</div>
+            {visualSource && (
+              <NapkinVisual
+                key={visualSource.key}
+                auto
+                text={visualSource.text}
+                context={visualSource.context}
+                useLabel="Use this"
+                onUse={insertVisual}
+                fallback={() => <BuiltInDiagram text={visualSource.text} code={mermaidCode} loading={diagramLoading} draw={drawBuiltInDiagram} />}
+              />
             )}
-            {!diagramLoading && mermaidCode && (
-              <MermaidDiagram code={mermaidCode} />
-            )}
-            {!diagramLoading && !mermaidCode && (
+            {!visualSource && (
               <div className="sn-diagram-placeholder">
                 <p>Visualize → highlight → confirm</p>
               </div>
