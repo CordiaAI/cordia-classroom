@@ -14,6 +14,7 @@ Env vars (all optional)
   CLASSROOM_BUILD_MODEL   default gpt-4o
   CLASSROOM_LIGHT_MODEL   default gpt-4o-mini
   CLASSROOM_VISION_MODEL  default gpt-4o
+  CLASSROOM_TRANSCRIBE_MODEL default gpt-4o-mini-transcribe (lecture recording)
   STUDY_GUIDE_COST_SAVER  default false. When "true", text-only study-guide batches shorter than
                           STUDY_GUIDE_COST_SAVER_MAX_CHARS (default 10000) use LIGHT_MODEL.
                           Long/dense batches and any batch with images always keep BUILD_MODEL.
@@ -30,6 +31,8 @@ VISION = "vision"
 BUILD_MODEL = os.getenv("CLASSROOM_BUILD_MODEL", "gpt-4o").strip() or "gpt-4o"
 LIGHT_MODEL = os.getenv("CLASSROOM_LIGHT_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
 VISION_MODEL = os.getenv("CLASSROOM_VISION_MODEL", "gpt-4o").strip() or "gpt-4o"
+# Lecture recording: speech to text, one 20-second chunk at a time.
+TRANSCRIBE_MODEL = os.getenv("CLASSROOM_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe").strip() or "gpt-4o-mini-transcribe"
 
 ROLE_MODELS = {BUILD: BUILD_MODEL, LIGHT: LIGHT_MODEL, VISION: VISION_MODEL}
 
@@ -71,6 +74,8 @@ FEATURES = {
     "smart_notes_diagram": CallSpec(LIGHT, 2000),
     "study_aid": CallSpec(LIGHT, 700),
     "study_aid_check": CallSpec(LIGHT, 250),
+    "lecture_notes": CallSpec(LIGHT, 1400),
+    "lecture_cleanup": CallSpec(LIGHT, 6000),
     # VISION
     "page_transcription": CallSpec(VISION, 1800),
     "handwriting": CallSpec(VISION, 800),

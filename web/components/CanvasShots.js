@@ -15,19 +15,7 @@ function Browser({ url, children, height = 220, label }) {
       <rect x="62" y="9" width="250" height="18" rx="9" className="shot-frame" />
       <text x="74" y="22" fontSize="11" style={TEXT} className="shot-text">{url}</text>
       {children}
-      <style jsx global>{`
-        .canvas-shot { display: block; width: 100%; height: auto; }
-        .canvas-shot .shot-frame { fill: var(--shot-frame); }
-        .canvas-shot .shot-edge { stroke: var(--shot-edge); }
-        .canvas-shot .shot-chrome { fill: var(--shot-chrome); }
-        .canvas-shot .shot-line-fill { fill: var(--shot-line); }
-        .canvas-shot .shot-soft { fill: var(--shot-soft); }
-        .canvas-shot .shot-nav { fill: var(--shot-nav); }
-        .canvas-shot .shot-nav-ink { fill: var(--shot-nav-ink); stroke: var(--shot-nav-ink); }
-        .canvas-shot .shot-text { fill: var(--shot-text); }
-        .canvas-shot .shot-link { fill: var(--shot-link); }
-        .canvas-shot .shot-mark { stroke: var(--shot-mark); }
-      `}</style>
+      <ShotStyle />
     </svg>
   );
 }
@@ -76,5 +64,24 @@ export function CanvasFeedLink() {
       <text x="84" y="111" fontSize="11" style={TEXT} className="shot-text">…/feeds/calendars/user_8Kc2.ics</text>
       <Mark cx={200} cy={107} rx={134} ry={20} />
     </Browser>
+  );
+}
+
+// The illustration palette (--shot-* tokens), shared by every drawn screen.
+export function ShotStyle() {
+  return (
+    <style jsx global>{`
+        .canvas-shot { display: block; width: 100%; height: auto; }
+        .canvas-shot .shot-frame { fill: var(--shot-frame); }
+        .canvas-shot .shot-edge { stroke: var(--shot-edge); }
+        .canvas-shot .shot-chrome { fill: var(--shot-chrome); }
+        .canvas-shot .shot-line-fill { fill: var(--shot-line); }
+        .canvas-shot .shot-soft { fill: var(--shot-soft); }
+        .canvas-shot .shot-nav { fill: var(--shot-nav); }
+        .canvas-shot .shot-nav-ink { fill: var(--shot-nav-ink); stroke: var(--shot-nav-ink); }
+        .canvas-shot .shot-text { fill: var(--shot-text); }
+        .canvas-shot .shot-link { fill: var(--shot-link); }
+        .canvas-shot .shot-mark { stroke: var(--shot-mark); }
+      `}</style>
   );
 }

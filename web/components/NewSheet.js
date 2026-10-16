@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, ClipboardPaste, FileImage, FileText, Link as LinkIcon, Mic, Presentation, Sparkles, Square, Upload, X,
+  ArrowLeft, ClipboardPaste, FileImage, FileText, Link as LinkIcon, Mic, Presentation, Sparkles, Upload, X,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
@@ -11,8 +11,10 @@ import { MAX_SOURCE_CHARS, baseName, combinedSource, extractFileText, fileKey, g
 import { NEW_SHEET_EVENT } from '../lib/newSheet';
 import { SAMPLE_GUIDE, SAMPLE_HEADINGS } from '../lib/sampleGuide';
 import { walkthroughEvent } from '../lib/walkthrough';
+import LectureRecorder from './LectureRecorder';
 
 const MAX_FILES = 5;
+const AUDIO_FILE = /\.(mp3|m4a|wav|webm|ogg|aac)$/i;
 const ACCEPT = '.pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.rtf,.png,.jpg,.jpeg,.webp,.heic,image/*';
 
 export const NEW_OPTIONS = [
@@ -113,8 +115,9 @@ export default function NewSheet() {
   const fileInput = useRef(null);
   const dropRef = useRef(null);
   const sheetRef = useRef(null);
-  const recognition = useRef(null);
   const openerRef = useRef(null);
+  const recordingRef = useRef(false);
+  recordingRef.current = recording;
 
   useEffect(() => {
     function onOpen(event) {
@@ -131,7 +134,7 @@ export default function NewSheet() {
   useEffect(() => {
     if (!open) return undefined;
     apiFetch('/folders').then(data => setFolders(data?.folders || []));
-    const onKey = event => { if (event.key === 'Escape') close(); };
+    const onKey = event => { if (event.key === 'Escape' && !recordingRef.current) close(); };
     window.addEventListener('keydown', onKey);
     sheetRef.current?.querySelector('button, input, textarea')?.focus();
     return () => window.removeEventListener('keydown', onKey);
@@ -171,12 +174,12 @@ export default function NewSheet() {
   });
 
   function reset() {
-    recognition.current?.stop();
     setMode(''); setFiles([]); setText(''); setUrl(''); setStatus('idle'); setError(''); setHeadings([]); setShown(0); setJobId(null);
   }
 
   function close() {
-    recognition.current?.stop();
+    // A recording in progress is never thrown away by a stray click or Escape.
+    if (recording) return;
     setOpen(false);
     // A guide still building keeps going in the background (top-right indicator).
     if (status !== 'building') reset();
@@ -187,6 +190,7 @@ export default function NewSheet() {
   function addFiles(list) {
     const problems = [];
     const readable = Array.from(list || []).filter(file => {
+      if (AUDIO_FILE.test(file.name) || /^audio\//.test(file.type)) { problems.push('For audio, use Record, then Upload recording.'); return false; }
       const unsupported = unsupportedFileMessage(file);
       if (unsupported) problems.push(unsupported);
       return !unsupported;
@@ -198,26 +202,6 @@ export default function NewSheet() {
       return merged.slice(0, MAX_FILES);
     });
     setError(problems.join(' '));
-  }
-
-  function toggleRecording() {
-    if (recording) { recognition.current?.stop(); return; }
-    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!Recognition) { setError('Recording needs Chrome or Edge.'); return; }
-    const rec = new Recognition();
-    rec.continuous = true;
-    rec.interimResults = false;
-    rec.lang = navigator.language || 'en-US';
-    rec.onresult = event => {
-      const said = Array.from(event.results).slice(event.resultIndex).filter(result => result.isFinal).map(result => result[0].transcript).join(' ').trim();
-      if (said) setText(current => (current ? current + ' ' : '') + said);
-    };
-    rec.onerror = event => { if (event.error === 'not-allowed') setError('Microphone blocked.'); setRecording(false); };
-    rec.onend = () => setRecording(false);
-    recognition.current = rec;
-    setError('');
-    setRecording(true);
-    rec.start();
   }
 
   async function create() {
@@ -246,31 +230,45 @@ export default function NewSheet() {
         sourceType = 'webpage';
         sourceUrl = href;
       } else {
-        recognition.current?.stop();
         source = text.trim();
         const firstLine = source.split('\n').map(line => line.trim()).find(Boolean) || '';
-        title = mode === 'record'
-          ? `Recording ${new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}`
-          : firstLine.slice(0, 72) || 'Pasted notes';
+        title = firstLine.slice(0, 72) || 'Pasted notes';
         sourceTitle = title;
       }
-      if (source.trim().length < 10) throw new Error('Not enough text to build a guide.');
-      if (source.length > MAX_SOURCE_CHARS) throw new Error(`Too long: ${source.length.toLocaleString()} of ${MAX_SOURCE_CHARS.toLocaleString()} characters.`);
-      const requestId = newRequestId();
-      setHeadings(sourceHeadings(source));
-      setShown(1);
-      setStatus('building');
-      const id = startGuideJob({
-        title,
-        run: () => generateAndSave({
-          source, requestId, title, sourceTitle, sourceType, sourceUrl,
-          externalSourceId: '', folderId, notes: true, flashcards: true, manualPairs: null,
-        }),
-      });
-      setJobId(id);
-      walkthroughEvent('guide-building');
+      startBuild({ source, title, sourceTitle, sourceType, sourceUrl, folderId });
     } catch (caught) {
       setStatus('idle');
+      setError(caught.message || 'Something went wrong.');
+    }
+  }
+
+  // Same live-build card for every source: headings play in while the guide is written.
+  function startBuild({ source, title, sourceTitle, sourceType, sourceUrl = '', folderId: classId = '' }) {
+    if (source.trim().length < 10) throw new Error('Not enough text to build a guide.');
+    if (source.length > MAX_SOURCE_CHARS) throw new Error(`Too long: ${source.length.toLocaleString()} of ${MAX_SOURCE_CHARS.toLocaleString()} characters.`);
+    const requestId = newRequestId();
+    setHeadings(sourceHeadings(source));
+    setShown(1);
+    setStatus('building');
+    const id = startGuideJob({
+      title,
+      run: () => generateAndSave({
+        source, requestId, title, sourceTitle, sourceType, sourceUrl,
+        externalSourceId: '', folderId: classId, notes: true, flashcards: true, manualPairs: null,
+      }),
+    });
+    setJobId(id);
+    walkthroughEvent('guide-building');
+  }
+
+  function buildFromRecording({ title, transcript, folderId: classId }) {
+    const name = (title || '').trim() || `Recording ${new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+    setRecording(false);
+    setError('');
+    if (classId) setFolderId(classId);
+    try {
+      startBuild({ source: transcript, title: name.slice(0, 120), sourceTitle: name.slice(0, 300), sourceType: 'lecture', folderId: classId || folderId });
+    } catch (caught) {
       setError(caught.message || 'Something went wrong.');
     }
   }
@@ -307,10 +305,10 @@ export default function NewSheet() {
       <section ref={sheetRef} className="c-sheet new-sheet" role="dialog" aria-modal="true" aria-labelledby="new-sheet-title" onClick={event => event.stopPropagation()}>
         <header className="c-sheet-head">
           <div className="c-row">
-            {mode && status === 'idle' && <button type="button" className="c-icon-btn" onClick={() => { setMode(''); setError(''); }} aria-label="Back"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>}
+            {mode && status === 'idle' && !recording && <button type="button" className="c-icon-btn" onClick={() => { setMode(''); setError(''); }} aria-label="Back"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>}
             <h2 id="new-sheet-title" className="c-title">{status === 'building' ? 'Building' : 'New guide'}</h2>
           </div>
-          <button type="button" className="c-icon-btn" onClick={close} aria-label="Close"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+          <button type="button" className="c-icon-btn" onClick={close} aria-label="Close" disabled={recording} title={recording ? 'Stop the recording first' : undefined}><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         </header>
 
         {status === 'building' ? (
@@ -359,20 +357,9 @@ export default function NewSheet() {
               </label>
             )}
             {mode === 'record' && (
-              <>
-                <button type="button" className={'new-record' + (recording ? ' is-on' : '')} onClick={toggleRecording} aria-pressed={recording}>
-                  {recording ? <Square size={28} strokeWidth={1.75} aria-hidden="true" /> : <Mic size={28} strokeWidth={1.75} aria-hidden="true" />}
-                  <span>{recording ? 'Stop' : 'Record'}</span>
-                </button>
-                {(text || recording) && (
-                  <label className="c-field">
-                    <span className="sr-only">Transcript</span>
-                    <textarea className="c-input new-text" value={text} onChange={event => setText(event.target.value)} aria-label="Transcript" />
-                  </label>
-                )}
-              </>
+              <LectureRecorder folders={folders} folderId={folderId} onFolder={setFolderId} onActiveChange={setRecording} onDone={buildFromRecording} />
             )}
-            {folders.length > 0 && (
+            {folders.length > 0 && mode !== 'record' && (
               <label className="c-field new-class">
                 <span>Class</span>
                 <select className="c-select" value={folderId} onChange={event => setFolderId(event.target.value)}>
@@ -386,7 +373,7 @@ export default function NewSheet() {
 
         {error && <p className="new-error" role="alert">{error}</p>}
 
-        {mode && mode !== 'sample' && status !== 'building' && (
+        {mode && mode !== 'sample' && mode !== 'record' && status !== 'building' && (
           <div className="new-foot">
             <button type="button" className="c-btn c-btn--quiet" onClick={() => { close(); router.push('/create'); }}>Write cards</button>
             <button type="button" className="c-btn c-btn--primary" onClick={create} disabled={!ready || status !== 'idle'}>
@@ -409,8 +396,6 @@ export default function NewSheet() {
         .new-files li { display: flex; align-items: center; gap: 10px; padding-left: 12px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); }
         .new-files li span { flex: 1; min-width: 0; }
         .new-text { min-height: 200px; }
-        .new-record { display: grid; justify-items: center; gap: 10px; justify-self: center; width: 128px; height: 128px; align-content: center; border: 0; border-radius:50%; background: var(--olive); color: var(--on-olive); font:600 15px/1 var(--font-sans); cursor: pointer; }
-        .new-record.is-on { background: var(--error-solid); }
         .new-class { max-width: 280px; }
         .new-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 20px; }
         .new-error { margin: 16px 0 0; color: var(--error); font:600 15px/1.5 var(--font-sans); }

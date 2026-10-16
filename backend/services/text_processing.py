@@ -438,3 +438,50 @@ def inject_page_image_descriptions(text: str, image_descriptions: dict) -> str:
         text += "\n\n" + "\n\n".join(additions)
 
     return text
+
+
+# ── Lecture transcripts ──────────────────────────────────────────────────────
+# Recording uploads 20-second chunks that overlap by about 2 seconds, so each chunk's
+# opening words usually repeat the end of the previous one. These helpers run before any
+# AI step: the overlap is removed here, not by asking a model to ignore it.
+
+_WORD = re.compile(r"[\w'’]+", re.UNICODE)
+_FILLERS = re.compile(r",?\s*\b(?:um+|uh+|erm+|hmm+|mm+|uh-huh)\b[,.]?(?=\s|$)", re.IGNORECASE)
+
+
+def _norm_words(text: str) -> List[str]:
+    return [w.lower().replace("’", "'") for w in _WORD.findall(text or "")]
+
+
+def merge_overlap(previous_tail: str, new_text: str, max_words: int = 30) -> str:
+    """Drop the opening words of `new_text` that repeat the end of `previous_tail`.
+
+    Finds the longest run (at least 2 words, at most `max_words`) where the last words of
+    the previous transcript equal the first words of the new chunk, then cuts it from the
+    new chunk while keeping its original spelling and punctuation."""
+    new_text = (new_text or "").strip()
+    tail = _norm_words(previous_tail)[-max_words:]
+    head = _norm_words(new_text)[:max_words]
+    best = 0
+    for size in range(min(len(tail), len(head)), 1, -1):
+        if tail[-size:] == head[:size]:
+            best = size
+            break
+    if not best:
+        return new_text
+    matches = list(_WORD.finditer(new_text))
+    cut = matches[best - 1].end()
+    return new_text[cut:].lstrip(" ,.;:-–—").strip()
+
+
+def clean_spoken_text(text: str) -> str:
+    """Remove spoken fillers and doubled spaces; keeps every substantive word."""
+    text = _FILLERS.sub(" ", text or "")
+    text = re.sub(r"\b(\w+)( \1\b)+", r"\1", text, flags=re.IGNORECASE)  # "the the" -> "the"
+    return re.sub(r"[ \t]{2,}", " ", text).strip()
+
+
+def transcript_text(segments: list) -> str:
+    """Join timed transcript segments ({start_ms, text}) into one cleaned text, in order."""
+    ordered = sorted((s for s in segments or [] if (s.get("text") or "").strip()), key=lambda s: int(s.get("start_ms") or 0))
+    return clean_spoken_text(" ".join(s["text"].strip() for s in ordered))

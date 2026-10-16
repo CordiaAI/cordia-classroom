@@ -105,6 +105,17 @@ async function install(context, state) {
     }
     if ((m = path.match(/^\/quiz\/([^/]+)\/submit$/))) return json({ score: 67 });
     if ((m = path.match(/^\/practice\/([^/]+)\/state$/))) return json({ practice: null });
+    if (path === '/generate') return json({ study_guide: 'Q1: Where is ATP made?\nA1: In the mitochondria, through cellular respiration.', notes: '- ATP stores energy', flashcards: [{ front: 'ATP', back: 'Energy carrier' }] });
+    if (path === '/lectures/usage') return json({ minutes_used: 36, minutes_limit: 120, minutes_left: 84, plan: 'free' });
+    if (path === '/lectures/terms') return json({ terms: ['mitochondria', 'ATP'] });
+    if (path === '/lectures/chunk') {
+      const seq = Number((req.postData() || '').match(/name="seq"\r\n\r\n(\d+)/)?.[1] || 0);
+      state.lectureChunks = [...(state.lectureChunks || []), seq];
+      return json({ text: `Part ${seq + 1} of the lecture covers cell energy and ATP.`, minutes_charged: 0 });
+    }
+    if (path === '/lectures/notes') return json({ notes: [{ kind: 'heading', text: 'Cell energy', at_ms: 0 }, { kind: 'exam', text: 'ATP is made in mitochondria', at_ms: 20000 }], class_id: state.folders[0]?.id || '' });
+    if (path === '/lectures/finish') return json({ title: 'Cell Energy and ATP', transcript: (body.segments || []).map(s => s.text).join(' ') + ' Mitochondria make ATP through respiration.\nATP stores energy.\nCells use ATP for work.' });
+    if (path === '/lectures/transcribe-file') return json({ segments: [{ start_ms: 0, text: 'An uploaded lecture about the Krebs cycle and how cells make energy in plain terms.' }] });
     if (path === '/billing/status') return json({ plan: 'free', features: { guide: { used: 1, limit: 3 }, tutor: { used: 2, limit: 10 }, learn_my_way: { used: 0, limit: 5 }, retain_types: { remaining: 1 } }, trial_available: true });
     if (path === '/learning-style') return json({ enabled: false, style: null });
     if (path === '/explanation-preference') return json({ text: '' });

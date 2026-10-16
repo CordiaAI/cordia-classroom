@@ -34,6 +34,8 @@ LIMITS = {
         "exam": 1,
         "retain_types": 1,
         "light": 30,
+        # Lecture recording, counted in minutes of audio transcribed.
+        "lecture_minute": 120,
     },
     "pro": {
         "guide": 100,
@@ -45,6 +47,7 @@ LIMITS = {
         "exam": 50,
         "retain_types": 300,
         "light": 500,
+        "lecture_minute": 1500,
     },
 }
 FEATURES = tuple(LIMITS["free"])
@@ -59,6 +62,7 @@ FEATURE_LABELS = {
     "exam": "practice exams",
     "retain_types": "Pro quiz sessions",
     "light": "AI reading actions",
+    "lecture_minute": "recording minutes",
 }
 FEATURE_SINGULAR = {
     "guide": "study guide",
@@ -70,6 +74,7 @@ FEATURE_SINGULAR = {
     "exam": "practice exam",
     "retain_types": "Pro quiz session",
     "light": "AI reading action",
+    "lecture_minute": "recording minute",
 }
 
 

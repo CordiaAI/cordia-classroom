@@ -38,7 +38,7 @@ from services.llm import (
     transcribe_document_pages,
     study_guide_is_complete, study_guide_to_flashcards,
 )
-from routers import auth, folders, guides, stats, search, quiz, billing, nclex, exam, feedback, smart_notes, calendar, tutor, learning
+from routers import auth, folders, guides, stats, search, quiz, billing, nclex, exam, feedback, smart_notes, calendar, tutor, learning, lectures
 from auth_utils import get_user_id
 from database import get_supabase
 from services.entitlements import record, require
@@ -172,6 +172,7 @@ app.include_router(smart_notes.router)
 app.include_router(calendar.router)
 app.include_router(tutor.router)
 app.include_router(learning.router)
+app.include_router(lectures.router)
 
 def _style_instruction(user_id: str) -> str:
     """Tutor presentation: the chosen study style and the student's own explanation request."""
