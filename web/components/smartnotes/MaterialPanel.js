@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useFileDropZone } from '../../lib/fileDrop';
 import { notesRequest } from '../../lib/smartnotes';
-import FileViewer from './FileViewer';
+import FileViewer, { ACCEPTED_FILE_TYPES } from './FileViewer';
 
 // Class material beside the notes: an opened or dropped file, or one of the student's study guides.
 export default function MaterialPanel({ onError }) {
@@ -57,7 +57,7 @@ export default function MaterialPanel({ onError }) {
           <input
             ref={fileInputRef}
             type="file"
-            accept="*/*"
+            accept={ACCEPTED_FILE_TYPES}
             onChange={handleFileSelect}
             style={{ display: 'none' }}
           />

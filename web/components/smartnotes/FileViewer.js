@@ -19,6 +19,9 @@ const TEXT_EXTS = new Set([
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico']);
 const VIDEO_EXTS = new Set(['mp4', 'webm', 'ogv', 'mov']);
 const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'm4a', 'flac']);
+// What the file picker offers: every type this viewer can show.
+export const ACCEPTED_FILE_TYPES = ['pdf', ...SLIDE_EXTS, ...EXTRACT_EXTS, ...TEXT_EXTS, ...IMAGE_EXTS, ...VIDEO_EXTS, ...AUDIO_EXTS]
+  .map(ext => '.' + ext).join(',');
 // Shown straight from the file through an object URL (slides get a rendered PDF instead).
 const isEmbeddable = ext => ext === 'pdf' || IMAGE_EXTS.has(ext) || VIDEO_EXTS.has(ext) || AUDIO_EXTS.has(ext);
 
