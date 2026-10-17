@@ -97,8 +97,8 @@ def load_preference(supabase, user_id: str) -> dict:
             .limit(1) \
             .execute()
         return (result.data or [{}])[0]
-    except Exception as e:
-        logger.warning(f"Learning preference unavailable: {e}")
+    except Exception:
+        logger.warning("Learning preference unavailable", exc_info=True)
         return {}
 
 
@@ -257,28 +257,22 @@ def _source_block(item: dict, related: List[dict]) -> str:
 def generate_study_aid(mode: str, item: dict, related: List[dict]) -> Optional[dict]:
     """Generate and validate one study aid; returns None when the model output is unusable."""
     client = get_openai_client()
-    if not client or mode not in VALIDATORS:
+    if mode not in VALIDATORS:
         return None
-    try:
-        response = chat(client, "study_aid",
-            messages=[
-                {"role": "system", "content": f"You create a study aid for one item from a student's study guide.\n{GROUNDING_RULES}\n\n{MODE_PROMPTS[mode]}"},
-                {"role": "user", "content": _source_block(item, related)},
-            ],
-            temperature=0.3,
-            response_format={"type": "json_object"},
-        )
-        return VALIDATORS[mode](_practice_json(response.choices[0].message.content))
-    except Exception as e:
-        logger.error(f"Study aid generation failed mode={mode}: {e}")
-        return None
+    response = chat(client, "study_aid",
+        messages=[
+            {"role": "system", "content": f"You create a study aid for one item from a student's study guide.\n{GROUNDING_RULES}\n\n{MODE_PROMPTS[mode]}"},
+            {"role": "user", "content": _source_block(item, related)},
+        ],
+        temperature=0.3,
+        response_format={"type": "json_object"},
+    )
+    return VALIDATORS[mode](_practice_json(response.choices[0].message.content))
 
 
 def check_attempt(item: dict, task: str, expected: str, attempt: str) -> Optional[dict]:
     """Feedback on the student's own explanation or application, judged only against the source."""
     client = get_openai_client()
-    if not client:
-        return None
     system = (
         "You give brief, encouraging feedback on a student's attempt, judged only against the SOURCE answer. "
         "Say what the attempt gets right, name the most important missing or incorrect point, and invite one "
@@ -292,16 +286,12 @@ def check_attempt(item: dict, task: str, expected: str, attempt: str) -> Optiona
         f"TASK GIVEN TO THE STUDENT\n{task}\n\nEXPECTED REASONING\n{expected or item['answer']}\n\n"
         f"STUDENT ATTEMPT\n{attempt}"
     )
-    try:
-        response = chat(client, "study_aid_check",
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            temperature=0.2,
-            response_format={"type": "json_object"},
-        )
-        payload = _practice_json(response.choices[0].message.content)
-    except Exception as e:
-        logger.error(f"Study aid check failed: {e}")
-        return None
+    response = chat(client, "study_aid_check",
+        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        temperature=0.2,
+        response_format={"type": "json_object"},
+    )
+    payload = _practice_json(response.choices[0].message.content)
     verdict = payload.get("verdict")
     feedback = str(payload.get("feedback") or "").strip()[:800]
     if verdict not in {"got_it", "partly", "not_yet"} or not feedback:

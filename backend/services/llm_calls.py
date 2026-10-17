@@ -13,8 +13,8 @@ def _insert_usage(row: dict) -> None:
     try:
         from database import get_supabase
         get_supabase().table("usage_events").insert(row).execute()
-    except Exception as e:
-        logger.warning(f"usage_events insert failed: {e}")
+    except Exception:
+        logger.warning("usage_events insert failed", exc_info=True)
 
 
 def log_usage(response, feature: str, model: str, user_id: Optional[str] = None) -> None:
@@ -35,8 +35,8 @@ def log_usage(response, feature: str, model: str, user_id: Optional[str] = None)
         logger.info("usage feature=%s model=%s prompt=%d completion=%d cached=%d",
                     feature, model, row["prompt_tokens"], row["completion_tokens"], row["cached_tokens"])
         threading.Thread(target=_insert_usage, args=(row,), daemon=True).start()
-    except Exception as e:
-        logger.warning(f"usage logging failed: {e}")
+    except Exception:
+        logger.warning("usage logging failed", exc_info=True)
 
 
 def chat(client, feature: str, *, model: Optional[str] = None, max_tokens: Optional[int] = None, **kwargs):

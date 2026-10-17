@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from openai import APIError, RateLimitError
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -41,6 +42,15 @@ app = FastAPI(
 # Attach rate limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(APIError)
+async def openai_error(request: Request, error: APIError):
+    """One place that turns a failed OpenAI call into an answer the student can act on."""
+    logger.error("OpenAI call failed request_id=%s path=%s", request.state.request_id, request.url.path, exc_info=error)
+    if isinstance(error, RateLimitError):
+        return JSONResponse(status_code=503, content={"detail": "Cordia's AI is busy right now. Please try again in a minute."})
+    return JSONResponse(status_code=502, content={"detail": "Cordia's AI service had a problem. Please try again."})
 
 # CORS — restrict to known origins
 ALLOWED_ORIGINS = [

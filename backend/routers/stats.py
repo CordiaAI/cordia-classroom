@@ -7,7 +7,7 @@ import re
 import json
 import logging
 from datetime import date, datetime, timedelta
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, Header, Request
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
@@ -114,7 +114,6 @@ class LogSessionRequest(BaseModel):
     @field_validator("metadata")
     @classmethod
     def validate_metadata(cls, v):
-        import json
         if v and len(json.dumps(v)) > 10_000:
             raise ValueError("Metadata too large")
         return v
@@ -162,80 +161,74 @@ def get_streak(authorization: str = Header(default=""), tz_offset: int = 0):
     tz_offset: minutes from UTC (e.g. -300 for EST). Used to determine
     the user's local day boundaries (12:00 AM - 11:59:59 PM).
     """
-    try:
-        # Clamp offset to valid range (-720 to +840 minutes)
-        tz_offset = max(-720, min(840, tz_offset))
+    # Clamp offset to valid range (-720 to +840 minutes)
+    tz_offset = max(-720, min(840, tz_offset))
 
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        # Determine "today" in the user's local timezone
-        user_now = datetime.utcnow() + timedelta(minutes=tz_offset)
-        user_today = user_now.date()
+    # Determine "today" in the user's local timezone
+    user_now = datetime.utcnow() + timedelta(minutes=tz_offset)
+    user_today = user_now.date()
 
-        result = supabase.table("user_streaks").select("*").eq("user_id", user_id).execute()
+    result = supabase.table("user_streaks").select("*").eq("user_id", user_id).execute()
 
-        if not result.data:
-            # Build empty Sunday-aligned week
-            days_since_sunday = (user_today.weekday() + 1) % 7
-            sunday = user_today - timedelta(days=days_since_sunday)
-            week = [{"date": str(sunday + timedelta(days=i)), "active": False} for i in range(7)]
-            return {
-                "current_streak": 0,
-                "longest_streak": 0,
-                "last_study_date": None,
-                "studied_today": False,
-                "week": week
-            }
-
-        streak = result.data[0]
-
-        # Study sessions are the source of truth; bucket them by the user's local day so the
-        # streak, week dots, and "studied today" agree (streak rows are written in server UTC).
-        window_start = datetime(user_today.year, user_today.month, user_today.day) - timedelta(days=400, minutes=tz_offset)
-        sessions = supabase.table("study_sessions") \
-            .select("started_at") \
-            .eq("user_id", user_id) \
-            .gte("started_at", window_start.isoformat()) \
-            .order("started_at", desc=True) \
-            .limit(5000) \
-            .execute()
-
-        active_days = set()
-        for s in (sessions.data or []):
-            ts = s["started_at"]
-            try:
-                utc_dt = datetime.fromisoformat(ts.replace("Z", "+00:00").replace("+00:00", ""))
-                active_days.add((utc_dt + timedelta(minutes=tz_offset)).date())
-            except (ValueError, AttributeError):
-                continue
-
-        studied_today = user_today in active_days
-        day = user_today if studied_today else user_today - timedelta(days=1)
-        current = 0
-        while day in active_days:
-            current += 1
-            day -= timedelta(days=1)
-
-        # Sunday-aligned week: weekday() Mon=0 .. Sun=6  →  days_since_sunday = (weekday+1)%7
-        sunday = user_today - timedelta(days=(user_today.weekday() + 1) % 7)
-        week = []
-        for i in range(7):
-            d = sunday + timedelta(days=i)
-            week.append({"date": str(d), "active": d in active_days})
-
+    if not result.data:
+        # Build empty Sunday-aligned week
+        days_since_sunday = (user_today.weekday() + 1) % 7
+        sunday = user_today - timedelta(days=days_since_sunday)
+        week = [{"date": str(sunday + timedelta(days=i)), "active": False} for i in range(7)]
         return {
-            "current_streak": current,
-            "longest_streak": max(streak["longest_streak"] or 0, current),
-            "last_study_date": streak["last_study_date"],
-            "studied_today": studied_today,
+            "current_streak": 0,
+            "longest_streak": 0,
+            "last_study_date": None,
+            "studied_today": False,
             "week": week
         }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting streak: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get streak")
+
+    streak = result.data[0]
+
+    # Study sessions are the source of truth; bucket them by the user's local day so the
+    # streak, week dots, and "studied today" agree (streak rows are written in server UTC).
+    window_start = datetime(user_today.year, user_today.month, user_today.day) - timedelta(days=400, minutes=tz_offset)
+    sessions = supabase.table("study_sessions") \
+        .select("started_at") \
+        .eq("user_id", user_id) \
+        .gte("started_at", window_start.isoformat()) \
+        .order("started_at", desc=True) \
+        .limit(5000) \
+        .execute()
+
+    active_days = set()
+    for s in (sessions.data or []):
+        ts = s["started_at"]
+        try:
+            utc_dt = datetime.fromisoformat(ts.replace("Z", "+00:00").replace("+00:00", ""))
+            active_days.add((utc_dt + timedelta(minutes=tz_offset)).date())
+        except (ValueError, AttributeError):
+            continue
+
+    studied_today = user_today in active_days
+    day = user_today if studied_today else user_today - timedelta(days=1)
+    current = 0
+    while day in active_days:
+        current += 1
+        day -= timedelta(days=1)
+
+    # Sunday-aligned week: weekday() Mon=0 .. Sun=6  →  days_since_sunday = (weekday+1)%7
+    sunday = user_today - timedelta(days=(user_today.weekday() + 1) % 7)
+    week = []
+    for i in range(7):
+        d = sunday + timedelta(days=i)
+        week.append({"date": str(d), "active": d in active_days})
+
+    return {
+        "current_streak": current,
+        "longest_streak": max(streak["longest_streak"] or 0, current),
+        "last_study_date": streak["last_study_date"],
+        "studied_today": studied_today,
+        "week": week
+    }
 
 
 @router.get("/overview")
@@ -298,8 +291,8 @@ def get_overview(authorization: str = Header(default="")):
         overview["minutes_today"] = sum(
             s.get("duration_seconds", 0) for s in (today_sessions.data or [])
         ) // 60
-    except Exception as e:
-        logger.warning("Returning partial overview after database error: %s", e)
+    except Exception:
+        logger.warning("Returning partial overview after database error", exc_info=True)
     return overview
 
 
@@ -307,42 +300,30 @@ def get_overview(authorization: str = Header(default="")):
 def get_study_insights(authorization: str = Header(default="")):
     """Strengths, weak spots, and research-backed study tips from the student's own results."""
     from services.study_insights import build_insights
-    try:
-        data = _student_results(get_user_id(authorization))
-        results, _ = _graded_items(data)
-        return build_insights(results, data["sessions"])
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error building study insights: {e}")
-        raise HTTPException(status_code=500, detail="Could not load your study insights")
+    data = _student_results(get_user_id(authorization))
+    results, _ = _graded_items(data)
+    return build_insights(results, data["sessions"])
 
 
 @router.post("/log-session")
 def log_session(request: LogSessionRequest, authorization: str = Header(default="")):
     """Log a study session and update streak."""
-    try:
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        data = {
-            "user_id": user_id,
-            "session_type": request.session_type,
-            "duration_seconds": request.duration_seconds,
-            "metadata": request.metadata or {}
-        }
-        if request.guide_id:
-            data["guide_id"] = request.guide_id
+    data = {
+        "user_id": user_id,
+        "session_type": request.session_type,
+        "duration_seconds": request.duration_seconds,
+        "metadata": request.metadata or {}
+    }
+    if request.guide_id:
+        data["guide_id"] = request.guide_id
 
-        supabase.table("study_sessions").insert(data).execute()
-        _update_streak(user_id)
+    supabase.table("study_sessions").insert(data).execute()
+    _update_streak(user_id)
 
-        return {"logged": True}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error logging session: {e}")
-        raise HTTPException(status_code=500, detail="Failed to log session")
+    return {"logged": True}
 
 
 @router.post("/beacon")
@@ -351,44 +332,40 @@ async def beacon_session(request: Request):
     Parses raw body since sendBeacon may send as text/plain."""
     try:
         data = json.loads(await request.body())
-    except Exception:
+    except ValueError:
         return {"logged": False}
     # Database writes run in a worker thread so they never stall other requests.
     return await run_in_threadpool(_log_beacon_session, data)
 
 
 def _log_beacon_session(data) -> dict:
-    try:
-        if not isinstance(data, dict):
-            return {"logged": False}
-        auth = data.get("authorization", "")
-        if not auth:
-            return {"logged": False}
-
-        user_id = get_user_id(auth)
-        supabase = get_supabase()
-
-        session_type = data.get("session_type", "browse")
-        allowed = {"flashcard", "quiz", "read", "timer", "browse"}
-        if session_type not in allowed:
-            session_type = "browse"
-
-        duration = min(max(int(data.get("duration_seconds", 0)), 0), 86400)
-
-        row = {
-            "user_id": user_id,
-            "session_type": session_type,
-            "duration_seconds": duration,
-            "metadata": {}
-        }
-        guide_id = data.get("guide_id")
-        if guide_id and _UUID_RE.match(guide_id):
-            row["guide_id"] = guide_id
-
-        supabase.table("study_sessions").insert(row).execute()
-        _update_streak(user_id)
-
-        return {"logged": True}
-    except Exception as e:
-        logger.error(f"Error in beacon session: {e}")
+    if not isinstance(data, dict):
         return {"logged": False}
+    auth = data.get("authorization", "")
+    if not auth:
+        return {"logged": False}
+
+    user_id = get_user_id(auth)
+    supabase = get_supabase()
+
+    session_type = data.get("session_type", "browse")
+    allowed = {"flashcard", "quiz", "read", "timer", "browse"}
+    if session_type not in allowed:
+        session_type = "browse"
+
+    duration = min(max(int(data.get("duration_seconds", 0)), 0), 86400)
+
+    row = {
+        "user_id": user_id,
+        "session_type": session_type,
+        "duration_seconds": duration,
+        "metadata": {}
+    }
+    guide_id = data.get("guide_id")
+    if guide_id and _UUID_RE.match(guide_id):
+        row["guide_id"] = guide_id
+
+    supabase.table("study_sessions").insert(row).execute()
+    _update_streak(user_id)
+
+    return {"logged": True}

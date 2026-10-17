@@ -127,7 +127,7 @@ def _organize(material: Material, class_id: Optional[str], authorization: str) -
 
 def _build_practice(user_id: str, material: Material) -> tuple:
     practice = generate_practice_guide(material.content, learning_guidance(user_id))
-    if not practice or practice.startswith("[Error"):
+    if not practice:
         raise HTTPException(status_code=502, detail="Cordia could not create practice problems from this material")
     cards = study_guide_to_flashcards(practice)
     if not cards or not study_guide_is_complete(practice):
