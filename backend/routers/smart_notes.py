@@ -6,21 +6,15 @@ from pydantic import BaseModel, field_validator
 from typing import Optional
 from database import get_supabase
 from auth_utils import get_user_id
+from ids import is_uuid, require_uuid
 from services.entitlements import record, require
 from services.llm import (
     generate_study_guide_from_notes, get_openai_client, study_guide_is_complete, study_guide_to_flashcards,
 )
 from services.llm_calls import chat
 
-_UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
 router = APIRouter(prefix="/smart_notes", tags=["smart_notes"])
-
-
-def _validate_uuid(value: str, name: str = "ID") -> str:
-    if not value or not _UUID_RE.match(value):
-        raise HTTPException(status_code=400, detail=f"Invalid {name}")
-    return value
 
 
 class CreateNoteRequest(BaseModel):
@@ -52,7 +46,7 @@ class UpdateNoteRequest(BaseModel):
     def validate_folder_id(cls, v):
         if v in (None, ""):
             return v
-        if not _UUID_RE.match(v):
+        if not is_uuid(v):
             raise ValueError("Invalid folder ID")
         return v
 
@@ -96,7 +90,7 @@ def create_note(request: CreateNoteRequest, authorization: str = Header(default=
 
 @router.get("/{note_id}")
 def get_note(note_id: str, authorization: str = Header(default="")):
-    _validate_uuid(note_id, "note ID")
+    require_uuid(note_id, "note ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
     result = supabase.table("smart_notes") \
@@ -111,7 +105,7 @@ def get_note(note_id: str, authorization: str = Header(default="")):
 
 @router.put("/{note_id}")
 def update_note(note_id: str, request: UpdateNoteRequest, authorization: str = Header(default="")):
-    _validate_uuid(note_id, "note ID")
+    require_uuid(note_id, "note ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
@@ -149,7 +143,7 @@ def update_note(note_id: str, request: UpdateNoteRequest, authorization: str = H
 
 @router.delete("/{note_id}")
 def delete_note(note_id: str, authorization: str = Header(default="")):
-    _validate_uuid(note_id, "note ID")
+    require_uuid(note_id, "note ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
     supabase.table("smart_notes") \
@@ -167,7 +161,7 @@ def generate_study_guide_from_note(note_id: str, authorization: str = Header(def
     user picks Approve (which posts to /guides), Edit (manual editor),
     or Cancel.
     """
-    _validate_uuid(note_id, "note ID")
+    require_uuid(note_id, "note ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 

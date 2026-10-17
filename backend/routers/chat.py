@@ -12,6 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Request
 
 from auth_utils import get_user_id
+from ids import require_uuid
 from database import get_supabase
 from rate_limit import limiter
 from routers import guides, smart_notes
@@ -34,7 +35,6 @@ MAX_CONTENT_LENGTH = 500_000
 TUTOR_CONTEXT_TOKENS = int(os.getenv("CLASSROOM_TUTOR_CONTEXT_TOKENS", "128000"))
 TUTOR_RESERVED_TOKENS = 6_000
 CONTEXT_FULL = "context_window_full"
-UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", re.IGNORECASE)
 PRACTICE_REQUEST = re.compile(r"\b(create|make|generate|build)\b.*\bpractice\b.*\b(problems?|questions?|guide)\b", re.IGNORECASE)
 BROWSER_SKILLS = {
     "capture": ("capture_current_page", "Working in the browser side panel now. Keep it open while I read the current page."),
@@ -60,8 +60,7 @@ class Material:
 
 
 def _owned_row(table: str, columns: str, row_id: str, user_id: str, kind: str) -> dict:
-    if not UUID.fullmatch(row_id):
-        raise HTTPException(status_code=400, detail=f"Invalid {kind} ID")
+    require_uuid(row_id, f"{kind} ID")
     result = get_supabase().table(table).select(columns).eq("id", row_id).eq("user_id", user_id).execute()
     if not result.data:
         raise HTTPException(status_code=404, detail=f"{kind.capitalize()} not found")

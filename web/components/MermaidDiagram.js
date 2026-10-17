@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 let renderCount = 0;
 
 // Renders Mermaid source with strict security; AI-written diagrams never get script or HTML labels.
-export default function MermaidDiagram({ code, label = 'Diagram' }) {
+export default function MermaidDiagram({ code, label = 'Diagram', className = 'study-aid-diagram' }) {
   const ref = useRef(null);
   const [error, setError] = useState(false);
 
@@ -22,5 +22,5 @@ export default function MermaidDiagram({ code, label = 'Diagram' }) {
   }, [code]);
 
   if (error) return <pre className="study-aid-diagram-fallback">{code}</pre>;
-  return <div ref={ref} className="study-aid-diagram" role="img" aria-label={label} />;
+  return <div ref={ref} className={className} role="img" aria-label={label} />;
 }

@@ -3,7 +3,6 @@ Stats router for CordiaClassroom.
 Handles streak tracking, study session logging, and overview statistics.
 """
 
-import re
 import json
 import logging
 from datetime import date, datetime, timedelta
@@ -13,8 +12,8 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from database import get_supabase
 from auth_utils import get_user_id
+from ids import is_uuid
 
-_UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/stats", tags=["stats"])
@@ -107,7 +106,7 @@ class LogSessionRequest(BaseModel):
     @field_validator("guide_id")
     @classmethod
     def validate_guide_id(cls, v):
-        if v is not None and not _UUID_RE.match(v):
+        if v is not None and not is_uuid(v):
             raise ValueError("Invalid guide ID")
         return v
 
@@ -362,7 +361,7 @@ def _log_beacon_session(data) -> dict:
         "metadata": {}
     }
     guide_id = data.get("guide_id")
-    if guide_id and _UUID_RE.match(guide_id):
+    if guide_id and is_uuid(guide_id):
         row["guide_id"] = guide_id
 
     supabase.table("study_sessions").insert(row).execute()

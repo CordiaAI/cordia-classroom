@@ -3,7 +3,6 @@ NCLEX router for CordiaClassroom.
 Generates clinical scenario MCQ and SATA questions with rationales from study guide content.
 """
 
-import re
 import logging
 from fastapi import APIRouter, HTTPException, Header, Depends
 from rate_limit import ai_rate_limit
@@ -12,18 +11,12 @@ from typing import List
 from database import get_supabase
 from services.llm import generate_nclex_questions
 from auth_utils import get_user_id
+from ids import require_uuid
 from services.entitlements import record, require
 
-_UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/nclex", tags=["nclex"])
-
-
-def _validate_uuid(value: str, name: str = "ID") -> str:
-    if not value or not _UUID_RE.match(value):
-        raise HTTPException(status_code=400, detail=f"Invalid {name}")
-    return value
 
 
 class NCLEXAnswer(BaseModel):
@@ -39,7 +32,7 @@ class NCLEXSubmission(BaseModel):
 @router.get("/{guide_id}/generate", dependencies=[Depends(ai_rate_limit())])
 def generate_nclex(guide_id: str, authorization: str = Header(default="")):
     """Generate NCLEX-style questions from a saved study guide."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
@@ -88,7 +81,7 @@ def generate_nclex(guide_id: str, authorization: str = Header(default="")):
 @router.post("/{guide_id}/submit")
 def submit_nclex(guide_id: str, submission: NCLEXSubmission, authorization: str = Header(default="")):
     """Submit NCLEX quiz answers and save results."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 

@@ -15,19 +15,13 @@ from database import get_supabase
 from services.llm import get_openai_client, grade_written_answer
 from services.llm_calls import chat
 from auth_utils import get_user_id
+from ids import require_uuid
 from services import retain
 from services.entitlements import plan_for, record, remaining, require, subscription_row
 
-_UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/quiz", tags=["quiz"])
-
-
-def _validate_uuid(value: str, name: str = "ID") -> str:
-    if not value or not _UUID_RE.match(value):
-        raise HTTPException(status_code=400, detail=f"Invalid {name}")
-    return value
 
 
 class QuizAnswer(BaseModel):
@@ -151,7 +145,7 @@ def _save_quiz(supabase, guide_id: str, user_id: str, questions: list) -> None:
 
 def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False):
     """Load or generate a Retain quiz, optionally replacing saved distractors."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
@@ -317,7 +311,7 @@ def start_session(guide_id: str, body: SessionRequest, authorization: str = Head
 @router.post("/{guide_id}/grade")
 def grade_written(guide_id: str, body: WrittenAnswer, authorization: str = Header(default="")):
     """Mark one written answer with full, partial or no credit, signed so the score can be trusted."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     questions = _saved_questions(get_supabase(), guide_id, user_id)
     if body.concept >= len(questions):
@@ -358,7 +352,7 @@ def _checked_attempts(supabase, guide_id: str, user_id: str, attempts: list) -> 
 @router.post("/{guide_id}/submit")
 def submit_quiz(guide_id: str, submission: QuizSubmission, authorization: str = Header(default="")):
     """Save a finished session. The score is first-try credit; practice after a miss never lowers it."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
@@ -401,7 +395,7 @@ def submit_quiz(guide_id: str, submission: QuizSubmission, authorization: str = 
 @router.get("/{guide_id}/history")
 def quiz_history(guide_id: str, authorization: str = Header(default="")):
     """Get quiz attempt history for a guide."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
