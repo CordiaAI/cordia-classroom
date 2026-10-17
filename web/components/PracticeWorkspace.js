@@ -164,7 +164,7 @@ export default function PracticeWorkspace() {
       setWorkText({});
       setReported({});
       drawings.current = {};
-      try { localStorage.removeItem(drawingsKey(guideId)); } catch {}
+      try { localStorage.removeItem(drawingsKey(guideId)); } catch { /* storage blocked: nothing was saved */ }
     } else {
       setError(apiErrorMessage(data?.detail, 'Cordia could not create the practice set.'));
     }
@@ -225,7 +225,7 @@ export default function PracticeWorkspace() {
   }
 
   function saveDrawings() {
-    try { localStorage.setItem(drawingsKey(guideId), JSON.stringify(drawings.current)); } catch {}
+    try { localStorage.setItem(drawingsKey(guideId), JSON.stringify(drawings.current)); } catch { /* storage blocked or full: drawings stay for this visit */ }
   }
 
   function endDraw() {

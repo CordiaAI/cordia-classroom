@@ -219,7 +219,7 @@ export async function authorizedFetch(path, options = {}) {
   let response = await request();
   if (response.status === 401 && await tryRefreshToken()) response = await request();
   if (response.status === 402) {
-    response.clone().json().then(data => announceLimit(response, data)).catch(() => {});
+    response.clone().json().then(data => announceLimit(response, data)).catch(() => { /* no readable limit details: the caller still gets the 402 */ });
   }
   return response;
 }
