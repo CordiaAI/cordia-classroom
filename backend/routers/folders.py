@@ -3,21 +3,14 @@ Folders router for CordiaClassroom.
 Handles CRUD operations for class folders.
 """
 
-import re
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, field_validator
 from database import get_supabase
 from auth_utils import get_user_id
+from ids import require_uuid
 
-_UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
 router = APIRouter(prefix="/folders", tags=["folders"])
-
-
-def _validate_uuid(value: str, name: str = "ID") -> str:
-    if not value or not _UUID_RE.match(value):
-        raise HTTPException(status_code=400, detail=f"Invalid {name}")
-    return value
 
 
 class CreateFolderRequest(BaseModel):
@@ -68,7 +61,7 @@ def create_folder(request: CreateFolderRequest, authorization: str = Header(defa
 @router.delete("/{folder_id}")
 def delete_folder(folder_id: str, authorization: str = Header(default="")):
     """Delete a folder."""
-    _validate_uuid(folder_id, "folder ID")
+    require_uuid(folder_id, "folder ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 

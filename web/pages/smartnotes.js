@@ -4,6 +4,7 @@ import { apiErrorMessage, authHeaders, authorizedFetch, responseJson } from '../
 import StudyWorkspaceFrame from '../components/StudyWorkspaceFrame';
 import PdfPages from '../components/PdfPages';
 import GuidedTour from '../components/GuidedTour';
+import MermaidDiagram from '../components/MermaidDiagram';
 import { practiceTourUrl, saveOnboardingStep } from '../lib/onboarding';
 import { SMARTNOTES_TOUR } from '../lib/tours';
 import { organizeDashboardGuides } from '../lib/dashboardOrganization';
@@ -154,27 +155,6 @@ function countEmptyBefore(block) {
     else break;
   }
   return count;
-}
-
-// ─── Mermaid renderer (lazy-loaded) ─────────────────────────────────────────
-function MermaidDiagram({ code }) {
-  const ref = useRef(null);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    if (!code || !ref.current) return;
-    setError(false);
-    import('mermaid').then(({ default: mermaid }) => {
-      mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'strict' });
-      const id = 'mermaid-' + Date.now();
-      mermaid.render(id, code).then(({ svg }) => {
-        if (ref.current) ref.current.innerHTML = svg;
-      }).catch(() => setError(true));
-    });
-  }, [code]);
-
-  if (error) return <p className="sn-diagram-placeholder">Diagram could not be rendered.</p>;
-  return <div ref={ref} className="sn-diagram-render" />;
 }
 
 // Office docs that need backend extraction (browser cannot render natively)
@@ -1702,7 +1682,7 @@ function SmartNotesEditor() {
               <div className="sn-diagram-placeholder">Generating diagram…</div>
             )}
             {!diagramLoading && mermaidCode && (
-              <MermaidDiagram code={mermaidCode} />
+              <MermaidDiagram code={mermaidCode} label="SmartNotes diagram" className="sn-diagram-render" />
             )}
             {!diagramLoading && !mermaidCode && (
               <div className="sn-diagram-placeholder">

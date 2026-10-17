@@ -9,17 +9,10 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from database import get_supabase
 from auth_utils import get_user_id
+from ids import is_uuid, require_uuid
 
-_UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
 router = APIRouter(prefix="/guides", tags=["guides"])
-
-
-def _validate_uuid(value: str, name: str = "ID") -> str:
-    """Validate a path parameter is a valid UUID."""
-    if not value or not _UUID_RE.match(value):
-        raise HTTPException(status_code=400, detail=f"Invalid {name}")
-    return value
 
 
 class SaveGuideRequest(BaseModel):
@@ -49,7 +42,7 @@ class SaveGuideRequest(BaseModel):
     @field_validator("folder_id")
     @classmethod
     def validate_folder_id(cls, v):
-        if v is not None and not _UUID_RE.match(v):
+        if v is not None and not is_uuid(v):
             raise ValueError("Invalid folder ID")
         return v
 
@@ -84,7 +77,7 @@ def list_guides(folder_id: Optional[str] = None, limit: int = 50, offset: int = 
         .eq("user_id", user_id)
 
     if folder_id:
-        _validate_uuid(folder_id, "folder ID")
+        require_uuid(folder_id, "folder ID")
         query = query.eq("folder_id", folder_id)
 
     result = query.order("created_at", desc=True) \
@@ -144,7 +137,7 @@ def save_guide(request: SaveGuideRequest, authorization: str = Header(default=""
 @router.patch("/{guide_id}")
 def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = Header(default="")):
     """Update an existing study guide's content (notes, title, flashcards, etc.)."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
@@ -167,7 +160,7 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
 @router.get("/{guide_id}")
 def get_guide(guide_id: str, authorization: str = Header(default="")):
     """Get a single study guide."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
@@ -186,7 +179,7 @@ def get_guide(guide_id: str, authorization: str = Header(default="")):
 @router.delete("/{guide_id}")
 def delete_guide(guide_id: str, authorization: str = Header(default="")):
     """Delete a study guide."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
@@ -215,7 +208,7 @@ class RenameGuideRequest(BaseModel):
 @router.patch("/{guide_id}/rename")
 def rename_guide(guide_id: str, request: RenameGuideRequest, authorization: str = Header(default="")):
     """Rename a study guide."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
@@ -240,7 +233,7 @@ def rename_guide(guide_id: str, request: RenameGuideRequest, authorization: str 
 @router.patch("/{guide_id}/bookmark")
 def toggle_bookmark(guide_id: str, authorization: str = Header(default="")):
     """Toggle bookmark status on a guide."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
@@ -272,7 +265,7 @@ class FlashcardProgressRequest(BaseModel):
 @router.patch("/{guide_id}/flashcard-progress")
 def update_flashcard_progress(guide_id: str, request: FlashcardProgressRequest, authorization: str = Header(default="")):
     """Update flashcard study progress."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
@@ -295,7 +288,7 @@ class MoveGuideRequest(BaseModel):
     @field_validator("folder_id")
     @classmethod
     def validate_folder_id(cls, v):
-        if v is not None and not _UUID_RE.match(v):
+        if v is not None and not is_uuid(v):
             raise ValueError("Invalid folder ID")
         return v
 
@@ -303,7 +296,7 @@ class MoveGuideRequest(BaseModel):
 @router.patch("/{guide_id}/move")
 def move_guide(guide_id: str, request: MoveGuideRequest, authorization: str = Header(default="")):
     """Move a guide to a different folder (or remove from folder if folder_id is None)."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
@@ -350,7 +343,7 @@ class ReadProgressRequest(BaseModel):
 @router.patch("/{guide_id}/read-progress")
 def update_read_progress(guide_id: str, request: ReadProgressRequest, authorization: str = Header(default="")):
     """Update read progress (0.0 to 1.0)."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 

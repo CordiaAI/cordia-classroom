@@ -1,11 +1,11 @@
 """Practice sets: ten verified problems from a guide or uploaded text, saved per guide."""
 import json
 import logging
-import re
 
 from fastapi import APIRouter, Header, HTTPException, Request
 
 from auth_utils import get_user_id
+from ids import is_uuid
 from database import get_supabase
 from rate_limit import limiter
 from schemas import PracticeGradeRequest, PracticeProgressRequest, PracticeRecognizeRequest, PracticeRequest
@@ -21,13 +21,12 @@ router = APIRouter(prefix="/practice", tags=["practice"])
 MAX_CONTENT_LENGTH = 500_000
 MAX_PROGRESS_BYTES = 200_000
 PROBLEMS_PER_SET = 10
-UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", re.IGNORECASE)
 INVALID_GUIDE = "That study guide link is not valid."
 MISSING_GUIDE = "That study guide is no longer available."
 
 
 def _owned_guide(guide_id: str, user_id: str, columns: str) -> dict:
-    if not UUID.fullmatch(guide_id or ""):
+    if not is_uuid(guide_id):
         raise HTTPException(status_code=400, detail=INVALID_GUIDE)
     result = get_supabase().table("study_guides").select(columns) \
         .eq("id", guide_id).eq("user_id", user_id).limit(1).execute()

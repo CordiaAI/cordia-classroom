@@ -1,7 +1,6 @@
 """Student-chosen study style and the per-question study aids it defaults to."""
 
 import logging
-import re
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
@@ -10,6 +9,7 @@ from rate_limit import ai_rate_limit
 from pydantic import BaseModel, Field
 
 from auth_utils import get_user_id
+from ids import require_uuid
 from database import get_supabase
 from services.entitlements import record, require
 from services.learning_styles import (
@@ -26,7 +26,6 @@ from services.learning_styles import (
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["learning"])
 
-UUID_PATTERN = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", re.IGNORECASE)
 StyleName = Literal["visual", "aural", "read_write", "kinesthetic", "multimodal"]
 AidMode = Literal["visual", "aural", "read_write", "kinesthetic"]
 
@@ -164,8 +163,7 @@ def set_onboarding(body: OnboardingUpdate, authorization: str = Header(default="
 
 
 def _owned_item(user_id: str, guide_id: str, number: int):
-    if not UUID_PATTERN.match(guide_id):
-        raise HTTPException(status_code=400, detail="Invalid guide ID")
+    require_uuid(guide_id, "guide ID")
     result = get_supabase().table("study_guides") \
         .select("id,study_guide") \
         .eq("id", guide_id) \
