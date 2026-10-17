@@ -376,7 +376,7 @@ export function formatOnKeyDown(e, root) {
       const letter = letteredMatch[1];
       const sep = letteredMatch[2].trimEnd();
       const content = letteredMatch[3].trim();
-      block.innerHTML = '<strong>' + letter + sep + '</strong>' + (content ? ' ' + escHtml(content) : '');
+      block.innerHTML = '<strong>' + escHtml(letter + sep) + '</strong>' + (content ? ' ' + escHtml(content) : '');
       const nextLetter = String.fromCharCode(letter.charCodeAt(0) + 1);
       const newLine = document.createElement('p');
       newLine.textContent = nextLetter + sep + ' ';
@@ -413,7 +413,7 @@ export function formatOnKeyDown(e, root) {
     if (defMatch && defMatch[1].trim().split(/\s+/).length <= 5) {
       e.preventDefault();
       block.innerHTML = '<strong>' + escHtml(defMatch[1].trim()) + '</strong> '
-        + defMatch[2] + ' ' + escHtml(defMatch[3]);
+        + escHtml(defMatch[2]) + ' ' + escHtml(defMatch[3]);
       newParaAfter(block);
       return;
     }

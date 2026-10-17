@@ -19,6 +19,8 @@ const TEXT_EXTS = new Set([
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico']);
 const VIDEO_EXTS = new Set(['mp4', 'webm', 'ogv', 'mov']);
 const AUDIO_EXTS = new Set(['mp3', 'wav', 'ogg', 'm4a', 'flac']);
+// Shown straight from the file through an object URL (slides get a rendered PDF instead).
+const isEmbeddable = ext => ext === 'pdf' || IMAGE_EXTS.has(ext) || VIDEO_EXTS.has(ext) || AUDIO_EXTS.has(ext);
 
 // ─── Study guide Q&A parser ──────────────────────────────────────────────────
 function parseGuideQA(html) {
@@ -26,8 +28,9 @@ function parseGuideQA(html) {
   const text = html
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&') // last, so "&amp;lt;" stays the text "&lt;"
+    .replace(/\s+/g, ' ').trim();
 
   const pairs = [];
   // Match Q\d+[:.] ... A\d+[:.] ... with the same number
@@ -149,8 +152,6 @@ export default function FileViewer({ file, guideContent }) {
     }
 
     if (EXTRACT_EXTS.has(ext)) {
-      const url = URL.createObjectURL(file);
-      setObjectUrl(url);
       setExtracting(true);
       const fd = new FormData();
       fd.append('file', file);
@@ -169,7 +170,7 @@ export default function FileViewer({ file, guideContent }) {
         .catch(() => {
           if (!cancelled) { setExtractError('Could not reach the server.'); setExtracting(false); }
         });
-      return () => { cancelled = true; URL.revokeObjectURL(url); };
+      return () => { cancelled = true; };
     }
 
     if (TEXT_EXTS.has(ext)) {
@@ -180,6 +181,7 @@ export default function FileViewer({ file, guideContent }) {
       return () => { cancelled = true; };
     }
 
+    if (!isEmbeddable(ext)) return;
     const url = URL.createObjectURL(file);
     setObjectUrl(url);
     return () => { cancelled = true; URL.revokeObjectURL(url); };
@@ -214,12 +216,14 @@ export default function FileViewer({ file, guideContent }) {
     return <div className="sn-viewer-empty"><p>{extractError}</p></div>;
   }
 
+  // No iframe fallback: a blob: URL shares this page's origin, so an HTML-like file could run as Classroom.
+  if (!isEmbeddable(ext) && !SLIDE_EXTS.has(ext)) {
+    return <div className="sn-viewer-empty"><p>Classroom can't preview .{ext} files. Open a PDF, slides, document, image, video, audio, or text file.</p></div>;
+  }
   if (!objectUrl) return null;
 
   if (ext === 'pdf' || SLIDE_EXTS.has(ext)) return <PdfPages url={objectUrl} title={file.name} />;
   if (IMAGE_EXTS.has(ext)) return <img src={objectUrl} className="sn-viewer-img" alt={file.name} />;
   if (VIDEO_EXTS.has(ext)) return <video src={objectUrl} controls className="sn-viewer-video" />;
-  if (AUDIO_EXTS.has(ext)) return <audio src={objectUrl} controls style={{ width: '100%', padding: 16 }} />;
-
-  return <iframe src={objectUrl} className="sn-iframe" title={file.name} />;
+  return <audio src={objectUrl} controls style={{ width: '100%', padding: 16 }} />;
 }
