@@ -26,7 +26,6 @@ class SaveGuideRequest(BaseModel):
     source_type: Optional[str] = Field(default=None, max_length=50)
     source_title: Optional[str] = Field(default=None, max_length=500)
     source_id: Optional[str] = Field(default=None, max_length=500)
-    domain: Optional[str] = None
 
     model_config = {"str_max_length": 5_000_000}
 
@@ -57,7 +56,7 @@ class SaveGuideRequest(BaseModel):
 
 
 # Columns for list screens: everything except the large text and question sets.
-SUMMARY_COLUMNS = "id,folder_id,title,source_url,created_at,is_bookmarked,read_progress,source_type,source_title,domain,flashcards"
+SUMMARY_COLUMNS = "id,folder_id,title,source_url,created_at,is_bookmarked,read_progress,source_type,source_title,flashcards"
 
 
 @router.get("")
@@ -105,9 +104,6 @@ def save_guide(request: SaveGuideRequest, authorization: str = Header(default=""
         "study_guide": request.study_guide,
         "source_url": request.source_url,
     }
-
-    if request.domain:
-        data["domain"] = request.domain
 
     if request.folder_id:
         data["folder_id"] = request.folder_id
