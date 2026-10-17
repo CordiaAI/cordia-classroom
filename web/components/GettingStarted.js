@@ -28,7 +28,7 @@ export default function GettingStarted({ guides, navigate }) {
   if (done === items.length) return null;
 
   function dismiss() {
-    try { localStorage.setItem(DISMISS_KEY, '1'); } catch {}
+    try { localStorage.setItem(DISMISS_KEY, '1'); } catch { /* remembering is optional */ }
     setDismissed(true);
   }
 

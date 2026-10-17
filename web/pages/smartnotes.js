@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { authHeaders, authorizedFetch, responseJson } from '../lib/api';
+import { apiErrorMessage, authHeaders, authorizedFetch, responseJson } from '../lib/api';
 import StudyWorkspaceFrame from '../components/StudyWorkspaceFrame';
 import PdfPages from '../components/PdfPages';
 import GuidedTour from '../components/GuidedTour';
@@ -11,6 +11,22 @@ import { useFileDropZone } from '../lib/fileDrop';
 import { sanitizeHtml } from '../lib/sanitizeHtml';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+// SmartNotes requests throw a readable message on any failure, so callers can show it.
+async function notesRequest(path, options = {}) {
+  let response;
+  try {
+    response = await fetch(API + path, {
+      ...options,
+      headers: { ...authHeaders(), 'Content-Type': 'application/json', ...options.headers },
+    });
+  } catch {
+    throw new Error(apiErrorMessage('Failed to fetch'));
+  }
+  const data = await responseJson(response);
+  if (!response.ok) throw Object.assign(new Error(data?.detail || apiErrorMessage('')), { status: response.status });
+  return data;
+}
 
 // ─── Rule-based formatter ────────────────────────────────────────────────────
 const SPELL_MAP = {
@@ -324,7 +340,7 @@ function FileViewer({ file, guideContent }) {
             return;
           }
 
-          const renderError = await responseJson(renderResponse).catch(() => ({}));
+          const renderError = await responseJson(renderResponse);
           if (renderError.detail) fallbackReason = `${renderError.detail} Showing extracted slide text instead.`;
         } catch {
           fallbackReason = 'Could not reach the visual renderer. Showing extracted slide text instead.';
@@ -336,7 +352,7 @@ function FileViewer({ file, guideContent }) {
         const extractData = new FormData();
         extractData.append('file', file);
         const extractResponse = await authorizedFetch('/extract-file-text', { method: 'POST', body: extractData });
-        const data = await responseJson(extractResponse).catch(() => ({}));
+        const data = await responseJson(extractResponse);
         if (cancelled) return;
         if (!extractResponse.ok) throw new Error(data.detail || 'Could not read this presentation.');
         setExtractedText(data.text || '');
@@ -361,7 +377,7 @@ function FileViewer({ file, guideContent }) {
       fd.append('file', file);
       authorizedFetch('/extract-file-text', { method: 'POST', body: fd })
         .then(async r => {
-          const data = await responseJson(r).catch(() => ({}));
+          const data = await responseJson(r);
           if (cancelled) return;
           if (!r.ok) {
             setExtractError(data.detail || 'Could not extract text from this file.');
@@ -444,33 +460,32 @@ function NotesIndex({ router, timerState, setTimerState }) {
   const [previewError, setPreviewError] = useState('');
   const [savingGuide, setSavingGuide] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([
-      fetch(API + '/smart_notes', { headers: authHeaders() }).then(responseJson).catch(() => ({ notes: [] })),
-      fetch(API + '/folders', { headers: authHeaders() }).then(responseJson).catch(() => ({ folders: [] })),
-      fetch(API + '/guides', { headers: authHeaders() }).then(responseJson).catch(() => ({ guides: [] })),
-    ]).then(([notesData, foldersData, guidesData]) => {
-      setNotes(notesData.notes || []);
-      setFolders(foldersData.folders || []);
-      setGuides(guidesData.guides || []);
-      setLoading(false);
-    });
+    // Each list loads on its own, so one failure still shows the others, plus the error.
+    Promise.allSettled([notesRequest('/smart_notes'), notesRequest('/folders'), notesRequest('/guides')])
+      .then(([notesResult, foldersResult, guidesResult]) => {
+        setNotes(notesResult.value?.notes || []);
+        setFolders(foldersResult.value?.folders || []);
+        setGuides(guidesResult.value?.guides || []);
+        const failed = [notesResult, foldersResult, guidesResult].find(result => result.status === 'rejected');
+        if (failed) setError(failed.reason.message);
+        setLoading(false);
+      });
   }, []);
 
   const folderById = Object.fromEntries(folders.map(f => [f.id, f]));
   const organized = organizeDashboardGuides(folders, guides);
 
   async function handleNew() {
+    setError('');
     try {
-      const resp = await fetch(API + '/smart_notes', {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Untitled Notes' }),
-      });
-      const data = await responseJson(resp);
-      if (data.note) router.push('/smartnotes?id=' + data.note.id);
-    } catch {}
+      const data = await notesRequest('/smart_notes', { method: 'POST', body: JSON.stringify({ title: 'Untitled Notes' }) });
+      router.push('/smartnotes?id=' + data.note.id);
+    } catch (caught) {
+      setError(caught.message);
+    }
   }
 
   async function handleSelectNoteForGuide(note) {
@@ -548,7 +563,7 @@ function NotesIndex({ router, timerState, setTimerState }) {
         pairs,
         inputMode: 'manual',
       }));
-    } catch {}
+    } catch { /* storage blocked: the create page opens without the draft */ }
     handleClosePreview();
     router.push('/create');
   }
@@ -592,6 +607,7 @@ function NotesIndex({ router, timerState, setTimerState }) {
               ? 'Click the note you want to turn into a study guide.'
               : 'Your SmartNotes sessions — pick up where you left off, or start fresh.'}
           </p>
+          {error && <p className="sn-status error" role="alert">{error}</p>}
         </div>
         <div className="sn-index-actions">
           {selectMode ? (
@@ -697,6 +713,7 @@ function SmartNotesEditor() {
   const [title, setTitle] = useState('Untitled Notes');
   const [saveStatus, setSaveStatus] = useState(''); // '' | 'saving' | 'saved' | 'error'
   const [saveError, setSaveError] = useState('');
+  const [actionError, setActionError] = useState(''); // a failed load, create, move, delete, or diagram
   const [notes, setNotes] = useState([]); // session list
   const [showNotesList, setShowNotesList] = useState(false);
 
@@ -761,71 +778,70 @@ function SmartNotesEditor() {
 
   // Load existing guides for picker
   useEffect(() => {
-    fetch(API + '/guides?limit=50', { headers: authHeaders() })
-      .then(responseJson)
+    notesRequest('/guides?limit=50')
       .then(data => setGuideList(data.guides || []))
-      .catch(() => {});
+      .catch(caught => setActionError(caught.message));
   }, []);
 
   // Load classes/folders for assignment
   useEffect(() => {
-    fetch(API + '/folders', { headers: authHeaders() })
-      .then(responseJson)
+    notesRequest('/folders')
       .then(data => setFolders(data.folders || []))
-      .catch(() => {});
+      .catch(caught => setActionError(caught.message));
   }, []);
 
   // Load notes list (also callable after save to refresh titles)
   const fetchNotes = useCallback(() => {
-    fetch(API + '/smart_notes', { headers: authHeaders() })
-      .then(responseJson)
+    notesRequest('/smart_notes')
       .then(data => setNotes(data.notes || []))
-      .catch(() => {});
+      .catch(caught => setActionError(caught.message));
   }, []);
 
   useEffect(() => { fetchNotes(); }, [noteId, fetchNotes]);
 
   async function createNote() {
+    let data;
     try {
-      const resp = await fetch(API + '/smart_notes', {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Untitled Notes' }),
-      });
-      const data = await responseJson(resp);
-      if (data.note) {
-        noteIdRef.current = data.note.id;
-        setNoteId(data.note.id);
-        // Ensure the paper has a starting <p> block so first-line typing has a wrapper
-        if (paperRef.current && !paperRef.current.innerHTML.trim()) {
-          paperRef.current.innerHTML = '<p><br></p>';
-        }
-        lastSavedRef.current = paperRef.current?.innerHTML || '';
-        lastSavedTitleRef.current = 'Untitled Notes';
-        window.history.replaceState({}, '', '/smartnotes?id=' + data.note.id);
-      }
-    } catch {}
+      data = await notesRequest('/smart_notes', { method: 'POST', body: JSON.stringify({ title: 'Untitled Notes' }) });
+    } catch (caught) {
+      setActionError(caught.message);
+      return;
+    }
+    noteIdRef.current = data.note.id;
+    setNoteId(data.note.id);
+    // Ensure the paper has a starting <p> block so first-line typing has a wrapper
+    if (paperRef.current && !paperRef.current.innerHTML.trim()) {
+      paperRef.current.innerHTML = '<p><br></p>';
+    }
+    lastSavedRef.current = paperRef.current?.innerHTML || '';
+    lastSavedTitleRef.current = 'Untitled Notes';
+    window.history.replaceState({}, '', '/smartnotes?id=' + data.note.id);
   }
 
   async function loadNote(id) {
+    let data;
     try {
-      const resp = await fetch(API + '/smart_notes/' + id, { headers: authHeaders() });
-      if (!resp.ok) { createNote(); return; }
-      const data = await responseJson(resp);
-      noteIdRef.current = data.note.id;
-      titleRef.current  = data.note.title || 'Untitled Notes';
-      folderIdRef.current = data.note.folder_id || '';
-      setNoteId(data.note.id);
-      setTitle(data.note.title || 'Untitled Notes');
-      setFolderId(data.note.folder_id || '');
-      if (paperRef.current) {
-        paperRef.current.innerHTML = data.note.content && data.note.content.trim()
-          ? sanitizeHtml(data.note.content)
-          : '<p><br></p>';
-        lastSavedRef.current = paperRef.current.innerHTML;
-        lastSavedTitleRef.current = data.note.title || 'Untitled Notes';
-      }
-    } catch {}
+      data = await notesRequest('/smart_notes/' + id);
+    } catch (caught) {
+      // Only a link to a note that doesn't exist starts a new one; any other failure keeps
+      // the student on this note and says why, so a blip never looks like lost notes.
+      if (caught.status === 400 || caught.status === 404) createNote();
+      else setActionError(caught.message);
+      return;
+    }
+    noteIdRef.current = data.note.id;
+    titleRef.current  = data.note.title || 'Untitled Notes';
+    folderIdRef.current = data.note.folder_id || '';
+    setNoteId(data.note.id);
+    setTitle(data.note.title || 'Untitled Notes');
+    setFolderId(data.note.folder_id || '');
+    if (paperRef.current) {
+      paperRef.current.innerHTML = data.note.content && data.note.content.trim()
+        ? sanitizeHtml(data.note.content)
+        : '<p><br></p>';
+      lastSavedRef.current = paperRef.current.innerHTML;
+      lastSavedTitleRef.current = data.note.title || 'Untitled Notes';
+    }
   }
 
   // ── Save helper — sends content to backend, updates lastSavedRef ────────
@@ -908,7 +924,7 @@ function SmartNotesEditor() {
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, content }),
         keepalive: true,
-      }).catch(() => {});
+      }).catch(() => { /* the page is closing; there is nowhere left to show the error */ });
       lastSavedRef.current = content;
       lastSavedTitleRef.current = title;
     }
@@ -925,14 +941,13 @@ function SmartNotesEditor() {
     folderIdRef.current = newId;
     setFolderId(newId);
     if (!noteIdRef.current) return;
+    setActionError('');
     try {
-      await fetch(API + '/smart_notes/' + noteIdRef.current, {
-        method: 'PUT',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folder_id: newId || '' }),
-      });
+      await notesRequest('/smart_notes/' + noteIdRef.current, { method: 'PUT', body: JSON.stringify({ folder_id: newId || '' }) });
       fetchNotes();
-    } catch {}
+    } catch (caught) {
+      setActionError(caught.message);
+    }
   }
 
   // ── Visualize: send highlighted text to diagram API ─────────────────────
@@ -945,15 +960,13 @@ function SmartNotesEditor() {
     if (!selectedText || selectedText.length < 5) return;
     setVisualizeMode(false);
     setDiagramLoading(true);
+    setActionError('');
     try {
-      const resp = await fetch(API + '/smart_notes/diagram', {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: selectedText }),
-      });
-      const data = await responseJson(resp);
+      const data = await notesRequest('/smart_notes/diagram', { method: 'POST', body: JSON.stringify({ content: selectedText }) });
       setMermaidCode(data.mermaid || null);
-    } catch {}
+    } catch (caught) {
+      setActionError(caught.message);
+    }
     setDiagramLoading(false);
   }
 
@@ -1374,30 +1387,27 @@ function SmartNotesEditor() {
   // ── New session — flush current, then create+navigate to fresh note ──────
   async function handleNewNote() {
     await doSave();
+    setActionError('');
     try {
-      const resp = await fetch(API + '/smart_notes', {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Untitled Notes' }),
-      });
-      const data = await responseJson(resp);
-      if (data.note) router.push('/smartnotes?id=' + data.note.id);
-    } catch {}
+      const data = await notesRequest('/smart_notes', { method: 'POST', body: JSON.stringify({ title: 'Untitled Notes' }) });
+      router.push('/smartnotes?id=' + data.note.id);
+    } catch (caught) {
+      setActionError(caught.message);
+    }
   }
 
   async function handleDeleteNote(id, e) {
     e?.stopPropagation();
     if (!window.confirm('Delete this note? This cannot be undone.')) return;
+    setActionError('');
     try {
-      await fetch(API + '/smart_notes/' + id, {
-        method: 'DELETE',
-        headers: authHeaders(),
-      });
-      setNotes(prev => prev.filter(n => n.id !== id));
-      if (id === noteIdRef.current) {
-        await handleNewNote();
-      }
-    } catch {}
+      await notesRequest('/smart_notes/' + id, { method: 'DELETE' });
+    } catch (caught) {
+      setActionError(caught.message);
+      return;
+    }
+    setNotes(prev => prev.filter(n => n.id !== id));
+    if (id === noteIdRef.current) await handleNewNote();
   }
 
   async function handleSwitchNote(id) {
@@ -1496,7 +1506,7 @@ function SmartNotesEditor() {
         pairs,
         inputMode: 'manual',
       }));
-    } catch {}
+    } catch { /* storage blocked: the create page opens without the draft */ }
     handleClosePreview();
     router.push('/create');
   }
@@ -1514,8 +1524,8 @@ function SmartNotesEditor() {
             placeholder="Note title..."
             spellCheck={false}
           />
-          <span className={`sn-status ${saveStatus}`}>
-            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? saveError : ''}
+          <span className={`sn-status ${actionError ? 'error' : saveStatus}`} role={actionError ? 'alert' : undefined}>
+            {actionError || (saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? saveError : '')}
           </span>
         </div>
         <div className="sn-header-right">
