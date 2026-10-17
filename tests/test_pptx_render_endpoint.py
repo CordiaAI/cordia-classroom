@@ -11,14 +11,15 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-import main as main_module  # noqa: E402
+import main  # noqa: E402
+from routers import materials  # noqa: E402
 from services.pptx_rendering import PptxRenderError, PptxRenderTimeout  # noqa: E402
 
 
 class PptxRenderEndpointTests(unittest.TestCase):
     def setUp(self):
-        self.client = TestClient(main_module.app)
-        self.auth_patch = patch.object(main_module, "get_user_id", return_value="user-1")
+        self.client = TestClient(main.app)
+        self.auth_patch = patch.object(materials, "get_user_id", return_value="user-1")
         self.auth_patch.start()
         self.addCleanup(self.auth_patch.stop)
 
@@ -31,7 +32,7 @@ class PptxRenderEndpointTests(unittest.TestCase):
 
     def test_returns_inline_pdf(self):
         pdf = b"%PDF-1.7 rendered"
-        with patch.object(main_module, "render_pptx_to_pdf", return_value=pdf, create=True):
+        with patch.object(materials, "render_pptx_to_pdf", return_value=pdf, create=True):
             response = self.post_file()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, pdf)
@@ -43,15 +44,15 @@ class PptxRenderEndpointTests(unittest.TestCase):
 
     def test_rejects_file_larger_than_fifty_megabytes(self):
         content = b"x" * (50 * 1024 * 1024 + 1)
-        self.assertEqual(self.post_file(content=content).status_code, 400)
+        self.assertEqual(self.post_file(content=content).status_code, 413)
 
     def test_maps_render_error_to_unprocessable_entity(self):
-        with patch.object(main_module, "render_pptx_to_pdf", side_effect=PptxRenderError("failed"), create=True):
+        with patch.object(materials, "render_pptx_to_pdf", side_effect=PptxRenderError("failed"), create=True):
             response = self.post_file()
         self.assertEqual(response.status_code, 422)
 
     def test_maps_timeout_to_gateway_timeout(self):
-        with patch.object(main_module, "render_pptx_to_pdf", side_effect=PptxRenderTimeout("timed out"), create=True):
+        with patch.object(materials, "render_pptx_to_pdf", side_effect=PptxRenderTimeout("timed out"), create=True):
             response = self.post_file()
         self.assertEqual(response.status_code, 504)
 

@@ -167,11 +167,11 @@ class TutorContractTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(answer.call_args.kwargs["context"], "Recursion needs a base case.")
 
-    @patch("main.learning_guidance", return_value="")
-    @patch("main.record")
-    @patch("main.require", return_value={"used": 0})
-    @patch("main.generate_verified_practice_set")
-    @patch("main.get_user_id", return_value="student-1")
+    @patch("routers.practice.learning_guidance", return_value="")
+    @patch("routers.practice.record")
+    @patch("routers.practice.require", return_value={"used": 0})
+    @patch("routers.practice.generate_verified_practice_set")
+    @patch("routers.practice.get_user_id", return_value="student-1")
     def test_practice_endpoint_returns_exactly_ten_source_grounded_problems(self, _auth, generate, _usage, record, _guidance):
         generate.return_value = {
             "subject_area": "Biology",
@@ -196,7 +196,7 @@ class TutorContractTests(unittest.TestCase):
             ],
         }
         db, _table = self.guide_db()
-        with patch("main.get_supabase", return_value=db):
+        with patch("routers.practice.get_supabase", return_value=db):
             response = self.client.post(
                 "/practice",
                 headers={"Authorization": "Bearer test"},
@@ -440,7 +440,7 @@ class TutorContractTests(unittest.TestCase):
         completed = {**turn, "status": "idle", "conversation_version": 12}
         with patch("routers.chat.get_supabase", return_value=db), \
              patch("routers.chat.claim_tutor_turn", return_value=turn), \
-             patch("main.guides.move_guide", return_value={"updated": True}) as move, \
+             patch("routers.guides.move_guide", return_value={"updated": True}) as move, \
              patch("routers.chat.complete_tutor_turn", return_value=completed), \
              patch("routers.chat.public_tutor_session", return_value={"id": "session-1", "status": "idle"}):
             response = self.client.post(
