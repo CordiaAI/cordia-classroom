@@ -84,11 +84,7 @@ def extract_file_text(request: Request, file: UploadFile = None, authorization: 
     elif extension in files.IMAGE_TYPES:
         image_url = files.image_data_url(data, extension)
         require(user_id, "light")
-        try:
-            text = transcribe_study_image(image_url)
-        except Exception:
-            logger.exception("Image extraction failed")
-            raise HTTPException(status_code=422, detail="Could not extract content from image.")
+        text = transcribe_study_image(image_url)
         if not text:
             raise HTTPException(status_code=422, detail="No educational content found in this image.")
         record(user_id, "light")
@@ -164,7 +160,7 @@ def _study_chunks(raw_text: str, images: list) -> tuple:
 
 def _guide(user_id: str, chunks: list, has_images: bool) -> tuple:
     study_guide = generate_study_guide(chunks, has_images=has_images, learning_guidance=learning_guidance(user_id))
-    if not study_guide or study_guide.startswith("[Error"):
+    if not study_guide:
         raise HTTPException(status_code=422, detail="CordiaClassroom could not build a guide from this material.")
     cards = study_guide_to_flashcards(study_guide)
     if not cards or not study_guide_is_complete(study_guide):

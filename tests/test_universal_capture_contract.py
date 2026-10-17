@@ -107,7 +107,7 @@ class UniversalCaptureContractTests(unittest.TestCase):
     @patch("routers.materials.learning_guidance", return_value="")
     @patch("routers.materials.record")
     @patch("routers.materials.require", return_value={"used": 0})
-    @patch("routers.materials.generate_study_guide", return_value="[Error generating study guide]")
+    @patch("routers.materials.generate_study_guide", return_value="")
     @patch("routers.materials.generate_notes_ai", return_value=[])
     @patch("routers.materials.get_user_id", return_value="student-1")
     def test_failed_generation_is_not_returned_as_a_guide(self, _auth, _notes, _guide, _usage, record, _guidance):

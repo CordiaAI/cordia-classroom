@@ -8,6 +8,7 @@ import os
 import logging
 import jwt
 from fastapi import HTTPException
+from supabase_auth.errors import AuthApiError, AuthInvalidJwtError
 from database import get_auth_supabase
 from services.models import current_user_id
 
@@ -83,8 +84,6 @@ def get_user_id(authorization: str) -> str:
             raise HTTPException(status_code=401, detail="Invalid token")
         current_user_id.set(result.user.id)
         return result.user.id
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.warning(f"Token verification failed: {e}")
+    except (AuthApiError, AuthInvalidJwtError) as e:
+        logger.info("Token verification failed: %s", e)
         raise HTTPException(status_code=401, detail="Invalid or expired token")

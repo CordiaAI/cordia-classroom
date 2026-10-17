@@ -145,8 +145,8 @@ def _pro_product_ids() -> set:
         try:
             product = _stripe().Price.retrieve(_price_id(interval)).product
             ids.add(product if isinstance(product, str) else product.id)
-        except Exception as e:
-            logger.warning(f"Could not resolve the {interval} Pro product: {e}")
+        except stripe.StripeError:
+            logger.warning("Could not resolve the %s Pro product", interval, exc_info=True)
     return ids
 
 
@@ -192,10 +192,8 @@ def sync_pro_from_stripe(user_id: str, force: bool = False) -> bool:
                     api.Subscription.modify(subscription["id"], metadata={**metadata, "user_id": user_id})
                 logger.info(f"Linked Stripe subscription {subscription['id']} to user {user_id[:8]} by email")
                 return True
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.warning(f"Stripe email lookup failed for user {user_id[:8]}: {e}")
+    except stripe.StripeError:
+        logger.warning("Stripe email lookup failed for user %s", user_id[:8], exc_info=True)
     return False
 
 
@@ -203,6 +201,7 @@ def _user_email(user_id: str) -> Optional[str]:
     try:
         return get_supabase().auth.admin.get_user_by_id(user_id).user.email
     except Exception:
+        logger.warning("Could not load email for user %s", user_id[:8], exc_info=True)
         return None
 
 
@@ -235,8 +234,8 @@ def _cancel_replaced_trial(previous: Optional[dict], new_subscription_id: str) -
     if old_id and old_id != new_subscription_id and (previous or {}).get("status") == "trialing":
         try:
             _stripe().Subscription.cancel(old_id)
-        except Exception as e:
-            logger.warning(f"Could not cancel replaced trial {old_id}: {e}")
+        except stripe.StripeError:
+            logger.warning("Could not cancel replaced trial %s", old_id, exc_info=True)
 
 
 def _handle_subscription_event(subscription: dict) -> None:
@@ -425,7 +424,7 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Missing Stripe signature")
     try:
         event = _stripe().Webhook.construct_event(await request.body(), signature, secret)
-    except Exception as exc:
+    except (ValueError, stripe.SignatureVerificationError) as exc:
         raise HTTPException(status_code=400, detail="Invalid Stripe signature") from exc
     process_stripe_event(event)
     return JSONResponse(content={"received": True})
