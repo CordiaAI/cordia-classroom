@@ -5,12 +5,25 @@ import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib
 import { useRequireAuth } from '../lib/auth';
 import { LoadingArea, SectionLoader } from './CordiaLoader';
 import Link from 'next/link';
-import { ArrowLeft, ChevronLeft, ChevronRight, Eraser, Eye, Flag, MessageCircle, PenLine, PencilRuler, RefreshCw, Sparkles, Trash2, Type, Upload, Wand2 } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, Eraser, Eye, Flag, Hand, MessageCircle, PenLine, PencilRuler, RefreshCw, Sparkles, Trash2, Type, Undo2, Upload, Video, VideoOff, Wand2 } from 'lucide-react';
 import { walkthroughEvent } from '../lib/walkthrough';
+import { drawLatestSegment, drawStroke, farEnough, finishStroke } from '../lib/airDraw.mjs';
+import AirDraw from './AirDraw';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const SYMBOLS = ['+', '−', '×', '÷', '=', '√', 'π', 'Σ', '→'];
 const drawingsKey = guideId => `practiceDrawings:${guideId}`;
+// Pen colours (tokens in styles/tokens.css, light and dark versions).
+const PEN_COLORS = [
+  { token: '--draw-ink', label: 'Ink' },
+  { token: '--draw-olive', label: 'Olive' },
+  { token: '--draw-blue', label: 'Blue' },
+  { token: '--draw-red', label: 'Red' },
+  { token: '--draw-orange', label: 'Orange' },
+  { token: '--draw-purple', label: 'Purple' },
+  { token: '--draw-teal', label: 'Teal' },
+  { token: '--draw-graphite', label: 'Graphite' },
+];
 
 function readableText(value) {
   return String(value || '')
@@ -54,6 +67,21 @@ export default function PracticeWorkspace() {
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
   const [guideOptions, setGuideOptions] = useState(null);
+  // Drawing: every stroke (mouse, touch or hand) is kept per problem so Undo goes stroke by stroke.
+  // Per-frame data lives in refs; only the toolbar uses state.
+  const strokes = useRef([]);
+  const live = useRef(null);
+  const baseImage = useRef(null);
+  const [penColor, setPenColor] = useState('--draw-ink');
+  const [penSize, setPenSize] = useState(3);
+  const pen = useRef({ color: penColor, size: penSize });
+  pen.current = { color: penColor, size: penSize };
+  const [canUndo, setCanUndo] = useState(false);
+  const [handOn, setHandOn] = useState(false);
+  const [handReady, setHandReady] = useState(false);
+  const [showCamera, setShowCamera] = useState(true);
+  const [handError, setHandError] = useState('');
+  const hasMaterial = Boolean(guide || upload);
 
   useEffect(() => {
     if (!ready) return;
@@ -113,28 +141,33 @@ export default function PracticeWorkspace() {
     const canvas = canvasRef.current;
     const board = boardRef.current;
     if (!canvas || !board) return;
+    // Each problem opens with its saved drawing as the base and an empty stroke list.
+    strokes.current = [];
+    live.current = null;
+    baseImage.current = null;
+    setCanUndo(false);
+    const snapshot = drawings.current[problemIndex] || '';
+    if (snapshot) {
+      const image = new Image();
+      image.onload = () => { baseImage.current = image; redraw(); };
+      image.src = snapshot;
+    }
     const resize = () => {
       const rect = board.getBoundingClientRect();
       const ratio = window.devicePixelRatio || 1;
-      const snapshot = drawings.current[problemIndex] || '';
       canvas.width = Math.max(1, Math.round(rect.width * ratio));
       canvas.height = Math.max(1, Math.round(rect.height * ratio));
       canvas.style.width = rect.width + 'px';
       canvas.style.height = rect.height + 'px';
-      const context = canvas.getContext('2d');
-      context.setTransform(ratio, 0, 0, ratio, 0, 0);
-      context.lineCap = 'round';
-      context.lineJoin = 'round';
-      if (snapshot) {
-        const image = new Image();
-        image.onload = () => context.drawImage(image, 0, 0, rect.width, rect.height);
-        image.src = snapshot;
-      }
+      canvas.getContext('2d').setTransform(ratio, 0, 0, ratio, 0, 0);
+      redraw();
     };
-    resize();
-    window.addEventListener('resize', resize);
-    return () => window.removeEventListener('resize', resize);
-  }, [problemIndex, problems.length]);
+    // Follow the board itself (not just the window): it grows when the problem text loads.
+    const observer = new ResizeObserver(resize);
+    observer.observe(board);
+    return () => observer.disconnect();
+    // hasMaterial: the board only exists once the guide or upload has loaded.
+  }, [problemIndex, problems.length, hasMaterial]);
 
   const sourceTitle = upload?.title || guide?.title || 'Study material';
   const sourceText = readableText(upload?.content || guide?.study_guide || guide?.notes);
@@ -203,37 +236,132 @@ export default function PracticeWorkspace() {
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }
 
-  function beginDraw(event) {
-    if (tool !== 'pen' && tool !== 'eraser') return;
-    drawing.current = true;
-    walkthroughEvent('practice-drew');
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const p = point(event);
-    const context = canvasRef.current.getContext('2d');
-    context.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
-    context.strokeStyle = cssVar('--paper-ink', 'black');
-    context.lineWidth = tool === 'eraser' ? 22 : 2.4;
-    context.beginPath();
-    context.moveTo(p.x, p.y);
+  const colorOf = token => cssVar(token, cssVar('--paper-ink', 'black'));
+
+  // Strokes after the last "clear"; the saved base drawing counts only if nothing cleared it.
+  function visibleStrokes() {
+    const lastClear = strokes.current.map(item => item.tool).lastIndexOf('clear');
+    return { showBase: lastClear === -1 && Boolean(baseImage.current), list: strokes.current.slice(lastClear + 1) };
   }
 
-  function moveDraw(event) {
-    if (!drawing.current || (tool !== 'pen' && tool !== 'eraser')) return;
-    const p = point(event);
-    const context = canvasRef.current.getContext('2d');
-    context.lineTo(p.x, p.y);
-    context.stroke();
+  function redraw() {
+    const canvas = canvasRef.current;
+    const board = boardRef.current;
+    if (!canvas || !board) return;
+    const rect = board.getBoundingClientRect();
+    const context = canvas.getContext('2d');
+    context.globalCompositeOperation = 'source-over';
+    context.clearRect(0, 0, rect.width, rect.height);
+    const { showBase, list } = visibleStrokes();
+    if (showBase) context.drawImage(baseImage.current, 0, 0, rect.width, rect.height);
+    list.forEach(item => drawStroke(context, item, colorOf(item.color)));
   }
 
   function saveDrawings() {
     try { localStorage.setItem(drawingsKey(guideId), JSON.stringify(drawings.current)); } catch {}
   }
 
+  function saveSnapshot() {
+    const { showBase, list } = visibleStrokes();
+    if (canvasRef.current && (showBase || list.length)) drawings.current[problemIndex] = canvasRef.current.toDataURL();
+    else delete drawings.current[problemIndex];
+    saveDrawings();
+  }
+
+  // One stroke API for mouse, touch and hand: start, move, end.
+  function startStroke(kind, p) {
+    if (!canvasRef.current || live.current) return;
+    walkthroughEvent('practice-drew');
+    const stroke = { tool: kind, color: pen.current.color, size: pen.current.size, points: [p] };
+    live.current = stroke;
+    drawLatestSegment(canvasRef.current.getContext('2d'), stroke, colorOf(stroke.color));
+  }
+
+  function extendStroke(p) {
+    const stroke = live.current;
+    if (!stroke || !canvasRef.current || !farEnough(stroke.points[stroke.points.length - 1], p)) return;
+    stroke.points.push(p);
+    drawLatestSegment(canvasRef.current.getContext('2d'), stroke, colorOf(stroke.color));
+  }
+
+  function endStroke() {
+    const stroke = live.current;
+    if (!stroke) return;
+    live.current = null;
+    if (canvasRef.current) finishStroke(canvasRef.current.getContext('2d'), stroke, colorOf(stroke.color));
+    strokes.current.push(stroke);
+    setCanUndo(true);
+    saveSnapshot();
+  }
+
+  // Clearing is a step too, so Undo brings the drawing back.
+  function clearDrawing() {
+    endStroke();
+    if (!visibleStrokes().showBase && !visibleStrokes().list.length) return;
+    strokes.current.push({ tool: 'clear' });
+    redraw();
+    setCanUndo(true);
+    saveSnapshot();
+  }
+
+  function undo() {
+    if (live.current || !strokes.current.length) return;
+    strokes.current.pop();
+    redraw();
+    setCanUndo(strokes.current.length > 0);
+    saveSnapshot();
+  }
+
+  function savePng() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const flat = document.createElement('canvas');
+    flat.width = canvas.width;
+    flat.height = canvas.height;
+    const context = flat.getContext('2d');
+    context.fillStyle = cssVar('--draw-paper', 'white');
+    context.fillRect(0, 0, flat.width, flat.height);
+    context.drawImage(canvas, 0, 0);
+    flat.toBlob(blob => {
+      if (!blob) return;
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = href;
+      link.download = `practice-${problemIndex + 1}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 1000);
+    }, 'image/png');
+  }
+
+  function toggleHand() {
+    if (handOn) { setHandOn(false); setHandReady(false); return; }
+    setHandError('');
+    setHandReady(false);
+    setHandOn(true);
+    if (tool === 'type') setTool('pen');
+  }
+
+  function beginDraw(event) {
+    if (tool !== 'pen' && tool !== 'eraser') return;
+    if (live.current) return;
+    drawing.current = true;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    startStroke(tool === 'eraser' ? 'eraser' : 'pen', point(event));
+  }
+
+  function moveDraw(event) {
+    if (!drawing.current) return;
+    // Coalesced events keep fast strokes smooth on high-rate pens and mice.
+    const events = event.nativeEvent.getCoalescedEvents?.() || [];
+    (events.length ? events : [event]).forEach(item => extendStroke(point(item)));
+  }
+
   function endDraw() {
     if (!drawing.current) return;
     drawing.current = false;
-    if (canvasRef.current) drawings.current[problemIndex] = canvasRef.current.toDataURL();
-    saveDrawings();
+    endStroke();
   }
 
   function changeProblem(nextIndex) {
@@ -265,7 +393,7 @@ export default function PracticeWorkspace() {
     flat.width = canvas.width;
     flat.height = canvas.height;
     const context = flat.getContext('2d');
-    context.fillStyle = cssVar('--paper', 'white');
+    context.fillStyle = cssVar('--draw-paper', 'white');
     context.fillRect(0, 0, flat.width, flat.height);
     context.drawImage(canvas, 0, 0);
     const data = await apiFetch('/practice/recognize', {
@@ -280,7 +408,10 @@ export default function PracticeWorkspace() {
     }
     if (!data.text) return;
     setWorkText(all => ({ ...all, [index]: [all[index], data.text].filter(Boolean).join('\n') }));
-    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    strokes.current = [];
+    baseImage.current = null;
+    setCanUndo(false);
+    redraw();
     delete drawings.current[index];
     saveDrawings();
     setTool('type');
@@ -305,10 +436,7 @@ export default function PracticeWorkspace() {
   }
 
   function clearWork() {
-    const canvas = canvasRef.current;
-    if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-    delete drawings.current[problemIndex];
-    saveDrawings();
+    clearDrawing();
     setWorkText(all => ({ ...all, [problemIndex]: '' }));
     setTokens(all => ({ ...all, [problemIndex]: [] }));
   }
@@ -464,7 +592,30 @@ export default function PracticeWorkspace() {
             </div>
             <button type="button" className="c-btn c-btn--quiet" onClick={tidyHandwriting} disabled={tidying || !current}><Wand2 {...ICON} />{tidying ? 'Reading…' : 'Tidy'}</button>
             <button type="button" className="c-icon-btn" onClick={clearWork} aria-label="Clear work"><Trash2 {...ICON} /></button>
+            <div className="practice-drawbar" role="group" aria-label="Drawing">
+            <button type="button" className={'c-btn c-btn--sm ' + (handOn ? 'c-btn--primary' : 'c-btn--secondary')} aria-pressed={handOn} onClick={toggleHand}>
+              <Hand {...ICON} />{handOn ? 'Stop hand' : 'Hand'}
+            </button>
+            {handOn && (
+              <button type="button" className="c-icon-btn" aria-pressed={showCamera} onClick={() => setShowCamera(value => !value)} aria-label={showCamera ? 'Hide camera preview' : 'Show camera preview'}>
+                {showCamera ? <Video {...ICON} /> : <VideoOff {...ICON} />}
+              </button>
+            )}
+            <div className="practice-swatches" role="group" aria-label="Pen colour">
+              {PEN_COLORS.map(color => (
+                <button key={color.token} type="button" className={'practice-swatch' + (penColor === color.token ? ' is-active' : '')} style={{ '--swatch': `var(${color.token})` }} aria-pressed={penColor === color.token} aria-label={color.label} title={color.label} onClick={() => setPenColor(color.token)} />
+              ))}
+            </div>
+            <label className="practice-size">
+              <span className="c-meta">Size</span>
+              <input type="range" min="1" max="24" step="1" value={penSize} onChange={event => setPenSize(Number(event.target.value))} aria-label="Brush size" />
+            </label>
+            <button type="button" className="c-icon-btn" onClick={undo} disabled={!canUndo} aria-label="Undo"><Undo2 {...ICON} /></button>
+            <button type="button" className="c-icon-btn" onClick={savePng} aria-label="Save drawing as PNG"><Download {...ICON} /></button>
+            {handOn && <span className="c-meta" role="status">{handReady ? 'Pinch to draw' : 'Starting camera…'}</span>}
+            </div>
           </div>
+          {handError && <div className="retain-action-error" role="alert">{handError}</div>}
 
           <div ref={boardRef} className="practice-board" data-tool={tool} data-spot="practice-canvas">
             <textarea
@@ -482,6 +633,16 @@ export default function PracticeWorkspace() {
               onPointerUp={endDraw}
               onPointerCancel={endDraw}
             />
+            {handOn && (
+              <AirDraw
+                boardRef={boardRef}
+                pen={pen}
+                stroke={{ start: startStroke, move: extendStroke, end: endStroke, clear: clearDrawing }}
+                showPreview={showCamera}
+                onStarted={() => setHandReady(true)}
+                onError={message => { setHandError(message); setHandOn(false); setHandReady(false); }}
+              />
+            )}
             {currentTokens.map(token => (
               <div
                 key={token.id}
@@ -569,6 +730,13 @@ export default function PracticeWorkspace() {
         .practice-toolbar .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
         .practice-symbols { display: flex; flex-wrap: wrap; gap: 2px; }
         .practice-symbols :global(.c-icon-btn) { font:600 15px/1 var(--font-sans); }
+        .practice-drawbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-basis: 100%; }
+        .practice-swatches { display: flex; flex-wrap: wrap; gap: 4px; }
+        .practice-swatch { width: 28px; height: 28px; padding: 0; border: 2px solid transparent; border-radius: var(--r-pill); background: var(--swatch); box-shadow: inset 0 0 0 2px var(--surface-raised); cursor: pointer; transition: border-color var(--dur) var(--ease); }
+        .practice-swatch.is-active { border-color: var(--olive); }
+        .practice-swatch:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
+        .practice-size { display: inline-flex; align-items: center; gap: 8px; }
+        .practice-size input { width: 112px; accent-color: var(--olive); }
         .practice-evaluation { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
       `}</style>
     </main>

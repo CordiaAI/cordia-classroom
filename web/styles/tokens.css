@@ -49,6 +49,16 @@
   /* Note paper (the editor and note cards are cream paper in both themes) */
   --paper: #FBF8F1;
   --paper-ink: #2B2A33;
+  /* Practice board pens (light board) and the fill used when a drawing is flattened */
+  --draw-ink: #2B2A33;
+  --draw-olive: #536149;
+  --draw-blue: #2F5FA8;
+  --draw-red: #B42318;
+  --draw-orange: #A2570E;
+  --draw-purple: #6B4BA8;
+  --draw-teal: #1F7A70;
+  --draw-graphite: #6E7378;
+  --draw-paper: #FBFCFB;
   --paper-line: rgba(43, 42, 51, 0.10);
 
   /* Shadows: one for cards, one for floating things */
@@ -161,6 +171,16 @@
   --error: #FF8A80;
   --error-bg: #3A2222;
   --paper: #F3EEE2;
+  /* Practice board pens on the dark board */
+  --draw-ink: #ECEFE8;
+  --draw-olive: #A9BC97;
+  --draw-blue: #8DB1EA;
+  --draw-red: #F09A90;
+  --draw-orange: #F1B37A;
+  --draw-purple: #C3ABEC;
+  --draw-teal: #86D2C7;
+  --draw-graphite: #A9AEB3;
+  --draw-paper: #1F2326;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.35), 0 18px 48px rgba(0, 0, 0, 0.45);
   --focus-ring: 0 0 0 2px var(--olive-ink);
