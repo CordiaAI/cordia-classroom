@@ -18,7 +18,7 @@ export function cameraErrorMessage(error) {
 async function createLandmarker() {
   const { FilesetResolver, HandLandmarker } = await import('@mediapipe/tasks-vision');
   const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
-  const options = delegate => ({ baseOptions: { modelAssetPath: MODEL_URL, delegate }, runningMode: 'VIDEO', numHands: 1 });
+  const options = delegate => ({ baseOptions: { modelAssetPath: MODEL_URL, delegate }, runningMode: 'VIDEO', numHands: 1, minHandDetectionConfidence: 0.6, minHandPresenceConfidence: 0.6, minTrackingConfidence: 0.6 });
   let landmarker;
   try {
     landmarker = await HandLandmarker.createFromOptions(fileset, options('GPU'));
@@ -136,8 +136,9 @@ export default function AirDraw({ boardRef, pen, stroke, showPreview, onError, o
       const now = performance.now();
       const result = landmarker.detectForVideo(video, now);
       const landmarks = result?.landmarks?.[0] || null;
+      const world = result?.worldLandmarks?.[0] || null;
       const aspect = (video.videoWidth || 640) / (video.videoHeight || 480);
-      const state = tracker.update(landmarks, now, { width: size.width, height: size.height, aspect });
+      const state = tracker.update(landmarks, now, { width: size.width, height: size.height, aspect, world });
       for (const event of state.events) {
         if (event.type === 'start') strokeRef.current.start(event.tool, event.point);
         else if (event.type === 'move') strokeRef.current.move(event.point);

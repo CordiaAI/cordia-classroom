@@ -73,7 +73,7 @@ export default function PracticeWorkspace() {
   const live = useRef(null);
   const baseImage = useRef(null);
   const [penColor, setPenColor] = useState('--draw-ink');
-  const [penSize, setPenSize] = useState(3);
+  const [penSize, setPenSize] = useState(4);
   const pen = useRef({ color: penColor, size: penSize });
   pen.current = { color: penColor, size: penSize };
   const [canUndo, setCanUndo] = useState(false);
