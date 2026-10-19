@@ -43,6 +43,15 @@ export function parseOutline(text) {
   return sections.filter(section => section.points.length);
 }
 
+// What the guide's Notes tab shows: the outline, or, until AI has written one, the key points
+// the guide's own answers make (so Notes is never empty).
+export function guideOutline(guide) {
+  const outline = parseOutline(guide?.notes);
+  if (outline.length) return outline;
+  const points = parseQAPairs(guide?.study_guide).map(pair => pair.answer).filter(Boolean);
+  return points.length ? [{ heading: 'Key points', points }] : [];
+}
+
 export function parseNotes(text) {
   if (!text) return [];
   return text.split('\n')

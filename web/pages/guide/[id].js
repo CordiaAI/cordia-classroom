@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
-import { parseQAPairs, parseOutline } from '../../lib/formatters';
+import { guideOutline, parseOutline, parseQAPairs } from '../../lib/formatters';
 import useSessionTracker from '../../lib/useSessionTracker';
 import StudyAidPanel from '../../components/StudyAidPanel';
 import StudyDocument from '../../components/StudyDocument';
@@ -33,7 +33,7 @@ function ask(guideId, prompt, send = false) {
 
 function exportGuide(guide) {
   const pairs = parseQAPairs(guide.study_guide);
-  const outline = parseOutline(guide.notes);
+  const outline = guideOutline(guide);
   const lines = [`# ${guide.title}`, ''];
   if (outline.length) {
     lines.push('## Notes', '');
@@ -220,7 +220,7 @@ export default function GuidePage() {
   if (!guide || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading guide" />;
 
   const pairs = parseQAPairs(guide.study_guide);
-  const outline = parseOutline(guide.notes);
+  const outline = guideOutline(guide);
   const cardCount = guide.flashcards?.length || 0;
   const sourceTitle = guide.source_title || (guide.source_url ? 'Source' : '');
   const externalSourceUrl = /^https?:\/\//i.test(guide.source_url || '') ? guide.source_url : '';
@@ -264,7 +264,7 @@ export default function GuidePage() {
           ]}
         />
       </header>
-      {sourceTitle && (
+      {sourceTitle && (sourceHref || sourceTitle.trim().toLowerCase() !== (guide.title || '').trim().toLowerCase()) && (
         <span className="guide-src">
           {sourceHref
             ? <a href={sourceHref} target={externalSourceUrl ? '_blank' : undefined} rel={externalSourceUrl ? 'noopener noreferrer' : undefined}><ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />{sourceTitle}</a>
@@ -282,15 +282,15 @@ export default function GuidePage() {
       </nav>
 
       {view === 'notes' ? (
-        <section className="c-card guide-notes" aria-label="Notes" aria-busy={notesState === 'making' && !outline.length}>
-          {outline.length ? outline.map((section, index) => (
-            <div key={index} className="guide-outline-section">
-              {section.heading && <h2 className="c-section-title">{section.heading}</h2>}
-              <ul className="c-study">{section.points.map((point, pointIndex) => <li key={pointIndex}>{point}</li>)}</ul>
-            </div>
-          )) : notesState === 'making' || notesState === 'idle'
+        <section className="c-card guide-notes" aria-label="Notes" aria-busy={notesState === 'making' && !parseOutline(guide.notes).length}>
+          {(notesState === 'making' || notesState === 'idle') && !parseOutline(guide.notes).length
             ? <SectionLoader height={160} label="Writing notes" />
-            : <p className="c-meta">Notes appear here once they are written. The questions are in Cards.</p>}
+            : outline.length ? outline.map((section, index) => (
+              <div key={index} className="guide-outline-section">
+                {section.heading && <h2 className="c-section-title">{section.heading}</h2>}
+                <ul className="c-study">{section.points.map((point, pointIndex) => <li key={pointIndex}>{point}</li>)}</ul>
+              </div>
+            )) : <p className="c-meta">Notes appear here once they are written. The questions are in Cards.</p>}
         </section>
       ) : (
         <>

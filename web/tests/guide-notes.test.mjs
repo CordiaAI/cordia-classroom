@@ -2,7 +2,7 @@
 // guide, older flat notes rewritten as an outline, outline notes kept.
 import assert from 'node:assert/strict';
 import { createGuideNotesService, needsOutline, outlineText } from '../lib/server/guideNotes.mjs';
-import { parseOutline } from '../lib/formatters.js';
+import { guideOutline, parseOutline } from '../lib/formatters.js';
 
 const GID = 'a0000000-0000-4000-8000-000000000001';
 const AUTH = 'Bearer token';
@@ -52,3 +52,7 @@ assert.deepEqual(parseOutline('- loose\n## A\n- one\n- two\n## B\n- three'), [{ 
   console.log('ok   no key, wrong sign-in and bad ids handled');
 }
 console.log('guide notes ok');
+// Without written notes, Notes shows the guide's key points rather than nothing.
+assert.deepEqual(guideOutline({ notes: '', study_guide: 'Q1: What is ATP?\nA1: The cell\'s energy carrier.\nQ2: Where is it made?\nA2: In the mitochondria.' }), [{ heading: 'Key points', points: ["The cell's energy carrier.", 'In the mitochondria.'] }]);
+assert.deepEqual(guideOutline({ notes: '## A\n- one', study_guide: 'Q1: x\nA1: y' }), [{ heading: 'A', points: ['one'] }]);
+console.log('ok   Notes falls back to the key points');
