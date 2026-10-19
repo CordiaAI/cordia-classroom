@@ -239,7 +239,7 @@ class FeedbackContractTests(unittest.TestCase):
                 authorization="Bearer valid",
             )
             updated = feedback.update_feedback_status(
-                "feedback-1",
+                "3f2b8c1e-9a4d-4e6f-b1c2-7d8e9f0a1b2c",
                 feedback.FeedbackStatusUpdate(status="planned"),
                 "Bearer valid",
             )

@@ -10,15 +10,14 @@ from auth_utils import get_user_id
 
 router = APIRouter(tags=["search"])
 
-# Characters that could be used for SQL injection in LIKE patterns
-_UNSAFE_PATTERN = re.compile(r'[%_\\\'";]')
+# Queries are sent as parameters, so only LIKE's own wildcards and escape need escaping;
+# apostrophes and quotes stay, so "Newton's law" can match.
+_LIKE_SPECIAL = re.compile(r'([\\%_])')
 
 
-def _sanitize_search_query(q: str) -> str:
-    """Sanitize search input — strip SQL wildcards and dangerous characters."""
-    q = q.strip()[:200]  # Max 200 chars
-    q = _UNSAFE_PATTERN.sub('', q)
-    return q
+def _like_pattern(q: str) -> str:
+    """The search text as a literal "contains" pattern for ilike."""
+    return "%" + _LIKE_SPECIAL.sub(r"\\\1", q) + "%"
 
 
 def _extract_snippet(text: str, query: str, length: int = 120) -> str:
@@ -41,29 +40,29 @@ def search_guides(q: str = Query(..., min_length=1, max_length=200), authorizati
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
-    # Sanitize search input
-    safe_q = _sanitize_search_query(q)
-    if not safe_q or len(safe_q) < 1:
+    q = q.strip()
+    if not q:
         return {"results": []}
+    pattern = _like_pattern(q)
 
     title_results = supabase.table("study_guides") \
         .select("id, title, folder_id, notes, study_guide, created_at") \
         .eq("user_id", user_id) \
-        .ilike("title", f"%{safe_q}%") \
+        .ilike("title", pattern) \
         .limit(20) \
         .execute()
 
     notes_results = supabase.table("study_guides") \
         .select("id, title, folder_id, notes, study_guide, created_at") \
         .eq("user_id", user_id) \
-        .ilike("notes", f"%{safe_q}%") \
+        .ilike("notes", pattern) \
         .limit(20) \
         .execute()
 
     guide_results = supabase.table("study_guides") \
         .select("id, title, folder_id, notes, study_guide, created_at") \
         .eq("user_id", user_id) \
-        .ilike("study_guide", f"%{safe_q}%") \
+        .ilike("study_guide", pattern) \
         .limit(20) \
         .execute()
 
