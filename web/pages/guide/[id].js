@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
+import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
 import BodyPortal from '../../components/BodyPortal';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, BookOpen, Brain, Download, ExternalLink, Layers, MessageCircle, NotebookText, PencilRuler, Pencil, Star, Stethoscope, SquarePen, Trash2, X,
+  ArrowLeft, Brain, Download, ExternalLink, Layers, MessageCircle, NotebookText, PencilRuler, Pencil, Star, Stethoscope, SquarePen, Trash2, X,
 } from 'lucide-react';
-import { apiErrorMessage, apiFetch } from '../../lib/api';
+import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import { parseQAPairs, parseNotes } from '../../lib/formatters';
 import useSessionTracker from '../../lib/useSessionTracker';
@@ -80,7 +80,9 @@ export default function GuidePage() {
   useSessionTracker('read', id || null);
   const [guide, setGuide] = useState(null);
   const [loadError, setLoadError] = useState('');
-  const [view, setView] = useState('read');
+  // Every guide has notes: a guide without any gets them written the first time it opens.
+  const [notesState, setNotesState] = useState('idle'); // idle | making | done
+  const notesAsked = useRef('');
   const [page, setPage] = useState(0);
   const [revealed, setRevealed] = useState(new Set());
   const [renaming, setRenaming] = useState(null);
@@ -124,6 +126,18 @@ export default function GuidePage() {
     const timer = setTimeout(() => setToast(''), 2500);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // A guide with no notes gets them written (once per visit); the summary card shows a loader meanwhile.
+  useEffect(() => {
+    if (!guide?.id || notesAsked.current === guide.id || parseNotes(guide.notes).length) return;
+    notesAsked.current = guide.id;
+    setNotesState('making');
+    fetch('/api/guide-notes', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ guide_id: guide.id }) })
+      .then(response => (response.ok ? response.json() : null))
+      .then(data => { if (data?.notes) setGuide(current => (current && current.id === guide.id ? { ...current, notes: data.notes } : current)); })
+      .catch(() => {})
+      .finally(() => setNotesState('done'));
+  }, [guide?.id]);
 
   async function loadGuide() {
     setLoadError('');
@@ -203,11 +217,10 @@ export default function GuidePage() {
     || (guide.source_type === 'study_guide' && guide.source_id ? `/guide/${guide.source_id}` : '');
   const explainWithAid = Boolean(learningStyle?.enabled);
   const pills = [
-    { key: 'read', label: 'Read', icon: BookOpen, view: 'read' },
+    { key: 'notes', label: 'Notes', icon: NotebookText, view: 'notes' },
     { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill' },
     { key: 'cards', label: 'Cards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: cardCount, spot: 'cards-pill' },
     { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id },
-    { key: 'notes', label: 'Notes', icon: NotebookText, view: 'notes' },
     ...(isNursing(guide) ? [{ key: 'nclex', label: 'NCLEX', icon: Stethoscope, href: '/nclex/' + id }] : []),
     { key: 'ask', label: 'Ask', icon: MessageCircle, spot: 'ask-pill', onClick: () => { walkthroughEvent('ask'); ask(id, ''); } },
   ];
@@ -251,33 +264,37 @@ export default function GuidePage() {
         {pills.map(pill => {
           const content = <><pill.icon size={20} strokeWidth={1.75} aria-hidden="true" />{pill.label}{pill.count !== undefined && <span className="c-meta">{pill.count}</span>}</>;
           if (pill.href) return <Link key={pill.key} className="c-pill" href={pill.href} data-spot={pill.spot}>{content}</Link>;
-          if (pill.view) return <button key={pill.key} type="button" className="c-pill" aria-current={view === pill.view ? 'page' : undefined} onClick={() => setView(pill.view)}>{content}</button>;
+          if (pill.view) return <button key={pill.key} type="button" className="c-pill" aria-current="page" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>{content}</button>;
           return <button key={pill.key} type="button" className="c-pill" data-spot={pill.spot} onClick={pill.onClick}>{content}</button>;
         })}
       </nav>
 
-      {view === 'read' ? (
-        <StudyDocument
-          key={guide.id}
-          guide={guide}
-          page={page}
-          onPageChange={changePage}
-          readSections={revealed}
-          onRead={index => setRevealed(previous => new Set([...previous, index]))}
-          onExplain={index => {
-            if (explainWithAid) setOpenAid(current => (current === pairs[index].index ? null : pairs[index].index));
-            else ask(id, `Explain this more simply: ${pairs[index].question}`, true);
-          }}
-          renderAid={index => (explainWithAid && openAid && pairs[index]?.index === openAid
-            ? <StudyAidPanel guideId={id} number={openAid} style={learningStyle.style} onClose={() => setOpenAid(null)} section={{ ...pairs[index], before: pairs[index - 1], after: pairs[index + 1], guideTitle: guide.title }} />
-            : null)}
-          onSelection={onSelection}
-        />
-      ) : (
+      {/* Notes: a summary of the guide first, then every question to read through. */}
+      {(notes.length > 0 || notesState === 'making') && (
         <section className="c-card guide-notes" aria-label="Notes">
-          {notes.length ? <ul className="c-study">{notes.map((note, index) => <li key={index}>{note}</li>)}</ul> : <p className="c-meta">0 notes</p>}
+          <h2 className="c-section-title">Summary</h2>
+          {notes.length
+            ? <ul className="c-study">{notes.map((note, index) => <li key={index}>{note}</li>)}</ul>
+            : <SectionLoader height={120} label="Writing notes" />}
         </section>
       )}
+      {pairs.length > 0 && <h2 className="c-section-title guide-questions-title">Questions</h2>}
+      <StudyDocument
+        key={guide.id}
+        guide={guide}
+        page={page}
+        onPageChange={changePage}
+        readSections={revealed}
+        onRead={index => setRevealed(previous => new Set([...previous, index]))}
+        onExplain={index => {
+          if (explainWithAid) setOpenAid(current => (current === pairs[index].index ? null : pairs[index].index));
+          else ask(id, `Explain this more simply: ${pairs[index].question}`, true);
+        }}
+        renderAid={index => (explainWithAid && openAid && pairs[index]?.index === openAid
+          ? <StudyAidPanel guideId={id} number={openAid} style={learningStyle.style} onClose={() => setOpenAid(null)} section={{ ...pairs[index], before: pairs[index - 1], after: pairs[index + 1], guideTitle: guide.title }} />
+          : null)}
+        onSelection={onSelection}
+        />
 
       {cardDraft !== null && <MakeCard front={cardDraft} onSave={saveCard} onClose={() => setCardDraft(null)} />}
       {confirmDelete && <ConfirmDialog title={`Delete ${guide.title}?`} onConfirm={deleteGuide} onCancel={() => setConfirmDelete(false)} />}
@@ -294,8 +311,10 @@ export default function GuidePage() {
         .guide-head :global(.guide-starred) { color: var(--olive-ink); }
         .guide-src { margin: -8px 0 0 48px; font:600 13px/1.5 var(--font-sans); }
         .guide-src a { display: inline-flex; align-items: center; gap: 6px; }
-        .guide-notes { padding: 32px 40px; }
+        .guide-notes { display: grid; gap: 16px; padding: 32px 40px; }
+        .guide-notes :global(.c-section-title) { margin: 0; }
         .guide-notes ul { margin: 0; padding-left: 20px; display: grid; gap: 12px; }
+        .guide-questions-title { margin: 16px 0 0; }
         @media (max-width: 767px) { .guide-src { margin-left: 0; } .guide-notes { padding: 24px 18px; } }
       `}</style>
     </article>
