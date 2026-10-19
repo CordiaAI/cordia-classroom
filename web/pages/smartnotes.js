@@ -10,6 +10,7 @@ import PdfPages from '../components/PdfPages';
 import { useFileDropZone } from '../lib/fileDrop';
 import { sanitizeHtml } from '../lib/sanitizeHtml';
 import NapkinVisual from '../components/NapkinVisual';
+import { MIN_CHARS, htmlToText, isDefaultTitle, needsCover } from '../lib/noteMeta.mjs';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -455,6 +456,51 @@ function NotesIndex({ router, timerState, setTimerState }) {
   const [previewError, setPreviewError] = useState('');
   const [savingGuide, setSavingGuide] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState(null);
+  // Napkin covers and AI titles, made in the background a few notes at a time.
+  const [covers, setCovers] = useState({});
+  const [coversEnabled, setCoversEnabled] = useState(false);
+  const [labelling, setLabelling] = useState({});
+  const labelled = useRef(new Set());
+
+  useEffect(() => {
+    fetch('/api/notes/covers', { headers: authHeaders() })
+      .then(response => (response.ok ? response.json() : null))
+      .then(data => {
+        if (!data) return;
+        setCoversEnabled(Boolean(data.enabled));
+        setCovers(Object.fromEntries((data.covers || []).map(cover => [cover.note_id, cover])));
+      })
+      .catch(() => {});
+  }, []);
+
+  // Untitled notes get an AI title; notes without a current cover get one (2 at a time, 6 per visit).
+  useEffect(() => {
+    if (loading) return undefined;
+    let cancelled = false;
+    const due = notes.map(note => {
+      const length = htmlToText(note.content).length;
+      return { note, title: length >= MIN_CHARS && isDefaultTitle(note.title), cover: coversEnabled && needsCover(covers[note.id], length) };
+    }).filter(item => (item.title || item.cover) && !labelled.current.has(item.note.id)).slice(0, 6);
+    if (!due.length) return undefined;
+    due.forEach(item => labelled.current.add(item.note.id));
+    let next = 0;
+    const work = async () => {
+      while (!cancelled && next < due.length) {
+        const item = due[next++];
+        if (item.cover) setLabelling(current => ({ ...current, [item.note.id]: true }));
+        const data = await fetch('/api/notes/meta', {
+          method: 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note_id: item.note.id, title: item.title, cover: item.cover }),
+        }).then(response => (response.ok ? response.json() : null)).catch(() => null);
+        if (data?.title) setNotes(current => current.map(note => (note.id === item.note.id ? { ...note, title: data.title } : note)));
+        if (data?.cover?.url) setCovers(current => ({ ...current, [item.note.id]: { ...data.cover, content_length: htmlToText(item.note.content).length } }));
+        setLabelling(current => { const { [item.note.id]: _, ...rest } = current; return rest; });
+      }
+    };
+    work(); work();
+    return () => { cancelled = true; };
+  }, [loading, notes.length, coversEnabled, Object.keys(covers).length]);
 
   useEffect(() => {
     Promise.all([
@@ -631,7 +677,10 @@ function NotesIndex({ router, timerState, setTimerState }) {
                   <div className="sn-card-paper sn-card-paper-3" />
                   <div className="sn-card-paper sn-card-paper-2" />
                   <div className="sn-card-paper sn-card-paper-1">
-                    <div className="sn-card-preview">{previewText(n.content) || 'Empty note'}</div>
+                    {covers[n.id]?.url
+                      ? <img className="sn-card-cover" src={covers[n.id].url} alt={covers[n.id].alt || ''} loading="lazy" />
+                      : <div className="sn-card-preview">{previewText(n.content) || 'Empty note'}</div>}
+                    {labelling[n.id] && <span className="sn-card-making"><CordiaLoader size={20} label="Making a cover" /></span>}
                   </div>
                 </div>
                 <div className="sn-card-meta">
@@ -752,6 +801,7 @@ function SmartNotesEditor() {
   const titleRef  = useRef('Untitled Notes');
   const lastSavedRef = useRef('');       // last saved content snapshot
   const lastSavedTitleRef = useRef('Untitled Notes'); // last saved title snapshot
+  const titleRequested = useRef(false); // AI title asked for once per opened note
 
   // Multi-page illusion: how many "filled pages" are behind the front paper (0–2)
   const [pageCount, setPageCount] = useState(0);
@@ -795,6 +845,7 @@ function SmartNotesEditor() {
   // A blank editor with no saved note behind it yet.
   function startBlankNote() {
     noteIdRef.current = null;
+    titleRequested.current = false;
     titleRef.current = 'Untitled Notes';
     folderIdRef.current = '';
     setNoteId(null);
@@ -856,6 +907,7 @@ function SmartNotesEditor() {
       if (!resp.ok) { startBlankNote(); return; }
       const data = await responseJson(resp);
       noteIdRef.current = data.note.id;
+      titleRequested.current = false;
       titleRef.current  = data.note.title || 'Untitled Notes';
       folderIdRef.current = data.note.folder_id || '';
       setNoteId(data.note.id);
@@ -902,6 +954,21 @@ function SmartNotesEditor() {
     lastSavedTitleRef.current = title;
     setSaveError('');
     setSaveStatus('saved');
+    // Still "Untitled Notes" with real text: ask once for an AI title (saved to the note by the server).
+    if (!titleRequested.current && isDefaultTitle(title) && (paperRef.current?.innerText || '').trim().length >= MIN_CHARS) {
+      titleRequested.current = true;
+      const noteId = noteIdRef.current;
+      fetch('/api/notes/meta', { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ note_id: noteId, title: true, cover: false }) })
+        .then(response => (response.ok ? response.json() : null))
+        .then(data => {
+          if (!data?.title || noteIdRef.current !== noteId || !isDefaultTitle(titleRef.current)) return;
+          titleRef.current = data.title;
+          lastSavedTitleRef.current = data.title;
+          setTitle(data.title);
+          fetchNotes();
+        })
+        .catch(() => {});
+    }
     setTimeout(() => setSaveStatus(s => s === 'saved' ? '' : s), 1500);
     fetchNotes(); // refresh sidebar list so title changes appear immediately
     return '';

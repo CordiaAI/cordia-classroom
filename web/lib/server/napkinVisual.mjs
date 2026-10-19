@@ -19,8 +19,9 @@ export const BUCKET = 'visuals';
 const MAX_TEXT = 2000;
 const MAX_CONTEXT = 1500;
 
-export function cacheKey({ text, context = '', style, theme }) {
-  return createHash('sha256').update(JSON.stringify([text, context, style, theme])).digest('hex');
+export function cacheKey({ text, context = '', style, theme, variations = VARIATIONS }) {
+  const parts = variations === VARIATIONS ? [text, context, style, theme] : [text, context, style, theme, variations];
+  return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 }
 
 // Alt text from the content itself: its first line, trimmed to a sentence.
@@ -153,7 +154,7 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
     return { fallback: 'timeout' };
   }
 
-  async function generate({ authorization, text, context = '', theme = 'light' }) {
+  async function generate({ authorization, text, context = '', theme = 'light', variations = VARIATIONS }) {
     const who = await account(authorization);
     if (!who) return { httpStatus: 401, body: { detail: 'Sign in again.' } };
     const content = String(text || '').trim().slice(0, MAX_TEXT);
@@ -161,7 +162,7 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
     const mode = theme === 'dark' ? 'dark' : 'light';
     if (!enabled) return { httpStatus: 200, body: { status: 'fallback', reason: 'not_configured' } };
 
-    const key = cacheKey({ text: content, context, style, theme: mode });
+    const key = cacheKey({ text: content, context, style, theme: mode, variations });
     const hit = await cached(key);
     const counts = await usage(who);
     if (hit?.files?.length) {
@@ -179,7 +180,7 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
       ...(context ? { context: String(context).slice(0, MAX_CONTEXT) } : {}),
       language: 'en-US',
       style_id: style,
-      number_of_visuals: VARIATIONS,
+      number_of_visuals: variations,
       transparent_background: true,
       color_mode: mode,
     }, deadline);
@@ -189,7 +190,7 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
 
     // Download now: Napkin's links expire after 30 minutes, and we never hotlink them.
     const visuals = [];
-    for (const [index, file] of result.files.slice(0, VARIATIONS).entries()) {
+    for (const [index, file] of result.files.slice(0, variations).entries()) {
       try {
         const response = await fetchImpl(file.url, { headers: { Authorization: `Bearer ${napkinKey}` } });
         if (!response.ok) continue;
