@@ -1,8 +1,10 @@
 // Note title and cover rules shared by the Notes page and /api/notes (lib/server/noteMeta.mjs).
 
 export const DEFAULT_TITLE = 'Untitled Notes';
-export const MIN_CHARS = 120;     // a note needs this much text before it gets a title or cover
-export const REGROW = 1.5;        // remake the cover once the note is this much longer
+export const MIN_CHARS = 25;      // one short sentence is enough for a title and a cover
+export const TYPING_CHARS = 80;   // while typing, wait for a little more before naming the note
+export const REGROW = 1.5;        // remake the cover once the note is this much longer…
+export const REGROW_CHARS = 150;  // …and at least this many characters longer
 
 export function htmlToText(html) {
   return String(html || '')
@@ -30,7 +32,7 @@ export function isDefaultTitle(title) {
 
 export function needsCover(cover, textLength) {
   if (textLength < MIN_CHARS) return false;
-  return !cover?.url || textLength >= (cover.content_length || 0) * REGROW;
+  return !cover?.url || textLength >= Math.max((cover.content_length || 0) * REGROW, (cover.content_length || 0) + REGROW_CHARS);
 }
 
 // An AI title is used only if it reads like a title: a few words, and not just the opening of

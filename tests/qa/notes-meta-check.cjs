@@ -31,7 +31,7 @@ async function session(browser, { theme = 'dark', width = 1280 } = {}) {
     state.noteMeta.push(body);
     await new Promise(resolve => setTimeout(resolve, 1200));
     const note = state.notes.find(item => item.id === body.note_id);
-    if (body.title) note.title = 'Earth Rotation and Orbit';
+    if (body.title) note.title = body.note_id === 'n2' ? 'Past Work Experience' : 'Earth Rotation and Orbit';
     return route.fulfill({ json: { ...(body.title ? { title: note.title } : {}), ...(body.cover ? { cover: { url: 'https://db.example.co/storage/v1/object/public/visuals/ab/x/0.svg', alt: 'Diagram: Earth' } } : {}) } });
   });
   await context.route(/db\.example\.co\/storage\//, route => route.fulfill({ body: SVG, headers: { 'content-type': 'image/svg+xml' } }));
@@ -45,19 +45,20 @@ async function session(browser, { theme = 'dark', width = 1280 } = {}) {
   const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--headless=new'] });
 
   for (const [width, theme] of [[1280, 'dark'], [390, 'light']]) {
-    await check(`Notes page ${width}px ${theme}: untitled note gets an AI title and a Napkin cover; short note left alone`, async () => {
+    await check(`Notes page ${width}px ${theme}: untitled notes, even one sentence, get an AI title and a Napkin cover`, async () => {
       const { context, page, state } = await session(browser, { width, theme });
       await page.goto(BASE + '/smartnotes');
       await page.locator('.sn-card').first().waitFor();
       const before = await page.locator('.sn-card').first().boundingBox();
       await page.locator('.sn-card-making').first().waitFor({ timeout: 5000 });
       expect(await page.locator('.sn-card-preview').first().isVisible(), 'preview hidden while the cover is made');
-      await page.locator('.sn-card-cover').waitFor({ timeout: 10000 });
+      await page.locator('.sn-card-cover').nth(1).waitFor({ timeout: 10000 });
       await page.locator('.sn-card-title:has-text("Earth Rotation and Orbit")').waitFor({ timeout: 5000 });
       const after = await page.locator('.sn-card').first().boundingBox();
       expect(Math.abs(before.height - after.height) < 1 && Math.abs(before.width - after.width) < 1, 'card size changed when the cover arrived');
-      expect(state.noteMeta.length === 1 && state.noteMeta[0].note_id === 'n1' && state.noteMeta[0].title && state.noteMeta[0].cover, `requests: ${JSON.stringify(state.noteMeta)}`);
-      expect(await page.locator('.sn-card-cover').getAttribute('alt') === 'Diagram: Earth', 'no alt text');
+      await page.locator('.sn-card-title:has-text("Past Work Experience")').waitFor({ timeout: 5000 });
+      expect(state.noteMeta.length === 2 && state.noteMeta.every(item => item.title && item.cover), `requests: ${JSON.stringify(state.noteMeta)}`);
+      expect(await page.locator('.sn-card-cover').first().getAttribute('alt') === 'Diagram: Earth', 'no alt text');
       await page.waitForTimeout(400);
       await page.screenshot({ path: path.join(SHOTS, `notes-covers-${width}-${theme}.png`) });
       await context.close();

@@ -10,7 +10,7 @@ import PdfPages from '../components/PdfPages';
 import { useFileDropZone } from '../lib/fileDrop';
 import { sanitizeHtml } from '../lib/sanitizeHtml';
 import NapkinVisual from '../components/NapkinVisual';
-import { MIN_CHARS, htmlToText, isDefaultTitle, needsCover } from '../lib/noteMeta.mjs';
+import { MIN_CHARS, TYPING_CHARS, htmlToText, isDefaultTitle, needsCover } from '../lib/noteMeta.mjs';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -955,7 +955,7 @@ function SmartNotesEditor() {
     setSaveError('');
     setSaveStatus('saved');
     // Still "Untitled Notes" with real text: ask once for an AI title (saved to the note by the server).
-    if (!titleRequested.current && isDefaultTitle(title) && (paperRef.current?.innerText || '').trim().length >= MIN_CHARS) {
+    if (!titleRequested.current && isDefaultTitle(title) && (paperRef.current?.innerText || '').trim().length >= TYPING_CHARS) {
       titleRequested.current = true;
       const noteId = noteIdRef.current;
       fetch('/api/notes/meta', { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ note_id: noteId, title: true, cover: false }) })

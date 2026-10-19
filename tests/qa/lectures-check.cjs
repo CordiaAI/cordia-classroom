@@ -27,21 +27,24 @@ const LECTURE = {
   },
 };
 
-async function session(browser, { width = 1440, theme = 'light' } = {}) {
+async function session(browser, { width = 1440, theme = 'light', lecture = LECTURE } = {}) {
   const context = await browser.newContext({ viewport: { width, height: 1000 } });
   const state = createState(true);
   state.todo = { id: 'd1', title: 'Problem set 3', kind: 'assignment', due_at: `${soon}T23:59:00Z`, said: 'Friday', quote: 'Problem set three is due Friday', at_ms: 40000, status: 'suggested' };
   state.saved = [];
+  state.lecture = lecture;
+  state.analyzeCalls = 0;
   await install(context, state);
-  await context.route(/localhost:3100\/api\/lectures\/(list|get|save|update|delete|todo|todos|usage)/, async route => {
+  await context.route(/localhost:3100\/api\/lectures\/(list|get|save|update|delete|todo|todos|usage|analyze)/, async route => {
     const url = new URL(route.request().url());
     const action = url.pathname.split('/').pop();
     const body = JSON.parse(route.request().postData() || '{}');
     if (action === 'list') return route.fulfill({ json: { enabled: true, lectures: [{ id: LID, title: LECTURE.title, folder_id: LECTURE.folder_id, source: 'recording', lecture_date: '2026-10-17', duration_ms: 3000000, summary: 'Supply and demand set prices.', watch_count: 1, todo_count: 1 }] } });
-    if (action === 'get') return route.fulfill({ json: { lecture: LECTURE, todos: state.todo.status === 'dismissed' ? [] : [state.todo] } });
+    if (action === 'get') return route.fulfill({ json: { lecture: state.lecture, todos: state.todo.status === 'dismissed' ? [] : [state.todo] } });
     if (action === 'save') { state.saved.push(body); return route.fulfill({ json: { lecture: { id: LID, title: LECTURE.title } } }); }
     if (action === 'todo') { Object.assign(state.todo, body.status ? { status: body.status } : {}); return route.fulfill({ json: { todo: state.todo } }); }
     if (action === 'todos') return route.fulfill({ json: { todos: state.todo.status === 'confirmed' ? [{ ...state.todo, lecture_id: LID, lecture_title: LECTURE.title }] : [] } });
+    if (action === 'analyze') { state.analyzeCalls += 1; await new Promise(resolve => setTimeout(resolve, 1200)); return route.fulfill({ json: { analysis: { ...LECTURE.analysis, note_id: 'note-9' }, todos: [state.todo] } }); }
     if (action === 'usage') return route.fulfill({ json: { minutes_left: 84, minutes_limit: 120, ready: false } });
     return route.fulfill({ json: {} });
   });
@@ -68,7 +71,7 @@ async function session(browser, { width = 1440, theme = 'light' } = {}) {
       await page.waitForURL(/\/lecture\//);
       await page.locator('.lecture-title').waitFor();
       await page.locator('h2:has-text("Summary")').waitFor();
-      for (const title of ['Summary', 'What to watch for', 'To do', 'Outline', 'Key terms', 'Questions from class', 'Transcript']) {
+      for (const title of ['Summary', 'What to watch for', 'To do', 'Notes', 'Key terms', 'Questions from class', 'Transcript']) {
         expect(await page.locator(`h2:has-text("${title}")`).count() === 1, `missing ${title}`);
       }
       expect(/definitely be on the midterm/.test(await page.locator('.lecture-quote').first().innerText()), 'no quote');
@@ -83,6 +86,19 @@ async function session(browser, { width = 1440, theme = 'light' } = {}) {
       await context.close();
     });
   }
+
+  await check('A lecture saved without notes gets them written on open, with Open in Notes', async () => {
+    const bare = { ...LECTURE, analysis: { analyzed: false } };
+    const { context, page, state, errors } = await session(browser, { lecture: bare });
+    await page.goto(BASE + '/lecture/' + LID);
+    await page.locator('h2:has-text("Notes")').waitFor();
+    await page.locator('text=Writing your notes').waitFor({ timeout: 5000 });
+    await page.locator('.lecture-outline-heading:has-text("Supply and demand")').waitFor({ timeout: 10000 });
+    expect(await page.getAttribute('a:has-text("Open in Notes")', 'href') === '/smartnotes?id=note-9', 'no link to the note');
+    expect(state.analyzeCalls === 1, `analyze called ${state.analyzeCalls} times`);
+    expect(!errors.length, errors[0]);
+    await context.close();
+  });
 
   await check('Add notes → saved as a lecture → opens it', async () => {
     const { context, page, state } = await session(browser);

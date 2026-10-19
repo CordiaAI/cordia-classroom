@@ -19,8 +19,8 @@ const SEGMENTS = [
   { start_ms: 40000, text: 'Problem set three is due next Friday before class.' },
 ];
 
-function world({ env = {}, analysis } = {}) {
-  const state = { inserts: {}, patches: [], urls: [] };
+function world({ env = {}, analysis, stored = { id: LECTURE, title: 'Supply and Demand Basics' } } = {}) {
+  const state = { inserts: {}, patches: [], urls: [], notes: [], lecturePatches: [] };
   const fetch = async (url, init = {}) => {
     const method = init.method || 'GET';
     state.urls.push(`${method} ${url}`);
@@ -39,13 +39,16 @@ function world({ env = {}, analysis } = {}) {
         questions: [{ question: 'What happens when supply falls?', at_ms: 20000 }],
       }) } }] });
     }
+    if (url === 'https://api.example.com/smart_notes' && method === 'POST') { state.notes.push({ created: JSON.parse(init.body) }); return json({ note: { id: 'note-1' } }); }
+    if (url.startsWith('https://api.example.com/smart_notes/') && method === 'PUT') { state.notes.push({ id: url.split('/').pop(), ...JSON.parse(init.body) }); return json({ ok: true }); }
+    if (url === 'https://api.example.com/folders') return json({ folders: [{ id: CLASS, name: 'Econ 101' }] });
     if (url.startsWith('https://db.example.co/rest/v1/lectures') && method === 'POST') { state.inserts.lecture = JSON.parse(init.body); return json([{ id: LECTURE, ...state.inserts.lecture }], 201); }
     if (url.startsWith('https://db.example.co/rest/v1/lecture_todos') && method === 'POST') { state.inserts.todos = JSON.parse(init.body); return json(null, 201); }
     if (url.startsWith('https://db.example.co/rest/v1/lectures?user_id=')) return json([{ id: LECTURE, title: 'Supply and Demand Basics', folder_id: CLASS, source: 'recording', lecture_date: '2026-10-17', duration_ms: 60000, analysis: { summary: ['Supply and demand set prices.'], watch_for: [{}] } }]);
     if (url.startsWith('https://db.example.co/rest/v1/lecture_todos?user_id=') && url.includes('status=in.')) return json([{ lecture_id: LECTURE, status: 'suggested' }]);
     if (url.startsWith('https://db.example.co/rest/v1/lecture_todos?user_id=') && url.includes('status=eq.confirmed')) return json([{ id: TODO, title: 'Problem set 3', kind: 'assignment', due_at: '2026-10-24T23:59:00Z', lecture_id: LECTURE, lectures: { title: 'Supply and Demand Basics', folder_id: CLASS } }]);
-    if (url.startsWith(`https://db.example.co/rest/v1/lectures?id=eq.${LECTURE}&user_id=eq.${USER}`) && method === 'GET') return json([{ id: LECTURE, title: 'Supply and Demand Basics' }]);
-    if (url.startsWith('https://db.example.co/rest/v1/lectures?id=eq.')) return method === 'GET' ? json([]) : json(null, 204);
+    if (url.startsWith(`https://db.example.co/rest/v1/lectures?id=eq.${LECTURE}&user_id=eq.${USER}`) && method === 'GET') return json([stored]);
+    if (url.startsWith('https://db.example.co/rest/v1/lectures?id=eq.')) { if (method === 'PATCH') state.lecturePatches.push(JSON.parse(init.body)); return method === 'GET' ? json([]) : json(null, 204); }
     if (url.startsWith('https://db.example.co/rest/v1/lecture_todos?lecture_id=')) return json([{ id: TODO, title: 'Problem set 3', status: 'suggested' }]);
     if (url.startsWith('https://db.example.co/rest/v1/lecture_todos?id=eq.') && method === 'PATCH') { state.patches.push({ url, body: JSON.parse(init.body) }); return json([{ id: TODO, ...JSON.parse(init.body) }]); }
     throw new Error(`unexpected ${method} ${url}`);
@@ -79,6 +82,10 @@ console.log('ok   only quoted, supported items are kept; times snap to lines');
   assert.equal(state.inserts.lecture.analysis.watch_for[0].at_ms, 20000);
   assert.deepEqual(state.inserts.todos.map(item => [item.title, item.due_at, item.said]), [['Problem set 3', '2026-10-24T23:59:00Z', 'next Friday']]);
   assert.equal(state.inserts.lecture.audio, undefined, 'no audio stored');
+  const note = state.notes.find(item => item.content);
+  assert.ok(note && note.title === 'Supply and Demand Basics' && note.folder_id === CLASS, 'the lecture is filed in Notes under its class');
+  assert.ok(note.content.includes('Supply and demand') && note.content.includes('Curves shift with conditions'), 'the note holds the outline');
+  assert.equal(state.lecturePatches.at(-1).analysis.note_id, 'note-1');
   console.log('ok   save: analysed once, stored with to-dos (suggested), class suggested');
 }
 {
@@ -87,6 +94,7 @@ console.log('ok   only quoted, supported items are kept; times snap to lines');
   assert.equal(body.lecture.id, LECTURE);
   assert.equal(state.inserts.lecture.analysis.analyzed, false);
   assert.equal(state.inserts.lecture.source, 'notes');
+  assert.ok(state.notes.find(item => item.content)?.content.includes('French Revolution'), 'the note still appears, with the transcript');
   console.log('ok   without AI the transcript is still saved');
 }
 {
@@ -111,6 +119,26 @@ console.log('ok   only quoted, supported items are kept; times snap to lines');
   const signedOut = world().library;
   assert.equal((await signedOut.list('Bearer bad')).status, 401);
   console.log('ok   not set up and signed out');
+}
+
+{
+  // A lecture saved before AI was set up gets its notes when it's opened.
+  const { library, state } = world({ stored: { id: LECTURE, title: 'Supply and Demand Basics', folder_id: CLASS, lecture_date: '2026-10-17', transcript: '', segments: SEGMENTS, analysis: { analyzed: false, note_id: 'note-1' } } });
+  const { status, body } = await library.analyze(AUTH, { id: LECTURE });
+  assert.equal(status, 200);
+  assert.equal(body.analysis.analyzed, true);
+  assert.equal(body.analysis.outline[0].heading, 'Supply and demand');
+  assert.equal(body.analysis.note_id, 'note-1', 'the same note is updated');
+  assert.equal(state.notes.filter(item => item.created).length, 0);
+  assert.ok(state.notes.at(-1).content.includes('Curves shift with conditions'));
+  assert.equal(body.todos.length, 1);
+  assert.equal(state.lecturePatches.at(-1).analysis.analyzed, true);
+  const noAi = world({ env: { OPENAI_API_KEY: '' }, stored: { id: LECTURE, title: 'Old lecture', transcript: 'We talked about the causes of the French Revolution in 1789.', segments: [], analysis: { analyzed: false } } });
+  const unset = await noAi.library.analyze(AUTH, { id: LECTURE });
+  assert.equal(unset.body.reason, 'not_configured');
+  assert.equal(unset.body.analysis.note_id, 'note-1', 'without AI the transcript still becomes a note');
+  assert.equal((await world().library.analyze(AUTH, { id: 'nope' })).status, 404);
+  console.log('ok   analyze: notes written on open, filed once in Notes');
 }
 
 // Calendar: lecture to-dos join the Canvas feed without doubling an assignment Canvas already has.

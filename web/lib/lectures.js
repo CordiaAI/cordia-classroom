@@ -34,6 +34,8 @@ export const updateLecture = body => call('update', { method: 'POST', body });
 export const deleteLecture = id => call('delete', { method: 'POST', body: { id } });
 export const updateTodo = body => call('todo', { method: 'POST', body });
 export const confirmedTodos = () => call('todos');
+// Writes the notes for a lecture saved without them (and files its note in the Notes tab).
+export const analyzeLecture = id => call('analyze', { method: 'POST', body: { id }, timeoutMs: 65000 });
 
 export function clock(ms) {
   const total = Math.floor((ms || 0) / 1000);

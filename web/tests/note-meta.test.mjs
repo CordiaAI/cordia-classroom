@@ -43,7 +43,7 @@ resetRateState();
 assert.equal(htmlToText('<p>A &amp; B</p><p>C</p>'), 'A & B\nC');
 assert.equal(heuristicTitle('the earth is round. It spins.'), 'The earth is round');
 assert.ok(isDefaultTitle('Untitled Notes') && isDefaultTitle('') && !isDefaultTitle('Biology week 3'));
-assert.ok(needsCover(null, 200) && !needsCover(null, 50) && !needsCover({ url: 'x', content_length: 200 }, 250) && needsCover({ url: 'x', content_length: 200 }, 300));
+  assert.ok(needsCover(null, 200) && needsCover(null, 50) && !needsCover(null, 20) && !needsCover({ url: 'x', content_length: 200 }, 300) && needsCover({ url: 'x', content_length: 200 }, 350))
 const transcript = "particular job. I. Alright, so basically what they're gonna ask is about your experience.";
 assert.equal(sensibleTitle('particular job. I. Alright', transcript), '', 'the opening words are not a title');
 assert.equal(sensibleTitle('Answering Job Interview Questions', transcript), 'Answering Job Interview Questions');
@@ -94,5 +94,17 @@ console.log('ok   helpers');
   assert.equal((await other.service.meta(AUTH, { noteId: 'someone-elses' })).status, 404);
   assert.equal((await other.service.meta('Bearer bad', { noteId: 'n1' })).status, 401);
   console.log('ok   short notes skipped; only your own notes');
+}
+{
+  // One sentence is enough: these are real notes that used to be skipped.
+  for (const sentence of ['What past work experiences do you have?', 'The earth is round and spins and orbits around the sun']) {
+    const { service, state } = world({ note: { id: 'n1', title: 'Untitled Notes', content: `<p>${sentence}</p>` } });
+    const { body } = await service.meta(AUTH, { noteId: 'n1' });
+    assert.ok(body.title && body.cover?.url, `no title or cover for "${sentence}"`);
+    assert.equal(state.napkin, 1);
+  }
+  assert.equal(needsCover({ url: 'x', content_length: 40 }, 70), false, 'a short note is not redrawn for a few more words');
+  assert.equal(needsCover({ url: 'x', content_length: 40 }, 200), true);
+  console.log('ok   one-sentence notes get a title and a cover');
 }
 console.log('note titles and covers ok');

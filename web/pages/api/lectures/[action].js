@@ -6,13 +6,13 @@
 // The Lectures section (lib/server/lectureLibrary.mjs):
 //   GET  /api/lectures/list            GET /api/lectures/get?id=       GET /api/lectures/todos
 //   POST /api/lectures/save            POST /api/lectures/update       POST /api/lectures/delete
-//   POST /api/lectures/todo
+//   POST /api/lectures/todo            POST /api/lectures/analyze { id }  (AI notes for a lecture saved without them)
 // Server env: OPENAI_API_KEY (transcription, analysis), SUPABASE_SERVICE_ROLE_KEY (storage, metering).
 import { MAX_CHUNK_BYTES, createLectureService } from '../../../lib/server/lectures.mjs';
 import { createLectureLibrary } from '../../../lib/server/lectureLibrary.mjs';
 
 const LIBRARY_GET = { list: 'list', get: 'get', todos: 'todos' };
-const LIBRARY_POST = { save: 'save', update: 'update', delete: 'remove', todo: 'todo' };
+const LIBRARY_POST = { save: 'save', update: 'update', delete: 'remove', todo: 'todo', analyze: 'analyze' };
 
 export const config = { api: { bodyParser: false }, maxDuration: 60 };
 

@@ -21,7 +21,7 @@ Return JSON:
 - watch_for: anything the speaker flags for a test, grade or requirement, calls a common mistake, says to remember, or repeats for emphasis. "point" says it plainly.
 - todos: assignments, readings, exams and deadlines the speaker mentions. "said" is how the date was said ("next Friday"). Work out due_date from the lecture date given below; leave it empty if no date was given.
 - quote: the speaker's exact words from the text, under 25 words. Required for watch_for and todos.
-- outline: the lecture's sections in order, each with 2 to 6 short points.
+- outline: the lecture written up as notes: its sections in order, each with 3 to 8 points that together cover all of the information (definitions, explanations, causes and effects, steps, examples, comparisons). Points are complete statements in plain language.
 - terms: terms the speaker defines or explains, with the definition as given.
 - questions: questions the speaker asks the class.
 - at_ms: the number in [brackets] at the start of the line it came from; 0 if the lines have no numbers.
@@ -55,7 +55,7 @@ export function cleanAnalysis(raw, { text, starts = [], classes = [] }) {
   const todos = (raw.todos || []).filter(item => clip(item?.title, 200) && supported(item?.quote, text)).slice(0, 20)
     .map(item => ({ title: clip(item.title, 200), kind: ['assignment', 'reading', 'exam', 'other'].includes(item.kind) ? item.kind : 'assignment', said: clip(item.said, 80), due_date: ISO_DATE.test(item.due_date || '') ? item.due_date : '', quote: clip(item.quote, 300), at_ms: at(item.at_ms) }));
   const outline = (raw.outline || []).filter(item => clip(item?.heading, 120)).slice(0, 20)
-    .map(item => ({ heading: clip(item.heading, 120), at_ms: at(item.at_ms), points: (item.points || []).map(point => clip(point, 300)).filter(Boolean).slice(0, 8) }));
+    .map(item => ({ heading: clip(item.heading, 120), at_ms: at(item.at_ms), points: (item.points || []).map(point => clip(point, 300)).filter(Boolean).slice(0, 10) }));
   const terms = (raw.terms || []).filter(item => clip(item?.term, 120) && clip(item?.definition, 400)).slice(0, 40)
     .map(item => ({ term: clip(item.term, 120), definition: clip(item.definition, 400), at_ms: at(item.at_ms) }));
   const questions = (raw.questions || []).filter(item => clip(item?.question, 300)).slice(0, 20)
@@ -72,6 +72,30 @@ export function cleanAnalysis(raw, { text, starts = [], classes = [] }) {
 export function lectureText(transcript, segments) {
   const timed = (segments || []).filter(item => String(item?.text || '').trim());
   return timed.length ? timed.map(item => `[${Math.round(item.start_ms || 0)}] ${String(item.text).trim()}`).join('\n') : String(transcript || '');
+}
+
+const escapeHtml = text => String(text || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+
+// The lecture as a note for the Notes tab: summary, notes by section, what to watch for, key
+// terms and to-dos. Without AI notes yet, the transcript itself in paragraphs.
+export function lectureNoteHtml(lecture, analysis = {}, todos = []) {
+  const list = items => `<ul>${items.map(item => `<li>${item}</li>`).join('')}</ul>`;
+  const parts = [];
+  if (analysis.summary?.length) parts.push('<h2>Summary</h2>', list(analysis.summary.map(escapeHtml)));
+  (analysis.outline || []).forEach(section => {
+    parts.push(`<h2>${escapeHtml(section.heading)}</h2>`);
+    if (section.points?.length) parts.push(list(section.points.map(escapeHtml)));
+  });
+  if (analysis.watch_for?.length) parts.push('<h2>What to watch for</h2>', list(analysis.watch_for.map(item => `<strong>${escapeHtml(item.point)}</strong>: “${escapeHtml(item.quote)}”`)));
+  if (analysis.terms?.length) parts.push('<h2>Key terms</h2>', list(analysis.terms.map(item => `<strong>${escapeHtml(item.term)}</strong>: ${escapeHtml(item.definition)}`)));
+  if (todos.length) parts.push('<h2>To do</h2>', list(todos.map(item => `${escapeHtml(item.title)}${item.said ? ` (${escapeHtml(item.said)})` : ''}`)));
+  if (!parts.length) {
+    const sentences = String(lecture.transcript || '').split(/(?<=[.!?])\s+/);
+    const paragraphs = [];
+    for (let i = 0; i < sentences.length; i += 5) paragraphs.push(sentences.slice(i, i + 5).join(' '));
+    parts.push('<h2>Transcript</h2>', ...paragraphs.filter(Boolean).map(paragraph => `<p>${escapeHtml(paragraph)}</p>`));
+  }
+  return parts.join('');
 }
 
 export function createLectureLibrary({ env = process.env, fetch: fetchImpl = globalThis.fetch, today = () => new Date() } = {}) {
@@ -134,6 +158,72 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
     return response.json();
   }
 
+  // Every lecture has a note in the Notes tab (made with the student's own sign-in, filed in
+  // the lecture's class). An existing note is refreshed when the AI notes arrive later.
+  async function syncNote(authorization, lecture, analysis, todos) {
+    const content = lectureNoteHtml(lecture, analysis, todos);
+    const headers = { Authorization: authorization, 'Content-Type': 'application/json' };
+    let noteId = analysis.note_id || '';
+    if (!noteId) {
+      const created = await fetchImpl(`${apiBase}/smart_notes`, { method: 'POST', headers, body: JSON.stringify({ title: lecture.title }) }).catch(() => null);
+      noteId = created?.ok ? (await created.json())?.note?.id || '' : '';
+      if (!noteId) return '';
+    }
+    await fetchImpl(`${apiBase}/smart_notes/${noteId}`, {
+      method: 'PUT', headers, body: JSON.stringify({ title: lecture.title, content, ...(lecture.folder_id ? { folder_id: lecture.folder_id } : {}) }),
+    }).catch(() => null);
+    return noteId;
+  }
+
+  async function saveAnalysis(userId, lectureId, analysis) {
+    await db(`/lectures?id=eq.${lectureId}&user_id=eq.${userId}`, { method: 'PATCH', body: JSON.stringify({ analysis, updated_at: new Date().toISOString() }) }).catch(() => null);
+  }
+
+  async function insertTodos(userId, lectureId, todos) {
+    if (!todos.length) return;
+    await db('/lecture_todos', {
+      method: 'POST',
+      body: JSON.stringify(todos.map(item => ({ user_id: userId, lecture_id: lectureId, title: item.title, kind: item.kind, due_at: item.due_date ? `${item.due_date}T23:59:00Z` : null, said: item.said, quote: item.quote, at_ms: item.at_ms }))),
+    }).catch(() => null);
+  }
+
+  // A lecture saved before its AI notes could be written gets them now (when it is opened).
+  async function analyzeLecture(authorization, { id } = {}) {
+    if (!enabled) return NOT_SET_UP;
+    const userId = await who(authorization);
+    if (!userId) return { status: 401, body: { detail: 'Sign in again.' } };
+    if (!UUID.test(id || '')) return { status: 404, body: { detail: 'Lecture not found.' } };
+    const found = await rows(`/lectures?id=eq.${id}&user_id=eq.${userId}&select=*`);
+    const lecture = found?.[0];
+    if (!lecture) return { status: 404, body: { detail: 'Lecture not found.' } };
+    const todosNow = async () => (await rows(`/lecture_todos?lecture_id=eq.${id}&user_id=eq.${userId}&status=neq.dismissed&select=id,title,kind,due_at,said,quote,at_ms,status&order=due_at.asc.nullslast`)) || [];
+    // Without AI notes yet, the lecture still gets its note (the transcript) in the Notes tab.
+    const keepNote = async (current, reason) => {
+      const todos = await todosNow();
+      let analysis = current;
+      if (!current.note_id) {
+        const noteId = await syncNote(authorization, lecture, current, todos);
+        if (noteId) { analysis = { ...current, note_id: noteId }; await saveAnalysis(userId, id, analysis); }
+      }
+      return { status: 200, body: { analysis, todos, ...(reason ? { reason } : {}) } };
+    };
+    if (lecture.analysis?.analyzed) return keepNote(lecture.analysis);
+    if (!openaiKey) return keepNote(lecture.analysis || {}, 'not_configured');
+    const segments = lecture.segments || [];
+    const text = lectureText(lecture.transcript, segments);
+    const folders = await fetchImpl(`${apiBase}/folders`, { headers: { Authorization: authorization } }).then(response => (response.ok ? response.json() : null)).catch(() => null);
+    const classes = (folders?.folders || []).map(item => ({ id: item.id, name: item.name }));
+    const raw = await analyze(text, { lectureDate: lecture.lecture_date, classes });
+    if (!raw) return keepNote(lecture.analysis || {}, 'failed');
+    const analysis = cleanAnalysis(raw, { text, starts: segments.map(item => item.start_ms), classes });
+    const { todos, title: _t, class_id: _c, ...stored } = analysis;
+    const next = { ...stored, analyzed: true, note_id: lecture.analysis?.note_id || '' };
+    await insertTodos(userId, id, todos);
+    next.note_id = await syncNote(authorization, lecture, next, todos) || next.note_id;
+    await saveAnalysis(userId, id, next);
+    return { status: 200, body: { analysis: next, todos: await todosNow() } };
+  }
+
   async function save(authorization, body = {}) {
     if (!enabled) return NOT_SET_UP;
     const userId = await who(authorization);
@@ -156,12 +246,10 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
     }).catch(() => null);
     if (!created?.ok) return NOT_SET_UP;
     const lecture = (await created.json())?.[0];
-    if (todos.length) {
-      await db('/lecture_todos', {
-        method: 'POST',
-        body: JSON.stringify(todos.map(item => ({ user_id: userId, lecture_id: lecture.id, title: item.title, kind: item.kind, due_at: item.due_date ? `${item.due_date}T23:59:00Z` : null, said: item.said, quote: item.quote, at_ms: item.at_ms }))),
-      }).catch(() => null);
-    }
+    await insertTodos(userId, lecture.id, todos);
+    // Notes always: the lecture's note goes into the Notes tab right away.
+    const noteId = await syncNote(authorization, lecture, lecture.analysis || {}, todos);
+    if (noteId) await saveAnalysis(userId, lecture.id, { ...(lecture.analysis || {}), note_id: noteId });
     return { status: 200, body: { lecture: { id: lecture.id, title } } };
   }
 
@@ -246,5 +334,5 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
     return { status: 200, body: { todos: found.map(({ lectures, ...item }) => ({ ...item, lecture_title: lectures?.title || '', folder_id: lectures?.folder_id || null })) } };
   }
 
-  return { save, list, get, update, remove, todo, todos, enabled };
+  return { save, list, get, update, remove, todo, todos, analyze: analyzeLecture, enabled };
 }

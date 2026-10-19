@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowLeft, BookOpen, CalendarCheck, CalendarPlus, Check, MessageCircle, Pencil, Sparkles, Trash2, X } from 'lucide-react';
-import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
+import { ArrowLeft, BookOpen, CalendarCheck, CalendarPlus, Check, MessageCircle, NotebookPen, Pencil, Sparkles, Trash2, X } from 'lucide-react';
+import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
 import Menu from '../../components/Menu';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { apiFetch } from '../../lib/api';
@@ -10,7 +10,7 @@ import { useRequireAuth } from '../../lib/auth';
 import useSessionTracker from '../../lib/useSessionTracker';
 import { startGuideJob } from '../../lib/guideJobs';
 import { generateAndSave, newRequestId } from '../../lib/guideCreate';
-import { clock, deleteLecture, dueLabel, getLecture, updateLecture, updateTodo } from '../../lib/lectures';
+import { analyzeLecture, clock, deleteLecture, dueLabel, getLecture, updateLecture, updateTodo } from '../../lib/lectures';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const WHY = { exam: 'On the exam', mistake: 'Common mistake', emphasis: 'Stressed', requirement: 'Required' };
@@ -35,6 +35,8 @@ export default function LecturePage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [toast, setToast] = useState('');
   const [making, setMaking] = useState(false);
+  const [notes, setNotes] = useState('idle'); // idle | writing | failed | unavailable
+  const notesAsked = useRef(false);
   const gate = useLoadGate(Boolean(data) || Boolean(error));
 
   useEffect(() => {
@@ -45,6 +47,21 @@ export default function LecturePage() {
     });
     apiFetch('/folders').then(result => setFolders(result?.folders || []));
   }, [ready, id]);
+
+  // Every lecture gets notes: written here if AI didn't run when it was saved, and filed in Notes.
+  async function writeNotes() {
+    setNotes(data?.lecture?.analysis?.analyzed ? 'idle' : 'writing');
+    const result = await analyzeLecture(id);
+    if (result?.analysis) setData(current => ({ ...current, lecture: { ...current.lecture, analysis: result.analysis }, todos: result.todos || current.todos }));
+    setNotes(result?.analysis?.analyzed ? 'idle' : result?.reason === 'not_configured' ? 'unavailable' : 'failed');
+  }
+
+  useEffect(() => {
+    const current = data?.lecture?.analysis;
+    if (!data?.lecture || notesAsked.current || (current?.analyzed && current?.note_id)) return;
+    notesAsked.current = true;
+    writeNotes();
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -168,16 +185,38 @@ export default function LecturePage() {
           : <button type="button" className="c-btn c-btn--primary" onClick={makeGuide} disabled={making}><Sparkles {...ICON} />{making ? 'Building…' : 'Make study guide'}</button>}
       </div>
 
-      {!analysis.analyzed && (
-        <p className="c-meta lecture-pending">The summary, what to watch for, to-dos and outline appear once AI is set up on this site. The transcript is saved below.</p>
-      )}
-
       {analysis.summary?.length > 0 && (
         <section className="c-card lecture-card" aria-labelledby="lecture-summary">
           <h2 id="lecture-summary" className="c-section-title">Summary</h2>
           <ul className="c-study lecture-points">{analysis.summary.map((point, index) => <li key={index}>{point}</li>)}</ul>
         </section>
       )}
+
+      <section className="c-card lecture-card" aria-labelledby="lecture-notes">
+        <div className="lecture-item-head">
+          <h2 id="lecture-notes" className="c-section-title">Notes</h2>
+          {analysis.note_id && <Link className="c-btn c-btn--quiet c-btn--sm" href={'/smartnotes?id=' + analysis.note_id}><NotebookPen size={16} strokeWidth={1.75} aria-hidden="true" />Open in Notes</Link>}
+        </div>
+        {analysis.outline?.length > 0 ? analysis.outline.map((section, index) => (
+          <div key={index} className="lecture-outline-section">
+            <div className="lecture-item-head">
+              <h3 className="lecture-outline-heading">{section.heading}</h3>
+              {timed && <button type="button" className="c-btn c-btn--quiet c-btn--sm lecture-time" onClick={() => jump(section.at_ms)}>{clock(section.at_ms)}</button>}
+            </div>
+            {section.points?.length > 0 && <ul className="c-study lecture-points">{section.points.map((point, pointIndex) => <li key={pointIndex}>{point}</li>)}</ul>}
+          </div>
+        )) : notes === 'writing' || (notes === 'idle' && !analysis.analyzed) ? (
+          <div className="lecture-notes-writing">
+            <SectionLoader height={96} label="Writing your notes" />
+            <p className="c-meta">Writing your notes from the lecture…</p>
+          </div>
+        ) : (
+          <div className="lecture-notes-empty">
+            <p className="c-meta">{notes === 'unavailable' ? "AI notes aren't set up on this site yet. The full transcript is below." : analysis.analyzed ? 'There was too little in this lecture to outline. The full transcript is below.' : "Couldn't write notes yet. The full transcript is below."}</p>
+            {notes === 'failed' && <button type="button" className="c-btn c-btn--secondary" onClick={writeNotes}><Sparkles {...ICON} />Try again</button>}
+          </div>
+        )}
+      </section>
 
       {analysis.watch_for?.length > 0 && (
         <section className="c-card lecture-card" aria-labelledby="lecture-watch">
@@ -234,21 +273,6 @@ export default function LecturePage() {
         </section>
       )}
 
-      {analysis.outline?.length > 0 && (
-        <section className="c-card lecture-card" aria-labelledby="lecture-outline">
-          <h2 id="lecture-outline" className="c-section-title">Outline</h2>
-          {analysis.outline.map((section, index) => (
-            <div key={index} className="lecture-outline-section">
-              <div className="lecture-item-head">
-                <h3 className="lecture-outline-heading">{section.heading}</h3>
-                {timed && <button type="button" className="c-btn c-btn--quiet c-btn--sm lecture-time" onClick={() => jump(section.at_ms)}>{clock(section.at_ms)}</button>}
-              </div>
-              {section.points?.length > 0 && <ul className="c-study lecture-points">{section.points.map((point, pointIndex) => <li key={pointIndex}>{point}</li>)}</ul>}
-            </div>
-          ))}
-        </section>
-      )}
-
       {analysis.terms?.length > 0 && (
         <section className="c-card lecture-card" aria-labelledby="lecture-terms">
           <h2 id="lecture-terms" className="c-section-title">Key terms</h2>
@@ -297,7 +321,10 @@ export default function LecturePage() {
         .lecture-rename { flex: 1 1 auto; }
         .lecture-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
         .lecture-class { width: auto; min-width: 160px; }
-        .lecture-pending { margin: 0; }
+        .lecture-notes-empty { display: grid; justify-items: start; gap: 12px; }
+        .lecture-notes-empty .c-meta { margin: 0; }
+        .lecture-notes-writing { display: grid; justify-items: center; gap: 4px; padding-bottom: 16px; }
+        .lecture-notes-writing .c-meta { margin: 0; }
         .lecture-card { display: grid; gap: 16px; padding: 20px; }
         .lecture-card :global(.c-section-title) { margin: 0; }
         .lecture-points { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
