@@ -22,6 +22,7 @@ import GroveCard from '../components/GroveCard';
 import PulseDot from '../components/PulseDot';
 import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
+import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
 
 const SLOW = Symbol('slow');
 const SLOW_MS = 4000;
@@ -80,6 +81,7 @@ export default function Today({ timerState, setTimerState }) {
     if (checklistData?.practice) markUsed('practice');
     if (checklistData?.learn_your_way) markUsed('explain');
     const applyCalendar = calendar => {
+      rememberCalendar(calendar);
       if (calendar?.connected) markUsed('calendar');
       else if (calendar && !calendar.detail && calendar.connected === false) unmarkUsed('calendar');
     };
@@ -95,8 +97,9 @@ export default function Today({ timerState, setTimerState }) {
       // A slim copy of the study queue (the full one carries every card's text).
       queue: queueData ? { cardTotal: queueData.cardTotal, misses: queueData.misses.map(() => 0), problems: queueData.problems, minutes: queueData.minutes, practice: queueData.practice } : null,
       insights: insightsData,
-      calendar: calendarData === SLOW ? null : calendarData,
-      calendarSlow: calendarData === SLOW,
+      // Slow feed: show the calendar this device last saw; the fresh one replaces it in place.
+      calendar: calendarData === SLOW ? readCalendarCache() : calendarData,
+      calendarSlow: calendarData === SLOW && !readCalendarCache(),
     };
   }, { enabled: ready && !legacy });
   const loadError = data?.loadError || '';

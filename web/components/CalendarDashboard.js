@@ -3,6 +3,8 @@ import { Bell, BellOff, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste
 import { apiErrorMessage, apiFetch, getUserId } from '../lib/api';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { CanvasCalendarFeed, CanvasCalendarNav, CanvasFeedLink } from './CanvasShots';
+import { LoadingArea, SectionLoader, useLoadGate } from './CordiaLoader';
+import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
 
 // Checked before Connect: a Canvas calendar feed is an https (or webcal) link ending in .ics.
 export function feedLinkProblem(value) {
@@ -79,9 +81,13 @@ function notifyDueToday(items, userId) {
 
 export default function CalendarDashboard({ compact = false, onOpenCalendar = () => {} }) {
   const [feedUrl, setFeedUrl] = useState('');
-  const [connected, setConnected] = useState(false);
-  const [items, setItems] = useState([]);
-  const [dueToday, setDueToday] = useState([]);
+  // The last feed this account loaded shows at once; a fresh copy replaces it in place.
+  const [cached] = useState(() => readCalendarCache());
+  const [status, setStatus] = useState(cached ? 'connected' : 'checking'); // checking | connected | disconnected | error
+  const connected = status === 'connected';
+  const gate = useLoadGate(status !== 'checking');
+  const [items, setItems] = useState(() => cached?.items || []);
+  const [dueToday, setDueToday] = useState(() => localDueToday(cached?.items || []));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [reminders, setReminders] = useState(false);
@@ -111,7 +117,8 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
 
   function applyCalendar(data, accountId) {
     if (!data?.connected || !Array.isArray(data.items)) return false;
-    setConnected(true);
+    rememberCalendar(data, accountId);
+    setStatus('connected');
     const today = localDueToday(data.items);
     setItems(data.items);
     setDueToday(today);
@@ -134,6 +141,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
       setFeedUrl('');
     } else {
       setError(apiErrorMessage(data?.detail, 'Classroom could not read this calendar feed.'));
+      setStatus(current => (current === 'checking' ? 'disconnected' : current));
     }
     setLoading(false);
   }
@@ -144,9 +152,11 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     setError('');
     const data = await apiFetch('/calendar/connection');
     if (data?.connected === false) {
-      setConnected(false);
+      rememberCalendar(data, accountId);
+      setStatus('disconnected');
     } else if (!applyCalendar(data, accountId)) {
       setError(apiErrorMessage(data?.detail, 'Classroom could not refresh this calendar feed.'));
+      setStatus(current => (current === 'checking' ? 'error' : current));
     }
     setLoading(false);
   }
@@ -162,7 +172,8 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     }
     const feedKey = accountKey(FEED_KEY, userId);
     if (feedKey) localStorage.removeItem(feedKey);
-    setConnected(false);
+    rememberCalendar({ connected: false }, userId);
+    setStatus('disconnected');
     setFeedUrl('');
     setItems([]);
     setDueToday([]);
@@ -192,6 +203,19 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     localStorage.setItem(reminderKey, 'on');
     setReminders(true);
     notifyDueToday(dueToday, userId);
+  }
+
+  // Never show the connect steps while we don't know yet: show the loader instead.
+  if (status === 'checking') {
+    return compact ? <SectionLoader height={183} label="Loading calendar" /> : <LoadingArea phase={gate} label="Loading calendar" />;
+  }
+  if (status === 'error') {
+    return (
+      <div className="c-empty" role="alert">
+        <p>{error}</p>
+        <button type="button" className="c-btn c-btn--secondary" onClick={() => refresh()}>Try again</button>
+      </div>
+    );
   }
 
   if (!connected) {
