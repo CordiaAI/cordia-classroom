@@ -102,5 +102,7 @@ strong, b { font-weight: 600; }
 .c-topbar, .c-topbar *, .c-tabbar, .c-tabbar * { font-family: var(--font-nav) !important; }
 /* Regular weight, larger, and set a touch tighter so the serif reads slim. */
 .c-topbar, .c-topbar *, .c-tabbar, .c-tabbar * { font-weight: 400 !important; letter-spacing: -0.01em; }
+/* A little bolder than regular (Times New Roman's bold is too heavy): a hairline stroke. */
+.c-topbar, .c-tabbar { -webkit-text-stroke: 0.35px currentColor; }
 .c-nav a, .c-topbar .c-searchbtn, .c-topbar .c-new-btn { font-size: var(--fs-17) !important; }
 .c-tabbar a { font-size: var(--fs-15) !important; }

@@ -3,8 +3,16 @@
 //   POST /api/lectures/chunk?recording_id=&seq=&start_ms=&duration_ms=&keep=  (body: raw audio; header X-Prompt: base64 text)
 //   POST /api/lectures/notes  { segments, classes }
 //   POST /api/lectures/title  { text }
-// Server env: OPENAI_API_KEY (required), SUPABASE_SERVICE_ROLE_KEY (minute metering, Keep audio).
+// The Lectures section (lib/server/lectureLibrary.mjs):
+//   GET  /api/lectures/list            GET /api/lectures/get?id=       GET /api/lectures/todos
+//   POST /api/lectures/save            POST /api/lectures/update       POST /api/lectures/delete
+//   POST /api/lectures/todo
+// Server env: OPENAI_API_KEY (transcription, analysis), SUPABASE_SERVICE_ROLE_KEY (storage, metering).
 import { MAX_CHUNK_BYTES, createLectureService } from '../../../lib/server/lectures.mjs';
+import { createLectureLibrary } from '../../../lib/server/lectureLibrary.mjs';
+
+const LIBRARY_GET = { list: 'list', get: 'get', todos: 'todos' };
+const LIBRARY_POST = { save: 'save', update: 'update', delete: 'remove', todo: 'todo' };
 
 export const config = { api: { bodyParser: false }, maxDuration: 60 };
 
@@ -43,6 +51,14 @@ export default async function handler(req, res) {
         keep: req.query.keep === '1',
         prompt,
       });
+    } else if (LIBRARY_GET[action] && req.method === 'GET') {
+      const library = createLectureLibrary();
+      result = action === 'get' ? await library.get(authorization, String(req.query.id || '')) : await library[LIBRARY_GET[action]](authorization);
+    } else if (LIBRARY_POST[action] && req.method === 'POST') {
+      const raw = await readBody(req, 6_000_000);
+      let body = {};
+      try { body = JSON.parse(raw?.toString('utf8') || '{}'); } catch { body = {}; }
+      result = await createLectureLibrary()[LIBRARY_POST[action]](authorization, body);
     } else if ((action === 'notes' || action === 'title') && req.method === 'POST') {
       const raw = await readBody(req, 2_000_000);
       let body = {};

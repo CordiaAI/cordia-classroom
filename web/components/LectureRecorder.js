@@ -17,6 +17,13 @@ const UPLOAD_PROBLEMS = {
   retrying: 'Connection trouble. Retrying; your audio is saved on this device.',
 };
 
+// When server transcription isn't set up, the browser's own speech recognition is used instead
+// (Apple's in Safari, Google's in Chrome). Free and live, a little less accurate; no audio leaves
+// the page through Cordia. It stops on long pauses, so it restarts itself while recording.
+function speechRecognition() {
+  return typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition || null : null;
+}
+
 function clock(ms) {
   const total = Math.floor(ms / 1000);
   const h = Math.floor(total / 3600);
@@ -71,6 +78,10 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
   const notedUpTo = useRef(0);
   const fileInput = useRef(null);
   const transcriptEnd = useRef(null);
+  const speech = useRef(null);       // browser speech recognition, when used
+  const speechSeq = useRef(0);
+  const source = useRef('recording');
+  const [interim, setInterim] = useState('');
   const active = ['recording', 'paused', 'finishing', 'stuck'].includes(phase);
   const shown = useMemo(() => mergedSegments(segments), [segments]);
 
@@ -106,7 +117,41 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
 
   useEffect(() => { transcriptEnd.current?.scrollIntoView({ block: 'nearest' }); }, [shown.length]);
 
+  // Browser speech: each final phrase becomes a timed segment.
+  function startSpeech() {
+    const Recognition = speechRecognition();
+    const rec = new Recognition();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = navigator.language || 'en-US';
+    rec.onresult = event => {
+      let pending = '';
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const text = event.results[i][0].transcript.trim();
+        if (!text) continue;
+        if (event.results[i].isFinal) {
+          const seq = speechSeq.current++;
+          segmentsRef.current = [...segmentsRef.current, { seq, start_ms: Math.round(recorder.current?.elapsed() || 0), text }];
+          setSegments(segmentsRef.current);
+        } else pending += `${text} `;
+      }
+      setInterim(pending.trim());
+    };
+    rec.onend = () => { if (speech.current === rec && recorder.current && !recorder.current.paused) { try { rec.start(); } catch { /* already running */ } } };
+    rec.onerror = event => { if (event.error === 'not-allowed') setError('Speech recognition was blocked.'); };
+    speech.current = rec;
+    try { rec.start(); } catch { /* already running */ }
+  }
+
+  function stopSpeech() {
+    const rec = speech.current;
+    speech.current = null;
+    setInterim('');
+    try { rec?.stop(); } catch { /* not running */ }
+  }
+
   function stopEverything() {
+    stopSpeech();
     cleanup.current.forEach(fn => fn());
     cleanup.current = [];
     recorder.current?.stop().catch(() => {});
@@ -153,9 +198,12 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
     setNotes([]);
     notesAt.current = NOTES_EVERY_MS;
     notedUpTo.current = 0;
-    uploader.current = makeUploader(newRecordingId());
+    source.current = 'recording';
+    const useBrowser = usage?.ready === false && Boolean(speechRecognition());
+    uploader.current = useBrowser ? null : makeUploader(newRecordingId());
     recorder.current = new ChunkedRecorder(stream, { onChunk: chunk => uploader.current?.add(chunk) });
     recorder.current.start();
+    if (useBrowser) startSpeech();
     cleanup.current.push(levelMeter(stream, setLevel), keepAwake());
     const clockTimer = setInterval(() => {
       const ms = recorder.current?.elapsed() || 0;
@@ -181,15 +229,26 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
     if (data?.class_id) setSuggested(data.class_id);
   }
 
-  function pause() { recorder.current?.pause(); setElapsed(recorder.current?.elapsed() || 0); setPhase('paused'); }
-  function resume() { recorder.current?.resume(); setPhase('recording'); }
+  function pause() { recorder.current?.pause(); if (speech.current) { const rec = speech.current; try { rec.stop(); } catch { /* not running */ } } setElapsed(recorder.current?.elapsed() || 0); setPhase('paused'); }
+  function resume() { recorder.current?.resume(); if (speech.current) { try { speech.current.start(); } catch { /* already running */ } } setPhase('recording'); }
 
   async function finish() {
     setPhase('finishing');
     setStep('Transcribing the last part');
     const current = recorder.current;
+    const browser = Boolean(speech.current);
+    stopSpeech();
     recorder.current = null;
     await current?.stop();
+    if (browser) {
+      // Browser speech has no uploads to wait for; give the last phrase a moment to arrive.
+      cleanup.current.forEach(fn => fn());
+      cleanup.current = [];
+      setLevel(0);
+      await new Promise(resolve => setTimeout(resolve, 600));
+      await build();
+      return;
+    }
     cleanup.current.forEach(fn => fn());
     cleanup.current = [];
     setLevel(0);
@@ -216,7 +275,15 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
     }
     setStep('Naming your lecture');
     const named = await postJson('/api/lectures/title', { text: transcript.slice(0, 6000) }, 10000);
-    onDone?.({ title: named?.title || fallbackTitle(), transcript, folderId: folderId || suggested || '' });
+    const timed = mergedSegments(segmentsRef.current);
+    onDone?.({
+      title: named?.title || fallbackTitle(),
+      transcript,
+      folderId: folderId || suggested || '',
+      segments: timed.map(({ start_ms, text }) => ({ start_ms, text })),
+      durationMs: Math.max(elapsed, timed.length ? timed[timed.length - 1].start_ms + 20000 : 0),
+      source: source.current,
+    });
   }
 
   // Upload recording: split the file, transcribe the pieces in parallel, then the same final steps.
@@ -236,6 +303,7 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
     }
     segmentsRef.current = [];
     setSegments([]);
+    source.current = 'upload';
     uploader.current?.dispose();
     uploader.current = makeUploader(newRecordingId());
     setStep(pieces.length > 1 ? `Transcribing ${pieces.length} parts` : 'Transcribing');
@@ -338,7 +406,8 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
           </div>
         )}
         <section className="rec-transcript" aria-label="Live transcript" aria-live="polite">
-          {shown.length ? shown.map(segment => <p key={segment.seq} id={`rec-at-${segment.start_ms}`}>{segment.text}</p>) : <p className="rec-note">The transcript appears here a few seconds behind.</p>}
+          {shown.length || interim ? shown.map(segment => <p key={segment.seq} id={`rec-at-${segment.start_ms}`}>{segment.text}</p>) : <p className="rec-note">The transcript appears here a few seconds behind.</p>}
+          {interim && <p className="rec-interim">{interim}</p>}
           <span ref={transcriptEnd} />
         </section>
         {notes.length > 0 && (
@@ -367,9 +436,11 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
         <span>{phase === 'asking' ? 'Allow the microphone' : 'Record'}</span>
       </button>
       {typeof minutesLeft === 'number' && <p className="rec-note rec-center">{outOfMinutes ? 'No recording minutes left this month' : `${minutesLeft} min left`}</p>}
-      {usage && usage.ready === false && <p className="rec-error">Transcription isn't set up on this site yet.</p>}
+      {usage && usage.ready === false && (speechRecognition()
+        ? <p className="rec-note rec-center">Transcribed by your browser's speech recognition.</p>
+        : <p className="rec-error">Transcription isn't set up on this site yet.</p>)}
       <div className="rec-row rec-center">
-        <button type="button" className="c-btn c-btn--secondary" onClick={() => fileInput.current?.click()} disabled={outOfMinutes}><Upload aria-hidden="true" />Upload recording</button>
+        <button type="button" className="c-btn c-btn--secondary" onClick={() => fileInput.current?.click()} disabled={outOfMinutes || usage?.ready === false}><Upload aria-hidden="true" />Upload recording</button>
         <input ref={fileInput} type="file" accept={AUDIO_ACCEPT} hidden onChange={event => { uploadRecording(event.target.files?.[0]); event.target.value = ''; }} />
       </div>
       <label className="rec-check rec-center">
@@ -405,6 +476,7 @@ function RecorderStyle() {
       .rec-class .c-field { flex: 1 1 200px; }
       .rec-transcript { max-height: 220px; overflow: auto; padding: 16px 20px; border: 1px solid var(--hairline); border-radius: var(--r-row); background: var(--surface-card); }
       .rec-transcript p { margin: 0 0 8px; color: var(--ink); font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); }
+      .rec-transcript p.rec-interim { color: var(--muted); }
       .rec-notes ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
       .rec-note-item { display: flex; gap: 8px; align-items: baseline; color: var(--ink); font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); }
       .rec-note-item.is-heading span { font-weight: 600; }

@@ -1,18 +1,33 @@
-// Server-only: summary notes for a guide that has none (/api/guide-notes).
-// Reads the guide with the student's own sign-in (so only their guides), writes notes that
-// summarize every section of it, and saves them to the guide. Needs OPENAI_API_KEY.
-// Guides made by /generate already get notes; this fills in guides from other paths.
+// Server-only: a guide's Notes, an outline summary of the whole topic (/api/guide-notes).
+// Reads the guide with the student's own sign-in (so only their guides), organises all of its
+// information into topic headings with points, and saves that as the guide's notes.
+// Runs once per guide: notes already in outline form are kept. Needs OPENAI_API_KEY.
 
-export const NOTES_RULES = `You write study notes that summarize a student's study guide. Use only what the guide says.
-Return JSON: {"notes": ["...", "..."]}
-- Cover every section of the guide; keep its order.
-- Each note is one complete, self-contained point in plain language (under 30 words): a definition, role, cause, step, comparison, example or other meaningful detail.
-- Keep names, numbers, dates and formulas exactly as written.
-- No questions, no headings, no filler such as "This section covers".
-- Between 6 and 30 notes, depending on how much the guide contains.`;
+export const NOTES_RULES = `You turn a student's study material into organised notes: an outline summary of the topic. Use only what the material says.
+Return JSON: {"sections": [{"heading": "...", "points": ["...", "..."]}]}
+- Group the information by topic, in a logical teaching order (foundations first, then what builds on them), not in question order.
+- Headings: short topic names (2 to 6 words). Use 3 to 10 sections.
+- Points: complete, self-contained statements in plain language (under 30 words each): definitions, roles, causes and effects, steps, comparisons, examples, relationships and other meaningful detail.
+- Cover all of the information in the material; keep names, numbers, dates and formulas exactly as written.
+- No questions, no answers-to-questions phrasing, no filler such as "This section covers".`;
 
-export function notesText(list) {
-  return list.map(note => `- ${String(note).replace(/\s+/g, ' ').trim()}`).filter(line => line.length > 3).join('\n');
+export const OUTLINE_MARK = /^##\s/m;
+
+// "## Heading" lines with "- point" lines under them (the format lib/formatters.js parseOutline reads).
+export function outlineText(sections) {
+  return (sections || [])
+    .map(section => {
+      const heading = String(section?.heading || '').replace(/\s+/g, ' ').trim();
+      const points = (section?.points || []).map(point => String(point).replace(/\s+/g, ' ').trim()).filter(Boolean);
+      return heading && points.length ? [`## ${heading}`, ...points.map(point => `- ${point}`)].join('\n') : '';
+    })
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+// Older guides kept a flat list of notes; those are rewritten as an outline.
+export function needsOutline(notes) {
+  return !OUTLINE_MARK.test(String(notes || ''));
 }
 
 export function createGuideNotesService({ env = process.env, fetch: fetchImpl = globalThis.fetch } = {}) {
@@ -26,9 +41,9 @@ export function createGuideNotesService({ env = process.env, fetch: fetchImpl = 
     if (!response?.ok) return { status: response?.status === 401 ? 401 : 404, body: { detail: 'Guide not found.' } };
     const guide = (await response.json())?.guide;
     if (!guide) return { status: 404, body: { detail: 'Guide not found.' } };
-    if (String(guide.notes || '').trim()) return { status: 200, body: { notes: guide.notes } };
-    if (!openaiKey) return { status: 200, body: { notes: '', reason: 'not_configured' } };
-    const content = String(guide.study_guide || '').trim();
+    if (!needsOutline(guide.notes)) return { status: 200, body: { notes: guide.notes } };
+    if (!openaiKey) return { status: 200, body: { notes: guide.notes || '', reason: 'not_configured' } };
+    const content = [String(guide.study_guide || '').trim(), String(guide.notes || '').trim()].filter(Boolean).join('\n\n');
     if (content.length < 40) return { status: 200, body: { notes: '', reason: 'empty' } };
 
     const controller = new AbortController();
@@ -38,17 +53,17 @@ export function createGuideNotesService({ env = process.env, fetch: fetchImpl = 
       const ai = await fetchImpl('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, temperature: 0.2, max_tokens: 2000, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: NOTES_RULES }, { role: 'user', content: `Title: ${guide.title}\n\n${content.slice(0, 60000)}` }] }),
+        body: JSON.stringify({ model, temperature: 0.2, max_tokens: 3000, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: NOTES_RULES }, { role: 'user', content: `Title: ${guide.title}\n\n${content.slice(0, 60000)}` }] }),
         signal: controller.signal,
       });
-      if (ai.ok) list = JSON.parse((await ai.json())?.choices?.[0]?.message?.content || '{}').notes || [];
+      if (ai.ok) list = JSON.parse((await ai.json())?.choices?.[0]?.message?.content || '{}').sections || [];
     } catch {
       list = [];
     } finally {
       clearTimeout(timer);
     }
-    const notes = notesText(Array.isArray(list) ? list.slice(0, 30) : []);
-    if (!notes) return { status: 200, body: { notes: '', reason: 'failed' } };
+    const notes = outlineText(Array.isArray(list) ? list.slice(0, 12) : []);
+    if (!notes) return { status: 200, body: { notes: guide.notes || '', reason: 'failed' } };
     await fetchImpl(`${apiBase}/guides/${guideId}`, {
       method: 'PATCH', headers: { Authorization: authorization, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: guide.title, notes }),
     }).catch(() => null);

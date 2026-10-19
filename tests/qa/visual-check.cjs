@@ -56,6 +56,7 @@ async function noOverflow(page) {
     await check(`Guide → Explain → Diagram: three sections at ${width}px ${theme}`, async () => {
       const { context, page, state } = await session(browser, { width, theme });
       await page.goto(`${BASE}/guide/${G}`);
+      await page.click('.c-pill:has-text("Cards")');
       for (let section = 0; section < 3; section += 1) {
         await page.locator('.reader-actions button:has-text("Explain")').nth(section).click();
         await page.locator('.study-aid-tab:has-text("Diagram")').click();
@@ -118,6 +119,7 @@ async function noOverflow(page) {
   await check('Timeout/failure falls back to the built-in diagram with one short message', async () => {
     const { context, page } = await session(browser, { visual: 'fallback' });
     await page.goto(`${BASE}/guide/${G}`);
+      await page.click('.c-pill:has-text("Cards")');
     await page.locator('.reader-actions button:has-text("Explain")').first().click();
     await page.locator('.study-aid-tab:has-text("Diagram")').click();
     await page.locator('.nv button:has-text("Make visual")').click();
@@ -130,6 +132,7 @@ async function noOverflow(page) {
   await check('Free limit opens the upgrade popup', async () => {
     const { context, page } = await session(browser, { visual: 'limit', left: 0 });
     await page.goto(`${BASE}/guide/${G}`);
+      await page.click('.c-pill:has-text("Cards")');
     await page.locator('.reader-actions button:has-text("Explain")').first().click();
     await page.locator('.study-aid-tab:has-text("Diagram")').click();
     await page.locator('.nv button:has-text("Make visual")').click();

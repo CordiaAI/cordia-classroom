@@ -27,6 +27,22 @@ export function parseQAPairs(text) {
 /**
  * Parse "- bullet\n- bullet" text into string[]
  */
+// Notes as an outline: "## Heading" lines start a section, "- point" lines fill it. Older flat
+// notes (points only) come back as one section without a heading.
+export function parseOutline(text) {
+  const sections = [];
+  let current = null;
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.trim();
+    if (line.startsWith('## ')) { current = { heading: line.slice(3).trim(), points: [] }; sections.push(current); }
+    else if (line.startsWith('- ')) {
+      if (!current) { current = { heading: '', points: [] }; sections.push(current); }
+      current.points.push(line.slice(2).trim());
+    }
+  }
+  return sections.filter(section => section.points.length);
+}
+
 export function parseNotes(text) {
   if (!text) return [];
   return text.split('\n')

@@ -14,6 +14,7 @@ import { walkthroughEvent } from '../lib/walkthrough';
 import LectureRecorder from './LectureRecorder';
 import CordiaLoader from './CordiaLoader';
 import { heuristicTitle, sensibleTitle } from '../lib/noteMeta.mjs';
+import { localDate, saveLecture } from '../lib/lectures';
 
 const MAX_FILES = 5;
 // What the build card shows while a guide is written: the real stages, not fragments of the source.
@@ -263,14 +264,27 @@ export default function NewSheet() {
     walkthroughEvent('guide-building');
   }
 
-  function buildFromRecording({ title, transcript, folderId: classId }) {
+  // A finished recording is saved as a lecture (summary, what to watch for, to-dos, transcript)
+  // and opens its page. Until Lectures storage is set up, it becomes a study guide instead.
+  async function buildFromRecording({ title, transcript, folderId: classId, segments = [], durationMs = 0, source = 'recording' }) {
     const name = sensibleTitle(title, transcript) || `Lecture ${new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
     setRecording(false);
     setError('');
     if (classId) setFolderId(classId);
+    setBuildTitle(name);
+    setStep(0);
+    setStatus('building');
+    const saved = await saveLecture({ title: name, transcript, segments, duration_ms: durationMs, source, folder_id: classId || folderId || '', lecture_date: localDate(), classes: folders.map(folder => ({ id: folder.id, name: folder.name })) });
+    if (saved?.lecture?.id) {
+      reset();
+      setOpen(false);
+      router.push('/lecture/' + saved.lecture.id);
+      return;
+    }
     try {
       startBuild({ source: transcript, title: name.slice(0, 120), sourceTitle: name.slice(0, 300), sourceType: 'lecture', folderId: classId || folderId });
     } catch (caught) {
+      setStatus('idle');
       setError(caught.message || 'Something went wrong.');
     }
   }

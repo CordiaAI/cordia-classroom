@@ -23,6 +23,7 @@ import PulseDot from '../components/PulseDot';
 import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
 import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
+import { confirmedTodos, lectureCalendarItems, mergeCalendarItems } from '../lib/lectures';
 
 const SLOW = Symbol('slow');
 const SLOW_MS = 4000;
@@ -57,7 +58,7 @@ export default function Today({ timerState, setTimerState }) {
     const safe = promise => promise.catch(() => null);
     const calendarRequest = safe(apiFetch('/calendar/connection'));
     const calendarOrSlow = Promise.race([calendarRequest, new Promise(resolve => setTimeout(() => resolve(SLOW), SLOW_MS))]);
-    const [foldersData, guidesData, statsData, streakData, onboardingData, queueData, insightsData, notesData, checklistData, calendarData] = await Promise.all([
+    const [foldersData, guidesData, statsData, streakData, onboardingData, queueData, insightsData, notesData, checklistData, calendarData, lectureTodos] = await Promise.all([
       safe(apiFetch('/folders')),
       safe(apiFetch('/guides?fields=summary&limit=500')),
       safe(apiFetch('/stats/overview')),
@@ -68,6 +69,7 @@ export default function Today({ timerState, setTimerState }) {
       safe(apiFetch('/smart_notes')),
       safe(apiFetch('/onboarding/checklist')),
       calendarOrSlow,
+      safe(confirmedTodos()),
     ]);
     const failure = [foldersData, guidesData, statsData].find(item => !item || item.detail);
     const guideList = Array.isArray(guidesData?.guides) ? guidesData.guides : [];
@@ -100,6 +102,7 @@ export default function Today({ timerState, setTimerState }) {
       // Slow feed: show the calendar this device last saw; the fresh one replaces it in place.
       calendar: calendarData === SLOW ? readCalendarCache() : calendarData,
       calendarSlow: calendarData === SLOW && !readCalendarCache(),
+      lectureItems: lectureCalendarItems(lectureTodos?.todos),
     };
   }, { enabled: ready && !legacy });
   const loadError = data?.loadError || '';
@@ -135,9 +138,11 @@ export default function Today({ timerState, setTimerState }) {
     : null;
   const toolGuide = continueGuide?.id;
   const nothingDue = queue && !queue.cardTotal && !queue.misses.length && !queue.problems;
-  const dueItems = calendar?.connected
-    ? (calendar.items || []).filter(item => new Date(item.due_at).getTime() >= Date.now() - 86400000).sort((a, b) => new Date(a.due_at) - new Date(b.due_at)).slice(0, 3)
-    : [];
+  // Canvas deadlines plus to-dos confirmed from lectures, soonest first.
+  const dueItems = mergeCalendarItems(calendar?.connected ? calendar.items || [] : [], data?.lectureItems || [])
+    .filter(item => new Date(item.due_at).getTime() >= Date.now() - 86400000)
+    .sort((a, b) => new Date(a.due_at) - new Date(b.due_at))
+    .slice(0, 3);
   const tools = [
     { label: 'Quiz', icon: Brain, href: toolGuide ? `/quiz/${toolGuide}` : '/library' },
     { label: 'Cards', icon: Layers, href: '/library?tab=cards', tip: 'cards' },
@@ -210,7 +215,7 @@ export default function Today({ timerState, setTimerState }) {
           <div className="c-card c-list">
             {calendarSlow && <SectionLoader height={3 * 61} label="Loading deadlines" />}
             {dueItems.map(item => (
-              <a key={item.id} className="c-list-row" href={item.url || '/calendar'} target={item.url ? '_blank' : undefined} rel={item.url ? 'noreferrer' : undefined}>
+              <a key={item.id} className="c-list-row" href={item.url || '/calendar'} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>
                 <span className="c-grow c-truncate">{item.title}</span>
                 <span className="c-meta">{shortDate(item.due_at)}</span>
               </a>

@@ -114,16 +114,19 @@ const seconds = text => text.split(':').reduce((sum, part) => sum * 60 + Number(
     await context.close();
   });
 
-  await check('Transcription not set up: clear message while recording, Stop answers at once (no endless loading)', async () => {
+  await check('Transcription not set up: the browser\'s speech recognition takes over; Stop never hangs', async () => {
     const { context, page } = await session(browser, { mode: 'unconfigured' });
-    expect(/isn't set up/.test(await page.locator('.rec').innerText()), 'no warning on the start screen');
+    await page.locator('text=Transcribed by your browser').waitFor({ timeout: 10000 });
+    expect(await page.locator('button:has-text("Upload recording")').isDisabled(), 'upload needs server transcription');
     await page.click('.rec-start');
-    await page.locator('.rec-stage .rec-error:has-text("isn\'t set up")').waitFor({ timeout: 20000 });
+    await page.locator('.rec-timer').waitFor({ timeout: 10000 });
+    expect(!(await page.locator('.rec-stage .rec-error').count()), 'error shown while recording');
+    await page.waitForTimeout(3000);
     const stopAt = Date.now();
     await page.click('.rec-stage button:has-text("Stop")');
-    await page.locator('.rec-finishing .rec-error').waitFor({ timeout: 10000 });
+    // Headless Chromium hears nothing, so it ends with a clear message, quickly.
+    await page.locator('.rec-error:has-text("Nothing was transcribed")').waitFor({ timeout: 10000 });
     expect(Date.now() - stopAt < 8000, 'Stop waited too long');
-    expect(await page.locator('button:has-text("Try again")').isVisible(), 'no Try again');
     await context.close();
   });
 

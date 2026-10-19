@@ -5,6 +5,7 @@ import { walkthroughEvent } from '../lib/walkthrough';
 import { CanvasCalendarFeed, CanvasCalendarNav, CanvasFeedLink } from './CanvasShots';
 import { LoadingArea, SectionLoader, useLoadGate } from './CordiaLoader';
 import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
+import { confirmedTodos, lectureCalendarItems, mergeCalendarItems } from '../lib/lectures';
 
 // Checked before Connect: a Canvas calendar feed is an https (or webcal) link ending in .ics.
 export function feedLinkProblem(value) {
@@ -88,6 +89,9 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
   const gate = useLoadGate(status !== 'checking');
   const [items, setItems] = useState(() => cached?.items || []);
   const [dueToday, setDueToday] = useState(() => localDueToday(cached?.items || []));
+  // To-dos confirmed from lectures show alongside the Canvas feed.
+  const [lectureItems, setLectureItems] = useState([]);
+  useEffect(() => { confirmedTodos().then(data => setLectureItems(lectureCalendarItems(data?.todos))); }, []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [reminders, setReminders] = useState(false);
@@ -273,14 +277,16 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     );
   }
 
-  const todayIds = new Set(dueToday.map(item => item.id));
-  const upcoming = items
+  const allItems = mergeCalendarItems(items, lectureItems);
+  const allToday = localDueToday(allItems);
+  const todayIds = new Set(allToday.map(item => item.id));
+  const upcoming = allItems
     .filter(item => !todayIds.has(item.id) && dateValue(item) >= Date.now())
     .sort((a, b) => dateValue(a) - dateValue(b))
     .slice(0, 10);
 
   if (compact) {
-    const agenda = [...dueToday, ...upcoming]
+    const agenda = [...allToday, ...upcoming]
       .sort((left, right) => dateValue(left) - dateValue(right))
       .slice(0, 3);
     return (
@@ -292,7 +298,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
         {error && <div className="compact-calendar-error" role="alert">{error}</div>}
         <div className="compact-agenda">
           {agenda.length ? agenda.map(item => (
-            <a key={item.id} href={item.url || undefined} target={item.url ? '_blank' : undefined} rel={item.url ? 'noreferrer' : undefined}>
+            <a key={item.id} href={item.url || undefined} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>
               <span className="compact-date">{dueLabel(item)}</span>
               <strong>{item.title}</strong>
               <small>{item.course || 'Canvas'}</small>
@@ -306,7 +312,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
 
   const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
   const weekEnd = addDays(weekStart, 7).getTime();
-  const weekItems = items
+  const weekItems = allItems
     .filter(item => dateValue(item) >= weekStart.getTime() && dateValue(item) < weekEnd)
     .sort((a, b) => dateValue(a) - dateValue(b));
   const todayKey = new Date().toDateString();
@@ -325,6 +331,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
       </>
     );
     const className = `calendar-item${past ? ' calendar-item-past' : ''}`;
+    if (item.internal) return <a key={item.id} className={className + ' calendar-item-lecture'} href={item.url} title={`Open the lecture: ${item.title}`}>{body}</a>;
     return item.url
       ? <a key={item.id} className={className} href={item.url} target="_blank" rel="noreferrer" title={`Open in Canvas: ${item.title}`}>{body}</a>
       : <div key={item.id} className={className}>{body}</div>;

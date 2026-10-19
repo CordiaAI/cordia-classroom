@@ -3,7 +3,7 @@ import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../components/C
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowUpDown, ArrowUpRight, ChevronDown, FolderInput, FolderPlus, Layers, Pencil, Plus, Search, Star, Trash2, X,
+  ArrowUpDown, ArrowUpRight, ChevronDown, FolderInput, FolderPlus, Layers, Mic, NotebookPen, Pencil, Plus, Search, Star, Trash2, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
@@ -15,6 +15,7 @@ import ProgressRing from '../components/ProgressRing';
 import Menu from '../components/Menu';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { openNewSheet } from '../lib/newSheet';
+import LectureList from '../components/LectureList';
 
 const SORTS = [
   { key: 'recent', label: 'Newest' },
@@ -33,7 +34,8 @@ export default function LibraryPage() {
   const router = useRouter();
   const { ready } = useRequireAuth();
   useSessionTracker('browse');
-  const tab = router.query.tab === 'cards' ? 'cards' : 'guides';
+  const tab = ['cards', 'lectures'].includes(router.query.tab) ? router.query.tab : 'guides';
+  const [addingLecture, setAddingLecture] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [folders, setFolders] = useState([]);
@@ -252,10 +254,16 @@ export default function LibraryPage() {
           <div className="c-seg" role="tablist" aria-label="Library">
             <Link href="/library" role="tab" aria-selected={tab === 'guides'} className={tab === 'guides' ? 'is-active' : ''}>Guides</Link>
             <Link href="/library?tab=cards" role="tab" aria-selected={tab === 'cards'} className={tab === 'cards' ? 'is-active' : ''}>Cards</Link>
+            <Link href="/library?tab=lectures" role="tab" aria-selected={tab === 'lectures'} className={tab === 'lectures' ? 'is-active' : ''}>Lectures</Link>
           </div>
-          {tab === 'guides'
-            ? <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet()}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />New guide</button>
-            : <button type="button" className="c-btn c-btn--primary" onClick={() => router.push('/create')}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />Make cards</button>}
+          {tab === 'guides' && <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet()}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />New guide</button>}
+          {tab === 'cards' && <button type="button" className="c-btn c-btn--primary" onClick={() => router.push('/create')}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />Make cards</button>}
+          {tab === 'lectures' && (
+            <>
+              <button type="button" className="c-btn c-btn--secondary" onClick={() => setAddingLecture(true)}><NotebookPen size={20} strokeWidth={1.75} aria-hidden="true" />Add notes</button>
+              <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet('record')}><Mic size={20} strokeWidth={1.75} aria-hidden="true" />Record lecture</button>
+            </>
+          )}
         </div>
       </header>
 
@@ -313,6 +321,8 @@ export default function LibraryPage() {
             </div>
           )}
         </>
+      ) : tab === 'lectures' ? (
+        <LectureList folders={folders} adding={addingLecture} onAddingChange={setAddingLecture} />
       ) : (
         <div className="c-card c-list">
           {!cardSets ? (

@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
-import { parseQAPairs, parseNotes } from '../../lib/formatters';
+import { parseQAPairs, parseOutline } from '../../lib/formatters';
 import useSessionTracker from '../../lib/useSessionTracker';
 import StudyAidPanel from '../../components/StudyAidPanel';
 import StudyDocument from '../../components/StudyDocument';
@@ -16,7 +16,7 @@ import Menu from '../../components/Menu';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useLearningStyle } from '../../lib/learningStyle';
 import { rememberGuidePage, rememberLastGuide } from '../../lib/userStore';
-import { walkthroughEvent } from '../../lib/walkthrough';
+import { activeStep, walkthroughEvent } from '../../lib/walkthrough';
 
 const NURSING_TERMS = ['nursing', 'nurse', 'nclex', 'patient', 'vital signs', 'medication administration', 'care plan', 'nursing diagnosis', 'iv therapy', 'delegation', 'scope of practice', 'sbar', 'discharge planning', 'wound care', 'fall prevention', 'infection control', 'postoperative', 'preoperative', 'lab values', 'contraindications'];
 
@@ -33,10 +33,14 @@ function ask(guideId, prompt, send = false) {
 
 function exportGuide(guide) {
   const pairs = parseQAPairs(guide.study_guide);
-  const notes = parseNotes(guide.notes);
+  const outline = parseOutline(guide.notes);
   const lines = [`# ${guide.title}`, ''];
-  pairs.forEach((pair, index) => lines.push(`## ${index + 1}. ${pair.question}`, '', pair.answer, ''));
-  if (notes.length) lines.push('## Notes', '', ...notes.map(note => `- ${note}`), '');
+  if (outline.length) {
+    lines.push('## Notes', '');
+    outline.forEach(section => lines.push(...(section.heading ? [`### ${section.heading}`, ''] : []), ...section.points.map(point => `- ${point}`), ''));
+  }
+  lines.push('## Questions', '');
+  pairs.forEach((pair, index) => lines.push(`### ${index + 1}. ${pair.question}`, '', pair.answer, ''));
   if (guide.flashcards?.length) lines.push('## Cards', '', ...guide.flashcards.map(card => `- **${card.front}** — ${card.back}`), '');
   const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
   const link = document.createElement('a');
@@ -80,7 +84,9 @@ export default function GuidePage() {
   useSessionTracker('read', id || null);
   const [guide, setGuide] = useState(null);
   const [loadError, setLoadError] = useState('');
-  // Every guide has notes: a guide without any gets them written the first time it opens.
+  // Notes: an outline summary of the topic. Cards: every question to read through, plus flip cards.
+  const [view, setView] = useState('notes');
+  // Every guide has outline notes: one without them gets them written the first time it opens.
   const [notesState, setNotesState] = useState('idle'); // idle | making | done
   const notesAsked = useRef('');
   const [page, setPage] = useState(0);
@@ -127,9 +133,9 @@ export default function GuidePage() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  // A guide with no notes gets them written (once per visit); the summary card shows a loader meanwhile.
+  // A guide without outline notes gets them written (once per visit); a loader shows meanwhile.
   useEffect(() => {
-    if (!guide?.id || notesAsked.current === guide.id || parseNotes(guide.notes).length) return;
+    if (!guide?.id || notesAsked.current === guide.id || /^##\s/m.test(guide.notes || '')) return;
     notesAsked.current = guide.id;
     setNotesState('making');
     fetch('/api/guide-notes', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ guide_id: guide.id }) })
@@ -137,6 +143,12 @@ export default function GuidePage() {
       .then(data => { if (data?.notes) setGuide(current => (current && current.id === guide.id ? { ...current, notes: data.notes } : current)); })
       .catch(() => {})
       .finally(() => setNotesState('done'));
+  }, [guide?.id]);
+
+  // The guided walkthrough points at the questions (Explain, highlighting): show them for those steps.
+  useEffect(() => {
+    const step = activeStep();
+    if (step && ['explain', 'highlight'].includes(step.id)) setView('cards');
   }, [guide?.id]);
 
   async function loadGuide() {
@@ -208,7 +220,7 @@ export default function GuidePage() {
   if (!guide || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading guide" />;
 
   const pairs = parseQAPairs(guide.study_guide);
-  const notes = parseNotes(guide.notes);
+  const outline = parseOutline(guide.notes);
   const cardCount = guide.flashcards?.length || 0;
   const sourceTitle = guide.source_title || (guide.source_url ? 'Source' : '');
   const externalSourceUrl = /^https?:\/\//i.test(guide.source_url || '') ? guide.source_url : '';
@@ -218,8 +230,8 @@ export default function GuidePage() {
   const explainWithAid = Boolean(learningStyle?.enabled);
   const pills = [
     { key: 'notes', label: 'Notes', icon: NotebookText, view: 'notes' },
+    { key: 'cards', label: 'Cards', icon: Layers, view: 'cards', count: cardCount, spot: 'cards-pill' },
     { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill' },
-    { key: 'cards', label: 'Cards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: cardCount, spot: 'cards-pill' },
     { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id },
     ...(isNursing(guide) ? [{ key: 'nclex', label: 'NCLEX', icon: Stethoscope, href: '/nclex/' + id }] : []),
     { key: 'ask', label: 'Ask', icon: MessageCircle, spot: 'ask-pill', onClick: () => { walkthroughEvent('ask'); ask(id, ''); } },
@@ -264,21 +276,29 @@ export default function GuidePage() {
         {pills.map(pill => {
           const content = <><pill.icon size={20} strokeWidth={1.75} aria-hidden="true" />{pill.label}{pill.count !== undefined && <span className="c-meta">{pill.count}</span>}</>;
           if (pill.href) return <Link key={pill.key} className="c-pill" href={pill.href} data-spot={pill.spot}>{content}</Link>;
-          if (pill.view) return <button key={pill.key} type="button" className="c-pill" aria-current="page" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>{content}</button>;
+          if (pill.view) return <button key={pill.key} type="button" className="c-pill" data-spot={pill.spot} aria-current={view === pill.view ? 'page' : undefined} onClick={() => { setView(pill.view); if (pill.view === 'cards') walkthroughEvent('cards-opened'); }}>{content}</button>;
           return <button key={pill.key} type="button" className="c-pill" data-spot={pill.spot} onClick={pill.onClick}>{content}</button>;
         })}
       </nav>
 
-      {/* Notes: a summary of the guide first, then every question to read through. */}
-      {(notes.length > 0 || notesState === 'making') && (
-        <section className="c-card guide-notes" aria-label="Notes">
-          <h2 className="c-section-title">Summary</h2>
-          {notes.length
-            ? <ul className="c-study">{notes.map((note, index) => <li key={index}>{note}</li>)}</ul>
-            : <SectionLoader height={120} label="Writing notes" />}
+      {view === 'notes' ? (
+        <section className="c-card guide-notes" aria-label="Notes" aria-busy={notesState === 'making' && !outline.length}>
+          {outline.length ? outline.map((section, index) => (
+            <div key={index} className="guide-outline-section">
+              {section.heading && <h2 className="c-section-title">{section.heading}</h2>}
+              <ul className="c-study">{section.points.map((point, pointIndex) => <li key={pointIndex}>{point}</li>)}</ul>
+            </div>
+          )) : notesState === 'making' || notesState === 'idle'
+            ? <SectionLoader height={160} label="Writing notes" />
+            : <p className="c-meta">Notes appear here once they are written. The questions are in Cards.</p>}
         </section>
-      )}
-      {pairs.length > 0 && <h2 className="c-section-title guide-questions-title">Questions</h2>}
+      ) : (
+        <>
+        {cardCount > 0 && (
+          <div className="guide-cards-bar">
+            <Link className="c-btn c-btn--primary" href={'/flashcards/study?guideId=' + id}><Layers size={20} strokeWidth={1.75} aria-hidden="true" />Flip cards · {cardCount}</Link>
+          </div>
+        )}
       <StudyDocument
         key={guide.id}
         guide={guide}
@@ -295,6 +315,8 @@ export default function GuidePage() {
           : null)}
         onSelection={onSelection}
         />
+        </>
+      )}
 
       {cardDraft !== null && <MakeCard front={cardDraft} onSave={saveCard} onClose={() => setCardDraft(null)} />}
       {confirmDelete && <ConfirmDialog title={`Delete ${guide.title}?`} onConfirm={deleteGuide} onCancel={() => setConfirmDelete(false)} />}
@@ -313,8 +335,10 @@ export default function GuidePage() {
         .guide-src a { display: inline-flex; align-items: center; gap: 6px; }
         .guide-notes { display: grid; gap: 16px; padding: 32px 40px; }
         .guide-notes :global(.c-section-title) { margin: 0; }
-        .guide-notes ul { margin: 0; padding-left: 20px; display: grid; gap: 12px; }
-        .guide-questions-title { margin: 16px 0 0; }
+        .guide-notes { gap: 32px; }
+        .guide-outline-section { display: grid; gap: 16px; }
+        .guide-notes ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+        .guide-cards-bar { display: flex; justify-content: flex-end; }
         @media (max-width: 767px) { .guide-src { margin-left: 0; } .guide-notes { padding: 24px 18px; } }
       `}</style>
     </article>
