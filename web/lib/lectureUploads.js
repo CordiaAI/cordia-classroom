@@ -1,11 +1,11 @@
-import { LIMIT_EVENT, authOnlyHeaders, responseJson } from './api';
+import { LIMIT_EVENT, authOnlyHeaders } from './api';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const DB = 'cordia-lectures';
 const STORE = 'chunks';
+export const CONCURRENCY = 3;
 
 // IndexedDB holds every chunk until the server has it, so a dropped connection (or a
-// closed laptop lid) loses nothing; uploads resume in order when the network is back.
+// closed laptop lid) loses nothing; uploads resume when the network is back.
 function openDb() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB, 1);
@@ -37,110 +37,135 @@ export async function savedChunks(recordingId) {
   }
 }
 
-function extensionFor(type) {
-  if (/mp4|m4a|aac/.test(type)) return 'm4a';
-  if (/ogg/.test(type)) return 'ogg';
-  return 'webm';
+function base64(text) {
+  const bytes = new TextEncoder().encode(text || '');
+  let binary = '';
+  bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
 }
 
-// Uploads chunks one at a time, in order, so each request can send the transcript tail
-// that came before it (the server removes the ~2 s of overlap against that tail).
+// Uploads chunks as they are recorded, up to CONCURRENCY at a time, so a backlog after an
+// offline stretch catches up fast. Each chunk is transcribed on its own; the browser removes
+// the overlap between neighbouring chunks (lib/lectureText.mjs).
+//   onText({ seq, startMs, text })   a chunk's words
+//   onState({ waiting, uploading, offline, error })   for the status line
+//   onLimit()   out of recording minutes
 export class ChunkUploader {
-  constructor({ recordingId, getTail, getTerms, keepAudio = false, onText, onState, onLimit }) {
+  constructor({ recordingId, getPrompt, keepAudio = false, onText, onState, onLimit }) {
     this.recordingId = recordingId;
-    this.getTail = getTail;
-    this.getTerms = getTerms;
+    this.getPrompt = getPrompt;
     this.keepAudio = keepAudio;
     this.onText = onText;
     this.onState = onState;
     this.onLimit = onLimit;
-    this.queue = [];
-    this.busy = false;
-    this.offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    this.queue = [];          // waiting chunks, oldest first
+    this.inFlight = new Set();
+    this.retryAt = 0;
     this.failures = 0;
+    this.error = null;        // a problem the student should see ('unavailable', 'auth', 'retrying')
     this.stopped = false;
-    this.onOnline = () => { this.offline = false; this.report(); this.pump(); };
+    this.offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    this.onOnline = () => { this.offline = false; this.retryAt = 0; this.report(); this.pump(); };
     this.onOffline = () => { this.offline = true; this.report(); };
     window.addEventListener('online', this.onOnline);
     window.addEventListener('offline', this.onOffline);
-    this.retry = setInterval(() => this.pump(), 5000);
+    this.timer = setInterval(() => this.pump(), 1000);
   }
 
   report() {
-    this.onState?.({ waiting: this.queue.length, offline: this.offline, busy: this.busy });
+    this.onState?.({ waiting: this.queue.length, uploading: this.inFlight.size, offline: this.offline, error: this.error });
   }
 
   async add({ seq, startMs, durationMs, blob }) {
-    const item = { key: `${this.recordingId}:${seq}`, recordingId: this.recordingId, seq, startMs, durationMs, blob, type: blob.type };
-    await save(item);
+    const item = { key: `${this.recordingId}:${seq}`, recordingId: this.recordingId, seq, startMs, durationMs, blob, type: blob.type || 'audio/webm' };
     this.queue.push(item);
     this.queue.sort((a, b) => a.seq - b.seq);
     this.report();
+    save(item); // in IndexedDB until uploaded
     this.pump();
   }
 
-  async pump() {
-    if (this.busy || this.stopped || !this.queue.length) return;
-    if (this.offline || (typeof navigator !== 'undefined' && navigator.onLine === false)) { this.offline = true; this.report(); return; }
-    this.busy = true;
-    this.report();
-    const item = this.queue[0];
-    try {
-      const form = new FormData();
-      form.append('audio', item.blob, `chunk-${item.seq}.${extensionFor(item.type)}`);
-      form.append('recording_id', this.recordingId);
-      form.append('seq', String(item.seq));
-      form.append('start_ms', String(Math.round(item.startMs)));
-      form.append('duration_ms', String(Math.round(item.durationMs)));
-      form.append('previous_tail', (this.getTail?.() || '').slice(-200));
-      form.append('terms', this.getTerms?.() || '');
-      const response = await fetch(`${API}/lectures/chunk`, { method: 'POST', headers: authOnlyHeaders(), body: form });
-      const data = await responseJson(response);
-      if (response.status === 402) {
-        window.dispatchEvent(new CustomEvent(LIMIT_EVENT, { detail: data?.detail || { feature: 'lecture_minute' } }));
-        this.onLimit?.();
-        this.stopped = true;
-        return;
-      }
-      if (!response.ok) throw new Error('upload');
-      if (this.keepAudio) {
-        const keep = new FormData();
-        keep.append('audio', item.blob, `chunk-${item.seq}.${extensionFor(item.type)}`);
-        keep.append('recording_id', this.recordingId);
-        keep.append('seq', String(item.seq));
-        fetch(`${API}/lectures/audio`, { method: 'POST', headers: authOnlyHeaders(), body: keep }).catch(() => {});
-      }
-      this.queue.shift();
-      this.failures = 0;
-      await remove(item.key);
-      this.onText?.({ seq: item.seq, startMs: item.startMs, text: data?.text || '' });
-    } catch {
-      // Network trouble: keep the chunk (it is already in IndexedDB) and try again shortly.
-      this.failures += 1;
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) this.offline = true;
-    } finally {
-      this.busy = false;
-      this.report();
-      if (!this.stopped && this.queue.length && !this.offline && this.failures < 3) setTimeout(() => this.pump(), this.failures ? 1500 * this.failures : 0);
+  pump() {
+    if (this.stopped || this.offline || Date.now() < this.retryAt) return;
+    while (this.inFlight.size < CONCURRENCY && this.queue.length) {
+      const item = this.queue.shift();
+      this.inFlight.add(item);
+      this.upload(item).finally(() => { this.inFlight.delete(item); this.report(); this.pump(); });
     }
+    this.report();
   }
 
-  // Resolves once every chunk is uploaded (waits through an offline stretch).
-  drained() {
+  async upload(item) {
+    const params = new URLSearchParams({
+      recording_id: this.recordingId, seq: String(item.seq), start_ms: String(Math.round(item.startMs)),
+      duration_ms: String(Math.round(item.durationMs)), keep: this.keepAudio ? '1' : '0',
+    });
+    let response;
+    let data = null;
+    try {
+      response = await fetch(`/api/lectures/chunk?${params}`, {
+        method: 'POST',
+        headers: { ...authOnlyHeaders(), 'Content-Type': item.type, 'X-Prompt': base64(this.getPrompt?.(item.seq) || '') },
+        body: item.blob,
+      });
+      data = await response.json().catch(() => null);
+    } catch {
+      response = null;
+    }
+    if (response?.ok) {
+      this.failures = 0;
+      if (this.error === 'retrying') this.error = null;
+      remove(item.key);
+      this.onText?.({ seq: item.seq, startMs: item.startMs, text: data?.text || '' });
+      return;
+    }
+    const status = response?.status || 0;
+    if (status === 402) {
+      window.dispatchEvent(new CustomEvent(LIMIT_EVENT, { detail: data?.detail || { feature: 'lecture_minute' } }));
+      this.stopped = true;
+      this.onLimit?.();
+      return;
+    }
+    if (status === 401 || status === 503) {
+      // Not signed in, or transcription isn't set up: retrying won't help. Keep the audio saved.
+      this.queue.unshift(item);
+      this.error = status === 401 ? 'auth' : 'unavailable';
+      this.retryAt = Date.now() + 15000;
+      return;
+    }
+    if (status === 400 || status === 413 || status === 415) {
+      remove(item.key); // this piece can never be transcribed; skip it, keep going
+      return;
+    }
+    // Network trouble or a server hiccup: try again soon, backing off up to 15 s.
+    this.failures += 1;
+    this.queue.unshift(item);
+    this.queue.sort((a, b) => a.seq - b.seq);
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) this.offline = true;
+    if (this.failures >= 2) this.error = 'retrying';
+    this.retryAt = Date.now() + Math.min(15000, 1000 * 2 ** Math.min(this.failures, 4));
+  }
+
+  // Waits until every chunk is uploaded or `timeoutMs` passes; never hangs.
+  drained({ timeoutMs = 45000 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    this.retryAt = 0;
     return new Promise(resolve => {
       const check = () => {
-        if (this.stopped || (!this.queue.length && !this.busy)) { clearInterval(timer); resolve(); return; }
-        this.failures = Math.min(this.failures, 2);
+        if (this.stopped || (!this.queue.length && !this.inFlight.size)) { clearInterval(timer); resolve({ ok: true, missing: 0 }); return; }
+        // Retrying can't fix these; say so now instead of waiting out the timer.
+        if ((this.error === 'unavailable' || this.error === 'auth') && !this.inFlight.size) { clearInterval(timer); resolve({ ok: false, missing: this.queue.length }); return; }
+        if (Date.now() >= deadline) { clearInterval(timer); resolve({ ok: false, missing: this.queue.length + this.inFlight.size }); return; }
         this.pump();
       };
-      const timer = setInterval(check, 500);
+      const timer = setInterval(check, 250);
       check();
     });
   }
 
   dispose() {
     this.stopped = true;
-    clearInterval(this.retry);
+    clearInterval(this.timer);
     window.removeEventListener('online', this.onOnline);
     window.removeEventListener('offline', this.onOffline);
   }

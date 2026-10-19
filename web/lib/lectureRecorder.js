@@ -3,6 +3,8 @@
 // one stops), so every chunk can be transcribed on its own. Pausing stops the clock.
 
 export const CHUNK_MS = 20000;
+// The first chunk is shorter so the live transcript starts within seconds.
+export const FIRST_CHUNK_MS = 8000;
 export const OVERLAP_MS = 2000;
 
 // Chrome and Firefox record Opus in WebM; Safari records AAC in MP4.
@@ -31,10 +33,11 @@ export async function openMicrophone() {
 }
 
 export class ChunkedRecorder {
-  constructor(stream, { mimeType = pickMimeType(), chunkMs = CHUNK_MS, overlapMs = OVERLAP_MS, onChunk } = {}) {
+  constructor(stream, { mimeType = pickMimeType(), chunkMs = CHUNK_MS, firstChunkMs = FIRST_CHUNK_MS, overlapMs = OVERLAP_MS, onChunk } = {}) {
     this.stream = stream;
     this.mimeType = mimeType;
     this.chunkMs = chunkMs;
+    this.firstChunkMs = firstChunkMs;
     this.overlapMs = overlapMs;
     this.onChunk = onChunk;
     this.seq = 0;
@@ -53,7 +56,7 @@ export class ChunkedRecorder {
 
   start() {
     this.resumedAt = Date.now();
-    this.nextAt = this.chunkMs - this.overlapMs;
+    this.nextAt = this.firstChunkMs - this.overlapMs;
     this.startSegment();
     this.ticker = setInterval(() => this.tick(), 200);
   }

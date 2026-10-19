@@ -27,7 +27,9 @@ assert.match(recorder, /Promise\.resolve\([^)]*this\.onChunk/, 'stop() waits for
 
 const uploads = read('lib/lectureUploads.js');
 assert.match(uploads, /indexedDB\.open/, 'chunks are buffered in IndexedDB');
-assert.match(uploads, /previous_tail/, 'each chunk sends the transcript tail for overlap removal');
+assert.match(uploads, /X-Prompt/, 'each chunk sends the transcript tail and class terms as the prompt');
+assert.match(uploads, /\/api\/lectures\/chunk/, 'chunks go to the web server route (works on Preview without a backend deploy)');
+assert.match(uploads, /drained\(\{ timeoutMs/, 'Stop waits for uploads with a time limit, never forever');
 
 const ui = read('components/LectureRecorder.js');
 for (const text of ['I have permission to record this lecture', 'Upload recording', 'Keep audio', 'min left', 'beforeunload']) {

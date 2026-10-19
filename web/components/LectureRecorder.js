@@ -1,14 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
-import { Mic, Pause, Play, Square, Upload } from 'lucide-react';
-import { apiFetch, authOnlyHeaders, getUserId, LIMIT_EVENT, openUpgrade, responseJson } from '../lib/api';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Mic, Pause, Play, RefreshCw, Square, Upload } from 'lucide-react';
+import { apiFetch, authHeaders, authOnlyHeaders, getUserId, openUpgrade } from '../lib/api';
 import { ChunkedRecorder, keepAwake, levelMeter, micPermission, openMicrophone, pickMimeType, recordingSupported } from '../lib/lectureRecorder';
 import { ChunkUploader } from '../lib/lectureUploads';
+import { audioDuration, fileKind, splitAudioFile } from '../lib/lectureFile';
+import { fallbackTitle, mergedSegments, transcriptText } from '../lib/lectureText.mjs';
 import CordiaLoader from './CordiaLoader';
 import MicHelp from './MicHelp';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const NOTES_EVERY_MS = 3 * 60 * 1000;
-const AUDIO_ACCEPT = '.mp3,.m4a,.wav,.webm,audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/webm';
+const AUDIO_ACCEPT = '.mp3,.m4a,.wav,.webm,.ogg,audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/webm,audio/ogg';
+
+const UPLOAD_PROBLEMS = {
+  unavailable: "Transcription isn't set up on this site yet. Your audio is saved on this device.",
+  auth: 'Sign in again to transcribe. Your audio is saved on this device.',
+  retrying: 'Connection trouble. Retrying; your audio is saved on this device.',
+};
 
 function clock(ms) {
   const total = Math.floor(ms / 1000);
@@ -27,20 +34,23 @@ function consentKey() { return `cordiaRecordConsent:${getUserId() || 'anon'}`; }
 function hasConsent() { try { return localStorage.getItem(consentKey()) === '1'; } catch { return false; } }
 function saveConsent() { try { localStorage.setItem(consentKey(), '1'); } catch { /* storage blocked */ } }
 
-function audioDuration(file) {
-  return new Promise(resolve => {
-    const audio = document.createElement('audio');
-    audio.preload = 'metadata';
-    audio.onloadedmetadata = () => { resolve(Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : 0); URL.revokeObjectURL(audio.src); };
-    audio.onerror = () => resolve(0);
-    audio.src = URL.createObjectURL(file);
-  });
+async function postJson(path, body, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(path, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body), signal: controller.signal });
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // Lecture recording, start to finish. When the transcript is ready, onDone({ title, transcript, folderId })
 // hands it to the New sheet, which builds the guide like any other upload.
 export default function LectureRecorder({ folders = [], folderId, onFolder, onDone, onActiveChange }) {
-  const [phase, setPhase] = useState('start'); // start | consent | asking | denied | recording | paused | finishing | unsupported
+  const [phase, setPhase] = useState('start'); // start | consent | asking | denied | recording | paused | finishing | stuck | unsupported
   const [consentChecked, setConsentChecked] = useState(false);
   const [keepAudio, setKeepAudio] = useState(false);
   const [usage, setUsage] = useState(null);
@@ -49,7 +59,8 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
   const [segments, setSegments] = useState([]);
   const [notes, setNotes] = useState([]);
   const [suggested, setSuggested] = useState('');
-  const [upload, setUpload] = useState({ waiting: 0, offline: false });
+  const [upload, setUpload] = useState({ waiting: 0, uploading: 0, offline: false, error: null });
+  const [step, setStep] = useState('');
   const [error, setError] = useState('');
   const recorder = useRef(null);
   const uploader = useRef(null);
@@ -57,24 +68,32 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
   const segmentsRef = useRef([]);
   const termsRef = useRef('');
   const notesAt = useRef(NOTES_EVERY_MS);
-  const recordingId = useRef('');
+  const notedUpTo = useRef(0);
   const fileInput = useRef(null);
   const transcriptEnd = useRef(null);
-  const active = phase === 'recording' || phase === 'paused' || phase === 'finishing';
+  const active = ['recording', 'paused', 'finishing', 'stuck'].includes(phase);
+  const shown = useMemo(() => mergedSegments(segments), [segments]);
 
   useEffect(() => { onActiveChange?.(active); }, [active, onActiveChange]);
 
   useEffect(() => {
     if (!recordingSupported() || !pickMimeType()) setPhase('unsupported');
-    apiFetch('/lectures/usage').then(data => { if (data && typeof data.minutes_left === 'number') setUsage(data); });
+    fetch('/api/lectures/usage', { headers: authOnlyHeaders() })
+      .then(response => (response.ok ? response.json() : null))
+      .then(data => { if (data && typeof data.minutes_left === 'number') setUsage(data); })
+      .catch(() => {});
     return () => stopEverything();
   }, []);
 
-  // Key terms from the chosen class's guides help the speech model with names and jargon.
+  // Class name and its guide titles help the speech model with names and jargon.
   useEffect(() => {
     termsRef.current = '';
     if (!folderId) return;
-    apiFetch(`/lectures/terms?folder_id=${encodeURIComponent(folderId)}`).then(data => { termsRef.current = (data?.terms || []).join(', '); });
+    const folder = folders.find(item => item.id === folderId);
+    apiFetch('/guides?fields=summary&limit=500').then(data => {
+      const titles = (data?.guides || []).filter(guide => guide.folder_id === folderId).map(guide => guide.title).filter(Boolean).slice(0, 15);
+      termsRef.current = [folder?.name, ...titles].filter(Boolean).join(', ').slice(0, 400);
+    });
   }, [folderId]);
 
   // Warn before leaving the page mid-recording.
@@ -85,7 +104,7 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
     return () => window.removeEventListener('beforeunload', warn);
   }, [active]);
 
-  useEffect(() => { transcriptEnd.current?.scrollIntoView({ block: 'nearest' }); }, [segments.length]);
+  useEffect(() => { transcriptEnd.current?.scrollIntoView({ block: 'nearest' }); }, [shown.length]);
 
   function stopEverything() {
     cleanup.current.forEach(fn => fn());
@@ -94,8 +113,25 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
     uploader.current?.dispose();
   }
 
-  function tail() {
-    return segmentsRef.current.map(segment => segment.text).join(' ').slice(-200);
+  // Speech-model prompt for a chunk: class terms plus the last ~200 characters said before it.
+  function promptFor(seq) {
+    const before = mergedSegments(segmentsRef.current.filter(item => item.seq < seq)).map(item => item.text).join(' ').slice(-200);
+    return [termsRef.current && `Terms: ${termsRef.current}`, before].filter(Boolean).join('\n');
+  }
+
+  function makeUploader(recordingId) {
+    return new ChunkUploader({
+      recordingId,
+      keepAudio,
+      getPrompt: promptFor,
+      onText: ({ seq, startMs, text }) => {
+        if (!text) return;
+        segmentsRef.current = [...segmentsRef.current.filter(item => item.seq !== seq), { seq, start_ms: Math.round(startMs), text }];
+        setSegments(segmentsRef.current);
+      },
+      onState: setUpload,
+      onLimit: () => { if (recorder.current) finish(); },
+    });
   }
 
   async function begin() {
@@ -107,28 +143,17 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
     try {
       stream = await openMicrophone();
     } catch (caught) {
-      setPhase(caught?.name === 'NotAllowedError' || caught?.name === 'SecurityError' ? 'denied' : 'start');
-      if (caught?.name !== 'NotAllowedError' && caught?.name !== 'SecurityError') setError('No microphone was found.');
+      const blocked = caught?.name === 'NotAllowedError' || caught?.name === 'SecurityError';
+      setPhase(blocked ? 'denied' : 'start');
+      if (!blocked) setError('No microphone was found.');
       return;
     }
-    recordingId.current = newRecordingId();
     segmentsRef.current = [];
     setSegments([]);
     setNotes([]);
     notesAt.current = NOTES_EVERY_MS;
-    uploader.current = new ChunkUploader({
-      recordingId: recordingId.current,
-      keepAudio,
-      getTail: tail,
-      getTerms: () => termsRef.current,
-      onText: ({ seq, startMs, text }) => {
-        if (!text) return;
-        segmentsRef.current = [...segmentsRef.current, { seq, start_ms: Math.round(startMs), text }].sort((a, b) => a.seq - b.seq);
-        setSegments(segmentsRef.current);
-      },
-      onState: setUpload,
-      onLimit: () => finish(true),
-    });
+    notedUpTo.current = 0;
+    uploader.current = makeUploader(newRecordingId());
     recorder.current = new ChunkedRecorder(stream, { onChunk: chunk => uploader.current?.add(chunk) });
     recorder.current.start();
     cleanup.current.push(levelMeter(stream, setLevel), keepAwake());
@@ -141,63 +166,87 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
     setPhase('recording');
   }
 
+  // Notes for what was said since the last update (plus a little before it for context).
   async function refreshNotes() {
-    if (!segmentsRef.current.length) return;
-    const data = await apiFetch('/lectures/notes', {
-      method: 'POST',
-      body: JSON.stringify({ segments: segmentsRef.current.map(({ start_ms, text }) => ({ start_ms, text })), classes: folders.map(folder => ({ id: folder.id, name: folder.name })) }),
-    });
-    if (Array.isArray(data?.notes)) setNotes(data.notes);
+    const recent = mergedSegments(segmentsRef.current).filter(item => item.start_ms >= notedUpTo.current - 30000);
+    if (!recent.length) return;
+    notedUpTo.current = recent[recent.length - 1].start_ms + 1;
+    const data = await postJson('/api/lectures/notes', { segments: recent.map(({ start_ms, text }) => ({ start_ms, text })), classes: folders.map(folder => ({ id: folder.id, name: folder.name })) }, 30000);
+    if (Array.isArray(data?.notes) && data.notes.length) {
+      setNotes(current => {
+        const seen = new Set(current.map(note => note.text.toLowerCase()));
+        return [...current, ...data.notes.filter(note => !seen.has(note.text.toLowerCase()))];
+      });
+    }
     if (data?.class_id) setSuggested(data.class_id);
   }
 
   function pause() { recorder.current?.pause(); setElapsed(recorder.current?.elapsed() || 0); setPhase('paused'); }
   function resume() { recorder.current?.resume(); setPhase('recording'); }
 
-  async function finish(limitReached = false) {
+  async function finish() {
     setPhase('finishing');
-    await recorder.current?.stop();
+    setStep('Transcribing the last part');
+    const current = recorder.current;
+    recorder.current = null;
+    await current?.stop();
     cleanup.current.forEach(fn => fn());
     cleanup.current = [];
     setLevel(0);
-    if (!limitReached) await uploader.current?.drained();
+    await settle();
+  }
+
+  // Wait for the last uploads (never forever), then build. If parts are still missing,
+  // let the student retry or go ahead with what is transcribed.
+  async function settle(timeoutMs = 25000) {
+    setPhase('finishing');
+    setStep('Transcribing the last part');
+    const result = await uploader.current?.drained({ timeoutMs });
+    if (result && !result.ok) { setPhase('stuck'); return; }
+    await build();
+  }
+
+  async function build() {
     uploader.current?.dispose();
-    await finalPass(segmentsRef.current);
+    const transcript = transcriptText(segmentsRef.current);
+    if (transcript.length < 40) {
+      setPhase('start');
+      setError(segmentsRef.current.length ? 'The recording is too short to make a guide.' : 'Nothing was transcribed. Check the microphone and try again.');
+      return;
+    }
+    setStep('Naming your lecture');
+    const named = await postJson('/api/lectures/title', { text: transcript.slice(0, 6000) }, 10000);
+    onDone?.({ title: named?.title || fallbackTitle(), transcript, folderId: folderId || suggested || '' });
   }
 
-  async function finalPass(list) {
-    if (!list.length) { setPhase('start'); setError('Nothing was heard. Check the microphone and try again.'); return; }
-    const data = await apiFetch('/lectures/finish', { method: 'POST', body: JSON.stringify({ segments: list.map(({ start_ms, text }) => ({ start_ms, text })) }) });
-    if (!data?.transcript) { setPhase('start'); setError(data?.detail && typeof data.detail === 'string' ? data.detail : "Couldn't finish the transcript. Try again."); return; }
-    onDone?.({ title: data.title || '', transcript: data.transcript, folderId: folderId || suggested || '' });
-  }
-
-  // Upload recording: the same final pass for an mp3, m4a, wav or webm file.
+  // Upload recording: split the file, transcribe the pieces in parallel, then the same final steps.
   async function uploadRecording(file) {
     if (!file) return;
     setError('');
-    if (!/\.(mp3|m4a|wav|webm)$/i.test(file.name) && !/^audio\//.test(file.type)) { setError('Use an mp3, m4a, wav or webm recording.'); return; }
+    if (!fileKind(file)) { setError('Use an mp3, m4a, wav or webm recording.'); return; }
     setPhase('finishing');
-    const form = new FormData();
-    form.append('audio', file, file.name);
-    form.append('recording_id', newRecordingId());
-    form.append('duration_ms', String(await audioDuration(file)));
-    form.append('terms', termsRef.current);
+    setStep('Reading the recording');
+    let pieces;
     try {
-      const response = await fetch(`${API}/lectures/transcribe-file`, { method: 'POST', headers: authOnlyHeaders(), body: form });
-      const data = await responseJson(response);
-      if (response.status === 402) { window.dispatchEvent(new CustomEvent(LIMIT_EVENT, { detail: data?.detail })); setPhase('start'); return; }
-      if (!response.ok) throw new Error(typeof data?.detail === 'string' ? data.detail : "Couldn't transcribe this recording.");
-      await finalPass(data.segments || []);
-    } catch (caught) {
+      pieces = await splitAudioFile(file, await audioDuration(file));
+    } catch {
       setPhase('start');
-      setError(caught.message || "Couldn't transcribe this recording.");
+      setError("This file couldn't be read here. Try an mp3 or wav.");
+      return;
     }
+    segmentsRef.current = [];
+    setSegments([]);
+    uploader.current?.dispose();
+    uploader.current = makeUploader(newRecordingId());
+    setStep(pieces.length > 1 ? `Transcribing ${pieces.length} parts` : 'Transcribing');
+    pieces.forEach((piece, seq) => uploader.current.add({ seq, ...piece }));
+    await settle(Math.max(60000, pieces.length * 15000));
   }
 
   const minutesLeft = usage?.minutes_left;
   const outOfMinutes = typeof minutesLeft === 'number' && minutesLeft <= 0;
   const suggestion = suggested && suggested !== folderId ? folders.find(folder => folder.id === suggested) : null;
+  const problem = upload.error ? UPLOAD_PROBLEMS[upload.error] : upload.offline ? 'Offline. Saving here and uploading when you are back.' : '';
 
   if (phase === 'unsupported') {
     return <p className="rec-note" role="status">This browser can't record audio. Use Chrome, Edge, Safari or Firefox, or upload a recording.</p>;
@@ -237,10 +286,25 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
   }
 
   if (phase === 'finishing') {
+    const left = upload.waiting + upload.uploading;
     return (
       <div className="rec rec-finishing">
-        <CordiaLoader label="Finishing the transcript" />
-        <p className="rec-note" role="status">{upload.offline ? 'Waiting for the connection to upload the last part.' : upload.waiting ? `Uploading ${upload.waiting} part${upload.waiting === 1 ? '' : 's'}` : 'Cleaning the transcript'}</p>
+        <CordiaLoader label={step || 'Finishing'} />
+        <p className="rec-note" role="status">{problem || (left > 1 && step.startsWith('Transcrib') ? `${step} · ${left} left` : step)}</p>
+        <RecorderStyle />
+      </div>
+    );
+  }
+
+  if (phase === 'stuck') {
+    return (
+      <div className="rec rec-finishing">
+        <p className="rec-error" role="alert">{problem || "Some of the recording hasn't been transcribed yet."}</p>
+        <p className="rec-note">{shown.length ? `${shown.length} part${shown.length === 1 ? ' is' : 's are'} ready.` : 'Nothing is transcribed yet.'} The rest is saved on this device.</p>
+        <div className="rec-row">
+          <button type="button" className="c-btn c-btn--secondary" onClick={() => settle()}><RefreshCw aria-hidden="true" />Try again</button>
+          {shown.length > 0 && <button type="button" className="c-btn c-btn--primary" onClick={build}>Make guide from what's done</button>}
+        </div>
         <RecorderStyle />
       </div>
     );
@@ -252,15 +316,13 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
         <div className="rec-stage c-card">
           <div className="rec-timer" role="timer" aria-live="off">{clock(elapsed)}</div>
           <div className="rec-level" aria-hidden="true"><span style={{ transform: `scaleX(${phase === 'paused' ? 0 : Math.max(0.02, level)})` }} /></div>
-          <p className="rec-note" role="status">
-            {phase === 'paused' ? 'Paused' : 'Recording'}
-            {upload.offline ? ' · Offline, saving here and uploading when you are back' : ''}
-          </p>
+          <p className="rec-note" role="status">{phase === 'paused' ? 'Paused' : 'Recording'}</p>
+          {problem && <p className="rec-error" role="alert">{problem}</p>}
           <div className="rec-row">
             {phase === 'paused'
               ? <button type="button" className="c-btn c-btn--secondary" onClick={resume}><Play aria-hidden="true" />Resume</button>
               : <button type="button" className="c-btn c-btn--secondary" onClick={pause}><Pause aria-hidden="true" />Pause</button>}
-            <button type="button" className="c-btn c-btn--primary" onClick={() => finish(false)}><Square aria-hidden="true" />Stop</button>
+            <button type="button" className="c-btn c-btn--primary" onClick={finish}><Square aria-hidden="true" />Stop</button>
           </div>
         </div>
         {folders.length > 0 && (
@@ -276,7 +338,7 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
           </div>
         )}
         <section className="rec-transcript" aria-label="Live transcript" aria-live="polite">
-          {segments.length ? segments.map(segment => <p key={segment.seq} id={`rec-at-${segment.start_ms}`}>{segment.text}</p>) : <p className="rec-note">The transcript appears here a few seconds behind.</p>}
+          {shown.length ? shown.map(segment => <p key={segment.seq} id={`rec-at-${segment.start_ms}`}>{segment.text}</p>) : <p className="rec-note">The transcript appears here a few seconds behind.</p>}
           <span ref={transcriptEnd} />
         </section>
         {notes.length > 0 && (
@@ -286,7 +348,7 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
               {notes.map((note, index) => (
                 <li key={index} className={`rec-note-item is-${note.kind}`}>
                   <a href={`#rec-at-${note.at_ms}`} className="c-meta">{clock(note.at_ms)}</a>
-                  <span>{note.kind === 'exam' ? 'On the exam: ' : note.kind === 'definition' ? '' : ''}{note.text}</span>
+                  <span>{note.kind === 'exam' ? 'On the exam: ' : ''}{note.text}</span>
                 </li>
               ))}
             </ul>
@@ -305,6 +367,7 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
         <span>{phase === 'asking' ? 'Allow the microphone' : 'Record'}</span>
       </button>
       {typeof minutesLeft === 'number' && <p className="rec-note rec-center">{outOfMinutes ? 'No recording minutes left this month' : `${minutesLeft} min left`}</p>}
+      {usage && usage.ready === false && <p className="rec-error">Transcription isn't set up on this site yet.</p>}
       <div className="rec-row rec-center">
         <button type="button" className="c-btn c-btn--secondary" onClick={() => fileInput.current?.click()} disabled={outOfMinutes}><Upload aria-hidden="true" />Upload recording</button>
         <input ref={fileInput} type="file" accept={AUDIO_ACCEPT} hidden onChange={event => { uploadRecording(event.target.files?.[0]); event.target.value = ''; }} />
