@@ -19,7 +19,9 @@ export default function PdfPages({ url, title }) {
     (async () => {
       const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
       pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/legacy/build/pdf.worker.min.mjs', import.meta.url).toString();
-      doc = await pdfjs.getDocument({ url }).promise;
+      // pdf.js only draws pages here and never runs a PDF's scripts; eval is off as well, the
+      // switch font-based exploits (CVE-2024-4367) relied on.
+      doc = await pdfjs.getDocument({ url, isEvalSupported: false }).promise;
       if (cancelled) return;
       const first = await doc.getPage(1);
       const base = first.getViewport({ scale: 1 });

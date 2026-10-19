@@ -96,7 +96,7 @@ export default function LoginPage() {
     // Google can't carry school details, so the callback saves them after sign-in.
     if (isSignup && form) {
       if (!form.reportValidity()) return;
-      try { sessionStorage.setItem('pendingProfile', JSON.stringify(profileFromForm(new FormData(form)))); } catch {}
+      try { sessionStorage.setItem('pendingProfile', JSON.stringify(profileFromForm(new FormData(form)))); } catch { /* storage blocked: details can be added in Settings */ }
     }
     setBusy(true);
     const { error: oauthError } = await supabaseAuth().signInWithOAuth({

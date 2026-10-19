@@ -40,14 +40,14 @@ export default function Dashboard({ timerState, setTimerState }) {
     try {
       const saved = JSON.parse(localStorage.getItem('cordiaOpenClasses') || '[]');
       if (Array.isArray(saved)) setOpenClasses(new Set(saved));
-    } catch {}
+    } catch { /* no readable saved state: classes start closed */ }
   }, []);
 
   function toggleClass(folderId) {
     setOpenClasses(current => {
       const next = new Set(current);
       if (next.has(folderId)) next.delete(folderId); else next.add(folderId);
-      try { localStorage.setItem('cordiaOpenClasses', JSON.stringify([...next])); } catch {}
+      try { localStorage.setItem('cordiaOpenClasses', JSON.stringify([...next])); } catch { /* remembering is optional */ }
       return next;
     });
   }

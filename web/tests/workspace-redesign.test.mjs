@@ -61,7 +61,7 @@ test('create page shows manual and upload windows side by side with one Create b
 });
 
 test('SmartNotes library uses the shared workspace frame', async () => {
-  const smartNotes = await source('pages/smartnotes.js');
+  const smartNotes = await source('components/smartnotes/NotesIndex.js');
 
   assert.match(smartNotes, /<StudyWorkspaceFrame/);
 });

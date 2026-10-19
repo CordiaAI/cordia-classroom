@@ -3,7 +3,7 @@ export const REQUEST_TIMEOUT_MS = 15000;
 // AI generation routinely takes 20-60s. Aborting early charged students for guides they
 // never received, so these routes wait up to two minutes.
 export const AI_TIMEOUT_MS = 120000;
-const AI_ROUTES = /^\/(generate|practice|chat|extract-file-text|render-pptx|ingest|quiz\/|nclex\/|exam\/|learning\/study-aids|smart_notes\/)/;
+const AI_ROUTES = /^\/(generate|practice|chat|extract-file-text|render-pptx|ingest|quiz\/|nclex\/|learning\/study-aids|smart_notes\/)/;
 
 export const LIMIT_EVENT = 'cordia:limit';
 export const UPGRADE_EVENT = 'cordia:upgrade';
@@ -219,7 +219,7 @@ export async function authorizedFetch(path, options = {}) {
   let response = await request();
   if (response.status === 401 && await tryRefreshToken()) response = await request();
   if (response.status === 402) {
-    response.clone().json().then(data => announceLimit(response, data)).catch(() => {});
+    response.clone().json().then(data => announceLimit(response, data)).catch(() => { /* no readable limit details: the caller still gets the 402 */ });
   }
   return response;
 }
