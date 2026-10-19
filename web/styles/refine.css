@@ -106,3 +106,10 @@ strong, b { font-weight: 600; }
 .c-topbar, .c-tabbar { -webkit-text-stroke: 0.35px currentColor; }
 .c-nav a, .c-topbar .c-searchbtn, .c-topbar .c-new-btn { font-size: var(--fs-17) !important; }
 .c-tabbar a { font-size: var(--fs-15) !important; }
+
+/* The serif, a little more: reading text and tab names read like a book; buttons, labels, dates
+   and other small details stay in the sans for legibility. */
+.c-study, .reader-a, .reader-prose, .reader-notes { font: 400 var(--fs-17)/var(--lh-body) var(--font-display) !important; letter-spacing: 0; }
+.c-pill, .c-seg a, .c-seg button { font-family: var(--font-display) !important; font-size: var(--fs-17) !important; font-weight: 500 !important; letter-spacing: -0.005em; }
+.lecture-quote, .rec-transcript p, .lecture-line > span:last-child { font-family: var(--font-display) !important; font-style: italic; font-size: var(--fs-17) !important; font-weight: 400 !important; }
+.lecture-line > span:last-child { font-style: normal; }
