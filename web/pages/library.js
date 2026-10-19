@@ -3,7 +3,7 @@ import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../components/C
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowUpDown, ArrowUpRight, ChevronDown, FolderInput, FolderPlus, Layers, Pencil, Search, Star, Trash2, X,
+  ArrowUpDown, ArrowUpRight, ChevronDown, FolderInput, FolderPlus, Layers, Pencil, Plus, Search, Star, Trash2, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
@@ -14,6 +14,7 @@ import { useUndoDelete } from '../lib/undoDelete';
 import ProgressRing from '../components/ProgressRing';
 import Menu from '../components/Menu';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { openNewSheet } from '../lib/newSheet';
 
 const SORTS = [
   { key: 'recent', label: 'Newest' },
@@ -247,9 +248,14 @@ export default function LibraryPage() {
     <div className="c-page library">
       <header className="c-page-head">
         <h1 className="c-title">Library</h1>
-        <div className="c-seg" role="tablist" aria-label="Library">
-          <Link href="/library" role="tab" aria-selected={tab === 'guides'} className={tab === 'guides' ? 'is-active' : ''}>Guides</Link>
-          <Link href="/library?tab=cards" role="tab" aria-selected={tab === 'cards'} className={tab === 'cards' ? 'is-active' : ''}>Cards</Link>
+        <div className="c-row c-row--wrap lib-head-actions">
+          <div className="c-seg" role="tablist" aria-label="Library">
+            <Link href="/library" role="tab" aria-selected={tab === 'guides'} className={tab === 'guides' ? 'is-active' : ''}>Guides</Link>
+            <Link href="/library?tab=cards" role="tab" aria-selected={tab === 'cards'} className={tab === 'cards' ? 'is-active' : ''}>Cards</Link>
+          </div>
+          {tab === 'guides'
+            ? <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet()}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />New guide</button>
+            : <button type="button" className="c-btn c-btn--primary" onClick={() => router.push('/create')}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />Make cards</button>}
         </div>
       </header>
 
@@ -312,7 +318,7 @@ export default function LibraryPage() {
           {!cardSets ? (
             <SectionLoader height={180} label="Loading cards" />
           ) : !cardSets.length ? (
-            <div className="c-empty"><Layers size={32} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">No cards</span></div>
+            <div className="c-empty"><Layers size={32} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">No cards</span><button type="button" className="c-btn c-btn--secondary" onClick={() => router.push('/create')}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />Make cards</button></div>
           ) : cardSets.map(guide => {
             const due = dueCount(guide);
             return (
