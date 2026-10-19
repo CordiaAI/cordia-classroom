@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from auth_utils import get_user_id
 from database import get_supabase
+from ids import require_uuid
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 
@@ -161,11 +162,12 @@ def list_feedback(
 @router.get("/review/{feedback_id}")
 def get_feedback_item(feedback_id: str, authorization: str = Header(default="")):
     _require_reviewer(authorization)
+    require_uuid(feedback_id, "feedback ID")
     result = (
         get_supabase()
         .table("feedback")
         .select("id,user_id,message,category,status,page_path,app_version,guide_id,question_id,created_at")
-        .eq("id", feedback_id[:100])
+        .eq("id", feedback_id)
         .limit(1)
         .execute()
     )
@@ -181,11 +183,12 @@ def update_feedback_status(
     authorization: str = Header(default=""),
 ):
     reviewer_id = _require_reviewer(authorization)
+    require_uuid(feedback_id, "feedback ID")
     result = (
         get_supabase()
         .table("feedback")
         .update({"status": request.status, "reviewed_by": reviewer_id})
-        .eq("id", feedback_id[:100])
+        .eq("id", feedback_id)
         .execute()
     )
     if not result.data:

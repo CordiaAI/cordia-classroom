@@ -22,7 +22,7 @@ export default function NotesIndex({ timerState, setTimerState }) {
 
   useEffect(() => {
     // Each list loads on its own, so one failure still shows the others, plus the error.
-    Promise.allSettled([notesRequest('/smart_notes'), notesRequest('/folders'), notesRequest('/guides')])
+    Promise.allSettled([notesRequest('/smart_notes'), notesRequest('/folders'), notesRequest('/guides?fields=summary&limit=500')])
       .then(([notesResult, foldersResult, guidesResult]) => {
         setNotes(notesResult.value?.notes || []);
         setFolders(foldersResult.value?.folders || []);

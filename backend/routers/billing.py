@@ -22,6 +22,7 @@ import stripe
 from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from auth_utils import get_user_id
 from database import get_supabase
@@ -426,5 +427,6 @@ async def stripe_webhook(request: Request):
         event = _stripe().Webhook.construct_event(await request.body(), signature, secret)
     except (ValueError, stripe.SignatureVerificationError) as exc:
         raise HTTPException(status_code=400, detail="Invalid Stripe signature") from exc
-    process_stripe_event(event)
+    # Stripe and database calls block; a worker thread keeps them off the event loop.
+    await run_in_threadpool(process_stripe_event, event)
     return JSONResponse(content={"received": True})
