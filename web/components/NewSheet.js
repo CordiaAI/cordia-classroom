@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, ClipboardPaste, FileImage, FileText, Link as LinkIcon, Mic, Presentation, Sparkles, Upload, X,
+  ArrowLeft, Check, ClipboardPaste, FileImage, FileText, Link as LinkIcon, Mic, Presentation, Sparkles, Upload, X,
 } from 'lucide-react';
-import { apiFetch } from '../lib/api';
+import { apiFetch, authHeaders } from '../lib/api';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 import { dismissGuideJob, startGuideJob, useGuideJobs } from '../lib/guideJobs';
 import { MAX_SOURCE_CHARS, baseName, combinedSource, extractFileText, fileKey, generateAndSave, newRequestId } from '../lib/guideCreate';
@@ -12,8 +12,29 @@ import { NEW_SHEET_EVENT } from '../lib/newSheet';
 import { SAMPLE_GUIDE, SAMPLE_HEADINGS } from '../lib/sampleGuide';
 import { walkthroughEvent } from '../lib/walkthrough';
 import LectureRecorder from './LectureRecorder';
+import CordiaLoader from './CordiaLoader';
+import { heuristicTitle, sensibleTitle } from '../lib/noteMeta.mjs';
 
 const MAX_FILES = 5;
+// What the build card shows while a guide is written: the real stages, not fragments of the source.
+const BUILD_STEPS = ['Reading your material', 'Finding the key ideas', 'Writing questions and answers', 'Making flashcards'];
+const STEP_MS = 7000;
+
+// A short AI title for pasted text (10 s at most); otherwise its first sentence.
+async function titleFor(source) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch('/api/lectures/title', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ text: source.slice(0, 6000) }), signal: controller.signal });
+    const data = response.ok ? await response.json() : null;
+    return sensibleTitle(data?.title, source) || heuristicTitle(source);
+  } catch {
+    return heuristicTitle(source);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const AUDIO_FILE = /\.(mp3|m4a|wav|webm|ogg|aac)$/i;
 const ACCEPT = '.pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.rtf,.png,.jpg,.jpeg,.webp,.heic,image/*';
 
@@ -58,24 +79,6 @@ export function NewOptions({ onPick, onSample }) {
   );
 }
 
-// Section names the student will recognize, pulled from their own material, so the
-// wait shows their headings arriving instead of a spinner.
-export function sourceHeadings(text) {
-  const seen = new Set();
-  const lines = String(text || '').split('\n').map(line => line.replace(/^[#>*\-\d.)\s]+/, '').trim());
-  const headings = lines.filter(line => {
-    const words = line.split(/\s+/).length;
-    if (line.length < 3 || line.length > 70 || words > 9) return false;
-    if (/[.,;]$/.test(line) || !/^[A-Z0-9]/.test(line)) return false;
-    const keyName = line.toLowerCase();
-    if (seen.has(keyName)) return false;
-    seen.add(keyName);
-    return true;
-  });
-  if (headings.length >= 3) return headings.slice(0, 14);
-  return String(text || '').split(/(?<=[.!?])\s+/).map(sentence => sentence.split(/\s+/).slice(0, 6).join(' ')).filter(Boolean).slice(0, 8);
-}
-
 async function readLink(url) {
   const response = await fetch(url, { mode: 'cors' });
   if (!response.ok) throw new Error('unreadable');
@@ -108,8 +111,8 @@ export default function NewSheet() {
   const [folderId, setFolderId] = useState('');
   const [status, setStatus] = useState('idle'); // idle | reading | building
   const [error, setError] = useState('');
-  const [headings, setHeadings] = useState([]);
-  const [shown, setShown] = useState(0);
+  const [buildTitle, setBuildTitle] = useState('');
+  const [step, setStep] = useState(0);
   const [jobId, setJobId] = useState(null);
   const [recording, setRecording] = useState(false);
   const fileInput = useRef(null);
@@ -140,12 +143,12 @@ export default function NewSheet() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open, mode]);
 
-  // Headings appear one by one while the guide is written.
+  // The steps move on while the guide is written; the last one stays until it is saved.
   useEffect(() => {
-    if (status !== 'building' || !headings.length) return undefined;
-    const timer = setInterval(() => setShown(count => Math.min(headings.length, count + 1)), 900);
+    if (status !== 'building') return undefined;
+    const timer = setInterval(() => setStep(current => Math.min(BUILD_STEPS.length - 1, current + 1)), mode === 'sample' ? 1500 : STEP_MS);
     return () => clearInterval(timer);
-  }, [status, headings.length]);
+  }, [status, mode]);
 
   // Land on the new guide when it is ready, if the sheet is still open.
   useEffect(() => {
@@ -174,7 +177,7 @@ export default function NewSheet() {
   });
 
   function reset() {
-    setMode(''); setFiles([]); setText(''); setUrl(''); setStatus('idle'); setError(''); setHeadings([]); setShown(0); setJobId(null);
+    setMode(''); setFiles([]); setText(''); setUrl(''); setStatus('idle'); setError(''); setBuildTitle(''); setStep(0); setJobId(null);
   }
 
   function close() {
@@ -183,7 +186,7 @@ export default function NewSheet() {
     setOpen(false);
     // A guide still building keeps going in the background (top-right indicator).
     if (status !== 'building') reset();
-    else { setStatus('idle'); setJobId(null); setHeadings([]); setMode(''); }
+    else { setStatus('idle'); setJobId(null); setBuildTitle(''); setStep(0); setMode(''); }
     openerRef.current?.focus?.();
   }
 
@@ -231,8 +234,7 @@ export default function NewSheet() {
         sourceUrl = href;
       } else {
         source = text.trim();
-        const firstLine = source.split('\n').map(line => line.trim()).find(Boolean) || '';
-        title = firstLine.slice(0, 72) || 'Pasted notes';
+        title = (source.length >= 10 ? await titleFor(source) : '') || 'Pasted notes';
         sourceTitle = title;
       }
       startBuild({ source, title, sourceTitle, sourceType, sourceUrl, folderId });
@@ -242,13 +244,13 @@ export default function NewSheet() {
     }
   }
 
-  // Same live-build card for every source: headings play in while the guide is written.
+  // Same build card for every source: the guide's name and the steps as it is written.
   function startBuild({ source, title, sourceTitle, sourceType, sourceUrl = '', folderId: classId = '' }) {
     if (source.trim().length < 10) throw new Error('Not enough text to build a guide.');
     if (source.length > MAX_SOURCE_CHARS) throw new Error(`Too long: ${source.length.toLocaleString()} of ${MAX_SOURCE_CHARS.toLocaleString()} characters.`);
     const requestId = newRequestId();
-    setHeadings(sourceHeadings(source));
-    setShown(1);
+    setBuildTitle(title);
+    setStep(0);
     setStatus('building');
     const id = startGuideJob({
       title,
@@ -262,7 +264,7 @@ export default function NewSheet() {
   }
 
   function buildFromRecording({ title, transcript, folderId: classId }) {
-    const name = (title || '').trim() || `Recording ${new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+    const name = sensibleTitle(title, transcript) || `Lecture ${new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
     setRecording(false);
     setError('');
     if (classId) setFolderId(classId);
@@ -273,12 +275,12 @@ export default function NewSheet() {
     }
   }
 
-  // The sample needs no AI: its headings play in, then it is saved as a real guide.
+  // The sample needs no AI: the steps play through, then it is saved as a real guide.
   function trySample() {
     setError('');
     setMode('sample');
-    setHeadings(SAMPLE_HEADINGS);
-    setShown(1);
+    setBuildTitle(SAMPLE_GUIDE.title);
+    setStep(0);
     setStatus('building');
     walkthroughEvent('guide-building');
     const id = startGuideJob({
@@ -312,11 +314,20 @@ export default function NewSheet() {
         </header>
 
         {status === 'building' ? (
-          <ol className="new-headings" aria-live="polite" data-spot="new-headings">
-            {headings.slice(0, shown).map((heading, index) => (
-              <li key={heading + index} className={index === shown - 1 ? 'is-current' : ''}>{heading}</li>
-            ))}
-          </ol>
+          <div className="new-build" data-spot="new-headings">
+            {buildTitle && <p className="new-build-title">{buildTitle}</p>}
+            <ol className="new-steps" aria-live="polite">
+              {BUILD_STEPS.map((label, index) => (
+                <li key={label} className={index < step ? 'is-done' : index === step ? 'is-current' : ''} aria-current={index === step ? 'step' : undefined}>
+                  <span className="new-step-mark" aria-hidden="true">
+                    {index < step ? <Check size={20} strokeWidth={1.75} /> : index === step ? <CordiaLoader size={20} label="In progress" /> : <span className="new-step-dot" />}
+                  </span>
+                  <span>{label}</span>
+                </li>
+              ))}
+            </ol>
+            <p className="c-meta">You can close this. It keeps building and shows at the top right.</p>
+          </div>
         ) : !mode ? (
           <NewOptions onPick={setMode} onSample={trySample} />
         ) : (
@@ -399,9 +410,15 @@ export default function NewSheet() {
         .new-class { max-width: 280px; }
         .new-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 20px; }
         .new-error { margin: 16px 0 0; color: var(--error); font:600 15px/1.5 var(--font-sans); }
-        .new-headings { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; min-height: 160px; }
-        .new-headings li { padding: 10px 14px; border-radius:var(--r-input); font:600 20px/1.15 var(--font-display); color: var(--ink); animation: c-rise 300ms var(--ease) both; }
-        .new-headings li.is-current { background: var(--olive-tint); }
+        .new-build { display: grid; gap: 16px; }
+        .new-build-title { margin: 0; font: 600 var(--fs-20)/var(--lh-title) var(--font-display); letter-spacing: var(--track-title); color: var(--ink); text-wrap: balance; }
+        .new-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+        .new-steps li { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: var(--r-input); font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--muted); transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
+        .new-steps li.is-current { background: var(--olive-tint); color: var(--ink); font-weight: 600; }
+        .new-steps li.is-done { color: var(--ink); }
+        .new-step-mark { display: inline-grid; place-items: center; width: 20px; height: 20px; flex: 0 0 20px; }
+        .new-steps li.is-done .new-step-mark :global(.lucide) { color: var(--olive-ink); }
+        .new-step-dot { width: 8px; height: 8px; border-radius: var(--r-pill); background: var(--hairline); box-shadow: inset 0 0 0 1px var(--muted); opacity: .6; }
       `}</style>
     </div>
     </BodyPortal>

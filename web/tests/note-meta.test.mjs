@@ -3,6 +3,7 @@
 // grows, short notes skipped, and only the student's own notes.
 import assert from 'node:assert/strict';
 import { createNoteMetaService, heuristicTitle, htmlToText, isDefaultTitle, needsCover } from '../lib/server/noteMeta.mjs';
+import { sensibleTitle } from '../lib/noteMeta.mjs';
 import { resetRateState } from '../lib/server/napkinVisual.mjs';
 
 const USER = '11111111-2222-4333-8444-555555555555';
@@ -43,6 +44,11 @@ assert.equal(htmlToText('<p>A &amp; B</p><p>C</p>'), 'A & B\nC');
 assert.equal(heuristicTitle('the earth is round. It spins.'), 'The earth is round');
 assert.ok(isDefaultTitle('Untitled Notes') && isDefaultTitle('') && !isDefaultTitle('Biology week 3'));
 assert.ok(needsCover(null, 200) && !needsCover(null, 50) && !needsCover({ url: 'x', content_length: 200 }, 250) && needsCover({ url: 'x', content_length: 200 }, 300));
+const transcript = "particular job. I. Alright, so basically what they're gonna ask is about your experience.";
+assert.equal(sensibleTitle('particular job. I. Alright', transcript), '', 'the opening words are not a title');
+assert.equal(sensibleTitle('Answering Job Interview Questions', transcript), 'Answering Job Interview Questions');
+assert.equal(sensibleTitle('"Cell Energy and ATP."', 'The mitochondria...'), 'Cell Energy and ATP');
+assert.equal(sensibleTitle('one two three four five six seven eight nine ten eleven', ''), '');
 console.log('ok   helpers');
 
 {

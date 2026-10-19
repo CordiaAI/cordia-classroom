@@ -32,3 +32,15 @@ export function needsCover(cover, textLength) {
   if (textLength < MIN_CHARS) return false;
   return !cover?.url || textLength >= (cover.content_length || 0) * REGROW;
 }
+
+// An AI title is used only if it reads like a title: a few words, and not just the opening of
+// the material itself (a transcript's first words are not a name).
+export function sensibleTitle(candidate, source) {
+  const title = String(candidate || '').trim().replace(/^["'“”]+|["'“”.]+$/g, '');
+  if (!title || title.length > 80) return '';
+  const words = title.split(/\s+/);
+  if (words.length > 10) return '';
+  const start = String(source || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, title.length + 5);
+  if (words.length > 2 && start.startsWith(title.toLowerCase())) return '';
+  return title;
+}
