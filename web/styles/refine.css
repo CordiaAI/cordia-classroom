@@ -100,3 +100,7 @@ strong, b { font-weight: 600; }
 
 /* Navigation in Times New Roman: the top bar (links, Search, New, avatar) and the phone tab bar. */
 .c-topbar, .c-topbar *, .c-tabbar, .c-tabbar * { font-family: var(--font-nav) !important; }
+/* Regular weight, larger, and set a touch tighter so the serif reads slim. */
+.c-topbar, .c-topbar *, .c-tabbar, .c-tabbar * { font-weight: 400 !important; letter-spacing: -0.01em; }
+.c-nav a, .c-topbar .c-searchbtn, .c-topbar .c-new-btn { font-size: var(--fs-17) !important; }
+.c-tabbar a { font-size: var(--fs-15) !important; }
