@@ -97,3 +97,6 @@ strong, b { font-weight: 600; }
 /* Card padding: 20px (rows 16px 20px; the reading page keeps its 40px page margins). */
 .grove-card, .plan-card, .pricing-card, .focus-card, .insights-card, .learn, .me-card, .recap, .grove-grid, .heat { padding: 20px !important; }
 .today-continue { padding: 16px 20px !important; border-radius: var(--r-row) !important; }
+
+/* Navigation in Times New Roman: the top bar (links, Search, New, avatar) and the phone tab bar. */
+.c-topbar, .c-topbar *, .c-tabbar, .c-tabbar * { font-family: var(--font-nav) !important; }

@@ -15,6 +15,7 @@
   /* Type */
   --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: 'Newsreader', Georgia, serif;
+  --font-nav: 'Times New Roman', Times, serif; /* top bar and phone tab bar */
   --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
   --fs-13: 13px; --fs-15: 15px; --fs-17: 17px; --fs-20: 20px; --fs-28: 28px; --fs-40: 40px;
   --lh-title: 1.15; --lh-body: 1.5;
