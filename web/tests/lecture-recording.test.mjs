@@ -32,7 +32,7 @@ assert.match(uploads, /\/api\/lectures\/chunk/, 'chunks go to the web server rou
 assert.match(uploads, /drained\(\{ timeoutMs/, 'Stop waits for uploads with a time limit, never forever');
 
 const ui = read('components/LectureRecorder.js');
-for (const text of ['I have permission to record this lecture', 'Upload recording', 'Keep audio', 'min left', 'beforeunload']) {
+for (const text of ['I have permission to record this lecture', 'Upload recording', 'min left', 'beforeunload']) {
   assert.ok(ui.includes(text), `LectureRecorder is missing "${text}"`);
 }
 

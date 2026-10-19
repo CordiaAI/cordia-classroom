@@ -59,7 +59,6 @@ async function postJson(path, body, timeoutMs) {
 export default function LectureRecorder({ folders = [], folderId, onFolder, onDone, onActiveChange }) {
   const [phase, setPhase] = useState('start'); // start | consent | asking | denied | recording | paused | finishing | stuck | unsupported
   const [consentChecked, setConsentChecked] = useState(false);
-  const [keepAudio, setKeepAudio] = useState(false);
   const [usage, setUsage] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const [level, setLevel] = useState(0);
@@ -167,7 +166,7 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
   function makeUploader(recordingId) {
     return new ChunkUploader({
       recordingId,
-      keepAudio,
+      keepAudio: false, // transcript only: audio is never kept
       getPrompt: promptFor,
       onText: ({ seq, startMs, text }) => {
         if (!text) return;
@@ -443,10 +442,6 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
         <button type="button" className="c-btn c-btn--secondary" onClick={() => fileInput.current?.click()} disabled={outOfMinutes || usage?.ready === false}><Upload aria-hidden="true" />Upload recording</button>
         <input ref={fileInput} type="file" accept={AUDIO_ACCEPT} hidden onChange={event => { uploadRecording(event.target.files?.[0]); event.target.value = ''; }} />
       </div>
-      <label className="rec-check rec-center">
-        <input type="checkbox" checked={keepAudio} onChange={event => setKeepAudio(event.target.checked)} />
-        <span>Keep audio</span>
-      </label>
       {error && <p className="rec-error" role="alert">{error}</p>}
       <RecorderStyle />
     </div>
