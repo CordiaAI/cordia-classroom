@@ -48,7 +48,7 @@ export function createGuideNotesService({ env = process.env, fetch: fetchImpl = 
 
   async function make(authorization, guideId) {
     if (!authorization || !/^[0-9a-f-]{36}$/i.test(guideId || '')) return { status: 400, body: { detail: 'Invalid guide.' } };
-    const response = await fetchImpl(`${apiBase}/guides/${guideId}`, { headers: { Authorization: authorization } }).catch(() => null);
+    const response = await fetchImpl(`${apiBase}/guides/${encodeURIComponent(guideId)}`, { headers: { Authorization: authorization } }).catch(() => null);
     if (!response?.ok) return { status: response?.status === 401 ? 401 : 404, body: { detail: 'Guide not found.' } };
     const guide = (await response.json())?.guide;
     if (!guide) return { status: 404, body: { detail: 'Guide not found.' } };
@@ -75,7 +75,7 @@ export function createGuideNotesService({ env = process.env, fetch: fetchImpl = 
     }
     const notes = outlineText(written && Array.isArray(written.sections) ? { ...written, sections: written.sections.slice(0, 12) } : null);
     if (!notes) return { status: 200, body: { notes: guide.notes || '', reason: 'failed' } };
-    await fetchImpl(`${apiBase}/guides/${guideId}`, {
+    await fetchImpl(`${apiBase}/guides/${encodeURIComponent(guideId)}`, {
       method: 'PATCH', headers: { Authorization: authorization, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: guide.title, notes }),
     }).catch(() => null);
     return { status: 200, body: { notes } };

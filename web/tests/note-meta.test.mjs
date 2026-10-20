@@ -107,4 +107,5 @@ console.log('ok   helpers');
   assert.equal(needsCover({ url: 'x', content_length: 40 }, 200), true);
   console.log('ok   one-sentence notes get a title and a cover');
 }
+assert.equal(htmlToText('<p>Use &amp;lt;b&amp;gt; for bold</p>'), 'Use &lt;b&gt; for bold', '&amp; is unescaped last');
 console.log('note titles and covers ok');

@@ -54,7 +54,9 @@ export default function RecapCard({ guides, folders, since, cardsStudied = 0 }) 
         for (const name of TOKENS) inner = inner.split(`var(${name})`).join(cssVar(name));
         const x = 90 + (index % 4) * 230;
         const y = 560 + Math.floor(index / 4) * 210;
-        return `<svg x="${x}" y="${y}" width="200" height="200" viewBox="0 0 100 100">${inner.replace(/<style[\s\S]*?<\/style>/g, '')}</svg>`;
+        let previous;
+        do { previous = inner; inner = inner.replace(/<style\b[\s\S]*?<\/style[^>]*>/gi, ''); } while (inner !== previous);
+        return `<svg x="${x}" y="${y}" width="200" height="200" viewBox="0 0 100 100">${inner}</svg>`;
       }).join('');
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
         <rect width="100%" height="100%" fill="${cssVar('--canvas')}"/>

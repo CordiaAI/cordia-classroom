@@ -30,13 +30,22 @@ export function altText(text) {
   return `Diagram: ${first.length > 120 ? first.slice(0, 117).trimEnd() + '…' : first}`;
 }
 
-// Generated SVGs are shown through <img>, where scripts never run; strip them anyway.
+// Generated SVGs are shown through <img>, where scripts never run; strip them anyway, repeating
+// until nothing changes (so a removal can't join pieces into a new tag). Anything still able to
+// run after that means the file is not used at all: returns ''.
+const RISKY_SVG = /<script|<foreignObject|\son[a-z]+\s*=|javascript:/i;
 export function cleanSvg(svg) {
-  return String(svg)
-    .replace(/<script[\s\S]*?<\/script\s*>/gi, '')
-    .replace(/<foreignObject[\s\S]*?<\/foreignObject\s*>/gi, '')
-    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/(href\s*=\s*["'])\s*javascript:[^"']*/gi, '$1#');
+  let out = String(svg);
+  let previous;
+  do {
+    previous = out;
+    out = out
+      .replace(/<script\b[\s\S]*?<\/script[^>]*>/gi, '')
+      .replace(/<foreignObject\b[\s\S]*?<\/foreignObject[^>]*>/gi, '')
+      .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+      .replace(/(href\s*=\s*["'])\s*javascript:[^"']*/gi, '$1#');
+  } while (out !== previous);
+  return RISKY_SVG.test(out) ? '' : out;
 }
 
 export function currentMonth(now = new Date()) {
@@ -194,7 +203,9 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
       try {
         const response = await fetchImpl(file.url, { headers: { Authorization: `Bearer ${napkinKey}` } });
         if (!response.ok) continue;
-        const url = await store(key, index, cleanSvg(await response.text()));
+        const clean = cleanSvg(await response.text());
+        if (!clean) continue;
+        const url = await store(key, index, clean);
         visuals.push({ url, width: file.width || null, height: file.height || null });
       } catch { /* skip this variation */ }
     }

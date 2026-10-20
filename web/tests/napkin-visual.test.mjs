@@ -158,5 +158,8 @@ resetRateState();
 }
 
 assert.equal(cleanSvg('<svg><script>x</script><g onload="y()"><a href="javascript:z()">a</a></g></svg>'), '<svg><g><a href="#">a</a></g></svg>');
+assert.equal(cleanSvg('<svg><scr<script>x</script>ipt>alert(1)</script></svg>'), '<svg></svg>', 'removals cannot join into a new tag');
+assert.equal(cleanSvg('<svg><script>never closed</svg>'), '', 'an SVG that could still run is not used');
+assert.equal(cleanSvg('<svg><script>x</script\t\n bar><g/></svg>'), '<svg><g/></svg>');
 assert.equal(altText('## What is osmosis?\nWater moves'), 'Diagram: What is osmosis?');
 console.log('napkin visual service ok');

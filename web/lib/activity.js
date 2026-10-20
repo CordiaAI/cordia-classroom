@@ -24,12 +24,14 @@ export function recordStudy({ guideId, guideTitle, minutes = 0, cards = 0, right
   day.c += cards;
   day.r += right;
   day.t += total;
-  if (guideId) {
-    const entry = day.g[groveKey(guideId)] || { n: guideTitle || '', m: 0, k: [] };
+  // The key comes from the URL; never let it name an Object built-in.
+  const groveId = guideId ? groveKey(guideId) : '';
+  if (groveId && !['__proto__', 'constructor', 'prototype'].includes(groveId)) {
+    const entry = (Object.hasOwn(day.g, groveId) && day.g[groveId]) || { n: guideTitle || '', m: 0, k: [] };
     entry.m = Math.round((entry.m + minutes) * 10) / 10;
     if (guideTitle) entry.n = guideTitle;
     if (kind && !entry.k.includes(kind)) entry.k.push(kind);
-    day.g[groveKey(guideId)] = entry;
+    day.g[groveId] = entry;
   }
   log[today] = day;
   const cutoff = dayKey(Date.now() - KEEP_DAYS * 86400000);
