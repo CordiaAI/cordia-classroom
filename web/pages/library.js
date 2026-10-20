@@ -40,6 +40,8 @@ export default function LibraryPage() {
   const [addingLecture, setAddingLecture] = useState(false);
   const [classesReady, setClassesReady] = useState(false);
   useEffect(() => { if (ready) canvasStatus().then(data => setClassesReady(Boolean(data))); }, [ready]);
+  // On narrow phones the tab bar scrolls; keep the open tab in view.
+  useEffect(() => { document.querySelector('.lib-head-actions .c-seg .is-active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [tab, classesReady]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [folders, setFolders] = useState([]);
@@ -358,6 +360,12 @@ export default function LibraryPage() {
       {confirm && <ConfirmDialog title={confirm.title} confirmLabel="Delete" onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
 
       <style jsx global>{`
+        /* Four tabs plus actions: on narrow phones the tabs scroll inside their bar, never the page. */
+        .library > *, .library .c-page-head, .lib-head-actions { min-width: 0; max-width: 100%; }
+        .lib-head-actions .c-seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+        .lib-head-actions .c-seg::-webkit-scrollbar { display: none; }
+        .lib-head-actions .c-seg a { flex: 0 0 auto; }
+        @media (max-width: 420px) { .lib-head-actions .c-seg a { padding: 0 12px; font-size: var(--fs-15) !important; } }
         .library .lib-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
         .library .lib-tools { display: flex; align-items: center; gap: 8px; }
         .library .lib-new-class { display: flex; gap: 8px; align-items: center; max-width: 480px; }

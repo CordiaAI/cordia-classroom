@@ -130,11 +130,11 @@ export default function CanvasConnectSheet({ school = '', initialDomain = '', on
                 <h3 className="c-step-title"><ClipboardPaste {...ICON} />Paste here</h3>
                 <div className="c-step-body">
                   <label className="c-field">
-                    <span className="c-section-title ccs-label">Canvas URL</span>
+                    <span>Canvas URL</span>
                     <input ref={urlRef} className="c-input" value={url} onChange={event => setUrl(event.target.value)} placeholder="school.instructure.com" inputMode="url" autoComplete="off" spellCheck="false" />
                   </label>
                   <label className="c-field">
-                    <span className="c-section-title ccs-label">Token</span>
+                    <span>Token</span>
                     <input className="c-input" type="password" value={token} onChange={event => setToken(event.target.value)} autoComplete="off" spellCheck="false" />
                   </label>
                 </div>
@@ -156,7 +156,6 @@ export default function CanvasConnectSheet({ school = '', initialDomain = '', on
           .ccs-title { margin: 0; font: 500 28px/1.1 var(--font-display); }
           .ccs-form { display: grid; gap: 16px; }
           .ccs-step-btn { justify-self: start; }
-          .ccs-label { font-size: 13px; }
           .ccs-value { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 4px 0 14px; border-radius: 12px; background: var(--field); border: 1px solid var(--line); }
           .ccs-value .c-meta { min-width: 64px; }
           .ccs-date { flex: 1; min-width: 0; height: 40px; border: 0; background: transparent; color: var(--ink); font: 600 15px/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }

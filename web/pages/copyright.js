@@ -51,15 +51,15 @@ export default function Copyright() {
       <style jsx global>{`
         .cr { width: min(560px, 100%); margin: 0 auto; display: grid; gap: 24px; }
         .cr-title { margin: 0; font: 500 40px/1.08 'Newsreader', Georgia, serif; letter-spacing: -0.02em; }
-        .cr-card { display: grid; gap: 16px; padding: 28px; border-radius: 28px; background: rgba(255, 255, 252, .78); border: 1px solid rgba(255, 255, 255, .6); box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 16px 40px rgba(0,0,0,.18); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); }
+        .cr-card { display: grid; gap: 16px; padding: 28px; border-radius: 28px; background: var(--surface-card); border: 1px solid var(--hairline); box-shadow: var(--shadow-float); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); }
         .cr-form { display: grid; gap: 16px; }
         .cr-field { display: grid; gap: 6px; font: 600 13px/1 var(--font-sans); }
         .cr-field textarea { min-height: 96px; padding-top: 12px; resize: vertical; }
         .cr-check { display: flex; gap: 10px; align-items: flex-start; font: 500 15px/1.45 var(--font-sans); cursor: pointer; }
-        .cr-check input { margin-top: 3px; width: 20px; height: 20px; flex: 0 0 auto; accent-color: #536149; }
+        .cr-check input { margin-top: 3px; width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--olive); }
         .cr-line { margin: 0; font: 600 17px/1.4 var(--font-sans); }
-        .cr-error { margin: 0; color: #B42318; font: 600 15px/1.4 var(--font-sans); }
-        .cr-contact { justify-self: start; color: #171B18; font: 600 15px/1 var(--font-sans); }
+        .cr-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+        .cr-contact { justify-self: start; color: var(--ink); font: 600 15px/1 var(--font-sans); }
       `}</style>
     </PublicPage>
   );

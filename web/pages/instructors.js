@@ -110,14 +110,14 @@ export default function Instructors() {
       <style jsx global>{`
         .ins { width: min(520px, 100%); margin: 0 auto; display: grid; gap: 24px; }
         .ins-title { margin: 0; font: 500 40px/1.08 'Newsreader', Georgia, serif; letter-spacing: -0.02em; }
-        .ins-card { display: grid; gap: 16px; padding: 28px; border-radius: 28px; background: rgba(255, 255, 252, .78); border: 1px solid rgba(255, 255, 255, .6); box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 16px 40px rgba(0,0,0,.18); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); }
+        .ins-card { display: grid; gap: 16px; padding: 28px; border-radius: 28px; background: var(--surface-card); border: 1px solid var(--hairline); box-shadow: var(--shadow-float); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); }
         .ins-form { display: grid; gap: 16px; }
         .ins-field { position: relative; display: grid; gap: 6px; font: 600 13px/1 var(--font-sans); }
         .ins-line { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 17px/1.4 var(--font-sans); }
-        .ins-error { margin: 0; color: #B42318; font: 600 15px/1.4 var(--font-sans); }
-        .ins-suggest { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin: 4px 0 0; padding: 4px; list-style: none; border-radius: 16px; background: #fff; box-shadow: 0 16px 40px rgba(0,0,0,.18); }
-        .ins-suggest button { width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none; font: 500 15px/1.3 var(--font-sans); text-align: left; cursor: pointer; color: #171B18; }
-        .ins-suggest button:hover { background: rgba(23,27,24,.06); }
+        .ins-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+        .ins-suggest { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin: 4px 0 0; padding: 4px; list-style: none; border-radius: 16px; background: var(--surface-raised); box-shadow: var(--shadow-float); }
+        .ins-suggest button { width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none; font: 500 15px/1.3 var(--font-sans); text-align: left; cursor: pointer; color: var(--ink); }
+        .ins-suggest button:hover { background: var(--olive-tint); }
       `}</style>
     </PublicPage>
   );
