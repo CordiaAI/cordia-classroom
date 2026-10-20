@@ -515,7 +515,7 @@ export default function PracticeWorkspace() {
         ) : guideOptions.length ? (
           <div className="practice-grid practice-guide-picker" data-spot="practice-picker">
             {guideOptions.map(option => (
-              <Link key={option.id} href={'/practice/' + option.id} className="c-card practice-guide">
+              <Link key={option.id} href={'/practice/' + option.id} className="c-card practice-guide" onClick={() => walkthroughEvent('practice-guide')}>
                 <PencilRuler size={24} strokeWidth={1.75} aria-hidden="true" />
                 <span>{option.title || 'Untitled guide'}</span>
               </Link>

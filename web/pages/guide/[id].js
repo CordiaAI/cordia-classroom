@@ -156,10 +156,10 @@ export default function GuidePage() {
       .finally(() => setNotesState('done'));
   }, [guide?.id]);
 
-  // The guided walkthrough points at the questions (Explain, highlighting): show them for those steps.
+  // A "Show me" that points at the questions (Explain, highlighting) opens By page.
   useEffect(() => {
     const step = activeStep();
-    if (step && ['explain', 'highlight'].includes(step.id)) setView('pages');
+    if (step && ['[data-spot="explain"]', '[data-spot="reader-text"]'].includes(step.target)) setView('pages');
   }, [guide?.id]);
 
   // By page: the first time, a tip points out the highlight menu (Explain, Make card, Ask).

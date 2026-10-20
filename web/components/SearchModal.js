@@ -84,7 +84,7 @@ export default function SearchModal({ onClose }) {
           <label className="c-search">
             <Search size={20} strokeWidth={1.75} aria-hidden="true" />
             <span className="sr-only">Search</span>
-            <input ref={inputRef} className="c-input" type="search" placeholder="Search" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={onKeyDown} aria-controls="c-search-results" />
+            <input ref={inputRef} className="c-input" type="search" placeholder={typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || '') ? 'Search guides, cards and notes  ⌘K' : 'Search guides, cards and notes  Ctrl K'} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={onKeyDown} aria-controls="c-search-results" />
           </label>
           <button type="button" className="c-icon-btn" onClick={onClose} aria-label="Close search"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         </div>

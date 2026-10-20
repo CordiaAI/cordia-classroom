@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Check, ChevronDown, Keyboard, NotebookPen, Sparkles, Trash2 } from 'lucide-react';
 import Menu from '../Menu';
+import { requestTip } from '../../lib/tips';
 import TypingShortcuts from './TypingShortcuts';
 import CordiaLoader from '../CordiaLoader';
 import MermaidDiagram from '../MermaidDiagram';
@@ -59,6 +60,8 @@ export default function SmartNotesEditor() {
   const [diagramLoading, setDiagramLoading] = useState(false);
   const [visualizeMode, setVisualizeMode] = useState(false);
   const [showTyping, setShowTyping] = useState(false);
+  // First note: a one-time tip points at the typing shortcuts.
+  useEffect(() => { requestTip('typing'); }, []);
   const [visualSource, setVisualSource] = useState(null); // { text, context, key }
   const visualAnchor = useRef(null);
 
@@ -522,14 +525,14 @@ export default function SmartNotesEditor() {
               </div>
             )}
           </div>
-          <Menu
-            label="More for this note"
-            items={[
-              { label: 'Typing shortcuts', icon: Keyboard, onSelect: () => setShowTyping(true) },
+          <button type="button" className="c-btn c-btn--quiet" data-tip="typing" onClick={() => setShowTyping(true)}><Keyboard size={20} strokeWidth={1.75} aria-hidden="true" />Typing shortcuts</button>
+          {noteId && noteId !== 'new' && (
+            <Menu
+              label="More for this note"
               // Library deletes it with the same 6-second Undo guides use.
-              ...(noteId && noteId !== 'new' ? [{ label: 'Delete note', icon: Trash2, danger: true, onSelect: () => router.push('/library?filter=notes&delete=' + encodeURIComponent(noteId)) }] : []),
-            ]}
-          />
+              items={[{ label: 'Delete note', icon: Trash2, danger: true, onSelect: () => router.push('/library?filter=notes&delete=' + encodeURIComponent(noteId)) }]}
+            />
+          )}
         </div>
       </div>
 

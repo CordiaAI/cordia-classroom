@@ -20,8 +20,7 @@ export default function HelpSheet({ onClose, onFeedback, onShortcuts, canReviewF
   async function replayDayOne() {
     onClose();
     if (router.pathname !== '/dashboard') await router.push('/dashboard');
-    // Replays skip "About you"; school details are already saved.
-    setWalkthrough({ id: 'day1', step: 1, sub: 0, status: 'active' });
+    setWalkthrough({ id: 'day1', step: 0, sub: 0, status: 'active' });
   }
 
   return (

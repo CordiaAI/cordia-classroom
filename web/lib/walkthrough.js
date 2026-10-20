@@ -9,44 +9,28 @@ const onQuiz = path => path === '/quiz/[guideId]';
 const onCards = path => path === '/flashcards/study';
 const onToday = path => path === '/dashboard';
 
-// Day one: 9 steps (dots), some with a few sub-steps.
+// First run: four screens, from sign-up to a first answered question. Everything else is
+// taught by one-time tips where it is used (lib/tips.js) and "Show me" in Learn Cordia.
 export const DAY_ONE = [
-  [{ id: 'about', screen: 'about', where: onToday, on: 'about-done' }],
   [
-    { id: 'new', target: '[data-spot="new"]', label: 'Tap New', on: 'new-opened' },
-    { id: 'new-pick', target: '[data-spot="new-options"]', label: 'Pick one', on: 'guide-building' },
+    { id: 'new', target: '[data-spot="new"]', label: 'What are you studying?', on: 'new-opened' },
+    { id: 'new-pick', target: '[data-spot="new-options"]', label: 'Upload, paste, a link, or a sample', on: 'guide-building' },
   ],
-  [{ id: 'build', target: '[data-spot="new-headings"]', label: 'Building', on: 'guide-ready', passive: true }],
+  // While the guide builds, the profile questions fill the wait (Walkthrough shows them).
   [
-    { id: 'explain', target: '[data-spot="explain"]', label: 'Tap Explain', where: onGuide, on: 'explain' },
-    { id: 'explain-close', target: '[data-spot="tutor-close"]', label: 'Close Tutor', on: 'tutor-closed', optionalTarget: true },
-  ],
-  [
-    { id: 'highlight', target: '[data-spot="reader-text"]', label: 'Highlight any text', where: onGuide, on: 'selection' },
-    { id: 'make-card', target: '[data-spot="make-card"]', label: 'Tap Make card', on: 'make-card-open' },
-    { id: 'card-save', target: '[data-spot="card-save"]', label: 'Save card', on: 'card-made' },
+    { id: 'about', screen: 'about', on: 'about-done' },
+    // Moves on when the guide is built (Walkthrough watches the build), opening it.
+    { id: 'build', target: '[data-spot="new-headings"]', label: 'Building your guide', passive: true },
   ],
   [
-    { id: 'quiz', target: '[data-spot="quiz-pill"]', label: 'Tap Quiz', where: onGuide, on: 'quiz-opened' },
+    { id: 'quiz', target: '[data-spot="quiz-pill"]', label: 'Try 3 questions', where: onGuide, on: 'quiz-opened' },
     { id: 'quiz-start', target: '[data-spot="quiz-start"]', label: '3 questions', where: onQuiz, on: 'quiz-started' },
     { id: 'quiz-answer', where: onQuiz, on: 'quiz-done', passive: true },
   ],
-  [
-    { id: 'ask', target: '[data-spot="ask-why"]', label: 'Tap Ask', where: onQuiz, on: 'ask' },
-    { id: 'ask-close', target: '[data-spot="tutor-close"]', label: 'Close Tutor', on: 'tutor-closed', optionalTarget: true },
-  ],
-  [
-    { id: 'quiz-back', target: '[data-spot="quiz-done"]', label: 'Back to guide', where: onQuiz, on: 'guide-open' },
-    { id: 'cards', target: '[data-spot="cards-pill"]', label: 'Tap Cards', where: onGuide, on: 'cards-opened' },
-    { id: 'flip', target: '[data-spot="flashcard"]', label: 'flip', where: onCards, on: 'card-flipped' },
-  ],
-  [
-    { id: 'today', target: '[data-spot="nav-today"]', label: 'Go to Today', on: 'today-opened' },
-    { id: 'canvas', target: '[data-spot="canvas-connect"]', label: 'Connect Canvas', where: onToday, on: 'canvas-opened', finishable: true, optionalTarget: true },
-  ],
+  [{ id: 'first-review', screen: 'first-review', on: 'first-run-done' }],
 ];
 
-// Short walkthroughs for each feature, started from a dot, Learn Cordia or Help.
+// Short walkthroughs for each feature, started from Learn Cordia (Today's first week, and Help).
 export const MINI = {
   add: { label: 'Add material', route: '/dashboard', steps: [
     { target: '[data-spot="new"]', label: 'Tap New', on: 'new-opened' },
@@ -65,43 +49,41 @@ export const MINI = {
     { target: '[data-spot="quiz-start"]', label: 'Tap Start', where: onQuiz, on: 'quiz-started' },
   ] },
   ask: { label: 'Tutor', route: 'guide', steps: [
-    { target: '[data-spot="ask-pill"]', label: 'Tap Ask', where: onGuide, on: 'ask' },
+    { target: '[data-spot="ask-pill"]', label: 'Ask the Tutor', where: onGuide, on: 'ask' },
   ] },
-  cards: { label: 'Cards', route: 'guide', steps: [
-    { target: '[data-spot="cards-pill"]', label: 'Tap Cards', where: onGuide, on: 'cards-opened' },
+  cards: { label: 'Flashcards', route: 'guide', steps: [
+    { target: '[data-spot="cards-pill"]', label: 'Tap Flashcards', where: onGuide, on: 'cards-opened' },
     { target: '[data-spot="flashcard"]', label: 'flip', where: onCards, on: 'card-flipped' },
   ] },
-  practice: { label: 'Practice', route: '/dashboard', steps: [
-    { target: '[data-spot="tool-practice"]', label: 'Tap Practice', where: onToday, on: 'practice-opened' },
+  practice: { label: 'Practice', route: '/practice', steps: [
     { target: '[data-spot="practice-picker"]', label: 'Pick a guide', where: path => path === '/practice', on: 'practice-guide' },
     { target: '[data-spot="practice-canvas"]', label: 'Show your work', where: path => path === '/practice/[guideId]', on: 'practice-drew' },
   ] },
-  calendar: { label: 'Calendar', route: '/dashboard', steps: [
-    { target: '[data-spot="nav-calendar"]', label: 'Open Calendar', on: 'calendar-opened' },
-    { target: '[data-spot="calendar-feed"]', label: 'Paste link', where: path => path === '/calendar', on: 'calendar-connected' },
+  canvas: { label: 'Canvas', route: '/calendar', steps: [
+    { target: '[data-spot="calendar-feed"]', label: 'Connect Canvas', where: path => path === '/calendar', on: 'calendar-connected', finishable: true },
+  ] },
+  calendar: { label: 'Calendar', route: '/calendar', steps: [
+    { target: '[data-spot="calendar-feed"]', label: 'Connect Canvas', where: path => path === '/calendar', on: 'calendar-connected', finishable: true },
   ] },
   focus: { label: 'Focus', route: '/dashboard', steps: [
-    { target: '[data-spot="focus-start"]', label: 'Start focus', where: onToday, on: 'focus-started' },
+    { target: '[data-spot="focus-btn"]', label: 'Open the timer', on: 'focus-opened' },
+    { target: '[data-spot="focus-start"]', label: 'Start focus', on: 'focus-started' },
   ] },
-  notes: { label: 'Notes', route: '/dashboard', steps: [
-    { target: '[data-spot="nav-notes"]', label: 'Open Notes', on: 'notes-opened' },
-    { target: '[data-spot="note-new"]', label: 'New note', where: path => path === '/smartnotes', on: 'note-created' },
+  notes: { label: 'Notes', route: '/library?filter=notes', steps: [
+    { target: '[data-spot="note-new"]', label: 'New note', where: path => path === '/library', on: 'note-created' },
   ] },
   insights: { label: 'Insights', route: '/dashboard', steps: [
-    { target: '[data-spot="insights"]', label: 'Your weak spots', where: onToday, on: 'insights-opened' },
+    { target: '[data-spot="insights"]', label: 'Your progress and weak spots', where: onToday, on: 'insights-opened' },
   ] },
-  canvas: { label: 'Canvas', route: '/dashboard', steps: [
-    { target: '[data-spot="canvas-connect"]', label: 'Connect Canvas', where: onToday, on: 'canvas-opened' },
-  ] },
-  grove: { label: 'Grove', route: '/dashboard', steps: [
-    { target: '[data-spot="grove"]', label: 'Your grove', where: onToday, on: 'grove-opened' },
+  grove: { label: 'Grove', route: '/progress', steps: [
+    { target: '[data-spot="grove"]', label: 'One tree per guide', where: path => path === '/progress', on: 'grove-opened', finishable: true },
   ] },
 };
 
 // Which real action counts as using each feature (ticks Learn Cordia, hides its dot).
 const FEATURE_EVENTS = {
   'guide-ready': 'add', explain: 'explain', 'card-made': 'card', 'quiz-started': 'quiz', ask: 'ask',
-  'card-flipped': 'cards', 'practice-opened': 'practice', 'calendar-connected': 'calendar', 'focus-started': 'focus',
+  'card-flipped': 'cards', 'practice-opened': 'practice', 'practice-guide': 'practice', 'calendar-connected': 'calendar', 'focus-started': 'focus',
   'note-written': 'notes', 'insights-opened': 'insights', 'grove-opened': 'grove', 'canvas-connected': 'canvas',
 };
 

@@ -8,11 +8,14 @@ import Heatmap from '../components/Heatmap';
 import RecapCard from '../components/RecapCard';
 import StudyInsights from '../components/StudyInsights';
 import { LoadGate } from '../components/CordiaLoader';
+import { markUsed } from '../lib/progress';
 
 // Everything about how studying is going, in one place: streak, grove, year, weak spots, recap.
 export default function Progress() {
   const { ready } = useRequireAuth();
   const [data, setData] = useState(null);
+
+  useEffect(() => { markUsed('grove'); markUsed('insights'); }, []);
 
   useEffect(() => {
     if (!ready) return;
@@ -50,7 +53,7 @@ export default function Progress() {
             </div>
           </section>
         )}
-        {data && <GroveGrid guides={data.guides} since={since} />}
+        {data && <div data-spot="grove"><GroveGrid guides={data.guides} since={since} /></div>}
         {data && <Heatmap serverWeek={data.streak?.week || []} />}
         <StudyInsights />
         {data && <RecapCard guides={data.guides} folders={data.folders} since={since} cardsStudied={data.overview?.cards_studied || 0} />}

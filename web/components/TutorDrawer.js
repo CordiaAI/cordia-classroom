@@ -28,14 +28,10 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
   }, []);
 
   useEffect(() => {
+    // The top bar's Tutor button.
     const toggle = () => changeOpen(!open);
-    const close = () => changeOpen(false);
     window.addEventListener('cordia:tutor-toggle', toggle);
-    window.addEventListener('cordia:tutor-close', close);
-    return () => {
-      window.removeEventListener('cordia:tutor-toggle', toggle);
-      window.removeEventListener('cordia:tutor-close', close);
-    };
+    return () => window.removeEventListener('cordia:tutor-toggle', toggle);
   }, [open]);
 
   useEffect(() => {

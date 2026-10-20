@@ -9,13 +9,12 @@ import { createDashboardOverview } from '../lib/dashboardOrganization';
 import { loadStudyQueue } from '../lib/studyQueue';
 import { lastGuide } from '../lib/userStore';
 import { markUsed, unmarkUsed, useProgress } from '../lib/progress';
-import { activeStep, dayOneFinished, startWalkthrough, walkthroughEvent } from '../lib/walkthrough';
+import { dayOneFinished, startWalkthrough, walkthroughEvent } from '../lib/walkthrough';
 import { readActivity, dayKey, streakWithFreeze } from '../lib/activity';
 import { loadOnboarding, saveOnboardingStep } from '../lib/onboarding';
 import { requestTip } from '../lib/tips';
 import ProgressRing from '../components/ProgressRing';
 import LearnCordia from '../components/LearnCordia';
-import AboutYou from '../components/AboutYou';
 import CanvasConnectButton from '../components/CanvasConnectButton';
 import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
@@ -42,7 +41,6 @@ export default function Today() {
   useSessionTracker('browse');
   const legacy = LEGACY_VIEWS[router.query.view];
   const progress = useProgress();
-  const step = activeStep(progress.wt?.status === 'active' ? progress.wt : null);
 
   useEffect(() => {
     if (ready && legacy) router.replace(legacy);
@@ -124,8 +122,6 @@ export default function Today() {
   }, [stats, calendar, insights, progress.first]);
 
   if (!ready || legacy) return null;
-
-  if (step?.screen === 'about') return <AboutYou />;
 
   const overview = createDashboardOverview(folders, guides);
   const remembered = lastGuide();
@@ -215,7 +211,7 @@ export default function Today() {
         )}
       </section>
 
-      <Link href="/progress" className="c-card today-progress" aria-label="Your progress" data-tip="insights" data-spot="insights">
+      <Link href="/progress" className="c-card today-progress" aria-label="Your progress" data-tip="insights" data-spot="insights" onClick={() => walkthroughEvent('insights-opened')}>
         {streakInfo && (
           <span className="today-stat">
             <Flame size={20} strokeWidth={1.75} aria-hidden="true" />

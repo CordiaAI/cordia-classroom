@@ -4,7 +4,6 @@ import { useRouter } from 'next/router';
 import { ChartColumn, TrendingDown, TrendingUp } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { walkthroughEvent } from '../lib/walkthrough';
-import PulseDot from './PulseDot';
 
 function Row({ item, icon: Icon, tone }) {
   return (
@@ -40,7 +39,6 @@ export default function StudyInsights({ compact = false, data }) {
       <header className="c-row">
         <ChartColumn size={20} strokeWidth={1.75} aria-hidden="true" />
         <h2 id="insights-title" className="c-section-title">Insights</h2>
-        {compact && <PulseDot feature="insights" />}
         {compact && <><span className="c-spacer" /><button type="button" className="c-btn c-btn--quiet" onClick={() => { walkthroughEvent('insights-opened'); router.push('/progress'); }}>Open</button></>}
       </header>
       {!insights ? (

@@ -163,6 +163,7 @@ export default function QuizPage() {
       )}
       <style jsx>{`
         .quiz-page { width: min(var(--page-max), 100%); margin: 0 auto; }
+        .quiz-page :global(.quiz-question-card) { width: min(720px, 100%); justify-self: center; }
         .quiz-guide { margin: -12px 0 0; font-family: var(--font-display); }
         .quiz-switch { justify-self: start; }
         .quiz-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }

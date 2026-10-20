@@ -89,7 +89,7 @@ test('walkthrough steps advance only on real actions', async () => {
   const walkthrough = await source('lib/walkthrough.js');
   const controller = await source('components/Walkthrough.js');
 
-  assert.equal((walkthrough.split('export const DAY_ONE = [')[1].split('\n];')[0].match(/^ {2}\[/gm) || []).length, 9);
-  assert.match(controller, /if \(name === active\.on\) advance\(current\)/);
+  assert.equal((walkthrough.split('export const DAY_ONE = [')[1].split('\n];')[0].match(/^ {2}\[/gm) || []).length, 4);
+  assert.match(controller, /if \(event\.detail\?\.name === active\.on\) advance\(current\)/);
   assert.doesNotMatch(controller, /setTimeout\(\(\) => advance/);
 });

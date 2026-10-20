@@ -612,3 +612,6 @@ body:has(.about) .c-fab { display: none; }
 
 /* Webcam drawing needs a desktop camera and pointer. */
 @media (max-width: 767px), (pointer: coarse) { .practice-webcam { display: none !important; } }
+
+/* While a file is dragged over the page: where it will go is outlined by its box; this says it works. */
+.c-drop-hint { position: fixed; left: 50%; bottom: 32px; z-index: 400; transform: translateX(-50%); padding: 12px 20px; border-radius: var(--r-pill); background: var(--olive); color: var(--on-olive); font: 600 var(--fs-15)/1 var(--font-sans); box-shadow: var(--shadow-lg); pointer-events: none; }

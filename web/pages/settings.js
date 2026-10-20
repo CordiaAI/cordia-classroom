@@ -303,10 +303,13 @@ export default function SettingsPage() {
         {activeSection === 'connections' && (
           <div className="profile-section c-stack" role="tabpanel" id="panel-connections" aria-labelledby="tab-connections">
             {canvasReady && <CanvasSettings school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} />}
-            <div className="c-card settings-row">
-              <span className="settings-row-label"><CalendarDays size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Calendar link</span></span>
-              <Link href="/calendar" className="c-btn c-btn--secondary">Open Calendar</Link>
-            </div>
+            {/* Canvas settings already offer the calendar link; without them, link to it here. */}
+            {!canvasReady && (
+              <div className="c-card settings-row">
+                <span className="settings-row-label"><CalendarDays size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Calendar link</span></span>
+                <Link href="/calendar" className="c-btn c-btn--secondary">Open Calendar</Link>
+              </div>
+            )}
             <div className="c-card settings-row">
               <span className="settings-row-label"><Puzzle size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Chrome extension</span></span>
               {extensionInstalled

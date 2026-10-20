@@ -107,3 +107,15 @@ export function useFileDropZone({ getElement, onFiles, priority = 0, enabled = t
 
   return enabled && active;
 }
+
+// True while a dragged file is over the page and some upload box will take it, for the
+// page-wide "Drop to upload" hint.
+export function useFileDragging() {
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    const notify = current => setDragging(current !== null);
+    listeners.add(notify);
+    return () => listeners.delete(notify);
+  }, []);
+  return dragging;
+}

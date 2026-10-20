@@ -13,6 +13,7 @@ import AccountMenu from './AccountMenu';
 import ShortcutsSheet from './ShortcutsSheet';
 import StudyTimer from './StudyTimer';
 import { openNewSheet } from '../lib/newSheet';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 // One navigation: the same four places on the glass top bar and the mobile tab bar, plus New.
 const navItems = [
@@ -159,7 +160,7 @@ export default function Sidebar({ timerState, setTimerState }) {
 
         <div className="c-bar-actions">
           <div className="c-menu-wrap" ref={timerRef}>
-            <button type="button" className={'c-btn c-btn--secondary c-timerbtn' + (isRunning ? ' is-running' : '')} onClick={() => setTimerOpen(open => !open)} aria-expanded={timerOpen} aria-label={isRunning ? `Focus timer, ${clock} left` : 'Focus timer'}>
+            <button type="button" className={'c-btn c-btn--secondary c-timerbtn' + (isRunning ? ' is-running' : '')} data-spot="focus-btn" onClick={() => { if (!timerOpen) walkthroughEvent('focus-opened'); setTimerOpen(open => !open); }} aria-expanded={timerOpen} aria-label={isRunning ? `Focus timer, ${clock} left` : 'Focus timer'}>
               <Timer size={20} strokeWidth={1.75} aria-hidden="true" />
               {isRunning && <span className="c-timer-clock">{clock}</span>}
             </button>
