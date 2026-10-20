@@ -14,7 +14,6 @@ export const FEATURE_COPY = {
   practice: { label: 'practice sets', title: 'Practice sets are a Pro feature', pro: 'Fresh practice problems from any guide' },
   ai_quiz: { label: 'AI quizzes', title: 'AI quizzes are a Pro feature', pro: 'Smarter quizzes with tougher answer choices' },
   nclex: { label: 'NCLEX sets', title: 'NCLEX mode is a Pro feature', pro: 'NCLEX-style questions from your own material' },
-  exam: { label: 'practice exams', title: 'Practice exams are a Pro feature', pro: 'Full practice exams from your guides' },
   retain_types: { label: 'Pro quiz sessions', title: 'Matching and fill in the blank are Pro', pro: 'Quiz yourself with matching and fill in the blank, not just multiple choice' },
   lecture_minute: { label: 'recording minutes', title: "You've used this month's recording minutes", pro: 'Record up to 25 hours of lectures a month' },
   visual: { label: 'visuals', title: "You've used this month's visuals", pro: 'Make up to 200 visuals a month for guides, notes and the Tutor' },
@@ -23,11 +22,14 @@ export const FEATURE_COPY = {
 
 export const METERED = ['guide', 'tutor', 'learn_my_way'];
 
+// Pro's monthly limits, shown next to each free limit (backend/services/entitlements.py enforces them).
+export const PRO_LIMITS = { guide: 100, tutor: 1000, learn_my_way: 300 };
+
 export const PRO_BENEFITS = [
   'Unlimited study guides from the app and the Chrome extension',
   'Unlimited Cordia Tutor',
   'Explain on every question',
-  'Practice sets, AI quizzes, NCLEX and practice exams',
+  'Practice sets, AI quizzes and NCLEX',
   'Guides that adapt to how you learn, every time you study',
 ];
 

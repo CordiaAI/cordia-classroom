@@ -41,7 +41,7 @@ export default function StudyInsights({ compact = false, data }) {
         <ChartColumn size={20} strokeWidth={1.75} aria-hidden="true" />
         <h2 id="insights-title" className="c-section-title">Insights</h2>
         {compact && <PulseDot feature="insights" />}
-        {compact && <><span className="c-spacer" /><button type="button" className="c-btn c-btn--quiet" onClick={() => { walkthroughEvent('insights-opened'); router.push('/settings?section=learning'); }}>Open</button></>}
+        {compact && <><span className="c-spacer" /><button type="button" className="c-btn c-btn--quiet" onClick={() => { walkthroughEvent('insights-opened'); router.push('/progress'); }}>Open</button></>}
       </header>
       {!insights ? (
         <SectionLoader height={72} label="Loading insights" />
@@ -52,6 +52,9 @@ export default function StudyInsights({ compact = false, data }) {
           {needsWork.slice(0, limit).map(item => <Row key={'w' + item.kind} item={item} icon={TrendingDown} tone="work" />)}
           {strengths.slice(0, limit).map(item => <Row key={'s' + item.kind} item={item} icon={TrendingUp} tone="good" />)}
         </ul>
+      )}
+      {!compact && needsWork.length > 0 && (
+        <button type="button" className="c-btn c-btn--secondary insights-practice" onClick={() => router.push('/practice')}>Practice these</button>
       )}
       {!compact && insights?.tips?.length > 0 && (
         <ul className="insight-tips">
@@ -67,7 +70,7 @@ export default function StudyInsights({ compact = false, data }) {
         .insights-card :global(.insight-row.good .lucide) { color: var(--success); }
         .insights-card :global(.insight-row.work .lucide) { color: var(--warning); }
         .insight-tips li { padding: 10px 0; border-top: 1px solid var(--line); }
-        .insights-empty { justify-self: start; }
+        .insights-empty, .insights-practice { justify-self: start; }
       `}</style>
     </section>
   );

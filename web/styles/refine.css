@@ -104,7 +104,11 @@ strong, b { font-weight: 600; }
 .c-topbar, .c-topbar *, .c-tabbar, .c-tabbar * { font-weight: 400 !important; letter-spacing: -0.01em; }
 /* A little bolder than regular (Times New Roman's bold is too heavy): a hairline stroke. */
 .c-topbar, .c-tabbar { -webkit-text-stroke: 0.35px currentColor; }
-.c-nav a, .c-topbar .c-searchbtn, .c-topbar .c-new-btn { font-size: var(--fs-17) !important; }
+/* The focus timer opens inside the top bar but is a normal card, not navigation. */
+.c-topbar .c-timer-pop, .c-topbar .c-timer-pop * { font-family: var(--font-sans) !important; -webkit-text-stroke: 0; letter-spacing: normal; }
+.c-topbar .c-timer-pop :is(.focus-face, .c-section-title, button) { font-weight: 600 !important; }
+.c-topbar .c-timer-clock { font-family: var(--font-sans) !important; font-weight: 600 !important; -webkit-text-stroke: 0; }
+.c-nav a, .c-nav .c-nav-btn, .c-topbar .c-searchbtn, .c-topbar .c-new-btn { font-size: var(--fs-17) !important; }
 .c-tabbar a { font-size: var(--fs-15) !important; }
 
 /* The serif, a little more: reading text and tab names read like a book; buttons, labels, dates

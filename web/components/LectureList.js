@@ -13,8 +13,9 @@ function dateLabel(value) {
   return new Date(`${value}T12:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-// Library → Lectures: recordings and lecture notes, newest first.
-export default function LectureList({ folders = [], adding, onAddingChange }) {
+// Library → Lectures: recordings and lecture notes, newest first. Library shows only the
+// add-notes form (showList=false) and lists lectures in its own class groups.
+export default function LectureList({ folders = [], adding, onAddingChange, showList = true }) {
   const router = useRouter();
   const [data, setData] = useState(null);
   const [form, setForm] = useState({ text: '', date: localDate(), folderId: '' });
@@ -22,7 +23,7 @@ export default function LectureList({ folders = [], adding, onAddingChange }) {
   const [error, setError] = useState('');
   const folderName = id => folders.find(folder => folder.id === id)?.name || '';
 
-  useEffect(() => { listLectures().then(setData); }, []);
+  useEffect(() => { if (showList) listLectures().then(setData); }, [showList]);
 
   // Notes taken in a lecture, or a transcript from elsewhere, saved as a lecture.
   async function saveNotes(event) {
@@ -70,7 +71,7 @@ export default function LectureList({ folders = [], adding, onAddingChange }) {
         </form>
       )}
 
-      {!data ? (
+      {!showList ? null : !data ? (
         <SectionLoader height={180} label="Loading lectures" />
       ) : data.enabled === false ? (
         <div className="c-empty">

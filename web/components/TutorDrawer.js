@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import AIChatWidget from './AIChatWidget';
-import { X } from 'lucide-react';
+import Link from 'next/link';
+import { Maximize2, X } from 'lucide-react';
 import { walkthroughEvent } from '../lib/walkthrough';
 
 const MIN_WIDTH = 300;
@@ -117,6 +118,7 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
       {open && <button type="button" className="tutor-backdrop" aria-label="Close Tutor" tabIndex={-1} onClick={() => changeOpen(false)} />}
       <div ref={shellRef} className={`tutor-drawer-shell${open ? ' is-open' : ''}`} style={{ '--tutor-width': `${width}px` }}>
       <aside id="cordia-tutor-drawer" className="tutor-drawer c-glass" aria-label="Tutor" aria-hidden={!open} inert={!open}>
+        <Link href="/tutor" className="c-icon-btn tutor-expand" aria-label="Open Tutor full page" onClick={() => changeOpen(false)}><Maximize2 size={18} strokeWidth={1.75} aria-hidden="true" /></Link>
         <button ref={toggleRef} type="button" className="c-icon-btn tutor-close" data-spot="tutor-close" aria-label="Close Tutor" onClick={() => changeOpen(false)}><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         <AIChatWidget preferredGuideId={preferredGuideId} preferredNoteId={preferredNoteId} />
         <div className="tutor-resize-handle" role="separator" aria-label="Resize Tutor" aria-orientation="vertical" aria-valuemin={MIN_WIDTH} aria-valuemax={MAX_WIDTH} aria-valuenow={width} tabIndex="0" onKeyDown={resizeWithKeyboard} onPointerDown={startResize} />

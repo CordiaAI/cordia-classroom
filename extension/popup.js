@@ -311,12 +311,23 @@ makeButton.addEventListener('click', makeStudyGuide);
 saveButton.addEventListener('click', saveStudyGuide);
 tutorForm.addEventListener('submit', askTutor);
 connectLink.addEventListener('click', () => announce('Sign in to Classroom. This panel will connect automatically.', 'working'));
+// "Make study guide from selection" (right-click menu) leaves this flag for the panel to start the guide.
+async function startPendingGuide() {
+  await authCheck;
+  const { pendingGuide } = await chrome.storage.session.get('pendingGuide');
+  if (!pendingGuide) return;
+  await chrome.storage.session.remove('pendingGuide');
+  if (state.authenticated && !makeButton.disabled) makeStudyGuide();
+}
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && ['authToken', 'userEmail'].some(key => changes[key])) initAuth();
+  if (area === 'session' && changes.pendingGuide?.newValue) startPendingGuide();
 });
 window.addEventListener('focus', initAuth);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) initAuth(); });
-initAuth();
+const authCheck = initAuth();
+startPendingGuide();
 
 document.getElementById('upgrade-open').addEventListener('click', () => {
   chrome.tabs.create({ url: UPGRADE_URL });

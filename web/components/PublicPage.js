@@ -25,6 +25,18 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
           </nav>
         </header>
         <main className="public-main">{children}</main>
+        <footer className="public-footer">
+          <nav aria-label="Site">
+            <Link href="/mission">Approach</Link>
+            <Link href="/pricing">Pricing</Link>
+            <Link href="/instructors">For instructors</Link>
+            <Link href="/install-extension">Get the Chrome extension</Link>
+            <Link href="/copyright">Copyright and takedowns</Link>
+            <Link href="/privacy">Privacy</Link>
+            <Link href="/terms">Terms</Link>
+            <Link href="/honor-code">Honor code</Link>
+          </nav>
+        </footer>
       </div>
       <style jsx global>{`
         .public { min-height: 100vh; background:var(--surface-card); color: var(--ink); }
@@ -41,7 +53,11 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
         .public-nav nav a:hover { background: var(--olive-tint); text-decoration: none; }
         .public-nav nav a.public-signin { background: var(--olive); color: var(--on-olive); }
         .public-main { width: min(1120px, 100%); margin: 0 auto; padding: 48px 24px 80px; }
-        @media (max-width: 600px) { .public-nav { padding: 0 12px 0 16px; } .public-nav nav a:not(.public-signin):first-child { display: none; } .public-main { padding: 32px 16px 64px; } }
+        .public-footer { border-top: 1px solid var(--hairline); padding: 24px; }
+        .public-footer nav { width: min(1120px, 100%); margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px 24px; }
+        .public-footer a { color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); text-decoration: none; }
+        .public-footer a:hover { color: var(--ink); text-decoration: underline; }
+        @media (max-width: 600px) { .public-nav { padding: 0 12px 0 16px; } .public-nav nav a:not(.public-signin):first-child { display: none; } .public-main { padding: 32px 16px 64px; } .public-footer { padding: 20px 16px; } }
       `}</style>
     </>
   );

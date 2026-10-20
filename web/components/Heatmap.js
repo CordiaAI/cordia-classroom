@@ -36,6 +36,7 @@ export default function Heatmap({ serverWeek = [] }) {
         <h2 id="heat-title" className="c-section-title">Year</h2>
         <span className="c-meta">{total} days</span>
       </header>
+      <p className="c-meta heat-hint">Tap a day to see what you studied.</p>
       <div className="heat-scroll" ref={node => { if (node) node.scrollLeft = node.scrollWidth; }}>
         <div className="heat-grid" role="group" aria-label="Study days this year">
           {days.map(day => {
@@ -66,6 +67,7 @@ export default function Heatmap({ serverWeek = [] }) {
       )}
       <style jsx>{`
         .heat { display: grid; gap: 12px; padding: 20px; }
+        .heat-hint { margin: 0; }
         .heat-scroll { overflow-x: auto; padding: 2px; }
         .heat-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 12px); grid-auto-columns: 12px; gap: 3px; width: max-content; }
         .heat-cell { width: 12px; height: 12px; padding: 0; border: 0; border-radius:12px; background: var(--card-sunk); cursor: pointer; }

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Check, ChevronDown, NotebookPen, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, Keyboard, NotebookPen, Sparkles, Trash2 } from 'lucide-react';
+import Menu from '../Menu';
+import TypingShortcuts from './TypingShortcuts';
 import CordiaLoader from '../CordiaLoader';
 import MermaidDiagram from '../MermaidDiagram';
 import NapkinVisual from '../NapkinVisual';
@@ -56,6 +58,7 @@ export default function SmartNotesEditor() {
   const [mermaidCode, setMermaidCode] = useState(null);
   const [diagramLoading, setDiagramLoading] = useState(false);
   const [visualizeMode, setVisualizeMode] = useState(false);
+  const [showTyping, setShowTyping] = useState(false);
   const [visualSource, setVisualSource] = useState(null); // { text, context, key }
   const visualAnchor = useRef(null);
 
@@ -519,6 +522,14 @@ export default function SmartNotesEditor() {
               </div>
             )}
           </div>
+          <Menu
+            label="More for this note"
+            items={[
+              { label: 'Typing shortcuts', icon: Keyboard, onSelect: () => setShowTyping(true) },
+              // Library deletes it with the same 6-second Undo guides use.
+              ...(noteId && noteId !== 'new' ? [{ label: 'Delete note', icon: Trash2, danger: true, onSelect: () => router.push('/library?filter=notes&delete=' + encodeURIComponent(noteId)) }] : []),
+            ]}
+          />
         </div>
       </div>
 
@@ -535,6 +546,7 @@ export default function SmartNotesEditor() {
         <div className="sn-paper-wrap">
           <div className="sn-paper-label-row">
             <span className="sn-panel-label">Notes</span>
+            {visualizeMode && <span className="sn-visualize-hint" role="status">Highlight text, then press ✓</span>}
             {visualizeMode && (
               <button
                 className="sn-visualize-confirm"
@@ -607,6 +619,7 @@ export default function SmartNotesEditor() {
       </div>
 
       <StudyGuidePreviewModal {...guide.modal} />
+      {showTyping && <TypingShortcuts onClose={() => setShowTyping(false)} />}
     </div>
   );
 }

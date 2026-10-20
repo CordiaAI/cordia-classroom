@@ -14,7 +14,7 @@ export default function GroveCard({ guides, planting = false }) {
 
   function open() {
     walkthroughEvent('grove-opened');
-    router.push('/settings?section=grove');
+    router.push('/progress');
   }
 
   return (

@@ -31,10 +31,10 @@ for (const token of ['--canvas: #EDF2F4', '--ink: #171B18', '--muted: rgba(23, 2
 }
 assert.match(system, /prefers-reduced-motion/);
 assert.match(tokens, /--lg-filter: blur\(24px\) saturate\(170%\)/);
-// One nav: five places, each a real route.
+// One nav: four places plus New, each a real route.
 const nav = sidebar.split('const navItems = [')[1].split('];')[0];
-assert.deepEqual([...nav.matchAll(/label: '([^']+)', href: '([^']+)'/g)].map(match => `${match[1]} ${match[2]}`), ['Today /dashboard', 'Library /library', 'Tutor /tutor', 'Notes /smartnotes', 'Calendar /calendar']);
-for (const label of ['Profile', 'Appearance', 'Plan', 'Help', 'Sign out']) {
+assert.deepEqual([...nav.matchAll(/label: '([^']+)', href: '([^']+)'/g)].map(match => `${match[1]} ${match[2]}`), ['Today /dashboard', 'Library /library', 'Tutor /tutor', 'Calendar /calendar']);
+for (const label of ['Progress', 'Settings', 'Appearance', 'Plan', 'Help', 'Sign out']) {
   assert.ok(sidebar.includes(`label: '${label}'`), `missing account menu item ${label}`);
 }
 assert.match(dashboard, /notes: '\/smartnotes'/);

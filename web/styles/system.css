@@ -178,6 +178,17 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
 }
 .c-nav a:hover { background: var(--olive-tint); text-decoration: none; }
 .c-nav a[aria-current='page'] { background: var(--olive); color: var(--on-olive); }
+.c-nav .c-nav-btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 0;
+  border-radius:var(--r-pill); background: transparent; color: var(--ink); cursor: pointer;
+  font:600 15px/1 var(--font-sans);
+}
+.c-nav .c-nav-btn:hover, .c-nav .c-nav-btn[aria-pressed='true'] { background: var(--olive-tint); }
+.c-timerbtn { height: 40px; min-width: 40px; padding: 0 10px; gap: 6px; justify-content: center; }
+.c-timerbtn.is-running { color: var(--olive-ink); }
+.c-timer-clock { font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+.c-timer-pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; width: 300px; }
+.c-timer-pop .focus-card { background: var(--surface-raised); box-shadow: var(--shadow-lg); }
 .c-bar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .c-searchbtn { height: 40px; padding: 0 8px 0 14px; gap: 10px; }
 .c-searchbtn kbd { font:600 13px/1 var(--font-sans); color: var(--muted); background: var(--olive-tint); border-radius:var(--r-pill); padding: 5px 8px; }
@@ -218,7 +229,7 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
   .main-content, .app-shell .main-content { padding: 20px 16px calc(var(--tabbar-h) + 96px) !important; }
   .c-tabbar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
-    display: grid; grid-template-columns: repeat(5, 1fr);
+    display: grid; grid-template-columns: repeat(4, 1fr);
     height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
     padding: 6px 4px env(safe-area-inset-bottom);
     background: var(--glass);

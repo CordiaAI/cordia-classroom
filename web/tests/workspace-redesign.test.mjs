@@ -4,12 +4,14 @@ import { readFile } from 'node:fs/promises';
 
 const source = relativePath => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
-test('one navigation: five places, URL-driven active state, Library owns study screens', async () => {
+test('one navigation: four places plus New, URL-driven active state, Library owns study screens, notes and lectures', async () => {
   const sidebar = await source('components/Sidebar.js');
   const navigation = sidebar.split('const navItems = [')[1].split('];')[0];
   const labels = [...navigation.matchAll(/\{ label: '([^']+)'/g)].map(match => match[1]);
 
-  assert.deepEqual(labels, ['Today', 'Library', 'Tutor', 'Notes', 'Calendar']);
+  assert.deepEqual(labels, ['Today', 'Library', 'Tutor', 'Calendar']);
+  assert.match(sidebar, /'\/smartnotes', '\/lecture'\]/);
+  assert.match(sidebar, /cordia:tutor-toggle/);
   assert.match(sidebar, /const LIBRARY_PATHS = \['\/library', '\/guide', '\/flashcards', '\/quiz', '\/practice'/);
   assert.match(sidebar, /aria-current=\{active === item\.href \? 'page' : undefined\}/);
   assert.match(sidebar, /isMac\(\) \? '⌘K' : 'Ctrl K'/);
@@ -35,28 +37,30 @@ test('old dashboard views redirect to their own routes', async () => {
   assert.doesNotMatch(dashboard, /Study smarter/);
 });
 
-test('Today: streak pill, Continue, four tools, no Start card', async () => {
+test('Today: Daily review first, Continue, Due soon (Canvas when empty), progress strip', async () => {
   const dashboard = await source('pages/dashboard.js');
 
   assert.match(dashboard, /<h1 className="c-title">Today<\/h1>/);
-  assert.match(dashboard, /<Flame /);
-  assert.doesNotMatch(dashboard, /today-start/);
+  assert.match(dashboard, /Start review/);
+  assert.match(dashboard, /router\.push\('\/session'\)/);
   assert.match(dashboard, /<CanvasConnectButton card [^>]*spot="canvas-connect"/);
-  const walkthrough = await source('lib/walkthrough.js');
-  assert.match(walkthrough, /id: 'canvas', target: '\[data-spot="canvas-connect"\]'[^\n]*finishable: true, optionalTarget: true/);
-  assert.match(await source('components/ClassesTab.js'), /<CanvasConnectButton \/>/);
-  assert.match(await source('components/Sidebar.js'), /key: 'canvas'[^\n]*section=canvas/);
-  for (const tool of ['Quiz', 'Cards', 'Practice', 'Notes']) assert.match(dashboard, new RegExp(`label: '${tool}'`));
+  assert.match(dashboard, /href="\/progress"/);
+  assert.match(dashboard, /<Flame /);
+  assert.doesNotMatch(dashboard, /label: 'Quiz'/);
 });
 
-test('Library holds guides and cards with Undo on delete', async () => {
+test('Library: one list grouped by class, kind filters, Undo on delete (notes too)', async () => {
   const library = await source('pages/library.js');
   const undo = await source('lib/undoDelete.js');
 
   assert.match(library, /<h1 className="c-title">Library<\/h1>/);
   assert.match(library, /\{ key: 'recent', label: 'Newest' \}/);
-  assert.match(library, /name: 'Unsorted'/);
-  assert.match(library, /`\$\{due\} due`/);
+  for (const label of ['All', 'Guides', 'Notes', 'Lectures', 'Flashcards', 'Starred']) assert.match(library, new RegExp(`label: '${label}'`));
+  assert.match(library, /name: 'Unfiled'/);
+  assert.match(library, /href=\{'\/folder\/' \+ folder\.id\} className="lib-group-name/);
+  assert.match(library, /path: '\/smart_notes\/' \+ item\.id/);
+  assert.match(undo, /item\.path \|\| '\/guides\/' \+ item\.id/);
+  assert.match(library, /`\$\{item.due\} due`/);
   assert.match(undo, /export const UNDO_MS = 6000/);
 });
 
