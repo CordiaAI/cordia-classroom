@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Bell, BellOff, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, ExternalLink, KeyRound, RefreshCw, Unlink } from 'lucide-react';
 import { apiErrorMessage, apiFetch, getUserId } from '../lib/api';
 import { walkthroughEvent } from '../lib/walkthrough';
@@ -97,6 +98,10 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
   // Canvas token connection (all classes and course files), offered when the backend has it.
   const [canvasReady, setCanvasReady] = useState(false);
   const [tokenOpen, setTokenOpen] = useState(false);
+  // One Connect Canvas: the access token first; the calendar link is the fallback.
+  const [feedOpen, setFeedOpen] = useState(false);
+  // Deadlines from the access token (not a calendar link) are managed in Settings.
+  const [fromToken, setFromToken] = useState(false);
   useEffect(() => { canvasStatus().then(data => setCanvasReady(Boolean(data) && !data.connected)); }, []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -129,6 +134,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     if (!data?.connected || !Array.isArray(data.items)) return false;
     rememberCalendar(data, accountId);
     setStatus('connected');
+    setFromToken(data.source === 'canvas');
     const today = localDueToday(data.items);
     setItems(data.items);
     setDueToday(today);
@@ -245,6 +251,24 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
       { label: 'Paste here', icon: ClipboardPaste, shot: <CanvasFeedLink />, line: 'Copy the link ending in .ics' },
     ];
     const linkProblem = feedLinkProblem(feedUrl);
+    const sheet = tokenOpen && <CanvasConnectSheet school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} onClose={() => setTokenOpen(false)} onConnected={data => { if (data?.connected) { setCanvasReady(false); refresh(); } }} />;
+    if (canvasReady && !feedOpen) {
+      return (
+        <section className="c-card cal-connect cal-connect--one" aria-label="Connect Canvas">
+          <KeyRound size={28} strokeWidth={1.75} aria-hidden="true" />
+          <h2 className="c-section-title">Connect Canvas</h2>
+          <p className="c-meta">Bring in every class’s deadlines, kept in sync.</p>
+          <button type="button" className="c-btn c-btn--primary" data-spot="calendar-feed" onClick={() => setTokenOpen(true)}>Connect Canvas</button>
+          <button type="button" className="c-btn c-btn--quiet" onClick={() => setFeedOpen(true)}>Use a calendar link instead</button>
+          {sheet}
+          <style jsx>{`
+            .cal-connect--one { display: grid; justify-items: center; gap: 12px; padding: 40px 28px; text-align: center; }
+            .cal-connect--one :global(.lucide) { color: var(--olive-ink); }
+            .cal-connect--one h2, .cal-connect--one p { margin: 0; }
+          `}</style>
+        </section>
+      );
+    }
     return (
       <section className="c-card cal-connect" aria-label="Connect Canvas calendar">
         <ol className="cal-steps">
@@ -269,10 +293,10 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
         {error && <div className="canvas-inline-error" role="alert">{error}</div>}
         {canvasReady && (
           <button type="button" className="c-btn c-btn--quiet cal-token" onClick={() => setTokenOpen(true)}>
-            <KeyRound size={20} strokeWidth={1.75} aria-hidden="true" />Connect Canvas
+            <KeyRound size={20} strokeWidth={1.75} aria-hidden="true" />Connect with an access token instead
           </button>
         )}
-        {tokenOpen && <CanvasConnectSheet school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} onClose={() => setTokenOpen(false)} />}
+        {sheet}
         <style jsx>{`
           .cal-connect { display: grid; gap: 24px; padding: 28px; }
           .cal-token { justify-self: start; margin: -12px 0 -8px -12px; }
@@ -364,7 +388,9 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
           <button type="button" className="c-btn c-btn--quiet" onClick={() => setWeekStart(startOfWeek(new Date()))}>This week</button>
           <button type="button" className="c-btn c-btn--secondary" onClick={toggleReminders} aria-pressed={reminders}>{reminders ? <Bell {...ICON} /> : <BellOff {...ICON} />}Reminders</button>
           <button type="button" className="c-icon-btn" onClick={() => refresh()} disabled={loading} aria-label="Refresh"><RefreshCw {...ICON} /></button>
-          <button type="button" className="c-icon-btn" onClick={disconnect} aria-label="Disconnect calendar"><Unlink {...ICON} /></button>
+          {fromToken
+            ? <Link href="/settings?section=connections" className="c-btn c-btn--quiet">Canvas settings</Link>
+            : <button type="button" className="c-icon-btn" onClick={disconnect} aria-label="Disconnect calendar"><Unlink {...ICON} /></button>}
         </div>
         <style jsx>{`
           .cal-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }

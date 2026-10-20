@@ -9,6 +9,8 @@ import TimerEngine from './TimerEngine';
 import CanvasReminder from './CanvasReminder';
 
 const WIDE = ['/guide/[id]', '/practice', '/practice/[guideId]', '/smartnotes', '/calendar', '/tutor'];
+// Study screens run in focus mode: no top bar or tab bar, just the screen's own exit.
+const FOCUS = ['/session', '/flashcards/study', '/quiz/[guideId]', '/nclex/[guideId]', '/practice/[guideId]'];
 
 export default function Layout({ children, timerState, setTimerState }) {
   const router = useRouter();
@@ -20,7 +22,7 @@ export default function Layout({ children, timerState, setTimerState }) {
   const routeKey = `${router.pathname}:${router.query.id || ''}:${router.query.guideId || ''}`;
 
   return (
-    <div className="app-shell">
+    <div className={'app-shell' + (FOCUS.includes(router.pathname) ? ' is-focus' : '')}>
       <Sidebar timerState={timerState} setTimerState={setTimerState} />
       <main id="classroom-main" className="main-content">
         <div key={routeKey} className={'workspace-route' + (WIDE.includes(router.pathname) && !(router.pathname === '/smartnotes' && !router.query.id) ? ' is-wide' : '')}>

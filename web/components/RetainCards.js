@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { apiFetch } from '../lib/api';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Sparkles } from 'lucide-react';
 import { requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { conceptAnswer, fillMatches, normalize, shuffled } from '../lib/retainEngine.mjs';
@@ -41,10 +41,23 @@ export function AskWhy() {
   );
 }
 
+// Beside Ask why: a plain explanation of the right answer, not of the mistake.
+export function ExplainAnswer() {
+  return (
+    <button type="button" className="c-btn c-btn--secondary quiz-ask" onClick={() => {
+      if (!lastMiss) return;
+      const { question, correct_answer: answer } = lastMiss.retainContext;
+      window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { guideId: lastMiss.guideId, prompt: `Explain this simply, with an example: ${question} (answer: ${answer})`, send: true } }));
+    }}>
+      <Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain
+    </button>
+  );
+}
+
 function NextButton({ onNext, missed }) {
   return (
     <div className="quiz-next-row">
-      {missed && <AskWhy />}
+      {missed && <><AskWhy /><ExplainAnswer /></>}
       <button type="button" className="c-btn c-btn--primary quiz-next" onClick={onNext} autoFocus>Next</button>
     </div>
   );

@@ -1,11 +1,14 @@
 import { getProgress, updateProgress } from './progress';
 
-// Three one-time tips (glass pill, 3 words max), each at its moment. A tap dismisses
-// it for good; at most one per session, never during a walkthrough.
+// One-time tips (glass pill, a few words), each at the moment a feature is useful. A tap
+// dismisses it for good; at most one per session, never during a walkthrough.
 export const TIPS = {
   ask: { text: 'Ask why', icon: 'MessageCircle' },
   calendar: { text: 'Add deadlines', icon: 'CalendarDays' },
   insights: { text: 'Your weak spots', icon: 'ChartColumn' },
+  highlight: { text: 'Highlight to explain', icon: 'Highlighter' },
+  keys: { text: 'Space flips · 1 Again · 2 Got it', icon: 'Keyboard' },
+  typing: { text: 'Typing shortcuts', icon: 'Keyboard' },
 };
 
 export const TIP_EVENT = 'cordia:tip';

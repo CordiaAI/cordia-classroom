@@ -593,8 +593,8 @@ export default function PracticeWorkspace() {
             <button type="button" className="c-btn c-btn--quiet" onClick={tidyHandwriting} disabled={tidying || !current}><Wand2 {...ICON} />{tidying ? 'Reading…' : 'Tidy'}</button>
             <button type="button" className="c-icon-btn" onClick={clearWork} aria-label="Clear work"><Trash2 {...ICON} /></button>
             <div className="practice-drawbar" role="group" aria-label="Drawing">
-            <button type="button" className={'c-btn c-btn--sm ' + (handOn ? 'c-btn--primary' : 'c-btn--secondary')} aria-pressed={handOn} onClick={toggleHand}>
-              <Hand {...ICON} />{handOn ? 'Stop hand' : 'Hand'}
+            <button type="button" className={'c-btn c-btn--sm practice-webcam ' + (handOn ? 'c-btn--primary' : 'c-btn--secondary')} aria-pressed={handOn} onClick={toggleHand}>
+              <Hand {...ICON} />{handOn ? 'Stop webcam drawing' : 'Draw with webcam'}
             </button>
             {handOn && (
               <button type="button" className="c-icon-btn" aria-pressed={showCamera} onClick={() => setShowCamera(value => !value)} aria-label={showCamera ? 'Hide camera preview' : 'Show camera preview'}>

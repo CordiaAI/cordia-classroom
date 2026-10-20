@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, MessageCircle, Pencil, Shuffle, Star } from 'lucide-react';
 import { walkthroughEvent } from '../lib/walkthrough';
+import { requestTip } from '../lib/tips';
 import SessionFinish from './SessionFinish';
 
 function shuffledOrder(length) {
@@ -36,6 +37,8 @@ export default function FlashcardViewer({
 
   const current = queue[0];
   useEffect(() => { if (flipped) walkthroughEvent('card-flipped'); }, [flipped]);
+  // First flashcard session on a keyboard computer: point out Space, 1 and 2.
+  useEffect(() => { if (window.matchMedia('(pointer: fine)').matches) requestTip('keys'); }, []);
   const card = flashcards[current];
 
   const finish = useCallback((nextKnown, nextMissed) => {
@@ -171,7 +174,7 @@ export default function FlashcardViewer({
               {card?.image && <img src={card.image} alt="" />}
             </div>
           </div>
-          <div className="fc-actions">
+          <div className="fc-actions" data-tip="keys">
             {flipped ? (
               <>
                 <button type="button" className="c-btn c-btn--secondary c-btn--lg" onClick={again}>Again <kbd>1</kbd></button>

@@ -22,14 +22,17 @@ export function openProblems(practice) {
 
 const SESSION_CARD_LIMIT = 30;
 
-// Everything Today's Start runs: due flashcards, then Retain misses, then practice,
-// across every guide. Uses only existing read endpoints.
-export async function loadStudyQueue({ practiceGuides = 5 } = {}) {
-  const data = await apiFetch('/guides?limit=100');
+// Everything Daily review runs: due flashcards, then Retain misses, then practice, across
+// every guide (or one guide, for its Study now). Uses only existing read endpoints.
+export async function loadStudyQueue({ practiceGuides = 5, guideId = '' } = {}) {
+  const data = guideId ? await apiFetch('/guides/' + guideId).then(result => ({ guides: result?.guide ? [result.guide] : [] })) : await apiFetch('/guides?limit=100');
   const guides = Array.isArray(data?.guides) ? data.guides : [];
   const cards = [];
   for (const guide of guides) {
-    for (const card of dueCards(guide)) {
+    // Study now on a guide with nothing due still runs a full round of its cards.
+    const due = dueCards(guide);
+    const pool = guideId && !due.length ? (guide.flashcards || []).map((card, index) => ({ ...card, index })) : due;
+    for (const card of pool) {
       cards.push({ kind: 'card', guideId: guide.id, guideTitle: guide.title, index: card.index, front: card.front, back: card.back, image: card.image });
     }
   }

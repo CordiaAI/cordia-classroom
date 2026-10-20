@@ -123,25 +123,25 @@ export default function QuizPage() {
         />
       ) : (
         <>
-          <div className="quiz-modes" role="group" aria-label="Question types">
+          <div className="c-seg quiz-switch" role="tablist" aria-label="Mode">
+            <button type="button" role="tab" aria-selected={!race} className={!race ? 'is-active' : ''} onClick={() => setRace(false)}>Quiz</button>
+            <button type="button" role="tab" aria-selected={race} className={race ? 'is-active' : ''} onClick={() => setRace(true)}>Match</button>
+          </div>
+          {!race && <div className="quiz-modes" role="group" aria-label="Question types">
             {Object.keys(TYPE_LABELS).map(type => {
               const mode = MODES[type];
               const locked = PRO_TYPES.includes(type) && plan && !plan.pro && plan.left <= 0;
-              const on = !race && types.includes(type);
+              const on = types.includes(type);
               return (
-                <button key={type} type="button" className={'quiz-mode' + (on ? ' is-on' : '')} aria-pressed={on} onClick={() => { if (race) { setRace(false); if (types.includes(type)) return; } toggle(type); }} aria-label={`${mode.label}${locked ? ', Pro' : ''}`}>
+                <button key={type} type="button" className={'quiz-mode' + (on ? ' is-on' : '')} aria-pressed={on} onClick={() => toggle(type)} aria-label={`${mode.label}${locked ? ', Pro' : ''}`}>
                   <mode.icon size={28} strokeWidth={1.75} aria-hidden="true" />
                   <span>{mode.label}</span>
                   {PRO_TYPES.includes(type) && plan && !plan.pro && <Lock className="quiz-lock" size={16} strokeWidth={1.75} aria-hidden="true" />}
                 </button>
               );
             })}
-            <button type="button" className={'quiz-mode' + (race ? ' is-on' : '')} aria-pressed={race} onClick={() => setRace(value => !value)} aria-label="Match, 60 seconds">
-              <Timer size={28} strokeWidth={1.75} aria-hidden="true" />
-              <span>Match</span>
-            </button>
-          </div>
-          <p className="quiz-note">{race ? <><Timer size={20} strokeWidth={1.75} aria-hidden="true" />60 seconds</> : <><Repeat size={20} strokeWidth={1.75} aria-hidden="true" />Misses repeat</>}</p>
+          </div>}
+          <p className="quiz-note">{race ? <><Timer size={20} strokeWidth={1.75} aria-hidden="true" />Match questions to answers in 60 seconds</> : <><Repeat size={20} strokeWidth={1.75} aria-hidden="true" />Misses repeat</>}</p>
           <button type="button" className="c-btn c-btn--primary c-btn--lg quiz-start" data-spot="quiz-start" onClick={start} disabled={starting || !types.length || !guideId}>
             {starting ? <><CordiaLoader size={20} label="Preparing" />Preparing</> : <><Play size={20} strokeWidth={1.75} aria-hidden="true" />Start</>}
           </button>
@@ -164,7 +164,8 @@ export default function QuizPage() {
       <style jsx>{`
         .quiz-page { width: min(var(--page-max), 100%); margin: 0 auto; }
         .quiz-guide { margin: -12px 0 0; font-family: var(--font-display); }
-        .quiz-modes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+        .quiz-switch { justify-self: start; }
+        .quiz-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .quiz-mode { position: relative; display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 120px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow); }
         .quiz-mode :global(.lucide) { color: var(--olive-ink); }
         .quiz-mode.is-on { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
@@ -173,7 +174,7 @@ export default function QuizPage() {
         .quiz-note :global(.lucide) { color: var(--olive-ink); }
         .quiz-start { justify-self: start; min-width: 180px; }
         .quiz-past-score { font-weight:600; font-variant-numeric: tabular-nums; }
-        @media (max-width: 767px) { .quiz-modes { grid-template-columns: repeat(3, minmax(0, 1fr)); } .quiz-start { width: 100%; } }
+        @media (max-width: 767px) { .quiz-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } .quiz-start { width: 100%; } }
       `}</style>
     </div>
   );

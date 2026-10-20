@@ -29,6 +29,8 @@ export default function SessionFinish({ guideId, guideTitle, cards, accuracy, mi
         <li><strong>{Math.round(accuracy)}%</strong><span>accuracy</span></li>
         <li><strong>{Math.max(1, Math.round(minutes))}</strong><span>min</span></li>
       </ul>
+      {/* Spacing works better than it feels, so say what happens next. */}
+      <p className="c-meta finish-next">{accuracy < 100 ? 'What you missed comes back in your next Daily review.' : 'All known. New and missed cards show up in your Daily review on Today.'}</p>
       {children}
       <div className="c-row finish-actions">
         {onRestart && <button type="button" className="c-btn c-btn--secondary" onClick={onRestart}><RotateCcw size={20} strokeWidth={1.75} aria-hidden="true" />Restart</button>}
@@ -36,6 +38,7 @@ export default function SessionFinish({ guideId, guideTitle, cards, accuracy, mi
       </div>
       <style jsx>{`
         .finish { display: grid; justify-items: center; gap: 16px; padding: 32px 24px; text-align: center; }
+        .finish-next { margin: 0; font-size: 15px; }
         .finish-stats { list-style: none; margin: 0; padding: 0; display: flex; gap: 40px; }
         .finish-stats li { display: grid; gap: 4px; }
         .finish-stats strong { font:600 28px/1 var(--font-sans); font-variant-numeric: tabular-nums; }

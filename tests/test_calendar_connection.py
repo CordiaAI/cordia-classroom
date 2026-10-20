@@ -48,6 +48,7 @@ class CalendarConnectionTests(unittest.TestCase):
         with (
             patch.object(calendar, "get_user_id", return_value="user-3"),
             patch.object(calendar, "_stored_feed", return_value=""),
+            patch.object(calendar, "_token_payload", return_value=None),
         ):
             result = calendar.get_calendar_connection("Bearer token")
         self.assertEqual(result, {"connected": False, "items": [], "due_today": []})
@@ -67,3 +68,45 @@ class CalendarConnectionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TokenCalendarTests(unittest.TestCase):
+    """With no calendar link, a Canvas access-token connection fills the calendar."""
+
+    def test_token_deadlines_fill_the_calendar(self):
+        sys.path.insert(0, os.path.dirname(__file__))
+        from datetime import datetime, timedelta, timezone
+        from fake_supabase import FakeDB
+
+        db = FakeDB()
+        soon = (datetime.now(timezone.utc) + timedelta(days=2)).isoformat()
+        long_ago = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+        db.rows("canvas_connections").append({"user_id": "u1", "canvas_domain": "school.instructure.com", "status": "connected"})
+        db.rows("canvas_courses").append({"user_id": "u1", "canvas_course_id": 7, "name": "Management", "course_code": "MGT 300"})
+        db.rows("canvas_assignments").extend([
+            {"user_id": "u1", "canvas_assignment_id": 70, "canvas_course_id": 7, "title": "Quiz 2", "due_at": soon},
+            {"user_id": "u1", "canvas_assignment_id": 71, "canvas_course_id": 7, "title": "Old essay", "due_at": long_ago},
+            {"user_id": "u2", "canvas_assignment_id": 72, "canvas_course_id": 7, "title": "Not mine", "due_at": soon},
+        ])
+        with (
+            patch.object(calendar, "get_user_id", return_value="u1"),
+            patch.object(calendar, "_stored_feed", return_value=""),
+            patch.object(calendar, "get_supabase", return_value=db),
+        ):
+            result = calendar.get_calendar_connection("Bearer token")
+        self.assertEqual((result["connected"], result["source"]), (True, "canvas"))
+        self.assertEqual([item["title"] for item in result["items"]], ["Quiz 2"])
+        self.assertEqual(result["items"][0]["type"], "quiz")
+        self.assertEqual(result["items"][0]["course"], "MGT 300")
+        self.assertEqual(result["items"][0]["url"], "https://school.instructure.com/courses/7/assignments/70")
+
+    def test_no_link_and_no_token_is_not_connected(self):
+        sys.path.insert(0, os.path.dirname(__file__))
+        from fake_supabase import FakeDB
+
+        with (
+            patch.object(calendar, "get_user_id", return_value="u1"),
+            patch.object(calendar, "_stored_feed", return_value=""),
+            patch.object(calendar, "get_supabase", return_value=FakeDB()),
+        ):
+            self.assertEqual(calendar.get_calendar_connection("Bearer token")["connected"], False)
