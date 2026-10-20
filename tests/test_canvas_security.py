@@ -6,7 +6,7 @@ import os
 import pathlib
 import sys
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
@@ -114,6 +114,48 @@ class HostTests(unittest.TestCase):
         slept = []
         cc.CanvasClient("school.instructure.com", TOKEN, http=http, sleep=slept.append, resolve=lambda _h: True).me()
         self.assertTrue(slept and slept[0] > 0)
+
+
+class PinnedConnectionTests(unittest.TestCase):
+    """The client connects only to an address that passed the public check (no DNS rebinding)."""
+
+    def _request(self, url):
+        import requests
+        return requests.Request("GET", url).prepare()
+
+    def test_connects_to_the_checked_address_with_tls_on_the_name(self):
+        adapter = cc._PinnedAdapter("school.instructure.com", "203.0.113.10")
+        host_params, pool_kwargs = adapter.build_connection_pool_key_attributes(self._request("https://school.instructure.com/api/v1/users/self"), True)
+        self.assertEqual(host_params["host"], "203.0.113.10")
+        self.assertEqual(pool_kwargs["server_hostname"], "school.instructure.com")
+        self.assertEqual(pool_kwargs["assert_hostname"], "school.instructure.com")
+
+    def test_other_hosts_are_refused(self):
+        adapter = cc._PinnedAdapter("school.instructure.com", "203.0.113.10")
+        with self.assertRaises(cc.CanvasForbiddenRequest):
+            adapter.build_connection_pool_key_attributes(self._request("https://evil.example/x"), True)
+
+    def test_host_header_is_the_canvas_name(self):
+        adapter = cc._PinnedAdapter("school.instructure.com", "203.0.113.10")
+        request = self._request("https://school.instructure.com/api/v1/users/self")
+        with patch.object(cc.HTTPAdapter, "send", return_value="sent") as sent:
+            self.assertEqual(adapter.send(request), "sent")
+        self.assertEqual(sent.call_args[0][0].headers["Host"], "school.instructure.com")
+
+    def test_private_or_mixed_addresses_are_never_pinned(self):
+        def infos(*addresses):
+            return [(None, None, None, "", (a, 443)) for a in addresses]
+        with patch.object(cc.socket, "getaddrinfo", return_value=infos("10.0.0.5")):
+            self.assertEqual(cc._public_addresses("school.instructure.com"), [])
+            with self.assertRaises(cc.CanvasForbiddenRequest):
+                cc.pinned_session("school.instructure.com")
+        with patch.object(cc.socket, "getaddrinfo", return_value=infos("93.184.215.14", "127.0.0.1")):
+            self.assertEqual(cc._public_addresses("school.instructure.com"), [])
+        with patch.object(cc.socket, "getaddrinfo", return_value=infos("93.184.215.14")):
+            session = cc.pinned_session("school.instructure.com")
+            adapter = session.get_adapter("https://school.instructure.com/api/v1/users/self")
+            self.assertIsInstance(adapter, cc._PinnedAdapter)
+            self.assertEqual(adapter._address, "93.184.215.14")
 
 
 class CryptoTests(unittest.TestCase):

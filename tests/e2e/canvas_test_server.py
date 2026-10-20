@@ -41,7 +41,8 @@ for module in (canvas, classes, admin, public_forms, calendar):
     module.get_user_id = user_from_token
     module.get_supabase = lambda: DB
 canvas_client.requests.Session = lambda: CANVAS
-canvas_client._resolves_public = lambda host: True
+canvas_client._public_addresses = lambda host: ['203.0.113.10']
+CANVAS.mount = lambda prefix, adapter: None  # the real client pins its session; the fake has nothing to pin
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])

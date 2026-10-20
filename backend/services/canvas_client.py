@@ -6,7 +6,9 @@ Rules enforced here (not in the UI):
   * Only GET, and only to the read-only allowlist below. Anything else raises.
   * Host check: https, no port, no credentials, no IP literal or localhost, the host is
     *.instructure.com or listed in canvas_school_policy, and it resolves to public addresses.
-    Redirects are never followed to another host.
+    Each client then connects only to an address that passed that check (TLS and Host still use
+    the Canvas name), so DNS can't be switched to a private address afterwards. Redirects are
+    never followed to another host.
   * X-Rate-Limit-Remaining is respected with backoff.
   * Every call is written to canvas_activity (endpoint name and status only).
   * A 401 raises CanvasUnauthorized so the caller disconnects.
@@ -26,6 +28,7 @@ from typing import Callable, Iterable, Optional
 from urllib.parse import parse_qsl, urlencode, urljoin, urlparse
 
 import requests
+from requests.adapters import HTTPAdapter
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from services.log_scrub import register_secret
@@ -125,13 +128,47 @@ def host_allowed(host: str, policy_domains: Iterable[str]) -> bool:
     return host in {d.lower() for d in policy_domains}
 
 
-def _resolves_public(host: str) -> bool:
+def _public_addresses(host: str) -> list[str]:
+    """The host's addresses, or [] unless every one of them is public."""
     try:
         infos = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
     except socket.gaierror:
-        return False
-    addresses = {info[4][0] for info in infos}
-    return bool(addresses) and all(ipaddress.ip_address(a.split("%")[0]).is_global for a in addresses)
+        return []
+    addresses = sorted({info[4][0].split("%")[0] for info in infos})
+    return addresses if addresses and all(ipaddress.ip_address(a).is_global for a in addresses) else []
+
+
+def _resolves_public(host: str) -> bool:
+    return bool(_public_addresses(host))
+
+
+class _PinnedAdapter(HTTPAdapter):
+    """Connects to one checked address for `host`; TLS (SNI and certificate) and Host stay `host`."""
+
+    def __init__(self, host: str, address: str, **kwargs):
+        self._host = host
+        self._address = address
+        super().__init__(**kwargs)
+
+    def build_connection_pool_key_attributes(self, request, verify, cert=None):
+        host_params, pool_kwargs = super().build_connection_pool_key_attributes(request, verify, cert)
+        if host_params.get("host") != self._host:
+            raise CanvasForbiddenRequest("Canvas requests stay on the checked host.")
+        return {**host_params, "host": self._address}, {**pool_kwargs, "server_hostname": self._host, "assert_hostname": self._host}
+
+    def send(self, request, *args, **kwargs):
+        request.headers["Host"] = self._host
+        return super().send(request, *args, **kwargs)
+
+
+def pinned_session(host: str) -> requests.Session:
+    """A session that can only reach `host`, at an address checked to be public."""
+    addresses = _public_addresses(host)
+    if not addresses:
+        raise CanvasForbiddenRequest("That Canvas address could not be reached.")
+    session = requests.Session()
+    session.mount(f"https://{host}/", _PinnedAdapter(host, addresses[0]))
+    return session
 
 
 def check_host(domain: str, policy_domains: Iterable[str], resolve: Optional[Callable[[str], bool]] = None) -> str:
@@ -213,7 +250,7 @@ class CanvasClient:
         self.__token = token
         register_secret(token)
         self._log = log or (lambda name, status: None)
-        self._http = http or requests.Session()
+        self._http = http or pinned_session(self.host)
         self._sleep = sleep
 
     def __repr__(self) -> str:  # never show the token

@@ -50,6 +50,9 @@ class FakeCanvas:
         self.calls = []
         self.unauthorized = False
 
+    def mount(self, prefix, adapter):  # the client pins its session to the checked address
+        self.mounted = (prefix, adapter)
+
     def request(self, method, url, headers=None, **_kwargs):
         parsed = urlparse(url)
         assert parsed.hostname == HOST
@@ -92,7 +95,7 @@ class CanvasIntegrationTests(unittest.TestCase):
             patch.object(canvas, "get_supabase", return_value=self.db),
             patch.object(classes, "get_supabase", return_value=self.db),
             patch.object(canvas_client.requests, "Session", return_value=self.canvas),
-            patch.object(canvas_client, "_resolves_public", return_value=True),
+            patch.object(canvas_client, "_public_addresses", return_value=["203.0.113.10"]),
         ]
         for p in self.patches:
             p.start()
