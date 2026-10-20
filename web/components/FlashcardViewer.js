@@ -131,8 +131,8 @@ export default function FlashcardViewer({
           </button>
         )}
         {onEdit && <button type="button" className="c-icon-btn" onClick={onEdit} aria-label="Edit"><Pencil size={20} strokeWidth={1.75} aria-hidden="true" /></button>}
-        <button type="button" className="c-btn c-btn--quiet fc-ask" onClick={() => card && askAboutCard(card, guideId)} disabled={done}>
-          <MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />Ask
+        <button type="button" className="c-btn c-btn--quiet fc-ask" onClick={() => card && askAboutCard(card, guideId)} disabled={done} aria-label="Ask about this card">
+          <MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" /><span className="fc-ask-label">Ask</span>
         </button>
       </div>
 
@@ -187,7 +187,8 @@ export default function FlashcardViewer({
         </>
       )}
       <style jsx>{`
-        .fc { display: grid; gap: 20px; width: min(760px, 100%); margin: 0 auto; }
+        .fc { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; width: min(760px, 100%); margin: 0 auto; min-width: 0; }
+        .fc > * { min-width: 0; }
         .fc-bar { position: sticky; top: calc(var(--bar-h) + 12px); z-index: 20; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius:var(--r-pill); }
         .fc-name { flex: 1; min-width: 0; padding: 0 8px; font:600 17px/1.15 var(--font-display); }
         .fc-bar :global(.is-starred) { color: var(--olive-ink); }
@@ -203,7 +204,8 @@ export default function FlashcardViewer({
         .fc-actions { display: flex; justify-content: center; gap: 12px; }
         .fc-actions :global(.c-btn) { min-width: 150px; }
         @media (max-width: 767px) {
-          .fc-bar { top: 64px; }
+          .fc-ask { padding: 0 10px; }
+          .fc-ask-label { display: none; }
           .fc-card { min-height: 300px; }
           .fc-actions :global(.c-btn) { flex: 1; min-width: 0; }
         }

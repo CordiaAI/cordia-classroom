@@ -18,7 +18,8 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
   useEffect(() => {
     const saved = Number(localStorage.getItem('cordiaTutorWidth'));
     if (saved >= MIN_WIDTH && saved <= MAX_WIDTH) setWidth(saved);
-    setOpen(localStorage.getItem(OPEN_KEY) === 'true');
+    // Phones open the Tutor full-screen, so it never reopens by itself there.
+    setOpen(localStorage.getItem(OPEN_KEY) === 'true' && window.matchMedia('(min-width: 768px)').matches);
   }, []);
 
   useEffect(() => {

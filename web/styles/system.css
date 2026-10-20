@@ -460,6 +460,12 @@ body:has(.about) .c-fab { display: none; }
   .sn-v-divider, .sn-h-divider { display: none !important; }
   .sn-paper-wrap, .sn-viewer-wrap, .sn-diagram-wrap { grid-column: 1 !important; grid-row: auto !important; min-width: 0; }
   .sn-viewer-wrap, .sn-diagram-wrap { min-height: 320px; }
+  /* The page scrolls on phones: the paper gets real height and the panels stack below it. */
+  .sn-page { height: auto !important; min-height: 100vh; padding: 12px; }
+  .sn-layout { flex: none !important; }
+  .sn-paper-wrap { min-height: 60vh; order: 0; }
+  .sn-viewer-wrap { order: 1; }
+  .sn-diagram-wrap { order: 2; }
 }
 @media (max-width: 767px) {
   .sn-header, .sn-header-left, .sn-header-right { flex-wrap: wrap; min-width: 0; max-width: 100%; }

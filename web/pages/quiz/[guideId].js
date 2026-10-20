@@ -43,7 +43,7 @@ export default function QuizPage() {
   const [race, setRace] = useState(false);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !guideId) return;
     setTypes(rememberedTypes());
     apiFetch(`/quiz/${guideId}/history`).then(data => setHistory(data?.attempts || []));
     apiFetch(`/guides/${guideId}`).then(data => setTitle(data?.guide?.title || ''));

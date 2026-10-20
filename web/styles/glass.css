@@ -86,3 +86,17 @@
 @media (prefers-reduced-transparency: reduce) {
   :is(.c-card, .c-btn--secondary, .c-btn--quiet, .c-icon-btn, .c-chip, .c-pill, .c-seg, .c-tutor-bubble, .c-input, .c-select, .c-sheet, .c-menu) { background: var(--surface-raised) !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
+
+/* A glass card is its own stacking context, so an open menu inside one would slide under
+   the next card. Lift whichever card holds the open menu. */
+:is(.c-card, .c-glass, .c-list-row):has(.c-menu) { position: relative; z-index: 30; }
+
+/* Tutor panel: the expand and close buttons sit together, clear of the title. */
+.tutor-drawer .tutor-expand { top: 10px; right: 54px; width: 40px; height: 40px; background: transparent; }
+.tutor-drawer .cordia-tutor-title-row { padding-right: 96px; }
+.cordia-tutor-input textarea { min-width: 0; }
+.cordia-tutor-input button { min-height: 38px; align-self: end; }
+@media (max-width: 767px) {
+  /* Full-screen on phones, so it needs a solid page behind it rather than glass. */
+  .tutor-drawer, .tutor-drawer.c-glass, :root:not([data-theme='dark']) .tutor-drawer.c-glass { background: var(--canvas); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}

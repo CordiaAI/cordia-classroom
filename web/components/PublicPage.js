@@ -1,11 +1,16 @@
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import AcademicInfinityMark from './AcademicInfinityMark';
+import { getToken } from '../lib/api';
 
 const SITE = 'https://classroom.cordiaai.io';
 
 // Shared frame for the signed-out pages: clouds, wordmark, and three links.
 export default function PublicPage({ title, description, path = '/', backdrop = '', children }) {
+  // Signed-in visitors get a way back into the app instead of "Sign in".
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => { setSignedIn(Boolean(getToken())); }, []);
   return (
     <>
       <Head>
@@ -21,7 +26,9 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
           <nav aria-label="Public">
             <Link href="/mission">Approach</Link>
             <Link href="/pricing">Pricing</Link>
-            <Link href="/login" className="public-signin">Sign in</Link>
+            {signedIn
+              ? <Link href="/dashboard" className="public-signin">Open Cordia</Link>
+              : <Link href="/login" className="public-signin">Sign in</Link>}
           </nav>
         </header>
         <main className="public-main">{children}</main>
@@ -53,6 +60,7 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
         .public-nav nav a:hover { background: var(--olive-tint); text-decoration: none; }
         .public-nav nav a.public-signin { background: var(--olive); color: var(--on-olive); }
         .public-main { width: min(1120px, 100%); margin: 0 auto; padding: 48px 24px 80px; }
+        .public-doc { color: var(--text-secondary); }
         .public-footer { border-top: 1px solid var(--hairline); padding: 24px; }
         .public-footer nav { width: min(1120px, 100%); margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px 24px; }
         .public-footer a { color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); text-decoration: none; }

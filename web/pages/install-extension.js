@@ -1,13 +1,11 @@
-import { useRequireAuth } from '../lib/auth';
+import PublicPage from '../components/PublicPage';
 import { Puzzle } from 'lucide-react';
 import AcademicInfinityMark from '../components/AcademicInfinityMark';
 import { EXTENSION_STORE_URL } from '../lib/extension';
 
 export default function InstallExtensionPage() {
-  const { ready } = useRequireAuth();
-  if (!ready) return null;
-
   return (
+    <PublicPage title="Get the Chrome extension — Cordia Classroom" description="Install the Cordia Classroom extension and capture course material in a few clicks." path="/install-extension">
     <div className="extension-install-page fade-in">
       <div className="extension-install-hero">
         <AcademicInfinityMark className="extension-install-logo" />
@@ -96,5 +94,6 @@ export default function InstallExtensionPage() {
         @media (max-width: 560px) { .extension-install-hero { align-items: flex-start; } .extension-install-logo { width: 48px; height: 48px; } .extension-install-step { padding: 16px; grid-template-columns: 30px 1fr; gap: 10px; } }
       `}</style>
     </div>
+    </PublicPage>
   );
 }

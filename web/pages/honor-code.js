@@ -1,17 +1,13 @@
-import Head from 'next/head';
+import PublicPage from '../components/PublicPage';
 
 export default function HonorCode() {
   return (
-    <>
-      <Head>
-        <title>Honor Code — CordiaClassroom</title>
-        <meta name="description" content="CordiaClassroom Academic Integrity and Honor Code" />
-      </Head>
-      <div style={{
+    <PublicPage title="Honor Code — Cordia Classroom" description="Using Cordia Classroom with academic integrity." path="/honor-code">
+      <div className="c-card public-doc" style={{
         maxWidth: '800px',
         margin: '0 auto',
-        padding: '60px 24px',
-        fontFamily: "'Segoe UI', -apple-system, sans-serif",
+        padding: '40px clamp(20px, 5vw, 48px)',
+        fontFamily: 'var(--font-sans)',
         color: 'var(--text-secondary)',
         lineHeight: '1.8',
       }}>
@@ -77,7 +73,7 @@ export default function HonorCode() {
           <a href="/terms" style={{ color: 'var(--accent)', fontSize: '0.9rem' }}>Terms of Service</a>
         </div>
       </div>
-    </>
+    </PublicPage>
   );
 }
 

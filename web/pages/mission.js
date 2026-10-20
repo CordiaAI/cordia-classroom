@@ -1,8 +1,6 @@
-import { useRequireAuth } from '../lib/auth';
+import PublicPage from '../components/PublicPage';
 
 export default function MissionPage() {
-  const { ready } = useRequireAuth();
-  if (!ready) return null;
 
   const features = [
     {
@@ -12,7 +10,7 @@ export default function MissionPage() {
     {
       title: 'NCLEX Question Generation',
       subtitle: 'Nursing User Group (More specific user groups to be added soon!)',
-      description: 'There is no other platform that offers NCLEX question generation. CordiaClassroom allows for you to use the material you are learning to generate NCLEX questions. This task is used to assist Nursing students in making study guides exactly like their exams with two button clicks.',
+      description: 'CordiaClassroom turns the material you are learning into NCLEX-style questions, so nursing students can practice in the same format as their exams in a couple of clicks.',
     },
     {
       title: 'CordiaClassroom Never Allows the AI to Search for Answers on the Web.',
@@ -33,8 +31,9 @@ export default function MissionPage() {
   ];
 
   return (
+    <PublicPage title="Our approach — Cordia Classroom" description="How Cordia Classroom turns your own course material into study guides, quizzes and flashcards." path="/mission">
     <div className="fade-in mission-page" style={{ width: 'min(var(--page-max), 100%)', margin: '0 auto' }}>
-      <h2 style={{ marginBottom: 4 }}>CordiaClassroom Features</h2>
+      <h1 style={{ marginBottom: 4 }}>CordiaClassroom Features</h1>
       <p style={{ color: 'var(--text-muted)', fontSize: 15, marginBottom: 28, lineHeight: 1.5 }}>
         CordiaClassroom was built by a college student, for college students. Our mission is to make studying smarter, faster, and more accessible for every student — regardless of major or learning style.
       </p>
@@ -65,5 +64,6 @@ export default function MissionPage() {
         Founder - Jackson Laughlin
       </p>
     </div>
+    </PublicPage>
   );
 }

@@ -29,8 +29,15 @@ export default function SettingsPage() {
     if (!router.isReady || !router.query.section) return;
     const section = String(router.query.section);
     if (section === 'grove') { router.replace('/progress'); return; }
-    setActiveSection(SECTION_ALIASES[section] || section);
+    const key = SECTION_ALIASES[section] || section;
+    setActiveSection(['account', 'study', 'appearance', 'plan', 'connections'].includes(key) ? key : 'account');
   }, [router.isReady, router.query.section]);
+
+  // Picking a tab updates the address, so Back and shared links land on it.
+  function pickSection(key) {
+    setActiveSection(key);
+    router.replace({ pathname: '/settings', query: key === 'account' ? {} : { section: key } }, undefined, { shallow: true });
+  }
   const [canvasReady, setCanvasReady] = useState(false);
   const [extensionInstalled, setExtensionInstalled] = useState(false);
   const [deleting, setDeleting] = useState(null); // null | { text, busy, error }
@@ -196,7 +203,7 @@ export default function SettingsPage() {
     if (next === null) return;
     event.preventDefault();
     const target = sections[(next + sections.length) % sections.length];
-    setActiveSection(target.key);
+    pickSection(target.key);
     document.getElementById(`tab-${target.key}`)?.focus();
   }
 
@@ -215,7 +222,7 @@ export default function SettingsPage() {
               aria-selected={activeSection === section.key}
               aria-controls={`panel-${section.key}`}
               tabIndex={activeSection === section.key ? 0 : -1}
-              onClick={() => setActiveSection(section.key)}
+              onClick={() => pickSection(section.key)}
             >
               {section.label}
             </button>

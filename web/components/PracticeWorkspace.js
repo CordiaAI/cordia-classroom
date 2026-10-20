@@ -535,7 +535,7 @@ export default function PracticeWorkspace() {
   }
 
   return (
-    <main className="practice-page">
+    <div className="practice-page">
       <header className="c-page-head practice-head">
         <div className="c-row practice-title-row">
           <button type="button" className="c-icon-btn" onClick={() => router.push(guideId ? '/guide/' + guideId : '/practice')} aria-label="Back"><ArrowLeft {...ICON} /></button>
@@ -723,6 +723,7 @@ export default function PracticeWorkspace() {
       <style jsx>{`
         .practice-page { display: grid; gap: 20px; }
         .practice-title-row { min-width: 0; flex: 1; }
+        @media (max-width: 767px) { .practice-head { flex-wrap: wrap; } .practice-title-row { flex-basis: 100%; } }
         .practice-source-name { font-family: var(--font-display); min-width: 0; }
         .practice-prompt { margin: 8px 0 0; font:600 20px/1.15 var(--font-display); }
         .practice-kind { text-transform: capitalize; }
@@ -739,6 +740,6 @@ export default function PracticeWorkspace() {
         .practice-size input { width: 112px; accent-color: var(--olive); }
         .practice-evaluation { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
       `}</style>
-    </main>
+    </div>
   );
 }

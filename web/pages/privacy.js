@@ -1,17 +1,13 @@
-import Head from 'next/head';
+import PublicPage from '../components/PublicPage';
 
 export default function PrivacyPolicy() {
   return (
-    <>
-      <Head>
-        <title>Privacy Policy — CordiaClassroom</title>
-        <meta name="description" content="CordiaClassroom Privacy Policy" />
-      </Head>
-      <div style={{
+    <PublicPage title="Privacy Policy — Cordia Classroom" description="How Cordia Classroom collects, uses and protects your data." path="/privacy">
+      <div className="c-card public-doc" style={{
         maxWidth: '800px',
         margin: '0 auto',
-        padding: '60px 24px',
-        fontFamily: "'Segoe UI', -apple-system, sans-serif",
+        padding: '40px clamp(20px, 5vw, 48px)',
+        fontFamily: 'var(--font-sans)',
         color: 'var(--text-secondary)',
         lineHeight: '1.8',
       }}>
@@ -176,7 +172,7 @@ export default function PrivacyPolicy() {
           </p>
         </Section>
       </div>
-    </>
+    </PublicPage>
   );
 }
 

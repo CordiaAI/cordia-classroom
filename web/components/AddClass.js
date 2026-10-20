@@ -28,6 +28,10 @@ export default function AddClass({ onAdded, onCancel, folderId = '', withName = 
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const codeRef = useRef(null);
+  // Suggestions show only while their field has focus, so they never sit over Add.
+  const [listFor, setListFor] = useState(null);
+  const fieldFocus = key => ({ onFocus: () => setListFor(key), onBlur: event => { if (!event.currentTarget.contains(event.relatedTarget)) setListFor(null); } });
+  const keepFocus = { onMouseDown: event => event.preventDefault() };
   const schools = useSuggest(q => '/classes/schools?q=' + encodeURIComponent(q), schoolText, !school && schoolText.trim().length >= 2);
   const catalog = useSuggest(q => `/classes/catalog?school_id=${school?.id}&q=${encodeURIComponent(q)}`, code, Boolean(school?.id) && code.trim().length >= 1);
 
@@ -66,20 +70,20 @@ export default function AddClass({ onAdded, onCancel, folderId = '', withName = 
           <input className="c-input" value={name} onChange={event => setName(event.target.value)} placeholder="Biology" autoComplete="off" autoFocus />
         </label>
       )}
-      <label className="c-field cls-field">
-        <span className="c-section-title cls-label">School{withName ? ' (with a code)' : ''}</span>
+      <label className="c-field cls-field" {...fieldFocus('school')}>
+        <span className="c-section-title cls-label">School{withName ? ' (optional, to share with classmates)' : ''}</span>
         <input className="c-input" value={school ? school.name : schoolText} onChange={event => { setSchool(null); setSchoolText(event.target.value); }} autoComplete="off" autoFocus={!withName} />
-        {schools.length > 0 && (
-          <ul className="c-menu cls-suggest" role="listbox" aria-label="Schools">
+        {listFor === 'school' && schools.length > 0 && (
+          <ul className="c-menu cls-suggest" role="listbox" aria-label="Schools" {...keepFocus}>
             {schools.map(item => <li key={item.id}><button type="button" role="option" aria-selected="false" onClick={() => { setSchool(item); codeRef.current?.focus(); }}>{item.name}</button></li>)}
           </ul>
         )}
       </label>
-      <label className="c-field cls-field">
+      <label className="c-field cls-field" {...fieldFocus('code')}>
         <span className="c-section-title cls-label">Course code{withName ? ' (optional)' : ''}</span>
         <input ref={codeRef} className="c-input" value={code} onChange={event => setCode(event.target.value)} placeholder="MGT 300" autoComplete="off" />
-        {catalog.length > 0 && (
-          <ul className="c-menu cls-suggest" role="listbox" aria-label="Classes">
+        {listFor === 'code' && catalog.length > 0 && (
+          <ul className="c-menu cls-suggest" role="listbox" aria-label="Classes" {...keepFocus}>
             {catalog.map(item => <li key={item.id}><button type="button" role="option" aria-selected="false" onClick={event => submit(event, item)}><strong>{item.code}</strong>{item.name && <span className="c-meta">{item.name}</span>}</button></li>)}
           </ul>
         )}
@@ -95,12 +99,13 @@ export default function AddClass({ onAdded, onCancel, folderId = '', withName = 
         .cls-add--named { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto; }
         .cls-field { position: relative; }
         .cls-label { font-size: 13px; }
-        .cls-suggest { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; margin-top: 4px; padding: 4px; list-style: none; }
+        .cls-suggest { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; margin-top: 4px; padding: 4px; list-style: none; max-height: 264px; overflow-y: auto; background: var(--canvas) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
         .cls-suggest button { display: flex; align-items: baseline; gap: 8px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none; color: var(--ink); font: 500 15px/1.3 var(--font-sans); text-align: left; cursor: pointer; }
         .cls-suggest button:hover, .cls-suggest button:focus-visible { background: var(--hover); }
         .cls-add-actions { display: flex; gap: 4px; }
         .cls-error { grid-column: 1 / -1; margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
-        @media (max-width: 767px) { .cls-add, .cls-add--named { grid-template-columns: minmax(0, 1fr); } }
+        /* Phones stack the fields, so the suggestions push Add down instead of covering it. */
+        @media (max-width: 767px) { .cls-add, .cls-add--named { grid-template-columns: minmax(0, 1fr); } .cls-suggest { position: static; } }
       `}</style>
     </>
   );

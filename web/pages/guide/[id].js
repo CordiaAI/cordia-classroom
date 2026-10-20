@@ -423,7 +423,7 @@ export default function GuidePage() {
       <style jsx>{`
         .guide { gap: 16px; }
         .guide-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .guide-title { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px; }
+        .guide-title { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-wrap: anywhere; }
         .guide-title :global(.guide-rename-btn) { flex: 0 0 auto; color: var(--muted); }
         .guide-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: -8px 0 0 48px; }
         .guide-share-label { display: inline-flex; align-items: center; gap: 6px; font: 600 13px/1 var(--font-sans); white-space: nowrap; }

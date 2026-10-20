@@ -21,7 +21,7 @@ export default function App({ Component, pageProps }) {
   // Public pages render without the signed-in shell. Pricing gets the app nav when signed in.
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => { setSignedIn(Boolean(getToken())); }, [router.pathname]);
-  const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password', '/instructors', '/copyright'].includes(router.pathname)
+  const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password', '/instructors', '/copyright', '/mission', '/install-extension', '/privacy', '/terms', '/honor-code'].includes(router.pathname)
     && !(router.pathname === '/pricing' && signedIn);
 
   // Authentication pages stay light; workspace routes honor the saved preference.
