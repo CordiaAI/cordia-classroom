@@ -1,5 +1,5 @@
 import {
-  Brain, CalendarDays, ChartColumn, Layers, MessageCircle, NotebookPen, PencilRuler, Sparkles, SquarePlus, Timer, TreeDeciduous, Upload,
+  Brain, CalendarDays, ChartColumn, Layers, Link2, MessageCircle, NotebookPen, PencilRuler, Sparkles, SquarePlus, Timer, TreeDeciduous, Upload,
 } from 'lucide-react';
 
 // Every feature, in the order a student meets them. Ids match MINI walkthroughs.
@@ -11,6 +11,7 @@ export const FEATURE_LIST = [
   { id: 'ask', label: 'Tutor', icon: MessageCircle },
   { id: 'cards', label: 'Cards', icon: Layers },
   { id: 'practice', label: 'Practice', icon: PencilRuler },
+  { id: 'canvas', label: 'Canvas', icon: Link2 },
   { id: 'calendar', label: 'Calendar', icon: CalendarDays },
   { id: 'focus', label: 'Focus', icon: Timer },
   { id: 'notes', label: 'Notes', icon: NotebookPen },

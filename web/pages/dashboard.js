@@ -19,6 +19,7 @@ import LearnCordia from '../components/LearnCordia';
 import AboutYou from '../components/AboutYou';
 import GroveCard from '../components/GroveCard';
 import PulseDot from '../components/PulseDot';
+import CanvasConnectButton from '../components/CanvasConnectButton';
 import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
 import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
@@ -163,6 +164,8 @@ export default function Today({ timerState, setTimerState }) {
           <button type="button" className="c-btn c-btn--secondary" onClick={refresh}>Retry</button>
         </div>
       )}
+
+      <CanvasConnectButton card className="c-btn c-btn--primary" spot="canvas-connect" />
 
       {continueGuide && (
         <section className="c-section" aria-labelledby="continue-title">

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, GraduationCap, Plus, X } from 'lucide-react';
 import { apiFetch, apiErrorMessage } from '../lib/api';
+import CanvasConnectButton from './CanvasConnectButton';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -85,6 +86,7 @@ export default function ClassesTab() {
     <div className="c-stack cls">
       <div className="c-row">
         <span className="c-spacer" />
+        <CanvasConnectButton />
         {!adding && <button type="button" className="c-btn c-btn--quiet" onClick={() => setAdding(true)}><Plus {...ICON} />Add class</button>}
       </div>
       {adding && <AddClass onCancel={() => setAdding(false)} onAdded={item => { setAdding(false); setClasses(list => [...(list || []).filter(c => c.id !== item.id), item].sort((a, b) => a.code.localeCompare(b.code))); }} />}

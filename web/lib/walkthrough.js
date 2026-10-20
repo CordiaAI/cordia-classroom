@@ -41,7 +41,8 @@ export const DAY_ONE = [
     { id: 'flip', target: '[data-spot="flashcard"]', label: 'flip', where: onCards, on: 'card-flipped' },
   ],
   [
-    { id: 'today', target: '[data-spot="nav-today"]', label: 'Go to Today', on: 'today-opened', finishable: true },
+    { id: 'today', target: '[data-spot="nav-today"]', label: 'Go to Today', on: 'today-opened' },
+    { id: 'canvas', target: '[data-spot="canvas-connect"]', label: 'Connect Canvas', where: onToday, on: 'canvas-opened', finishable: true, optionalTarget: true },
   ],
 ];
 
@@ -89,6 +90,9 @@ export const MINI = {
   insights: { label: 'Insights', route: '/dashboard', steps: [
     { target: '[data-spot="insights"]', label: 'Your weak spots', where: onToday, on: 'insights-opened' },
   ] },
+  canvas: { label: 'Canvas', route: '/dashboard', steps: [
+    { target: '[data-spot="canvas-connect"]', label: 'Connect Canvas', where: onToday, on: 'canvas-opened' },
+  ] },
   grove: { label: 'Grove', route: '/dashboard', steps: [
     { target: '[data-spot="grove"]', label: 'Your grove', where: onToday, on: 'grove-opened' },
   ] },
@@ -98,7 +102,7 @@ export const MINI = {
 const FEATURE_EVENTS = {
   'guide-ready': 'add', explain: 'explain', 'card-made': 'card', 'quiz-started': 'quiz', ask: 'ask',
   'card-flipped': 'cards', 'practice-opened': 'practice', 'calendar-connected': 'calendar', 'focus-started': 'focus',
-  'note-written': 'notes', 'insights-opened': 'insights', 'grove-opened': 'grove',
+  'note-written': 'notes', 'insights-opened': 'insights', 'grove-opened': 'grove', 'canvas-connected': 'canvas',
 };
 
 export const FEATURES = Object.keys(MINI);

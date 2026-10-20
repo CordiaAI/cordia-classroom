@@ -41,6 +41,11 @@ test('Today: streak pill, Continue, four tools, no Start card', async () => {
   assert.match(dashboard, /<h1 className="c-title">Today<\/h1>/);
   assert.match(dashboard, /<Flame /);
   assert.doesNotMatch(dashboard, /today-start/);
+  assert.match(dashboard, /<CanvasConnectButton card [^>]*spot="canvas-connect"/);
+  const walkthrough = await source('lib/walkthrough.js');
+  assert.match(walkthrough, /id: 'canvas', target: '\[data-spot="canvas-connect"\]'[^\n]*finishable: true, optionalTarget: true/);
+  assert.match(await source('components/ClassesTab.js'), /<CanvasConnectButton \/>/);
+  assert.match(await source('components/Sidebar.js'), /key: 'canvas'[^\n]*section=canvas/);
   for (const tool of ['Quiz', 'Cards', 'Practice', 'Notes']) assert.match(dashboard, new RegExp(`label: '${tool}'`));
 });
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  CalendarDays, CircleHelp, CreditCard, Library, LogOut, MessageCircle, NotebookPen, Palette, Plus, Search, Sun, User,
+  CalendarDays, CircleHelp, CreditCard, Library, Link2, LogOut, MessageCircle, NotebookPen, Palette, Plus, Search, Sun, User,
 } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
@@ -92,6 +92,7 @@ export default function Sidebar() {
     { key: 'profile', label: 'Profile', icon: User, onSelect: () => router.push('/settings') },
     { key: 'appearance', label: 'Appearance', icon: Palette, onSelect: () => router.push('/settings?section=appearance') },
     { key: 'plan', label: 'Plan', icon: CreditCard, onSelect: () => router.push('/settings?section=plan') },
+    { key: 'canvas', label: 'Canvas', icon: Link2, onSelect: () => router.push('/settings?section=canvas') },
     { key: 'help', label: 'Help', icon: CircleHelp, onSelect: () => setShowHelp(true) },
     { key: 'signout', label: 'Sign out', icon: LogOut, separated: true, onSelect: () => signOut() },
   ];
