@@ -4,23 +4,20 @@ Full-text search across study guides.
 """
 
 import re
-import logging
-from fastapi import APIRouter, HTTPException, Header, Query
+from fastapi import APIRouter, Header, Query
 from database import get_supabase
 from auth_utils import get_user_id
 
-logger = logging.getLogger(__name__)
 router = APIRouter(tags=["search"])
 
-# Characters that could be used for SQL injection in LIKE patterns
-_UNSAFE_PATTERN = re.compile(r'[%_\\\'";]')
+# Queries are sent as parameters, so only LIKE's own wildcards and escape need escaping;
+# apostrophes and quotes stay, so "Newton's law" can match.
+_LIKE_SPECIAL = re.compile(r'([\\%_])')
 
 
-def _sanitize_search_query(q: str) -> str:
-    """Sanitize search input — strip SQL wildcards and dangerous characters."""
-    q = q.strip()[:200]  # Max 200 chars
-    q = _UNSAFE_PATTERN.sub('', q)
-    return q
+def _like_pattern(q: str) -> str:
+    """The search text as a literal "contains" pattern for ilike."""
+    return "%" + _LIKE_SPECIAL.sub(r"\\\1", q) + "%"
 
 
 def _extract_snippet(text: str, query: str, length: int = 120) -> str:
@@ -40,59 +37,53 @@ def _extract_snippet(text: str, query: str, length: int = 120) -> str:
 @router.get("/search")
 def search_guides(q: str = Query(..., min_length=1, max_length=200), authorization: str = Header(default="")):
     """Search guides by title, notes, and study_guide content."""
-    try:
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        # Sanitize search input
-        safe_q = _sanitize_search_query(q)
-        if not safe_q or len(safe_q) < 1:
-            return {"results": []}
+    q = q.strip()
+    if not q:
+        return {"results": []}
+    pattern = _like_pattern(q)
 
-        title_results = supabase.table("study_guides") \
-            .select("id, title, folder_id, notes, study_guide, created_at") \
-            .eq("user_id", user_id) \
-            .ilike("title", f"%{safe_q}%") \
-            .limit(20) \
-            .execute()
+    title_results = supabase.table("study_guides") \
+        .select("id, title, folder_id, notes, study_guide, created_at") \
+        .eq("user_id", user_id) \
+        .ilike("title", pattern) \
+        .limit(20) \
+        .execute()
 
-        notes_results = supabase.table("study_guides") \
-            .select("id, title, folder_id, notes, study_guide, created_at") \
-            .eq("user_id", user_id) \
-            .ilike("notes", f"%{safe_q}%") \
-            .limit(20) \
-            .execute()
+    notes_results = supabase.table("study_guides") \
+        .select("id, title, folder_id, notes, study_guide, created_at") \
+        .eq("user_id", user_id) \
+        .ilike("notes", pattern) \
+        .limit(20) \
+        .execute()
 
-        guide_results = supabase.table("study_guides") \
-            .select("id, title, folder_id, notes, study_guide, created_at") \
-            .eq("user_id", user_id) \
-            .ilike("study_guide", f"%{safe_q}%") \
-            .limit(20) \
-            .execute()
+    guide_results = supabase.table("study_guides") \
+        .select("id, title, folder_id, notes, study_guide, created_at") \
+        .eq("user_id", user_id) \
+        .ilike("study_guide", pattern) \
+        .limit(20) \
+        .execute()
 
-        # Deduplicate by id
-        seen = set()
-        results = []
-        for source, field in [(title_results, "title"), (notes_results, "notes"), (guide_results, "study_guide")]:
-            for row in (source.data or []):
-                if row["id"] not in seen:
-                    seen.add(row["id"])
-                    if field == "title":
-                        snippet = _extract_snippet(row.get("notes") or row.get("study_guide") or "", q)
-                    else:
-                        snippet = _extract_snippet(row.get(field, ""), q)
-                    results.append({
-                        "id": row["id"],
-                        "title": row["title"],
-                        "folder_id": row.get("folder_id"),
-                        "snippet": snippet,
-                        "match_field": field,
-                        "created_at": row["created_at"]
-                    })
+    # Deduplicate by id
+    seen = set()
+    results = []
+    for source, field in [(title_results, "title"), (notes_results, "notes"), (guide_results, "study_guide")]:
+        for row in (source.data or []):
+            if row["id"] not in seen:
+                seen.add(row["id"])
+                if field == "title":
+                    snippet = _extract_snippet(row.get("notes") or row.get("study_guide") or "", q)
+                else:
+                    snippet = _extract_snippet(row.get(field, ""), q)
+                results.append({
+                    "id": row["id"],
+                    "title": row["title"],
+                    "folder_id": row.get("folder_id"),
+                    "snippet": snippet,
+                    "match_field": field,
+                    "created_at": row["created_at"]
+                })
 
-        return {"results": results}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error searching: {e}")
-        raise HTTPException(status_code=500, detail="Search failed")
+    return {"results": results}

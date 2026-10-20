@@ -40,9 +40,9 @@ export default function OAuthCallback() {
     try {
       pending = sessionStorage.getItem('pendingProfile');
       sessionStorage.removeItem('pendingProfile');
-    } catch {}
+    } catch { /* storage blocked: the student can add school details in Settings */ }
     const saveProfile = pending
-      ? apiFetch('/auth/profile', { method: 'PATCH', body: pending }).catch(() => null)
+      ? apiFetch('/auth/profile', { method: 'PATCH', body: pending })
       : Promise.resolve();
     saveProfile.finally(() => router.replace('/dashboard'));
   }, [router]);

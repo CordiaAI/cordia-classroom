@@ -12,7 +12,8 @@ BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
-import main as main_module  # noqa: E402
+import main  # noqa: E402
+from routers import materials  # noqa: E402
 from services.pptx_rendering import (  # noqa: E402
     PptxRenderUnavailable,
     render_pptx_to_pdf,
@@ -35,10 +36,10 @@ class PptxRenderHardeningTests(unittest.TestCase):
         self.assertTrue(any(arg.startswith("-env:UserInstallation=file:///") for arg in observed_args))
 
     def test_missing_renderer_is_server_error(self):
-        client = TestClient(main_module.app)
+        client = TestClient(main.app)
         with (
-            patch.object(main_module, "get_user_id", return_value="user-1"),
-            patch.object(main_module, "render_pptx_to_pdf", side_effect=PptxRenderUnavailable("unavailable")),
+            patch.object(materials, "get_user_id", return_value="user-1"),
+            patch.object(materials, "render_pptx_to_pdf", side_effect=PptxRenderUnavailable("unavailable")),
         ):
             response = client.post(
                 "/render-pptx",
@@ -48,8 +49,8 @@ class PptxRenderHardeningTests(unittest.TestCase):
         self.assertEqual(response.status_code, 500)
 
     def test_endpoint_offloads_blocking_conversion(self):
-        source = (BACKEND / "main.py").read_text(encoding="utf-8")
-        self.assertIn("await run_in_threadpool(render_pptx_to_pdf, content_bytes, suffix)", source)
+        source = (BACKEND / "routers" / "materials.py").read_text(encoding="utf-8")
+        self.assertIn("await run_in_threadpool(render_pptx_to_pdf, data, suffix)", source)
 
 
 if __name__ == "__main__":

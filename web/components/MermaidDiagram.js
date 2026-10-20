@@ -46,7 +46,7 @@ export function mermaidConfig(theme = currentTheme()) {
 }
 
 // Renders Mermaid source with strict security; AI-written diagrams never get script or HTML labels.
-export default function MermaidDiagram({ code, label = 'Diagram' }) {
+export default function MermaidDiagram({ code, label = 'Diagram', className = 'study-aid-diagram' }) {
   const ref = useRef(null);
   const [error, setError] = useState(false);
   const [theme, setTheme] = useState(currentTheme);
@@ -73,5 +73,5 @@ export default function MermaidDiagram({ code, label = 'Diagram' }) {
   }, [code, theme]);
 
   if (error) return <pre className="study-aid-diagram-fallback">{code}</pre>;
-  return <div ref={ref} className="study-aid-diagram" role="img" aria-label={label} />;
+  return <div ref={ref} className={className} role="img" aria-label={label} />;
 }

@@ -15,19 +15,13 @@ from database import get_supabase
 from services.llm import get_openai_client, grade_written_answer
 from services.llm_calls import chat
 from auth_utils import get_user_id
+from ids import require_uuid
 from services import retain
 from services.entitlements import plan_for, record, remaining, require, subscription_row
 
-_UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/quiz", tags=["quiz"])
-
-
-def _validate_uuid(value: str, name: str = "ID") -> str:
-    if not value or not _UUID_RE.match(value):
-        raise HTTPException(status_code=400, detail=f"Invalid {name}")
-    return value
 
 
 class QuizAnswer(BaseModel):
@@ -161,65 +155,62 @@ def _save_quiz(supabase, guide_id: str, user_id: str, questions: list) -> None:
             .eq("id", guide_id) \
             .eq("user_id", user_id) \
             .execute()
-    except Exception as cache_err:
-        logger.warning(f"Failed to cache quiz questions for guide {guide_id}: {cache_err}")
+    except Exception:
+        logger.warning("Failed to cache quiz questions for guide %s", guide_id, exc_info=True)
 
 
 def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False):
     """Load or generate a Retain quiz, optionally replacing saved distractors."""
-    try:
-        _validate_uuid(guide_id, "guide ID")
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        result = supabase.table("study_guides") \
-            .select("study_guide, quiz_questions") \
-            .eq("id", guide_id) \
-            .eq("user_id", user_id) \
-            .execute()
+    result = supabase.table("study_guides") \
+        .select("study_guide, quiz_questions") \
+        .eq("id", guide_id) \
+        .eq("user_id", user_id) \
+        .execute()
 
-        if not result.data:
-            raise HTTPException(status_code=404, detail="Guide not found")
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Guide not found")
 
 
-        # A quiz is generated once, then stays attached to its guide until the user regenerates it.
-        cached = result.data[0].get("quiz_questions")
-        if cached and not regenerate:
-            return {"questions": cached}
+    # A quiz is generated once, then stays attached to its guide until the user regenerates it.
+    cached = result.data[0].get("quiz_questions")
+    if cached and not regenerate:
+        return {"questions": cached}
 
-        study_guide_text = result.data[0].get("study_guide", "")
-        if not study_guide_text:
-            raise HTTPException(status_code=400, detail="No study guide content to generate quiz from")
+    study_guide_text = result.data[0].get("study_guide", "")
+    if not study_guide_text:
+        raise HTTPException(status_code=400, detail="No study guide content to generate quiz from")
 
-        qa_pairs = _parse_qa_pairs(study_guide_text)
-        if not qa_pairs:
-            raise HTTPException(status_code=400, detail="No Q&A pairs found in study guide")
+    qa_pairs = _parse_qa_pairs(study_guide_text)
+    if not qa_pairs:
+        raise HTTPException(status_code=400, detail="No Q&A pairs found in study guide")
 
-        qa_pairs = qa_pairs[:50]
+    qa_pairs = qa_pairs[:50]
 
-        # AI distractors are a Pro feature; free accounts get one AI quiz a month as a
-        # preview, then guide-derived options. An explicit regenerate at 0 opens the upgrade.
-        use_ai = remaining(user_id, "ai_quiz") > 0
-        if not use_ai and regenerate:
-            require(user_id, "ai_quiz")
-        if not use_ai:
-            questions = _standard_questions(qa_pairs)
-            if not questions:
-                raise HTTPException(
-                    status_code=400,
-                    detail="At least two distinct study-guide answers are needed for Retain",
-                )
-            _save_quiz(supabase, guide_id, user_id, questions)
-            return {"questions": questions}
-
+    # AI distractors are a Pro feature; free accounts get one AI quiz a month as a
+    # preview, then guide-derived options. An explicit regenerate at 0 opens the upgrade.
+    use_ai = remaining(user_id, "ai_quiz") > 0
+    if not use_ai and regenerate:
         require(user_id, "ai_quiz")
-        client = get_openai_client()
-        if not client:
-            raise HTTPException(status_code=500, detail="AI service unavailable")
+    if not use_ai:
+        questions = _standard_questions(qa_pairs)
+        if not questions:
+            raise HTTPException(
+                status_code=400,
+                detail="At least two distinct study-guide answers are needed for Retain",
+            )
+        _save_quiz(supabase, guide_id, user_id, questions)
+        return {"questions": questions}
 
-        qa_text = "\n".join(f"Q: {p['question']}\nA: {p['answer']}" for p in qa_pairs)
+    require(user_id, "ai_quiz")
+    client = get_openai_client()
 
-        prompt = f"""For each Q&A pair below, generate exactly 3 plausible but WRONG answer choices.
+    qa_text = "\n".join(f"Q: {p['question']}\nA: {p['answer']}" for p in qa_pairs)
+
+    prompt = f"""For each Q&A pair below, generate exactly 3 plausible but WRONG answer choices.
 Return a JSON object {{"items": [...]}} with one element per Q&A pair, in order, where each element has:
 - "distractors": [wrong1, wrong2, wrong3]
 
@@ -234,63 +225,57 @@ CRITICAL RULES — follow every one:
 
 Return ONLY the JSON object, no other text:"""
 
-        response = chat(client, "quiz_distractors",
-            messages=[
-                {"role": "system", "content": "Generate quiz distractors. Return valid JSON only."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.5,
-            response_format={"type": "json_object"},
+    response = chat(client, "quiz_distractors",
+        messages=[
+            {"role": "system", "content": "Generate quiz distractors. Return valid JSON only."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.5,
+        response_format={"type": "json_object"},
+    )
+
+    # JSON mode keeps escaping valid (e.g. LaTeX backslashes in math guides).
+    # If the AI reply is still unusable, fall back to guide-derived options instead of failing.
+    try:
+        distractors_list = json.loads(response.choices[0].message.content or "{}").get("items", [])
+    except (json.JSONDecodeError, AttributeError):
+        logger.warning(f"Unusable distractor JSON for guide {guide_id}; using guide-derived options")
+        distractors_list = []
+    if not isinstance(distractors_list, list):
+        distractors_list = []
+
+    questions = []
+    for i, pair in enumerate(qa_pairs):
+        correct_answer = pair["answer"]
+        item = distractors_list[i] if i < len(distractors_list) and isinstance(distractors_list[i], dict) else {}
+        generated = item.get("distractors", [])
+        if not isinstance(generated, list):
+            generated = []
+        distractors = _balanced_distractors(
+            correct_answer,
+            generated,
+            _other_answers(qa_pairs, i),
         )
+        if not distractors:
+            continue
+        options = [correct_answer, *distractors]
+        random.shuffle(options)
+        correct_index = options.index(correct_answer)
+        questions.append({
+            "question": pair["question"],
+            "options": options,
+            "correct_index": correct_index
+        })
 
-        # JSON mode keeps escaping valid (e.g. LaTeX backslashes in math guides).
-        # If the AI reply is still unusable, fall back to guide-derived options instead of failing.
-        try:
-            distractors_list = json.loads(response.choices[0].message.content or "{}").get("items", [])
-        except (json.JSONDecodeError, AttributeError):
-            logger.warning(f"Unusable distractor JSON for guide {guide_id}; using guide-derived options")
-            distractors_list = []
-        if not isinstance(distractors_list, list):
-            distractors_list = []
+    if not questions:
+        raise HTTPException(status_code=502, detail="Could not create balanced Retain options")
 
-        questions = []
-        for i, pair in enumerate(qa_pairs):
-            correct_answer = pair["answer"]
-            item = distractors_list[i] if i < len(distractors_list) and isinstance(distractors_list[i], dict) else {}
-            generated = item.get("distractors", [])
-            if not isinstance(generated, list):
-                generated = []
-            distractors = _balanced_distractors(
-                correct_answer,
-                generated,
-                _other_answers(qa_pairs, i),
-            )
-            if not distractors:
-                continue
-            options = [correct_answer, *distractors]
-            random.shuffle(options)
-            correct_index = options.index(correct_answer)
-            questions.append({
-                "question": pair["question"],
-                "options": options,
-                "correct_index": correct_index
-            })
+    # Never cache the fallback, so the next visit retries the AI distractors.
+    if distractors_list:
+        _save_quiz(supabase, guide_id, user_id, questions)
 
-        if not questions:
-            raise HTTPException(status_code=502, detail="Could not create balanced Retain options")
-
-        # Never cache the fallback, so the next visit retries the AI distractors.
-        if distractors_list:
-            _save_quiz(supabase, guide_id, user_id, questions)
-
-        record(user_id, "ai_quiz")
-        return {"questions": questions}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error generating quiz: {e}")
-        raise HTTPException(status_code=500, detail="Failed to generate quiz")
+    record(user_id, "ai_quiz")
+    return {"questions": questions}
 
 
 @router.get("/{guide_id}/generate", dependencies=[Depends(ai_rate_limit())])
@@ -342,7 +327,7 @@ def start_session(guide_id: str, body: SessionRequest, authorization: str = Head
 @router.post("/{guide_id}/grade")
 def grade_written(guide_id: str, body: WrittenAnswer, authorization: str = Header(default="")):
     """Mark one written answer with full, partial or no credit, signed so the score can be trusted."""
-    _validate_uuid(guide_id, "guide ID")
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     questions = _saved_questions(get_supabase(), guide_id, user_id)
     if body.concept >= len(questions):
@@ -383,73 +368,59 @@ def _checked_attempts(supabase, guide_id: str, user_id: str, attempts: list) -> 
 @router.post("/{guide_id}/submit")
 def submit_quiz(guide_id: str, submission: QuizSubmission, authorization: str = Header(default="")):
     """Save a finished session. The score is first-try credit; practice after a miss never lowers it."""
-    try:
-        _validate_uuid(guide_id, "guide ID")
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        if submission.attempts:
-            answers = _checked_attempts(supabase, guide_id, user_id, submission.attempts)
-        else:  # sessions started before question types shipped
-            answers = [a.model_dump() for a in submission.answers]
-        total = len(answers)
-        if total == 0:
-            raise HTTPException(status_code=400, detail="No answers submitted")
-        correct = sum(1 for a in answers if a["is_correct"])
-        earned = sum(a.get("credit", 1.0 if a["is_correct"] else 0.0) for a in answers)
-        score = round((earned / total) * 100)
+    if submission.attempts:
+        answers = _checked_attempts(supabase, guide_id, user_id, submission.attempts)
+    else:  # sessions started before question types shipped
+        answers = [a.model_dump() for a in submission.answers]
+    total = len(answers)
+    if total == 0:
+        raise HTTPException(status_code=400, detail="No answers submitted")
+    correct = sum(1 for a in answers if a["is_correct"])
+    earned = sum(a.get("credit", 1.0 if a["is_correct"] else 0.0) for a in answers)
+    score = round((earned / total) * 100)
 
-        supabase.table("quiz_attempts").insert({
-            "user_id": user_id,
-            "guide_id": guide_id,
-            "score": score,
-            "total_questions": total,
-            "correct_answers": correct,
-            "answers": answers,
-        }).execute()
+    supabase.table("quiz_attempts").insert({
+        "user_id": user_id,
+        "guide_id": guide_id,
+        "score": score,
+        "total_questions": total,
+        "correct_answers": correct,
+        "answers": answers,
+    }).execute()
 
-        # Log study session
-        supabase.table("study_sessions").insert({
-            "user_id": user_id,
-            "guide_id": guide_id,
-            "session_type": "quiz",
-            "duration_seconds": 0,
-            "metadata": {"score": score, "total": total, "correct": correct}
-        }).execute()
+    # Log study session
+    supabase.table("study_sessions").insert({
+        "user_id": user_id,
+        "guide_id": guide_id,
+        "session_type": "quiz",
+        "duration_seconds": 0,
+        "metadata": {"score": score, "total": total, "correct": correct}
+    }).execute()
 
-        # Update streak
-        from routers.stats import _update_streak
-        _update_streak(user_id)
+    # Update streak
+    from routers.stats import _update_streak
+    _update_streak(user_id)
 
-        return {"score": score, "total": total, "correct": correct, "earned": earned}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error submitting quiz: {e}")
-        raise HTTPException(status_code=500, detail="Failed to submit quiz")
+    return {"score": score, "total": total, "correct": correct, "earned": earned}
 
 
 @router.get("/{guide_id}/history")
 def quiz_history(guide_id: str, authorization: str = Header(default="")):
     """Get quiz attempt history for a guide."""
-    try:
-        _validate_uuid(guide_id, "guide ID")
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        result = supabase.table("quiz_attempts") \
-            .select("id, score, total_questions, correct_answers, completed_at") \
-            .eq("user_id", user_id) \
-            .eq("guide_id", guide_id) \
-            .order("completed_at", desc=True) \
-            .limit(10) \
-            .execute()
+    result = supabase.table("quiz_attempts") \
+        .select("id, score, total_questions, correct_answers, completed_at") \
+        .eq("user_id", user_id) \
+        .eq("guide_id", guide_id) \
+        .order("completed_at", desc=True) \
+        .limit(10) \
+        .execute()
 
-        return {"attempts": result.data or []}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting quiz history: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get quiz history")
+    return {"attempts": result.data or []}

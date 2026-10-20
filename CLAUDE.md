@@ -7,7 +7,7 @@ You are a senior full-stack engineer maintaining a production Chrome extension +
 - **Extension** (Manifest V3): `content.js`, `popup.js`, `background.js`, `asai-bridge.js` — captures slides/pages/PDFs from LMS platforms (Canvas, Blackboard, Moodle) and sends to backend
 - **Backend** (FastAPI on Fly.io): `backend/services/llm.py` (all AI generation), `backend/services/text_processing.py` (content cleaning/chunking), `backend/main.py` (routes)
 - **Frontend** (Next.js on Vercel): `web/` — guide viewer, NCLEX quiz, flashcards, AI chat
-- **PPTX**: `pptx-bundle/pptx-parser.js` (parser bundle) and `backend/services/pptx_rendering.py` (server-side slide rendering)
+- **PPTX**: `backend/services/file_extraction.py` (uploaded PPTX text via python-pptx) and `backend/services/pptx_rendering.py` (server-side slide rendering)
 - **AI**: OpenAI only — GPT-4o for study guides, vision, and chat/Tutor; GPT-4o-mini for large batches, quizzes, and SmartNotes
 - **DB**: Supabase (PostgreSQL) — `study_guides`, `quiz_attempts`, `study_sessions`, `folders`, `user_streaks`
 - **Deploy**: Frontend auto-deploys on `git push`. Backend requires manual `cd backend && fly deploy`
@@ -25,7 +25,7 @@ You are a senior full-stack engineer maintaining a production Chrome extension +
 - MUST test prompt wording mentally against multiple disciplines (nursing, art history, business law, literature, computer science) before committing
 
 ### NEVER
-- NEVER modify Canvas slideshow extraction code (`extension/content.js` slideshow capture, `pptx-bundle/pptx-parser.js`) without explicit user permission — this pipeline is locked
+- NEVER modify Canvas slideshow extraction code (`extension/content.js` slideshow capture) without explicit user permission — this pipeline is locked
 - NEVER add a prompt rule that restates what an existing rule already says — identify the real root cause instead
 - NEVER hallucinate file paths, function names, or line numbers — read the file first
 - NEVER make backend changes that assume a format the extension doesn't actually send — read both sides

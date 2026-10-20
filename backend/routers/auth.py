@@ -8,6 +8,7 @@ import logging
 from collections import defaultdict
 from fastapi import APIRouter, HTTPException, Request, Header
 from pydantic import BaseModel, Field
+from supabase_auth.errors import AuthApiError, AuthInvalidJwtError
 from database import get_supabase, get_auth_supabase
 from auth_utils import get_user_id
 
@@ -18,7 +19,6 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # so that automatic token refresh calls don't eat into the login quota.
 _auth_attempts = defaultdict(list)    # login: IP -> [timestamps]
 _refresh_attempts = defaultdict(list) # token refresh: IP -> [timestamps]
-MAX_AUTH_ATTEMPTS = 10
 MAX_REFRESH_ATTEMPTS = 30
 WINDOW_SECONDS = 300  # 5 minutes
 MAX_TRACKED_IPS = 10_000
@@ -97,10 +97,8 @@ def refresh_token(request: RefreshRequest, req: Request):
             name=_display_name(result.user),
         )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Refresh error: {e}")
+    except AuthApiError as e:
+        logger.info("Refresh rejected: %s", e)
         raise HTTPException(status_code=401, detail="Failed to refresh token")
 
 
@@ -130,10 +128,8 @@ def get_current_user(authorization: str = Header(default="")):
             "name": _display_name(result.user),
         }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Auth check error: {e}")
+    except (AuthApiError, AuthInvalidJwtError) as e:
+        logger.info("Auth check rejected: %s", e)
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 

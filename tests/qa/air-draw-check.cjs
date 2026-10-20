@@ -118,7 +118,10 @@ const inkPixels = page => page.evaluate(() => {
     const tracks = await page.evaluateHandle(() => document.querySelector('.air-preview video').srcObject.getTracks());
     await page.click('button[aria-label="Back"]');
     await page.waitForURL(/\/guide\//);
-    expect(await tracks.evaluate(list => list.every(track => track.readyState === 'ended')), 'camera still on after leaving');
+    // The camera stops in the page's cleanup, which can land just after the URL changes.
+    let ended = false;
+    for (let i = 0; i < 20 && !ended; i += 1) { ended = await tracks.evaluate(list => list.every(track => track.readyState === 'ended')); if (!ended) await page.waitForTimeout(100); }
+    expect(ended, 'camera still on after leaving');
     await context.close();
   });
 

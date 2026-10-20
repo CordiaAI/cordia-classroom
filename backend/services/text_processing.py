@@ -5,6 +5,7 @@ Handles LMS content, slideshows, and general educational material.
 
 import re
 import logging
+from html.parser import HTMLParser
 from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -75,16 +76,6 @@ SLIDESHOW_INDICATORS = [
     # Removed: "presentation", "powerpoint", ".pptx", "google slides"
     # These cause false positives on pages that merely mention these words
 ]
-
-# Content section headers that indicate educational content
-CONTENT_HEADERS = [
-    "learning objectives", "objectives", "goals", "overview", "introduction",
-    "summary", "key points", "key concepts", "main ideas", "takeaways",
-    "chapter", "section", "module", "unit", "lesson", "topic",
-    "definition", "example", "practice", "exercise", "activity",
-    "important", "note", "remember", "tip", "warning", "caution"
-]
-
 
 def is_navigation_text(text: str) -> bool:
     """Check if text is likely navigation/UI element rather than educational content."""
@@ -159,7 +150,7 @@ def extract_slideshow_content(text: str) -> List[dict]:
 
         # Detect slide boundaries — matches both "--- Slide N ---" (extension format)
         # and plain "Slide N" (other sources)
-        if re.match(r'^-*\s*slide\s*\d+\s*-*\s*$', line, re.IGNORECASE):
+        if re.fullmatch(r'-{0,10}\s{0,5}slide\s{0,5}\d{1,4}\s{0,5}-{0,10}', line, re.IGNORECASE):
             if current_slide["content"]:
                 slides.append(current_slide)
             current_slide = {"title": "", "content": []}
@@ -358,38 +349,6 @@ def format_slideshow_text(slides: List[dict]) -> str:
     return '\n\n'.join(parts)
 
 
-def extract_key_terms(text: str) -> List[str]:
-    """
-    Extract potential key terms and concepts from text.
-    Looks for capitalized phrases, bold/emphasized text, and defined terms.
-    """
-    terms = set()
-
-    # Capitalized phrases (potential proper nouns/key terms)
-    caps_pattern = r'\b([A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)*)\b'
-    for match in re.finditer(caps_pattern, text):
-        term = match.group(1)
-        # Filter out common words and too short terms
-        if len(term) > 3 and term.lower() not in {'the', 'this', 'that', 'these', 'those'}:
-            terms.add(term)
-
-    # Terms in quotes or parentheses (often definitions)
-    quoted_pattern = r'["\']([^"\']+)["\']|\(([^)]+)\)'
-    for match in re.finditer(quoted_pattern, text):
-        term = match.group(1) or match.group(2)
-        if term and 3 < len(term) < 50:
-            terms.add(term.strip())
-
-    # Terms followed by "is defined as", "means", "refers to"
-    definition_pattern = r'(\b[A-Za-z][\w\s]+?)\s+(?:is defined as|means|refers to|is called)'
-    for match in re.finditer(definition_pattern, text, re.IGNORECASE):
-        term = match.group(1).strip()
-        if 3 < len(term) < 50:
-            terms.add(term)
-
-    return list(terms)
-
-
 def inject_image_descriptions(slides: list, image_descriptions: dict) -> list:
     """
     Merge image analysis results into slide content.
@@ -440,48 +399,36 @@ def inject_page_image_descriptions(text: str, image_descriptions: dict) -> str:
     return text
 
 
-# ── Lecture transcripts ──────────────────────────────────────────────────────
-# Recording uploads 20-second chunks that overlap by about 2 seconds, so each chunk's
-# opening words usually repeat the end of the previous one. These helpers run before any
-# AI step: the overlap is removed here, not by asking a model to ignore it.
+class _HtmlText(HTMLParser):
+    """Collects text; block-level tags become line breaks. One pass, so input size can't blow up the cost."""
+    BLOCKS = {"p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "br"}
 
-_WORD = re.compile(r"[\w'’]+", re.UNICODE)
-_FILLERS = re.compile(r",?\s*\b(?:um+|uh+|erm+|hmm+|mm+|uh-huh)\b[,.]?(?=\s|$)", re.IGNORECASE)
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
 
+    def _break(self, tag):
+        if tag in self.BLOCKS:
+            self.parts.append("\n")
 
-def _norm_words(text: str) -> List[str]:
-    return [w.lower().replace("’", "'") for w in _WORD.findall(text or "")]
+    def handle_starttag(self, tag, attrs):
+        self._break(tag)
 
+    def handle_endtag(self, tag):
+        self._break(tag)
 
-def merge_overlap(previous_tail: str, new_text: str, max_words: int = 30) -> str:
-    """Drop the opening words of `new_text` that repeat the end of `previous_tail`.
+    def handle_startendtag(self, tag, attrs):
+        self._break(tag)
 
-    Finds the longest run (at least 2 words, at most `max_words`) where the last words of
-    the previous transcript equal the first words of the new chunk, then cuts it from the
-    new chunk while keeping its original spelling and punctuation."""
-    new_text = (new_text or "").strip()
-    tail = _norm_words(previous_tail)[-max_words:]
-    head = _norm_words(new_text)[:max_words]
-    best = 0
-    for size in range(min(len(tail), len(head)), 1, -1):
-        if tail[-size:] == head[:size]:
-            best = size
-            break
-    if not best:
-        return new_text
-    matches = list(_WORD.finditer(new_text))
-    cut = matches[best - 1].end()
-    return new_text[cut:].lstrip(" ,.;:-–—").strip()
+    def handle_data(self, data):
+        self.parts.append(data)
 
 
-def clean_spoken_text(text: str) -> str:
-    """Remove spoken fillers and doubled spaces; keeps every substantive word."""
-    text = _FILLERS.sub(" ", text or "")
-    text = re.sub(r"\b(\w+)( \1\b)+", r"\1", text, flags=re.IGNORECASE)  # "the the" -> "the"
-    return re.sub(r"[ \t]{2,}", " ", text).strip()
-
-
-def transcript_text(segments: list) -> str:
-    """Join timed transcript segments ({start_ms, text}) into one cleaned text, in order."""
-    ordered = sorted((s for s in segments or [] if (s.get("text") or "").strip()), key=lambda s: int(s.get("start_ms") or 0))
-    return clean_spoken_text(" ".join(s["text"].strip() for s in ordered))
+def html_to_text(text: str) -> str:
+    """SmartNote HTML as plain text for AI context."""
+    if "<" not in (text or ""):
+        return text
+    parser = _HtmlText()
+    parser.feed(text)
+    parser.close()
+    return "".join(parser.parts)

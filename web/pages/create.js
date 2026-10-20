@@ -69,7 +69,7 @@ export default function CreateGuidePage() {
         setExternalSourceId(sourceDraft.external_source_id || '');
         if (sourceDraft.content && !manualDraft?.pairs?.length) setLastWindow('file');
       }
-    } catch {}
+    } catch { /* no readable draft: start empty */ }
   }, []);
 
   useEffect(() => {
@@ -85,7 +85,7 @@ export default function CreateGuidePage() {
       } else {
         localStorage.removeItem(SOURCE_DRAFT_KEY);
       }
-    } catch {}
+    } catch { /* storage blocked: drafts are a convenience */ }
   }, [content, externalSourceId, isEdit, manualPairs, sourceUrl, title]);
 
   useEffect(() => {

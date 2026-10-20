@@ -9,33 +9,24 @@ import re
 import ast
 import json
 import math
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from typing import List, Optional
 
 from services.llm_calls import chat
 from services.models import study_guide_model
 from services.practice_areas import PRACTICE_AREAS, PRACTICE_BASE, classifier_prompt
-try:
-    from openai import OpenAI
-except ImportError:
-    OpenAI = None
-try:
-    from dotenv import load_dotenv
-except ImportError:
-    def load_dotenv(*_args, **_kwargs):
-        return False
+from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 logger = logging.getLogger(__name__)
 
 
-def get_openai_client() -> Optional[OpenAI]:
-    """Get configured OpenAI client."""
-    api_key = os.getenv('OPENAI_API_KEY')
-    if not api_key:
-        logger.error("OPENAI_API_KEY not set")
-        return None
-    return OpenAI(api_key=api_key) if OpenAI else None
+def get_openai_client() -> OpenAI:
+    """OpenAI client from OPENAI_API_KEY; a missing key is a deploy error, so it raises."""
+    return OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 
 def generate_notes_ai(content: str, max_notes: int = 25) -> List[str]:
@@ -44,8 +35,6 @@ def generate_notes_ai(content: str, max_notes: int = 25) -> List[str]:
     Returns a list of concise, important points.
     """
     client = get_openai_client()
-    if not client:
-        return _generate_notes_fallback(content)
 
     prompt = f"""Analyze the following educational content and extract the most important key points as study notes.
 
@@ -76,55 +65,37 @@ Content:
 
 Return ONLY the bullet points, one per line, starting with "- ":"""
 
-    try:
-        response = chat(client, "notes",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-        )
-        result = response.choices[0].message.content.strip()
+    response = chat(client, "notes",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+    )
+    result = response.choices[0].message.content.strip()
 
-        # Detect if AI found no educational content
-        if "NO_EDUCATIONAL_CONTENT" in result:
-            logger.warning("Notes generation: no educational content detected")
-            return []
+    # Detect if AI found no educational content
+    if "NO_EDUCATIONAL_CONTENT" in result:
+        logger.warning("Notes generation: no educational content detected")
+        return []
 
-        # Parse the response into individual notes
-        notes = []
-        for line in result.split('\n'):
-            line = line.strip()
-            if line.startswith('- '):
-                notes.append(line[2:].strip())
-            elif line.startswith('• '):
-                notes.append(line[2:].strip())
-            elif line and not line.startswith('#'):
-                notes.append(line)
-
-        return notes[:max_notes]
-
-    except Exception as e:
-        logger.error(f"Error generating notes with AI: {e}")
-        return _generate_notes_fallback(content)
-
-
-def _generate_notes_fallback(content: str) -> List[str]:
-    """Fallback note extraction without AI."""
+    # Parse the response into individual notes
     notes = []
-    for line in content.split('\n'):
+    for line in result.split('\n'):
         line = line.strip()
-        if len(line) > 20 and len(line) < 300:
-            if not any(skip in line.lower() for skip in ['click', 'menu', 'navigation', 'http']):
-                notes.append(line)
-    return notes[:15]
+        if line.startswith('- '):
+            notes.append(line[2:].strip())
+        elif line.startswith('• '):
+            notes.append(line[2:].strip())
+        elif line and not line.startswith('#'):
+            notes.append(line)
 
-def _build_study_guide_prompt(context: str, domain_context: str = "", learning_guidance: str = "") -> str:
+    return notes[:max_notes]
+
+
+def _build_study_guide_prompt(context: str, learning_guidance: str = "") -> str:
     """Build the study guide generation prompt for a chunk of content."""
-    domain_block = ""
-    if domain_context:
-        domain_block = f"\n[DOMAIN CONTEXT]\n{domain_context}\n\n"
     learning_block = f"\n[QUESTION STYLE]\n{learning_guidance}\n" if learning_guidance else ""
 
     return f"""Create a study guide Q&A from the text below.
-{domain_block}{learning_block}
+{learning_block}
 
 CRITICAL RULES:
 • ONLY use information that is explicitly stated in the text below.
@@ -189,7 +160,6 @@ Continue until every item is covered."""
 def _postprocess_study_guide(raw_result: str, start_index: int = 1) -> tuple:
     """Post-process study guide output: truncate answers and renumber Q&A pairs.
     Returns (processed_text, next_index)."""
-    import re
     lines = raw_result.split('\n')
     processed_lines = []
     current_q_num = start_index
@@ -230,7 +200,6 @@ def _smart_notes_html_to_markdown(html: str) -> str:
     indentation). The hierarchy is what GPT-4o uses to recognize
     label/explanation relationships per the SmartNotes prompt rules.
     """
-    import re
     if not html:
         return ""
 
@@ -372,8 +341,6 @@ def generate_study_guide_from_notes(html_content: str) -> str:
     contain no educational content.
     """
     client = get_openai_client()
-    if not client:
-        return "[Error: OpenAI API key not configured]"
 
     markdown = _smart_notes_html_to_markdown(html_content)
     if not markdown.strip():
@@ -386,54 +353,46 @@ def generate_study_guide_from_notes(html_content: str) -> str:
 
     prompt = _SMART_NOTES_STUDY_GUIDE_PROMPT.format(markdown=markdown)
 
-    try:
-        response = chat(client, "smart_notes_guide",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You convert student-written class notes into exam-ready Q&A study guides. "
-                        "You respect the student's exact wording for definitions and never paraphrase. "
-                        "You use the student's structure (headings, bold, bullets, indentation) to recognize "
-                        "label/explanation relationships. You never combine distinct concepts into one question."
-                    ),
-                },
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.1,
-        )
-        raw = response.choices[0].message.content.strip()
-        if "NO_EDUCATIONAL_CONTENT" in raw:
-            logger.info("SmartNotes study guide: no educational content detected")
-            return ""
+    response = chat(client, "smart_notes_guide",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You convert student-written class notes into exam-ready Q&A study guides. "
+                    "You respect the student's exact wording for definitions and never paraphrase. "
+                    "You use the student's structure (headings, bold, bullets, indentation) to recognize "
+                    "label/explanation relationships. You never combine distinct concepts into one question."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.1,
+    )
+    raw = response.choices[0].message.content.strip()
+    if "NO_EDUCATIONAL_CONTENT" in raw:
+        logger.info("SmartNotes study guide: no educational content detected")
+        return ""
 
-        # Renumber for safety; do NOT truncate answers — rule #1 requires
-        # preserving the student's exact wording, including long definitions.
-        import re as _re
-        lines = raw.split('\n')
-        out_lines = []
-        n = 1
-        for line in lines:
-            line = line.rstrip()
-            qm = _re.match(r'^Q\d+:\s*(.*)', line)
-            am = _re.match(r'^A\d+:\s*(.*)', line)
-            if qm:
-                out_lines.append(f"Q{n}: {qm.group(1)}")
-            elif am:
-                out_lines.append(f"A{n}: {am.group(1)}")
-                n += 1
-            else:
-                out_lines.append(line)
-        result = '\n'.join(out_lines).strip()
-        q_count = len(_re.findall(r'^Q\d+:', result, _re.MULTILINE))
-        logger.info(f"SmartNotes study guide generated — {q_count} Q&A pairs from {len(markdown)} chars")
-        return result
-
-    except Exception as e:
-        logger.error(f"Error generating SmartNotes study guide: {e}")
-        if hasattr(e, 'status_code') and e.status_code == 429:
-            return "[Error: OpenAI rate limit reached. Please try again later.]"
-        return "[Error generating study guide]"
+    # Renumber for safety; do NOT truncate answers — rule #1 requires
+    # preserving the student's exact wording, including long definitions.
+    lines = raw.split('\n')
+    out_lines = []
+    n = 1
+    for line in lines:
+        line = line.rstrip()
+        qm = re.match(r'^Q\d+:\s*(.*)', line)
+        am = re.match(r'^A\d+:\s*(.*)', line)
+        if qm:
+            out_lines.append(f"Q{n}: {qm.group(1)}")
+        elif am:
+            out_lines.append(f"A{n}: {am.group(1)}")
+            n += 1
+        else:
+            out_lines.append(line)
+    result = '\n'.join(out_lines).strip()
+    q_count = len(re.findall(r'^Q\d+:', result, re.MULTILINE))
+    logger.info(f"SmartNotes study guide generated — {q_count} Q&A pairs from {len(markdown)} chars")
+    return result
 
 
 _PRACTICE_KINDS = {
@@ -601,34 +560,28 @@ def validate_practice_set(payload: dict, limit: int = 10) -> dict:
 def grade_practice_answer(prompt: str, reference: str, worked_solution: str, student_answer: str, work: str = "") -> dict:
     """Mark a student's practice answer right or wrong against the reference, explaining any miss."""
     client = get_openai_client()
-    if not client:
-        return {}
-    try:
-        response = chat(client, "practice_grade",
-            messages=[
-                {"role": "system", "content": (
-                    "You grade one practice answer. Judge meaning, not wording: an answer is correct "
-                    "if it would earn full credit from a fair teacher (equivalent code, forms, units, "
-                    "or phrasing count). Minor typos that do not change meaning are fine. If it is "
-                    "wrong or incomplete, reply like a warm, encouraging tutor in 2-3 sentences: start "
-                    "with 'Not quite.', say specifically what their answer or work shows they did, and "
-                    "point to what to check or change, without just handing over the answer. If correct, "
-                    "confirm briefly. "
-                    'Return JSON: {"correct": true|false, "explanation": "..."}'
-                )},
-                {"role": "user", "content": (
-                    f"TASK:\n{prompt[:3000]}\n\nREFERENCE ANSWER:\n{reference[:3000]}\n\n"
-                    f"WORKED SOLUTION:\n{worked_solution[:3000]}\n\nSTUDENT ANSWER:\n{student_answer[:3000]}"
-                    f"\n\nSTUDENT'S TYPED WORK:\n{work[:3000] or '(none)'}"
-                )},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0,
-        )
-        parsed = _practice_json(response.choices[0].message.content)
-    except Exception as e:
-        logger.error(f"Error grading practice answer: {e}")
-        return {}
+    response = chat(client, "practice_grade",
+        messages=[
+            {"role": "system", "content": (
+                "You grade one practice answer. Judge meaning, not wording: an answer is correct "
+                "if it would earn full credit from a fair teacher (equivalent code, forms, units, "
+                "or phrasing count). Minor typos that do not change meaning are fine. If it is "
+                "wrong or incomplete, reply like a warm, encouraging tutor in 2-3 sentences: start "
+                "with 'Not quite.', say specifically what their answer or work shows they did, and "
+                "point to what to check or change, without just handing over the answer. If correct, "
+                "confirm briefly. "
+                'Return JSON: {"correct": true|false, "explanation": "..."}'
+            )},
+            {"role": "user", "content": (
+                f"TASK:\n{prompt[:3000]}\n\nREFERENCE ANSWER:\n{reference[:3000]}\n\n"
+                f"WORKED SOLUTION:\n{worked_solution[:3000]}\n\nSTUDENT ANSWER:\n{student_answer[:3000]}"
+                f"\n\nSTUDENT'S TYPED WORK:\n{work[:3000] or '(none)'}"
+            )},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    parsed = _practice_json(response.choices[0].message.content)
     if not isinstance(parsed.get("correct"), bool):
         return {}
     return {"correct": parsed["correct"], "explanation": str(parsed.get("explanation") or "").strip()[:1200]}
@@ -637,34 +590,28 @@ def grade_practice_answer(prompt: str, reference: str, worked_solution: str, stu
 def grade_written_answer(question: str, reference: str, student_answer: str) -> dict:
     """Mark a Retain written answer against the guide's answer: full, partial or no credit."""
     client = get_openai_client()
-    if not client:
-        return {}
-    try:
-        response = chat(client, "retain_grade",
-            messages=[
-                {"role": "system", "content": (
-                    "You mark one short written answer against the study guide's answer, for any "
-                    "subject. Judge meaning, not wording: paraphrases, synonyms and minor typos are "
-                    "fine. Use only the guide's answer as the standard; never reward or require facts "
-                    "it does not contain. Verdicts: \"right\" if the answer covers the guide answer's "
-                    "essential points; \"partial\" if it gets some essential points but misses or "
-                    "confuses others; \"wrong\" if it misses the main idea or is incorrect. In 1-2 "
-                    "encouraging sentences, say what was right and, if not right, what was missing, "
-                    "without restating the whole answer. "
-                    'Return JSON: {"verdict": "right"|"partial"|"wrong", "explanation": "..."}'
-                )},
-                {"role": "user", "content": (
-                    f"QUESTION:\n{question[:2000]}\n\nGUIDE ANSWER:\n{reference[:3000]}"
-                    f"\n\nSTUDENT ANSWER:\n{student_answer[:3000]}"
-                )},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0,
-        )
-        parsed = _practice_json(response.choices[0].message.content)
-    except Exception as e:
-        logger.error(f"Error grading written Retain answer: {e}")
-        return {}
+    response = chat(client, "retain_grade",
+        messages=[
+            {"role": "system", "content": (
+                "You mark one short written answer against the study guide's answer, for any "
+                "subject. Judge meaning, not wording: paraphrases, synonyms and minor typos are "
+                "fine. Use only the guide's answer as the standard; never reward or require facts "
+                "it does not contain. Verdicts: \"right\" if the answer covers the guide answer's "
+                "essential points; \"partial\" if it gets some essential points but misses or "
+                "confuses others; \"wrong\" if it misses the main idea or is incorrect. In 1-2 "
+                "encouraging sentences, say what was right and, if not right, what was missing, "
+                "without restating the whole answer. "
+                'Return JSON: {"verdict": "right"|"partial"|"wrong", "explanation": "..."}'
+            )},
+            {"role": "user", "content": (
+                f"QUESTION:\n{question[:2000]}\n\nGUIDE ANSWER:\n{reference[:3000]}"
+                f"\n\nSTUDENT ANSWER:\n{student_answer[:3000]}"
+            )},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    parsed = _practice_json(response.choices[0].message.content)
     credit = {"right": 1.0, "partial": 0.5, "wrong": 0.0}.get(str(parsed.get("verdict") or "").lower())
     if credit is None:
         return {}
@@ -674,9 +621,8 @@ def grade_written_answer(question: str, reference: str, student_answer: str) -> 
 def transcribe_document_pages(page_images: list, max_pages: int = 20) -> str:
     """OCR for scanned documents: transcribe each page image (data URLs), in page order."""
     client = get_openai_client()
-    if not client or not page_images:
+    if not page_images:
         return ""
-    from concurrent.futures import ThreadPoolExecutor
 
     def transcribe(data_url):
         try:
@@ -692,62 +638,68 @@ def transcribe_document_pages(page_images: list, max_pages: int = 20) -> str:
                 temperature=0,
             )
             return (response.choices[0].message.content or "").strip()
-        except Exception as e:
-            logger.error(f"Page transcription failed: {e}")
+        except Exception:
+            # One unreadable page must not lose the rest of the document.
+            logger.warning("Page transcription failed", exc_info=True)
             return ""
 
-    from contextvars import copy_context
     with ThreadPoolExecutor(max_workers=6) as pool:
         pages = list(pool.map(lambda url: copy_context().run(transcribe, url), page_images[:max_pages]))
     return "\n\n".join(f"--- Page {i} ---\n{text}" for i, text in enumerate(pages, 1) if text)
 
 
+def transcribe_study_image(image_data_url: str) -> str:
+    """Transcribe an uploaded photo of notes, a page, or a whiteboard. Empty when it holds no study content."""
+    client = get_openai_client()
+    response = chat(client, "image_extraction",
+        messages=[{"role": "user", "content": [
+            {"type": "image_url", "image_url": {"url": image_data_url}},
+            {"type": "text", "text": (
+                "You are extracting educational content from an image (e.g. a photo of "
+                "notes, a textbook page, a whiteboard, or a diagram). Transcribe ALL "
+                "visible text exactly as written, then describe any diagrams, charts, "
+                "or formulas with enough detail to study from. Use clear headings where "
+                "visible. If the image contains no educational content, respond with "
+                "exactly: NO_EDUCATIONAL_CONTENT"
+            )},
+        ]}],
+    )
+    text = (response.choices[0].message.content or "").strip()
+    return "" if "NO_EDUCATIONAL_CONTENT" in text else text
+
+
 def recognize_handwriting(image_data_url: str):
     """Transcribe a handwritten workspace drawing into clean text; None when it can't be read."""
     client = get_openai_client()
-    if not client:
-        return None
-    try:
-        response = chat(client, "handwriting",
-            messages=[
-                {"role": "system", "content": (
-                    "Transcribe the handwriting in this image exactly as written, keeping its line "
-                    "breaks and layout. Write math with plain symbols and Unicode superscripts or ^ "
-                    "(e.g. 5³, x^n), fractions as a/b. Do not solve, correct, or add anything. "
-                    'Return JSON: {"text": "..."} with an empty string if nothing is written.'
-                )},
-                {"role": "user", "content": [{"type": "image_url", "image_url": {"url": image_data_url, "detail": "high"}}]},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0,
-        )
-        parsed = _practice_json(response.choices[0].message.content)
-    except Exception as e:
-        logger.error(f"Error recognizing handwriting: {e}")
-        return None
+    response = chat(client, "handwriting",
+        messages=[
+            {"role": "system", "content": (
+                "Transcribe the handwriting in this image exactly as written, keeping its line "
+                "breaks and layout. Write math with plain symbols and Unicode superscripts or ^ "
+                "(e.g. 5³, x^n), fractions as a/b. Do not solve, correct, or add anything. "
+                'Return JSON: {"text": "..."} with an empty string if nothing is written.'
+            )},
+            {"role": "user", "content": [{"type": "image_url", "image_url": {"url": image_data_url, "detail": "high"}}]},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    parsed = _practice_json(response.choices[0].message.content)
     return str(parsed.get("text") or "").strip()[:6000]
 
 
-def classify_practice_area(context: str, declared_domain: str = "") -> dict:
+def classify_practice_area(context: str) -> dict:
     """Step 1: identify the area of study so step 2 can use that area's practice prompt."""
     client = get_openai_client()
-    fallback = {"area": "general", "subject_area": ""}
-    if not client:
-        return fallback
-    hint = f"\nThe student's guide is tagged: {declared_domain}." if declared_domain else ""
-    try:
-        response = chat(client, "practice_classify",
-            messages=[
-                {"role": "system", "content": classifier_prompt()},
-                {"role": "user", "content": f"MATERIAL:{hint}\n{context[:6000]}"},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0,
-        )
-        parsed = _practice_json(response.choices[0].message.content)
-    except Exception as e:
-        logger.error(f"Error classifying practice area: {e}")
-        return fallback
+    response = chat(client, "practice_classify",
+        messages=[
+            {"role": "system", "content": classifier_prompt()},
+            {"role": "user", "content": f"MATERIAL:\n{context[:6000]}"},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    parsed = _practice_json(response.choices[0].message.content)
     area = str(parsed.get("area") or "").strip().lower()
     return {
         "area": area if area in PRACTICE_AREAS else "general",
@@ -755,13 +707,11 @@ def classify_practice_area(context: str, declared_domain: str = "") -> dict:
     }
 
 
-def generate_verified_practice_set(context: str, learning_guidance: str = "", domain: str = "") -> dict:
+def generate_verified_practice_set(context: str, learning_guidance: str = "") -> dict:
     """Classify the area of study, then generate 10 problems with that area's system prompt."""
     client = get_openai_client()
-    if not client:
-        return {}
 
-    classified = classify_practice_area(context, domain)
+    classified = classify_practice_area(context)
     area = PRACTICE_AREAS[classified["area"]]
     guidance = f"\nAdapt the presentation to this learner: {learning_guidance}" if learning_guidance else ""
     prompt = f"""Write exactly 10 practice problems from this {classified['subject_area'] or area['label']} material.{guidance}
@@ -784,19 +734,15 @@ Return one JSON object:
     "test_cases": []
   }}]
 }}"""
-    try:
-        response = chat(client, "practice_set",
-            messages=[
-                {"role": "system", "content": f"{PRACTICE_BASE}\n\n{area['label']}: {area['prompt']}"},
-                {"role": "user", "content": prompt},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.4,
-        )
-        payload = _practice_json(response.choices[0].message.content)
-    except Exception as e:
-        logger.error(f"Error generating practice set: {e}")
-        return {}
+    response = chat(client, "practice_set",
+        messages=[
+            {"role": "system", "content": f"{PRACTICE_BASE}\n\n{area['label']}: {area['prompt']}"},
+            {"role": "user", "content": prompt},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.4,
+    )
+    payload = _practice_json(response.choices[0].message.content)
 
     payload["subject_area"] = classified["subject_area"] or area["label"]
     payload["domain"] = classified["area"]
@@ -815,7 +761,7 @@ def generate_practice_guide(context: str, learning_guidance: str = "") -> str:
     """Compatibility wrapper for Tutor-created practice guides."""
     practice = generate_verified_practice_set(context, learning_guidance)
     if not practice.get("problems"):
-        return "[Error generating practice guide]"
+        return ""
     lines = []
     for index, problem in enumerate(practice["problems"], start=1):
         prompt = re.sub(r"\s+", " ", problem["prompt"]).strip()
@@ -861,7 +807,7 @@ def study_guide_is_complete(content: str) -> bool:
     return found_pair and not awaiting_answer
 
 
-def generate_study_guide(chunks: List[str], has_images: bool = False, domain: Optional[str] = None, learning_guidance: str = "") -> str:
+def generate_study_guide(chunks: List[str], has_images: bool = False, learning_guidance: str = "") -> str:
     """
     Generate a comprehensive study guide with AI-generated questions and answers.
     Uses chunked generation: splits content into ~8000-char batches and makes
@@ -869,13 +815,8 @@ def generate_study_guide(chunks: List[str], has_images: bool = False, domain: Op
 
     Model comes from services.models (BUILD_MODEL regardless of length; the opt-in
     STUDY_GUIDE_COST_SAVER only downgrades short text-only batches).
-
-    When domain is set, injects domain-specific terminology and context to
-    steer vocabulary and focus without changing the core prompt rules.
     """
     client = get_openai_client()
-    if not client:
-        return "[Error: OpenAI API key not configured]"
 
     # Group chunks into batches of ~8000 chars each (works for both XML slides
     # and regular text — matching the batch size that produced 92 Q&A for 59 slides)
@@ -908,46 +849,31 @@ def generate_study_guide(chunks: List[str], has_images: bool = False, domain: Op
         f"{len(batches)} batch(es), batch_chars=[{', '.join(str(len(b)) for b in batches)}]"
     )
 
-    # Load domain context once (empty string if no domain)
-    domain_context = ""
-    if domain:
-        from domains import get_study_guide_context
-        domain_context = get_study_guide_context(domain)
-        if domain_context:
-            logger.info(f"Study guide using domain context: {domain}")
-
     all_results = []
     for i, batch_text in enumerate(batches):
         prompt = _build_study_guide_prompt(
             batch_text[:30000],
-            domain_context=domain_context,
             learning_guidance=learning_guidance,
         )
-        try:
-            response = chat(client, "study_guide",
-                model=study_guide_model(len(batch_text), has_images),
-                messages=[
-                    {"role": "system", "content": "You are an exhaustive study guide generator. Academic assignments, rubrics, exam topics, and deliverables are valid study material. Cover every stated concept and requirement without inventing facts. Return NO_EDUCATIONAL_CONTENT only for empty, unrelated, or interface-only text."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.1,
-            )
-            result = response.choices[0].message.content.strip()
-            # Detect if AI found no educational content (anti-hallucination guard)
-            if "NO_EDUCATIONAL_CONTENT" in result:
-                logger.warning(f"Study guide batch {i+1}: no educational content detected, skipping")
-                continue
-            all_results.append(result)
-            import re as _re_log
-            q_count = len(_re_log.findall(r'^Q\d+:', result, _re_log.MULTILINE))
-            logger.info(f"Study guide batch {i+1}/{len(batches)} complete — {q_count} Q&A pairs, {len(batch_text)} chars input")
-        except Exception as e:
-            logger.error(f"Error in study guide batch {i+1}: {e}")
-            if hasattr(e, 'status_code') and e.status_code == 429:
-                return "[Error: OpenAI rate limit reached. Please try again later.]"
+        response = chat(client, "study_guide",
+            model=study_guide_model(len(batch_text), has_images),
+            messages=[
+                {"role": "system", "content": "You are an exhaustive study guide generator. Academic assignments, rubrics, exam topics, and deliverables are valid study material. Cover every stated concept and requirement without inventing facts. Return NO_EDUCATIONAL_CONTENT only for empty, unrelated, or interface-only text."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+        )
+        result = response.choices[0].message.content.strip()
+        # Detect if AI found no educational content (anti-hallucination guard)
+        if "NO_EDUCATIONAL_CONTENT" in result:
+            logger.warning(f"Study guide batch {i+1}: no educational content detected, skipping")
+            continue
+        all_results.append(result)
+        q_count = len(re.findall(r'^Q\d+:', result, re.MULTILINE))
+        logger.info(f"Study guide batch {i+1}/{len(batches)} complete — {q_count} Q&A pairs, {len(batch_text)} chars input")
 
     if not all_results:
-        return "[Error generating study guide]"
+        return ""
 
     # Merge all batch results and renumber sequentially
     merged_parts = []
@@ -966,18 +892,14 @@ def generate_nclex_questions(content: str) -> list:
     encounters every concept from the study material in NCLEX format.
     Returns a list of question dicts with type, stem, options, correct_indices, rationale.
     """
-    import re as _re
-    import json as _json
 
     client = get_openai_client()
-    if not client:
-        return []
 
     context = content[:25000]
 
     # Count Q&A pairs already identified in the study guide so we can give
     # GPT-4o an explicit target instead of letting it cluster into themes.
-    qa_matches = _re.findall(r'^Q\d+:', context, _re.MULTILINE)
+    qa_matches = re.findall(r'^Q\d+:', context, re.MULTILINE)
     n_pairs = len(qa_matches)
 
     if n_pairs > 0:
@@ -1028,322 +950,53 @@ Return ONLY a valid JSON array — no markdown, no extra text:
 
 Do NOT stop until every Q&A pair has a corresponding NCLEX question."""
 
+    response = chat(client, "nclex_questions",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert NCLEX question writer with 20 years of nursing education experience. "
+                    "You write one NCLEX question for each Q&A pair in the study material — never fewer. "
+                    "Never merge multiple Q&A pairs into one question. "
+                    "Always return valid JSON only — no markdown, no extra text."
+                )
+            },
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.6,
+    )
+    raw = response.choices[0].message.content.strip()
+
+    # Strip markdown code fences if present
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+
+    # Attempt to parse; if truncated mid-JSON, recover completed objects
     try:
-        response = chat(client, "nclex_questions",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an expert NCLEX question writer with 20 years of nursing education experience. "
-                        "You write one NCLEX question for each Q&A pair in the study material — never fewer. "
-                        "Never merge multiple Q&A pairs into one question. "
-                        "Always return valid JSON only — no markdown, no extra text."
-                    )
-                },
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.6,
-        )
-        raw = response.choices[0].message.content.strip()
-
-        # Strip markdown code fences if present
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-
-        # Attempt to parse; if truncated mid-JSON, recover completed objects
-        try:
-            questions = _loads_model_json(raw)
-        except _json.JSONDecodeError:
-            last_complete = raw.rfind('},')
-            if last_complete > 0:
-                try:
-                    questions = _loads_model_json(raw[:last_complete + 1] + ']')
-                except _json.JSONDecodeError:
-                    logger.error("Could not recover partial NCLEX JSON")
-                    return []
-            else:
-                logger.error("NCLEX response was not valid JSON")
+        questions = _loads_model_json(raw)
+    except json.JSONDecodeError:
+        last_complete = raw.rfind('},')
+        if last_complete > 0:
+            try:
+                questions = _loads_model_json(raw[:last_complete + 1] + ']')
+            except json.JSONDecodeError:
+                logger.error("Could not recover partial NCLEX JSON")
                 return []
+        else:
+            logger.error("NCLEX response was not valid JSON")
+            return []
 
-        # Validate basic structure
-        validated = []
-        for q in questions:
-            if not all(k in q for k in ("type", "stem", "options", "correct_indices", "rationale")):
-                continue
-            if q["type"] not in ("mcq", "sata"):
-                continue
-            validated.append(q)
-        return validated
-
-    except Exception as e:
-        logger.error(f"Error generating NCLEX questions: {e}")
-        return []
-
-
-def generate_practice_questions(content: str) -> list:
-    """
-    Generate practice questions (MCQ and multi-select) from any academic content.
-    Generic version — not nursing/NCLEX-specific.
-    Returns a list of question dicts with type, stem, options, correct_indices, rationale.
-    """
-    import re as _re
-    import json as _json
-
-    client = get_openai_client()
-    if not client:
-        return []
-
-    context = content[:25000]
-
-    # Count Q&A pairs in the study guide for target count
-    qa_matches = _re.findall(r'^Q\d+:', context, _re.MULTILINE)
-    n_pairs = len(qa_matches)
-
-    if n_pairs > 0:
-        count_instruction = (
-            f"The study guide below contains {n_pairs} Q&A pairs (Q1/A1, Q2/A2, …). "
-            f"Each pair represents ONE distinct concept. "
-            f"Generate exactly one practice question per Q&A pair — that means a minimum of {n_pairs} questions. "
-            f"Do NOT merge multiple Q&A pairs into a single question."
-        )
-    else:
-        count_instruction = (
-            "Identify every key concept, definition, process, cause-effect relationship, "
-            "and factual detail in the content. "
-            "Generate one practice question per identified item — do NOT group multiple items into one question."
-        )
-
-    prompt = f"""Create practice exam questions from the academic study material below.
-
-{count_instruction}
-
-QUESTION RULES:
-- Mix types: ~60% MCQ (4 options, 1 correct) and ~40% multi-select (5 options, 2-4 correct)
-- Each question should test understanding and application, not just memorization
-- Distractors must be plausible and relevant to the topic, not obviously wrong
-- ALL options (correct and incorrect) MUST be similar in length and level of detail — never make the correct answer longer or more specific than the distractors
-- Multi-select stems must end with "(Select all that apply)"
-- Rationale: 2-3 sentences — explain why correct answers are right AND why key distractors are wrong
-
-CONTENT:
-{context}
-
-Return ONLY a valid JSON array — no markdown, no extra text:
-[
-  {{
-    "type": "mcq",
-    "stem": "Which of the following best describes...?",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
-    "correct_indices": [1],
-    "rationale": "Option B is correct because... Option A is incorrect because..."
-  }},
-  {{
-    "type": "sata",
-    "stem": "Which of the following are characteristics of...? (Select all that apply)",
-    "options": ["Option A", "Option B", "Option C", "Option D", "Option E"],
-    "correct_indices": [0, 2, 3],
-    "rationale": "Options A, C, and D are correct because... Options B and E are incorrect because..."
-  }}
-]
-
-Do NOT stop until every Q&A pair has a corresponding practice question."""
-
-    try:
-        response = chat(client, "practice_questions",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an expert exam question writer. "
-                        "You write one practice question for each Q&A pair in the study material — never fewer. "
-                        "Never merge multiple Q&A pairs into one question. "
-                        "Always return valid JSON only — no markdown, no extra text."
-                    )
-                },
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.6,
-        )
-        raw = response.choices[0].message.content.strip()
-
-        # Strip markdown code fences if present
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-
-        # Parse JSON, recover if truncated
-        try:
-            questions = _loads_model_json(raw)
-        except _json.JSONDecodeError:
-            last_complete = raw.rfind('},')
-            if last_complete > 0:
-                try:
-                    questions = _loads_model_json(raw[:last_complete + 1] + ']')
-                except _json.JSONDecodeError:
-                    logger.error("Could not recover partial practice questions JSON")
-                    return []
-            else:
-                logger.error("Practice questions response was not valid JSON")
-                return []
-
-        # Validate structure
-        validated = []
-        for q in questions:
-            if not all(k in q for k in ("type", "stem", "options", "correct_indices", "rationale")):
-                continue
-            if q["type"] not in ("mcq", "sata"):
-                continue
-            validated.append(q)
-        return validated
-
-    except Exception as e:
-        logger.error(f"Error generating practice questions: {e}")
-        return []
-
-
-def generate_exam_questions(content: str, domain_id: str, exam_mode_id: str) -> list:
-    """
-    Generate domain-specific exam questions using few-shot examples from domain config.
-    Generalized version that works for any domain with exam modes (NAPLEX, Bar, etc.).
-    Returns a list of question dicts with type, stem, options, correct_indices, rationale.
-    """
-    import re as _re
-    import json as _json
-    from domains import get_domain, get_exam_examples
-
-    client = get_openai_client()
-    if not client:
-        return []
-
-    domain = get_domain(domain_id)
-    if not domain:
-        logger.warning(f"Unknown domain '{domain_id}', falling back to generic practice questions")
-        return generate_practice_questions(content)
-
-    # Find the exam mode config
-    exam_mode = None
-    for mode in domain.get('exam_modes', []):
-        if mode['id'] == exam_mode_id:
-            exam_mode = mode
-            break
-    if not exam_mode:
-        logger.warning(f"Unknown exam mode '{exam_mode_id}' for domain '{domain_id}', falling back")
-        return generate_practice_questions(content)
-
-    context = content[:25000]
-
-    # Count Q&A pairs for target count
-    qa_matches = _re.findall(r'^Q\d+:', context, _re.MULTILINE)
-    n_pairs = len(qa_matches)
-
-    if n_pairs > 0:
-        count_instruction = (
-            f"The study guide below contains {n_pairs} Q&A pairs (Q1/A1, Q2/A2, …). "
-            f"Each pair represents ONE distinct concept. "
-            f"Generate exactly one exam question per Q&A pair — that means a minimum of {n_pairs} questions. "
-            f"Do NOT merge multiple Q&A pairs into a single question."
-        )
-    else:
-        count_instruction = (
-            "Identify every key concept, definition, process, and factual detail in the content. "
-            "Generate one exam question per identified item — do NOT group multiple items into one question."
-        )
-
-    # Build few-shot examples block from domain config
-    examples = get_exam_examples(domain_id, exam_mode_id)
-    examples_block = ""
-    if examples:
-        examples_json = _json.dumps(examples[:2], indent=2)
-        examples_block = f"\nHere are example questions in the correct style:\n{examples_json}\n\nGenerate questions in a similar style and format.\n"
-
-    prompt = f"""Create {exam_mode['display_name']} practice exam questions from the study material below.
-
-{count_instruction}
-
-QUESTION RULES:
-- Mix types: ~60% MCQ (4 options, 1 correct) and ~40% multi-select (5 options, 2-4 correct)
-- Each question should test understanding and application, not just memorization
-- Distractors must be plausible and relevant to the topic, not obviously wrong
-- ALL options (correct and incorrect) MUST be similar in length and level of detail — never make the correct answer longer or more specific than the distractors
-- Multi-select stems must end with "(Select all that apply)"
-- Rationale: 2-3 sentences — explain why correct answers are right AND why key distractors are wrong
-{examples_block}
-CONTENT:
-{context}
-
-Return ONLY a valid JSON array — no markdown, no extra text:
-[
-  {{
-    "type": "mcq",
-    "stem": "...",
-    "options": ["A", "B", "C", "D"],
-    "correct_indices": [1],
-    "rationale": "..."
-  }}
-]
-
-Do NOT stop until every Q&A pair has a corresponding exam question."""
-
-    system_persona = exam_mode.get('system_persona',
-        f"You are an expert {domain['display_name']} exam question writer.")
-
-    try:
-        response = chat(client, "exam_questions",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        f"{system_persona} "
-                        "You write one exam question for each Q&A pair in the study material — never fewer. "
-                        "Never merge multiple Q&A pairs into one question. "
-                        "Always return valid JSON only — no markdown, no extra text."
-                    )
-                },
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.6,
-        )
-        raw = response.choices[0].message.content.strip()
-
-        # Strip markdown code fences if present
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-
-        # Parse JSON, recover if truncated
-        try:
-            questions = _loads_model_json(raw)
-        except _json.JSONDecodeError:
-            last_complete = raw.rfind('},')
-            if last_complete > 0:
-                try:
-                    questions = _loads_model_json(raw[:last_complete + 1] + ']')
-                except _json.JSONDecodeError:
-                    logger.error(f"Could not recover partial {exam_mode_id} exam JSON")
-                    return []
-            else:
-                logger.error(f"{exam_mode_id} exam response was not valid JSON")
-                return []
-
-        # Validate structure
-        validated = []
-        for q in questions:
-            if not all(k in q for k in ("type", "stem", "options", "correct_indices", "rationale")):
-                continue
-            if q["type"] not in ("mcq", "sata"):
-                continue
-            validated.append(q)
-
-        logger.info(f"Generated {len(validated)} {exam_mode_id} exam questions for domain {domain_id}")
-        return validated
-
-    except Exception as e:
-        logger.error(f"Error generating {exam_mode_id} exam questions: {e}")
-        return []
+    # Validate basic structure
+    validated = []
+    for q in questions:
+        if not all(k in q for k in ("type", "stem", "options", "correct_indices", "rationale")):
+            continue
+        if q["type"] not in ("mcq", "sata"):
+            continue
+        validated.append(q)
+    return validated
 
 
 def generate_flashcards(chunks: List[str], max_cards: int = 15) -> List[dict]:
@@ -1352,8 +1005,6 @@ def generate_flashcards(chunks: List[str], max_cards: int = 15) -> List[dict]:
     Returns list of {front: question, back: answer} dictionaries.
     """
     client = get_openai_client()
-    if not client:
-        return []
 
     context = '\n\n'.join(chunks)[:10000]
 
@@ -1386,33 +1037,28 @@ BACK: [Answer]
 
 (continue for all flashcards)"""
 
-    try:
-        response = chat(client, "flashcards",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-        )
-        result = response.choices[0].message.content.strip()
+    response = chat(client, "flashcards",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.4,
+    )
+    result = response.choices[0].message.content.strip()
 
-        # Parse flashcards
-        flashcards = []
-        current_front = None
+    # Parse flashcards
+    flashcards = []
+    current_front = None
 
-        for line in result.split('\n'):
-            line = line.strip()
-            if line.upper().startswith('FRONT:'):
-                current_front = line[6:].strip()
-            elif line.upper().startswith('BACK:') and current_front:
-                flashcards.append({
-                    'front': current_front,
-                    'back': line[5:].strip()
-                })
-                current_front = None
+    for line in result.split('\n'):
+        line = line.strip()
+        if line.upper().startswith('FRONT:'):
+            current_front = line[6:].strip()
+        elif line.upper().startswith('BACK:') and current_front:
+            flashcards.append({
+                'front': current_front,
+                'back': line[5:].strip()
+            })
+            current_front = None
 
-        return flashcards[:max_cards]
-
-    except Exception as e:
-        logger.error(f"Error generating flashcards: {e}")
-        return []
+    return flashcards[:max_cards]
 
 
 RICH_TEXT_FORMAT = """
@@ -1442,8 +1088,6 @@ def answer_question(
     full_history keeps the whole conversation (the caller has checked it fits the model).
     """
     client = get_openai_client()
-    if not client:
-        return "[Error: OpenAI API key not configured]"
 
     if allow_clarification:
         system_prompt = (
@@ -1497,24 +1141,19 @@ Question: {question}
 
 Answer based on the context above:"""
 
-    try:
-        messages = [{"role": "system", "content": system_prompt}]
-        earlier = conversation or []
-        for message in (earlier if full_history else earlier[-6:]):
-            role = "assistant" if message.get("role") in {"ai", "assistant"} else "user"
-            text = str(message.get("text") or "").strip()
-            if text:
-                messages.append({"role": role, "content": text if full_history else text[:2_000]})
-        messages.append({"role": "user", "content": prompt})
-        response = chat(client, feature,
-            messages=messages,
-            temperature=0.5,
-        )
-        return response.choices[0].message.content.strip()
-
-    except Exception as e:
-        logger.error(f"Error answering question: {e}")
-        return f"[Error: {e}]"
+    messages = [{"role": "system", "content": system_prompt}]
+    earlier = conversation or []
+    for message in (earlier if full_history else earlier[-6:]):
+        role = "assistant" if message.get("role") in {"ai", "assistant"} else "user"
+        text = str(message.get("text") or "").strip()
+        if text:
+            messages.append({"role": role, "content": text if full_history else text[:2_000]})
+    messages.append({"role": "user", "content": prompt})
+    response = chat(client, feature,
+        messages=messages,
+        temperature=0.5,
+    )
+    return response.choices[0].message.content.strip()
 
 
 def explain_retain_answer(
@@ -1528,8 +1167,6 @@ def explain_retain_answer(
 ) -> str:
     """Explain a missed Retain answer without merely repeating the answer key."""
     client = get_openai_client()
-    if not client:
-        return "[Error: OpenAI API key not configured]"
 
     system_prompt = """You are Cordia Tutor having a natural conversation with a student who missed a practice question.
 
@@ -1572,67 +1209,14 @@ THE KEYED CORRECT ANSWER
 Explain the distinction conversationally. Do not simply repeat the keyed answer.""",
     })
 
-    try:
-        response = chat(client, "retain_explain",
-            messages=messages,
-            temperature=0.4,
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        logger.error(f"Error explaining Retain answer: {e}")
-        return f"[Error: {e}]"
-
-
-def summarize_for_slideshow(slides: List[dict]) -> str:
-    """
-    Summarize slideshow content into study material.
-    """
-    client = get_openai_client()
-    if not client:
-        return ""
-
-    # Format slides for the prompt
-    slides_text = ""
-    for i, slide in enumerate(slides, 1):
-        slides_text += f"\n--- Slide {i}: {slide.get('title', 'Untitled')} ---\n"
-        slides_text += '\n'.join(slide.get('content', []))
-
-    prompt = f"""Summarize this slideshow presentation into comprehensive study notes.
-
-{slides_text[:8000]}
-
-Create:
-1. A brief overview (2-3 sentences)
-2. Key points from each slide
-3. Important terms and definitions
-4. Connections between concepts
-
-Format as organized notes with clear sections."""
-
-    try:
-        response = chat(client, "slideshow_summary",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-        )
-        return response.choices[0].message.content.strip()
-
-    except Exception as e:
-        logger.error(f"Error summarizing slideshow: {e}")
-        return ""
+    response = chat(client, "retain_explain",
+        messages=messages,
+        temperature=0.4,
+    )
+    return response.choices[0].message.content.strip()
 
 
 # Legacy function names for backwards compatibility
-def generate_notes(chunks: List[str]) -> List[str]:
-    """Legacy wrapper for generate_notes_ai."""
-    content = '\n\n'.join(chunks)
-    return generate_notes_ai(content)
-
-
-def generate_questions_from_notes(notes: List[str]) -> List[str]:
-    """Legacy function - now handled by generate_study_guide."""
-    return [f"What is {note[:50]}...?" for note in notes[:10] if len(note) > 10]
-
-
 def analyze_images_for_slides(images: list, slide_texts: dict = None) -> dict:
     """
     Analyze images using GPT-4o vision. Returns {slide_index: description}.
@@ -1646,10 +1230,6 @@ def analyze_images_for_slides(images: list, slide_texts: dict = None) -> dict:
         dict mapping slide_index (or sequential int for page images) to description text
     """
     client = get_openai_client()
-    if not client:
-        logger.error("No OpenAI client for vision analysis")
-        return {}
-
     if not images:
         return {}
 
@@ -1722,8 +1302,9 @@ def analyze_images_for_slides(images: list, slide_texts: dict = None) -> dict:
             results[slide_idx] = description
             logger.info(f"Vision analysis for slide {slide_idx}: {len(description)} chars")
 
-        except Exception as e:
-            logger.error(f"Vision analysis failed for slide {slide_idx}: {e}")
+        except Exception:
+            # The slide's text still reaches the guide; only its image description is lost.
+            logger.warning("Vision analysis failed for slide %s", slide_idx, exc_info=True)
             continue
 
     return results

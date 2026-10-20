@@ -26,7 +26,9 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             web/package-lock.json
-      - run: pip install -r backend/requirements.txt
+      - run: pip install -r backend/requirements.txt pyflakes
+      # Unused imports and names shadowed by later definitions (a route once replaced the OpenAI helper it shared a name with).
+      - run: python -m pyflakes backend
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm ci --prefix web

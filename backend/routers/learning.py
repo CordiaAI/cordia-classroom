@@ -1,7 +1,6 @@
 """Student-chosen study style and the per-question study aids it defaults to."""
 
 import logging
-import re
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
@@ -10,6 +9,7 @@ from rate_limit import ai_rate_limit
 from pydantic import BaseModel, Field
 
 from auth_utils import get_user_id
+from ids import require_uuid
 from database import get_supabase
 from services.entitlements import record, require
 from services.learning_styles import (
@@ -26,7 +26,6 @@ from services.learning_styles import (
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["learning"])
 
-UUID_PATTERN = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$", re.IGNORECASE)
 StyleName = Literal["visual", "aural", "read_write", "kinesthetic", "multimodal"]
 AidMode = Literal["visual", "aural", "read_write", "kinesthetic"]
 
@@ -83,16 +82,12 @@ def set_learning_style(body: StyleUpdate, authorization: str = Header(default=""
     user_id = get_user_id(authorization)
     _require_enabled()
     now = datetime.now(timezone.utc).isoformat()
-    try:
-        get_supabase().table("learning_preferences").upsert({
-            "user_id": user_id,
-            "style": body.style,
-            "prompted_at": now,
-            "updated_at": now,
-        }).execute()
-    except Exception as e:
-        logger.error(f"Could not save learning style: {e}")
-        raise HTTPException(status_code=500, detail="Could not save your study style")
+    get_supabase().table("learning_preferences").upsert({
+        "user_id": user_id,
+        "style": body.style,
+        "prompted_at": now,
+        "updated_at": now,
+    }).execute()
     return {"enabled": True, "style": body.style, "prompted": True, "styles": list(STYLES)}
 
 
@@ -107,15 +102,11 @@ def get_explanation_preference(authorization: str = Header(default="")):
 def set_explanation_preference(body: ExplanationPreference, authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     text = " ".join(body.text.split())
-    try:
-        get_supabase().table("learning_preferences").upsert({
-            "user_id": user_id,
-            "explain_preference": text or None,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }).execute()
-    except Exception as e:
-        logger.error(f"Could not save explanation preference: {e}")
-        raise HTTPException(status_code=500, detail="Could not save how you like things explained")
+    get_supabase().table("learning_preferences").upsert({
+        "user_id": user_id,
+        "explain_preference": text or None,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }).execute()
     return {"text": text}
 
 
@@ -131,9 +122,9 @@ def get_onboarding(authorization: str = Header(default="")):
             .limit(1)
             .execute()
         ).data
-    except Exception as e:
+    except Exception:
         # Never block the app on the wizard: report it finished when progress is unreadable.
-        logger.warning(f"Onboarding progress unavailable: {e}")
+        logger.warning("Onboarding progress unavailable", exc_info=True)
         return {"step": "done", "completed": True}
     row = rows[0] if rows else {}
     return {"step": row.get("step") or "style", "completed": bool(row.get("completed_at"))}
@@ -148,8 +139,8 @@ def get_onboarding_checklist(authorization: str = Header(default="")):
     def used(query) -> bool:
         try:
             return bool(query.limit(1).execute().data)
-        except Exception as e:
-            logger.warning(f"Checklist lookup failed: {e}")
+        except Exception:
+            logger.warning("Checklist lookup failed", exc_info=True)
             return False
 
     return {
@@ -167,17 +158,12 @@ def set_onboarding(body: OnboardingUpdate, authorization: str = Header(default="
     record = {"user_id": user_id, "step": body.step, "updated_at": now}
     if body.step == "done":
         record["completed_at"] = now
-    try:
-        get_supabase().table("onboarding_progress").upsert(record).execute()
-    except Exception as e:
-        logger.error(f"Could not save onboarding progress: {e}")
-        raise HTTPException(status_code=500, detail="Could not save your setup progress")
+    get_supabase().table("onboarding_progress").upsert(record).execute()
     return {"step": body.step, "completed": body.step == "done"}
 
 
 def _owned_item(user_id: str, guide_id: str, number: int):
-    if not UUID_PATTERN.match(guide_id):
-        raise HTTPException(status_code=400, detail="Invalid guide ID")
+    require_uuid(guide_id, "guide ID")
     result = get_supabase().table("study_guides") \
         .select("id,study_guide") \
         .eq("id", guide_id) \
@@ -225,8 +211,8 @@ def create_study_aid(body: StudyAidRequest, authorization: str = Header(default=
             "mode": body.mode,
             "content": content,
         }, on_conflict="user_id,guide_id,item_key,mode").execute()
-    except Exception as e:
-        logger.warning(f"Study aid cache write failed: {e}")
+    except Exception:
+        logger.warning("Study aid cache write failed", exc_info=True)
     record(user_id, "learn_my_way")
     return public_aid(body.mode, content)
 

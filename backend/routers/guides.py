@@ -4,24 +4,15 @@ Handles CRUD operations for saved study guides.
 """
 
 import re
-import logging
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from database import get_supabase
 from auth_utils import get_user_id
+from ids import is_uuid, require_uuid
 
-_UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/guides", tags=["guides"])
-
-
-def _validate_uuid(value: str, name: str = "ID") -> str:
-    """Validate a path parameter is a valid UUID."""
-    if not value or not _UUID_RE.match(value):
-        raise HTTPException(status_code=400, detail=f"Invalid {name}")
-    return value
 
 
 class SaveGuideRequest(BaseModel):
@@ -35,7 +26,6 @@ class SaveGuideRequest(BaseModel):
     source_type: Optional[str] = Field(default=None, max_length=50)
     source_title: Optional[str] = Field(default=None, max_length=500)
     source_id: Optional[str] = Field(default=None, max_length=500)
-    domain: Optional[str] = None
 
     model_config = {"str_max_length": 5_000_000}
 
@@ -51,7 +41,7 @@ class SaveGuideRequest(BaseModel):
     @field_validator("folder_id")
     @classmethod
     def validate_folder_id(cls, v):
-        if v is not None and not _UUID_RE.match(v):
+        if v is not None and not is_uuid(v):
             raise ValueError("Invalid folder ID")
         return v
 
@@ -66,174 +56,136 @@ class SaveGuideRequest(BaseModel):
 
 
 # Columns for list screens: everything except the large text and question sets.
-SUMMARY_COLUMNS = "id,folder_id,title,source_url,created_at,is_bookmarked,read_progress,source_type,source_title,domain,flashcards"
+SUMMARY_COLUMNS = "id,folder_id,title,source_url,created_at,is_bookmarked,read_progress,source_type,source_title,flashcards"
 
 
 @router.get("")
 def list_guides(folder_id: Optional[str] = None, limit: int = 50, offset: int = 0, fields: str = "", authorization: str = Header(default="")):
     """List guides, optionally filtered by folder. Paginated.
     fields=summary returns list metadata plus flashcard_count, without guide text."""
-    try:
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
-        summary = fields == "summary"
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+    summary = fields == "summary"
 
-        # Enforce pagination bounds (summaries are small, so a whole library fits)
-        limit = max(1, min(limit, 500 if summary else 100))
-        offset = max(0, offset)
+    # Enforce pagination bounds (summaries are small, so a whole library fits)
+    limit = max(1, min(limit, 500 if summary else 100))
+    offset = max(0, offset)
 
-        query = supabase.table("study_guides") \
-            .select(SUMMARY_COLUMNS if summary else "*") \
-            .eq("user_id", user_id)
+    query = supabase.table("study_guides") \
+        .select(SUMMARY_COLUMNS if summary else "*") \
+        .eq("user_id", user_id)
 
-        if folder_id:
-            _validate_uuid(folder_id, "folder ID")
-            query = query.eq("folder_id", folder_id)
+    if folder_id:
+        require_uuid(folder_id, "folder ID")
+        query = query.eq("folder_id", folder_id)
 
-        result = query.order("created_at", desc=True) \
-            .range(offset, offset + limit - 1) \
-            .execute()
+    result = query.order("created_at", desc=True) \
+        .range(offset, offset + limit - 1) \
+        .execute()
 
-        guides = result.data or []
-        if summary:
-            for guide in guides:
-                cards = guide.pop("flashcards", None)
-                guide["flashcard_count"] = len(cards) if isinstance(cards, list) else 0
-        return {"guides": guides}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error listing guides: {e}")
-        raise HTTPException(status_code=500, detail="Failed to list guides")
+    guides = result.data or []
+    if summary:
+        for guide in guides:
+            cards = guide.pop("flashcards", None)
+            guide["flashcard_count"] = len(cards) if isinstance(cards, list) else 0
+    return {"guides": guides}
 
 
 @router.post("")
 def save_guide(request: SaveGuideRequest, authorization: str = Header(default="")):
     """Save a new study guide."""
-    try:
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        data = {
-            "user_id": user_id,
-            "title": request.title,
-            "notes": request.notes,
-            "study_guide": request.study_guide,
-            "source_url": request.source_url,
-        }
+    data = {
+        "user_id": user_id,
+        "title": request.title,
+        "notes": request.notes,
+        "study_guide": request.study_guide,
+        "source_url": request.source_url,
+    }
 
-        if request.domain:
-            data["domain"] = request.domain
+    if request.folder_id:
+        data["folder_id"] = request.folder_id
 
-        if request.folder_id:
-            data["folder_id"] = request.folder_id
+    if request.flashcards:
+        data["flashcards"] = request.flashcards
 
-        if request.flashcards:
-            data["flashcards"] = request.flashcards
+    if request.external_source_id:
+        data["external_source_id"] = request.external_source_id
 
-        if request.external_source_id:
-            data["external_source_id"] = request.external_source_id
+    for field in ("source_type", "source_title", "source_id"):
+        value = getattr(request, field)
+        if value:
+            data[field] = value
 
-        for field in ("source_type", "source_title", "source_id"):
-            value = getattr(request, field)
-            if value:
-                data[field] = value
+    table = supabase.table("study_guides")
+    result = (
+        table.upsert(data, on_conflict="user_id,external_source_id")
+        if request.external_source_id
+        else table.insert(data)
+    ).execute()
 
-        table = supabase.table("study_guides")
-        result = (
-            table.upsert(data, on_conflict="user_id,external_source_id")
-            if request.external_source_id
-            else table.insert(data)
-        ).execute()
-
-        if result.data:
-            return {"guide": result.data[0]}
-        raise HTTPException(status_code=500, detail="Failed to save guide")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error saving guide: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save guide")
+    if result.data:
+        return {"guide": result.data[0]}
+    raise HTTPException(status_code=500, detail="Failed to save guide")
 
 @router.patch("/{guide_id}")
 def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = Header(default="")):
     """Update an existing study guide's content (notes, title, flashcards, etc.)."""
-    try:
-        _validate_uuid(guide_id, "guide ID")
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        # 1. Prepare only the fields that were provided in the request
-        # This converts the Pydantic model to a dict, excluding unset values
-        update_data = request.model_dump(exclude_unset=True)
+    # 1. Prepare only the fields that were provided in the request
+    # This converts the Pydantic model to a dict, excluding unset values
+    update_data = request.model_dump(exclude_unset=True)
 
-        # 2. Perform the update in Supabase
-        result = supabase.table("study_guides") \
-            .update(update_data) \
-            .eq("id", guide_id) \
-            .eq("user_id", user_id) \
-            .execute()
+    # 2. Perform the update in Supabase
+    result = supabase.table("study_guides") \
+        .update(update_data) \
+        .eq("id", guide_id) \
+        .eq("user_id", user_id) \
+        .execute()
 
-        if not result.data:
-            raise HTTPException(status_code=404, detail="Guide not found or no changes made")
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Guide not found or no changes made")
 
-        return {"guide": result.data[0]}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating guide: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update guide")
+    return {"guide": result.data[0]}
     
 @router.get("/{guide_id}")
 def get_guide(guide_id: str, authorization: str = Header(default="")):
     """Get a single study guide."""
-    try:
-        _validate_uuid(guide_id, "guide ID")
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        result = supabase.table("study_guides") \
-            .select("*") \
-            .eq("id", guide_id) \
-            .eq("user_id", user_id) \
-            .execute()
+    result = supabase.table("study_guides") \
+        .select("*") \
+        .eq("id", guide_id) \
+        .eq("user_id", user_id) \
+        .execute()
 
-        if not result.data:
-            raise HTTPException(status_code=404, detail="Guide not found")
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Guide not found")
 
-        return {"guide": result.data[0]}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting guide: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get guide")
+    return {"guide": result.data[0]}
 
 
 @router.delete("/{guide_id}")
 def delete_guide(guide_id: str, authorization: str = Header(default="")):
     """Delete a study guide."""
-    try:
-        _validate_uuid(guide_id, "guide ID")
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        supabase.table("study_guides") \
-            .delete() \
-            .eq("id", guide_id) \
-            .eq("user_id", user_id) \
-            .execute()
+    supabase.table("study_guides") \
+        .delete() \
+        .eq("id", guide_id) \
+        .eq("user_id", user_id) \
+        .execute()
 
-        return {"deleted": True}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting guide: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete guide")
+    return {"deleted": True}
 
 
 class RenameGuideRequest(BaseModel):
@@ -252,64 +204,52 @@ class RenameGuideRequest(BaseModel):
 @router.patch("/{guide_id}/rename")
 def rename_guide(guide_id: str, request: RenameGuideRequest, authorization: str = Header(default="")):
     """Rename a study guide."""
-    try:
-        _validate_uuid(guide_id, "guide ID")
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        current = supabase.table("study_guides") \
-            .select("id") \
-            .eq("id", guide_id) \
-            .eq("user_id", user_id) \
-            .execute()
+    current = supabase.table("study_guides") \
+        .select("id") \
+        .eq("id", guide_id) \
+        .eq("user_id", user_id) \
+        .execute()
 
-        if not current.data:
-            raise HTTPException(status_code=404, detail="Guide not found")
+    if not current.data:
+        raise HTTPException(status_code=404, detail="Guide not found")
 
-        supabase.table("study_guides") \
-            .update({"title": request.title}) \
-            .eq("id", guide_id) \
-            .eq("user_id", user_id) \
-            .execute()
+    supabase.table("study_guides") \
+        .update({"title": request.title}) \
+        .eq("id", guide_id) \
+        .eq("user_id", user_id) \
+        .execute()
 
-        return {"title": request.title}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error renaming guide: {e}")
-        raise HTTPException(status_code=500, detail="Failed to rename guide")
+    return {"title": request.title}
 
 
 @router.patch("/{guide_id}/bookmark")
 def toggle_bookmark(guide_id: str, authorization: str = Header(default="")):
     """Toggle bookmark status on a guide."""
-    try:
-        _validate_uuid(guide_id, "guide ID")
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        current = supabase.table("study_guides") \
-            .select("is_bookmarked") \
-            .eq("id", guide_id) \
-            .eq("user_id", user_id) \
-            .execute()
+    current = supabase.table("study_guides") \
+        .select("is_bookmarked") \
+        .eq("id", guide_id) \
+        .eq("user_id", user_id) \
+        .execute()
 
-        if not current.data:
-            raise HTTPException(status_code=404, detail="Guide not found")
+    if not current.data:
+        raise HTTPException(status_code=404, detail="Guide not found")
 
-        new_val = not current.data[0].get("is_bookmarked", False)
-        supabase.table("study_guides") \
-            .update({"is_bookmarked": new_val}) \
-            .eq("id", guide_id) \
-            .eq("user_id", user_id) \
-            .execute()
+    new_val = not current.data[0].get("is_bookmarked", False)
+    supabase.table("study_guides") \
+        .update({"is_bookmarked": new_val}) \
+        .eq("id", guide_id) \
+        .eq("user_id", user_id) \
+        .execute()
 
-        return {"is_bookmarked": new_val}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error toggling bookmark: {e}")
-        raise HTTPException(status_code=500, detail="Failed to toggle bookmark")
+    return {"is_bookmarked": new_val}
 
 
 class FlashcardProgressRequest(BaseModel):
@@ -321,27 +261,21 @@ class FlashcardProgressRequest(BaseModel):
 @router.patch("/{guide_id}/flashcard-progress")
 def update_flashcard_progress(guide_id: str, request: FlashcardProgressRequest, authorization: str = Header(default="")):
     """Update flashcard study progress."""
-    try:
-        _validate_uuid(guide_id, "guide ID")
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        supabase.table("study_guides") \
-            .update({"flashcard_progress": {
-                "known": request.known,
-                "unknown": request.unknown,
-                "last_studied": request.last_studied
-            }}) \
-            .eq("id", guide_id) \
-            .eq("user_id", user_id) \
-            .execute()
+    supabase.table("study_guides") \
+        .update({"flashcard_progress": {
+            "known": request.known,
+            "unknown": request.unknown,
+            "last_studied": request.last_studied
+        }}) \
+        .eq("id", guide_id) \
+        .eq("user_id", user_id) \
+        .execute()
 
-        return {"updated": True}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating flashcard progress: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update progress")
+    return {"updated": True}
 
 
 class MoveGuideRequest(BaseModel):
@@ -350,7 +284,7 @@ class MoveGuideRequest(BaseModel):
     @field_validator("folder_id")
     @classmethod
     def validate_folder_id(cls, v):
-        if v is not None and not _UUID_RE.match(v):
+        if v is not None and not is_uuid(v):
             raise ValueError("Invalid folder ID")
         return v
 
@@ -358,43 +292,37 @@ class MoveGuideRequest(BaseModel):
 @router.patch("/{guide_id}/move")
 def move_guide(guide_id: str, request: MoveGuideRequest, authorization: str = Header(default="")):
     """Move a guide to a different folder (or remove from folder if folder_id is None)."""
-    try:
-        _validate_uuid(guide_id, "guide ID")
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        # Verify guide belongs to user
-        current = supabase.table("study_guides") \
+    # Verify guide belongs to user
+    current = supabase.table("study_guides") \
+        .select("id") \
+        .eq("id", guide_id) \
+        .eq("user_id", user_id) \
+        .execute()
+
+    if not current.data:
+        raise HTTPException(status_code=404, detail="Guide not found")
+
+    # If folder_id provided, verify folder belongs to user
+    if request.folder_id:
+        folder = supabase.table("folders") \
             .select("id") \
-            .eq("id", guide_id) \
+            .eq("id", request.folder_id) \
             .eq("user_id", user_id) \
             .execute()
+        if not folder.data:
+            raise HTTPException(status_code=404, detail="Folder not found")
 
-        if not current.data:
-            raise HTTPException(status_code=404, detail="Guide not found")
+    supabase.table("study_guides") \
+        .update({"folder_id": request.folder_id}) \
+        .eq("id", guide_id) \
+        .eq("user_id", user_id) \
+        .execute()
 
-        # If folder_id provided, verify folder belongs to user
-        if request.folder_id:
-            folder = supabase.table("folders") \
-                .select("id") \
-                .eq("id", request.folder_id) \
-                .eq("user_id", user_id) \
-                .execute()
-            if not folder.data:
-                raise HTTPException(status_code=404, detail="Folder not found")
-
-        supabase.table("study_guides") \
-            .update({"folder_id": request.folder_id}) \
-            .eq("id", guide_id) \
-            .eq("user_id", user_id) \
-            .execute()
-
-        return {"updated": True, "folder_id": request.folder_id}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error moving guide: {e}")
-        raise HTTPException(status_code=500, detail="Failed to move guide")
+    return {"updated": True, "folder_id": request.folder_id}
 
 
 class ReadProgressRequest(BaseModel):
@@ -411,20 +339,14 @@ class ReadProgressRequest(BaseModel):
 @router.patch("/{guide_id}/read-progress")
 def update_read_progress(guide_id: str, request: ReadProgressRequest, authorization: str = Header(default="")):
     """Update read progress (0.0 to 1.0)."""
-    try:
-        _validate_uuid(guide_id, "guide ID")
-        user_id = get_user_id(authorization)
-        supabase = get_supabase()
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
 
-        supabase.table("study_guides") \
-            .update({"read_progress": min(1.0, max(0.0, request.read_progress))}) \
-            .eq("id", guide_id) \
-            .eq("user_id", user_id) \
-            .execute()
+    supabase.table("study_guides") \
+        .update({"read_progress": min(1.0, max(0.0, request.read_progress))}) \
+        .eq("id", guide_id) \
+        .eq("user_id", user_id) \
+        .execute()
 
-        return {"updated": True}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating read progress: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update progress")
+    return {"updated": True}

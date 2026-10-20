@@ -9,6 +9,11 @@ import time
 from collections import defaultdict, deque
 
 from fastapi import HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+# Per-IP limits declared with @limiter.limit on a route; main.py attaches it to the app.
+limiter = Limiter(key_func=get_remote_address)
 
 _lock = threading.Lock()
 _hits = defaultdict(deque)

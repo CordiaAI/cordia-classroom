@@ -1,6 +1,5 @@
 """Authenticated beta feedback submission and staff review routes."""
 
-import logging
 import os
 from typing import Literal, Optional
 from uuid import UUID
@@ -10,8 +9,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from auth_utils import get_user_id
 from database import get_supabase
+from ids import require_uuid
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 FeedbackCategory = Literal[
@@ -108,36 +107,30 @@ def submit_feedback(request: FeedbackRequest, authorization: str = Header(defaul
         "question_id": request.context.question_id,
         "client_request_id": str(request.client_request_id),
     }
-    try:
-        supabase = get_supabase()
-        result = (
+    supabase = get_supabase()
+    result = (
+        supabase
+        .table("feedback")
+        .upsert(
+            payload,
+            on_conflict="user_id,client_request_id",
+            ignore_duplicates=True,
+        )
+        .execute()
+    )
+    row = result.data[0] if result.data else None
+    if not row:
+        duplicate = (
             supabase
             .table("feedback")
-            .upsert(
-                payload,
-                on_conflict="user_id,client_request_id",
-                ignore_duplicates=True,
-            )
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("client_request_id", str(request.client_request_id))
+            .limit(1)
             .execute()
         )
-        row = result.data[0] if result.data else None
-        if not row:
-            duplicate = (
-                supabase
-                .table("feedback")
-                .select("id")
-                .eq("user_id", user_id)
-                .eq("client_request_id", str(request.client_request_id))
-                .limit(1)
-                .execute()
-            )
-            row = duplicate.data[0] if duplicate.data else None
-        return {"submitted": True, "feedback_id": row.get("id") if row else None}
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Feedback submission failed for user_id=%s", user_id)
-        raise HTTPException(status_code=500, detail="Failed to submit feedback")
+        row = duplicate.data[0] if duplicate.data else None
+    return {"submitted": True, "feedback_id": row.get("id") if row else None}
 
 
 @router.get("/reviewer-status")
@@ -155,43 +148,32 @@ def list_feedback(
     authorization: str = Header(default=""),
 ):
     _require_reviewer(authorization)
-    try:
-        query = get_supabase().table("feedback").select(
-            "id,user_id,message,category,status,page_path,app_version,guide_id,question_id,created_at"
-        )
-        if category:
-            query = query.eq("category", category)
-        if status:
-            query = query.eq("status", status)
-        result = query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
-        return {"items": result.data or [], "limit": limit, "offset": offset}
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Feedback review list failed")
-        raise HTTPException(status_code=500, detail="Failed to load feedback")
+    query = get_supabase().table("feedback").select(
+        "id,user_id,message,category,status,page_path,app_version,guide_id,question_id,created_at"
+    )
+    if category:
+        query = query.eq("category", category)
+    if status:
+        query = query.eq("status", status)
+    result = query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+    return {"items": result.data or [], "limit": limit, "offset": offset}
 
 
 @router.get("/review/{feedback_id}")
 def get_feedback_item(feedback_id: str, authorization: str = Header(default="")):
     _require_reviewer(authorization)
-    try:
-        result = (
-            get_supabase()
-            .table("feedback")
-            .select("id,user_id,message,category,status,page_path,app_version,guide_id,question_id,created_at")
-            .eq("id", feedback_id[:100])
-            .limit(1)
-            .execute()
-        )
-        if not result.data:
-            raise HTTPException(status_code=404, detail="Feedback item not found")
-        return {"item": result.data[0]}
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Feedback review detail failed")
-        raise HTTPException(status_code=500, detail="Failed to load feedback")
+    require_uuid(feedback_id, "feedback ID")
+    result = (
+        get_supabase()
+        .table("feedback")
+        .select("id,user_id,message,category,status,page_path,app_version,guide_id,question_id,created_at")
+        .eq("id", feedback_id)
+        .limit(1)
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Feedback item not found")
+    return {"item": result.data[0]}
 
 
 @router.patch("/review/{feedback_id}")
@@ -201,19 +183,14 @@ def update_feedback_status(
     authorization: str = Header(default=""),
 ):
     reviewer_id = _require_reviewer(authorization)
-    try:
-        result = (
-            get_supabase()
-            .table("feedback")
-            .update({"status": request.status, "reviewed_by": reviewer_id})
-            .eq("id", feedback_id[:100])
-            .execute()
-        )
-        if not result.data:
-            raise HTTPException(status_code=404, detail="Feedback item not found")
-        return {"item": result.data[0]}
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Feedback status update failed")
-        raise HTTPException(status_code=500, detail="Failed to update feedback")
+    require_uuid(feedback_id, "feedback ID")
+    result = (
+        get_supabase()
+        .table("feedback")
+        .update({"status": request.status, "reviewed_by": reviewer_id})
+        .eq("id", feedback_id)
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Feedback item not found")
+    return {"item": result.data[0]}
