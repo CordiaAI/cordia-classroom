@@ -39,12 +39,32 @@ def log_usage(response, feature: str, model: str, user_id: Optional[str] = None)
         logger.warning("usage logging failed", exc_info=True)
 
 
+# Groq's models reason before answering, and the reasoning counts against max_tokens. Keep it
+# short and out of the answer, and add headroom so a feature's answer budget is still all answer.
+REASONING_HEADROOM = 2048
+
+
+def _reasoning_options(model: str) -> dict:
+    if not models.GROQ:
+        return {}
+    if model.startswith("openai/gpt-oss"):
+        return {"reasoning_effort": "low"}
+    if model.startswith("qwen/"):
+        return {"reasoning_format": "hidden"}
+    return {}
+
+
 def chat(client, feature: str, *, model: Optional[str] = None, max_tokens: Optional[int] = None, **kwargs):
     """client.chat.completions.create with the feature's configured model and max_tokens."""
     model = model or models.model_for(feature)
+    limit = max_tokens or models.FEATURES[feature].max_tokens
+    extra = _reasoning_options(model)
+    if extra:
+        limit += REASONING_HEADROOM
+        kwargs["extra_body"] = {**extra, **(kwargs.get("extra_body") or {})}
     response = client.chat.completions.create(
         model=model,
-        max_tokens=max_tokens or models.FEATURES[feature].max_tokens,
+        max_tokens=limit,
         **kwargs,
     )
     log_usage(response, feature, model)

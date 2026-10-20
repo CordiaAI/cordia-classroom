@@ -8,7 +8,7 @@ You are a senior full-stack engineer maintaining a production Chrome extension +
 - **Backend** (FastAPI on Fly.io): `backend/services/llm.py` (all AI generation), `backend/services/text_processing.py` (content cleaning/chunking), `backend/main.py` (routes)
 - **Frontend** (Next.js on Vercel): `web/` — guide viewer, NCLEX quiz, flashcards, AI chat
 - **PPTX**: `backend/services/file_extraction.py` (uploaded PPTX text via python-pptx) and `backend/services/pptx_rendering.py` (server-side slide rendering)
-- **AI**: OpenAI only — GPT-4o for study guides, vision, and chat/Tutor; GPT-4o-mini for large batches, quizzes, and SmartNotes
+- **AI**: Groq when `GROQ_API_KEY` is set (backend `services/models.py`, web `web/lib/server/aiProvider.mjs`): `openai/gpt-oss-120b` for study guides, chat/Tutor, quizzes and notes; `qwen/qwen3.8-27b` for vision; `whisper-large-v3-turbo` for recording. Otherwise OpenAI: GPT-4o for study guides, vision and chat/Tutor; GPT-4o-mini for large batches, quizzes and SmartNotes
 - **DB**: Supabase (PostgreSQL) — `study_guides`, `quiz_attempts`, `study_sessions`, `folders`, `user_streaks`
 - **Deploy**: Frontend auto-deploys on `git push`. Backend requires manual `cd backend && fly deploy`
 
