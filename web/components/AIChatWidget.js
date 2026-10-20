@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
 import MermaidDiagram from './MermaidDiagram';
 import NapkinVisual from './NapkinVisual';
-import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from './ExplanationPreference';
 import { ArrowUp, BookOpen, Layers, MessageCircle, Paperclip, PencilRuler, SlidersHorizontal, X as CloseIcon } from 'lucide-react';
 import { lastGuide } from '../lib/userStore';
@@ -112,14 +111,14 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const [localError, setLocalError] = useState('');
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [explainOpen, setExplainOpen] = useState(false);
-  const { learningStyle } = useLearningStyle();
   const [listening, setListening] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState(-1);
   const recognitionRef = useRef(null);
-  const Recognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
-  const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
-  // Voice tools are for students who chose to study by listening and talking.
-  const voice = learningStyle?.style === 'aural';
+  // Read after mount: the server render has no browser speech APIs, and the first client
+  // render must match it.
+  const [speech, setSpeech] = useState({ Recognition: null, canSpeak: false });
+  useEffect(() => setSpeech({ Recognition: window.SpeechRecognition || window.webkitSpeechRecognition || null, canSpeak: 'speechSynthesis' in window }), []);
+  const { Recognition, canSpeak } = speech;
 
   useEffect(() => () => {
     recognitionRef.current?.stop();
@@ -479,7 +478,8 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         {optionsOpen && <>
         <TutorSelect label="Tutor skill" value={skillOverride} onChange={changeSkill} disabled={!session || busy} options={[
           { value: '', label: `Auto · ${session?.skills?.find(item => item.id === session?.active_skill)?.label || 'Explain'}` },
-          ...(session?.skills || [{ id: 'explain', label: 'Explain' }]).map(item => ({ value: item.id, label: item.available === false ? `${item.label} — coming soon` : item.label, disabled: item.available === false })),
+          // Only modes that work today are listed.
+          ...(session?.skills || [{ id: 'explain', label: 'Explain' }]).filter(item => item.available !== false).map(item => ({ value: item.id, label: item.label })),
         ]} />
         {needsTargetClass && <TutorSelect label="Destination class" value={targetClassId} onChange={setTargetClassId} options={[
           { value: '', label: 'Choose destination class' },
@@ -541,7 +541,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
               </button>
             )}
             <TutorMessageText text={message.text} plain={message.role === 'user'} />
-            {voice && canSpeak && message.role !== 'user' && message.text && (
+            {canSpeak && message.role !== 'user' && message.text && (
               <button type="button" className="cordia-tutor-speak" onClick={() => toggleSpeech(index, message.text)} aria-pressed={speakingIndex === index}>
                 {speakingIndex === index ? 'Stop' : 'Listen'}
               </button>
@@ -568,7 +568,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         <div ref={endRef} />
       </div>
 
-      <div className={`cordia-tutor-input${voice && Recognition ? ' has-mic' : ''}`}>
+      <div className={`cordia-tutor-input${Recognition ? ' has-mic' : ''}`}>
         <textarea
           value={input}
           onChange={event => setInput(event.target.value)}
@@ -583,7 +583,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
           disabled={!canSubmit || busy || remaining <= 0 || !session}
           rows="2"
         />
-        {voice && Recognition && (
+        {Recognition && (
           <button
             type="button"
             className={`cordia-tutor-mic${listening ? ' is-listening' : ''}`}

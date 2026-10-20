@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { apiFetch, setToken, scheduleProactiveRefresh } from '../../lib/api';
+import { setToken, scheduleProactiveRefresh } from '../../lib/api';
 import { authMessage } from '../../components/AuthCard';
 
 function tokenEmail(token) {
@@ -35,16 +35,7 @@ export default function OAuthCallback() {
     scheduleProactiveRefresh();
     window.history.replaceState({}, document.title, '/auth/callback');
 
-    // School details entered before "Sign up with Google" (Google can't carry them).
-    let pending = null;
-    try {
-      pending = sessionStorage.getItem('pendingProfile');
-      sessionStorage.removeItem('pendingProfile');
-    } catch { /* storage blocked: the student can add school details in Settings */ }
-    const saveProfile = pending
-      ? apiFetch('/auth/profile', { method: 'PATCH', body: pending })
-      : Promise.resolve();
-    saveProfile.finally(() => router.replace('/dashboard'));
+    router.replace('/dashboard');
   }, [router]);
 
   return (

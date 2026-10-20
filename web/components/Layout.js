@@ -7,11 +7,15 @@ import TipHost from './TipHost';
 import Walkthrough from './Walkthrough';
 import TimerEngine from './TimerEngine';
 import CanvasReminder from './CanvasReminder';
+import { useFileDragging } from '../lib/fileDrop';
 
-const WIDE = ['/guide/[id]', '/practice', '/practice/[guideId]', '/smartnotes', '/calendar', '/tutor'];
+const WIDE = ['/guide/[id]', '/practice', '/practice/[guideId]', '/smartnotes', '/canvas', '/tutor'];
+// Study screens run in focus mode: no top bar or tab bar, just the screen's own exit.
+const FOCUS = ['/session', '/flashcards/study', '/quiz/[guideId]', '/nclex/[guideId]', '/practice/[guideId]'];
 
 export default function Layout({ children, timerState, setTimerState }) {
   const router = useRouter();
+  const dragging = useFileDragging();
   // The Tutor page shows the Tutor full size, so the side panel stays out of the way there.
   const pageOwnsTutor = router.pathname === '/tutor';
   const activeGuideId = router.query.guideId || (router.pathname === '/guide/[id]' ? router.query.id : '');
@@ -20,13 +24,14 @@ export default function Layout({ children, timerState, setTimerState }) {
   const routeKey = `${router.pathname}:${router.query.id || ''}:${router.query.guideId || ''}`;
 
   return (
-    <div className="app-shell">
-      <Sidebar />
+    <div className={'app-shell' + (FOCUS.includes(router.pathname) ? ' is-focus' : '')}>
+      <Sidebar timerState={timerState} setTimerState={setTimerState} />
       <main id="classroom-main" className="main-content">
         <div key={routeKey} className={'workspace-route' + (WIDE.includes(router.pathname) && !(router.pathname === '/smartnotes' && !router.query.id) ? ' is-wide' : '')}>
           {children}
         </div>
       </main>
+      {dragging && <div className="c-drop-hint" role="status">Drop to upload</div>}
       <GuideJobIndicator />
       <NewSheet />
       <TipHost />

@@ -108,6 +108,9 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .tutor-drawer-shell.is-open { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; transition: transform var(--motion-smooth), opacity var(--motion-smooth), visibility 0s; }
 .tutor-drawer { width: var(--tutor-width); border: 1px solid var(--glass-edge); border-radius:20px; padding-top: 14px; }
 .tutor-resize-handle { left: 0; right: auto; }
+.tutor-resize-handle::after { content: ''; position: absolute; top: 50%; left: 3px; width: 4px; height: 40px; margin-top: -20px; border-radius: var(--r-pill); background: var(--hover-edge); }
+.tutor-resize-handle:hover::after { background: var(--olive); }
+.tutor-expand { position: absolute; top: 13px; right: 48px; z-index: 2; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--bg-hover); color: var(--ink); }
 .tutor-close { position: absolute; top: 13px; right: 12px; z-index: 2; width: 28px; height: 28px; border: 0; border-radius:50%; background: var(--bg-hover); color: var(--ink); font-size:20px; cursor: pointer; }
 .tutor-brand-mark { width: 25px; height: 23px; object-fit: contain; }
 .cordia-tutor { background: transparent; border: 0; box-shadow: none; }

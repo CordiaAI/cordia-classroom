@@ -2,12 +2,12 @@
 import json
 import logging
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from auth_utils import get_user_id
 from ids import is_uuid
 from database import get_supabase
-from rate_limit import limiter
+from rate_limit import ai_rate_limit, limiter
 from schemas import PracticeGradeRequest, PracticeProgressRequest, PracticeRecognizeRequest, PracticeRequest
 from services.entitlements import record, require
 from services.guidance import learning_guidance
@@ -103,14 +103,16 @@ def save_practice_progress(guide_id: str, body: PracticeProgressRequest, request
     return {"saved": True}
 
 
-@router.post("/grade")
+@router.post("/grade", dependencies=[Depends(ai_rate_limit(max_calls=30))])
 @limiter.limit("60/minute")
 def grade_practice(body: PracticeGradeRequest, request: Request, authorization: str = Header(default="")):
     """Mark one answer right or wrong; a wrong answer's explanation goes to the Tutor."""
     user_id = get_user_id(authorization)
+    require(user_id, "light")
     result = grade_practice_answer(body.prompt, body.reference, body.worked_solution, body.student_answer, body.work)
     if not result:
         raise HTTPException(status_code=502, detail="Cordia could not check this answer. Please try again.")
+    record(user_id, "light")
     if not result["correct"] and result["explanation"]:
         # The page shows only Right / Not quite; the explanation is optional, so a failure here is logged.
         try:
@@ -120,12 +122,14 @@ def grade_practice(body: PracticeGradeRequest, request: Request, authorization: 
     return result
 
 
-@router.post("/recognize")
+@router.post("/recognize", dependencies=[Depends(ai_rate_limit(max_calls=10))])
 @limiter.limit("20/minute")
 def recognize_practice_handwriting(body: PracticeRecognizeRequest, request: Request, authorization: str = Header(default="")):
     """Turn a drawing from the practice workspace into typed text."""
-    get_user_id(authorization)
+    user_id = get_user_id(authorization)
+    require(user_id, "light")
     text = recognize_handwriting(body.image)
     if text is None:
         raise HTTPException(status_code=502, detail="Cordia could not read this drawing. Please try again.")
+    record(user_id, "light")
     return {"text": text}

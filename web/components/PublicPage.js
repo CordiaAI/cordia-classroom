@@ -1,11 +1,16 @@
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import AcademicInfinityMark from './AcademicInfinityMark';
+import { getToken } from '../lib/api';
 
 const SITE = 'https://classroom.cordiaai.io';
 
 // Shared frame for the signed-out pages: clouds, wordmark, and three links.
 export default function PublicPage({ title, description, path = '/', backdrop = '', children }) {
+  // Signed-in visitors get a way back into the app instead of "Sign in".
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => { setSignedIn(Boolean(getToken())); }, []);
   return (
     <>
       <Head>
@@ -13,7 +18,7 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
         <meta name="description" content={description} />
         <link rel="canonical" href={SITE + path} />
         <meta property="og:url" content={SITE + path} />
-        <meta property="og:image" content={`${SITE}/cordia-classroom-icon.png`} key="og:image" />
+        <meta property="og:image" content={`${SITE}/og-image.png`} key="og:image" />
       </Head>
       <div className={'public' + (backdrop ? ' public--photo' : '')} style={backdrop ? { '--public-photo': `url('${backdrop}')` } : { '--public-backdrop': "url('/classroom-clouds.webp')" }}>
         <header className="public-nav">
@@ -21,10 +26,24 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
           <nav aria-label="Public">
             <Link href="/mission">Approach</Link>
             <Link href="/pricing">Pricing</Link>
-            <Link href="/login" className="public-signin">Sign in</Link>
+            {signedIn
+              ? <Link href="/dashboard" className="public-signin">Open Cordia</Link>
+              : <Link href="/login" className="public-signin">Sign in</Link>}
           </nav>
         </header>
         <main className="public-main">{children}</main>
+        <footer className="public-footer">
+          <nav aria-label="Site">
+            <Link href="/mission">Approach</Link>
+            <Link href="/pricing">Pricing</Link>
+            <Link href="/instructors">For instructors</Link>
+            <Link href="/install-extension">Get the Chrome extension</Link>
+            <Link href="/copyright">Copyright and takedowns</Link>
+            <Link href="/privacy">Privacy</Link>
+            <Link href="/terms">Terms</Link>
+            <Link href="/honor-code">Honor code</Link>
+          </nav>
+        </footer>
       </div>
       <style jsx global>{`
         .public { min-height: 100vh; background:var(--surface-card); color: var(--ink); }
@@ -33,15 +52,20 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
         .public--photo .public-nav { background: var(--glass-shell, var(--surface-card)); }
         .public--photo .auth, .public--photo .c-card { -webkit-backdrop-filter: blur(20px) saturate(140%); backdrop-filter: blur(20px) saturate(140%); }
         .public-nav { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; padding: 0 24px; background: var(--surface-card); border-bottom: 1px solid var(--hairline); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); }
-        .public-brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; font:400 22px/1.15 var(--font-nav); letter-spacing: -0.01em; -webkit-text-stroke: 0.35px currentColor; }
+        .public-brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; font:600 20px/1.15 var(--font-display); letter-spacing: 0; }
         .public-brand:hover { text-decoration: none; }
         .public-mark { width: 30px; height: 26px; object-fit: contain; }
         .public-nav nav { display: flex; align-items: center; gap: 4px; }
-        .public-nav nav a { display: inline-flex; align-items: center; height: 40px; padding: 0 14px; border-radius:999px; color: var(--ink); font:400 var(--fs-17)/1 var(--font-nav); letter-spacing: -0.01em; -webkit-text-stroke: 0.35px currentColor; text-decoration: none; }
+        .public-nav nav a { display: inline-flex; align-items: center; height: 40px; padding: 0 14px; border-radius:999px; color: var(--ink); font:600 var(--fs-15)/1 var(--font-sans); text-decoration: none; }
         .public-nav nav a:hover { background: var(--olive-tint); text-decoration: none; }
         .public-nav nav a.public-signin { background: var(--olive); color: var(--on-olive); }
         .public-main { width: min(1120px, 100%); margin: 0 auto; padding: 48px 24px 80px; }
-        @media (max-width: 600px) { .public-nav { padding: 0 12px 0 16px; } .public-nav nav a:not(.public-signin):first-child { display: none; } .public-main { padding: 32px 16px 64px; } }
+        .public-doc { color: var(--text-secondary); }
+        .public-footer { border-top: 1px solid var(--hairline); padding: 24px; }
+        .public-footer nav { width: min(1120px, 100%); margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px 24px; }
+        .public-footer a { color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); text-decoration: none; }
+        .public-footer a:hover { color: var(--ink); text-decoration: underline; }
+        @media (max-width: 600px) { .public-nav { padding: 0 12px 0 16px; } .public-nav nav a:not(.public-signin):first-child { display: none; } .public-main { padding: 32px 16px 64px; } .public-footer { padding: 20px 16px; } }
       `}</style>
     </>
   );

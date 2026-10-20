@@ -61,6 +61,21 @@ def _stripe():
     return stripe
 
 
+def cancel_subscription_for_deletion(user_id: str) -> None:
+    """Account deletion ends a paid plan first, so a deleted account is never billed again."""
+    row = (get_supabase().table("user_subscriptions").select("stripe_subscription_id,status").eq("user_id", user_id).limit(1).execute().data or [None])[0]
+    subscription_id = (row or {}).get("stripe_subscription_id")
+    if not subscription_id or (row or {}).get("status") in ("canceled", "incomplete_expired"):
+        return
+    try:
+        _stripe().Subscription.cancel(subscription_id)
+    except stripe.error.InvalidRequestError as exc:  # already gone at Stripe
+        logger.info("Subscription %s not cancelled: %s", subscription_id, exc)
+    except stripe.error.StripeError as exc:
+        logger.error("Subscription cancel failed for %s: %s", user_id, exc)
+        raise HTTPException(status_code=502, detail="We couldn't cancel your subscription, so your account wasn't deleted. Try again or email support@cordiaai.io.")
+
+
 def _frontend() -> str:
     return os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
 

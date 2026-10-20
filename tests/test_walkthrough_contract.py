@@ -19,10 +19,12 @@ class WalkthroughContractTests(unittest.TestCase):
         self.assertIn(">Skip</button>", source)
         self.assertIn("prefers-reduced-motion", source)
 
-    def test_day_one_has_nine_steps_and_saves_progress_on_the_server(self):
+    def test_first_run_has_four_screens_and_saves_progress_on_the_server(self):
         walkthrough = read("lib", "walkthrough.js")
         day_one = walkthrough.split("export const DAY_ONE = [")[1].split("\n];")[0]
-        self.assertEqual(day_one.count("\n  ["), 9)
+        self.assertEqual(day_one.count("\n  ["), 4)
+        for step in ("id: 'new'", "screen: 'about'", "id: 'quiz-start'", "screen: 'first-review'"):
+            self.assertIn(step, day_one)
         progress = read("lib", "progress.js")
         self.assertIn("/auth/v1/user", progress)
         self.assertIn("data: { cordia: state }", progress)

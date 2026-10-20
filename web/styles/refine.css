@@ -14,7 +14,7 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 /* ---------- Type roles ---------- */
 /* Titles: Newsreader 600, slight negative tracking, balanced lines. */
 :is(.c-title, .pricing-title, .guide-title-btn, .guide-title-input, .c-section-title, .today-continue-title, .lib-row-title, .folder-row-title,
-  .sn-card-title, .reader-q, .quiz-question-text, .practice-prompt, .fc-face p, .today-counts strong, .recap-class, .me-names strong,
+  .sn-card-title, .reader-q, .quiz-question-text, .practice-prompt, .fc-face p, .recap-class, .me-names strong,
   .c-brand > span, main h1:not(.sr-only), .public-main h1, .public-main h2, .public-main h3, .extension-install-step h2, .mission-page h2, .mission-page h3) {
   font-family: var(--font-display) !important;
   font-weight: 600 !important;
@@ -29,7 +29,7 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 :is(.today-continue-title, .lib-row-title, .folder-row-title, .sn-card-title, .recap-class, .me-names strong, .extension-install-step h2, .public-main h3, .mission-page h3,
   .today .c-list-row > .c-grow, .calendar-item strong) { font-family: var(--font-display) !important; font-weight: 600 !important; font-size: var(--fs-17) !important; letter-spacing: var(--track-title); line-height: var(--lh-title); }
 :is(.reader-q, .quiz-question-text, .practice-prompt) { font-size: var(--fs-20) !important; }
-:is(.fc-face p, .today-counts strong) { font-size: var(--fs-28) !important; font-variant-numeric: tabular-nums; }
+.fc-face p { font-size: var(--fs-28) !important; font-variant-numeric: tabular-nums; }
 .c-brand > span { font-size: var(--fs-20) !important; }
 /* Reading text is body text: Manrope 17 at 1.5. */
 .c-study, .reader-a, .reader-prose, .reader-notes { font: 500 var(--fs-17)/var(--lh-body) var(--font-sans) !important; letter-spacing: 0; }
@@ -98,14 +98,6 @@ strong, b { font-weight: 600; }
 .grove-card, .plan-card, .pricing-card, .focus-card, .insights-card, .learn, .me-card, .recap, .grove-grid, .heat { padding: 20px !important; }
 .today-continue { padding: 16px 20px !important; border-radius: var(--r-row) !important; }
 
-/* Navigation in Times New Roman: the top bar (links, Search, New, avatar) and the phone tab bar. */
-.c-topbar, .c-topbar *, .c-tabbar, .c-tabbar * { font-family: var(--font-nav) !important; }
-/* Regular weight, larger, and set a touch tighter so the serif reads slim. */
-.c-topbar, .c-topbar *, .c-tabbar, .c-tabbar * { font-weight: 400 !important; letter-spacing: -0.01em; }
-/* A little bolder than regular (Times New Roman's bold is too heavy): a hairline stroke. */
-.c-topbar, .c-tabbar { -webkit-text-stroke: 0.35px currentColor; }
-.c-nav a, .c-topbar .c-searchbtn, .c-topbar .c-new-btn { font-size: var(--fs-17) !important; }
-.c-tabbar a { font-size: var(--fs-15) !important; }
 
 /* The serif, a little more: reading text and tab names read like a book; buttons, labels, dates
    and other small details stay in the sans for legibility. */

@@ -178,6 +178,17 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
 }
 .c-nav a:hover { background: var(--olive-tint); text-decoration: none; }
 .c-nav a[aria-current='page'] { background: var(--olive); color: var(--on-olive); }
+.c-nav .c-nav-btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 0;
+  border-radius:var(--r-pill); background: transparent; color: var(--ink); cursor: pointer;
+  font:600 15px/1 var(--font-sans);
+}
+.c-nav .c-nav-btn:hover, .c-nav .c-nav-btn[aria-pressed='true'] { background: var(--olive-tint); }
+.c-timerbtn { height: 40px; min-width: 40px; padding: 0 10px; gap: 6px; justify-content: center; }
+.c-timerbtn.is-running { color: var(--olive-ink); }
+.c-timer-clock { font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+.c-timer-pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; width: 300px; }
+.c-timer-pop .focus-card { background: var(--surface-raised); box-shadow: var(--shadow-lg); }
 .c-bar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .c-searchbtn { height: 40px; padding: 0 8px 0 14px; gap: 10px; }
 .c-searchbtn kbd { font:600 13px/1 var(--font-sans); color: var(--muted); background: var(--olive-tint); border-radius:var(--r-pill); padding: 5px 8px; }
@@ -218,7 +229,7 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
   .main-content, .app-shell .main-content { padding: 20px 16px calc(var(--tabbar-h) + 96px) !important; }
   .c-tabbar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
-    display: grid; grid-template-columns: repeat(5, 1fr);
+    display: grid; grid-template-columns: repeat(4, 1fr);
     height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
     padding: 6px 4px env(safe-area-inset-bottom);
     background: var(--glass);
@@ -449,6 +460,12 @@ body:has(.about) .c-fab { display: none; }
   .sn-v-divider, .sn-h-divider { display: none !important; }
   .sn-paper-wrap, .sn-viewer-wrap, .sn-diagram-wrap { grid-column: 1 !important; grid-row: auto !important; min-width: 0; }
   .sn-viewer-wrap, .sn-diagram-wrap { min-height: 320px; }
+  /* The page scrolls on phones: the paper gets real height and the panels stack below it. */
+  .sn-page { height: auto !important; min-height: 100vh; padding: 12px; }
+  .sn-layout { flex: none !important; }
+  .sn-paper-wrap { min-height: 60vh; order: 0; }
+  .sn-viewer-wrap { order: 1; }
+  .sn-diagram-wrap { order: 2; }
 }
 @media (max-width: 767px) {
   .sn-header, .sn-header-left, .sn-header-right { flex-wrap: wrap; min-width: 0; max-width: 100%; }
@@ -594,3 +611,13 @@ body:has(.about) .c-fab { display: none; }
 .c-step-num { grid-row: span 2; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--olive); color: var(--on-olive); font: 600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
 .c-step-title { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; font: 600 17px/1.3 var(--font-sans); }
 .c-step-body { display: grid; gap: 8px; min-width: 0; }
+
+/* Focus mode on study screens: the top bar, tab bar and New button step aside. */
+.app-shell.is-focus .c-topbar, .app-shell.is-focus .c-tabbar, .app-shell.is-focus .c-fab { display: none !important; }
+.app-shell.is-focus { --bar-h: 0px; --tabbar-h: 0px; }
+
+/* Webcam drawing needs a desktop camera and pointer. */
+@media (max-width: 767px), (pointer: coarse) { .practice-webcam { display: none !important; } }
+
+/* While a file is dragged over the page: where it will go is outlined by its box; this says it works. */
+.c-drop-hint { position: fixed; left: 50%; bottom: 32px; z-index: 400; transform: translateX(-50%); padding: 12px 20px; border-radius: var(--r-pill); background: var(--olive); color: var(--on-olive); font: 600 var(--fs-15)/1 var(--font-sans); box-shadow: var(--shadow-lg); pointer-events: none; }

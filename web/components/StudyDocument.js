@@ -77,7 +77,7 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
           return (
             <section className="reader-block" key={pair.index}>
               <h2 className="reader-q"><span className="c-meta">{index + 1}</span>{pair.question}</h2>
-              <p className="c-study reader-a" data-spot={offset === 0 ? 'reader-text' : undefined}>{pair.answer}</p>
+              <p className="c-study reader-a" data-spot={offset === 0 ? 'reader-text' : undefined} data-tip={offset === 0 ? 'highlight' : undefined}>{pair.answer}</p>
               {pair.image && <img className="reader-img" src={pair.image} alt="" />}
               {(onRead || onExplain) && (
                 <div className="reader-actions">

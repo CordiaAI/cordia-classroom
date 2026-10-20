@@ -87,6 +87,8 @@ class AddClassRequest(BaseModel):
     code: str = Field(..., min_length=2, max_length=60)
     name: str = Field(default="", max_length=200)
     term: Optional[str] = Field(default=None, max_length=60)
+    # A Library class (folder) that gains this course code; otherwise one is made.
+    folder_id: Optional[str] = None
 
 
 @router.get("/classes")
@@ -136,8 +138,16 @@ def add_class(body: AddClassRequest, authorization: str = Header(default="")):
     if not normalize_course_code(body.code).code:
         raise HTTPException(status_code=400, detail="Use a course code like MGT 300")
     class_row = ensure_class(db, school["id"], body.code, body.name.strip())
+    # The Library class and the shared class are one thing: a code added to an existing
+    # Library class links that folder (membership otherwise makes one).
+    if body.folder_id:
+        folder_id = _uuid(body.folder_id, "folder ID")
+        if not _one(db.table("folders").select("id").eq("id", folder_id).eq("user_id", user_id).limit(1).execute()):
+            raise HTTPException(status_code=404, detail="Folder not found")
+        if not _one(db.table("folders").select("id").eq("user_id", user_id).eq("class_id", class_row["id"]).limit(1).execute()):
+            db.table("folders").update({"class_id": class_row["id"]}).eq("id", folder_id).eq("user_id", user_id).execute()
     add_membership(db, user_id, class_row, (body.term or "").strip() or term_for(), "manual")
-    return {"class": next(c for c in _user_classes(db, user_id) if c["id"] == class_row["id"])}
+    return {"class": next(c for c in _user_classes(db, user_id) if c["id"] == class_row["id"]), "folder": ensure_folder(db, user_id, class_row)}
 
 
 @router.delete("/classes/{class_id}")

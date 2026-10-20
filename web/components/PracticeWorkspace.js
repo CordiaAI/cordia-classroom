@@ -515,7 +515,7 @@ export default function PracticeWorkspace() {
         ) : guideOptions.length ? (
           <div className="practice-grid practice-guide-picker" data-spot="practice-picker">
             {guideOptions.map(option => (
-              <Link key={option.id} href={'/practice/' + option.id} className="c-card practice-guide">
+              <Link key={option.id} href={'/practice/' + option.id} className="c-card practice-guide" onClick={() => walkthroughEvent('practice-guide')}>
                 <PencilRuler size={24} strokeWidth={1.75} aria-hidden="true" />
                 <span>{option.title || 'Untitled guide'}</span>
               </Link>
@@ -535,7 +535,7 @@ export default function PracticeWorkspace() {
   }
 
   return (
-    <main className="practice-page">
+    <div className="practice-page">
       <header className="c-page-head practice-head">
         <div className="c-row practice-title-row">
           <button type="button" className="c-icon-btn" onClick={() => router.push(guideId ? '/guide/' + guideId : '/practice')} aria-label="Back"><ArrowLeft {...ICON} /></button>
@@ -593,8 +593,8 @@ export default function PracticeWorkspace() {
             <button type="button" className="c-btn c-btn--quiet" onClick={tidyHandwriting} disabled={tidying || !current}><Wand2 {...ICON} />{tidying ? 'Reading…' : 'Tidy'}</button>
             <button type="button" className="c-icon-btn" onClick={clearWork} aria-label="Clear work"><Trash2 {...ICON} /></button>
             <div className="practice-drawbar" role="group" aria-label="Drawing">
-            <button type="button" className={'c-btn c-btn--sm ' + (handOn ? 'c-btn--primary' : 'c-btn--secondary')} aria-pressed={handOn} onClick={toggleHand}>
-              <Hand {...ICON} />{handOn ? 'Stop hand' : 'Hand'}
+            <button type="button" className={'c-btn c-btn--sm practice-webcam ' + (handOn ? 'c-btn--primary' : 'c-btn--secondary')} aria-pressed={handOn} onClick={toggleHand}>
+              <Hand {...ICON} />{handOn ? 'Stop webcam drawing' : 'Draw with webcam'}
             </button>
             {handOn && (
               <button type="button" className="c-icon-btn" aria-pressed={showCamera} onClick={() => setShowCamera(value => !value)} aria-label={showCamera ? 'Hide camera preview' : 'Show camera preview'}>
@@ -723,6 +723,7 @@ export default function PracticeWorkspace() {
       <style jsx>{`
         .practice-page { display: grid; gap: 20px; }
         .practice-title-row { min-width: 0; flex: 1; }
+        @media (max-width: 767px) { .practice-head { flex-wrap: wrap; } .practice-title-row { flex-basis: 100%; } }
         .practice-source-name { font-family: var(--font-display); min-width: 0; }
         .practice-prompt { margin: 8px 0 0; font:600 20px/1.15 var(--font-display); }
         .practice-kind { text-transform: capitalize; }
@@ -739,6 +740,6 @@ export default function PracticeWorkspace() {
         .practice-size input { width: 112px; accent-color: var(--olive); }
         .practice-evaluation { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
       `}</style>
-    </main>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Check, Eye, EyeOff, X } from 'lucide-react';
@@ -50,6 +50,8 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
   const [busy, setBusy] = useState(false);
   const signup = mode === 'signup';
   const passed = CHECKS.map(check => check.test(password));
+  // After a self-serve account deletion, say it worked.
+  useEffect(() => { if (router.query.deleted === '1') setNotice('Your account and data were deleted.'); }, [router.query.deleted]);
 
   function finishSession(session) {
     setToken(session.access_token, session.user?.email, session.refresh_token, session.user?.user_metadata?.name);

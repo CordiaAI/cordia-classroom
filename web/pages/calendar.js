@@ -1,18 +1,9 @@
-import { useRequireAuth } from '../lib/auth';
-import useSessionTracker from '../lib/useSessionTracker';
 import { useEffect } from 'react';
-import CalendarDashboard from '../components/CalendarDashboard';
-import { walkthroughEvent } from '../lib/walkthrough';
+import { useRouter } from 'next/router';
 
-export default function CalendarPage() {
-  const { ready } = useRequireAuth();
-  useSessionTracker('browse');
-  useEffect(() => { if (ready) walkthroughEvent('calendar-opened'); }, [ready]);
-  if (!ready) return null;
-  return (
-    <div className="c-page">
-      <header className="c-page-head"><h1 className="c-title">Calendar</h1></header>
-      <CalendarDashboard />
-    </div>
-  );
+// The calendar lives inside Canvas now; old links land there.
+export default function CalendarRedirect() {
+  const router = useRouter();
+  useEffect(() => { router.replace('/canvas?tab=calendar'); }, [router]);
+  return null;
 }

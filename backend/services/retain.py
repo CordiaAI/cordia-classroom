@@ -128,7 +128,11 @@ def plan_session(questions: list, selected) -> list:
 
 
 def _signing_key() -> bytes:
-    secret = os.getenv("RETAIN_SIGNING_KEY") or os.getenv("SUPABASE_JWT_SECRET") or os.getenv("SUPABASE_KEY") or ""
+    secret = (os.getenv("RETAIN_SIGNING_KEY") or os.getenv("SUPABASE_JWT_SECRET")
+              or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY") or "")
+    if not secret:
+        # An empty key would let anyone forge written-answer credit: refuse to grade instead.
+        raise RuntimeError("RETAIN_SIGNING_KEY is not set")
     return hashlib.sha256(("cordia-retain-grade:" + secret).encode()).digest()
 
 

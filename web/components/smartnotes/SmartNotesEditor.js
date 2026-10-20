@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Check, ChevronDown, NotebookPen, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, Keyboard, NotebookPen, Sparkles, Trash2 } from 'lucide-react';
+import Menu from '../Menu';
+import { requestTip } from '../../lib/tips';
+import TypingShortcuts from './TypingShortcuts';
 import CordiaLoader from '../CordiaLoader';
 import MermaidDiagram from '../MermaidDiagram';
 import NapkinVisual from '../NapkinVisual';
@@ -56,6 +59,9 @@ export default function SmartNotesEditor() {
   const [mermaidCode, setMermaidCode] = useState(null);
   const [diagramLoading, setDiagramLoading] = useState(false);
   const [visualizeMode, setVisualizeMode] = useState(false);
+  const [showTyping, setShowTyping] = useState(false);
+  // First note: a one-time tip points at the typing shortcuts.
+  useEffect(() => { requestTip('typing'); }, []);
   const [visualSource, setVisualSource] = useState(null); // { text, context, key }
   const visualAnchor = useRef(null);
 
@@ -284,11 +290,14 @@ export default function SmartNotesEditor() {
       const contentChanged = content !== lastSavedRef.current;
       const titleChanged = title !== lastSavedTitleRef.current;
       if (!contentChanged && !titleChanged) return;
+      const body = JSON.stringify({ title, content });
+      // Browsers refuse keepalive bodies over 64 KB (notes with pasted images), so big notes
+      // save with a normal request: it still completes on SPA navigation.
       fetch(API + '/smart_notes/' + noteIdRef.current, {
         method: 'PUT',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content }),
-        keepalive: true,
+        body,
+        keepalive: new Blob([body]).size < 60000,
       }).catch(() => { /* the page is closing; there is nowhere left to show the error */ });
       lastSavedRef.current = content;
       lastSavedTitleRef.current = title;
@@ -519,6 +528,14 @@ export default function SmartNotesEditor() {
               </div>
             )}
           </div>
+          <button type="button" className="c-btn c-btn--quiet" data-tip="typing" onClick={() => setShowTyping(true)}><Keyboard size={20} strokeWidth={1.75} aria-hidden="true" />Typing shortcuts</button>
+          {noteId && noteId !== 'new' && (
+            <Menu
+              label="More for this note"
+              // Library deletes it with the same 6-second Undo guides use.
+              items={[{ label: 'Delete note', icon: Trash2, danger: true, onSelect: () => router.push('/library?filter=notes&delete=' + encodeURIComponent(noteId)) }]}
+            />
+          )}
         </div>
       </div>
 
@@ -535,6 +552,7 @@ export default function SmartNotesEditor() {
         <div className="sn-paper-wrap">
           <div className="sn-paper-label-row">
             <span className="sn-panel-label">Notes</span>
+            {visualizeMode && <span className="sn-visualize-hint" role="status">Highlight text, then press ✓</span>}
             {visualizeMode && (
               <button
                 className="sn-visualize-confirm"
@@ -607,6 +625,7 @@ export default function SmartNotesEditor() {
       </div>
 
       <StudyGuidePreviewModal {...guide.modal} />
+      {showTyping && <TypingShortcuts onClose={() => setShowTyping(false)} />}
     </div>
   );
 }

@@ -59,7 +59,8 @@
 
     syncAuth();
     window.addEventListener('message', onMessage);
-    window.addEventListener('focus', syncAuth);
+    // Focus only re-reads the saved session; refreshing here would rotate the token on every focus.
+    window.addEventListener('focus', () => syncAuth());
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) syncAuth();
     });

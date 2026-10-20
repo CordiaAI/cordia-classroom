@@ -29,7 +29,10 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
         if (!scrolled) {
           scrolled = true;
           const box = element.getBoundingClientRect();
-          if (box.top < 70 || box.bottom > window.innerHeight - 90) element.scrollIntoView({ block: 'center', behavior: 'auto' });
+          // Also scrolls sideways, for a target inside a scrolling row of pills.
+          if (box.top < 70 || box.bottom > window.innerHeight - 90 || box.left < 0 || box.right > window.innerWidth) {
+            element.scrollIntoView({ block: 'center', inline: 'center', behavior: 'auto' });
+          }
         }
         const box = element.getBoundingClientRect();
         setRect(current => (current && Math.abs(current.top - box.top) < 0.5 && Math.abs(current.left - box.left) < 0.5 && Math.abs(current.width - box.width) < 0.5 && Math.abs(current.height - box.height) < 0.5
@@ -61,10 +64,10 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
     else { labelStyle = { top: hole.top - 14, left: centerX, transform: 'translate(-50%, -100%)' }; arrow = 'down'; }
   }
 
-  // Skip sits bottom-right on desktop and top-right on phones, and moves left if
+  // Skip sits bottom-right on desktop and just under the top bar on phones, and moves left if
   // it would cover the spotlighted control.
   const phone = vw < 768;
-  const skipLeft = hole && (phone ? hole.top < 72 && hole.right > vw - 140 : hole.bottom > vh - 84 && hole.right > vw - 160);
+  const skipLeft = hole && (phone ? hole.top < 128 && hole.bottom > 64 && hole.right > vw - 140 : hole.bottom > vh - 84 && hole.right > vw - 160);
 
   const dots = (
     <span className="spot-dots" aria-label={`${index + 1} of ${total}`}>
@@ -118,7 +121,7 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
         .spot :global(.spot-dots i.is-now) { background: var(--olive); width: 16px; }
         .spot :global(.spot-dots .c-meta) { margin-left: 6px; }
         .spot-skip {
-          position: fixed; top: 12px; right: 12px; height: 44px; padding: 0 20px; pointer-events: auto;
+          position: fixed; top: calc(var(--bar-h, 64px) + 12px); right: 12px; height: 44px; padding: 0 20px; pointer-events: auto;
           border-radius:999px; border: 1px solid var(--glass-edge);
           background: var(--glass); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
           color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer;

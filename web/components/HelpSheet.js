@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
-import { Inbox, MessageSquareText, Play, Puzzle, X } from 'lucide-react';
+import { Check, Inbox, Keyboard, MessageSquareText, Play, Puzzle, X } from 'lucide-react';
 import { EXTENSION_STORE_URL } from '../lib/extension';
 import { setWalkthrough } from '../lib/walkthrough';
 import LearnCordia from './LearnCordia';
 
-export default function HelpSheet({ onClose, onFeedback, canReviewFeedback }) {
+export default function HelpSheet({ onClose, onFeedback, onShortcuts, canReviewFeedback }) {
   const router = useRouter();
   const [installed, setInstalled] = useState(true);
 
@@ -20,8 +20,7 @@ export default function HelpSheet({ onClose, onFeedback, canReviewFeedback }) {
   async function replayDayOne() {
     onClose();
     if (router.pathname !== '/dashboard') await router.push('/dashboard');
-    // Replays skip "About you"; school details are already saved.
-    setWalkthrough({ id: 'day1', step: 1, sub: 0, status: 'active' });
+    setWalkthrough({ id: 'day1', step: 0, sub: 0, status: 'active' });
   }
 
   return (
@@ -36,20 +35,25 @@ export default function HelpSheet({ onClose, onFeedback, canReviewFeedback }) {
         <div className="help-actions">
           <button type="button" className="c-btn c-btn--secondary" onClick={replayDayOne}><Play size={20} strokeWidth={1.75} aria-hidden="true" />Replay tour</button>
           <button type="button" className="c-btn c-btn--secondary" onClick={onFeedback}><MessageSquareText size={20} strokeWidth={1.75} aria-hidden="true" />Feedback</button>
-          {!installed && <a className="c-btn c-btn--secondary" href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer"><Puzzle size={20} strokeWidth={1.75} aria-hidden="true" />Get extension</a>}
+          <button type="button" className="c-btn c-btn--secondary" onClick={onShortcuts}><Keyboard size={20} strokeWidth={1.75} aria-hidden="true" />Keyboard shortcuts</button>
+          {installed
+            ? <span className="c-btn c-btn--quiet help-installed"><Check size={20} strokeWidth={1.75} aria-hidden="true" />Chrome extension installed</span>
+            : <a className="c-btn c-btn--secondary" href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer"><Puzzle size={20} strokeWidth={1.75} aria-hidden="true" />Get the Chrome extension</a>}
           {canReviewFeedback && <button type="button" className="c-btn c-btn--secondary" onClick={() => { onClose(); router.push('/feedback-review'); }}><Inbox size={20} strokeWidth={1.75} aria-hidden="true" />Review feedback</button>}
         </div>
         <nav className="help-links" aria-label="Policies">
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
           <a href="/honor-code">Honor code</a>
+          <a href="/copyright">Copyright</a>
         </nav>
       </section>
       <style jsx>{`
         .help-sheet { width: min(720px, 100%); }
         .help-sheet :global(.learn) { box-shadow: none; }
         .help-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
-        .help-links { display: flex; gap: 20px; margin-top: 24px; font:600 13px/1 var(--font-sans); }
+        .help-installed { cursor: default; }
+        .help-links { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 24px; font:600 13px/1 var(--font-sans); }
       `}</style>
     </div>
     </BodyPortal>

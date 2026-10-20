@@ -14,12 +14,19 @@ async function main() {
     if (!worker) worker = await context.waitForEvent('serviceworker');
     const extensionId = new URL(worker.url()).host;
     const manifest = await worker.evaluate(() => chrome.runtime.getManifest());
-    assert.equal(manifest.version, '2.1.0');
+    assert.equal(manifest.version, '2.1.2');
     assert.equal(manifest.name, 'CordiaClassroom');
     assert.equal(manifest.action.default_icon['128'], 'icon128.png');
     assert.deepEqual(manifest.host_permissions, ['<all_urls>']);
     assert.equal(manifest.optional_host_permissions, undefined);
     assert.equal(manifest.side_panel.default_path, 'popup.html');
+    assert.deepEqual(manifest.commands._execute_action.suggested_key, { default: 'Ctrl+Shift+Y', mac: 'Command+Shift+Y' });
+    assert.ok(manifest.permissions.includes('contextMenus'));
+    const commands = await worker.evaluate(() => chrome.commands.getAll());
+    assert.equal(commands.find(command => command.name === '_execute_action')?.shortcut, 'Ctrl+Shift+Y');
+    const workerSource = await worker.evaluate(() => fetch(chrome.runtime.getURL('background.js')).then(response => response.text()));
+    assert.match(workerSource, /id: SELECTION_MENU, title: 'Make study guide from selection', contexts: \['selection'\]/);
+    assert.match(workerSource, /chrome\.sidePanel\.open\?\.\(\{ windowId: tab\.windowId \}\)/);
 
     const panel = await context.newPage();
     await panel.setViewportSize({ width: 360, height: 800 });

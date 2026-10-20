@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Play } from 'lucide-react';
 import Spotlight from './Spotlight';
+import AboutYou from './AboutYou';
+import FirstReview from './FirstReview';
+import { useGuideJobs } from '../lib/guideJobs';
 import { useProgress } from '../lib/progress';
 import { DAY_ONE, MINI, WT_EVENT, activeStep, endWalkthrough, setWalkthrough } from '../lib/walkthrough';
 import { saveOnboardingStep } from '../lib/onboarding';
@@ -18,14 +21,6 @@ function next(wt) {
   const sub = (wt.sub || 0) + 1;
   if (steps[wt.step] && sub < steps[wt.step].length) return { ...wt, sub };
   return wt.step + 1 < steps.length ? { ...wt, step: wt.step + 1, sub: 0 } : null;
-}
-
-function locate(id) {
-  for (let step = 0; step < DAY_ONE.length; step += 1) {
-    const sub = DAY_ONE[step].findIndex(item => item.id === id);
-    if (sub >= 0) return { step, sub };
-  }
-  return null;
 }
 
 // Runs the active walkthrough: one spotlight at a time, advanced by real actions.
@@ -59,23 +54,7 @@ export default function Walkthrough() {
       const current = wtRef.current;
       const active = activeStep(current);
       if (!current || !active) return;
-      const name = event.detail?.name;
-      if (current.id === 'day1') {
-        // A first miss during the 3-question quiz detours to Ask, then back.
-        if (name === 'quiz-miss' && active.id === 'quiz-answer' && !current.asked) {
-          setWalkthrough({ ...current, ...locate('ask'), asked: true });
-          return;
-        }
-        if (name === 'tutor-closed' && active.id === 'ask-close') {
-          setWalkthrough({ ...current, ...locate('quiz-answer') });
-          return;
-        }
-        if (name === 'quiz-done' && ['quiz-answer', 'ask', 'ask-close'].includes(active.id)) {
-          setWalkthrough({ ...current, ...locate('quiz-back') });
-          return;
-        }
-      }
-      if (name === active.on) advance(current);
+      if (event.detail?.name === active.on) advance(current);
     }
     window.addEventListener(WT_EVENT, onEvent);
     return () => window.removeEventListener(WT_EVENT, onEvent);
@@ -90,7 +69,19 @@ export default function Walkthrough() {
     return () => clearTimeout(timer);
   }, [step?.id, step?.target, wt?.step, wt?.sub]);
 
-  if (!wt || !step || step.screen) return null;
+  // Building: it moves on once the first guide is open. If it finished while the profile
+  // questions were up, open it.
+  const jobs = useGuideJobs();
+  const built = jobs.find(job => job.status === 'done' && job.guideId);
+  useEffect(() => {
+    if (step?.id !== 'build') return;
+    if (router.pathname === '/guide/[id]') advance(wtRef.current);
+    else if (built) router.push('/guide/' + built.guideId);
+  }, [step?.id, built?.guideId, router.pathname]);
+
+  if (!wt || !step) return null;
+  if (step.screen === 'about') return <AboutYou index={step.index} total={step.total} />;
+  if (step.screen === 'first-review') return <FirstReview onDone={() => { finish('done'); router.push('/dashboard'); }} />;
 
   // The student wandered off the step's screen: one pill brings them back.
   if (step.where && !step.where(router.pathname)) {
@@ -99,7 +90,7 @@ export default function Walkthrough() {
       : step.where('/dashboard') ? '/dashboard'
         : step.where('/quiz/[guideId]') && guide ? `/quiz/${guide.id}`
           : step.where('/practice') ? '/practice'
-            : step.where('/calendar') ? '/calendar'
+            : step.where('/canvas') ? '/canvas?tab=calendar'
               : step.where('/smartnotes') ? '/smartnotes'
                 : guide ? `/guide/${guide.id}` : '/dashboard';
     return (

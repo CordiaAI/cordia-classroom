@@ -92,6 +92,15 @@ def list_guides(folder_id: Optional[str] = None, limit: int = 50, offset: int = 
     return {"guides": guides}
 
 
+def require_own_folder(supabase, user_id: str, folder_id: Optional[str]) -> None:
+    """A guide can only be filed in one of the student's own classes."""
+    if not folder_id:
+        return
+    require_uuid(folder_id, "folder ID")
+    if not supabase.table("folders").select("id").eq("id", folder_id).eq("user_id", user_id).execute().data:
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+
 @router.post("")
 def save_guide(request: SaveGuideRequest, authorization: str = Header(default="")):
     """Save a new study guide."""
@@ -107,6 +116,7 @@ def save_guide(request: SaveGuideRequest, authorization: str = Header(default=""
     }
 
     if request.folder_id:
+        require_own_folder(supabase, user_id, request.folder_id)
         data["folder_id"] = request.folder_id
 
     if request.flashcards:
@@ -141,6 +151,7 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
     # 1. Prepare only the fields that were provided in the request
     # This converts the Pydantic model to a dict, excluding unset values
     update_data = request.model_dump(exclude_unset=True)
+    require_own_folder(supabase, user_id, update_data.get("folder_id"))
 
     # 2. Perform the update in Supabase
     result = supabase.table("study_guides") \
@@ -310,15 +321,7 @@ def move_guide(guide_id: str, request: MoveGuideRequest, authorization: str = He
     if not current.data:
         raise HTTPException(status_code=404, detail="Guide not found")
 
-    # If folder_id provided, verify folder belongs to user
-    if request.folder_id:
-        folder = supabase.table("folders") \
-            .select("id") \
-            .eq("id", request.folder_id) \
-            .eq("user_id", user_id) \
-            .execute()
-        if not folder.data:
-            raise HTTPException(status_code=404, detail="Folder not found")
+    require_own_folder(supabase, user_id, request.folder_id)
 
     supabase.table("study_guides") \
         .update({"folder_id": request.folder_id}) \

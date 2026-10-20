@@ -3,9 +3,11 @@ import '../styles/classroom.css';
 import '../styles/system.css';
 import '../styles/refine.css';
 import '../styles/tokens.css';
+import '../styles/glass.css';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
+import { installErrorReporting } from '../lib/errorReport';
 import Layout from '../components/Layout';
 import UpgradeModal from '../components/UpgradeModal';
 import { scheduleProactiveRefresh, getToken } from '../lib/api';
@@ -19,11 +21,12 @@ export default function App({ Component, pageProps }) {
   // Public pages render without the signed-in shell. Pricing gets the app nav when signed in.
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => { setSignedIn(Boolean(getToken())); }, [router.pathname]);
-  const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password', '/instructors', '/copyright'].includes(router.pathname)
+  const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password', '/instructors', '/copyright', '/mission', '/install-extension', '/privacy', '/terms', '/honor-code'].includes(router.pathname)
     && !(router.pathname === '/pricing' && signedIn);
 
   // Authentication pages stay light; workspace routes honor the saved preference.
   useEffect(() => { applyTheme(router.pathname); }, [router.pathname]);
+  useEffect(() => { installErrorReporting(); }, []);
 
   // Start proactive token refresh if already logged in; the account's saved theme wins over the cache.
   useEffect(() => {
@@ -44,8 +47,10 @@ export default function App({ Component, pageProps }) {
       <meta property="og:site_name" content="CordiaClassroom" />
       <meta property="og:title" content="CordiaClassroom" />
       <meta property="og:description" content="Turn course material into focused study guides, notes, flashcards, and practice." />
-      <meta property="og:image" content="https://classroom.cordiaai.io/cordia-classroom-icon.png" key="og:image" />
-            <meta name="twitter:card" content="summary" />
+      <meta property="og:image" content="https://classroom.cordiaai.io/og-image.png" key="og:image" />
+      <meta property="og:image:width" content="1200" key="og:image:width" />
+      <meta property="og:image:height" content="630" key="og:image:height" />
+            <meta name="twitter:card" content="summary_large_image" key="twitter:card" />
     </Head>
   );
 

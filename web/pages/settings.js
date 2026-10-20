@@ -3,18 +3,15 @@ import { SectionLoader } from '../components/CordiaLoader';
 import { setThemePreference } from '../lib/theme';
 import { useRouter } from 'next/router';
 import { useRequireAuth } from '../lib/auth';
-import { apiErrorMessage, apiFetch, cacheUserIdentity, getUserEmail, getUserName, openUpgrade } from '../lib/api';
-import { FEATURE_COPY, FREE_SUMMARY, METERED, PRICES, PRO_BENEFITS, PRO_NAME, resetLabel } from '../lib/plans';
-import FeedbackModal from '../components/FeedbackModal';
+import Link from 'next/link';
+import { apiErrorMessage, apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName, openUpgrade } from '../lib/api';
+import { EXTENSION_STORE_URL } from '../lib/extension';
+import { FEATURE_COPY, FREE_SUMMARY, METERED, PRICES, PRO_BENEFITS, PRO_LIMITS, resetLabel } from '../lib/plans';
 import LearningStylePicker from '../components/LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from '../components/ExplanationPreference';
-import StudyInsights from '../components/StudyInsights';
-import { Check, CreditCard, Moon, Sun } from 'lucide-react';
-import GroveGrid from '../components/GroveGrid';
-import Heatmap from '../components/Heatmap';
-import RecapCard from '../components/RecapCard';
-import { semesterStart } from '../lib/activity';
+import { CalendarDays, Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2 } from 'lucide-react';
+import BodyPortal from '../components/BodyPortal';
 import CanvasSettings from '../components/CanvasSettings';
 import SharingSettings from '../components/SharingSettings';
 import { canvasStatus } from '../lib/canvas';
@@ -25,26 +22,29 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState('account');
   const [profileName, setProfileName] = useState('');
 
-  // /settings?section=learning opens a section directly (e.g. from the dashboard insights card).
-  // Old links (subscription, grove) land on the tab that now holds them.
-  const SECTION_ALIASES = { subscription: 'plan', grove: 'account', profile: 'account' };
+  // /settings?section=study opens a tab directly. Old links land on the tab that now
+  // holds them; the grove moved to Progress.
+  const SECTION_ALIASES = { subscription: 'plan', profile: 'account', learning: 'study', canvas: 'connections' };
   useEffect(() => {
     if (!router.isReady || !router.query.section) return;
     const section = String(router.query.section);
-    setActiveSection(SECTION_ALIASES[section] || section);
-    if (section === 'grove') setTimeout(() => document.getElementById('grove')?.scrollIntoView({ block: 'start' }), 400);
+    if (section === 'grove') { router.replace('/progress'); return; }
+    const key = SECTION_ALIASES[section] || section;
+    setActiveSection(['account', 'study', 'appearance', 'plan', 'connections'].includes(key) ? key : 'account');
   }, [router.isReady, router.query.section]);
-  const [library, setLibrary] = useState({ guides: [], folders: [], streak: null, overview: null });
+
+  // Picking a tab updates the address, so Back and shared links land on it.
+  function pickSection(key) {
+    setActiveSection(key);
+    router.replace({ pathname: '/settings', query: key === 'account' ? {} : { section: key } }, undefined, { shallow: true });
+  }
   const [canvasReady, setCanvasReady] = useState(false);
-  useEffect(() => { if (ready) canvasStatus().then(data => setCanvasReady(Boolean(data))); }, [ready]);
+  const [extensionInstalled, setExtensionInstalled] = useState(false);
+  const [deleting, setDeleting] = useState(null); // null | { text, busy, error }
   useEffect(() => {
     if (!ready) return;
-    Promise.all([
-      apiFetch('/guides?fields=summary&limit=500'),
-      apiFetch('/folders'),
-      apiFetch('/stats/streak?tz_offset=' + -new Date().getTimezoneOffset()),
-      apiFetch('/stats/overview'),
-    ]).then(([guides, folders, streak, overview]) => setLibrary({ guides: guides?.guides || [], folders: folders?.folders || [], streak, overview }));
+    canvasStatus().then(data => setCanvasReady(Boolean(data)));
+    setExtensionInstalled(document.documentElement.getAttribute('data-asai-extension') === 'ready');
   }, [ready]);
   const [email, setEmail] = useState('');
 
@@ -59,9 +59,6 @@ export default function SettingsPage() {
   // Theme state
   const [theme, setTheme] = useState('light');
 
-  // Feedback modal
-  const [showFeedback, setShowFeedback] = useState(false);
-
   // Study style
   const { learningStyle, saveStyle } = useLearningStyle();
   const [savingStyle, setSavingStyle] = useState(false);
@@ -70,7 +67,7 @@ export default function SettingsPage() {
     setSavingStyle(true);
     const data = await saveStyle(style);
     setSavingStyle(false);
-    setMessage(data?.enabled ? 'Study style saved.' : apiErrorMessage(data?.detail, 'Could not save your study style.'));
+    setMessage(data?.enabled ? 'Saved.' : apiErrorMessage(data?.detail, 'Could not save that.'));
   }
 
   useEffect(() => {
@@ -160,6 +157,19 @@ export default function SettingsPage() {
     setThemePreference(next);
   }
 
+  async function deleteAccount(event) {
+    event.preventDefault();
+    if (deleting.text !== 'DELETE' || deleting.busy) return;
+    setDeleting(current => ({ ...current, busy: true, error: '' }));
+    const data = await apiFetch('/auth/account', { method: 'DELETE', body: JSON.stringify({ confirm: 'DELETE' }) });
+    if (data?.deleted) {
+      clearAuth();
+      router.replace('/?deleted=1');
+    } else {
+      setDeleting(current => ({ ...current, busy: false, error: apiErrorMessage(data?.detail, 'Your account could not be deleted. Try again or email support@cordiaai.io.') }));
+    }
+  }
+
   if (!ready) return null;
 
   const isPlus = status?.plan === 'classroom_plus';
@@ -179,13 +189,12 @@ export default function SettingsPage() {
   }
 
   const sections = [
-    { key: 'account', label: 'Profile' },
-    { key: 'learning', label: 'Learning' },
+    { key: 'account', label: 'Account' },
+    { key: 'study', label: 'Study' },
     { key: 'appearance', label: 'Appearance' },
-    { key: 'plan', label: 'Plan' },
-    ...(canvasReady || activeSection === 'canvas' ? [{ key: 'canvas', label: 'Canvas' }] : []),
+    { key: 'plan', label: 'Plan & billing' },
+    { key: 'connections', label: 'Connections' },
   ];
-  const since = semesterStart();
   const initials = (profileName || email.split('@')[0] || '').split(/[\s._-]+/).filter(part => /^[a-z]/i.test(part)).slice(0, 2).map(part => part[0]).join('').toUpperCase();
 
   function onTabKey(event) {
@@ -194,16 +203,16 @@ export default function SettingsPage() {
     if (next === null) return;
     event.preventDefault();
     const target = sections[(next + sections.length) % sections.length];
-    setActiveSection(target.key);
+    pickSection(target.key);
     document.getElementById(`tab-${target.key}`)?.focus();
   }
 
   return (
     <>
       <div className="c-page profile-page">
-        <header className="c-page-head"><h1 className="c-title">Profile</h1></header>
+        <header className="c-page-head"><h1 className="c-title">Settings</h1></header>
 
-        <div className="c-seg profile-tabs" role="tablist" aria-label="Profile" onKeyDown={onTabKey}>
+        <div className="c-seg profile-tabs" role="tablist" aria-label="Settings" onKeyDown={onTabKey}>
           {sections.map(section => (
             <button
               key={section.key}
@@ -213,7 +222,7 @@ export default function SettingsPage() {
               aria-selected={activeSection === section.key}
               aria-controls={`panel-${section.key}`}
               tabIndex={activeSection === section.key ? 0 : -1}
-              onClick={() => setActiveSection(section.key)}
+              onClick={() => pickSection(section.key)}
             >
               {section.label}
             </button>
@@ -240,7 +249,7 @@ export default function SettingsPage() {
                       return (
                         <div key={feature} className="plan-usage-row">
                           <span className="plan-usage-label">{FEATURE_COPY[feature].label}</span>
-                          <span className="c-meta">{item.used} / {item.limit}</span>
+                          <span className="c-meta">{item.used} / {item.limit}{!isPlus && PRO_LIMITS[feature] ? ` · Pro ${PRO_LIMITS[feature].toLocaleString()} a month` : ''}</span>
                           <div className="c-bar"><span style={{ width: pct + '%', background: pct >= 100 ? 'var(--error)' : undefined }} /></div>
                         </div>
                       );
@@ -313,9 +322,22 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {activeSection === 'canvas' && (
-          <div className="profile-section c-stack" role="tabpanel" id="panel-canvas" aria-labelledby="tab-canvas">
-            <CanvasSettings school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} />
+        {activeSection === 'connections' && (
+          <div className="profile-section c-stack" role="tabpanel" id="panel-connections" aria-labelledby="tab-connections">
+            {canvasReady && <CanvasSettings school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} />}
+            {/* Canvas settings already offer the calendar link; without them, link to it here. */}
+            {!canvasReady && (
+              <div className="c-card settings-row">
+                <span className="settings-row-label"><CalendarDays size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Calendar link</span></span>
+                <Link href="/canvas?tab=calendar" className="c-btn c-btn--secondary">Open Calendar</Link>
+              </div>
+            )}
+            <div className="c-card settings-row">
+              <span className="settings-row-label"><Puzzle size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Chrome extension</span></span>
+              {extensionInstalled
+                ? <span className="c-meta">Installed</span>
+                : <a className="c-btn c-btn--secondary" href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer">Get extension</a>}
+            </div>
             {canvasReady && <SharingSettings />}
           </div>
         )}
@@ -332,19 +354,19 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {activeSection === 'learning' && (
-          <div className="profile-section c-stack" role="tabpanel" id="panel-learning" aria-labelledby="tab-learning">
+        {activeSection === 'study' && (
+          <div className="profile-section c-stack" role="tabpanel" id="panel-study" aria-labelledby="tab-study">
             <div className="c-card settings-card"><ExplanationPreference /></div>
             {learningStyle?.enabled && (
               <div className="c-card settings-card">
-                <h2 className="c-section-title">Study style</h2>
+                <h2 className="c-section-title">Explain things to me with…</h2>
+                <p className="c-meta settings-note">Sets which Explain view opens first. Every view is always one tap away.</p>
                 <LearningStylePicker value={learningStyle.style} onSelect={chooseStyle} disabled={savingStyle} />
                 {learningStyle.style && (
                   <button type="button" className="c-btn c-btn--quiet" onClick={() => chooseStyle(null)} disabled={savingStyle}>Use standard</button>
                 )}
               </div>
             )}
-            <StudyInsights />
           </div>
         )}
 
@@ -356,11 +378,12 @@ export default function SettingsPage() {
                 <strong>{profileName || 'Your account'}</strong>
                 <span className="c-meta">{email}</span>
               </div>
-              <button type="button" className="c-btn c-btn--secondary" onClick={() => setShowFeedback(true)}>Feedback</button>
+              <button type="button" className="c-btn c-btn--secondary" onClick={() => { clearAuth(); router.push('/'); }}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" />Sign out</button>
             </div>
-            <RecapCard guides={library.guides} folders={library.folders} since={since} cardsStudied={library.overview?.cards_studied || 0} />
-            <GroveGrid guides={library.guides} since={since} />
-            <Heatmap serverWeek={library.streak?.week || []} />
+            <div className="c-card settings-row">
+              <span className="settings-row-label"><Trash2 size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Delete account</span></span>
+              <button type="button" className="c-btn c-btn--secondary settings-danger" onClick={() => setDeleting({ text: '', busy: false, error: '' })}>Delete account</button>
+            </div>
             <nav className="settings-links" aria-label="Policies">
               <a href="/privacy">Privacy</a>
               <a href="/terms">Terms</a>
@@ -370,15 +393,42 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+      {deleting && (
+        <BodyPortal>
+          <div className="c-scrim" onClick={() => !deleting.busy && setDeleting(null)}>
+            <form className="c-sheet delete-sheet" role="dialog" aria-modal="true" aria-labelledby="delete-title" onSubmit={deleteAccount} onClick={event => event.stopPropagation()}>
+              <h2 id="delete-title" className="c-title">Delete your account?</h2>
+              <p>This permanently deletes your study guides, notes, flashcards, lectures, classes, progress and Canvas connection, and cancels a paid plan. Sets you shared with a class are removed too. It can’t be undone.</p>
+              <label className="c-field">
+                <span>Type DELETE to confirm</span>
+                <input className="c-input" value={deleting.text} onChange={event => setDeleting(current => ({ ...current, text: event.target.value }))} autoComplete="off" autoFocus />
+              </label>
+              {deleting.error && <p className="delete-error" role="alert">{deleting.error}</p>}
+              <div className="delete-actions">
+                <button type="button" className="c-btn c-btn--secondary" onClick={() => setDeleting(null)} disabled={deleting.busy}>Cancel</button>
+                <button type="submit" className="c-btn c-btn--primary delete-confirm" disabled={deleting.text !== 'DELETE' || deleting.busy}>{deleting.busy ? 'Deleting…' : 'Delete account'}</button>
+              </div>
+            </form>
+          </div>
+        </BodyPortal>
+      )}
 
       <style jsx>{`
+        .delete-sheet { display: grid; gap: 16px; width: min(480px, 100%); }
+        .delete-sheet p { margin: 0; }
+        .delete-error { color: var(--error); font-weight: 600; }
+        .delete-actions { display: flex; justify-content: flex-end; gap: 8px; }
+        :global(.delete-confirm:not(:disabled)) { background: var(--error) !important; border-color: var(--error) !important; color: var(--on-olive) !important; }
+        :global(.settings-danger) { color: var(--error) !important; }
         .profile-page { width: min(var(--page-max), 100%); margin: 0 auto; }
         .profile-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }
         .profile-message { padding: 14px 18px; border-radius:var(--r-card); background: var(--olive-tint); font-weight:600; }
         .profile-section { animation: fadeIn 0.2s ease; }
         .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; flex-wrap: wrap; }
         .settings-row .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
+        .settings-row-label { display: inline-flex; align-items: center; gap: 10px; }
+        .settings-row-label :global(.lucide) { color: var(--olive-ink); }
+        .settings-note { margin: -4px 0 0; }
         .settings-card { display: grid; gap: 12px; padding: 20px; }
         .settings-links { display: flex; gap: 20px; font:600 13px/1 var(--font-sans); }
         .me-card { display: flex; align-items: center; gap: 16px; padding: 20px; }

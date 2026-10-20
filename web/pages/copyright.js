@@ -2,7 +2,7 @@ import { useState } from 'react';
 import PublicPage from '../components/PublicPage';
 import { publicFetch } from '../lib/publicApi';
 
-const CONTACT = 'copyright@cordiacode.com';
+const CONTACT = 'support@cordiaai.io';
 
 // Takedown requests. A named set is hidden at once, pending review.
 export default function Copyright() {
@@ -47,6 +47,18 @@ export default function Copyright() {
           )}
           <a className="cr-contact" href={`mailto:${CONTACT}`}>{CONTACT}</a>
         </div>
+        <div className="cr-card cr-policy">
+          <h2>How we handle copyright</h2>
+          <p>We respect copyright and respond to notices under the U.S. Digital Millennium Copyright Act (DMCA). A set named in a notice is hidden right away while we review it.</p>
+          <h3>Sending a notice</h3>
+          <p>Use the form above or email us. Include: your signature (typing your full name counts), the work you own, a link to the shared set, your contact details, a statement that you believe in good faith the use isn't authorized, and a statement, under penalty of perjury, that your notice is accurate and you own the work or may act for its owner.</p>
+          <h3>Counter-notice</h3>
+          <p>If your set was removed by mistake, email us with your name and contact details, the set, a statement under penalty of perjury that it was removed by mistake or misidentification, and your consent to the jurisdiction of a U.S. federal court. We may restore it after 10 business days unless the claimant tells us they have filed a lawsuit.</p>
+          <h3>Repeat infringers</h3>
+          <p>We remove sharing access, and may close the accounts, of people who repeatedly share material that infringes copyright.</p>
+          <h3>Designated agent</h3>
+          <p>Copyright Agent, CordiaClassroom · <a href={`mailto:${CONTACT}`}>{CONTACT}</a></p>
+        </div>
       </section>
       <style jsx global>{`
         .cr { width: min(560px, 100%); margin: 0 auto; display: grid; gap: 24px; }
@@ -60,6 +72,10 @@ export default function Copyright() {
         .cr-line { margin: 0; font: 600 17px/1.4 var(--font-sans); }
         .cr-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
         .cr-contact { justify-self: start; color: var(--ink); font: 600 15px/1 var(--font-sans); }
+        .cr-policy { gap: 10px; font: 500 15px/1.55 var(--font-sans); }
+        .cr-policy h2 { margin: 0; font: 600 20px/1.2 var(--font-display); }
+        .cr-policy h3 { margin: 8px 0 0; font: 600 15px/1.3 var(--font-sans); }
+        .cr-policy p { margin: 0; }
       `}</style>
     </PublicPage>
   );

@@ -15,7 +15,6 @@
   /* Type */
   --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: 'Newsreader', Georgia, serif;
-  --font-nav: 'Times New Roman', Times, serif; /* top bar and phone tab bar */
   --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
   --fs-13: 13px; --fs-15: 15px; --fs-17: 17px; --fs-20: 20px; --fs-28: 28px; --fs-40: 40px;
   --lh-title: 1.15; --lh-body: 1.5;
@@ -83,8 +82,22 @@
   --streak-width: 220px;
   --workspace-rail-width: 190px;
 
-  /* Glass */
-  --lg-filter: blur(24px) saturate(170%);
+  /* Liquid glass, matte: a frosted fill with a fine grain, the faintest top light, a soft
+     rim and a low, diffuse shadow (no shine) (styles/glass.css applies it everywhere). */
+  --lg-filter: blur(34px) saturate(115%);
+  --lg-fill: rgba(250, 251, 249, 0.58);
+  --lg-fill-strong: rgba(250, 251, 249, 0.80);
+  --lg-fill-field: rgba(250, 251, 249, 0.62);
+  --lg-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 45%);
+  --lg-sheen-olive: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 60%);
+  --lg-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  --lg-rim: rgba(255, 255, 255, 0.40);
+  --lg-rim-low: rgba(255, 255, 255, 0);
+  --lg-border: rgba(255, 255, 255, 0.42);
+  --lg-border-shade: rgba(23, 27, 24, 0.06);
+  --lg-depth: 0 1px 2px rgba(16, 24, 16, 0.04), 0 8px 22px -10px rgba(16, 24, 16, 0.12);
+  --lg-depth-float: 0 2px 6px rgba(16, 24, 16, 0.05), 0 18px 40px -14px rgba(16, 24, 16, 0.20);
+  --lg-press: rgba(255, 255, 255, 0.30);
 
   /* Illustrations (drawn Canvas screens) and brand marks */
   --shot-frame: #FFFFFF; --shot-edge: rgba(34, 49, 41, 0.18); --shot-chrome: #EEF1EC; --shot-line: rgba(34, 49, 41, 0.2);
@@ -137,12 +150,12 @@
   --motion-fast: var(--dur) var(--ease);
   --motion-smooth: var(--dur) var(--ease);
   --motion-press: var(--dur) var(--ease);
-  --lg-card: var(--surface-card);
-  --lg-panel: var(--surface-raised);
-  --lg-menu: var(--surface-raised);
-  --lg-edge: var(--hairline);
-  --lg-highlight: 0 0 #0000;
-  --lg-shadow: var(--shadow-card);
+  --lg-card: var(--lg-sheen), var(--lg-grain), var(--lg-fill);
+  --lg-panel: var(--lg-sheen), var(--lg-grain), var(--lg-fill-strong);
+  --lg-menu: var(--lg-sheen), var(--lg-fill-strong);
+  --lg-edge: var(--lg-border);
+  --lg-highlight: inset 0 1px 0 var(--lg-rim), inset 0 -1px 0 var(--lg-rim-low), 0 0 0 0.5px var(--lg-border-shade);
+  --lg-shadow: var(--lg-depth);
   --hover-wash: var(--wash);
   --hover-edge: rgba(23, 27, 24, 0.16);
   --hover-shadow: var(--shadow-float);
@@ -186,6 +199,19 @@
   --draw-paper: #1F2326;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.35), 0 18px 48px rgba(0, 0, 0, 0.45);
+  --lg-filter: blur(34px) saturate(110%);
+  --lg-fill: rgba(48, 52, 57, 0.58);
+  --lg-fill-strong: rgba(42, 46, 51, 0.84);
+  --lg-fill-field: rgba(32, 35, 39, 0.60);
+  --lg-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0) 45%);
+  --lg-sheen-olive: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 60%);
+  --lg-rim: rgba(255, 255, 255, 0.07);
+  --lg-rim-low: rgba(255, 255, 255, 0);
+  --lg-border: rgba(255, 255, 255, 0.08);
+  --lg-border-shade: rgba(0, 0, 0, 0.25);
+  --lg-depth: 0 1px 2px rgba(0, 0, 0, 0.22), 0 10px 26px -12px rgba(0, 0, 0, 0.45);
+  --lg-depth-float: 0 2px 8px rgba(0, 0, 0, 0.30), 0 22px 48px -14px rgba(0, 0, 0, 0.55);
+  --lg-press: rgba(255, 255, 255, 0.06);
   --focus-ring: 0 0 0 2px var(--olive-ink);
   --shot-frame: #2F3238; --shot-edge: rgba(255, 255, 255, 0.16); --shot-chrome: #24272C; --shot-line: rgba(255, 255, 255, 0.22);
   --shot-soft: #3A3E45; --shot-nav: #1E2A33; --shot-text: #FFFFFF; --shot-link: #8CC4FF; --shot-mark: #C3CFB6;

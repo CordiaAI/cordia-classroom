@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  CalendarDays, CircleHelp, CreditCard, Library, LogOut, MessageCircle, NotebookPen, Palette, Plus, Search, Sun, User,
+  ChartNoAxesColumn, CircleHelp, CreditCard, GraduationCap, Library, Link2, LogOut, Palette, Plus, Search, Settings, Sun, Timer, User,
 } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
@@ -10,26 +10,27 @@ import AcademicInfinityMark from './AcademicInfinityMark';
 import SearchModal from './SearchModal';
 import HelpSheet from './HelpSheet';
 import AccountMenu from './AccountMenu';
+import ShortcutsSheet from './ShortcutsSheet';
+import StudyTimer from './StudyTimer';
+import TutorBubble from './TutorBubble';
 import { openNewSheet } from '../lib/newSheet';
+import { walkthroughEvent } from '../lib/walkthrough';
 
-// One navigation: the same five places on the glass top bar and the mobile tab bar.
+// One navigation: the same three places on the glass top bar and the mobile tab bar, plus New.
+// The Tutor is the bubble in the corner (TutorBubble); the calendar lives inside Canvas.
 const navItems = [
   { label: 'Today', href: '/dashboard', icon: Sun, spot: 'nav-today' },
   { label: 'Library', href: '/library', icon: Library, spot: 'nav-library' },
-  { label: 'Tutor', href: '/tutor', icon: MessageCircle, spot: 'nav-tutor' },
-  { label: 'Notes', href: '/smartnotes', icon: NotebookPen, spot: 'nav-notes' },
-  { label: 'Calendar', href: '/calendar', icon: CalendarDays, spot: 'nav-calendar' },
+  { label: 'Canvas', href: '/canvas', icon: GraduationCap, spot: 'nav-canvas', tip: 'calendar' },
 ];
 
-// Guide, flashcard, Retain and Practice screens all live inside Library.
-const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice', '/nclex', '/folder', '/create', '/session', '/class'];
+// Guides, notes, lectures, classes and every study screen live inside Library.
+const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice', '/nclex', '/folder', '/create', '/session', '/class', '/smartnotes', '/lecture'];
 
 export function activeNavHref(pathname) {
   if (pathname === '/dashboard') return '/dashboard';
   if (LIBRARY_PATHS.some(path => pathname === path || pathname.startsWith(path + '/'))) return '/library';
-  if (pathname.startsWith('/tutor')) return '/tutor';
-  if (pathname.startsWith('/smartnotes')) return '/smartnotes';
-  if (pathname.startsWith('/calendar')) return '/calendar';
+  if (pathname.startsWith('/canvas') || pathname.startsWith('/calendar')) return '/canvas';
   return '';
 }
 
@@ -37,7 +38,7 @@ function isMac() {
   return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
 }
 
-export default function Sidebar() {
+export default function Sidebar({ timerState, setTimerState }) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -45,7 +46,10 @@ export default function Sidebar() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [timerOpen, setTimerOpen] = useState(false);
   const [canReviewFeedback, setCanReviewFeedback] = useState(false);
+  const timerRef = useRef(null);
   const [shortcut, setShortcut] = useState('Ctrl K');
   const avatarRef = useRef(null);
   const active = activeNavHref(router.pathname);
@@ -69,11 +73,12 @@ export default function Sidebar() {
         event.preventDefault();
         setShowSearch(true);
       }
+      // "?" lists every shortcut, except while typing.
+      const typing = event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"]');
+      if (event.key === '?' && !typing) setShowShortcuts(true);
     };
-    const openSearch = () => setShowSearch(true);
     window.addEventListener('keydown', onKey);
-    window.addEventListener('cordia:search', openSearch);
-    return () => { alive = false; window.removeEventListener('keydown', onKey); window.removeEventListener('cordia:search', openSearch); };
+    return () => { alive = false; window.removeEventListener('keydown', onKey); };
   }, []);
 
   // Closing returns focus to the avatar (Escape, choosing an item); an outside click leaves focus where it landed.
@@ -83,15 +88,27 @@ export default function Sidebar() {
   }, []);
 
   useEffect(() => {
-    const closeAll = () => { setMenuOpen(false); setShowSearch(false); };
+    const closeAll = () => { setMenuOpen(false); setShowSearch(false); setTimerOpen(false); };
     router.events.on('routeChangeStart', closeAll);
     return () => router.events.off('routeChangeStart', closeAll);
   }, [router.events]);
 
+  // The focus timer popover closes on an outside click or Escape.
+  useEffect(() => {
+    if (!timerOpen) return undefined;
+    const onDown = event => { if (!timerRef.current?.contains(event.target)) setTimerOpen(false); };
+    const onKey = event => { if (event.key === 'Escape') setTimerOpen(false); };
+    document.addEventListener('pointerdown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', onDown); window.removeEventListener('keydown', onKey); };
+  }, [timerOpen]);
+
   const accountItems = [
-    { key: 'profile', label: 'Profile', icon: User, onSelect: () => router.push('/settings') },
+    { key: 'progress', label: 'Progress', icon: ChartNoAxesColumn, onSelect: () => router.push('/progress') },
+    { key: 'profile', label: 'Settings', icon: Settings, onSelect: () => router.push('/settings') },
     { key: 'appearance', label: 'Appearance', icon: Palette, onSelect: () => router.push('/settings?section=appearance') },
     { key: 'plan', label: 'Plan', icon: CreditCard, onSelect: () => router.push('/settings?section=plan') },
+    { key: 'canvas', label: 'Canvas', icon: Link2, onSelect: () => router.push('/settings?section=connections') },
     { key: 'help', label: 'Help', icon: CircleHelp, onSelect: () => setShowHelp(true) },
     { key: 'signout', label: 'Sign out', icon: LogOut, separated: true, onSelect: () => signOut() },
   ];
@@ -110,7 +127,9 @@ export default function Sidebar() {
     .map(part => part[0])
     .join('')
     .toUpperCase();
-  const onProfile = router.pathname === '/settings' || router.pathname === '/billing';
+  const onProfile = ['/settings', '/billing', '/progress'].includes(router.pathname);
+  const { minutes = 25, seconds = 0, isRunning = false } = timerState || {};
+  const clock = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
   return (
     <>
@@ -123,7 +142,7 @@ export default function Sidebar() {
 
         <nav className="c-nav" aria-label="Primary">
           {navItems.map(item => (
-            <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.href === '/calendar' ? 'calendar' : undefined} data-spot={item.spot}>
+            <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.tip} data-spot={item.spot}>
               <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
               {item.label}
             </Link>
@@ -131,6 +150,13 @@ export default function Sidebar() {
         </nav>
 
         <div className="c-bar-actions">
+          <div className="c-menu-wrap" ref={timerRef}>
+            <button type="button" className={'c-btn c-btn--secondary c-timerbtn' + (isRunning ? ' is-running' : '')} data-spot="focus-btn" onClick={() => { if (!timerOpen) walkthroughEvent('focus-opened'); setTimerOpen(open => !open); }} aria-expanded={timerOpen} aria-label={isRunning ? `Focus timer, ${clock} left` : 'Focus timer'}>
+              <Timer size={20} strokeWidth={1.75} aria-hidden="true" />
+              {isRunning && <span className="c-timer-clock">{clock}</span>}
+            </button>
+            {timerOpen && <div className="c-timer-pop"><StudyTimer timerState={timerState} setTimerState={setTimerState} /></div>}
+          </div>
           <button type="button" className="c-btn c-btn--secondary c-searchbtn" onClick={() => setShowSearch(true)} aria-label="Search" aria-keyshortcuts={shortcut === '⌘K' ? 'Meta+K' : 'Control+K'}>
             <Search size={20} strokeWidth={1.75} aria-hidden="true" />
             <span>Search</span>
@@ -149,26 +175,36 @@ export default function Sidebar() {
       </header>
 
       <nav className="c-tabbar" aria-label="Primary">
-        {navItems.map(item => (
+        {navItems.slice(0, 2).map(item => (
+          <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-spot={item.spot}>
+            <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
+            {item.label}
+          </Link>
+        ))}
+        <button type="button" className="c-tab-new" data-spot="new" onClick={() => openNewSheet()} aria-label="New">
+          <span className="c-tab-new-dot"><Plus size={22} strokeWidth={2} aria-hidden="true" /></span>
+          New
+        </button>
+        {navItems.slice(2).map(item => (
           <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-spot={item.spot}>
             <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
             {item.label}
           </Link>
         ))}
       </nav>
-      <button type="button" className="c-btn c-btn--primary c-fab" data-spot="new" onClick={() => openNewSheet()}>
-        <Plus size={20} strokeWidth={1.75} aria-hidden="true" />New
-      </button>
+      <TutorBubble />
 
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
       {showHelp && (
         <HelpSheet
           onClose={() => setShowHelp(false)}
           onFeedback={() => { setShowHelp(false); setShowFeedback(true); }}
+          onShortcuts={() => { setShowHelp(false); setShowShortcuts(true); }}
           canReviewFeedback={canReviewFeedback}
         />
       )}
       {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
+      {showShortcuts && <ShortcutsSheet onClose={() => setShowShortcuts(false)} />}
     </>
   );
 }

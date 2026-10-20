@@ -97,6 +97,22 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
+# Refuse oversized bodies before they are read into memory (1 GB machine). Uploads are
+# capped at 50 MB by read_upload; other requests carry text, never more than a few MB.
+MAX_UPLOAD_BODY = 60 * 1024 * 1024
+MAX_JSON_BODY = 8 * 1024 * 1024
+
+
+@app.middleware("http")
+async def limit_body_size(request: Request, call_next):
+    length = request.headers.get("content-length")
+    if length and length.isdigit():
+        multipart = request.headers.get("content-type", "").startswith("multipart/")
+        if int(length) > (MAX_UPLOAD_BODY if multipart else MAX_JSON_BODY):
+            return JSONResponse(status_code=413, content={"detail": "That upload is too large."})
+    return await call_next(request)
+
+
 # Shared response metadata and security headers
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):

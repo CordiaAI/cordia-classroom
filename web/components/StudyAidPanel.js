@@ -267,14 +267,7 @@ export default function StudyAidPanel({ guideId, number, style, onClose, section
         ))}
         <button type="button" className="study-aid-close" onClick={onClose} aria-label="Close">×</button>
       </div>
-      {tab === 'mix' ? (
-        <div className="study-aid-mix">
-          <VisualAid key={`${number}-visual`} guideId={guideId} number={number} cache={cache} section={section} />
-          <KinestheticAid key={`${number}-kinesthetic`} guideId={guideId} number={number} cache={cache} />
-        </div>
-      ) : (
-        <Aid key={`${number}-${tab}`} guideId={guideId} number={number} cache={cache} section={section} />
-      )}
+      <Aid key={`${number}-${tab}`} guideId={guideId} number={number} cache={cache} section={section} />
     </section>
   );
 }

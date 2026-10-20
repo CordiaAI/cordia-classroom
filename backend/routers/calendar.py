@@ -197,7 +197,8 @@ def _events(text: str) -> list[dict]:
                         "due_at": due.isoformat(),
                         "all_day": all_day,
                         "type": _kind(title),
-                        "url": current.get("URL") or None,
+                        # Only web links: a feed could carry javascript: or data: URLs.
+                        "url": current["URL"] if re.match(r"https?://", current.get("URL") or "") else None,
                         "course": _decode(current.get("LOCATION") or "") or None,
                     })
             current = None
@@ -241,12 +242,45 @@ def _stored_feed(user_id: str) -> str:
     return result.data[0].get("feed_url") or "" if result.data else ""
 
 
+def _token_payload(user_id: str) -> dict | None:
+    """Deadlines from a Canvas access-token connection, when there is no calendar link.
+    One Connect Canvas fills the calendar either way."""
+    db = get_supabase()
+    rows = db.table("canvas_connections").select("canvas_domain,status").eq("user_id", user_id).limit(1).execute().data or []
+    if not rows or rows[0].get("status") != "connected":
+        return None
+    domain = rows[0]["canvas_domain"]
+    now = datetime.now(timezone.utc)
+    start, end = (now - timedelta(days=7)).isoformat(), (now + timedelta(days=90)).isoformat()
+    assignments = db.table("canvas_assignments").select("canvas_assignment_id,canvas_course_id,title,due_at") \
+        .eq("user_id", user_id).gte("due_at", start).lte("due_at", end).order("due_at").limit(100).execute().data or []
+    courses = {row["canvas_course_id"]: row.get("course_code") or row.get("name") or None
+               for row in db.table("canvas_courses").select("canvas_course_id,name,course_code").eq("user_id", user_id).execute().data or []}
+    items = [{
+        "id": f"canvas-{item['canvas_assignment_id']}",
+        "title": item.get("title") or "Assignment",
+        "due_at": item["due_at"],
+        "all_day": False,
+        "type": _kind(item.get("title") or ""),
+        "url": f"https://{domain}/courses/{item['canvas_course_id']}/assignments/{item['canvas_assignment_id']}",
+        "course": courses.get(item["canvas_course_id"]),
+    } for item in assignments if item.get("due_at")]
+    today = now.date()
+    return {
+        "connected": True,
+        "source": "canvas",
+        "items": items,
+        "due_today": [item for item in items if datetime.fromisoformat(item["due_at"]).date() == today],
+        "updated_at": now.isoformat(),
+    }
+
+
 @router.get("/connection")
 def get_calendar_connection(authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     url = _stored_feed(user_id)
     if not url:
-        return {"connected": False, "items": [], "due_today": []}
+        return _token_payload(user_id) or {"connected": False, "items": [], "due_today": []}
     return _calendar_payload(url)
 
 

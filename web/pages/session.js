@@ -26,7 +26,8 @@ function PracticeList({ practice }) {
   );
 }
 
-// Today's Start: due flashcards, then Retain misses, then open practice problems.
+// Daily review: due flashcards, then Retain misses, then open practice problems.
+// With ?guideId= it is that guide's Study now.
 export default function StudySession() {
   const router = useRouter();
   const { ready } = useRequireAuth();
@@ -34,8 +35,10 @@ export default function StudySession() {
   const gate = useLoadGate(Boolean(queue));
 
   useEffect(() => {
-    if (ready) loadStudyQueue().then(setQueue);
-  }, [ready]);
+    if (!ready || !router.isReady) return;
+    // ?guideId= is a guide's Study now: the same round, for that guide only.
+    loadStudyQueue({ guideId: typeof router.query.guideId === 'string' ? router.query.guideId : '' }).then(setQueue);
+  }, [ready, router.isReady]);
 
   const cards = queue ? [...queue.cards, ...queue.misses] : [];
   // Nothing to flip: Start goes straight into the first open practice set, not a menu.
@@ -99,8 +102,8 @@ export default function StudySession() {
     <Reveal phase={gate}>
     <FlashcardViewer
       flashcards={cards}
-      title="Today"
-      onBack={() => router.push('/dashboard')}
+      title={router.query.guideId ? queue.guides[0]?.title || 'Study now' : 'Daily review'}
+      onBack={() => router.push(router.query.guideId ? '/guide/' + router.query.guideId : '/dashboard')}
       onFinish={onFinish}
       finishExtra={<PracticeList practice={queue.practice} />}
     />

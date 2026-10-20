@@ -62,6 +62,10 @@ class Query:
         self.filters.append(lambda r: r.get(key) is not None and str(r.get(key)) >= str(value))
         return self
 
+    def lte(self, key, value):
+        self.filters.append(lambda r: r.get(key) is not None and str(r.get(key)) <= str(value))
+        return self
+
     def ilike(self, key, pattern):
         needle = pattern.strip("%").lower()
         starts = not pattern.startswith("%")

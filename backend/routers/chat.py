@@ -149,6 +149,12 @@ GUIDE_KINDS = {
 }
 
 
+def _check_picked_class(user_id: str, body: ChatRequest) -> None:
+    """A class the student picked must be theirs (one inherited from the material already is)."""
+    if body.class_id:
+        guides.require_own_folder(get_supabase(), user_id, body.class_id)
+
+
 def _create_guide(user_id: str, material: Material, class_id: Optional[str], feature: str) -> ChatResponse:
     """Build a guide or practice set from the selected material and save it beside its source."""
     require(user_id, feature)
@@ -267,8 +273,10 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
             ))
         return ChatResponse(answer="Choose a study guide, SmartNote, or uploaded file before asking Cordia.")
     if skill == "practice" or PRACTICE_REQUEST.search(question):
+        _check_picked_class(user_id, body)
         return _create_guide(user_id, material, class_id, "practice")
     if skill == "build_guide":
+        _check_picked_class(user_id, body)
         return _create_guide(user_id, material, class_id, "guide")
     return _tutor_reply(body, user_id, question, material, skill, turn)
 

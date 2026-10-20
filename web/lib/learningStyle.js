@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from './api';
 
-// `uses` must stay accurate: a style changes the Tutor's replies and which view each
-// study-guide question's "Learn it your way" panel opens with.
+// `uses` must stay accurate: a preference changes the Tutor's replies and which Explain
+// view opens first. It never hides a view or a tool from anyone.
 export const STYLE_OPTIONS = [
   {
     id: 'visual', label: 'Visual', hint: 'Diagrams, maps and charts',
@@ -10,7 +10,7 @@ export const STYLE_OPTIONS = [
   },
   {
     id: 'aural', label: 'Listening & talking', hint: 'Hear it explained, then explain it back',
-    uses: ['Tutor explains conversationally and asks you to say it back', 'Talk to the Tutor with the mic and hear replies read aloud', 'Guide questions read aloud, and you answer by voice'],
+    uses: ['Tutor explains conversationally and asks you to say it back', 'Explain opens on Listen: questions read aloud, and you answer by voice'],
   },
   {
     id: 'read_write', label: 'Reading & writing', hint: 'Notes, definitions and summaries',
@@ -22,12 +22,12 @@ export const STYLE_OPTIONS = [
   },
   {
     id: 'multimodal', label: 'A mix', hint: 'Diagrams plus real-life examples',
-    uses: ['Tutor pairs a short explanation with an example and a diagram', 'Guide questions show a diagram and an example together'],
+    uses: ['Tutor pairs a short explanation with an example and a diagram', 'Explain opens on Diagram'],
   },
 ];
 
+// Every Explain view is open to everyone; a saved preference only picks the first tab.
 export const AID_TABS = [
-  { id: 'mix', label: 'Mix' },
   { id: 'visual', label: 'Diagram' },
   { id: 'aural', label: 'Listen' },
   { id: 'read_write', label: 'Notes' },
@@ -35,7 +35,6 @@ export const AID_TABS = [
 ];
 
 export function defaultAidTab(style) {
-  if (style === 'multimodal') return 'mix';
   return AID_TABS.some(tab => tab.id === style) ? style : 'visual';
 }
 

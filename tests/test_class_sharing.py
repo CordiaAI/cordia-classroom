@@ -70,6 +70,19 @@ class SharingFlowTests(unittest.TestCase):
         with self.s.as_user(user):
             return classes.add_class(classes.AddClassRequest(school_id=self.school_id, code=code, name="Management", term=term), "")["class"]
 
+    def test_adding_a_code_links_the_library_class(self):
+        # A new code makes its Library class; adding a code to an existing class links that one.
+        with self.s.as_user("owner"):
+            made = classes.add_class(classes.AddClassRequest(school_id=self.school_id, code="MGT 300", name="Management"), "")
+            self.assertEqual(made["folder"]["class_id"], made["class"]["id"])
+            self.db.rows("folders").append({"id": "20000000-0000-4000-8000-000000000001", "user_id": "owner", "name": "Film", "class_id": None})
+            linked = classes.add_class(classes.AddClassRequest(school_id=self.school_id, code="FILM 201", folder_id="20000000-0000-4000-8000-000000000001"), "")
+            self.assertEqual(linked["folder"]["id"], "20000000-0000-4000-8000-000000000001")
+            self.assertEqual(linked["folder"]["class_id"], linked["class"]["id"])
+            self.assertEqual(len([f for f in self.db.rows("folders") if f["user_id"] == "owner"]), 2)
+        with self.s.as_user("outsider"), self.assertRaises(HTTPException):
+            classes.add_class(classes.AddClassRequest(school_id=self.school_id, code="FILM 201", folder_id="20000000-0000-4000-8000-000000000001"), "")
+
     def test_share_flow_end_to_end(self):
         guide_id = "10000000-0000-4000-8000-000000000001"
         mgt = self.add("owner")

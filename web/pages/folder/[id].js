@@ -1,112 +1,105 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
+import { ArrowLeft, AudioLines, BookOpen, FolderInput, Hash, NotebookPen, Plus, Trash2, UserRound } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
-import Link from 'next/link';
-import { ArrowLeft, BookOpen, FolderInput, Plus, Trash2 } from 'lucide-react';
+import { listLectures } from '../../lib/lectures';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Menu from '../../components/Menu';
 import ProgressRing from '../../components/ProgressRing';
+import AddClass from '../../components/AddClass';
+import { ClassDeadlines, ClassSets } from '../../components/ClassSets';
 import { openNewSheet } from '../../lib/newSheet';
 
-export default function FolderPage() {
+const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
+const TABS = [['material', 'Your material'], ['sets', 'Class sets'], ['deadlines', 'Deadlines']];
+
+function shortDate(value) {
+  const date = new Date(value || '');
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+// The one Class page: your own material, the sets classmates shared, and your deadlines.
+// A class with a course code is the same thing as the shared class (folders.class_id).
+export default function ClassPage() {
   const router = useRouter();
   const { id } = router.query;
   const { ready } = useRequireAuth();
   const [folder, setFolder] = useState(null);
+  const [cls, setCls] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [folders, setFolders] = useState([]);
-  const [guides, setGuides] = useState([]);
+  const [items, setItems] = useState([]);
+  const [deadlines, setDeadlines] = useState(null);
+  const [showName, setShowName] = useState(null);
+  const [addingCode, setAddingCode] = useState(false);
   const [confirm, setConfirm] = useState(null);
-  const [contextMenu, setContextMenu] = useState(null);
-  const [toast, setToast] = useState(null);
+  const [toast, setToast] = useState('');
+  const tab = TABS.some(([key]) => key === router.query.tab) ? router.query.tab : 'material';
   const gate = useLoadGate(Boolean(folder) || Boolean(loadError));
-  const contextRef = useRef(null);
+
+  useEffect(() => { if (ready && id) loadData(); }, [ready, id]);
 
   useEffect(() => {
-    if (ready && id) loadData();
-    function onClick(e) {
-      if (contextRef.current && !contextRef.current.contains(e.target)) setContextMenu(null);
-    }
-    function onKey(e) { if (e.key === 'Escape') setContextMenu(null); }
-    window.addEventListener('click', onClick);
-    window.addEventListener('keydown', onKey);
-    return () => { window.removeEventListener('click', onClick); window.removeEventListener('keydown', onKey); };
-  }, [ready, id]);
-
-  function showToast(message, type = 'success') {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 2500);
-  }
+    if (!toast) return undefined;
+    const timer = setTimeout(() => setToast(''), 2500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   async function loadData() {
     setLoadError('');
-    const [foldersData, guidesData] = await Promise.all([
-      apiFetch('/folders'),
-      apiFetch('/guides?folder_id=' + id)
+    const [foldersData, guidesData, notesData, lectureData] = await Promise.all([
+      apiFetch('/folders'), apiFetch('/guides?fields=summary&folder_id=' + encodeURIComponent(id)), apiFetch('/smart_notes'), listLectures().catch(() => null),
     ]);
     const failure = [foldersData, guidesData].find(data => !data || data.detail);
-    if (failure) {
-      setLoadError(apiErrorMessage(failure?.detail, 'This class could not be loaded.'));
-      return;
+    if (failure) { setLoadError(apiErrorMessage(failure?.detail, 'This class could not be loaded.')); return; }
+    const all = foldersData?.folders || [];
+    const current = all.find(item => item.id === id);
+    if (!current) { setLoadError('This class no longer exists or you do not have access to it.'); return; }
+    setFolders(all);
+    setFolder(current);
+    setItems([
+      ...(guidesData?.guides || []).map(guide => ({ kind: 'guide', id: guide.id, title: guide.title, date: guide.created_at, href: '/guide/' + guide.id, progress: guide.read_progress })),
+      ...(notesData?.notes || []).filter(note => note.folder_id === id).map(note => ({ kind: 'note', id: note.id, title: note.title || 'Untitled Notes', date: note.updated_at, href: '/smartnotes?id=' + note.id })),
+      ...(lectureData?.lectures || []).filter(lecture => lecture.folder_id === id).map(lecture => ({ kind: 'lecture', id: lecture.id, title: lecture.title, date: lecture.lecture_date ? `${lecture.lecture_date}T12:00:00` : lecture.created_at, href: '/lecture/' + lecture.id })),
+    ].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)));
+    if (current.class_id) {
+      apiFetch('/classes/' + current.class_id).then(result => setCls(result?.class || null));
+      apiFetch(`/classes/${current.class_id}/deadlines`).then(result => setDeadlines(result?.deadlines || []));
+      apiFetch('/sharing/settings').then(data => setShowName(typeof data?.show_first_name === 'boolean' ? data.show_first_name : null));
     }
-    const allFolders = foldersData?.folders || [];
-    setFolders(allFolders);
-    const currentFolder = allFolders.find(f => f.id === id);
-    if (!currentFolder) {
-      setLoadError('This class no longer exists or you do not have access to it.');
-      return;
-    }
-    setFolder(currentFolder);
-    setGuides(guidesData?.guides || []);
   }
 
-  function deleteGuide(guideId, e) {
-    if (e) e.stopPropagation();
-    setContextMenu(null);
-    setConfirm({
-      title: 'Delete guide?',
-      message: '',
-      onConfirm: async () => {
-        await apiFetch('/guides/' + guideId, { method: 'DELETE' });
-        setGuides(guides.filter(g => g.id !== guideId));
-        setConfirm(null);
-        showToast('Guide deleted', 'info');
-      }
-    });
+  function setTab(key) {
+    router.replace({ pathname: router.pathname, query: { id, ...(key === 'material' ? {} : { tab: key }) } }, undefined, { shallow: true });
   }
 
-  function deleteFolder() {
+  async function toggleShowName() {
+    const next = !showName;
+    setShowName(next);
+    const data = await apiFetch('/sharing/settings', { method: 'PUT', body: JSON.stringify({ show_first_name: next }) });
+    if (typeof data?.show_first_name === 'boolean') setShowName(data.show_first_name);
+    setToast(next ? 'Your first name shows on sets you share' : 'Your sets are shared without your name');
+  }
+
+  async function moveGuide(item, folderId) {
+    const data = await apiFetch('/guides/' + item.id + '/move', { method: 'PATCH', body: JSON.stringify({ folder_id: folderId }) });
+    if (!data?.updated) return;
+    setItems(current => current.filter(row => row.id !== item.id));
+    setToast('Moved to ' + (folderId ? folders.find(f => f.id === folderId)?.name : 'Unfiled'));
+  }
+
+  function deleteClass() {
     setConfirm({
-      title: 'Delete class?',
-      message: '',
+      title: `Delete ${folder.name}?`,
       onConfirm: async () => {
-        await apiFetch('/folders/' + id, { method: 'DELETE' });
+        // Deleting the class also leaves its shared class, so it doesn't come back as a link.
+        await Promise.all([apiFetch('/folders/' + id, { method: 'DELETE' }), folder.class_id && apiFetch('/classes/' + folder.class_id, { method: 'DELETE' })]);
         router.push('/library');
-      }
+      },
     });
-  }
-
-  function onGuideContextMenu(e, guide) {
-    e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, guide });
-  }
-
-  async function moveGuideToFolder(guideId, folderId) {
-    setContextMenu(null);
-    const data = await apiFetch('/guides/' + guideId + '/move', {
-      method: 'PATCH',
-      body: JSON.stringify({ folder_id: folderId })
-    });
-    if (data?.updated) {
-      if (folderId !== id) {
-        // Moved out of this folder
-        setGuides(guides.filter(g => g.id !== guideId));
-        const targetName = folderId ? folders.find(f => f.id === folderId)?.name : 'No class';
-        showToast('Moved to ' + targetName);
-      }
-    }
   }
 
   if (loadError && !folder) return (
@@ -122,51 +115,88 @@ export default function FolderPage() {
 
   if (!folder || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading class" />;
 
+  const upcoming = deadlines ? deadlines.length : 0;
+  const menu = [
+    ...(folder.class_id ? [] : [{ label: 'Add course code', icon: Hash, onSelect: () => setAddingCode(true) }]),
+    ...(folder.class_id && showName !== null ? [{ label: showName ? 'Hide my first name on shared sets' : 'Show my first name on shared sets', icon: UserRound, onSelect: toggleShowName }] : []),
+    { label: 'Delete class', icon: Trash2, danger: true, onSelect: deleteClass },
+  ];
+  const needsCode = (
+    <div className="c-card cls-needs-code">
+      <p className="cp-line">Add this class’s course code to see sets classmates share{tab === 'deadlines' ? ' and your Canvas deadlines' : ''}.</p>
+      {addingCode
+        ? <AddClass folderId={folder.id} onCancel={() => setAddingCode(false)} onAdded={() => { setAddingCode(false); loadData(); }} />
+        : <button type="button" className="c-btn c-btn--secondary" onClick={() => setAddingCode(true)}><Hash {...ICON} />Add course code</button>}
+    </div>
+  );
+
   return (
     <Reveal phase={gate}>
-    <div className="c-page">
-      {confirm && <ConfirmDialog title={confirm.title} message={confirm.message} onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
+    <div className="c-page cls-page">
+      {confirm && <ConfirmDialog title={confirm.title} confirmLabel="Delete" onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
       <header className="c-page-head">
-        <div className="c-row">
-          <button type="button" className="c-icon-btn" onClick={() => router.push('/library')} aria-label="Library"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
-          <h1 className="c-title">{folder.name}</h1>
-          <span className="c-meta">{guides.length}</span>
+        <div className="c-row cls-title-row">
+          <Link href="/library" className="c-icon-btn" aria-label="Library"><ArrowLeft {...ICON} /></Link>
+          <div className="cls-title">
+            <h1 className="c-title">{folder.name}</h1>
+            <span className="c-meta">
+              {[cls?.code && cls.code !== folder.name ? cls.code : '', cls?.school, folder.class_id && deadlines ? `${upcoming} upcoming deadline${upcoming === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')}
+            </span>
+          </div>
         </div>
         <div className="c-row">
-          <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet()}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />New</button>
-          <Menu label="Class actions" items={[{ label: 'Delete class', icon: Trash2, danger: true, onSelect: deleteFolder }]} />
+          <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet()}><Plus {...ICON} />New</button>
+          <Menu label="Class actions" items={menu} />
         </div>
       </header>
 
-      {guides.length === 0 ? (
-        <div className="c-empty"><BookOpen size={32} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">0 guides</span></div>
-      ) : (
-        <div className="c-card c-list">
-          {guides.map(guide => (
-            <div key={guide.id} className="c-list-row">
-              <ProgressRing value={guide.read_progress} size={36} label={false} />
-              <Link href={'/guide/' + guide.id} className="c-grow folder-row-link">
-                <span className="folder-row-title c-truncate">{guide.title}</span>
-                <span className="c-meta">{new Date(guide.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
-              </Link>
-              <Menu
-                label={`More for ${guide.title}`}
-                items={[
-                  { label: 'Move to class', icon: FolderInput, items: [
-                    { label: 'Unsorted', onSelect: () => moveGuideToFolder(guide.id, null) },
-                    ...folders.filter(f => f.id !== id).map(f => ({ label: f.name, onSelect: () => moveGuideToFolder(guide.id, f.id) })),
-                  ] },
-                  { label: 'Delete', icon: Trash2, danger: true, onSelect: () => deleteGuide(guide.id) },
-                ]}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-      {toast && <div className="c-toast" role="status"><span>{toast.message}</span></div>}
+      <div className="c-seg cls-tabs" role="tablist" aria-label="Class">
+        {TABS.map(([key, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button>
+        ))}
+      </div>
+
+      {tab === 'material' ? (
+        items.length === 0 ? (
+          <div className="c-empty"><BookOpen size={32} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Nothing here yet</span></div>
+        ) : (
+          <div className="c-card c-list">
+            {items.map(item => (
+              <div key={item.kind + item.id} className="c-list-row">
+                {item.kind === 'guide' ? <ProgressRing value={item.progress} size={36} label={false} />
+                  : item.kind === 'note' ? <NotebookPen {...ICON} /> : <AudioLines {...ICON} />}
+                <Link href={item.href} className="c-grow folder-row-link">
+                  <span className="folder-row-title c-truncate">{item.title}</span>
+                  <span className="c-meta">{[item.kind === 'note' ? 'Note' : item.kind === 'lecture' ? 'Lecture' : '', shortDate(item.date)].filter(Boolean).join(' · ')}</span>
+                </Link>
+                {item.kind === 'guide' && (
+                  <Menu
+                    label={`More for ${item.title}`}
+                    items={[{ label: 'Move to class', icon: FolderInput, items: [
+                      { label: 'Unfiled', onSelect: () => moveGuide(item, null) },
+                      ...folders.filter(f => f.id !== id).map(f => ({ label: f.name, onSelect: () => moveGuide(item, f.id) })),
+                    ] }]}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        )
+      ) : !folder.class_id ? needsCode
+        : tab === 'sets' ? <ClassSets classId={folder.class_id} onToast={setToast} />
+        : <ClassDeadlines classId={folder.class_id} deadlines={deadlines} />}
+
+      {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
       <style jsx>{`
+        .cls-title-row { min-width: 0; align-items: flex-start; }
+        .cls-title { display: grid; gap: 2px; min-width: 0; }
+        .cls-title :global(.c-title) { overflow-wrap: anywhere; }
+        .cls-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }
+        .cls-needs-code { display: grid; gap: 12px; padding: 20px; justify-items: start; }
+        .cls-needs-code :global(.cls-add) { width: 100%; box-shadow: none; padding: 0; background: none; border: 0; }
         :global(.folder-row-link) { display: flex; align-items: baseline; gap: 12px; min-width: 0; color: var(--ink); text-decoration: none; }
         .folder-row-title { font:600 17px/1.15 var(--font-display); min-width: 0; }
+        @media (max-width: 767px) { :global(.folder-row-link) { flex-direction: column; gap: 2px; } }
       `}</style>
     </div>
     </Reveal>

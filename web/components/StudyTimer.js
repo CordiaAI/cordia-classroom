@@ -1,7 +1,6 @@
 import { Pause, Play, RotateCcw, Timer } from 'lucide-react';
 import { TIMER_MODES } from './TimerEngine';
 import { walkthroughEvent } from '../lib/walkthrough';
-import PulseDot from './PulseDot';
 
 const MODES = TIMER_MODES;
 
@@ -28,7 +27,6 @@ export default function StudyTimer({ timerState, setTimerState }) {
       <header className="c-row">
         <Timer size={20} strokeWidth={1.75} aria-hidden="true" />
         <h2 id="timer-title" className="c-section-title">Focus</h2>
-        <PulseDot feature="focus" />
       </header>
       <div className="focus-face" role="timer" aria-live="off">{pad(minutes)}:{pad(seconds)}</div>
       <div className="c-seg focus-modes" role="tablist" aria-label="Timer length">

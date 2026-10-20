@@ -4,7 +4,7 @@ import BodyPortal from '../../components/BodyPortal';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Brain, Download, ExternalLink, Layers, Lock, MessageCircle, NotebookText, PencilRuler, Pencil, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
+  ArrowLeft, Brain, Download, ExternalLink, Layers, Lock, MessageCircle, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -18,6 +18,8 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import { useLearningStyle } from '../../lib/learningStyle';
 import { rememberGuidePage, rememberLastGuide } from '../../lib/userStore';
 import { activeStep, walkthroughEvent } from '../../lib/walkthrough';
+import { requestTip } from '../../lib/tips';
+import { readUserValue, writeUserValue } from '../../lib/userStore';
 
 const NURSING_TERMS = ['nursing', 'nurse', 'nclex', 'patient', 'vital signs', 'medication administration', 'care plan', 'nursing diagnosis', 'iv therapy', 'delegation', 'scope of practice', 'sbar', 'discharge planning', 'wound care', 'fall prevention', 'infection control', 'postoperative', 'preoperative', 'lab values', 'contraindications'];
 
@@ -92,8 +94,8 @@ export default function GuidePage() {
   useSessionTracker('read', id || null);
   const [guide, setGuide] = useState(null);
   const [loadError, setLoadError] = useState('');
-  // Notes: an outline summary of the topic. Cards: every question to read through, plus flip cards.
-  const [view, setView] = useState('notes');
+  // Outline: the topic as an outline. By page: every question, 3 per page, to read through.
+  const [view, setView] = useState('outline');
   // Every guide has outline notes: one without them gets them written the first time it opens.
   const [notesState, setNotesState] = useState('idle'); // idle | making | done
   const notesAsked = useRef('');
@@ -154,11 +156,25 @@ export default function GuidePage() {
       .finally(() => setNotesState('done'));
   }, [guide?.id]);
 
-  // The guided walkthrough points at the questions (Explain, highlighting): show them for those steps.
+  // A "Show me" that points at the questions (Explain, highlighting) opens By page.
   useEffect(() => {
     const step = activeStep();
-    if (step && ['explain', 'highlight'].includes(step.id)) setView('cards');
+    if (step && ['[data-spot="explain"]', '[data-spot="reader-text"]'].includes(step.target)) setView('pages');
   }, [guide?.id]);
+
+  // By page: the first time, a tip points out the highlight menu (Explain, Make card, Ask).
+  useEffect(() => { if (view === 'pages' && guide) requestTip('highlight'); }, [view, guide?.id]);
+
+  // NCLEX practice appears only for nursing material, so say so the first time it does.
+  const nursing = isNursing(guide);
+  const [nclexNew, setNclexNew] = useState(false);
+  useEffect(() => {
+    if (!nursing || !guide?.id) return;
+    const seen = readUserValue('cordiaNclexSeen', []) || [];
+    if (seen.includes(guide.id)) return;
+    setNclexNew(true);
+    writeUserValue('cordiaNclexSeen', [...seen, guide.id].slice(-200));
+  }, [nursing, guide?.id]);
 
   async function loadSharing() {
     const data = await apiFetch('/sharing/guides/' + id);
@@ -257,14 +273,15 @@ export default function GuidePage() {
     || (guide.source_type === 'smartnote' && guide.source_id ? `/smartnotes?id=${guide.source_id}` : '')
     || (guide.source_type === 'study_guide' && guide.source_id ? `/guide/${guide.source_id}` : '');
   const explainWithAid = Boolean(learningStyle?.enabled);
-  const pills = [
-    { key: 'notes', label: 'Notes', icon: NotebookText, view: 'notes' },
-    { key: 'cards', label: 'Cards', icon: Layers, view: 'cards', count: cardCount, spot: 'cards-pill' },
+  const tabs = [
+    { key: 'outline', label: 'Outline', icon: NotebookText, view: true },
+    { key: 'flashcards', label: 'Flashcards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: cardCount, spot: 'cards-pill', event: 'cards-opened' },
     { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill' },
     { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id },
-    ...(isNursing(guide) ? [{ key: 'nclex', label: 'NCLEX', icon: Stethoscope, href: '/nclex/' + id }] : []),
-    { key: 'ask', label: 'Ask', icon: MessageCircle, spot: 'ask-pill', onClick: () => { walkthroughEvent('ask'); ask(id, ''); } },
+    ...(nursing ? [{ key: 'nclex', label: 'NCLEX', icon: Stethoscope, href: '/nclex/' + id }] : []),
   ];
+  const shareable = sharing?.class && !sharing.linked;
+  const shared = shareable && sharing.visibility === 'class';
 
   return (
     <Reveal phase={gate}>
@@ -277,7 +294,8 @@ export default function GuidePage() {
           </form>
         ) : (
           <h1 className="c-title guide-title">
-            <button type="button" className="guide-title-btn" onClick={() => setRenaming(guide.title)} aria-label={`${guide.title}, rename`}>{guide.title}</button>
+            <button type="button" className="guide-title-btn" onClick={() => setRenaming(guide.title)}>{guide.title}</button>
+            <button type="button" className="c-icon-btn guide-rename-btn" onClick={() => setRenaming(guide.title)} aria-label="Rename guide"><Pencil size={18} strokeWidth={1.75} aria-hidden="true" /></button>
           </h1>
         )}
         <button type="button" className={'c-icon-btn' + (guide.is_bookmarked ? ' guide-starred' : '')} onClick={toggleStar} aria-pressed={Boolean(guide.is_bookmarked)} aria-label={guide.is_bookmarked ? 'Unstar' : 'Star'}>
@@ -287,42 +305,71 @@ export default function GuidePage() {
           label="Guide actions"
           items={[
             { label: 'Edit', icon: SquarePen, onSelect: () => router.push('/create?editGuideId=' + id) },
-            { label: 'Rename', icon: Pencil, onSelect: () => setRenaming(guide.title) },
             { label: 'Export', icon: Download, onSelect: () => exportGuide(guide) },
-            ...(sharing?.class && !sharing.linked ? [sharing.class.sharing_blocked
-              ? { label: 'Sharing off', icon: Lock, disabled: true }
-              : sharing.visibility === 'class'
-                ? { label: 'Make private', icon: Lock, onSelect: () => setVisibility('private') }
-                : { label: `Share with ${sharing.class.code}`, icon: Users, onSelect: () => setVisibility('class') }] : []),
             { label: 'Delete', icon: Trash2, danger: true, onSelect: () => setConfirmDelete(true) },
           ]}
         />
+        <Link href={'/session?guideId=' + id} className="c-btn c-btn--primary guide-study-now"><Play size={20} strokeWidth={1.75} aria-hidden="true" />Study now</Link>
       </header>
       {sharing?.update_available && (
         <button type="button" className="c-chip guide-update" onClick={pullUpdate}><RefreshCw size={16} strokeWidth={1.75} aria-hidden="true" />Update available</button>
       )}
       {!sharing?.linked && <ClassChip guideId={id} onFiled={() => loadSharing()} />}
-      {sourceTitle && (sourceHref || sourceTitle.trim().toLowerCase() !== (guide.title || '').trim().toLowerCase()) && (
-        <span className="guide-src">
-          {sourceHref
-            ? <a href={sourceHref} target={externalSourceUrl ? '_blank' : undefined} rel={externalSourceUrl ? 'noopener noreferrer' : undefined}><ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />{sourceTitle}</a>
-            : sourceTitle}
-        </span>
+      <div className="guide-meta">
+        {sourceTitle && (sourceHref || sourceTitle.trim().toLowerCase() !== (guide.title || '').trim().toLowerCase()) && (
+          <span className="guide-src">
+            {sourceHref
+              ? <a href={sourceHref} target={externalSourceUrl ? '_blank' : undefined} rel={externalSourceUrl ? 'noopener noreferrer' : undefined}><ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />{sourceTitle}</a>
+              : sourceTitle}
+          </span>
+        )}
+        {shareable && (sharing.class.sharing_blocked
+          ? <span className="c-chip guide-share"><Lock size={16} strokeWidth={1.75} aria-hidden="true" />Sharing off for {sharing.class.code}</span>
+          : (
+            <Menu
+              label={shared ? `Shared with ${sharing.class.code}` : 'Private'}
+              trigger={<span className="guide-share-label">{shared ? <Users size={16} strokeWidth={1.75} aria-hidden="true" /> : <Lock size={16} strokeWidth={1.75} aria-hidden="true" />}{shared ? `Shared with ${sharing.class.code}` : 'Private'}</span>}
+              align="left"
+              items={[
+                { label: 'Private', icon: Lock, current: !shared, onSelect: () => setVisibility('private') },
+                { label: `Share with ${sharing.class.code}`, icon: Users, current: shared, onSelect: () => setVisibility('class') },
+              ]}
+            />
+          ))}
+      </div>
+
+      {nclexNew && (
+        <div className="guide-nclex" role="status">
+          <Stethoscope size={20} strokeWidth={1.75} aria-hidden="true" />
+          <span>Nursing material detected: NCLEX practice added.</span>
+          <span className="c-spacer" />
+          <Link href={'/nclex/' + id} className="c-btn c-btn--quiet">Try it</Link>
+          <button type="button" className="c-icon-btn" onClick={() => setNclexNew(false)} aria-label="Dismiss"><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
+        </div>
       )}
 
-      <nav className="c-pills" aria-label="Study this guide">
-        {pills.map(pill => {
-          const content = <><pill.icon size={20} strokeWidth={1.75} aria-hidden="true" />{pill.label}{pill.count !== undefined && <span className="c-meta">{pill.count}</span>}</>;
-          if (pill.href) return <Link key={pill.key} className="c-pill" href={pill.href} data-spot={pill.spot}>{content}</Link>;
-          if (pill.view) return <button key={pill.key} type="button" className="c-pill" data-spot={pill.spot} aria-current={view === pill.view ? 'page' : undefined} onClick={() => { setView(pill.view); if (pill.view === 'cards') walkthroughEvent('cards-opened'); }}>{content}</button>;
-          return <button key={pill.key} type="button" className="c-pill" data-spot={pill.spot} onClick={pill.onClick}>{content}</button>;
-        })}
-      </nav>
+      <div className="guide-tabs-row">
+        <nav className="c-pills" aria-label="Study this guide">
+          {tabs.map(tab => {
+            const content = <><tab.icon size={20} strokeWidth={1.75} aria-hidden="true" />{tab.label}{tab.count !== undefined && <span className="c-meta">{tab.count}</span>}</>;
+            if (tab.view) return <span key={tab.key} className="c-pill" aria-current="page">{content}</span>;
+            return <Link key={tab.key} className="c-pill" href={tab.href} data-spot={tab.spot} onClick={tab.event ? () => walkthroughEvent(tab.event) : undefined}>{content}</Link>;
+          })}
+        </nav>
+        <button type="button" className="c-btn c-btn--secondary guide-ask" data-spot="ask-pill" onClick={() => { walkthroughEvent('ask'); ask(id, ''); }}>
+          <MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />Ask Tutor about this guide
+        </button>
+      </div>
 
-      {view === 'notes' ? (
-        <section className="c-card guide-notes" aria-label="Notes" aria-busy={notesState === 'making' && !notesWritten}>
+      <div className="c-seg guide-view" role="tablist" aria-label="Outline view">
+        <button type="button" role="tab" aria-selected={view === 'outline'} className={view === 'outline' ? 'is-active' : ''} onClick={() => setView('outline')}>Outline</button>
+        <button type="button" role="tab" aria-selected={view === 'pages'} className={view === 'pages' ? 'is-active' : ''} onClick={() => setView('pages')}>By page</button>
+      </div>
+
+      {view === 'outline' ? (
+        <section className="c-card guide-notes" aria-label="Outline" aria-busy={notesState === 'making' && !notesWritten}>
           {(notesState === 'making' || notesState === 'idle') && !notesWritten
-            ? <SectionLoader height={160} label="Writing notes" />
+            ? <SectionLoader height={160} label="Writing the outline" />
             : hasStudyNotes(notes) ? (
               <>
                 {notes.overview && <p className="guide-overview">{rich(notes.overview)}</p>}
@@ -346,15 +393,10 @@ export default function GuidePage() {
                   </div>
                 )}
               </>
-            ) : <p className="c-meta">Notes appear here once they are written. The questions are in Cards.</p>}
+            ) : <p className="c-meta">The outline appears here once it is written. The questions are in By page.</p>}
         </section>
       ) : (
         <>
-        {cardCount > 0 && (
-          <div className="guide-cards-bar">
-            <Link className="c-btn c-btn--primary" href={'/flashcards/study?guideId=' + id}><Layers size={20} strokeWidth={1.75} aria-hidden="true" />Flip cards · {cardCount}</Link>
-          </div>
-        )}
       <StudyDocument
         key={guide.id}
         guide={guide}
@@ -380,14 +422,26 @@ export default function GuidePage() {
 
       <style jsx>{`
         .guide { gap: 16px; }
-        .guide-head { display: flex; align-items: center; gap: 8px; }
-        .guide-title { flex: 1 1 auto; min-width: 0; }
+        .guide-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .guide-title { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-wrap: anywhere; }
+        .guide-title :global(.guide-rename-btn) { flex: 0 0 auto; color: var(--muted); }
+        .guide-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: -8px 0 0 48px; }
+        .guide-share-label { display: inline-flex; align-items: center; gap: 6px; font: 600 13px/1 var(--font-sans); white-space: nowrap; }
+        .guide-meta :global(.c-menu-wrap > .c-icon-btn) { width: auto; height: 32px; padding: 0 12px; border-radius: var(--r-pill); border: 1px solid var(--line); }
+        .guide-nclex { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; border-radius: var(--r-row); background: var(--olive-tint); font: 600 15px/1.4 var(--font-sans); }
+        .guide-nclex :global(.lucide) { color: var(--olive-ink); flex: 0 0 auto; }
+        .guide-tabs-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .guide-tabs-row .c-pills { flex: 1 1 auto; min-width: 0; max-width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+        .guide-tabs-row .c-pills::-webkit-scrollbar { display: none; }
+        .guide-tabs-row .c-pills :global(.c-pill) { flex: 0 0 auto; }
+        .guide-tabs-row, .guide-head { min-width: 0; max-width: 100%; }
+        .guide-view { justify-self: start; }
         .guide-title-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing:-0.015em; text-align: left; cursor: text; border-radius:var(--r-input); }
         .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
         .guide-rename { flex: 1 1 auto; min-width: 0; }
         .guide-title-input { font:600 28px/1.15 var(--font-display); height: 52px; }
         .guide-head :global(.guide-starred) { color: var(--olive-ink); }
-        .guide-src { margin: -8px 0 0 48px; font:600 13px/1.5 var(--font-sans); }
+        .guide-src { font:600 13px/1.5 var(--font-sans); }
         .guide-src a { display: inline-flex; align-items: center; gap: 6px; }
         .guide-notes { display: grid; gap: 16px; padding: 32px 40px; }
         .guide-notes :global(.c-section-title) { margin: 0; }
@@ -399,8 +453,12 @@ export default function GuidePage() {
         .guide-overview { margin: 0; padding-bottom: 24px; border-bottom: 1px solid var(--line); font: 400 var(--fs-20)/1.5 var(--font-display); color: var(--ink); }
         .guide-outline-num { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 10px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 var(--fs-13)/1 var(--font-sans); vertical-align: 3px; }
         .guide-key { display: grid; gap: 16px; padding: 24px 28px; border-radius: 16px; background: var(--olive-tint); }
-        .guide-cards-bar { display: flex; justify-content: flex-end; }
-        @media (max-width: 767px) { .guide-src { margin-left: 0; } .guide-notes { padding: 24px 18px; } }
+        @media (max-width: 767px) {
+          .guide-meta { margin-left: 0; }
+          .guide-notes { padding: 24px 18px; }
+          .guide-head :global(.guide-study-now) { order: 5; width: 100%; justify-content: center; }
+          .guide-ask { width: 100%; justify-content: center; }
+        }
       `}</style>
     </article>
     </Reveal>

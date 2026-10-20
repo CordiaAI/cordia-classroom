@@ -1,7 +1,21 @@
 const API = 'https://autostudy-ai.fly.dev';
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
+// The toolbar icon and its Ctrl/Cmd+Shift+Y shortcut (_execute_action) both open the side panel.
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+
+const SELECTION_MENU = 'make-guide-from-selection';
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({ id: SELECTION_MENU, title: 'Make study guide from selection', contexts: ['selection'] });
+});
+
+// Open the panel inside the click's user gesture, then leave a flag the panel picks up to start
+// "Make study guide"; capture already prefers the page's selected text.
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId !== SELECTION_MENU || !tab) return;
+  chrome.sidePanel.open?.({ windowId: tab.windowId })?.catch(() => {});
+  chrome.storage.session.set({ pendingGuide: Date.now() });
+});
 
 const storageGet = keys => new Promise(resolve => chrome.storage.local.get(keys, resolve));
 
