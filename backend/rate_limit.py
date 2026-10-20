@@ -10,10 +10,17 @@ from collections import defaultdict, deque
 
 from fastapi import HTTPException, Request
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+
+
+def client_ip(request: Request) -> str:
+    """The student's address. On Fly every request arrives from Fly's proxy, so the socket
+    address is the same for everyone; Fly puts the real one in Fly-Client-IP (and replaces
+    any value a client sends)."""
+    return request.headers.get("fly-client-ip") or (request.client.host if request.client else "unknown")
+
 
 # Per-IP limits declared with @limiter.limit on a route; main.py attaches it to the app.
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip)
 
 _lock = threading.Lock()
 _hits = defaultdict(deque)
@@ -23,7 +30,7 @@ def _caller_key(request: Request) -> str:
     auth = request.headers.get("authorization", "")
     if auth:
         return "user:" + hashlib.sha256(auth.encode()).hexdigest()[:24]
-    return "ip:" + (request.client.host if request.client else "unknown")
+    return "ip:" + client_ip(request)
 
 
 def ai_rate_limit(max_calls: int = 10, window_seconds: int = 60):

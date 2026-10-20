@@ -290,11 +290,14 @@ export default function SmartNotesEditor() {
       const contentChanged = content !== lastSavedRef.current;
       const titleChanged = title !== lastSavedTitleRef.current;
       if (!contentChanged && !titleChanged) return;
+      const body = JSON.stringify({ title, content });
+      // Browsers refuse keepalive bodies over 64 KB (notes with pasted images), so big notes
+      // save with a normal request: it still completes on SPA navigation.
       fetch(API + '/smart_notes/' + noteIdRef.current, {
         method: 'PUT',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content }),
-        keepalive: true,
+        body,
+        keepalive: new Blob([body]).size < 60000,
       }).catch(() => { /* the page is closing; there is nowhere left to show the error */ });
       lastSavedRef.current = content;
       lastSavedTitleRef.current = title;

@@ -165,7 +165,7 @@ export default function LibraryPage() {
       setGuides(current => current.map(guide => (guide.id === item.id ? { ...guide, folder_id: folderId } : guide)));
     } else if (item.kind === 'note') {
       const data = await apiFetch('/smart_notes/' + item.id, { method: 'PUT', body: JSON.stringify({ folder_id: folderId || '' }) });
-      if (!data) return;
+      if (!data?.updated) { setToast(apiErrorMessage(data?.detail, 'Note not moved.')); return; }
       setNotes(current => current.map(note => (note.id === item.id ? { ...note, folder_id: folderId } : note)));
     } else return;
     setToast(label);

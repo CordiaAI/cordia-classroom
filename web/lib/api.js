@@ -3,7 +3,7 @@ export const REQUEST_TIMEOUT_MS = 15000;
 // AI generation routinely takes 20-60s. Aborting early charged students for guides they
 // never received, so these routes wait up to two minutes.
 export const AI_TIMEOUT_MS = 120000;
-const AI_ROUTES = /^\/(generate|practice|chat|extract-file-text|render-pptx|ingest|quiz\/|nclex\/|learning\/study-aids|smart_notes\/)/;
+const AI_ROUTES = /^\/(generate|practice|chat|extract-file-text|render-pptx|ingest|quiz\/|nclex\/|study-aids|smart_notes\/)/;
 
 export const LIMIT_EVENT = 'cordia:limit';
 export const UPGRADE_EVENT = 'cordia:upgrade';

@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from supabase_auth.errors import AuthApiError, AuthInvalidJwtError
 from database import get_supabase, get_auth_supabase
 from auth_utils import get_user_id
+from rate_limit import client_ip
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -26,7 +27,7 @@ MAX_TRACKED_IPS = 10_000
 
 def _check_rate_limit(request: Request, store: defaultdict, max_attempts: int):
     """Block IPs that exceed max_attempts within WINDOW_SECONDS."""
-    ip = request.client.host if request.client else "unknown"
+    ip = client_ip(request)
     now = time.time()
 
     # Evict stale IPs if tracker is too large
@@ -174,6 +175,22 @@ def _remove_lecture_audio(supabase, user_id: str) -> None:
         logger.warning("Lecture audio cleanup skipped: %s", exc)
 
 
+def _remove_visuals(supabase, user_id: str) -> None:
+    """Diagrams and note covers the student made live in the public 'visuals' bucket."""
+    marker = "/storage/v1/object/public/visuals/"
+    try:
+        cached = supabase.table("visual_cache").select("files").eq("user_id", user_id).execute().data or []
+        covers = supabase.table("note_covers").select("url").eq("user_id", user_id).execute().data or []
+        urls = [item.get("url", "") for row in cached for item in (row.get("files") or []) if isinstance(item, dict)]
+        urls += [row.get("url", "") for row in covers]
+        paths = sorted({url.split(marker, 1)[1] for url in urls if marker in url})
+        for start in range(0, len(paths), 100):
+            supabase.storage.from_("visuals").remove(paths[start:start + 100])
+        supabase.table("visual_cache").delete().eq("user_id", user_id).execute()
+    except Exception as exc:  # visuals not set up: nothing stored to remove
+        logger.warning("Visual cleanup skipped: %s", exc)
+
+
 class DeleteAccountRequest(BaseModel):
     confirm: str = Field(..., max_length=20)
 
@@ -196,6 +213,7 @@ def delete_account(request: DeleteAccountRequest, authorization: str = Header(de
         supabase.table(table).delete().eq("user_id", user_id).execute()
     supabase.table("user_profiles").delete().eq("id", user_id).execute()
     _remove_lecture_audio(supabase, user_id)
+    _remove_visuals(supabase, user_id)
     supabase.auth.admin.delete_user(user_id)
     logger.info("Account deleted: %s", user_id)
     return {"deleted": True}

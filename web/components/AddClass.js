@@ -67,7 +67,7 @@ export default function AddClass({ onAdded, onCancel, folderId = '', withName = 
         </label>
       )}
       <label className="c-field cls-field">
-        <span className="c-section-title cls-label">School{withName ? ' (optional)' : ''}</span>
+        <span className="c-section-title cls-label">School{withName ? ' (with a code)' : ''}</span>
         <input className="c-input" value={school ? school.name : schoolText} onChange={event => { setSchool(null); setSchoolText(event.target.value); }} autoComplete="off" autoFocus={!withName} />
         {schools.length > 0 && (
           <ul className="c-menu cls-suggest" role="listbox" aria-label="Schools">

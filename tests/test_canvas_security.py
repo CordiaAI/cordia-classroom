@@ -107,6 +107,28 @@ class HostTests(unittest.TestCase):
         with self.assertRaises(cc.CanvasForbiddenRequest):
             client.me()
 
+    def test_file_download_follows_only_to_the_canvas_file_host_without_the_token(self):
+        meta = MagicMock(status_code=200, is_redirect=False, ok=True, headers={})
+        meta.json.return_value = {"size": 10, "display_name": "Syllabus.pdf"}
+        hop = MagicMock(status_code=302, is_redirect=True, ok=False, headers={"location": "https://inst-fs-iad-prod.inscloudgate.net/files/blob?token=signed"}, text="")
+        http = MagicMock()
+        http.request.side_effect = [meta, hop]
+        client = cc.CanvasClient("school.instructure.com", TOKEN, http=http, resolve=lambda _h: True)
+        body = MagicMock(status_code=200, is_redirect=False, ok=True, headers={})
+        body.iter_content.return_value = [b"%PDF-1"]
+        file_session = MagicMock()
+        file_session.get.return_value = body
+        with patch.object(cc, "pinned_session", return_value=file_session) as pinned:
+            name, data = client.download_file(7, 70)
+        self.assertEqual((name, data), ("Syllabus.pdf", b"%PDF-1"))
+        pinned.assert_called_once_with("inst-fs-iad-prod.inscloudgate.net")
+        self.assertNotIn("headers", file_session.get.call_args.kwargs)  # the token never leaves Canvas
+
+        hop_evil = MagicMock(status_code=302, is_redirect=True, ok=False, headers={"location": "https://evil.com/x"}, text="")
+        http.request.side_effect = [meta, hop_evil]
+        with self.assertRaises(cc.CanvasForbiddenRequest):
+            client.download_file(7, 70)
+
     def test_client_cannot_be_used_for_writes(self):
         http = MagicMock()
         client = cc.CanvasClient("school.instructure.com", TOKEN, http=http, resolve=lambda _h: True)

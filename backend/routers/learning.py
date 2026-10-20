@@ -217,7 +217,7 @@ def create_study_aid(body: StudyAidRequest, authorization: str = Header(default=
     return public_aid(body.mode, content)
 
 
-@router.post("/study-aids/check")
+@router.post("/study-aids/check", dependencies=[Depends(ai_rate_limit(max_calls=20))])
 def check_study_aid(body: StudyAidCheck, authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     _require_enabled()

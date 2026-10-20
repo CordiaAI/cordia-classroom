@@ -40,6 +40,9 @@ TIMEOUT = 15
 MAX_PAGES = 20
 LOW_REMAINING = 100.0
 MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024
+# Canvas serves file bytes from a separate file host through a pre-signed link. Only these
+# hosts are followed, without the token, at a checked public address.
+FILE_HOST_SUFFIXES = (".inscloudgate.net", ".instructure-uploads.com", ".canvas-user-content.com", ".instructure.com", ".amazonaws.com")
 
 
 class CanvasError(Exception):
@@ -162,6 +165,26 @@ class _PinnedAdapter(HTTPAdapter):
         return super().send(request, *args, **kwargs)
 
 
+def _fetch_file_host(url: str, hops: int = 2) -> requests.Response:
+    """GET a pre-signed Canvas file link: an allowlisted file host, https only, a checked
+    public address, no Authorization header, and at most `hops` more redirects."""
+    target = urlparse(url)
+    host = (target.hostname or "").lower()
+    if target.scheme != "https" or target.port is not None or not host.endswith(FILE_HOST_SUFFIXES):
+        raise CanvasForbiddenRequest("Canvas served this file from another host.")
+    try:
+        response = pinned_session(host).get(url, timeout=TIMEOUT, allow_redirects=False, stream=True)
+    except requests.RequestException:
+        raise CanvasError("Canvas could not send this file.") from None
+    if response.is_redirect or response.status_code in (301, 302, 303, 307, 308):
+        if hops <= 0:
+            raise CanvasError("Canvas could not send this file.")
+        return _fetch_file_host(urljoin(url, response.headers.get("location", "")), hops - 1)
+    if not response.ok:
+        raise CanvasError(f"Canvas returned {response.status_code} for the file.")
+    return response
+
+
 def pinned_session(host: str) -> requests.Session:
     """A session that can only reach `host`, at an address checked to be public."""
     addresses = _public_addresses(host)
@@ -275,7 +298,7 @@ class CanvasClient:
         return cls(host, token, **kwargs)
 
     # The only network method. Everything goes through the allowlist and host check.
-    def _get(self, path: str, query: Optional[list[tuple[str, str]]] = None, *, stream: bool = False) -> requests.Response:
+    def _get(self, path: str, query: Optional[list[tuple[str, str]]] = None, *, stream: bool = False, file_download: bool = False) -> requests.Response:
         query = list(query or [])
         endpoint = check_request("GET", path, query)
         url = f"https://{self.host}{path}" + (("?" + urlencode(query)) if query else "")
@@ -296,9 +319,13 @@ class CanvasClient:
             if response.is_redirect or response.status_code in (301, 302, 303, 307, 308):
                 location = response.headers.get("location", "")
                 target = urlparse(urljoin(url, location))
-                if target.scheme != "https" or (target.hostname or "").lower() != self.host or target.port is not None:
+                if target.scheme != "https" or target.port is not None:
                     raise CanvasForbiddenRequest("Canvas redirected to another host.")
-                return self._get(target.path, parse_qsl(target.query, keep_blank_values=True), stream=stream)
+                if (target.hostname or "").lower() != self.host:
+                    if file_download:
+                        return _fetch_file_host(target.geturl())
+                    raise CanvasForbiddenRequest("Canvas redirected to another host.")
+                return self._get(target.path, parse_qsl(target.query, keep_blank_values=True), stream=stream, file_download=file_download)
             if not response.ok:
                 raise CanvasError(f"Canvas returned {response.status_code} for {endpoint.name}.")
             return response
@@ -358,7 +385,7 @@ class CanvasClient:
         meta = self._get(f"/api/v1/courses/{int(course_id)}/files/{int(file_id)}").json()
         if int(meta.get("size") or 0) > MAX_DOWNLOAD_BYTES:
             raise CanvasError("Too large (50 MB max)")
-        response = self._get(f"/files/{int(file_id)}/download", [("download_frd", "1")], stream=True)
+        response = self._get(f"/files/{int(file_id)}/download", [("download_frd", "1")], stream=True, file_download=True)
         body = bytearray()
         for chunk in response.iter_content(64 * 1024):
             body.extend(chunk)

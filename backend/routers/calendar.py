@@ -197,7 +197,8 @@ def _events(text: str) -> list[dict]:
                         "due_at": due.isoformat(),
                         "all_day": all_day,
                         "type": _kind(title),
-                        "url": current.get("URL") or None,
+                        # Only web links: a feed could carry javascript: or data: URLs.
+                        "url": current["URL"] if re.match(r"https?://", current.get("URL") or "") else None,
                         "course": _decode(current.get("LOCATION") or "") or None,
                     })
             current = None

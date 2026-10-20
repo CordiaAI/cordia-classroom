@@ -324,7 +324,7 @@ def start_session(guide_id: str, body: SessionRequest, authorization: str = Head
     }
 
 
-@router.post("/{guide_id}/grade")
+@router.post("/{guide_id}/grade", dependencies=[Depends(ai_rate_limit(max_calls=30))])
 def grade_written(guide_id: str, body: WrittenAnswer, authorization: str = Header(default="")):
     """Mark one written answer with full, partial or no credit, signed so the score can be trusted."""
     require_uuid(guide_id, "guide ID")
