@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
-import { guideOutline, parseOutline, parseQAPairs } from '../../lib/formatters';
+import { guideNotes, hasStudyNotes, isStudyGuideNotes, parseQAPairs, parseStudyNotes } from '../../lib/formatters';
 import useSessionTracker from '../../lib/useSessionTracker';
 import StudyAidPanel from '../../components/StudyAidPanel';
 import StudyDocument from '../../components/StudyDocument';
@@ -31,13 +31,20 @@ function ask(guideId, prompt, send = false) {
   window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { guideId, prompt, send } }));
 }
 
+// **term** in notes → bold.
+function rich(text) {
+  return String(text).split(/\*\*(.+?)\*\*/g).map((part, index) => (index % 2 ? <strong key={index}>{part}</strong> : part));
+}
+
 function exportGuide(guide) {
   const pairs = parseQAPairs(guide.study_guide);
-  const outline = guideOutline(guide);
+  const notes = guideNotes(guide);
   const lines = [`# ${guide.title}`, ''];
-  if (outline.length) {
+  if (hasStudyNotes(notes)) {
     lines.push('## Notes', '');
-    outline.forEach(section => lines.push(...(section.heading ? [`### ${section.heading}`, ''] : []), ...section.points.map(point => `- ${point}`), ''));
+    if (notes.overview) lines.push(notes.overview, '');
+    notes.sections.forEach(section => lines.push(...(section.heading ? [`### ${section.heading}`, ''] : []), ...section.points.flatMap(point => [`- ${point.text}`, ...point.sub.map(item => `  - ${item}`)]), ''));
+    if (notes.keyPoints.length) lines.push('### Key points', '', ...notes.keyPoints.map(point => `- ${point}`), '');
   }
   lines.push('## Questions', '');
   pairs.forEach((pair, index) => lines.push(`### ${index + 1}. ${pair.question}`, '', pair.answer, ''));
@@ -135,7 +142,7 @@ export default function GuidePage() {
 
   // A guide without outline notes gets them written (once per visit); a loader shows meanwhile.
   useEffect(() => {
-    if (!guide?.id || notesAsked.current === guide.id || /^##\s/m.test(guide.notes || '')) return;
+    if (!guide?.id || notesAsked.current === guide.id || isStudyGuideNotes(guide.notes)) return;
     notesAsked.current = guide.id;
     setNotesState('making');
     fetch('/api/guide-notes', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ guide_id: guide.id }) })
@@ -220,7 +227,8 @@ export default function GuidePage() {
   if (!guide || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading guide" />;
 
   const pairs = parseQAPairs(guide.study_guide);
-  const outline = guideOutline(guide);
+  const notes = guideNotes(guide);
+  const notesWritten = hasStudyNotes(parseStudyNotes(guide.notes));
   const cardCount = guide.flashcards?.length || 0;
   const sourceTitle = guide.source_title || (guide.source_url ? 'Source' : '');
   const externalSourceUrl = /^https?:\/\//i.test(guide.source_url || '') ? guide.source_url : '';
@@ -282,15 +290,33 @@ export default function GuidePage() {
       </nav>
 
       {view === 'notes' ? (
-        <section className="c-card guide-notes" aria-label="Notes" aria-busy={notesState === 'making' && !parseOutline(guide.notes).length}>
-          {(notesState === 'making' || notesState === 'idle') && !parseOutline(guide.notes).length
+        <section className="c-card guide-notes" aria-label="Notes" aria-busy={notesState === 'making' && !notesWritten}>
+          {(notesState === 'making' || notesState === 'idle') && !notesWritten
             ? <SectionLoader height={160} label="Writing notes" />
-            : outline.length ? outline.map((section, index) => (
-              <div key={index} className="guide-outline-section">
-                {section.heading && <h2 className="c-section-title">{section.heading}</h2>}
-                <ul className="c-study">{section.points.map((point, pointIndex) => <li key={pointIndex}>{point}</li>)}</ul>
-              </div>
-            )) : <p className="c-meta">Notes appear here once they are written. The questions are in Cards.</p>}
+            : hasStudyNotes(notes) ? (
+              <>
+                {notes.overview && <p className="guide-overview">{rich(notes.overview)}</p>}
+                {notes.sections.map((section, index) => (
+                  <div key={index} className="guide-outline-section">
+                    {section.heading && <h2 className="c-section-title"><span className="guide-outline-num">{index + 1}</span>{section.heading}</h2>}
+                    <ul className="c-study">
+                      {section.points.map((point, pointIndex) => (
+                        <li key={pointIndex}>
+                          {rich(point.text)}
+                          {point.sub.length > 0 && <ul className="guide-sub">{point.sub.map((item, itemIndex) => <li key={itemIndex}>{rich(item)}</li>)}</ul>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+                {notes.keyPoints.length > 0 && (
+                  <div className="guide-key">
+                    <h2 className="c-section-title">Key points</h2>
+                    <ul className="c-study">{notes.keyPoints.map((point, index) => <li key={index}>{rich(point)}</li>)}</ul>
+                  </div>
+                )}
+              </>
+            ) : <p className="c-meta">Notes appear here once they are written. The questions are in Cards.</p>}
         </section>
       ) : (
         <>
@@ -338,6 +364,11 @@ export default function GuidePage() {
         .guide-notes { gap: 32px; }
         .guide-outline-section { display: grid; gap: 16px; }
         .guide-notes ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+        .guide-notes .guide-sub { margin-top: 6px; gap: 4px; list-style: circle; color: var(--muted-ink); }
+        .guide-notes :global(strong) { font-weight: 600; color: var(--ink); }
+        .guide-overview { margin: 0; padding-bottom: 24px; border-bottom: 1px solid var(--line); font: 400 var(--fs-20)/1.5 var(--font-display); color: var(--ink); }
+        .guide-outline-num { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 10px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 var(--fs-13)/1 var(--font-sans); vertical-align: 3px; }
+        .guide-key { display: grid; gap: 16px; padding: 24px 28px; border-radius: 16px; background: var(--olive-tint); }
         .guide-cards-bar { display: flex; justify-content: flex-end; }
         @media (max-width: 767px) { .guide-src { margin-left: 0; } .guide-notes { padding: 24px 18px; } }
       `}</style>

@@ -48,7 +48,7 @@ async function session(browser, { width = 1440, theme = 'light', lecture = LECTU
     if (action === 'usage') return route.fulfill({ json: { minutes_left: 84, minutes_limit: 120, ready: false } });
     return route.fulfill({ json: {} });
   });
-  await context.route(/localhost:3100\/api\/guide-notes$/, route => route.fulfill({ json: { notes: '## Cells\n- Cells are the basic unit of life.\n- The mitochondria make energy.\n\n## Membranes\n- Membranes control what enters and leaves.' } }));
+  await context.route(/localhost:3100\/api\/guide-notes$/, route => route.fulfill({ json: { notes: '> How cells are built and powered.\n\n## Cells\n- **Cells** are the basic unit of life.\n- The **mitochondria** make energy.\n  - Through cellular respiration\n\n## Membranes\n- Membranes control what enters and leaves.\n\n## Key points\n- Cells are the basic unit of life.\n- Mitochondria make the cell\'s energy.' } }));
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -127,12 +127,16 @@ async function session(browser, { width = 1440, theme = 'light', lecture = LECTU
     await context.close();
   });
 
-  await check('Guide: Notes is an outline only; Cards has the questions and Flip cards', async () => {
+  await check('Guide: Notes is a study guide (overview, outline, key points); Cards has the questions and Flip cards', async () => {
     const { context, page } = await session(browser);
     await page.goto(BASE + '/guide/a0000000-0000-4000-8000-000000000001');
     await page.locator('.guide-outline-section h2:has-text("Cells")').waitFor({ timeout: 10000 });
     expect(await page.locator('.reader-actions').count() === 0, 'questions shown in Notes');
-    await page.screenshot({ path: path.join(SHOTS, 'guide-notes-outline.png') });
+    expect(/How cells are built/.test(await page.locator('.guide-overview').innerText()), 'no overview');
+    expect(await page.locator('.guide-sub li:has-text("cellular respiration")').count() === 1, 'no sub-points');
+    expect(await page.locator('.guide-notes strong:has-text("mitochondria")').count() === 1, 'key terms not bold');
+    expect(await page.locator('.guide-key li').count() === 2, 'no Key points at the end');
+    await page.screenshot({ path: path.join(SHOTS, 'guide-notes-outline.png'), fullPage: true });
     await page.click('.c-pill:has-text("Cards")');
     await page.locator('.reader-actions').first().waitFor();
     expect(await page.locator('a:has-text("Flip cards")').count() === 1, 'no Flip cards button');

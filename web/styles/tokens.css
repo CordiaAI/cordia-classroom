@@ -29,6 +29,7 @@
   --surface-raised: rgba(255, 255, 252, 0.86); /* 3 raised glass: nav, sheets, menus, Tutor */
   --hairline: rgba(23, 27, 24, 0.08);
   --wash: rgba(255, 255, 255, 0.38);       /* hover brighten */
+  --photo-veil: rgba(237, 242, 244, 0.30);  /* over the sign-in photo */
   --scrim: rgba(23, 27, 24, 0.28);
   --spot-dim: rgba(23, 27, 24, 0.4);         /* onboarding spotlight dims the app to 40% */
 
@@ -160,6 +161,7 @@
   --surface-raised: rgba(39, 42, 48, 0.86);
   --hairline: rgba(255, 255, 255, 0.08);
   --wash: rgba(255, 255, 255, 0.06);
+  --photo-veil: rgba(26, 29, 32, 0.80);
   --scrim: rgba(0, 0, 0, 0.45);
   --olive: #536149;
   --olive-press: #3D4937;

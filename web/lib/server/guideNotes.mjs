@@ -1,33 +1,44 @@
 // Server-only: a guide's Notes, an outline summary of the whole topic (/api/guide-notes).
 // Reads the guide with the student's own sign-in (so only their guides), organises all of its
 // information into topic headings with points, and saves that as the guide's notes.
-// Runs once per guide: notes already in outline form are kept. Needs OPENAI_API_KEY.
+// Runs once per guide: notes already in this form are kept. Needs OPENAI_API_KEY.
 
-export const NOTES_RULES = `You turn a student's study material into organised notes: an outline summary of the topic. Use only what the material says.
-Return JSON: {"sections": [{"heading": "...", "points": ["...", "..."]}]}
-- Group the information by topic, in a logical teaching order (foundations first, then what builds on them), not in question order.
-- Headings: short topic names (2 to 6 words). Use 3 to 10 sections.
-- Points: complete, self-contained statements in plain language (under 30 words each): definitions, roles, causes and effects, steps, comparisons, examples, relationships and other meaningful detail.
+import { KEY_POINTS, isStudyGuideNotes } from '../formatters.js';
+
+export const NOTES_RULES = `You write the notes of a study guide from a student's material: a short overview, the whole topic as a full outline, then the key points to remember. Use only what the material says.
+Return JSON: {"overview": "...", "sections": [{"heading": "...", "points": [{"text": "...", "sub": ["..."]}]}], "key_points": ["..."]}
+- overview: one or two sentences on what the topic is and how its parts fit together.
+- sections: the full outline, grouped by topic in a logical teaching order (foundations first, then what builds on them), not in question order. 3 to 12 sections, each with a short heading (2 to 6 words).
+- points: complete statements in plain language (under 30 words): definitions, roles, causes and effects, steps or stages, comparisons, examples, relationships and other meaningful detail. Put the supporting detail of a point (the items of a list, steps, examples, exceptions) in its "sub" list (under 20 words each).
+- Put each key term in **double asterisks** where it is first defined.
 - Cover all of the information in the material; keep names, numbers, dates and formulas exactly as written.
+- key_points: 4 to 8 of the most important takeaways, one sentence each. They sum up the outline and add nothing new.
 - No questions, no answers-to-questions phrasing, no filler such as "This section covers".`;
 
-export const OUTLINE_MARK = /^##\s/m;
+const clean = value => String(value || '').replace(/\s+/g, ' ').trim();
 
-// "## Heading" lines with "- point" lines under them (the format lib/formatters.js parseOutline reads).
-export function outlineText(sections) {
-  return (sections || [])
-    .map(section => {
-      const heading = String(section?.heading || '').replace(/\s+/g, ' ').trim();
-      const points = (section?.points || []).map(point => String(point).replace(/\s+/g, ' ').trim()).filter(Boolean);
-      return heading && points.length ? [`## ${heading}`, ...points.map(point => `- ${point}`)].join('\n') : '';
-    })
-    .filter(Boolean)
-    .join('\n\n');
+// The text lib/formatters.js parseStudyNotes reads: "> overview", "## Heading", "- point",
+// "  - detail", and "## Key points" at the end. Takes the AI's JSON (or a plain list of sections).
+export function outlineText(notes) {
+  const { overview = '', sections = [], key_points: keyPoints = [] } = Array.isArray(notes) ? { sections: notes } : (notes || {});
+  const blocks = (sections || []).map(section => {
+    const heading = clean(section?.heading);
+    const points = (section?.points || []).map(point => (typeof point === 'string' ? { text: point, sub: [] } : point))
+      .map(point => ({ text: clean(point?.text), sub: (point?.sub || []).map(clean).filter(Boolean).slice(0, 8) }))
+      .filter(point => point.text);
+    return heading && points.length ? [`## ${heading}`, ...points.flatMap(point => [`- ${point.text}`, ...point.sub.map(item => `  - ${item}`)])].join('\n') : '';
+  }).filter(Boolean);
+  if (!blocks.length) return '';
+  // Always end with Key points (that marks notes as written); without any, each section's lead point.
+  let key = (keyPoints || []).map(clean).filter(Boolean).slice(0, 10);
+  if (!key.length) key = blocks.map(block => block.split('\n')[1].slice(2)).slice(0, 8);
+  return [clean(overview) ? `> ${clean(overview)}` : '', ...blocks, [`## ${KEY_POINTS}`, ...key.map(point => `- ${point}`)].join('\n')]
+    .filter(Boolean).join('\n\n');
 }
 
-// Older guides kept a flat list of notes; those are rewritten as an outline.
+// Notes written before the study-guide form (flat lists, outlines without key points) are rewritten.
 export function needsOutline(notes) {
-  return !OUTLINE_MARK.test(String(notes || ''));
+  return !isStudyGuideNotes(notes);
 }
 
 export function createGuideNotesService({ env = process.env, fetch: fetchImpl = globalThis.fetch } = {}) {
@@ -48,21 +59,21 @@ export function createGuideNotesService({ env = process.env, fetch: fetchImpl = 
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 40000);
-    let list = [];
+    let written = null;
     try {
       const ai = await fetchImpl('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, temperature: 0.2, max_tokens: 3000, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: NOTES_RULES }, { role: 'user', content: `Title: ${guide.title}\n\n${content.slice(0, 60000)}` }] }),
+        body: JSON.stringify({ model, temperature: 0.2, max_tokens: 4500, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: NOTES_RULES }, { role: 'user', content: `Title: ${guide.title}\n\n${content.slice(0, 60000)}` }] }),
         signal: controller.signal,
       });
-      if (ai.ok) list = JSON.parse((await ai.json())?.choices?.[0]?.message?.content || '{}').sections || [];
+      if (ai.ok) written = JSON.parse((await ai.json())?.choices?.[0]?.message?.content || '{}');
     } catch {
-      list = [];
+      written = null;
     } finally {
       clearTimeout(timer);
     }
-    const notes = outlineText(Array.isArray(list) ? list.slice(0, 12) : []);
+    const notes = outlineText(written && Array.isArray(written.sections) ? { ...written, sections: written.sections.slice(0, 12) } : null);
     if (!notes) return { status: 200, body: { notes: guide.notes || '', reason: 'failed' } };
     await fetchImpl(`${apiBase}/guides/${guideId}`, {
       method: 'PATCH', headers: { Authorization: authorization, 'Content-Type': 'application/json' }, body: JSON.stringify({ title: guide.title, notes }),
