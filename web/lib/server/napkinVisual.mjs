@@ -30,22 +30,13 @@ export function altText(text) {
   return `Diagram: ${first.length > 120 ? first.slice(0, 117).trimEnd() + '…' : first}`;
 }
 
-// Generated SVGs are shown through <img>, where scripts never run; strip them anyway, repeating
-// until nothing changes (so a removal can't join pieces into a new tag). Anything still able to
-// run after that means the file is not used at all: returns ''.
-const RISKY_SVG = /<script|<foreignObject|\son[a-z]+\s*=|javascript:/i;
+// Generated SVGs are shown through <img>, where scripts never run. A diagram never needs a
+// script, embedded HTML, an event handler or a javascript: link, so an SVG with any of them is
+// not used at all (no partial cleaning that a crafted file could slip through).
+const RISKY_SVG = /<\s*script|<\s*foreignObject|\son[a-z]+\s*=|javascript\s*:/i;
 export function cleanSvg(svg) {
-  let out = String(svg);
-  let previous;
-  do {
-    previous = out;
-    out = out
-      .replace(/<script\b[\s\S]*?<\/script[^>]*>/gi, '')
-      .replace(/<foreignObject\b[\s\S]*?<\/foreignObject[^>]*>/gi, '')
-      .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-      .replace(/(href\s*=\s*["'])\s*javascript:[^"']*/gi, '$1#');
-  } while (out !== previous);
-  return RISKY_SVG.test(out) ? '' : out;
+  const text = String(svg);
+  return RISKY_SVG.test(text) ? '' : text;
 }
 
 export function currentMonth(now = new Date()) {

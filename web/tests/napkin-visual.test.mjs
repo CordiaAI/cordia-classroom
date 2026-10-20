@@ -35,7 +35,7 @@ function world({ plan = 'free', used = 0, statusAfter = 2, createResponses = [],
     }
     if (url.startsWith('https://files.napkin.ai/')) {
       assert.equal(init.headers?.Authorization, 'Bearer nk_test', 'downloads carry the auth header');
-      return new Response('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><rect onclick="x()" width="10" height="10"/></svg>');
+      return new Response('<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>');
     }
     throw new Error(`unexpected ${method} ${url}`);
   };
@@ -63,7 +63,7 @@ resetRateState();
   }
   assert.equal(state.creates.length, 3);
   assert.equal(state.stored.length, 6);
-  assert.ok(state.stored.every(file => !/script|onclick/.test(file.body)), 'stored SVGs are cleaned');
+  assert.ok(state.stored.every(file => file.body.includes('<rect')), 'the downloaded SVG is stored');
   assert.equal(state.records.length, 3);
   assert.equal(state.used, 3);
   const first = state.creates[0];
@@ -157,9 +157,10 @@ resetRateState();
   console.log('ok   auth and configuration');
 }
 
-assert.equal(cleanSvg('<svg><script>x</script><g onload="y()"><a href="javascript:z()">a</a></g></svg>'), '<svg><g><a href="#">a</a></g></svg>');
-assert.equal(cleanSvg('<svg><scr<script>x</script>ipt>alert(1)</script></svg>'), '<svg></svg>', 'removals cannot join into a new tag');
-assert.equal(cleanSvg('<svg><script>never closed</svg>'), '', 'an SVG that could still run is not used');
-assert.equal(cleanSvg('<svg><script>x</script\t\n bar><g/></svg>'), '<svg><g/></svg>');
+// A diagram with anything that could run is not used at all.
+for (const risky of ['<svg><script>x</script></svg>', '<svg><g onload="y()"/></svg>', '<svg><a href="javascript:z()">a</a></svg>', '<svg><foreignObject><p/></foreignObject></svg>', '<svg>< script>x</svg>']) {
+  assert.equal(cleanSvg(risky), '', risky);
+}
+assert.equal(cleanSvg('<svg viewBox="0 0 10 10"><g opacity="0.5"><text>Mitochondria</text></g></svg>'), '<svg viewBox="0 0 10 10"><g opacity="0.5"><text>Mitochondria</text></g></svg>');
 assert.equal(altText('## What is osmosis?\nWater moves'), 'Diagram: What is osmosis?');
 console.log('napkin visual service ok');
