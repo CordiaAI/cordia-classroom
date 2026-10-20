@@ -15,7 +15,6 @@
   /* Type */
   --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: 'Newsreader', Georgia, serif;
-  --font-nav: 'Times New Roman', Times, serif; /* top bar and phone tab bar */
   --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
   --fs-13: 13px; --fs-15: 15px; --fs-17: 17px; --fs-20: 20px; --fs-28: 28px; --fs-40: 40px;
   --lh-title: 1.15; --lh-body: 1.5;
@@ -83,8 +82,22 @@
   --streak-width: 220px;
   --workspace-rail-width: 190px;
 
-  /* Glass */
-  --lg-filter: blur(24px) saturate(170%);
+  /* Liquid glass, matte: a frosted fill, a soft sheen from the top edge, a bright rim,
+     a fine grain and a soft drop shadow (styles/glass.css applies it everywhere). */
+  --lg-filter: blur(26px) saturate(185%) brightness(1.03);
+  --lg-fill: rgba(255, 255, 255, 0.46);
+  --lg-fill-strong: rgba(255, 255, 255, 0.72);
+  --lg-fill-field: rgba(255, 255, 255, 0.58);
+  --lg-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.60) 0%, rgba(255, 255, 255, 0.14) 34%, rgba(255, 255, 255, 0) 62%);
+  --lg-sheen-olive: linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.06) 45%, rgba(0, 0, 0, 0.06) 100%);
+  --lg-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 .045 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  --lg-rim: rgba(255, 255, 255, 0.85);
+  --lg-rim-low: rgba(255, 255, 255, 0.30);
+  --lg-border: rgba(255, 255, 255, 0.62);
+  --lg-border-shade: rgba(23, 27, 24, 0.07);
+  --lg-depth: 0 1px 1px rgba(16, 24, 16, 0.04), 0 10px 30px -10px rgba(16, 24, 16, 0.18), 0 2px 6px rgba(16, 24, 16, 0.04);
+  --lg-depth-float: 0 2px 6px rgba(16, 24, 16, 0.06), 0 24px 56px -12px rgba(16, 24, 16, 0.26);
+  --lg-press: rgba(255, 255, 255, 0.30);
 
   /* Illustrations (drawn Canvas screens) and brand marks */
   --shot-frame: #FFFFFF; --shot-edge: rgba(34, 49, 41, 0.18); --shot-chrome: #EEF1EC; --shot-line: rgba(34, 49, 41, 0.2);
@@ -137,12 +150,12 @@
   --motion-fast: var(--dur) var(--ease);
   --motion-smooth: var(--dur) var(--ease);
   --motion-press: var(--dur) var(--ease);
-  --lg-card: var(--surface-card);
-  --lg-panel: var(--surface-raised);
-  --lg-menu: var(--surface-raised);
-  --lg-edge: var(--hairline);
-  --lg-highlight: 0 0 #0000;
-  --lg-shadow: var(--shadow-card);
+  --lg-card: var(--lg-sheen), var(--lg-grain), var(--lg-fill);
+  --lg-panel: var(--lg-sheen), var(--lg-grain), var(--lg-fill-strong);
+  --lg-menu: var(--lg-sheen), var(--lg-fill-strong);
+  --lg-edge: var(--lg-border);
+  --lg-highlight: inset 0 1px 0 var(--lg-rim), inset 0 -1px 0 var(--lg-rim-low), 0 0 0 0.5px var(--lg-border-shade);
+  --lg-shadow: var(--lg-depth);
   --hover-wash: var(--wash);
   --hover-edge: rgba(23, 27, 24, 0.16);
   --hover-shadow: var(--shadow-float);
@@ -186,6 +199,19 @@
   --draw-paper: #1F2326;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.35), 0 18px 48px rgba(0, 0, 0, 0.45);
+  --lg-filter: blur(26px) saturate(160%) brightness(0.98);
+  --lg-fill: rgba(46, 50, 56, 0.48);
+  --lg-fill-strong: rgba(40, 44, 50, 0.80);
+  --lg-fill-field: rgba(30, 33, 38, 0.55);
+  --lg-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.03) 36%, rgba(255, 255, 255, 0) 62%);
+  --lg-sheen-olive: linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 45%, rgba(0, 0, 0, 0.12) 100%);
+  --lg-rim: rgba(255, 255, 255, 0.16);
+  --lg-rim-low: rgba(255, 255, 255, 0.05);
+  --lg-border: rgba(255, 255, 255, 0.10);
+  --lg-border-shade: rgba(0, 0, 0, 0.30);
+  --lg-depth: 0 1px 1px rgba(0, 0, 0, 0.25), 0 12px 32px -10px rgba(0, 0, 0, 0.55);
+  --lg-depth-float: 0 2px 8px rgba(0, 0, 0, 0.35), 0 26px 60px -12px rgba(0, 0, 0, 0.65);
+  --lg-press: rgba(255, 255, 255, 0.06);
   --focus-ring: 0 0 0 2px var(--olive-ink);
   --shot-frame: #2F3238; --shot-edge: rgba(255, 255, 255, 0.16); --shot-chrome: #24272C; --shot-line: rgba(255, 255, 255, 0.22);
   --shot-soft: #3A3E45; --shot-nav: #1E2A33; --shot-text: #FFFFFF; --shot-link: #8CC4FF; --shot-mark: #C3CFB6;

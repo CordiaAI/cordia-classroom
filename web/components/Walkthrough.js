@@ -90,7 +90,7 @@ export default function Walkthrough() {
       : step.where('/dashboard') ? '/dashboard'
         : step.where('/quiz/[guideId]') && guide ? `/quiz/${guide.id}`
           : step.where('/practice') ? '/practice'
-            : step.where('/calendar') ? '/calendar'
+            : step.where('/canvas') ? '/canvas?tab=calendar'
               : step.where('/smartnotes') ? '/smartnotes'
                 : guide ? `/guide/${guide.id}` : '/dashboard';
     return (

@@ -1,12 +1,11 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ChevronRight, Flame, Play, Snowflake, Timer, TreeDeciduous } from 'lucide-react';
+import { ChevronRight, Flame, Snowflake, Timer, TreeDeciduous } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
 import { createDashboardOverview } from '../lib/dashboardOrganization';
-import { loadStudyQueue } from '../lib/studyQueue';
 import { lastGuide } from '../lib/userStore';
 import { markUsed, unmarkUsed, useProgress } from '../lib/progress';
 import { dayOneFinished, startWalkthrough, walkthroughEvent } from '../lib/walkthrough';
@@ -24,7 +23,7 @@ import { confirmedTodos, lectureCalendarItems, mergeCalendarItems } from '../lib
 const SLOW = Symbol('slow');
 const SLOW_MS = 4000;
 
-const LEGACY_VIEWS = { guides: '/library', classes: '/library', calendar: '/calendar', notes: '/smartnotes' };
+const LEGACY_VIEWS = { guides: '/library', classes: '/library', calendar: '/canvas?tab=calendar', notes: '/smartnotes' };
 
 function shortDate(value) {
   const date = new Date(value || '');
@@ -53,13 +52,12 @@ export default function Today() {
     const safe = promise => promise.catch(() => null);
     const calendarRequest = safe(apiFetch('/calendar/connection'));
     const calendarOrSlow = Promise.race([calendarRequest, new Promise(resolve => setTimeout(() => resolve(SLOW), SLOW_MS))]);
-    const [foldersData, guidesData, statsData, streakData, onboardingData, queueData, insightsData, notesData, checklistData, calendarData, lectureTodos] = await Promise.all([
+    const [foldersData, guidesData, statsData, streakData, onboardingData, insightsData, notesData, checklistData, calendarData, lectureTodos] = await Promise.all([
       safe(apiFetch('/folders')),
       safe(apiFetch('/guides?fields=summary&limit=500')),
       safe(apiFetch('/stats/overview')),
       safe(apiFetch('/stats/streak?tz_offset=' + tz)),
       safe(loadOnboarding()),
-      safe(loadStudyQueue()),
       safe(apiFetch('/stats/insights')),
       safe(apiFetch('/smart_notes')),
       safe(apiFetch('/onboarding/checklist')),
@@ -91,8 +89,6 @@ export default function Today() {
       stats: statsData && !statsData.detail ? statsData : null,
       streak: streakData && !streakData.detail ? streakData : null,
       onboarding: onboardingData,
-      // A slim copy of the review queue (the full one carries every card's text).
-      queue: queueData ? { cards: queueData.cardTotal, misses: queueData.misses.length, problems: queueData.problems, minutes: queueData.minutes } : null,
       insights: insightsData,
       // Slow feed: show the calendar this device last saw; the fresh one replaces it in place.
       calendar: calendarData === SLOW ? readCalendarCache() : calendarData,
@@ -106,7 +102,6 @@ export default function Today() {
   const stats = data?.stats || null;
   const streak = data?.streak || null;
   const insights = data?.insights || null;
-  const queue = data?.queue || null;
   const calendar = data?.calendar || null;
   const calendarSlow = Boolean(data?.calendarSlow);
   const streakInfo = streak ? streakWithFreeze(streak.week || [], streak.current_streak || 0) : null;
@@ -134,13 +129,6 @@ export default function Today() {
     .filter(item => new Date(item.due_at).getTime() >= Date.now() - 86400000)
     .sort((a, b) => new Date(a.due_at) - new Date(b.due_at))
     .slice(0, 3);
-  const due = queue ? queue.cards + queue.misses + queue.problems : 0;
-  const reviewParts = queue ? [
-    queue.cards && plural(queue.cards, 'card'),
-    queue.misses && plural(queue.misses, 'missed question'),
-    queue.problems && plural(queue.problems, 'problem'),
-    `about ${queue.minutes} min`,
-  ].filter(Boolean) : [];
   // Focus and study minutes over the last 7 days, from this browser's study log.
   const activity = readActivity();
   const weekMinutes = Math.round(Array.from({ length: 7 }, (_, back) => activity[dayKey(Date.now() - back * 86400000)]?.m || 0).reduce((sum, value) => sum + value, 0));
@@ -160,22 +148,6 @@ export default function Today() {
         </div>
       )}
 
-      <section className="c-glass today-review" aria-labelledby="review-title" data-spot="start">
-        <div className="today-review-text">
-          <h2 id="review-title" className="c-section-title">{queue && !due ? 'All caught up' : 'Daily review'}</h2>
-          <span className="c-meta" aria-live="polite">
-            {!queue ? 'Checking what’s due…' : due ? reviewParts.join(' · ') : 'Nothing is due. Add material or quiz yourself to keep it fresh.'}
-          </span>
-        </div>
-        {queue && !due ? (
-          continueGuide && <Link href={`/quiz/${continueGuide.id}`} className="c-btn c-btn--secondary today-review-btn">Quiz yourself on {continueGuide.title}</Link>
-        ) : (
-          <button type="button" className="c-btn c-btn--primary c-btn--lg today-review-btn" onClick={() => { walkthroughEvent('start'); router.push('/session'); }} disabled={!queue}>
-            <Play size={20} strokeWidth={1.75} aria-hidden="true" />Start review
-          </button>
-        )}
-      </section>
-
       {continueGuide && (
         <section className="c-section" aria-labelledby="continue-title">
           <h2 id="continue-title" className="c-section-title">Continue</h2>
@@ -192,13 +164,13 @@ export default function Today() {
         <div className="c-row">
           <h2 id="due-title" className="c-section-title">Due soon</h2>
           <span className="c-spacer" />
-          <Link href="/calendar" className="c-btn c-btn--quiet">See calendar</Link>
+          <Link href="/canvas?tab=calendar" className="c-btn c-btn--quiet">See calendar</Link>
         </div>
         {(dueItems.length > 0 || calendarSlow) ? (
           <div className="c-card c-list">
             {calendarSlow && <SectionLoader height={3 * 61} label="Loading deadlines" />}
             {dueItems.map(item => (
-              <a key={item.id} className="c-list-row" href={item.url || '/calendar'} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>
+              <a key={item.id} className="c-list-row" href={item.url || '/canvas?tab=calendar'} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>
                 <span className="c-grow c-truncate">{item.title}</span>
                 <span className="c-meta">{shortDate(item.due_at)}</span>
               </a>
@@ -230,10 +202,6 @@ export default function Today() {
 
       <style jsx>{`
         .today-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
-        .today-review { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px; border-radius:var(--r-card); flex-wrap: wrap; }
-        .today-review-text { display: grid; gap: 4px; min-width: 0; }
-        .today-review-text .c-meta { font-size: 15px; }
-        :global(.today-review-btn) { min-width: 180px; justify-content: center; }
         .today-none { margin: 0; }
         :global(.today-continue) { display: flex; align-items: center; gap: 16px; padding: 14px 18px; color: var(--ink); text-decoration: none; }
         :global(.today-continue:hover), :global(.today-progress:hover) { text-decoration: none; border-color: var(--olive); }
@@ -242,9 +210,7 @@ export default function Today() {
         .today-stat { display: inline-flex; align-items: center; gap: 6px; font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .today-stat :global(.today-freeze) { color: var(--olive-ink); }
         @media (max-width: 767px) {
-          .today-review { padding: 20px; }
-          :global(.today-review-btn) { width: 100%; }
-          :global(.today-progress) { gap: 14px; }
+              :global(.today-progress) { gap: 14px; }
           .today-progress-more { display: none; }
         }
       `}</style>

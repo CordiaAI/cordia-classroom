@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  CalendarDays, ChartNoAxesColumn, CircleHelp, CreditCard, Library, Link2, LogOut, MessageCircle, Palette, Plus, Search, Settings, Sun, Timer, User,
+  ChartNoAxesColumn, CircleHelp, CreditCard, GraduationCap, Library, Link2, LogOut, Palette, Plus, Search, Settings, Sun, Timer, User,
 } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
@@ -12,15 +12,16 @@ import HelpSheet from './HelpSheet';
 import AccountMenu from './AccountMenu';
 import ShortcutsSheet from './ShortcutsSheet';
 import StudyTimer from './StudyTimer';
+import TutorBubble from './TutorBubble';
 import { openNewSheet } from '../lib/newSheet';
 import { walkthroughEvent } from '../lib/walkthrough';
 
-// One navigation: the same four places on the glass top bar and the mobile tab bar, plus New.
+// One navigation: the same three places on the glass top bar and the mobile tab bar, plus New.
+// The Tutor is the bubble in the corner (TutorBubble); the calendar lives inside Canvas.
 const navItems = [
   { label: 'Today', href: '/dashboard', icon: Sun, spot: 'nav-today' },
   { label: 'Library', href: '/library', icon: Library, spot: 'nav-library' },
-  { label: 'Tutor', href: '/tutor', icon: MessageCircle, spot: 'nav-tutor' },
-  { label: 'Calendar', href: '/calendar', icon: CalendarDays, spot: 'nav-calendar' },
+  { label: 'Canvas', href: '/canvas', icon: GraduationCap, spot: 'nav-canvas', tip: 'calendar' },
 ];
 
 // Guides, notes, lectures, classes and every study screen live inside Library.
@@ -29,8 +30,7 @@ const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice'
 export function activeNavHref(pathname) {
   if (pathname === '/dashboard') return '/dashboard';
   if (LIBRARY_PATHS.some(path => pathname === path || pathname.startsWith(path + '/'))) return '/library';
-  if (pathname.startsWith('/tutor')) return '/tutor';
-  if (pathname.startsWith('/calendar')) return '/calendar';
+  if (pathname.startsWith('/canvas') || pathname.startsWith('/calendar')) return '/canvas';
   return '';
 }
 
@@ -48,7 +48,6 @@ export default function Sidebar({ timerState, setTimerState }) {
   const [showSearch, setShowSearch] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [timerOpen, setTimerOpen] = useState(false);
-  const [tutorOpen, setTutorOpen] = useState(false);
   const [canReviewFeedback, setCanReviewFeedback] = useState(false);
   const timerRef = useRef(null);
   const [shortcut, setShortcut] = useState('Ctrl K');
@@ -78,10 +77,8 @@ export default function Sidebar({ timerState, setTimerState }) {
       const typing = event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"]');
       if (event.key === '?' && !typing) setShowShortcuts(true);
     };
-    const onTutor = event => setTutorOpen(Boolean(event.detail?.open));
     window.addEventListener('keydown', onKey);
-    window.addEventListener('cordia:tutor-visibility', onTutor);
-    return () => { alive = false; window.removeEventListener('keydown', onKey); window.removeEventListener('cordia:tutor-visibility', onTutor); };
+    return () => { alive = false; window.removeEventListener('keydown', onKey); };
   }, []);
 
   // Closing returns focus to the avatar (Escape, choosing an item); an outside click leaves focus where it landed.
@@ -144,18 +141,12 @@ export default function Sidebar({ timerState, setTimerState }) {
         </Link>
 
         <nav className="c-nav" aria-label="Primary">
-          {navItems.map(item => (item.href === '/tutor' && active !== '/tutor' ? (
-            // On a wide screen Tutor opens beside the page; its expand icon opens the full page.
-            <button key={item.href} type="button" className="c-nav-btn" aria-pressed={tutorOpen} aria-controls="cordia-tutor-drawer" data-spot={item.spot} onClick={() => window.dispatchEvent(new Event('cordia:tutor-toggle'))}>
-              <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
-              {item.label}
-            </button>
-          ) : (
-            <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.href === '/calendar' ? 'calendar' : undefined} data-spot={item.spot}>
+          {navItems.map(item => (
+            <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.tip} data-spot={item.spot}>
               <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
               {item.label}
             </Link>
-          )))}
+          ))}
         </nav>
 
         <div className="c-bar-actions">
@@ -184,16 +175,24 @@ export default function Sidebar({ timerState, setTimerState }) {
       </header>
 
       <nav className="c-tabbar" aria-label="Primary">
-        {navItems.map(item => (
+        {navItems.slice(0, 2).map(item => (
+          <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-spot={item.spot}>
+            <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
+            {item.label}
+          </Link>
+        ))}
+        <button type="button" className="c-tab-new" data-spot="new" onClick={() => openNewSheet()} aria-label="New">
+          <span className="c-tab-new-dot"><Plus size={22} strokeWidth={2} aria-hidden="true" /></span>
+          New
+        </button>
+        {navItems.slice(2).map(item => (
           <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-spot={item.spot}>
             <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
             {item.label}
           </Link>
         ))}
       </nav>
-      <button type="button" className="c-btn c-btn--primary c-fab" data-spot="new" onClick={() => openNewSheet()}>
-        <Plus size={20} strokeWidth={1.75} aria-hidden="true" />New
-      </button>
+      <TutorBubble />
 
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
       {showHelp && (

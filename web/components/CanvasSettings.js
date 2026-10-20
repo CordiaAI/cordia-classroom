@@ -122,7 +122,7 @@ export default function CanvasSettings({ school = '' }) {
         <section className="c-card cset-card" aria-labelledby="cset-title">
           <h2 id="cset-title" className="c-section-title">Canvas</h2>
           <div className="cset-options">
-            <Link href="/calendar" className="cset-option">
+            <Link href="/canvas?tab=calendar" className="cset-option">
               <CalendarDays {...ICON} />
               <strong>Calendar feed</strong>
             </Link>

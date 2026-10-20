@@ -307,7 +307,7 @@ export default function SettingsPage() {
             {!canvasReady && (
               <div className="c-card settings-row">
                 <span className="settings-row-label"><CalendarDays size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Calendar link</span></span>
-                <Link href="/calendar" className="c-btn c-btn--secondary">Open Calendar</Link>
+                <Link href="/canvas?tab=calendar" className="c-btn c-btn--secondary">Open Calendar</Link>
               </div>
             )}
             <div className="c-card settings-row">

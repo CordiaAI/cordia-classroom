@@ -1,0 +1,88 @@
+/* Liquid glass, matte, on everything that isn't the backdrop: cards, panels, menus,
+   buttons, chips, tabs, fields and the floating controls. Loaded last; colors come only
+   from tokens.css (--lg-*). Sizes, spacing and positions never change here. */
+
+/* One recipe: frosted fill + sheen + grain, a bright top rim, a hairline edge, a soft shadow. */
+:is(.c-btn--secondary, .btn-outline, .btn-gray, .c-btn--quiet, .c-icon-btn, .c-chip, .c-pill, .c-seg, .c-avatar,
+  .c-searchbtn, .c-timerbtn, .c-tutor-bubble, .today-streak, .c-toast, .c-tip, .wt-resume, .guide-jobs .guide-job,
+  .quiz-mode, .quiz-option, .study-aid-tab, .tutor-select-trigger, .cset-option, .practice-guide, .lib-kind, .c-drop-hint) {
+  background: var(--lg-sheen), var(--lg-fill);
+  border: 1px solid var(--lg-edge);
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+  box-shadow: var(--lg-highlight), var(--lg-shadow);
+}
+
+/* Quiet buttons and icon buttons stay lighter so rows of them don't feel heavy. */
+:is(.c-btn--quiet, .c-icon-btn) { box-shadow: var(--lg-highlight); }
+:is(.c-btn--quiet, .c-icon-btn):hover:not(:disabled) { background: var(--lg-sheen), var(--lg-fill-strong); }
+
+/* Primary actions: olive glass with the same rim and sheen. */
+:is(.c-btn--primary, .btn, .btn-green, .c-tab-new-dot) {
+  background: var(--lg-sheen-olive), var(--olive);
+  border: 1px solid var(--lg-edge);
+  box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow);
+}
+:is(.c-btn--primary, .btn, .btn-green):hover:not(:disabled) { background: var(--lg-sheen-olive), var(--olive-press); }
+
+/* Selected states: olive glass for pills and chips; a raised clear pane for segment tabs. */
+:is(.c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-chip[aria-pressed='true'], .quiz-mode.is-on) {
+  background: var(--lg-sheen-olive), var(--olive);
+  color: var(--on-olive);
+  border-color: var(--lg-edge);
+}
+.quiz-mode.is-on { background: var(--lg-sheen), var(--lg-fill-strong); box-shadow: 0 0 0 2px var(--olive), var(--lg-highlight), var(--lg-shadow); color: var(--ink); }
+.c-seg { box-shadow: var(--lg-highlight); }
+:is(.c-seg [aria-selected='true'], .c-seg .is-active) {
+  background: var(--lg-sheen), var(--lg-fill-strong);
+  box-shadow: var(--lg-highlight), var(--lg-shadow);
+}
+/* The active place in the nav reads as a pane of glass, not a flat fill. */
+:is(.c-nav a[aria-current='page'], .c-tabbar a[aria-current='page']) {
+  background: var(--lg-sheen), var(--lg-fill-strong);
+  box-shadow: var(--lg-highlight), var(--lg-shadow);
+}
+
+/* Fields: a slightly clearer pane, set into the surface. */
+:is(.c-input, .c-select, .c-search .c-input, textarea.c-input) {
+  background: var(--lg-sheen), var(--lg-fill-field);
+  border: 1px solid var(--lg-edge);
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+  box-shadow: inset 0 1px 2px var(--lg-border-shade), inset 0 -1px 0 var(--lg-rim-low);
+}
+
+/* Floating things get the deeper shadow. */
+:is(.c-tutor-bubble, .c-toast, .c-tip, .wt-resume, .c-drop-hint, .c-timer-pop .focus-card, .c-menu, .c-sheet) { box-shadow: var(--lg-highlight), var(--lg-depth-float) !important; }
+
+/* The Tutor bubble: a round pane in the bottom-right corner, label on hover. */
+.c-tutor-bubble {
+  position: fixed; right: 24px; bottom: 24px; z-index: 95;
+  display: inline-flex; align-items: center; gap: 10px; height: 56px; min-width: 56px; padding: 0 16px;
+  border-radius: var(--r-pill); color: var(--ink); cursor: pointer;
+  font: 600 var(--fs-15)/1 var(--font-sans);
+  transition: transform var(--dur) var(--ease);
+}
+.c-tutor-bubble .lucide { color: var(--olive-ink); flex: 0 0 auto; }
+.c-tutor-bubble:hover { transform: translateY(-1px); }
+.c-tutor-bubble:active { transform: scale(.97); }
+@media (max-width: 767px) {
+  .c-tutor-bubble { right: 16px; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 14px); width: 56px; padding: 0; justify-content: center; }
+  .c-tutor-bubble-label { display: none; }
+}
+.app-shell.is-focus .c-tutor-bubble { bottom: 24px; }
+
+/* Phone tab bar: New sits in the middle as a raised olive pane. */
+.c-tab-new {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  border: 0; background: none; color: var(--ink); cursor: pointer;
+  font: 600 13px/1 var(--font-sans);
+}
+.c-tab-new-dot { display: grid; place-items: center; width: 36px; height: 28px; border-radius: var(--r-pill); color: var(--on-olive); }
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :is(.c-btn--secondary, .c-btn--quiet, .c-icon-btn, .c-chip, .c-pill, .c-seg, .c-avatar, .c-searchbtn, .c-timerbtn, .c-tutor-bubble, .c-input, .c-select) { background: var(--card); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :is(.c-card, .c-btn--secondary, .c-btn--quiet, .c-icon-btn, .c-chip, .c-pill, .c-seg, .c-tutor-bubble, .c-input, .c-select, .c-sheet, .c-menu) { background: var(--surface-raised) !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}

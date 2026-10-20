@@ -4,14 +4,15 @@ import { readFile } from 'node:fs/promises';
 
 const source = relativePath => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
-test('one navigation: four places plus New, URL-driven active state, Library owns study screens, notes and lectures', async () => {
+test('one navigation: Today, Library, Canvas plus New; Tutor is a bubble; Library owns study screens, notes and lectures', async () => {
   const sidebar = await source('components/Sidebar.js');
   const navigation = sidebar.split('const navItems = [')[1].split('];')[0];
   const labels = [...navigation.matchAll(/\{ label: '([^']+)'/g)].map(match => match[1]);
 
-  assert.deepEqual(labels, ['Today', 'Library', 'Tutor', 'Calendar']);
+  assert.deepEqual(labels, ['Today', 'Library', 'Canvas']);
   assert.match(sidebar, /'\/smartnotes', '\/lecture'\]/);
-  assert.match(sidebar, /cordia:tutor-toggle/);
+  assert.match(sidebar, /<TutorBubble \/>/);
+  assert.match(await source('components/TutorBubble.js'), /cordia:tutor-toggle/);
   assert.match(sidebar, /const LIBRARY_PATHS = \['\/library', '\/guide', '\/flashcards', '\/quiz', '\/practice'/);
   assert.match(sidebar, /aria-current=\{active === item\.href \? 'page' : undefined\}/);
   assert.match(sidebar, /isMac\(\) \? '⌘K' : 'Ctrl K'/);
@@ -32,17 +33,16 @@ test('Practice asks for a guide before showing the workspace', async () => {
 test('old dashboard views redirect to their own routes', async () => {
   const dashboard = await source('pages/dashboard.js');
 
-  assert.match(dashboard, /const LEGACY_VIEWS = \{ guides: '\/library', classes: '\/library', calendar: '\/calendar', notes: '\/smartnotes' \}/);
+  assert.match(dashboard, /const LEGACY_VIEWS = \{ guides: '\/library', classes: '\/library', calendar: '\/canvas\?tab=calendar', notes: '\/smartnotes' \}/);
   assert.match(dashboard, /router\.replace\(legacy\)/);
   assert.doesNotMatch(dashboard, /Study smarter/);
 });
 
-test('Today: Daily review first, Continue, Due soon (Canvas when empty), progress strip', async () => {
+test('Today: Continue, Due soon (Canvas when empty), progress strip; no Daily review card', async () => {
   const dashboard = await source('pages/dashboard.js');
 
   assert.match(dashboard, /<h1 className="c-title">Today<\/h1>/);
-  assert.match(dashboard, /Start review/);
-  assert.match(dashboard, /router\.push\('\/session'\)/);
+  assert.doesNotMatch(dashboard, /Start review|today-review/);
   assert.match(dashboard, /<CanvasConnectButton card [^>]*spot="canvas-connect"/);
   assert.match(dashboard, /href="\/progress"/);
   assert.match(dashboard, /<Flame /);

@@ -1,7 +1,6 @@
 // Touch-up audit, per route, light and dark (mocked API, local build only):
 //  - font sizes outside 13/15/17/20/28/40, Manrope weights other than 500/600
-//  - any text not in Manrope or Newsreader (Times = the webfont failed), except the
-//    navigation bars, which are set in Times New Roman on purpose
+//  - any text not in Manrope or Newsreader (Times = the webfont failed)
 //  - border radii outside 12/16/20/28/999 (or 50% circles)
 //  - cards nested three deep
 //  - pages whose content is not on the shared container (left edge and width)
@@ -47,7 +46,7 @@ const THEMES = (arg('themes') || 'light,dark').split(',');
           const size = Math.round(parseFloat(s.fontSize) * 10) / 10;
           const family = s.fontFamily.split(',')[0].replace(/["']/g, '').trim();
           if (!SIZES.includes(size)) problems.add(`size ${size}px ${name(el)} "${walker.currentNode.textContent.trim().slice(0, 20)}"`);
-          if (!/^(Manrope|Newsreader)$/i.test(family) && !/mono|code/i.test(s.fontFamily) && !(/^Times New Roman$/i.test(family) && el.closest('.c-topbar, .c-tabbar'))) problems.add(`font ${family} ${name(el)}`);
+          if (!/^(Manrope|Newsreader)$/i.test(family) && !/mono|code/i.test(s.fontFamily)) problems.add(`font ${family} ${name(el)}`);
           if (/Manrope/i.test(family) && !['500', '600'].includes(s.fontWeight)) problems.add(`weight ${s.fontWeight} ${name(el)} "${walker.currentNode.textContent.trim().slice(0, 20)}"`);
         }
         for (const el of document.querySelectorAll('body *')) {

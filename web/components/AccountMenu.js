@@ -134,7 +134,7 @@ export default function AccountMenu({ open, onClose, anchorRef, items }) {
         .acct-bubble:active { transform: scale(.98); }
         @media (hover: hover) {
           .acct-bubbles.is-open .acct-bubble:hover, .acct-bubbles.is-open .acct-bubble:focus-visible {
-            background: color-mix(in srgb, var(--lg-menu), var(--hover-light) 6%);
+            background: color-mix(in srgb, var(--lg-fill-strong), var(--hover-light) 6%);
             border-color: var(--hover-edge);
             transform: translateY(-1px);
           }

@@ -129,6 +129,7 @@ export default function NewSheet() {
       setOpen(true);
       setMode(event.detail?.mode || '');
       setError('');
+      if (event.detail?.files?.length) addFiles(event.detail.files);
       walkthroughEvent('new-opened');
     }
     window.addEventListener(NEW_SHEET_EVENT, onOpen);

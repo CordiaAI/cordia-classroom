@@ -9,7 +9,7 @@ import TimerEngine from './TimerEngine';
 import CanvasReminder from './CanvasReminder';
 import { useFileDragging } from '../lib/fileDrop';
 
-const WIDE = ['/guide/[id]', '/practice', '/practice/[guideId]', '/smartnotes', '/calendar', '/tutor'];
+const WIDE = ['/guide/[id]', '/practice', '/practice/[guideId]', '/smartnotes', '/canvas', '/tutor'];
 // Study screens run in focus mode: no top bar or tab bar, just the screen's own exit.
 const FOCUS = ['/session', '/flashcards/study', '/quiz/[guideId]', '/nclex/[guideId]', '/practice/[guideId]'];
 

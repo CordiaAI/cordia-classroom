@@ -30,10 +30,10 @@ for (const token of ['--canvas: #EDF2F4', '--ink: #171B18', '--muted: rgba(23, 2
   assert.ok(tokens.includes(token), `missing design token ${token}`);
 }
 assert.match(system, /prefers-reduced-motion/);
-assert.match(tokens, /--lg-filter: blur\(24px\) saturate\(170%\)/);
-// One nav: four places plus New, each a real route.
+assert.match(tokens, /--lg-filter: blur\(26px\) saturate\(185%\)/);
+// One nav: three places plus New, each a real route; the Tutor is a bubble.
 const nav = sidebar.split('const navItems = [')[1].split('];')[0];
-assert.deepEqual([...nav.matchAll(/label: '([^']+)', href: '([^']+)'/g)].map(match => `${match[1]} ${match[2]}`), ['Today /dashboard', 'Library /library', 'Tutor /tutor', 'Calendar /calendar']);
+assert.deepEqual([...nav.matchAll(/label: '([^']+)', href: '([^']+)'/g)].map(match => `${match[1]} ${match[2]}`), ['Today /dashboard', 'Library /library', 'Canvas /canvas']);
 for (const label of ['Progress', 'Settings', 'Appearance', 'Plan', 'Help', 'Sign out']) {
   assert.ok(sidebar.includes(`label: '${label}'`), `missing account menu item ${label}`);
 }
