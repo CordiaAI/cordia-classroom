@@ -6,6 +6,7 @@
 // Storage: tables lectures + lecture_todos (supabase/migrations/20261019120000_lectures.sql),
 // read and written with the service role, always filtered to the signed-in student.
 import { sensibleTitle } from '../noteMeta.mjs';
+import { aiProvider } from './aiProvider.mjs';
 
 export const ANALYSIS_RULES = `You read a lecture (a transcript, or a student's notes from it) and pull out what the student needs. Use only what is in the text; never add outside knowledge.
 Return JSON:
@@ -102,8 +103,9 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
   const apiBase = (env.CLASSROOM_API_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
   const supabaseUrl = (env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
-  const openaiKey = env.OPENAI_API_KEY || '';
-  const model = env.CLASSROOM_LECTURE_CHAT_MODEL || 'gpt-4o-mini';
+  const provider = aiProvider(env);
+  const openaiKey = provider.key;
+  const model = provider.chatModel;
   const enabled = Boolean(supabaseUrl && serviceKey);
   const NOT_SET_UP = { status: 503, body: { detail: "Lectures aren't set up on this site yet.", code: 'not_configured' } };
 
@@ -131,7 +133,7 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 55000);
     try {
-      const response = await fetchImpl('https://api.openai.com/v1/chat/completions', {
+      const response = await fetchImpl(`${provider.base}/chat/completions`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({

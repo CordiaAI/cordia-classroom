@@ -1,7 +1,7 @@
 // Notes: AI title and Napkin cover (see lib/server/noteMeta.mjs).
 //   GET  /api/notes/covers            this student's note covers
 //   POST /api/notes/meta { note_id, title, cover }
-// Server env: OPENAI_API_KEY (titles, outlines), NAPKIN_API_KEY + SUPABASE_SERVICE_ROLE_KEY (covers).
+// Server env: GROQ_API_KEY or OPENAI_API_KEY (titles, outlines), NAPKIN_API_KEY + SUPABASE_SERVICE_ROLE_KEY (covers).
 import { createNoteMetaService } from '../../../lib/server/noteMeta.mjs';
 
 export const config = { maxDuration: 60 };

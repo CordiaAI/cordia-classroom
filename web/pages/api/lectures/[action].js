@@ -7,7 +7,7 @@
 //   GET  /api/lectures/list            GET /api/lectures/get?id=       GET /api/lectures/todos
 //   POST /api/lectures/save            POST /api/lectures/update       POST /api/lectures/delete
 //   POST /api/lectures/todo            POST /api/lectures/analyze { id }  (AI notes for a lecture saved without them)
-// Server env: OPENAI_API_KEY (transcription, analysis), SUPABASE_SERVICE_ROLE_KEY (storage, metering).
+// Server env: GROQ_API_KEY or OPENAI_API_KEY (transcription, analysis; lib/server/aiProvider.mjs), SUPABASE_SERVICE_ROLE_KEY (storage, metering).
 import { MAX_CHUNK_BYTES, createLectureService } from '../../../lib/server/lectures.mjs';
 import { createLectureLibrary } from '../../../lib/server/lectureLibrary.mjs';
 

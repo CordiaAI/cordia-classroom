@@ -9,6 +9,7 @@
 //     remade only when the note has grown by half since it was made.
 // covers(): every cover this student has, for the Notes page.
 import { createVisualService } from './napkinVisual.mjs';
+import { aiProvider } from './aiProvider.mjs';
 
 import { DEFAULT_TITLE, MIN_CHARS, heuristicTitle, htmlToText, isDefaultTitle, needsCover } from '../noteMeta.mjs';
 
@@ -23,8 +24,9 @@ export function createNoteMetaService({ env = process.env, fetch: fetchImpl = gl
   const apiBase = (env.CLASSROOM_API_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
   const supabaseUrl = (env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
-  const openaiKey = env.OPENAI_API_KEY || '';
-  const chatModel = env.CLASSROOM_LECTURE_CHAT_MODEL || 'gpt-4o-mini';
+  const provider = aiProvider(env);
+  const openaiKey = provider.key;
+  const chatModel = provider.chatModel;
   const visuals = createVisualService({ env, fetch: fetchImpl, ...(sleep ? { sleep } : {}), ...(now ? { now } : {}) });
 
   const db = (path, init = {}) => fetchImpl(`${supabaseUrl}${path}`, {
@@ -69,7 +71,7 @@ export function createNoteMetaService({ env = process.env, fetch: fetchImpl = gl
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await fetchImpl('https://api.openai.com/v1/chat/completions', {
+      const response = await fetchImpl(`${provider.base}/chat/completions`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: chatModel, temperature: 0.2, max_tokens: 400, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: META_RULES }, { role: 'user', content: text.slice(0, 12000) }] }),

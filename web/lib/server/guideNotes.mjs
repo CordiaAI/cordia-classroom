@@ -1,9 +1,10 @@
 // Server-only: a guide's Notes, an outline summary of the whole topic (/api/guide-notes).
 // Reads the guide with the student's own sign-in (so only their guides), organises all of its
 // information into topic headings with points, and saves that as the guide's notes.
-// Runs once per guide: notes already in this form are kept. Needs OPENAI_API_KEY.
+// Runs once per guide: notes already in this form are kept. Needs GROQ_API_KEY or OPENAI_API_KEY (lib/server/aiProvider.mjs).
 
 import { KEY_POINTS, isStudyGuideNotes } from '../formatters.js';
+import { aiProvider } from './aiProvider.mjs';
 
 export const NOTES_RULES = `You write the notes of a study guide from a student's material: a short overview, the whole topic as a full outline, then the key points to remember. Use only what the material says.
 Return JSON: {"overview": "...", "sections": [{"heading": "...", "points": [{"text": "...", "sub": ["..."]}]}], "key_points": ["..."]}
@@ -43,8 +44,9 @@ export function needsOutline(notes) {
 
 export function createGuideNotesService({ env = process.env, fetch: fetchImpl = globalThis.fetch } = {}) {
   const apiBase = (env.CLASSROOM_API_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-  const openaiKey = env.OPENAI_API_KEY || '';
-  const model = env.CLASSROOM_LECTURE_CHAT_MODEL || 'gpt-4o-mini';
+  const provider = aiProvider(env);
+  const openaiKey = provider.key;
+  const model = provider.chatModel;
 
   async function make(authorization, guideId) {
     if (!authorization || !/^[0-9a-f-]{36}$/i.test(guideId || '')) return { status: 400, body: { detail: 'Invalid guide.' } };
@@ -61,7 +63,7 @@ export function createGuideNotesService({ env = process.env, fetch: fetchImpl = 
     const timer = setTimeout(() => controller.abort(), 40000);
     let written = null;
     try {
-      const ai = await fetchImpl('https://api.openai.com/v1/chat/completions', {
+      const ai = await fetchImpl(`${provider.base}/chat/completions`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, temperature: 0.2, max_tokens: 4500, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: NOTES_RULES }, { role: 'user', content: `Title: ${guide.title}\n\n${content.slice(0, 60000)}` }] }),

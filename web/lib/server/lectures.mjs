@@ -9,6 +9,7 @@
 // Minutes are metered in Supabase (feature "lecture_minute") when SUPABASE_SERVICE_ROLE_KEY is
 // set and the lecture migration is applied; until then recording works and is not counted.
 
+import { aiProvider } from './aiProvider.mjs';
 export const LIMITS = { free: 120, pro: 1500 };
 export const MAX_CHUNK_BYTES = 4_300_000; // under Vercel's 4.5 MB request limit
 const FEATURE = 'lecture_minute';
@@ -58,9 +59,9 @@ function userIdFromToken(authorization) {
 }
 
 export function createLectureService({ env = process.env, fetch: fetchImpl = globalThis.fetch, sleep = sleepReal, now = () => new Date() } = {}) {
-  const openaiKey = env.OPENAI_API_KEY || '';
-  const transcribeModel = env.CLASSROOM_TRANSCRIBE_MODEL || 'gpt-4o-mini-transcribe';
-  const chatModel = env.CLASSROOM_LECTURE_CHAT_MODEL || 'gpt-4o-mini';
+  const provider = aiProvider(env);
+  const openaiKey = provider.key;
+  const { transcribeModel, chatModel } = provider;
   const supabaseUrl = (env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
   const metered = Boolean(supabaseUrl && serviceKey);
@@ -111,13 +112,13 @@ export function createLectureService({ env = process.env, fetch: fetchImpl = glo
     }
   }
 
-  // OpenAI call with a time limit and one retry for timeouts, rate limits and server errors.
+  // AI call (Groq or OpenAI) with a time limit and one retry for timeouts, rate limits and server errors.
   async function openai(path, init, { timeoutMs = 45000 } = {}) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const response = await fetchImpl(`https://api.openai.com/v1${path}`, { ...init, headers: { Authorization: `Bearer ${openaiKey}`, ...(init.headers || {}) }, signal: controller.signal });
+        const response = await fetchImpl(`${provider.base}${path}`, { ...init, headers: { Authorization: `Bearer ${openaiKey}`, ...(init.headers || {}) }, signal: controller.signal });
         if (response.ok) return await response.json();
         if (attempt === 0 && (response.status === 429 || response.status >= 500)) {
           const wait = Math.min(4000, (Number(response.headers.get('retry-after')) || 1) * 1000);
