@@ -10,7 +10,8 @@ import { FEATURE_COPY, FREE_SUMMARY, METERED, PRICES, PRO_BENEFITS, PRO_LIMITS, 
 import LearningStylePicker from '../components/LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from '../components/ExplanationPreference';
-import { CalendarDays, Check, CreditCard, LogOut, Moon, Puzzle, Sun } from 'lucide-react';
+import { CalendarDays, Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2 } from 'lucide-react';
+import BodyPortal from '../components/BodyPortal';
 import CanvasSettings from '../components/CanvasSettings';
 import SharingSettings from '../components/SharingSettings';
 import { canvasStatus } from '../lib/canvas';
@@ -32,6 +33,7 @@ export default function SettingsPage() {
   }, [router.isReady, router.query.section]);
   const [canvasReady, setCanvasReady] = useState(false);
   const [extensionInstalled, setExtensionInstalled] = useState(false);
+  const [deleting, setDeleting] = useState(null); // null | { text, busy, error }
   useEffect(() => {
     if (!ready) return;
     canvasStatus().then(data => setCanvasReady(Boolean(data)));
@@ -146,6 +148,19 @@ export default function SettingsPage() {
   function setAppearance(next) {
     setTheme(next);
     setThemePreference(next);
+  }
+
+  async function deleteAccount(event) {
+    event.preventDefault();
+    if (deleting.text !== 'DELETE' || deleting.busy) return;
+    setDeleting(current => ({ ...current, busy: true, error: '' }));
+    const data = await apiFetch('/auth/account', { method: 'DELETE', body: JSON.stringify({ confirm: 'DELETE' }) });
+    if (data?.deleted) {
+      clearAuth();
+      router.replace('/?deleted=1');
+    } else {
+      setDeleting(current => ({ ...current, busy: false, error: apiErrorMessage(data?.detail, 'Your account could not be deleted. Try again or email support@cordiaai.io.') }));
+    }
   }
 
   if (!ready) return null;
@@ -358,6 +373,10 @@ export default function SettingsPage() {
               </div>
               <button type="button" className="c-btn c-btn--secondary" onClick={() => { clearAuth(); router.push('/'); }}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" />Sign out</button>
             </div>
+            <div className="c-card settings-row">
+              <span className="settings-row-label"><Trash2 size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Delete account</span></span>
+              <button type="button" className="c-btn c-btn--secondary settings-danger" onClick={() => setDeleting({ text: '', busy: false, error: '' })}>Delete account</button>
+            </div>
             <nav className="settings-links" aria-label="Policies">
               <a href="/privacy">Privacy</a>
               <a href="/terms">Terms</a>
@@ -367,7 +386,33 @@ export default function SettingsPage() {
         )}
       </div>
 
+      {deleting && (
+        <BodyPortal>
+          <div className="c-scrim" onClick={() => !deleting.busy && setDeleting(null)}>
+            <form className="c-sheet delete-sheet" role="dialog" aria-modal="true" aria-labelledby="delete-title" onSubmit={deleteAccount} onClick={event => event.stopPropagation()}>
+              <h2 id="delete-title" className="c-title">Delete your account?</h2>
+              <p>This permanently deletes your study guides, notes, flashcards, lectures, classes, progress and Canvas connection, and cancels a paid plan. Sets you shared with a class are removed too. It can’t be undone.</p>
+              <label className="c-field">
+                <span>Type DELETE to confirm</span>
+                <input className="c-input" value={deleting.text} onChange={event => setDeleting(current => ({ ...current, text: event.target.value }))} autoComplete="off" autoFocus />
+              </label>
+              {deleting.error && <p className="delete-error" role="alert">{deleting.error}</p>}
+              <div className="delete-actions">
+                <button type="button" className="c-btn c-btn--secondary" onClick={() => setDeleting(null)} disabled={deleting.busy}>Cancel</button>
+                <button type="submit" className="c-btn c-btn--primary delete-confirm" disabled={deleting.text !== 'DELETE' || deleting.busy}>{deleting.busy ? 'Deleting…' : 'Delete account'}</button>
+              </div>
+            </form>
+          </div>
+        </BodyPortal>
+      )}
+
       <style jsx>{`
+        .delete-sheet { display: grid; gap: 16px; width: min(480px, 100%); }
+        .delete-sheet p { margin: 0; }
+        .delete-error { color: var(--error); font-weight: 600; }
+        .delete-actions { display: flex; justify-content: flex-end; gap: 8px; }
+        :global(.delete-confirm:not(:disabled)) { background: var(--error) !important; border-color: var(--error) !important; color: var(--on-olive) !important; }
+        :global(.settings-danger) { color: var(--error) !important; }
         .profile-page { width: min(var(--page-max), 100%); margin: 0 auto; }
         .profile-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }
         .profile-message { padding: 14px 18px; border-radius:var(--r-card); background: var(--olive-tint); font-weight:600; }

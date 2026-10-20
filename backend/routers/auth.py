@@ -155,3 +155,47 @@ def update_profile(request: ProfileRequest, authorization: str = Header(default=
     if updates:
         supabase.table("user_profiles").update(updates).eq("id", user_id).execute()
     return {"updated": sorted(updates)}
+
+
+def _remove_lecture_audio(supabase, user_id: str) -> None:
+    """Recordings are stored as lecture-audio/<user>/<recording>/<chunk>."""
+    bucket = supabase.storage.from_("lecture-audio")
+    try:
+        paths = []
+        for folder in bucket.list(user_id) or []:
+            prefix = f"{user_id}/{folder['name']}"
+            if folder.get("id"):  # a file directly under the user's folder
+                paths.append(prefix)
+                continue
+            paths.extend(f"{prefix}/{item['name']}" for item in bucket.list(prefix) or [])
+        for start in range(0, len(paths), 100):
+            bucket.remove(paths[start:start + 100])
+    except Exception as exc:  # no bucket yet (lectures not set up): nothing stored to remove
+        logger.warning("Lecture audio cleanup skipped: %s", exc)
+
+
+class DeleteAccountRequest(BaseModel):
+    confirm: str = Field(..., max_length=20)
+
+
+# Tables keyed by user_id that are not removed by the auth.users cascade (created before
+# migrations, or without a foreign key). Everything else cascades when the user is deleted.
+_USER_TABLES = ("study_guides", "smart_notes", "folders", "quiz_attempts", "study_sessions", "user_streaks", "usage_events")
+
+
+@router.delete("/account")
+def delete_account(request: DeleteAccountRequest, authorization: str = Header(default="")):
+    """Self-serve account deletion: cancels a paid plan, removes the student's data and the login."""
+    if request.confirm != "DELETE":
+        raise HTTPException(status_code=400, detail='Type DELETE to confirm')
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+    from routers.billing import cancel_subscription_for_deletion
+    cancel_subscription_for_deletion(user_id)
+    for table in _USER_TABLES:
+        supabase.table(table).delete().eq("user_id", user_id).execute()
+    supabase.table("user_profiles").delete().eq("id", user_id).execute()
+    _remove_lecture_audio(supabase, user_id)
+    supabase.auth.admin.delete_user(user_id)
+    logger.info("Account deleted: %s", user_id)
+    return {"deleted": True}

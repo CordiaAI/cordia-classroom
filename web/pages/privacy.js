@@ -19,7 +19,7 @@ export default function PrivacyPolicy() {
           Privacy Policy
         </h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '0.9rem' }}>
-          Effective Date: February 25, 2026 &nbsp;|&nbsp; Last Updated: September 16, 2026
+          Effective Date: February 25, 2026 &nbsp;|&nbsp; Last Updated: October 20, 2026
         </p>
 
         <p style={{ marginBottom: '32px' }}>
@@ -41,9 +41,21 @@ export default function PrivacyPolicy() {
           <p>Study guides, notes, and flashcards you generate are stored in our database associated with your account so you can access them through the platform.</p>
 
           <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>d. Usage Data</strong></p>
-          <p>We track monthly complete study builds and lightweight AI actions per account to enforce plan limits. We do not collect detailed analytics, browsing history, or behavioral tracking data.</p>
+          <p>We count monthly study builds, Tutor prompts, recording minutes and other AI actions per account to enforce plan limits, and we keep a study log (minutes, cards and streaks) to show your progress. We use Vercel Web Analytics and Speed Insights, which record anonymous page views and page-load performance without cookies or cross-site tracking. When the web app hits an error, the error message, page path and code location are logged so we can fix it; your study content is not included. We do not collect your browsing history.</p>
 
-          <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>e. Payment Information</strong></p>
+          <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>e. Lecture Recordings</strong></p>
+          <p>If you record a lecture, audio from your microphone is sent in short pieces to our servers and to our speech-to-text provider to make a transcript. The transcript, the notes and to-dos made from it, and the audio pieces are stored with your account until you delete the lecture or your account. You are responsible for having permission to record (see our Terms of Service).</p>
+
+          <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>f. Canvas Connection</strong></p>
+          <p>If you connect Canvas with an access token, we store the token encrypted and use it only to read what the features need: your course list, the courses you choose to bring in (name, code, term, syllabus topics and module titles), their assignment titles and due dates, and the list of course files. A file is downloaded only when you choose it. We do not read rosters, grades, submissions or messages. Each request to Canvas is recorded in an activity log you can see in Settings. Disconnecting deletes the token and the Canvas data we stored; you can also delete the token in Canvas.</p>
+
+          <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>g. Sets Shared With a Class</strong></p>
+          <p>If you choose to share a study set with a class, classmates who joined that class can see and copy its title, questions and flashcards (never your private notes). Shared sets are anonymous unless you turn on "Show my first name". Classmates may report a set, and instructors may turn sharing off for their course. You can make a set private again at any time.</p>
+
+          <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>h. Profile and Feedback</strong></p>
+          <p>We store the name, school, level and major you give us, your study preferences, and any feedback you send.</p>
+
+          <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>i. Payment Information</strong></p>
           <p>Payments are processed by Stripe. We do not collect or store your full credit card number, card verification code, or bank account details. Stripe provides us with a customer identifier and subscription status. Stripe's privacy policy governs their handling of your payment data and can be found at stripe.com/privacy.</p>
         </Section>
 
@@ -66,7 +78,7 @@ export default function PrivacyPolicy() {
         <Section title="3. How We Share Your Information">
           <p>We do not sell, trade, or rent your personal information to third parties. We may share data only in the following limited circumstances:</p>
           <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
-            <li><strong style={{ color: 'var(--text-primary)' }}>Service Providers:</strong> We use trusted third-party providers to operate the Service, including Supabase (database and authentication), OpenAI (AI content generation), Stripe (payment processing), and Fly.io (backend hosting). These providers are contractually obligated to protect your data and may only use it to perform services on our behalf.</li>
+            <li><strong style={{ color: 'var(--text-primary)' }}>Service Providers:</strong> We use trusted third-party providers to operate the Service, including Supabase (database, file storage and authentication), Groq and OpenAI (AI content generation, image reading and speech-to-text), Napkin AI (diagrams and note covers, which receive the text being illustrated), Stripe (payment processing), Vercel (web hosting and anonymous analytics), and Fly.io (backend hosting). If you connect Canvas, requests go to your school's Canvas (Instructure) site using your token. These providers are contractually obligated to protect your data and may only use it to perform services on our behalf.</li>
             <li style={{ marginTop: '8px' }}><strong style={{ color: 'var(--text-primary)' }}>Legal Requirements:</strong> We may disclose your information if required to do so by law, regulation, or valid legal process (e.g., a court order or subpoena).</li>
             <li style={{ marginTop: '8px' }}><strong style={{ color: 'var(--text-primary)' }}>Business Transfers:</strong> In the event of a merger, acquisition, or sale of all or a portion of our assets, your information may be transferred as part of that transaction. We will notify you of any such change via email or a prominent notice on our platform.</li>
           </ul>
@@ -77,8 +89,10 @@ export default function PrivacyPolicy() {
             We retain your account information and generated study materials for as long as your account is active.
             The most recent bounded, normalized page capture and its source metadata are retained in your private Tutor
             session until a later capture replaces them or your account is deleted. Study material you choose to save is
-            retained with your account. If you delete your account, we will delete your personal
-            data within 30 days, except where retention is required by law.
+            retained with your account. You can delete your account at any time in Settings → Account → Delete account:
+            your study materials, notes, lectures and recordings, classes, progress, shared sets and Canvas connection
+            are deleted immediately and a paid plan is cancelled. Copies in our providers' encrypted backups expire
+            within 30 days, except where retention is required by law.
           </p>
         </Section>
 
@@ -96,8 +110,9 @@ export default function PrivacyPolicy() {
 
         <Section title="6. Cookies and Local Storage">
           <p>
-            The CordiaClassroom web platform uses browser local storage to maintain your authenticated session.
-            We do not use third-party tracking cookies or advertising cookies. No cross-site tracking is performed.
+            The CordiaClassroom web platform uses browser local storage to maintain your authenticated session and
+            to remember preferences such as your theme and drafts. We do not use third-party tracking cookies or
+            advertising cookies. No cross-site tracking is performed.
           </p>
         </Section>
 
@@ -128,7 +143,8 @@ export default function PrivacyPolicy() {
             <li>Data portability (receive a copy of your data in a structured format)</li>
           </ul>
           <p style={{ marginTop: '12px' }}>
-            To exercise any of these rights, please contact us at the email address below.
+            You can delete your account yourself in Settings, export any study guide from its menu, and
+            disconnect Canvas or a calendar feed at any time. For anything else, contact us at the email address below.
           </p>
         </Section>
 

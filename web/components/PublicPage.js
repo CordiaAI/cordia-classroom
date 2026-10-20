@@ -13,7 +13,7 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
         <meta name="description" content={description} />
         <link rel="canonical" href={SITE + path} />
         <meta property="og:url" content={SITE + path} />
-        <meta property="og:image" content={`${SITE}/cordia-classroom-icon.png`} key="og:image" />
+        <meta property="og:image" content={`${SITE}/og-image.png`} key="og:image" />
       </Head>
       <div className={'public' + (backdrop ? ' public--photo' : '')} style={backdrop ? { '--public-photo': `url('${backdrop}')` } : { '--public-backdrop': "url('/classroom-clouds.webp')" }}>
         <header className="public-nav">
