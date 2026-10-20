@@ -171,7 +171,7 @@ please must page pages final midterm quiz quizzes credit submit submission requi
 def topic_summary(syllabus_html: str, module_titles: list[str], limit: int = 600) -> str:
     """A short topic summary: module titles first, then frequent syllabus terms. No raw text kept."""
     titles = [re.sub(r"\s+", " ", t).strip() for t in module_titles if t and t.strip()]
-    text = re.sub(r"<[^>]+>", " ", syllabus_html or "")
+    text = re.sub(r"<[^<>]*>", " ", (syllabus_html or "")[:200000])
     common = [w for w, _ in Counter(t for t in _tokens(text) if t not in _SYLLABUS_STOP).most_common(25)]
     summary = "; ".join(dict.fromkeys(titles))
     if common:

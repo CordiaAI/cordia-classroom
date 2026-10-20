@@ -111,10 +111,11 @@ def search_schools(q: str = "", authorization: str = Header(default="")):
 @router.get("/classes/catalog")
 def search_catalog(school_id: str, q: str = "", authorization: str = Header(default="")):
     get_user_id(authorization)
-    code = re.sub(r"[^A-Za-z0-9 ]", " ", q).upper().strip()
+    code = re.sub(r"[^A-Za-z0-9 ]", " ", q[:40]).upper().strip()
     query = get_supabase().table("classes").select("id,course_code_normalized,display_name").eq("school_id", _uuid(school_id, "school ID"))
     if code:
-        spaced = re.sub(r"([A-Z]+)\s*([0-9])", r"\1 \2", code)
+        # "MGT300" and "MGT  300" both become "MGT 300" (single-character patterns: linear time).
+        spaced = re.sub(r"([A-Z])([0-9])", r"\1 \2", re.sub(r"\s+", " ", code))
         query = query.ilike("course_code_normalized", spaced + "%")
     rows = query.limit(8).execute().data or []
     return {"classes": [{"id": r["id"], "code": r["course_code_normalized"], "name": r.get("display_name") or ""} for r in rows]}

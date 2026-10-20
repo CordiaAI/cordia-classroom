@@ -105,7 +105,9 @@ def normalize_domain(value: str) -> str:
     if parsed.username or parsed.password or parsed.port is not None:
         raise CanvasForbiddenRequest("Use the plain Canvas address, like school.instructure.com.")
     host = (parsed.hostname or "").rstrip(".").lower()
-    if not host or not re.fullmatch(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+", host):
+    labels = host.split(".")
+    # One DNS label at a time, with bounded patterns, so a crafted host can't make the check slow.
+    if not host or len(host) > 253 or len(labels) < 2 or not all(re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label) for label in labels):
         raise CanvasForbiddenRequest("That is not a Canvas address.")
     try:
         ipaddress.ip_address(host)
