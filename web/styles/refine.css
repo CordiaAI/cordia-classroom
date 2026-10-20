@@ -14,7 +14,7 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 /* ---------- Type roles ---------- */
 /* Titles: Newsreader 600, slight negative tracking, balanced lines. */
 :is(.c-title, .pricing-title, .guide-title-btn, .guide-title-input, .c-section-title, .today-continue-title, .lib-row-title, .folder-row-title,
-  .sn-card-title, .reader-q, .quiz-question-text, .practice-prompt, .fc-face p, .today-counts strong, .recap-class, .me-names strong,
+  .sn-card-title, .reader-q, .quiz-question-text, .practice-prompt, .fc-face p, .recap-class, .me-names strong,
   .c-brand > span, main h1:not(.sr-only), .public-main h1, .public-main h2, .public-main h3, .extension-install-step h2, .mission-page h2, .mission-page h3) {
   font-family: var(--font-display) !important;
   font-weight: 600 !important;
@@ -29,7 +29,7 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 :is(.today-continue-title, .lib-row-title, .folder-row-title, .sn-card-title, .recap-class, .me-names strong, .extension-install-step h2, .public-main h3, .mission-page h3,
   .today .c-list-row > .c-grow, .calendar-item strong) { font-family: var(--font-display) !important; font-weight: 600 !important; font-size: var(--fs-17) !important; letter-spacing: var(--track-title); line-height: var(--lh-title); }
 :is(.reader-q, .quiz-question-text, .practice-prompt) { font-size: var(--fs-20) !important; }
-:is(.fc-face p, .today-counts strong) { font-size: var(--fs-28) !important; font-variant-numeric: tabular-nums; }
+.fc-face p { font-size: var(--fs-28) !important; font-variant-numeric: tabular-nums; }
 .c-brand > span { font-size: var(--fs-20) !important; }
 /* Reading text is body text: Manrope 17 at 1.5. */
 .c-study, .reader-a, .reader-prose, .reader-notes { font: 500 var(--fs-17)/var(--lh-body) var(--font-sans) !important; letter-spacing: 0; }

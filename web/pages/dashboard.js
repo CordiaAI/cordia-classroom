@@ -1,12 +1,11 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Brain, ChevronRight, Flame, Layers, NotebookPen, PencilRuler, Play, Snowflake } from 'lucide-react';
+import { Brain, ChevronRight, Flame, Layers, NotebookPen, PencilRuler, Snowflake } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
 import { createDashboardOverview } from '../lib/dashboardOrganization';
-import { loadStudyQueue } from '../lib/studyQueue';
 import { lastGuide } from '../lib/userStore';
 import { markUsed, unmarkUsed, useProgress } from '../lib/progress';
 import { activeStep, dayOneFinished, startWalkthrough, walkthroughEvent } from '../lib/walkthrough';
@@ -58,13 +57,12 @@ export default function Today({ timerState, setTimerState }) {
     const safe = promise => promise.catch(() => null);
     const calendarRequest = safe(apiFetch('/calendar/connection'));
     const calendarOrSlow = Promise.race([calendarRequest, new Promise(resolve => setTimeout(() => resolve(SLOW), SLOW_MS))]);
-    const [foldersData, guidesData, statsData, streakData, onboardingData, queueData, insightsData, notesData, checklistData, calendarData, lectureTodos] = await Promise.all([
+    const [foldersData, guidesData, statsData, streakData, onboardingData, insightsData, notesData, checklistData, calendarData, lectureTodos] = await Promise.all([
       safe(apiFetch('/folders')),
       safe(apiFetch('/guides?fields=summary&limit=500')),
       safe(apiFetch('/stats/overview')),
       safe(apiFetch('/stats/streak?tz_offset=' + tz)),
       safe(loadOnboarding()),
-      safe(loadStudyQueue()),
       safe(apiFetch('/stats/insights')),
       safe(apiFetch('/smart_notes')),
       safe(apiFetch('/onboarding/checklist')),
@@ -96,8 +94,6 @@ export default function Today({ timerState, setTimerState }) {
       stats: statsData && !statsData.detail ? statsData : null,
       streak: streakData && !streakData.detail ? streakData : null,
       onboarding: onboardingData,
-      // A slim copy of the study queue (the full one carries every card's text).
-      queue: queueData ? { cardTotal: queueData.cardTotal, misses: queueData.misses.map(() => 0), problems: queueData.problems, minutes: queueData.minutes, practice: queueData.practice } : null,
       insights: insightsData,
       // Slow feed: show the calendar this device last saw; the fresh one replaces it in place.
       calendar: calendarData === SLOW ? readCalendarCache() : calendarData,
@@ -110,7 +106,6 @@ export default function Today({ timerState, setTimerState }) {
   const guides = data?.guides || [];
   const stats = data?.stats || null;
   const streak = data?.streak || null;
-  const queue = data?.queue || null;
   const insights = data?.insights || null;
   const calendar = data?.calendar || null;
   const calendarSlow = Boolean(data?.calendarSlow);
@@ -120,11 +115,11 @@ export default function Today({ timerState, setTimerState }) {
 
   // Feature tips, one per session, each at its moment.
   useEffect(() => {
-    if (!queue || !stats || !progress.first) return;
+    if (!stats || !progress.first) return;
     const visit = { days: Math.floor((Date.now() - progress.first) / 86400000) + 1 };
     if (visit.days >= 3 && calendar && !calendar.connected) requestTip('calendar');
     else if (visit.days >= 7 && insights?.answered) requestTip('insights');
-  }, [queue, stats, calendar, insights, progress.first]);
+  }, [stats, calendar, insights, progress.first]);
 
   if (!ready || legacy) return null;
 
@@ -137,7 +132,6 @@ export default function Today({ timerState, setTimerState }) {
     ? `/guide/${continueGuide.id}${remembered?.id === continueGuide.id && remembered.page ? `?page=${remembered.page + 1}` : ''}`
     : null;
   const toolGuide = continueGuide?.id;
-  const nothingDue = queue && !queue.cardTotal && !queue.misses.length && !queue.problems;
   // Canvas deadlines plus to-dos confirmed from lectures, soonest first.
   const dueItems = mergeCalendarItems(calendar?.connected ? calendar.items || [] : [], data?.lectureItems || [])
     .filter(item => new Date(item.due_at).getTime() >= Date.now() - 86400000)
@@ -169,17 +163,6 @@ export default function Today({ timerState, setTimerState }) {
           <button type="button" className="c-btn c-btn--secondary" onClick={refresh}>Retry</button>
         </div>
       )}
-
-      <section className="c-glass today-start" aria-label="Start">
-        <ul className="today-counts" aria-live="polite">
-          <li><strong>{queue ? queue.cardTotal + queue.misses.length : '–'}</strong><span>cards</span></li>
-          <li><strong>{queue ? queue.problems : '–'}</strong><span>problems</span></li>
-          <li><strong>{queue ? queue.minutes : '–'}</strong><span>min</span></li>
-        </ul>
-        <button type="button" className="c-btn c-btn--primary c-btn--lg today-start-btn" data-spot="start" onClick={() => { walkthroughEvent('start'); router.push('/session'); }} disabled={!queue || nothingDue}>
-          <Play size={20} strokeWidth={1.75} aria-hidden="true" />Start
-        </button>
-      </section>
 
       {continueGuide && (
         <section className="c-section" aria-labelledby="continue-title">
@@ -224,7 +207,7 @@ export default function Today({ timerState, setTimerState }) {
         </section>
       )}
 
-      <GroveCard guides={guides} planting={step?.id === 'today' || step?.id === 'start'} />
+      <GroveCard guides={guides} planting={step?.id === 'today'} />
 
       <div className="today-pair">
         <StudyTimer timerState={timerState} setTimerState={setTimerState} />
@@ -240,12 +223,6 @@ export default function Today({ timerState, setTimerState }) {
         .today-tool-wrap { position: relative; display: grid; }
         .today-dot { position: absolute; top: 8px; right: 8px; }
         .today-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
-        .today-start { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px; border-radius:var(--r-card); flex-wrap: wrap; }
-        .today-counts { list-style: none; margin: 0; padding: 0; display: flex; gap: 32px; }
-        .today-counts li { display: grid; gap: 2px; }
-        .today-counts strong { font:600 28px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
-        .today-counts span { font:500 15px/1 var(--font-sans); }
-        .today-start-btn { min-width: 160px; }
         :global(.today-continue) { display: flex; align-items: center; gap: 16px; padding: 14px 18px; color: var(--ink); text-decoration: none; }
         :global(.today-continue:hover) { text-decoration: none; border-color: var(--olive); }
         .today-continue-title { flex: 1 1 auto; min-width: 0; font:600 17px/1.15 var(--font-display); }
@@ -255,10 +232,7 @@ export default function Today({ timerState, setTimerState }) {
         :global(.today-tool .lucide) { color: var(--olive-ink); }
         .today-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
         @media (max-width: 767px) {
-          .today-start { padding: 20px; }
-          .today-counts { gap: 20px; }
-          .today-start-btn { width: 100%; }
-          .today-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                .today-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .today-pair { grid-template-columns: 1fr; }
         }
       `}</style>

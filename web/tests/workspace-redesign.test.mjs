@@ -35,12 +35,12 @@ test('old dashboard views redirect to their own routes', async () => {
   assert.doesNotMatch(dashboard, /Study smarter/);
 });
 
-test('Today: streak pill, Start card, Continue, four tools', async () => {
+test('Today: streak pill, Continue, four tools, no Start card', async () => {
   const dashboard = await source('pages/dashboard.js');
 
   assert.match(dashboard, /<h1 className="c-title">Today<\/h1>/);
   assert.match(dashboard, /<Flame /);
-  assert.match(dashboard, /router\.push\('\/session'\)/);
+  assert.doesNotMatch(dashboard, /today-start/);
   for (const tool of ['Quiz', 'Cards', 'Practice', 'Notes']) assert.match(dashboard, new RegExp(`label: '${tool}'`));
 });
 

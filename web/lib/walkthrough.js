@@ -41,8 +41,7 @@ export const DAY_ONE = [
     { id: 'flip', target: '[data-spot="flashcard"]', label: 'flip', where: onCards, on: 'card-flipped' },
   ],
   [
-    { id: 'today', target: '[data-spot="nav-today"]', label: 'Go to Today', on: 'today-opened' },
-    { id: 'start', target: '[data-spot="start"]', label: 'Come back daily', where: onToday, on: 'start', finishable: true },
+    { id: 'today', target: '[data-spot="nav-today"]', label: 'Go to Today', on: 'today-opened', finishable: true },
   ],
 ];
 
