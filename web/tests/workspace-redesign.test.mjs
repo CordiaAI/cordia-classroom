@@ -38,7 +38,7 @@ test('old dashboard views redirect to their own routes', async () => {
   assert.doesNotMatch(dashboard, /Study smarter/);
 });
 
-test('Today: Continue, Due soon (Canvas when empty), progress strip; no Daily review card', async () => {
+test('Today: Continue, four tool tiles, Due soon (Canvas when empty), progress strip; no Daily review card', async () => {
   const dashboard = await source('pages/dashboard.js');
 
   assert.match(dashboard, /<h1 className="c-title">Today<\/h1>/);
@@ -46,7 +46,7 @@ test('Today: Continue, Due soon (Canvas when empty), progress strip; no Daily re
   assert.match(dashboard, /<CanvasConnectButton card [^>]*spot="canvas-connect"/);
   assert.match(dashboard, /href="\/progress"/);
   assert.match(dashboard, /<Flame /);
-  assert.doesNotMatch(dashboard, /label: 'Quiz'/);
+  for (const tool of ['Quiz', 'Cards', 'Practice', 'Notes']) assert.match(dashboard, new RegExp(`label: '${tool}'`));
 });
 
 test('Library: one list grouped by class, kind filters, Undo on delete (notes too)', async () => {

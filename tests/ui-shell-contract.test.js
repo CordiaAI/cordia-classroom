@@ -30,7 +30,7 @@ for (const token of ['--canvas: #EDF2F4', '--ink: #171B18', '--muted: rgba(23, 2
   assert.ok(tokens.includes(token), `missing design token ${token}`);
 }
 assert.match(system, /prefers-reduced-motion/);
-assert.match(tokens, /--lg-filter: blur\(26px\) saturate\(185%\)/);
+assert.match(tokens, /--lg-filter: blur\(34px\) saturate\(115%\)/);
 // One nav: three places plus New, each a real route; the Tutor is a bubble.
 const nav = sidebar.split('const navItems = [')[1].split('];')[0];
 assert.deepEqual([...nav.matchAll(/label: '([^']+)', href: '([^']+)'/g)].map(match => `${match[1]} ${match[2]}`), ['Today /dashboard', 'Library /library', 'Canvas /canvas']);
