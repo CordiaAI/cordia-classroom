@@ -12,6 +12,7 @@ import { scheduleProactiveRefresh, getToken } from '../lib/api';
 import { applyTheme, syncThemeFromAccount } from '../lib/theme';
 import { useProgress } from '../lib/progress';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
@@ -49,7 +50,7 @@ export default function App({ Component, pageProps }) {
   );
 
   if (isLoginPage) {
-    return <>{brandHead}<Component {...pageProps} /><Analytics /></>;
+    return <>{brandHead}<Component {...pageProps} /><Analytics /><SpeedInsights /></>;
   }
 
   return (
@@ -60,6 +61,7 @@ export default function App({ Component, pageProps }) {
       </Layout>
       <UpgradeModal />
       <Analytics />
+      <SpeedInsights />
     </>
   );
 }
