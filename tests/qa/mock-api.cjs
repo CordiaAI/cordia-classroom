@@ -86,6 +86,7 @@ async function install(context, state) {
     if (path === '/onboarding/checklist') return json({ extension_guide: false, learn_your_way: false, practice: false, smartnote: false });
     if (path === '/smart_notes' && method === 'GET') return json({ notes: state.notes });
     if (path === '/smart_notes' && method === 'POST') { const n = { id: 'n' + Date.now(), title: body.title, content: '' }; state.notes.unshift(n); return json({ note: n }); }
+    if ((m = path.match(/^\/smart_notes\/([^/]+)$/)) && method === 'PUT') { const n = state.notes.find(item => item.id === m[1]); if (n) Object.assign(n, body); return json({ note: n }); }
     if ((m = path.match(/^\/smart_notes\/([^/]+)$/))) return json({ note: state.notes.find(n => n.id === m[1]) || state.notes[0] });
     if (path === '/calendar/connection' && method === 'GET') return json(state.populated ? { connected: true, items: [
       { id: 'c1', title: 'Lab report [BIO-101-002]', due_at: new Date(Date.now() + 86400000).toISOString(), type: 'assignment', url: 'https://school.instructure.com/courses/1/assignments/1' },

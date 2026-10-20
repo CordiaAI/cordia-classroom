@@ -14,7 +14,7 @@ import { walkthroughEvent } from '../lib/walkthrough';
 import LectureRecorder from './LectureRecorder';
 import CordiaLoader from './CordiaLoader';
 import { heuristicTitle, sensibleTitle } from '../lib/noteMeta.mjs';
-import { localDate, saveLecture } from '../lib/lectures';
+import { localDate, saveLecture, saveTranscriptNote } from '../lib/lectures';
 
 const MAX_FILES = 5;
 // What the build card shows while a guide is written: the real stages, not fragments of the source.
@@ -279,6 +279,14 @@ export default function NewSheet() {
       reset();
       setOpen(false);
       router.push('/lecture/' + saved.lecture.id);
+      return;
+    }
+    // Lectures aren't available: keep the recording as a note (it can become a guide from there).
+    const noteId = await saveTranscriptNote({ title: name, transcript, folderId: classId || folderId });
+    if (noteId) {
+      reset();
+      setOpen(false);
+      router.push('/smartnotes?id=' + noteId);
       return;
     }
     try {

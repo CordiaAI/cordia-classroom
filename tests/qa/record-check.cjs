@@ -73,7 +73,7 @@ const seconds = text => text.split(':').reduce((sum, part) => sum * 60 + Number(
     await context.close();
   });
 
-  await check('Record: live transcript within ~12 s; 2 min with pause/resume and a 30 s drop; Stop builds the guide fast', async () => {
+  await check('Record: live transcript within ~12 s; 2 min with pause/resume and a 30 s drop; Stop saves it fast (as a note when lectures are not set up)', async () => {
     const { context, page, state } = await session(browser);
     expect((await page.locator('.rec-note.rec-center').innerText()) === '84 min left', 'minutes left not shown');
     await page.click('.rec-start');
@@ -102,15 +102,16 @@ const seconds = text => text.split(':').reduce((sum, part) => sum * 60 + Number(
     const elapsed = seconds(await timer(page));
     const stopAt = Date.now();
     await page.click('.rec-stage button:has-text("Stop")');
-    await page.waitForURL(/\/guide\//, { timeout: 30000 });
+    await page.waitForURL(/\/smartnotes\?id=/, { timeout: 30000 });
     const stopSeconds = (Date.now() - stopAt) / 1000;
-    console.log(`     ${elapsed} s recorded, ${state.chunks.length} chunks, guide ${stopSeconds.toFixed(1)} s after Stop`);
+    console.log(`     ${elapsed} s recorded, ${state.chunks.length} chunks, note ${stopSeconds.toFixed(1)} s after Stop`);
     const sorted = [...state.chunks].sort((a, b) => a - b);
     expect(sorted.every((seq, index) => seq === index), `chunks missing: ${sorted.join(',')}`);
     expect(sorted.length >= Math.ceil((elapsed - 8) / 18) + 1, `only ${sorted.length} chunks for ${elapsed} s`);
     expect(stopSeconds < 15, `Stop took ${stopSeconds} s`);
-    const saved = state.guides[0];
-    expect(saved.title === 'Cell Energy and ATP' && saved.source_type === 'lecture', `saved ${saved.title} / ${saved.source_type}`);
+    // Lectures aren't set up on a local build, so the recording is kept as a note.
+    const saved = state.notes[0];
+    expect(saved.title === 'Cell Energy and ATP' && /ATP is made in the mitochondria/.test(saved.content), `saved ${saved.title} / ${String(saved.content).slice(0, 80)}`);
     await context.close();
   });
 
@@ -142,10 +143,10 @@ const seconds = text => text.split(':').reduce((sum, part) => sum * 60 + Number(
     await context.close();
   });
 
-  await check('Upload recording: a small file builds a guide', async () => {
+  await check('Upload recording: a small file is saved', async () => {
     const { context, page, state } = await session(browser);
     await page.setInputFiles('.rec input[type=file]', { name: 'lecture.mp3', mimeType: 'audio/mpeg', buffer: Buffer.alloc(200000, 1) });
-    await page.waitForURL(/\/guide\//, { timeout: 20000 });
+    await page.waitForURL(/\/smartnotes\?id=/, { timeout: 20000 });
     expect(state.chunks.length === 1, `sent ${state.chunks.length} parts`);
     await context.close();
   });
@@ -153,7 +154,7 @@ const seconds = text => text.split(':').reduce((sum, part) => sum * 60 + Number(
   await check('Upload recording: a long mp3 is split into parts sent in parallel', async () => {
     const { context, page, state } = await session(browser);
     await page.setInputFiles('.rec input[type=file]', { name: 'long-lecture.mp3', mimeType: 'audio/mpeg', buffer: Buffer.alloc(12_000_000, 7) });
-    await page.waitForURL(/\/guide\//, { timeout: 60000 });
+    await page.waitForURL(/\/smartnotes\?id=/, { timeout: 60000 });
     expect(state.chunks.length === 4, `sent ${state.chunks.length} parts`);
     expect(state.chunkSizes.every(size => size <= 4_300_000), `part too big: ${Math.max(...state.chunkSizes)}`);
     await context.close();
