@@ -79,6 +79,8 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
   const transcriptEnd = useRef(null);
   const speech = useRef(null);       // browser speech recognition, when used
   const speechSeq = useRef(0);
+  const speechPending = useRef('');  // words heard but not yet final
+  const speechEnded = useRef(null);  // resolves when recognition has stopped
   const source = useRef('recording');
   const [interim, setInterim] = useState('');
   const active = ['recording', 'paused', 'finishing', 'stuck'].includes(phase);
@@ -116,7 +118,18 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
 
   useEffect(() => { transcriptEnd.current?.scrollIntoView({ block: 'nearest' }); }, [shown.length]);
 
-  // Browser speech: each final phrase becomes a timed segment.
+  // Browser speech: each final phrase becomes a timed segment. Words still pending when
+  // recognition ends (Stop, Pause, or Chrome's own restart) are kept too, not dropped.
+  function keepPending() {
+    const text = speechPending.current.trim();
+    speechPending.current = '';
+    setInterim('');
+    if (!text) return;
+    const seq = speechSeq.current++;
+    segmentsRef.current = [...segmentsRef.current, { seq, start_ms: Math.round(recorder.current?.elapsed() || segmentsRef.current.at(-1)?.start_ms || 0), text }];
+    setSegments(segmentsRef.current);
+  }
+
   function startSpeech() {
     const Recognition = speechRecognition();
     const rec = new Recognition();
@@ -134,19 +147,27 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
           setSegments(segmentsRef.current);
         } else pending += `${text} `;
       }
+      speechPending.current = pending.trim();
       setInterim(pending.trim());
     };
-    rec.onend = () => { if (speech.current === rec && recorder.current && !recorder.current.paused) { try { rec.start(); } catch { /* already running */ } } };
+    rec.onend = () => {
+      keepPending();
+      speechEnded.current?.();
+      if (speech.current === rec && recorder.current && !recorder.current.paused) { try { rec.start(); } catch { /* already running */ } }
+    };
     rec.onerror = event => { if (event.error === 'not-allowed') setError('Speech recognition was blocked.'); };
     speech.current = rec;
     try { rec.start(); } catch { /* already running */ }
   }
 
+  // Stops recognition and waits (up to 3 s) for its last words, which arrive as it ends.
   function stopSpeech() {
     const rec = speech.current;
     speech.current = null;
-    setInterim('');
-    try { rec?.stop(); } catch { /* not running */ }
+    if (!rec) return Promise.resolve();
+    const ended = new Promise(resolve => { speechEnded.current = resolve; setTimeout(resolve, 3000); });
+    try { rec.stop(); } catch { /* not running */ }
+    return ended.then(() => { speechEnded.current = null; keepPending(); });
   }
 
   function stopEverything() {
@@ -236,18 +257,20 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
     setStep('Transcribing the last part');
     const current = recorder.current;
     const browser = Boolean(speech.current);
-    stopSpeech();
-    recorder.current = null;
-    await current?.stop();
+    const spoken = stopSpeech();
     if (browser) {
-      // Browser speech has no uploads to wait for; give the last phrase a moment to arrive.
+      // Browser speech has no uploads to wait for: wait for its last words, then build.
+      await spoken;
+      recorder.current = null;
+      await current?.stop();
       cleanup.current.forEach(fn => fn());
       cleanup.current = [];
       setLevel(0);
-      await new Promise(resolve => setTimeout(resolve, 600));
       await build();
       return;
     }
+    recorder.current = null;
+    await current?.stop();
     cleanup.current.forEach(fn => fn());
     cleanup.current = [];
     setLevel(0);

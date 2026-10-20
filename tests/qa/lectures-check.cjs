@@ -154,6 +154,36 @@ async function session(browser, { width = 1440, theme = 'light', lecture = LECTU
     await context.close();
   });
 
+  await check('Browser speech: words still pending (never final) are kept on Stop and on Chrome restarts', async () => {
+    const { context, page, state } = await session(browser);
+    // A fake engine like Chrome on a long stretch of speech: only interim results; a restart
+    // (its ~1 minute limit) partway through; finals never come.
+    await page.addInitScript(() => {
+      const said = ['Today we are covering the causes of the French Revolution in seventeen eighty nine', 'and how the debt crisis and bread prices pushed people to act'];
+      let part = 0;
+      class FakeRecognition {
+        start() { this.running = true; const text = said[Math.min(part, said.length - 1)]; part += 1;
+          setTimeout(() => this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: false })] }), 300);
+          if (part === 1) setTimeout(() => { if (this.running) { this.running = false; this.onend?.(); } }, 900); }
+        stop() { if (!this.running) return; this.running = false; setTimeout(() => this.onend?.(), 200); }
+      }
+      window.SpeechRecognition = FakeRecognition;
+      window.webkitSpeechRecognition = FakeRecognition;
+    });
+    await page.goto(BASE + '/dashboard');
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('cordia:new', { detail: { mode: 'record' } })));
+    await page.locator('text=Transcribed by your browser').waitFor({ timeout: 10000 });
+    await page.click('.rec-start');
+    await page.locator('.rec-timer').waitFor({ timeout: 10000 });
+    await page.locator('.rec-transcript p:has-text("French Revolution")').waitFor({ timeout: 5000 });
+    await page.locator('.rec-interim:has-text("bread prices")').waitFor({ timeout: 5000 });
+    await page.click('.rec-stage button:has-text("Stop")');
+    await page.waitForURL(/\/lecture\//, { timeout: 15000 });
+    const saved = state.saved[0] || {};
+    expect(/French Revolution/.test(saved.transcript) && /bread prices/.test(saved.transcript), `saved: ${JSON.stringify(saved.transcript)}`);
+    await context.close();
+  });
+
   await browser.close();
   const failed = results.filter(ok => !ok).length;
   console.log(`\n${results.length - failed}/${results.length} passed`);
