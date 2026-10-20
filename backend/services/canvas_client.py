@@ -5,7 +5,8 @@ Rules enforced here (not in the UI):
     12-byte IV per token, and the user id as associated data. The key never touches the DB.
   * Only GET, and only to the read-only allowlist below. Anything else raises.
   * Host check: https, no port, no credentials, no IP literal or localhost, the host is
-    *.instructure.com or listed in canvas_school_policy, and it resolves to public addresses.
+    *.instructure.com (directly or as a DNS alias of one, like a school's own Canvas address) or
+    listed in canvas_school_policy, and it resolves to public addresses.
     Each client then connects only to an address that passed that check (TLS and Host still use
     the Canvas name), so DNS can't be switched to a private address afterwards. Redirects are
     never followed to another host.
@@ -171,10 +172,22 @@ def pinned_session(host: str) -> requests.Session:
     return session
 
 
-def check_host(domain: str, policy_domains: Iterable[str], resolve: Optional[Callable[[str], bool]] = None) -> str:
+def _canonical_name(host: str) -> str:
+    """The name DNS resolves `host` to through its CNAMEs ('' if it doesn't resolve)."""
+    try:
+        return socket.gethostbyname_ex(host)[0].rstrip(".").lower()
+    except (socket.gaierror, socket.herror, UnicodeError):
+        return ""
+
+
+def check_host(domain: str, policy_domains: Iterable[str], resolve: Optional[Callable[[str], bool]] = None,
+               canonical: Optional[Callable[[str], str]] = None) -> str:
     resolve = resolve or _resolves_public
+    canonical = canonical or _canonical_name
     host = normalize_domain(domain)
-    if not host_allowed(host, policy_domains):
+    # A school's own Canvas address (e.g. usaonline.southalabama.edu) is a DNS alias of its
+    # *.instructure.com instance; that counts as Instructure-hosted Canvas too.
+    if not host_allowed(host, policy_domains) and not host_allowed(canonical(host), []):
         raise CanvasForbiddenRequest("Cordia doesn't recognize that Canvas address.")
     if not resolve(host):
         raise CanvasForbiddenRequest("That Canvas address could not be reached.")

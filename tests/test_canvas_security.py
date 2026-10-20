@@ -86,6 +86,15 @@ class HostTests(unittest.TestCase):
         self.assertEqual(cc.check_host("School.Instructure.com", [], resolve=lambda _h: True), "school.instructure.com")
         self.assertEqual(cc.check_host("https://canvas.example.edu/", ["canvas.example.edu"], resolve=lambda _h: True), "canvas.example.edu")
 
+    def test_school_domain_that_aliases_instructure_is_allowed(self):
+        alias = {"usaonline.southalabama.edu": "southalabama-vanity.instructure.com"}.get
+        self.assertEqual(cc.check_host("usaonline.southalabama.edu", [], resolve=lambda _h: True, canonical=lambda h: alias(h, "")), "usaonline.southalabama.edu")
+        for name in ("evil.example.edu", "instructure.com.evil.example", ""):
+            with self.assertRaises(cc.CanvasForbiddenRequest, msg=name):
+                cc.check_host("canvas.example.edu", [], resolve=lambda _h: True, canonical=lambda _h, n=name: n)
+        with self.assertRaises(cc.CanvasForbiddenRequest):  # an alias still has to resolve to public addresses
+            cc.check_host("usaonline.southalabama.edu", [], resolve=lambda _h: False, canonical=lambda h: alias(h, ""))
+
     def test_private_dns_answer_is_rejected(self):
         with self.assertRaises(cc.CanvasForbiddenRequest):
             cc.check_host("school.instructure.com", [], resolve=lambda _h: False)
