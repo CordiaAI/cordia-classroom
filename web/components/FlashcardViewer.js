@@ -1,200 +1,216 @@
-import { useState, useRef } from 'react';
-import { apiFetch } from '../lib/api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowLeft, MessageCircle, Pencil, Shuffle, Star } from 'lucide-react';
+import { walkthroughEvent } from '../lib/walkthrough';
+import SessionFinish from './SessionFinish';
 
-export default function FlashcardViewer({ flashcards, guideId, onComplete }) {
+function shuffledOrder(length) {
+  const order = Array.from({ length }, (_, index) => index);
+  for (let index = order.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.random() * (index + 1));
+    [order[index], order[swap]] = [order[swap], order[index]];
+  }
+  return order;
+}
+
+export function askAboutCard(card, guideId) {
+  window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', {
+    detail: { guideId: card.guideId || guideId, prompt: `Explain this question: ${card.front}`, send: true },
+  }));
+}
+
+// One flashcard session. Missed cards go to the back of the queue until known.
+// cards: [{ front, back, image?, guideId? }]. onFinish({ known: [i], missed: [i], seconds }).
+export default function FlashcardViewer({
+  flashcards, guideId, title, onBack, onFinish, onExit, starred, onToggleStar, onEdit, finishExtra,
+}) {
   const total = flashcards.length;
-  // queue[0] is always the current card index. Wrong cards move to back of queue.
-  const [queue, setQueue] = useState(() => flashcards.map((_, i) => i));
-  const [isFlipped, setIsFlipped] = useState(false);
-  const [correctDone, setCorrectDone] = useState([]); // indices fully mastered
-  const [missedSet, setMissedSet] = useState(new Set()); // indices ever marked wrong
-  const [historyStack, setHistoryStack] = useState([]); // for back button
+  const [queue, setQueue] = useState(() => flashcards.map((_, index) => index));
+  const [flipped, setFlipped] = useState(false);
+  const [known, setKnown] = useState([]);
+  const [missed, setMissed] = useState(() => new Set());
+  const [history, setHistory] = useState([]);
   const [done, setDone] = useState(false);
-  const startTime = useRef(Date.now());
+  const [seconds, setSeconds] = useState(0);
+  const started = useRef(Date.now());
+  const cardRef = useRef(null);
 
-  function flip() { setIsFlipped(f => !f); }
+  const current = queue[0];
+  useEffect(() => { if (flipped) walkthroughEvent('card-flipped'); }, [flipped]);
+  const card = flashcards[current];
 
-  function markKnown() {
-    if (!isFlipped) return;
-    const cardIndex = queue[0];
-    const snapshot = { queue: [...queue], correctDone: [...correctDone], missedSet: new Set(missedSet) };
-    const newCorrect = [...correctDone, cardIndex];
-    const newQueue = queue.slice(1);
-    setHistoryStack(h => [...h, snapshot]);
-    setCorrectDone(newCorrect);
-    setQueue(newQueue);
-    setIsFlipped(false);
-    if (newQueue.length === 0) finish(newCorrect, missedSet);
+  const finish = useCallback((nextKnown, nextMissed) => {
+    const elapsed = Math.round((Date.now() - started.current) / 1000);
+    setSeconds(elapsed);
+    setDone(true);
+    onFinish?.({ known: nextKnown, missed: [...nextMissed].filter(index => !nextKnown.includes(index)), seconds: elapsed });
+  }, [onFinish]);
+
+  function snapshot() {
+    return { queue: [...queue], known: [...known], missed: new Set(missed) };
   }
 
-  function markUnknown() {
-    if (!isFlipped) return;
-    const cardIndex = queue[0];
-    const snapshot = { queue: [...queue], correctDone: [...correctDone], missedSet: new Set(missedSet) };
-    const newMissed = new Set(missedSet);
-    newMissed.add(cardIndex);
-    // Move card to back of queue for re-practice
-    const newQueue = [...queue.slice(1), cardIndex];
-    setHistoryStack(h => [...h, snapshot]);
-    setMissedSet(newMissed);
-    setQueue(newQueue);
-    setIsFlipped(false);
-    window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', {
-      detail: {
-        guideId,
-        prompt: `Explain this question: ${flashcards[cardIndex].front}`,
-      },
-    }));
+  function gotIt() {
+    if (!flipped || card === undefined) return;
+    const nextKnown = [...known, current];
+    const nextQueue = queue.slice(1);
+    setHistory(list => [...list, snapshot()]);
+    setKnown(nextKnown);
+    setQueue(nextQueue);
+    setFlipped(false);
+    if (!nextQueue.length) finish(nextKnown, missed);
   }
 
-  function goBack() {
-    if (historyStack.length === 0) return;
-    const prev = historyStack[historyStack.length - 1];
-    setHistoryStack(h => h.slice(0, -1));
-    setQueue(prev.queue);
-    setCorrectDone(prev.correctDone);
-    setMissedSet(prev.missedSet);
-    setIsFlipped(false);
+  function again() {
+    if (!flipped || card === undefined) return;
+    const nextMissed = new Set(missed);
+    nextMissed.add(current);
+    setHistory(list => [...list, snapshot()]);
+    setMissed(nextMissed);
+    setQueue([...queue.slice(1), current]);
+    setFlipped(false);
+  }
+
+  function back() {
+    const previous = history[history.length - 1];
+    if (!previous) return;
+    setHistory(list => list.slice(0, -1));
+    setQueue(previous.queue);
+    setKnown(previous.known);
+    setMissed(previous.missed);
+    setFlipped(false);
     setDone(false);
   }
 
-  async function finish(c, m) {
-    setDone(true);
-    const elapsed = Math.round((Date.now() - startTime.current) / 1000);
-    const knownIndices = c;
-    const unknownIndices = [...m].filter(i => !c.includes(i));
-    if (guideId) {
-      await Promise.all([
-        apiFetch('/guides/' + guideId + '/flashcard-progress', {
-          method: 'PATCH',
-          body: JSON.stringify({ known: knownIndices, unknown: unknownIndices, last_studied: new Date().toISOString() })
-        }),
-        apiFetch('/stats/log-session', {
-          method: 'POST',
-          body: JSON.stringify({
-            guide_id: guideId,
-            session_type: 'flashcard',
-            duration_seconds: elapsed,
-            metadata: { cards_studied: total, cards_correct: c.length }
-          })
-        })
-      ]);
-    }
-    if (onComplete) onComplete({ known: knownIndices, unknown: unknownIndices });
+  function shuffle() {
+    const order = shuffledOrder(queue.length);
+    setQueue(order.map(index => queue[index]));
+    setFlipped(false);
   }
 
   function restart() {
-    setQueue(flashcards.map((_, i) => i));
-    setCorrectDone([]);
-    setMissedSet(new Set());
-    setHistoryStack([]);
-    setIsFlipped(false);
+    setQueue(flashcards.map((_, index) => index));
+    setKnown([]);
+    setMissed(new Set());
+    setHistory([]);
+    setFlipped(false);
     setDone(false);
-    startTime.current = Date.now();
+    started.current = Date.now();
   }
 
-  if (done) {
-    return (
-      <div className="completion-card">
-        <div className="completion-icon">&#127881;</div>
-        <div className="completion-title">Session Complete!</div>
-        <div className="completion-stat">{correctDone.length}/{total}</div>
-        <div className="completion-detail">cards mastered</div>
-        <div style={{ display: 'flex', gap: 32, justifyContent: 'center', marginTop: 20 }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: 'var(--success)', fontSize: '1.4em', fontWeight: 800, letterSpacing: '-0.04em' }}>{correctDone.length}</div>
-            <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginTop: 3 }}>Correct</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: 'var(--error)', fontSize: '1.4em', fontWeight: 800, letterSpacing: '-0.04em' }}>{missedSet.size}</div>
-            <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginTop: 3 }}>Missed</div>
-          </div>
-        </div>
-        <div style={{ marginTop: 16 }}>
-          <div className="progress-bar-container" style={{ height: 8 }}>
-            <div className="progress-bar-fill green" style={{ width: (correctDone.length / total * 100) + '%' }} />
-          </div>
-        </div>
-        <div className="completion-actions">
-          <button className="btn-outline" onClick={() => window.history.back()}>Done</button>
-          <button className="btn" onClick={restart}>Restart</button>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    function onKey(event) {
+      if (event.target.closest?.('input, textarea, select, [contenteditable="true"], .tutor-drawer')) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (done) return;
+      if (event.key === ' ' || event.key === 'Enter') {
+        if (event.target.closest?.('button') && event.target !== cardRef.current) return;
+        event.preventDefault();
+        setFlipped(value => !value);
+      } else if (event.key === '1') again();
+      else if (event.key === '2') gotIt();
+      else if (event.key === 'ArrowLeft') back();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
-  if (queue.length === 0) {
-    finish(correctDone, missedSet);
-    return null;
-  }
-
-  const card = flashcards[queue[0]];
-  const correctCount = correctDone.length;
-  // Cards still in queue that were previously missed
-  const wrongCount = queue.filter(i => missedSet.has(i)).length;
-  // Cards not yet shown (in queue, never missed)
-  const unseenCount = queue.length - wrongCount;
+  const position = Math.min(total, known.length + 1);
 
   return (
-    <div>
-      {/* Progress tracker */}
-      <div className="fc-progress-tracker">
-        <div className="fc-progress-stat fc-correct">
-          <span className="fc-progress-count">{correctCount}</span>
-          <span className="fc-progress-label">Correct</span>
-        </div>
-        <div className="fc-progress-stat fc-wrong">
-          <span className="fc-progress-count">{wrongCount}</span>
-          <span className="fc-progress-label">Missed</span>
-        </div>
-        <div className="fc-progress-stat fc-unseen">
-          <span className="fc-progress-count">{unseenCount}</span>
-          <span className="fc-progress-label">Remaining</span>
-        </div>
+    <div className="fc">
+      <div className="c-glass fc-bar" role="toolbar" aria-label="Flashcards">
+        <button type="button" className="c-icon-btn" onClick={onBack} aria-label="Back"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+        <span className="fc-name c-truncate">{title}</span>
+        <button type="button" className="c-icon-btn" onClick={shuffle} aria-label="Shuffle" disabled={done}><Shuffle size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+        {onToggleStar && (
+          <button type="button" className={'c-icon-btn' + (starred ? ' is-starred' : '')} onClick={onToggleStar} aria-pressed={Boolean(starred)} aria-label={starred ? 'Unstar' : 'Star'}>
+            <Star size={20} strokeWidth={1.75} aria-hidden="true" fill={starred ? 'currentColor' : 'none'} />
+          </button>
+        )}
+        {onEdit && <button type="button" className="c-icon-btn" onClick={onEdit} aria-label="Edit"><Pencil size={20} strokeWidth={1.75} aria-hidden="true" /></button>}
+        <button type="button" className="c-btn c-btn--quiet fc-ask" onClick={() => card && askAboutCard(card, guideId)} disabled={done}>
+          <MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />Ask
+        </button>
       </div>
 
-      <div className="progress-bar-container" style={{ marginBottom: 12 }}>
-        <div className="progress-bar-fill" style={{ width: (correctCount / total * 100) + '%' }} />
-      </div>
-
-      <div className="flashcard-container" onClick={flip} role="button" tabIndex={0} aria-label={isFlipped ? 'Show question' : 'Reveal answer'} aria-pressed={isFlipped} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); flip(); } }}>
-        <div className={'flashcard-inner' + (isFlipped ? ' flipped' : '')}>
-          <div className="flashcard-face flashcard-front" aria-hidden={isFlipped}>
-            <div className="flashcard-label">Question</div>
-            {card.front}
+      {done ? (
+        <SessionFinish
+          guideId={guideId || flashcards[0]?.guideId}
+          guideTitle={title}
+          cards={total}
+          accuracy={((total - missed.size) / Math.max(1, total)) * 100}
+          minutes={seconds / 60}
+          kind="cards"
+          onRestart={restart}
+          onDone={onExit || onBack}
+        >
+          {finishExtra}
+        </SessionFinish>
+      ) : (
+        <>
+          <div className="fc-progress">
+            <div className="c-bar" role="progressbar" aria-label="Progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={known.length}><span style={{ width: `${(known.length / total) * 100}%` }} /></div>
+            <span className="c-meta">{position} / {total}</span>
           </div>
-          <div className="flashcard-face flashcard-back" aria-hidden={!isFlipped}>
-            <div className="flashcard-label">Answer</div>
-            {card.back}
-            {card.image && (
-              <img
-                src={card.image}
-                alt=""
-                style={{ maxWidth: '100%', maxHeight: 200, marginTop: 12, borderRadius: 8, objectFit: 'contain' }}
-              />
+          <div
+            ref={cardRef}
+            data-spot="flashcard"
+            className={'fc-card' + (flipped ? ' is-flipped' : '')}
+            role="button"
+            tabIndex={0}
+            aria-roledescription="flashcard"
+            aria-pressed={flipped}
+            onClick={() => setFlipped(value => !value)}
+          >
+            <div className="fc-face fc-front" aria-hidden={flipped}>
+              {card?.guideTitle && <span className="c-meta">{card.guideTitle}</span>}
+              <p>{card?.front}</p>
+            </div>
+            <div className="fc-face fc-back" aria-hidden={!flipped}>
+              <p>{card?.back}</p>
+              {card?.image && <img src={card.image} alt="" />}
+            </div>
+          </div>
+          <div className="fc-actions">
+            {flipped ? (
+              <>
+                <button type="button" className="c-btn c-btn--secondary c-btn--lg" onClick={again}>Again <kbd>1</kbd></button>
+                <button type="button" className="c-btn c-btn--primary c-btn--lg" onClick={gotIt}>Got it <kbd>2</kbd></button>
+              </>
+            ) : (
+              <button type="button" className="c-btn c-btn--secondary c-btn--lg" onClick={() => setFlipped(true)}>Flip <kbd>Space</kbd></button>
             )}
           </div>
-        </div>
-      </div>
-
-      {!isFlipped ? (
-        <div style={{ textAlign: 'center', marginTop: 12 }}>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85em', marginBottom: historyStack.length > 0 ? 8 : 0 }}>
-            Click card to reveal answer
-          </p>
-          {historyStack.length > 0 && (
-            <button className="fc-btn-back-subtle" onClick={goBack}>&#8592; Previous card</button>
-          )}
-        </div>
-      ) : (
-        <div className="flashcard-actions">
-          {historyStack.length > 0 && (
-            <button className="fc-btn fc-btn-back" onClick={goBack}>&#8592;</button>
-          )}
-          <button className="fc-btn fc-btn-again" onClick={markUnknown}>Study Again</button>
-          <button className="fc-btn fc-btn-know" onClick={markKnown}>Got It</button>
-        </div>
+        </>
       )}
+      <style jsx>{`
+        .fc { display: grid; gap: 20px; width: min(760px, 100%); margin: 0 auto; }
+        .fc-bar { position: sticky; top: calc(var(--bar-h) + 12px); z-index: 20; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius:var(--r-pill); }
+        .fc-name { flex: 1; min-width: 0; padding: 0 8px; font:600 17px/1.15 var(--font-display); }
+        .fc-bar :global(.is-starred) { color: var(--olive-ink); }
+        .fc-progress { display: flex; align-items: center; gap: 12px; }
+        .fc-progress .c-bar { flex: 1; }
+        .fc-card { position: relative; min-height: 340px; perspective: 1400px; cursor: pointer; border-radius:var(--r-card); }
+        .fc-face { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 12px; padding: 32px; overflow: auto; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); box-shadow: var(--shadow); backface-visibility: hidden; transition: transform var(--dur) var(--ease); text-align: center; }
+        .fc-face p { margin: 0; max-width: 34ch; font:500 20px/1.15 var(--font-display); color: var(--ink); }
+        .fc-face img { max-width: 100%; max-height: 180px; object-fit: contain; border-radius:var(--r-input); }
+        .fc-back { transform: rotateY(180deg); }
+        .is-flipped .fc-front { transform: rotateY(-180deg); }
+        .is-flipped .fc-back { transform: rotateY(0); }
+        .fc-actions { display: flex; justify-content: center; gap: 12px; }
+        .fc-actions :global(.c-btn) { min-width: 150px; }
+        @media (max-width: 767px) {
+          .fc-bar { top: 64px; }
+          .fc-card { min-height: 300px; }
+          .fc-actions :global(.c-btn) { flex: 1; min-width: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .fc-face { transition: none; }
+          .fc-back { transform: none; opacity: 0; }
+          .is-flipped .fc-front { transform: none; opacity: 0; }
+          .is-flipped .fc-back { opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

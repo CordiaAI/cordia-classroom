@@ -85,6 +85,22 @@ def _other_answers(qa_pairs: list, index: int) -> list:
     return sorted(candidates, key=lambda value: abs(len(value) - len(answer)))
 
 
+def _not_longest(answer: str, chosen: list, pool: list) -> list:
+    """Keep the correct answer from being the visibly longest option.
+
+    If no chosen distractor is at least 90% of the answer's length, swap the shortest one for
+    the closest-length pool value that is (when the pool has one)."""
+    if not chosen or any(len(str(value)) >= 0.9 * len(answer) for value in chosen):
+        return chosen
+    taken = {str(value).casefold() for value in chosen} | {answer.casefold()}
+    longer = sorted((str(value).strip() for value in pool if len(str(value).strip()) >= 0.9 * len(answer) and str(value).strip().casefold() not in taken),
+                    key=lambda value: len(value) - len(answer))
+    if not longer:
+        return chosen
+    shortest = min(range(len(chosen)), key=lambda i: len(str(chosen[i])))
+    return [longer[0] if i == shortest else value for i, value in enumerate(chosen)]
+
+
 def _standard_questions(qa_pairs: list) -> list:
     """Build an instant free Retain quiz from answers already in the guide."""
     questions = []
@@ -92,7 +108,7 @@ def _standard_questions(qa_pairs: list) -> list:
         answer = pair["answer"]
         candidates = _other_answers(qa_pairs, index)
         shortlist = candidates[:min(6, len(candidates))]
-        distractors = random.sample(shortlist, min(3, len(shortlist)))
+        distractors = _not_longest(answer, random.sample(shortlist, min(3, len(shortlist))), candidates)
         if not distractors:
             continue
         options = [answer, *distractors]
@@ -128,7 +144,7 @@ def _balanced_distractors(answer: str, generated: list, fallback: list) -> list:
     add(generated, enforce_length=True)
     add(fallback, enforce_length=True)
     add(sorted([*generated, *fallback], key=lambda value: abs(len(str(value)) - len(answer))))
-    return accepted[:3]
+    return _not_longest(answer, accepted[:3], [*generated, *fallback])
 
 
 def _save_quiz(supabase, guide_id: str, user_id: str, questions: list) -> None:

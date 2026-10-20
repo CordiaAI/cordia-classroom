@@ -1,10 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
+import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
-import { formatDate } from '../../lib/formatters';
+import Link from 'next/link';
+import { ArrowLeft, BookOpen, FolderInput, Plus, Trash2 } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import AILoadingSphere from '../../components/AILoadingSphere';
+import Menu from '../../components/Menu';
+import ProgressRing from '../../components/ProgressRing';
+import { openNewSheet } from '../../lib/newSheet';
 
 export default function FolderPage() {
   const router = useRouter();
@@ -17,6 +21,7 @@ export default function FolderPage() {
   const [confirm, setConfirm] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [toast, setToast] = useState(null);
+  const gate = useLoadGate(Boolean(folder) || Boolean(loadError));
   const contextRef = useRef(null);
 
   useEffect(() => {
@@ -61,8 +66,8 @@ export default function FolderPage() {
     if (e) e.stopPropagation();
     setContextMenu(null);
     setConfirm({
-      title: 'Delete Guide',
-      message: 'Are you sure you want to delete this study guide?',
+      title: 'Delete guide?',
+      message: '',
       onConfirm: async () => {
         await apiFetch('/guides/' + guideId, { method: 'DELETE' });
         setGuides(guides.filter(g => g.id !== guideId));
@@ -74,11 +79,11 @@ export default function FolderPage() {
 
   function deleteFolder() {
     setConfirm({
-      title: 'Delete Folder',
-      message: 'Delete this folder and all its contents?',
+      title: 'Delete class?',
+      message: '',
       onConfirm: async () => {
         await apiFetch('/folders/' + id, { method: 'DELETE' });
-        router.push('/dashboard');
+        router.push('/library');
       }
     });
   }
@@ -105,119 +110,65 @@ export default function FolderPage() {
   }
 
   if (loadError && !folder) return (
-    <div className="empty-state" role="alert">
-      <h2>Class unavailable</h2>
+    <div className="c-empty" role="alert">
+      <h1 className="c-title">Class unavailable</h1>
       <p>{loadError}</p>
-      <div className="resource-load-actions">
-        <button type="button" className="btn" onClick={loadData}>Try again</button>
-        <button type="button" className="btn-outline" onClick={() => router.push('/dashboard?view=guides')}>Back to Study Guides</button>
+      <div className="c-row">
+        <button type="button" className="c-btn c-btn--primary" onClick={loadData}>Retry</button>
+        <button type="button" className="c-btn c-btn--secondary" onClick={() => router.push('/library')}>Library</button>
       </div>
     </div>
   );
 
-  if (!folder) return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 16 }}>
-      <AILoadingSphere />
-    </div>
-  );
+  if (!folder || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading class" />;
 
   return (
-    <div className="fade-in">
-      {confirm && (
-        <ConfirmDialog
-          title={confirm.title}
-          message={confirm.message}
-          onConfirm={confirm.onConfirm}
-          onCancel={() => setConfirm(null)}
-        />
-      )}
-
-      <a href="#" onClick={e => { e.preventDefault(); router.push('/dashboard?view=guides'); }} style={{ fontSize: '0.85em', color: 'var(--text-muted)' }}>
-        &larr; All Study Guides
-      </a>
-
-      <div className="section-header" style={{ marginTop: 12 }}>
-        <h2>{folder.name}</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn" style={{ fontSize: '0.8em', padding: '6px 14px' }} onClick={() => router.push('/create?folder=' + id)}>
-            + Create Guide
-          </button>
-          <button className="btn btn-red" style={{ fontSize: '0.8em', padding: '6px 14px' }} onClick={deleteFolder}>
-            Delete Folder
-          </button>
+    <Reveal phase={gate}>
+    <div className="c-page">
+      {confirm && <ConfirmDialog title={confirm.title} message={confirm.message} onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
+      <header className="c-page-head">
+        <div className="c-row">
+          <button type="button" className="c-icon-btn" onClick={() => router.push('/library')} aria-label="Library"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+          <h1 className="c-title">{folder.name}</h1>
+          <span className="c-meta">{guides.length}</span>
         </div>
-      </div>
-
-      <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>{guides.length} study guides &middot; Right-click a guide for options</p>
+        <div className="c-row">
+          <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet()}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />New</button>
+          <Menu label="Class actions" items={[{ label: 'Delete class', icon: Trash2, danger: true, onSelect: deleteFolder }]} />
+        </div>
+      </header>
 
       {guides.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">&#128214;</div>
-          No study guides in this folder yet.<br />Use the Chrome extension to capture content and save it here.
-        </div>
+        <div className="c-empty"><BookOpen size={32} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">0 guides</span></div>
       ) : (
-        guides.map(guide => (
-          <div
-            key={guide.id}
-            className="card draggable-guide"
-            onClick={() => router.push('/guide/' + guide.id)}
-            onContextMenu={e => onGuideContextMenu(e, guide)}
-          >
-            <div className="card-row">
-              <div style={{ flex: 1 }}>
-                <h3>{guide.title}</h3>
-                <p>
-                  {(guide.source_title || guide.source_url) && <span>Based on {guide.source_title || 'Original source'}</span>}
-                  {' '}
-                  <span className="timestamp">{formatDate(guide.created_at)}</span>
-                  {guide.read_progress > 0 && (
-                    <span style={{ marginLeft: 8 }}>
-                      <span className="mini-progress">
-                        <span className="mini-progress-fill" style={{ width: Math.round((guide.read_progress || 0) * 100) + '%' }} />
-                      </span>
-                      {Math.round((guide.read_progress || 0) * 100)}%
-                    </span>
-                  )}
-                </p>
-              </div>
-              <button className="btn btn-red" style={{ fontSize: '0.8em', padding: '4px 10px' }} onClick={e => deleteGuide(guide.id, e)}>
-                Delete
-              </button>
-            </div>
-          </div>
-        ))
-      )}
-
-      {/* Context Menu */}
-      {contextMenu && (
-        <div
-          ref={contextRef}
-          className="context-menu"
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-        >
-          <div className="context-menu-header">{contextMenu.guide.title}</div>
-          <div className="context-menu-divider" />
-          <div className="context-menu-item" onClick={() => { router.push('/guide/' + contextMenu.guide.id); setContextMenu(null); }}>
-            &#128214; Open Guide
-          </div>
-          <div className="context-menu-divider" />
-          <div className="context-menu-label">Move to:</div>
-          <div className="context-menu-item" onClick={() => moveGuideToFolder(contextMenu.guide.id, null)}>
-            &#10060; Remove from class
-          </div>
-          {folders.filter(f => f.id !== id).map(f => (
-            <div key={f.id} className="context-menu-item" onClick={() => moveGuideToFolder(contextMenu.guide.id, f.id)}>
-              &#128193; {f.name}
+        <div className="c-card c-list">
+          {guides.map(guide => (
+            <div key={guide.id} className="c-list-row">
+              <ProgressRing value={guide.read_progress} size={36} label={false} />
+              <Link href={'/guide/' + guide.id} className="c-grow folder-row-link">
+                <span className="folder-row-title c-truncate">{guide.title}</span>
+                <span className="c-meta">{new Date(guide.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+              </Link>
+              <Menu
+                label={`More for ${guide.title}`}
+                items={[
+                  { label: 'Move to class', icon: FolderInput, items: [
+                    { label: 'Unsorted', onSelect: () => moveGuideToFolder(guide.id, null) },
+                    ...folders.filter(f => f.id !== id).map(f => ({ label: f.name, onSelect: () => moveGuideToFolder(guide.id, f.id) })),
+                  ] },
+                  { label: 'Delete', icon: Trash2, danger: true, onSelect: () => deleteGuide(guide.id) },
+                ]}
+              />
             </div>
           ))}
-          <div className="context-menu-divider" />
-          <div className="context-menu-item context-menu-danger" onClick={() => deleteGuide(contextMenu.guide.id)}>
-            &#128465; Delete Guide
-          </div>
         </div>
       )}
-
-      {toast && <div className={'toast toast-' + toast.type}>{toast.message}</div>}
+      {toast && <div className="c-toast" role="status"><span>{toast.message}</span></div>}
+      <style jsx>{`
+        :global(.folder-row-link) { display: flex; align-items: baseline; gap: 12px; min-width: 0; color: var(--ink); text-decoration: none; }
+        .folder-row-title { font:600 17px/1.15 var(--font-display); min-width: 0; }
+      `}</style>
     </div>
+    </Reveal>
   );
 }

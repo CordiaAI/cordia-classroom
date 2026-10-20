@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -19,6 +20,8 @@ from routers import (
     auth, billing, calendar, chat, feedback, folders, guides, learning, materials,
     nclex, practice, quiz, search, smart_notes, stats, tutor,
 )
+from routers import canvas, classes, admin, public_forms
+from services import log_scrub
 
 # Load environment variables
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
@@ -29,6 +32,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+log_scrub.install()
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -51,6 +55,13 @@ async def openai_error(request: Request, error: APIError):
     if isinstance(error, RateLimitError):
         return JSONResponse(status_code=503, content={"detail": "Cordia's AI is busy right now. Please try again in a minute."})
     return JSONResponse(status_code=502, content={"detail": "Cordia's AI service had a problem. Please try again."})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, exc: RequestValidationError):
+    # Never echo submitted values back: a Canvas token could be among them.
+    errors = [{"loc": list(e.get("loc", ())), "msg": e.get("msg", ""), "type": e.get("type", "")} for e in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": errors})
 
 # CORS — restrict to known origins
 ALLOWED_ORIGINS = [
@@ -140,6 +151,10 @@ app.include_router(chat.router)
 app.include_router(materials.router)
 app.include_router(practice.router)
 app.include_router(learning.router)
+app.include_router(canvas.router)
+app.include_router(classes.router)
+app.include_router(admin.router)
+app.include_router(public_forms.router)
 
 
 

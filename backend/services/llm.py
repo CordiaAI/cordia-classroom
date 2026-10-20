@@ -14,7 +14,7 @@ from contextvars import copy_context
 from typing import List, Optional
 
 from services.llm_calls import chat
-from services.models import study_guide_model
+from services.models import GROQ, GROQ_BASE_URL, study_guide_model
 from services.practice_areas import PRACTICE_AREAS, PRACTICE_BASE, classifier_prompt
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -25,7 +25,10 @@ logger = logging.getLogger(__name__)
 
 
 def get_openai_client() -> OpenAI:
-    """OpenAI client from OPENAI_API_KEY; a missing key is a deploy error, so it raises."""
+    """Chat client: Groq (OpenAI-compatible) when GROQ_API_KEY is set, else OpenAI from OPENAI_API_KEY.
+    A missing key is a deploy error, so it raises."""
+    if GROQ:
+        return OpenAI(api_key=os.environ["GROQ_API_KEY"], base_url=GROQ_BASE_URL)
     return OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 

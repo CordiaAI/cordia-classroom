@@ -1,15 +1,21 @@
 import { useState } from 'react';
 import { apiFetch } from '../lib/api';
 import { advance, createSession, currentCard, firstAttempts, progress, recordResults } from '../lib/retainEngine.mjs';
+import { Repeat } from 'lucide-react';
+import SessionFinish from './SessionFinish';
 import { FillCard, MatchingCard, McCard, WrittenCard } from './RetainCards';
+import { rememberRetainMisses } from '../lib/userStore';
+import { conceptAnswer } from '../lib/retainEngine.mjs';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 // Retain: every idea is asked once in its best-fitting format. A miss must then be answered
 // right two more times, a few questions apart, before it clears. The score is first-try only.
-export default function QuizMode({ questions, cards, types, guideId, onRestart }) {
+export default function QuizMode({ questions, cards, types, guideId, onRestart, onDone }) {
   const [session, setSession] = useState(() => createSession(questions, cards, types));
   const [answered, setAnswered] = useState(false);
   const [score, setScore] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [startedAt] = useState(() => Date.now());
   const card = currentCard(session);
   const stats = progress(session);
 
@@ -23,6 +29,10 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart }
     setSession(next);
     setAnswered(false);
     if (!currentCard(next)) {
+      // First-try misses come back in Today's Start session.
+      const misses = firstAttempts(next).filter(item => item.credit < 1).map(item => ({ question: questions[item.concept]?.question || '', answer: conceptAnswer(questions[item.concept]) })).filter(item => item.question && item.answer);
+      rememberRetainMisses(guideId, misses);
+      walkthroughEvent('quiz-done');
       setSaving(true);
       const data = await apiFetch(`/quiz/${guideId}/submit`, {
         method: 'POST',
@@ -44,37 +54,25 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart }
 
   if (!card) {
     const finalStats = progress(session);
+    const accuracy = score?.score ?? Math.round((finalStats.firstTryRight / Math.max(1, finalStats.total)) * 100);
     return (
-      <div className="quiz-result">
-        <div className="quiz-score">{score?.score ?? Math.round((finalStats.firstTryRight / Math.max(1, finalStats.total)) * 100)}%</div>
-        <div className="quiz-score-label">Retain Score</div>
-        <div className="quiz-breakdown">{finalStats.firstTryRight} of {finalStats.total} right on the first try</div>
-        {finalStats.missedMastered > 0 && (
-          <div className="retain-mastered-note">You mastered {finalStats.missedMastered} question{finalStats.missedMastered === 1 ? '' : 's'} you missed at first.</div>
-        )}
-        {finalStats.firstTryRight === finalStats.total && <div className="retain-mastered-note">Perfect — every question right on the first try!</div>}
-        {saving && <p className="retain-hint">Saving your score…</p>}
+      <SessionFinish guideId={guideId} cards={finalStats.total} accuracy={accuracy} minutes={(Date.now() - startedAt) / 60000} kind="quiz" onRestart={onRestart} onDone={onDone} doneSpot="quiz-done">
+        {saving && <span className="c-meta" role="status">Saving…</span>}
         {score?.error && <p className="retain-action-error" role="alert">{score.error}</p>}
-        <div className="completion-actions" style={{ marginTop: 20 }}>
-          <button className="btn" onClick={onRestart}>Study again</button>
-          <button className="btn-outline" onClick={() => window.history.back()}>Back to Guide</button>
-        </div>
-      </div>
+      </SessionFinish>
     );
   }
 
   const props = { card, guideId, onResult, onNext };
   return (
-    <div className="quiz-question-card">
-      <div className="retain-status-bar">
-        <span className="retain-mastered">{stats.cleared} / {stats.total} cleared</span>
-        {stats.toClear > 0 && <span className="retain-review-badge">{stats.toClear} to practice again</span>}
-      </div>
-      <div className="progress-bar-container" style={{ marginBottom: 16 }}>
-        <div className="progress-bar-fill" style={{ width: Math.round((stats.cleared / Math.max(1, stats.total)) * 100) + '%' }} />
+    <div className="c-card quiz-question-card">
+      <div className="quiz-progress">
+        <div className="c-bar" role="progressbar" aria-label="Cleared" aria-valuemin={0} aria-valuemax={stats.total} aria-valuenow={stats.cleared}><span style={{ width: Math.round((stats.cleared / Math.max(1, stats.total)) * 100) + '%' }} /></div>
+        <span className="c-meta">{stats.cleared} / {stats.total}</span>
+        {stats.toClear > 0 && <span className="c-meta quiz-repeat"><Repeat size={16} strokeWidth={1.75} aria-hidden="true" />{stats.toClear}</span>}
       </div>
       {card.reask && !answered && (
-        <div className="retain-review-label">You missed this one — get it right {session.concepts[card.concepts[0]].needs} more time{session.concepts[card.concepts[0]].needs === 1 ? '' : 's'} to clear it.</div>
+        <div className="quiz-reask"><Repeat size={20} strokeWidth={1.75} aria-hidden="true" />Repeat · {session.concepts[card.concepts[0]].needs} left</div>
       )}
       {card.type === 'matching' && <MatchingCard key={card.id} {...props} questions={questions} />}
       {card.type === 'fill' && <FillCard key={card.id} {...props} question={questions[card.concepts[0]]} />}

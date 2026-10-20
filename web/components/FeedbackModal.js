@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Check } from 'lucide-react';
+import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
 import { apiFetch } from '../lib/api';
 
@@ -99,6 +101,7 @@ export default function FeedbackModal({ onClose }) {
   }
 
   return (
+    <BodyPortal>
     <div className="feedback-overlay" onMouseDown={event => {
       if (event.target === event.currentTarget) onClose();
     }}>
@@ -113,7 +116,7 @@ export default function FeedbackModal({ onClose }) {
       >
         {submitted ? (
           <div className="feedback-success" role="status">
-            <span aria-hidden="true">✓</span>
+            <Check aria-hidden="true" />
             <h2>Feedback sent</h2>
             <p>Thank you for helping improve CordiaClassroom.</p>
           </div>
@@ -159,38 +162,39 @@ export default function FeedbackModal({ onClose }) {
       </section>
 
       <style jsx>{`
-        .feedback-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgba(23, 25, 21, 0.45); backdrop-filter: blur(7px); }
-        .feedback-modal { width: min(540px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; padding: 30px; border: 1px solid var(--line); border-radius: 24px; background: var(--surface-raised); color: var(--ink); box-shadow: var(--shadow-float); }
+        .feedback-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: var(--scrim); }
+        .feedback-modal { width: min(540px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; padding: 30px; border: 1px solid var(--line); border-radius:20px; background: var(--lg-panel); -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); border-color: var(--lg-edge); color: var(--ink); box-shadow: var(--lg-highlight), var(--lg-shadow); }
         .feedback-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
-        .feedback-kicker { margin: 0 0 8px; color: var(--olive); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.16em; }
-        h2 { margin: 0; color: var(--ink); font-size: clamp(1.65rem, 4vw, 2.15rem); line-height: 1.05; letter-spacing: -0.045em; }
-        .feedback-heading p:last-child { margin: 9px 0 0; color: var(--text-secondary); font-size: 0.9rem; }
-        .feedback-close { width: 38px; height: 38px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--ink); font: inherit; font-size: 1.45rem; line-height: 1; cursor: pointer; }
-        label { display: block; margin-bottom: 8px; color: var(--ink); font-size: 0.8rem; font-weight: 750; }
-        select, textarea { width: 100%; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); color: var(--ink); font: inherit; }
+        .feedback-kicker { margin: 0 0 8px; color: var(--olive); font-size: 13px; font-weight:600; letter-spacing:0; }
+        h2 { margin: 0; color: var(--ink); font-size: max(13px, clamp(1.65rem, 4vw, 2.15rem)); line-height:1.15; letter-spacing:-0.015em; }
+        .feedback-heading p:last-child { margin: 9px 0 0; color: var(--text-secondary); font-size:15px; }
+        .feedback-close { width: 38px; height: 38px; flex: 0 0 auto; border: 1px solid var(--line); border-radius:50%; background: var(--surface); color: var(--ink); font: inherit; font-size:20px; line-height:1; cursor: pointer; }
+        label { display: block; margin-bottom: 8px; color: var(--ink); font-size: 13px; font-weight:600; }
+        select, textarea { width: 100%; border: 1px solid var(--line); border-radius:12px; background: var(--surface); color: var(--ink); font: inherit; }
         select { min-height: 48px; margin-bottom: 20px; padding: 0 13px; }
-        textarea { padding: 14px; resize: vertical; line-height: 1.5; }
+        textarea { padding: 14px; resize: none; line-height:1.5; }
         select:focus, textarea:focus, button:focus-visible { outline: 3px solid color-mix(in srgb, var(--olive) 28%, transparent); outline-offset: 2px; }
         .feedback-message-label { display: flex; align-items: center; justify-content: space-between; }
-        .feedback-message-label span { color: var(--muted-ink); font-size: 0.7rem; }
-        .feedback-context { margin: 9px 0 0; color: var(--muted-ink); font-size: 0.72rem; line-height: 1.45; }
-        .feedback-error { margin: 13px 0 0; color: #9e3737; font-size: 0.82rem; font-weight: 650; line-height: 1.45; }
+        .feedback-message-label span { color: var(--muted-ink); font-size: 13px; }
+        .feedback-context { margin: 9px 0 0; color: var(--muted-ink); font-size: 13px; line-height:1.5; }
+        .feedback-error { margin: 13px 0 0; color: var(--error); font-size:13px; font-weight:600; line-height:1.5; }
         .feedback-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
-        .feedback-cancel, .feedback-submit { min-height: 46px; padding: 0 18px; border-radius: 12px; font: inherit; font-size: 0.86rem; font-weight: 750; cursor: pointer; }
+        .feedback-cancel, .feedback-submit { min-height: 46px; padding: 0 18px; border-radius:12px; font: inherit; font-size:13px; font-weight:600; cursor: pointer; }
         .feedback-cancel { border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
-        .feedback-submit { border: 0; background: #11120f; color: #fff; box-shadow: 0 9px 22px rgba(17, 18, 15, 0.18); }
+        .feedback-submit { border: 0; background: var(--ink); color: var(--on-olive); box-shadow:var(--shadow-card); }
         .feedback-submit:disabled { cursor: default; opacity: 0.42; box-shadow: none; }
         .feedback-success { display: grid; justify-items: center; padding: 24px 8px; text-align: center; }
-        .feedback-success span { width: 50px; height: 50px; display: grid; place-items: center; border-radius: 50%; background: var(--accent-glow); color: var(--olive); font-size: 1.35rem; font-weight: 800; }
+        .feedback-success span { width: 50px; height: 50px; display: grid; place-items: center; border-radius:50%; background: var(--accent-glow); color: var(--olive); font-size:20px; font-weight:600; }
         .feedback-success h2 { margin-top: 16px; }
         .feedback-success p { margin: 9px 0 0; color: var(--text-secondary); }
         @media (max-width: 560px) {
           .feedback-overlay { align-items: end; padding: 0; }
-          .feedback-modal { max-height: 92vh; padding: 24px 19px max(24px, env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; }
+          .feedback-modal { max-height: 92vh; padding: 24px 19px max(24px, env(safe-area-inset-bottom)); border-radius:20px 20px 0 0; }
           .feedback-actions { display: grid; grid-template-columns: 1fr 1fr; }
         }
         @media (prefers-reduced-motion: reduce) { .feedback-overlay, .feedback-modal { animation: none; transition: none; } }
       `}</style>
     </div>
+    </BodyPortal>
   );
 }

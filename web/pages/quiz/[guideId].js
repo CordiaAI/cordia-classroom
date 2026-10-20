@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react';
+import CordiaLoader from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
 import { apiFetch, openUpgrade } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import { PRO_TYPES, TYPE_LABELS } from '../../lib/retainEngine.mjs';
+import { ArrowLeft, Lock, ListChecks, PenLine, Play, RefreshCw, Repeat, TextCursorInput, Shuffle as PairsIcon, Timer } from 'lucide-react';
+import MatchRace from '../../components/MatchRace';
 import QuizMode from '../../components/QuizMode';
+import { inDayOne, walkthroughEvent } from '../../lib/walkthrough';
 
-const TYPE_HINTS = {
-  mc: 'Pick the right answer',
-  written: 'Explain in your own words',
-  fill: 'Type the key term',
-  matching: 'Drag terms to their answers',
+// Short tile names; TYPE_LABELS stays the engine's own naming.
+const MODES = {
+  mc: { label: 'Choice', icon: ListChecks },
+  written: { label: 'Written', icon: PenLine },
+  fill: { label: 'Fill in', icon: TextCursorInput },
+  matching: { label: 'Pairs', icon: PairsIcon },
 };
 const STORAGE_KEY = 'retainTypes';
 
@@ -33,14 +38,19 @@ export default function QuizPage() {
   const [starting, setStarting] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState('');
+  const [history, setHistory] = useState([]);
+  const [title, setTitle] = useState('');
+  const [race, setRace] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
     setTypes(rememberedTypes());
+    apiFetch(`/quiz/${guideId}/history`).then(data => setHistory(data?.attempts || []));
+    apiFetch(`/guides/${guideId}`).then(data => setTitle(data?.guide?.title || ''));
     apiFetch('/billing/status').then(data => {
       if (data?.features) setPlan({ pro: data.plan === 'classroom_plus' || data.unlimited, left: data.features.retain_types?.remaining ?? 0 });
     });
-  }, [ready]);
+  }, [ready, guideId]);
 
   const proLocked = plan && !plan.pro && plan.left <= 0;
 
@@ -59,13 +69,21 @@ export default function QuizPage() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* remembering is optional */ }
   }
 
+  useEffect(() => { if (ready && guideId) walkthroughEvent('quiz-opened'); }, [ready, guideId]);
+
   async function start() {
     setStarting(true);
     setError('');
-    const data = await apiFetch(`/quiz/${guideId}/session`, { method: 'POST', body: JSON.stringify({ types }) });
+    // The day-one walkthrough runs a short 3-question multiple-choice round.
+    const short = inDayOne('quiz-start');
+    const chosen = short || race ? ['mc'] : types;
+    const data = await apiFetch(`/quiz/${guideId}/session`, { method: 'POST', body: JSON.stringify({ types: chosen }) });
     setStarting(false);
-    if (data?.cards?.length) setSession({ ...data, selected: types, version: Date.now() });
-    else setError(data?.detail || 'Retain could not start. Make sure this guide has questions and answers.');
+    if (data?.cards?.length) {
+      setSession({ ...data, cards: short ? data.cards.slice(0, 3) : data.cards, selected: chosen, race: race && !short, version: Date.now() });
+      walkthroughEvent('quiz-started');
+    }
+    else setError(data?.detail || 'The quiz could not start. Make sure this guide has questions and answers.');
   }
 
   async function regenerate() {
@@ -78,21 +96,22 @@ export default function QuizPage() {
   }
 
   return (
-    <div className="fade-in">
-      <div className="retain-page-header">
-        <div>
-          <a href="#" onClick={e => { e.preventDefault(); router.back(); }} style={{ fontSize: '0.85em', color: 'var(--text-muted)' }}>
-            &larr; Back to Guide
-          </a>
-          <h2>Retain</h2>
+    <div className="c-page quiz-page">
+      <header className="c-page-head">
+        <div className="c-row">
+          <button type="button" className="c-icon-btn" onClick={() => router.push('/guide/' + guideId)} aria-label="Back to guide"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+          <h1 className="c-title">Quiz</h1>
         </div>
-        <button className="btn-outline" onClick={regenerate} disabled={regenerating || starting}>
-          {regenerating ? 'Regenerating...' : 'Regenerate questions'}
+        <button type="button" className="c-btn c-btn--quiet" onClick={regenerate} disabled={regenerating || starting}>
+          <RefreshCw size={20} strokeWidth={1.75} aria-hidden="true" />{regenerating ? 'Regenerating…' : 'Regenerate'}
         </button>
-      </div>
+      </header>
+      {title && <p className="c-section-title quiz-guide">{title}</p>}
       {error && <div className="retain-action-error" role="alert">{error}</div>}
 
-      {session ? (
+      {session?.race ? (
+        <MatchRace key={session.version} questions={session.questions} guideId={guideId} onRestart={() => setSession(null)} onDone={() => router.push('/guide/' + guideId)} />
+      ) : session ? (
         <QuizMode
           key={session.version}
           questions={session.questions}
@@ -100,32 +119,62 @@ export default function QuizPage() {
           types={session.selected}
           guideId={guideId}
           onRestart={() => setSession(null)}
+          onDone={() => { walkthroughEvent('guide-open'); router.push('/guide/' + guideId); }}
         />
       ) : (
-        <section className="quiz-question-card retain-picker" aria-labelledby="retain-picker-title">
-          <h3 id="retain-picker-title">How do you want to be quizzed?</h3>
-          <p className="retain-hint">Pick one or more. Each question uses the type that fits it best, and short one-sentence answers stay multiple choice.</p>
-          <div className="retain-type-grid" role="group" aria-label="Question types">
-            {Object.entries(TYPE_LABELS).map(([type, label]) => {
-              const pro = PRO_TYPES.includes(type);
-              const on = types.includes(type);
+        <>
+          <div className="quiz-modes" role="group" aria-label="Question types">
+            {Object.keys(TYPE_LABELS).map(type => {
+              const mode = MODES[type];
+              const locked = PRO_TYPES.includes(type) && plan && !plan.pro && plan.left <= 0;
+              const on = !race && types.includes(type);
               return (
-                <button key={type} type="button" className={'retain-type' + (on ? ' on' : '')} aria-pressed={on} onClick={() => toggle(type)}>
-                  <strong>{label}</strong>
-                  <small>{TYPE_HINTS[type]}</small>
-                  {pro && plan && !plan.pro && (
-                    <span className="retain-pro-badge">{plan.left > 0 ? 'Pro · free try' : 'Pro'}</span>
-                  )}
+                <button key={type} type="button" className={'quiz-mode' + (on ? ' is-on' : '')} aria-pressed={on} onClick={() => { if (race) { setRace(false); if (types.includes(type)) return; } toggle(type); }} aria-label={`${mode.label}${locked ? ', Pro' : ''}`}>
+                  <mode.icon size={28} strokeWidth={1.75} aria-hidden="true" />
+                  <span>{mode.label}</span>
+                  {PRO_TYPES.includes(type) && plan && !plan.pro && <Lock className="quiz-lock" size={16} strokeWidth={1.75} aria-hidden="true" />}
                 </button>
               );
             })}
+            <button type="button" className={'quiz-mode' + (race ? ' is-on' : '')} aria-pressed={race} onClick={() => setRace(value => !value)} aria-label="Match, 60 seconds">
+              <Timer size={28} strokeWidth={1.75} aria-hidden="true" />
+              <span>Match</span>
+            </button>
           </div>
-          <p className="retain-hint">Miss a question and it comes back until you get it right two more times.</p>
-          <button type="button" className="btn retain-start" onClick={start} disabled={starting || !types.length || !guideId}>
-            {starting ? 'Preparing your questions…' : 'Start Retain'}
+          <p className="quiz-note">{race ? <><Timer size={20} strokeWidth={1.75} aria-hidden="true" />60 seconds</> : <><Repeat size={20} strokeWidth={1.75} aria-hidden="true" />Misses repeat</>}</p>
+          <button type="button" className="c-btn c-btn--primary c-btn--lg quiz-start" data-spot="quiz-start" onClick={start} disabled={starting || !types.length || !guideId}>
+            {starting ? <><CordiaLoader size={20} label="Preparing" />Preparing</> : <><Play size={20} strokeWidth={1.75} aria-hidden="true" />Start</>}
           </button>
-        </section>
+          {history.length > 0 && (
+            <section className="c-section" aria-labelledby="quiz-history">
+              <h2 id="quiz-history" className="c-section-title">Past</h2>
+              <div className="c-card c-list">
+                {history.map(attempt => (
+                  <div key={attempt.id} className="c-list-row">
+                    <span className="c-grow quiz-past-score">{attempt.score}%</span>
+                    <span className="c-meta">{attempt.correct_answers}/{attempt.total_questions}</span>
+                    <span className="c-meta">{new Date(attempt.completed_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       )}
+      <style jsx>{`
+        .quiz-page { width: min(var(--page-max), 100%); margin: 0 auto; }
+        .quiz-guide { margin: -12px 0 0; font-family: var(--font-display); }
+        .quiz-modes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+        .quiz-mode { position: relative; display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 120px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow); }
+        .quiz-mode :global(.lucide) { color: var(--olive-ink); }
+        .quiz-mode.is-on { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
+        .quiz-mode :global(.quiz-lock) { position: absolute; top: 12px; right: 12px; color: var(--muted); }
+        .quiz-note { display: flex; align-items: center; gap: 8px; margin: 0; font-weight:600; }
+        .quiz-note :global(.lucide) { color: var(--olive-ink); }
+        .quiz-start { justify-self: start; min-width: 180px; }
+        .quiz-past-score { font-weight:600; font-variant-numeric: tabular-nums; }
+        @media (max-width: 767px) { .quiz-modes { grid-template-columns: repeat(3, minmax(0, 1fr)); } .quiz-start { width: 100%; } }
+      `}</style>
     </div>
   );
 }

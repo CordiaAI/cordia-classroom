@@ -1,0 +1,225 @@
+/* Cordia Classroom design tokens: the ONLY place color literals live (a test enforces this).
+   Loaded last (pages/_app.js), so these values win over anything earlier.
+
+   Type scale: 13, 15, 17, 20, 28, 40 px. Newsreader for titles, Manrope for everything else.
+   Radius scale: 12 (inputs, chips), 16 (rows, small cards), 20 (cards), 28 (big panels), 999 (pills).
+   Surfaces: three levels per theme (backdrop, glass card, raised glass).
+   One accent (olive) for the primary action, the active nav item and progress. */
+
+@font-face { font-family: Manrope; src: url('/fonts/manrope.ttf') format('truetype'); font-style: normal; font-weight: 200 800; font-display: swap; }
+@font-face { font-family: Newsreader; src: url('/fonts/newsreader.ttf') format('truetype'); font-style: normal; font-weight: 200 800; font-display: swap; }
+
+:root {
+  color-scheme: light;
+
+  /* Type */
+  --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Newsreader', Georgia, serif;
+  --font-nav: 'Times New Roman', Times, serif; /* top bar and phone tab bar */
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --fs-13: 13px; --fs-15: 15px; --fs-17: 17px; --fs-20: 20px; --fs-28: 28px; --fs-40: 40px;
+  --lh-title: 1.15; --lh-body: 1.5;
+  --track-title: -0.015em;
+
+  /* Neutrals: ink, muted (ink at 64%), and three surface levels */
+  --ink: #171B18;
+  --muted: rgba(23, 27, 24, 0.64);
+  --canvas: #EDF2F4;                       /* 1 backdrop */
+  --surface-card: rgba(255, 255, 252, 0.55); /* 2 glass card */
+  --surface-raised: rgba(255, 255, 252, 0.86); /* 3 raised glass: nav, sheets, menus, Tutor */
+  --hairline: rgba(23, 27, 24, 0.08);
+  --wash: rgba(255, 255, 255, 0.38);       /* hover brighten */
+  --photo-veil: rgba(237, 242, 244, 0.30);  /* over the sign-in photo */
+  --scrim: rgba(23, 27, 24, 0.28);
+  --spot-dim: rgba(23, 27, 24, 0.4);         /* onboarding spotlight dims the app to 40% */
+
+  /* Accent and states */
+  --olive: #536149;
+  --olive-press: #3D4937;
+  --olive-ink: #536149;                    /* olive used as text or icon */
+  --olive-tint: rgba(83, 97, 73, 0.12);
+  --on-olive: #FFFFFF;
+  --success: #2F6B3F;
+  --success-bg: rgba(57, 114, 75, 0.12);
+  --warning: #8A5D00;
+  --warning-bg: rgba(154, 103, 0, 0.12);
+  --error: #B42318;
+  --error-bg: rgba(180, 35, 24, 0.08);
+  --error-solid: #B42318;
+  --selection: rgba(83, 97, 73, 0.30);
+
+  /* Note paper (the editor and note cards are cream paper in both themes) */
+  --paper: #FBF8F1;
+  --paper-ink: #2B2A33;
+  /* Practice board pens (light board) and the fill used when a drawing is flattened */
+  --draw-ink: #2B2A33;
+  --draw-olive: #536149;
+  --draw-blue: #2F5FA8;
+  --draw-red: #B42318;
+  --draw-orange: #A2570E;
+  --draw-purple: #6B4BA8;
+  --draw-teal: #1F7A70;
+  --draw-graphite: #6E7378;
+  --draw-paper: #FBFCFB;
+  --paper-line: rgba(43, 42, 51, 0.10);
+
+  /* Shadows: one for cards, one for floating things */
+  --shadow-card: 0 1px 2px rgba(16, 24, 16, 0.04), 0 8px 24px rgba(16, 24, 16, 0.06);
+  --shadow-float: 0 2px 8px rgba(16, 24, 16, 0.06), 0 18px 48px rgba(16, 24, 16, 0.14);
+  --focus-ring: 0 0 0 2px var(--olive);
+
+  /* Radii */
+  --r-input: 12px; --r-row: 16px; --r-card: 20px; --r-panel: 28px; --r-pill: 999px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur: 180ms;
+
+  /* Layout */
+  --bar-h: 64px;
+  --tabbar-h: 68px;
+  --page-max: 1080px;
+  --sidebar-width: 240px;
+  --streak-width: 220px;
+  --workspace-rail-width: 190px;
+
+  /* Glass */
+  --lg-filter: blur(24px) saturate(170%);
+
+  /* Illustrations (drawn Canvas screens) and brand marks */
+  --shot-frame: #FFFFFF; --shot-edge: rgba(34, 49, 41, 0.18); --shot-chrome: #EEF1EC; --shot-line: rgba(34, 49, 41, 0.2);
+  --shot-soft: #F1F3EF; --shot-nav: #394B58; --shot-nav-ink: #FFFFFF; --shot-text: #171B18; --shot-link: #0B6BC2; --shot-mark: #536149;
+  --google-blue: #4285F4; --google-green: #34A853; --google-yellow: #FBBC05; --google-red: #EA4335;
+  --heat-0: rgba(23, 27, 24, 0.06);
+  --heat-1: rgba(83, 97, 73, 0.30); --heat-2: rgba(83, 97, 73, 0.50); --heat-3: rgba(83, 97, 73, 0.75); --heat-4: #536149;
+
+  /* Older names map onto the system (kept so every screen resolves to these tokens). */
+  --card: var(--surface-card);
+  --card-sunk: var(--surface-card);
+  --glass: var(--surface-raised);
+  --glass-shell: var(--surface-raised);
+  --glass-edge: var(--hairline);
+  --field: var(--surface-card);
+  --line: var(--hairline);
+  --surface: var(--surface-card);
+  --surface-muted: var(--surface-card);
+  --reading-surface: var(--surface-card);
+  --sand: var(--surface-card);
+  --muted-ink: var(--muted);
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink);
+  --text-muted: var(--muted);
+  --text-error: var(--error);
+  --accent: var(--olive);
+  --accent-strong: var(--olive);
+  --accent-dark: var(--olive-press);
+  --accent-secondary: var(--olive);
+  --accent-on: var(--on-olive);
+  --accent-glow: var(--olive-tint);
+  --olive-hover: var(--olive-press);
+  --bg-deepest: var(--canvas);
+  --bg-primary: var(--surface-card);
+  --bg-secondary: var(--surface-card);
+  --bg-tertiary: var(--surface-card);
+  --bg-hover: var(--olive-tint);
+  --bg-error: var(--error-bg);
+  --red: var(--error);
+  --border-default: var(--hairline);
+  --border-subtle: var(--hairline);
+  --border-active: var(--olive);
+  --shadow: var(--shadow-card);
+  --shadow-sm: var(--shadow-card);
+  --shadow-md: var(--shadow-card);
+  --shadow-lg: var(--shadow-float);
+  --shadow-glow: var(--focus-ring);
+  --radius: var(--r-input);
+  --radius-lg: var(--r-card);
+  --motion-fast: var(--dur) var(--ease);
+  --motion-smooth: var(--dur) var(--ease);
+  --motion-press: var(--dur) var(--ease);
+  --lg-card: var(--surface-card);
+  --lg-panel: var(--surface-raised);
+  --lg-menu: var(--surface-raised);
+  --lg-edge: var(--hairline);
+  --lg-highlight: 0 0 #0000;
+  --lg-shadow: var(--shadow-card);
+  --hover-wash: var(--wash);
+  --hover-edge: rgba(23, 27, 24, 0.16);
+  --hover-shadow: var(--shadow-float);
+  --hover-light: #FFFFFF;
+  --primary-glow: 0 0 0 4px rgba(83, 97, 73, 0.16), 0 8px 22px rgba(83, 97, 73, 0.28);
+  --public-backdrop: var(--canvas);
+  --login-backdrop: none;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --ink: #FFFFFF;
+  --muted: rgba(255, 255, 255, 0.64);
+  --canvas: #1A1D20;
+  --surface-card: rgba(39, 42, 48, 0.55);
+  --surface-raised: rgba(39, 42, 48, 0.86);
+  --hairline: rgba(255, 255, 255, 0.08);
+  --wash: rgba(255, 255, 255, 0.06);
+  --photo-veil: rgba(26, 29, 32, 0.80);
+  --scrim: rgba(0, 0, 0, 0.45);
+  --olive: #536149;
+  --olive-press: #3D4937;
+  --olive-ink: #CFDAC3;
+  --olive-tint: rgba(195, 207, 182, 0.12);
+  --success: #8FD1A0;
+  --success-bg: rgba(143, 209, 160, 0.14);
+  --warning: #F2C14E;
+  --warning-bg: rgba(242, 193, 78, 0.14);
+  --error: #FF8A80;
+  --error-bg: #3A2222;
+  --paper: #F3EEE2;
+  /* Practice board pens on the dark board */
+  --draw-ink: #ECEFE8;
+  --draw-olive: #A9BC97;
+  --draw-blue: #8DB1EA;
+  --draw-red: #F09A90;
+  --draw-orange: #F1B37A;
+  --draw-purple: #C3ABEC;
+  --draw-teal: #86D2C7;
+  --draw-graphite: #A9AEB3;
+  --draw-paper: #1F2326;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.35), 0 18px 48px rgba(0, 0, 0, 0.45);
+  --focus-ring: 0 0 0 2px var(--olive-ink);
+  --shot-frame: #2F3238; --shot-edge: rgba(255, 255, 255, 0.16); --shot-chrome: #24272C; --shot-line: rgba(255, 255, 255, 0.22);
+  --shot-soft: #3A3E45; --shot-nav: #1E2A33; --shot-text: #FFFFFF; --shot-link: #8CC4FF; --shot-mark: #C3CFB6;
+  --heat-0: rgba(255, 255, 255, 0.06);
+  --heat-1: rgba(195, 207, 182, 0.30); --heat-2: rgba(195, 207, 182, 0.50); --heat-3: rgba(195, 207, 182, 0.75); --heat-4: #C3CFB6;
+  --hover-edge: rgba(255, 255, 255, 0.18);
+  --primary-glow: 0 0 0 4px rgba(195, 207, 182, 0.14), 0 8px 22px rgba(83, 97, 73, 0.5);
+  /* Olive used as text must be the light olive on dark surfaces. */
+  --accent: var(--olive-ink);
+  --accent-secondary: var(--olive-ink);
+}
+
+/* Backdrop behind the app: pale clouds in light; a static, softly blurred olive and charcoal field in dark. */
+html { background: var(--canvas); }
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(rgba(242, 248, 250, 0.12), rgba(238, 245, 248, 0.26)), url('/classroom-clouds.webp') center / cover;
+  filter: blur(14px); opacity: 0.35;
+}
+[data-theme='dark'] body::before {
+  opacity: 1;
+  inset: -120px;
+  background:
+    radial-gradient(55% 48% at 16% 20%, #2B3327 0%, #2B3327 35%, transparent 75%),
+    radial-gradient(44% 40% at 84% 28%, #1E2125 0%, #1E2125 40%, transparent 78%),
+    radial-gradient(58% 50% at 66% 84%, #2B3327 0%, #2B3327 35%, transparent 75%),
+    radial-gradient(40% 34% at 10% 88%, #1E2125 0%, transparent 72%),
+    #1A1D20;
+  filter: blur(80px);
+}
+
+/* Note paper (cream in both themes): its text always uses the paper ink. */
+.sn-paper, .sn-card-paper {
+  background: var(--paper) !important;
+  color: var(--paper-ink) !important;
+}
+:is(.sn-paper, .sn-card-paper) :is(p, li, h1, h2, h3, h4, span, div, strong, em, .sn-card-preview) { color: var(--paper-ink) !important; }

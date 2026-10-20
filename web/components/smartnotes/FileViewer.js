@@ -195,7 +195,7 @@ export default function FileViewer({ file, guideContent }) {
 
   const ext = file.name.split('.').pop().toLowerCase();
 
-  if (extracting) return <div className="sn-viewer-empty"><p>{SLIDE_EXTS.has(ext) ? 'Preparing slides' : 'Reading'} {file.name}…</p></div>;
+  if (extracting) return <div className="sn-viewer-empty"><CordiaLoader size={20} label={SLIDE_EXTS.has(ext) ? 'Preparing slides' : 'Reading the file'} /></div>;
 
   if (slidesData !== null) return (
     <div className="sn-slide-fallback">

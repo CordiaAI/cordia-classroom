@@ -1,0 +1,210 @@
+import { useEffect, useState } from 'react';
+import { Download, Sparkles } from 'lucide-react';
+import { authOnlyHeaders, openUpgrade } from '../lib/api';
+import CordiaLoader from './CordiaLoader';
+import { currentTheme } from './MermaidDiagram';
+
+export const VISUAL_ERROR = "Couldn't make a visual. Try again.";
+
+// Visuals left this month, shared by every NapkinVisual on the page.
+let usageCache = null;
+let usagePromise = null;
+const usageListeners = new Set();
+function setUsage(next) {
+  usageCache = next;
+  usageListeners.forEach(listener => listener(next));
+}
+function loadUsage() {
+  if (!usagePromise) {
+    usagePromise = fetch('/api/visual', { headers: authOnlyHeaders() })
+      .then(response => (response.ok ? response.json() : null))
+      .catch(() => null)
+      .then(data => { setUsage(data); return data; });
+  }
+  return usagePromise;
+}
+export function useVisualUsage() {
+  const [usage, setLocal] = useState(usageCache);
+  useEffect(() => {
+    usageListeners.add(setLocal);
+    loadUsage();
+    return () => usageListeners.delete(setLocal);
+  }, []);
+  return usage;
+}
+
+function useTheme() {
+  const [theme, setTheme] = useState('light');
+  useEffect(() => {
+    setTheme(currentTheme());
+    const observer = new MutationObserver(() => setTheme(currentTheme()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+  return theme;
+}
+
+export function visualsLeftLabel(usage) {
+  if (!usage || typeof usage.left !== 'number') return '';
+  return `${usage.left} visual${usage.left === 1 ? '' : 's'} left`;
+}
+
+async function saveFile(blob, name) {
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 1000);
+}
+
+async function download(visual, format, name) {
+  const svg = await (await fetch(visual.url)).text();
+  const svgBlob = new Blob([svg], { type: 'image/svg+xml' });
+  if (format === 'svg') return saveFile(svgBlob, `${name}.svg`);
+  const href = URL.createObjectURL(svgBlob);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = href;
+    });
+    const scale = 2;
+    const width = (visual.width || image.naturalWidth || 1200) * scale;
+    const height = (visual.height || image.naturalHeight || 800) * scale;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(image, 0, 0, width, height);
+    const png = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    if (png) await saveFile(png, `${name}.png`);
+  } finally {
+    URL.revokeObjectURL(href);
+  }
+}
+
+// A Napkin visual for a piece of study text. `fallback()` renders the page's own themed
+// diagram whenever there is no visual (not set up, timed out, rate limited, failed).
+// auto: start at once (Notes' "Make diagram"); otherwise a "Make visual" button shows.
+export default function NapkinVisual({ text, context = '', fallback, auto = false, onUse, useLabel = 'Use this', name = 'cordia-visual' }) {
+  const usage = useVisualUsage();
+  const theme = useTheme();
+  const [state, setState] = useState({ phase: 'idle' }); // idle | loading | ready | fallback | limit
+  const [index, setIndex] = useState(0);
+  const [used, setUsed] = useState(false);
+  const disabled = usage && usage.enabled === false;
+
+  async function make() {
+    setState({ phase: 'loading' });
+    setIndex(0);
+    setUsed(false);
+    try {
+      const response = await fetch('/api/visual', {
+        method: 'POST',
+        headers: { ...authOnlyHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, context, theme: currentTheme() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 402) {
+        const detail = data?.detail || {};
+        setUsage({ ...(usageCache || {}), left: 0, limit: detail.limit });
+        if (detail.plan === 'free') openUpgrade({ feature: 'visual' });
+        setState({ phase: 'limit', pro: detail.plan !== 'free' });
+        return;
+      }
+      if (data?.status === 'ok' && data.visuals?.length) {
+        if (typeof data.left === 'number') setUsage({ ...(usageCache || {}), left: data.left, limit: data.limit });
+        setState({ phase: 'ready', visuals: data.visuals, alt: data.alt, rendered: data.theme });
+        return;
+      }
+      setState({ phase: 'fallback', quiet: data?.reason === 'not_configured' });
+    } catch {
+      setState({ phase: 'fallback' });
+    }
+  }
+
+  useEffect(() => {
+    if (!auto || !text) return;
+    if (disabled) { setState({ phase: 'fallback', quiet: true }); return; }
+    if (usage) make();
+  }, [auto, text, Boolean(usage), disabled]);
+
+  const left = visualsLeftLabel(usage);
+  const visual = state.visuals?.[index];
+
+  if (state.phase === 'loading') {
+    return (
+      <div className="nv">
+        <div className="nv-frame nv-frame--loading"><CordiaLoader label="Making a visual" /></div>
+        <VisualStyle />
+      </div>
+    );
+  }
+
+  if (state.phase === 'ready' && visual) {
+    // Never a light visual on a dark page: if the theme changed since it was made, recolour it.
+    const inverted = state.rendered && state.rendered !== theme;
+    return (
+      <div className="nv">
+        <figure className="nv-frame">
+          <img className={'nv-image' + (inverted ? ' is-inverted' : '')} src={visual.url} alt={state.alt || 'Diagram'} width={visual.width || undefined} height={visual.height || undefined} />
+        </figure>
+        <div className="nv-bar">
+          {state.visuals.length > 1 && !used && (
+            <div className="nv-dots" role="group" aria-label="Variations">
+              {state.visuals.map((item, dot) => (
+                <button key={item.url} type="button" className={'nv-dot' + (dot === index ? ' is-on' : '')} aria-label={`Variation ${dot + 1} of ${state.visuals.length}`} aria-pressed={dot === index} onClick={() => setIndex(dot)} />
+              ))}
+            </div>
+          )}
+          <div className="nv-actions">
+            <button type="button" className="c-btn c-btn--sm c-btn--quiet" onClick={() => download(visual, 'svg', name)}><Download aria-hidden="true" />SVG</button>
+            <button type="button" className="c-btn c-btn--sm c-btn--quiet" onClick={() => download(visual, 'png', name)}><Download aria-hidden="true" />PNG</button>
+            {!used && (
+              <button type="button" className={`c-btn c-btn--sm ${onUse ? 'c-btn--primary' : 'c-btn--secondary'}`} onClick={() => { setUsed(true); onUse?.({ ...visual, alt: state.alt, theme: state.rendered }); }}>{useLabel}</button>
+            )}
+          </div>
+        </div>
+        <VisualStyle />
+      </div>
+    );
+  }
+
+  return (
+    <div className="nv">
+      {fallback?.()}
+      {state.phase === 'fallback' && !state.quiet && <p className="nv-error" role="alert">{VISUAL_ERROR}</p>}
+      {state.phase === 'limit' && state.pro && <p className="nv-error" role="alert">Limit reached</p>}
+      {!disabled && state.phase !== 'limit' && !(auto && state.phase === 'idle') && (
+        <div className="nv-bar">
+          <button type="button" className="c-btn c-btn--sm c-btn--secondary" onClick={make} disabled={!text}><Sparkles aria-hidden="true" />{state.phase === 'fallback' ? 'Try again' : 'Make visual'}</button>
+          {left && <span className="c-meta">{left}</span>}
+        </div>
+      )}
+      <VisualStyle />
+    </div>
+  );
+}
+
+function VisualStyle() {
+  return (
+    <style jsx global>{`
+      .nv { display: grid; gap: 8px; min-width: 0; }
+      .nv-frame { margin: 0; display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 10; max-height: 480px; padding: 16px; border: 1px solid var(--hairline); border-radius: var(--r-row); background: var(--surface-card); overflow: hidden; }
+      .nv-image { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+      .nv-image.is-inverted { filter: invert(1) hue-rotate(180deg); }
+      .nv-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+      .nv-dots { display: inline-flex; gap: 8px; }
+      .nv-dot { width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; cursor: pointer; display: grid; place-items: center; }
+      .nv-dot::before { content: ''; width: 8px; height: 8px; border-radius: var(--r-pill); background: var(--muted); opacity: .5; }
+      .nv-dot.is-on::before { background: var(--olive); opacity: 1; }
+      .nv-actions { display: inline-flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+      .nv-error { margin: 0; color: var(--muted); font: 500 var(--fs-13)/var(--lh-body) var(--font-sans); }
+      img.nv-inline { display: block; max-width: 100%; height: auto; margin: 16px 0; border-radius: var(--r-row); }
+      [data-theme='dark'] img.nv-inline.nv-light, :root:not([data-theme='dark']) img.nv-inline.nv-dark { filter: invert(1) hue-rotate(180deg); }
+    `}</style>
+  );
+}

@@ -15,7 +15,7 @@ export default function MissionPage() {
       description: 'There is no other platform that offers NCLEX question generation. CordiaClassroom allows for you to use the material you are learning to generate NCLEX questions. This task is used to assist Nursing students in making study guides exactly like their exams with two button clicks.',
     },
     {
-      title: 'CordiaClassroom Never Allows the AI to Search for Answers on the Web!',
+      title: 'CordiaClassroom Never Allows the AI to Search for Answers on the Web.',
       description: 'The main issue with simply asking an LLM to create a study guide is that the answers and questions are NOT DIRECTLY from your class material. CordiaClassroom makes this super simple and easy. It only uses the context that was captured as its knowledge! This way it is the exact material from your classes.',
     },
     {
@@ -24,7 +24,7 @@ export default function MissionPage() {
     },
     {
       title: 'The Cost',
-      description: 'Start free with 3 study guides, 10 tutor prompts and 5 Learn My Way views each month. CordiaClassroom Pro is $9.99 a month or $29 a semester. Try Pro free for 7 days with no card; the trial never turns into a charge on its own.',
+      description: 'Start free with 3 study guides, 10 tutor prompts and 5 Explain views each month. CordiaClassroom Pro is $9.99 a month or $29 a semester. Try Pro free for 7 days with no card; the trial never turns into a charge on its own.',
     },
     {
       title: 'Users Are "Cofounders"',
@@ -33,9 +33,9 @@ export default function MissionPage() {
   ];
 
   return (
-    <div className="fade-in" style={{ maxWidth: 760 }}>
+    <div className="fade-in mission-page" style={{ width: 'min(var(--page-max), 100%)', margin: '0 auto' }}>
       <h2 style={{ marginBottom: 4 }}>CordiaClassroom Features</h2>
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.92em', marginBottom: 28, lineHeight: 1.6 }}>
+      <p style={{ color: 'var(--text-muted)', fontSize: 15, marginBottom: 28, lineHeight: 1.5 }}>
         CordiaClassroom was built by a college student, for college students. Our mission is to make studying smarter, faster, and more accessible for every student — regardless of major or learning style.
       </p>
 
@@ -47,21 +47,21 @@ export default function MissionPage() {
             borderRadius: 'var(--radius-lg)',
             padding: '20px 24px',
           }}>
-            <h3 style={{ fontSize: '1.05em', marginBottom: 4, color: 'var(--text-primary)' }}>
+            <h3 style={{ marginBottom: 4, color: 'var(--text-primary)' }}>
               {f.title}
             </h3>
             {f.subtitle && (
-              <span style={{ fontSize: '0.78em', color: 'var(--accent)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>
                 {f.subtitle}
               </span>
             )}
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.88em', lineHeight: 1.6, marginTop: 8 }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 15, lineHeight: 1.5, marginTop: 8 }}>
               {f.description}
             </p>
           </div>
         ))}
       </div>
-      <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85em', marginTop: 24, fontStyle: 'italic' }}>
+      <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 15, marginTop: 24, fontStyle: 'italic' }}>
         Founder - Jackson Laughlin
       </p>
     </div>

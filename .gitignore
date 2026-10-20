@@ -29,3 +29,5 @@ node_modules/
 Thumbs.db
 .vscode/
 .idea/
+qa-screenshots/
+qa-touchup/

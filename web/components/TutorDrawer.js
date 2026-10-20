@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import AIChatWidget from './AIChatWidget';
-import AcademicInfinityMark from './AcademicInfinityMark';
+import { X } from 'lucide-react';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 const MIN_WIDTH = 300;
 const MAX_WIDTH = 520;
@@ -10,6 +11,7 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
   const [open, setOpen] = useState(false);
   const [width, setWidth] = useState(360);
   const toggleRef = useRef(null);
+  const openerRef = useRef(null);
   const shellRef = useRef(null);
 
   useEffect(() => {
@@ -26,8 +28,13 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
 
   useEffect(() => {
     const toggle = () => changeOpen(!open);
+    const close = () => changeOpen(false);
     window.addEventListener('cordia:tutor-toggle', toggle);
-    return () => window.removeEventListener('cordia:tutor-toggle', toggle);
+    window.addEventListener('cordia:tutor-close', close);
+    return () => {
+      window.removeEventListener('cordia:tutor-toggle', toggle);
+      window.removeEventListener('cordia:tutor-close', close);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -35,7 +42,6 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
     const closeOnEscape = event => {
       if (event.key !== 'Escape') return;
       changeOpen(false);
-      toggleRef.current?.focus();
     };
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
@@ -65,7 +71,10 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
   }, [open]);
 
   function changeOpen(next) {
+    if (next && !open) openerRef.current = document.activeElement;
+    if (!next && open) setTimeout(() => openerRef.current?.focus?.(), 0);
     setOpen(next);
+    if (!next) walkthroughEvent('tutor-closed');
     localStorage.setItem(OPEN_KEY, String(next));
     window.dispatchEvent(new CustomEvent('cordia:tutor-visibility', { detail: { open: next } }));
   }
@@ -105,26 +114,14 @@ export default function TutorDrawer({ preferredGuideId = '', preferredNoteId = '
 
   return (
     <>
-      {open && <button type="button" className="tutor-backdrop" aria-label="Dismiss Tutor overlay" onClick={() => { changeOpen(false); toggleRef.current?.focus(); }} />}
+      {open && <button type="button" className="tutor-backdrop" aria-label="Close Tutor" tabIndex={-1} onClick={() => changeOpen(false)} />}
       <div ref={shellRef} className={`tutor-drawer-shell${open ? ' is-open' : ''}`} style={{ '--tutor-width': `${width}px` }}>
-      <aside id="cordia-tutor-drawer" className="tutor-drawer" aria-label="Cordia Tutor" aria-hidden={!open} inert={!open}>
-        <button type="button" className="tutor-close" aria-label="Close Cordia Tutor" onClick={() => { changeOpen(false); toggleRef.current?.focus(); }}>×</button>
+      <aside id="cordia-tutor-drawer" className="tutor-drawer c-glass" aria-label="Tutor" aria-hidden={!open} inert={!open}>
+        <button ref={toggleRef} type="button" className="c-icon-btn tutor-close" data-spot="tutor-close" aria-label="Close Tutor" onClick={() => changeOpen(false)}><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         <AIChatWidget preferredGuideId={preferredGuideId} preferredNoteId={preferredNoteId} />
         <div className="tutor-resize-handle" role="separator" aria-label="Resize Tutor" aria-orientation="vertical" aria-valuemin={MIN_WIDTH} aria-valuemax={MAX_WIDTH} aria-valuenow={width} tabIndex="0" onKeyDown={resizeWithKeyboard} onPointerDown={startResize} />
       </aside>
       </div>
-      <button
-        ref={toggleRef}
-        type="button"
-        className={`tutor-drawer-toggle${open ? ' is-hidden' : ''}`}
-        onClick={() => changeOpen(true)}
-        aria-controls="cordia-tutor-drawer"
-        aria-expanded={open}
-        aria-label="Open Cordia Tutor"
-        tabIndex={open ? -1 : 0}
-      >
-        <AcademicInfinityMark className="tutor-brand-mark" /> Tutor
-      </button>
     </>
   );
 }

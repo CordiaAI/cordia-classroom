@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { FileUp } from 'lucide-react';
 import { useFileDropZone } from '../../lib/fileDrop';
 import { notesRequest } from '../../lib/smartnotes';
 import FileViewer, { ACCEPTED_FILE_TYPES } from './FileViewer';
@@ -49,10 +50,10 @@ export default function MaterialPanel({ onError }) {
       className={`sn-viewer-wrap${viewerDragOver ? ' sn-viewer-drag' : ''}`}
     >
       <div className="sn-viewer-toolbar">
-        <span className="sn-panel-label">Class Material</span>
+        <span className="sn-panel-label">Material</span>
         <div className="sn-viewer-controls">
-          <button className="btn sn-open-btn" onClick={() => fileInputRef.current?.click()}>
-            Open File
+          <button className="c-btn c-btn--secondary sn-open-btn" onClick={() => fileInputRef.current?.click()}>
+            <FileUp size={20} strokeWidth={1.75} aria-hidden="true" />Open
           </button>
           <input
             ref={fileInputRef}
@@ -62,8 +63,8 @@ export default function MaterialPanel({ onError }) {
             style={{ display: 'none' }}
           />
           {guideList.length > 0 && (
-            <select className="sn-guide-select" onChange={handleGuideSelect} defaultValue="">
-              <option value="" disabled>View a study guide…</option>
+            <select className="c-select sn-guide-select" onChange={handleGuideSelect} defaultValue="" aria-label="Show a guide">
+              <option value="" disabled>Guide</option>
               {guideList.map(g => (
                 <option key={g.id} value={g.id}>{g.title}</option>
               ))}
@@ -77,7 +78,7 @@ export default function MaterialPanel({ onError }) {
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.35">
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
             </svg>
-            <p>Open or drag &amp; drop a PDF, PowerPoint, document, or image — or select a study guide above.</p>
+            <p>Drop a file</p>
           </div>
         )}
         {viewerDragOver && (
@@ -85,7 +86,7 @@ export default function MaterialPanel({ onError }) {
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            <p>Drop to open</p>
+            <p>Drop</p>
           </div>
         )}
         <FileViewer file={viewerFile} guideContent={guideContent} />

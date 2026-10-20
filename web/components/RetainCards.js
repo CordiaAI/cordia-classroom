@@ -1,31 +1,59 @@
 import { useState } from 'react';
 import { apiFetch } from '../lib/api';
+import { MessageCircle } from 'lucide-react';
+import { requestTip } from '../lib/tips';
+import { walkthroughEvent } from '../lib/walkthrough';
 import { conceptAnswer, fillMatches, normalize, shuffled } from '../lib/retainEngine.mjs';
 
 // A wrong answer of any type opens the Tutor's "why was I wrong" help.
-export function askTutorAboutMiss(guideId, question, selectedAnswer, options = []) {
-  window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', {
-    detail: {
-      guideId,
-      skill: 'retain',
-      prompt: 'Can you explain why my answer does not work and help me understand the difference?',
-      retainContext: {
-        question: question.question,
-        options,
-        selected_answer: selectedAnswer,
-        correct_answer: conceptAnswer(question),
-      },
+// The context for "why was I wrong", sent when the student taps Ask why.
+function missDetail(guideId, question, selectedAnswer, options) {
+  return {
+    guideId,
+    skill: 'retain',
+    prompt: 'Can you explain why my answer does not work and help me understand the difference?',
+    retainContext: {
+      question: question.question,
+      options,
+      selected_answer: selectedAnswer,
+      correct_answer: conceptAnswer(question),
     },
-  }));
+  };
 }
 
-function NextButton({ onNext }) {
-  return <button type="button" className="quiz-gotit-btn" onClick={onNext} autoFocus>Got it!</button>;
+let lastMiss = null;
+
+// A wrong answer of any type shows "Ask why"; tapping it opens the Tutor and sends.
+export function askTutorAboutMiss(guideId, question, selectedAnswer, options = []) {
+  lastMiss = missDetail(guideId, question, selectedAnswer, options);
+  walkthroughEvent('quiz-miss');
+  requestTip('ask');
+}
+
+export function AskWhy() {
+  return (
+    <button type="button" className="c-btn c-btn--secondary quiz-ask" data-spot="ask-why" data-tip="ask" onClick={() => {
+      walkthroughEvent('ask');
+      if (lastMiss) window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { ...lastMiss, send: true } }));
+    }}>
+      <MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />Ask why
+    </button>
+  );
+}
+
+function NextButton({ onNext, missed }) {
+  return (
+    <div className="quiz-next-row">
+      {missed && <AskWhy />}
+      <button type="button" className="c-btn c-btn--primary quiz-next" onClick={onNext} autoFocus>Next</button>
+    </div>
+  );
 }
 
 export function McCard({ card, question, guideId, onResult, onNext }) {
   const answer = conceptAnswer(question);
-  const [options] = useState(() => (card.reask ? shuffled(question.options, card.id) : question.options));
+  // Always shuffled, so the right answer's position never gives it away (saved quizzes kept it first).
+  const [options] = useState(() => shuffled(question.options || [], Math.floor(Math.random() * 233280)));
   const [selected, setSelected] = useState(null);
 
   function choose(option) {
@@ -49,7 +77,7 @@ export function McCard({ card, question, guideId, onResult, onNext }) {
       {options.map(option => (
         <button key={option} type="button" className={optionClass(option)} onClick={() => choose(option)}>{option}</button>
       ))}
-      {selected !== null && <NextButton onNext={onNext} />}
+      {selected !== null && <NextButton onNext={onNext} missed={selected !== answer} />}
     </>
   );
 }
@@ -82,14 +110,14 @@ export function FillCard({ card, question, guideId, onResult, onNext }) {
           autoFocus
           autoComplete="off"
         />
-        {right === null && <button type="submit" className="btn" disabled={!value.trim()}>Check</button>}
+        {right === null && <button type="submit" className="c-btn c-btn--primary" disabled={!value.trim()}>Check</button>}
       </div>
       {right !== null && (
         <p className={'retain-feedback ' + (right ? 'right' : 'wrong')} role="status">
-          {right ? 'Correct!' : <>Not quite. The answer is <strong>{answer}</strong>.</>}
+          {right ? 'Correct' : <>Answer: <strong>{answer}</strong></>}
         </p>
       )}
-      {right !== null && <NextButton onNext={onNext} />}
+      {right !== null && <NextButton onNext={onNext} missed={!right} />}
     </form>
   );
 }
@@ -135,8 +163,7 @@ export function MatchingCard({ card, questions, guideId, onResult, onNext }) {
 
   return (
     <>
-      <div className="quiz-question-text">Match each question with its answer.</div>
-      <p className="retain-hint">Drag an answer onto a question, or tap an answer and then tap the question.</p>
+      <div className="quiz-question-text">Match</div>
       <div className="retain-match-bank" aria-label="Answers">
         {bank.filter(answer => !used.has(answer)).map(answer => (
           <button
@@ -164,20 +191,20 @@ export function MatchingCard({ card, questions, guideId, onResult, onNext }) {
                 onDragOver={event => event.preventDefault()}
                 onDrop={event => { event.preventDefault(); place(row.index, event.dataTransfer.getData('text/plain')); }}
                 aria-label={value ? `Answer: ${value}. Tap to remove.` : 'Empty. Tap after choosing an answer.'}
-              >{value || 'Drop answer here'}</button>
+              >{value || 'Drop here'}</button>
               {checked && state === ' wrong' && <small className="retain-correct-answer">Answer: {row.answer}</small>}
             </li>
           );
         })}
       </ol>
       {!checked
-        ? <button type="button" className="btn retain-check" onClick={check} disabled={Object.keys(placed).length !== rows.length}>Check matches</button>
-        : <NextButton onNext={onNext} />}
+        ? <button type="button" className="c-btn c-btn--primary retain-check" onClick={check} disabled={Object.keys(placed).length !== rows.length}>Check</button>
+        : <NextButton onNext={onNext} missed={rows.some(row => normalize(placed[row.index]) !== normalize(row.answer))} />}
     </>
   );
 }
 
-const VERDICTS = { 1: ['right', 'Right!'], 0.5: ['partial', 'Partly right'], 0: ['wrong', 'Not quite'] };
+const VERDICTS = { 1: ['right', 'Right'], 0.5: ['partial', 'Partly right'], 0: ['wrong', 'Not quite'] };
 
 export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitch }) {
   const concept = card.concepts[0];
@@ -213,7 +240,7 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
         className="retain-written-input"
         value={value}
         onChange={event => setValue(event.target.value)}
-        placeholder="Answer in your own words"
+        placeholder="Your answer"
         aria-label="Your answer"
         rows={4}
         readOnly={Boolean(grade) || busy}
@@ -222,11 +249,11 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
       />
       {!grade && (
         <div className="retain-written-actions">
-          <button type="submit" className="btn" disabled={busy || !value.trim()}>{busy ? 'Checking…' : 'Check answer'}</button>
+          <button type="submit" className="c-btn c-btn--primary" disabled={busy || !value.trim()}>{busy ? 'Checking…' : 'Check'}</button>
           {error && (
             <>
               <span className="retain-action-error" role="alert">{error}</span>
-              <button type="button" className="btn-outline" onClick={() => onSwitch('mc')}>Use multiple choice instead</button>
+              <button type="button" className="c-btn c-btn--secondary" onClick={() => onSwitch('mc')}>Use choices</button>
             </>
           )}
         </div>
@@ -234,10 +261,10 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
       {grade && (
         <div className={'retain-feedback ' + tone} role="status">
           <strong>{label}</strong> {grade.explanation}
-          {grade.credit !== 1 && <p className="retain-guide-answer"><span>Guide answer</span>{grade.answer}</p>}
+          {grade.credit !== 1 && <p className="retain-guide-answer"><span>Answer</span>{grade.answer}</p>}
         </div>
       )}
-      {grade && <NextButton onNext={onNext} />}
+      {grade && <NextButton onNext={onNext} missed={grade.credit !== 1} />}
     </form>
   );
 }

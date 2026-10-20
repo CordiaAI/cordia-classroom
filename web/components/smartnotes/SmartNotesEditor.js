@@ -1,31 +1,63 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import GuidedTour from '../GuidedTour';
+import { Check, ChevronDown, NotebookPen, Sparkles } from 'lucide-react';
+import CordiaLoader from '../CordiaLoader';
 import MermaidDiagram from '../MermaidDiagram';
+import NapkinVisual from '../NapkinVisual';
 import { authHeaders, authorizedFetch } from '../../lib/api';
+import { TYPING_CHARS, isDefaultTitle } from '../../lib/noteMeta.mjs';
 import { cleanPastedHtml, formatOnKeyDown, plainTextToHtml } from '../../lib/notesEditing';
-import { practiceTourUrl, saveOnboardingStep } from '../../lib/onboarding';
 import { sanitizeHtml } from '../../lib/sanitizeHtml';
 import { API, notesRequest, saveErrorMessage } from '../../lib/smartnotes';
-import { SMARTNOTES_TOUR } from '../../lib/tours';
+import { walkthroughEvent } from '../../lib/walkthrough';
 import MaterialPanel from './MaterialPanel';
 import { StudyGuidePreviewModal, useGuidePreview } from './GuidePreview';
+
+// The built-in diagram for a highlight, drawn only when no Napkin visual is available.
+function BuiltInDiagram({ text, code, loading, draw }) {
+  useEffect(() => { if (!code) draw(text); }, [text]);
+  if (loading) return <div className="sn-diagram-placeholder"><CordiaLoader size={20} label="Drawing" /></div>;
+  return code ? <MermaidDiagram code={code} label="SmartNotes diagram" className="sn-diagram-render" /> : null;
+}
 
 // One note: the paper on the left, class material and a diagram panel on the right.
 export default function SmartNotesEditor() {
   const router = useRouter();
   const [noteId, setNoteId] = useState(null);
   const [title, setTitle] = useState('Untitled Notes');
+  const [hasText, setHasText] = useState(false);
   const [saveStatus, setSaveStatus] = useState(''); // '' | 'saving' | 'saved' | 'error'
   const [saveError, setSaveError] = useState('');
   const [actionError, setActionError] = useState(''); // a failed load, create, move, delete, or diagram
   const [notes, setNotes] = useState([]); // session list
   const [showNotesList, setShowNotesList] = useState(false);
+  const notesPickerRef = useRef(null);
+  const notesTriggerRef = useRef(null);
+  // The notes dropdown closes on Escape (focus returns to its button) and on any outside click.
+  useEffect(() => {
+    if (!showNotesList) return undefined;
+    function onKey(event) {
+      if (event.key !== 'Escape') return;
+      setShowNotesList(false);
+      notesTriggerRef.current?.focus();
+    }
+    function onPointer(event) {
+      if (!notesPickerRef.current?.contains(event.target)) setShowNotesList(false);
+    }
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer);
+    };
+  }, [showNotesList]);
 
   // Diagram / visualize
   const [mermaidCode, setMermaidCode] = useState(null);
   const [diagramLoading, setDiagramLoading] = useState(false);
   const [visualizeMode, setVisualizeMode] = useState(false);
+  const [visualSource, setVisualSource] = useState(null); // { text, context, key }
+  const visualAnchor = useRef(null);
 
   // "Turn into Study Guide" preview modal
   const [convertingGuide, setConvertingGuide] = useState(false);
@@ -50,6 +82,7 @@ export default function SmartNotesEditor() {
   const titleRef  = useRef('Untitled Notes');
   const lastSavedRef = useRef('');       // last saved content snapshot
   const lastSavedTitleRef = useRef('Untitled Notes'); // last saved title snapshot
+  const titleRequested = useRef(false); // AI title asked for once per opened note
 
   // Multi-page illusion: how many "filled pages" are behind the front paper (0–2)
   const [pageCount, setPageCount] = useState(0);
@@ -57,7 +90,9 @@ export default function SmartNotesEditor() {
   // ── Init: load existing note (parent only renders editor when ?id is present)
   useEffect(() => {
     const { id } = router.query;
-    if (id && String(id) !== String(noteIdRef.current)) {
+    if (id === 'new') {
+      if (noteIdRef.current || !paperRef.current?.innerHTML) startBlankNote();
+    } else if (id && String(id) !== String(noteIdRef.current)) {
       loadNote(id);
     }
   }, [router.isReady, router.query.id]);
@@ -78,23 +113,55 @@ export default function SmartNotesEditor() {
 
   useEffect(() => { fetchNotes(); }, [noteId, fetchNotes]);
 
-  async function createNote() {
-    let data;
-    try {
-      data = await notesRequest('/smart_notes', { method: 'POST', body: JSON.stringify({ title: 'Untitled Notes' }) });
-    } catch (caught) {
-      setActionError(caught.message);
-      return;
-    }
-    noteIdRef.current = data.note.id;
-    setNoteId(data.note.id);
-    // Ensure the paper has a starting <p> block so first-line typing has a wrapper
-    if (paperRef.current && !paperRef.current.innerHTML.trim()) {
+  // A blank editor with no saved note behind it yet.
+  function startBlankNote() {
+    noteIdRef.current = null;
+    titleRequested.current = false;
+    titleRef.current = 'Untitled Notes';
+    folderIdRef.current = '';
+    setNoteId(null);
+    setTitle('Untitled Notes');
+    setFolderId('');
+    if (paperRef.current) {
       paperRef.current.innerHTML = '<p><br></p>';
+      lastSavedRef.current = paperRef.current.innerHTML;
+      setHasText(false);
     }
-    lastSavedRef.current = paperRef.current?.innerHTML || '';
     lastSavedTitleRef.current = 'Untitled Notes';
-    window.history.replaceState({}, '', '/smartnotes?id=' + data.note.id);
+  }
+
+  // The note is created on the server the first time it has something in it.
+  const creatingRef = useRef(null);
+  function noteIsEmpty() {
+    const text = paperRef.current?.innerText?.trim() || '';
+    const title = (titleRef.current || '').trim();
+    return !text && (!title || title === 'Untitled Notes');
+  }
+  async function ensureNote() {
+    if (noteIdRef.current) return noteIdRef.current;
+    if (noteIsEmpty()) return null;
+    if (!creatingRef.current) {
+      creatingRef.current = (async () => {
+        try {
+          const data = await notesRequest('/smart_notes', { method: 'POST', body: JSON.stringify({ title: titleRef.current || 'Untitled Notes' }) });
+          noteIdRef.current = data.note.id;
+          setNoteId(data.note.id);
+          walkthroughEvent('note-written');
+          if (folderIdRef.current) {
+            await notesRequest('/smart_notes/' + data.note.id, { method: 'PUT', body: JSON.stringify({ folder_id: folderIdRef.current }) })
+              .catch(caught => setActionError(caught.message));
+          }
+          window.history.replaceState(window.history.state, '', '/smartnotes?id=' + data.note.id);
+          return data.note.id;
+        } catch (caught) {
+          setActionError(caught.message);
+          return null;
+        } finally {
+          creatingRef.current = null;
+        }
+      })();
+    }
+    return creatingRef.current;
   }
 
   async function loadNote(id) {
@@ -104,11 +171,12 @@ export default function SmartNotesEditor() {
     } catch (caught) {
       // Only a link to a note that doesn't exist starts a new one; any other failure keeps
       // the student on this note and says why, so a blip never looks like lost notes.
-      if (caught.status === 400 || caught.status === 404) createNote();
+      if (caught.status === 400 || caught.status === 404) startBlankNote();
       else setActionError(caught.message);
       return;
     }
     noteIdRef.current = data.note.id;
+    titleRequested.current = false;
     titleRef.current  = data.note.title || 'Untitled Notes';
     folderIdRef.current = data.note.folder_id || '';
     setNoteId(data.note.id);
@@ -120,6 +188,7 @@ export default function SmartNotesEditor() {
         : '<p><br></p>';
       lastSavedRef.current = paperRef.current.innerHTML;
       lastSavedTitleRef.current = data.note.title || 'Untitled Notes';
+      setHasText(Boolean(paperRef.current.innerText.trim()));
     }
   }
 
@@ -127,7 +196,8 @@ export default function SmartNotesEditor() {
   // Resolves to '' when the note is saved (or unchanged), otherwise to a readable error.
   // A failed save leaves lastSavedRef untouched so the next autosave retries it.
   const doSave = useCallback(async (opts = {}) => {
-    if (!paperRef.current || !noteIdRef.current) return '';
+    if (!paperRef.current) return '';
+    if (!noteIdRef.current && !(await ensureNote())) return '';
     const content = paperRef.current.innerHTML;
     const title = titleRef.current;
     if (content === lastSavedRef.current && title === lastSavedTitleRef.current && !opts.force) return '';
@@ -152,6 +222,21 @@ export default function SmartNotesEditor() {
     lastSavedTitleRef.current = title;
     setSaveError('');
     setSaveStatus('saved');
+    // Still "Untitled Notes" with real text: ask once for an AI title (saved to the note by the server).
+    if (!titleRequested.current && isDefaultTitle(title) && (paperRef.current?.innerText || '').trim().length >= TYPING_CHARS) {
+      titleRequested.current = true;
+      const noteId = noteIdRef.current;
+      fetch('/api/notes/meta', { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ note_id: noteId, title: true, cover: false }) })
+        .then(response => (response.ok ? response.json() : null))
+        .then(data => {
+          if (!data?.title || noteIdRef.current !== noteId || !isDefaultTitle(titleRef.current)) return;
+          titleRef.current = data.title;
+          lastSavedTitleRef.current = data.title;
+          setTitle(data.title);
+          fetchNotes();
+        })
+        .catch(() => {});
+    }
     setTimeout(() => setSaveStatus(s => s === 'saved' ? '' : s), 1500);
     fetchNotes(); // refresh sidebar list so title changes appear immediately
     return '';
@@ -160,7 +245,6 @@ export default function SmartNotesEditor() {
   // ── Autosave (debounced 1s after a keypress) ────────────────────────────
   const scheduleSave = useCallback(() => {
     clearTimeout(saveTimer.current);
-    if (!noteIdRef.current) return;
     saveTimer.current = setTimeout(() => doSave(), 1000);
   }, [doSave]);
 
@@ -192,7 +276,9 @@ export default function SmartNotesEditor() {
   useEffect(() => {
     function flushSave() {
       clearTimeout(saveTimer.current);
-      if (!noteIdRef.current || !paperRef.current) return;
+      if (!paperRef.current) return;
+      // A note that was never saved and has text: create it now (SPA navigation keeps this running).
+      if (!noteIdRef.current) { if (!noteIsEmpty()) doSave(); return; }
       const content = paperRef.current.innerHTML;
       const title = titleRef.current;
       const contentChanged = content !== lastSavedRef.current;
@@ -219,7 +305,7 @@ export default function SmartNotesEditor() {
     const newId = e.target.value;
     folderIdRef.current = newId;
     setFolderId(newId);
-    if (!noteIdRef.current) return;
+    if (!noteIdRef.current) return; // saved with the note when it is first created
     setActionError('');
     try {
       await notesRequest('/smart_notes/' + noteIdRef.current, { method: 'PUT', body: JSON.stringify({ folder_id: newId || '' }) });
@@ -234,19 +320,50 @@ export default function SmartNotesEditor() {
     setVisualizeMode(v => !v);
   }
 
-  async function handleCheckmark() {
-    const selectedText = window.getSelection()?.toString()?.trim();
+  // "Make diagram": a Napkin visual of the highlight (the rest of the note is context).
+  // If no visual can be made, the built-in diagram is drawn instead.
+  function handleCheckmark() {
+    const selection = window.getSelection();
+    const selectedText = selection?.toString()?.trim();
     if (!selectedText || selectedText.length < 5) return;
+    const paperText = paperRef.current?.innerText || '';
+    const at = paperText.indexOf(selectedText);
+    const context = at >= 0
+      ? `${paperText.slice(Math.max(0, at - 700), at)}\n${paperText.slice(at + selectedText.length, at + selectedText.length + 700)}`.trim()
+      : '';
+    let block = selection.rangeCount ? selection.getRangeAt(0).endContainer : null;
+    while (block && block.parentNode !== paperRef.current) block = block.parentNode;
+    visualAnchor.current = block || null;
     setVisualizeMode(false);
+    setMermaidCode(null);
+    setVisualSource({ text: selectedText, context, key: Date.now() });
+  }
+
+  async function drawBuiltInDiagram(text) {
     setDiagramLoading(true);
     setActionError('');
     try {
-      const data = await notesRequest('/smart_notes/diagram', { method: 'POST', body: JSON.stringify({ content: selectedText }) });
+      const data = await notesRequest('/smart_notes/diagram', { method: 'POST', body: JSON.stringify({ content: text }) });
       setMermaidCode(data.mermaid || null);
     } catch (caught) {
       setActionError(caught.message);
     }
     setDiagramLoading(false);
+  }
+
+  // "Use this" puts the visual into the note, after the highlighted paragraph.
+  function insertVisual(visual) {
+    const paper = paperRef.current;
+    if (!paper) return;
+    const img = document.createElement('img');
+    img.src = visual.url;
+    img.alt = visual.alt || 'Diagram';
+    img.className = `nv-inline nv-${visual.theme === 'dark' ? 'dark' : 'light'}`;
+    const anchor = visualAnchor.current && paper.contains(visualAnchor.current) ? visualAnchor.current : paper.lastChild;
+    if (anchor) anchor.parentNode.insertBefore(img, anchor.nextSibling);
+    else paper.appendChild(img);
+    setHasText(true);
+    scheduleSave();
   }
 
   // ── Resize handlers ──────────────────────────────────────────────────────
@@ -293,25 +410,23 @@ export default function SmartNotesEditor() {
     event.preventDefault();
     const cleaned = (html && cleanPastedHtml(html)) || plainTextToHtml(text || '');
     if (cleaned) document.execCommand('insertHTML', false, cleaned);
+    setHasText(Boolean(paperRef.current?.innerText.trim()));
     scheduleSave();
   }
 
   // ── Paper keyboard handler ───────────────────────────────────────────────
   function onPaperKeyUp(e) {
     if (!paperRef.current) return;
+    setHasText(Boolean(paperRef.current.innerText.trim()));
     scheduleSave();
   }
 
   // ── New session — flush current, then create+navigate to fresh note ──────
   async function handleNewNote() {
+    setShowNotesList(false);
     await doSave();
-    setActionError('');
-    try {
-      const data = await notesRequest('/smart_notes', { method: 'POST', body: JSON.stringify({ title: 'Untitled Notes' }) });
-      router.push('/smartnotes?id=' + data.note.id);
-    } catch (caught) {
-      setActionError(caught.message);
-    }
+    startBlankNote();
+    router.push('/smartnotes?id=new');
   }
 
   async function handleSwitchNote(id) {
@@ -320,18 +435,9 @@ export default function SmartNotesEditor() {
     router.push('/smartnotes?id=' + id);
   }
 
-  async function finishSmartNotesTour(outcome) {
-    if (outcome === 'skipped') {
-      await saveOnboardingStep('done');
-      router.replace('/smartnotes?id=' + noteIdRef.current, undefined, { shallow: true });
-      return;
-    }
-    await saveOnboardingStep('practice');
-    router.push(await practiceTourUrl());
-  }
-
   async function handleConvertToGuide() {
     setShowNotesList(false);
+    await ensureNote();
     if (!noteIdRef.current) return;
     setConvertingGuide(true);
     // The backend reads the saved note, so a failed save must stop here with its reason.
@@ -343,7 +449,6 @@ export default function SmartNotesEditor() {
 
   return (
     <div className="sn-page">
-      {router.query.tour === '1' && noteId && <GuidedTour steps={SMARTNOTES_TOUR} onFinish={finishSmartNotesTour} />}
       {/* Header bar */}
       <div className="sn-header">
         <div className="sn-header-left">
@@ -351,58 +456,55 @@ export default function SmartNotesEditor() {
             className="sn-title-input"
             value={title}
             onChange={e => { titleRef.current = e.target.value; setTitle(e.target.value); scheduleSave(); }}
-            placeholder="Note title..."
+            placeholder="Title"
+            aria-label="Note title"
             spellCheck={false}
           />
           <span className={`sn-status ${actionError ? 'error' : saveStatus}`} role={actionError ? 'alert' : undefined}>
-            {actionError || (saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? saveError : '')}
+            {actionError || (saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? saveError : '')}
           </span>
         </div>
         <div className="sn-header-right">
           <select
-            className="sn-class-select"
+            aria-label="Class"
+            className="c-select sn-class-select"
             value={folderId}
             onChange={handleFolderChange}
-            title="Assign to class"
           >
             <option value="">No class</option>
             {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
           </select>
+          {hasText && (
+            <button className="c-btn c-btn--secondary sn-convert-header-btn" onClick={handleConvertToGuide} disabled={convertingGuide}>
+              <Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />{convertingGuide ? 'Building…' : 'Turn into guide'}
+            </button>
+          )}
           <button
-            className="btn sn-convert-header-btn"
-            onClick={handleConvertToGuide}
-            disabled={convertingGuide}
-            title="Turn this note into a study guide"
-          >
-            {convertingGuide ? 'Generating…' : 'Turn into Study Guide'}
-          </button>
-          <button
-            className={`btn sn-save-btn${saveStatus === 'saving' ? ' saving' : saveStatus === 'saved' ? ' saved' : saveStatus === 'error' ? ' error' : ''}`}
+            className={`c-btn c-btn--primary sn-save-btn${saveStatus === 'saving' ? ' saving' : saveStatus === 'saved' ? ' saved' : saveStatus === 'error' ? ' error' : ''}`}
             onClick={() => doSave({ force: true })}
           >
-            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? 'Error' : 'Save'}
+            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Error' : 'Save'}
           </button>
-          <div className="sn-notes-picker">
+          <div className="sn-notes-picker" ref={notesPickerRef}>
             <button
-              className={`btn sn-open-btn sn-notes-dropdown-trigger${showNotesList ? ' open' : ''}`}
+              ref={notesTriggerRef}
+              className={`c-btn c-btn--secondary sn-notes-dropdown-trigger${showNotesList ? ' open' : ''}`}
               onClick={() => setShowNotesList(v => !v)}
+              aria-expanded={showNotesList}
             >
-              <span>My Notes</span>
-              <svg className="sn-chevron" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-                <path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <NotebookPen size={20} strokeWidth={1.75} aria-hidden="true" />Notes<ChevronDown size={18} strokeWidth={1.75} aria-hidden="true" />
             </button>
             {showNotesList && (
               <div className="sn-notes-dropdown">
                 <div className="sn-notes-dropdown-header">
-                  <span className="sn-panel-label">Sessions</span>
-                  <button className="sn-new-btn" onClick={handleNewNote}>+ New</button>
+                  <span className="sn-panel-label">Notes</span>
+                  <button className="c-btn c-btn--quiet sn-new-btn" onClick={handleNewNote}>New note</button>
                 </div>
                 <div
                   className={'sn-notes-item sn-notes-item--back'}
                   onClick={async () => { setShowNotesList(false); await doSave(); router.push('/smartnotes'); }}
                 >
-                  ← All notes
+                  All notes
                 </div>
                 {notes.map(n => (
                   <div
@@ -413,7 +515,7 @@ export default function SmartNotesEditor() {
                     {n.title || 'Untitled Notes'}
                   </div>
                 ))}
-                {notes.length === 0 && <div className="sn-notes-item muted">No sessions yet</div>}
+                {notes.length === 0 && <div className="sn-notes-item muted">0 notes</div>}
               </div>
             )}
           </div>
@@ -432,14 +534,15 @@ export default function SmartNotesEditor() {
         {/* Left: notes paper — spans all 3 rows */}
         <div className="sn-paper-wrap">
           <div className="sn-paper-label-row">
-            <span className="sn-panel-label">SmartNotes</span>
+            <span className="sn-panel-label">Notes</span>
             {visualizeMode && (
               <button
                 className="sn-visualize-confirm"
                 onClick={handleCheckmark}
                 title="Generate diagram from highlighted text"
+                aria-label="Make diagram"
               >
-                ✓
+                <Check aria-hidden="true" />
               </button>
             )}
           </div>
@@ -455,7 +558,7 @@ export default function SmartNotesEditor() {
             onKeyDown={e => formatOnKeyDown(e, paperRef.current)}
             onKeyUp={onPaperKeyUp}
             onPaste={onPaperPaste}
-            data-placeholder="Start typing your notes here…"
+            data-placeholder="Start typing"
             spellCheck={false}
           />
           </div>
@@ -473,24 +576,29 @@ export default function SmartNotesEditor() {
         {/* Bottom-right: diagram */}
         <div className="sn-diagram-wrap">
           <div className="sn-diagram-toolbar">
-            <span className="sn-panel-label">Visual Diagram</span>
+            <span className="sn-panel-label">Diagram</span>
             <button
-              className={`btn sn-open-btn sn-visualize-btn${visualizeMode ? ' active' : ''}`}
+              className={`c-btn c-btn--secondary sn-visualize-btn${visualizeMode ? ' active' : ''}`}
               onClick={handleVisualize}
             >
               {visualizeMode ? 'Cancel' : 'Visualize'}
             </button>
           </div>
           <div className="sn-diagram-body">
-            {diagramLoading && (
-              <div className="sn-diagram-placeholder">Generating diagram…</div>
+            {visualSource && (
+              <NapkinVisual
+                key={visualSource.key}
+                auto
+                text={visualSource.text}
+                context={visualSource.context}
+                useLabel="Use this"
+                onUse={insertVisual}
+                fallback={() => <BuiltInDiagram text={visualSource.text} code={mermaidCode} loading={diagramLoading} draw={drawBuiltInDiagram} />}
+              />
             )}
-            {!diagramLoading && mermaidCode && (
-              <MermaidDiagram code={mermaidCode} label="SmartNotes diagram" className="sn-diagram-render" />
-            )}
-            {!diagramLoading && !mermaidCode && (
+            {!visualSource && (
               <div className="sn-diagram-placeholder">
-                <p>Click "Visualize", highlight text in your notes, then click ✓</p>
+                <p>Visualize → highlight → confirm</p>
               </div>
             )}
           </div>

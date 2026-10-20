@@ -344,7 +344,7 @@ export function formatOnKeyDown(e, root) {
     const calloutMatch = lineText.match(/^!{2,3}\s+(.+)$/);
     if (calloutMatch) {
       e.preventDefault();
-      block.innerHTML = '<mark class="sn-callout">⚠ ' + escHtml(calloutMatch[1]) + '</mark>';
+      block.innerHTML = '<mark class="sn-callout">' + escHtml(calloutMatch[1]) + '</mark>';
       newParaAfter(block);
       return;
     }

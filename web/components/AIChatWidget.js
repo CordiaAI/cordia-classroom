@@ -2,21 +2,25 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
 import MermaidDiagram from './MermaidDiagram';
+import NapkinVisual from './NapkinVisual';
 import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from './ExplanationPreference';
-import AcademicInfinityMark from './AcademicInfinityMark';
-import WorkspaceIcon from './WorkspaceIcon';
+import { ArrowUp, BookOpen, Layers, MessageCircle, Paperclip, PencilRuler, SlidersHorizontal, X as CloseIcon } from 'lucide-react';
+import { lastGuide } from '../lib/userStore';
+import { walkthroughEvent } from '../lib/walkthrough';
 import TutorSelect from './TutorSelect';
-import AILoadingSphere from './AILoadingSphere';
+import CordiaLoader from './CordiaLoader';
 import { inlineParts, parseTutorAnswer } from '../lib/tutorFormat.mjs';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 
 // Tutor replies may include ```mermaid blocks; render them as diagrams and keep the rest as text.
+// A diagram can become a Napkin visual of the reply's explanation (the diagram stays as fallback).
 function TutorMessageText({ text, plain = false }) {
   if (plain) return <span className="cordia-tutor-text">{text}</span>;
   const parts = String(text || '').split(/```mermaid\s*\n([\s\S]*?)```/);
+  const explanation = speakableText(text).slice(0, 2000);
   return parts.map((part, index) => (index % 2 === 1
-    ? <MermaidDiagram key={index} code={part.trim()} label="Tutor diagram" />
+    ? <NapkinVisual key={index} text={explanation} name="tutor-visual" fallback={() => <MermaidDiagram code={part.trim()} label="Tutor diagram" />} />
     : part.trim() && <TutorAnswer key={index} text={part} />));
 }
 
@@ -106,6 +110,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const sendingRef = useRef(false);
   const [extracting, setExtracting] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [explainOpen, setExplainOpen] = useState(false);
   const { learningStyle } = useLearningStyle();
   const [listening, setListening] = useState(false);
@@ -160,6 +165,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     },
   });
   const appliedPreferred = useRef('');
+  const pendingSend = useRef('');
 
   // The Tutor stays mounted across pages, so guides and notes made elsewhere (Create,
   // SmartNotes, the extension) are reloaded on navigation and when the tab regains focus.
@@ -267,6 +273,9 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     ...(session?.browser_content_available ? [{ ...(browserMaterial || {}), title: browserMaterial?.title || 'Captured browser material', kind: 'browser', key: 'browser' }] : []),
   ];
 
+  // The material on screen always wins: each navigation re-applies it, so the chip
+  // never keeps showing a guide from an earlier page.
+  useEffect(() => { appliedPreferred.current = ''; }, [router.asPath, preferredGuideId, preferredNoteId]);
   useEffect(() => {
     const preferred = preferredGuideId ? `guide:${preferredGuideId}` : preferredNoteId ? `note:${preferredNoteId}` : '';
     if (preferred && preferred !== appliedPreferred.current && materials.some(item => item.key === preferred)) {
@@ -274,8 +283,12 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
       setContextKey(preferred);
       return;
     }
-    if (!materials.some(item => item.key === contextKey)) setContextKey(materials[0]?.key || '');
-  }, [guides, notes, attachments.length, materials.length, contextKey, preferredGuideId, preferredNoteId]);
+    if (!materials.some(item => item.key === contextKey)) {
+      const last = lastGuide();
+      const fallback = last && materials.some(item => item.key === `guide:${last.id}`) ? `guide:${last.id}` : materials[0]?.key || '';
+      setContextKey(fallback);
+    }
+  }, [guides, notes, attachments.length, materials.length, contextKey, preferredGuideId, preferredNoteId, router.asPath]);
 
   useEffect(() => {
     const prefill = event => {
@@ -289,6 +302,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
           if (detail.retainContext && current.trim() && current !== detail.prompt) setSavedDraft(current);
           return detail.prompt;
         });
+        if (detail.send) pendingSend.current = detail.prompt;
       }
     };
     window.addEventListener('cordia:tutor-prompt', prefill);
@@ -310,6 +324,13 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const remaining = MAX_MESSAGES - messages.filter(message => message.role === 'user').length;
   const busy = loading || (session?.status && session.status !== 'idle');
   const progressLabel = SKILL_PROGRESS[session?.active_skill] || 'Cordia is working…';
+
+  // "Explain" and "Ask why" send at once so the Tutor explains without another tap.
+  useEffect(() => {
+    if (!pendingSend.current || input !== pendingSend.current || !canSubmit || busy || !session?.id) return;
+    pendingSend.current = '';
+    sendMessage();
+  }, [input, canSubmit, busy, session?.id, contextKey]);
 
   async function changeSkill(nextSkill) {
     setSkillOverride(nextSkill);
@@ -334,7 +355,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     const room = MAX_ATTACHMENTS - attachments.length;
     if (readable.length > room) problems.push(`The Tutor can hold up to ${MAX_ATTACHMENTS} files at a time.`);
     const toRead = readable.slice(0, Math.max(room, 0));
-    setLocalError(problems.join(' '));
+    setLocalError([...new Set(problems)].join(' '));
     if (fileRef.current) fileRef.current.value = '';
     if (!toRead.length) return;
     setExtracting(true);
@@ -348,10 +369,10 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         if (!response.ok || !data?.text) throw new Error(apiErrorMessage(data?.detail, 'Could not read this file.'));
         added.push({ id: `${file.name}:${file.size}:${file.lastModified}`, title: file.name, content: data.text });
       } catch (error) {
-        problems.push(`${file.name}: ${error.message || 'Could not read this file.'}`);
+        problems.push(toRead.length > 1 ? 'Some files could not be read.' : 'This file could not be read.');
       }
     }
-    setLocalError(problems.join(' '));
+    setLocalError([...new Set(problems)].join(' '));
     if (added.length) {
       setAttachments(current => {
         const seen = new Set(current.map(file => file.id));
@@ -369,6 +390,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   async function sendMessage() {
     const question = input.trim();
     if (!question || !canSubmit || busy || remaining <= 0 || !session?.id) return;
+    walkthroughEvent('ask');
     setInput('');
     setLocalError('');
     sendingRef.current = true;
@@ -437,23 +459,27 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     <section ref={rootRef} className="cordia-tutor" aria-label="Cordia tutor">
       <header className="cordia-tutor-header">
         <div className="cordia-tutor-title-row">
-          <strong><AcademicInfinityMark className="tutor-brand-mark" />Cordia Tutor</strong>
-          <span className={`cordia-browser-status${session?.browser_available ? ' is-online' : ''}`}>
-            {session?.browser_available ? 'Browser available' : 'Browser unavailable'}
-          </span>
+          <MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />
+          <strong>Tutor</strong>
+          {session?.browser_available && <span className="cordia-browser-status is-online" aria-label="Browser connected" title="Browser connected" />}
         </div>
-        <details className="tutor-context-controls">
-        <summary>Study context <span>⌄</span></summary>
+        <div className="cordia-tutor-context" aria-label="Context">
+          <BookOpen size={16} strokeWidth={1.75} aria-hidden="true" />
+          <TutorSelect label="Study material" value={contextKey} onChange={setContextKey} options={[
+            ...(materials.length === 0 ? [{ value: '', label: 'No material' }] : []),
+            ...guides.map(item => ({ value: `guide:${item.id}`, label: item.title || 'Untitled guide', group: 'Guides' })),
+            ...notes.map(item => ({ value: `note:${item.id}`, label: item.title || 'Untitled note', group: 'Notes' })),
+            ...(attachments.length ? [{ value: 'attachment', label: attachments.length === 1 ? attachments[0].title : `${attachments.length} files`, group: 'Files' }] : []),
+            ...(session?.browser_content_available ? [{ value: 'browser', label: browserMaterial?.title || 'Browser page', group: 'Browser' }] : []),
+          ]} />
+        </div>
+        <details className="tutor-context-controls" open={optionsOpen} onToggle={event => setOptionsOpen(event.currentTarget.open)}>
+        <summary><SlidersHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />Options</summary>
+        {/* Rendered only while Options is open: closed, these controls sat invisibly over "Ask anything". */}
+        {optionsOpen && <>
         <TutorSelect label="Tutor skill" value={skillOverride} onChange={changeSkill} disabled={!session || busy} options={[
           { value: '', label: `Auto · ${session?.skills?.find(item => item.id === session?.active_skill)?.label || 'Explain'}` },
           ...(session?.skills || [{ id: 'explain', label: 'Explain' }]).map(item => ({ value: item.id, label: item.available === false ? `${item.label} — coming soon` : item.label, disabled: item.available === false })),
-        ]} />
-        <TutorSelect label="Study material" value={contextKey} onChange={setContextKey} options={[
-          ...(materials.length === 0 ? [{ value: '', label: 'Choose study material' }] : []),
-          ...guides.map(item => ({ value: `guide:${item.id}`, label: item.title || 'Untitled guide', group: 'Study Guides' })),
-          ...notes.map(item => ({ value: `note:${item.id}`, label: item.title || 'Untitled note', group: 'SmartNotes' })),
-          ...(attachments.length ? [{ value: 'attachment', label: attachments.length === 1 ? attachments[0].title : `${attachments.length} attached files`, group: 'Attached files' }] : []),
-          ...(session?.browser_content_available ? [{ value: 'browser', label: browserMaterial?.title || 'Captured browser material', group: 'Browser' }] : []),
         ]} />
         {needsTargetClass && <TutorSelect label="Destination class" value={targetClassId} onChange={setTargetClassId} options={[
           { value: '', label: 'Choose destination class' },
@@ -469,36 +495,41 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
             {attachments.map(file => (
               <li key={file.id}>
                 <span>{file.title}</span>
-                <button type="button" onClick={() => removeAttachment(file.id)} aria-label={`Remove ${file.title}`}>×</button>
+                <button type="button" className="c-icon-btn" onClick={() => removeAttachment(file.id)} aria-label={`Remove ${file.title}`}><CloseIcon size={18} strokeWidth={1.75} aria-hidden="true" /></button>
               </li>
             ))}
           </ul>
         )}
         {contextKey === 'attachment' && combinedAttachments.trimmed.length > 0 && (
-          <p className="cordia-tutor-attach-note">The Tutor reads about {TUTOR_CONTEXT_CHARS.toLocaleString()} characters at a time, so only the start of {combinedAttachments.trimmed.join(', ')} is included. Remove a file to give the others more room.</p>
+          <p className="cordia-tutor-attach-note" role="status">Trimmed: {combinedAttachments.trimmed.join(', ')}</p>
         )}
         <input ref={fileRef} type="file" accept="*" multiple onChange={event => attachFiles(event.target.files)} hidden />
         <button type="button" className={'cordia-tutor-attach' + (attachDropActive ? ' drop-target-active' : '')} onClick={() => fileRef.current?.click()} disabled={extracting || attachments.length >= MAX_ATTACHMENTS}>
-          {extracting ? 'Reading files…' : attachDropActive ? 'Drop to attach' : attachments.length >= MAX_ATTACHMENTS ? `${MAX_ATTACHMENTS} files attached` : attachments.length ? 'Attach another file' : 'Attach study material'}
+          <Paperclip size={18} strokeWidth={1.75} aria-hidden="true" />{extracting ? 'Reading…' : attachDropActive ? 'Drop' : attachments.length >= MAX_ATTACHMENTS ? `${MAX_ATTACHMENTS} files` : 'Attach'}
         </button>
         <button type="button" className="cordia-tutor-explain-toggle" onClick={() => setExplainOpen(open => !open)} aria-expanded={explainOpen}>
-          How should I explain things?
+          Explain style
         </button>
         {explainOpen && (
           <div className="cordia-tutor-explain-panel">
             <ExplanationPreference compact onSaved={() => setTimeout(() => setExplainOpen(false), 900)} />
           </div>
         )}
+        </>}
         </details>
       </header>
 
       <div className="cordia-tutor-messages" aria-live="polite">
         {messages.length === 0 && (
           <div className="tutor-welcome">
-            <h3>Let's make it clear.</h3>
-            <p>{material ? `How can I help you with ${material.title || 'your material'} today?` : 'What would you like to understand today?'}</p>
+            <h2>Ask anything</h2>
             <div className="tutor-starter-actions">
-              {[{ label: 'Explain this concept in simpler terms', prompt: 'Explain the key concepts in this material in simple terms.', icon: 'tutor' }, { label: 'Create a study guide from this document', prompt: 'Create a study guide from this material.', icon: 'study' }, { label: 'Generate practice questions', prompt: 'Generate practice questions from this material.', icon: 'practice' }, { label: 'Make flashcards for key points', prompt: 'Make flashcards for the key points in this material.', icon: 'flashcards' }].map(action => <button type="button" key={action.icon} onClick={() => setInput(action.prompt)}><WorkspaceIcon name={action.icon} /><span>{action.label}</span></button>)}
+              {[
+                { label: 'Explain', prompt: 'Explain the key concepts in this material in simple terms.', icon: MessageCircle },
+                { label: 'Make guide', prompt: 'Create a study guide from this material.', icon: BookOpen },
+                { label: 'Practice', prompt: 'Generate practice questions from this material.', icon: PencilRuler },
+                { label: 'Flashcards', prompt: 'Make flashcards for the key points in this material.', icon: Layers },
+              ].map(action => <button type="button" key={action.label} className="c-chip" onClick={() => setInput(action.prompt)}><action.icon size={16} strokeWidth={1.75} aria-hidden="true" />{action.label}</button>)}
             </div>
           </div>
         )}
@@ -529,7 +560,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         ))}
         {busy && messages.at(-1)?.role === 'user' && (
           <div className="cordia-tutor-message ai tutor-thinking">
-            <AILoadingSphere size={14} label="" />
+            <CordiaLoader size={20} label="Thinking" />
             <span>{progressLabel}</span>
           </div>
         )}
@@ -547,7 +578,8 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
               sendMessage();
             }
           }}
-          placeholder={!hasRequiredContext ? 'Choose or attach study material' : needsTargetClass && !targetClassId ? 'Choose a destination class' : 'Ask Cordia…'}
+          aria-label="Message"
+          placeholder={!hasRequiredContext ? 'Pick material' : needsTargetClass && !targetClassId ? 'Pick a class' : 'Ask'}
           disabled={!canSubmit || busy || remaining <= 0 || !session}
           rows="2"
         />
@@ -563,11 +595,13 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
             <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="1.5" width="5" height="8" rx="2.5" fill="currentColor" /><path d="M3.5 7.5a4.5 4.5 0 0 0 9 0M8 12v2.5" stroke="currentColor" strokeWidth="1.4" fill="none" /></svg>
           </button>
         )}
-        <button type="button" onClick={sendMessage} disabled={!canSubmit || busy || !input.trim() || remaining <= 0 || !session} aria-label="Send">
-          ↑
-        </button>
+        {input.trim() && (
+          <button type="button" className="cordia-tutor-send" onClick={sendMessage} disabled={!canSubmit || busy || remaining <= 0 || !session} aria-label="Send">
+            <ArrowUp size={20} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        )}
       </div>
-      {remaining <= 3 && <small className="cordia-tutor-limit">{Math.max(remaining, 0)} questions remaining</small>}
+      {remaining <= 3 && <small className="c-meta cordia-tutor-limit">{Math.max(remaining, 0)} left</small>}
     </section>
   );
 }

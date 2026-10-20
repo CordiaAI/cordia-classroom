@@ -27,6 +27,67 @@ export function parseQAPairs(text) {
 /**
  * Parse "- bullet\n- bullet" text into string[]
  */
+// Notes as an outline: "## Heading" lines start a section, "- point" lines fill it. Older flat
+// notes (points only) come back as one section without a heading.
+export function parseOutline(text) {
+  const sections = [];
+  let current = null;
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.trim();
+    if (line.startsWith('## ')) { current = { heading: line.slice(3).trim(), points: [] }; sections.push(current); }
+    else if (line.startsWith('- ')) {
+      if (!current) { current = { heading: '', points: [] }; sections.push(current); }
+      current.points.push(line.slice(2).trim());
+    }
+  }
+  return sections.filter(section => section.points.length);
+}
+
+// A guide's Notes, written like a study guide (lib/server/guideNotes.mjs writes it):
+//   > overview
+//   ## Topic heading
+//   - point, with **key terms** in bold
+//     - supporting detail under that point
+//   ## Key points
+//   - the takeaways, at the end
+export const KEY_POINTS = 'Key points';
+
+export function parseStudyNotes(text) {
+  const notes = { overview: '', sections: [], keyPoints: [] };
+  let current = null;
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.trim();
+    if (line.startsWith('> ')) notes.overview = [notes.overview, line.slice(2).trim()].filter(Boolean).join(' ');
+    else if (line.startsWith('## ')) {
+      const heading = line.slice(3).trim();
+      current = heading.toLowerCase() === KEY_POINTS.toLowerCase() ? 'key' : { heading, points: [] };
+      if (current !== 'key') notes.sections.push(current);
+    } else if (line.startsWith('- ')) {
+      const point = line.slice(2).trim();
+      if (current === 'key') { notes.keyPoints.push(point); continue; }
+      if (!current) { current = { heading: '', points: [] }; notes.sections.push(current); }
+      const last = current.points[current.points.length - 1];
+      if (/^(\s{2,}|\t)- /.test(raw) && last) last.sub.push(point);
+      else current.points.push({ text: point, sub: [] });
+    }
+  }
+  notes.sections = notes.sections.filter(section => section.points.length);
+  return notes;
+}
+
+export const hasStudyNotes = notes => notes.sections.length + notes.keyPoints.length > 0;
+
+// Notes in the current study-guide form end with a Key points section; older notes get rewritten.
+export const isStudyGuideNotes = text => /^##\s+key points\s*$/im.test(String(text || ''));
+
+// What the guide's Notes tab shows: its notes, or, until AI has written them, the key points the
+// guide's own answers make (so Notes is never empty).
+export function guideNotes(guide) {
+  const notes = parseStudyNotes(guide?.notes);
+  if (hasStudyNotes(notes)) return notes;
+  return { overview: '', sections: [], keyPoints: parseQAPairs(guide?.study_guide).map(pair => pair.answer).filter(Boolean) };
+}
+
 export function parseNotes(text) {
   if (!text) return [];
   return text.split('\n')

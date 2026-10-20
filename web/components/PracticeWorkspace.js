@@ -1,15 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
+import { cssVar } from '../lib/cssVar';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
-import AILoadingSphere from './AILoadingSphere';
-import GuidedTour from './GuidedTour';
-import { saveOnboardingStep } from '../lib/onboarding';
-import { PRACTICE_TOUR } from '../lib/tours';
+import { LoadingArea, SectionLoader } from './CordiaLoader';
+import Link from 'next/link';
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, Eraser, Eye, Flag, Hand, MessageCircle, PenLine, PencilRuler, RefreshCw, Sparkles, Trash2, Type, Undo2, Upload, Video, VideoOff, Wand2 } from 'lucide-react';
+import { walkthroughEvent } from '../lib/walkthrough';
+import { drawLatestSegment, drawStroke, farEnough, finishStroke } from '../lib/airDraw.mjs';
+import AirDraw from './AirDraw';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const SYMBOLS = ['+', '−', '×', '÷', '=', '√', 'π', 'Σ', '→'];
 const drawingsKey = guideId => `practiceDrawings:${guideId}`;
+// Pen colours (tokens in styles/tokens.css, light and dark versions).
+const PEN_COLORS = [
+  { token: '--draw-ink', label: 'Ink' },
+  { token: '--draw-olive', label: 'Olive' },
+  { token: '--draw-blue', label: 'Blue' },
+  { token: '--draw-red', label: 'Red' },
+  { token: '--draw-orange', label: 'Orange' },
+  { token: '--draw-purple', label: 'Purple' },
+  { token: '--draw-teal', label: 'Teal' },
+  { token: '--draw-graphite', label: 'Graphite' },
+];
 
 function readableText(value) {
   return String(value || '')
@@ -53,7 +67,21 @@ export default function PracticeWorkspace() {
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
   const [guideOptions, setGuideOptions] = useState(null);
-  const touring = router.query.tour === '1';
+  // Drawing: every stroke (mouse, touch or hand) is kept per problem so Undo goes stroke by stroke.
+  // Per-frame data lives in refs; only the toolbar uses state.
+  const strokes = useRef([]);
+  const live = useRef(null);
+  const baseImage = useRef(null);
+  const [penColor, setPenColor] = useState('--draw-ink');
+  const [penSize, setPenSize] = useState(4);
+  const pen = useRef({ color: penColor, size: penSize });
+  pen.current = { color: penColor, size: penSize };
+  const [canUndo, setCanUndo] = useState(false);
+  const [handOn, setHandOn] = useState(false);
+  const [handReady, setHandReady] = useState(false);
+  const [showCamera, setShowCamera] = useState(true);
+  const [handError, setHandError] = useState('');
+  const hasMaterial = Boolean(guide || upload);
 
   useEffect(() => {
     if (!ready) return;
@@ -74,17 +102,22 @@ export default function PracticeWorkspace() {
       const saved = data?.practice;
       if (!Array.isArray(saved?.problems) || saved.problems.length !== 10) return;
       const progress = saved.progress || {};
+      // Each visit starts fresh: only problems already answered right keep their work.
+      // Unsolved problems open blank, without the last answer or its "Not quite" result.
+      const solved = Object.keys(progress.evaluations || {}).filter(index => progress.evaluations[index]?.status === 'correct');
+      const keep = (map = {}) => Object.fromEntries(Object.entries(map).filter(([index]) => solved.includes(index)));
+      const firstOpen = saved.problems.findIndex((_, index) => !solved.includes(String(index)));
       restoring.current = true;
       setProblems(saved.problems);
       setPracticeInfo({ subjectArea: saved.subject_area, domain: saved.domain, truthNote: saved.truth_note });
-      setProblemIndex(Math.min(9, Math.max(0, Number(progress.problemIndex) || 0)));
-      setAnswers(progress.answers || {});
-      setEvaluations(progress.evaluations || {});
-      setRevealed(progress.revealed || {});
-      setWorkText(progress.workText || {});
-      setTokens(progress.tokens || {});
+      setProblemIndex(firstOpen === -1 ? 0 : firstOpen);
+      setAnswers(keep(progress.answers));
+      setEvaluations(keep(progress.evaluations));
+      setRevealed(keep(progress.revealed));
+      setWorkText(keep(progress.workText));
+      setTokens(keep(progress.tokens));
       setReported(progress.reported || {});
-      try { drawings.current = JSON.parse(localStorage.getItem(drawingsKey(guideId)) || '{}'); } catch { drawings.current = {}; }
+      try { drawings.current = keep(JSON.parse(localStorage.getItem(drawingsKey(guideId)) || '{}')); } catch { drawings.current = {}; }
     });
   }, [ready, guideId]);
 
@@ -108,39 +141,39 @@ export default function PracticeWorkspace() {
     const canvas = canvasRef.current;
     const board = boardRef.current;
     if (!canvas || !board) return;
+    // Each problem opens with its saved drawing as the base and an empty stroke list.
+    strokes.current = [];
+    live.current = null;
+    baseImage.current = null;
+    setCanUndo(false);
+    const snapshot = drawings.current[problemIndex] || '';
+    if (snapshot) {
+      const image = new Image();
+      image.onload = () => { baseImage.current = image; redraw(); };
+      image.src = snapshot;
+    }
     const resize = () => {
       const rect = board.getBoundingClientRect();
       const ratio = window.devicePixelRatio || 1;
-      const snapshot = drawings.current[problemIndex] || '';
       canvas.width = Math.max(1, Math.round(rect.width * ratio));
       canvas.height = Math.max(1, Math.round(rect.height * ratio));
       canvas.style.width = rect.width + 'px';
       canvas.style.height = rect.height + 'px';
-      const context = canvas.getContext('2d');
-      context.setTransform(ratio, 0, 0, ratio, 0, 0);
-      context.lineCap = 'round';
-      context.lineJoin = 'round';
-      if (snapshot) {
-        const image = new Image();
-        image.onload = () => context.drawImage(image, 0, 0, rect.width, rect.height);
-        image.src = snapshot;
-      }
+      canvas.getContext('2d').setTransform(ratio, 0, 0, ratio, 0, 0);
+      redraw();
     };
-    resize();
-    window.addEventListener('resize', resize);
-    return () => window.removeEventListener('resize', resize);
-  }, [problemIndex, problems.length]);
+    // Follow the board itself (not just the window): it grows when the problem text loads.
+    const observer = new ResizeObserver(resize);
+    observer.observe(board);
+    return () => observer.disconnect();
+    // hasMaterial: the board only exists once the guide or upload has loaded.
+  }, [problemIndex, problems.length, hasMaterial]);
 
   const sourceTitle = upload?.title || guide?.title || 'Study material';
   const sourceText = readableText(upload?.content || guide?.study_guide || guide?.notes);
   const current = problems[problemIndex];
   const currentTokens = tokens[problemIndex] || [];
   const sourceBlocks = sourceText ? sourceText.split(/\n\s*\n/).filter(block => block.trim()) : [];
-
-  async function finishTour() {
-    await saveOnboardingStep('done');
-    router.replace(guideId ? '/practice/' + guideId : '/practice', undefined, { shallow: true });
-  }
 
   async function generateProblems() {
     if (!guide && !upload) return;
@@ -203,36 +236,132 @@ export default function PracticeWorkspace() {
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }
 
-  function beginDraw(event) {
-    if (tool !== 'pen' && tool !== 'eraser') return;
-    drawing.current = true;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const p = point(event);
-    const context = canvasRef.current.getContext('2d');
-    context.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
-    context.strokeStyle = '#11120f';
-    context.lineWidth = tool === 'eraser' ? 22 : 2.4;
-    context.beginPath();
-    context.moveTo(p.x, p.y);
+  const colorOf = token => cssVar(token, cssVar('--paper-ink', 'black'));
+
+  // Strokes after the last "clear"; the saved base drawing counts only if nothing cleared it.
+  function visibleStrokes() {
+    const lastClear = strokes.current.map(item => item.tool).lastIndexOf('clear');
+    return { showBase: lastClear === -1 && Boolean(baseImage.current), list: strokes.current.slice(lastClear + 1) };
   }
 
-  function moveDraw(event) {
-    if (!drawing.current || (tool !== 'pen' && tool !== 'eraser')) return;
-    const p = point(event);
-    const context = canvasRef.current.getContext('2d');
-    context.lineTo(p.x, p.y);
-    context.stroke();
+  function redraw() {
+    const canvas = canvasRef.current;
+    const board = boardRef.current;
+    if (!canvas || !board) return;
+    const rect = board.getBoundingClientRect();
+    const context = canvas.getContext('2d');
+    context.globalCompositeOperation = 'source-over';
+    context.clearRect(0, 0, rect.width, rect.height);
+    const { showBase, list } = visibleStrokes();
+    if (showBase) context.drawImage(baseImage.current, 0, 0, rect.width, rect.height);
+    list.forEach(item => drawStroke(context, item, colorOf(item.color)));
   }
 
   function saveDrawings() {
     try { localStorage.setItem(drawingsKey(guideId), JSON.stringify(drawings.current)); } catch { /* storage blocked or full: drawings stay for this visit */ }
   }
 
+  function saveSnapshot() {
+    const { showBase, list } = visibleStrokes();
+    if (canvasRef.current && (showBase || list.length)) drawings.current[problemIndex] = canvasRef.current.toDataURL();
+    else delete drawings.current[problemIndex];
+    saveDrawings();
+  }
+
+  // One stroke API for mouse, touch and hand: start, move, end.
+  function startStroke(kind, p) {
+    if (!canvasRef.current || live.current) return;
+    walkthroughEvent('practice-drew');
+    const stroke = { tool: kind, color: pen.current.color, size: pen.current.size, points: [p] };
+    live.current = stroke;
+    drawLatestSegment(canvasRef.current.getContext('2d'), stroke, colorOf(stroke.color));
+  }
+
+  function extendStroke(p) {
+    const stroke = live.current;
+    if (!stroke || !canvasRef.current || !farEnough(stroke.points[stroke.points.length - 1], p)) return;
+    stroke.points.push(p);
+    drawLatestSegment(canvasRef.current.getContext('2d'), stroke, colorOf(stroke.color));
+  }
+
+  function endStroke() {
+    const stroke = live.current;
+    if (!stroke) return;
+    live.current = null;
+    if (canvasRef.current) finishStroke(canvasRef.current.getContext('2d'), stroke, colorOf(stroke.color));
+    strokes.current.push(stroke);
+    setCanUndo(true);
+    saveSnapshot();
+  }
+
+  // Clearing is a step too, so Undo brings the drawing back.
+  function clearDrawing() {
+    endStroke();
+    if (!visibleStrokes().showBase && !visibleStrokes().list.length) return;
+    strokes.current.push({ tool: 'clear' });
+    redraw();
+    setCanUndo(true);
+    saveSnapshot();
+  }
+
+  function undo() {
+    if (live.current || !strokes.current.length) return;
+    strokes.current.pop();
+    redraw();
+    setCanUndo(strokes.current.length > 0);
+    saveSnapshot();
+  }
+
+  function savePng() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const flat = document.createElement('canvas');
+    flat.width = canvas.width;
+    flat.height = canvas.height;
+    const context = flat.getContext('2d');
+    context.fillStyle = cssVar('--draw-paper', 'white');
+    context.fillRect(0, 0, flat.width, flat.height);
+    context.drawImage(canvas, 0, 0);
+    flat.toBlob(blob => {
+      if (!blob) return;
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = href;
+      link.download = `practice-${problemIndex + 1}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 1000);
+    }, 'image/png');
+  }
+
+  function toggleHand() {
+    if (handOn) { setHandOn(false); setHandReady(false); return; }
+    setHandError('');
+    setHandReady(false);
+    setHandOn(true);
+    if (tool === 'type') setTool('pen');
+  }
+
+  function beginDraw(event) {
+    if (tool !== 'pen' && tool !== 'eraser') return;
+    if (live.current) return;
+    drawing.current = true;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    startStroke(tool === 'eraser' ? 'eraser' : 'pen', point(event));
+  }
+
+  function moveDraw(event) {
+    if (!drawing.current) return;
+    // Coalesced events keep fast strokes smooth on high-rate pens and mice.
+    const events = event.nativeEvent.getCoalescedEvents?.() || [];
+    (events.length ? events : [event]).forEach(item => extendStroke(point(item)));
+  }
+
   function endDraw() {
     if (!drawing.current) return;
     drawing.current = false;
-    if (canvasRef.current) drawings.current[problemIndex] = canvasRef.current.toDataURL();
-    saveDrawings();
+    endStroke();
   }
 
   function changeProblem(nextIndex) {
@@ -264,7 +393,7 @@ export default function PracticeWorkspace() {
     flat.width = canvas.width;
     flat.height = canvas.height;
     const context = flat.getContext('2d');
-    context.fillStyle = '#fff';
+    context.fillStyle = cssVar('--draw-paper', 'white');
     context.fillRect(0, 0, flat.width, flat.height);
     context.drawImage(canvas, 0, 0);
     const data = await apiFetch('/practice/recognize', {
@@ -279,7 +408,10 @@ export default function PracticeWorkspace() {
     }
     if (!data.text) return;
     setWorkText(all => ({ ...all, [index]: [all[index], data.text].filter(Boolean).join('\n') }));
-    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    strokes.current = [];
+    baseImage.current = null;
+    setCanUndo(false);
+    redraw();
     delete drawings.current[index];
     saveDrawings();
     setTool('type');
@@ -304,10 +436,7 @@ export default function PracticeWorkspace() {
   }
 
   function clearWork() {
-    const canvas = canvasRef.current;
-    if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-    delete drawings.current[problemIndex];
-    saveDrawings();
+    clearDrawing();
     setWorkText(all => ({ ...all, [problemIndex]: '' }));
     setTokens(all => ({ ...all, [problemIndex]: [] }));
   }
@@ -365,40 +494,60 @@ export default function PracticeWorkspace() {
     else setError(apiErrorMessage(data?.detail, 'Your report could not be sent. Please try again.'));
   }
 
-  function chooseGuide(event) {
-    const value = event.target.value;
-    if (value === 'create') router.push('/create');
-    else if (value) router.push('/practice/' + value);
+  if (guideId && !guide && !error) {
+    return <LoadingArea label="Loading practice" />;
   }
 
-  if (guideId && !guide && !error) {
-    return <div className="practice-loading"><AILoadingSphere /></div>;
+  const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
+
+  // Pick a guide first; the workspace appears only once there is material.
+  if (!guideId && !upload) {
+    return (
+      <div className="c-page practice-pick">
+        <header className="c-page-head">
+          <h1 className="c-title">Practice</h1>
+          <input ref={fileRef} type="file" hidden accept=".pdf,.docx,.pptx,.txt" onChange={event => useUploadedFile(event.target.files?.[0])} />
+          <button type="button" className="c-btn c-btn--secondary" onClick={() => fileRef.current?.click()} disabled={extracting}><Upload {...ICON} />{extracting ? 'Reading…' : 'Upload'}</button>
+        </header>
+        {error && <div className="retain-action-error" role="alert">{error}</div>}
+        {!guideOptions ? (
+          <SectionLoader height={240} label="Loading guides" />
+        ) : guideOptions.length ? (
+          <div className="practice-grid practice-guide-picker" data-spot="practice-picker">
+            {guideOptions.map(option => (
+              <Link key={option.id} href={'/practice/' + option.id} className="c-card practice-guide">
+                <PencilRuler size={24} strokeWidth={1.75} aria-hidden="true" />
+                <span>{option.title || 'Untitled guide'}</span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="c-empty"><button type="button" className="c-btn c-btn--primary" onClick={() => router.push('/create')}>Create guide or upload file</button></div>
+        )}
+        <style jsx>{`
+          .practice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+          :global(.practice-guide) { display: grid; align-content: space-between; gap: 16px; min-height: 112px; padding: 18px; color: var(--ink); text-decoration: none; font:600 17px/1.15 var(--font-display); }
+          :global(.practice-guide:hover) { text-decoration: none; border-color: var(--olive); }
+          :global(.practice-guide .lucide) { color: var(--olive-ink); }
+        `}</style>
+      </div>
+    );
   }
 
   return (
-    <main className="practice-page fade-in">
-      {touring && (guide || !guideId) && <GuidedTour steps={PRACTICE_TOUR} onFinish={finishTour} />}
-      <header className="practice-header">
-        <div>
-          {guideId && <button type="button" className="create-back-link" onClick={() => router.push('/guide/' + guideId)}>Back to study guide</button>}
-          <h1>Practice workspace</h1>
-          <p>{practiceInfo?.subjectArea ? `${practiceInfo.subjectArea} practice` : 'Work through 10 source-grounded activities without leaving your material.'}</p>
+    <main className="practice-page">
+      <header className="c-page-head practice-head">
+        <div className="c-row practice-title-row">
+          <button type="button" className="c-icon-btn" onClick={() => router.push(guideId ? '/guide/' + guideId : '/practice')} aria-label="Back"><ArrowLeft {...ICON} /></button>
+          <h1 className="c-title">Practice</h1>
+          <span className="c-section-title c-truncate practice-source-name">{sourceTitle}</span>
         </div>
-        <div className="practice-source-actions">
-          <label className="practice-guide-picker">
-            <span className="sr-only">Study guide</span>
-            <select value={upload ? '' : guideId || ''} onChange={chooseGuide} disabled={!guideOptions}>
-              <option value="" disabled>{!guideOptions ? 'Loading study guides…' : guideOptions.length ? 'Choose a study guide' : 'No study guides yet'}</option>
-              {(guideOptions || []).map(option => <option key={option.id} value={option.id}>{option.title || 'Untitled guide'}</option>)}
-              {guideOptions && guideOptions.length === 0 && <option value="create">Create guide or upload file</option>}
-            </select>
-          </label>
+        <div className="c-row">
           <input ref={fileRef} type="file" hidden accept=".pdf,.docx,.pptx,.txt" onChange={event => useUploadedFile(event.target.files?.[0])} />
-          <button type="button" className="btn-outline" onClick={() => fileRef.current?.click()} disabled={extracting}>
-            {extracting ? 'Reading file…' : 'Use another file'}
-          </button>
-          <button type="button" className="btn" onClick={generateProblems} disabled={loading || !sourceText}>
-            {loading ? 'Creating 10 problems…' : problems.length ? 'Regenerate problems' : 'Generate 10 problems'}
+          <button type="button" className="c-btn c-btn--quiet" onClick={() => fileRef.current?.click()} disabled={extracting}><Upload {...ICON} />{extracting ? 'Reading…' : 'Upload'}</button>
+          <button type="button" className={'c-btn ' + (problems.length ? 'c-btn--secondary' : 'c-btn--primary')} onClick={generateProblems} disabled={loading || !sourceText}>
+            {problems.length ? <RefreshCw {...ICON} /> : <Sparkles {...ICON} />}
+            {loading ? 'Creating…' : problems.length ? 'Regenerate' : 'Generate'}
           </button>
         </div>
       </header>
@@ -406,46 +555,74 @@ export default function PracticeWorkspace() {
       {error && <div className="retain-action-error" role="alert">{error}</div>}
 
       <section className="practice-layout">
-        <article className="practice-problem-panel">
+        <article className="c-card practice-problem-panel">
           <div className="practice-problem-heading">
             <div>
-              <span>Problem {problems.length ? problemIndex + 1 : 0} of {problems.length || 10}</span>
-              {current?.practice_type && <small className="practice-kind">{current.practice_type.replace('_', ' ')}</small>}
-              <h2>{current?.prompt || (sourceText ? 'Generate a set to begin.' : 'Choose a study guide to begin.')}</h2>
+              <div className="c-row">
+                <span className="c-meta">{problems.length ? problemIndex + 1 : 0} / {problems.length || 10}</span>
+                {current?.practice_type && <span className="c-meta practice-kind">{current.practice_type.replace('_', ' ')}</span>}
+              </div>
+              <h2 className="practice-prompt">{current?.prompt || (loading ? 'Creating…' : 'Generate')}</h2>
               {current?.starter_code && <pre className="practice-code"><code>{current.starter_code}</code></pre>}
               {current?.test_cases?.length > 0 && (
                 <div className="practice-tests">
-                  <strong>Acceptance tests</strong>
+                  <strong>Tests</strong>
                   <ul>{current.test_cases.map((test, index) => <li key={index}><code>{test}</code></li>)}</ul>
                 </div>
               )}
             </div>
             {problems.length > 0 && (
-              <div className="practice-nav">
-                <button type="button" onClick={() => changeProblem(problemIndex - 1)} disabled={problemIndex === 0} aria-label="Previous problem">←</button>
-                <button type="button" onClick={() => changeProblem(problemIndex + 1)} disabled={problemIndex === problems.length - 1} aria-label="Next problem">→</button>
+              <div className="c-row">
+                <button type="button" className="c-icon-btn" onClick={() => changeProblem(problemIndex - 1)} disabled={problemIndex === 0} aria-label="Previous problem"><ChevronLeft {...ICON} /></button>
+                <button type="button" className="c-icon-btn" onClick={() => changeProblem(problemIndex + 1)} disabled={problemIndex === problems.length - 1} aria-label="Next problem"><ChevronRight {...ICON} /></button>
               </div>
             )}
           </div>
 
-          <div className="practice-toolbar" aria-label="Workspace tools">
-            <button type="button" className={tool === 'pen' ? 'active' : ''} onClick={() => setTool('pen')}>Draw</button>
-            <button type="button" className={tool === 'eraser' ? 'active' : ''} onClick={() => setTool('eraser')}>Eraser</button>
-            <button type="button" className={tool === 'type' ? 'active' : ''} onClick={() => setTool('type')}>Type</button>
-            <span className="practice-toolbar-divider" />
-            {SYMBOLS.map(symbol => <button type="button" key={symbol} onClick={() => addSymbol(symbol)} aria-label={`Add ${symbol}`}>{symbol}</button>)}
-            <button type="button" onClick={() => addSymbol('', 'exp')} aria-label="Add exponent" title="Exponent: drag next to a number, then type the power">xⁿ</button>
-            <button type="button" onClick={() => addSymbol('', 'text')} aria-label="Add text tile" title="Typed tile you can drag anywhere">Aa</button>
-            <button type="button" onClick={tidyHandwriting} disabled={tidying || !current} title="Turn your handwriting into clean typed text">{tidying ? 'Reading…' : 'Tidy handwriting'}</button>
-            <button type="button" className="practice-clear" onClick={clearWork}>Clear</button>
+          <div className="practice-toolbar" role="toolbar" aria-label="Workspace tools">
+            <div className="c-seg" role="group" aria-label="Tool">
+              <button type="button" className={tool === 'pen' ? 'is-active' : ''} aria-pressed={tool === 'pen'} onClick={() => setTool('pen')}><PenLine {...ICON} /> Draw</button>
+              <button type="button" className={tool === 'eraser' ? 'is-active' : ''} aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')}><Eraser {...ICON} /> Erase</button>
+              <button type="button" className={tool === 'type' ? 'is-active' : ''} aria-pressed={tool === 'type'} onClick={() => setTool('type')}><Type {...ICON} /> Type</button>
+            </div>
+            <div className="practice-symbols">
+              {SYMBOLS.map(symbol => <button type="button" className="c-icon-btn" key={symbol} onClick={() => addSymbol(symbol)} aria-label={`Add ${symbol}`}>{symbol}</button>)}
+              <button type="button" className="c-icon-btn" onClick={() => addSymbol('', 'exp')} aria-label="Add exponent">xⁿ</button>
+              <button type="button" className="c-icon-btn" onClick={() => addSymbol('', 'text')} aria-label="Add text tile">Aa</button>
+            </div>
+            <button type="button" className="c-btn c-btn--quiet" onClick={tidyHandwriting} disabled={tidying || !current}><Wand2 {...ICON} />{tidying ? 'Reading…' : 'Tidy'}</button>
+            <button type="button" className="c-icon-btn" onClick={clearWork} aria-label="Clear work"><Trash2 {...ICON} /></button>
+            <div className="practice-drawbar" role="group" aria-label="Drawing">
+            <button type="button" className={'c-btn c-btn--sm ' + (handOn ? 'c-btn--primary' : 'c-btn--secondary')} aria-pressed={handOn} onClick={toggleHand}>
+              <Hand {...ICON} />{handOn ? 'Stop hand' : 'Hand'}
+            </button>
+            {handOn && (
+              <button type="button" className="c-icon-btn" aria-pressed={showCamera} onClick={() => setShowCamera(value => !value)} aria-label={showCamera ? 'Hide camera preview' : 'Show camera preview'}>
+                {showCamera ? <Video {...ICON} /> : <VideoOff {...ICON} />}
+              </button>
+            )}
+            <div className="practice-swatches" role="group" aria-label="Pen colour">
+              {PEN_COLORS.map(color => (
+                <button key={color.token} type="button" className={'practice-swatch' + (penColor === color.token ? ' is-active' : '')} style={{ '--swatch': `var(${color.token})` }} aria-pressed={penColor === color.token} aria-label={color.label} title={color.label} onClick={() => setPenColor(color.token)} />
+              ))}
+            </div>
+            <label className="practice-size">
+              <span className="c-meta">Size</span>
+              <input type="range" min="1" max="24" step="1" value={penSize} onChange={event => setPenSize(Number(event.target.value))} aria-label="Brush size" />
+            </label>
+            <button type="button" className="c-icon-btn" onClick={undo} disabled={!canUndo} aria-label="Undo"><Undo2 {...ICON} /></button>
+            <button type="button" className="c-icon-btn" onClick={savePng} aria-label="Save drawing as PNG"><Download {...ICON} /></button>
+            {handOn && <span className="c-meta" role="status">{handReady ? 'Pinch to draw' : 'Starting camera…'}</span>}
+            </div>
           </div>
+          {handError && <div className="retain-action-error" role="alert">{handError}</div>}
 
-          <div ref={boardRef} className="practice-board" data-tool={tool}>
+          <div ref={boardRef} className="practice-board" data-tool={tool} data-spot="practice-canvas">
             <textarea
               aria-label="Typed work"
               value={workText[problemIndex] || ''}
               onChange={event => setWorkText(all => ({ ...all, [problemIndex]: event.target.value }))}
-              placeholder={tool === 'type' ? 'Type your work here…' : ''}
+              placeholder={tool === 'type' ? 'Type here' : ''}
               readOnly={tool !== 'type'}
             />
             <canvas
@@ -456,6 +633,16 @@ export default function PracticeWorkspace() {
               onPointerUp={endDraw}
               onPointerCancel={endDraw}
             />
+            {handOn && (
+              <AirDraw
+                boardRef={boardRef}
+                pen={pen}
+                stroke={{ start: startStroke, move: extendStroke, end: endStroke, clear: clearDrawing }}
+                showPreview={showCamera}
+                onStarted={() => setHandReady(true)}
+                onError={message => { setHandError(message); setHandOn(false); setHandReady(false); }}
+              />
+            )}
             {currentTokens.map(token => (
               <div
                 key={token.id}
@@ -465,7 +652,6 @@ export default function PracticeWorkspace() {
                 onPointerMove={event => moveToken(event, token)}
                 onPointerUp={() => { drag.current = null; }}
                 onDoubleClick={() => removeToken(token)}
-                title="Drag to move · double-click to remove"
               >
                 {token.kind === 'exp' || token.kind === 'text' ? (
                   <input
@@ -485,41 +671,43 @@ export default function PracticeWorkspace() {
             <label htmlFor="practice-answer-input">Your answer</label>
             <textarea
               id="practice-answer-input"
+              className="c-input"
               value={answers[problemIndex] || ''}
               onChange={event => setAnswers(all => ({ ...all, [problemIndex]: event.target.value }))}
-              placeholder={current?.answer_format || 'Enter your answer…'}
+              placeholder={current?.answer_format || 'Answer'}
               disabled={!current}
             />
-            <button type="submit" className="btn" disabled={!current || grading || !answers[problemIndex]?.trim()}>
+            <button type="submit" className="c-btn c-btn--primary" disabled={!current || grading || !answers[problemIndex]?.trim()}>
               {grading ? 'Checking…' : 'Check answer'}
             </button>
             {evaluations[problemIndex] && (
               <div className={`practice-evaluation ${evaluations[problemIndex].status}`} role="status">
-                <strong>{evaluations[problemIndex].status === 'correct' ? 'Right!' : 'Not quite'}</strong>
-                <span>{evaluations[problemIndex].status === 'correct'
-                  ? (evaluations[problemIndex].message ? ` — ${evaluations[problemIndex].message}` : '')
-                  : ' — your Tutor left you a note.'}</span>
-                <button type="button" className="practice-report" onClick={reportGrade} disabled={reported[problemIndex]}>
-                  {reported[problemIndex] ? 'Reported — thanks' : 'Report incorrect answer'}
+                <strong>{evaluations[problemIndex].status === 'correct' ? 'Right' : 'Not quite'}</strong>
+                {evaluations[problemIndex].status === 'correct' && evaluations[problemIndex].message && <span>{evaluations[problemIndex].message}</span>}
+                {evaluations[problemIndex].status !== 'correct' && (
+                  <button type="button" className="c-btn c-btn--quiet" onClick={() => window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { guideId, refresh: true } }))}><MessageCircle {...ICON} />Ask</button>
+                )}
+                <button type="button" className="c-btn c-btn--quiet practice-report" onClick={reportGrade} disabled={reported[problemIndex]}>
+                  <Flag {...ICON} />{reported[problemIndex] ? 'Reported' : 'Report'}
                 </button>
               </div>
             )}
             {revealed[problemIndex] && (
               <div className="practice-solution">
-                <div className="practice-verification-row"><strong>Answer</strong></div>
+                <strong>Answer</strong>
                 <p>{current.answer}</p>
-                {current.worked_solution && <p className="practice-worked"><strong>Why:</strong> {current.worked_solution}</p>}
+                {current.worked_solution && <p className="practice-worked"><strong>Why</strong> {current.worked_solution}</p>}
               </div>
             )}
           </form>
         </article>
 
-        <aside className="practice-source-panel">
-          <header>
-            <span>Source material</span>
-            <h2>{sourceTitle}</h2>
+        <aside className="c-card practice-source-panel" aria-label="Source material">
+          <header className="c-row">
+            <h2 className="c-section-title">Source</h2>
+            <span className="c-spacer" />
+            <button type="button" className="c-btn c-btn--quiet" onClick={() => setShownBlocks(all => (Object.keys(all).length >= sourceBlocks.length ? {} : Object.fromEntries(sourceBlocks.map((_, index) => [index, true]))))}><Eye {...ICON} />{Object.keys(shownBlocks).length >= sourceBlocks.length && sourceBlocks.length ? 'Hide' : 'Reveal'}</button>
           </header>
-          <p className="practice-source-hint">Double-click a section to reveal it.</p>
           <div className="practice-source-copy">
             {sourceBlocks.length ? sourceBlocks.map((block, index) => (
               <p
@@ -528,10 +716,29 @@ export default function PracticeWorkspace() {
                 onDoubleClick={() => setShownBlocks(all => ({ ...all, [index]: !all[index] }))}
                 title={shownBlocks[index] ? 'Double-click to hide' : 'Double-click to reveal'}
               >{block}</p>
-            )) : (guideId || upload ? 'No readable source material is available.' : 'Choose a study guide above, or upload a file, to see it here.')}
+            )) : <p className="c-meta">0 sections</p>}
           </div>
         </aside>
       </section>
+      <style jsx>{`
+        .practice-page { display: grid; gap: 20px; }
+        .practice-title-row { min-width: 0; flex: 1; }
+        .practice-source-name { font-family: var(--font-display); min-width: 0; }
+        .practice-prompt { margin: 8px 0 0; font:600 20px/1.15 var(--font-display); }
+        .practice-kind { text-transform: capitalize; }
+        .practice-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+        .practice-toolbar .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
+        .practice-symbols { display: flex; flex-wrap: wrap; gap: 2px; }
+        .practice-symbols :global(.c-icon-btn) { font:600 15px/1 var(--font-sans); }
+        .practice-drawbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-basis: 100%; }
+        .practice-swatches { display: flex; flex-wrap: wrap; gap: 4px; }
+        .practice-swatch { width: 28px; height: 28px; padding: 0; border: 2px solid transparent; border-radius: var(--r-pill); background: var(--swatch); box-shadow: inset 0 0 0 2px var(--surface-raised); cursor: pointer; transition: border-color var(--dur) var(--ease); }
+        .practice-swatch.is-active { border-color: var(--olive); }
+        .practice-swatch:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
+        .practice-size { display: inline-flex; align-items: center; gap: 8px; }
+        .practice-size input { width: 112px; accent-color: var(--olive); }
+        .practice-evaluation { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+      `}</style>
     </main>
   );
 }

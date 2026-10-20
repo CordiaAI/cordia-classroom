@@ -1,13 +1,89 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
+import BodyPortal from '../../components/BodyPortal';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { apiErrorMessage, apiFetch } from '../../lib/api';
+import {
+  ArrowLeft, Brain, Download, ExternalLink, Layers, Lock, MessageCircle, NotebookText, PencilRuler, Pencil, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
+} from 'lucide-react';
+import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
-import { parseQAPairs, parseNotes, formatDate } from '../../lib/formatters';
+import { guideNotes, hasStudyNotes, isStudyGuideNotes, parseQAPairs, parseStudyNotes } from '../../lib/formatters';
 import useSessionTracker from '../../lib/useSessionTracker';
-import AILoadingSphere from '../../components/AILoadingSphere';
 import StudyAidPanel from '../../components/StudyAidPanel';
 import StudyDocument from '../../components/StudyDocument';
+import Menu from '../../components/Menu';
+import ClassChip from '../../components/ClassChip';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { useLearningStyle } from '../../lib/learningStyle';
+import { rememberGuidePage, rememberLastGuide } from '../../lib/userStore';
+import { activeStep, walkthroughEvent } from '../../lib/walkthrough';
+
+const NURSING_TERMS = ['nursing', 'nurse', 'nclex', 'patient', 'vital signs', 'medication administration', 'care plan', 'nursing diagnosis', 'iv therapy', 'delegation', 'scope of practice', 'sbar', 'discharge planning', 'wound care', 'fall prevention', 'infection control', 'postoperative', 'preoperative', 'lab values', 'contraindications'];
+
+// NCLEX Mode is offered only for nursing material.
+function isNursing(guide) {
+  if (guide?.domain === 'nursing') return true;
+  const text = `${guide?.title || ''}\n${guide?.study_guide || ''}`.toLowerCase();
+  return NURSING_TERMS.filter(term => text.includes(term)).length >= 4;
+}
+
+function ask(guideId, prompt, send = false) {
+  window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { guideId, prompt, send } }));
+}
+
+// **term** in notes → bold.
+function rich(text) {
+  return String(text).split(/\*\*(.+?)\*\*/g).map((part, index) => (index % 2 ? <strong key={index}>{part}</strong> : part));
+}
+
+function exportGuide(guide) {
+  const pairs = parseQAPairs(guide.study_guide);
+  const notes = guideNotes(guide);
+  const lines = [`# ${guide.title}`, ''];
+  if (hasStudyNotes(notes)) {
+    lines.push('## Notes', '');
+    if (notes.overview) lines.push(notes.overview, '');
+    notes.sections.forEach(section => lines.push(...(section.heading ? [`### ${section.heading}`, ''] : []), ...section.points.flatMap(point => [`- ${point.text}`, ...point.sub.map(item => `  - ${item}`)]), ''));
+    if (notes.keyPoints.length) lines.push('### Key points', '', ...notes.keyPoints.map(point => `- ${point}`), '');
+  }
+  lines.push('## Questions', '');
+  pairs.forEach((pair, index) => lines.push(`### ${index + 1}. ${pair.question}`, '', pair.answer, ''));
+  if (guide.flashcards?.length) lines.push('## Cards', '', ...guide.flashcards.map(card => `- **${card.front}** — ${card.back}`), '');
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `${(guide.title || 'guide').replace(/[^\w\s-]/g, '').trim() || 'guide'}.md`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+function MakeCard({ front: initialFront, onSave, onClose }) {
+  const [front, setFront] = useState(initialFront);
+  const [back, setBack] = useState('');
+  const [saving, setSaving] = useState(false);
+  return (
+    <BodyPortal>
+    <div className="c-scrim" onClick={onClose}>
+      <form className="c-sheet make-card" role="dialog" aria-modal="true" aria-labelledby="make-card-title" onClick={event => event.stopPropagation()} onSubmit={async event => { event.preventDefault(); setSaving(true); await onSave({ front: front.trim(), back: back.trim() }); setSaving(false); }}>
+        <header className="c-sheet-head">
+          <h2 id="make-card-title" className="c-title">New card</h2>
+          <button type="button" className="c-icon-btn" onClick={onClose} aria-label="Close"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+        </header>
+        <label className="c-field"><span>Front</span><textarea className="c-input" value={front} onChange={event => setFront(event.target.value)} rows={3} /></label>
+        <label className="c-field"><span>Back</span><textarea className="c-input" value={back} onChange={event => setBack(event.target.value)} rows={3} autoFocus /></label>
+        <div className="make-card-foot"><button type="submit" data-spot="card-save" className="c-btn c-btn--primary" disabled={saving || !front.trim() || !back.trim()}>{saving ? 'Saving…' : 'Save'}</button></div>
+        <style jsx>{`
+          .make-card { display: grid; gap: 16px; width: min(520px, 100%); }
+          .make-card .c-sheet-head { margin-bottom: 0; }
+          .make-card textarea { min-height: 88px; }
+          .make-card-foot { display: flex; justify-content: flex-end; }
+        `}</style>
+      </form>
+    </div>
+    </BodyPortal>
+  );
+}
 
 export default function GuidePage() {
   const router = useRouter();
@@ -16,16 +92,30 @@ export default function GuidePage() {
   useSessionTracker('read', id || null);
   const [guide, setGuide] = useState(null);
   const [loadError, setLoadError] = useState('');
-  const [activeTab, setActiveTab] = useState('guide');
-  const [revealedQs, setRevealedQs] = useState(new Set());
-  const [quizHistory, setQuizHistory] = useState([]);
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [renameValue, setRenameValue] = useState('');
+  // Notes: an outline summary of the topic. Cards: every question to read through, plus flip cards.
+  const [view, setView] = useState('notes');
+  // Every guide has outline notes: one without them gets them written the first time it opens.
+  const [notesState, setNotesState] = useState('idle'); // idle | making | done
+  const notesAsked = useRef('');
+  const [page, setPage] = useState(0);
+  const [revealed, setRevealed] = useState(new Set());
+  const [renaming, setRenaming] = useState(null);
+  const [openAid, setOpenAid] = useState(null);
+  const [cardDraft, setCardDraft] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [toast, setToast] = useState('');
+  const [sharing, setSharing] = useState(null);
   const prevRevealed = useRef(0);
   const { learningStyle } = useLearningStyle();
-  const [openAid, setOpenAid] = useState(null);
+  const gate = useLoadGate(Boolean(guide) || Boolean(loadError));
 
-  // ?learn=1 (from the setup checklist) opens "Learn it your way" on the first question.
+  useEffect(() => {
+    if (!router.isReady) return;
+    const requested = Number(router.query.page);
+    if (requested > 0) setPage(requested - 1);
+  }, [router.isReady]);
+
+  // ?learn=1 opens Explain on the first question.
   useEffect(() => {
     if (router.query.learn !== '1' || !guide || !learningStyle?.enabled || openAid) return;
     const first = parseQAPairs(guide.study_guide)[0];
@@ -33,279 +123,286 @@ export default function GuidePage() {
   }, [router.query.learn, guide, learningStyle?.enabled]);
 
   useEffect(() => {
-    if (ready && id) {
-      loadGuide();
-      loadQuizHistory();
-    }
+    if (ready && id) loadGuide();
   }, [ready, id]);
 
-  // Save read progress when revealed count changes
   useEffect(() => {
     if (!guide || !id) return;
-    const qaPairs = parseQAPairs(guide.study_guide);
-    if (qaPairs.length === 0) return;
-    const progress = revealedQs.size / qaPairs.length;
-    if (revealedQs.size > prevRevealed.current) {
-      prevRevealed.current = revealedQs.size;
-      apiFetch('/guides/' + id + '/read-progress', {
-        method: 'PATCH',
-        body: JSON.stringify({ read_progress: progress })
-      });
-    }
-  }, [revealedQs]);
+    const pairs = parseQAPairs(guide.study_guide);
+    if (!pairs.length || revealed.size <= prevRevealed.current) return;
+    prevRevealed.current = revealed.size;
+    const progress = revealed.size / pairs.length;
+    apiFetch('/guides/' + id + '/read-progress', { method: 'PATCH', body: JSON.stringify({ read_progress: progress }) });
+    setGuide(current => ({ ...current, read_progress: Math.max(current.read_progress || 0, progress) }));
+  }, [revealed]);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = setTimeout(() => setToast(''), 2500);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  // A guide without outline notes gets them written (once per visit); a loader shows meanwhile.
+  useEffect(() => {
+    if (!guide?.id || notesAsked.current === guide.id || isStudyGuideNotes(guide.notes)) return;
+    notesAsked.current = guide.id;
+    setNotesState('making');
+    fetch('/api/guide-notes', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ guide_id: guide.id }) })
+      .then(response => (response.ok ? response.json() : null))
+      .then(data => { if (data?.notes) setGuide(current => (current && current.id === guide.id ? { ...current, notes: data.notes } : current)); })
+      .catch(() => {})
+      .finally(() => setNotesState('done'));
+  }, [guide?.id]);
+
+  // The guided walkthrough points at the questions (Explain, highlighting): show them for those steps.
+  useEffect(() => {
+    const step = activeStep();
+    if (step && ['explain', 'highlight'].includes(step.id)) setView('cards');
+  }, [guide?.id]);
+
+  async function loadSharing() {
+    const data = await apiFetch('/sharing/guides/' + id);
+    setSharing(data && 'visibility' in data ? data : null);
+  }
+
+  async function setVisibility(visibility) {
+    const data = await apiFetch('/sharing/guides/' + id, { method: 'PUT', body: JSON.stringify({ visibility }) });
+    if (data?.visibility) {
+      setSharing(current => ({ ...current, visibility: data.visibility, status: data.status }));
+      setToast(data.status === 'held' ? 'Held for review' : data.visibility === 'class' ? `Shared with ${sharing.class.code}` : 'Private');
+    } else setToast(apiErrorMessage(data?.detail, 'Could not change sharing'));
+  }
+
+  async function pullUpdate() {
+    const data = await apiFetch(`/sharing/guides/${id}/update`, { method: 'POST' });
+    if (data?.ok) { await loadGuide(); setSharing(current => ({ ...current, update_available: false })); setToast('Updated'); }
+  }
 
   async function loadGuide() {
     setLoadError('');
+    loadSharing();
     const data = await apiFetch('/guides/' + id);
     if (data?.guide) {
       setGuide(data.guide);
+      rememberLastGuide({ id: data.guide.id, title: data.guide.title, page: Number(router.query.page) > 0 ? Number(router.query.page) - 1 : 0 });
+      walkthroughEvent('guide-open');
     } else {
       setLoadError(apiErrorMessage(data?.detail, 'This study guide could not be loaded.'));
     }
   }
 
-  async function loadQuizHistory() {
-    const data = await apiFetch('/quiz/' + id + '/history');
-    if (data?.attempts) setQuizHistory(data.attempts);
+  function changePage(next) {
+    setPage(next);
+    rememberGuidePage(id, next);
+    router.replace({ pathname: router.pathname, query: { ...router.query, page: next + 1 } }, undefined, { shallow: true, scroll: false });
   }
 
-  async function toggleBookmark() {
+  async function toggleStar() {
+    setGuide(current => ({ ...current, is_bookmarked: !current.is_bookmarked }));
     const data = await apiFetch('/guides/' + id + '/bookmark', { method: 'PATCH' });
-    if (data) setGuide(prev => ({ ...prev, is_bookmarked: data.is_bookmarked }));
+    if (data && typeof data.is_bookmarked === 'boolean') setGuide(current => ({ ...current, is_bookmarked: data.is_bookmarked }));
+  }
+
+  async function saveTitle(event) {
+    event?.preventDefault();
+    const title = renaming?.trim();
+    setRenaming(null);
+    if (!title || title === guide.title) return;
+    const data = await apiFetch('/guides/' + id + '/rename', { method: 'PATCH', body: JSON.stringify({ title }) });
+    if (data?.title) setGuide(current => ({ ...current, title: data.title }));
+  }
+
+  async function deleteGuide() {
+    await apiFetch('/guides/' + id, { method: 'DELETE' });
+    router.push('/library');
+  }
+
+  async function saveCard(card) {
+    const flashcards = [...(guide.flashcards || []), card];
+    const data = await apiFetch('/guides/' + id, { method: 'PATCH', body: JSON.stringify({ title: guide.title, flashcards }) });
+    if (data?.guide) {
+      setGuide(current => ({ ...current, flashcards: data.guide.flashcards || flashcards }));
+      setCardDraft(null);
+      setToast('Card added');
+      walkthroughEvent('card-made');
+    } else setToast(apiErrorMessage(data?.detail, 'Card not saved.'));
+  }
+
+  function onSelection(kind, text) {
+    if (kind === 'card') { setCardDraft(text); walkthroughEvent('make-card-open'); }
+    else if (kind === 'explain') ask(id, `Explain this more simply: "${text}"`, true);
+    else ask(id, `About "${text}": `);
   }
 
   if (loadError && !guide) return (
-    <div className="empty-state" role="alert">
-      <h2>Study guide unavailable</h2>
+    <div className="c-empty" role="alert">
+      <h1 className="c-title">Study guide unavailable</h1>
       <p>{loadError}</p>
-      <div className="resource-load-actions">
-        <button type="button" className="btn" onClick={loadGuide}>Try again</button>
-        <button type="button" className="btn-outline" onClick={() => router.push('/dashboard?view=guides')}>Back to Study Guides</button>
+      <div className="c-row">
+        <button type="button" className="c-btn c-btn--primary" onClick={loadGuide}>Retry</button>
+        <button type="button" className="c-btn c-btn--secondary" onClick={() => router.push('/library')}>Library</button>
       </div>
     </div>
   );
 
-  if (!guide) return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 16 }}>
-      <AILoadingSphere />
-    </div>
-  );
+  if (!guide || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading guide" />;
 
-  const qaPairs = parseQAPairs(guide.study_guide);
-  const notes = parseNotes(guide.notes);
-  const flashcards = guide.flashcards || [];
-  const sourceTitle = guide.source_title || (guide.source_url ? 'Original source' : '');
+  const pairs = parseQAPairs(guide.study_guide);
+  const notes = guideNotes(guide);
+  const notesWritten = hasStudyNotes(parseStudyNotes(guide.notes));
+  const cardCount = guide.flashcards?.length || 0;
+  const sourceTitle = guide.source_title || (guide.source_url ? 'Source' : '');
   const externalSourceUrl = /^https?:\/\//i.test(guide.source_url || '') ? guide.source_url : '';
   const sourceHref = externalSourceUrl
     || (guide.source_type === 'smartnote' && guide.source_id ? `/smartnotes?id=${guide.source_id}` : '')
     || (guide.source_type === 'study_guide' && guide.source_id ? `/guide/${guide.source_id}` : '');
-  const fcProgress = guide.flashcard_progress || {};
-  const tabs = [
-    { key: 'guide', label: 'Study Guide' },
-    { key: 'notes', label: 'Notes' },
-    { key: 'flashcards', label: `Flashcards (${flashcards.length})` },
-    { key: 'quiz', label: 'Retain' },
-    { key: 'practice', label: 'Practice' },
+  const explainWithAid = Boolean(learningStyle?.enabled);
+  const pills = [
+    { key: 'notes', label: 'Notes', icon: NotebookText, view: 'notes' },
+    { key: 'cards', label: 'Cards', icon: Layers, view: 'cards', count: cardCount, spot: 'cards-pill' },
+    { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill' },
+    { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id },
+    ...(isNursing(guide) ? [{ key: 'nclex', label: 'NCLEX', icon: Stethoscope, href: '/nclex/' + id }] : []),
+    { key: 'ask', label: 'Ask', icon: MessageCircle, spot: 'ask-pill', onClick: () => { walkthroughEvent('ask'); ask(id, ''); } },
   ];
 
   return (
-    <article className="guide-reader-window">
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-        <div>
-          <a href="#" onClick={e => { e.preventDefault(); router.back(); }} style={{ fontSize: '0.85em', color: 'var(--text-muted)' }}>
-            &larr; Back
-          </a>
-          {isRenaming ? (
-            <input
-              autoFocus
-              value={renameValue}
-              onChange={e => setRenameValue(e.target.value)}
-              onKeyDown={async e => {
-                if (e.key === 'Enter' && renameValue.trim()) {
-                  const data = await apiFetch('/guides/' + id + '/rename', {
-                    method: 'PATCH',
-                    body: JSON.stringify({ title: renameValue.trim() })
-                  });
-                  if (data?.title) setGuide(prev => ({ ...prev, title: data.title }));
-                  setIsRenaming(false);
-                } else if (e.key === 'Escape') {
-                  setIsRenaming(false);
-                }
-              }}
-              onBlur={() => setIsRenaming(false)}
-              style={{ fontSize: '1.5em', fontWeight: 700, background: 'var(--bg-tertiary)', border: '1px solid var(--border-active)', borderRadius: 6, padding: '4px 8px', color: 'var(--text-primary)', width: '100%', marginTop: 8 }}
-            />
-          ) : (
-            <h2 style={{ marginTop: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
-              onClick={() => { setRenameValue(guide.title); setIsRenaming(true); }}
-            >
-              {guide.title}
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-            </h2>
-          )}
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85em', marginTop: 4 }}>
-            {sourceTitle && <span className="guide-source">Based on {sourceHref
-              ? <a href={sourceHref} target={externalSourceUrl ? '_blank' : undefined} rel={externalSourceUrl ? 'noopener noreferrer' : undefined}>{sourceTitle}</a>
-              : sourceTitle} · </span>}
-            <span className="timestamp">{formatDate(guide.created_at)}</span>
-          </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-          <button
-            className="btn"
-            onClick={() => router.push('/create?editGuideId=' + id)}
-            style={{ padding: '6px 14px', fontSize: '0.8em' }}
-          >
-            Edit Guide
-          </button>
-          <button className={'bookmark-btn' + (guide.is_bookmarked ? ' active' : '')} onClick={toggleBookmark} style={{ fontSize: '1.6em' }}>
-            {guide.is_bookmarked ? '\u2605' : '\u2606'}
-          </button>
-        </div>
-      </div>
+    <Reveal phase={gate}>
+    <article className="c-page guide">
+      <header className="guide-head">
+        <button type="button" className="c-icon-btn" onClick={() => (window.history.length > 1 ? router.back() : router.push('/library'))} aria-label="Back"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+        {renaming !== null ? (
+          <form className="guide-rename" onSubmit={saveTitle}>
+            <input className="c-input guide-title-input" value={renaming} onChange={event => setRenaming(event.target.value)} onBlur={saveTitle} onKeyDown={event => { if (event.key === 'Escape') setRenaming(null); }} aria-label="Guide title" autoFocus />
+          </form>
+        ) : (
+          <h1 className="c-title guide-title">
+            <button type="button" className="guide-title-btn" onClick={() => setRenaming(guide.title)} aria-label={`${guide.title}, rename`}>{guide.title}</button>
+          </h1>
+        )}
+        <button type="button" className={'c-icon-btn' + (guide.is_bookmarked ? ' guide-starred' : '')} onClick={toggleStar} aria-pressed={Boolean(guide.is_bookmarked)} aria-label={guide.is_bookmarked ? 'Unstar' : 'Star'}>
+          <Star size={20} strokeWidth={1.75} aria-hidden="true" fill={guide.is_bookmarked ? 'currentColor' : 'none'} />
+        </button>
+        <Menu
+          label="Guide actions"
+          items={[
+            { label: 'Edit', icon: SquarePen, onSelect: () => router.push('/create?editGuideId=' + id) },
+            { label: 'Rename', icon: Pencil, onSelect: () => setRenaming(guide.title) },
+            { label: 'Export', icon: Download, onSelect: () => exportGuide(guide) },
+            ...(sharing?.class && !sharing.linked ? [sharing.class.sharing_blocked
+              ? { label: 'Sharing off', icon: Lock, disabled: true }
+              : sharing.visibility === 'class'
+                ? { label: 'Make private', icon: Lock, onSelect: () => setVisibility('private') }
+                : { label: `Share with ${sharing.class.code}`, icon: Users, onSelect: () => setVisibility('class') }] : []),
+            { label: 'Delete', icon: Trash2, danger: true, onSelect: () => setConfirmDelete(true) },
+          ]}
+        />
+      </header>
+      {sharing?.update_available && (
+        <button type="button" className="c-chip guide-update" onClick={pullUpdate}><RefreshCw size={16} strokeWidth={1.75} aria-hidden="true" />Update available</button>
+      )}
+      {!sharing?.linked && <ClassChip guideId={id} onFiled={() => loadSharing()} />}
+      {sourceTitle && (sourceHref || sourceTitle.trim().toLowerCase() !== (guide.title || '').trim().toLowerCase()) && (
+        <span className="guide-src">
+          {sourceHref
+            ? <a href={sourceHref} target={externalSourceUrl ? '_blank' : undefined} rel={externalSourceUrl ? 'noopener noreferrer' : undefined}><ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" />{sourceTitle}</a>
+            : sourceTitle}
+        </span>
+      )}
 
-      {/* Tabs */}
-      <div className="tabs" style={{ alignItems: 'flex-end' }}>
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            className={'tab-btn' + (activeTab === tab.key ? ' active' : '')}
-            aria-pressed={activeTab === tab.key}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-        <details className="reader-more-tools">
-          <summary>More</summary>
-          <button type="button" className="tab-btn" onClick={() => setActiveTab('nclex')}>NCLEX Mode</button>
-        </details>
-      </div>
+      <nav className="c-pills" aria-label="Study this guide">
+        {pills.map(pill => {
+          const content = <><pill.icon size={20} strokeWidth={1.75} aria-hidden="true" />{pill.label}{pill.count !== undefined && <span className="c-meta">{pill.count}</span>}</>;
+          if (pill.href) return <Link key={pill.key} className="c-pill" href={pill.href} data-spot={pill.spot}>{content}</Link>;
+          if (pill.view) return <button key={pill.key} type="button" className="c-pill" data-spot={pill.spot} aria-current={view === pill.view ? 'page' : undefined} onClick={() => { setView(pill.view); if (pill.view === 'cards') walkthroughEvent('cards-opened'); }}>{content}</button>;
+          return <button key={pill.key} type="button" className="c-pill" data-spot={pill.spot} onClick={pill.onClick}>{content}</button>;
+        })}
+      </nav>
 
-      <div key={activeTab} className="study-tab-content">
-      {/* Tab content */}
-      {activeTab === 'guide' && (
+      {view === 'notes' ? (
+        <section className="c-card guide-notes" aria-label="Notes" aria-busy={notesState === 'making' && !notesWritten}>
+          {(notesState === 'making' || notesState === 'idle') && !notesWritten
+            ? <SectionLoader height={160} label="Writing notes" />
+            : hasStudyNotes(notes) ? (
+              <>
+                {notes.overview && <p className="guide-overview">{rich(notes.overview)}</p>}
+                {notes.sections.map((section, index) => (
+                  <div key={index} className="guide-outline-section">
+                    {section.heading && <h2 className="c-section-title"><span className="guide-outline-num">{index + 1}</span>{section.heading}</h2>}
+                    <ul className="c-study">
+                      {section.points.map((point, pointIndex) => (
+                        <li key={pointIndex}>
+                          {rich(point.text)}
+                          {point.sub.length > 0 && <ul className="guide-sub">{point.sub.map((item, itemIndex) => <li key={itemIndex}>{rich(item)}</li>)}</ul>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+                {notes.keyPoints.length > 0 && (
+                  <div className="guide-key">
+                    <h2 className="c-section-title">Key points</h2>
+                    <ul className="c-study">{notes.keyPoints.map((point, index) => <li key={index}>{rich(point)}</li>)}</ul>
+                  </div>
+                )}
+              </>
+            ) : <p className="c-meta">Notes appear here once they are written. The questions are in Cards.</p>}
+        </section>
+      ) : (
         <>
-          <StudyDocument key={guide.id} guide={guide} readSections={revealedQs} onLearn={learningStyle?.enabled ? index => setOpenAid(qaPairs[index].index) : undefined} renderAid={index => (
-            learningStyle?.enabled && openAid && qaPairs[index]?.index === openAid
-              ? <StudyAidPanel guideId={id} number={openAid} style={learningStyle.style} onClose={() => setOpenAid(null)} />
-              : null
-          )} onRead={index => {
-            setRevealedQs(previous => new Set([...previous, index]));
-          }} />
+        {cardCount > 0 && (
+          <div className="guide-cards-bar">
+            <Link className="c-btn c-btn--primary" href={'/flashcards/study?guideId=' + id}><Layers size={20} strokeWidth={1.75} aria-hidden="true" />Flip cards · {cardCount}</Link>
+          </div>
+        )}
+      <StudyDocument
+        key={guide.id}
+        guide={guide}
+        page={page}
+        onPageChange={changePage}
+        readSections={revealed}
+        onRead={index => setRevealed(previous => new Set([...previous, index]))}
+        onExplain={index => {
+          if (explainWithAid) setOpenAid(current => (current === pairs[index].index ? null : pairs[index].index));
+          else ask(id, `Explain this more simply: ${pairs[index].question}`, true);
+        }}
+        renderAid={index => (explainWithAid && openAid && pairs[index]?.index === openAid
+          ? <StudyAidPanel guideId={id} number={openAid} style={learningStyle.style} onClose={() => setOpenAid(null)} section={{ ...pairs[index], before: pairs[index - 1], after: pairs[index + 1], guideTitle: guide.title }} />
+          : null)}
+        onSelection={onSelection}
+        />
         </>
       )}
 
-      {activeTab === 'notes' && (
-        <div className="guide-content">
-          {notes.length === 0 ? (
-            <span style={{ color: 'var(--text-muted)' }}>No notes available.</span>
-          ) : (
-            <ul className="notes-list">
-              {notes.map((note, i) => <li key={i}>{note}</li>)}
-            </ul>
-          )}
-        </div>
-      )}
+      {cardDraft !== null && <MakeCard front={cardDraft} onSave={saveCard} onClose={() => setCardDraft(null)} />}
+      {confirmDelete && <ConfirmDialog title={`Delete ${guide.title}?`} onConfirm={deleteGuide} onCancel={() => setConfirmDelete(false)} />}
+      {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
 
-      {activeTab === 'flashcards' && (
-        <div>
-          {flashcards.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon">&#127183;</div>
-              No flashcards for this guide.
-            </div>
-          ) : (
-            <div>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
-                {flashcards.length} flashcards available.
-                {fcProgress.known && <span> {fcProgress.known.length} mastered.</span>}
-              </p>
-              <button className="btn" onClick={() => router.push('/flashcards/study?guideId=' + id)}>
-                Start Study Session
-              </button>
-              <div style={{ marginTop: 20 }}>
-                {flashcards.slice(0, 5).map((fc, i) => (
-                  <div key={i} className="fc-hub-card">
-                    <span style={{ color: 'var(--text-primary)' }}>{fc.front}</span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8em' }}>Card {i + 1}</span>
-                  </div>
-                ))}
-                {flashcards.length > 5 && (
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85em', marginTop: 8 }}>
-                    +{flashcards.length - 5} more cards
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'quiz' && (
-        <div>
-          {qaPairs.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon">&#128221;</div>
-              No Q&A pairs to generate a Retain session from.
-            </div>
-          ) : (
-            <div>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
-                Retain session generated from {qaPairs.length} questions in your study guide.
-              </p>
-              <button className="btn" onClick={() => router.push('/quiz/' + id)}>
-                Start Quiz
-              </button>
-              {quizHistory.length > 0 && (
-                <div style={{ marginTop: 20 }}>
-                  <h3 style={{ fontSize: '1em', marginBottom: 10, color: 'var(--text-secondary)' }}>Past Attempts</h3>
-                  {quizHistory.map((a, i) => (
-                    <div key={i} className="fc-hub-card">
-                      <span style={{ color: 'var(--text-primary)' }}>Score: {a.score}%</span>
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8em' }}>
-                        {a.correct_answers}/{a.total_questions} correct | {formatDate(a.completed_at)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'practice' && (
-        <div className="practice-tab-intro">
-          <h3>Work the problem, not just the flashcard.</h3>
-          <p>
-            Generate 10 source-grounded problems or scenarios, keep this guide visible,
-            and use a touch-ready workspace to draw, type, and arrange symbols.
-          </p>
-          <button className="btn" onClick={() => router.push('/practice/' + id)}>
-            Open practice workspace
-          </button>
-        </div>
-      )}
-
-      {activeTab === 'nclex' && (
-        <div>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>
-            Practice with AI-generated NCLEX-style clinical scenario questions based on your study material.
-          </p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85em', marginBottom: 20 }}>
-            Includes Multiple Choice and Select All That Apply (SATA) with rationales for each question.
-          </p>
-          <button className="btn" onClick={() => router.push('/nclex/' + id)}>
-            Start NCLEX Practice
-          </button>
-        </div>
-      )}
-      </div>
+      <style jsx>{`
+        .guide { gap: 16px; }
+        .guide-head { display: flex; align-items: center; gap: 8px; }
+        .guide-title { flex: 1 1 auto; min-width: 0; }
+        .guide-title-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing:-0.015em; text-align: left; cursor: text; border-radius:var(--r-input); }
+        .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
+        .guide-rename { flex: 1 1 auto; min-width: 0; }
+        .guide-title-input { font:600 28px/1.15 var(--font-display); height: 52px; }
+        .guide-head :global(.guide-starred) { color: var(--olive-ink); }
+        .guide-src { margin: -8px 0 0 48px; font:600 13px/1.5 var(--font-sans); }
+        .guide-src a { display: inline-flex; align-items: center; gap: 6px; }
+        .guide-notes { display: grid; gap: 16px; padding: 32px 40px; }
+        .guide-notes :global(.c-section-title) { margin: 0; }
+        .guide-notes { gap: 32px; }
+        .guide-outline-section { display: grid; gap: 16px; }
+        .guide-notes ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+        .guide-notes .guide-sub { margin-top: 6px; gap: 4px; list-style: circle; color: var(--muted-ink); }
+        .guide-notes :global(strong) { font-weight: 600; color: var(--ink); }
+        .guide-overview { margin: 0; padding-bottom: 24px; border-bottom: 1px solid var(--line); font: 400 var(--fs-20)/1.5 var(--font-display); color: var(--ink); }
+        .guide-outline-num { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 10px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 var(--fs-13)/1 var(--font-sans); vertical-align: 3px; }
+        .guide-key { display: grid; gap: 16px; padding: 24px 28px; border-radius: 16px; background: var(--olive-tint); }
+        .guide-cards-bar { display: flex; justify-content: flex-end; }
+        @media (max-width: 767px) { .guide-src { margin-left: 0; } .guide-notes { padding: 24px 18px; } }
+      `}</style>
     </article>
+    </Reveal>
   );
 }

@@ -1,5 +1,24 @@
 import { useEffect, useState } from 'react';
+import { Bell, BellOff, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, ExternalLink, KeyRound, RefreshCw, Unlink } from 'lucide-react';
 import { apiErrorMessage, apiFetch, getUserId } from '../lib/api';
+import { walkthroughEvent } from '../lib/walkthrough';
+import { CanvasCalendarFeed, CanvasCalendarNav, CanvasFeedLink } from './CanvasShots';
+import { LoadingArea, SectionLoader, useLoadGate } from './CordiaLoader';
+import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
+import { confirmedTodos, lectureCalendarItems, mergeCalendarItems } from '../lib/lectures';
+
+// Checked before Connect: a Canvas calendar feed is an https (or webcal) link ending in .ics.
+export function feedLinkProblem(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  let url;
+  try { url = new URL(text.replace(/^webcal:\/\//i, 'https://')); } catch { return 'That is not a link. Paste the whole link from Canvas.'; }
+  if (url.protocol !== 'https:') return 'The link should start with https://';
+  if (!/\.ics$/i.test(url.pathname)) return 'Use the Calendar Feed link that ends in .ics.';
+  return '';
+}
+import { canvasStatus } from '../lib/canvas';
+import CanvasConnectSheet from './CanvasConnectSheet';
 
 const FEED_KEY = 'cordiaCanvasCalendarFeed';
 const REMINDER_KEY = 'cordiaCalendarReminders';
@@ -48,13 +67,8 @@ function timeLabel(item) {
 }
 
 function weekSummary(items) {
-  if (!items.length) return 'Nothing due this week.';
   const tests = items.filter(item => item.type === 'exam' || item.type === 'quiz').length;
-  const parts = [`${items.length} due this week`];
-  if (tests) parts.push(`${tests} ${tests === 1 ? 'exam or quiz' : 'exams and quizzes'}`);
-  const next = items.find(item => dateValue(item) >= Date.now());
-  if (next) parts.push(`next: ${next.title} (${new Date(next.due_at).toLocaleDateString([], { weekday: 'short' })})`);
-  return parts.join(' · ');
+  return `${items.length} due${tests ? ` · ${tests} ${tests === 1 ? 'test' : 'tests'}` : ''}`;
 }
 
 function notifyDueToday(items, userId) {
@@ -70,9 +84,20 @@ function notifyDueToday(items, userId) {
 
 export default function CalendarDashboard({ compact = false, onOpenCalendar = () => {} }) {
   const [feedUrl, setFeedUrl] = useState('');
-  const [connected, setConnected] = useState(false);
-  const [items, setItems] = useState([]);
-  const [dueToday, setDueToday] = useState([]);
+  // The last feed this account loaded shows at once; a fresh copy replaces it in place.
+  const [cached] = useState(() => readCalendarCache());
+  const [status, setStatus] = useState(cached ? 'connected' : 'checking'); // checking | connected | disconnected | error
+  const connected = status === 'connected';
+  const gate = useLoadGate(status !== 'checking');
+  const [items, setItems] = useState(() => cached?.items || []);
+  const [dueToday, setDueToday] = useState(() => localDueToday(cached?.items || []));
+  // To-dos confirmed from lectures show alongside the Canvas feed.
+  const [lectureItems, setLectureItems] = useState([]);
+  useEffect(() => { confirmedTodos().then(data => setLectureItems(lectureCalendarItems(data?.todos))); }, []);
+  // Canvas token connection (all classes and course files), offered when the backend has it.
+  const [canvasReady, setCanvasReady] = useState(false);
+  const [tokenOpen, setTokenOpen] = useState(false);
+  useEffect(() => { canvasStatus().then(data => setCanvasReady(Boolean(data) && !data.connected)); }, []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [reminders, setReminders] = useState(false);
@@ -102,7 +127,8 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
 
   function applyCalendar(data, accountId) {
     if (!data?.connected || !Array.isArray(data.items)) return false;
-    setConnected(true);
+    rememberCalendar(data, accountId);
+    setStatus('connected');
     const today = localDueToday(data.items);
     setItems(data.items);
     setDueToday(today);
@@ -119,11 +145,13 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
       body: JSON.stringify({ url }),
     });
     if (applyCalendar(data, accountId)) {
+      walkthroughEvent('calendar-connected');
       const feedKey = accountKey(FEED_KEY, accountId);
       if (feedKey) localStorage.removeItem(feedKey);
       setFeedUrl('');
     } else {
       setError(apiErrorMessage(data?.detail, 'Classroom could not read this calendar feed.'));
+      setStatus(current => (current === 'checking' ? 'disconnected' : current));
     }
     setLoading(false);
   }
@@ -134,9 +162,11 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     setError('');
     const data = await apiFetch('/calendar/connection');
     if (data?.connected === false) {
-      setConnected(false);
+      rememberCalendar(data, accountId);
+      setStatus('disconnected');
     } else if (!applyCalendar(data, accountId)) {
       setError(apiErrorMessage(data?.detail, 'Classroom could not refresh this calendar feed.'));
+      setStatus(current => (current === 'checking' ? 'error' : current));
     }
     setLoading(false);
   }
@@ -152,7 +182,8 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     }
     const feedKey = accountKey(FEED_KEY, userId);
     if (feedKey) localStorage.removeItem(feedKey);
-    setConnected(false);
+    rememberCalendar({ connected: false }, userId);
+    setStatus('disconnected');
     setFeedUrl('');
     setItems([]);
     setDueToday([]);
@@ -184,82 +215,108 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     notifyDueToday(dueToday, userId);
   }
 
+  // Never show the connect steps while we don't know yet: show the loader instead.
+  if (status === 'checking') {
+    return compact ? <SectionLoader height={183} label="Loading calendar" /> : <LoadingArea phase={gate} label="Loading calendar" />;
+  }
+  if (status === 'error') {
+    return (
+      <div className="c-empty" role="alert">
+        <p>{error}</p>
+        <button type="button" className="c-btn c-btn--secondary" onClick={() => refresh()}>Try again</button>
+      </div>
+    );
+  }
+
   if (!connected) {
     if (compact) {
       return (
         <section className="compact-calendar">
-          <header>
-            <div>
-              <span className="compact-eyebrow">Upcoming</span>
-              <h2>Bring deadlines into view.</h2>
-            </div>
-            <span className="compact-calendar-mark" aria-hidden="true">31</span>
-          </header>
-          <p>Connect your Canvas calendar once to see assignments and due dates here.</p>
+          <header><h2>Due soon</h2></header>
           {error && <div className="compact-calendar-error" role="alert">{error}</div>}
-          <button type="button" onClick={onOpenCalendar}>Connect calendar</button>
+          <button type="button" onClick={onOpenCalendar}>Connect</button>
           <CompactStyles />
         </section>
       );
     }
+    const steps = [
+      { label: 'Open Canvas', icon: ExternalLink, shot: <CanvasCalendarNav />, line: 'Open Canvas Calendar' },
+      { label: 'Copy link', icon: ClipboardCopy, shot: <CanvasCalendarFeed />, line: 'Click Calendar Feed in the right sidebar' },
+      { label: 'Paste here', icon: ClipboardPaste, shot: <CanvasFeedLink />, line: 'Copy the link ending in .ics' },
+    ];
+    const linkProblem = feedLinkProblem(feedUrl);
     return (
-      <section className="canvas-dashboard calendar-connect-card">
-        <div className="calendar-mark" aria-hidden="true">31</div>
-        <div className="calendar-connect-copy">
-          <span className="calendar-eyebrow">Canvas calendar</span>
-          <h2>See what is due without connecting your Canvas account.</h2>
-          <ol className="calendar-steps">
-            <li><strong>Open Canvas Calendar</strong> and select Calendar Feed.</li>
-            <li><strong>Copy the feed link</strong> shown by Canvas.</li>
-            <li><strong>Paste it here</strong> to show due dates and reminders.</li>
-          </ol>
-          <div className="calendar-connect-form">
-            <input
-              type="url"
-              value={feedUrl}
-              onChange={event => setFeedUrl(event.target.value)}
-              placeholder="https://your-school.edu/feeds/calendars/..."
-              aria-label="Canvas calendar feed URL"
-            />
-            <button type="button" className="btn btn-green" onClick={() => connect(feedUrl.trim())} disabled={loading || !feedUrl.trim()}>
-              {loading ? 'Checking calendar…' : 'Connect calendar'}
-            </button>
-          </div>
-          <small>Your private feed link is saved to your Classroom account so deadlines reconnect automatically on your devices.</small>
-          {error && <div className="canvas-inline-error" role="alert">{error}</div>}
-        </div>
+      <section className="c-card cal-connect" aria-label="Connect Canvas calendar">
+        <ol className="cal-steps">
+          {steps.map((step, index) => (
+            <li key={step.label}>
+              <span className="cal-step-num" aria-hidden="true">{index + 1}</span>
+              <step.icon size={24} strokeWidth={1.75} aria-hidden="true" />
+              <span>{step.label}</span>
+              <div className="cal-step-shot">{step.shot}</div>
+              <p className="cal-step-line">{step.line}</p>
+            </li>
+          ))}
+        </ol>
+        <form className="cal-form" onSubmit={event => { event.preventDefault(); if (feedUrl.trim() && !linkProblem) connect(feedUrl.trim().replace(/^webcal:\/\//i, 'https://')); }}>
+          <label className="c-field cal-field">
+            <span>Calendar feed link</span>
+            <input className="c-input" type="text" inputMode="url" value={feedUrl} onChange={event => setFeedUrl(event.target.value)} placeholder="https://" data-spot="calendar-feed" aria-invalid={Boolean(linkProblem)} aria-describedby={linkProblem ? 'cal-link-problem' : undefined} />
+          </label>
+          <button type="submit" className="c-btn c-btn--primary" disabled={loading || !feedUrl.trim() || Boolean(linkProblem)}>{loading ? 'Checking…' : 'Connect'}</button>
+        </form>
+        {linkProblem && <p id="cal-link-problem" className="canvas-inline-error" role="alert">{linkProblem}</p>}
+        {error && <div className="canvas-inline-error" role="alert">{error}</div>}
+        {canvasReady && (
+          <button type="button" className="c-btn c-btn--quiet cal-token" onClick={() => setTokenOpen(true)}>
+            <KeyRound size={20} strokeWidth={1.75} aria-hidden="true" />Connect Canvas
+          </button>
+        )}
+        {tokenOpen && <CanvasConnectSheet school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} onClose={() => setTokenOpen(false)} />}
+        <style jsx>{`
+          .cal-connect { display: grid; gap: 24px; padding: 28px; }
+          .cal-token { justify-self: start; margin: -12px 0 -8px -12px; }
+          .cal-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+          .cal-steps li { display: grid; justify-items: center; gap: 10px; padding: 20px 12px; border-radius:var(--r-card); background: var(--card-sunk); font:600 15px/1.15 var(--font-sans); text-align: center; }
+          .cal-steps :global(.lucide) { color: var(--olive-ink); }
+          .cal-step-num { display: grid; place-items: center; width: 28px; height: 28px; border-radius:50%; background: var(--olive); color: var(--on-olive); font:600 13px/1 var(--font-sans); }
+          .cal-step-shot { width: 100%; border-radius:var(--r-input); overflow: hidden; }
+          .cal-step-line { margin: 0; font:600 13px/1.5 var(--font-sans); color: var(--ink); }
+          .cal-form { display: flex; align-items: flex-end; gap: 8px; }
+          .cal-field { flex: 1; }
+          @media (max-width: 767px) { .cal-steps { grid-template-columns: 1fr; } .cal-steps li { grid-template-columns: auto auto 1fr; justify-items: start; align-items: center; padding: 14px; } .cal-step-shot, .cal-step-line { grid-column: 1 / -1; } .cal-form { flex-direction: column; align-items: stretch; } }
+        `}</style>
       </section>
     );
   }
 
-  const todayIds = new Set(dueToday.map(item => item.id));
-  const upcoming = items
+  const allItems = mergeCalendarItems(items, lectureItems);
+  const allToday = localDueToday(allItems);
+  const todayIds = new Set(allToday.map(item => item.id));
+  const upcoming = allItems
     .filter(item => !todayIds.has(item.id) && dateValue(item) >= Date.now())
     .sort((a, b) => dateValue(a) - dateValue(b))
     .slice(0, 10);
 
   if (compact) {
-    const agenda = [...dueToday, ...upcoming]
+    const agenda = [...allToday, ...upcoming]
       .sort((left, right) => dateValue(left) - dateValue(right))
       .slice(0, 3);
     return (
       <section className="compact-calendar">
         <header>
-          <div>
-            <span className="compact-eyebrow">Upcoming</span>
-            <h2>Your next deadlines</h2>
-          </div>
-          <button type="button" className="compact-calendar-link" onClick={onOpenCalendar}>View calendar</button>
+          <h2>Due soon</h2>
+          <button type="button" className="compact-calendar-link" onClick={onOpenCalendar}>Calendar</button>
         </header>
         {error && <div className="compact-calendar-error" role="alert">{error}</div>}
         <div className="compact-agenda">
           {agenda.length ? agenda.map(item => (
-            <a key={item.id} href={item.url || undefined} target={item.url ? '_blank' : undefined} rel={item.url ? 'noreferrer' : undefined}>
+            <a key={item.id} href={item.url || undefined} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>
               <span className="compact-date">{dueLabel(item)}</span>
               <strong>{item.title}</strong>
               <small>{item.course || 'Canvas'}</small>
             </a>
-          )) : <p>Nothing due soon. Your calendar is clear.</p>}
+          )) : <p>0 due</p>}
         </div>
         <CompactStyles />
       </section>
@@ -268,7 +325,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
 
   const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
   const weekEnd = addDays(weekStart, 7).getTime();
-  const weekItems = items
+  const weekItems = allItems
     .filter(item => dateValue(item) >= weekStart.getTime() && dateValue(item) < weekEnd)
     .sort((a, b) => dateValue(a) - dateValue(b));
   const todayKey = new Date().toDateString();
@@ -287,29 +344,31 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
       </>
     );
     const className = `calendar-item${past ? ' calendar-item-past' : ''}`;
+    if (item.internal) return <a key={item.id} className={className + ' calendar-item-lecture'} href={item.url} title={`Open the lecture: ${item.title}`}>{body}</a>;
     return item.url
       ? <a key={item.id} className={className} href={item.url} target="_blank" rel="noreferrer" title={`Open in Canvas: ${item.title}`}>{body}</a>
       : <div key={item.id} className={className}>{body}</div>;
   }
 
+  const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
   return (
-    <section className="canvas-dashboard calendar-dashboard">
-      <header className="canvas-dashboard-header">
-        <div>
-          <span className="calendar-eyebrow">Canvas calendar</span>
-          <h2>Week of {rangeLabel}</h2>
-          <p className="calendar-week-summary">{weekSummary(weekItems)}</p>
+    <section className="calendar-dashboard">
+      <header className="cal-head">
+        <div className="c-row">
+          <button type="button" className="c-icon-btn" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week"><ChevronLeft {...ICON} /></button>
+          <h2 className="c-section-title">{rangeLabel}</h2>
+          <button type="button" className="c-icon-btn" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week"><ChevronRight {...ICON} /></button>
+          <span className="c-meta">{weekSummary(weekItems)}</span>
         </div>
-        <div className="calendar-actions">
-          <div className="calendar-week-nav">
-            <button type="button" className="btn-outline" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week">‹</button>
-            <button type="button" className="btn-outline" onClick={() => setWeekStart(startOfWeek(new Date()))}>This week</button>
-            <button type="button" className="btn-outline" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week">›</button>
-          </div>
-          <button type="button" className="btn-outline" onClick={toggleReminders}>{reminders ? 'Reminders on' : 'Enable reminders'}</button>
-          <button type="button" className="btn-outline" onClick={() => refresh()} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh'}</button>
-          <button type="button" className="calendar-disconnect" onClick={disconnect}>Disconnect</button>
+        <div className="c-row c-row--wrap">
+          <button type="button" className="c-btn c-btn--quiet" onClick={() => setWeekStart(startOfWeek(new Date()))}>This week</button>
+          <button type="button" className="c-btn c-btn--secondary" onClick={toggleReminders} aria-pressed={reminders}>{reminders ? <Bell {...ICON} /> : <BellOff {...ICON} />}Reminders</button>
+          <button type="button" className="c-icon-btn" onClick={() => refresh()} disabled={loading} aria-label="Refresh"><RefreshCw {...ICON} /></button>
+          <button type="button" className="c-icon-btn" onClick={disconnect} aria-label="Disconnect calendar"><Unlink {...ICON} /></button>
         </div>
+        <style jsx>{`
+          .cal-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+        `}</style>
       </header>
       {error && <div className="canvas-inline-error" role="alert">{error}</div>}
       <div className="calendar-week">
@@ -321,10 +380,10 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
               <header>
                 <span>{day.toLocaleDateString([], { weekday: 'short' })}</span>
                 <strong>{day.getDate()}</strong>
-                {isToday && <em>Due today</em>}
+                {isToday && <em>Today</em>}
               </header>
               <div className="calendar-day-items">
-                {dayItems.length ? dayItems.map(itemCard) : <p className="calendar-day-empty">—</p>}
+                {dayItems.length ? dayItems.map(itemCard) : <p className="calendar-day-empty" aria-label="Nothing due">–</p>}
               </div>
             </section>
           );
@@ -337,21 +396,21 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
 function CompactStyles() {
   return (
     <style jsx global>{`
-      .compact-calendar { display: flex; min-width: 0; min-height: 255px; flex-direction: column; padding: 26px; border: 1px solid var(--border-default); border-radius: 28px; background: var(--surface); box-shadow: var(--shadow-md); }
+      .compact-calendar { display: flex; min-width: 0; min-height: 255px; flex-direction: column; padding: 26px; border: 1px solid var(--border-default); border-radius:20px; background: var(--surface); box-shadow: var(--shadow-md); }
       .compact-calendar header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-      .compact-eyebrow { color: var(--accent); font-size: .69rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-      .compact-calendar h2 { margin: 5px 0 0; font-size: 1.45rem; letter-spacing: -.04em; }
-      .compact-calendar > p, .compact-agenda > p { margin: 18px 0; color: var(--text-muted); line-height: 1.55; }
-      .compact-calendar > button { align-self: flex-start; margin-top: auto; padding: 10px 14px; border: 1px solid var(--border-default); border-radius: 12px; color: var(--ink); background: var(--bg-hover); font: inherit; font-size: .78rem; font-weight: 750; cursor: pointer; }
-      .compact-calendar-mark { display: grid; width: 43px; height: 43px; flex: 0 0 auto; place-items: center; border-radius: 13px; color: var(--accent); background: var(--bg-hover); font-weight: 850; }
-      .compact-calendar-link { flex: 0 0 auto; padding: 0; border: 0; color: var(--accent); background: transparent; font: inherit; font-size: .73rem; font-weight: 750; cursor: pointer; }
+      .compact-eyebrow { color: var(--accent); font-size: 13px; font-weight:600; letter-spacing:0; text-transform:none; }
+      .compact-calendar h2 { margin: 5px 0 0; font-size:20px; letter-spacing:-0.015em; }
+      .compact-calendar > p, .compact-agenda > p { margin: 18px 0; color: var(--text-muted); line-height:1.5; }
+      .compact-calendar > button { align-self: flex-start; margin-top: auto; padding: 10px 14px; border: 1px solid var(--border-default); border-radius:12px; color: var(--ink); background: var(--bg-hover); font: inherit; font-size: 13px; font-weight:600; cursor: pointer; }
+      .compact-calendar-mark { display: grid; width: 43px; height: 43px; flex: 0 0 auto; place-items: center; border-radius:12px; color: var(--accent); background: var(--bg-hover); font-weight:600; }
+      .compact-calendar-link { flex: 0 0 auto; padding: 0; border: 0; color: var(--accent); background: transparent; font: inherit; font-size: 13px; font-weight:600; cursor: pointer; }
       .compact-agenda { display: grid; margin-top: 13px; }
       .compact-agenda a { display: grid; min-width: 0; gap: 2px; padding: 11px 0; border-top: 1px solid var(--border-default); color: var(--ink); text-decoration: none; }
-      .compact-agenda strong { overflow: hidden; font-size: .82rem; text-overflow: ellipsis; white-space: nowrap; }
-      .compact-agenda small { overflow: hidden; color: var(--text-muted); font-size: .67rem; text-overflow: ellipsis; white-space: nowrap; }
-      .compact-date { color: var(--accent); font-size: .62rem; font-weight: 750; }
-      .compact-calendar-error { margin-top: 12px; color: var(--error); font-size: .72rem; line-height: 1.4; }
-      @media (max-width: 620px) { .compact-calendar { min-height: 0; border-radius: 22px; padding: 22px; } }
+      .compact-agenda strong { overflow: hidden; font-size:13px; text-overflow: ellipsis; white-space: nowrap; }
+      .compact-agenda small { overflow: hidden; color: var(--text-muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+      .compact-date { color: var(--accent); font-size: 13px; font-weight:600; }
+      .compact-calendar-error { margin-top: 12px; color: var(--error); font-size: 13px; line-height:1.5; }
+      @media (max-width: 620px) { .compact-calendar { min-height: 0; border-radius:20px; padding: 22px; } }
     `}</style>
   );
 }

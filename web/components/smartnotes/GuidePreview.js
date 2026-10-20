@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/router';
+import BodyPortal from '../BodyPortal';
 import { notesRequest } from '../../lib/smartnotes';
 
 const DEFAULT_TITLE = 'Untitled — Study Guide';
@@ -87,14 +88,16 @@ export function StudyGuidePreviewModal({ preview, title, setTitle, error, saving
   if (!preview) return null;
   const hasPairs = preview.pairs && preview.pairs.length > 0;
   return (
-    <div className="sn-modal-overlay" onClick={onClose}>
-      <div className="sn-modal" onClick={e => e.stopPropagation()}>
+    <BodyPortal>
+    <div className="c-scrim" onClick={onClose}>
+      <div className="c-sheet sn-modal" role="dialog" aria-modal="true" aria-label="Guide preview" onClick={e => e.stopPropagation()}>
         <div className="sn-modal-header">
           <input
-            className="sn-modal-title-input"
+            className="c-input sn-modal-title-input"
+            aria-label="Guide title"
             value={title}
             onChange={e => setTitle(e.target.value)}
-            placeholder="Study guide title"
+            placeholder="Title"
             disabled={saving}
           />
         </div>
@@ -110,21 +113,22 @@ export function StudyGuidePreviewModal({ preview, title, setTitle, error, saving
               ))}
             </div>
           ) : (
-            !error && <div className="sn-modal-empty">No questions generated.</div>
+            !error && <div className="sn-modal-empty">0 questions</div>
           )}
         </div>
         <div className="sn-modal-footer">
-          <button className="btn sn-modal-cancel" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="btn sn-modal-edit" onClick={onEdit} disabled={saving || !hasPairs}>Edit</button>
+          <button className="c-btn c-btn--quiet sn-modal-cancel" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="c-btn c-btn--secondary sn-modal-edit" onClick={onEdit} disabled={saving || !hasPairs}>Edit</button>
           <button
-            className="btn sn-modal-approve"
+            className="c-btn c-btn--primary sn-modal-approve"
             onClick={onApprove}
             disabled={saving || !hasPairs || !title.trim()}
           >
-            {saving ? 'Saving…' : 'Approve'}
+            {saving ? 'Saving…' : 'Save guide'}
           </button>
         </div>
       </div>
     </div>
+    </BodyPortal>
   );
 }

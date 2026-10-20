@@ -140,7 +140,7 @@ export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
         <div className="completion-actions" style={{ marginTop: 20, gap: 8 }}>
           <button className="btn" onClick={retake}>Retake</button>
           {saveStatus === 'saved' ? (
-            <button className="btn" disabled style={{ opacity: 0.7 }}>Saved!</button>
+            <button className="btn" disabled style={{ opacity: 0.7 }}>Saved</button>
           ) : (
             <button className="btn" onClick={openSaveForm} disabled={showSave}>Save as Study Guide</button>
           )}
@@ -152,7 +152,7 @@ export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
             marginTop: 16, padding: 16, background: 'var(--bg-secondary)',
             border: '1px solid var(--border-default)', borderRadius: 10
           }}>
-            <label style={{ display: 'block', fontSize: '0.85em', color: 'var(--text-secondary)', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
               Title
             </label>
             <input
@@ -161,7 +161,7 @@ export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
               onChange={e => setSaveTitle(e.target.value)}
               style={{ marginBottom: 10, width: '100%' }}
             />
-            <label style={{ display: 'block', fontSize: '0.85em', color: 'var(--text-secondary)', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
               Save to Class (optional)
             </label>
             <select
@@ -185,7 +185,7 @@ export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
               <button className="btn-outline" onClick={() => setShowSave(false)}>Cancel</button>
             </div>
             {saveStatus === 'error' && (
-              <div style={{ color: 'var(--error)', fontSize: '0.85em', marginTop: 8 }}>Failed to save. Try again.</div>
+              <div style={{ color: 'var(--error)', fontSize: 13, marginTop: 8 }}>Failed to save. Try again.</div>
             )}
           </div>
         )}

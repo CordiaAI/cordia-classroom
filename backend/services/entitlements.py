@@ -33,6 +33,10 @@ LIMITS = {
         "nclex": 1,
         "retain_types": 1,
         "light": 30,
+        # Lecture recording, counted in minutes of audio transcribed.
+        "lecture_minute": 120,
+        # Napkin visuals, made and stored by the web app's /api/visual route.
+        "visual": 10,
     },
     "pro": {
         "guide": 100,
@@ -43,6 +47,8 @@ LIMITS = {
         "nclex": 50,
         "retain_types": 300,
         "light": 500,
+        "lecture_minute": 1500,
+        "visual": 200,
     },
 }
 FEATURES = tuple(LIMITS["free"])
@@ -50,13 +56,33 @@ FEATURES = tuple(LIMITS["free"])
 FEATURE_LABELS = {
     "guide": "study guides",
     "tutor": "tutor prompts",
-    "learn_my_way": "Learn My Way views",
+    "learn_my_way": "Explain views",
     "practice": "practice sets",
-    "ai_quiz": "AI Retain quizzes",
+    "ai_quiz": "AI quizzes",
     "nclex": "NCLEX sets",
-    "retain_types": "Pro Retain sessions",
+    "retain_types": "Pro quiz sessions",
     "light": "AI reading actions",
+    "lecture_minute": "recording minutes",
+    "visual": "visuals",
 }
+FEATURE_SINGULAR = {
+    "guide": "study guide",
+    "tutor": "tutor prompt",
+    "learn_my_way": "Explain view",
+    "practice": "practice set",
+    "ai_quiz": "AI quiz",
+    "nclex": "NCLEX set",
+    "retain_types": "Pro quiz session",
+    "light": "AI reading action",
+    "lecture_minute": "recording minute",
+    "visual": "visual",
+}
+
+
+def limit_message(feature: str, limit: int) -> str:
+    if limit == 1:
+        return f"You've used your free {FEATURE_SINGULAR.get(feature, FEATURE_LABELS[feature])}."
+    return f"You've used all {limit} {FEATURE_LABELS[feature]} this month."
 
 
 def _now() -> datetime:
@@ -166,7 +192,7 @@ class LimitReached(HTTPException):
                 "limit": limit,
                 "plan": PRO if plan == "pro" else "free",
                 "resets_at": next_reset(),
-                "message": f"You've used all {limit} {FEATURE_LABELS[feature]} this month.",
+                "message": limit_message(feature, limit),
                 "upgrade_url": "/settings?section=subscription",
             },
         )

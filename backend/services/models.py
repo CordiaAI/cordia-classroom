@@ -1,5 +1,8 @@
 """
-Single source of truth for which OpenAI model each task uses and how much it may write.
+Single source of truth for which model each task uses and how much it may write.
+
+Provider: Groq when GROQ_API_KEY is set (its OpenAI-compatible API; see services.llm), otherwise
+OpenAI. The defaults below follow the provider.
 
 Swap a model without a deploy by changing an env var (Fly: `fly secrets set ...` restarts the
 app; no code change). Nothing outside this file should contain a model name literal.
@@ -11,9 +14,9 @@ Roles
   VISION  Handwriting, page transcription, slide/image analysis, image extraction.
 
 Env vars (all optional)
-  CLASSROOM_BUILD_MODEL   default gpt-4o
-  CLASSROOM_LIGHT_MODEL   default gpt-4o-mini
-  CLASSROOM_VISION_MODEL  default gpt-4o
+  CLASSROOM_BUILD_MODEL   default gpt-4o       (Groq: openai/gpt-oss-120b)
+  CLASSROOM_LIGHT_MODEL   default gpt-4o-mini  (Groq: openai/gpt-oss-120b)
+  CLASSROOM_VISION_MODEL  default gpt-4o       (Groq: qwen/qwen3.8-27b, its model that reads images)
   STUDY_GUIDE_COST_SAVER  default false. When "true", text-only study-guide batches shorter than
                           STUDY_GUIDE_COST_SAVER_MAX_CHARS (default 10000) use LIGHT_MODEL.
                           Long/dense batches and any batch with images always keep BUILD_MODEL.
@@ -27,9 +30,16 @@ BUILD = "build"
 LIGHT = "light"
 VISION = "vision"
 
-BUILD_MODEL = os.getenv("CLASSROOM_BUILD_MODEL", "gpt-4o").strip() or "gpt-4o"
-LIGHT_MODEL = os.getenv("CLASSROOM_LIGHT_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
-VISION_MODEL = os.getenv("CLASSROOM_VISION_MODEL", "gpt-4o").strip() or "gpt-4o"
+GROQ = bool(os.getenv("GROQ_API_KEY", "").strip())
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
+_DEFAULTS = (
+    {BUILD: "openai/gpt-oss-120b", LIGHT: "openai/gpt-oss-120b", VISION: "qwen/qwen3.8-27b"} if GROQ
+    else {BUILD: "gpt-4o", LIGHT: "gpt-4o-mini", VISION: "gpt-4o"}
+)
+BUILD_MODEL = os.getenv("CLASSROOM_BUILD_MODEL", "").strip() or _DEFAULTS[BUILD]
+LIGHT_MODEL = os.getenv("CLASSROOM_LIGHT_MODEL", "").strip() or _DEFAULTS[LIGHT]
+VISION_MODEL = os.getenv("CLASSROOM_VISION_MODEL", "").strip() or _DEFAULTS[VISION]
 
 ROLE_MODELS = {BUILD: BUILD_MODEL, LIGHT: LIGHT_MODEL, VISION: VISION_MODEL}
 
