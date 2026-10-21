@@ -26,10 +26,10 @@ test('a Claude call sends the Messages API request and reads only the text', asy
   assert.equal(out.text, '{"title":"Osmosis"}');
   assert.match(sent.url, /\/v1\/messages/);
   assert.equal(sent.body.model, 'claude-sonnet-5-5');
-  assert.equal(sent.body.fallbacks, 'default');
+  assert.equal(sent.body.fallbacks, undefined, 'server-side fallbacks only go to Opus, which Classroom never uses');
   assert.equal(sent.body.output_config.effort, 'low');
   assert.ok(sent.body.max_tokens > 200, 'headroom for thinking');
-  assert.equal(sent.body.temperature, undefined, 'Opus 5.5 takes no sampling settings');
+  assert.equal(sent.body.temperature, undefined, 'Claude takes no sampling settings');
   assert.match(sent.body.system, /only the JSON object/);
 });
 

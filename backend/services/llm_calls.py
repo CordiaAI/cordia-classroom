@@ -124,13 +124,10 @@ def _claude(client, feature: str, model: str, limit: int, *, messages: list, res
     json_mode = (response_format or {}).get("type") == "json_object"
     system, turns = claude_request(messages, json_mode)
     # Streamed, so long guides never hit the request timeout; get_final_message() collects it.
-    # fallbacks="default": a request one model declines is answered by another in the same call.
-    # Haiku has no server-side fallback, so it is asked only for the other models.
-    fallback = {} if "haiku" in model else {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
+    # No server-side `fallbacks`: its targets are Opus models only, which Classroom never uses.
     with client.beta.messages.stream(
         model=model,
         max_tokens=limit + CLAUDE_HEADROOM.get(role, 4000),
-        **fallback,
         output_config={"effort": models.CLAUDE_EFFORT.get(role, "medium")},
         system=system or None,
         messages=turns,
