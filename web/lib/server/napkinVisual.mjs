@@ -11,8 +11,9 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 export const NAPKIN_BASE = 'https://api.napkin.ai';
-// Built-in "Pure Outline" (Formal): a quiet, near-monochrome style until NAPKIN_STYLE_ID is set.
-export const DEFAULT_STYLE_ID = 'CSQQ4VB1DGPP4V31CDNJTVKFBXK6JV3C5NS34';
+// Built-in "Pastel Field" (Casual): soft sage and orange fills, close to Cordia's palette, until
+// NAPKIN_STYLE_ID picks another (https://api.napkin.ai/docs/styles).
+export const DEFAULT_STYLE_ID = 'CDGQ6XB1DGPQ6VV6EGPQ4CG';
 export const LIMITS = { free: 10, pro: 200 };
 export const POLL_MS = 1500;
 export const BUDGET_MS = 20000;

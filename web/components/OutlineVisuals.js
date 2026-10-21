@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Layers, MessageCircle, Shapes, Sparkles, Trash2, X } from 'lucide-react';
+import BodyPortal from './BodyPortal';
+import { Layers, Maximize2, MessageCircle, Shapes, Sparkles, Trash2, X } from 'lucide-react';
 import { authOnlyHeaders } from '../lib/api';
 import { readUserValue, writeUserValue } from '../lib/userStore';
 import { walkthroughEvent } from '../lib/walkthrough';
 import NapkinVisual from './NapkinVisual';
+import { visualContent } from '../lib/visualText';
 
 // Visuals in a guide's Outline: highlight text, press Visualize, three versions appear beside that
 // section; the one the student keeps stays there. Kept visuals are saved through
@@ -130,7 +132,14 @@ export function OutlineSelectMenu({ selection, onAction }) {
 
 // The column beside one Outline section: the visual being drawn (three versions to pick from)
 // and the ones already kept.
-export function SectionVisuals({ kept, pending, context, onKeep, onCancel, onRemove }) {
+export function SectionVisuals({ kept, pending, section, context, onKeep, onCancel, onRemove }) {
+  const [enlarged, setEnlarged] = useState(null);
+  useEffect(() => {
+    if (!enlarged) return undefined;
+    const onKey = event => { if (event.key === 'Escape') setEnlarged(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [enlarged]);
   return (
     <aside className="ov-side" aria-label="Visuals">
       {pending && (
@@ -141,7 +150,7 @@ export function SectionVisuals({ kept, pending, context, onKeep, onCancel, onRem
           </div>
           <NapkinVisual
             key={pending.key}
-            text={pending.text}
+            text={visualContent(pending.text, section)}
             context={context}
             auto
             useLabel="Keep this"
@@ -153,10 +162,23 @@ export function SectionVisuals({ kept, pending, context, onKeep, onCancel, onRem
       )}
       {kept.map(visual => (
         <figure key={visual.id} className="ov-kept">
-          <img className={`ov-img ov-${visual.theme === 'dark' ? 'dark' : 'light'}`} src={visual.url} alt={visual.alt || 'Visual'} loading="lazy" />
-          <button type="button" className="c-icon-btn ov-remove" aria-label="Remove visual" title="Remove visual" onClick={() => onRemove(visual)}><Trash2 size={16} strokeWidth={1.75} aria-hidden="true" /></button>
+          <button type="button" className="ov-open" aria-label="Open visual full size" onClick={() => setEnlarged(visual)}>
+            <img className={`ov-img ov-${visual.theme === 'dark' ? 'dark' : 'light'}`} src={visual.url} alt={visual.alt || 'Visual'} loading="lazy" />
+          </button>
+          <div className="ov-tools">
+            <button type="button" className="c-icon-btn" aria-label="Open visual full size" title="Full size" onClick={() => setEnlarged(visual)}><Maximize2 size={16} strokeWidth={1.75} aria-hidden="true" /></button>
+            <button type="button" className="c-icon-btn" aria-label="Remove visual" title="Remove visual" onClick={() => onRemove(visual)}><Trash2 size={16} strokeWidth={1.75} aria-hidden="true" /></button>
+          </div>
         </figure>
       ))}
+      {enlarged && (
+        <BodyPortal>
+          <div className="c-scrim ov-zoom" onClick={() => setEnlarged(null)} role="dialog" aria-modal="true" aria-label="Visual">
+            <img className={`ov-zoom-img ov-img ov-${enlarged.theme === 'dark' ? 'dark' : 'light'}`} src={enlarged.url} alt={enlarged.alt || 'Visual'} />
+            <button type="button" className="c-icon-btn ov-zoom-close" aria-label="Close" onClick={() => setEnlarged(null)}><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+          </div>
+        </BodyPortal>
+      )}
       <OutlineVisualStyle />
     </aside>
   );
@@ -172,13 +194,19 @@ function OutlineVisualStyle() {
       .ov-pending { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-row); background: var(--surface-card, var(--card)); }
       .ov-pending-head { display: flex; align-items: flex-start; gap: 8px; }
       .ov-quote { flex: 1; min-width: 0; font-style: italic; }
-      .ov-pending .nv-frame { aspect-ratio: 4 / 3; padding: 8px; }
+      .ov-pending .nv-frame { aspect-ratio: auto; min-height: 280px; max-height: none; padding: 8px; }
+      .ov-pending .nv-image { width: 100%; }
       .ov-kept { position: relative; margin: 0; padding: 8px; border: 1px solid var(--hairline, var(--line)); border-radius: var(--r-row); background: var(--surface-card, var(--card)); }
       .ov-img { display: block; width: 100%; height: auto; }
+      .ov-open { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+      .ov-tools { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
+      .ov-tools .c-icon-btn { background: var(--card); }
+      .ov-kept:hover .ov-tools, .ov-tools:focus-within { opacity: 1; }
+      @media (hover: none) { .ov-tools { opacity: 1; } }
+      .ov-zoom { display: grid; place-items: center; padding: 24px; cursor: zoom-out; }
+      .ov-zoom-img { width: min(1200px, 100%); max-height: calc(100vh - 48px); object-fit: contain; border-radius: var(--r-card); background: var(--card); padding: 16px; box-shadow: var(--shadow-float); }
+      .ov-zoom-close { position: fixed; top: 16px; right: 16px; background: var(--card); }
       [data-theme='dark'] .ov-img.ov-light, :root:not([data-theme='dark']) .ov-img.ov-dark { filter: invert(1) hue-rotate(180deg); }
-      .ov-remove { position: absolute; top: 6px; right: 6px; opacity: 0; transition: opacity .15s; background: var(--card); }
-      .ov-kept:hover .ov-remove, .ov-remove:focus-visible { opacity: 1; }
-      @media (hover: none) { .ov-remove { opacity: 1; } }
     `}</style>
   );
 }
