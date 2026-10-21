@@ -62,11 +62,11 @@ export default function RecapCard({ guides, folders, since, cardsStudied = 0 }) 
         <rect width="100%" height="100%" fill="${cssVar('--canvas')}"/>
         <rect x="48" y="48" width="${width - 96}" height="${height - 96}" rx="40" fill="${cssVar('--paper')}"/>
         <text x="96" y="160" font-family="Newsreader, Georgia, serif" font-size="64" font-weight="600" fill="${cssVar('--paper-ink')}">${escapeXml(name)} in Cordia</text>
-        <text x="96" y="300" font-family="Manrope, Helvetica, Arial, sans-serif" font-size="96" font-weight="600" fill="${cssVar('--olive')}">${stats.hours}</text>
-        <text x="96" y="350" font-family="Manrope, Helvetica, Arial, sans-serif" font-size="32" fill="${cssVar('--paper-ink')}">hours</text>
-        <text x="420" y="300" font-family="Manrope, Helvetica, Arial, sans-serif" font-size="96" font-weight="600" fill="${cssVar('--olive')}">${stats.cards}</text>
-        <text x="420" y="350" font-family="Manrope, Helvetica, Arial, sans-serif" font-size="32" fill="${cssVar('--paper-ink')}">cards</text>
-        <text x="96" y="450" font-family="Manrope, Helvetica, Arial, sans-serif" font-size="32" fill="${cssVar('--paper-ink')}" fill-opacity="0.64">Top class</text>
+        <text x="96" y="300" font-family="Quicksand, Helvetica, Arial, sans-serif" font-size="96" font-weight="600" fill="${cssVar('--olive')}">${stats.hours}</text>
+        <text x="96" y="350" font-family="Quicksand, Helvetica, Arial, sans-serif" font-size="32" fill="${cssVar('--paper-ink')}">hours</text>
+        <text x="420" y="300" font-family="Quicksand, Helvetica, Arial, sans-serif" font-size="96" font-weight="600" fill="${cssVar('--olive')}">${stats.cards}</text>
+        <text x="420" y="350" font-family="Quicksand, Helvetica, Arial, sans-serif" font-size="32" fill="${cssVar('--paper-ink')}">cards</text>
+        <text x="96" y="450" font-family="Quicksand, Helvetica, Arial, sans-serif" font-size="32" fill="${cssVar('--paper-ink')}" fill-opacity="0.64">Top class</text>
         <text x="96" y="500" font-family="Newsreader, Georgia, serif" font-size="44" font-weight="600" fill="${cssVar('--paper-ink')}">${escapeXml(stats.topClass)}</text>
         ${treeMarkup}
       </svg>`;

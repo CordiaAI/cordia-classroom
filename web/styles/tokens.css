@@ -1,19 +1,19 @@
 /* Cordia Classroom design tokens: the ONLY place color literals live (a test enforces this).
    Loaded last (pages/_app.js), so these values win over anything earlier.
 
-   Type scale: 13, 15, 17, 20, 28, 40 px. Newsreader for titles, Manrope for everything else.
+   Type scale: 13, 15, 17, 20, 28, 40 px. Newsreader for titles, Quicksand for everything else.
    Radius scale: 12 (inputs, chips), 16 (rows, small cards), 20 (cards), 28 (big panels), 999 (pills).
    Surfaces: three levels per theme (backdrop, glass card, raised glass).
    One accent (olive) for the primary action, the active nav item and progress. */
 
-@font-face { font-family: Manrope; src: url('/fonts/manrope.ttf') format('truetype'); font-style: normal; font-weight: 200 800; font-display: swap; }
+@font-face { font-family: Quicksand; src: url('/fonts/quicksand.ttf') format('truetype'); font-style: normal; font-weight: 300 700; font-display: swap; }
 @font-face { font-family: Newsreader; src: url('/fonts/newsreader.ttf') format('truetype'); font-style: normal; font-weight: 200 800; font-display: swap; }
 
 :root {
   color-scheme: light;
 
   /* Type */
-  --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-sans: 'Quicksand', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: 'Newsreader', Georgia, serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
   --fs-13: 13px; --fs-15: 15px; --fs-17: 17px; --fs-20: 20px; --fs-28: 28px; --fs-40: 40px;
