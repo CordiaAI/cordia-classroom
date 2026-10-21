@@ -19,17 +19,6 @@ export default function LearnCordia({ onBeforeShow, hideWhenComplete = false, co
     ? [{ label: '', items: FEATURE_LIST.filter(item => !progress.used.includes(item.id)).slice(0, NEXT_COUNT) }]
     : FEATURE_GROUPS;
 
-  function row(item) {
-    const used = progress.used.includes(item.id);
-    return (
-      <li key={item.id} className={used ? 'is-used' : ''}>
-        <span className="learn-icon" aria-hidden="true">{used ? <Check size={18} strokeWidth={2} /> : <item.icon size={20} strokeWidth={1.75} />}</span>
-        <span className="learn-label">{item.label}</span>
-        <button type="button" className="c-btn c-btn--quiet" onClick={async () => { onBeforeShow?.(); await showMe(router, item.id); }} aria-label={`Show me ${item.label}`}>Show me</button>
-      </li>
-    );
-  }
-
   return (
     <section className="c-card learn" aria-labelledby="learn-title">
       <header className="c-row">
@@ -39,7 +28,18 @@ export default function LearnCordia({ onBeforeShow, hideWhenComplete = false, co
       {groups.map(group => (
         <div key={group.label || 'next'} className="learn-group">
           {group.label && <h3 className="learn-group-title">{group.label}</h3>}
-          <ul className="learn-list">{group.items.map(row)}</ul>
+          <ul className="learn-list">
+            {group.items.map(item => {
+              const used = progress.used.includes(item.id);
+              return (
+                <li key={item.id} className={used ? 'is-used' : ''}>
+                  <span className="learn-icon" aria-hidden="true">{used ? <Check size={18} strokeWidth={2} /> : <item.icon size={20} strokeWidth={1.75} />}</span>
+                  <span className="learn-label">{item.label}</span>
+                  <button type="button" className="c-btn c-btn--quiet" onClick={async () => { onBeforeShow?.(); await showMe(router, item.id); }} aria-label={`Show me ${item.label}`}>Show me</button>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       ))}
       {compact && <Link href="/settings?section=learn" className="c-btn c-btn--quiet learn-all" onClick={onBeforeShow}>See all {FEATURE_LIST.length}</Link>}
@@ -47,7 +47,7 @@ export default function LearnCordia({ onBeforeShow, hideWhenComplete = false, co
         .learn { display: grid; gap: 8px; padding: 20px; }
         .learn-group { display: grid; gap: 4px; }
         .learn-group + .learn-group { margin-top: 12px; }
-        .learn-group-title { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
+        .learn-group-title { margin: 0; font: 600 13px/1.4 var(--font-sans); letter-spacing: 0; color: var(--muted); }
         .learn-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
         .learn-list li { display: flex; align-items: center; gap: 12px; min-height: 52px; border-top: 1px solid var(--line); }
         .learn-icon { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border-radius:50%; background: var(--olive-tint); color: var(--olive-ink); }
