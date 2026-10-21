@@ -1,0 +1,106 @@
+/* Settings → Assistant (components/assistant). Built from the design system's c- classes and
+   tokens only; these rules lay them out. */
+
+.asst-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 20px; }
+/* Grid children may shrink, so wide controls scroll inside instead of widening the page. */
+.asst, .asst-card > *, .asst .c-field > *, .asst-form > * { min-width: 0; }
+.asst .c-field { grid-template-columns: minmax(0, 1fr); }
+.asst-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; flex-wrap: wrap; }
+.asst-row-label { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
+.asst-row-label > .lucide, .asst-intro > .lucide, .asst-app .c-list-row > .lucide { flex: none; color: var(--olive-ink); }
+.asst-row-title { font: 600 var(--fs-17)/1.15 var(--font-sans); color: var(--ink); }
+.asst-app-text { display: grid; gap: 2px; min-width: 0; }
+.asst-intro { display: flex; align-items: flex-start; gap: 12px; }
+.asst-intro .c-section-title { margin: 0 0 4px; }
+.asst-card .c-section-title, .asst-card p { margin: 0; }
+.asst-subtitle { margin: 0 0 2px; font: 600 var(--fs-17)/1.3 var(--font-sans); color: var(--ink); }
+
+.asst-form { display: grid; gap: 16px; }
+.asst-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+.asst-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.asst-spread { justify-content: space-between; }
+.asst-error { margin: 0; color: var(--error); font-weight: 600; }
+.asst-danger { color: var(--error) !important; }
+.asst-phone, .asst-code, .asst-name { max-width: 320px; }
+.asst-code { letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
+.asst-textarea { min-height: 120px; padding: 12px 14px; resize: none; font: 500 var(--fs-15)/1.5 var(--font-sans); }
+.asst-start { justify-self: start; }
+
+.asst-checks { display: grid; gap: 12px; }
+.asst-check { display: grid; grid-template-columns: 24px 1fr; gap: 12px; align-items: start; font: 500 var(--fs-15)/1.55 var(--font-sans); color: var(--ink); cursor: pointer; }
+.asst-check input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--olive); cursor: pointer; }
+.asst-check a { color: var(--olive-ink); font-weight: 600; }
+
+/* Survey: one statement per row, a five-step scale that scrolls sideways on phones. */
+.asst-survey { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.asst-survey fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+.asst-survey legend { padding: 0; font: 600 var(--fs-17)/1.4 var(--font-sans); color: var(--ink); }
+.asst-scale { justify-self: start; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.asst-scale::-webkit-scrollbar { display: none; }
+.asst-scale button { white-space: nowrap; }
+
+/* Personality options: flat rows inside the card (glass nests once). Selected is olive tint. */
+.asst-group { display: grid; gap: 8px; }
+.asst-group-title { margin: 8px 0 0; font: 600 var(--fs-15)/1.4 var(--font-sans); color: var(--muted); }
+.asst-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.asst-option {
+  display: grid; gap: 2px; align-content: start; text-align: left; min-height: 64px; padding: 12px 16px;
+  border-radius: var(--r-row); border: 1px solid var(--hairline); background: var(--surface-card); color: var(--ink);
+  font: 600 var(--fs-15)/1.3 var(--font-sans); cursor: pointer;
+  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.asst-option strong { font-weight: 600; }
+.asst-option[aria-checked='true'] { background: var(--olive-tint); border-color: transparent; color: var(--olive-ink); }
+.asst-option[aria-checked='true'] .c-meta { color: var(--olive-ink); }
+@media (hover: hover) { .asst-option:hover { background: var(--olive-tint); } }
+
+/* Style sliders beside a sample text. */
+.asst-split { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: 16px; align-items: start; }
+.asst-slider { display: grid; gap: 6px; }
+.asst-slider-head { display: flex; align-items: center; justify-content: space-between; min-height: 36px; }
+.asst-slider-label { font: 600 var(--fs-15)/1.4 var(--font-sans); color: var(--ink); }
+.asst-slider input[type='range'] { width: 100%; height: 28px; accent-color: var(--olive); cursor: pointer; }
+.asst-slider-ends { display: flex; justify-content: space-between; }
+.asst-preview { position: sticky; top: 88px; align-content: start; }
+.asst-bubble {
+  justify-self: start; max-width: 92%; margin: 0; padding: 10px 14px; border-radius: 18px 18px 18px 6px;
+  background: var(--surface-raised); border: 1px solid var(--hairline); color: var(--ink);
+  font: 500 var(--fs-15)/1.5 var(--font-sans); white-space: pre-wrap;
+}
+.asst-bubble.is-me { justify-self: end; border-radius: 18px 18px 6px 18px; background: var(--olive); border-color: transparent; color: var(--on-olive); }
+
+/* Schedule and check-ins. */
+.asst-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.asst-seg { justify-self: start; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.asst-seg::-webkit-scrollbar { display: none; }
+.asst-seg button { white-space: nowrap; }
+.asst-toggles { display: grid; gap: 4px; }
+.asst-toggle-row { display: grid; gap: 0; padding: 4px 0 8px; border-bottom: 1px solid var(--hairline); }
+.asst-toggle-row:last-child { border-bottom: 0; }
+.asst-toggle-row .c-meta { padding-right: 56px; }
+.asst-inline-select { width: auto; min-width: 150px; }
+
+/* Lists inside a card are flat; the card is the glass. */
+.asst-flat-list { grid-template-columns: minmax(0, 1fr); padding: 0; background: none; box-shadow: none; border: 0; }
+/* These rows don't open anything, so they don't hover like rows that do. */
+.asst-flat-list .c-list-row:hover { background: none; }
+.asst-app + .asst-app { border-top: 1px solid var(--hairline); }
+.asst-app .c-list-row { border-top: 0; padding-left: 0; padding-right: 0; }
+.asst-calendars { display: grid; gap: 4px; padding: 0 0 12px 32px; }
+.asst-calendars .c-btn { justify-self: start; }
+
+.asst-tabs { justify-self: start; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.asst-tabs::-webkit-scrollbar { display: none; }
+.asst-tabs button { white-space: nowrap; }
+
+.asst-sheet { display: grid; gap: 16px; width: min(560px, 100%); max-height: calc(100dvh - 48px); overflow-y: auto; }
+.asst-sheet p { margin: 0; }
+.asst-sheet-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.asst-delete-confirm:not(:disabled) { background: var(--error-solid) !important; border-color: var(--error-solid) !important; color: var(--on-olive) !important; }
+
+@media (max-width: 767px) {
+  .asst-split { grid-template-columns: 1fr; }
+  .asst-preview { position: static; order: -1; }
+  .asst-row { padding: 16px; }
+  .asst-row .asst-actions { width: 100%; }
+}

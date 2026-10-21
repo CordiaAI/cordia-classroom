@@ -182,7 +182,7 @@ export function scheduleProactiveRefresh() {
 // API calls on the same page don't each fire their own refresh.
 let _refreshPromise = null;
 
-export async function tryRefreshToken() {
+async function tryRefreshToken() {
   if (_refreshPromise) return _refreshPromise;
   _refreshPromise = _doRefresh().finally(() => { _refreshPromise = null; });
   return _refreshPromise;

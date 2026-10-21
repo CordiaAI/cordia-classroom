@@ -22,20 +22,16 @@ const navItems = [
   { label: 'Today', href: '/dashboard', icon: Sun, spot: 'nav-today' },
   { label: 'Library', href: '/library', icon: Library, spot: 'nav-library' },
   { label: 'Canvas', href: '/canvas', icon: GraduationCap, spot: 'nav-canvas', tip: 'calendar' },
-  // Cordia Assistant is its own app behind /assistant (next.config.js), so a full page load.
-  { label: 'Assistant', href: '/assistant', icon: MessageCircle, spot: 'nav-assistant', external: true },
+  // Cordia Assistant's settings live in Settings → Assistant.
+  { label: 'Assistant', href: '/settings?section=assistant', icon: MessageCircle, spot: 'nav-assistant' },
 ];
-
-function NavLink({ item, active, children }) {
-  const props = { href: item.href, 'aria-current': active === item.href ? 'page' : undefined, 'data-tip': item.tip, 'data-spot': item.spot };
-  return item.external ? <a {...props}>{children}</a> : <Link {...props}>{children}</Link>;
-}
 
 // Guides, notes, lectures, classes and every study screen live inside Library.
 const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice', '/nclex', '/folder', '/create', '/session', '/class', '/smartnotes', '/lecture'];
 
-export function activeNavHref(pathname) {
+export function activeNavHref(pathname, section = '') {
   if (pathname === '/dashboard') return '/dashboard';
+  if (pathname === '/settings' && section === 'assistant') return '/settings?section=assistant';
   if (LIBRARY_PATHS.some(path => pathname === path || pathname.startsWith(path + '/'))) return '/library';
   if (pathname.startsWith('/canvas') || pathname.startsWith('/calendar')) return '/canvas';
   return '';
@@ -59,7 +55,7 @@ export default function Sidebar({ timerState, setTimerState }) {
   const timerRef = useRef(null);
   const [shortcut, setShortcut] = useState('Ctrl K');
   const avatarRef = useRef(null);
-  const active = activeNavHref(router.pathname);
+  const active = activeNavHref(router.pathname, String(router.query.section || ''));
 
   useEffect(() => {
     setShortcut(isMac() ? '⌘K' : 'Ctrl K');
@@ -149,10 +145,10 @@ export default function Sidebar({ timerState, setTimerState }) {
 
         <nav className="c-nav" aria-label="Primary">
           {navItems.map(item => (
-            <NavLink key={item.href} item={item} active={active}>
+            <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.tip} data-spot={item.spot}>
               <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
               {item.label}
-            </NavLink>
+            </Link>
           ))}
         </nav>
 
@@ -193,10 +189,10 @@ export default function Sidebar({ timerState, setTimerState }) {
           New
         </button>
         {navItems.slice(2).map(item => (
-          <NavLink key={item.href} item={{ ...item, tip: undefined }} active={active}>
+          <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-spot={item.spot}>
             <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
             {item.label}
-          </NavLink>
+          </Link>
         ))}
       </nav>
       <TutorBubble />
