@@ -7,7 +7,6 @@ import { walkthroughEvent } from '../../lib/walkthrough';
 import { PhoneStep, ProfileStep, SurveyStep } from './AssistantSetup';
 import AssistantPersonality from './AssistantPersonality';
 import AssistantSchedule from './AssistantSchedule';
-import AssistantApps from './AssistantApps';
 import AssistantData from './AssistantData';
 import AssistantUses from './AssistantUses';
 
@@ -16,7 +15,6 @@ const TABS = [
   { key: 'uses', label: 'Helps with' },
   { key: 'personality', label: 'Personality' },
   { key: 'schedule', label: 'Schedule' },
-  { key: 'apps', label: 'Apps' },
   { key: 'data', label: 'Your data' },
 ];
 
@@ -53,12 +51,12 @@ export default function AssistantSettings({ onOpenPlan }) {
 
   useEffect(() => { load(); }, []);
 
-  // Coming back from connecting an app.
+  // Coming back from connecting an app. Apps are connected in Settings › Connectors now; this
+  // still answers a sign-in that started from the Assistant's own link.
   useEffect(() => {
     if (!router.isReady) return;
     const { connected, connection } = router.query;
     if (!connected && !connection) return;
-    if (connected) setTab('apps');
     toast(connected ? 'Connected' : "That app didn't connect. Try again.");
     const { connected: _c, connection: _f, provider: _p, ...rest } = router.query;
     router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
@@ -116,10 +114,9 @@ export default function AssistantSettings({ onOpenPlan }) {
           </div>
 
           <div role="tabpanel" id={`asst-panel-${tab}`} aria-labelledby={`asst-tab-${tab}`}>
-            {tab === 'uses' && <AssistantUses view={view} catalog={catalog} save={save} onOpenApps={() => setTab('apps')} />}
+            {tab === 'uses' && <AssistantUses view={view} catalog={catalog} save={save} />}
             {tab === 'personality' && <AssistantPersonality view={view} catalog={catalog} save={save} reload={load} toast={toast} />}
             {tab === 'schedule' && <AssistantSchedule view={view} catalog={catalog} save={save} toast={toast} />}
-            {tab === 'apps' && <AssistantApps view={view} catalog={catalog} setView={setView} toast={toast} />}
             {tab === 'data' && <AssistantData view={view} setView={setView} toast={toast} onDeleted={() => { toast('Assistant deleted'); setMe({ stage: 'setup' }); setTab('uses'); }} />}
           </div>
         </>

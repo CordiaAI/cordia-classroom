@@ -31,10 +31,10 @@ test('consent wording comes from the Assistant, word for word', () => {
   assert.match(setup, /consents: \{ sms_informational: true, personality_data: true, terms: true \}/);
 });
 
-test('one icon set: apps use Lucide icons, not brand marks or emoji', () => {
-  const apps = read('components/assistant/AssistantApps.js');
-  assert.match(apps, /from 'lucide-react'/);
-  assert.doesNotMatch(apps, /<img|\.svg|\p{Extended_Pictographic}/u);
+test('apps are connected in Settings › Connectors, not an Assistant Apps tab; no emoji', () => {
+  const settings = read('components/assistant/AssistantSettings.js');
+  assert.doesNotMatch(settings, /key: 'apps'|AssistantApps/);
+  assert.match(read('components/assistant/AssistantUses.js'), /href="\/settings\?section=connectors"/);
   for (const file of ['AssistantSettings', 'AssistantSetup', 'AssistantPersonality', 'AssistantSchedule', 'AssistantData']) {
     assert.doesNotMatch(read(`components/assistant/${file}.js`), /\p{Extended_Pictographic}/u, file);
   }

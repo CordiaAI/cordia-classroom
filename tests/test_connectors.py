@@ -40,7 +40,7 @@ class ConnectorTests(unittest.TestCase):
         with patch("services.composio.configured", return_value=False), patch("services.composio.active_accounts", return_value={}):
             body = self.client.get("/connectors", headers=self.auth).json()
         by_id = {c["id"]: c for c in body["connectors"]}
-        self.assertEqual(list(by_id), ["gcal", "apple_calendar", "gtasks", "gdrive", "gdocs", "notion"])
+        self.assertEqual(list(by_id), ["gcal", "apple_calendar", "gtasks", "gdrive", "gdocs", "notion", "gsheets", "gmail", "outlook", "slack", "ynab", "dropbox", "github"])
         self.assertTrue(by_id["apple_calendar"]["available"])
         self.assertFalse(by_id["gcal"]["available"])
         with patch("services.composio.configured", return_value=True), patch("services.composio.active_accounts", return_value={"gcal": "ca_1"}):

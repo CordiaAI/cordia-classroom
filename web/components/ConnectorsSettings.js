@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { ChevronRight, Copy, Search, X } from 'lucide-react';
+import { ChevronRight, Copy, Mail, Search, Wallet, X } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import ConfirmDialog from './ConfirmDialog';
 import { SectionLoader } from './CordiaLoader';
@@ -10,6 +10,8 @@ import CanvasConnectSheet from './CanvasConnectSheet';
 import CanvasCourseList from './CanvasCourseList';
 import { BRAND_PATHS } from '../lib/brandIcons';
 import { walkthroughEvent } from '../lib/walkthrough';
+import { assistantApi } from '../lib/assistant';
+import IcloudSheet from './assistant/IcloudSheet';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // What each app does here, shown in its sheet.
@@ -21,14 +23,63 @@ const DETAILS = {
   gdrive: 'Find a PDF, Word, PowerPoint or Google Doc in your Drive and open it in Create, ready to make a guide.',
   gdocs: 'Find a Google Doc and open its text in Create, ready to make a guide.',
   notion: 'Find a Notion page and open it in Create, ready to make a guide. Share the page with Cordia in Notion first.',
+  gsheets: 'Text Cordia Assistant to add a row or read a sheet: log study hours, expenses, anything.',
+  gmail: 'Cordia Assistant can text you about emails that need a reply and read recent mail when you ask.',
+  outlook: 'Cordia Assistant can text you about emails that need a reply and read recent mail when you ask.',
+  slack: 'Ask Cordia Assistant what you missed in Slack and reply by text.',
+  ynab: 'Ask Cordia Assistant what is left in a budget category before you spend.',
+  dropbox: 'Ask Cordia Assistant to find a file in your Dropbox.',
+  github: 'Ask Cordia Assistant about your issues and pull requests.',
 };
+// Apps that work in Classroom itself; the rest are for texting Cordia Assistant. Every app
+// connected here works in both.
+const CLASSROOM_APPS = ['gcal', 'apple_calendar', 'gtasks', 'gdrive', 'gdocs', 'notion'];
+// Simple Icons has no mark for these; a plain icon stands in.
+const FALLBACK_ICONS = { outlook: Mail, ynab: Wallet };
 
 // The app's logo on a rounded glass tile, like Cordia Assistant. Decorative: the name is beside it.
 function ConnectorIcon({ id, size = 'md' }) {
+  const Fallback = !BRAND_PATHS[id] && FALLBACK_ICONS[id];
   return (
     <span className={`cn-icon is-${size}`} aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d={BRAND_PATHS[id] || ''} /></svg>
+      {Fallback ? <Fallback strokeWidth={1.75} /> : <svg viewBox="0 0 24 24" fill="currentColor"><path d={BRAND_PATHS[id] || ''} /></svg>}
     </span>
+  );
+}
+
+// In the Apple Calendar sheet: Cordia Assistant reads your Apple Calendar (with an app-specific
+// password) to text you before classes and events. Separate from the deadline feed above it.
+function AssistantAppleCalendar() {
+  const [state, setState] = useState(null); // { connector, status, available } | { off: true }
+  const [signingIn, setSigningIn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  async function load() {
+    const [catalog, me] = await Promise.all([assistantApi('/catalog'), assistantApi('/me')]);
+    const connector = catalog.ok && catalog.data.connectors?.find(item => item.id === 'icloud_calendar');
+    if (!connector || !me.ok || me.data.stage !== 'active') { setState({ off: true }); return; }
+    const status = me.data.settings.connections.find(item => item.provider === 'icloud_calendar')?.status;
+    setState({ connector, status, available: me.data.settings.available?.icloud_calendar !== false });
+  }
+  useEffect(() => { load(); }, []);
+  async function disconnect() {
+    setBusy(true);
+    const out = await assistantApi('/connections/icloud_calendar', { method: 'DELETE' });
+    setBusy(false);
+    if (out.ok) { setMessage('Cordia Assistant no longer reads your Apple Calendar'); load(); }
+    else setMessage(out.data.error || "That didn't disconnect. Try again.");
+  }
+  if (!state || state.off || !state.available) return null;
+  const on = state.status === 'active';
+  return (
+    <div className="cn-assistant">
+      <p className="c-meta">{on ? 'Cordia Assistant reads your Apple Calendar to text you before classes and events.' : 'Want texts before classes and events? Let Cordia Assistant read your Apple Calendar.'}</p>
+      {on
+        ? <button type="button" className="c-btn c-btn--quiet" disabled={busy} onClick={disconnect}>Stop reading it</button>
+        : <button type="button" className="c-btn c-btn--secondary" onClick={() => setSigningIn(true)}>Let Cordia read it</button>}
+      {message && <p className="cn-notice" role="status">{message}</p>}
+      {signingIn && <IcloudSheet connector={state.connector} onClose={() => setSigningIn(false)} onConnected={() => { setSigningIn(false); setMessage('Apple Calendar connected to Cordia Assistant'); load(); }} />}
+    </div>
   );
 }
 const IMPORTS = ['gdrive', 'gdocs', 'notion'];
@@ -250,11 +301,29 @@ export default function ConnectorsSettings() {
     );
   }
 
+  function tile(connector) {
+    const soon = connector.id !== 'apple_calendar' && !connector.available;
+    return (
+      <li key={connector.id}>
+        <button type="button" className={'cn-tile' + (soon ? ' is-soon' : '')} onClick={() => { walkthroughEvent('connector-opened'); setOpen(connector.id); setError(''); setNotice(''); }}>
+          <ConnectorIcon id={connector.id} />
+          <span className="cn-tile-text">
+            <span className="cn-name">{connector.name}</span>
+            <span className="cn-tag">{connector.tagline}</span>
+          </span>
+          {connector.connected && <span className="cn-badge is-on">Connected</span>}
+          {soon && <span className="cn-badge">Soon</span>}
+          <ChevronRight className="cn-chev" size={18} strokeWidth={1.75} aria-hidden="true" />
+        </button>
+      </li>
+    );
+  }
+
   const active = open && open !== 'canvas' && connectors?.find(item => item.id === open);
   return (
     <div className="c-card cn-card">
       <h2 className="c-section-title">Connect your apps</h2>
-      <p className="c-meta">Tap one to see what it does and how to connect it. For texting, Cordia Assistant connects its own apps on the Assistant page.</p>
+      <p className="c-meta">Tap one to see what it does and how to connect it. Apps you connect here also work when you text Cordia Assistant.</p>
       {connectors === null ? <SectionLoader label="Loading connectors" /> : (
         <ul className="cn-grid" data-spot="connectors">
           {canvas && (
@@ -270,24 +339,14 @@ export default function ConnectorsSettings() {
               </button>
             </li>
           )}
-          {connectors.map(connector => {
-            const soon = connector.id !== 'apple_calendar' && !connector.available;
-            return (
-              <li key={connector.id}>
-                <button type="button" className={'cn-tile' + (soon ? ' is-soon' : '')} onClick={() => { walkthroughEvent('connector-opened'); setOpen(connector.id); setError(''); setNotice(''); }}>
-                  <ConnectorIcon id={connector.id} />
-                  <span className="cn-tile-text">
-                    <span className="cn-name">{connector.name}</span>
-                    <span className="cn-tag">{connector.tagline}</span>
-                  </span>
-                  {connector.connected && <span className="cn-badge is-on">Connected</span>}
-                  {soon && <span className="cn-badge">Soon</span>}
-                  <ChevronRight className="cn-chev" size={18} strokeWidth={1.75} aria-hidden="true" />
-                </button>
-              </li>
-            );
-          })}
+          {connectors.filter(item => CLASSROOM_APPS.includes(item.id)).map(tile)}
         </ul>
+      )}
+      {connectors?.some(item => !CLASSROOM_APPS.includes(item.id)) && (
+        <>
+          <h3 className="cn-group-title">For texting with Cordia Assistant</h3>
+          <ul className="cn-grid">{connectors.filter(item => !CLASSROOM_APPS.includes(item.id)).map(tile)}</ul>
+        </>
       )}
       {!open && notice && <p className="cn-notice" role="status">{notice}</p>}
       {!open && error && <p className="cn-error" role="alert">{error}</p>}
@@ -338,6 +397,7 @@ export default function ConnectorsSettings() {
                   </div>
                 </div>
               )}
+              {active.id === 'apple_calendar' && <AssistantAppleCalendar />}
               {notice && <p className="cn-notice" role="status">{notice}</p>}
               {error && <p className="cn-error" role="alert">{error}</p>}
             </div>
