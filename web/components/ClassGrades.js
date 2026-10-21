@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BookOpen, Sparkles } from 'lucide-react';
+import { BookOpen, Check, Sparkles } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { SectionLoader } from './CordiaLoader';
 
@@ -94,7 +94,9 @@ export default function ClassGrades({ courseId, guides = [], onMakeGuide }) {
                   {up && <span className="cg-goal is-up">{up}</span>}
                   {keep && <span className="cg-goal">{keep}</span>}
                 </div>
-                {guide
+                {item.submitted
+                  ? <span className="c-chip cg-done"><Check {...ICON} />Turned in</span>
+                  : guide
                   ? <Link href={'/guide/' + guide.id} className="c-btn c-btn--secondary c-btn--sm"><BookOpen {...ICON} />Study {guide.title.length > 24 ? 'guide' : guide.title}</Link>
                   : onMakeGuide && <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={onMakeGuide}><Sparkles {...ICON} />Make a guide</button>}
               </li>

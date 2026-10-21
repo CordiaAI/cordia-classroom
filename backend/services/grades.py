@@ -98,8 +98,11 @@ def estimate(groups: list, weighted: bool, *, now: Optional[datetime] = None, li
                 when = None
             if when is not None and when < now:
                 continue
+            submission = item.get("submission") or {}
             row = {
                 "id": item["id"], "name": str(item.get("name") or "Assignment")[:300], "due_at": due,
+                # Turned in, waiting on a grade: nothing left to study for.
+                "submitted": bool(submission.get("submitted_at")) or submission.get("workflow_state") in {"submitted", "pending_review"},
                 "points": float(item["points_possible"]), "group": str(group.get("name") or ""),
                 "weight": float(group.get("group_weight") or 0) if weighted else None,
             }

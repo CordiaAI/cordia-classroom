@@ -395,9 +395,12 @@ def list_files(course_id: int, authorization: str = Header(default="")):
         try:
             files = client.files(course_id)
         except CanvasDenied as exc:
-            # Many classes hide the Files page from students; their files are linked from Modules.
-            logger.info("canvas files.list denied course=%s (%s); using modules", course_id, exc)
-            files = client.module_files(course_id)
+            logger.info("canvas files.list denied course=%s (%s); using linked files", course_id, exc)
+            files = []
+        # Many classes hide or don't use the Files page; their files are linked from Modules,
+        # Pages and assignments instead.
+        if not files:
+            files = client.linked_files(course_id)
     except CanvasUnauthorized:
         _auto_disconnect(db, user_id)
         raise HTTPException(status_code=409, detail="Reconnect Canvas")
