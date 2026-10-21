@@ -13,6 +13,10 @@
   box-shadow: var(--lg-highlight), var(--lg-shadow);
 }
 
+/* Pills in a scrolling row skip the blur: Chrome sometimes paints a blurred pill inside a
+   scroll container with a stale strip (the selected tab looked cut off on its right). */
+.c-pills .c-pill { -webkit-backdrop-filter: none; backdrop-filter: none; }
+
 /* Quiet buttons and icon buttons stay lighter so rows of them don't feel heavy. */
 :is(.c-btn--quiet, .c-icon-btn) { box-shadow: var(--lg-highlight); }
 :is(.c-btn--quiet, .c-icon-btn):hover:not(:disabled) { background: var(--lg-sheen), var(--lg-fill-strong); }
@@ -96,7 +100,9 @@
 
 /* Tutor panel: the expand and close buttons sit together, clear of the title. */
 .tutor-drawer .tutor-expand { top: 10px; right: 54px; width: 40px; height: 40px; background: transparent; }
-.tutor-drawer .cordia-tutor-title-row { padding-right: 96px; }
+/* The title row is as tall as the expand and close buttons beside it, so the material picker
+   below starts under them instead of running beneath them. */
+.tutor-drawer .cordia-tutor-title-row { padding-right: 104px; min-height: 46px; }
 .cordia-tutor-input textarea { min-width: 0; }
 .cordia-tutor-input button { min-height: 38px; align-self: end; }
 @media (max-width: 767px) {

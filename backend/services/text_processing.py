@@ -263,6 +263,26 @@ def clean_text(text: str) -> str:
 
 
 # text_processing.py (replace chunk_text with this)
+def _open_quote(text: str) -> bool:
+    """True when text leaves a quotation open: more opening than closing curly quotes, or an odd
+    number of straight double quotes."""
+    return text.count("\u201c") > text.count("\u201d") or text.count('"') % 2 == 1
+
+
+def _keep_quotes_whole(sentences: List[str]) -> List[str]:
+    """Join sentences that sit inside one quotation, so a quoted passage (a creed, a poem, a
+    statute, a speech) is never split across chunks and reaches the model whole."""
+    joined, current = [], ""
+    for sentence in sentences:
+        current = f"{current} {sentence}" if current else sentence
+        if not _open_quote(current):
+            joined.append(current)
+            current = ""
+    if current:
+        joined.append(current)
+    return joined
+
+
 def chunk_text(text: str, max_length: int = 1500, slides: List[dict] = None) -> List[str]:
     """
     Split text into chunks for processing, respecting slide boundaries when slides are provided.
@@ -303,7 +323,7 @@ def chunk_text(text: str, max_length: int = 1500, slides: List[dict] = None) -> 
             if current_chunk:
                 chunks.append(current_chunk.strip())
             if len(para) > max_length:
-                sentences = re.split(r'(?<=[.!?])\s+', para)
+                sentences = _keep_quotes_whole(re.split(r'(?<=[.!?])\s+', para))
                 current_chunk = ""
                 for sentence in sentences:
                     if len(current_chunk) + len(sentence) + 1 <= max_length:

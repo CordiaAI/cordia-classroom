@@ -114,6 +114,8 @@ export default function GuidePage() {
   const [cardDraft, setCardDraft] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [toast, setToast] = useState('');
+  // The outline before "Regenerate outline", so the toast can put it back.
+  const [undoNotes, setUndoNotes] = useState(null);
   const [sharing, setSharing] = useState(null);
   const prevRevealed = useRef(0);
   const { learningStyle } = useLearningStyle();
@@ -148,7 +150,7 @@ export default function GuidePage() {
 
   useEffect(() => {
     if (!toast) return undefined;
-    const timer = setTimeout(() => setToast(''), 2500);
+    const timer = setTimeout(() => { setToast(''); setUndoNotes(null); }, undoNotes === null ? 2500 : 8000);
     return () => clearTimeout(timer);
   }, [toast]);
 
@@ -282,13 +284,29 @@ export default function GuidePage() {
   }
 
   // Notes the student typed (or any outline) rewritten as a tidy outline; their words are the source.
+  // For a guide with material this is "Regenerate outline": written again from the material, with Undo.
   async function tidyOutline() {
+    const before = guide.notes || '';
     setMaking('outline');
     const data = await fetch('/api/guide-notes', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ guide_id: guide.id, force: true }) })
       .then(response => (response.ok ? response.json() : null)).catch(() => null);
     setMaking('');
-    if (data?.notes) { setGuide(current => ({ ...current, notes: data.notes })); setNotesVersion(value => value + 1); setToast('Outline written'); }
+    if (data?.notes) {
+      setGuide(current => ({ ...current, notes: data.notes }));
+      setNotesVersion(value => value + 1);
+      setUndoNotes(hasMaterial && before.trim() ? before : null);
+      setToast(hasMaterial ? 'Outline regenerated' : 'Outline written');
+    }
     else setToast(data?.reason === 'empty' ? 'Write a few more notes first' : "The outline wasn't written. Try again.");
+  }
+
+  async function undoRegenerate() {
+    const notes = undoNotes;
+    setUndoNotes(null);
+    setToast('');
+    const data = await apiFetch('/guides/' + guide.id, { method: 'PATCH', body: JSON.stringify({ title: guide.title, notes }) });
+    if (data?.guide) { setGuide(current => ({ ...current, notes })); setNotesVersion(value => value + 1); setToast('Outline put back'); }
+    else setToast(apiErrorMessage(data?.detail, "The old outline wasn't put back."));
   }
 
   // Flashcards and a quiz from the notes, for a guide that started as the student's own notes.
@@ -453,9 +471,14 @@ export default function GuidePage() {
               </div>
             </div>
           )}
-          {notesState === 'making' && !notesWritten
+          {(notesState === 'making' && !notesWritten) || (making === 'outline' && hasMaterial)
             ? <SectionLoader height={160} label="Writing the outline" />
-            : <OutlineEditor guide={guide} version={notesVersion} onSaved={saved => setGuide(current => ({ ...current, notes: saved }))} onAction={onSelection} placeholder={hasMaterial ? 'Add your own notes anywhere…' : 'Type your notes… Use Heading for a new topic and Bullet for points.'} />}
+            : <OutlineEditor guide={guide} version={notesVersion}
+                tools={hasMaterial && (
+                  <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} disabled={Boolean(making)} onClick={tidyOutline}>
+                    <RefreshCw size={16} strokeWidth={1.75} aria-hidden="true" />Regenerate outline
+                  </button>
+                )} onSaved={saved => setGuide(current => ({ ...current, notes: saved }))} onAction={onSelection} placeholder={hasMaterial ? 'Add your own notes anywhere…' : 'Type your notes… Use Heading for a new topic and Bullet for points.'} />}
         </section>
       ) : (
         <>
@@ -480,7 +503,12 @@ export default function GuidePage() {
 
       {cardDraft !== null && <MakeCard front={cardDraft} onSave={saveCard} onClose={() => setCardDraft(null)} />}
       {confirmDelete && <ConfirmDialog title={`Delete ${guide.title}?`} onConfirm={deleteGuide} onCancel={() => setConfirmDelete(false)} />}
-      {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
+      {toast && (
+        <div className="c-toast" role="status">
+          <span>{toast}</span>
+          {undoNotes !== null && <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={undoRegenerate}>Undo</button>}
+        </div>
+      )}
 
       <style jsx>{`
         .guide { gap: 16px; }

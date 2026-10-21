@@ -88,6 +88,33 @@ class UniversalCaptureContractTests(unittest.TestCase):
         )
         self.assertFalse(study_guide_is_complete(guide))
 
+    def test_a_quoted_passage_stays_whole(self):
+        from services.text_processing import chunk_text
+        from services.llm import _postprocess_study_guide
+        creed = "\u201c" + " ".join(f"Line {i} of the creed holds to principle {i}." for i in range(40)) + "\u201d"
+        chunks = chunk_text("An opening sentence. " * 40 + "The creed reads: " + creed + " A closing sentence." * 10)
+        self.assertEqual(sum(creed in chunk for chunk in chunks), 1, "the quotation is split across chunks")
+        guide, _ = _postprocess_study_guide(f"Q1: What is the full creed?\nA1: {creed}\nQ2: What is X?\nA2: One. Two. Three. Four.")
+        self.assertIn(f"A1: {creed}", guide, "a quoted answer is never trimmed")
+        self.assertIn("A2: One. Two. Three.", guide)
+        self.assertNotIn("Four", guide)
+
+    def test_model_output_in_other_qa_shapes_becomes_a_complete_guide(self):
+        from services.llm import _postprocess_study_guide
+        shapes = [
+            "## Cells\n**Q1:** What is mitosis?\n**A1:** Cell division.\n\n**Q2:** What follows?\n**A2:** Cytokinesis.",
+            "Q1. What is mitosis?\nA1. Cell division.\nQ2) What follows?\nA2) Cytokinesis.",
+            "Q1:\nWhat is mitosis?\nA1:\nCell division.\nQ2: What follows?\nA2: Cytokinesis.",
+            # Cut off mid-pair: the unanswered question is dropped, the rest is kept.
+            "Q1: What is mitosis?\nA1: Cell division.\nQ2: What follows?\nA2: Cytokinesis.\nQ3: What comes next?",
+        ]
+        for raw in shapes:
+            with self.subTest(raw=raw[:30]):
+                guide, next_index = _postprocess_study_guide(raw)
+                self.assertTrue(study_guide_is_complete(guide), guide)
+                self.assertEqual(next_index, 3)
+                self.assertEqual([card["front"] for card in study_guide_to_flashcards(guide)], ["What is mitosis?", "What follows?"])
+
     @patch("routers.materials.learning_guidance", return_value="")
     @patch("routers.materials.record")
     @patch("routers.materials.require", return_value={"used": 0})
