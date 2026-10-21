@@ -111,6 +111,16 @@ async function install(context, state) {
     if (path === '/calendar/connection' && method === 'POST') return json({ connected: true, items: [] });
     if (path === '/tutor/session') return json(state.tutor);
     if (path === '/tutor/chats') return json({ chats: state.chats || [] });
+    if (path === '/connectors' && method === 'GET') {
+      state.linked = state.linked || {};
+      return json({ connectors: [['gcal', 'Google Calendar', 'Put your deadlines on your calendar.'], ['apple_calendar', 'Apple Calendar', 'Subscribe to your deadlines on iPhone and Mac.'], ['gtasks', 'Google Tasks', 'Turn deadlines into to-dos.'], ['gdrive', 'Google Drive', 'Import course files into a guide.'], ['gdocs', 'Google Docs', 'Import notes into a guide.'], ['notion', 'Notion', 'Import notes into a guide.']].map(([id, name, tagline]) => ({ id, name, tagline, available: true, connected: Boolean(state.linked[id]) })) });
+    }
+    if ((m = path.match(/^\/connectors\/([a-z_]+)\/connect$/))) { state.linked = { ...(state.linked || {}), [m[1]]: true }; return json({ redirect_url: `/settings?section=connectors&connected=${m[1]}` }); }
+    if ((m = path.match(/^\/connectors\/([a-z_]+)$/)) && method === 'DELETE') { delete state.linked[m[1]]; return json({ ok: true }); }
+    if (path.match(/^\/connectors\/(gcal|gtasks)\/deadlines$/)) return json({ added: 3, skipped: 0 });
+    if (path === '/connectors/apple_calendar/feed') return json({ url: 'https://api.example.com/calendar-feed/u.sig.ics', webcal_url: 'about:blank' });
+    if (path.match(/^\/connectors\/[a-z]+\/files/)) return json({ files: [{ id: 'f1', title: 'Biology lecture 4 notes', kind: 'doc', edited: '2026-10-20' }, { id: 'f2', title: 'Syllabus', kind: 'pdf', edited: '2026-09-01' }] });
+    if (path.match(/^\/connectors\/[a-z]+\/import$/)) return json({ title: 'Biology lecture 4 notes', text: 'Osmosis is the movement of water across a membrane.' });
     if (path === '/tutor/session/new') {
       state.chats = state.chats || [];
       if (state.tutor.messages.length) state.chats.unshift({ id: 'c' + (state.chats.length + 1), guide_id: state.tutor.active_guide_id || null, title: state.tutor.messages[0].text.slice(0, 80), updated_at: new Date().toISOString(), messages: state.tutor.messages });

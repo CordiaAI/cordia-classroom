@@ -44,8 +44,7 @@ export function Landing({ mode = 'signin', path = '/' }) {
     >
       <div className="landing">
         <section className="landing-hero">
-          <h1 className="landing-title">Classroom</h1>
-          <p className="landing-tagline">Your space to learn.</p>
+          <h1 className="landing-title">CordiaClassroom</h1>
           <ul className="sr-only">{FEATURES.map(feature => <li key={feature}>{feature}</li>)}</ul>
           <div className="landing-ticker" aria-hidden="true">
             <div className="landing-ticker-track">
@@ -60,7 +59,6 @@ export function Landing({ mode = 'signin', path = '/' }) {
         .landing-hero { min-width: 0; }
         /* Bigger than other page titles (refine.css sets every h1 to 40). */
         .landing-title { margin: 0; font:600 64px/1.05 var(--font-display); font-size: 64px !important; letter-spacing:-0.015em; color: var(--ink); }
-        .landing-tagline { margin: 12px 0 0; font:500 20px/1.4 var(--font-sans); color: var(--ink); }
         .landing-ticker { margin-top: 32px; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, var(--ink) 10%, var(--ink) 90%, transparent); mask-image: linear-gradient(90deg, transparent, var(--ink) 10%, var(--ink) 90%, transparent); }
         .landing-ticker-track { display: flex; gap: 12px; width: max-content; animation: landing-ticker 48s linear infinite; }
         .landing-ticker:hover .landing-ticker-track { animation-play-state: paused; }
@@ -69,7 +67,7 @@ export function Landing({ mode = 'signin', path = '/' }) {
         /* The list is drawn twice, so moving it by half its width loops without a jump. */
         @keyframes landing-ticker { from { transform: translateX(0); } to { transform: translateX(calc(-50% - 6px)); } }
         @media (prefers-reduced-motion: reduce) { .landing-ticker { -webkit-mask-image: none; mask-image: none; } .landing-ticker-track { animation: none; width: auto; flex-wrap: wrap; } .landing-ticker-item:nth-child(n + ${FEATURES.length + 1}) { display: none; } }
-        @media (max-width: 860px) { .landing { grid-template-columns: 1fr; gap: 32px; min-height: 0; } .landing-title { font-size: 44px !important; } .landing-tagline { font-size: 17px; } .landing-ticker { margin-top: 24px; } }
+        @media (max-width: 860px) { .landing { grid-template-columns: 1fr; gap: 32px; min-height: 0; } .landing-title { font-size: clamp(34px, 10vw, 44px) !important; } .landing-ticker { margin-top: 24px; } }
       `}</style>
     </PublicPage>
   );

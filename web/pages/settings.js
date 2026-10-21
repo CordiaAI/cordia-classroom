@@ -16,6 +16,7 @@ import CanvasSettings from '../components/CanvasSettings';
 import SharingSettings from '../components/SharingSettings';
 import PhoneSettings from '../components/PhoneSettings';
 import LearnCordia from '../components/LearnCordia';
+import ConnectorsSettings from '../components/ConnectorsSettings';
 import useScrollerTabs from '../lib/useScrollerTabs';
 import { canvasStatus } from '../lib/canvas';
 
@@ -28,13 +29,13 @@ export default function SettingsPage() {
 
   // /settings?section=study opens a tab directly. Old links land on the tab that now
   // holds them; the grove moved to Progress.
-  const SECTION_ALIASES = { subscription: 'plan', profile: 'account', learning: 'study', canvas: 'connections' };
+  const SECTION_ALIASES = { subscription: 'plan', profile: 'account', learning: 'study', canvas: 'connectors', connections: 'connectors' };
   useEffect(() => {
     if (!router.isReady || !router.query.section) return;
     const section = String(router.query.section);
     if (section === 'grove') { router.replace('/progress'); return; }
     const key = SECTION_ALIASES[section] || section;
-    setActiveSection(['account', 'study', 'appearance', 'plan', 'connections', 'learn'].includes(key) ? key : 'account');
+    setActiveSection(['account', 'study', 'appearance', 'plan', 'connectors', 'learn'].includes(key) ? key : 'account');
   }, [router.isReady, router.query.section]);
 
   // Picking a tab updates the address, so Back and shared links land on it.
@@ -197,7 +198,7 @@ export default function SettingsPage() {
     { key: 'study', label: 'Study' },
     { key: 'appearance', label: 'Appearance' },
     { key: 'plan', label: 'Plan & billing' },
-    { key: 'connections', label: 'Connections' },
+    { key: 'connectors', label: 'Connectors' },
     { key: 'learn', label: 'Learn Cordia' },
   ];
   const initials = (profileName || email.split('@')[0] || '').split(/[\s._-]+/).filter(part => /^[a-z]/i.test(part)).slice(0, 2).map(part => part[0]).join('').toUpperCase();
@@ -333,8 +334,9 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {activeSection === 'connections' && (
-          <div className="profile-section c-stack" role="tabpanel" id="panel-connections" aria-labelledby="tab-connections">
+        {activeSection === 'connectors' && (
+          <div className="profile-section c-stack" role="tabpanel" id="panel-connectors" aria-labelledby="tab-connectors">
+            <ConnectorsSettings />
             {canvasReady && <CanvasSettings school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} />}
             {/* Canvas settings already offer the calendar link; without them, link to it here. */}
             {!canvasReady && (

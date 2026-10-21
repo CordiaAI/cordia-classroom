@@ -59,9 +59,8 @@ assert.match(authCard, /supabaseAuth\(\)\.signInWithOAuth/);
 assert.match(authCard, /var\(--google-blue\)/);
 assert.match(publicPage, /classroom-clouds\.webp/);
 assert.match(authCard, /Continue with Google/);
-assert.match(login, /<h1 className="landing-title">Classroom<\/h1>/);
+assert.match(login, /<h1 className="landing-title">CordiaClassroom<\/h1>/);
 assert.match(login, /Tutor reminds you through phone messages/);
-assert.match(login, /Your space to learn\./);
 // Raw provider errors never reach the student.
 assert.match(authCard, /export function authMessage/);
 assert.doesNotMatch(authCard, /setError\(authError\?\.message/);

@@ -175,3 +175,28 @@ body { touch-action: manipulation; }
 .tutor-chat-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.4 var(--font-sans); }
 .tutor-chat-row .c-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tutor-chats-btn[aria-pressed='true'] { background: var(--olive-tint) !important; color: var(--olive-ink) !important; }
+
+/* Settings › Connectors: one list like Cordia Assistant's Apps. */
+.cn-card { display: grid; gap: 12px; padding: 20px; }
+.cn-card > .c-section-title, .cn-card > .c-meta { margin: 0; }
+.cn-list { margin: 0 -20px; }
+.cn-row { flex-wrap: wrap; padding-left: 20px; padding-right: 20px; }
+.cn-row:hover { background: transparent; }
+.cn-text { display: grid; gap: 2px; }
+.cn-row-title { font: 600 17px/1.35 var(--font-sans); color: var(--ink); }
+.cn-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-left: auto; }
+.cn-feed { display: grid; gap: 8px; padding: 0 20px 14px 52px; }
+.cn-feed .c-meta { margin: 0; }
+.cn-feed-row { display: flex; gap: 8px; }
+.cn-feed-row .c-input { flex: 1 1 auto; min-width: 0; }
+.cn-notice { margin: 0; color: var(--olive-ink); font: 600 15px/1.4 var(--font-sans); }
+.cn-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+.cn-sheet { width: min(560px, 100%); display: grid; gap: 14px; max-height: min(640px, 90svh); overflow: hidden; grid-template-rows: auto auto minmax(0, 1fr) auto auto; }
+.cn-sheet .c-sheet-head { margin-bottom: 0; }
+.cn-search { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+.cn-search .c-input { flex: 1 1 auto; min-width: 0; }
+.cn-results { overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--hairline); border-radius: var(--r-row); }
+.cn-result { width: 100%; border-left: 0; border-right: 0; border-bottom: 0; background: transparent; text-align: left; font: inherit; cursor: pointer; }
+.cn-result .c-grow { display: grid; gap: 2px; }
+.cn-sheet > .c-meta { margin: 0; }
+@media (max-width: 560px) { .cn-actions { width: 100%; justify-content: flex-start; padding-left: 32px; } .cn-feed { padding-left: 20px; } }
