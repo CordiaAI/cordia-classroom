@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowRight } from 'lucide-react';
-import { getToken } from '../lib/api';
+import { clearAuth, getToken, tryRefreshToken } from '../lib/api';
+import { rememberReturnTo, takeReturnTo } from '../lib/returnTo.mjs';
 import PublicPage from '../components/PublicPage';
 import AuthCard from '../components/AuthCard';
 
@@ -10,7 +9,18 @@ import AuthCard from '../components/AuthCard';
 export function Landing({ mode = 'signin', path = '/' }) {
   const router = useRouter();
   useEffect(() => {
-    if (getToken()) router.push('/dashboard');
+    const back = rememberReturnTo(new URLSearchParams(window.location.search).get('next'));
+    if (!getToken()) return;
+    if (!back) {
+      router.push('/dashboard');
+      return;
+    }
+    // The Assistant sends students here when their token has expired: renew it and go back,
+    // or sign in again if it can't be renewed.
+    tryRefreshToken().then(ok => {
+      if (ok) window.location.assign(takeReturnTo() || back);
+      else clearAuth();
+    });
   }, []);
 
   return (
@@ -24,7 +34,6 @@ export function Landing({ mode = 'signin', path = '/' }) {
         <section className="landing-hero">
           <div className="landing-brand-name" aria-hidden="true">Cordia<br />Classroom</div>
           <h1 className="landing-title">Your space to learn.</h1>
-          {path === '/' && <Link href="/signup" className="landing-cta">Get started<ArrowRight size={20} strokeWidth={1.75} aria-hidden="true" /></Link>}
         </section>
         <AuthCard mode={mode} linkModes={path !== '/'} key={mode} />
       </div>
@@ -32,8 +41,7 @@ export function Landing({ mode = 'signin', path = '/' }) {
         .landing { display: grid; grid-template-columns: minmax(0, 1fr) 400px; align-items: center; gap: 48px; min-height: calc(100vh - 64px - 128px); }
         .landing-brand-name { font:600 20px/1.15 var(--font-display); color: var(--olive-ink); margin-bottom: 20px; }
         .landing-title { margin: 0; font:600 40px/1.15 var(--font-display); letter-spacing:-0.015em; color: var(--ink); }
-        .landing-hero :global(.landing-cta) { display: inline-flex; align-items: center; gap: 8px; height: 48px; margin-top: 32px; padding: 0 24px; border-radius:999px; background: var(--olive); color: var(--on-olive); font:600 15px/1 var(--font-sans); text-decoration: none; }
-        @media (max-width: 860px) { .landing { grid-template-columns: 1fr; gap: 32px; min-height: 0; } .landing-hero :global(.landing-cta) { display: none; } }
+        @media (max-width: 860px) { .landing { grid-template-columns: 1fr; gap: 32px; min-height: 0; } }
       `}</style>
     </PublicPage>
   );

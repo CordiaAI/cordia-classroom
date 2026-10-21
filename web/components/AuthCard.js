@@ -5,6 +5,7 @@ import { Check, Eye, EyeOff, Smartphone, X } from 'lucide-react';
 import { setToken, scheduleProactiveRefresh } from '../lib/api';
 import { supabaseAuth } from '../lib/supabase';
 import { formatPhone, normalizePhone } from '../lib/phone.mjs';
+import { takeReturnTo } from '../lib/returnTo.mjs';
 
 export function GoogleLogo() {
   return (
@@ -65,7 +66,9 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
   function finishSession(session) {
     setToken(session.access_token, session.user?.email, session.refresh_token, session.user?.user_metadata?.name);
     scheduleProactiveRefresh();
-    router.push('/dashboard');
+    const back = takeReturnTo();
+    if (back) window.location.assign(back);
+    else router.push('/dashboard');
   }
 
   function switchMode(next) {
