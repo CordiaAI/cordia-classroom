@@ -450,7 +450,7 @@ export default function GuidePage() {
         .guide-notes ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
         .guide-notes .guide-sub { margin-top: 6px; gap: 4px; list-style: circle; color: var(--muted-ink); }
         .guide-notes :global(strong) { font-weight: 600; color: var(--ink); }
-        .guide-overview { margin: 0; padding-bottom: 24px; border-bottom: 1px solid var(--line); font: 400 var(--fs-20)/1.5 var(--font-display); color: var(--ink); }
+        .guide-overview { margin: 0; padding-bottom: 24px; border-bottom: 1px solid var(--line); font: 400 var(--fs-20)/1.5 var(--font-sans); color: var(--ink); }
         .guide-outline-num { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 10px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 var(--fs-13)/1 var(--font-sans); vertical-align: 3px; }
         .guide-key { display: grid; gap: 16px; padding: 24px 28px; border-radius: 16px; background: var(--olive-tint); }
         @media (max-width: 767px) {

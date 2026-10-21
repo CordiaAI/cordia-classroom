@@ -129,7 +129,7 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
         .reader-paper { padding: 40px 48px; min-width: 0; display: grid; justify-items: center; scroll-margin-top: calc(var(--bar-h) + 16px); }
         .reader-block { width: 100%; max-width: 68ch; padding: 8px 0 28px; }
         .reader-block + .reader-block { border-top: 1px solid var(--line); padding-top: 28px; }
-        .reader-q { display: flex; gap: 12px; align-items: baseline; margin: 0 0 12px; font:600 20px/1.15 var(--font-display); letter-spacing:0; }
+        .reader-q { display: flex; gap: 12px; align-items: baseline; margin: 0 0 12px; font:600 20px/1.15 var(--font-sans); letter-spacing:0; }
         .reader-a { margin: 0; white-space: pre-wrap; }
         .reader-img { display: block; max-width: 100%; margin-top: 16px; border-radius:var(--r-input); }
         .reader-actions { display: flex; gap: 4px; margin: 16px 0 0 -12px; }

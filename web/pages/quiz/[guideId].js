@@ -164,7 +164,7 @@ export default function QuizPage() {
       <style jsx>{`
         .quiz-page { width: min(var(--page-max), 100%); margin: 0 auto; }
         .quiz-page :global(.quiz-question-card) { width: min(720px, 100%); justify-self: center; }
-        .quiz-guide { margin: -12px 0 0; font-family: var(--font-display); }
+        .quiz-guide { margin: -12px 0 0; font-family: var(--font-sans); }
         .quiz-switch { justify-self: start; }
         .quiz-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .quiz-mode { position: relative; display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 120px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow); }

@@ -195,7 +195,7 @@ export default function ClassPage() {
         .cls-needs-code { display: grid; gap: 12px; padding: 20px; justify-items: start; }
         .cls-needs-code :global(.cls-add) { width: 100%; box-shadow: none; padding: 0; background: none; border: 0; }
         :global(.folder-row-link) { display: flex; align-items: baseline; gap: 12px; min-width: 0; color: var(--ink); text-decoration: none; }
-        .folder-row-title { font:600 17px/1.15 var(--font-display); min-width: 0; }
+        .folder-row-title { font:600 17px/1.15 var(--font-sans); min-width: 0; }
         @media (max-width: 767px) { :global(.folder-row-link) { flex-direction: column; gap: 2px; } }
       `}</style>
     </div>
