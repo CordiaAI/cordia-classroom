@@ -129,7 +129,9 @@ def _claude(client, feature: str, model: str, limit: int, *, messages: list, res
         model=model,
         max_tokens=limit + CLAUDE_HEADROOM.get(role, 4000),
         output_config={"effort": models.CLAUDE_EFFORT.get(role, "medium")},
-        system=system or None,
+        # As text blocks: the API answered a plain-string system prompt with
+        # "system: Input should be a valid array". With no system prompt, none is sent.
+        **({"system": [{"type": "text", "text": system}]} if system else {}),
         messages=turns,
         **({"timeout": timeout} if timeout else {}),
     ) as stream:
