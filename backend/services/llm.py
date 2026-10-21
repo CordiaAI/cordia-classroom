@@ -1364,3 +1364,48 @@ def edit_outline(outline: str, request: str, material: str = "") -> dict:
         return {}
     return {"notes": notes[:60000], "summary": str(parsed.get("summary") or "").strip()[:300]}
 
+
+
+APP_ACTION_RULES = (
+    "You turn a student's request in a study app into one app action. Reply with only a JSON object.\n"
+    "Actions:\n"
+    '{"action":"open","guide_id":ID,"tab":"outline|flashcards|quiz|practice"} open a guide (tab optional)\n'
+    '{"action":"open","class_id":ID} open a class\n'
+    '{"action":"open","page":"dashboard|library|calendar|progress|settings|canvas|assistant"} open a page\n'
+    '{"action":"move","guide_id":ID,"class_id":ID or null} put a guide in a class (null takes it out of its class)\n'
+    '{"action":"rename_guide","guide_id":ID,"title":TEXT}\n'
+    '{"action":"create_class","name":TEXT}\n'
+    '{"action":"rename_class","class_id":ID,"name":TEXT}\n'
+    '{"action":"delete_guide","guide_id":ID}\n'
+    '{"action":"new_note","title":TEXT,"class_id":ID or null} a blank notes page\n'
+    '{"action":"make","guide_id":ID,"kind":"guide|practice"} build a new study guide or practice set from a guide\n'
+    '{"action":"none"} anything else: a question about the material, or a change inside a guide\'s outline\n'
+    "Use only IDs from the lists. \"This\", \"it\" or \"this guide\" means the CURRENT guide. "
+    "Match names loosely (course codes, short names, typos). If the request names something that is "
+    'not in the lists, reply {"action":"missing","name":TEXT}.'
+)
+
+
+def plan_app_action(request: str, current: Optional[dict], guides: list, classes: list) -> dict:
+    """The app action a Tutor request asks for (see APP_ACTION_RULES), or {} when it is not one."""
+    class_names = {item["id"]: item.get("name") or "" for item in classes}
+    guide_lines = "\n".join(
+        f"{item['id']} | {item.get('title') or 'Untitled'}" + (f" | class: {class_names.get(item.get('folder_id'), '')}" if item.get("folder_id") else "")
+        for item in guides
+    )
+    class_lines = "\n".join(f"{item['id']} | {item.get('name') or 'Untitled class'}" for item in classes)
+    response = chat(get_openai_client(), "tutor_action",
+        messages=[
+            {"role": "system", "content": APP_ACTION_RULES},
+            {"role": "user", "content": (
+                f"REQUEST:\n{request[:2000]}\n\nCURRENT GUIDE: {(current or {}).get('id') or 'none'}"
+                f"\n\nGUIDES:\n{guide_lines or '(none)'}\n\nCLASSES:\n{class_lines or '(none)'}"
+            )},
+        ],
+        response_format={"type": "json_object"},
+    )
+    try:
+        parsed = _loads_model_json(response.choices[0].message.content or "{}")
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}

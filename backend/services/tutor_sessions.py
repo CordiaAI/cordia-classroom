@@ -466,8 +466,9 @@ def complete_tutor_turn(user_id: str, turn: dict, response: dict):
     assistant_message = {"role": "ai", "text": response.get("answer") or ""}
     if response.get("source"):
         assistant_message["source"] = response["source"]
-    if response.get("guide"):
-        assistant_message["guide"] = response["guide"]
+    for key in ("guide", "link", "confirm"):
+        if response.get(key):
+            assistant_message[key] = response[key]
     messages.append(assistant_message)
     next_version = (turn.get("conversation_version") or 0) + 1
     action_result = {

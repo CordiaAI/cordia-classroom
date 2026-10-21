@@ -83,16 +83,6 @@ ALLOWED_ORIGIN_REGEX = (
     r"|https://cordia-classroom(-[a-z0-9-]+-(itzjlaughs-projects|cordia-ai))?\.vercel\.app"
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
-    expose_headers=["X-Request-ID"],
-    max_age=600,
-)
 # Guide text compresses several-fold; small responses are left alone.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
@@ -148,6 +138,21 @@ async def add_security_headers(request: Request, call_next):
     if os.getenv("ENVIRONMENT") == "production":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
+
+
+# Added last so it is the outermost layer: the 500 and 413 replies made by the middleware above
+# carry CORS headers too. Without them the browser hides the error and the app only sees a
+# failed request (a guide that "took too long" the moment it failed).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+    expose_headers=["X-Request-ID"],
+    max_age=600,
+)
 
 
 # Include Supabase-backed routers

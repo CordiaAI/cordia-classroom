@@ -10,6 +10,9 @@ import { walkthroughEvent } from '../lib/walkthrough';
 import { drawLatestSegment, drawStroke, farEnough, finishStroke } from '../lib/airDraw.mjs';
 import AirDraw from './AirDraw';
 
+// Drawing in the air with the webcam is off on the live site until it tracks well enough.
+const WEBCAM_DRAWING = false;
+
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const SYMBOLS = ['+', '−', '×', '÷', '=', '√', 'π', 'Σ', '→'];
 const drawingsKey = guideId => `practiceDrawings:${guideId}`;
@@ -593,9 +596,11 @@ export default function PracticeWorkspace() {
             <button type="button" className="c-btn c-btn--quiet" onClick={tidyHandwriting} disabled={tidying || !current}><Wand2 {...ICON} />{tidying ? 'Reading…' : 'Tidy'}</button>
             <button type="button" className="c-icon-btn" onClick={clearWork} aria-label="Clear work"><Trash2 {...ICON} /></button>
             <div className="practice-drawbar" role="group" aria-label="Drawing">
+            {WEBCAM_DRAWING && (
             <button type="button" className={'c-btn c-btn--sm practice-webcam ' + (handOn ? 'c-btn--primary' : 'c-btn--secondary')} aria-pressed={handOn} onClick={toggleHand}>
               <Hand {...ICON} />{handOn ? 'Stop webcam drawing' : 'Draw with webcam'}
             </button>
+            )}
             {handOn && (
               <button type="button" className="c-icon-btn" aria-pressed={showCamera} onClick={() => setShowCamera(value => !value)} aria-label={showCamera ? 'Hide camera preview' : 'Show camera preview'}>
                 {showCamera ? <Video {...ICON} /> : <VideoOff {...ICON} />}

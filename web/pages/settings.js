@@ -9,7 +9,7 @@ import { EXTENSION_STORE_URL } from '../lib/extension';
 import { FEATURE_COPY, FREE_SUMMARY, METERED, PRICES, PRO_BENEFITS, PRO_LIMITS, resetLabel } from '../lib/plans';
 import LearningStylePicker from '../components/LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
-import ExplanationPreference from '../components/ExplanationPreference';
+import TutorSettings from '../components/TutorSettings';
 import { Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2 } from 'lucide-react';
 import BodyPortal from '../components/BodyPortal';
 import SharingSettings from '../components/SharingSettings';
@@ -36,7 +36,7 @@ export default function SettingsPage() {
     // The Assistant moved to its own page; its app still links here when an app connects.
     if (section === 'assistant') { const { section: _s, ...rest } = router.query; router.replace({ pathname: '/assistant', query: rest }); return; }
     const key = SECTION_ALIASES[section] || section;
-    setActiveSection(['account', 'study', 'appearance', 'plan', 'connectors', 'learn'].includes(key) ? key : 'account');
+    setActiveSection(['account', 'study', 'tutor', 'appearance', 'plan', 'connectors', 'learn'].includes(key) ? key : 'account');
   }, [router.isReady, router.query.section]);
 
   // Picking a tab updates the address, so Back and shared links land on it.
@@ -67,6 +67,9 @@ export default function SettingsPage() {
 
   // Study style
   const { learningStyle, saveStyle } = useLearningStyle();
+  useEffect(() => {
+    if (activeSection === 'study' && learningStyle?.enabled === false) setActiveSection('tutor');
+  }, [activeSection, learningStyle?.enabled]);
   const [savingStyle, setSavingStyle] = useState(false);
 
   async function chooseStyle(style) {
@@ -196,7 +199,9 @@ export default function SettingsPage() {
 
   const sections = [
     { key: 'account', label: 'Account' },
-    { key: 'study', label: 'Study' },
+    // Study only holds the Explain view picker now; without it, Tutor is where explaining is set.
+    ...(learningStyle?.enabled === false ? [] : [{ key: 'study', label: 'Study' }]),
+    { key: 'tutor', label: 'Tutor' },
     { key: 'appearance', label: 'Appearance' },
     { key: 'plan', label: 'Plan & billing' },
     { key: 'connectors', label: 'Connectors' },
@@ -360,9 +365,14 @@ export default function SettingsPage() {
           </div>
         )}
 
+        {activeSection === 'tutor' && (
+          <div className="profile-section c-stack" role="tabpanel" id="panel-tutor" aria-labelledby="tab-tutor">
+            <TutorSettings />
+          </div>
+        )}
+
         {activeSection === 'study' && (
           <div className="profile-section c-stack" role="tabpanel" id="panel-study" aria-labelledby="tab-study">
-            <div className="c-card settings-card"><ExplanationPreference /></div>
             {learningStyle?.enabled && (
               <div className="c-card settings-card">
                 <h2 className="c-section-title">Explain things to me with…</h2>

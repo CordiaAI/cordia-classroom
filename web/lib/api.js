@@ -231,7 +231,9 @@ export async function authorizedFetch(path, options = {}) {
   return response;
 }
 
-export async function apiFetch(path, options = {}) {
+// Returns the response JSON, or null when the request failed. With `reportFailure`, a failed
+// request returns { detail, failed: 'timeout' | 'network' } instead, so the caller can say which.
+export async function apiFetch(path, { reportFailure = false, ...options } = {}) {
   if (typeof window === 'undefined' || !getToken()) return null;
   try {
     let resp = await fetchWithTimeout(API + path, {
@@ -259,6 +261,9 @@ export async function apiFetch(path, options = {}) {
     return data;
   } catch (e) {
     console.error('API fetch error:', path, e);
-    return null;
+    if (!reportFailure) return null;
+    return e?.name === 'AbortError'
+      ? { failed: 'timeout', detail: 'Classroom took too long to answer.' }
+      : { failed: 'network', detail: "Couldn't reach Classroom. Check your connection and try again." };
   }
 }

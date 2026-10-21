@@ -87,6 +87,75 @@ class TutorContractTests(unittest.TestCase):
         table.update.assert_called_once_with({"notes": "## Tools\n- GitHub stores the files"})
         self.assertEqual(edit.call_args.args[0], "## Tools\n- GihHub stores the files")
 
+    def test_app_requests_are_told_apart_from_questions(self):
+        from routers.chat import _asks_for_app_action
+        for request in ["Open my BUS 101 class", "take me to the calendar", "put this guide in Biology",
+                        "rename this guide to Week 3", "make a class called Art History", "delete the Lecture 10/19 guide"]:
+            self.assertTrue(_asks_for_app_action(request), request)
+        for question in ["What is an open market?", "Explain this guide", "Fix the spelling of GihHub", "why did Rome fall"]:
+            self.assertFalse(_asks_for_app_action(question), question)
+
+    def app_db(self, guides, classes):
+        table = MagicMock()
+        for name in ("select", "eq", "order", "limit"):
+            getattr(table, name).return_value = table
+        table.execute.side_effect = [MagicMock(data=guides), MagicMock(data=classes)]
+        db = MagicMock()
+        db.table.return_value = table
+        return db
+
+    @patch("routers.chat.get_user_id", return_value="student-1")
+    def test_tutor_opens_a_class_by_name(self, _auth):
+        class_id = "77777777-7777-4777-8777-777777777777"
+        db = self.app_db([], [{"id": class_id, "name": "BUS 101"}])
+        with patch("routers.chat.get_supabase", return_value=db), \
+             patch("routers.chat.plan_app_action", return_value={"action": "open", "class_id": class_id}) as plan:
+            response = self.client.post("/chat", headers={"Authorization": "Bearer test"},
+                                        json={"question": "Open my bus 101 class", "content": ""})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["action"], "navigate")
+        self.assertEqual(body["link"], {"href": f"/folder/{class_id}", "label": "BUS 101"})
+        self.assertEqual(plan.call_args.args[3], [{"id": class_id, "name": "BUS 101"}])
+
+    @patch("routers.chat.get_user_id", return_value="student-1")
+    def test_tutor_moves_a_guide_into_a_class(self, _auth):
+        class_id = "77777777-7777-4777-8777-777777777777"
+        db = self.app_db([{"id": self.guide_id, "title": "Lecture 10/19", "folder_id": None}], [{"id": class_id, "name": "BUS 101"}])
+        with patch("routers.chat.get_supabase", return_value=db), \
+             patch("routers.chat.plan_app_action", return_value={"action": "move", "guide_id": self.guide_id, "class_id": class_id}), \
+             patch("routers.guides.move_guide", return_value={"updated": True}) as move:
+            response = self.client.post("/chat", headers={"Authorization": "Bearer test"},
+                                        json={"question": "Put Lecture 10/19 in BUS 101", "content": ""})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["answer"], "Moved Lecture 10/19 to BUS 101.")
+        self.assertEqual(move.call_args.args[0], self.guide_id)
+        self.assertEqual(move.call_args.args[1].folder_id, class_id)
+
+    @patch("routers.chat.get_user_id", return_value="student-1")
+    def test_tutor_never_acts_on_guides_the_student_does_not_own(self, _auth):
+        db = self.app_db([], [])
+        with patch("routers.chat.get_supabase", return_value=db), \
+             patch("routers.chat.plan_app_action", return_value={"action": "delete_guide", "guide_id": self.guide_id}), \
+             patch("routers.guides.delete_guide") as delete:
+            response = self.client.post("/chat", headers={"Authorization": "Bearer test"},
+                                        json={"question": "delete the biology guide", "content": ""})
+        self.assertEqual(response.json()["action"], "not_found")
+        delete.assert_not_called()
+
+    @patch("routers.chat.get_user_id", return_value="student-1")
+    def test_deleting_a_guide_asks_to_confirm(self, _auth):
+        db = self.app_db([{"id": self.guide_id, "title": "Biology", "folder_id": None}], [])
+        with patch("routers.chat.get_supabase", return_value=db), \
+             patch("routers.chat.plan_app_action", return_value={"action": "delete_guide", "guide_id": self.guide_id}), \
+             patch("routers.guides.delete_guide") as delete:
+            response = self.client.post("/chat", headers={"Authorization": "Bearer test"},
+                                        json={"question": "delete the biology guide", "content": ""})
+        body = response.json()
+        self.assertEqual(body["action"], "confirm_delete")
+        self.assertEqual(body["confirm"], {"kind": "delete_guide", "guide_id": self.guide_id, "title": "Biology"})
+        delete.assert_not_called()
+
     @patch("routers.chat.learning_guidance", return_value="")
     @patch("routers.chat.record")
     @patch("routers.chat.require", return_value={"used": 0})

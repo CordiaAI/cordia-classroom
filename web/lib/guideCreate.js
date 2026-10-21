@@ -40,8 +40,13 @@ export async function generateAndSave({ source, requestId, title, sourceTitle, s
     body: JSON.stringify({ content: source, notes, study_guide: true, flashcards, request_id: requestId }),
     // A long document can take a few minutes to write; the request_id keeps a retry free.
     timeoutMs: GUIDE_TIMEOUT_MS,
+    reportFailure: true,
   });
-  if (!generated) throw new Error('The guide took too long to come back. Try again; you will not be charged twice.');
+  if (!generated || generated.failed) {
+    throw new Error(generated?.failed === 'timeout'
+      ? 'The guide took too long to come back. Try again; you will not be charged twice.'
+      : "Couldn't reach Classroom while building the guide. Try again; you will not be charged twice.");
+  }
   if (generated.detail) {
     const detail = typeof generated.detail === 'string' ? generated.detail : generated.detail.message;
     const error = new Error(detail || 'Study guide generation failed.');
