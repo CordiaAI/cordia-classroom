@@ -2,6 +2,7 @@ import PublicPage from '../components/PublicPage';
 import { Puzzle } from 'lucide-react';
 import AcademicInfinityMark from '../components/AcademicInfinityMark';
 import { EXTENSION_STORE_URL } from '../lib/extension';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 export default function InstallExtensionPage() {
   return (
@@ -22,7 +23,7 @@ export default function InstallExtensionPage() {
           <div>
             <h2>Download it from the Chrome Web Store</h2>
             <p>Open the listing, then select <strong>Add to Chrome</strong>.</p>
-            <a className="extension-install-store-link" href={EXTENSION_STORE_URL} target="_blank" rel="noreferrer">
+            <a className="extension-install-store-link" onClick={() => walkthroughEvent('extension-opened')} href={EXTENSION_STORE_URL} target="_blank" rel="noreferrer">
               Open CordiaClassroom in Chrome Web Store <span aria-hidden="true">↗</span>
             </a>
           </div>

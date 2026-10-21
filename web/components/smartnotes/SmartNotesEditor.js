@@ -439,6 +439,7 @@ export default function SmartNotesEditor() {
     const anchor = visualAnchor.current && paper.contains(visualAnchor.current) ? visualAnchor.current : paper.lastChild;
     if (anchor) anchor.parentNode.insertBefore(img, anchor.nextSibling);
     else paper.appendChild(img);
+    walkthroughEvent('visual-added');
     setHasText(true);
     scheduleSave();
   }
@@ -681,7 +682,7 @@ export default function SmartNotesEditor() {
         <div className="sn-diagram-wrap">
           <div className="sn-diagram-toolbar">
             <span className="sn-panel-label">Visual</span>
-            <button type="button" className="c-btn c-btn--secondary c-btn--sm sn-visualize-btn" onMouseDown={event => event.preventDefault()} onClick={makeVisual}>
+            <button type="button" className="c-btn c-btn--secondary c-btn--sm sn-visualize-btn" data-spot="make-visual" onMouseDown={event => event.preventDefault()} onClick={makeVisual}>
               <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />Make visual
             </button>
           </div>

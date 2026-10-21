@@ -125,7 +125,7 @@ export default function QuizPage() {
         <>
           <div className="c-seg quiz-switch" role="tablist" aria-label="Mode">
             <button type="button" role="tab" aria-selected={!race} className={!race ? 'is-active' : ''} onClick={() => setRace(false)}>Quiz</button>
-            <button type="button" role="tab" aria-selected={race} className={race ? 'is-active' : ''} onClick={() => setRace(true)}>Match</button>
+            <button type="button" role="tab" aria-selected={race} className={race ? 'is-active' : ''} data-spot="match-tab" onClick={() => { setRace(true); walkthroughEvent('match-opened'); }}>Match</button>
           </div>
           {!race && <div className="quiz-modes" role="group" aria-label="Question types">
             {Object.keys(TYPE_LABELS).map(type => {

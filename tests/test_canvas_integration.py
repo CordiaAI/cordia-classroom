@@ -49,6 +49,7 @@ class FakeCanvas:
     def __init__(self):
         self.calls = []
         self.unauthorized = False
+        self.files_denied_401 = False
 
     def mount(self, prefix, adapter):  # the client pins its session to the checked address
         self.mounted = (prefix, adapter)
@@ -70,7 +71,9 @@ class FakeCanvas:
             if path == base:
                 return FakeResponse(200, {**course, "syllabus_body": "<p>Leadership, motivation and organizational design. Grading: 40% exams.</p>"})
             if path == base + "/modules":
-                return FakeResponse(200, [{"name": "Week 1: Planning", "items": [{"title": "Strategy basics"}]}])
+                return FakeResponse(200, [{"name": "Week 1: Planning", "items": [{"title": "Strategy basics"}, {"title": "Week 1 slides", "type": "File", "content_id": 77}]}])
+            if path == base + "/files" and self.files_denied_401:
+                return FakeResponse(401, {"status": "unauthorized", "errors": [{"message": "user not authorized to perform that action"}]})
             if path == base + "/assignments":
                 return FakeResponse(200, [
                     {"id": course["id"] * 10, "name": "Case study", "due_at": "2026-11-01T05:00:00Z", "points_possible": 10,
@@ -175,6 +178,17 @@ class CanvasIntegrationTests(unittest.TestCase):
             self.assertEqual(self.db.rows(table), [], table)
 
         self.assertNotIn(TOKEN, self.log_stream.getvalue())
+
+    def test_hidden_files_page_lists_module_files_and_keeps_the_connection(self):
+        self.connect()
+        course = COURSES[0]["id"]
+        canvas.set_import(course, canvas.ImportRequest(imported=True), "Bearer x")
+        # The Files page is hidden (Canvas answers 404): the files linked from Modules are listed.
+        self.assertEqual(canvas.list_files(course, "Bearer x")["files"], [{"id": 77, "name": "Week 1 slides", "size": None, "type": None}])
+        # A 401 "not authorized to perform that action" is a hidden page, not a bad token.
+        self.canvas.files_denied_401 = True
+        self.assertEqual(len(canvas.list_files(course, "Bearer x")["files"]), 1)
+        self.assertTrue(self.db.rows("canvas_tokens"))
 
     def test_school_that_disallows_tokens_is_refused(self):
         with self.assertRaises(HTTPException) as caught:

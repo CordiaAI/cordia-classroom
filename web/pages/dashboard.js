@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Brain, ChevronRight, Flame, Layers, NotebookPen, PencilRuler, Snowflake, Timer } from 'lucide-react';
+import { ChevronRight, Flame, Snowflake, Timer } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
@@ -163,20 +163,6 @@ export default function Today() {
         </section>
       )}
 
-      <nav className="today-tools" aria-label="Study tools">
-        {[
-          { label: 'Quiz', icon: Brain, href: continueGuide ? `/quiz/${continueGuide.id}` : '/library' },
-          { label: 'Cards', icon: Layers, href: '/library?filter=flashcards', tip: 'cards' },
-          { label: 'Practice', icon: PencilRuler, href: '/practice', spot: 'tool-practice' },
-          { label: 'Notes', icon: NotebookPen, href: '/library?filter=notes' },
-        ].map(tool => (
-          <Link key={tool.label} href={tool.href} className="c-card today-tool" data-tip={tool.tip} data-spot={tool.spot}>
-            <tool.icon size={28} strokeWidth={1.75} aria-hidden="true" />
-            <span>{tool.label}</span>
-          </Link>
-        ))}
-      </nav>
-
       <section className="c-section" aria-labelledby="due-title">
         <div className="c-row">
           <h2 id="due-title" className="c-section-title">Due soon</h2>
@@ -215,17 +201,13 @@ export default function Today() {
         <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
       </Link>
 
-      {firstWeek && (dayOneFinished(progress) || !progress.wt) ? <LearnCordia hideWhenComplete /> : null}
+      {firstWeek && (dayOneFinished(progress) || !progress.wt) ? <LearnCordia hideWhenComplete compact /> : null}
 
       <style jsx>{`
         .today-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
         .today-none { margin: 0; }
         :global(.today-continue) { display: flex; align-items: center; gap: 16px; padding: 14px 18px; color: var(--ink); text-decoration: none; }
         :global(.today-continue:hover), :global(.today-progress:hover) { text-decoration: none; border-color: var(--olive); }
-        .today-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-        :global(.today-tool) { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 112px; color: var(--ink); text-decoration: none; font:600 15px/1 var(--font-sans); }
-        :global(.today-tool:hover) { text-decoration: none; }
-        :global(.today-tool .lucide) { color: var(--olive-ink); }
         .today-due { gap: 14px; }
         .today-due-link { color: var(--ink); text-decoration: none; }
         .today-due.is-done .today-due-link { color: var(--muted); text-decoration: line-through; }
@@ -235,7 +217,6 @@ export default function Today() {
         .today-stat :global(.today-freeze) { color: var(--olive-ink); }
         @media (max-width: 767px) {
               :global(.today-progress) { gap: 14px; }
-          .today-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .today-progress-more { display: none; }
         }
       `}</style>

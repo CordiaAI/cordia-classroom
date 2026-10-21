@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Check, ClipboardPaste, FileImage, FileText, Link as LinkIcon, Mic, Presentation, Sparkles, Upload, X,
+  ArrowLeft, Brain, Check, ClipboardPaste, FileImage, FileText, Layers, Link as LinkIcon, Mic, NotebookPen, PencilRuler, Presentation, Sparkles, Upload, X,
 } from 'lucide-react';
 import { apiFetch, authHeaders } from '../lib/api';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
@@ -11,6 +11,7 @@ import { MAX_SOURCE_CHARS, baseName, combinedSource, extractFileText, fileKey, g
 import { NEW_SHEET_EVENT } from '../lib/newSheet';
 import { SAMPLE_GUIDE, SAMPLE_HEADINGS } from '../lib/sampleGuide';
 import { walkthroughEvent } from '../lib/walkthrough';
+import { lastGuide } from '../lib/userStore';
 import LectureRecorder from './LectureRecorder';
 import CordiaLoader from './CordiaLoader';
 import { heuristicTitle, sensibleTitle } from '../lib/noteMeta.mjs';
@@ -52,6 +53,38 @@ const FORMATS = [
   { label: 'PPTX', icon: Presentation },
   { label: 'Image', icon: FileImage },
 ];
+
+// Study tools made from what's already in Classroom: a quiz on the last guide, cards, practice, a note.
+function MakeOptions({ onGo }) {
+  const guide = lastGuide();
+  const items = [
+    { label: 'Quiz', icon: Brain, href: guide ? `/quiz/${guide.id}` : '/library' },
+    { label: 'Flashcards', icon: Layers, href: '/create' },
+    { label: 'Practice', icon: PencilRuler, href: '/practice' },
+    { label: 'Note', icon: NotebookPen, href: '/smartnotes?id=new', event: 'note-created' },
+  ];
+  return (
+    <section className="new-make" aria-labelledby="new-make-title">
+      <h3 id="new-make-title" className="c-meta new-make-title">Or make a new</h3>
+      <div className="new-make-row">
+        {items.map(item => (
+          <button key={item.label} type="button" className="new-make-btn" onClick={() => { if (item.event) walkthroughEvent(item.event); onGo(item.href); }}>
+            <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />{item.label}
+          </button>
+        ))}
+      </div>
+      <style jsx>{`
+        .new-make { display: grid; gap: 8px; margin-top: 16px; }
+        .new-make-title { margin: 0; font-weight: 600; }
+        .new-make-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+        .new-make-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur); }
+        .new-make-btn:hover { border-color: var(--olive); }
+        .new-make-btn :global(.lucide) { color: var(--olive-ink); }
+        @media (max-width: 520px) { .new-make-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      `}</style>
+    </section>
+  );
+}
 
 // The four big ways in. Used by the sheet and by the first-run screen.
 export function NewOptions({ onPick, onSample }) {
@@ -331,7 +364,7 @@ export default function NewSheet() {
         <header className="c-sheet-head">
           <div className="c-row">
             {mode && status === 'idle' && !recording && <button type="button" className="c-icon-btn" onClick={() => { setMode(''); setError(''); }} aria-label="Back"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>}
-            <h2 id="new-sheet-title" className="c-title">{status === 'building' ? 'Building' : 'New guide'}</h2>
+            <h2 id="new-sheet-title" className="c-title">{status === 'building' ? 'Building' : mode ? 'New guide' : 'New'}</h2>
           </div>
           <button type="button" className="c-icon-btn" onClick={close} aria-label="Close" disabled={recording} title={recording ? 'Stop the recording first' : undefined}><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         </header>
@@ -352,7 +385,10 @@ export default function NewSheet() {
             <p className="c-meta">You can close this. It keeps building and shows at the top right.</p>
           </div>
         ) : !mode ? (
-          <NewOptions onPick={setMode} onSample={trySample} />
+          <>
+            <NewOptions onPick={setMode} onSample={trySample} />
+            <MakeOptions onGo={href => { close(); router.push(href); }} />
+          </>
         ) : (
           <div className="new-panel">
             {mode === 'upload' && (

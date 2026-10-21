@@ -332,7 +332,7 @@ export default function LibraryPage() {
   const primary = filter === 'notes'
     ? <button type="button" className="c-btn c-btn--primary" data-spot="note-new" onClick={() => { walkthroughEvent('note-created'); router.push('/smartnotes?id=new'); }}><FilePlus2 size={20} strokeWidth={1.75} aria-hidden="true" />New note</button>
     : filter === 'lectures'
-      ? <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet('record')}><Mic size={20} strokeWidth={1.75} aria-hidden="true" />Record lecture</button>
+      ? <button type="button" className="c-btn c-btn--primary" data-spot="record-lecture" onClick={() => { walkthroughEvent('record-opened'); openNewSheet('record'); }}><Mic size={20} strokeWidth={1.75} aria-hidden="true" />Record lecture</button>
       : filter === 'flashcards'
         ? <button type="button" className="c-btn c-btn--primary" onClick={() => router.push('/create')}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />Make cards</button>
         : <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet()}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />New</button>;

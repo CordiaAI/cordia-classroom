@@ -1,5 +1,6 @@
-"""Settings > Connectors: Google Calendar, Google Tasks, Google Drive, Google Docs and Notion
-through Composio, and Apple Calendar through a subscribed calendar feed."""
+"""Settings > Connectors: Google Calendar, Google Tasks, Google Drive, Google Docs, Notion and the
+apps Cordia Assistant uses by text (Sheets, Gmail, Outlook, Slack, YNAB, Dropbox, GitHub) through
+Composio, and Apple Calendar through a subscribed calendar feed. One connection serves both apps."""
 
 import hashlib
 import hmac
@@ -28,6 +29,13 @@ CONNECTORS = [
     {"id": "gdrive", "name": "Google Drive", "tagline": "Import course files into a guide."},
     {"id": "gdocs", "name": "Google Docs", "tagline": "Import notes into a guide."},
     {"id": "notion", "name": "Notion", "tagline": "Import notes into a guide."},
+    {"id": "gsheets", "name": "Google Sheets", "tagline": "Text Cordia to log anything to a sheet."},
+    {"id": "gmail", "name": "Gmail", "tagline": "Cordia texts you about emails that need a reply."},
+    {"id": "outlook", "name": "Outlook", "tagline": "Cordia texts you about emails that need a reply."},
+    {"id": "slack", "name": "Slack", "tagline": "Catch what you missed and reply by text."},
+    {"id": "ynab", "name": "YNAB", "tagline": "Check your budget by text."},
+    {"id": "dropbox", "name": "Dropbox", "tagline": "Find a file by text."},
+    {"id": "github", "name": "GitHub", "tagline": "Check issues and pull requests by text."},
 ]
 COMPOSIO_IDS = set(composio.TOOLKITS)
 

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import Toggle from '../Toggle';
 
 const CALENDARS = ['gcal', 'icloud_calendar'];
@@ -17,7 +18,7 @@ export function UsesPicker({ catalog, value, onChange, disabled = false }) {
   );
 }
 
-export default function AssistantUses({ view, catalog, save, onOpenApps }) {
+export default function AssistantUses({ view, catalog, save }) {
   const uses = view.identity.uses;
   const name = view.identity.assistant_name;
   const hasCalendar = view.connections.some(c => CALENDARS.includes(c.provider) && c.status === 'active');
@@ -32,7 +33,7 @@ export default function AssistantUses({ view, catalog, save, onOpenApps }) {
         {uses.includes('classes') && !hasCalendar && (
           <div className="asst-actions asst-spread">
             <span className="c-meta">Class reminders come from your calendar. Connect Google or Apple Calendar so {name} knows when they are.</span>
-            <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={onOpenApps}>Connect a calendar</button>
+            <Link className="c-btn c-btn--secondary c-btn--sm" href="/settings?section=connectors">Connect a calendar</Link>
           </div>
         )}
         {!uses.length && <p className="c-meta">With nothing picked, {name} only texts when you text it, plus reminders you ask for.</p>}

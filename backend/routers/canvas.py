@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from auth_utils import get_user_id
 from database import get_supabase
 from services import canvas_client
-from services.canvas_client import CanvasClient, CanvasError, CanvasForbiddenRequest, CanvasUnauthorized
+from services.canvas_client import CanvasClient, CanvasDenied, CanvasError, CanvasForbiddenRequest, CanvasUnauthorized
 from services.class_catalog import clean_term, school_name_from_domain, topic_summary
 from services.class_db import add_membership, ensure_class, ensure_school
 from services.grades import estimate
@@ -118,7 +118,10 @@ def _course_row(user_id: str, course: dict, school_id: Optional[str]) -> dict:
 def _import_course(db, user_id: str, client: CanvasClient, row: dict, school: dict) -> None:
     course_id = row["canvas_course_id"]
     detail = client.course(course_id)
-    modules = client.modules(course_id)
+    try:
+        modules = client.modules(course_id)
+    except CanvasDenied:
+        modules = []  # Modules hidden from students: summarise from the syllabus alone.
     titles = []
     for module in modules or []:
         titles.append(str(module.get("name") or ""))
@@ -388,11 +391,20 @@ def list_files(course_id: int, authorization: str = Header(default="")):
     db = get_supabase()
     connection = _imported_course(db, user_id, course_id)
     try:
-        files = _client(db, user_id, connection).files(course_id)
+        client = _client(db, user_id, connection)
+        try:
+            files = client.files(course_id)
+        except CanvasDenied as exc:
+            # Many classes hide the Files page from students; their files are linked from Modules.
+            logger.info("canvas files.list denied course=%s (%s); using modules", course_id, exc)
+            files = client.module_files(course_id)
     except CanvasUnauthorized:
         _auto_disconnect(db, user_id)
         raise HTTPException(status_code=409, detail="Reconnect Canvas")
-    except CanvasError:
+    except CanvasDenied:
+        raise HTTPException(status_code=403, detail="This class doesn't share its files with students in Canvas.")
+    except CanvasError as exc:
+        logger.warning("canvas files.list failed course=%s: %s", course_id, exc)
         raise HTTPException(status_code=502, detail="Canvas could not be reached.")
     return {"files": [{"id": f.get("id"), "name": f.get("display_name"), "size": f.get("size"), "type": f.get("content-type")} for f in files or []]}
 
@@ -430,7 +442,10 @@ def course_grades(course_id: int, authorization: str = Header(default="")):
     except CanvasUnauthorized:
         _auto_disconnect(db, user_id)
         raise HTTPException(status_code=409, detail="Reconnect Canvas")
-    except CanvasError:
+    except CanvasDenied:
+        raise HTTPException(status_code=403, detail="This class doesn't share grades with students in Canvas.")
+    except CanvasError as exc:
+        logger.warning("canvas grades failed course=%s: %s", course_id, exc)
         raise HTTPException(status_code=502, detail="Canvas could not be reached.")
     result = estimate(groups or [], bool(course.get("apply_assignment_group_weights")))
     grades = next((e.get("grades") for e in enrollments or [] if e.get("type") == "StudentEnrollment" and e.get("grades")), None) or {}

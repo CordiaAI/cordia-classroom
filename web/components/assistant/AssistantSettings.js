@@ -3,10 +3,10 @@ import { useRouter } from 'next/router';
 import { MessageCircle } from 'lucide-react';
 import { SectionLoader } from '../CordiaLoader';
 import { assistantApi } from '../../lib/assistant';
+import { walkthroughEvent } from '../../lib/walkthrough';
 import { PhoneStep, ProfileStep, SurveyStep } from './AssistantSetup';
 import AssistantPersonality from './AssistantPersonality';
 import AssistantSchedule from './AssistantSchedule';
-import AssistantApps from './AssistantApps';
 import AssistantData from './AssistantData';
 import AssistantUses from './AssistantUses';
 
@@ -15,7 +15,6 @@ const TABS = [
   { key: 'uses', label: 'Helps with' },
   { key: 'personality', label: 'Personality' },
   { key: 'schedule', label: 'Schedule' },
-  { key: 'apps', label: 'Apps' },
   { key: 'data', label: 'Your data' },
 ];
 
@@ -47,16 +46,17 @@ export default function AssistantSettings({ onOpenPlan }) {
     setError('');
     setCatalog(cat.data);
     setMe(who.data);
+    if (who.data?.stage === 'active') walkthroughEvent('assistant-ready');
   }, [catalog]);
 
   useEffect(() => { load(); }, []);
 
-  // Coming back from connecting an app.
+  // Coming back from connecting an app. Apps are connected in Settings › Connectors now; this
+  // still answers a sign-in that started from the Assistant's own link.
   useEffect(() => {
     if (!router.isReady) return;
     const { connected, connection } = router.query;
     if (!connected && !connection) return;
-    if (connected) setTab('apps');
     toast(connected ? 'Connected' : "That app didn't connect. Try again.");
     const { connected: _c, connection: _f, provider: _p, ...rest } = router.query;
     router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
@@ -79,7 +79,7 @@ export default function AssistantSettings({ onOpenPlan }) {
   const plan = view?.user.classroom;
 
   return (
-    <div className="c-stack asst">
+    <div className="c-stack asst" data-spot="assistant">
       {me.stage === 'setup' && <PhoneStep onDone={load} />}
       {me.stage === 'onboarding' && me.onboarding.next === 'profile' && <ProfileStep catalog={catalog} phoneLast4={me.phone_last4} onDone={load} />}
       {me.stage === 'onboarding' && me.onboarding.next === 'survey' && (
@@ -114,10 +114,9 @@ export default function AssistantSettings({ onOpenPlan }) {
           </div>
 
           <div role="tabpanel" id={`asst-panel-${tab}`} aria-labelledby={`asst-tab-${tab}`}>
-            {tab === 'uses' && <AssistantUses view={view} catalog={catalog} save={save} onOpenApps={() => setTab('apps')} />}
+            {tab === 'uses' && <AssistantUses view={view} catalog={catalog} save={save} />}
             {tab === 'personality' && <AssistantPersonality view={view} catalog={catalog} save={save} reload={load} toast={toast} />}
             {tab === 'schedule' && <AssistantSchedule view={view} catalog={catalog} save={save} toast={toast} />}
-            {tab === 'apps' && <AssistantApps view={view} catalog={catalog} setView={setView} toast={toast} />}
             {tab === 'data' && <AssistantData view={view} setView={setView} toast={toast} onDeleted={() => { toast('Assistant deleted'); setMe({ stage: 'setup' }); setTab('uses'); }} />}
           </div>
         </>

@@ -72,6 +72,26 @@ export const MINI = {
   notes: { label: 'Notes', route: '/library?filter=notes', steps: [
     { target: '[data-spot="note-new"]', label: 'New note', where: path => path === '/library', on: 'note-created' },
   ] },
+  record: { label: 'Record a lecture', route: '/library?filter=lectures', steps: [
+    { target: '[data-spot="record-lecture"]', label: 'Tap Record lecture', where: path => path === '/library', on: 'record-opened' },
+    { target: '[data-spot="rec-start"]', label: 'Record. Notes write themselves as you go', on: 'recording-started', finishable: true },
+  ] },
+  visual: { label: 'Visuals', route: '/library?filter=notes', steps: [
+    { target: '[data-spot="note-new"]', label: 'Open a note', where: path => path === '/library', on: 'note-created' },
+    { target: '[data-spot="make-visual"]', label: 'Highlight text, then Make visual', where: path => path === '/smartnotes', on: 'visual-added', finishable: true },
+  ] },
+  match: { label: 'Match', route: 'guide', steps: [
+    { target: '[data-spot="quiz-pill"]', label: 'Tap Quiz', where: onGuide, on: 'quiz-opened' },
+    { target: '[data-spot="match-tab"]', label: 'Tap Match: pair them up in 60 seconds', where: onQuiz, on: 'match-opened' },
+  ] },
+  connectors: { label: 'Connectors', route: '/settings?section=connectors', steps: [
+    { target: '[data-spot="connectors"]', label: 'Bring in Google Calendar, Drive, Notion and more', where: path => path === '/settings', on: 'connector-opened', finishable: true },
+  ] },
+  assistant: { label: 'Assistant', route: '/assistant', steps: [
+    { target: '[data-spot="assistant"]', label: 'Text Cordia: reminders and quick questions by phone', where: path => path === '/assistant', on: 'assistant-ready', finishable: true },
+  ] },
+  // A public page outside the app shell: "Show me" just opens it.
+  extension: { label: 'Extension', route: '/install-extension', steps: [] },
   insights: { label: 'Insights', route: '/dashboard', steps: [
     { target: '[data-spot="insights"]', label: 'Your progress and weak spots', where: onToday, on: 'insights-opened' },
   ] },
@@ -82,6 +102,8 @@ const FEATURE_EVENTS = {
   'guide-ready': 'add', explain: 'explain', 'card-made': 'card', 'quiz-started': 'quiz', ask: 'ask',
   'card-flipped': 'cards', 'practice-opened': 'practice', 'practice-guide': 'practice', 'calendar-connected': 'calendar', 'focus-started': 'focus',
   'note-written': 'notes', 'insights-opened': 'insights', 'canvas-connected': 'canvas',
+  'recording-started': 'record', 'visual-added': 'visual', 'match-opened': 'match', 'connector-connected': 'connectors',
+  'assistant-ready': 'assistant', 'extension-opened': 'extension',
 };
 
 export const FEATURES = Object.keys(MINI);

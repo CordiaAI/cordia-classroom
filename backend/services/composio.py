@@ -22,6 +22,14 @@ TOOLKITS = {
     "gdrive": "googledrive",
     "gdocs": "googledocs",
     "notion": "notion",
+    # Used by Cordia Assistant when the student texts; connected here like the rest.
+    "gsheets": "googlesheets",
+    "gmail": "gmail",
+    "outlook": "outlook",
+    "slack": "slack",
+    "ynab": "ynab",
+    "dropbox": "dropbox",
+    "github": "github",
 }
 # The Assistant's optional overrides for an auth config on our own OAuth app; same names here.
 AUTH_CONFIG_ENV = {
@@ -30,6 +38,13 @@ AUTH_CONFIG_ENV = {
     "gdrive": "COMPOSIO_AUTH_CONFIG_GDRIVE",
     "gdocs": "COMPOSIO_AUTH_CONFIG_GDOCS",
     "notion": "COMPOSIO_AUTH_CONFIG_NOTION",
+    "gsheets": "COMPOSIO_AUTH_CONFIG_GSHEETS",
+    "gmail": "COMPOSIO_AUTH_CONFIG_GMAIL",
+    "outlook": "COMPOSIO_AUTH_CONFIG_OUTLOOK",
+    "slack": "COMPOSIO_AUTH_CONFIG_SLACK",
+    "ynab": "COMPOSIO_AUTH_CONFIG_YNAB",
+    "dropbox": "COMPOSIO_AUTH_CONFIG_DROPBOX",
+    "github": "COMPOSIO_AUTH_CONFIG_GITHUB",
 }
 _auth_configs: dict[str, str] = {}
 

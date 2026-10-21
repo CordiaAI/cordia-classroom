@@ -57,6 +57,11 @@ class CanvasUnauthorized(CanvasError):
     """Canvas rejected the token (401). The connection must be removed."""
 
 
+class CanvasDenied(CanvasError):
+    """The token works but Canvas won't show this to the student (a hidden Files page, a
+    locked area): 403/404, or a 401 "not authorized to perform that action"."""
+
+
 # ---------------------------------------------------------------------------
 # Encryption
 # ---------------------------------------------------------------------------
@@ -313,6 +318,10 @@ class CanvasClient:
                 raise CanvasError("Canvas could not be reached.") from None
             self._log(endpoint.name, response.status_code)
             if response.status_code == 401:
+                # Canvas also answers 401 when a working token may not see one page; only a bad
+                # token means disconnecting.
+                if "not authorized to perform" in (response.text or "").lower():
+                    raise CanvasDenied(f"Canvas denied {endpoint.name} (401).")
                 raise CanvasUnauthorized("Canvas rejected the token.")
             if response.status_code == 403 and "rate limit" in (response.text or "").lower() and attempt < 3:
                 self._sleep(2 ** attempt)
@@ -328,6 +337,8 @@ class CanvasClient:
                         return _fetch_file_host(target.geturl())
                     raise CanvasForbiddenRequest("Canvas redirected to another host.")
                 return self._get(target.path, parse_qsl(target.query, keep_blank_values=True), stream=stream, file_download=file_download)
+            if response.status_code in (403, 404):
+                raise CanvasDenied(f"Canvas denied {endpoint.name} ({response.status_code}).")
             if not response.ok:
                 raise CanvasError(f"Canvas returned {response.status_code} for {endpoint.name}.")
             return response
@@ -389,6 +400,15 @@ class CanvasClient:
 
     def files(self, course_id: int) -> list:
         return self._pages(f"/api/v1/courses/{int(course_id)}/files", [])
+
+    def module_files(self, course_id: int) -> list:
+        """Files linked from the class's Modules, for classes that hide the Files page from students."""
+        found = {}
+        for module in self.modules(course_id) or []:
+            for item in module.get("items") or []:
+                if item.get("type") == "File" and item.get("content_id") and item["content_id"] not in found:
+                    found[item["content_id"]] = {"id": item["content_id"], "display_name": item.get("title") or "File"}
+        return list(found.values())
 
     def download_file(self, course_id: int, file_id: int) -> tuple[str, bytes]:
         """One file the user picked. Returns (filename, bytes)."""

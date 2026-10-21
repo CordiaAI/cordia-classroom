@@ -204,6 +204,9 @@ body { touch-action: manipulation; }
 .cn-detail-text { margin: 0; color: var(--ink); font: 500 15px/1.55 var(--font-sans); }
 .cn-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
 .cn-feed { display: grid; gap: 8px; width: 100%; text-align: left; }
+.cn-assistant { display: grid; justify-items: start; gap: 8px; width: 100%; padding-top: 12px; border-top: 1px solid var(--hairline); text-align: left; }
+.cn-group-title { margin: 20px 0 0; font: 600 var(--fs-15, 15px)/1.4 var(--font-sans); color: var(--muted); }
+.cn-icon .lucide { width: 28px; height: 28px; }
 .cn-feed .c-meta { margin: 0; }
 .cn-feed-row { display: flex; gap: 8px; }
 .cn-feed-row .c-input { flex: 1 1 auto; min-width: 0; }

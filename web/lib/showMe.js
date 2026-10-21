@@ -11,5 +11,5 @@ export async function showMe(router, id) {
     route = guide ? `/guide/${guide.id}` : '/library';
   }
   if (route && router.asPath.split('?')[0] !== route) await router.push(route);
-  startWalkthrough(id);
+  if (mini.steps.length) startWalkthrough(id);
 }
