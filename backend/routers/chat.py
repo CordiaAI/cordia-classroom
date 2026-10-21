@@ -2,7 +2,7 @@
 
 A message is answered by one of: a browser command (capture / find material),
 organizing a guide or note into a class, building a guide or practice set from
-the selected material, or a grounded Tutor reply.
+the selected material, editing the selected guide's outline, or a grounded Tutor reply.
 """
 import os
 import re
@@ -20,7 +20,7 @@ from schemas import ChatRequest, ChatResponse
 from services.entitlements import record, require
 from services.guidance import learning_guidance, style_instruction
 from services.llm import (
-    answer_question, explain_retain_answer, generate_practice_guide, generate_study_guide,
+    answer_question, edit_outline, explain_retain_answer, generate_practice_guide, generate_study_guide,
     study_guide_is_complete, study_guide_to_flashcards,
 )
 from services.text_processing import chunk_text, clean_text, html_to_text
@@ -35,6 +35,13 @@ MAX_CONTENT_LENGTH = 500_000
 TUTOR_CONTEXT_TOKENS = int(os.getenv("CLASSROOM_TUTOR_CONTEXT_TOKENS", "128000"))
 TUTOR_RESERVED_TOKENS = 6_000
 CONTEXT_FULL = "context_window_full"
+# "Add a section on X to the outline", "rewrite point 2 of my notes": an instruction to change it.
+OUTLINE_EDIT_REQUEST = re.compile(
+    r"^\s*(?:please\s+|can you\s+|could you\s+)?(?:add|remove|delete|rewrite|reword|edit|update|fix|move|rename|"
+    r"shorten|expand|simplify|reorganize|reorder|insert|include|merge|split|replace|put)\b.*\b"
+    r"(?:outline|notes?|sections?|points?|bullets?|headings?|key points)\b",
+    re.IGNORECASE,
+)
 PRACTICE_REQUEST = re.compile(r"\b(create|make|generate|build)\b.*\bpractice\b.*\b(problems?|questions?|guide)\b", re.IGNORECASE)
 BROWSER_SKILLS = {
     "capture": ("capture_current_page", "Working in the browser side panel now. Keep it open while I read the current page."),
@@ -256,6 +263,23 @@ def _tutor_reply(body: ChatRequest, user_id: str, question: str, material: Mater
     return ChatResponse(answer=answer, source=material.source)
 
 
+def _edit_outline(user_id: str, material: Material, question: str) -> ChatResponse:
+    """Change the selected guide's outline as the student asked and save it."""
+    guide = material.guide
+    edited = edit_outline(guide.get("notes") or "", question, guide.get("study_guide") or "")
+    if not edited:
+        return ChatResponse(answer="I couldn't make that change to the outline. Try saying it another way.")
+    get_supabase().table("study_guides").update({"notes": edited["notes"]}).eq("id", guide["id"]).eq("user_id", user_id).execute()
+    record(user_id, "tutor")
+    summary = edited["summary"] or "Done."
+    return ChatResponse(
+        answer=f"{summary} Your outline is updated.",
+        action="outline_updated",
+        guide={"id": guide["id"]},
+        source=material.source,
+    )
+
+
 def _reply(body: ChatRequest, user_id: str, question: str, material: Material, class_id: Optional[str],
            skill: Optional[str], turn: Optional[dict], authorization: str) -> ChatResponse:
     if skill == "plan" and not material.content.strip():
@@ -265,6 +289,11 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
         )
     if skill == "organize":
         return _organize(material, body.class_id, authorization)
+    # Before the empty-material check: a new notes page can be edited while still empty.
+    if material.guide and (skill == "edit_outline" or (skill in {None, "explain"} and OUTLINE_EDIT_REQUEST.search(question))):
+        return _edit_outline(user_id, material, question)
+    if skill == "edit_outline":
+        return ChatResponse(answer="Pick a guide above, then tell me what to change in its outline.")
     if not material.content.strip():
         if material.source:
             return ChatResponse(answer=(

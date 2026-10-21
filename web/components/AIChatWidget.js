@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
 import NapkinVisual from './NapkinVisual';
 import ExplanationPreference from './ExplanationPreference';
-import { ArrowUp, BookOpen, Layers, MessageCircle, MessagesSquare, Paperclip, PencilRuler, Plus, SlidersHorizontal, X as CloseIcon } from 'lucide-react';
+import { ArrowUp, BookOpen, Layers, ListTree, MessageCircle, MessagesSquare, Paperclip, PencilRuler, Plus, SlidersHorizontal, X as CloseIcon } from 'lucide-react';
 import { lastGuide } from '../lib/userStore';
 import { walkthroughEvent } from '../lib/walkthrough';
 import TutorSelect from './TutorSelect';
@@ -440,6 +440,10 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         setContextKey(`guide:${data.guide.id}`);
       }
     }
+    // The Tutor changed a guide's outline: the guide page refreshes it in place.
+    if (data?.action === 'outline_updated' && data.guide?.id) {
+      window.dispatchEvent(new CustomEvent('cordia:outline-updated', { detail: { guideId: data.guide.id } }));
+    }
     if (data?.session?.id) {
       setSkillOverride('');
       setRetainContext(null);
@@ -599,7 +603,8 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
                 { label: 'Make guide', prompt: 'Create a study guide from this material.', icon: BookOpen },
                 { label: 'Practice', prompt: 'Generate practice questions from this material.', icon: PencilRuler },
                 { label: 'Flashcards', prompt: 'Make flashcards for the key points in this material.', icon: Layers },
-              ].map(action => <button type="button" key={action.label} className="c-chip" onClick={() => setInput(action.prompt)}><action.icon size={16} strokeWidth={1.75} aria-hidden="true" />{action.label}</button>)}
+                ...(material?.kind === 'guide' ? [{ label: 'Edit outline', prompt: 'Edit the outline: ', icon: ListTree, skill: 'edit_outline' }] : []),
+              ].map(action => <button type="button" key={action.label} className="c-chip" onClick={() => { setInput(action.prompt); if (action.skill) setSkillOverride(action.skill); }}><action.icon size={16} strokeWidth={1.75} aria-hidden="true" />{action.label}</button>)}
             </div>}
           </div>
         )}

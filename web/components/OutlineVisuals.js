@@ -102,8 +102,9 @@ export function sectionTextOf(block, root) {
 // a kept visual finds its line again.
 const ownText = el => [...el.childNodes].filter(n => !(n.nodeType === 1 && /^(UL|OL)$/.test(n.tagName))).map(n => n.textContent).join('');
 const squash = text => String(text || '').replace(/\s+/g, ' ').trim().toLowerCase();
-export function findAnchorBlock(root, anchor) {
-  const want = squash(anchor).slice(0, 60);
+export function findAnchorBlock(root, anchor, { end = false } = {}) {
+  const all = squash(anchor);
+  const want = end ? all.slice(-50) : all.slice(0, 60);
   if (!root || !want) return null;
   const blocks = [...root.querySelectorAll('li, h1, h2, h3, p')];
   return blocks.find(el => squash(ownText(el)).includes(want))
@@ -233,6 +234,10 @@ function OutlineVisualStyle() {
       .ov-pending .nv-image { width: 100%; }
       .ov-kept { position: relative; margin: 0; padding: 8px; border: 1px solid var(--hairline, var(--line)); border-radius: var(--r-row); background: var(--surface-card, var(--card)); }
       .ov-img { display: block; width: 100%; height: auto; }
+      /* Beside the outline a visual is no taller than the text it was made from (OutlineEditor sets --oe-fit). */
+      .oe-side-item .ov-kept .ov-img { max-height: var(--oe-fit, none); object-fit: contain; }
+      .oe-side-item .ov-pending .nv-frame { min-height: 0; max-height: var(--oe-fit, none); }
+      .oe-side-item .ov-pending .nv-image { max-height: calc(var(--oe-fit, 100vh) - 16px); object-fit: contain; }
       [data-theme='dark'] .ov-img.ov-light, :root:not([data-theme='dark']) .ov-img.ov-dark { filter: invert(1) hue-rotate(180deg); }
       .ov-open { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; cursor: zoom-in; }
       .ov-tools { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
@@ -240,7 +245,7 @@ function OutlineVisualStyle() {
       .ov-kept:hover .ov-tools, .ov-tools:focus-within { opacity: 1; }
       @media (hover: none) { .ov-tools { opacity: 1; } }
       .ov-zoom { display: grid; place-items: center; padding: 24px; cursor: zoom-out; }
-      .ov-zoom-art { width: min(1200px, 100%); max-height: calc(100vh - 48px); overflow: auto; border-radius: var(--r-card); background: var(--card); padding: 16px; box-shadow: var(--shadow-float); }
+      .ov-zoom-art { width: min(1200px, 100%); max-height: calc(100vh - 48px); overflow: auto; border-radius: var(--r-card); background: var(--paper); padding: 16px; box-shadow: var(--shadow-float); }
       .ov-zoom-art .ov-img { max-height: calc(100vh - 80px); object-fit: contain; }
       .ov-zoom-close { position: fixed; top: 16px; right: 16px; background: var(--card); }
     `}</style>

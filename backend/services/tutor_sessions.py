@@ -87,6 +87,17 @@ TUTOR_SKILLS = {
         "confirm": [],
         "instruction": "Follow only bounded same-origin course links from the approved active page and report exactly which relevant sources were found.",
     },
+    "edit_outline": {
+        "label": "Edit outline",
+        "version": 1,
+        "available": True,
+        "outcome": "Change the selected guide's outline the way the student asks.",
+        "complete_when": "The outline is saved with the requested change and nothing else lost.",
+        "tools": ["read_context", "edit_outline"],
+        "requires_context": True,
+        "confirm": [],
+        "instruction": "Make exactly the change the student asks for in the guide's outline and keep everything else as it was.",
+    },
     "organize": {
         "label": "Organize",
         "version": 1,

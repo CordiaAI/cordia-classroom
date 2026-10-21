@@ -24,7 +24,9 @@ export function aiProvider(env = process.env) {
 // The provider for writing: Claude when ANTHROPIC_API_KEY is set, else the one above.
 export function chatProvider(env = process.env) {
   if (env.ANTHROPIC_API_KEY) {
-    return { name: 'anthropic', key: env.ANTHROPIC_API_KEY, chatModel: env.ANTHROPIC_MODEL || 'claude-opus-5-5' };
+    // Sonnet; ANTHROPIC_MODEL can pick another Claude model, but never Opus.
+    const chosen = String(env.ANTHROPIC_MODEL || '').trim();
+    return { name: 'anthropic', key: env.ANTHROPIC_API_KEY, chatModel: chosen && !/opus/i.test(chosen) ? chosen : 'claude-sonnet-5-5' };
   }
   return aiProvider(env);
 }

@@ -162,6 +162,17 @@ export default function GuidePage() {
       .finally(() => setNotesState('done'));
   }, [guide?.id]);
 
+  // The Tutor edited this guide's outline: load the new outline into the page.
+  useEffect(() => {
+    async function onUpdated(event) {
+      if (event.detail?.guideId !== id) return;
+      const data = await apiFetch('/guides/' + id);
+      if (data?.guide) { setGuide(current => ({ ...current, notes: data.guide.notes })); setNotesVersion(value => value + 1); setToast('Outline updated'); }
+    }
+    window.addEventListener('cordia:outline-updated', onUpdated);
+    return () => window.removeEventListener('cordia:outline-updated', onUpdated);
+  }, [id]);
+
   // A "Show me" that points at the questions (Explain, highlighting) opens By page.
   useEffect(() => {
     const step = activeStep();
@@ -265,7 +276,7 @@ export default function GuidePage() {
     const source = String(guide.notes || '').replace(/^(>|##|\s*-)\s?/gm, '').trim();
     if (source.length < 40) { setToast('Write a few more notes first'); return; }
     setMaking('cards');
-    const generated = await apiFetch('/generate', { method: 'POST', body: JSON.stringify({ content: source, notes: false, study_guide: true, flashcards: true, request_id: newRequestId() }) });
+    const generated = await apiFetch('/generate', { method: 'POST', body: JSON.stringify({ content: source, notes: false, study_guide: true, flashcards: true, request_id: newRequestId() }), timeoutMs: 6 * 60 * 1000 });
     if (!generated?.study_guide || generated.study_guide.startsWith('[Error')) {
       setMaking('');
       setToast(apiErrorMessage(generated?.detail, "Cards and quiz weren't made. Try again."));

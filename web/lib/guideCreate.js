@@ -1,7 +1,10 @@
 import { apiFetch, getToken, responseJson } from './api';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// A long document can take a few minutes to become a guide.
+const GUIDE_TIMEOUT_MS = 6 * 60 * 1000;
 // /generate keeps at most this much source text (MAX_CONTENT_LENGTH in backend/main.py).
+
 export const MAX_SOURCE_CHARS = 500_000;
 
 export function fileKey(file) {
@@ -35,6 +38,8 @@ export async function generateAndSave({ source, requestId, title, sourceTitle, s
   const generated = await apiFetch('/generate', {
     method: 'POST',
     body: JSON.stringify({ content: source, notes, study_guide: true, flashcards, request_id: requestId }),
+    // A long document can take a few minutes to write; the request_id keeps a retry free.
+    timeoutMs: GUIDE_TIMEOUT_MS,
   });
   if (!generated) throw new Error('The guide took too long to come back. Try again; you will not be charged twice.');
   if (generated.detail) {
