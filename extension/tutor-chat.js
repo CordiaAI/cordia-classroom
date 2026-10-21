@@ -183,7 +183,7 @@
 
     sizeButton.addEventListener('click', () => {
       const maximized = document.body.classList.toggle('tutor-maximized');
-      sizeButton.textContent = maximized ? 'Minimize chat' : 'Maximize chat';
+      sizeButton.textContent = maximized ? 'Exit full screen' : 'Full screen';
       sizeButton.setAttribute('aria-pressed', String(maximized));
       card.scrollIntoView({ block: 'start' });
       scroll();

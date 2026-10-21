@@ -324,6 +324,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && ['authToken', 'userEmail'].some(key => changes[key])) initAuth();
   if (area === 'session' && changes.pendingGuide?.newValue) startPendingGuide();
 });
+// The page card names the tab the panel will read.
+const pageTitle = document.getElementById('page-title');
+async function showPage() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []);
+  pageTitle.textContent = cleanTitle(tab?.title) || 'The page you have open';
+}
+showPage();
+chrome.tabs.onActivated?.addListener(showPage);
+chrome.tabs.onUpdated?.addListener((id, change) => { if (change.title) showPage(); });
 window.addEventListener('focus', initAuth);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) initAuth(); });
 const authCheck = initAuth();
