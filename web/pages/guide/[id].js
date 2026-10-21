@@ -424,7 +424,8 @@ export default function GuidePage() {
                         <SectionVisuals
                           kept={kept}
                           pending={pending}
-                          context={[guide.title, block.context].filter(Boolean).join('\n\n')}
+                          section={block.context}
+                          context={guide.title}
                           onKeep={async visual => { setPendingVisual(null); await guideVisuals.keep(visual); setToast('Visual kept'); }}
                           onCancel={() => setPendingVisual(null)}
                           onRemove={guideVisuals.remove}
@@ -490,8 +491,8 @@ export default function GuidePage() {
         .guide-notes { gap: 32px; }
         .guide-outline-section { display: grid; gap: 16px; }
         .guide-outline-body { display: grid; gap: 16px; min-width: 0; }
-        .guide-outline-section.has-visual { grid-template-columns: minmax(0, 1fr) minmax(240px, 38%); gap: 24px; align-items: start; }
-        @media (max-width: 899px) { .guide-outline-section.has-visual { grid-template-columns: minmax(0, 1fr); } }
+        .guide-outline-section.has-visual { grid-template-columns: minmax(0, 1fr) minmax(320px, 48%); gap: 28px; align-items: start; }
+        @media (max-width: 1099px) { .guide-outline-section.has-visual { grid-template-columns: minmax(0, 1fr); } }
         .guide-notes ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
         .guide-notes .guide-sub { margin-top: 6px; gap: 4px; list-style: circle; color: var(--muted-ink); }
         .guide-notes :global(strong) { font-weight: 600; color: var(--ink); }

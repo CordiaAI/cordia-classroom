@@ -8,6 +8,7 @@ import TypingShortcuts from './TypingShortcuts';
 import CordiaLoader from '../CordiaLoader';
 import MermaidDiagram from '../MermaidDiagram';
 import NapkinVisual from '../NapkinVisual';
+import { visualContent } from '../../lib/visualText';
 import { authHeaders, authorizedFetch } from '../../lib/api';
 import { TYPING_CHARS, isDefaultTitle } from '../../lib/noteMeta.mjs';
 import { cleanPastedHtml, formatOnKeyDown, plainTextToHtml } from '../../lib/notesEditing';
@@ -393,8 +394,9 @@ export default function SmartNotesEditor() {
     if (!paper) return;
     const selection = window.getSelection();
     const picked = selection?.rangeCount && paper.contains(selection.anchorNode) ? selection.toString().trim() : '';
-    let text = picked;
     let anchor = picked ? topBlock(selection.getRangeAt(0).endContainer) : null;
+    // A short highlight leads, and the rest of its section gives Napkin enough to draw.
+    let text = picked && anchor ? visualContent(picked, sectionAround(anchor).map(block => block.innerText || block.textContent || '').join('\n')) : picked;
     if (text.length < 5) {
       const caret = selection?.rangeCount && paper.contains(selection.anchorNode) ? topBlock(selection.anchorNode) : null;
       const blocks = caret ? sectionAround(caret) : [];
