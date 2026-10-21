@@ -112,7 +112,7 @@ export default function ConnectorsSettings() {
   const [open, setOpen] = useState(null);
   const [canvas, setCanvas] = useState(undefined);
 
-  // Canvas connects through Classroom's own Canvas flow, not Composio: an access token, or a
+  // Canvas connects through Classroom's own Canvas flow, unlike the other apps: an access token, or a
   // calendar link where the school blocks tokens. Its tile shows which one is in.
   async function loadCanvas() {
     const [status, calendar] = await Promise.all([canvasStatus(), apiFetch('/calendar/connection')]);
