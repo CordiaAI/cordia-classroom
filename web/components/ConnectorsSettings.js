@@ -5,11 +5,14 @@ import BodyPortal from './BodyPortal';
 import ConfirmDialog from './ConfirmDialog';
 import { SectionLoader } from './CordiaLoader';
 import { apiFetch } from '../lib/api';
+import { canvasStatus } from '../lib/canvas';
+import CanvasSettings from './CanvasSettings';
 import { BRAND_PATHS } from '../lib/brandIcons';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // What each app does here, shown in its sheet.
 const DETAILS = {
+  canvas: 'Brings in your classes, deadlines, what you turned in, grades and course files. An access token does all of it; a calendar link is only for schools that block tokens.',
   gcal: 'Adds each upcoming deadline to your Google Calendar as a 30-minute event ending when it is due. Run it again any time: deadlines already there are skipped.',
   apple_calendar: 'Subscribes your Apple Calendar to your deadlines. It refreshes every hour on your iPhone, iPad and Mac. No Apple password needed.',
   gtasks: 'Adds each upcoming deadline to Google Tasks as a to-do due that day. To-dos already there are skipped.',
@@ -107,6 +110,19 @@ export default function ConnectorsSettings() {
   const [removing, setRemoving] = useState(null);
   const [feed, setFeed] = useState('');
   const [open, setOpen] = useState(null);
+  const [canvas, setCanvas] = useState(undefined);
+
+  // Canvas connects through Classroom's own Canvas flow, not Composio: an access token, or a
+  // calendar link where the school blocks tokens. Its tile shows which one is in.
+  async function loadCanvas() {
+    const [status, calendar] = await Promise.all([canvasStatus(), apiFetch('/calendar/connection')]);
+    setCanvas(status ? { status, feed: Boolean(calendar?.connected) && calendar?.source !== 'canvas' } : null);
+  }
+  useEffect(() => { loadCanvas(); }, []);
+  const canvasBadge = !canvas ? null
+    : canvas.status.status === 'needs_reconnect' ? { text: 'Reconnect', cls: 'is-warn' }
+      : canvas.status.connected ? { text: 'Connected', cls: 'is-on' }
+        : canvas.feed ? { text: 'Calendar link', cls: 'is-on' } : null;
 
   async function load() {
     const data = await apiFetch('/connectors');
@@ -189,13 +205,26 @@ export default function ConnectorsSettings() {
     );
   }
 
-  const active = open && connectors?.find(item => item.id === open);
+  const active = open && open !== 'canvas' && connectors?.find(item => item.id === open);
   return (
     <div className="c-card cn-card">
       <h2 className="c-section-title">Connect your apps</h2>
       <p className="c-meta">Tap one to see what it does and how to connect it. Apps you connect here work in Cordia Assistant too.</p>
       {connectors === null ? <SectionLoader label="Loading connectors" /> : (
         <ul className="cn-grid">
+          {canvas && (
+            <li>
+              <button type="button" className="cn-tile" onClick={() => { setOpen('canvas'); setError(''); setNotice(''); }}>
+                <ConnectorIcon id="canvas" />
+                <span className="cn-tile-text">
+                  <span className="cn-name">Canvas</span>
+                  <span className="cn-tag">{canvas.status.connected ? canvas.status.domain : 'Bring in your classes and deadlines.'}</span>
+                </span>
+                {canvasBadge && <span className={`cn-badge ${canvasBadge.cls}`}>{canvasBadge.text}</span>}
+                <ChevronRight className="cn-chev" size={18} strokeWidth={1.75} aria-hidden="true" />
+              </button>
+            </li>
+          )}
           {connectors.map(connector => {
             const soon = connector.id !== 'apple_calendar' && !connector.available;
             return (
@@ -217,6 +246,23 @@ export default function ConnectorsSettings() {
       )}
       {!active && notice && <p className="cn-notice" role="status">{notice}</p>}
       {!active && error && <p className="cn-error" role="alert">{error}</p>}
+      {open === 'canvas' && canvas && (
+        <BodyPortal>
+          <div className="c-scrim" onClick={() => { setOpen(null); loadCanvas(); }}>
+            <div className="c-sheet cn-detail is-canvas" role="dialog" aria-modal="true" aria-labelledby="cn-canvas-title" onClick={event => event.stopPropagation()}>
+              <button type="button" className="c-icon-btn cn-close" onClick={() => { setOpen(null); loadCanvas(); }} aria-label="Close"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+              <ConnectorIcon id="canvas" size="lg" />
+              <h2 id="cn-canvas-title" className="c-section-title">Canvas</h2>
+              {canvasBadge && <span className={`cn-badge ${canvasBadge.cls}`}>{canvasBadge.text}</span>}
+              <p className="cn-detail-text">{DETAILS.canvas}</p>
+              {canvas.feed && !canvas.status.connected && <p className="c-meta">Your deadlines come from your calendar link. Add an access token to also see what you turned in, grades and course files.</p>}
+              <div className="cn-canvas-body">
+                <CanvasSettings school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} onChange={loadCanvas} />
+              </div>
+            </div>
+          </div>
+        </BodyPortal>
+      )}
       {active && (
         <BodyPortal>
           <div className="c-scrim" onClick={() => setOpen(null)}>

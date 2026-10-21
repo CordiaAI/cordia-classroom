@@ -37,12 +37,22 @@ class CalendarConnectionTests(unittest.TestCase):
         payload = {"connected": True, "items": [], "due_today": [], "updated_at": "now"}
         with (
             patch.object(calendar, "get_user_id", return_value="user-2"),
+            patch.object(calendar, "_token_payload", return_value=None),
             patch.object(calendar, "_stored_feed", return_value="https://canvas.example.edu/feeds/calendars/private.ics"),
             patch.object(calendar, "_calendar_payload", return_value=payload),
         ):
             result = calendar.get_calendar_connection("Bearer token")
         self.assertEqual(result, payload)
         self.assertNotIn("feed_url", result)
+
+    def test_canvas_token_wins_over_a_calendar_link(self):
+        token = {"connected": True, "source": "canvas", "items": [], "due_today": []}
+        with (
+            patch.object(calendar, "get_user_id", return_value="user-2"),
+            patch.object(calendar, "_token_payload", return_value=token),
+            patch.object(calendar, "_stored_feed", side_effect=AssertionError("the link isn't read")),
+        ):
+            self.assertEqual(calendar.get_calendar_connection("Bearer token"), token)
 
     def test_get_connection_is_empty_when_account_has_no_feed(self):
         with (

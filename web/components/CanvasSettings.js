@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { CalendarDays, ExternalLink, KeyRound, RefreshCw } from 'lucide-react';
 import { apiFetch, apiErrorMessage } from '../lib/api';
@@ -13,7 +13,7 @@ function when(iso) {
   return new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-export default function CanvasSettings({ school = '' }) {
+export default function CanvasSettings({ school = '', onChange }) {
   const [status, setStatus] = useState(undefined);
   const [connecting, setConnecting] = useState(false);
   const [activity, setActivity] = useState(null);
@@ -21,6 +21,15 @@ export default function CanvasSettings({ school = '' }) {
   const [removed, setRemoved] = useState(null);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+
+  // Tells the Connectors tile when Canvas connects, disconnects or needs reconnecting.
+  const seen = useRef(null);
+  useEffect(() => {
+    if (status === undefined) return;
+    const key = `${status?.connected}:${status?.status}`;
+    if (seen.current !== null && seen.current !== key) onChange?.();
+    seen.current = key;
+  }, [status?.connected, status?.status]);
 
   useEffect(() => {
     canvasStatus().then(data => setStatus(data));
@@ -122,18 +131,18 @@ export default function CanvasSettings({ school = '' }) {
         <section className="c-card cset-card" aria-labelledby="cset-title">
           <h2 id="cset-title" className="c-section-title">Canvas</h2>
           <div className="cset-options">
-            <Link href="/canvas?tab=calendar" className="cset-option">
-              <CalendarDays {...ICON} />
-              <strong>Calendar feed</strong>
-            </Link>
             {tokensAllowed ? (
               <button type="button" className="cset-option" onClick={() => setConnecting(true)}>
                 <KeyRound {...ICON} />
-                <strong>Access token</strong>
+                <span><strong>Access token</strong><span className="c-meta">Deadlines, what you turned in, grades and files</span></span>
               </button>
             ) : (
               <p className="cset-line">Your school doesn't allow tokens</p>
             )}
+            <Link href="/canvas?tab=calendar" className="cset-option">
+              <CalendarDays {...ICON} />
+              <span><strong>Calendar link</strong><span className="c-meta">Deadlines only, for schools that block tokens</span></span>
+            </Link>
           </div>
         </section>
       )}

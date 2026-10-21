@@ -10,9 +10,8 @@ import { FEATURE_COPY, FREE_SUMMARY, METERED, PRICES, PRO_BENEFITS, PRO_LIMITS, 
 import LearningStylePicker from '../components/LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from '../components/ExplanationPreference';
-import { CalendarDays, Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2 } from 'lucide-react';
+import { Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2 } from 'lucide-react';
 import BodyPortal from '../components/BodyPortal';
-import CanvasSettings from '../components/CanvasSettings';
 import SharingSettings from '../components/SharingSettings';
 import PhoneSettings from '../components/PhoneSettings';
 import LearnCordia from '../components/LearnCordia';
@@ -337,14 +336,6 @@ export default function SettingsPage() {
         {activeSection === 'connectors' && (
           <div className="profile-section c-stack" role="tabpanel" id="panel-connectors" aria-labelledby="tab-connectors">
             <ConnectorsSettings />
-            {canvasReady && <CanvasSettings school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} />}
-            {/* Canvas settings already offer the calendar link; without them, link to it here. */}
-            {!canvasReady && (
-              <div className="c-card settings-row">
-                <span className="settings-row-label"><CalendarDays size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Calendar link</span></span>
-                <Link href="/canvas?tab=calendar" className="c-btn c-btn--secondary">Open Calendar</Link>
-              </div>
-            )}
             <div className="c-card settings-row">
               <span className="settings-row-label"><Puzzle size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Chrome extension</span></span>
               {extensionInstalled

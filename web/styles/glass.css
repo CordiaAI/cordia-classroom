@@ -190,6 +190,10 @@ body { touch-action: manipulation; }
 .cn-tag, .cn-chev { display: none; }
 .cn-badge { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--r-pill); border: 1px solid var(--hairline); color: var(--muted); font: 600 13px/1 var(--font-sans); }
 .cn-badge.is-on { border-color: transparent; background: var(--success-bg); color: var(--success); }
+.cn-badge.is-warn { border-color: transparent; background: var(--warning-bg); color: var(--warning); }
+.cn-detail.is-canvas { width: min(640px, 100%); max-height: 90svh; overflow-y: auto; }
+.cn-canvas-body { width: 100%; text-align: left; }
+.cn-canvas-body .cset-card { box-shadow: none; }
 .cn-icon { display: grid; place-items: center; flex: none; width: 56px; height: 56px; border-radius: 17px; color: var(--ink); background: var(--lg-sheen), var(--lg-fill-strong); box-shadow: var(--lg-highlight), 0 0 0 1px var(--hairline), var(--lg-shadow); }
 .cn-icon svg { width: 28px; height: 28px; }
 .cn-icon.is-lg { width: 72px; height: 72px; border-radius: 22px; }

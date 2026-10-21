@@ -282,10 +282,15 @@ def _token_payload(user_id: str) -> dict | None:
 
 
 def calendar_for(user_id: str) -> dict:
-    """The student's deadlines from their calendar link or Canvas token, whichever they connected."""
+    """The student's deadlines. A Canvas access token wins over a calendar link: it also knows
+    what was turned in and which course each item belongs to. The link is for schools that
+    don't allow tokens."""
+    token = _token_payload(user_id)
+    if token:
+        return token
     url = _stored_feed(user_id)
     if not url:
-        return _token_payload(user_id) or {"connected": False, "items": [], "due_today": []}
+        return {"connected": False, "items": [], "due_today": []}
     return _calendar_payload(url, user_id)
 
 
