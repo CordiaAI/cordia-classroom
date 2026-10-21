@@ -156,7 +156,10 @@ export function useOutlineSelection(rootRef) {
 export function OutlineSelectMenu({ selection, onAction }) {
   if (!selection) return null;
   const act = kind => { window.getSelection()?.removeAllRanges(); onAction(kind, selection); };
+  // At the end of <body>: inside the glass outline card, backdrop-filter made "fixed" relative
+  // to the card, so the menu landed off-screen for any line below the first section.
   return (
+    <BodyPortal>
     <div className="c-menu ov-select" style={{ top: selection.top, left: selection.left }} role="menu" aria-label="Selection" onMouseDown={event => event.preventDefault()}>
       <button type="button" role="menuitem" className="ov-select-main" onClick={() => act('visualize')}><Shapes size={20} strokeWidth={1.75} aria-hidden="true" />Visualize</button>
       <button type="button" role="menuitem" onClick={() => act('explain')}><Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain</button>
@@ -164,6 +167,7 @@ export function OutlineSelectMenu({ selection, onAction }) {
       <button type="button" role="menuitem" onClick={() => act('ask')}><MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />Ask</button>
       <OutlineVisualStyle />
     </div>
+    </BodyPortal>
   );
 }
 
