@@ -54,6 +54,9 @@
 
 /* Floating things get the deeper shadow. */
 :is(.c-tutor-bubble, .c-toast, .c-tip, .wt-resume, .c-drop-hint, .c-timer-pop .focus-card, .c-menu, .c-sheet) { box-shadow: var(--lg-highlight), var(--lg-depth-float) !important; }
+/* The toast is light glass now, so its text is ink (it was light text for the old dark toast). */
+.c-toast { color: var(--ink); }
+.c-toast .c-btn--quiet { color: var(--olive-ink); }
 
 /* The Tutor bubble: a round pane in the bottom-right corner, label on hover. */
 .c-tutor-bubble {

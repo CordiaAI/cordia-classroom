@@ -14,6 +14,7 @@ import StudyAidPanel from '../../components/StudyAidPanel';
 import StudyDocument from '../../components/StudyDocument';
 import OutlineEditor from '../../components/OutlineEditor';
 import { newRequestId } from '../../lib/guideCreate';
+import { classLabel } from '../../lib/classLabel';
 import Menu from '../../components/Menu';
 import ClassChip from '../../components/ClassChip';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -252,7 +253,7 @@ export default function GuidePage() {
     const data = await apiFetch('/guides/' + id + '/move', { method: 'PATCH', body: JSON.stringify({ folder_id: folderId }) });
     if (data && !data.detail) {
       setGuide(current => ({ ...current, folder_id: folderId }));
-      const name = classes.find(item => item.id === folderId)?.name;
+      const name = classLabel(classes.find(item => item.id === folderId)?.name).title;
       setToast(folderId ? `Added to ${name || 'class'}` : 'Removed from its class');
       loadSharing();
     } else setToast(apiErrorMessage(data?.detail, "That class change didn't save."));
@@ -369,7 +370,7 @@ export default function GuidePage() {
               label: guide.folder_id ? 'Move to class' : 'Add to class',
               icon: FolderInput,
               items: [
-                ...classes.map(folder => ({ label: folder.name, current: guide.folder_id === folder.id, onSelect: () => moveToClass(folder.id) })),
+                ...classes.map(folder => ({ key: folder.id, label: classLabel(folder.name).title, meta: classLabel(folder.name).code, current: guide.folder_id === folder.id, onSelect: () => moveToClass(folder.id) })),
                 ...(guide.folder_id ? [{ label: 'No class', onSelect: () => moveToClass(null) }] : []),
                 ...(classes.length ? [] : [{ label: 'Make a class in Library', onSelect: () => router.push('/library') }]),
               ],
