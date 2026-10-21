@@ -1,7 +1,8 @@
 """
 Single source of truth for which model each task uses and how much it may write.
 
-Provider: Groq when GROQ_API_KEY is set (its OpenAI-compatible API; see services.llm), otherwise
+Provider: Anthropic (Claude, through the official SDK; see services.llm_calls) when
+ANTHROPIC_API_KEY is set, else Groq when GROQ_API_KEY is set (its OpenAI-compatible API), else
 OpenAI. The defaults below follow the provider.
 
 Swap a model without a deploy by changing an env var (Fly: `fly secrets set ...` restarts the
@@ -30,13 +31,19 @@ BUILD = "build"
 LIGHT = "light"
 VISION = "vision"
 
-GROQ = bool(os.getenv("GROQ_API_KEY", "").strip())
+ANTHROPIC = bool(os.getenv("ANTHROPIC_API_KEY", "").strip())
+GROQ = not ANTHROPIC and bool(os.getenv("GROQ_API_KEY", "").strip())
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
+CLAUDE_MODEL = os.getenv("ANTHROPIC_MODEL", "").strip() or "claude-opus-5-5"
 _DEFAULTS = (
-    {BUILD: "openai/gpt-oss-120b", LIGHT: "openai/gpt-oss-120b", VISION: "qwen/qwen3.8-27b"} if GROQ
+    {BUILD: CLAUDE_MODEL, LIGHT: CLAUDE_MODEL, VISION: CLAUDE_MODEL} if ANTHROPIC
+    else {BUILD: "openai/gpt-oss-120b", LIGHT: "openai/gpt-oss-120b", VISION: "qwen/qwen3.8-27b"} if GROQ
     else {BUILD: "gpt-4o", LIGHT: "gpt-4o-mini", VISION: "gpt-4o"}
 )
+# Claude's effort per role: guides and questions must be complete and exact; Tutor answers
+# and small jobs are quick.
+CLAUDE_EFFORT = {BUILD: "high", LIGHT: "low", VISION: "medium"}
 BUILD_MODEL = os.getenv("CLASSROOM_BUILD_MODEL", "").strip() or _DEFAULTS[BUILD]
 LIGHT_MODEL = os.getenv("CLASSROOM_LIGHT_MODEL", "").strip() or _DEFAULTS[LIGHT]
 VISION_MODEL = os.getenv("CLASSROOM_VISION_MODEL", "").strip() or _DEFAULTS[VISION]

@@ -8,7 +8,7 @@ You are a senior full-stack engineer maintaining a production Chrome extension +
 - **Backend** (FastAPI on Fly.io): `backend/services/llm.py` (all AI generation), `backend/services/text_processing.py` (content cleaning/chunking), `backend/main.py` (routes)
 - **Frontend** (Next.js on Vercel): `web/` — guide viewer, NCLEX quiz, flashcards, AI chat
 - **PPTX**: `backend/services/file_extraction.py` (uploaded PPTX text via python-pptx) and `backend/services/pptx_rendering.py` (server-side slide rendering)
-- **AI**: Groq when `GROQ_API_KEY` is set (backend `services/models.py`, web `web/lib/server/aiProvider.mjs`): `openai/gpt-oss-120b` for study guides, chat/Tutor, quizzes and notes; `qwen/qwen3.8-27b` for vision; `whisper-large-v3-turbo` for recording. Otherwise OpenAI: GPT-4o for study guides, vision and chat/Tutor; GPT-4o-mini for large batches, quizzes and SmartNotes
+- **AI**: Anthropic when `ANTHROPIC_API_KEY` is set (backend `services/models.py` + `services/llm_calls.py`, web `web/lib/server/aiProvider.mjs` `chatProvider` + `aiChat.mjs`): `claude-opus-5-5` for everything (effort high for guides/questions, low for Tutor and small jobs; `ANTHROPIC_MODEL` overrides). Lecture transcription stays on Whisper (`whisper-large-v3-turbo` on Groq, else OpenAI). Without the Anthropic key: Groq when `GROQ_API_KEY` is set (`openai/gpt-oss-120b`, `qwen/qwen3.8-27b` for vision), otherwise OpenAI (GPT-4o / GPT-4o-mini)
 - **DB**: Supabase (PostgreSQL) — `study_guides`, `quiz_attempts`, `study_sessions`, `folders`, `user_streaks`
 - **Deploy**: Frontend auto-deploys on `git push`. Backend requires manual `cd backend && fly deploy`
 

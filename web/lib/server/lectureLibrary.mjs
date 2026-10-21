@@ -7,7 +7,8 @@
 // Storage: tables lectures + lecture_todos (supabase/migrations/20261019120000_lectures.sql),
 // read and written with the service role, always filtered to the signed-in student.
 import { sensibleTitle } from '../noteMeta.mjs';
-import { aiProvider } from './aiProvider.mjs';
+import { chatProvider } from './aiProvider.mjs';
+import { aiChat } from './aiChat.mjs';
 import { outlineHtml } from '../lectureOutline.mjs';
 
 export { outlineHtml };
@@ -134,9 +135,8 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
   const apiBase = (env.CLASSROOM_API_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
   const supabaseUrl = (env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
-  const provider = aiProvider(env);
+  const provider = chatProvider(env);
   const openaiKey = provider.key;
-  const model = provider.chatModel;
   const enabled = Boolean(supabaseUrl && serviceKey);
   const NOT_SET_UP = { status: 503, body: { detail: "Lectures aren't set up on this site yet.", code: 'not_configured' } };
 
@@ -157,36 +157,11 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
     }
   }
 
-  // One chat call. Groq's gpt-oss reasons before answering and that counts against max_tokens,
-  // so reasoning is kept low and the budget generous; a cut-off answer would not parse.
+  // One writing call; null when it failed. A cut-off answer would not parse, so it is logged.
   async function complete(system, user, { json = false, maxTokens = 8000 } = {}) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 55000);
-    try {
-      const response = await fetchImpl(`${provider.base}/chat/completions`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model, temperature: 0.2, max_tokens: maxTokens,
-          ...(json ? { response_format: { type: 'json_object' } } : {}),
-          ...(provider.name === 'groq' ? { reasoning_effort: 'low' } : {}),
-          messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-        }),
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        console.error('Lecture AI call failed', response.status, (await response.text().catch(() => '')).slice(0, 300));
-        return null;
-      }
-      const choice = (await response.json())?.choices?.[0];
-      if (choice?.finish_reason === 'length') console.error('Lecture AI answer was cut off at', maxTokens, 'tokens');
-      return choice?.message?.content || null;
-    } catch (error) {
-      console.error('Lecture AI call failed', error?.name || error);
-      return null;
-    } finally {
-      clearTimeout(timer);
-    }
+    const out = await aiChat(provider, { system, user, maxTokens, json, timeoutMs: 55000, fetchImpl });
+    if (out?.cutOff) console.error('Lecture AI answer was cut off at', maxTokens, 'tokens');
+    return out?.text || null;
   }
 
   async function analyze(text, { lectureDate, classes }) {

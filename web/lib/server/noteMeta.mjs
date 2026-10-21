@@ -9,7 +9,8 @@
 //     remade only when the note has grown by half since it was made.
 // covers(): every cover this student has, for the Notes page.
 import { createVisualService } from './napkinVisual.mjs';
-import { aiProvider } from './aiProvider.mjs';
+import { chatProvider } from './aiProvider.mjs';
+import { aiChat } from './aiChat.mjs';
 
 import { DEFAULT_TITLE, MIN_CHARS, heuristicTitle, htmlToText, isDefaultTitle, needsCover } from '../noteMeta.mjs';
 
@@ -24,9 +25,8 @@ export function createNoteMetaService({ env = process.env, fetch: fetchImpl = gl
   const apiBase = (env.CLASSROOM_API_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
   const supabaseUrl = (env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
-  const provider = aiProvider(env);
+  const provider = chatProvider(env);
   const openaiKey = provider.key;
-  const chatModel = provider.chatModel;
   const visuals = createVisualService({ env, fetch: fetchImpl, ...(sleep ? { sleep } : {}), ...(now ? { now } : {}) });
 
   const db = (path, init = {}) => fetchImpl(`${supabaseUrl}${path}`, {
@@ -68,23 +68,14 @@ export function createNoteMetaService({ env = process.env, fetch: fetchImpl = gl
   // One small AI call for both the title and the cover outline. Null when AI isn't set up.
   async function label(text) {
     if (!openaiKey) return null;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+    const out = await aiChat(provider, { system: META_RULES, user: text.slice(0, 12000), maxTokens: 400, json: true, timeoutMs: 15000, fetchImpl });
+    if (!out) return null;
     try {
-      const response = await fetchImpl(`${provider.base}/chat/completions`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: chatModel, temperature: 0.2, max_tokens: 400, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: META_RULES }, { role: 'user', content: text.slice(0, 12000) }] }),
-        signal: controller.signal,
-      });
-      if (!response.ok) return null;
-      const parsed = JSON.parse((await response.json())?.choices?.[0]?.message?.content || '{}');
+      const parsed = JSON.parse(out.text || '{}');
       const title = String(parsed.title || '').trim().replace(/^["']|["'.]+$/g, '').slice(0, 80);
       return { title, outline: String(parsed.outline || '').trim().slice(0, 1800) };
     } catch {
       return null;
-    } finally {
-      clearTimeout(timer);
     }
   }
 

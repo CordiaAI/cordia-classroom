@@ -1,6 +1,7 @@
-// Server-only: which AI the web app's routes call (notes, titles, lecture analysis, transcription).
-// Groq when GROQ_API_KEY is set (an OpenAI-compatible API, including Whisper transcription),
-// otherwise OpenAI with OPENAI_API_KEY. `key` is '' when neither is set.
+// Server-only: which AI the web app's routes call. Writing (notes, titles, lecture outlines) goes
+// to Anthropic when ANTHROPIC_API_KEY is set (chatProvider below). Transcription stays here:
+// Groq when GROQ_API_KEY is set (Whisper), otherwise OpenAI with OPENAI_API_KEY. `key` is ''
+// when neither is set.
 export function aiProvider(env = process.env) {
   if (env.GROQ_API_KEY) {
     return {
@@ -18,4 +19,12 @@ export function aiProvider(env = process.env) {
     chatModel: env.CLASSROOM_LECTURE_CHAT_MODEL || 'gpt-4o-mini',
     transcribeModel: env.CLASSROOM_TRANSCRIBE_MODEL || 'gpt-4o-mini-transcribe',
   };
+}
+
+// The provider for writing: Claude when ANTHROPIC_API_KEY is set, else the one above.
+export function chatProvider(env = process.env) {
+  if (env.ANTHROPIC_API_KEY) {
+    return { name: 'anthropic', key: env.ANTHROPIC_API_KEY, chatModel: env.ANTHROPIC_MODEL || 'claude-opus-5-5' };
+  }
+  return aiProvider(env);
 }

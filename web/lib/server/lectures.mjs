@@ -9,7 +9,8 @@
 // Minutes are metered in Supabase (feature "lecture_minute") when SUPABASE_SERVICE_ROLE_KEY is
 // set and the lecture migration is applied; until then recording works and is not counted.
 
-import { aiProvider } from './aiProvider.mjs';
+import { aiProvider, chatProvider } from './aiProvider.mjs';
+import { aiChat } from './aiChat.mjs';
 export const LIMITS = { free: 120, pro: 1500 };
 export const MAX_CHUNK_BYTES = 4_300_000; // under Vercel's 4.5 MB request limit
 const FEATURE = 'lecture_minute';
@@ -61,7 +62,9 @@ function userIdFromToken(authorization) {
 export function createLectureService({ env = process.env, fetch: fetchImpl = globalThis.fetch, sleep = sleepReal, now = () => new Date() } = {}) {
   const provider = aiProvider(env);
   const openaiKey = provider.key;
-  const { transcribeModel, chatModel } = provider;
+  const { transcribeModel } = provider;
+  // Notes and titles are written by chatProvider (Claude when set); audio stays with Whisper.
+  const writer = chatProvider(env);
   const supabaseUrl = (env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
   const metered = Boolean(supabaseUrl && serviceKey);
@@ -173,18 +176,15 @@ export function createLectureService({ env = process.env, fetch: fetchImpl = glo
     const who = await account(authorization);
     if (!who) return { status: 401, body: { detail: 'Sign in again.' } };
     const lines = segments.filter(item => String(item?.text || '').trim()).sort((a, b) => a.start_ms - b.start_ms).map(item => `[${Math.round(item.start_ms)}] ${String(item.text).trim()}`);
-    if (!lines.length || !openaiKey) return { status: 200, body: { notes: [], class_id: '' } };
+    if (!lines.length || !writer.key) return { status: 200, body: { notes: [], class_id: '' } };
     const classList = classes.slice(0, 200).map(item => `${item.id}: ${item.name}`).join('\n') || '(none)';
-    const data = await openai('/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: chatModel, temperature: 0.2, max_tokens: 1400, response_format: { type: 'json_object' },
-        messages: [{ role: 'system', content: NOTES_RULES }, { role: 'user', content: `Classes:\n${classList}\n\nTranscript (each line starts with [start_ms]):\n${lines.join('\n').slice(-24000)}` }],
-      }),
-    }, { timeoutMs: 25000 });
+    const out = await aiChat(writer, {
+      system: NOTES_RULES,
+      user: `Classes:\n${classList}\n\nTranscript (each line starts with [start_ms]):\n${lines.join('\n').slice(-24000)}`,
+      maxTokens: 1400, json: true, timeoutMs: 25000, fetchImpl,
+    });
     let parsed = {};
-    try { parsed = JSON.parse(data?.choices?.[0]?.message?.content || '{}'); } catch { parsed = {}; }
+    try { parsed = JSON.parse(out?.text || '{}'); } catch { parsed = {}; }
     const starts = segments.map(item => Math.round(item.start_ms)).sort((a, b) => a - b);
     const items = (parsed.notes || []).filter(item => ['heading', 'definition', 'term', 'exam'].includes(item?.kind) && String(item?.text || '').trim()).slice(0, 40).map(item => {
       const at = Number(item.at_ms) || 0;
@@ -197,13 +197,9 @@ export function createLectureService({ env = process.env, fetch: fetchImpl = glo
   async function title(authorization, { text = '' } = {}) {
     const who = await account(authorization);
     if (!who) return { status: 401, body: { detail: 'Sign in again.' } };
-    if (!openaiKey || String(text).trim().length < 40) return { status: 200, body: { title: '' } };
-    const data = await openai('/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: chatModel, temperature: 0.2, max_tokens: 30, messages: [{ role: 'system', content: TITLE_RULES }, { role: 'user', content: String(text).slice(0, 6000) }] }),
-    }, { timeoutMs: 12000 });
-    const raw = String(data?.choices?.[0]?.message?.content || '').trim().replace(/^["']|["'.]+$/g, '');
+    if (!writer.key || String(text).trim().length < 40) return { status: 200, body: { title: '' } };
+    const out = await aiChat(writer, { system: TITLE_RULES, user: String(text).slice(0, 6000), maxTokens: 30, timeoutMs: 12000, fetchImpl });
+    const raw = String(out?.text || '').trim().replace(/^["']|["'.]+$/g, '');
     return { status: 200, body: { title: raw.slice(0, 120) } };
   }
 
