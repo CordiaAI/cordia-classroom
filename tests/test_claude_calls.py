@@ -74,6 +74,19 @@ class ClaudeCallTests(unittest.TestCase):
             self.assertEqual(fresh.VISION_MODEL, "claude-sonnet-5-5")
         importlib.reload(models)
 
+    def test_a_leftover_model_of_another_provider_is_ignored(self):
+        import importlib
+        from services import models
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "k", "CLASSROOM_BUILD_MODEL": "gpt-4o",
+                                       "CLASSROOM_VISION_MODEL": "openai/gpt-oss-120b", "CLASSROOM_LIGHT_MODEL": "claude-haiku-5-5"}):
+            fresh = importlib.reload(models)
+            self.assertEqual(fresh.BUILD_MODEL, "claude-sonnet-5-5")
+            self.assertEqual(fresh.VISION_MODEL, "claude-sonnet-5-5")
+            self.assertEqual(fresh.LIGHT_MODEL, "claude-haiku-5-5")
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "", "GROQ_API_KEY": "g", "CLASSROOM_BUILD_MODEL": "claude-sonnet-5-5"}):
+            self.assertEqual(importlib.reload(models).BUILD_MODEL, "openai/gpt-oss-120b")
+        importlib.reload(models)
+
 
 if __name__ == "__main__":
     unittest.main()
