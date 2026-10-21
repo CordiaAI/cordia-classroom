@@ -2,7 +2,8 @@
 
 A message is answered by one of: a browser command (capture / find material),
 organizing a guide or note into a class, building a guide or practice set from
-the selected material, editing the selected guide's outline, or a grounded Tutor reply.
+the selected material, editing the selected guide's outline, an app action (open a guide, class or
+page; move, rename or delete a guide; make a class, notes page or guide), or a grounded Tutor reply.
 """
 import os
 import re
@@ -15,12 +16,12 @@ from auth_utils import get_user_id
 from ids import require_uuid
 from database import get_supabase
 from rate_limit import limiter
-from routers import guides, smart_notes
+from routers import folders, guides, smart_notes
 from schemas import ChatRequest, ChatResponse
 from services.entitlements import record, require
 from services.guidance import learning_guidance, style_instruction
 from services.llm import (
-    answer_question, edit_outline, explain_retain_answer, generate_practice_guide, generate_study_guide,
+    answer_question, edit_outline, explain_retain_answer, generate_practice_guide, generate_study_guide, plan_app_action,
     study_guide_is_complete, study_guide_to_flashcards,
 )
 from services.text_processing import chunk_text, clean_text, html_to_text
@@ -52,6 +53,29 @@ def _asks_to_edit_outline(question: str) -> bool:
     if QUESTION_START.search(question) or not OUTLINE_EDIT_VERB.search(question):
         return False
     return bool(OUTLINE_EDIT_ALWAYS.search(question) or OUTLINE_EDIT_TARGET.search(question))
+
+
+# Requests to do something in the app ("open my BUS 101 class", "put this guide in Biology",
+# "rename it to Week 3", "make a class called Art History"). The planner decides; it can say none.
+APP_ALWAYS = re.compile(r"\b(?:open|go to|take me|bring up|pull up|navigate|move|put|file|rename|delete|trash)\b", re.IGNORECASE)
+APP_VERB = re.compile(r"\b(?:create|make|start|new|add|show me)\b", re.IGNORECASE)
+APP_NOUN = re.compile(
+    r"\b(?:class(?:es)?|folders?|courses?|library|calendar|dashboard|progress|settings|canvas|assistant|"
+    r"page|guides?|study ?guides?|notes? page|flashcards|quiz|practice)\b",
+    re.IGNORECASE,
+)
+PAGES = {
+    "dashboard": ("/dashboard", "Dashboard"), "library": ("/library", "Library"), "calendar": ("/calendar", "Calendar"),
+    "progress": ("/progress", "Progress"), "settings": ("/settings", "Settings"), "canvas": ("/canvas", "Canvas"),
+    "assistant": ("/assistant", "Assistant"),
+}
+GUIDE_TABS = {"flashcards": "/flashcards/study?guideId={id}", "quiz": "/quiz/{id}", "practice": "/practice/{id}"}
+
+
+def _asks_for_app_action(question: str) -> bool:
+    if QUESTION_START.search(question):
+        return False
+    return bool(APP_ALWAYS.search(question) or (APP_VERB.search(question) and APP_NOUN.search(question)))
 
 
 PRACTICE_REQUEST = re.compile(r"\b(create|make|generate|build)\b.*\bpractice\b.*\b(problems?|questions?|guide)\b", re.IGNORECASE)
@@ -207,6 +231,78 @@ def _create_guide(user_id: str, material: Material, class_id: Optional[str], fea
     )
 
 
+def _app_action(user_id: str, question: str, material: Material, authorization: str) -> Optional[ChatResponse]:
+    """Do what the student asked in the app, using only their own guides and classes; None when it isn't an app action."""
+    supabase = get_supabase()
+    owned_guides = supabase.table("study_guides").select("id,title,folder_id").eq("user_id", user_id) \
+        .order("updated_at", desc=True).limit(300).execute().data or []
+    owned_classes = supabase.table("folders").select("id,name").eq("user_id", user_id).limit(200).execute().data or []
+    plan = plan_app_action(question, material.guide, owned_guides, owned_classes)
+    action = plan.get("action")
+    guide = next((item for item in owned_guides if item["id"] == plan.get("guide_id")), None)
+    folder = next((item for item in owned_classes if item["id"] == plan.get("class_id")), None)
+    title = lambda item: (item or {}).get("title") or "Untitled guide"
+    name = lambda item: (item or {}).get("name") or "Untitled class"
+    guide_link = lambda item: {"href": f"/guide/{item['id']}", "label": title(item)}
+    class_link = lambda item: {"href": f"/folder/{item['id']}", "label": name(item)}
+    needs_guide = action in {"move", "rename_guide", "delete_guide", "make"} or (action == "open" and plan.get("guide_id"))
+    needs_class = action == "rename_class" or (action == "open" and plan.get("class_id")) or (action == "move" and plan.get("class_id"))
+    if action == "missing" or (needs_guide and not guide) or (needs_class and not folder):
+        missing = str(plan.get("name") or "").strip()[:100]
+        return ChatResponse(answer=(
+            f"I couldn't find “{missing}” in your guides or classes." if missing
+            else "I couldn't find that in your guides or classes. Say its name as it shows in Library."
+        ), action="not_found")
+
+    if action == "open":
+        if guide:
+            tab = GUIDE_TABS.get(plan.get("tab"))
+            link = {"href": tab.format(id=guide["id"]) if tab else f"/guide/{guide['id']}", "label": title(guide)}
+        elif folder:
+            link = class_link(folder)
+        elif plan.get("page") in PAGES:
+            href, label = PAGES[plan["page"]]
+            link = {"href": href, "label": label}
+        else:
+            return None
+        return ChatResponse(answer=f"Opening {link['label']}.", action="navigate", link=link)
+    if action == "move":
+        guides.move_guide(guide["id"], guides.MoveGuideRequest(folder_id=folder["id"] if folder else None), authorization)
+        if not folder:
+            return ChatResponse(answer=f"Took {title(guide)} out of its class.", action="organized_material", link=guide_link(guide))
+        return ChatResponse(answer=f"Moved {title(guide)} to {name(folder)}.", action="organized_material", link=class_link(folder))
+    if action == "rename_guide" and str(plan.get("title") or "").strip():
+        renamed = guides.rename_guide(guide["id"], guides.RenameGuideRequest(title=str(plan["title"])[:500]), authorization)
+        return ChatResponse(answer=f"Renamed {title(guide)} to {renamed['title']}.", action="renamed_guide",
+                            link={"href": f"/guide/{guide['id']}", "label": renamed["title"]})
+    if action == "create_class" and str(plan.get("name") or "").strip():
+        created = folders.create_folder(folders.FolderNameRequest(name=str(plan["name"])[:100]), authorization)["folder"]
+        return ChatResponse(answer=f"Made the class {name(created)}.", action="created_class", link=class_link(created))
+    if action == "rename_class" and str(plan.get("name") or "").strip():
+        renamed = folders.rename_folder(folder["id"], folders.FolderNameRequest(name=str(plan["name"])[:100]), authorization)["folder"]
+        return ChatResponse(answer=f"Renamed {name(folder)} to {name(renamed)}.", action="renamed_class", link=class_link(renamed))
+    if action == "delete_guide":
+        # Deleting can't be undone, so the student confirms it with a button.
+        return ChatResponse(answer=f"Delete {title(guide)}? This can't be undone.", action="confirm_delete",
+                            confirm={"kind": "delete_guide", "guide_id": guide["id"], "title": title(guide)})
+    if action == "new_note":
+        note_title = str(plan.get("title") or "").strip()[:500] or "Untitled notes"
+        created = guides.save_guide(guides.SaveGuideRequest(
+            title=note_title, notes="", source_type="notes", folder_id=folder["id"] if folder else None,
+        ), authorization)["guide"]
+        return ChatResponse(answer=f"Made a notes page, {title(created)}.", action="navigate", link=guide_link(created))
+    if action == "make":
+        kind = "practice" if plan.get("kind") == "practice" else "guide"
+        loaded = _owned_row("study_guides", "id,title,folder_id,study_guide,notes,source_url", guide["id"], user_id, "guide")
+        content = (loaded.get("study_guide") or loaded.get("notes") or "")[:MAX_CONTENT_LENGTH]
+        if not content.strip():
+            return ChatResponse(answer=f"{title(guide)} has no material to build from yet.")
+        source = {"type": "study_guide", "id": loaded["id"], "title": title(loaded)}
+        made = _create_guide(user_id, Material(content, source, guide=loaded), loaded.get("folder_id"), kind)
+        return made.model_copy(update={"link": guide_link(made.guide)})
+    return None
+
+
 def _verified_retain_context(body: ChatRequest, content: str):
     """A missed practice question the Tutor explains must still match the guide it came from."""
     retain = body.retain_context
@@ -296,11 +392,21 @@ def _edit_outline(user_id: str, material: Material, question: str) -> Optional[C
 
 def _reply(body: ChatRequest, user_id: str, question: str, material: Material, class_id: Optional[str],
            skill: Optional[str], turn: Optional[dict], authorization: str) -> ChatResponse:
+    # First: "open my calendar" or "make flashcards for X" also read as the Plan or Retain skill.
+    # Not when the request plainly works on the selected material or the student picked a class above.
+    about_material = bool(material.content.strip() and PRACTICE_REQUEST.search(question))
+    if (skill in {None, "explain", "build_guide", "practice", "organize", "plan", "retain"} and not body.class_id
+            and not about_material and _asks_for_app_action(question)):
+        done = _app_action(user_id, question, material, authorization)
+        if done:
+            return done
     if skill == "plan" and not material.content.strip():
         return ChatResponse(
             answer="Open Canvas calendar reminders on the Dashboard to review what is due today and what is coming next.",
             action="opened_plan_help",
         )
+    if skill == "organize" and body.class_id:
+        return _organize(material, body.class_id, authorization)
     if skill == "organize":
         return _organize(material, body.class_id, authorization)
     # Before the empty-material check: a new notes page can be edited while still empty.

@@ -10,7 +10,7 @@ export default function TutorPage() {
     <div className="tutor-page">
       <h1 className="sr-only">Tutor</h1>
       <div className="c-glass tutor-page-panel">
-        <AIChatWidget preferredGuideId={lastGuide()?.id || ''} />
+        <AIChatWidget preferredGuideId={lastGuide()?.id || ''} freshOnMount />
       </div>
       <style jsx>{`
         .tutor-page { display: grid; justify-items: center; }

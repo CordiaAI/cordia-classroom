@@ -128,6 +128,10 @@ class ChatResponse(BaseModel):
     action: Optional[str] = None
     guide: Optional[dict] = None
     source: Optional[dict] = None
+    # An app page the reply opens or points to: {"href", "label"}.
+    link: Optional[dict] = None
+    # An action the student must confirm with a button: {"kind": "delete_guide", "guide_id", "title"}.
+    confirm: Optional[dict] = None
     skill: Optional[str] = None
     session: Optional[dict] = None
 

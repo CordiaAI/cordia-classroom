@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
 import NapkinVisual from './NapkinVisual';
-import ExplanationPreference from './ExplanationPreference';
-import { ArrowUp, BookOpen, Layers, ListTree, MessageCircle, MessagesSquare, Paperclip, PencilRuler, Plus, SlidersHorizontal, X as CloseIcon } from 'lucide-react';
+import { ArrowUp, BookOpen, Layers, ListTree, MessageCircle, MessagesSquare, Paperclip, PencilRuler, Plus, Trash2, X as CloseIcon } from 'lucide-react';
 import { lastGuide } from '../lib/userStore';
 import { walkthroughEvent } from '../lib/walkthrough';
+import { tutorMode } from '../lib/tutorPrefs';
 import TutorSelect from './TutorSelect';
 import CordiaLoader from './CordiaLoader';
 import { inlineParts, parseTutorAnswer } from '../lib/tutorFormat.mjs';
@@ -89,7 +89,8 @@ const SKILL_PROGRESS = {
   organize: 'Organizing study material…',
 };
 
-export default function AIChatWidget({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '' }) {
+// freshOnMount: the full Tutor page opens on a new chat; the side panel starts one each time it opens.
+export default function AIChatWidget({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '', freshOnMount = false }) {
   const router = useRouter();
   const [loadedGuides, setLoadedGuides] = useState([]);
   const [notes, setNotes] = useState([]);
@@ -98,6 +99,8 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const [attachments, setAttachments] = useState([]);
   const [browserMaterial, setBrowserMaterial] = useState(null);
   const [session, setSession] = useState(null);
+  // The mode chosen in Settings › Tutor; Auto ('') picks from what the student asks.
+  const [savedMode, setSavedMode] = useState('');
   const [skillOverride, setSkillOverride] = useState('');
   const [targetClassId, setTargetClassId] = useState('');
   const [input, setInput] = useState('');
@@ -109,11 +112,11 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const sendingRef = useRef(false);
   const [extracting, setExtracting] = useState(false);
   const [localError, setLocalError] = useState('');
-  const [optionsOpen, setOptionsOpen] = useState(false);
+  // Set when the Tutor opens: the next session load starts a new chat (the last one is saved).
+  const [freshPending, setFreshPending] = useState(false);
   const [chatsOpen, setChatsOpen] = useState(false);
   const [savedChats, setSavedChats] = useState(null);
   const [chatsError, setChatsError] = useState('');
-  const [explainOpen, setExplainOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState(-1);
   const recognitionRef = useRef(null);
@@ -323,13 +326,13 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   // Auto keeps the skill the Tutor was last using, except one-time actions (organizing into a
   // class): after one of those, Auto is Explain again, so the next question isn't asked for a class.
   const autoSkill = general || ONE_TIME_SKILLS.includes(session?.active_skill) ? 'explain' : session?.active_skill || 'explain';
-  const selectedSkillId = skillOverride || autoSkill;
+  const selectedSkillId = skillOverride || savedMode || autoSkill;
   const selectedSkill = session?.skills?.find(item => item.id === selectedSkillId);
   const hasRequiredContext = (Boolean(material) && (material.kind !== 'browser' || Boolean(material.content))) || selectedSkill?.requires_context === false || (general && ['', 'explain'].includes(skillOverride));
   const needsTargetClass = selectedSkillId === 'organize';
   const canSubmit = hasRequiredContext && (!needsTargetClass || Boolean(targetClassId));
   const remaining = MAX_MESSAGES - messages.filter(message => message.role === 'user').length;
-  const busy = loading || (session?.status && session.status !== 'idle');
+  const busy = loading || freshPending || (session?.status && session.status !== 'idle');
   const progressLabel = SKILL_PROGRESS[session?.active_skill] || 'Cordia is working…';
 
   // "Explain" and "Ask why" send at once so the Tutor explains without another tap.
@@ -338,17 +341,6 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     pendingSend.current = '';
     sendMessage();
   }, [input, canSubmit, busy, session?.id, contextKey]);
-
-  async function changeSkill(nextSkill) {
-    setSkillOverride(nextSkill);
-    if (!session?.id || !nextSkill) return;
-    const next = await apiFetch('/tutor/session/skill', {
-      method: 'PATCH',
-      body: JSON.stringify({ session_id: session.id, skill: nextSkill }),
-    });
-    if (next?.id) setSession(next);
-    else setLocalError(next?.detail || 'Could not change Tutor skill.');
-  }
 
   async function attachFiles(list) {
     const picked = Array.from(list || []);
@@ -425,7 +417,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         ...(material?.kind === 'browser' && material.url ? { context_url: material.url } : {}),
         session_id: session.id,
         conversation_version: session.conversation_version,
-        skill: skillOverride || (autoSkill !== session.active_skill ? autoSkill : null),
+        skill: skillOverride || savedMode || (autoSkill !== session.active_skill ? autoSkill : null),
         retain_context: retainContext || undefined,
         class_id: needsTargetClass ? targetClassId : material?.folder_id || undefined,
         mode: 'short',
@@ -440,6 +432,11 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         setContextKey(`guide:${data.guide.id}`);
       }
     }
+    // The Tutor opened something in the app ("open my BUS 101 class").
+    if (data?.action === 'navigate' && data.link?.href) router.push(data.link.href);
+    // A renamed guide that is open refreshes like an edited outline does.
+    const renamedId = data?.action === 'renamed_guide' && data.link?.href?.match(/^\/guide\/([^/?]+)/)?.[1];
+    if (renamedId) window.dispatchEvent(new CustomEvent('cordia:outline-updated', { detail: { guideId: renamedId } }));
     // The Tutor changed a guide's outline: the guide page refreshes it in place.
     if (data?.action === 'outline_updated' && data.guide?.id) {
       window.dispatchEvent(new CustomEvent('cordia:outline-updated', { detail: { guideId: data.guide.id } }));
@@ -471,8 +468,34 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     });
   }, [chatsOpen]);
 
-  async function startChat({ guideId = null, resume = null } = {}) {
-    if (!session?.id || busy) return;
+  useEffect(() => {
+    const readMode = () => setSavedMode(tutorMode());
+    readMode();
+    if (freshOnMount && sessionStorage.getItem('cordiaTutorKeep') !== '1') setFreshPending(true);
+    sessionStorage.removeItem('cordiaTutorKeep');
+    const onVisibility = event => { if (event.detail?.open) setFreshPending(true); };
+    window.addEventListener('cordia:tutor-visibility', onVisibility);
+    window.addEventListener('cordia:tutor-mode', readMode);
+    return () => {
+      window.removeEventListener('cordia:tutor-visibility', onVisibility);
+      window.removeEventListener('cordia:tutor-mode', readMode);
+    };
+  }, []);
+
+  // Each time the Tutor opens it is on a new chat. The one before is saved under Past chats;
+  // nothing is started while a reply is still being worked on, or when the chat is already empty.
+  useEffect(() => {
+    if (!freshPending || !session?.id) return;
+    if (loading || (session.status && session.status !== 'idle') || !(session.messages || []).length) {
+      setFreshPending(false);
+      return;
+    }
+    const guide = contextKey.startsWith('guide:') ? contextKey.slice(6) : null;
+    startChat({ guideId: guide, opening: true }).finally(() => setFreshPending(false));
+  }, [freshPending, session?.id]);
+
+  async function startChat({ guideId = null, resume = null, opening = false } = {}) {
+    if (!session?.id || (busy && !opening)) return;
     setChatsError('');
     const next = await apiFetch('/tutor/session/new', {
       method: 'POST',
@@ -488,6 +511,18 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     setChatsOpen(false);
   }
 
+  async function deleteFromTutor(confirm) {
+    const done = await apiFetch(`/guides/${confirm.guide_id}`, { method: 'DELETE' });
+    if (!done?.deleted) { setLocalError(done?.detail || `Could not delete ${confirm.title}.`); return; }
+    setLoadedGuides(current => current.filter(item => item.id !== confirm.guide_id));
+    if (contextKey === `guide:${confirm.guide_id}`) setContextKey('none');
+    setSession(current => ({
+      ...current,
+      messages: (current?.messages || []).map(message => (message.confirm?.guide_id === confirm.guide_id ? { ...message, confirm: null, text: `Deleted ${confirm.title}.` } : message)),
+    }));
+    if (router.asPath.startsWith(`/guide/${confirm.guide_id}`)) router.push('/library');
+  }
+
   function openSource(source) {
     if (source?.type === 'study_guide') router.push('/guide/' + source.id);
     if (source?.type === 'smartnote') router.push('/smartnotes?id=' + source.id);
@@ -500,9 +535,6 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         <div className="cordia-tutor-title-row">
           <MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />
           <strong>Tutor</strong>
-          <button type="button" className="c-btn c-btn--quiet tutor-chats-btn" aria-pressed={chatsOpen} onClick={() => setChatsOpen(open => !open)} disabled={!session}>
-            <MessagesSquare size={18} strokeWidth={1.75} aria-hidden="true" />Chats
-          </button>
           {session?.browser_available && <span className="cordia-browser-status is-online" aria-label="Browser connected" title="Browser connected" />}
         </div>
         <div className="cordia-tutor-context" aria-label="Context">
@@ -515,15 +547,9 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
             ...(session?.browser_content_available ? [{ value: 'browser', label: browserMaterial?.title || 'Browser page', group: 'Browser' }] : []),
           ]} />
         </div>
-        <details className="tutor-context-controls" open={optionsOpen} onToggle={event => setOptionsOpen(event.currentTarget.open)}>
-        <summary><SlidersHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />Options</summary>
-        {/* Rendered only while Options is open: closed, these controls sat invisibly over "Ask anything". */}
-        {optionsOpen && <>
-        <TutorSelect label="Tutor skill" value={skillOverride} onChange={changeSkill} disabled={!session || busy} options={[
-          { value: '', label: `Auto · ${session?.skills?.find(item => item.id === autoSkill)?.label || 'Explain'}` },
-          // Only modes that work today are listed.
-          ...(session?.skills || [{ id: 'explain', label: 'Explain' }]).filter(item => item.available !== false).map(item => ({ value: item.id, label: item.label })),
-        ]} />
+        <button type="button" className="tutor-past-chats" aria-pressed={chatsOpen} onClick={() => setChatsOpen(open => !open)} disabled={!session}>
+          <MessagesSquare size={16} strokeWidth={1.75} aria-hidden="true" />{chatsOpen ? 'Back to chat' : 'Past chats'}
+        </button>
         {needsTargetClass && <TutorSelect label="Destination class" value={targetClassId} onChange={setTargetClassId} options={[
           { value: '', label: 'Choose destination class' },
           ...classes.map(item => ({ value: item.id, label: item.name })),
@@ -533,33 +559,6 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
             Browser unavailable. Open the Chrome side panel, choose an existing guide or SmartNote, or attach a file below.
           </p>
         )}
-        {attachments.length > 0 && (
-          <ul className="cordia-tutor-attachments" aria-label="Attached files">
-            {attachments.map(file => (
-              <li key={file.id}>
-                <span>{file.title}</span>
-                <button type="button" className="c-icon-btn" onClick={() => removeAttachment(file.id)} aria-label={`Remove ${file.title}`}><CloseIcon size={18} strokeWidth={1.75} aria-hidden="true" /></button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {contextKey === 'attachment' && combinedAttachments.trimmed.length > 0 && (
-          <p className="cordia-tutor-attach-note" role="status">Trimmed: {combinedAttachments.trimmed.join(', ')}</p>
-        )}
-        <input ref={fileRef} type="file" accept="*" multiple onChange={event => attachFiles(event.target.files)} hidden />
-        <button type="button" className={'cordia-tutor-attach' + (attachDropActive ? ' drop-target-active' : '')} onClick={() => fileRef.current?.click()} disabled={extracting || attachments.length >= MAX_ATTACHMENTS}>
-          <Paperclip size={18} strokeWidth={1.75} aria-hidden="true" />{extracting ? 'Reading…' : attachDropActive ? 'Drop' : attachments.length >= MAX_ATTACHMENTS ? `${MAX_ATTACHMENTS} files` : 'Attach'}
-        </button>
-        <button type="button" className="cordia-tutor-explain-toggle" onClick={() => setExplainOpen(open => !open)} aria-expanded={explainOpen}>
-          Explain style
-        </button>
-        {explainOpen && (
-          <div className="cordia-tutor-explain-panel">
-            <ExplanationPreference compact onSaved={() => setTimeout(() => setExplainOpen(false), 900)} />
-          </div>
-        )}
-        </>}
-        </details>
       </header>
 
       {chatsOpen ? (
@@ -626,9 +625,18 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
                 {item.title || item.url}
               </button>
             ))}
-            {message.guide && (
+            {message.link ? (
+              <button type="button" className="cordia-tutor-guide-link" onClick={() => router.push(message.link.href)}>
+                Open {message.link.label}
+              </button>
+            ) : message.guide?.title && (
               <button type="button" className="cordia-tutor-guide-link" onClick={() => router.push('/guide/' + message.guide.id)}>
                 Open {message.guide.title}
+              </button>
+            )}
+            {message.confirm?.kind === 'delete_guide' && index === messages.length - 1 && (
+              <button type="button" className="c-btn c-btn--secondary cordia-tutor-confirm is-danger" onClick={() => deleteFromTutor(message.confirm)} disabled={busy}>
+                <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />Delete {message.confirm.title}
               </button>
             )}
           </div>
@@ -644,7 +652,27 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
       </div>
       )}
 
-      <div className={`cordia-tutor-input${Recognition ? ' has-mic' : ''}`}>
+      {attachments.length > 0 && (
+        <div className="cordia-tutor-files">
+          <ul className="cordia-tutor-attachments" aria-label="Attached files">
+            {attachments.map(file => (
+              <li key={file.id}>
+                <span>{file.title}</span>
+                <button type="button" className="c-icon-btn" onClick={() => removeAttachment(file.id)} aria-label={`Remove ${file.title}`}><CloseIcon size={18} strokeWidth={1.75} aria-hidden="true" /></button>
+              </li>
+            ))}
+          </ul>
+          {contextKey === 'attachment' && combinedAttachments.trimmed.length > 0 && (
+            <p className="cordia-tutor-attach-note" role="status">Trimmed: {combinedAttachments.trimmed.join(', ')}</p>
+          )}
+        </div>
+      )}
+      <div className={`cordia-tutor-input${Recognition ? ' has-mic' : ''}${attachDropActive ? ' drop-target-active' : ''}`}>
+        <input ref={fileRef} type="file" accept="*" multiple onChange={event => attachFiles(event.target.files)} hidden />
+        <button type="button" className="cordia-tutor-clip" onClick={() => fileRef.current?.click()} disabled={extracting || attachments.length >= MAX_ATTACHMENTS}
+          aria-label={extracting ? 'Reading file' : attachments.length >= MAX_ATTACHMENTS ? `${MAX_ATTACHMENTS} files attached` : 'Attach files'} title="Attach files">
+          {extracting ? <CordiaLoader size={16} label="Reading" /> : <Paperclip size={18} strokeWidth={1.75} aria-hidden="true" />}
+        </button>
         <textarea
           value={input}
           onChange={event => setInput(event.target.value)}
@@ -682,7 +710,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         <small className="c-meta cordia-tutor-limit" role="status">
           {!session ? "Connecting to the Tutor… If this stays, refresh the page."
             : busy ? 'Cordia is still answering your last message.'
-              : remaining <= 0 ? 'This chat is full. Start a new chat in Chats.'
+              : remaining <= 0 ? 'This chat is full. Start a new chat in Past chats.'
                 : needsTargetClass ? 'Pick the class to put it in.'
                   : 'Pick a guide or attach a file above.'}
         </small>

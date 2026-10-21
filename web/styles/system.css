@@ -382,9 +382,10 @@ body:has(.about) .c-fab { display: none; }
 .tutor-select-options { border-radius:var(--r-input); background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
 .tutor-select-option { font:500 15px/1.5 var(--font-sans); color: var(--ink); }
 .tutor-select-option small { font-size: 13px; color: var(--muted); }
-.tutor-context-controls summary { display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; color: var(--ink); font:600 13px/1 var(--font-sans); cursor: pointer; list-style: none; }
-.tutor-context-controls[open] { display: grid; gap: 8px; }
-.cordia-tutor-attach, .cordia-tutor-explain-toggle { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius:var(--r-pill); background: var(--card); color: var(--ink); font:600 13px/1 var(--font-sans); cursor: pointer; justify-self: start; }
+/* Past chats sits where Options used to; the Tutor's options live in Settings › Tutor. */
+.tutor-past-chats { display: inline-flex; align-items: center; gap: 6px; justify-self: start; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius:var(--r-pill); background: transparent; color: var(--ink); font:600 13px/1 var(--font-sans); cursor: pointer; }
+.tutor-past-chats .lucide { color: var(--olive-ink); }
+.tutor-past-chats[aria-pressed='true'] { background: var(--olive-tint); color: var(--olive-ink); border-color: transparent; }
 .cordia-tutor-messages { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; }
 .cordia-tutor-message { font:500 15px/1.5 var(--font-sans); }
 .cordia-tutor-message.ai { background: var(--card); border: 1px solid var(--line); border-radius:var(--r-card); box-shadow: none; }
@@ -401,6 +402,12 @@ body:has(.about) .c-fab { display: none; }
 .cordia-tutor-input textarea:focus-visible { outline: none; }
 .cordia-tutor-input .cordia-tutor-send { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border: 0; border-radius:50%; background: var(--olive); color: var(--on-olive); cursor: pointer; }
 [data-theme='dark'] .cordia-tutor-input .cordia-tutor-send { background: var(--olive) !important; color: var(--ink) !important; }
+.cordia-tutor-input .cordia-tutor-clip, [data-theme='dark'] .cordia-tutor-input .cordia-tutor-clip { display: grid; place-items: center; width: 36px; height: 40px; min-height: 40px; flex: 0 0 auto; margin-left: -8px; border: 0; border-radius:50%; background: transparent !important; color: var(--muted-ink) !important; cursor: pointer; }
+.cordia-tutor-input .cordia-tutor-clip:hover:not(:disabled) { color: var(--olive-ink) !important; }
+.cordia-tutor-input.drop-target-active { outline: 2px dashed var(--olive); }
+.cordia-tutor-files { display: grid; gap: 4px; margin: 0 12px -4px; padding: 8px 12px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); }
+.cordia-tutor-confirm { display: inline-flex; gap: 6px; margin-top: 6px; }
+.tutor-mode-picker [aria-checked='true'] { background: var(--card); box-shadow: var(--shadow); }
 .cordia-tutor-limit { padding: 0 18px 10px; }
 .cordia-tutor-attachments { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .cordia-tutor-attachments li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font:500 13px/1.5 var(--font-sans); }
