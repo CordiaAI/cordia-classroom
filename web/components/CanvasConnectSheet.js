@@ -60,11 +60,6 @@ export default function CanvasConnectSheet({ school = '', initialDomain = '', on
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  function openCanvas() {
-    if (!host) { urlRef.current?.focus(); return; }
-    window.open(`https://${host}/profile/settings`, '_blank', 'noopener,noreferrer');
-  }
-
   async function connect(event) {
     event.preventDefault();
     if (!host || !token.trim() || !understood || busy) return;
@@ -112,7 +107,7 @@ export default function CanvasConnectSheet({ school = '', initialDomain = '', on
                 <span className="c-step-num" aria-hidden="true">1</span>
                 <h3 className="c-step-title"><ExternalLink {...ICON} />Open Canvas</h3>
                 <div className="c-step-body">
-                  <button type="button" className="c-btn c-btn--secondary ccs-step-btn" onClick={openCanvas}>Open settings</button>
+                  <p className="ccs-how">In Canvas, click <strong>Account</strong> (your picture, top left), then <strong>Settings</strong>. Scroll to <strong>Approved Integrations</strong> and click <strong>+ New Access Token</strong>.</p>
                 </div>
               </li>
               <li className="c-step">
@@ -155,7 +150,8 @@ export default function CanvasConnectSheet({ school = '', initialDomain = '', on
           .ccs .c-sheet-head { margin-bottom: 0; }
           .ccs-title { margin: 0; font: 500 28px/1.1 var(--font-display); }
           .ccs-form { display: grid; gap: 16px; }
-          .ccs-step-btn { justify-self: start; }
+          .ccs-how { margin: 0; color: var(--ink); font: 500 15px/1.55 var(--font-sans); }
+          .ccs-how strong { font-weight: 600; }
           .ccs-value { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 4px 0 14px; border-radius: 12px; background: var(--field); border: 1px solid var(--line); }
           .ccs-value .c-meta { min-width: 64px; }
           .ccs-date { flex: 1; min-width: 0; height: 40px; border: 0; background: transparent; color: var(--ink); font: 600 15px/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }

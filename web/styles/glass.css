@@ -200,3 +200,20 @@ body { touch-action: manipulation; }
 .cn-result .c-grow { display: grid; gap: 2px; }
 .cn-sheet > .c-meta { margin: 0; }
 @media (max-width: 560px) { .cn-actions { width: 100%; justify-content: flex-start; padding-left: 32px; } .cn-feed { padding-left: 20px; } }
+
+/* Quiz answers: green for right, red for wrong. The glass recipe above outranks the state
+   rules in system.css (its list holds a two-class selector), and the hover edge is
+   !important, so the states are restated here, last and stronger. */
+.quiz-option.quiz-option.quiz-option.quiz-option:is(.correct, .correct-shine, .correct-glow) {
+  background: var(--lg-sheen), var(--success-bg);
+  border-color: var(--success) !important;
+  box-shadow: 0 0 0 1px var(--success), var(--lg-highlight) !important;
+  color: var(--ink);
+}
+.quiz-option.quiz-option.quiz-option.quiz-option:is(.wrong, .wrong-shake) {
+  background: var(--lg-sheen), var(--error-bg);
+  border-color: var(--error) !important;
+  box-shadow: 0 0 0 1px var(--error), var(--lg-highlight) !important;
+  color: var(--ink);
+}
+.quiz-option.quiz-option.selected { border-color: var(--olive); box-shadow: 0 0 0 1px var(--olive), var(--lg-highlight); }
