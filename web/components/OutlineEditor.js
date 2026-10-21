@@ -7,6 +7,7 @@ import { KeptVisual, OutlineSelectMenu, PendingVisual, findAnchorBlock, useGuide
 
 const SAVE_MS = 900;
 const GAP = 12;
+const MIN_FIT = 160;
 
 // A guide's Outline, which is also where the student's own notes live: the AI's outline (if the
 // guide has material) and anything the student types, saved to the guide's notes as they go.
@@ -79,6 +80,15 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, p
     const side = window.matchMedia('(min-width: 1100px)').matches;
     const nodes = [...gutter.children].filter(node => node.dataset.anchor !== undefined);
     const blocks = nodes.map(node => findAnchorBlock(page, node.dataset.anchor));
+    // Each visual fits the height of the lines it was made from (never under MIN_FIT, to stay readable).
+    nodes.forEach((node, index) => {
+      const first = blocks[index];
+      const last = findAnchorBlock(page, node.dataset.anchor, { end: true });
+      const top = first?.getBoundingClientRect().top;
+      const bottom = Math.max(first?.getBoundingClientRect().bottom || 0, last?.getBoundingClientRect().bottom || 0);
+      if (first) node.style.setProperty('--oe-fit', `${Math.max(MIN_FIT, Math.round(bottom - top))}px`);
+      else node.style.removeProperty('--oe-fit');
+    });
     const order = nodes.map((node, index) => index).sort((x, y) => (blocks[x] && blocks[y] ? (blocks[x].compareDocumentPosition(blocks[y]) & 4 ? -1 : 1) : blocks[x] ? -1 : 1));
     if (side) {
       const top = gutter.getBoundingClientRect().top;

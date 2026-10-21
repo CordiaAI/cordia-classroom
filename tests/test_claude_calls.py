@@ -38,12 +38,12 @@ class ClaudeCallTests(unittest.TestCase):
         client = MagicMock()
         client.beta.messages.stream.return_value = stream
         with patch.object(models, "ANTHROPIC", True), patch.object(llm_calls, "log_usage"):
-            response = llm_calls.chat(client, "study_guide", model="claude-opus-5-5",
+            response = llm_calls.chat(client, "study_guide", model="claude-sonnet-5-5",
                                       messages=[{"role": "user", "content": "Make a guide."}],
                                       temperature=0.2, response_format={"type": "json_object"})
         sent = client.beta.messages.stream.call_args.kwargs
         self.assertNotIn("temperature", sent)
-        self.assertEqual(sent["output_config"], {"effort": "high"}, "guides get high effort")
+        self.assertEqual(sent["output_config"], {"effort": "medium"}, "guides get medium effort")
         self.assertEqual(sent["fallbacks"], "default")
         self.assertGreater(sent["max_tokens"], models.FEATURES["study_guide"].max_tokens)
         self.assertEqual(response.choices[0].message.content, '{"a": 1}')
@@ -58,9 +58,20 @@ class ClaudeCallTests(unittest.TestCase):
         client = MagicMock()
         client.beta.messages.stream.return_value = stream
         with patch.object(models, "ANTHROPIC", True), patch.object(llm_calls, "log_usage"):
-            response = llm_calls.chat(client, "tutor_short", model="claude-opus-5-5", messages=[{"role": "user", "content": "x"}])
+            response = llm_calls.chat(client, "tutor_short", model="claude-haiku-5-5", messages=[{"role": "user", "content": "x"}])
         self.assertEqual(response.choices[0].message.content, "")
         self.assertEqual(response.choices[0].finish_reason, "content_filter")
+        self.assertNotIn("fallbacks", client.beta.messages.stream.call_args.kwargs, "Haiku has no server-side fallback")
+
+    def test_never_opus(self):
+        import importlib
+        from services import models
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "k", "CLASSROOM_BUILD_MODEL": "claude-opus-5-5"}):
+            fresh = importlib.reload(models)
+            self.assertEqual(fresh.BUILD_MODEL, "claude-sonnet-5-5")
+            self.assertEqual(fresh.LIGHT_MODEL, "claude-haiku-5-5")
+            self.assertEqual(fresh.VISION_MODEL, "claude-sonnet-5-5")
+        importlib.reload(models)
 
 
 if __name__ == "__main__":

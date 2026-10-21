@@ -1325,3 +1325,42 @@ def analyze_images_for_slides(images: list, slide_texts: dict = None) -> dict:
             continue
 
     return results
+
+
+OUTLINE_EDIT_RULES = (
+    "You edit the outline of a student's study guide the way they ask. Make the change they ask "
+    "for and keep everything else exactly as written (same wording, order and bold terms). "
+    "When they ask to add or expand something, write it from the guide's material; if the material "
+    "does not cover it, add what they wrote or asked for, plainly, and never invent facts, names, "
+    "numbers or dates. Keep the outline's format, one item per line:\n"
+    "> overview (one line, optional)\n## Section heading\n- point, with **key terms** in bold\n"
+    "  - supporting detail under the point above\n"
+    "and keep a final \"## Key points\" section if the outline has one.\n"
+    'Return JSON: {"notes": "the whole outline after the change", '
+    '"summary": "one short sentence saying what you changed"}'
+)
+
+
+def edit_outline(outline: str, request: str, material: str = "") -> dict:
+    """The guide's outline with the student's requested change: {"notes", "summary"}, or {}."""
+    client = get_openai_client()
+    response = chat(client, "outline_edit",
+        messages=[
+            {"role": "system", "content": OUTLINE_EDIT_RULES},
+            {"role": "user", "content": (
+                f"REQUEST:\n{request[:2000]}\n\nCURRENT OUTLINE:\n{outline[:30000] or '(empty)'}"
+                f"\n\nGUIDE MATERIAL:\n{material[:40000] or '(none)'}"
+            )},
+        ],
+        response_format={"type": "json_object"},
+    )
+    try:
+        parsed = _loads_model_json(response.choices[0].message.content or "{}")
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return {}
+    notes = str(parsed.get("notes") or "").strip()
+    # Only the outline format: headings and points (an overview line is optional).
+    if not re.search(r"^\s*-\s+\S", notes, re.M):
+        return {}
+    return {"notes": notes[:60000], "summary": str(parsed.get("summary") or "").strip()[:300]}
+

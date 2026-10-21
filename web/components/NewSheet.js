@@ -463,7 +463,8 @@ export default function NewSheet() {
         .new-formats > span { display: inline-flex; align-items: center; gap: 6px; }
         .new-formats :global(.lucide) { color: var(--muted); }
         .new-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-        .new-files li { display: flex; align-items: center; gap: 10px; padding-left: 12px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); }
+        .new-files li { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 4px 4px 4px 12px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); }
+        .new-files li :global(.c-icon-btn) { flex: none; width: 36px; height: 36px; min-width: 0; min-height: 0; }
         .new-files li span { flex: 1; min-width: 0; }
         .new-text { min-height: 200px; }
         .new-class { max-width: 280px; }

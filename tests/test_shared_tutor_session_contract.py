@@ -19,7 +19,7 @@ class SharedTutorSessionContractTests(unittest.TestCase):
         self.assertEqual(infer_tutor_skill("Explain this study guide"), "explain")
         self.assertEqual(infer_tutor_skill("Create a study guide from this"), "build_guide")
         self.assertEqual(set(TUTOR_SKILLS), {
-            "explain", "capture", "build_guide", "practice", "retain", "plan", "find_material", "organize"
+            "explain", "capture", "build_guide", "practice", "retain", "plan", "find_material", "edit_outline", "organize"
         })
         for definition in TUTOR_SKILLS.values():
             self.assertTrue(definition["outcome"])

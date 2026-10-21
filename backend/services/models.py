@@ -35,18 +35,28 @@ ANTHROPIC = bool(os.getenv("ANTHROPIC_API_KEY", "").strip())
 GROQ = not ANTHROPIC and bool(os.getenv("GROQ_API_KEY", "").strip())
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
-CLAUDE_MODEL = os.getenv("ANTHROPIC_MODEL", "").strip() or "claude-opus-5-5"
+# Claude: Sonnet for guides, questions and images; Haiku for the Tutor and small jobs. Never Opus.
+CLAUDE_SONNET = "claude-sonnet-5-5"
+CLAUDE_HAIKU = "claude-haiku-5-5"
 _DEFAULTS = (
-    {BUILD: CLAUDE_MODEL, LIGHT: CLAUDE_MODEL, VISION: CLAUDE_MODEL} if ANTHROPIC
+    {BUILD: CLAUDE_SONNET, LIGHT: CLAUDE_HAIKU, VISION: CLAUDE_SONNET} if ANTHROPIC
     else {BUILD: "openai/gpt-oss-120b", LIGHT: "openai/gpt-oss-120b", VISION: "qwen/qwen3.8-27b"} if GROQ
     else {BUILD: "gpt-4o", LIGHT: "gpt-4o-mini", VISION: "gpt-4o"}
 )
-# Claude's effort per role: guides and questions must be complete and exact; Tutor answers
-# and small jobs are quick.
-CLAUDE_EFFORT = {BUILD: "high", LIGHT: "low", VISION: "medium"}
-BUILD_MODEL = os.getenv("CLASSROOM_BUILD_MODEL", "").strip() or _DEFAULTS[BUILD]
-LIGHT_MODEL = os.getenv("CLASSROOM_LIGHT_MODEL", "").strip() or _DEFAULTS[LIGHT]
-VISION_MODEL = os.getenv("CLASSROOM_VISION_MODEL", "").strip() or _DEFAULTS[VISION]
+# Claude's effort per role. Medium for guides and questions: complete and exact, and fast enough
+# that a long document's guide comes back in a minute or two (high took longer than students wait).
+CLAUDE_EFFORT = {BUILD: "medium", LIGHT: "low", VISION: "medium"}
+
+
+def _role_model(name: str, role: str) -> str:
+    """A per-role override from the environment, except Opus, which is never used."""
+    chosen = os.getenv(name, "").strip()
+    return chosen if chosen and "opus" not in chosen.lower() else _DEFAULTS[role]
+
+
+BUILD_MODEL = _role_model("CLASSROOM_BUILD_MODEL", BUILD)
+LIGHT_MODEL = _role_model("CLASSROOM_LIGHT_MODEL", LIGHT)
+VISION_MODEL = _role_model("CLASSROOM_VISION_MODEL", VISION)
 
 ROLE_MODELS = {BUILD: BUILD_MODEL, LIGHT: LIGHT_MODEL, VISION: VISION_MODEL}
 
@@ -75,6 +85,7 @@ FEATURES = {
     "notes": CallSpec(BUILD, 2000),
     "slideshow_summary": CallSpec(BUILD, 1500),
     "retain_explain": CallSpec(BUILD, 500),
+    "outline_edit": CallSpec(BUILD, 8000),
     # LIGHT
     "tutor_clarify": CallSpec(LIGHT, 500),
     "tutor_rich": CallSpec(LIGHT, 1400),
