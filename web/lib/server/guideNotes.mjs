@@ -4,7 +4,8 @@
 // Runs once per guide: notes already in this form are kept. Needs GROQ_API_KEY or OPENAI_API_KEY (lib/server/aiProvider.mjs).
 
 import { KEY_POINTS, isStudyGuideNotes } from '../formatters.js';
-import { aiProvider } from './aiProvider.mjs';
+import { chatProvider } from './aiProvider.mjs';
+import { aiChat } from './aiChat.mjs';
 
 export const NOTES_RULES = `You write the notes of a study guide from a student's material: a short overview, the whole topic as a full outline, then the key points to remember. Use only what the material says.
 Return JSON: {"overview": "...", "sections": [{"heading": "...", "points": [{"text": "...", "sub": ["..."]}]}], "key_points": ["..."]}
@@ -44,9 +45,8 @@ export function needsOutline(notes) {
 
 export function createGuideNotesService({ env = process.env, fetch: fetchImpl = globalThis.fetch } = {}) {
   const apiBase = (env.CLASSROOM_API_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-  const provider = aiProvider(env);
+  const provider = chatProvider(env);
   const openaiKey = provider.key;
-  const model = provider.chatModel;
 
   async function make(authorization, guideId) {
     if (!authorization || !/^[0-9a-f-]{36}$/i.test(guideId || '')) return { status: 400, body: { detail: 'Invalid guide.' } };
@@ -59,22 +59,9 @@ export function createGuideNotesService({ env = process.env, fetch: fetchImpl = 
     const content = [String(guide.study_guide || '').trim(), String(guide.notes || '').trim()].filter(Boolean).join('\n\n');
     if (content.length < 40) return { status: 200, body: { notes: '', reason: 'empty' } };
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 40000);
     let written = null;
-    try {
-      const ai = await fetchImpl(`${provider.base}/chat/completions`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, temperature: 0.2, max_tokens: 4500, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: NOTES_RULES }, { role: 'user', content: `Title: ${guide.title}\n\n${content.slice(0, 60000)}` }] }),
-        signal: controller.signal,
-      });
-      if (ai.ok) written = JSON.parse((await ai.json())?.choices?.[0]?.message?.content || '{}');
-    } catch {
-      written = null;
-    } finally {
-      clearTimeout(timer);
-    }
+    const out = await aiChat(provider, { system: NOTES_RULES, user: `Title: ${guide.title}\n\n${content.slice(0, 60000)}`, maxTokens: 4500, json: true, timeoutMs: 40000, fetchImpl });
+    try { written = out ? JSON.parse(out.text || '{}') : null; } catch { written = null; }
     const notes = outlineText(written && Array.isArray(written.sections) ? { ...written, sections: written.sections.slice(0, 12) } : null);
     if (!notes) return { status: 200, body: { notes: guide.notes || '', reason: 'failed' } };
     await fetchImpl(`${apiBase}/guides/${encodeURIComponent(guideId)}`, {

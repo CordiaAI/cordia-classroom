@@ -14,9 +14,10 @@ from contextvars import copy_context
 from typing import List, Optional
 
 from services.llm_calls import chat
-from services.models import GROQ, GROQ_BASE_URL, study_guide_model
+from services.models import ANTHROPIC, GROQ, GROQ_BASE_URL, study_guide_model
 from services.practice_areas import PRACTICE_AREAS, PRACTICE_BASE, classifier_prompt
 from dotenv import load_dotenv
+import anthropic
 from openai import OpenAI
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -24,9 +25,12 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 logger = logging.getLogger(__name__)
 
 
-def get_openai_client() -> OpenAI:
-    """Chat client: Groq (OpenAI-compatible) when GROQ_API_KEY is set, else OpenAI from OPENAI_API_KEY.
+def get_openai_client():
+    """Chat client: Anthropic when ANTHROPIC_API_KEY is set (services.llm_calls.chat speaks to it),
+    else Groq (OpenAI-compatible) when GROQ_API_KEY is set, else OpenAI from OPENAI_API_KEY.
     A missing key is a deploy error, so it raises."""
+    if ANTHROPIC:
+        return anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"], max_retries=2)
     if GROQ:
         return OpenAI(api_key=os.environ["GROQ_API_KEY"], base_url=GROQ_BASE_URL)
     return OpenAI(api_key=os.environ["OPENAI_API_KEY"])
