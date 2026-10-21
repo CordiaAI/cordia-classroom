@@ -1073,38 +1073,6 @@ input::placeholder { color: var(--text-muted); }
   perspective: 1800px;
 }
 
-/* Ghost pages — appear behind the editable paper as content grows */
-.sn-ghost-page {
-  position: absolute; inset: 0;
-  border-radius:12px;
-  background:var(--surface-card);
-  border-top: 1px solid var(--hairline);
-  border-bottom: 1px solid var(--hairline);
-  box-shadow:var(--shadow-card);
-  pointer-events: none;
-  opacity: 0;
-  transform-origin: 0% 100%;
-  transform: translateX(40px) rotate(0deg) scale(0.985);
-  transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
-}
-[data-theme="dark"] .sn-ghost-page {
-  background:var(--surface-card);
-  box-shadow:var(--shadow-card);
-}
-
-/* Stage states — control ghost page visibility based on content height */
-.sn-paper-stage--p1 .sn-ghost-page-2,
-.sn-paper-stage--p2 .sn-ghost-page-2 {
-  opacity: 0.92;
-  transform: translateX(-16px) translateY(7px) rotate(-2deg);
-  z-index: 1;
-}
-.sn-paper-stage--p2 .sn-ghost-page-3 {
-  opacity: 0.78;
-  transform: translateX(-30px) translateY(13px) rotate(-4deg);
-  z-index: 0;
-}
-
 /* Editable paper — the front-most "current" sheet */
 .sn-paper {
   position: relative; z-index: 2;
@@ -1171,6 +1139,17 @@ input::placeholder { color: var(--text-muted); }
 [data-theme="light"] .sn-paper mark.sn-callout { background: var(--warning-bg); }
 .sn-paper li { margin-left: 18px; margin-bottom: 2px; }
 .sn-paper p { margin: 0 0 6px; }
+/* Lecture outlines: sections, subsections and nested points read like a study outline. */
+.sn-paper h1 { font-size: var(--fs-20); }
+.sn-paper h4 { font-size: 15px; font-weight: 600; margin: 12px 0 4px; color: var(--ink); }
+.sn-paper ul, .sn-paper ol { margin: 2px 0 8px; padding-left: 4px; }
+.sn-paper li > ul, .sn-paper li > ol { margin: 2px 0 4px; }
+.sn-paper li > ul { list-style: circle; }
+.sn-paper li { color: var(--ink); }
+.sn-transcript { white-space: normal; color: var(--ink); cursor: text; user-select: text; }
+.sn-transcript p { margin: 0 0 14px; }
+.sn-lecture-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sn-view-seg button { white-space: nowrap; }
 .sn-paper hr {
   border: none; border-top: 1px solid var(--hairline);
   margin: 18px 0;

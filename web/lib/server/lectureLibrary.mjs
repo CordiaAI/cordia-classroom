@@ -1,12 +1,16 @@
 // Server-only: the Lectures section (/api/lectures/*). Lectures are transcripts (no audio is
 // stored): a recording's transcript, an uploaded recording's, or notes / a transcript pasted in.
-// Each one is read once by the AI for a summary, what to watch for, to-dos with dates, an
-// outline, key terms and the professor's questions. Every watch-for item and to-do must quote
+// Each one is read once by the AI for a summary, what to watch for, to-dos with dates, key
+// terms and the professor's questions, and once more for a full study outline (Markdown,
+// shown as the lecture's note). Every watch-for item and to-do must quote
 // the lecture, or it is dropped. To-dos reach Calendar and Today only once confirmed.
 // Storage: tables lectures + lecture_todos (supabase/migrations/20261019120000_lectures.sql),
 // read and written with the service role, always filtered to the signed-in student.
 import { sensibleTitle } from '../noteMeta.mjs';
 import { aiProvider } from './aiProvider.mjs';
+import { outlineHtml } from '../lectureOutline.mjs';
+
+export { outlineHtml };
 
 export const ANALYSIS_RULES = `You read a lecture (a transcript, or a student's notes from it) and pull out what the student needs. Use only what is in the text; never add outside knowledge.
 Return JSON:
@@ -14,7 +18,6 @@ Return JSON:
  "summary": ["..."],
  "watch_for": [{"point": "...", "why": "exam" | "mistake" | "emphasis" | "requirement", "quote": "...", "at_ms": 0}],
  "todos": [{"title": "...", "kind": "assignment" | "reading" | "exam" | "other", "said": "...", "due_date": "YYYY-MM-DD or empty", "quote": "...", "at_ms": 0}],
- "outline": [{"heading": "...", "at_ms": 0, "points": ["..."]}],
  "terms": [{"term": "...", "definition": "...", "at_ms": 0}],
  "questions": [{"question": "...", "at_ms": 0}]}
 - title: 3 to 8 words naming the subject, as a student would label it.
@@ -22,12 +25,26 @@ Return JSON:
 - watch_for: anything the speaker flags for a test, grade or requirement, calls a common mistake, says to remember, or repeats for emphasis. "point" says it plainly.
 - todos: assignments, readings, exams and deadlines the speaker mentions. "said" is how the date was said ("next Friday"). Work out due_date from the lecture date given below; leave it empty if no date was given.
 - quote: the speaker's exact words from the text, under 25 words. Required for watch_for and todos.
-- outline: the lecture written up as notes: its sections in order, each with 3 to 8 points that together cover all of the information (definitions, explanations, causes and effects, steps, examples, comparisons). Points are complete statements in plain language.
 - terms: terms the speaker defines or explains, with the definition as given.
 - questions: questions the speaker asks the class.
 - at_ms: the number in [brackets] at the start of the line it came from; 0 if the lines have no numbers.
 - class_id: the id of the class whose name best matches the subject, or "" if none fits.
 - Use empty lists when there is nothing of a kind.`;
+
+export const OUTLINE_RULES = `You turn a class lecture transcript into a complete study outline a student can learn from. Use only what the speaker taught.
+Write Markdown only, in this shape:
+# <Subject of the lecture>
+## I. <Section>
+### A. <Subsection>
+* <point>
+   * <supporting detail or example>
+1. <item> (for lists or steps the speaker gave in order)
+- Cover all of the teaching in the order it was taught: definitions, explanations, lists, comparisons, causes and effects, examples, requirements, deadlines and instructions. A full class usually needs several sections, each with subsections.
+- Points are short, clear statements in plain language, not quotes. Nest details and examples under the point they support; label examples "Example:".
+- When the speaker sums up the lesson, end with those takeaways as a numbered list under "## Key Takeaways".
+- Leave out anything that is not part of the class: side conversations, chatter, small talk, garbled or inaudible stretches. If you left any out, end with the line "Note: unrelated side conversation was left out."
+- The transcript comes from speech recognition. When a word was plainly misheard and the context makes the intended word certain, write the intended word. When a date, number or name is unclear or conflicts with the rest, write what was said and add "(confirm)".
+- Never add facts, definitions or advice the speaker did not give.`;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -69,17 +86,31 @@ export function cleanAnalysis(raw, { text, starts = [], classes = [] }) {
   };
 }
 
+// Speech-recognition noise the AI should never see: runs of hyphenated letters ("T-C- T-C-",
+// "i-i-i-i"), dot runs, stray question marks and the same short phrase repeated back to back.
+export function cleanSpeech(text) {
+  return String(text || '')
+    .replace(/(?:\b[\p{L}]{1,3}-+\s*){3,}[\p{L}]{0,3}[.!?]?/gu, ' ')
+    .replace(/(?:\.\s*){4,}/g, '. ')
+    .replace(/(?:\?\s*){2,}/g, '? ')
+    .replace(/(\b[^.!?]{2,40}[.!?])(?:\s+\1)+/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([.,!?])/g, '$1')
+    .trim();
+}
+
 // The lecture as the model reads it: "[start_ms] text" lines when there are timed segments.
 export function lectureText(transcript, segments) {
-  const timed = (segments || []).filter(item => String(item?.text || '').trim());
-  return timed.length ? timed.map(item => `[${Math.round(item.start_ms || 0)}] ${String(item.text).trim()}`).join('\n') : String(transcript || '');
+  const timed = (segments || []).map(item => ({ ...item, text: cleanSpeech(item?.text) })).filter(item => item.text.length > 1);
+  return timed.length ? timed.map(item => `[${Math.round(item.start_ms || 0)}] ${item.text}`).join('\n') : cleanSpeech(transcript);
 }
 
 const escapeHtml = text => String(text || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
-
-// The lecture as a note for the Notes tab: summary, notes by section, what to watch for, key
+// The lecture as a note for the Notes tab: the outline, or else summary, notes by section, what to watch for, key
 // terms and to-dos. Without AI notes yet, the transcript itself in paragraphs.
 export function lectureNoteHtml(lecture, analysis = {}, todos = []) {
+  // The full outline is the note when there is one; the transcript stays one tap away.
+  if (analysis.outline_md) return outlineHtml(analysis.outline_md);
   const list = items => `<ul>${items.map(item => `<li>${item}</li>`).join('')}</ul>`;
   const parts = [];
   if (analysis.summary?.length) parts.push('<h2>Summary</h2>', list(analysis.summary.map(escapeHtml)));
@@ -126,10 +157,9 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
     }
   }
 
-  async function analyze(text, { lectureDate, classes }) {
-    if (!openaiKey || text.trim().length < 40) return null;
-    const date = new Date(`${lectureDate}T12:00:00Z`);
-    const weekday = date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+  // One chat call. Groq's gpt-oss reasons before answering and that counts against max_tokens,
+  // so reasoning is kept low and the budget generous; a cut-off answer would not parse.
+  async function complete(system, user, { json = false, maxTokens = 8000 } = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 55000);
     try {
@@ -137,21 +167,49 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
         method: 'POST',
         headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model, temperature: 0.2, max_tokens: 4000, response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: ANALYSIS_RULES },
-            { role: 'user', content: `Lecture date: ${lectureDate} (${weekday})\nClasses:\n${classes.map(item => `${item.id}: ${item.name}`).join('\n') || '(none)'}\n\nLecture:\n${text.slice(0, 80000)}` },
-          ],
+          model, temperature: 0.2, max_tokens: maxTokens,
+          ...(json ? { response_format: { type: 'json_object' } } : {}),
+          ...(provider.name === 'groq' ? { reasoning_effort: 'low' } : {}),
+          messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
         }),
         signal: controller.signal,
       });
-      if (!response.ok) return null;
-      return JSON.parse((await response.json())?.choices?.[0]?.message?.content || '{}');
-    } catch {
+      if (!response.ok) {
+        console.error('Lecture AI call failed', response.status, (await response.text().catch(() => '')).slice(0, 300));
+        return null;
+      }
+      const choice = (await response.json())?.choices?.[0];
+      if (choice?.finish_reason === 'length') console.error('Lecture AI answer was cut off at', maxTokens, 'tokens');
+      return choice?.message?.content || null;
+    } catch (error) {
+      console.error('Lecture AI call failed', error?.name || error);
       return null;
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  async function analyze(text, { lectureDate, classes }) {
+    if (!openaiKey || text.trim().length < 40) return null;
+    const date = new Date(`${lectureDate}T12:00:00Z`);
+    const weekday = date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+    const content = await complete(ANALYSIS_RULES,
+      `Lecture date: ${lectureDate} (${weekday})\nClasses:\n${classes.map(item => `${item.id}: ${item.name}`).join('\n') || '(none)'}\n\nLecture:\n${text.slice(0, 80000)}`,
+      { json: true, maxTokens: 8000 });
+    try {
+      return content ? JSON.parse(content) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // The full study outline, as Markdown. Plain text in, so the [ms] markers don't cost tokens.
+  async function writeOutline(transcript, { lectureDate }) {
+    const text = cleanSpeech(transcript);
+    if (!openaiKey || text.length < 200) return '';
+    const markdown = await complete(OUTLINE_RULES, `Lecture date: ${lectureDate}\n\nTranscript:\n${text.slice(0, 80000)}`, { maxTokens: 16000 });
+    const clean = String(markdown || '').replace(/^```(?:markdown)?\s*|```\s*$/g, '').trim();
+    return /^#{1,4}\s|^[*\-]\s/m.test(clean) ? clean.slice(0, 60000) : '';
   }
 
   async function rows(path) {
@@ -190,7 +248,7 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
   }
 
   // A lecture saved before its AI notes could be written gets them now (when it is opened).
-  async function analyzeLecture(authorization, { id } = {}) {
+  async function analyzeLecture(authorization, { id, rewrite = false } = {}) {
     if (!enabled) return NOT_SET_UP;
     const userId = await who(authorization);
     if (!userId) return { status: 401, body: { detail: 'Sign in again.' } };
@@ -209,17 +267,22 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
       }
       return { status: 200, body: { analysis, todos, ...(reason ? { reason } : {}) } };
     };
-    if (lecture.analysis?.analyzed) return keepNote(lecture.analysis);
+    // A finished lecture is left alone unless the student asks for its outline (rewrite).
+    if (lecture.analysis?.analyzed && (lecture.analysis?.outline_md || !rewrite)) return keepNote(lecture.analysis);
     if (!openaiKey) return keepNote(lecture.analysis || {}, 'not_configured');
     const segments = lecture.segments || [];
     const text = lectureText(lecture.transcript, segments);
     const folders = await fetchImpl(`${apiBase}/folders`, { headers: { Authorization: authorization } }).then(response => (response.ok ? response.json() : null)).catch(() => null);
     const classes = (folders?.folders || []).map(item => ({ id: item.id, name: item.name }));
-    const raw = await analyze(text, { lectureDate: lecture.lecture_date, classes });
-    if (!raw) return keepNote(lecture.analysis || {}, 'failed');
-    const analysis = cleanAnalysis(raw, { text, starts: segments.map(item => item.start_ms), classes });
+    const already = lecture.analysis?.analyzed;
+    const [raw, outlineMd] = await Promise.all([
+      already ? null : analyze(text, { lectureDate: lecture.lecture_date, classes }),
+      writeOutline(lecture.transcript, { lectureDate: lecture.lecture_date }),
+    ]);
+    if (!already && !raw && !outlineMd) return keepNote(lecture.analysis || {}, 'failed');
+    const analysis = raw ? cleanAnalysis(raw, { text, starts: segments.map(item => item.start_ms), classes }) : { ...(lecture.analysis || {}), todos: [] };
     const { todos, title: _t, class_id: _c, ...stored } = analysis;
-    const next = { ...stored, analyzed: true, note_id: lecture.analysis?.note_id || '' };
+    const next = { ...stored, analyzed: Boolean(already || raw), outline_md: outlineMd || lecture.analysis?.outline_md || '', note_id: lecture.analysis?.note_id || '' };
     await insertTodos(userId, id, todos);
     next.note_id = await syncNote(authorization, lecture, next, todos) || next.note_id;
     await saveAnalysis(userId, id, next);
@@ -236,7 +299,7 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
     const lectureDate = ISO_DATE.test(body.lecture_date || '') ? body.lecture_date : today().toISOString().slice(0, 10);
     const classes = (Array.isArray(body.classes) ? body.classes : []).filter(item => UUID.test(item?.id || '')).slice(0, 200).map(item => ({ id: item.id, name: clip(item.name, 120) }));
     const text = lectureText(transcript, segments);
-    const raw = await analyze(text, { lectureDate, classes });
+    const [raw, outlineMd] = await Promise.all([analyze(text, { lectureDate, classes }), writeOutline(transcript, { lectureDate })]);
     const analysis = raw ? cleanAnalysis(raw, { text, starts: segments.map(item => item.start_ms), classes }) : { summary: [], watch_for: [], todos: [], outline: [], terms: [], questions: [] };
     const folderId = UUID.test(body.folder_id || '') ? body.folder_id : analysis.class_id || null;
     const title = analysis.title || sensibleTitle(body.title, transcript) || `Lecture ${new Date(`${lectureDate}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`;
@@ -244,7 +307,7 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
     const { todos, title: _t, class_id: _c, ...stored } = analysis;
     const created = await db('/lectures', {
       method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ user_id: userId, folder_id: folderId, title, source, lecture_date: lectureDate, duration_ms: Math.max(0, Math.round(Number(body.duration_ms) || 0)), transcript, segments, analysis: { ...stored, analyzed: Boolean(raw) } }),
+      body: JSON.stringify({ user_id: userId, folder_id: folderId, title, source, lecture_date: lectureDate, duration_ms: Math.max(0, Math.round(Number(body.duration_ms) || 0)), transcript, segments, analysis: { ...stored, outline_md: outlineMd, analyzed: Boolean(raw) } }),
     }).catch(() => null);
     if (!created?.ok) return NOT_SET_UP;
     const lecture = (await created.json())?.[0];
@@ -269,6 +332,8 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
         lectures: lectures.map(({ analysis, ...item }) => ({
           ...item,
           summary: (analysis?.summary || [])[0] || '',
+          note_id: analysis?.note_id || '',
+          has_outline: Boolean(analysis?.outline_md),
           watch_count: (analysis?.watch_for || []).length,
           todo_count: todos.filter(todo => todo.lecture_id === item.id).length,
         })),
