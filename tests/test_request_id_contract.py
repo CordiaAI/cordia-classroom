@@ -38,6 +38,19 @@ class RequestIdContractTests(unittest.TestCase):
                 })
                 self.assertEqual(response.headers["access-control-allow-origin"], origin)
 
+    def test_server_errors_reach_the_browser(self):
+        @app.get("/__test_crash")
+        def crash():
+            raise RuntimeError("boom")
+
+        origin = "https://classroom.cordiaai.io"
+        response = TestClient(app, raise_server_exceptions=False).get("/__test_crash", headers={"Origin": origin})
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.headers["access-control-allow-origin"], origin)
+        too_big = self.client.post("/generate", headers={"Origin": origin, "Content-Length": str(9 * 1024 * 1024)}, content=b"")
+        self.assertEqual(too_big.status_code, 413)
+        self.assertEqual(too_big.headers["access-control-allow-origin"], origin)
+
     def test_unhandled_error_is_logged_without_exposing_internals(self):
         request = Request({"type": "http", "method": "GET", "path": "/private", "headers": []})
 
