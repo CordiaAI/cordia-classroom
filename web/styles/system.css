@@ -316,7 +316,7 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
 }
 .c-toast .c-btn--quiet { color: inherit; height: 44px; }
 [data-theme='dark'] .c-toast { background: var(--surface-card); color: var(--ink); }
-[data-theme='dark'] .c-toast .c-btn--quiet { color: var(--olive); }
+[data-theme='dark'] .c-toast .c-btn--quiet { color: var(--olive-ink); }
 @media (max-width: 767px) { .c-toast { bottom: calc(var(--tabbar-h) + 84px); } }
 
 .c-tip {
