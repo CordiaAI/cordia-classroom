@@ -504,3 +504,105 @@ def fail_tutor_turn(user_id: str, turn: dict | None, detail: str):
         .eq("run_id", turn["run_id"])
         .execute()
     )
+
+
+MAX_SAVED_CHATS = 30
+
+
+def _chat_title(messages: list) -> str:
+    first = next((m.get("text") for m in messages if m.get("role") == "user" and m.get("text")), "")
+    title = " ".join(str(first).split())
+    return title[:77] + "…" if len(title) > 80 else title or "Tutor chat"
+
+
+def _chats_table():
+    return get_supabase().table("tutor_chats")
+
+
+def _chats_unavailable(error: Exception):
+    # The saved-chats table arrives with migration 20261021130000_tutor_chats.sql.
+    raise HTTPException(status_code=503, detail="Saved chats aren't set up yet.") from error
+
+
+def list_tutor_chats(user_id: str) -> list:
+    try:
+        result = (
+            _chats_table()
+            .select("id,guide_id,title,updated_at")
+            .eq("user_id", user_id)
+            .order("updated_at", desc=True)
+            .limit(MAX_SAVED_CHATS)
+            .execute()
+        )
+    except Exception as error:
+        _chats_unavailable(error)
+    return result.data or []
+
+
+def start_tutor_chat(user_id: str, session_id: str, guide_id: str | None = None, resume_id: str | None = None):
+    """Save the live conversation as a chat, then open an empty one (about guide_id, or general)
+    or move a saved chat back into the live session."""
+    row = _owned_session(user_id, session_id)
+    if row.get("status") in {"running", "waiting_browser"} and not _run_is_stale(row):
+        raise HTTPException(status_code=409, detail="Wait for Cordia Tutor to finish before starting a new chat")
+    resumed = None
+    if resume_id:
+        try:
+            found = _chats_table().select("*").eq("id", resume_id).eq("user_id", user_id).limit(1).execute()
+        except Exception as error:
+            _chats_unavailable(error)
+        if not found.data:
+            raise HTTPException(status_code=404, detail="Chat not found")
+        resumed = found.data[0]
+    elif guide_id:
+        owned = get_supabase().table("study_guides").select("id").eq("id", guide_id).eq("user_id", user_id).limit(1).execute()
+        if not owned.data:
+            raise HTTPException(status_code=404, detail="Guide not found")
+
+    saved = None
+    current = list(row.get("messages") or [])
+    if current:
+        try:
+            inserted = _chats_table().insert({
+                "user_id": user_id,
+                "guide_id": row.get("active_guide_id"),
+                "title": _chat_title(current),
+                "messages": current,
+                "updated_at": row.get("updated_at") or datetime.now(timezone.utc).isoformat(),
+            }).execute()
+        except Exception as error:
+            _chats_unavailable(error)
+        saved = (inserted.data or [{}])[0].get("id")
+
+    result = (
+        get_supabase().table("tutor_sessions")
+        .update({
+            "messages": (resumed or {}).get("messages") or [],
+            "active_guide_id": (resumed or {}).get("guide_id") if resumed else guide_id,
+            "current_goal": "",
+            "status": "idle",
+            "run_id": None,
+            "run_started_at": None,
+            "conversation_version": (row.get("conversation_version") or 0) + 1,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+        .eq("id", session_id)
+        .eq("user_id", user_id)
+        .eq("conversation_version", row.get("conversation_version") or 0)
+        .execute()
+    )
+    if not result.data:
+        if saved:
+            _chats_table().delete().eq("id", saved).eq("user_id", user_id).execute()
+        raise HTTPException(status_code=409, detail="Tutor conversation changed. Refresh and try again.")
+    if resumed:
+        _chats_table().delete().eq("id", resumed["id"]).eq("user_id", user_id).execute()
+    if saved:
+        # Keep only the most recent saved chats.
+        older = (
+            _chats_table().select("id").eq("user_id", user_id)
+            .order("updated_at", desc=True).range(MAX_SAVED_CHATS, MAX_SAVED_CHATS + 49).execute()
+        )
+        if older.data:
+            _chats_table().delete().in_("id", [chat["id"] for chat in older.data]).eq("user_id", user_id).execute()
+    return result.data[0]

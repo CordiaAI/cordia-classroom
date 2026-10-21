@@ -8,9 +8,12 @@ from fastapi import APIRouter, Header
 from pydantic import BaseModel, Field, field_validator
 
 from auth_utils import get_user_id
+from ids import require_uuid
 from services.tutor_sessions import (
     get_or_create_tutor_session,
+    list_tutor_chats,
     public_tutor_session,
+    start_tutor_chat,
     update_browser_context,
     update_tutor_skill,
     tutor_browser_content,
@@ -71,6 +74,12 @@ class BrowserContextUpdate(BaseModel):
         ).strip()
 
 
+class NewTutorChat(BaseModel):
+    session_id: str = Field(..., max_length=36)
+    guide_id: Optional[str] = Field(default=None, max_length=36)
+    resume_id: Optional[str] = Field(default=None, max_length=36)
+
+
 class TutorSkillUpdate(BaseModel):
     session_id: str = Field(..., max_length=36)
     skill: str = Field(..., max_length=30)
@@ -99,3 +108,19 @@ def browser_context(body: BrowserContextUpdate, authorization: str = Header(defa
 def tutor_skill(body: TutorSkillUpdate, authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     return public_tutor_session(update_tutor_skill(user_id, body.session_id, body.skill))
+
+
+@router.get("/chats")
+def saved_tutor_chats(authorization: str = Header(default="")):
+    user_id = get_user_id(authorization)
+    return {"chats": list_tutor_chats(user_id)}
+
+
+@router.post("/session/new")
+def new_tutor_chat(body: NewTutorChat, authorization: str = Header(default="")):
+    """Start a new chat (about a guide, or general) or resume a saved one; the current chat is saved."""
+    user_id = get_user_id(authorization)
+    for value, name in ((body.session_id, "session ID"), (body.guide_id, "guide ID"), (body.resume_id, "chat ID")):
+        if value:
+            require_uuid(value, name)
+    return public_tutor_session(start_tutor_chat(user_id, body.session_id, body.guide_id, body.resume_id))

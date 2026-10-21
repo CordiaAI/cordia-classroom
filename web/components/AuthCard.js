@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Check, Eye, EyeOff, X } from 'lucide-react';
+import { Check, Eye, EyeOff, Smartphone, X } from 'lucide-react';
 import { setToken, scheduleProactiveRefresh } from '../lib/api';
 import { supabaseAuth } from '../lib/supabase';
+import { formatPhone, normalizePhone } from '../lib/phone.mjs';
 import { takeReturnTo } from '../lib/returnTo.mjs';
 
 export function GoogleLogo() {
@@ -30,7 +31,10 @@ export function authMessage(error) {
   if (/invalid.?login|invalid.?credentials|invalid_grant/.test(text)) return 'Wrong email or password.';
   if (/not.?confirmed/.test(text)) return 'Confirm your email first.';
   if (/already.?(registered|exists)|user_already_exists/.test(text)) return 'That email has an account. Sign in.';
-  if (/rate|too many|429|over_email_send/.test(text)) return 'Too many tries. Wait a minute.';
+  if (/rate|too many|429|over_email_send|over_sms_send/.test(text)) return 'Too many tries. Wait a minute.';
+  if (/phone.?provider|sms.?provider|unsupported phone|phone.*(disabled|not enabled)/.test(text)) return "Phone sign-in isn't turned on yet. Use Google or email.";
+  if (/otp|token.*(expired|invalid)|(expired|invalid).*token/.test(text)) return "That code didn't work. Check it or send a new one.";
+  if (/phone/.test(text)) return 'Enter a valid phone number.';
   if (/weak|password.*(characters|least|short|should)/.test(text)) return 'Use 8+ characters with a–z, A–Z, 0–9 and a symbol.';
   if (/email.*(invalid|valid)|invalid.*email/.test(text)) return 'Enter a valid email.';
   if (/fetch|network|failed to/.test(text)) return "Can't connect. Try again.";
@@ -38,7 +42,8 @@ export function authMessage(error) {
   return 'Something went wrong. Try again.';
 }
 
-// Sign in / Create account: Google first, then email and password.
+// Sign in / Create account: Google, a texted code to your phone, or email and password.
+// A phone number signs in to the account that has it, or makes a new one.
 export default function AuthCard({ mode: initialMode = 'signin', linkModes = false }) {
   const router = useRouter();
   const [mode, setMode] = useState(initialMode); // signin | signup | reset
@@ -49,6 +54,10 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [phoneStep, setPhoneStep] = useState(null); // null | 'number' | 'code'
+  const [phone, setPhone] = useState('');
+  const [sentTo, setSentTo] = useState('');
+  const [code, setCode] = useState('');
   const signup = mode === 'signup';
   const passed = CHECKS.map(check => check.test(password));
   // After a self-serve account deletion, say it worked.
@@ -64,6 +73,7 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
 
   function switchMode(next) {
     setMode(next);
+    setPhoneStep(null);
     setError('');
     setNotice('');
     setSubmitted(false);
@@ -80,6 +90,33 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
       setError(authMessage(oauthError));
       setBusy(false);
     }
+  }
+
+  async function sendCode(event) {
+    event?.preventDefault();
+    setError('');
+    setNotice('');
+    const number = normalizePhone(phone);
+    if (!number) { setError('Enter your phone number with area code.'); return; }
+    setBusy(true);
+    const { error: otpError } = await supabaseAuth().signInWithOtp({ phone: number });
+    setBusy(false);
+    if (otpError) { setError(authMessage(otpError)); return; }
+    setSentTo(number);
+    setCode('');
+    setPhoneStep('code');
+  }
+
+  async function verifyCode(event) {
+    event.preventDefault();
+    setError('');
+    const token = code.replace(/\D/g, '');
+    if (token.length < 6) { setError('Enter the 6-digit code.'); return; }
+    setBusy(true);
+    const { data, error: verifyError } = await supabaseAuth().verifyOtp({ phone: sentTo, token, type: 'sms' });
+    setBusy(false);
+    if (verifyError || !data?.session) { setError(authMessage(verifyError || { message: 'invalid otp' })); return; }
+    finishSession(data.session);
   }
 
   async function submit(event) {
@@ -147,10 +184,44 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
           <button type="button" className="auth-google" onClick={continueWithGoogle} disabled={busy}>
             <GoogleLogo />Continue with Google
           </button>
+          {!phoneStep && (
+            <button type="button" className="auth-google auth-phone-btn" onClick={() => { setPhoneStep('number'); setError(''); setNotice(''); }} disabled={busy}>
+              <Smartphone size={20} strokeWidth={1.75} aria-hidden="true" />Continue with phone
+            </button>
+          )}
           <div className="auth-or" aria-hidden="true"><span>or</span></div>
         </>
       )}
 
+      {phoneStep === 'number' && (
+        <form className="auth-form" onSubmit={sendCode} noValidate>
+          <div className="auth-field">
+            <label htmlFor="auth-phone">Phone number</label>
+            <input id="auth-phone" className="auth-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="(555) 123-4567" value={phone} onChange={event => setPhone(event.target.value)} autoFocus />
+          </div>
+          <p className="auth-fine">We'll text you a 6-digit code. Message and data rates may apply.</p>
+          {error && <p className="auth-error" role="alert">{error}</p>}
+          <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Sending…' : 'Text me a code'}</button>
+          <button type="button" className="auth-link" onClick={() => { setPhoneStep(null); setError(''); }}>Use email instead</button>
+        </form>
+      )}
+
+      {phoneStep === 'code' && (
+        <form className="auth-form" onSubmit={verifyCode} noValidate>
+          <div className="auth-field">
+            <label htmlFor="auth-code">Code sent to {formatPhone(sentTo)}</label>
+            <input id="auth-code" className="auth-input auth-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={code} onChange={event => setCode(event.target.value)} autoFocus />
+          </div>
+          {error && <p className="auth-error" role="alert">{error}</p>}
+          <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Checking…' : signup ? 'Create account' : 'Sign in'}</button>
+          <div className="auth-phone-links">
+            <button type="button" className="auth-link" onClick={sendCode} disabled={busy}>Send a new code</button>
+            <button type="button" className="auth-link" onClick={() => { setPhoneStep('number'); setError(''); }}>Change number</button>
+          </div>
+        </form>
+      )}
+
+      {!phoneStep && (
       <form className="auth-form" onSubmit={submit} noValidate>
         <div className="auth-field">
           <label htmlFor="auth-email">Email</label>
@@ -199,6 +270,7 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
         </button>
         {mode === 'reset' && <button type="button" className="auth-link" onClick={() => switchMode('signin')}>Back to sign in</button>}
       </form>
+      )}
 
       <style jsx>{`
         .auth { display: grid; gap: 16px; width: min(400px, 100%); padding: 28px; border-radius:20px; background: var(--surface-card); border: 1px solid var(--hairline); box-shadow:var(--shadow-card); color: var(--ink); }
@@ -226,6 +298,9 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
         .auth-forgot { justify-self: end; margin-top: -6px; }
         .auth-error { margin: 0; color: var(--error); font:600 15px/1.5 var(--font-sans); }
         .auth-notice { margin: 0; color: var(--olive-ink); font:600 15px/1.5 var(--font-sans); }
+        .auth-fine { margin: 0; color: var(--muted); font: 500 13px/1.5 var(--font-sans); }
+        .auth-code { letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
+        .auth-phone-links { display: flex; justify-content: space-between; gap: 12px; }
         .auth-submit { height: 48px; border: 0; border-radius:999px; background: var(--olive); color: var(--on-olive); font:600 15px/1 var(--font-sans); cursor: pointer; }
         .auth-submit:hover:not(:disabled) { box-shadow:var(--shadow-card); }
         .auth-submit:disabled { opacity: .6; cursor: default; }

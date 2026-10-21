@@ -15,6 +15,7 @@ import { openNewSheet } from '../../lib/newSheet';
 import { canvasStatus } from '../../lib/canvas';
 import { CourseFiles } from '../../components/CanvasClasses';
 import ClassGrades from '../../components/ClassGrades';
+import useScrollerTabs from '../../lib/useScrollerTabs';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // Course files and Grades show for a class brought in from Canvas.
@@ -46,6 +47,7 @@ export default function ClassPage() {
   const [renaming, setRenaming] = useState(null);
   const tabs = TABS.filter(([, , needs]) => !needs || course);
   const tab = tabs.some(([key]) => key === router.query.tab) ? router.query.tab : 'material';
+  const tabsRef = useScrollerTabs(tab);
   const gate = useLoadGate(Boolean(folder) || Boolean(loadError));
 
   useEffect(() => { if (ready && id) loadData(); }, [ready, id]);
@@ -185,7 +187,7 @@ export default function ClassPage() {
         </div>
       </header>
 
-      <div className="c-seg cls-tabs" role="tablist" aria-label="Class">
+      <div ref={tabsRef} className="c-seg is-scroller cls-tabs" role="tablist" aria-label="Class">
         {tabs.map(([key, label]) => (
           <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button>
         ))}

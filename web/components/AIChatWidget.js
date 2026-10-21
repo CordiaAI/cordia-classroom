@@ -4,7 +4,7 @@ import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib
 import MermaidDiagram from './MermaidDiagram';
 import NapkinVisual from './NapkinVisual';
 import ExplanationPreference from './ExplanationPreference';
-import { ArrowUp, BookOpen, Layers, MessageCircle, Paperclip, PencilRuler, SlidersHorizontal, X as CloseIcon } from 'lucide-react';
+import { ArrowUp, BookOpen, Layers, MessageCircle, MessagesSquare, Paperclip, PencilRuler, Plus, SlidersHorizontal, X as CloseIcon } from 'lucide-react';
 import { lastGuide } from '../lib/userStore';
 import { walkthroughEvent } from '../lib/walkthrough';
 import TutorSelect from './TutorSelect';
@@ -110,6 +110,9 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const [extracting, setExtracting] = useState(false);
   const [localError, setLocalError] = useState('');
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [chatsOpen, setChatsOpen] = useState(false);
+  const [savedChats, setSavedChats] = useState(null);
+  const [chatsError, setChatsError] = useState('');
   const [explainOpen, setExplainOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState(-1);
@@ -282,7 +285,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
       setContextKey(preferred);
       return;
     }
-    if (!materials.some(item => item.key === contextKey)) {
+    if (contextKey !== 'none' && !materials.some(item => item.key === contextKey)) {
       const last = lastGuide();
       const fallback = last && materials.some(item => item.key === `guide:${last.id}`) ? `guide:${last.id}` : materials[0]?.key || '';
       setContextKey(fallback);
@@ -312,12 +315,14 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   useEffect(() => {
     const container = endRef.current?.closest('.cordia-tutor-messages');
     container?.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-  }, [messages.length, loading]);
+  }, [messages.length, loading, chatsOpen]);
 
   const material = materials.find(item => item.key === contextKey);
   const selectedSkillId = skillOverride || session?.active_skill || 'explain';
   const selectedSkill = session?.skills?.find(item => item.id === selectedSkillId);
-  const hasRequiredContext = (Boolean(material) && (material.kind !== 'browser' || Boolean(material.content))) || selectedSkill?.requires_context === false;
+  // With no material chosen, Explain (or Auto) is a general chat answered from general knowledge.
+  const general = !material && ['', 'none'].includes(contextKey);
+  const hasRequiredContext = (Boolean(material) && (material.kind !== 'browser' || Boolean(material.content))) || selectedSkill?.requires_context === false || (general && ['', 'explain'].includes(skillOverride));
   const needsTargetClass = selectedSkillId === 'organize';
   const canSubmit = hasRequiredContext && (!needsTargetClass || Boolean(targetClassId));
   const remaining = MAX_MESSAGES - messages.filter(message => message.role === 'user').length;
@@ -390,6 +395,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     const question = input.trim();
     if (!question || !canSubmit || busy || remaining <= 0 || !session?.id) return;
     walkthroughEvent('ask');
+    setChatsOpen(false);
     setInput('');
     setLocalError('');
     sendingRef.current = true;
@@ -448,6 +454,33 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     setLoading(false);
   }
 
+  // Chats: the live conversation is saved when a new one starts, and saved chats can be reopened.
+  useEffect(() => {
+    if (!chatsOpen) return;
+    setChatsError('');
+    apiFetch('/tutor/chats').then(data => {
+      if (Array.isArray(data?.chats)) setSavedChats(data.chats);
+      else { setSavedChats([]); setChatsError(data?.detail || 'Saved chats could not be loaded.'); }
+    });
+  }, [chatsOpen]);
+
+  async function startChat({ guideId = null, resume = null } = {}) {
+    if (!session?.id || busy) return;
+    setChatsError('');
+    const next = await apiFetch('/tutor/session/new', {
+      method: 'POST',
+      body: JSON.stringify({ session_id: session.id, guide_id: guideId, resume_id: resume?.id || null }),
+    });
+    if (!next?.id) { setChatsError(next?.detail || 'Could not start a new chat.'); return; }
+    const guide = resume ? resume.guide_id : guideId;
+    setSession(next);
+    setContextKey(guide && guides.some(item => item.id === guide) ? `guide:${guide}` : 'none');
+    setSkillOverride('');
+    setRetainContext(null);
+    setLocalError('');
+    setChatsOpen(false);
+  }
+
   function openSource(source) {
     if (source?.type === 'study_guide') router.push('/guide/' + source.id);
     if (source?.type === 'smartnote') router.push('/smartnotes?id=' + source.id);
@@ -460,12 +493,15 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         <div className="cordia-tutor-title-row">
           <MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />
           <strong>Tutor</strong>
+          <button type="button" className="c-btn c-btn--quiet tutor-chats-btn" aria-pressed={chatsOpen} onClick={() => setChatsOpen(open => !open)} disabled={!session}>
+            <MessagesSquare size={18} strokeWidth={1.75} aria-hidden="true" />Chats
+          </button>
           {session?.browser_available && <span className="cordia-browser-status is-online" aria-label="Browser connected" title="Browser connected" />}
         </div>
         <div className="cordia-tutor-context" aria-label="Context">
           <BookOpen size={16} strokeWidth={1.75} aria-hidden="true" />
           <TutorSelect label="Study material" value={contextKey} onChange={setContextKey} options={[
-            ...(materials.length === 0 ? [{ value: '', label: 'No material' }] : []),
+            { value: 'none', label: 'No material · general chat' },
             ...guides.map(item => ({ value: `guide:${item.id}`, label: item.title || 'Untitled guide', group: 'Guides' })),
             ...notes.map(item => ({ value: `note:${item.id}`, label: item.title || 'Untitled note', group: 'Notes' })),
             ...(attachments.length ? [{ value: 'attachment', label: attachments.length === 1 ? attachments[0].title : `${attachments.length} files`, group: 'Files' }] : []),
@@ -519,18 +555,49 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         </details>
       </header>
 
+      {chatsOpen ? (
+        <div className="cordia-tutor-messages tutor-chats">
+          <div className="tutor-chats-new">
+            {material?.kind === 'guide' && (
+              <button type="button" className="c-btn c-btn--primary" onClick={() => startChat({ guideId: material.id })} disabled={busy}>
+                <Plus size={18} strokeWidth={1.75} aria-hidden="true" /><span>New chat about {material.title || 'this guide'}</span>
+              </button>
+            )}
+            <button type="button" className="c-btn c-btn--secondary" onClick={() => startChat()} disabled={busy}>
+              <Plus size={18} strokeWidth={1.75} aria-hidden="true" /><span>New general chat</span>
+            </button>
+            {messages.length > 0 && <p className="c-meta">Your current chat is saved below when you start a new one.</p>}
+          </div>
+          <h3 className="tutor-chats-title">Saved chats</h3>
+          {savedChats === null ? <CordiaLoader size={20} label="Loading chats" /> : savedChats.length === 0 && !chatsError ? (
+            <p className="c-meta">Nothing here yet. Start a new chat and this one is saved here to pick up later.</p>
+          ) : (
+            <ul className="tutor-chats-list">
+              {savedChats.map(chat => (
+                <li key={chat.id}>
+                  <button type="button" className="tutor-chat-row" onClick={() => startChat({ resume: chat })} disabled={busy}>
+                    <span className="tutor-chat-row-title">{chat.title || 'Tutor chat'}</span>
+                    <span className="c-meta">{guides.find(item => item.id === chat.guide_id)?.title || 'General'} · {new Date(chat.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {chatsError && <p className="cordia-tutor-message error" role="alert">{chatsError}</p>}
+        </div>
+      ) : (
       <div className="cordia-tutor-messages" aria-live="polite">
         {messages.length === 0 && (
           <div className="tutor-welcome">
             <h2>Ask anything</h2>
-            <div className="tutor-starter-actions">
+            {general ? <p className="c-meta">A general chat, not tied to a guide. Pick a guide above to ask about your course material.</p> : <div className="tutor-starter-actions">
               {[
                 { label: 'Explain', prompt: 'Explain the key concepts in this material in simple terms.', icon: MessageCircle },
                 { label: 'Make guide', prompt: 'Create a study guide from this material.', icon: BookOpen },
                 { label: 'Practice', prompt: 'Generate practice questions from this material.', icon: PencilRuler },
                 { label: 'Flashcards', prompt: 'Make flashcards for the key points in this material.', icon: Layers },
               ].map(action => <button type="button" key={action.label} className="c-chip" onClick={() => setInput(action.prompt)}><action.icon size={16} strokeWidth={1.75} aria-hidden="true" />{action.label}</button>)}
-            </div>
+            </div>}
           </div>
         )}
         {messages.map((message, index) => (
@@ -567,6 +634,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         {localError && <div className="cordia-tutor-message error">{localError}</div>}
         <div ref={endRef} />
       </div>
+      )}
 
       <div className={`cordia-tutor-input${Recognition ? ' has-mic' : ''}`}>
         <textarea

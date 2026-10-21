@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Brain, ChevronRight, Flame, Layers, NotebookPen, PencilRuler, Snowflake, Timer, TreeDeciduous } from 'lucide-react';
+import { Brain, ChevronRight, Flame, Layers, NotebookPen, PencilRuler, Snowflake, Timer } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
@@ -138,10 +138,10 @@ export default function Today() {
   const firstWeek = !progress.first || Date.now() - progress.first < 7 * 86400000;
 
   return (
-    <LoadGate ready={loaded} label="Loading Today">
+    <LoadGate ready={loaded} label="Loading your dashboard">
     <div className="c-page today">
       <header className="c-page-head">
-        <h1 className="c-title">Today</h1>
+        <h1 className="c-title">Dashboard</h1>
       </header>
 
       {loadError && (
@@ -209,7 +209,6 @@ export default function Today() {
             {streakInfo.frozenThisWeek && <Snowflake size={16} strokeWidth={1.75} aria-label="Freeze used this week" className="today-freeze" />}
           </span>
         )}
-        <span className="today-stat"><TreeDeciduous size={20} strokeWidth={1.75} aria-hidden="true" /><strong>{plural(guides.length, 'tree')}</strong></span>
         <span className="today-stat"><Timer size={20} strokeWidth={1.75} aria-hidden="true" /><strong>{weekMinutes} min</strong><span className="c-meta">this week</span></span>
         <span className="c-spacer" />
         <span className="c-meta today-progress-more">Progress</span>

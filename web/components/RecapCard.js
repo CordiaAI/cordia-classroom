@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { cssVar } from '../lib/cssVar';
 import { Share2 } from 'lucide-react';
-import GroveTree from './GroveTree';
 import { groveKey, useProgress } from '../lib/progress';
 import { dayKey, readActivity, semesterName } from '../lib/activity';
 
@@ -11,7 +10,7 @@ function escapeXml(text) {
   return String(text).replace(/[<>&"']/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[char]));
 }
 
-// "Semester in Cordia": hours, cards, top class and the grove, shareable as a PNG.
+// "Semester in Cordia": hours, cards and top class, shareable as a PNG.
 export default function RecapCard({ guides, folders, since, cardsStudied = 0 }) {
   const progress = useProgress();
   const treesRef = useRef(null);
@@ -41,7 +40,6 @@ export default function RecapCard({ guides, folders, since, cardsStudied = 0 }) 
       topClass: folders.find(folder => folder.id === topId)?.name || '–',
     };
   }, [guides, folders, since, progress.grove, cardsStudied]);
-  const trees = guides.filter(guide => new Date(guide.created_at) >= since).slice(0, 8);
   const name = semesterName();
 
   async function share() {
@@ -105,19 +103,12 @@ export default function RecapCard({ guides, folders, since, cardsStudied = 0 }) 
         <li><strong>{stats.cards}</strong><span>cards</span></li>
         <li><strong className="recap-class">{stats.topClass}</strong><span>top class</span></li>
       </ul>
-      <div className="recap-trees" ref={treesRef} aria-hidden="true">
-        {trees.map(guide => {
-          const key = groveKey(guide.id);
-          return <GroveTree key={guide.id} minutes={progress.grove[key] || 0} rings={progress.rings[key] || 0} size={64} />;
-        })}
-      </div>
       <style jsx>{`
         .recap { display: grid; gap: 16px; padding: 20px; border-radius:var(--r-card); }
         .recap-stats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
         .recap-stats li { display: grid; gap: 4px; min-width: 0; }
         .recap-stats strong { font:600 28px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--olive-ink); }
         .recap-stats .recap-class { font:600 20px/1.15 var(--font-sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .recap-trees { display: flex; flex-wrap: wrap; gap: 4px; min-height: 64px; }
       `}</style>
     </section>
   );

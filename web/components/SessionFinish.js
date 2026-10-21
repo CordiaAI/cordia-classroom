@@ -1,28 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { RotateCcw } from 'lucide-react';
-import GroveTree from './GroveTree';
-import { addGrowth, addRing, getProgress, groveKey } from '../lib/progress';
+import { addGrowth, addRing } from '../lib/progress';
 import { recordStudy } from '../lib/activity';
 import { apiFetch } from '../lib/api';
 import { canvasKnownAvailable } from '../lib/canvas';
 
-// The end of every session: the guide's tree gains a ring, plus three numbers.
+// The end of every session: three numbers and what to do next. (Study time per guide is still
+// recorded for the Progress page; the grove of trees is hidden for now.)
 export default function SessionFinish({ guideId, guideTitle, cards, accuracy, minutes, kind, onRestart, onDone, doneSpot, children }) {
-  const [tree, setTree] = useState(null);
-
   useEffect(() => {
     recordStudy({ guideId, guideTitle, minutes, cards, right: Math.round((accuracy / 100) * cards), total: cards, kind });
     if (guideId) addGrowth(guideId, minutes);
     // Saved class sets count you as a studier (ranking only); other guides no-op on the server.
     if (guideId && canvasKnownAvailable() !== false) apiFetch(`/sharing/guides/${guideId}/studied`, { method: 'POST', body: JSON.stringify({ accuracy: Math.round(accuracy) }) });
-    const rings = guideId ? addRing(guideId) : 0;
-    const key = groveKey(guideId);
-    setTree({ minutes: getProgress().grove[key] || minutes, rings });
+    if (guideId) addRing(guideId);
   }, []);
 
   return (
     <section className="c-card finish" aria-labelledby="finish-title">
-      {tree && <GroveTree minutes={tree.minutes} rings={Math.max(1, tree.rings)} newRing size={132} title="Your tree grew a ring" />}
       <h2 id="finish-title" className="c-title">Done</h2>
       <ul className="finish-stats">
         <li><strong>{cards}</strong><span>cards</span></li>
@@ -30,7 +25,7 @@ export default function SessionFinish({ guideId, guideTitle, cards, accuracy, mi
         <li><strong>{Math.max(1, Math.round(minutes))}</strong><span>min</span></li>
       </ul>
       {/* Spacing works better than it feels, so say what happens next. */}
-      <p className="c-meta finish-next">{accuracy < 100 ? 'What you missed comes back in your next Daily review.' : 'All known. New and missed cards show up in your Daily review on Today.'}</p>
+      <p className="c-meta finish-next">{accuracy < 100 ? 'Study this guide again soon to lock in the ones you missed.' : 'All known. A quick review in a few days keeps it that way.'}</p>
       {children}
       <div className="c-row finish-actions">
         {onRestart && <button type="button" className="c-btn c-btn--secondary" onClick={onRestart}><RotateCcw size={20} strokeWidth={1.75} aria-hidden="true" />Restart</button>}

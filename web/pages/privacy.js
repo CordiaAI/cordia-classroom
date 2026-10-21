@@ -27,7 +27,7 @@ export default function PrivacyPolicy() {
 
         <Section title="1. Information We Collect">
           <p><strong style={{ color: 'var(--text-primary)' }}>a. Account Information</strong></p>
-          <p>When you create an account, we collect your email address and a hashed password. We do not store plaintext passwords.</p>
+          <p>When you create an account, we collect your email address and a hashed password, or your Google sign-in, or your phone number if you sign in with a texted code. We do not store plaintext passwords. Your phone number is used only to sign you in; sign-in codes are sent by our authentication provider's SMS service, and we do not send marketing texts.</p>
 
           <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>b. Page Content</strong></p>
           <p>When you ask the Chrome side panel to capture a page, bounded visible study content is transmitted to our servers for AI processing. The most recent normalized capture, page title, and source URL are stored in your private Tutor session so the same Tutor can continue in CordiaClassroom. A capture may also be retained as study material when you choose to save it.</p>
