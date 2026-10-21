@@ -30,7 +30,8 @@ test('a Claude call sends the Messages API request and reads only the text', asy
   assert.equal(sent.body.output_config.effort, 'low');
   assert.ok(sent.body.max_tokens > 200, 'headroom for thinking');
   assert.equal(sent.body.temperature, undefined, 'Claude takes no sampling settings');
-  assert.match(sent.body.system, /only the JSON object/);
+  assert.equal(sent.body.system.length, 1);
+  assert.match(sent.body.system[0].text, /only the JSON object/);
 });
 
 test('a refused or failed Claude call returns null', async () => {

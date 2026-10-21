@@ -43,6 +43,7 @@ class ClaudeCallTests(unittest.TestCase):
                                       temperature=0.2, response_format={"type": "json_object"})
         sent = client.beta.messages.stream.call_args.kwargs
         self.assertNotIn("temperature", sent)
+        self.assertEqual(sent["system"], [{"type": "text", "text": "Respond with only the JSON object: no code fences and no other text."}])
         self.assertEqual(sent["output_config"], {"effort": "medium"}, "guides get medium effort")
         self.assertNotIn("fallbacks", sent, "server-side fallbacks only go to Opus, which Classroom never uses")
         self.assertNotIn("betas", sent)

@@ -46,7 +46,8 @@ async function claude(provider, { system, user, maxTokens, json, timeoutMs, fetc
       model: provider.chatModel,
       max_tokens: maxTokens + THINKING_HEADROOM,
       output_config: { effort: 'low' },
-      system: json ? `${system}\n\nRespond with only the JSON object: no code fences and no other text.` : system,
+      // As a text block: the API can refuse a plain-string system prompt ("Input should be a valid array").
+      system: [{ type: 'text', text: json ? `${system}\n\nRespond with only the JSON object: no code fences and no other text.` : system }],
       messages: [{ role: 'user', content: user }],
     });
     if (message.stop_reason === 'refusal') return null;
