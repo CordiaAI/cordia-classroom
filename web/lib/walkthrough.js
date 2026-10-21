@@ -75,16 +75,13 @@ export const MINI = {
   insights: { label: 'Insights', route: '/dashboard', steps: [
     { target: '[data-spot="insights"]', label: 'Your progress and weak spots', where: onToday, on: 'insights-opened' },
   ] },
-  grove: { label: 'Grove', route: '/progress', steps: [
-    { target: '[data-spot="grove"]', label: 'One tree per guide', where: path => path === '/progress', on: 'grove-opened', finishable: true },
-  ] },
 };
 
 // Which real action counts as using each feature (ticks Learn Cordia, hides its dot).
 const FEATURE_EVENTS = {
   'guide-ready': 'add', explain: 'explain', 'card-made': 'card', 'quiz-started': 'quiz', ask: 'ask',
   'card-flipped': 'cards', 'practice-opened': 'practice', 'practice-guide': 'practice', 'calendar-connected': 'calendar', 'focus-started': 'focus',
-  'note-written': 'notes', 'insights-opened': 'insights', 'grove-opened': 'grove', 'canvas-connected': 'canvas',
+  'note-written': 'notes', 'insights-opened': 'insights', 'canvas-connected': 'canvas',
 };
 
 export const FEATURES = Object.keys(MINI);

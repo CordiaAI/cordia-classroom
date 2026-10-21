@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import {
-  ChartNoAxesColumn, CircleHelp, CreditCard, GraduationCap, Library, Link2, LogOut, Palette, Plus, Search, Settings, Sun, Timer, User,
-} from 'lucide-react';
+import { ChartNoAxesColumn, CircleHelp, CreditCard, GraduationCap, LayoutDashboard, Library, Link2, LogOut, Palette, Plus, Search, Settings, Timer, User } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -19,7 +17,7 @@ import { walkthroughEvent } from '../lib/walkthrough';
 // One navigation: the same three places on the glass top bar and the mobile tab bar, plus New.
 // The Tutor is the bubble in the corner (TutorBubble); the calendar lives inside Canvas.
 const navItems = [
-  { label: 'Today', href: '/dashboard', icon: Sun, spot: 'nav-today' },
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, spot: 'nav-today' },
   { label: 'Library', href: '/library', icon: Library, spot: 'nav-library' },
   { label: 'Canvas', href: '/canvas', icon: GraduationCap, spot: 'nav-canvas', tip: 'calendar' },
 ];
@@ -135,7 +133,7 @@ export default function Sidebar({ timerState, setTimerState }) {
     <>
       <a className="workspace-skip-link" href="#classroom-main">Skip to content</a>
       <header className="c-topbar">
-        <Link className="c-brand" href="/dashboard" aria-label="Cordia Classroom, Today">
+        <Link className="c-brand" href="/dashboard" aria-label="Cordia Classroom, Dashboard">
           <AcademicInfinityMark className="top-navigation-mark" title="" />
           <span>cordia</span>
         </Link>

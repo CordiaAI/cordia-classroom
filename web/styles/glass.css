@@ -106,3 +106,53 @@ main .sn-paper :is(h1, h2, h3, h4), .sn-paper :is(h1, h2, h3, h4) { font-family:
 main .sn-paper h1, .sn-paper h1 { font-size: var(--fs-20) !important; font-weight: 700 !important; }
 .sn-paper h2 { font-size: var(--fs-17) !important; }
 .sn-paper :is(h3, h4) { font-size: var(--fs-15) !important; }
+
+/* An icon button that is switched on (shuffle, star, camera) reads like a switch that is on:
+   olive glass with a white icon, unmistakable at a glance in both themes. */
+:is(.c-icon-btn[aria-pressed='true'], .c-icon-btn.is-on):not(:disabled) { background: var(--lg-sheen-olive), var(--olive) !important; border-color: var(--lg-edge); color: var(--on-olive); box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow); }
+:is(.c-icon-btn[aria-pressed='true'], .c-icon-btn.is-on) svg.lucide { color: var(--on-olive) !important; }
+
+/* Phones never zoom: no double-tap zoom, and fields are 16px so iOS doesn't zoom in on focus. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { touch-action: manipulation; }
+@media (max-width: 767px), (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea, [contenteditable='true'] { font-size: 16px !important; }
+}
+
+/* Notched phones in landscape: keep the side gutters clear of the notch and rounded corners. */
+@media (max-width: 767px), (pointer: coarse) {
+  .main-content, .app-shell .main-content {
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
+  }
+  .c-topbar { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  .c-tabbar { padding-left: max(4px, env(safe-area-inset-left)); padding-right: max(4px, env(safe-area-inset-right)); }
+}
+
+/* A page's sections never grow wider than the page (grid items default to their content's
+   min width, which pushed Library's class cards past a 360px screen). */
+.c-page > * { min-width: 0; }
+/* Notes sits in the page like every other page: no second set of page padding. */
+.sn-index { padding: 0 !important; max-width: none; }
+
+/* Calendar: each day's date sits on a rounded glass bar; today's is olive with white text,
+   over a faint olive column (it was a hard black rectangle). */
+.calendar-day > header { margin: 6px 6px 0; border-radius: var(--r-input); border-bottom: 0 !important; background: var(--lg-sheen), var(--lg-fill) !important; box-shadow: var(--lg-highlight); }
+.calendar-day-today, [data-theme='dark'] .calendar-day-today { background: var(--olive-tint) !important; border-radius: var(--r-row); }
+.calendar-day-today > header, [data-theme='dark'] .calendar-day-today > header { background: var(--lg-sheen-olive), var(--olive) !important; box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow); }
+.calendar-day-today > header :is(span, strong, em) { color: var(--on-olive) !important; }
+
+/* Tab bars that hold more tabs than a phone is wide (Settings, a class page): full width,
+   scroll sideways with a soft fade on the side that has more. */
+@media (max-width: 767px) {
+  .c-seg.is-scroller { display: flex; width: 100%; justify-self: stretch; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+  .c-seg.is-scroller::-webkit-scrollbar { display: none; }
+  .c-seg.is-scroller > * { flex: 0 0 auto; scroll-snap-align: center; white-space: nowrap; }
+  .c-seg.is-scroller.fade-right { -webkit-mask-image: linear-gradient(to right, var(--on-olive) 82%, transparent); mask-image: linear-gradient(to right, var(--on-olive) 82%, transparent); }
+  .c-seg.is-scroller.fade-left { -webkit-mask-image: linear-gradient(to left, var(--on-olive) 82%, transparent); mask-image: linear-gradient(to left, var(--on-olive) 82%, transparent); }
+  .c-seg.is-scroller.fade-left.fade-right { -webkit-mask-image: linear-gradient(to right, transparent, var(--on-olive) 18%, var(--on-olive) 82%, transparent); mask-image: linear-gradient(to right, transparent, var(--on-olive) 18%, var(--on-olive) 82%, transparent); }
+}
+/* Stacks and sections are one column that never grows past its container (a long truncated
+   title would otherwise stretch the column and push row actions off the card). */
+:is(.c-stack, .c-section) { grid-template-columns: minmax(0, 1fr); }
+:is(.c-stack, .c-section) > * { min-width: 0; }
