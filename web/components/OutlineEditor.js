@@ -13,7 +13,8 @@ const MIN_FIT = 160;
 // guide has material) and anything the student types, saved to the guide's notes as they go.
 // Highlight text for Visualize, Explain, Make card or Ask; a visual appears right beside the
 // highlighted line, and the one kept stays there.
-export default function OutlineEditor({ guide, version = 0, onSaved, onAction, placeholder = 'Type your notes…' }) {
+// tools: extra toolbar buttons from the page (Regenerate outline on a guide with material).
+export default function OutlineEditor({ guide, version = 0, onSaved, onAction, tools = null, placeholder = 'Type your notes…' }) {
   const pageRef = useRef(null);
   const gutterRef = useRef(null);
   const saved = useRef(guide.notes || '');
@@ -148,6 +149,7 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, p
           <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={() => format('indent')}><ListIndentIncrease size={16} strokeWidth={1.75} aria-hidden="true" />Detail</button>
           <span className="c-spacer" />
           <span className="c-meta oe-status" role="status">{saving}</span>
+          {tools}
         </div>
         <div
           ref={pageRef}
