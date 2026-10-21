@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ArrowRight } from 'lucide-react';
-import { getToken } from '../lib/api';
+import { clearAuth, getToken, tryRefreshToken } from '../lib/api';
+import { rememberReturnTo, takeReturnTo } from '../lib/returnTo.mjs';
 import PublicPage from '../components/PublicPage';
 import AuthCard from '../components/AuthCard';
 
@@ -10,7 +11,18 @@ import AuthCard from '../components/AuthCard';
 export function Landing({ mode = 'signin', path = '/' }) {
   const router = useRouter();
   useEffect(() => {
-    if (getToken()) router.push('/dashboard');
+    const back = rememberReturnTo(new URLSearchParams(window.location.search).get('next'));
+    if (!getToken()) return;
+    if (!back) {
+      router.push('/dashboard');
+      return;
+    }
+    // The Assistant sends students here when their token has expired: renew it and go back,
+    // or sign in again if it can't be renewed.
+    tryRefreshToken().then(ok => {
+      if (ok) window.location.assign(takeReturnTo() || back);
+      else clearAuth();
+    });
   }, []);
 
   return (

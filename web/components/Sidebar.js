@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ChartNoAxesColumn, CircleHelp, CreditCard, GraduationCap, Library, Link2, LogOut, Palette, Plus, Search, Settings, Sun, Timer, User,
+  ChartNoAxesColumn, CircleHelp, CreditCard, GraduationCap, Library, Link2, LogOut, MessageCircle, Palette, Plus, Search, Settings, Sun, Timer, User,
 } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
@@ -22,7 +22,14 @@ const navItems = [
   { label: 'Today', href: '/dashboard', icon: Sun, spot: 'nav-today' },
   { label: 'Library', href: '/library', icon: Library, spot: 'nav-library' },
   { label: 'Canvas', href: '/canvas', icon: GraduationCap, spot: 'nav-canvas', tip: 'calendar' },
+  // Cordia Assistant is its own app behind /assistant (next.config.js), so a full page load.
+  { label: 'Assistant', href: '/assistant', icon: MessageCircle, spot: 'nav-assistant', external: true },
 ];
+
+function NavLink({ item, active, children }) {
+  const props = { href: item.href, 'aria-current': active === item.href ? 'page' : undefined, 'data-tip': item.tip, 'data-spot': item.spot };
+  return item.external ? <a {...props}>{children}</a> : <Link {...props}>{children}</Link>;
+}
 
 // Guides, notes, lectures, classes and every study screen live inside Library.
 const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice', '/nclex', '/folder', '/create', '/session', '/class', '/smartnotes', '/lecture'];
@@ -142,10 +149,10 @@ export default function Sidebar({ timerState, setTimerState }) {
 
         <nav className="c-nav" aria-label="Primary">
           {navItems.map(item => (
-            <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.tip} data-spot={item.spot}>
+            <NavLink key={item.href} item={item} active={active}>
               <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
               {item.label}
-            </Link>
+            </NavLink>
           ))}
         </nav>
 
@@ -186,10 +193,10 @@ export default function Sidebar({ timerState, setTimerState }) {
           New
         </button>
         {navItems.slice(2).map(item => (
-          <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-spot={item.spot}>
+          <NavLink key={item.href} item={{ ...item, tip: undefined }} active={active}>
             <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
             {item.label}
-          </Link>
+          </NavLink>
         ))}
       </nav>
       <TutorBubble />

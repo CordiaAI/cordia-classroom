@@ -24,8 +24,19 @@ const contentSecurityPolicy = [
   'report-uri /api/csp-report',
 ].join('; ');
 
+// Cordia Assistant (texting) is its own Next.js app with basePath /assistant, deployed as its own
+// Vercel project. Classroom forwards /assistant to it, so students get one site and one login.
+const assistantUrl = process.env.ASSISTANT_URL;
+
 module.exports = {
   reactStrictMode: true,
+  async rewrites() {
+    if (!assistantUrl) return [];
+    return [
+      { source: '/assistant', destination: `${assistantUrl}/assistant` },
+      { source: '/assistant/:path*', destination: `${assistantUrl}/assistant/:path*` },
+    ];
+  },
   async redirects() {
     return [{
       source: '/:path*',
@@ -43,6 +54,11 @@ module.exports = {
         { key: 'X-Frame-Options', value: 'DENY' },
         { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         { key: 'Permissions-Policy', value: 'camera=(self), geolocation=(), microphone=(self)' },
+      ],
+    }, {
+      // Classroom's own pages only: the Assistant's pages load different resources.
+      source: '/((?!assistant(?:/|$)).*)',
+      headers: [
         // Report-only until production reports come back clean; then rename to Content-Security-Policy.
         { key: 'Content-Security-Policy-Report-Only', value: contentSecurityPolicy },
       ],

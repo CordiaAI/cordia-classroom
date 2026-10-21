@@ -4,12 +4,12 @@ import { readFile } from 'node:fs/promises';
 
 const source = relativePath => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
-test('one navigation: Today, Library, Canvas plus New; Tutor is a bubble; Library owns study screens, notes and lectures', async () => {
+test('one navigation: Today, Library, Canvas, Assistant plus New; Tutor is a bubble; Library owns study screens, notes and lectures', async () => {
   const sidebar = await source('components/Sidebar.js');
   const navigation = sidebar.split('const navItems = [')[1].split('];')[0];
   const labels = [...navigation.matchAll(/\{ label: '([^']+)'/g)].map(match => match[1]);
 
-  assert.deepEqual(labels, ['Today', 'Library', 'Canvas']);
+  assert.deepEqual(labels, ['Today', 'Library', 'Canvas', 'Assistant']);
   assert.match(sidebar, /'\/smartnotes', '\/lecture'\]/);
   assert.match(sidebar, /<TutorBubble \/>/);
   assert.match(await source('components/TutorBubble.js'), /cordia:tutor-toggle/);

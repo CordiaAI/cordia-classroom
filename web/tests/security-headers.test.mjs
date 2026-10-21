@@ -9,8 +9,11 @@ async function policy(env) {
   Object.assign(process.env, env);
   try {
     delete require.cache[require.resolve('../next.config.js')];
-    const [{ headers }] = await require('../next.config.js').headers();
-    const header = headers.find(h => h.key === 'Content-Security-Policy-Report-Only');
+    const rules = await require('../next.config.js').headers();
+    const rule = rules.find(r => r.headers.some(h => h.key === 'Content-Security-Policy-Report-Only'));
+    // Classroom's pages only; the Assistant app behind /assistant loads different resources.
+    assert.equal(rule.source, '/((?!assistant(?:/|$)).*)');
+    const header = rule.headers.find(h => h.key === 'Content-Security-Policy-Report-Only');
     return Object.fromEntries(header.value.split('; ').map(part => {
       const [name, ...values] = part.split(' ');
       return [name, values];
