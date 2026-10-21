@@ -27,9 +27,9 @@ test('the return path survives one round trip and is used once', () => {
   assert.equal(takeReturnTo(), null);
 });
 
-test('/assistant is forwarded to the Assistant app, and the nav opens Settings › Assistant', () => {
+test('/assistant is forwarded to the Assistant app, and the nav opens the Assistant page', () => {
   const config = readFileSync(new URL('../next.config.js', import.meta.url), 'utf8');
   assert.match(config, /source: '\/assistant\/:path\*', destination: `\$\{assistantUrl\}\/assistant\/:path\*`/);
   const sidebar = readFileSync(new URL('../components/Sidebar.js', import.meta.url), 'utf8');
-  assert.match(sidebar, /label: 'Assistant', href: '\/settings\?section=assistant'/);
+  assert.match(sidebar, /label: 'Assistant', href: '\/assistant'/);
 });

@@ -6,13 +6,15 @@ import { readFileSync } from 'node:fs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('Settings has an Assistant tab, and the top bar opens it', () => {
-  const settings = read('pages/settings.js');
-  assert.match(settings, /\{ key: 'assistant', label: 'Assistant' \}/);
-  assert.match(settings, /<AssistantSettings onOpenPlan=/);
+test('the Assistant has its own page, the top bar opens it, and old Settings links land there', () => {
+  const page = read('pages/assistant.js');
+  assert.match(page, /<AssistantSettings onOpenPlan=/);
   const sidebar = read('components/Sidebar.js');
-  assert.match(sidebar, /label: 'Assistant', href: '\/settings\?section=assistant'/);
-  assert.match(sidebar, /pathname === '\/settings' && section === 'assistant'/);
+  assert.match(sidebar, /label: 'Assistant', href: '\/assistant'/);
+  assert.match(sidebar, /pathname === '\/assistant'/);
+  const settings = read('pages/settings.js');
+  assert.doesNotMatch(settings, /key: 'assistant'/);
+  assert.match(settings, /section === 'assistant'.*pathname: '\/assistant'/);
 });
 
 test('calls go to /assistant/api with the Classroom token, never a second login', () => {

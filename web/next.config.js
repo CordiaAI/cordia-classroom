@@ -33,7 +33,6 @@ module.exports = {
   async rewrites() {
     if (!assistantUrl) return [];
     return [
-      { source: '/assistant', destination: `${assistantUrl}/assistant` },
       { source: '/assistant/:path*', destination: `${assistantUrl}/assistant/:path*` },
     ];
   },

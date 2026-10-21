@@ -22,8 +22,8 @@ const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, spot: 'nav-today' },
   { label: 'Library', href: '/library', icon: Library, spot: 'nav-library' },
   { label: 'Canvas', href: '/canvas', icon: GraduationCap, spot: 'nav-canvas', tip: 'calendar' },
-  // Cordia Assistant's settings live in Settings → Assistant.
-  { label: 'Assistant', href: '/settings?section=assistant', icon: MessageCircle, spot: 'nav-assistant' },
+  // Cordia Assistant has its own page (pages/assistant.js).
+  { label: 'Assistant', href: '/assistant', icon: MessageCircle, spot: 'nav-assistant' },
 ];
 
 // Guides, notes, lectures, classes and every study screen live inside Library.
@@ -31,7 +31,7 @@ const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice'
 
 export function activeNavHref(pathname, section = '') {
   if (pathname === '/dashboard') return '/dashboard';
-  if (pathname === '/settings' && section === 'assistant') return '/settings?section=assistant';
+  if (pathname === '/assistant') return '/assistant';
   if (LIBRARY_PATHS.some(path => pathname === path || pathname.startsWith(path + '/'))) return '/library';
   if (pathname.startsWith('/canvas') || pathname.startsWith('/calendar')) return '/canvas';
   return '';
