@@ -281,13 +281,17 @@ def _token_payload(user_id: str) -> dict | None:
     }
 
 
-@router.get("/connection")
-def get_calendar_connection(authorization: str = Header(default="")):
-    user_id = get_user_id(authorization)
+def calendar_for(user_id: str) -> dict:
+    """The student's deadlines from their calendar link or Canvas token, whichever they connected."""
     url = _stored_feed(user_id)
     if not url:
         return _token_payload(user_id) or {"connected": False, "items": [], "due_today": []}
     return _calendar_payload(url, user_id)
+
+
+@router.get("/connection")
+def get_calendar_connection(authorization: str = Header(default="")):
+    return calendar_for(get_user_id(authorization))
 
 
 class DoneRequest(BaseModel):

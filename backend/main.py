@@ -20,7 +20,7 @@ from routers import (
     auth, billing, calendar, chat, feedback, folders, guides, learning, materials,
     nclex, practice, quiz, search, smart_notes, stats, tutor,
 )
-from routers import canvas, classes, admin, public_forms
+from routers import canvas, classes, admin, public_forms, connectors
 from services import log_scrub
 
 # Load environment variables
@@ -162,6 +162,7 @@ app.include_router(billing.router)
 app.include_router(feedback.router)
 app.include_router(smart_notes.router)
 app.include_router(calendar.router)
+app.include_router(connectors.router)
 app.include_router(tutor.router)
 app.include_router(chat.router)
 app.include_router(materials.router)

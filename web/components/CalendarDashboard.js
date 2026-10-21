@@ -389,7 +389,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
           <button type="button" className="c-btn c-btn--secondary" onClick={toggleReminders} aria-pressed={reminders}>{reminders ? <Bell {...ICON} /> : <BellOff {...ICON} />}Reminders</button>
           <button type="button" className="c-icon-btn" onClick={() => refresh()} disabled={loading} aria-label="Refresh"><RefreshCw {...ICON} /></button>
           {fromToken
-            ? <Link href="/settings?section=connections" className="c-btn c-btn--quiet">Canvas settings</Link>
+            ? <Link href="/settings?section=connectors" className="c-btn c-btn--quiet">Canvas settings</Link>
             : <button type="button" className="c-icon-btn" onClick={disconnect} aria-label="Disconnect calendar"><Unlink {...ICON} /></button>}
         </div>
         <style jsx>{`

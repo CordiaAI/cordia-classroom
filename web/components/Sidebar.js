@@ -115,7 +115,7 @@ export default function Sidebar({ timerState, setTimerState }) {
     { key: 'profile', label: 'Settings', icon: Settings, onSelect: () => router.push('/settings') },
     { key: 'appearance', label: 'Appearance', icon: Palette, onSelect: () => router.push('/settings?section=appearance') },
     { key: 'plan', label: 'Plan', icon: CreditCard, onSelect: () => router.push('/settings?section=plan') },
-    { key: 'canvas', label: 'Canvas', icon: Link2, onSelect: () => router.push('/settings?section=connections') },
+    { key: 'canvas', label: 'Canvas', icon: Link2, onSelect: () => router.push('/settings?section=connectors') },
     { key: 'help', label: 'Help', icon: CircleHelp, onSelect: () => setShowHelp(true) },
     { key: 'signout', label: 'Sign out', icon: LogOut, separated: true, onSelect: () => signOut() },
   ];
