@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { MessageCircle } from 'lucide-react';
 import { SectionLoader } from '../CordiaLoader';
 import { assistantApi } from '../../lib/assistant';
+import { walkthroughEvent } from '../../lib/walkthrough';
 import { PhoneStep, ProfileStep, SurveyStep } from './AssistantSetup';
 import AssistantPersonality from './AssistantPersonality';
 import AssistantSchedule from './AssistantSchedule';
@@ -47,6 +48,7 @@ export default function AssistantSettings({ onOpenPlan }) {
     setError('');
     setCatalog(cat.data);
     setMe(who.data);
+    if (who.data?.stage === 'active') walkthroughEvent('assistant-ready');
   }, [catalog]);
 
   useEffect(() => { load(); }, []);
@@ -79,7 +81,7 @@ export default function AssistantSettings({ onOpenPlan }) {
   const plan = view?.user.classroom;
 
   return (
-    <div className="c-stack asst">
+    <div className="c-stack asst" data-spot="assistant">
       {me.stage === 'setup' && <PhoneStep onDone={load} />}
       {me.stage === 'onboarding' && me.onboarding.next === 'profile' && <ProfileStep catalog={catalog} phoneLast4={me.phone_last4} onDone={load} />}
       {me.stage === 'onboarding' && me.onboarding.next === 'survey' && (

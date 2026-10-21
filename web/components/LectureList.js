@@ -5,6 +5,7 @@ import { AudioLines, Eye, ListChecks, Mic, NotebookPen, X } from 'lucide-react';
 import { SectionLoader } from './CordiaLoader';
 import { listLectures, localDate, saveLecture } from '../lib/lectures';
 import { openNewSheet } from '../lib/newSheet';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -85,7 +86,7 @@ export default function LectureList({ folders = [], adding, onAddingChange, show
             <AudioLines size={32} strokeWidth={1.75} aria-hidden="true" />
             <span className="c-section-title">No lectures yet</span>
             <div className="c-row c-row--wrap">
-              <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet('record')}><Mic {...ICON} />Record lecture</button>
+              <button type="button" className="c-btn c-btn--primary" data-spot="record-lecture" onClick={() => { walkthroughEvent('record-opened'); openNewSheet('record'); }}><Mic {...ICON} />Record lecture</button>
               <button type="button" className="c-btn c-btn--secondary" onClick={() => onAddingChange(true)}><NotebookPen {...ICON} />Add notes or transcript</button>
             </div>
           </div>

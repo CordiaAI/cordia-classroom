@@ -86,7 +86,9 @@ export default function Walkthrough() {
   // The student wandered off the step's screen: one pill brings them back.
   if (step.where && !step.where(router.pathname)) {
     const guide = lastGuide();
-    const route = step.where('/guide/[id]') ? (guide ? `/guide/${guide.id}` : '/library')
+    const own = MINI[wt.id]?.route;
+    const route = own && own !== 'guide' && step.where(own.split('?')[0]) ? own
+      : step.where('/guide/[id]') ? (guide ? `/guide/${guide.id}` : '/library')
       : step.where('/dashboard') ? '/dashboard'
         : step.where('/quiz/[guideId]') && guide ? `/quiz/${guide.id}`
           : step.where('/practice') ? '/practice'

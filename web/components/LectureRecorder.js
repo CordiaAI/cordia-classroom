@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Mic, Pause, Play, RefreshCw, Square, Upload } from 'lucide-react';
+import { walkthroughEvent } from '../lib/walkthrough';
 import { apiFetch, authHeaders, authOnlyHeaders, getUserId, openUpgrade } from '../lib/api';
 import { ChunkedRecorder, keepAwake, levelMeter, micPermission, openMicrophone, pickMimeType, recordingSupported } from '../lib/lectureRecorder';
 import { ChunkUploader } from '../lib/lectureUploads';
@@ -232,6 +233,7 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
     }, 250);
     cleanup.current.push(() => clearInterval(clockTimer));
     setPhase('recording');
+    walkthroughEvent('recording-started');
   }
 
   // Notes for what was said since the last update (plus a little before it for context).
@@ -453,7 +455,7 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
   // Start (and "asking" while the browser shows its microphone prompt)
   return (
     <div className="rec">
-      <button type="button" className="rec-start" onClick={outOfMinutes ? () => openUpgrade({ feature: 'lecture_minute' }) : begin} disabled={phase === 'asking'}>
+      <button type="button" className="rec-start" data-spot="rec-start" onClick={outOfMinutes ? () => openUpgrade({ feature: 'lecture_minute' }) : begin} disabled={phase === 'asking'}>
         <Mic aria-hidden="true" />
         <span>{phase === 'asking' ? 'Allow the microphone' : 'Record'}</span>
       </button>

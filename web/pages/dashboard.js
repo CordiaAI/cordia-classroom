@@ -215,7 +215,7 @@ export default function Today() {
         <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
       </Link>
 
-      {firstWeek && (dayOneFinished(progress) || !progress.wt) ? <LearnCordia hideWhenComplete /> : null}
+      {firstWeek && (dayOneFinished(progress) || !progress.wt) ? <LearnCordia hideWhenComplete compact /> : null}
 
       <style jsx>{`
         .today-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }

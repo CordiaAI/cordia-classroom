@@ -9,6 +9,7 @@ import { canvasStatus, displayDate } from '../lib/canvas';
 import CanvasConnectSheet from './CanvasConnectSheet';
 import CanvasCourseList from './CanvasCourseList';
 import { BRAND_PATHS } from '../lib/brandIcons';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // What each app does here, shown in its sheet.
@@ -167,7 +168,10 @@ export default function ConnectorsSettings() {
 
   async function load() {
     const data = await apiFetch('/connectors');
-    if (Array.isArray(data?.connectors)) setConnectors(data.connectors);
+    if (Array.isArray(data?.connectors)) {
+      setConnectors(data.connectors);
+      if (data.connectors.some(item => item.connected)) walkthroughEvent('connector-connected');
+    }
     else { setConnectors([]); setError(data?.detail || "Connectors couldn't load. Try again."); }
     return data?.connectors || [];
   }
@@ -252,10 +256,10 @@ export default function ConnectorsSettings() {
       <h2 className="c-section-title">Connect your apps</h2>
       <p className="c-meta">Tap one to see what it does and how to connect it. For texting, Cordia Assistant connects its own apps on the Assistant page.</p>
       {connectors === null ? <SectionLoader label="Loading connectors" /> : (
-        <ul className="cn-grid">
+        <ul className="cn-grid" data-spot="connectors">
           {canvas && (
             <li>
-              <button type="button" className="cn-tile" onClick={() => { setOpen('canvas'); setShowClasses(false); setError(''); setNotice(''); }}>
+              <button type="button" className="cn-tile" onClick={() => { walkthroughEvent('connector-opened'); setOpen('canvas'); setShowClasses(false); setError(''); setNotice(''); }}>
                 <ConnectorIcon id="canvas" />
                 <span className="cn-tile-text">
                   <span className="cn-name">Canvas</span>
@@ -270,7 +274,7 @@ export default function ConnectorsSettings() {
             const soon = connector.id !== 'apple_calendar' && !connector.available;
             return (
               <li key={connector.id}>
-                <button type="button" className={'cn-tile' + (soon ? ' is-soon' : '')} onClick={() => { setOpen(connector.id); setError(''); setNotice(''); }}>
+                <button type="button" className={'cn-tile' + (soon ? ' is-soon' : '')} onClick={() => { walkthroughEvent('connector-opened'); setOpen(connector.id); setError(''); setNotice(''); }}>
                   <ConnectorIcon id={connector.id} />
                   <span className="cn-tile-text">
                     <span className="cn-name">{connector.name}</span>
