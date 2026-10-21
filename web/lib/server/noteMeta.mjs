@@ -13,6 +13,7 @@ import { chatProvider } from './aiProvider.mjs';
 import { aiChat } from './aiChat.mjs';
 
 import { DEFAULT_TITLE, MIN_CHARS, heuristicTitle, htmlToText, isDefaultTitle, needsCover } from '../noteMeta.mjs';
+import { supabaseUrlFrom } from '../supabaseUrl.mjs';
 
 export { DEFAULT_TITLE, MIN_CHARS, heuristicTitle, htmlToText, isDefaultTitle, needsCover };
 
@@ -23,7 +24,7 @@ Return JSON: {"title": "...", "outline": "..."}
 
 export function createNoteMetaService({ env = process.env, fetch: fetchImpl = globalThis.fetch, sleep, now } = {}) {
   const apiBase = (env.CLASSROOM_API_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-  const supabaseUrl = (env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+  const supabaseUrl = supabaseUrlFrom(env);
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
   const provider = chatProvider(env);
   const openaiKey = provider.key;

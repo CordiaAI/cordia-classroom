@@ -9,6 +9,7 @@
 // drawing never runs into the serverless time limit. Anything that goes wrong on Napkin's side
 // returns { status: 'fallback' } so the page shows its own themed diagram instead.
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { supabaseUrlFrom } from '../supabaseUrl.mjs';
 
 export const NAPKIN_BASE = 'https://api.napkin.ai';
 // Built-in "Pastel Field" (Casual): soft sage and orange fills, close to Cordia's palette, until
@@ -62,13 +63,16 @@ function noteRateHeaders(headers, now) {
 }
 
 export function createVisualService({ env = process.env, fetch: fetchImpl = globalThis.fetch, sleep = sleepReal, now = () => Date.now() } = {}) {
-  const supabaseUrl = (env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+  const supabaseUrl = supabaseUrlFrom(env);
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
   const napkinKey = env.NAPKIN_API_KEY || '';
   const napkinBase = (env.NAPKIN_API_BASE || NAPKIN_BASE).replace(/\/$/, '');
   const apiBase = (env.CLASSROOM_API_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
   const style = env.NAPKIN_STYLE_ID || DEFAULT_STYLE_ID;
   const enabled = Boolean(napkinKey && supabaseUrl && serviceKey);
+  // Which server settings are missing (names only), so "not set up" says what to add.
+  const missing = [!napkinKey && 'NAPKIN_API_KEY', !serviceKey && 'SUPABASE_SERVICE_ROLE_KEY'].filter(Boolean);
+  if (missing.length) console.warn('[visual] not set up; missing', missing.join(', '));
 
   // The resume ticket: which Napkin request, when it started, for whom and for what content.
   const sign = value => createHmac('sha256', `cordia-visual:${serviceKey}`).update(value).digest('base64url');
@@ -175,7 +179,7 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
     const content = String(text || '').trim().slice(0, MAX_TEXT);
     if (content.length < 3) return { httpStatus: 400, body: { detail: 'Nothing to draw.' } };
     const mode = theme === 'dark' ? 'dark' : 'light';
-    if (!enabled) return { httpStatus: 200, body: { status: 'fallback', reason: 'not_configured' } };
+    if (!enabled) return { httpStatus: 200, body: { status: 'fallback', reason: 'not_configured', missing } };
 
     const key = cacheKey({ text: content, context, style, theme: mode, variations });
     const hit = await cached(key);
@@ -236,7 +240,7 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
   async function usageFor(authorization) {
     const who = await account(authorization);
     if (!who) return { httpStatus: 401, body: { detail: 'Sign in again.' } };
-    if (!enabled) return { httpStatus: 200, body: { enabled: false, plan: who.plan, limit: LIMITS[who.plan], left: LIMITS[who.plan] } };
+    if (!enabled) return { httpStatus: 200, body: { enabled: false, missing, plan: who.plan, limit: LIMITS[who.plan], left: LIMITS[who.plan] } };
     return { httpStatus: 200, body: { enabled: true, ...(await usage(who)) } };
   }
 

@@ -10,6 +10,7 @@ import { sensibleTitle } from '../noteMeta.mjs';
 import { chatProvider } from './aiProvider.mjs';
 import { aiChat } from './aiChat.mjs';
 import { outlineHtml } from '../lectureOutline.mjs';
+import { supabaseUrlFrom } from '../supabaseUrl.mjs';
 
 export { outlineHtml };
 
@@ -133,7 +134,7 @@ export function lectureNoteHtml(lecture, analysis = {}, todos = []) {
 
 export function createLectureLibrary({ env = process.env, fetch: fetchImpl = globalThis.fetch, today = () => new Date() } = {}) {
   const apiBase = (env.CLASSROOM_API_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-  const supabaseUrl = (env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+  const supabaseUrl = supabaseUrlFrom(env);
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
   const provider = chatProvider(env);
   const openaiKey = provider.key;
