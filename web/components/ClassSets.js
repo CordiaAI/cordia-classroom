@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Bookmark, Check, Flag, Layers } from 'lucide-react';
 import { apiFetch, apiErrorMessage } from '../lib/api';
+import DoneCheck from './DoneCheck';
 import Menu from './Menu';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
@@ -97,13 +98,25 @@ export function ClassDeadlines({ classId, deadlines }) {
   return (
     <ul className="c-card cp-list">
       {deadlines.map((item, index) => (
-        <li key={index} className="cp-row">
-          <span className="cp-main"><span className="cp-title c-truncate">{item.title}</span></span>
-          <span className="c-meta cp-due">{dueLabel(item.due_at)}</span>
-        </li>
+        <DeadlineRow key={item.id || index} item={item} />
       ))}
       <ClassStyles />
     </ul>
+  );
+}
+
+function DeadlineRow({ item }) {
+  const [done, setDone] = useState(Boolean(item.done));
+  const late = !done && new Date(item.due_at) < new Date();
+  return (
+    <li className={'cp-row cp-deadline' + (done ? ' is-done' : '')}>
+      {item.id && <DoneCheck id={item.id} title={item.title} done={done} onChange={setDone} />}
+      <span className="cp-main">
+        <span className="cp-title c-truncate">{item.title}</span>
+        {(item.submitted || late) && <span className="c-meta">{item.submitted ? 'Turned in on Canvas' : 'Past due'}</span>}
+      </span>
+      <span className="c-meta cp-due">{dueLabel(item.due_at)}</span>
+    </li>
   );
 }
 
@@ -119,8 +132,10 @@ function ClassStyles() {
         .cp-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-variant-numeric: tabular-nums; }
         .cp-versions { font: 600 13px/1 var(--font-sans); white-space: nowrap; }
         .cp-row .c-menu-wrap:has(.cp-versions) > .c-icon-btn { width: auto; padding: 0 12px; border-radius: 999px; }
+        .cp-deadline { gap: 14px; }
+        .cp-deadline.is-done .cp-title { color: var(--muted); text-decoration: line-through; }
         .cp-due { font-variant-numeric: tabular-nums; padding-right: 16px; white-space: nowrap; }
-        @media (max-width: 767px) { .cp-list { padding-left: 16px; } .cp-row { flex-wrap: wrap; padding: 12px 0; } .cp-main { flex-basis: 100%; } }
+        @media (max-width: 767px) { .cp-list { padding-left: 16px; } .cp-row { flex-wrap: wrap; padding: 12px 0; } .cp-main { flex-basis: 100%; } .cp-deadline { flex-wrap: nowrap; } .cp-deadline .cp-main { flex-basis: auto; } }
     `}</style>
   );
 }

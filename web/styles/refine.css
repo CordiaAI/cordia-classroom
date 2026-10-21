@@ -1,6 +1,6 @@
 /* Refinement layer: the same app, fewer and more consistent decisions.
    Loaded after system.css and before tokens.css. No colors here, only tokens.
-   Type: 13, 15, 17, 20, 28, 40. Newsreader for titles; Manrope 500/600 for everything else. */
+   Type: 13, 15, 17, 20, 28, 40. Newsreader for titles; Quicksand 500/600 for everything else. */
 
 /* ---------- Base ---------- */
 body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -12,7 +12,7 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 ::-webkit-scrollbar-thumb { background: var(--hover-edge); border-radius: var(--r-pill); }
 
 /* ---------- Type roles ---------- */
-/* Page titles: Newsreader 600, slight negative tracking, balanced lines. Everything smaller is Manrope. */
+/* Page titles: Newsreader 600, slight negative tracking, balanced lines. Everything smaller is Quicksand. */
 :is(.c-title, .pricing-title, .guide-title-btn, .guide-title-input,
   .c-brand > span, main h1:not(.sr-only), .public-main h1, .public-main h2, .public-main h3, .extension-install-step h2, .mission-page h2, .mission-page h3) {
   font-family: var(--font-display) !important;
@@ -27,7 +27,7 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 :is(.c-section-title, .public-main h2, .mission-page h2) { font-size: var(--fs-20) !important; }
 :is(.today-continue-title, .lib-row-title, .folder-row-title, .sn-card-title, .recap-class, .me-names strong, .extension-install-step h2, .public-main h3, .mission-page h3,
   .today .c-list-row > .c-grow, .calendar-item strong) { font-family: var(--font-sans) !important; font-weight: 600 !important; font-size: var(--fs-17) !important; letter-spacing: -0.01em; line-height: var(--lh-title); }
-/* Section titles, questions and card faces: Manrope 600. */
+/* Section titles, questions and card faces: Quicksand 600. */
 :is(.c-section-title, .reader-q, .quiz-question-text, .practice-prompt, .fc-face p, .today-counts strong) {
   font-family: var(--font-sans) !important;
   font-weight: 600 !important;
@@ -39,8 +39,8 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 :is(.reader-q, .quiz-question-text, .practice-prompt) { font-size: var(--fs-20) !important; }
 .fc-face p { font-size: var(--fs-28) !important; font-variant-numeric: tabular-nums; }
 .c-brand > span { font-size: var(--fs-20) !important; }
-/* Reading text is body text: Manrope 17 at 1.55. */
-.c-study, .reader-a, .reader-prose, .reader-notes { font: 400 var(--fs-17)/1.55 var(--font-sans) !important; letter-spacing: 0; }
+/* Reading text is body text: Quicksand 17 at 1.55, at 500 so its thin strokes stay legible. */
+.c-study, .reader-a, .reader-prose, .reader-notes { font: 500 var(--fs-17)/1.55 var(--font-sans) !important; letter-spacing: 0; }
 .c-meta { font: 500 var(--fs-13)/var(--lh-body) var(--font-sans); color: var(--muted); font-variant-numeric: tabular-nums; }
 .focus-face { font-size: var(--fs-40) !important; }
 .sr-only { font-size: var(--fs-15) !important; }

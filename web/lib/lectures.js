@@ -35,7 +35,8 @@ export const deleteLecture = id => call('delete', { method: 'POST', body: { id }
 export const updateTodo = body => call('todo', { method: 'POST', body });
 export const confirmedTodos = () => call('todos');
 // Writes the notes for a lecture saved without them (and files its note in the Notes tab).
-export const analyzeLecture = id => call('analyze', { method: 'POST', body: { id }, timeoutMs: 65000 });
+// rewrite: also write the full outline for a lecture analyzed before outlines existed.
+export const analyzeLecture = (id, { rewrite = false } = {}) => call('analyze', { method: 'POST', body: { id, rewrite }, timeoutMs: 65000 });
 
 // When a lecture can't be saved, the recording still lands in Notes (Classroom API), so a
 // transcript is never lost. Returns the note id, or '' if that fails too.

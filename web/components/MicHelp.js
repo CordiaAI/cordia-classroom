@@ -2,7 +2,7 @@ import { ShotStyle } from './CanvasShots';
 
 // Drawn copy of the browser screen for turning the microphone back on: the site-settings
 // icon left of the address is circled, and its menu shows Microphone set to Allow.
-const TEXT = { fontFamily: 'Manrope, Arial, sans-serif', fontWeight: 600 };
+const TEXT = { fontFamily: 'Quicksand, Arial, sans-serif', fontWeight: 600 };
 
 export default function MicHelp() {
   return (

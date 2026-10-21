@@ -318,6 +318,7 @@ export default function LibraryPage() {
               label={`More for ${name}`}
               items={[
                 { label: 'Open class', icon: ArrowUpRight, onSelect: () => router.push('/folder/' + folder.id) },
+                { label: 'Rename class', icon: Pencil, onSelect: () => router.push('/folder/' + folder.id + '?rename=1') },
                 { label: 'Delete class', icon: Trash2, danger: true, onSelect: () => deleteClass(folder) },
               ]}
             />

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Check, ChevronDown, Keyboard, NotebookPen, Sparkles, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Keyboard, ListTree, NotebookPen, Sparkles, Trash2 } from 'lucide-react';
+import ConfirmDialog from '../ConfirmDialog';
 import Menu from '../Menu';
 import { requestTip } from '../../lib/tips';
 import TypingShortcuts from './TypingShortcuts';
@@ -13,6 +14,7 @@ import { cleanPastedHtml, formatOnKeyDown, plainTextToHtml } from '../../lib/not
 import { sanitizeHtml } from '../../lib/sanitizeHtml';
 import { API, notesRequest, saveErrorMessage } from '../../lib/smartnotes';
 import { walkthroughEvent } from '../../lib/walkthrough';
+import { analyzeLecture, getLecture, listLectures } from '../../lib/lectures';
 import MaterialPanel from './MaterialPanel';
 import { StudyGuidePreviewModal, useGuidePreview } from './GuidePreview';
 
@@ -21,6 +23,14 @@ function BuiltInDiagram({ text, code, loading, draw }) {
   useEffect(() => { if (!code) draw(text); }, [text]);
   if (loading) return <div className="sn-diagram-placeholder"><CordiaLoader size={20} label="Drawing" /></div>;
   return code ? <MermaidDiagram code={code} label="SmartNotes diagram" className="sn-diagram-render" /> : null;
+}
+
+// The raw transcript in readable paragraphs of about five sentences.
+function transcriptParagraphs(text) {
+  const sentences = String(text || '').split(/(?<=[.!?])\s+/).filter(Boolean);
+  const paragraphs = [];
+  for (let i = 0; i < sentences.length; i += 5) paragraphs.push(sentences.slice(i, i + 5).join(' '));
+  return paragraphs.length ? paragraphs : ['No transcript was saved for this lecture.'];
 }
 
 // One note: the paper on the left, class material and a diagram panel on the right.
@@ -91,7 +101,12 @@ export default function SmartNotesEditor() {
   const titleRequested = useRef(false); // AI title asked for once per opened note
 
   // Multi-page illusion: how many "filled pages" are behind the front paper (0–2)
-  const [pageCount, setPageCount] = useState(0);
+  // A lecture's note: the outline, with the raw transcript one tap away.
+  const [lecture, setLecture] = useState(null); // { id, has_outline }
+  const [view, setView] = useState('notes'); // 'notes' | 'transcript'
+  const [transcript, setTranscript] = useState(null);
+  const [outlining, setOutlining] = useState(false);
+  const [confirmOutline, setConfirmOutline] = useState(false);
 
   // ── Init: load existing note (parent only renders editor when ?id is present)
   useEffect(() => {
@@ -196,6 +211,39 @@ export default function SmartNotesEditor() {
       lastSavedTitleRef.current = data.note.title || 'Untitled Notes';
       setHasText(Boolean(paperRef.current.innerText.trim()));
     }
+    findLecture(data.note.id);
+  }
+
+  // Is this note a lecture's? Then it gets Outline / Transcript and, if needed, Make outline.
+  async function findLecture(id) {
+    setView('notes');
+    setTranscript(null);
+    const data = await listLectures().catch(() => null);
+    const found = (data?.lectures || []).find(item => item.note_id && item.note_id === id);
+    setLecture(found ? { id: found.id, has_outline: Boolean(found.has_outline) } : null);
+  }
+
+  async function showTranscript() {
+    setView('transcript');
+    if (transcript !== null || !lecture) return;
+    const data = await getLecture(lecture.id).catch(() => null);
+    setTranscript(String(data?.lecture?.transcript || ''));
+  }
+
+  async function makeOutline() {
+    setConfirmOutline(false);
+    if (!lecture || outlining) return;
+    setOutlining(true);
+    setActionError('');
+    const data = await analyzeLecture(lecture.id, { rewrite: true }).catch(() => null);
+    setOutlining(false);
+    if (data?.analysis?.outline_md) {
+      setLecture(current => ({ ...current, has_outline: true }));
+      setView('notes');
+      await loadNote(noteIdRef.current);
+    } else {
+      setActionError(data?.reason === 'not_configured' ? "AI notes aren't set up on this site yet." : 'The outline could not be written. Try again in a minute.');
+    }
   }
 
   // ── Save helper — sends content to backend, updates lastSavedRef ────────
@@ -260,23 +308,6 @@ export default function SmartNotesEditor() {
     return () => clearInterval(pollTimer.current);
   }, [doSave]);
 
-  // ── Multi-page illusion — track scrollHeight, add ghost pages as content grows
-  useEffect(() => {
-    const paper = paperRef.current;
-    if (!paper) return;
-    function update() {
-      const visible = paper.clientHeight || 1;
-      // Each "filled page" = one extra visible-height of content beyond the first
-      const filled = Math.max(0, Math.floor((paper.scrollHeight - 16) / visible) - 1);
-      setPageCount(Math.min(filled, 2)); // cap at 2 ghost pages
-    }
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(paper);
-    const mo = new MutationObserver(update);
-    mo.observe(paper, { childList: true, subtree: true, characterData: true });
-    return () => { ro.disconnect(); mo.disconnect(); };
-  }, []);
 
   // ── Flush save on unmount (SPA navigation) and beforeunload (tab close) ──
   useEffect(() => {
@@ -458,6 +489,15 @@ export default function SmartNotesEditor() {
 
   return (
     <div className="sn-page">
+      {confirmOutline && (
+        <ConfirmDialog
+          title="Replace this note with an outline?"
+          message="Cordia writes a full outline from the lecture. The transcript stays under Transcript."
+          confirmLabel="Make outline"
+          onConfirm={makeOutline}
+          onCancel={() => setConfirmOutline(false)}
+        />
+      )}
       {/* Header bar */}
       <div className="sn-header">
         <div className="sn-header-left">
@@ -551,7 +591,19 @@ export default function SmartNotesEditor() {
         {/* Left: notes paper — spans all 3 rows */}
         <div className="sn-paper-wrap">
           <div className="sn-paper-label-row">
-            <span className="sn-panel-label">Notes</span>
+            {lecture ? (
+              <div className="sn-lecture-bar">
+                <div className="c-seg sn-view-seg" role="tablist" aria-label="Lecture view">
+                  <button type="button" role="tab" aria-selected={view === 'notes'} className={view === 'notes' ? 'is-active' : ''} onClick={() => setView('notes')}>{lecture.has_outline ? 'Outline' : 'Notes'}</button>
+                  <button type="button" role="tab" aria-selected={view === 'transcript'} className={view === 'transcript' ? 'is-active' : ''} onClick={showTranscript}>Transcript</button>
+                </div>
+                {!lecture.has_outline && (
+                  <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={() => setConfirmOutline(true)} disabled={outlining}>
+                    <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />{outlining ? 'Writing the outline…' : 'Make outline'}
+                  </button>
+                )}
+              </div>
+            ) : <span className="sn-panel-label">Notes</span>}
             {visualizeMode && <span className="sn-visualize-hint" role="status">Highlight text, then press ✓</span>}
             {visualizeMode && (
               <button
@@ -564,12 +616,15 @@ export default function SmartNotesEditor() {
               </button>
             )}
           </div>
-          <div className={`sn-paper-stage sn-paper-stage--p${pageCount}`}>
-            {/* Ghost pages behind — appear as content fills */}
-            <div className="sn-ghost-page sn-ghost-page-3" aria-hidden="true" />
-            <div className="sn-ghost-page sn-ghost-page-2" aria-hidden="true" />
+          <div className="sn-paper-stage">
+          {view === 'transcript' && (
+            <div className="sn-paper sn-transcript" aria-label="Transcript">
+              {transcript === null ? <CordiaLoader size={20} label="Loading transcript" /> : transcriptParagraphs(transcript).map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+            </div>
+          )}
           <div
             ref={paperRef}
+            hidden={view === 'transcript'}
             className={`sn-paper${visualizeMode ? ' sn-paper--visualize' : ''}`}
             contentEditable
             suppressContentEditableWarning

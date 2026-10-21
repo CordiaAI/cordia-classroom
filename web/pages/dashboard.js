@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Brain, ChevronRight, Flame, Layers, NotebookPen, PencilRuler, Snowflake, Timer, TreeDeciduous } from 'lucide-react';
@@ -15,6 +15,7 @@ import { requestTip } from '../lib/tips';
 import ProgressRing from '../components/ProgressRing';
 import LearnCordia from '../components/LearnCordia';
 import CanvasConnectButton from '../components/CanvasConnectButton';
+import DoneCheck from '../components/DoneCheck';
 import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
 import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
@@ -37,6 +38,8 @@ function plural(count, word) {
 export default function Today() {
   const router = useRouter();
   const { ready } = useRequireAuth();
+  // Deadlines checked off here stay listed, struck through, until the next load.
+  const [doneNow, setDoneNow] = useState({});
   useSessionTracker('browse');
   const legacy = LEGACY_VIEWS[router.query.view];
   const progress = useProgress();
@@ -126,7 +129,7 @@ export default function Today() {
     : null;
   // Canvas deadlines plus to-dos confirmed from lectures, soonest first.
   const dueItems = mergeCalendarItems(calendar?.connected ? calendar.items || [] : [], data?.lectureItems || [])
-    .filter(item => new Date(item.due_at).getTime() >= Date.now() - 86400000)
+    .filter(item => new Date(item.due_at).getTime() >= Date.now() - 86400000 && !item.done)
     .sort((a, b) => new Date(a.due_at) - new Date(b.due_at))
     .slice(0, 3);
   // Focus and study minutes over the last 7 days, from this browser's study log.
@@ -184,10 +187,11 @@ export default function Today() {
           <div className="c-card c-list">
             {calendarSlow && <SectionLoader height={3 * 61} label="Loading deadlines" />}
             {dueItems.map(item => (
-              <a key={item.id} className="c-list-row" href={item.url || '/canvas?tab=calendar'} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>
-                <span className="c-grow c-truncate">{item.title}</span>
+              <div key={item.id} className={'c-list-row today-due' + (doneNow[item.id] ? ' is-done' : '')}>
+                <DoneCheck id={item.id} title={item.title} done={Boolean(doneNow[item.id])} onChange={done => setDoneNow(current => ({ ...current, [item.id]: done }))} />
+                <a className="c-grow c-truncate today-due-link" href={item.url || '/canvas?tab=calendar'} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>{item.title}</a>
                 <span className="c-meta">{shortDate(item.due_at)}</span>
-              </a>
+              </div>
             ))}
           </div>
         ) : calendar?.connected ? (
@@ -223,6 +227,9 @@ export default function Today() {
         :global(.today-tool) { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 112px; color: var(--ink); text-decoration: none; font:600 15px/1 var(--font-sans); }
         :global(.today-tool:hover) { text-decoration: none; }
         :global(.today-tool .lucide) { color: var(--olive-ink); }
+        .today-due { gap: 14px; }
+        .today-due-link { color: var(--ink); text-decoration: none; }
+        .today-due.is-done .today-due-link { color: var(--muted); text-decoration: line-through; }
         .today-continue-title { flex: 1 1 auto; min-width: 0; font:600 17px/1.15 var(--font-sans); }
         :global(.today-progress) { display: flex; align-items: center; gap: 20px; padding: 14px 18px; color: var(--ink); text-decoration: none; flex-wrap: wrap; }
         .today-stat { display: inline-flex; align-items: center; gap: 6px; font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }

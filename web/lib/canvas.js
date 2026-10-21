@@ -59,3 +59,9 @@ export const ENDPOINT_LABELS = {
   'files.get': 'File details',
   'files.download': 'File download',
 };
+
+// Check a deadline off (or back on). Canvas items and calendar-link items both use their item id.
+export async function setDeadlineDone(id, done) {
+  const data = await apiFetch(`/calendar/items/${encodeURIComponent(id)}/done`, { method: 'PUT', body: JSON.stringify({ done }) });
+  return typeof data?.done === 'boolean';
+}

@@ -127,8 +127,9 @@ class CanvasIntegrationTests(unittest.TestCase):
         self.assertEqual(len(self.db.rows("class_memberships")), 3)
         self.assertEqual({m["source"] for m in self.db.rows("class_memberships")}, {"canvas"})
         self.assertEqual(len(self.db.rows("folders")), 3)
-        # Data minimization: only titles and due dates; summary is short; no raw syllabus, grades or submissions.
-        self.assertEqual(set(self.db.rows("canvas_assignments")[0]), {"user_id", "canvas_assignment_id", "canvas_course_id", "title", "due_at", "created_at"})
+        # Data minimization: titles, due dates and a turned-in flag; summary is short; no raw syllabus,
+        # scores or submission contents (grades are read live for the Grades tab and never stored).
+        self.assertEqual(set(self.db.rows("canvas_assignments")[0]), {"user_id", "canvas_assignment_id", "canvas_course_id", "title", "due_at", "submitted", "created_at"})
         for row in self.db.rows("canvas_courses"):
             self.assertLessEqual(len(row["topic_summary"]), 600)
             self.assertNotIn("<p>", row["topic_summary"])

@@ -367,7 +367,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
         {item.course && <small>{item.course}</small>}
       </>
     );
-    const className = `calendar-item${past ? ' calendar-item-past' : ''}`;
+    const className = `calendar-item${past ? ' calendar-item-past' : ''}${item.done ? ' calendar-item-done' : ''}`;
     if (item.internal) return <a key={item.id} className={className + ' calendar-item-lecture'} href={item.url} title={`Open the lecture: ${item.title}`}>{body}</a>;
     return item.url
       ? <a key={item.id} className={className} href={item.url} target="_blank" rel="noreferrer" title={`Open in Canvas: ${item.title}`}>{body}</a>
