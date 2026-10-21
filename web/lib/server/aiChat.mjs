@@ -35,8 +35,8 @@ export async function aiChat(provider, { system, user, maxTokens, json = false, 
 }
 
 // Claude thinks before it answers and the thinking counts against max_tokens, so the budget
-// gets headroom. These are short writing jobs: low effort. A refused request falls back
-// server-side to another model instead of failing.
+// gets headroom. These are short writing jobs: low effort. No server-side `fallbacks`: its
+// targets are Opus models only, which Classroom never uses.
 const THINKING_HEADROOM = 4000;
 
 async function claude(provider, { system, user, maxTokens, json, timeoutMs, fetchImpl }) {
@@ -45,8 +45,6 @@ async function claude(provider, { system, user, maxTokens, json, timeoutMs, fetc
     const message = await client.beta.messages.create({
       model: provider.chatModel,
       max_tokens: maxTokens + THINKING_HEADROOM,
-      // Haiku has no server-side fallback, so it is asked only for the other models.
-      ...(/haiku/i.test(provider.chatModel) ? {} : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }),
       output_config: { effort: 'low' },
       system: json ? `${system}\n\nRespond with only the JSON object: no code fences and no other text.` : system,
       messages: [{ role: 'user', content: user }],

@@ -44,7 +44,8 @@ class ClaudeCallTests(unittest.TestCase):
         sent = client.beta.messages.stream.call_args.kwargs
         self.assertNotIn("temperature", sent)
         self.assertEqual(sent["output_config"], {"effort": "medium"}, "guides get medium effort")
-        self.assertEqual(sent["fallbacks"], "default")
+        self.assertNotIn("fallbacks", sent, "server-side fallbacks only go to Opus, which Classroom never uses")
+        self.assertNotIn("betas", sent)
         self.assertGreater(sent["max_tokens"], models.FEATURES["study_guide"].max_tokens)
         self.assertEqual(response.choices[0].message.content, '{"a": 1}')
         self.assertEqual(response.choices[0].finish_reason, "stop")
@@ -61,7 +62,7 @@ class ClaudeCallTests(unittest.TestCase):
             response = llm_calls.chat(client, "tutor_short", model="claude-haiku-5-5", messages=[{"role": "user", "content": "x"}])
         self.assertEqual(response.choices[0].message.content, "")
         self.assertEqual(response.choices[0].finish_reason, "content_filter")
-        self.assertNotIn("fallbacks", client.beta.messages.stream.call_args.kwargs, "Haiku has no server-side fallback")
+        self.assertNotIn("fallbacks", client.beta.messages.stream.call_args.kwargs)
 
     def test_never_opus(self):
         import importlib

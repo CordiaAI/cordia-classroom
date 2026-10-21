@@ -11,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+import anthropic
 from openai import APIError, RateLimitError
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -53,6 +54,17 @@ async def openai_error(request: Request, error: APIError):
     """One place that turns a failed OpenAI call into an answer the student can act on."""
     logger.error("OpenAI call failed request_id=%s path=%s", request.state.request_id, request.url.path, exc_info=error)
     if isinstance(error, RateLimitError):
+        return JSONResponse(status_code=503, content={"detail": "Cordia's AI is busy right now. Please try again in a minute."})
+    return JSONResponse(status_code=502, content={"detail": "Cordia's AI service had a problem. Please try again."})
+
+
+@app.exception_handler(anthropic.APIError)
+async def claude_error(request: Request, error: anthropic.APIError):
+    """The same for a failed Claude call: logged with its status, answered in words the student can act on."""
+    status = getattr(error, "status_code", None)
+    logger.error("Claude call failed request_id=%s path=%s status=%s message=%s", request.state.request_id,
+                 request.url.path, status, str(error)[:500])
+    if isinstance(error, anthropic.RateLimitError) or status == 529:
         return JSONResponse(status_code=503, content={"detail": "Cordia's AI is busy right now. Please try again in a minute."})
     return JSONResponse(status_code=502, content={"detail": "Cordia's AI service had a problem. Please try again."})
 

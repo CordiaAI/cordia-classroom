@@ -51,6 +51,26 @@ class RequestIdContractTests(unittest.TestCase):
         self.assertEqual(too_big.status_code, 413)
         self.assertEqual(too_big.headers["access-control-allow-origin"], origin)
 
+    def test_a_failed_claude_call_is_explained(self):
+        import anthropic
+        import httpx
+        request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+
+        @app.get("/__test_claude_down")
+        def claude_down():
+            raise anthropic.APIConnectionError(request=request)
+
+        @app.get("/__test_claude_busy")
+        def claude_busy():
+            raise anthropic.RateLimitError("busy", response=httpx.Response(429, request=request), body=None)
+
+        client = TestClient(app, raise_server_exceptions=False)
+        down = client.get("/__test_claude_down", headers={"Origin": "https://classroom.cordiaai.io"})
+        self.assertEqual(down.status_code, 502)
+        self.assertEqual(down.json()["detail"], "Cordia's AI service had a problem. Please try again.")
+        self.assertEqual(down.headers["access-control-allow-origin"], "https://classroom.cordiaai.io")
+        self.assertEqual(client.get("/__test_claude_busy").status_code, 503)
+
     def test_unhandled_error_is_logged_without_exposing_internals(self):
         request = Request({"type": "http", "method": "GET", "path": "/private", "headers": []})
 
