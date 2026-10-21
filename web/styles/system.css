@@ -216,6 +216,14 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
 .c-menu [role='menuitem'].is-danger { color: var(--error); }
 .c-menu hr { margin: 6px 8px; border: 0; border-top: 1px solid var(--line); }
 .c-menu-wrap { position: relative; }
+/* Menus from components/Menu.js render at the end of <body>, fixed under their button. */
+.c-menu.is-floating { position: fixed; z-index: 400; width: max-content; min-width: 220px; max-width: min(340px, calc(100vw - 16px)); max-height: min(420px, calc(100vh - 16px)); overflow-y: auto; }
+.c-menu-text { display: grid; gap: 2px; min-width: 0; }
+.c-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-menu [role='menuitem'].has-meta { height: auto; min-height: 52px; padding-top: 8px; padding-bottom: 8px; }
+.c-menu-meta { font: 500 13px/1.2 var(--font-sans); color: var(--muted); }
+.c-menu [role='menuitem'].c-menu-back { height: 40px; gap: 6px; color: var(--muted); font-size: 14px; border-bottom: 1px solid var(--line); border-radius: var(--r-input) var(--r-input) 0 0; margin-bottom: 4px; }
+.c-menu [role='menuitem'][aria-current='true'] .c-menu-label::after { content: ' ✓'; color: var(--olive-ink); }
 
 .c-new-btn { height: 40px; min-height: 40px; padding: 0 16px; }
 

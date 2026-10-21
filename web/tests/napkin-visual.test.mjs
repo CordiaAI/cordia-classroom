@@ -94,7 +94,7 @@ resetRateState();
 // A slow drawing: past 20 s the route answers "pending" with a signed ticket, and the next
 // call with that ticket keeps waiting on the same Napkin request (no second request, one charge).
 {
-  const { state, service } = world({ statusAfter: 20 });
+  const { state, service } = world({ statusAfter: 30 });
   const first = await service.generate({ authorization: AUTH, text: 'The water cycle has four stages', theme: 'light' });
   assert.equal(first.body.status, 'pending');
   assert.ok(state.clock <= BUDGET_MS, `answered within ${BUDGET_MS} ms`);

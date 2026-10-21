@@ -16,7 +16,8 @@ export const NAPKIN_BASE = 'https://api.napkin.ai';
 // NAPKIN_STYLE_ID picks another (https://api.napkin.ai/docs/styles).
 export const DEFAULT_STYLE_ID = 'CDGQ6XB1DGPQ6VV6EGPQ4CG';
 export const LIMITS = { free: 10, pro: 200 };
-export const POLL_MS = 1500;
+// Checked every second, so a finished drawing is picked up quickly.
+export const POLL_MS = 1000;
 export const BUDGET_MS = 20000;
 export const TOTAL_MS = 180000;
 export const VARIATIONS = 3;
@@ -182,8 +183,7 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
     if (!enabled) return { httpStatus: 200, body: { status: 'fallback', reason: 'not_configured', missing } };
 
     const key = cacheKey({ text: content, context, style, theme: mode, variations });
-    const hit = await cached(key);
-    const counts = await usage(who);
+    const [hit, counts] = await Promise.all([cached(key), usage(who)]);
     if (hit?.files?.length) {
       return { httpStatus: 200, body: { status: 'ok', cached: true, visuals: hit.files, alt: hit.alt, theme: hit.theme || mode, left: counts.left, limit: counts.limit } };
     }
@@ -216,23 +216,26 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
     if (result.fallback) return { httpStatus: 200, body: { status: 'fallback', reason: result.fallback } };
 
     // Download now: Napkin's links expire after 30 minutes, and we never hotlink them.
-    const visuals = [];
-    for (const [index, file] of result.files.slice(0, variations).entries()) {
+    // All versions at once, each downloaded and stored in parallel.
+    const saved = await Promise.all(result.files.slice(0, variations).map(async (file, index) => {
       try {
         const response = await fetchImpl(file.url, { headers: { Authorization: `Bearer ${napkinKey}` } });
-        if (!response.ok) continue;
+        if (!response.ok) return null;
         const clean = cleanSvg(await response.text());
-        if (!clean) continue;
+        if (!clean) return null;
         // Without the "visuals" bucket (migration not run) the drawing is still shown, inline.
         const url = await store(key, index, clean).catch(() => `data:image/svg+xml;base64,${Buffer.from(clean).toString('base64')}`);
-        visuals.push({ url, width: file.width || null, height: file.height || null });
-      } catch { /* skip this variation */ }
-    }
+        return { url, width: file.width || null, height: file.height || null };
+      } catch { return null; /* skip this variation */ }
+    }));
+    const visuals = saved.filter(Boolean);
     if (!visuals.length) return { httpStatus: 200, body: { status: 'fallback', reason: 'download_failed' } };
 
     const alt = altText(content);
-    await db('/rest/v1/rpc/record_feature_usage', { method: 'POST', body: JSON.stringify({ p_user_id: who.userId, p_feature: 'visual', p_month: currentMonth(new Date(now())), p_request_key: `visual:${key}`.slice(0, 120) }) });
-    await db('/rest/v1/visual_cache', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key, user_id: who.userId, theme: mode, alt, files: visuals }) });
+    await Promise.all([
+      db('/rest/v1/rpc/record_feature_usage', { method: 'POST', body: JSON.stringify({ p_user_id: who.userId, p_feature: 'visual', p_month: currentMonth(new Date(now())), p_request_key: `visual:${key}`.slice(0, 120) }) }),
+      db('/rest/v1/visual_cache', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ key, user_id: who.userId, theme: mode, alt, files: visuals }) }),
+    ]);
     const left = who.unlimited ? counts.limit : Math.max(0, counts.left - 1);
     return { httpStatus: 200, body: { status: 'ok', cached: false, visuals, alt, theme: mode, left, limit: counts.limit } };
   }

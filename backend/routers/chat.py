@@ -35,13 +35,25 @@ MAX_CONTENT_LENGTH = 500_000
 TUTOR_CONTEXT_TOKENS = int(os.getenv("CLASSROOM_TUTOR_CONTEXT_TOKENS", "128000"))
 TUTOR_RESERVED_TOKENS = 6_000
 CONTEXT_FULL = "context_window_full"
-# "Add a section on X to the outline", "rewrite point 2 of my notes": an instruction to change it.
-OUTLINE_EDIT_REQUEST = re.compile(
-    r"^\s*(?:please\s+|can you\s+|could you\s+)?(?:add|remove|delete|rewrite|reword|edit|update|fix|move|rename|"
-    r"shorten|expand|simplify|reorganize|reorder|insert|include|merge|split|replace|put)\b.*\b"
-    r"(?:outline|notes?|sections?|points?|bullets?|headings?|key points)\b",
+# An instruction to change the selected guide's outline: "fix the spelling of GihHub", "change X to Y",
+# "add a section on Z to my notes". Questions ("what does…", "explain…") are never edits.
+OUTLINE_EDIT_VERB = re.compile(
+    r"\b(?:add|remove|delete|rewrite|reword|edit|update|fix|correct|change|replace|rename|respell|spell|"
+    r"capitali[sz]e|bold|shorten|expand|simplify|reorganize|reorder|insert|include|merge|split|move|put)\b",
     re.IGNORECASE,
 )
+# Verbs that only mean an edit when the request also names a part of the outline.
+OUTLINE_EDIT_TARGET = re.compile(r"\b(?:outline|notes?|sections?|points?|bullets?|headings?|key points|lines?|spelling|typos?|words?|titles?)\b", re.IGNORECASE)
+OUTLINE_EDIT_ALWAYS = re.compile(r"\b(?:fix|correct|change|replace|rename|respell|capitali[sz]e)\b", re.IGNORECASE)
+QUESTION_START = re.compile(r"^\s*(?:what|why|how|who|when|where|which|explain|describe|define|summari[sz]e|tell me|is|are|does|do)\b", re.IGNORECASE)
+
+
+def _asks_to_edit_outline(question: str) -> bool:
+    if QUESTION_START.search(question) or not OUTLINE_EDIT_VERB.search(question):
+        return False
+    return bool(OUTLINE_EDIT_ALWAYS.search(question) or OUTLINE_EDIT_TARGET.search(question))
+
+
 PRACTICE_REQUEST = re.compile(r"\b(create|make|generate|build)\b.*\bpractice\b.*\b(problems?|questions?|guide)\b", re.IGNORECASE)
 BROWSER_SKILLS = {
     "capture": ("capture_current_page", "Working in the browser side panel now. Keep it open while I read the current page."),
@@ -263,12 +275,14 @@ def _tutor_reply(body: ChatRequest, user_id: str, question: str, material: Mater
     return ChatResponse(answer=answer, source=material.source)
 
 
-def _edit_outline(user_id: str, material: Material, question: str) -> ChatResponse:
-    """Change the selected guide's outline as the student asked and save it."""
+def _edit_outline(user_id: str, material: Material, question: str) -> Optional[ChatResponse]:
+    """Change the selected guide's outline as the student asked and save it; None when nothing changed."""
     guide = material.guide
-    edited = edit_outline(guide.get("notes") or "", question, guide.get("study_guide") or "")
-    if not edited:
-        return ChatResponse(answer="I couldn't make that change to the outline. Try saying it another way.")
+    before = guide.get("notes") or ""
+    edited = edit_outline(before, question, guide.get("study_guide") or "")
+    # Nothing changed (it wasn't really an edit): the Tutor answers it as a question instead.
+    if not edited or edited["notes"].strip() == before.strip():
+        return None
     get_supabase().table("study_guides").update({"notes": edited["notes"]}).eq("id", guide["id"]).eq("user_id", user_id).execute()
     record(user_id, "tutor")
     summary = edited["summary"] or "Done."
@@ -290,10 +304,15 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
     if skill == "organize":
         return _organize(material, body.class_id, authorization)
     # Before the empty-material check: a new notes page can be edited while still empty.
-    if material.guide and (skill == "edit_outline" or (skill in {None, "explain"} and OUTLINE_EDIT_REQUEST.search(question))):
-        return _edit_outline(user_id, material, question)
+    if material.guide and (skill == "edit_outline" or (skill in {None, "explain"} and _asks_to_edit_outline(question))):
+        edited = _edit_outline(user_id, material, question)
+        if edited:
+            return edited
     if skill == "edit_outline":
-        return ChatResponse(answer="Pick a guide above, then tell me what to change in its outline.")
+        return ChatResponse(answer=(
+            "I couldn't make that change to the outline. Say what to change, like “fix the spelling of GihHub”."
+            if material.guide else "Pick a guide above, then tell me what to change in its outline."
+        ))
     if not material.content.strip():
         if material.source:
             return ChatResponse(answer=(

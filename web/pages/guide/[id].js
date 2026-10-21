@@ -4,7 +4,7 @@ import BodyPortal from '../../components/BodyPortal';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Brain, Download, ExternalLink, Layers, Lock, MessageCircle, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
+  ArrowLeft, Brain, Download, ExternalLink, FolderInput, Layers, Lock, MessageCircle, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -14,6 +14,7 @@ import StudyAidPanel from '../../components/StudyAidPanel';
 import StudyDocument from '../../components/StudyDocument';
 import OutlineEditor from '../../components/OutlineEditor';
 import { newRequestId } from '../../lib/guideCreate';
+import { classLabel } from '../../lib/classLabel';
 import Menu from '../../components/Menu';
 import ClassChip from '../../components/ClassChip';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -101,6 +102,8 @@ export default function GuidePage() {
   // The Outline is also where the student's notes live; bumping this refills it after a rewrite.
   const [notesVersion, setNotesVersion] = useState(0);
   const [making, setMaking] = useState(''); // '' | 'outline' | 'cards'
+  const [classes, setClasses] = useState([]);
+  useEffect(() => { apiFetch('/folders').then(data => setClasses(data?.folders || [])); }, []);
   // Every guide has outline notes: one without them gets them written the first time it opens.
   const [notesState, setNotesState] = useState('idle'); // idle | making | done
   const notesAsked = useRef('');
@@ -245,8 +248,25 @@ export default function GuidePage() {
     if (data?.title) setGuide(current => ({ ...current, title: data.title }));
   }
 
+  // The ⋯ menu's Add to class: file the guide in one of the student's classes (or none).
+  async function moveToClass(folderId) {
+    const data = await apiFetch('/guides/' + id + '/move', { method: 'PATCH', body: JSON.stringify({ folder_id: folderId }) });
+    if (data && !data.detail) {
+      setGuide(current => ({ ...current, folder_id: folderId }));
+      const name = classLabel(classes.find(item => item.id === folderId)?.name).title;
+      setToast(folderId ? `Added to ${name || 'class'}` : 'Removed from its class');
+      loadSharing();
+    } else setToast(apiErrorMessage(data?.detail, "That class change didn't save."));
+  }
+
   async function deleteGuide() {
-    await apiFetch('/guides/' + id, { method: 'DELETE' });
+    setConfirmDelete(false);
+    const data = await apiFetch('/guides/' + id, { method: 'DELETE' });
+    if (!data?.deleted) { setToast(apiErrorMessage(data?.detail, "That didn't delete. Try again.")); return; }
+    // A guide moved in from an old note (pages/smartnotes.js) takes that note with it, or the note
+    // would show in Library again and come back as a new guide when opened.
+    const noteId = String(guide?.source_type || '').startsWith('note:') ? guide.source_type.slice(5) : '';
+    if (noteId) await apiFetch('/smart_notes/' + noteId, { method: 'DELETE' });
     router.push('/library');
   }
 
@@ -352,6 +372,15 @@ export default function GuidePage() {
           label="Guide actions"
           items={[
             { label: 'Edit', icon: SquarePen, onSelect: () => router.push('/create?editGuideId=' + id) },
+            {
+              label: guide.folder_id ? 'Move to class' : 'Add to class',
+              icon: FolderInput,
+              items: [
+                ...classes.map(folder => ({ key: folder.id, label: classLabel(folder.name).title, meta: classLabel(folder.name).code, current: guide.folder_id === folder.id, onSelect: () => moveToClass(folder.id) })),
+                ...(guide.folder_id ? [{ label: 'No class', onSelect: () => moveToClass(null) }] : []),
+                ...(classes.length ? [] : [{ label: 'Make a class in Library', onSelect: () => router.push('/library') }]),
+              ],
+            },
             { label: 'Export', icon: Download, onSelect: () => exportGuide(guide) },
             { label: 'Delete', icon: Trash2, danger: true, onSelect: () => setConfirmDelete(true) },
           ]}

@@ -45,6 +45,17 @@ MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024
 FILE_HOST_SUFFIXES = (".inscloudgate.net", ".instructure-uploads.com", ".canvas-user-content.com", ".instructure.com", ".amazonaws.com")
 
 
+# Links to course files inside Canvas HTML (pages, assignment descriptions).
+_FILE_LINK = re.compile(r'<a\b[^>]*href="[^"]*/files/(\d+)[^"]*"[^>]*>(.*?)</a>', re.IGNORECASE | re.DOTALL)
+_FILE_ID = re.compile(r'/files/(\d+)')
+MAX_LINKED_PAGES = 25
+MAX_LINKED_FILES = 60
+
+
+def _strip_tags(html: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html or "")).strip()[:200]
+
+
 class CanvasError(Exception):
     """A Canvas request failed. Messages never contain the token."""
 
@@ -249,6 +260,7 @@ ALLOWLIST = (
     _ep("calendar_events.list", r"/api/v1/calendar_events", params=("type", "start_date", "end_date", "all_events"), multi={"context_codes[]": None}),
     _ep("files.list", r"/api/v1/courses/\d+/files", params=("search_term", "sort", "order")),
     _ep("files.get", r"/api/v1/courses/\d+/files/\d+"),
+    _ep("pages.get", r"/api/v1/courses/\d+/pages/[A-Za-z0-9_.-]+"),
     _ep("files.download", r"/files/\d+/download", params=("download_frd", "verifier")),
 )
 
@@ -401,14 +413,56 @@ class CanvasClient:
     def files(self, course_id: int) -> list:
         return self._pages(f"/api/v1/courses/{int(course_id)}/files", [])
 
-    def module_files(self, course_id: int) -> list:
-        """Files linked from the class's Modules, for classes that hide the Files page from students."""
-        found = {}
-        for module in self.modules(course_id) or []:
+    def linked_files(self, course_id: int) -> list:
+        """Files the class links to instead of listing them on its Files page: Module file items,
+        files linked from the Pages its Modules show, and files linked in assignment descriptions."""
+        found: dict = {}
+
+        def add(file_id, name=""):
+            file_id = int(file_id)
+            if file_id not in found or (name and not found[file_id].get("display_name")):
+                found[file_id] = {"id": file_id, "display_name": name}
+
+        def scan(html: str) -> None:
+            text = str(html or "")
+            for match in _FILE_LINK.finditer(text):
+                add(match.group(1), _strip_tags(match.group(2)))
+            for match in _FILE_ID.finditer(text):
+                add(match.group(1))
+
+        try:
+            modules = self.modules(course_id) or []
+        except CanvasDenied:
+            modules = []
+        pages = []
+        for module in modules:
             for item in module.get("items") or []:
-                if item.get("type") == "File" and item.get("content_id") and item["content_id"] not in found:
-                    found[item["content_id"]] = {"id": item["content_id"], "display_name": item.get("title") or "File"}
-        return list(found.values())
+                if item.get("type") == "File" and item.get("content_id"):
+                    add(item["content_id"], item.get("title") or "")
+                elif item.get("type") == "Page" and item.get("page_url") and re.fullmatch(r"[A-Za-z0-9_.-]+", item["page_url"]):
+                    pages.append(item["page_url"])
+        for slug in pages[:MAX_LINKED_PAGES]:
+            try:
+                scan(self._get(f"/api/v1/courses/{int(course_id)}/pages/{slug}").json().get("body"))
+            except CanvasDenied:
+                continue
+        try:
+            for assignment in self.assignments(course_id) or []:
+                scan(assignment.get("description"))
+        except CanvasDenied:
+            pass
+        # Fill in names (and sizes) the links didn't give; a file the student can't open is left out.
+        files = []
+        for entry in list(found.values())[:MAX_LINKED_FILES]:
+            if entry["display_name"]:
+                files.append(entry)
+                continue
+            try:
+                meta = self._get(f"/api/v1/courses/{int(course_id)}/files/{entry['id']}").json()
+                files.append({"id": entry["id"], "display_name": meta.get("display_name") or "File", "size": meta.get("size"), "content-type": meta.get("content-type")})
+            except CanvasDenied:
+                continue
+        return files
 
     def download_file(self, course_id: int, file_id: int) -> tuple[str, bytes]:
         """One file the user picked. Returns (filename, bytes)."""

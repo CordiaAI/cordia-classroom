@@ -50,6 +50,7 @@ class FakeCanvas:
         self.calls = []
         self.unauthorized = False
         self.files_denied_401 = False
+        self.linked = False  # a class that keeps its files in Pages and assignments
 
     def mount(self, prefix, adapter):  # the client pins its session to the checked address
         self.mounted = (prefix, adapter)
@@ -70,6 +71,16 @@ class FakeCanvas:
             base = f"/api/v1/courses/{course['id']}"
             if path == base:
                 return FakeResponse(200, {**course, "syllabus_body": "<p>Leadership, motivation and organizational design. Grading: 40% exams.</p>"})
+            if self.linked and path == base + "/modules":
+                return FakeResponse(200, [{"name": "Week 1", "items": [{"title": "Readings", "type": "Page", "page_url": "week-1-readings"}]}])
+            if self.linked and path == base + "/files":
+                return FakeResponse(200, [])
+            if self.linked and path == base + "/pages/week-1-readings":
+                return FakeResponse(200, {"body": f'<p>Read <a href="https://{HOST}/courses/{course["id"]}/files/501?wrap=1">Chapter 1 slides</a> first.</p>'})
+            if self.linked and path == base + "/assignments":
+                return FakeResponse(200, [{"id": 1, "name": "Essay", "description": f'<p>Rubric: <img src="/courses/{course["id"]}/files/502/preview"></p>'}])
+            if self.linked and path == base + "/files/502":
+                return FakeResponse(200, {"id": 502, "display_name": "Essay rubric.pdf", "size": 2048, "content-type": "application/pdf"})
             if path == base + "/modules":
                 return FakeResponse(200, [{"name": "Week 1: Planning", "items": [{"title": "Strategy basics"}, {"title": "Week 1 slides", "type": "File", "content_id": 77}]}])
             if path == base + "/files" and self.files_denied_401:
@@ -189,6 +200,14 @@ class CanvasIntegrationTests(unittest.TestCase):
         self.canvas.files_denied_401 = True
         self.assertEqual(len(canvas.list_files(course, "Bearer x")["files"]), 1)
         self.assertTrue(self.db.rows("canvas_tokens"))
+
+    def test_files_linked_from_pages_and_assignments_are_listed(self):
+        self.connect()
+        course = COURSES[0]["id"]
+        canvas.set_import(course, canvas.ImportRequest(imported=True), "Bearer x")
+        self.canvas.linked = True
+        files = canvas.list_files(course, "Bearer x")["files"]
+        self.assertEqual({f["id"]: f["name"] for f in files}, {501: "Chapter 1 slides", 502: "Essay rubric.pdf"})
 
     def test_school_that_disallows_tokens_is_refused(self):
         with self.assertRaises(HTTPException) as caught:

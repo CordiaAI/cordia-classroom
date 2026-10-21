@@ -18,6 +18,7 @@ import AddClass from '../components/AddClass';
 import LectureList from '../components/LectureList';
 import { openNewSheet } from '../lib/newSheet';
 import { walkthroughEvent } from '../lib/walkthrough';
+import { classLabel } from '../lib/classLabel';
 
 const SORTS = [
   { key: 'recent', label: 'Newest' },
@@ -160,7 +161,7 @@ export default function LibraryPage() {
 
   async function moveItem(item, folderId) {
     if ((item.folderId || null) === folderId) return;
-    const label = folderId ? `Moved to ${folders.find(folder => folder.id === folderId)?.name || 'class'}` : 'Moved to Unfiled';
+    const label = folderId ? `Moved to ${classLabel(folders.find(folder => folder.id === folderId)?.name).title || 'class'}` : 'Moved to Unfiled';
     if (item.kind === 'guide') {
       const data = await apiFetch('/guides/' + item.id + '/move', { method: 'PATCH', body: JSON.stringify({ folder_id: folderId }) });
       if (!data?.updated) return;
@@ -242,7 +243,7 @@ export default function LibraryPage() {
       icon: FolderInput,
       items: [
         { label: 'Unfiled', current: !item.folderId, onSelect: () => moveItem(item, null) },
-        ...folders.map(folder => ({ label: folder.name, current: item.folderId === folder.id, onSelect: () => moveItem(item, folder.id) })),
+        ...folders.map(folder => ({ key: folder.id, label: classLabel(folder.name).title, meta: classLabel(folder.name).code, current: item.folderId === folder.id, onSelect: () => moveItem(item, folder.id) })),
       ],
     };
   }
@@ -286,7 +287,8 @@ export default function LibraryPage() {
             items={[
               { label: 'Rename', icon: Pencil, onSelect: () => setRenaming({ id: item.id, value: item.title }) },
               moveMenu(item),
-              { label: 'Delete', icon: Trash2, danger: true, onSelect: () => remove({ id: item.id, title: item.title }) },
+              // A guide moved in from an old note takes that note with it (pages/smartnotes.js).
+              { label: 'Delete', icon: Trash2, danger: true, onSelect: () => remove({ id: item.id, title: item.title, also: String(item.guide?.source_type || '').startsWith('note:') ? ['/smart_notes/' + item.guide.source_type.slice(5)] : [] }) },
             ]}
           />
         )}

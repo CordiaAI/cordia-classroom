@@ -18,6 +18,11 @@ def item(id_, points, score=None, due="2026-11-01T00:00:00Z", **sub):
 
 
 class GradeMath(unittest.TestCase):
+    def test_turned_in_work_is_marked_so_it_is_not_offered_a_guide(self):
+        groups = [{"name": "All", "assignments": [item(1, 100, 85), item(2, 100, submitted_at="2026-10-20T10:00:00Z", workflow_state="submitted"), item(3, 100)]}]
+        rows = {row["id"]: row["submitted"] for row in grades.estimate(groups, False, now=NOW)["upcoming"]}
+        self.assertEqual(rows, {2: True, 3: False})
+
     def test_unweighted_current_and_needed(self):
         groups = [{"name": "All", "assignments": [item(1, 100, 85), item(2, 100)]}]
         result = grades.estimate(groups, False, now=NOW)
