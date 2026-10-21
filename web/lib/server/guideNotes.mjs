@@ -14,6 +14,7 @@ Return JSON: {"overview": "...", "sections": [{"heading": "...", "points": [{"te
 - points: complete statements in plain language (under 30 words): definitions, roles, causes and effects, steps or stages, comparisons, examples, relationships and other meaningful detail. Put the supporting detail of a point (the items of a list, steps, examples, exceptions) in its "sub" list (under 20 words each).
 - Put each key term in **double asterisks** where it is first defined.
 - Cover all of the information in the material; keep names, numbers, dates and formulas exactly as written.
+- A quoted passage, or any passage meant to be known word for word (a creed, oath, motto, poem, scripture, statute), goes in one point whole and word for word, in quotation marks, with no word limit. Never split, shorten or paraphrase it.
 - key_points: 4 to 8 of the most important takeaways, one sentence each. They sum up the outline and add nothing new.
 - No questions, no answers-to-questions phrasing, no filler such as "This section covers".`;
 

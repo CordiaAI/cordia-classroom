@@ -111,6 +111,7 @@ CRITICAL RULES:
 • Worked examples, practice problems, and case studies teach a method: ask how to apply that method (with the given values, rules, or tables) and answer with the steps and result the text supports. Every question must stand alone — never refer to the source's labels such as "Problem 4", "Example 2", "Slide 5", or "the table above".
 • If the text contains no educational content (e.g., only navigation menus, UI elements, or unrelated text), respond with exactly: "NO_EDUCATIONAL_CONTENT"
 • Every answer MUST be directly supported by the text provided.
+• A quoted passage, or any passage meant to be known word for word (a creed, oath, motto, poem, scripture, statute, definition given as a quotation), is asked about whole: its answer is the complete passage, word for word, inside quotation marks. Never split it across questions, shorten it, or paraphrase it.
 • NEVER generate a question where the answer is "no additional information is provided" or similar — if the text doesn't explain a term, skip it.
 • IGNORE these non-educational sections entirely — do NOT generate questions from them:
   - References, citations, bibliographies, footnotes, ISBNs, DOIs
@@ -159,10 +160,13 @@ Do NOT skip any item. Do NOT stop until every identified item has been asked abo
 
 FORMAT:
 Q1: [question]
-A1: [answer in 1-3 sentences]
+A1: [answer in 1-3 sentences; a quoted passage in full]
 
 Continue until every item is covered."""
 
+
+# A quotation of at least eight words, in curly or straight double quotes.
+_QUOTED_PASSAGE = re.compile(r'[\u201c"](?:\S+\s+){7,}[^\u201d"]*[\u201d"]')
 
 # A Q/A label however a model writes it: "Q1:", "**Q1:**", "- Q1.", "### A1)", "Q 1 -".
 _QA_LABEL = re.compile(r'^[\s>*#_-]*([QA])\s*(\d+)\s*[:.)\-]\s*[*_]*\s*(.*?)\s*[*_]*$')
@@ -234,6 +238,11 @@ def _postprocess_study_guide(raw_result: str, start_index: int = 1) -> tuple:
         a_match = re.match(r'^A\d+:\s*(.*)', line)
         if a_match:
             answer = a_match.group(1)
+            # A quoted passage is kept whole: trimming would cut a creed, poem or statute short.
+            if _QUOTED_PASSAGE.search(answer):
+                processed_lines.append(f"A{current_q_num}: {answer}")
+                current_q_num += 1
+                continue
             sentences = answer.split('. ')
             if len(sentences) > 3:
                 answer = '. '.join(sentences[:3]) + '.'
