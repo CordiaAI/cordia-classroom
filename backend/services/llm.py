@@ -164,10 +164,57 @@ A1: [answer in 1-3 sentences]
 Continue until every item is covered."""
 
 
+# A Q/A label however a model writes it: "Q1:", "**Q1:**", "- Q1.", "### A1)", "Q 1 -".
+_QA_LABEL = re.compile(r'^[\s>*#_-]*([QA])\s*(\d+)\s*[:.)\-]\s*[*_]*\s*(.*?)\s*[*_]*$')
+
+
+def _canonical_qa(raw_result: str) -> str:
+    """Rewrite a model's Q&A into exact "Qn: …" / "An: …" lines, each question with its answer.
+
+    Joins a label left alone on its line to the text below it, and drops a question with no
+    answer (an output cut off mid-pair) or an answer with no question, so one stray line never
+    sinks the whole guide.
+    """
+    pairs, question, pending = [], None, None  # pending: a label still waiting for its text
+    out = []
+    for line in raw_result.split('\n'):
+        match = _QA_LABEL.match(line)
+        text = line.strip().strip('*_').strip()
+        if match:
+            kind, body = match.group(1), match.group(3).strip()
+            if kind == 'Q':
+                if question is not None:
+                    logger.warning("Study guide: dropped a question with no answer")
+                question, pending = (body, None) if body else (None, 'Q')
+            elif question is not None:
+                if body:
+                    out.append((question, body))
+                    question = None
+                else:
+                    pending = 'A'
+            continue
+        if pending == 'Q' and text:
+            question, pending = text, None
+        elif pending == 'A' and text and question is not None:
+            out.append((question, text))
+            question, pending = None, None
+        else:
+            out.append(text)
+    if question is not None:
+        logger.warning("Study guide: dropped a question with no answer (output ended mid-pair)")
+    lines = []
+    for item in out:
+        if isinstance(item, tuple):
+            lines.extend([f"Q0: {item[0]}", f"A0: {item[1]}"])
+        else:
+            lines.append(item)
+    return '\n'.join(lines)
+
+
 def _postprocess_study_guide(raw_result: str, start_index: int = 1) -> tuple:
-    """Post-process study guide output: truncate answers and renumber Q&A pairs.
+    """Post-process study guide output: put Q&A in canonical form, truncate answers and renumber.
     Returns (processed_text, next_index)."""
-    lines = raw_result.split('\n')
+    lines = _canonical_qa(raw_result).split('\n')
     processed_lines = []
     current_q_num = start_index
 

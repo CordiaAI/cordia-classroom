@@ -140,6 +140,8 @@ def _claude(client, feature: str, model: str, limit: int, *, messages: list, res
     if json_mode:
         text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     finish = {"end_turn": "stop", "max_tokens": "length", "refusal": "content_filter"}.get(message.stop_reason, "stop")
+    if message.stop_reason == "max_tokens":
+        logger.warning("claude ran out of room feature=%s max_tokens=%s", feature, limit + CLAUDE_HEADROOM.get(role, 4000))
     if message.stop_reason == "refusal":
         logger.warning("claude refused feature=%s", feature)
         text = ""
