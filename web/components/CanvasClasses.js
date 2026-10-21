@@ -131,7 +131,7 @@ export default function CanvasClasses({ status, onStatus }) {
         .cc-head .cc-closed { transform: rotate(-90deg); }
         .cc-head .lucide { transition: transform var(--dur) var(--ease); }
         .cc-name { flex: 1; min-width: 0; display: grid; gap: 2px; padding: 6px 4px; border: 0; background: none; color: var(--ink); text-align: left; cursor: pointer; }
-        .cc-name strong { font: 600 20px/1.15 var(--font-display); }
+        .cc-name strong { font: 600 20px/1.15 var(--font-sans); }
         .cc-files { list-style: none; margin: 0; padding: 0 8px 8px; display: grid; }
         .cc-file { display: flex; align-items: center; gap: 12px; min-height: 56px; border-top: 1px solid var(--line); }
         .cc-file > .lucide { color: var(--olive-ink); flex: 0 0 auto; }

@@ -332,7 +332,7 @@ export default function LecturePage() {
         .lecture-item { display: grid; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid var(--hairline); }
         .lecture-item:last-child { padding-bottom: 0; border-bottom: 0; }
         .lecture-item-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-        .lecture-item-head strong { font: 600 var(--fs-17)/var(--lh-title) var(--font-display); color: var(--ink); }
+        .lecture-item-head strong { font: 600 var(--fs-17)/var(--lh-title) var(--font-sans); color: var(--ink); }
         .lecture-quote { margin: 0; padding-left: 12px; border-left: 2px solid var(--hairline); color: var(--muted); font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); }
         .lecture-time { justify-self: start; font-variant-numeric: tabular-nums; }
         .lecture-todo-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
@@ -341,7 +341,7 @@ export default function LecturePage() {
         .lecture-on-cal { display: inline-flex; align-items: center; gap: 4px; }
         .lecture-todo.is-done strong { text-decoration: line-through; color: var(--muted); }
         .lecture-outline-section { display: grid; gap: 8px; }
-        .lecture-outline-heading { margin: 0; font: 600 var(--fs-17)/var(--lh-title) var(--font-display); color: var(--ink); }
+        .lecture-outline-heading { margin: 0; font: 600 var(--fs-17)/var(--lh-title) var(--font-sans); color: var(--ink); }
         .lecture-terms { margin: 0; display: grid; gap: 12px; }
         .lecture-term { display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 16px; }
         .lecture-term dt { font: 600 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink); }

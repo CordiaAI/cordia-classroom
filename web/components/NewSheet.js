@@ -434,7 +434,7 @@ export default function NewSheet() {
         .new-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 20px; }
         .new-error { margin: 16px 0 0; color: var(--error); font:600 15px/1.5 var(--font-sans); }
         .new-build { display: grid; gap: 16px; }
-        .new-build-title { margin: 0; font: 600 var(--fs-20)/var(--lh-title) var(--font-display); letter-spacing: var(--track-title); color: var(--ink); text-wrap: balance; }
+        .new-build-title { margin: 0; font: 600 var(--fs-20)/var(--lh-title) var(--font-sans); letter-spacing: var(--track-title); color: var(--ink); text-wrap: balance; }
         .new-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
         .new-steps li { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: var(--r-input); font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--muted); transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
         .new-steps li.is-current { background: var(--olive-tint); color: var(--ink); font-weight: 600; }

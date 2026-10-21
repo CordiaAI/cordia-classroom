@@ -223,7 +223,7 @@ export default function Today() {
         :global(.today-tool) { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 112px; color: var(--ink); text-decoration: none; font:600 15px/1 var(--font-sans); }
         :global(.today-tool:hover) { text-decoration: none; }
         :global(.today-tool .lucide) { color: var(--olive-ink); }
-        .today-continue-title { flex: 1 1 auto; min-width: 0; font:600 17px/1.15 var(--font-display); }
+        .today-continue-title { flex: 1 1 auto; min-width: 0; font:600 17px/1.15 var(--font-sans); }
         :global(.today-progress) { display: flex; align-items: center; gap: 20px; padding: 14px 18px; color: var(--ink); text-decoration: none; flex-wrap: wrap; }
         .today-stat { display: inline-flex; align-items: center; gap: 6px; font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .today-stat :global(.today-freeze) { color: var(--olive-ink); }

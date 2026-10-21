@@ -73,7 +73,7 @@ export default function Copyright() {
         .cr-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
         .cr-contact { justify-self: start; color: var(--ink); font: 600 15px/1 var(--font-sans); }
         .cr-policy { gap: 10px; font: 500 15px/1.55 var(--font-sans); }
-        .cr-policy h2 { margin: 0; font: 600 20px/1.2 var(--font-display); }
+        .cr-policy h2 { margin: 0; font: 600 20px/1.2 var(--font-sans); }
         .cr-policy h3 { margin: 8px 0 0; font: 600 15px/1.3 var(--font-sans); }
         .cr-policy p { margin: 0; }
       `}</style>

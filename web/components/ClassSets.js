@@ -115,7 +115,7 @@ function ClassStyles() {
         .cp-row { display: flex; align-items: center; gap: 12px; min-height: 72px; border-bottom: 1px solid var(--line); }
         .cp-row:last-child { border-bottom: 0; }
         .cp-main { flex: 1; display: grid; gap: 4px; min-width: 0; }
-        .cp-title { font: 500 17px/1.3 var(--font-display); }
+        .cp-title { font: 500 17px/1.3 var(--font-sans); }
         .cp-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-variant-numeric: tabular-nums; }
         .cp-versions { font: 600 13px/1 var(--font-sans); white-space: nowrap; }
         .cp-row .c-menu-wrap:has(.cp-versions) > .c-icon-btn { width: auto; padding: 0 12px; border-radius: 999px; }

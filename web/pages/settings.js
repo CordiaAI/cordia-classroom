@@ -435,7 +435,7 @@ export default function SettingsPage() {
         .me-avatar { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius:50%; background: var(--olive); color: var(--on-olive); font:600 20px/1 var(--font-sans); }
         .me-names { display: grid; gap: 2px; flex: 1; min-width: 0; }
         .me-names > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .me-names strong { font:600 20px/1.15 var(--font-display); }
+        .me-names strong { font:600 20px/1.15 var(--font-sans); }
         .billing-current-plan { display: grid; gap: 12px; padding: 20px; margin-bottom: 16px; }
         .plan-badge { justify-self: start; padding: 6px 14px; border-radius:var(--r-pill); background: var(--card-sunk); font-weight:600; }
         .plan-badge[data-plan="plus"] { background: var(--olive); color: var(--on-olive); }

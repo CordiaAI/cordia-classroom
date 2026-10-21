@@ -12,9 +12,8 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 ::-webkit-scrollbar-thumb { background: var(--hover-edge); border-radius: var(--r-pill); }
 
 /* ---------- Type roles ---------- */
-/* Titles: Newsreader 600, slight negative tracking, balanced lines. */
-:is(.c-title, .pricing-title, .guide-title-btn, .guide-title-input, .c-section-title, .today-continue-title, .lib-row-title, .folder-row-title,
-  .sn-card-title, .reader-q, .quiz-question-text, .practice-prompt, .fc-face p, .recap-class, .me-names strong,
+/* Page titles: Newsreader 600, slight negative tracking, balanced lines. Everything smaller is Manrope. */
+:is(.c-title, .pricing-title, .guide-title-btn, .guide-title-input,
   .c-brand > span, main h1:not(.sr-only), .public-main h1, .public-main h2, .public-main h3, .extension-install-step h2, .mission-page h2, .mission-page h3) {
   font-family: var(--font-display) !important;
   font-weight: 600 !important;
@@ -27,12 +26,21 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 :is(.c-sheet .c-title, .c-sheet h2.c-title) { font-size: var(--fs-28) !important; }
 :is(.c-section-title, .public-main h2, .mission-page h2) { font-size: var(--fs-20) !important; }
 :is(.today-continue-title, .lib-row-title, .folder-row-title, .sn-card-title, .recap-class, .me-names strong, .extension-install-step h2, .public-main h3, .mission-page h3,
-  .today .c-list-row > .c-grow, .calendar-item strong) { font-family: var(--font-display) !important; font-weight: 600 !important; font-size: var(--fs-17) !important; letter-spacing: var(--track-title); line-height: var(--lh-title); }
+  .today .c-list-row > .c-grow, .calendar-item strong) { font-family: var(--font-sans) !important; font-weight: 600 !important; font-size: var(--fs-17) !important; letter-spacing: -0.01em; line-height: var(--lh-title); }
+/* Section titles, questions and card faces: Manrope 600. */
+:is(.c-section-title, .reader-q, .quiz-question-text, .practice-prompt, .fc-face p, .today-counts strong) {
+  font-family: var(--font-sans) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  line-height: var(--lh-title) !important;
+  text-wrap: balance;
+}
+.c-pill, .c-seg a, .c-seg button { font-family: var(--font-sans) !important; font-size: var(--fs-15) !important; font-weight: 600 !important; letter-spacing: 0 !important; }
 :is(.reader-q, .quiz-question-text, .practice-prompt) { font-size: var(--fs-20) !important; }
 .fc-face p { font-size: var(--fs-28) !important; font-variant-numeric: tabular-nums; }
 .c-brand > span { font-size: var(--fs-20) !important; }
-/* Reading text is body text: Manrope 17 at 1.5. */
-.c-study, .reader-a, .reader-prose, .reader-notes { font: 500 var(--fs-17)/var(--lh-body) var(--font-sans) !important; letter-spacing: 0; }
+/* Reading text is body text: Manrope 17 at 1.55. */
+.c-study, .reader-a, .reader-prose, .reader-notes { font: 400 var(--fs-17)/1.55 var(--font-sans) !important; letter-spacing: 0; }
 .c-meta { font: 500 var(--fs-13)/var(--lh-body) var(--font-sans); color: var(--muted); font-variant-numeric: tabular-nums; }
 .focus-face { font-size: var(--fs-40) !important; }
 .sr-only { font-size: var(--fs-15) !important; }
@@ -99,9 +107,6 @@ strong, b { font-weight: 600; }
 .today-continue { padding: 16px 20px !important; border-radius: var(--r-row) !important; }
 
 
-/* The serif, a little more: reading text and tab names read like a book; buttons, labels, dates
-   and other small details stay in the sans for legibility. */
-.c-study, .reader-a, .reader-prose, .reader-notes { font: 400 var(--fs-17)/var(--lh-body) var(--font-display) !important; letter-spacing: 0; }
-.c-pill, .c-seg a, .c-seg button { font-family: var(--font-display) !important; font-size: var(--fs-17) !important; font-weight: 500 !important; letter-spacing: -0.005em; }
-.lecture-quote, .rec-transcript p, .lecture-line > span:last-child { font-family: var(--font-display) !important; font-style: italic; font-size: var(--fs-17) !important; font-weight: 400 !important; }
+/* Lecture quotes read as quotes: italic. */
+.lecture-quote, .rec-transcript p, .lecture-line > span:last-child { font-family: var(--font-sans) !important; font-style: italic; font-size: var(--fs-17) !important; font-weight: 400 !important; }
 .lecture-line > span:last-child { font-style: normal; }
