@@ -69,16 +69,18 @@ export const MINI = {
     { target: '[data-spot="focus-btn"]', label: 'Open the timer', on: 'focus-opened' },
     { target: '[data-spot="focus-start"]', label: 'Start focus', on: 'focus-started' },
   ] },
-  notes: { label: 'Notes', route: '/library?filter=notes', steps: [
-    { target: '[data-spot="note-new"]', label: 'New note', where: path => path === '/library', on: 'note-created' },
+  // Notes live in a guide's Outline: New › Note makes a page to type in.
+  notes: { label: 'Notes', route: '/dashboard', steps: [
+    { target: '[data-spot="new"]', label: 'Tap New', on: 'new-opened' },
+    { target: '[data-spot="new-note"]', label: 'Tap Note', on: 'note-created' },
+    { target: '[data-spot="note-new"]', label: 'Type your notes', where: onGuide, on: 'note-written', finishable: true },
   ] },
   record: { label: 'Record a lecture', route: '/library?filter=lectures', steps: [
     { target: '[data-spot="record-lecture"]', label: 'Tap Record lecture', where: path => path === '/library', on: 'record-opened' },
     { target: '[data-spot="rec-start"]', label: 'Record. Notes write themselves as you go', on: 'recording-started', finishable: true },
   ] },
-  visual: { label: 'Visuals', route: '/library?filter=notes', steps: [
-    { target: '[data-spot="note-new"]', label: 'Open a note', where: path => path === '/library', on: 'note-created' },
-    { target: '[data-spot="make-visual"]', label: 'Highlight text, then Make visual', where: path => path === '/smartnotes', on: 'visual-added', finishable: true },
+  visual: { label: 'Visuals', route: 'guide', steps: [
+    { target: '[data-spot="note-new"]', label: 'Highlight a line, then tap Visualize', where: onGuide, on: 'visual-added', finishable: true },
   ] },
   match: { label: 'Match', route: 'guide', steps: [
     { target: '[data-spot="quiz-pill"]', label: 'Tap Quiz', where: onGuide, on: 'quiz-opened' },

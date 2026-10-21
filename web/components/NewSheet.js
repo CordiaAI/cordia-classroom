@@ -61,14 +61,14 @@ function MakeOptions({ onGo }) {
     { label: 'Quiz', icon: Brain, href: guide ? `/quiz/${guide.id}` : '/library' },
     { label: 'Flashcards', icon: Layers, href: '/create' },
     { label: 'Practice', icon: PencilRuler, href: '/practice' },
-    { label: 'Note', icon: NotebookPen, href: '/smartnotes?id=new', event: 'note-created' },
+    { label: 'Note', icon: NotebookPen, href: '/smartnotes?id=new', event: 'note-created', spot: 'new-note' },
   ];
   return (
     <section className="new-make" aria-labelledby="new-make-title">
       <h3 id="new-make-title" className="c-meta new-make-title">Or make a new</h3>
       <div className="new-make-row">
         {items.map(item => (
-          <button key={item.label} type="button" className="new-make-btn" onClick={() => { if (item.event) walkthroughEvent(item.event); onGo(item.href); }}>
+          <button key={item.label} type="button" className="new-make-btn" data-spot={item.spot} onClick={() => { if (item.event) walkthroughEvent(item.event); onGo(item.href); }}>
             <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />{item.label}
           </button>
         ))}

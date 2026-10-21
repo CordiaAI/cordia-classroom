@@ -48,13 +48,14 @@ export function createGuideNotesService({ env = process.env, fetch: fetchImpl = 
   const provider = chatProvider(env);
   const openaiKey = provider.key;
 
-  async function make(authorization, guideId) {
+  // force: rewrite even notes already in outline form (the student asked: Make it an outline).
+  async function make(authorization, guideId, { force = false } = {}) {
     if (!authorization || !/^[0-9a-f-]{36}$/i.test(guideId || '')) return { status: 400, body: { detail: 'Invalid guide.' } };
     const response = await fetchImpl(`${apiBase}/guides/${encodeURIComponent(guideId)}`, { headers: { Authorization: authorization } }).catch(() => null);
     if (!response?.ok) return { status: response?.status === 401 ? 401 : 404, body: { detail: 'Guide not found.' } };
     const guide = (await response.json())?.guide;
     if (!guide) return { status: 404, body: { detail: 'Guide not found.' } };
-    if (!needsOutline(guide.notes)) return { status: 200, body: { notes: guide.notes } };
+    if (!force && !needsOutline(guide.notes)) return { status: 200, body: { notes: guide.notes } };
     if (!openaiKey) return { status: 200, body: { notes: guide.notes || '', reason: 'not_configured' } };
     const content = [String(guide.study_guide || '').trim(), String(guide.notes || '').trim()].filter(Boolean).join('\n\n');
     if (content.length < 40) return { status: 200, body: { notes: '', reason: 'empty' } };

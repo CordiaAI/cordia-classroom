@@ -17,7 +17,6 @@ const tutorDrawer = read('web', 'components', 'TutorDrawer.js');
 const retain = read('web', 'components', 'RetainCards.js');
 const flashcards = read('web', 'components', 'FlashcardViewer.js');
 const createPage = read('web', 'pages', 'create.js');
-const smartnotesGuidePreview = read('web', 'components', 'smartnotes', 'GuidePreview.js');
 const nclex = read('web', 'components', 'NCLEXQuizMode.js');
 const extensionPopup = read('extension', 'popup.js');
 const missionPage = read('web', 'pages', 'mission.js');
@@ -112,8 +111,6 @@ assert.match(tutor, /choose an existing guide or SmartNote, or attach a file/);
 assert.match(tutor, /Based on \{message\.source\.title\}/);
 assert.match(tutor, /retain_context: retainContext/);
 assert.doesNotMatch(createPage, /externalSourceId\.startsWith\('canvas:'\)/);
-// The notes list and the editor save guides through one shared path that keeps the source.
-assert.equal((smartnotesGuidePreview.match(/source_type: preview\.source\?\.type/g) || []).length, 1);
 assert.match(nclex, /source_type: 'study_guide'/);
 assert.match(extensionPopup, /action: 'createStudyGuide'/);
 assert.match(extensionPopup, /sourceType: source\.sourceType/);

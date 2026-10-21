@@ -3,7 +3,7 @@ import { LoadingArea, Reveal, useLoadGate } from '../components/CordiaLoader';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowUpDown, ArrowUpRight, AudioLines, BookOpen, ChevronDown, FilePlus2, FolderInput, FolderPlus, Layers, Mic, NotebookPen, Pencil, Plus, Search, Star, Trash2,
+  ArrowUpDown, ArrowUpRight, AudioLines, BookOpen, ChevronDown, FolderInput, FolderPlus, Layers, Mic, NotebookPen, Pencil, Plus, Search, Star, Trash2,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
@@ -29,12 +29,12 @@ const SORTS = [
 const FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'guides', label: 'Guides' },
-  { key: 'notes', label: 'Notes' },
   { key: 'lectures', label: 'Lectures' },
   { key: 'flashcards', label: 'Flashcards' },
   { key: 'starred', label: 'Starred' },
 ];
-const TAB_ALIASES = { cards: 'flashcards', classes: 'all' };
+// Notes live in guides now, so old Notes links show them all.
+const TAB_ALIASES = { cards: 'flashcards', classes: 'all', notes: 'all' };
 const ICONS = { guide: BookOpen, note: NotebookPen, lecture: AudioLines };
 
 function shortDate(value) {
@@ -112,7 +112,9 @@ export default function LibraryPage() {
     if (failure) setLoadError(apiErrorMessage(failure?.detail, 'Your library could not be loaded.'));
     if (Array.isArray(foldersData?.folders)) setFolders(foldersData.folders);
     if (Array.isArray(guidesData?.guides)) setGuides(guidesData.guides);
-    setNotes(Array.isArray(notesData?.notes) ? notesData.notes : []);
+    // Notes already moved into a guide show as that guide.
+    const moved = new Set((guidesData?.guides || []).map(guide => guide.source_type).filter(type => String(type || '').startsWith('note:')).map(type => type.slice(5)));
+    setNotes(Array.isArray(notesData?.notes) ? notesData.notes.filter(note => !moved.has(note.id)) : []);
     setLectures(Array.isArray(lectureData?.lectures) ? lectureData.lectures : []);
     setSharedClasses(Array.isArray(classData?.classes) ? classData.classes : []);
     setLoading(false);
@@ -192,7 +194,8 @@ export default function LibraryPage() {
     if (filter === 'flashcards') {
       (cardSets || []).forEach(guide => rows.push({ kind: 'cards', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/flashcards/study?guideId=' + guide.id, due: dueCount(cardsById.get(guide.id)), total: guide.flashcards.length }));
     }
-    if (['all', 'notes'].includes(filter)) {
+    if (filter === 'all') {
+      // Older notes not yet moved into a guide; opening one moves it (pages/smartnotes.js).
       notes.forEach(note => rows.push({ kind: 'note', id: note.id, title: note.title || 'Untitled Notes', folderId: note.folder_id, date: note.updated_at || note.created_at, href: '/smartnotes?id=' + note.id }));
     }
     if (['all', 'lectures'].includes(filter)) {
@@ -329,9 +332,7 @@ export default function LibraryPage() {
     );
   }
 
-  const primary = filter === 'notes'
-    ? <button type="button" className="c-btn c-btn--primary" data-spot="note-new" onClick={() => { walkthroughEvent('note-created'); router.push('/smartnotes?id=new'); }}><FilePlus2 size={20} strokeWidth={1.75} aria-hidden="true" />New note</button>
-    : filter === 'lectures'
+  const primary = filter === 'lectures'
       ? <button type="button" className="c-btn c-btn--primary" data-spot="record-lecture" onClick={() => { walkthroughEvent('record-opened'); openNewSheet('record'); }}><Mic size={20} strokeWidth={1.75} aria-hidden="true" />Record lecture</button>
       : filter === 'flashcards'
         ? <button type="button" className="c-btn c-btn--primary" onClick={() => router.push('/create')}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />Make cards</button>

@@ -6,6 +6,8 @@
 // the visuals itself.
 
 export const MAX_PER_GUIDE = 40;
+const INLINE_PREFIX = 'data:image/svg+xml;base64,';
+const MAX_INLINE = 1_500_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function userIdFromToken(authorization) {
@@ -58,9 +60,13 @@ export function createGuideVisualsService({ env = process.env, fetch: fetchImpl 
     return { httpStatus: 200, body: { stored: true, visuals: await response.json() } };
   }
 
+  // An image Cordia stored, or (before the visuals bucket exists) the drawing itself, inline.
   async function keep({ authorization, guideId, section, anchor, url, alt, theme }) {
     if (!supabaseUrl || !serviceKey) return notStored;
-    if (!String(url || '').startsWith(imagePrefix) || /[\s"'<>]/.test(url)) return { httpStatus: 400, body: { detail: 'That visual can’t be kept.' } };
+    const image = String(url || '');
+    const stored = image.startsWith(imagePrefix) && !/[\s"'<>]/.test(image);
+    const inline = image.startsWith(INLINE_PREFIX) && image.length <= MAX_INLINE && /^[A-Za-z0-9+/=]+$/.test(image.slice(INLINE_PREFIX.length));
+    if (!stored && !inline) return { httpStatus: 400, body: { detail: 'That visual can’t be kept.' } };
     const userId = await owner(authorization, guideId);
     if (!userId) return { httpStatus: 404, body: { detail: 'Guide not found' } };
     const row = {
@@ -68,7 +74,7 @@ export function createGuideVisualsService({ env = process.env, fetch: fetchImpl 
       guide_id: guideId,
       section: clip(section, 500),
       anchor: clip(anchor, 600),
-      url: clip(url, 1000),
+      url: image,
       alt: clip(alt, 500),
       theme: theme === 'dark' ? 'dark' : 'light',
     };

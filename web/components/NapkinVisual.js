@@ -5,6 +5,12 @@ import CordiaLoader from './CordiaLoader';
 import { currentTheme } from './MermaidDiagram';
 
 export const VISUAL_ERROR = "Couldn't make a visual. Try again.";
+// Why Napkin didn't draw, in words a student can act on.
+const REASONS = {
+  not_configured: "Visuals aren't set up yet.",
+  rate_limited: 'Napkin is busy. Try again in a minute.',
+  timeout: 'Napkin took too long. Try again.',
+};
 
 // Visuals left this month, shared by every NapkinVisual on the page.
 let usageCache = null;
@@ -128,7 +134,7 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
         setState({ phase: 'ready', visuals: data.visuals, alt: data.alt, rendered: data.theme });
         return;
       }
-      setState({ phase: 'fallback', quiet: data?.reason === 'not_configured' });
+      setState({ phase: 'fallback', reason: data?.reason, quiet: data?.reason === 'not_configured' && Boolean(fallback) });
     } catch {
       setState({ phase: 'fallback' });
     }
@@ -136,7 +142,7 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
 
   useEffect(() => {
     if (!auto || !text) return;
-    if (disabled) { setState({ phase: 'fallback', quiet: true }); return; }
+    if (disabled) { setState({ phase: 'fallback', reason: 'not_configured', quiet: Boolean(fallback) }); return; }
     if (usage) make();
   }, [auto, text, Boolean(usage), disabled]);
 
@@ -186,7 +192,7 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
   return (
     <div className="nv">
       {fallback?.()}
-      {state.phase === 'fallback' && !state.quiet && <p className="nv-error" role="alert">{VISUAL_ERROR}</p>}
+      {state.phase === 'fallback' && !state.quiet && <p className="nv-error" role="alert">{REASONS[state.reason] || VISUAL_ERROR}</p>}
       {state.phase === 'limit' && state.pro && <p className="nv-error" role="alert">Limit reached</p>}
       {!disabled && state.phase !== 'limit' && !(auto && state.phase === 'idle') && (
         <div className="nv-bar">

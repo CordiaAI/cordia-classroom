@@ -51,13 +51,14 @@ test('Dashboard: Continue, Due soon (Canvas when empty), progress strip; tools l
   for (const tool of ['Quiz', 'Flashcards', 'Practice', 'Note']) assert.match(newSheet, new RegExp(`label: '${tool}'`));
 });
 
-test('Library: one list grouped by class, kind filters, Undo on delete (notes too)', async () => {
+test('Library: one list grouped by class, kind filters (no Notes: notes live in guides), Undo on delete', async () => {
   const library = await source('pages/library.js');
   const undo = await source('lib/undoDelete.js');
 
   assert.match(library, /<h1 className="c-title">Library<\/h1>/);
   assert.match(library, /\{ key: 'recent', label: 'Newest' \}/);
-  for (const label of ['All', 'Guides', 'Notes', 'Lectures', 'Flashcards', 'Starred']) assert.match(library, new RegExp(`label: '${label}'`));
+  for (const label of ['All', 'Guides', 'Lectures', 'Flashcards', 'Starred']) assert.match(library, new RegExp(`label: '${label}'`));
+  assert.doesNotMatch(library, /label: 'Notes'/);
   assert.match(library, /name: 'Unfiled'/);
   assert.match(library, /href=\{'\/folder\/' \+ folder\.id\} className="lib-group-name/);
   assert.match(library, /path: '\/smart_notes\/' \+ item\.id/);
