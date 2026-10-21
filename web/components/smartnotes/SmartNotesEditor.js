@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Check, ChevronDown, Keyboard, ListTree, NotebookPen, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, Keyboard, ListTree, NotebookPen, Sparkles, Trash2 } from 'lucide-react';
 import ConfirmDialog from '../ConfirmDialog';
 import Menu from '../Menu';
 import { requestTip } from '../../lib/tips';
@@ -68,12 +68,29 @@ export default function SmartNotesEditor() {
   // Diagram / visualize
   const [mermaidCode, setMermaidCode] = useState(null);
   const [diagramLoading, setDiagramLoading] = useState(false);
-  const [visualizeMode, setVisualizeMode] = useState(false);
+  const [selectionBubble, setSelectionBubble] = useState(null); // { top, left } over the highlight
   const [showTyping, setShowTyping] = useState(false);
   // First note: a one-time tip points at the typing shortcuts.
   useEffect(() => { requestTip('typing'); }, []);
   const [visualSource, setVisualSource] = useState(null); // { text, context, key }
   const visualAnchor = useRef(null);
+  const stageRef = useRef(null);
+
+  // Highlighting text in the note shows a "Make visual" button right above it.
+  useEffect(() => {
+    function onSelection() {
+      const selection = window.getSelection();
+      const paper = paperRef.current;
+      const stage = stageRef.current;
+      const text = selection?.toString().trim() || '';
+      if (!paper || !stage || !selection?.rangeCount || text.length < 5 || !paper.contains(selection.anchorNode)) { setSelectionBubble(null); return; }
+      const box = selection.getRangeAt(0).getBoundingClientRect();
+      const frame = stage.getBoundingClientRect();
+      setSelectionBubble({ top: Math.max(4, box.top - frame.top + stage.scrollTop - 44), left: Math.min(Math.max(8, box.left - frame.left + box.width / 2), frame.width - 8) });
+    }
+    document.addEventListener('selectionchange', onSelection);
+    return () => document.removeEventListener('selectionchange', onSelection);
+  }, []);
 
   // "Turn into Study Guide" preview modal
   const [convertingGuide, setConvertingGuide] = useState(false);
@@ -355,28 +372,48 @@ export default function SmartNotesEditor() {
     }
   }
 
-  // ── Visualize: send highlighted text to diagram API ─────────────────────
-  function handleVisualize() {
-    setVisualizeMode(v => !v);
+  // ── Make visual: a Napkin visual of the highlight, or of the section the cursor is in ──
+  // The rest of the note around it is sent as context. If no visual can be made, the
+  // built-in diagram is drawn instead.
+  const isHeading = node => /^H[1-3]$/.test(node?.nodeName || '');
+  function topBlock(node) {
+    const paper = paperRef.current;
+    while (node && node.parentNode !== paper) node = node.parentNode;
+    return node || null;
   }
-
-  // "Make diagram": a Napkin visual of the highlight (the rest of the note is context).
-  // If no visual can be made, the built-in diagram is drawn instead.
-  function handleCheckmark() {
+  function sectionAround(block) {
+    let start = block;
+    while (start && !isHeading(start) && start.previousElementSibling) start = start.previousElementSibling;
+    const blocks = [start];
+    for (let next = start?.nextElementSibling; next && !isHeading(next); next = next.nextElementSibling) blocks.push(next);
+    return blocks.filter(Boolean);
+  }
+  function makeVisual() {
+    const paper = paperRef.current;
+    if (!paper) return;
     const selection = window.getSelection();
-    const selectedText = selection?.toString()?.trim();
-    if (!selectedText || selectedText.length < 5) return;
-    const paperText = paperRef.current?.innerText || '';
-    const at = paperText.indexOf(selectedText);
+    const picked = selection?.rangeCount && paper.contains(selection.anchorNode) ? selection.toString().trim() : '';
+    let text = picked;
+    let anchor = picked ? topBlock(selection.getRangeAt(0).endContainer) : null;
+    if (text.length < 5) {
+      const caret = selection?.rangeCount && paper.contains(selection.anchorNode) ? topBlock(selection.anchorNode) : null;
+      const blocks = caret ? sectionAround(caret) : [];
+      text = blocks.map(block => block.innerText || block.textContent || '').join('\n').trim();
+      anchor = blocks.at(-1) || null;
+      if (text.length < 5) { text = (paper.innerText || '').trim(); anchor = paper.lastElementChild; }
+    }
+    if (text.length < 5) { setActionError('Write or select something in the note first.'); return; }
+    text = text.slice(0, 2000);
+    const paperText = paper.innerText || '';
+    const at = paperText.indexOf(text.slice(0, 200));
     const context = at >= 0
-      ? `${paperText.slice(Math.max(0, at - 700), at)}\n${paperText.slice(at + selectedText.length, at + selectedText.length + 700)}`.trim()
+      ? `${paperText.slice(Math.max(0, at - 700), at)}\n${paperText.slice(at + text.length, at + text.length + 700)}`.trim()
       : '';
-    let block = selection.rangeCount ? selection.getRangeAt(0).endContainer : null;
-    while (block && block.parentNode !== paperRef.current) block = block.parentNode;
-    visualAnchor.current = block || null;
-    setVisualizeMode(false);
+    visualAnchor.current = anchor;
+    setSelectionBubble(null);
     setMermaidCode(null);
-    setVisualSource({ text: selectedText, context, key: Date.now() });
+    setActionError('');
+    setVisualSource({ text, context, key: Date.now() });
   }
 
   async function drawBuiltInDiagram(text) {
@@ -604,19 +641,13 @@ export default function SmartNotesEditor() {
                 )}
               </div>
             ) : <span className="sn-panel-label">Notes</span>}
-            {visualizeMode && <span className="sn-visualize-hint" role="status">Highlight text, then press ✓</span>}
-            {visualizeMode && (
-              <button
-                className="sn-visualize-confirm"
-                onClick={handleCheckmark}
-                title="Generate diagram from highlighted text"
-                aria-label="Make diagram"
-              >
-                <Check aria-hidden="true" />
-              </button>
-            )}
           </div>
-          <div className="sn-paper-stage">
+          <div className="sn-paper-stage" ref={stageRef}>
+          {selectionBubble && view !== 'transcript' && (
+            <button type="button" className="c-btn c-btn--primary c-btn--sm sn-visual-bubble" style={{ top: selectionBubble.top, left: selectionBubble.left }} onMouseDown={event => event.preventDefault()} onClick={makeVisual}>
+              <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />Make visual
+            </button>
+          )}
           {view === 'transcript' && (
             <div className="sn-paper sn-transcript" aria-label="Transcript">
               {transcript === null ? <CordiaLoader size={20} label="Loading transcript" /> : transcriptParagraphs(transcript).map((paragraph, index) => <p key={index}>{paragraph}</p>)}
@@ -625,7 +656,7 @@ export default function SmartNotesEditor() {
           <div
             ref={paperRef}
             hidden={view === 'transcript'}
-            className={`sn-paper${visualizeMode ? ' sn-paper--visualize' : ''}`}
+            className="sn-paper"
             contentEditable
             suppressContentEditableWarning
             onKeyDown={e => formatOnKeyDown(e, paperRef.current)}
@@ -649,12 +680,9 @@ export default function SmartNotesEditor() {
         {/* Bottom-right: diagram */}
         <div className="sn-diagram-wrap">
           <div className="sn-diagram-toolbar">
-            <span className="sn-panel-label">Diagram</span>
-            <button
-              className={`c-btn c-btn--secondary sn-visualize-btn${visualizeMode ? ' active' : ''}`}
-              onClick={handleVisualize}
-            >
-              {visualizeMode ? 'Cancel' : 'Visualize'}
+            <span className="sn-panel-label">Visual</span>
+            <button type="button" className="c-btn c-btn--secondary c-btn--sm sn-visualize-btn" onMouseDown={event => event.preventDefault()} onClick={makeVisual}>
+              <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />Make visual
             </button>
           </div>
           <div className="sn-diagram-body">
@@ -664,14 +692,14 @@ export default function SmartNotesEditor() {
                 auto
                 text={visualSource.text}
                 context={visualSource.context}
-                useLabel="Use this"
+                useLabel="Add to note"
                 onUse={insertVisual}
                 fallback={() => <BuiltInDiagram text={visualSource.text} code={mermaidCode} loading={diagramLoading} draw={drawBuiltInDiagram} />}
               />
             )}
             {!visualSource && (
               <div className="sn-diagram-placeholder">
-                <p>Visualize → highlight → confirm</p>
+                <p>Highlight text in your notes and press Make visual. Or click into a section and press Make visual here to draw that whole section.</p>
               </div>
             )}
           </div>

@@ -18,7 +18,6 @@ import LearnCordia from '../components/LearnCordia';
 import ConnectorsSettings from '../components/ConnectorsSettings';
 import useScrollerTabs from '../lib/useScrollerTabs';
 import { canvasStatus } from '../lib/canvas';
-import AssistantSettings from '../components/assistant/AssistantSettings';
 
 export default function SettingsPage() {
   const { ready } = useRequireAuth();
@@ -34,8 +33,10 @@ export default function SettingsPage() {
     if (!router.isReady || !router.query.section) return;
     const section = String(router.query.section);
     if (section === 'grove') { router.replace('/progress'); return; }
+    // The Assistant moved to its own page; its app still links here when an app connects.
+    if (section === 'assistant') { const { section: _s, ...rest } = router.query; router.replace({ pathname: '/assistant', query: rest }); return; }
     const key = SECTION_ALIASES[section] || section;
-    setActiveSection(['account', 'study', 'assistant', 'appearance', 'plan', 'connectors', 'learn'].includes(key) ? key : 'account');
+    setActiveSection(['account', 'study', 'appearance', 'plan', 'connectors', 'learn'].includes(key) ? key : 'account');
   }, [router.isReady, router.query.section]);
 
   // Picking a tab updates the address, so Back and shared links land on it.
@@ -196,7 +197,6 @@ export default function SettingsPage() {
   const sections = [
     { key: 'account', label: 'Account' },
     { key: 'study', label: 'Study' },
-    { key: 'assistant', label: 'Assistant' },
     { key: 'appearance', label: 'Appearance' },
     { key: 'plan', label: 'Plan & billing' },
     { key: 'connectors', label: 'Connectors' },
@@ -345,12 +345,6 @@ export default function SettingsPage() {
                 : <a className="c-btn c-btn--secondary" href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer">Get extension</a>}
             </div>
             {canvasReady && <SharingSettings />}
-          </div>
-        )}
-
-        {activeSection === 'assistant' && (
-          <div className="profile-section" role="tabpanel" id="panel-assistant" aria-labelledby="tab-assistant">
-            <AssistantSettings onOpenPlan={() => pickSection('plan')} />
           </div>
         )}
 

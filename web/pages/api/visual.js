@@ -1,4 +1,5 @@
-// Napkin AI visuals. GET: visuals left this month. POST { text, context, theme }: make a visual.
+// Napkin AI visuals. GET: visuals left this month. POST { text, context, theme, resume? }: make a
+// visual; a drawing still running answers { status: 'pending', resume } and is called again.
 // Server env (never sent to the browser): NAPKIN_API_KEY, NAPKIN_STYLE_ID (optional),
 // SUPABASE_SERVICE_ROLE_KEY (storage, cache and usage).
 import { createVisualService } from '../../lib/server/napkinVisual.mjs';
@@ -13,8 +14,8 @@ export default async function handler(req, res) {
     let result;
     if (req.method === 'GET') result = await service.usageFor(authorization);
     else if (req.method === 'POST') {
-      const { text, context, theme } = req.body || {};
-      result = await service.generate({ authorization, text, context, theme });
+      const { text, context, theme, resume } = req.body || {};
+      result = await service.generate({ authorization, text, context, theme, resume });
     } else {
       res.setHeader('Allow', 'GET, POST');
       return res.status(405).json({ detail: 'Method not allowed' });

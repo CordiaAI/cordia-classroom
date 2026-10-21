@@ -59,7 +59,7 @@ export default function AssistantSettings({ onOpenPlan }) {
     if (connected) setTab('apps');
     toast(connected ? 'Connected' : "That app didn't connect. Try again.");
     const { connected: _c, connection: _f, provider: _p, ...rest } = router.query;
-    router.replace({ pathname: '/settings', query: rest }, undefined, { shallow: true });
+    router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
   }, [router.isReady]);
 
   const setView = useCallback(view => setMe(current => ({ ...current, stage: 'active', settings: view })), []);

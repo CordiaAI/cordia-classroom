@@ -250,7 +250,7 @@ export default function ConnectorsSettings() {
   return (
     <div className="c-card cn-card">
       <h2 className="c-section-title">Connect your apps</h2>
-      <p className="c-meta">Tap one to see what it does and how to connect it. For texting, Cordia Assistant connects its own apps in Settings › Assistant.</p>
+      <p className="c-meta">Tap one to see what it does and how to connect it. For texting, Cordia Assistant connects its own apps on the Assistant page.</p>
       {connectors === null ? <SectionLoader label="Loading connectors" /> : (
         <ul className="cn-grid">
           {canvas && (

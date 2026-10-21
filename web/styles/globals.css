@@ -1033,28 +1033,15 @@ input::placeholder { color: var(--text-muted); }
 .sn-h-divider:hover::after { background: var(--olive); }
 
 /* Visualize mode */
-.sn-paper--visualize {
-  box-shadow:var(--shadow-card);
-  cursor: text;
-}
-.sn-visualize-hint { font: 600 var(--fs-13)/1.3 var(--font-sans); color: var(--olive-ink); }
-.sn-visualize-confirm {
-  background: var(--olive); color: var(--on-olive); border: none;
-  border-radius:50%; width: 28px; height: 28px;
-  font-size: 15px; font-weight:600; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow:var(--shadow-card);
-  transition: transform var(--dur), box-shadow var(--dur);
-  flex-shrink: 0;
-}
-.sn-visualize-confirm:hover { transform: scale(1.1); }
 .sn-diagram-toolbar {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 8px; flex-shrink: 0;
 }
 .sn-diagram-toolbar .sn-panel-label { margin-bottom: 0; }
-.sn-visualize-btn { font-size:13px; padding: 4px 14px; }
-.sn-visualize-btn.active { background: var(--accent-glow); }
+.sn-visualize-btn { gap: 6px; }
+.sn-diagram-body .nv-frame { aspect-ratio: auto; height: clamp(140px, 24vh, 260px); padding: 8px; }
+/* The Make visual button that appears above highlighted text. */
+.sn-visual-bubble { position: absolute; z-index: 5; gap: 6px; transform: translateX(-50%); box-shadow: var(--shadow-float); white-space: nowrap; }
 
 /* Section labels (per spec) */
 .sn-panel-label {
@@ -2477,7 +2464,6 @@ input:focus, textarea:focus, select:focus { border-color: var(--olive); box-shad
 [data-theme="dark"] .sidebar-user-avatar,
 [data-theme="dark"] .sn-save-btn,
 [data-theme="dark"] .sn-open-btn,
-[data-theme="dark"] .sn-visualize-confirm,
 [data-theme="dark"] .cordia-tutor-message.user,
 [data-theme="dark"] .cordia-tutor-input button { background: var(--accent-strong) !important; color: var(--accent-on) !important; }
 [data-theme="dark"] .guide-row-type,

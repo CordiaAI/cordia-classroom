@@ -324,6 +324,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && ['authToken', 'userEmail'].some(key => changes[key])) initAuth();
   if (area === 'session' && changes.pendingGuide?.newValue) startPendingGuide();
 });
+const showPage = () => chrome.tabs.query({ active: true, currentWindow: true }, ([tab] = []) => { document.getElementById('page-title').textContent = cleanTitle(tab?.title) || 'The page you have open'; }); // the tab the panel reads
+showPage(); chrome.tabs.onActivated?.addListener(showPage); chrome.tabs.onUpdated?.addListener((id, change) => change.title && showPage());
 window.addEventListener('focus', initAuth);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) initAuth(); });
 const authCheck = initAuth();

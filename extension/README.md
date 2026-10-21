@@ -42,7 +42,7 @@ Documents are downloaded with your browser sign-in and read by the CordiaClassro
 Under the guide button, ask Cordia about the current page. It reads the page first if you haven't made a guide yet, and remembers the conversation.
 
 - **New chat** clears the conversation.
-- **Maximize chat** gives the tutor the whole panel (**Minimize chat** shrinks it back).
+- **Full screen** gives the tutor the whole panel (**Exit full screen** shrinks it back).
 - If a chat gets too long, Cordia asks you to start a new one.
 
 ## Free plan limits
