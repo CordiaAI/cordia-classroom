@@ -5,8 +5,9 @@ import BodyPortal from './BodyPortal';
 import ConfirmDialog from './ConfirmDialog';
 import { SectionLoader } from './CordiaLoader';
 import { apiFetch } from '../lib/api';
-import { canvasStatus } from '../lib/canvas';
-import CanvasSettings from './CanvasSettings';
+import { canvasStatus, displayDate } from '../lib/canvas';
+import CanvasConnectSheet from './CanvasConnectSheet';
+import CanvasCourseList from './CanvasCourseList';
 import { BRAND_PATHS } from '../lib/brandIcons';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
@@ -111,6 +112,9 @@ export default function ConnectorsSettings() {
   const [feed, setFeed] = useState('');
   const [open, setOpen] = useState(null);
   const [canvas, setCanvas] = useState(undefined);
+  const [canvasConnecting, setCanvasConnecting] = useState(false);
+  const [showClasses, setShowClasses] = useState(false);
+  const [canvasRemoving, setCanvasRemoving] = useState(false);
 
   // Canvas connects through Classroom's own Canvas flow, unlike the other apps: an access token, or a
   // calendar link where the school blocks tokens. Its tile shows which one is in.
@@ -119,6 +123,43 @@ export default function ConnectorsSettings() {
     setCanvas(status ? { status, feed: Boolean(calendar?.connected) && calendar?.source !== 'canvas' } : null);
   }
   useEffect(() => { loadCanvas(); }, []);
+  const school = () => (typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : '');
+
+  async function syncCanvas() {
+    setBusy('canvas'); setError('');
+    const data = await apiFetch('/canvas/sync', { method: 'POST' });
+    setBusy('');
+    if (data && 'connected' in data) { setCanvas(current => ({ ...current, status: data })); say('Canvas synced'); }
+    else fail(data?.detail || "Canvas couldn't be reached. Try again.");
+  }
+
+  async function disconnectCanvas() {
+    setCanvasRemoving(false);
+    setBusy('canvas');
+    const data = await apiFetch('/canvas', { method: 'DELETE' });
+    setBusy('');
+    if (data && 'connected' in data) {
+      await loadCanvas();
+      say(data.settings_url ? 'Canvas disconnected. Delete the token in Canvas too: Account › Settings › Approved Integrations.' : 'Canvas disconnected');
+    } else fail(data?.detail || "That didn't disconnect. Try again.");
+  }
+
+  function canvasActions() {
+    const { status, feed } = canvas;
+    const working = busy === 'canvas';
+    if (status.status === 'needs_reconnect') return <button type="button" className="c-btn c-btn--primary" onClick={() => setCanvasConnecting(true)}>Reconnect</button>;
+    if (!status.connected) {
+      return <button type="button" className="c-btn c-btn--primary" onClick={() => setCanvasConnecting(true)}>{feed ? 'Add access token' : 'Connect'}</button>;
+    }
+    return (
+      <>
+        <button type="button" className="c-btn c-btn--primary" disabled={working} onClick={syncCanvas}>{working ? 'Syncing…' : 'Sync now'}</button>
+        <button type="button" className="c-btn c-btn--secondary" onClick={() => setShowClasses(value => !value)} aria-expanded={showClasses}>Classes</button>
+        <button type="button" className="c-btn c-btn--quiet" disabled={working} onClick={() => setCanvasRemoving(true)}>Disconnect</button>
+      </>
+    );
+  }
+
   const canvasBadge = !canvas ? null
     : canvas.status.status === 'needs_reconnect' ? { text: 'Reconnect', cls: 'is-warn' }
       : canvas.status.connected ? { text: 'Connected', cls: 'is-on' }
@@ -214,7 +255,7 @@ export default function ConnectorsSettings() {
         <ul className="cn-grid">
           {canvas && (
             <li>
-              <button type="button" className="cn-tile" onClick={() => { setOpen('canvas'); setError(''); setNotice(''); }}>
+              <button type="button" className="cn-tile" onClick={() => { setOpen('canvas'); setShowClasses(false); setError(''); setNotice(''); }}>
                 <ConnectorIcon id="canvas" />
                 <span className="cn-tile-text">
                   <span className="cn-name">Canvas</span>
@@ -244,8 +285,8 @@ export default function ConnectorsSettings() {
           })}
         </ul>
       )}
-      {!active && notice && <p className="cn-notice" role="status">{notice}</p>}
-      {!active && error && <p className="cn-error" role="alert">{error}</p>}
+      {!open && notice && <p className="cn-notice" role="status">{notice}</p>}
+      {!open && error && <p className="cn-error" role="alert">{error}</p>}
       {open === 'canvas' && canvas && (
         <BodyPortal>
           <div className="c-scrim" onClick={() => { setOpen(null); loadCanvas(); }}>
@@ -255,10 +296,21 @@ export default function ConnectorsSettings() {
               <h2 id="cn-canvas-title" className="c-section-title">Canvas</h2>
               {canvasBadge && <span className={`cn-badge ${canvasBadge.cls}`}>{canvasBadge.text}</span>}
               <p className="cn-detail-text">{DETAILS.canvas}</p>
-              {canvas.feed && !canvas.status.connected && <p className="c-meta">Your deadlines come from your calendar link. Add an access token to also see what you turned in, grades and course files.</p>}
-              <div className="cn-canvas-body">
-                <CanvasSettings school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} onChange={loadCanvas} />
-              </div>
+              {canvas.status.connected && (
+                <p className="c-meta cn-canvas-meta">{canvas.status.domain} · •••• {canvas.status.last4}{canvas.status.expires_at ? ` · Expires ${displayDate(canvas.status.expires_at)}` : ''}</p>
+              )}
+              {canvas.feed && !canvas.status.connected && <p className="c-meta">Your deadlines come from a calendar link. An access token also brings what you turned in, grades and course files.</p>}
+              <div className="cn-actions">{canvasActions()}</div>
+              {showClasses && canvas.status.connected && (
+                <div className="cn-canvas-classes">
+                  <CanvasCourseList courses={canvas.status.courses} onChange={next => setCanvas(current => ({ ...current, status: next }))} />
+                </div>
+              )}
+              {!canvas.status.connected && !canvas.feed && (
+                <p className="c-meta">School blocks access tokens? Use a calendar link instead: on the Canvas page, open Calendar.</p>
+              )}
+              {notice && <p className="cn-notice" role="status">{notice}</p>}
+              {error && <p className="cn-error" role="alert">{error}</p>}
             </div>
           </div>
         </BodyPortal>
@@ -287,6 +339,23 @@ export default function ConnectorsSettings() {
             </div>
           </div>
         </BodyPortal>
+      )}
+      {canvasConnecting && (
+        <CanvasConnectSheet
+          school={school()}
+          initialDomain={canvas?.status?.domain || ''}
+          onClose={() => setCanvasConnecting(false)}
+          onConnected={() => { setCanvasConnecting(false); loadCanvas(); say('Canvas connected'); }}
+        />
+      )}
+      {canvasRemoving && (
+        <ConfirmDialog
+          title="Disconnect Canvas?"
+          message="Your classes and guides stay. Deadlines, grades and files stop updating until you connect again."
+          confirmLabel="Disconnect"
+          onConfirm={disconnectCanvas}
+          onCancel={() => setCanvasRemoving(false)}
+        />
       )}
       {importing && <ImportSheet connector={importing} onClose={() => setImporting(null)} />}
       {removing && (
