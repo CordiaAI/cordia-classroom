@@ -26,6 +26,7 @@ function TutorInline({ text }) {
   return inlineParts(text).map((part, index) => (part.bold ? <strong key={index}>{part.text}</strong> : part.text));
 }
 
+const ONE_TIME_SKILLS = ['organize'];
 const TUTOR_LINE_CLASS = { paragraph: '', bullet: 'tutor-bullet', note: 'tutor-note', work: 'tutor-work' };
 
 // Bold main points, numbered steps with the work beneath, bullets, and plain-language notes.
@@ -317,10 +318,13 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   }, [messages.length, loading, chatsOpen]);
 
   const material = materials.find(item => item.key === contextKey);
-  const selectedSkillId = skillOverride || session?.active_skill || 'explain';
-  const selectedSkill = session?.skills?.find(item => item.id === selectedSkillId);
   // With no material chosen, Explain (or Auto) is a general chat answered from general knowledge.
   const general = !material && ['', 'none'].includes(contextKey);
+  // Auto keeps the skill the Tutor was last using, except one-time actions (organizing into a
+  // class): after one of those, Auto is Explain again, so the next question isn't asked for a class.
+  const autoSkill = general || ONE_TIME_SKILLS.includes(session?.active_skill) ? 'explain' : session?.active_skill || 'explain';
+  const selectedSkillId = skillOverride || autoSkill;
+  const selectedSkill = session?.skills?.find(item => item.id === selectedSkillId);
   const hasRequiredContext = (Boolean(material) && (material.kind !== 'browser' || Boolean(material.content))) || selectedSkill?.requires_context === false || (general && ['', 'explain'].includes(skillOverride));
   const needsTargetClass = selectedSkillId === 'organize';
   const canSubmit = hasRequiredContext && (!needsTargetClass || Boolean(targetClassId));
@@ -421,7 +425,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         ...(material?.kind === 'browser' && material.url ? { context_url: material.url } : {}),
         session_id: session.id,
         conversation_version: session.conversation_version,
-        skill: skillOverride || null,
+        skill: skillOverride || (autoSkill !== session.active_skill ? autoSkill : null),
         retain_context: retainContext || undefined,
         class_id: needsTargetClass ? targetClassId : material?.folder_id || undefined,
         mode: 'short',
@@ -512,7 +516,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         {/* Rendered only while Options is open: closed, these controls sat invisibly over "Ask anything". */}
         {optionsOpen && <>
         <TutorSelect label="Tutor skill" value={skillOverride} onChange={changeSkill} disabled={!session || busy} options={[
-          { value: '', label: `Auto · ${session?.skills?.find(item => item.id === session?.active_skill)?.label || 'Explain'}` },
+          { value: '', label: `Auto · ${session?.skills?.find(item => item.id === autoSkill)?.label || 'Explain'}` },
           // Only modes that work today are listed.
           ...(session?.skills || [{ id: 'explain', label: 'Explain' }]).filter(item => item.available !== false).map(item => ({ value: item.id, label: item.label })),
         ]} />
