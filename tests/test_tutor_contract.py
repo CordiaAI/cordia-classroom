@@ -57,6 +57,36 @@ class TutorContractTests(unittest.TestCase):
         self.assertEqual(response.json()["source"], {"type": "study_guide", "id": self.guide_id, "title": "Biology"})
         self.assertEqual(answer.call_args.kwargs["context"], "Q1: What is mitosis?\nA1: Cell division.")
 
+    def test_outline_edit_requests_are_told_apart_from_questions(self):
+        from routers.chat import _asks_to_edit_outline
+        for request in ["Fix the spelling of GihHub", "can you change GihHub to GitHub", "Add a section on Vercel to the outline",
+                        "please remove the third bullet", "correct the typo in point 2"]:
+            self.assertTrue(_asks_to_edit_outline(request), request)
+        for question in ["What does GitHub do?", "Explain how to fix a merge conflict", "how do I change my repository settings",
+                         "Make flashcards from my notes"]:
+            self.assertFalse(_asks_to_edit_outline(question), question)
+
+    @patch("routers.chat.learning_guidance", return_value="")
+    @patch("routers.chat.record")
+    @patch("routers.chat.require", return_value={"used": 0})
+    @patch("routers.chat.edit_outline", return_value={"notes": "## Tools\n- GitHub stores the files", "summary": "Fixed GihHub to GitHub."})
+    @patch("routers.chat.get_user_id", return_value="student-1")
+    def test_tutor_edits_the_outline_when_asked(self, _auth, edit, _usage, _record, _guidance):
+        db, table = self.guide_db()
+        table.update.return_value = table
+        table.execute.side_effect = [MagicMock(data=[{"id": self.guide_id, "title": "Biology", "folder_id": "f", "study_guide": "Q1: x\nA1: y",
+                                                      "notes": "## Tools\n- GihHub stores the files", "source_url": None}]), MagicMock(data=[{}])]
+        with patch("routers.chat.get_supabase", return_value=db):
+            response = self.client.post("/chat", headers={"Authorization": "Bearer test"},
+                                        json={"question": "Fix the spelling of GihHub", "content": "", "guide_id": self.guide_id})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["action"], "outline_updated")
+        self.assertEqual(body["guide"], {"id": self.guide_id})
+        self.assertIn("Fixed GihHub to GitHub.", body["answer"])
+        table.update.assert_called_once_with({"notes": "## Tools\n- GitHub stores the files"})
+        self.assertEqual(edit.call_args.args[0], "## Tools\n- GihHub stores the files")
+
     @patch("routers.chat.learning_guidance", return_value="")
     @patch("routers.chat.record")
     @patch("routers.chat.require", return_value={"used": 0})
