@@ -12,6 +12,7 @@ import { guideNotes, hasStudyNotes, isStudyGuideNotes, parseQAPairs, parseStudyN
 import useSessionTracker from '../../lib/useSessionTracker';
 import StudyAidPanel from '../../components/StudyAidPanel';
 import StudyDocument from '../../components/StudyDocument';
+import { OutlineSelectMenu, SectionVisuals, useGuideVisuals, useOutlineSelection } from '../../components/OutlineVisuals';
 import Menu from '../../components/Menu';
 import ClassChip from '../../components/ClassChip';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -96,6 +97,11 @@ export default function GuidePage() {
   const [loadError, setLoadError] = useState('');
   // Outline: the topic as an outline. By page: every question, 3 per page, to read through.
   const [view, setView] = useState('outline');
+  // Outline visuals: highlight -> Visualize draws beside that section; kept ones stay there.
+  const outlineRef = useRef(null);
+  const [outlineSelection, setOutlineSelection] = useOutlineSelection(outlineRef);
+  const [pendingVisual, setPendingVisual] = useState(null); // { key, section, text }
+  const guideVisuals = useGuideVisuals(id);
   // Every guide has outline notes: one without them gets them written the first time it opens.
   const [notesState, setNotesState] = useState('idle'); // idle | making | done
   const notesAsked = useRef('');
@@ -244,6 +250,12 @@ export default function GuidePage() {
     } else setToast(apiErrorMessage(data?.detail, 'Card not saved.'));
   }
 
+  function onOutlineAction(kind, picked) {
+    setOutlineSelection(null);
+    if (kind === 'visualize') setPendingVisual({ key: Date.now(), section: picked.section, text: picked.text });
+    else onSelection(kind, picked.text);
+  }
+
   function onSelection(kind, text) {
     if (kind === 'card') { setCardDraft(text); walkthroughEvent('make-card-open'); }
     else if (kind === 'explain') ask(id, `Explain this more simply: "${text}"`, true);
@@ -367,31 +379,61 @@ export default function GuidePage() {
       </div>
 
       {view === 'outline' ? (
-        <section className="c-card guide-notes" aria-label="Outline" aria-busy={notesState === 'making' && !notesWritten}>
+        <section ref={outlineRef} className="c-card guide-notes" aria-label="Outline" aria-busy={notesState === 'making' && !notesWritten}>
           {(notesState === 'making' || notesState === 'idle') && !notesWritten
             ? <SectionLoader height={160} label="Writing the outline" />
             : hasStudyNotes(notes) ? (
               <>
-                {notes.overview && <p className="guide-overview">{rich(notes.overview)}</p>}
-                {notes.sections.map((section, index) => (
-                  <div key={index} className="guide-outline-section">
-                    {section.heading && <h2 className="c-section-title"><span className="guide-outline-num">{index + 1}</span>{section.heading}</h2>}
-                    <ul className="c-study">
-                      {section.points.map((point, pointIndex) => (
-                        <li key={pointIndex}>
-                          {rich(point.text)}
-                          {point.sub.length > 0 && <ul className="guide-sub">{point.sub.map((item, itemIndex) => <li key={itemIndex}>{rich(item)}</li>)}</ul>}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-                {notes.keyPoints.length > 0 && (
-                  <div className="guide-key">
-                    <h2 className="c-section-title">Key points</h2>
-                    <ul className="c-study">{notes.keyPoints.map((point, index) => <li key={index}>{rich(point)}</li>)}</ul>
-                  </div>
-                )}
+                {[
+                  notes.overview && { key: 'overview', context: notes.overview, body: <p className="guide-overview">{rich(notes.overview)}</p> },
+                  ...notes.sections.map((section, index) => ({
+                    key: `s${index}:${section.heading || ''}`.slice(0, 500),
+                    context: [section.heading, ...section.points.flatMap(point => [point.text, ...point.sub])].filter(Boolean).join('\n'),
+                    body: (
+                      <>
+                        {section.heading && <h2 className="c-section-title"><span className="guide-outline-num">{index + 1}</span>{section.heading}</h2>}
+                        <ul className="c-study">
+                          {section.points.map((point, pointIndex) => (
+                            <li key={pointIndex}>
+                              {rich(point.text)}
+                              {point.sub.length > 0 && <ul className="guide-sub">{point.sub.map((item, itemIndex) => <li key={itemIndex}>{rich(item)}</li>)}</ul>}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    ),
+                  })),
+                  notes.keyPoints.length > 0 && {
+                    key: 'key',
+                    context: notes.keyPoints.join('\n'),
+                    body: (
+                      <div className="guide-key">
+                        <h2 className="c-section-title">Key points</h2>
+                        <ul className="c-study">{notes.keyPoints.map((point, index) => <li key={index}>{rich(point)}</li>)}</ul>
+                      </div>
+                    ),
+                  },
+                ].filter(Boolean).map(block => {
+                  const kept = guideVisuals.visuals.filter(visual => visual.section === block.key);
+                  const pending = pendingVisual?.section === block.key ? pendingVisual : null;
+                  const side = kept.length > 0 || pending;
+                  return (
+                    <div key={block.key} className={'guide-outline-section' + (side ? ' has-visual' : '')} data-outline-section={block.key}>
+                      <div className="guide-outline-body">{block.body}</div>
+                      {side && (
+                        <SectionVisuals
+                          kept={kept}
+                          pending={pending}
+                          context={[guide.title, block.context].filter(Boolean).join('\n\n')}
+                          onKeep={async visual => { setPendingVisual(null); await guideVisuals.keep(visual); setToast('Visual kept'); }}
+                          onCancel={() => setPendingVisual(null)}
+                          onRemove={guideVisuals.remove}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+                <OutlineSelectMenu selection={outlineSelection} onAction={onOutlineAction} />
               </>
             ) : <p className="c-meta">The outline appears here once it is written. The questions are in By page.</p>}
         </section>
@@ -447,6 +489,9 @@ export default function GuidePage() {
         .guide-notes :global(.c-section-title) { margin: 0; }
         .guide-notes { gap: 32px; }
         .guide-outline-section { display: grid; gap: 16px; }
+        .guide-outline-body { display: grid; gap: 16px; min-width: 0; }
+        .guide-outline-section.has-visual { grid-template-columns: minmax(0, 1fr) minmax(240px, 38%); gap: 24px; align-items: start; }
+        @media (max-width: 899px) { .guide-outline-section.has-visual { grid-template-columns: minmax(0, 1fr); } }
         .guide-notes ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
         .guide-notes .guide-sub { margin-top: 6px; gap: 4px; list-style: circle; color: var(--muted-ink); }
         .guide-notes :global(strong) { font-weight: 600; color: var(--ink); }
