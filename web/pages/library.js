@@ -287,7 +287,8 @@ export default function LibraryPage() {
             items={[
               { label: 'Rename', icon: Pencil, onSelect: () => setRenaming({ id: item.id, value: item.title }) },
               moveMenu(item),
-              { label: 'Delete', icon: Trash2, danger: true, onSelect: () => remove({ id: item.id, title: item.title }) },
+              // A guide moved in from an old note takes that note with it (pages/smartnotes.js).
+              { label: 'Delete', icon: Trash2, danger: true, onSelect: () => remove({ id: item.id, title: item.title, also: String(item.guide?.source_type || '').startsWith('note:') ? ['/smart_notes/' + item.guide.source_type.slice(5)] : [] }) },
             ]}
           />
         )}

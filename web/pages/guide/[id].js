@@ -260,7 +260,13 @@ export default function GuidePage() {
   }
 
   async function deleteGuide() {
-    await apiFetch('/guides/' + id, { method: 'DELETE' });
+    setConfirmDelete(false);
+    const data = await apiFetch('/guides/' + id, { method: 'DELETE' });
+    if (!data?.deleted) { setToast(apiErrorMessage(data?.detail, "That didn't delete. Try again.")); return; }
+    // A guide moved in from an old note (pages/smartnotes.js) takes that note with it, or the note
+    // would show in Library again and come back as a new guide when opened.
+    const noteId = String(guide?.source_type || '').startsWith('note:') ? guide.source_type.slice(5) : '';
+    if (noteId) await apiFetch('/smart_notes/' + noteId, { method: 'DELETE' });
     router.push('/library');
   }
 
