@@ -14,6 +14,7 @@ import { CalendarDays, Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2 } fr
 import BodyPortal from '../components/BodyPortal';
 import CanvasSettings from '../components/CanvasSettings';
 import SharingSettings from '../components/SharingSettings';
+import PhoneSettings from '../components/PhoneSettings';
 import { canvasStatus } from '../lib/canvas';
 
 export default function SettingsPage() {
@@ -77,7 +78,7 @@ export default function SettingsPage() {
     apiFetch('/auth/me').then(identity => {
       if (!identity?.user_id) return;
       cacheUserIdentity(identity);
-      setEmail(identity.email || '');
+      setEmail(identity.email || getUserEmail() || '');
       setProfileName(identity.name || '');
     });
     const saved = localStorage.getItem('theme') || 'light';
@@ -380,6 +381,7 @@ export default function SettingsPage() {
               </div>
               <button type="button" className="c-btn c-btn--secondary" onClick={() => { clearAuth(); router.push('/'); }}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" />Sign out</button>
             </div>
+            <PhoneSettings />
             <div className="c-card settings-row">
               <span className="settings-row-label"><Trash2 size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Delete account</span></span>
               <button type="button" className="c-btn c-btn--secondary settings-danger" onClick={() => setDeleting({ text: '', busy: false, error: '' })}>Delete account</button>

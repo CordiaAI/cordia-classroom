@@ -40,6 +40,13 @@ async function install(context, state) {
       if (req.method() === 'PUT') { const body = JSON.parse(req.postData() || '{}'); state.meta = { ...state.meta, ...(body.data || {}) }; }
       return route.fulfill({ json: { id: USER, user_metadata: state.meta } });
     }
+    if (url.includes('/otp')) { state.otp = JSON.parse(req.postData() || '{}'); return route.fulfill({ json: {} }); }
+    if (url.includes('/verify')) {
+      const body = JSON.parse(req.postData() || '{}');
+      state.verified = body;
+      if (body.token !== '123456') return route.fulfill({ status: 403, json: { code: 'otp_expired', msg: 'Token has expired or is invalid' } });
+      return route.fulfill({ json: { access_token: TOKEN, refresh_token: 'r2', token_type: 'bearer', expires_in: 3600, user: { id: USER, phone: (body.phone || '').replace('+', '') } } });
+    }
     if (url.includes('/signup')) return route.fulfill({ status: 422, json: { code: 'weak_password', msg: 'Password should contain at least one character of each: abcdefghijklmnopqrstuvwxyz, ABCDEFGHIJKLMNOPQRSTUVWXYZ, 0123456789, !@#$%^&*()_+-=[]{};\':"|<>?,./`~.' } });
     if (url.includes('/token')) return route.fulfill({ status: 400, json: { error: 'invalid_grant', error_description: 'Invalid login credentials' } });
     return route.fulfill({ json: {} });

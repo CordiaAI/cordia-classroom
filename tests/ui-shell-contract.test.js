@@ -42,7 +42,7 @@ assert.match(publicPage, /AcademicInfinityMark/);
 assert.match(install, /AcademicInfinityMark/);
 const classroomStyles = read('web', 'styles', 'classroom.css');
 // Both webfonts are self-hosted with swap and a Georgia fallback (never Times).
-assert.match(tokens, /--font-sans: 'Manrope'/);
+assert.match(tokens, /--font-sans: 'Quicksand'/);
 assert.match(tokens, /--font-display: 'Newsreader', Georgia, serif/);
 assert.match(tokens, /font-family: Newsreader; src: url\('\/fonts\/newsreader\.ttf'\)[^}]*font-display: swap/);
 assert.doesNotMatch(classroomStyles, /text-transform:\s*uppercase/);
