@@ -176,16 +176,30 @@ body { touch-action: manipulation; }
 .tutor-chat-row .c-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tutor-chats-btn[aria-pressed='true'] { background: var(--olive-tint) !important; color: var(--olive-ink) !important; }
 
-/* Settings › Connectors: one list like Cordia Assistant's Apps. */
-.cn-card { display: grid; gap: 12px; padding: 20px; }
+/* Settings › Connectors: tiles with brand marks, like Cordia Assistant's Connections.
+   Phones show one list with a line on what each app does. */
+.cn-card { display: grid; gap: 12px; padding: 24px; }
 .cn-card > .c-section-title, .cn-card > .c-meta { margin: 0; }
-.cn-list { margin: 0 -20px; }
-.cn-row { flex-wrap: wrap; padding-left: 20px; padding-right: 20px; }
-.cn-row:hover { background: transparent; }
-.cn-text { display: grid; gap: 2px; }
-.cn-row-title { font: 600 17px/1.35 var(--font-sans); color: var(--ink); }
-.cn-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-left: auto; }
-.cn-feed { display: grid; gap: 8px; padding: 0 20px 14px 52px; }
+.cn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 14px; margin: 8px 0 0; padding: 0; list-style: none; }
+.cn-grid li { display: grid; }
+.cn-tile { position: relative; display: grid; justify-items: center; align-content: start; gap: 12px; padding: 24px 14px 18px; border: 1px solid var(--lg-edge); border-radius: var(--r-card); background: var(--lg-sheen), var(--lg-fill); box-shadow: var(--lg-highlight), var(--lg-shadow); color: var(--ink); text-align: center; font: inherit; cursor: pointer; transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+.cn-tile:hover { transform: translateY(-2px); box-shadow: var(--lg-highlight), var(--shadow-float); }
+.cn-tile.is-soon { opacity: .62; }
+.cn-tile-text { display: grid; gap: 2px; min-width: 0; }
+.cn-name { font: 600 15px/1.3 var(--font-sans); color: var(--ink); }
+.cn-tag, .cn-chev { display: none; }
+.cn-badge { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--r-pill); border: 1px solid var(--hairline); color: var(--muted); font: 600 13px/1 var(--font-sans); }
+.cn-badge.is-on { border-color: transparent; background: var(--success-bg); color: var(--success); }
+.cn-icon { display: grid; place-items: center; flex: none; width: 56px; height: 56px; border-radius: 17px; color: var(--ink); background: var(--lg-sheen), var(--lg-fill-strong); box-shadow: var(--lg-highlight), 0 0 0 1px var(--hairline), var(--lg-shadow); }
+.cn-icon svg { width: 28px; height: 28px; }
+.cn-icon.is-lg { width: 72px; height: 72px; border-radius: 22px; }
+.cn-icon.is-lg svg { width: 36px; height: 36px; }
+.cn-detail { position: relative; width: min(440px, 100%); display: grid; justify-items: center; gap: 12px; padding-top: 32px; text-align: center; }
+.cn-detail .c-section-title { margin: 0; }
+.cn-close { position: absolute; top: 12px; right: 12px; }
+.cn-detail-text { margin: 0; color: var(--ink); font: 500 15px/1.55 var(--font-sans); }
+.cn-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
+.cn-feed { display: grid; gap: 8px; width: 100%; text-align: left; }
 .cn-feed .c-meta { margin: 0; }
 .cn-feed-row { display: flex; gap: 8px; }
 .cn-feed-row .c-input { flex: 1 1 auto; min-width: 0; }
@@ -198,8 +212,20 @@ body { touch-action: manipulation; }
 .cn-results { overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--hairline); border-radius: var(--r-row); }
 .cn-result { width: 100%; border-left: 0; border-right: 0; border-bottom: 0; background: transparent; text-align: left; font: inherit; cursor: pointer; }
 .cn-result .c-grow { display: grid; gap: 2px; }
+.cn-row-title { font: 600 17px/1.35 var(--font-sans); color: var(--ink); }
 .cn-sheet > .c-meta { margin: 0; }
-@media (max-width: 560px) { .cn-actions { width: 100%; justify-content: flex-start; padding-left: 32px; } .cn-feed { padding-left: 20px; } }
+@media (max-width: 560px) {
+  .cn-card { padding: 20px 16px; }
+  .cn-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .cn-grid li + li { border-top: 1px solid var(--hairline); }
+  .cn-tile { display: flex; align-items: center; gap: 12px; padding: 10px 0; text-align: left; border: 0; border-radius: 0; background: none; box-shadow: none; }
+  .cn-tile:hover { transform: none; box-shadow: none; }
+  .cn-tile .cn-icon { width: 42px; height: 42px; border-radius: 12px; }
+  .cn-tile .cn-icon svg { width: 22px; height: 22px; }
+  .cn-tile-text { flex: 1 1 auto; }
+  .cn-tag { display: block; overflow: hidden; color: var(--muted); font: 500 13px/1.35 var(--font-sans); white-space: nowrap; text-overflow: ellipsis; }
+  .cn-chev { display: block; flex: none; color: var(--muted); }
+}
 
 /* Quiz answers: green for right, red for wrong. The glass recipe above outranks the state
    rules in system.css (its list holds a two-class selector), and the hover edge is
