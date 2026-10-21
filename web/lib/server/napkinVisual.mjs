@@ -219,7 +219,8 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
         if (!response.ok) continue;
         const clean = cleanSvg(await response.text());
         if (!clean) continue;
-        const url = await store(key, index, clean);
+        // Without the "visuals" bucket (migration not run) the drawing is still shown, inline.
+        const url = await store(key, index, clean).catch(() => `data:image/svg+xml;base64,${Buffer.from(clean).toString('base64')}`);
         visuals.push({ url, width: file.width || null, height: file.height || null });
       } catch { /* skip this variation */ }
     }

@@ -53,3 +53,11 @@ test('before the migration runs, answers stored: false so the browser keeps them
   const out = await createGuideVisualsService({ env, fetch }).list({ authorization: 'Bearer t', guideId: GUIDE });
   assert.deepEqual(out.body, { stored: false });
 });
+
+test('before the visuals bucket exists, the drawing itself (inline SVG) can be kept', async () => {
+  const { fetch } = fakeFetch();
+  const service = createGuideVisualsService({ env, fetch });
+  const inline = 'data:image/svg+xml;base64,' + Buffer.from('<svg/>').toString('base64');
+  assert.equal((await service.keep({ authorization: 'Bearer t', guideId: GUIDE, anchor: 'Uses ATP', url: inline })).body.visual.url, inline);
+  assert.equal((await service.keep({ authorization: 'Bearer t', guideId: GUIDE, url: 'data:text/html;base64,PHNjcmlwdD4=' })).httpStatus, 400);
+});

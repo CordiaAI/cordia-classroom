@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
-import MermaidDiagram from './MermaidDiagram';
 import NapkinVisual from './NapkinVisual';
 import ExplanationPreference from './ExplanationPreference';
 import { ArrowUp, BookOpen, Layers, MessageCircle, MessagesSquare, Paperclip, PencilRuler, Plus, SlidersHorizontal, X as CloseIcon } from 'lucide-react';
@@ -13,13 +12,13 @@ import { inlineParts, parseTutorAnswer } from '../lib/tutorFormat.mjs';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 
 // Tutor replies may include ```mermaid blocks; render them as diagrams and keep the rest as text.
-// A diagram can become a Napkin visual of the reply's explanation (the diagram stays as fallback).
+// A reply's diagram is drawn by Napkin from the reply's explanation.
 function TutorMessageText({ text, plain = false }) {
   if (plain) return <span className="cordia-tutor-text">{text}</span>;
   const parts = String(text || '').split(/```mermaid\s*\n([\s\S]*?)```/);
   const explanation = speakableText(text).slice(0, 2000);
   return parts.map((part, index) => (index % 2 === 1
-    ? <NapkinVisual key={index} text={explanation} name="tutor-visual" fallback={() => <MermaidDiagram code={part.trim()} label="Tutor diagram" />} />
+    ? <NapkinVisual key={index} text={explanation} name="tutor-visual" />
     : part.trim() && <TutorAnswer key={index} text={part} />));
 }
 
@@ -670,6 +669,15 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         )}
       </div>
       {remaining <= 3 && <small className="c-meta cordia-tutor-limit">{Math.max(remaining, 0)} left</small>}
+      {input.trim() && !(canSubmit && !busy && remaining > 0 && session) && (
+        <small className="c-meta cordia-tutor-limit" role="status">
+          {!session ? "Connecting to the Tutor… If this stays, refresh the page."
+            : busy ? 'Cordia is still answering your last message.'
+              : remaining <= 0 ? 'This chat is full. Start a new chat in Chats.'
+                : needsTargetClass ? 'Pick the class to put it in.'
+                  : 'Pick a guide or attach a file above.'}
+        </small>
+      )}
     </section>
   );
 }

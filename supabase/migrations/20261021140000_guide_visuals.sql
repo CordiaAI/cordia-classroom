@@ -2,9 +2,9 @@
 -- 20261016130000_napkin_visuals.sql).
 --
 -- Highlight text in the Outline -> Visualize -> three Napkin versions appear beside it -> the one
--- the student keeps is saved here and shows beside that section every time the guide opens.
--- The images themselves are already in the public "visuals" bucket; this only records which one
--- sits where. Only the web server (service role) reads or writes it, after checking through the
+-- the student keeps is saved here and shows beside that line every time the guide opens.
+-- The images themselves are in the public "visuals" bucket (or, if that bucket doesn't exist
+-- yet, the SVG inline as a data URL); this records which one sits where. Only the web server (service role) reads or writes it, after checking through the
 -- Classroom API that the guide is the student's own. Until this runs, kept visuals are saved in
 -- the browser instead.
 
@@ -14,7 +14,7 @@ create table if not exists public.guide_visuals (
   guide_id uuid not null references public.study_guides (id) on delete cascade,
   section text not null default '' check (char_length(section) <= 500),
   anchor text not null default '' check (char_length(anchor) <= 600),
-  url text not null check (char_length(url) <= 1000),
+  url text not null check (char_length(url) <= 1500000),
   alt text not null default '' check (char_length(alt) <= 500),
   theme text not null default 'light' check (theme in ('light', 'dark')),
   created_at timestamptz not null default now()

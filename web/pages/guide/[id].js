@@ -12,7 +12,8 @@ import { guideNotes, hasStudyNotes, isStudyGuideNotes, parseQAPairs, parseStudyN
 import useSessionTracker from '../../lib/useSessionTracker';
 import StudyAidPanel from '../../components/StudyAidPanel';
 import StudyDocument from '../../components/StudyDocument';
-import { OutlineSelectMenu, SectionVisuals, useGuideVisuals, useOutlineSelection } from '../../components/OutlineVisuals';
+import OutlineEditor from '../../components/OutlineEditor';
+import { newRequestId } from '../../lib/guideCreate';
 import Menu from '../../components/Menu';
 import ClassChip from '../../components/ClassChip';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -97,11 +98,9 @@ export default function GuidePage() {
   const [loadError, setLoadError] = useState('');
   // Outline: the topic as an outline. By page: every question, 3 per page, to read through.
   const [view, setView] = useState('outline');
-  // Outline visuals: highlight -> Visualize draws beside that section; kept ones stay there.
-  const outlineRef = useRef(null);
-  const [outlineSelection, setOutlineSelection] = useOutlineSelection(outlineRef);
-  const [pendingVisual, setPendingVisual] = useState(null); // { key, section, text }
-  const guideVisuals = useGuideVisuals(id);
+  // The Outline is also where the student's notes live; bumping this refills it after a rewrite.
+  const [notesVersion, setNotesVersion] = useState(0);
+  const [making, setMaking] = useState(''); // '' | 'outline' | 'cards'
   // Every guide has outline notes: one without them gets them written the first time it opens.
   const [notesState, setNotesState] = useState('idle'); // idle | making | done
   const notesAsked = useRef('');
@@ -152,12 +151,13 @@ export default function GuidePage() {
 
   // A guide without outline notes gets them written (once per visit); a loader shows meanwhile.
   useEffect(() => {
-    if (!guide?.id || notesAsked.current === guide.id || isStudyGuideNotes(guide.notes)) return;
+    // Only guides made from material; a guide that is the student's own notes is never rewritten.
+    if (!guide?.id || notesAsked.current === guide.id || isStudyGuideNotes(guide.notes) || !String(guide.study_guide || '').trim()) return;
     notesAsked.current = guide.id;
     setNotesState('making');
     fetch('/api/guide-notes', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ guide_id: guide.id }) })
       .then(response => (response.ok ? response.json() : null))
-      .then(data => { if (data?.notes) setGuide(current => (current && current.id === guide.id ? { ...current, notes: data.notes } : current)); })
+      .then(data => { if (data?.notes) { setGuide(current => (current && current.id === guide.id ? { ...current, notes: data.notes } : current)); setNotesVersion(value => value + 1); } })
       .catch(() => {})
       .finally(() => setNotesState('done'));
   }, [guide?.id]);
@@ -250,10 +250,31 @@ export default function GuidePage() {
     } else setToast(apiErrorMessage(data?.detail, 'Card not saved.'));
   }
 
-  function onOutlineAction(kind, picked) {
-    setOutlineSelection(null);
-    if (kind === 'visualize') setPendingVisual({ key: Date.now(), section: picked.section, text: picked.text });
-    else onSelection(kind, picked.text);
+  // Notes the student typed (or any outline) rewritten as a tidy outline; their words are the source.
+  async function tidyOutline() {
+    setMaking('outline');
+    const data = await fetch('/api/guide-notes', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ guide_id: guide.id, force: true }) })
+      .then(response => (response.ok ? response.json() : null)).catch(() => null);
+    setMaking('');
+    if (data?.notes) { setGuide(current => ({ ...current, notes: data.notes })); setNotesVersion(value => value + 1); setToast('Outline written'); }
+    else setToast(data?.reason === 'empty' ? 'Write a few more notes first' : "The outline wasn't written. Try again.");
+  }
+
+  // Flashcards and a quiz from the notes, for a guide that started as the student's own notes.
+  async function makeStudySet() {
+    const source = String(guide.notes || '').replace(/^(>|##|\s*-)\s?/gm, '').trim();
+    if (source.length < 40) { setToast('Write a few more notes first'); return; }
+    setMaking('cards');
+    const generated = await apiFetch('/generate', { method: 'POST', body: JSON.stringify({ content: source, notes: false, study_guide: true, flashcards: true, request_id: newRequestId() }) });
+    if (!generated?.study_guide || generated.study_guide.startsWith('[Error')) {
+      setMaking('');
+      setToast(apiErrorMessage(generated?.detail, "Cards and quiz weren't made. Try again."));
+      return;
+    }
+    const data = await apiFetch('/guides/' + guide.id, { method: 'PATCH', body: JSON.stringify({ title: guide.title, study_guide: generated.study_guide, flashcards: generated.flashcards || [] }) });
+    setMaking('');
+    if (data?.guide) { setGuide(current => ({ ...current, study_guide: data.guide.study_guide, flashcards: data.guide.flashcards })); setToast('Flashcards and quiz ready'); }
+    else setToast("Cards and quiz weren't saved. Try again.");
   }
 
   function onSelection(kind, text) {
@@ -279,17 +300,20 @@ export default function GuidePage() {
   const notes = guideNotes(guide);
   const notesWritten = hasStudyNotes(parseStudyNotes(guide.notes));
   const cardCount = guide.flashcards?.length || 0;
+  // A guide with no material is the student's own notes until they make cards and a quiz from it.
+  const hasMaterial = Boolean(String(guide.study_guide || '').trim());
   const sourceTitle = guide.source_title || (guide.source_url ? 'Source' : '');
   const externalSourceUrl = /^https?:\/\//i.test(guide.source_url || '') ? guide.source_url : '';
   const sourceHref = externalSourceUrl
-    || (guide.source_type === 'smartnote' && guide.source_id ? `/smartnotes?id=${guide.source_id}` : '')
     || (guide.source_type === 'study_guide' && guide.source_id ? `/guide/${guide.source_id}` : '');
   const explainWithAid = Boolean(learningStyle?.enabled);
   const tabs = [
     { key: 'outline', label: 'Outline', icon: NotebookText, view: true },
-    { key: 'flashcards', label: 'Flashcards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: cardCount, spot: 'cards-pill', event: 'cards-opened' },
-    { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill' },
-    { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id },
+    ...(hasMaterial ? [
+      { key: 'flashcards', label: 'Flashcards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: cardCount, spot: 'cards-pill', event: 'cards-opened' },
+      { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill' },
+      { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id },
+    ] : []),
     ...(nursing ? [{ key: 'nclex', label: 'NCLEX', icon: Stethoscope, href: '/nclex/' + id }] : []),
   ];
   const shareable = sharing?.class && !sharing.linked;
@@ -373,70 +397,25 @@ export default function GuidePage() {
         </button>
       </div>
 
-      <div className="c-seg guide-view" role="tablist" aria-label="Outline view">
+      {hasMaterial && <div className="c-seg guide-view" role="tablist" aria-label="Outline view">
         <button type="button" role="tab" aria-selected={view === 'outline'} className={view === 'outline' ? 'is-active' : ''} onClick={() => setView('outline')}>Outline</button>
         <button type="button" role="tab" aria-selected={view === 'pages'} className={view === 'pages' ? 'is-active' : ''} onClick={() => setView('pages')}>By page</button>
-      </div>
+      </div>}
 
-      {view === 'outline' ? (
-        <section ref={outlineRef} className="c-card guide-notes" aria-label="Outline" aria-busy={notesState === 'making' && !notesWritten}>
-          {(notesState === 'making' || notesState === 'idle') && !notesWritten
+      {view === 'outline' || !hasMaterial ? (
+        <section className="c-card guide-notes" aria-label="Outline" aria-busy={notesState === 'making' && !notesWritten}>
+          {!hasMaterial && (
+            <div className="guide-make">
+              <p className="c-meta">Your notes. Turn them into a tidy outline, or into flashcards and a quiz, whenever you're ready.</p>
+              <div className="c-row c-row--wrap">
+                <button type="button" className="c-btn c-btn--secondary c-btn--sm" disabled={Boolean(making)} onClick={tidyOutline}>{making === 'outline' ? 'Writing the outline…' : 'Make it an outline'}</button>
+                <button type="button" className="c-btn c-btn--primary c-btn--sm" disabled={Boolean(making)} onClick={makeStudySet}>{making === 'cards' ? 'Making cards and quiz…' : 'Make flashcards and quiz'}</button>
+              </div>
+            </div>
+          )}
+          {notesState === 'making' && !notesWritten
             ? <SectionLoader height={160} label="Writing the outline" />
-            : hasStudyNotes(notes) ? (
-              <>
-                {[
-                  notes.overview && { key: 'overview', context: notes.overview, body: <p className="guide-overview">{rich(notes.overview)}</p> },
-                  ...notes.sections.map((section, index) => ({
-                    key: `s${index}:${section.heading || ''}`.slice(0, 500),
-                    context: [section.heading, ...section.points.flatMap(point => [point.text, ...point.sub])].filter(Boolean).join('\n'),
-                    body: (
-                      <>
-                        {section.heading && <h2 className="c-section-title"><span className="guide-outline-num">{index + 1}</span>{section.heading}</h2>}
-                        <ul className="c-study">
-                          {section.points.map((point, pointIndex) => (
-                            <li key={pointIndex}>
-                              {rich(point.text)}
-                              {point.sub.length > 0 && <ul className="guide-sub">{point.sub.map((item, itemIndex) => <li key={itemIndex}>{rich(item)}</li>)}</ul>}
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    ),
-                  })),
-                  notes.keyPoints.length > 0 && {
-                    key: 'key',
-                    context: notes.keyPoints.join('\n'),
-                    body: (
-                      <div className="guide-key">
-                        <h2 className="c-section-title">Key points</h2>
-                        <ul className="c-study">{notes.keyPoints.map((point, index) => <li key={index}>{rich(point)}</li>)}</ul>
-                      </div>
-                    ),
-                  },
-                ].filter(Boolean).map(block => {
-                  const kept = guideVisuals.visuals.filter(visual => visual.section === block.key);
-                  const pending = pendingVisual?.section === block.key ? pendingVisual : null;
-                  const side = kept.length > 0 || pending;
-                  return (
-                    <div key={block.key} className={'guide-outline-section' + (side ? ' has-visual' : '')} data-outline-section={block.key}>
-                      <div className="guide-outline-body">{block.body}</div>
-                      {side && (
-                        <SectionVisuals
-                          kept={kept}
-                          pending={pending}
-                          section={block.context}
-                          context={guide.title}
-                          onKeep={async visual => { setPendingVisual(null); await guideVisuals.keep(visual); setToast('Visual kept'); }}
-                          onCancel={() => setPendingVisual(null)}
-                          onRemove={guideVisuals.remove}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-                <OutlineSelectMenu selection={outlineSelection} onAction={onOutlineAction} />
-              </>
-            ) : <p className="c-meta">The outline appears here once it is written. The questions are in By page.</p>}
+            : <OutlineEditor guide={guide} version={notesVersion} onSaved={saved => setGuide(current => ({ ...current, notes: saved }))} onAction={onSelection} placeholder={hasMaterial ? 'Add your own notes anywhere…' : 'Type your notes… Use Heading for a new topic and Bullet for points.'} />}
         </section>
       ) : (
         <>
@@ -497,6 +476,8 @@ export default function GuidePage() {
         .guide-notes .guide-sub { margin-top: 6px; gap: 4px; list-style: circle; color: var(--muted-ink); }
         .guide-notes :global(strong) { font-weight: 600; color: var(--ink); }
         .guide-overview { margin: 0; padding-bottom: 24px; border-bottom: 1px solid var(--line); font: 400 var(--fs-20)/1.5 var(--font-sans); color: var(--ink); }
+        .guide-make { display: grid; gap: 10px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+        .guide-make p { margin: 0; }
         .guide-outline-num { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 10px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 var(--fs-13)/1 var(--font-sans); vertical-align: 3px; }
         .guide-key { display: grid; gap: 16px; padding: 24px 28px; border-radius: 16px; background: var(--olive-tint); }
         @media (max-width: 767px) {

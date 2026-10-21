@@ -151,7 +151,7 @@ function VisualAid({ guideId, number, cache, section }) {
                 text={sectionText(section)}
                 context={[section.guideTitle, sectionText(section.before), sectionText(section.after)].filter(Boolean).join('\n\n')}
                 name={`visual-${number}`}
-                fallback={() => <MermaidDiagram code={data.mermaid} label={data.caption || 'Concept diagram'} />}
+                auto
               />
             )}
           {practice ? (
