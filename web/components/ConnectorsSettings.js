@@ -1,14 +1,35 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { CalendarDays, Copy, FileText, FolderOpen, HardDrive, ListChecks, NotebookPen, Search } from 'lucide-react';
+import { ChevronRight, Copy, Search, X } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import ConfirmDialog from './ConfirmDialog';
 import { SectionLoader } from './CordiaLoader';
 import { apiFetch } from '../lib/api';
+import { canvasStatus, displayDate } from '../lib/canvas';
+import CanvasConnectSheet from './CanvasConnectSheet';
+import CanvasCourseList from './CanvasCourseList';
+import { BRAND_PATHS } from '../lib/brandIcons';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
-// One icon set (Lucide), as in Cordia Assistant: apps show what they do, not their brand marks.
-const APP_ICONS = { gcal: CalendarDays, apple_calendar: CalendarDays, gtasks: ListChecks, gdrive: HardDrive, gdocs: FileText, notion: NotebookPen };
+// What each app does here, shown in its sheet.
+const DETAILS = {
+  canvas: 'Brings in your classes, deadlines, what you turned in, grades and course files. An access token does all of it; a calendar link is only for schools that block tokens.',
+  gcal: 'Adds each upcoming deadline to your Google Calendar as a 30-minute event ending when it is due. Run it again any time: deadlines already there are skipped.',
+  apple_calendar: 'Subscribes your Apple Calendar to your deadlines. It refreshes every hour on your iPhone, iPad and Mac. No Apple password needed.',
+  gtasks: 'Adds each upcoming deadline to Google Tasks as a to-do due that day. To-dos already there are skipped.',
+  gdrive: 'Find a PDF, Word, PowerPoint or Google Doc in your Drive and open it in Create, ready to make a guide.',
+  gdocs: 'Find a Google Doc and open its text in Create, ready to make a guide.',
+  notion: 'Find a Notion page and open it in Create, ready to make a guide. Share the page with Cordia in Notion first.',
+};
+
+// The app's logo on a rounded glass tile, like Cordia Assistant. Decorative: the name is beside it.
+function ConnectorIcon({ id, size = 'md' }) {
+  return (
+    <span className={`cn-icon is-${size}`} aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d={BRAND_PATHS[id] || ''} /></svg>
+    </span>
+  );
+}
 const IMPORTS = ['gdrive', 'gdocs', 'notion'];
 // Create reads this draft, so an import opens there ready to make a guide.
 const SOURCE_DRAFT_KEY = 'autostudy_text_draft';
@@ -89,6 +110,60 @@ export default function ConnectorsSettings() {
   const [importing, setImporting] = useState(null);
   const [removing, setRemoving] = useState(null);
   const [feed, setFeed] = useState('');
+  const [open, setOpen] = useState(null);
+  const [canvas, setCanvas] = useState(undefined);
+  const [canvasConnecting, setCanvasConnecting] = useState(false);
+  const [showClasses, setShowClasses] = useState(false);
+  const [canvasRemoving, setCanvasRemoving] = useState(false);
+
+  // Canvas connects through Classroom's own Canvas flow, unlike the other apps: an access token, or a
+  // calendar link where the school blocks tokens. Its tile shows which one is in.
+  async function loadCanvas() {
+    const [status, calendar] = await Promise.all([canvasStatus(), apiFetch('/calendar/connection')]);
+    setCanvas(status ? { status, feed: Boolean(calendar?.connected) && calendar?.source !== 'canvas' } : null);
+  }
+  useEffect(() => { loadCanvas(); }, []);
+  const school = () => (typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : '');
+
+  async function syncCanvas() {
+    setBusy('canvas'); setError('');
+    const data = await apiFetch('/canvas/sync', { method: 'POST' });
+    setBusy('');
+    if (data && 'connected' in data) { setCanvas(current => ({ ...current, status: data })); say('Canvas synced'); }
+    else fail(data?.detail || "Canvas couldn't be reached. Try again.");
+  }
+
+  async function disconnectCanvas() {
+    setCanvasRemoving(false);
+    setBusy('canvas');
+    const data = await apiFetch('/canvas', { method: 'DELETE' });
+    setBusy('');
+    if (data && 'connected' in data) {
+      await loadCanvas();
+      say(data.settings_url ? 'Canvas disconnected. Delete the token in Canvas too: Account › Settings › Approved Integrations.' : 'Canvas disconnected');
+    } else fail(data?.detail || "That didn't disconnect. Try again.");
+  }
+
+  function canvasActions() {
+    const { status, feed } = canvas;
+    const working = busy === 'canvas';
+    if (status.status === 'needs_reconnect') return <button type="button" className="c-btn c-btn--primary" onClick={() => setCanvasConnecting(true)}>Reconnect</button>;
+    if (!status.connected) {
+      return <button type="button" className="c-btn c-btn--primary" onClick={() => setCanvasConnecting(true)}>{feed ? 'Add access token' : 'Connect'}</button>;
+    }
+    return (
+      <>
+        <button type="button" className="c-btn c-btn--primary" disabled={working} onClick={syncCanvas}>{working ? 'Syncing…' : 'Sync now'}</button>
+        <button type="button" className="c-btn c-btn--secondary" onClick={() => setShowClasses(value => !value)} aria-expanded={showClasses}>Classes</button>
+        <button type="button" className="c-btn c-btn--quiet" disabled={working} onClick={() => setCanvasRemoving(true)}>Disconnect</button>
+      </>
+    );
+  }
+
+  const canvasBadge = !canvas ? null
+    : canvas.status.status === 'needs_reconnect' ? { text: 'Reconnect', cls: 'is-warn' }
+      : canvas.status.connected ? { text: 'Connected', cls: 'is-on' }
+        : canvas.feed ? { text: 'Calendar link', cls: 'is-on' } : null;
 
   async function load() {
     const data = await apiFetch('/connectors');
@@ -152,59 +227,136 @@ export default function ConnectorsSettings() {
   function actions(connector) {
     const working = busy === connector.id;
     if (connector.id === 'apple_calendar') {
-      return <button type="button" className="c-btn c-btn--secondary c-btn--sm" disabled={working} onClick={() => subscribe(connector)}>{working ? 'Opening…' : 'Subscribe'}</button>;
+      return <button type="button" className="c-btn c-btn--primary" disabled={working} onClick={() => subscribe(connector)}>{working ? 'Opening…' : 'Subscribe'}</button>;
     }
     if (!connector.available) return <span className="c-meta">Coming soon</span>;
     if (!connector.connected) {
-      return <button type="button" className="c-btn c-btn--secondary c-btn--sm" disabled={working} onClick={() => connect(connector)}>{working ? 'Opening…' : 'Connect'}</button>;
+      return <button type="button" className="c-btn c-btn--primary" disabled={working} onClick={() => connect(connector)}>{working ? 'Opening…' : 'Connect'}</button>;
     }
     return (
       <>
         {['gcal', 'gtasks'].includes(connector.id) && (
-          <button type="button" className="c-btn c-btn--primary c-btn--sm" disabled={working} onClick={() => sendDeadlines(connector)}>{working ? 'Adding…' : connector.id === 'gcal' ? 'Add deadlines' : 'Add to-dos'}</button>
+          <button type="button" className="c-btn c-btn--primary" disabled={working} onClick={() => sendDeadlines(connector)}>{working ? 'Adding…' : connector.id === 'gcal' ? 'Add deadlines' : 'Add to-dos'}</button>
         )}
         {IMPORTS.includes(connector.id) && (
-          <button type="button" className="c-btn c-btn--primary c-btn--sm" disabled={working} onClick={() => setImporting(connector)}>Import</button>
+          <button type="button" className="c-btn c-btn--primary" disabled={working} onClick={() => { setOpen(null); setImporting(connector); }}>Import</button>
         )}
-        <button type="button" className="c-btn c-btn--quiet c-btn--sm" disabled={working} onClick={() => setRemoving(connector)}>Disconnect</button>
+        <button type="button" className="c-btn c-btn--quiet" disabled={working} onClick={() => { setOpen(null); setRemoving(connector); }}>Disconnect</button>
       </>
     );
   }
 
+  const active = open && open !== 'canvas' && connectors?.find(item => item.id === open);
   return (
     <div className="c-card cn-card">
-      <h2 className="c-section-title">Connectors</h2>
-      <p className="c-meta">Send your deadlines to your calendar and to-dos, and bring notes in to make guides. Apps you connect here work in Cordia Assistant too.</p>
+      <h2 className="c-section-title">Connect your apps</h2>
+      <p className="c-meta">Tap one to see what it does and how to connect it. Apps you connect here work in Cordia Assistant too.</p>
       {connectors === null ? <SectionLoader label="Loading connectors" /> : (
-        <div className="c-list cn-list">
+        <ul className="cn-grid">
+          {canvas && (
+            <li>
+              <button type="button" className="cn-tile" onClick={() => { setOpen('canvas'); setShowClasses(false); setError(''); setNotice(''); }}>
+                <ConnectorIcon id="canvas" />
+                <span className="cn-tile-text">
+                  <span className="cn-name">Canvas</span>
+                  <span className="cn-tag">{canvas.status.connected ? canvas.status.domain : 'Bring in your classes and deadlines.'}</span>
+                </span>
+                {canvasBadge && <span className={`cn-badge ${canvasBadge.cls}`}>{canvasBadge.text}</span>}
+                <ChevronRight className="cn-chev" size={18} strokeWidth={1.75} aria-hidden="true" />
+              </button>
+            </li>
+          )}
           {connectors.map(connector => {
-            const Icon = APP_ICONS[connector.id] || FolderOpen;
+            const soon = connector.id !== 'apple_calendar' && !connector.available;
             return (
-              <div key={connector.id} className="cn-app">
-                <div className="c-list-row cn-row">
-                  <Icon {...ICON} />
-                  <span className="c-grow cn-text">
-                    <strong className="cn-row-title">{connector.name}</strong>
-                    <span className="c-meta">{connector.connected ? 'Connected' : connector.tagline}</span>
+              <li key={connector.id}>
+                <button type="button" className={'cn-tile' + (soon ? ' is-soon' : '')} onClick={() => { setOpen(connector.id); setError(''); setNotice(''); }}>
+                  <ConnectorIcon id={connector.id} />
+                  <span className="cn-tile-text">
+                    <span className="cn-name">{connector.name}</span>
+                    <span className="cn-tag">{connector.tagline}</span>
                   </span>
-                  <span className="cn-actions">{actions(connector)}</span>
-                </div>
-                {connector.id === 'apple_calendar' && feed && (
-                  <div className="cn-feed">
-                    <p className="c-meta">If Calendar didn't open, add this link in Calendar → File → New Calendar Subscription, or on iPhone in Settings → Calendar → Accounts → Add Subscribed Calendar.</p>
-                    <div className="cn-feed-row">
-                      <input className="c-input" readOnly value={feed} aria-label="Calendar link" onFocus={event => event.target.select()} />
-                      <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={copyFeed}><Copy {...ICON} />Copy</button>
-                    </div>
-                  </div>
-                )}
-              </div>
+                  {connector.connected && <span className="cn-badge is-on">Connected</span>}
+                  {soon && <span className="cn-badge">Soon</span>}
+                  <ChevronRight className="cn-chev" size={18} strokeWidth={1.75} aria-hidden="true" />
+                </button>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
-      {notice && <p className="cn-notice" role="status">{notice}</p>}
-      {error && <p className="cn-error" role="alert">{error}</p>}
+      {!open && notice && <p className="cn-notice" role="status">{notice}</p>}
+      {!open && error && <p className="cn-error" role="alert">{error}</p>}
+      {open === 'canvas' && canvas && (
+        <BodyPortal>
+          <div className="c-scrim" onClick={() => { setOpen(null); loadCanvas(); }}>
+            <div className="c-sheet cn-detail is-canvas" role="dialog" aria-modal="true" aria-labelledby="cn-canvas-title" onClick={event => event.stopPropagation()}>
+              <button type="button" className="c-icon-btn cn-close" onClick={() => { setOpen(null); loadCanvas(); }} aria-label="Close"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+              <ConnectorIcon id="canvas" size="lg" />
+              <h2 id="cn-canvas-title" className="c-section-title">Canvas</h2>
+              {canvasBadge && <span className={`cn-badge ${canvasBadge.cls}`}>{canvasBadge.text}</span>}
+              <p className="cn-detail-text">{DETAILS.canvas}</p>
+              {canvas.status.connected && (
+                <p className="c-meta cn-canvas-meta">{canvas.status.domain} · •••• {canvas.status.last4}{canvas.status.expires_at ? ` · Expires ${displayDate(canvas.status.expires_at)}` : ''}</p>
+              )}
+              {canvas.feed && !canvas.status.connected && <p className="c-meta">Your deadlines come from a calendar link. An access token also brings what you turned in, grades and course files.</p>}
+              <div className="cn-actions">{canvasActions()}</div>
+              {showClasses && canvas.status.connected && (
+                <div className="cn-canvas-classes">
+                  <CanvasCourseList courses={canvas.status.courses} onChange={next => setCanvas(current => ({ ...current, status: next }))} />
+                </div>
+              )}
+              {!canvas.status.connected && !canvas.feed && (
+                <p className="c-meta">School blocks access tokens? Use a calendar link instead: on the Canvas page, open Calendar.</p>
+              )}
+              {notice && <p className="cn-notice" role="status">{notice}</p>}
+              {error && <p className="cn-error" role="alert">{error}</p>}
+            </div>
+          </div>
+        </BodyPortal>
+      )}
+      {active && (
+        <BodyPortal>
+          <div className="c-scrim" onClick={() => setOpen(null)}>
+            <div className="c-sheet cn-detail" role="dialog" aria-modal="true" aria-labelledby="cn-detail-title" onClick={event => event.stopPropagation()}>
+              <button type="button" className="c-icon-btn cn-close" onClick={() => setOpen(null)} aria-label="Close"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+              <ConnectorIcon id={active.id} size="lg" />
+              <h2 id="cn-detail-title" className="c-section-title">{active.name}</h2>
+              {active.connected && <span className="cn-badge is-on">Connected</span>}
+              <p className="cn-detail-text">{DETAILS[active.id]}</p>
+              <div className="cn-actions">{actions(active)}</div>
+              {active.id === 'apple_calendar' && feed && (
+                <div className="cn-feed">
+                  <p className="c-meta">If Calendar didn't open, add this link in Calendar → File → New Calendar Subscription, or on iPhone in Settings → Calendar → Accounts → Add Subscribed Calendar.</p>
+                  <div className="cn-feed-row">
+                    <input className="c-input" readOnly value={feed} aria-label="Calendar link" onFocus={event => event.target.select()} />
+                    <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={copyFeed}><Copy size={18} strokeWidth={1.75} aria-hidden="true" />Copy</button>
+                  </div>
+                </div>
+              )}
+              {notice && <p className="cn-notice" role="status">{notice}</p>}
+              {error && <p className="cn-error" role="alert">{error}</p>}
+            </div>
+          </div>
+        </BodyPortal>
+      )}
+      {canvasConnecting && (
+        <CanvasConnectSheet
+          school={school()}
+          initialDomain={canvas?.status?.domain || ''}
+          onClose={() => setCanvasConnecting(false)}
+          onConnected={() => { setCanvasConnecting(false); loadCanvas(); say('Canvas connected'); }}
+        />
+      )}
+      {canvasRemoving && (
+        <ConfirmDialog
+          title="Disconnect Canvas?"
+          message="Your classes and guides stay. Deadlines, grades and files stop updating until you connect again."
+          confirmLabel="Disconnect"
+          onConfirm={disconnectCanvas}
+          onCancel={() => setCanvasRemoving(false)}
+        />
+      )}
       {importing && <ImportSheet connector={importing} onClose={() => setImporting(null)} />}
       {removing && (
         <ConfirmDialog

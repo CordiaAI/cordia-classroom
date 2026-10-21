@@ -43,7 +43,8 @@ export function authMessage(error) {
 }
 
 // Sign in / Create account: Google, a texted code to your phone, or email and password.
-// A phone number signs in to the account that has it, or makes a new one.
+// A phone number only signs in to an account that already has it (added in Settings ›
+// Account). It never makes a new account: that split a student's progress across two.
 export default function AuthCard({ mode: initialMode = 'signin', linkModes = false }) {
   const router = useRouter();
   const [mode, setMode] = useState(initialMode); // signin | signup | reset
@@ -99,9 +100,15 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
     const number = normalizePhone(phone);
     if (!number) { setError('Enter your phone number with area code.'); return; }
     setBusy(true);
-    const { error: otpError } = await supabaseAuth().signInWithOtp({ phone: number });
+    const { error: otpError } = await supabaseAuth().signInWithOtp({ phone: number, options: { shouldCreateUser: false } });
     setBusy(false);
-    if (otpError) { setError(authMessage(otpError)); return; }
+    if (otpError) {
+      const text = `${otpError.code || ''} ${otpError.message || ''}`.toLowerCase();
+      setError(/signups? not allowed|otp_disabled|user not found/.test(text)
+        ? 'No account has this number yet. Sign in with email or Google, then add it in Settings › Account.'
+        : authMessage(otpError));
+      return;
+    }
     setSentTo(number);
     setCode('');
     setPhoneStep('code');
@@ -184,7 +191,7 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
           <button type="button" className="auth-google" onClick={continueWithGoogle} disabled={busy}>
             <GoogleLogo />Continue with Google
           </button>
-          {!phoneStep && (
+          {!phoneStep && mode !== 'signup' && (
             <button type="button" className="auth-google auth-phone-btn" onClick={() => { setPhoneStep('number'); setError(''); setNotice(''); }} disabled={busy}>
               <Smartphone size={20} strokeWidth={1.75} aria-hidden="true" />Continue with phone
             </button>
@@ -199,7 +206,7 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
             <label htmlFor="auth-phone">Phone number</label>
             <input id="auth-phone" className="auth-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="(555) 123-4567" value={phone} onChange={event => setPhone(event.target.value)} autoFocus />
           </div>
-          <p className="auth-fine">We'll text you a 6-digit code. Message and data rates may apply.</p>
+          <p className="auth-fine">For accounts with a phone added in Settings › Account. We'll text you a 6-digit code. Message and data rates may apply.</p>
           {error && <p className="auth-error" role="alert">{error}</p>}
           <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Sending…' : 'Text me a code'}</button>
           <button type="button" className="auth-link" onClick={() => { setPhoneStep(null); setError(''); }}>Use email instead</button>
