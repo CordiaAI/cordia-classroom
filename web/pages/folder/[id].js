@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, AudioLines, BookOpen, FolderInput, Hash, NotebookPen, Plus, Trash2, UserRound } from 'lucide-react';
+import { ArrowLeft, AudioLines, BookOpen, FolderInput, Hash, NotebookPen, Pencil, Plus, Trash2, UserRound } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import { listLectures } from '../../lib/lectures';
@@ -12,16 +12,21 @@ import ProgressRing from '../../components/ProgressRing';
 import AddClass from '../../components/AddClass';
 import { ClassDeadlines, ClassSets } from '../../components/ClassSets';
 import { openNewSheet } from '../../lib/newSheet';
+import { canvasStatus } from '../../lib/canvas';
+import { CourseFiles } from '../../components/CanvasClasses';
+import ClassGrades from '../../components/ClassGrades';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
-const TABS = [['material', 'Your material'], ['sets', 'Class sets'], ['deadlines', 'Deadlines']];
+// Course files and Grades show for a class brought in from Canvas.
+const TABS = [['material', 'Your material'], ['files', 'Course files', 'canvas'], ['grades', 'Grades', 'canvas'], ['sets', 'Class sets'], ['deadlines', 'Deadlines']];
 
 function shortDate(value) {
   const date = new Date(value || '');
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-// The one Class page: your own material, the sets classmates shared, and your deadlines.
+// The one Class page: your own material, its Canvas files and grade, the sets classmates shared,
+// and your deadlines.
 // A class with a course code is the same thing as the shared class (folders.class_id).
 export default function ClassPage() {
   const router = useRouter();
@@ -37,10 +42,20 @@ export default function ClassPage() {
   const [addingCode, setAddingCode] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [toast, setToast] = useState('');
-  const tab = TABS.some(([key]) => key === router.query.tab) ? router.query.tab : 'material';
+  const [course, setCourse] = useState(null);
+  const [renaming, setRenaming] = useState(null);
+  const tabs = TABS.filter(([, , needs]) => !needs || course);
+  const tab = tabs.some(([key]) => key === router.query.tab) ? router.query.tab : 'material';
   const gate = useLoadGate(Boolean(folder) || Boolean(loadError));
 
   useEffect(() => { if (ready && id) loadData(); }, [ready, id]);
+
+  // Library's "Rename class" lands here with ?rename=1.
+  useEffect(() => {
+    if (!folder || !router.query.rename) return;
+    setRenaming(folder.name);
+    router.replace({ pathname: router.pathname, query: { id } }, undefined, { shallow: true });
+  }, [folder?.id, router.query.rename]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -66,6 +81,7 @@ export default function ClassPage() {
       ...(lectureData?.lectures || []).filter(lecture => lecture.folder_id === id).map(lecture => ({ kind: 'lecture', id: lecture.id, title: lecture.title, date: lecture.lecture_date ? `${lecture.lecture_date}T12:00:00` : lecture.created_at, href: '/lecture/' + lecture.id })),
     ].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)));
     if (current.class_id) {
+      canvasStatus().then(status => setCourse((status?.courses || []).find(item => item.imported && item.class_id === current.class_id) || null));
       apiFetch('/classes/' + current.class_id).then(result => setCls(result?.class || null));
       apiFetch(`/classes/${current.class_id}/deadlines`).then(result => setDeadlines(result?.deadlines || []));
       apiFetch('/sharing/settings').then(data => setShowName(typeof data?.show_first_name === 'boolean' ? data.show_first_name : null));
@@ -89,6 +105,18 @@ export default function ClassPage() {
     if (!data?.updated) return;
     setItems(current => current.filter(row => row.id !== item.id));
     setToast('Moved to ' + (folderId ? folders.find(f => f.id === folderId)?.name : 'Unfiled'));
+  }
+
+  async function saveName(event) {
+    event?.preventDefault();
+    const name = (renaming || '').trim();
+    setRenaming(null);
+    if (!name || name === folder.name) return;
+    const previous = folder.name;
+    setFolder(current => ({ ...current, name }));
+    const data = await apiFetch('/folders/' + id, { method: 'PATCH', body: JSON.stringify({ name }) });
+    if (data?.folder) setToast('Renamed');
+    else { setFolder(current => ({ ...current, name: previous })); setToast(apiErrorMessage(data?.detail, 'Could not rename this class.')); }
   }
 
   function deleteClass() {
@@ -115,8 +143,9 @@ export default function ClassPage() {
 
   if (!folder || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading class" />;
 
-  const upcoming = deadlines ? deadlines.length : 0;
+  const upcoming = deadlines ? deadlines.filter(item => !item.done && new Date(item.due_at) >= new Date()).length : 0;
   const menu = [
+    { label: 'Rename class', icon: Pencil, onSelect: () => setRenaming(folder.name) },
     ...(folder.class_id ? [] : [{ label: 'Add course code', icon: Hash, onSelect: () => setAddingCode(true) }]),
     ...(folder.class_id && showName !== null ? [{ label: showName ? 'Hide my first name on shared sets' : 'Show my first name on shared sets', icon: UserRound, onSelect: toggleShowName }] : []),
     { label: 'Delete class', icon: Trash2, danger: true, onSelect: deleteClass },
@@ -138,7 +167,13 @@ export default function ClassPage() {
         <div className="c-row cls-title-row">
           <Link href="/library" className="c-icon-btn" aria-label="Library"><ArrowLeft {...ICON} /></Link>
           <div className="cls-title">
-            <h1 className="c-title">{folder.name}</h1>
+            {renaming !== null ? (
+              <form onSubmit={saveName}>
+                <input className="c-input cls-name-input" value={renaming} maxLength={100} onChange={event => setRenaming(event.target.value)} onBlur={saveName} onKeyDown={event => { if (event.key === 'Escape') setRenaming(null); }} aria-label="Class name" autoFocus />
+              </form>
+            ) : (
+              <h1 className="c-title"><button type="button" className="cls-name-btn" onClick={() => setRenaming(folder.name)} title="Rename class">{folder.name}</button></h1>
+            )}
             <span className="c-meta">
               {[cls?.code && cls.code !== folder.name ? cls.code : '', cls?.school, folder.class_id && deadlines ? `${upcoming} upcoming deadline${upcoming === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')}
             </span>
@@ -151,7 +186,7 @@ export default function ClassPage() {
       </header>
 
       <div className="c-seg cls-tabs" role="tablist" aria-label="Class">
-        {TABS.map(([key, label]) => (
+        {tabs.map(([key, label]) => (
           <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button>
         ))}
       </div>
@@ -182,7 +217,9 @@ export default function ClassPage() {
             ))}
           </div>
         )
-      ) : !folder.class_id ? needsCode
+      ) : tab === 'files' && course ? <div className="c-card cls-files"><CourseFiles course={course} /></div>
+        : tab === 'grades' && course ? <ClassGrades courseId={course.id} guides={items.filter(item => item.kind === 'guide')} onMakeGuide={() => setTab('files')} />
+        : !folder.class_id ? needsCode
         : tab === 'sets' ? <ClassSets classId={folder.class_id} onToast={setToast} />
         : <ClassDeadlines classId={folder.class_id} deadlines={deadlines} />}
 
@@ -191,6 +228,11 @@ export default function ClassPage() {
         .cls-title-row { min-width: 0; align-items: flex-start; }
         .cls-title { display: grid; gap: 2px; min-width: 0; }
         .cls-title :global(.c-title) { overflow-wrap: anywhere; }
+        .cls-name-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; cursor: text; }
+        .cls-name-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
+        :global(.cls-name-input) { font: 600 28px/1.15 var(--font-display); height: 52px; width: min(640px, 70vw); }
+        .cls-files { padding: 8px; }
+        .cls-tabs button { flex: 0 0 auto; white-space: nowrap; }
         .cls-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }
         .cls-needs-code { display: grid; gap: 12px; padding: 20px; justify-items: start; }
         .cls-needs-code :global(.cls-add) { width: 100%; box-shadow: none; padding: 0; background: none; border: 0; }

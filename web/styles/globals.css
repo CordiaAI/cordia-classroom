@@ -2806,6 +2806,8 @@ a.calendar-item:hover { border-color: var(--ink); transform: translateY(-1px); }
 .calendar-item-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 6px; }
 .calendar-item-meta .calendar-kind { min-width: 0; padding: 3px 7px; }
 .calendar-item-past { opacity: 0.55; }
+.calendar-item-done strong { text-decoration: line-through; color: var(--muted); }
+.calendar-item-done { opacity: 0.6; }
 .calendar-kind { min-width: 64px; padding: 5px 7px; border-radius:999px; background: var(--surface-card); color: var(--olive); font-size: 13px; font-weight:600; text-align: center; text-transform: capitalize; }
 .calendar-kind-exam,
 .calendar-kind-quiz { background: var(--surface-card); color: var(--warning); }

@@ -13,7 +13,7 @@ from ids import require_uuid
 router = APIRouter(prefix="/folders", tags=["folders"])
 
 
-class CreateFolderRequest(BaseModel):
+class FolderNameRequest(BaseModel):
     name: str
 
     @field_validator("name")
@@ -43,7 +43,7 @@ def list_folders(authorization: str = Header(default="")):
 
 
 @router.post("")
-def create_folder(request: CreateFolderRequest, authorization: str = Header(default="")):
+def create_folder(request: FolderNameRequest, authorization: str = Header(default="")):
     """Create a new folder (class)."""
     user_id = get_user_id(authorization)
     supabase = get_supabase()
@@ -56,6 +56,24 @@ def create_folder(request: CreateFolderRequest, authorization: str = Header(defa
     if result.data:
         return {"folder": result.data[0]}
     raise HTTPException(status_code=500, detail="Failed to create folder")
+
+
+@router.patch("/{folder_id}")
+def rename_folder(folder_id: str, request: FolderNameRequest, authorization: str = Header(default="")):
+    """Rename a class. Only your own Library name changes; a shared class keeps its course code."""
+    require_uuid(folder_id, "folder ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+
+    result = supabase.table("folders") \
+        .update({"name": request.name}) \
+        .eq("id", folder_id) \
+        .eq("user_id", user_id) \
+        .execute()
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Class not found")
+    return {"folder": result.data[0]}
 
 
 @router.delete("/{folder_id}")

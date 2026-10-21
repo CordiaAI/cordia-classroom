@@ -60,7 +60,8 @@ class AllowlistTests(unittest.TestCase):
             ("/api/v1/courses", [("enrollment_state", "completed")]),
             ("/api/v1/courses", [("enrollment_state", "active"), ("include[]", "total_scores")]),
             ("/api/v1/courses/12", [("include[]", "students")]),
-            ("/api/v1/courses/12/assignments", [("include[]", "submission")]),
+            ("/api/v1/courses/12/assignments", [("include[]", "all_dates")]),
+            ("/api/v1/courses/12/enrollments", [("user_id", "77")]),  # only your own enrollment
             ("/api/v1/courses/12/modules", [("include[]", "content_details")]),
             ("/api/v1/calendar_events", [("context_codes[]", "group_3")]),
             ("/api/v1/users/self", [("as_user_id", "5")]),

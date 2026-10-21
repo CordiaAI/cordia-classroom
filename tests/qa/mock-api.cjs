@@ -57,6 +57,14 @@ async function install(context, state) {
     if (path === '/auth/profile') return json({ updated: ['university'] });
     if (path === '/feedback/reviewer-status') return json({ reviewer: false });
     if (path === '/folders' && method === 'GET') return json({ folders: state.folders });
+    if ((m = path.match(/^\/folders\/([^/]+)$/)) && method === 'PATCH') { const f = state.folders.find(item => item.id === m[1]); if (f) f.name = body.name; return json(f ? { folder: f } : { detail: 'Class not found' }); }
+    // Canvas-linked class: set state.canvas (a /canvas/status payload) to turn these on.
+    if (path === '/canvas/status' && state.canvas) return json(state.canvas);
+    if ((m = path.match(/^\/classes\/([^/]+)\/deadlines$/))) return json({ deadlines: state.deadlines || [] });
+    if ((m = path.match(/^\/classes\/([^/]+)$/)) && method === 'GET' && state.canvas) return json({ class: { id: m[1], code: 'MUL 101', name: 'Introduction to Music', school: 'Usaonline' }, sets: [] });
+    if ((m = path.match(/^\/canvas\/courses\/(\d+)\/files$/))) return json({ files: [{ id: 1, name: 'Week 3 - Rhythm and Meter.pdf', size: 2400000, type: 'application/pdf' }, { id: 2, name: 'Syllabus.docx', size: 54000 }] });
+    if ((m = path.match(/^\/canvas\/courses\/(\d+)\/grades$/))) return json(state.grades || { score: null, letter: null, weighted: false, upcoming: [] });
+    if ((m = path.match(/^\/calendar\/items\/([^/]+)\/done$/)) && method === 'PUT') { state.marks = { ...(state.marks || {}), [decodeURIComponent(m[1])]: body.done }; return json({ item_key: decodeURIComponent(m[1]), done: body.done }); }
     if (path === '/folders' && method === 'POST') { const f = { id: 'f' + Date.now(), name: body.name }; state.folders.unshift(f); return json({ folder: f }); }
     if (path === '/guides' && method === 'GET') return json({ guides: url.searchParams.get('fields') === 'summary' ? state.guides.map(summary) : state.guides });
     if (path === '/guides' && method === 'POST') {
