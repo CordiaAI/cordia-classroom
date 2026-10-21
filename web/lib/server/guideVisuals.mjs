@@ -4,6 +4,7 @@
 // student only ever lists or changes visuals on their own guides. Rows live in guide_visuals
 // (service role only). Until that table exists, answers { stored: false } and the browser keeps
 // the visuals itself.
+import { supabaseUrlFrom } from '../supabaseUrl.mjs';
 
 export const MAX_PER_GUIDE = 40;
 const INLINE_PREFIX = 'data:image/svg+xml;base64,';
@@ -23,7 +24,7 @@ const clip = (value, max) => String(value || '').trim().slice(0, max);
 
 export function createGuideVisualsService({ env = process.env, fetch: fetchImpl = globalThis.fetch } = {}) {
   const apiBase = (env.CLASSROOM_API_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-  const supabaseUrl = (env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+  const supabaseUrl = supabaseUrlFrom(env);
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
   // Only images Cordia stored itself (napkinVisual.mjs) can be kept.
   const imagePrefix = `${supabaseUrl}/storage/v1/object/public/visuals/`;

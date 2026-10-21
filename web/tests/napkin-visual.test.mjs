@@ -175,7 +175,7 @@ resetRateState();
   const { service } = world();
   assert.equal((await service.generate({ authorization: 'Bearer nope', text: 'x y z' })).httpStatus, 401);
   const bare = createVisualService({ env: { NEXT_PUBLIC_API_URL: 'https://api.example.com' }, fetch: async () => new Response(JSON.stringify({ plan: 'free' })) });
-  assert.deepEqual((await bare.generate({ authorization: AUTH, text: 'Some text here' })).body, { status: 'fallback', reason: 'not_configured' });
+  assert.deepEqual((await bare.generate({ authorization: AUTH, text: 'Some text here' })).body, { status: 'fallback', reason: 'not_configured', missing: ['NAPKIN_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY'] });
   console.log('ok   auth and configuration');
 }
 

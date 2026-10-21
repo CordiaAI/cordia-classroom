@@ -11,6 +11,7 @@
 
 import { aiProvider, chatProvider } from './aiProvider.mjs';
 import { aiChat } from './aiChat.mjs';
+import { supabaseUrlFrom } from '../supabaseUrl.mjs';
 export const LIMITS = { free: 120, pro: 1500 };
 export const MAX_CHUNK_BYTES = 4_300_000; // under Vercel's 4.5 MB request limit
 const FEATURE = 'lecture_minute';
@@ -65,7 +66,7 @@ export function createLectureService({ env = process.env, fetch: fetchImpl = glo
   const { transcribeModel } = provider;
   // Notes and titles are written by chatProvider (Claude when set); audio stays with Whisper.
   const writer = chatProvider(env);
-  const supabaseUrl = (env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+  const supabaseUrl = supabaseUrlFrom(env);
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
   const metered = Boolean(supabaseUrl && serviceKey);
   const apiBase = (env.CLASSROOM_API_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');

@@ -192,7 +192,12 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
   return (
     <div className="nv">
       {fallback?.()}
-      {state.phase === 'fallback' && !state.quiet && <p className="nv-error" role="alert">{REASONS[state.reason] || VISUAL_ERROR}</p>}
+      {state.phase === 'fallback' && !state.quiet && (
+        <p className="nv-error" role="alert">
+          {REASONS[state.reason] || VISUAL_ERROR}
+          {state.reason === 'not_configured' && usage?.missing?.length ? ` Missing on the server: ${usage.missing.join(', ')}.` : ''}
+        </p>
+      )}
       {state.phase === 'limit' && state.pro && <p className="nv-error" role="alert">Limit reached</p>}
       {!disabled && state.phase !== 'limit' && !(auto && state.phase === 'idle') && (
         <div className="nv-bar">
