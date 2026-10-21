@@ -1,7 +1,7 @@
 // Napkin visuals service (/api/visual) with a fake network and clock: three guide sections,
 // one Notes highlight, a forced timeout, a rate-limit response, the monthly limit and the cache.
 import assert from 'node:assert/strict';
-import { BUDGET_MS, DEFAULT_STYLE_ID, altText, cleanSvg, createVisualService, resetRateState } from '../lib/server/napkinVisual.mjs';
+import { BUDGET_MS, TOTAL_MS, DEFAULT_STYLE_ID, altText, cleanSvg, createVisualService, resetRateState } from '../lib/server/napkinVisual.mjs';
 
 const ENV = { NAPKIN_API_KEY: 'nk_test', NEXT_PUBLIC_SUPABASE_URL: 'https://db.example.co', SUPABASE_SERVICE_ROLE_KEY: 'service', NEXT_PUBLIC_API_URL: 'https://api.example.com' };
 const USER = '11111111-2222-4333-8444-555555555555';
@@ -68,8 +68,8 @@ resetRateState();
   assert.equal(state.used, 3);
   const first = state.creates[0];
   assert.deepEqual(
-    { format: first.format, language: first.language, style_id: first.style_id, number_of_visuals: first.number_of_visuals, transparent_background: first.transparent_background, color_mode: first.color_mode },
-    { format: 'svg', language: 'en-US', style_id: DEFAULT_STYLE_ID, number_of_visuals: 2, transparent_background: true, color_mode: 'light' },
+    { format: first.format, language: first.language, style_id: first.style_id, number_of_visuals: first.number_of_visuals, sort_strategy: first.sort_strategy, transparent_background: first.transparent_background, color_mode: first.color_mode },
+    { format: 'svg', language: 'en-US', style_id: DEFAULT_STYLE_ID, number_of_visuals: 3, sort_strategy: 'variation', transparent_background: true, color_mode: 'light' },
   );
   // Same section again: served from the cache, Napkin not called, nothing charged.
   const again = await service.generate({ authorization: AUTH, text: sections[0][0], context: sections[0][1], theme: 'light' });
@@ -91,13 +91,35 @@ resetRateState();
   console.log('ok   notes highlight');
 }
 
-// Forced timeout: Napkin never finishes, so the route gives up within 45 s and charges nothing.
+// A slow drawing: past 20 s the route answers "pending" with a signed ticket, and the next
+// call with that ticket keeps waiting on the same Napkin request (no second request, one charge).
+{
+  const { state, service } = world({ statusAfter: 20 });
+  const first = await service.generate({ authorization: AUTH, text: 'The water cycle has four stages', theme: 'light' });
+  assert.equal(first.body.status, 'pending');
+  assert.ok(state.clock <= BUDGET_MS, `answered within ${BUDGET_MS} ms`);
+  const done = await service.generate({ authorization: AUTH, text: 'The water cycle has four stages', theme: 'light', resume: first.body.resume });
+  assert.equal(done.body.status, 'ok');
+  assert.equal(state.creates.length, 1, 'the same Napkin request is resumed');
+  assert.equal(state.used, 1);
+  // A ticket for other content, or a forged one, is refused.
+  const other = await service.generate({ authorization: AUTH, text: 'Something else entirely', theme: 'light', resume: first.body.resume });
+  assert.equal(other.httpStatus, 400);
+  console.log('ok   slow drawing resumes');
+}
+
+// Forced timeout: Napkin never finishes, so after 3 minutes in all the route gives up and charges nothing.
 {
   const { state, service } = world({ pendingForever: true });
-  const { body } = await service.generate({ authorization: AUTH, text: 'The French Revolution began in 1789', theme: 'light' });
+  let body = (await service.generate({ authorization: AUTH, text: 'The French Revolution began in 1789', theme: 'light' })).body;
+  let calls = 1;
+  while (body.status === 'pending' && calls < 20) {
+    body = (await service.generate({ authorization: AUTH, text: 'The French Revolution began in 1789', theme: 'light', resume: body.resume })).body;
+    calls += 1;
+  }
   assert.deepEqual(body, { status: 'fallback', reason: 'timeout' });
-  assert.ok(state.clock <= BUDGET_MS, `waited ${state.clock} ms`);
-  assert.ok(state.polls >= 25, 'polled every 1.5 s');
+  assert.ok(state.clock >= TOTAL_MS && state.clock <= TOTAL_MS + BUDGET_MS, `gave up at ${state.clock} ms`);
+  assert.equal(state.creates.length, 1);
   assert.equal(state.used, 0);
   assert.equal(state.stored.length, 0);
   console.log('ok   forced timeout');

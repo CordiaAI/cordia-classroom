@@ -2,25 +2,28 @@
 //
 // Flow: verify the student (Classroom API /billing/status, which also gives the plan) ->
 // cache lookup by hash(text + context + style + theme) -> monthly limit -> POST /v1/visual ->
-// poll status every 1.5 s (45 s budget) -> download every file at once with the auth header
+// poll status every 1.5 s for up to 20 s -> download every file at once with the auth header
 // (Napkin URLs expire after 30 minutes) -> store in our own bucket -> charge one use -> cache.
-// Anything that goes wrong on Napkin's side returns { status: 'fallback' } so the page shows
-// its own themed diagram instead.
-import { createHash } from 'node:crypto';
+// A drawing still running after 20 s returns { status: 'pending', resume } and the page calls
+// again with `resume` (a signed ticket) to keep waiting, up to 3 minutes in all, so a slow
+// drawing never runs into the serverless time limit. Anything that goes wrong on Napkin's side
+// returns { status: 'fallback' } so the page shows its own themed diagram instead.
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 export const NAPKIN_BASE = 'https://api.napkin.ai';
 // Built-in "Pure Outline" (Formal): a quiet, near-monochrome style until NAPKIN_STYLE_ID is set.
 export const DEFAULT_STYLE_ID = 'CSQQ4VB1DGPP4V31CDNJTVKFBXK6JV3C5NS34';
 export const LIMITS = { free: 10, pro: 200 };
 export const POLL_MS = 1500;
-export const BUDGET_MS = 45000;
-export const VARIATIONS = 2;
+export const BUDGET_MS = 20000;
+export const TOTAL_MS = 180000;
+export const VARIATIONS = 3;
 export const BUCKET = 'visuals';
 const MAX_TEXT = 2000;
 const MAX_CONTEXT = 1500;
 
 export function cacheKey({ text, context = '', style, theme, variations = VARIATIONS }) {
-  const parts = variations === VARIATIONS ? [text, context, style, theme] : [text, context, style, theme, variations];
+  const parts = variations === 2 ? [text, context, style, theme] : [text, context, style, theme, variations];
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 }
 
@@ -65,6 +68,17 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
   const apiBase = (env.CLASSROOM_API_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
   const style = env.NAPKIN_STYLE_ID || DEFAULT_STYLE_ID;
   const enabled = Boolean(napkinKey && supabaseUrl && serviceKey);
+
+  // The resume ticket: which Napkin request, when it started, for whom and for what content.
+  const sign = value => createHmac('sha256', `cordia-visual:${serviceKey}`).update(value).digest('base64url');
+  const ticket = (userId, key, id, startedAt) => `${id}.${startedAt}.${sign(`${userId}|${key}|${id}|${startedAt}`)}`;
+  function readTicket(value, userId, key) {
+    const [id, startedAt, mac] = String(value || '').split('.');
+    if (!id || !startedAt || !mac) return null;
+    const expected = Buffer.from(sign(`${userId}|${key}|${id}|${startedAt}`));
+    const given = Buffer.from(mac);
+    return given.length === expected.length && timingSafeEqual(given, expected) ? { id, startedAt: Number(startedAt) } : null;
+  }
 
   const db = (path, init = {}) => fetchImpl(`${supabaseUrl}${path}`, {
     ...init,
@@ -154,7 +168,7 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
     return { fallback: 'timeout' };
   }
 
-  async function generate({ authorization, text, context = '', theme = 'light', variations = VARIATIONS }) {
+  async function generate({ authorization, text, context = '', theme = 'light', variations = VARIATIONS, resume = '' }) {
     const who = await account(authorization);
     if (!who) return { httpStatus: 401, body: { detail: 'Sign in again.' } };
     const content = String(text || '').trim().slice(0, MAX_TEXT);
@@ -168,12 +182,14 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
     if (hit?.files?.length) {
       return { httpStatus: 200, body: { status: 'ok', cached: true, visuals: hit.files, alt: hit.alt, theme: hit.theme || mode, left: counts.left, limit: counts.limit } };
     }
-    if (!who.unlimited && counts.left <= 0) {
+    const resumed = resume ? readTicket(resume, who.userId, key) : null;
+    if (resume && !resumed) return { httpStatus: 400, body: { detail: 'That drawing request expired. Try again.' } };
+    if (!resumed && !who.unlimited && counts.left <= 0) {
       return { httpStatus: 402, body: { detail: { code: 'limit_reached', feature: 'visual', plan: who.plan === 'pro' ? 'classroom_plus' : 'free', used: counts.used, limit: counts.limit, message: who.plan === 'pro' ? 'Limit reached' : "You've used this month's visuals." } } };
     }
 
     const deadline = now() + BUDGET_MS;
-    const created = await createRequest({
+    const created = resumed ? { id: resumed.id } : await createRequest({
       format: 'svg',
       content,
       // Napkin replaced context_before/context_after with one context field (API v0.5.1).
@@ -181,11 +197,17 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
       language: 'en-US',
       style_id: style,
       number_of_visuals: variations,
+      // Variations that differ in layout, so the choice is a real choice (API v1.1.4).
+      sort_strategy: 'variation',
       transparent_background: true,
       color_mode: mode,
     }, deadline);
     if (created.fallback) return { httpStatus: 200, body: { status: 'fallback', reason: created.fallback } };
-    const result = await waitForFiles(created.id, deadline);
+    const startedAt = resumed?.startedAt || now();
+    const result = await waitForFiles(created.id, Math.min(deadline, startedAt + TOTAL_MS));
+    if (result.fallback === 'timeout' && now() + POLL_MS < startedAt + TOTAL_MS) {
+      return { httpStatus: 200, body: { status: 'pending', resume: ticket(who.userId, key, created.id, startedAt) } };
+    }
     if (result.fallback) return { httpStatus: 200, body: { status: 'fallback', reason: result.fallback } };
 
     // Download now: Napkin's links expire after 30 minutes, and we never hotlink them.

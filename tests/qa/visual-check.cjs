@@ -91,7 +91,7 @@ async function noOverflow(page) {
     });
   }
 
-  await check('Notes → Visualize → Make diagram inserts the visual', async () => {
+  await check('Notes: highlight → Make visual → Add to note inserts the visual', async () => {
     const { context, page, state } = await session(browser);
     await page.goto(`${BASE}/smartnotes?id=n1`);
     const paper = page.locator('.sn-paper');
@@ -100,17 +100,16 @@ async function noOverflow(page) {
     await paper.click();
     await page.keyboard.press('End');
     await page.keyboard.type(' Supply rises as price rises.');
-    await page.click('.sn-visualize-btn');
     await page.evaluate(() => {
       const node = [...document.querySelectorAll('.sn-paper p')].find(p => p.textContent.includes('Supply'));
       const range = document.createRange();
       range.selectNodeContents(node);
       const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
     });
-    await page.click('.sn-visualize-confirm');
+    await page.click('.sn-visual-bubble');
     await page.locator('.sn-diagram-body .nv-image').waitFor({ timeout: 10000 });
     expect(state.posts.length === 1 && /Supply/.test(state.posts[0].text), 'highlight not sent');
-    await page.click('.sn-diagram-body button:has-text("Use this")');
+    await page.click('.sn-diagram-body button:has-text("Add to note")');
     expect((await page.locator('.sn-paper img.nv-inline').count()) === 1, 'visual not inserted into the note');
     await page.screenshot({ path: path.join(SHOTS, 'visual-notes-1440-light.png') });
     await context.close();

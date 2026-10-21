@@ -102,12 +102,20 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
     setIndex(0);
     setUsed(false);
     try {
-      const response = await fetch('/api/visual', {
+      const ask = resume => fetch('/api/visual', {
         method: 'POST',
         headers: { ...authOnlyHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, context, theme: currentTheme() }),
+        body: JSON.stringify({ text, context, theme: drawnTheme, ...(resume ? { resume } : {}) }),
       });
-      const data = await response.json().catch(() => ({}));
+      const drawnTheme = currentTheme();
+      let response = await ask();
+      let data = await response.json().catch(() => ({}));
+      // A slow drawing answers "pending"; keep asking with its ticket (the server stops at 3 minutes).
+      for (let round = 0; data?.status === 'pending' && data.resume && round < 12; round += 1) {
+        setState({ phase: 'loading', slow: true });
+        response = await ask(data.resume);
+        data = await response.json().catch(() => ({}));
+      }
       if (response.status === 402) {
         const detail = data?.detail || {};
         setUsage({ ...(usageCache || {}), left: 0, limit: detail.limit });
@@ -138,7 +146,9 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
   if (state.phase === 'loading') {
     return (
       <div className="nv">
-        <div className="nv-frame nv-frame--loading"><CordiaLoader label="Making a visual" /></div>
+        <div className="nv-frame nv-frame--loading">
+          <div className="nv-wait"><CordiaLoader label="Making a visual" /><span className="c-meta">{state.slow ? 'Still drawing. Detailed visuals can take a minute.' : 'Drawing three versions to choose from…'}</span></div>
+        </div>
         <VisualStyle />
       </div>
     );
@@ -153,19 +163,19 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
           <img className={'nv-image' + (inverted ? ' is-inverted' : '')} src={visual.url} alt={state.alt || 'Diagram'} width={visual.width || undefined} height={visual.height || undefined} />
         </figure>
         <div className="nv-bar">
+          {!used && (
+            <button type="button" className={`c-btn c-btn--sm ${onUse ? 'c-btn--primary' : 'c-btn--secondary'}`} onClick={() => { setUsed(true); onUse?.({ ...visual, alt: state.alt, theme: state.rendered }); }}>{useLabel}</button>
+          )}
           {state.visuals.length > 1 && !used && (
-            <div className="nv-dots" role="group" aria-label="Variations">
+            <div className="nv-dots" role="group" aria-label="Versions">
               {state.visuals.map((item, dot) => (
-                <button key={item.url} type="button" className={'nv-dot' + (dot === index ? ' is-on' : '')} aria-label={`Variation ${dot + 1} of ${state.visuals.length}`} aria-pressed={dot === index} onClick={() => setIndex(dot)} />
+                <button key={item.url} type="button" className={'nv-dot' + (dot === index ? ' is-on' : '')} aria-label={`Version ${dot + 1} of ${state.visuals.length}`} aria-pressed={dot === index} onClick={() => setIndex(dot)} />
               ))}
             </div>
           )}
           <div className="nv-actions">
-            <button type="button" className="c-btn c-btn--sm c-btn--quiet" onClick={() => download(visual, 'svg', name)}><Download aria-hidden="true" />SVG</button>
-            <button type="button" className="c-btn c-btn--sm c-btn--quiet" onClick={() => download(visual, 'png', name)}><Download aria-hidden="true" />PNG</button>
-            {!used && (
-              <button type="button" className={`c-btn c-btn--sm ${onUse ? 'c-btn--primary' : 'c-btn--secondary'}`} onClick={() => { setUsed(true); onUse?.({ ...visual, alt: state.alt, theme: state.rendered }); }}>{useLabel}</button>
-            )}
+            <button type="button" className="c-icon-btn" aria-label="Download SVG" title="Download SVG" onClick={() => download(visual, 'svg', name)}><Download size={18} strokeWidth={1.75} aria-hidden="true" /></button>
+            <button type="button" className="c-btn c-btn--sm c-btn--quiet" onClick={() => download(visual, 'png', name)}>PNG</button>
           </div>
         </div>
         <VisualStyle />
@@ -194,6 +204,7 @@ function VisualStyle() {
     <style jsx global>{`
       .nv { display: grid; gap: 8px; min-width: 0; }
       .nv-frame { margin: 0; display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 10; max-height: 480px; padding: 16px; border: 1px solid var(--hairline); border-radius: var(--r-row); background: var(--surface-card); overflow: hidden; }
+      .nv-wait { display: grid; justify-items: center; gap: 12px; text-align: center; }
       .nv-image { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
       .nv-image.is-inverted { filter: invert(1) hue-rotate(180deg); }
       .nv-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
