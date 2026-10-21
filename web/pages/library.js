@@ -345,6 +345,7 @@ export default function LibraryPage() {
         <h1 className="c-title">Library</h1>
         <div className="c-row lib-head-actions">
           {filter === 'lectures' && <button type="button" className="c-btn c-btn--secondary" onClick={() => setAddingLecture(true)}><NotebookPen size={20} strokeWidth={1.75} aria-hidden="true" />Add notes</button>}
+          <button type="button" className="c-icon-btn lib-add-class-icon" onClick={() => setAddingClass(true)} aria-label="Add a class"><FolderPlus size={20} strokeWidth={1.75} aria-hidden="true" /></button>
           {primary}
         </div>
       </header>
@@ -372,7 +373,7 @@ export default function LibraryPage() {
           ))}
         </div>
         <span className="c-spacer" />
-        <button type="button" className="c-btn c-btn--quiet" onClick={() => setAddingClass(true)}><FolderPlus size={20} strokeWidth={1.75} aria-hidden="true" />Add a class</button>
+        <button type="button" className="c-btn c-btn--quiet lib-add-class" onClick={() => setAddingClass(true)}><FolderPlus size={20} strokeWidth={1.75} aria-hidden="true" />Add a class</button>
       </div>
 
       {addingClass && <AddClass withName onCancel={() => setAddingClass(false)} onAdded={classAdded} />}
@@ -405,6 +406,8 @@ export default function LibraryPage() {
         .library > *, .library .c-page-head, .lib-head-actions { min-width: 0; max-width: 100%; }
         .library .lib-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
         .library .lib-tools { display: flex; align-items: center; gap: 8px; }
+        .library .lib-add-class-icon { display: none; }
+        @media (max-width: 767px) { .library .lib-add-class-icon { display: inline-grid; } }
         .library .lib-filter-row { flex-wrap: nowrap; min-width: 0; }
         /* Six filters: on narrow phones they scroll inside their row, never the page. */
         .library .lib-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; }
@@ -431,7 +434,9 @@ export default function LibraryPage() {
         .library .lib-empty-group { padding: 8px 16px 14px; margin: 0; }
         @media (max-width: 767px) {
           .library .lib-row-link { flex-direction: column; gap: 2px; }
-          .library .lib-filter-row > .c-btn { padding: 0 10px; }
+          /* Phones: "Add a class" moves up beside New, so the filters get the whole row. */
+          .library .lib-add-class { display: none; }
+          .library .lib-filters { margin: 0 -16px; padding: 2px 16px; }
         }
       `}</style>
     </div>

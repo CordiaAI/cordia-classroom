@@ -271,7 +271,10 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
                 f"{material.source.get('title') or 'The selected material'} is selected, but it does not contain "
                 "readable study material yet. Add content or choose another source."
             ))
-        return ChatResponse(answer="Choose a study guide, SmartNote, or uploaded file before asking Cordia.")
+        if skill != "explain":
+            return ChatResponse(answer="Choose a study guide, SmartNote, or uploaded file before asking Cordia.")
+        # A general chat: no material selected, answered from general knowledge.
+        return _tutor_reply(body, user_id, question, material, skill, turn)
     if skill == "practice" or PRACTICE_REQUEST.search(question):
         _check_picked_class(user_id, body)
         return _create_guide(user_id, material, class_id, "practice")

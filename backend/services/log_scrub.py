@@ -51,8 +51,13 @@ class ScrubFilter(logging.Filter):
         except Exception:
             return True
         cleaned = scrub(message)
-        if cleaned != message or record.args:
-            record.msg, record.args = cleaned, None
+        if cleaned != message:
+            pieces = record.args if isinstance(record.args, tuple) else None
+            if record.name == "uvicorn.access" and pieces:
+                # uvicorn's access formatter unpacks record.args itself; keep their shape.
+                record.args = tuple(scrub(arg) if isinstance(arg, str) else arg for arg in pieces)
+            else:
+                record.msg, record.args = cleaned, None
         if record.exc_info and record.exc_info[1] is not None:
             record.exc_text = scrub(logging.Formatter().formatException(record.exc_info))
             record.exc_info = None

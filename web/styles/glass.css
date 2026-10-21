@@ -106,3 +106,144 @@ main .sn-paper :is(h1, h2, h3, h4), .sn-paper :is(h1, h2, h3, h4) { font-family:
 main .sn-paper h1, .sn-paper h1 { font-size: var(--fs-20) !important; font-weight: 700 !important; }
 .sn-paper h2 { font-size: var(--fs-17) !important; }
 .sn-paper :is(h3, h4) { font-size: var(--fs-15) !important; }
+
+/* An icon button that is switched on (shuffle, star, camera) reads like a switch that is on:
+   olive glass with a white icon, unmistakable at a glance in both themes. */
+:is(.c-icon-btn[aria-pressed='true'], .c-icon-btn.is-on):not(:disabled) { background: var(--lg-sheen-olive), var(--olive) !important; border-color: var(--lg-edge); color: var(--on-olive); box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow); }
+:is(.c-icon-btn[aria-pressed='true'], .c-icon-btn.is-on) svg.lucide { color: var(--on-olive) !important; }
+
+/* Phones never zoom: no double-tap zoom, and fields are 16px so iOS doesn't zoom in on focus. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { touch-action: manipulation; }
+@media (max-width: 767px), (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea, [contenteditable='true'] { font-size: 16px !important; }
+}
+
+/* Notched phones in landscape: keep the side gutters clear of the notch and rounded corners. */
+@media (max-width: 767px), (pointer: coarse) {
+  .main-content, .app-shell .main-content {
+    padding-left: max(16px, env(safe-area-inset-left)) !important;
+    padding-right: max(16px, env(safe-area-inset-right)) !important;
+  }
+  .c-topbar { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  .c-tabbar { padding-left: max(4px, env(safe-area-inset-left)); padding-right: max(4px, env(safe-area-inset-right)); }
+}
+
+/* A page's sections never grow wider than the page (grid items default to their content's
+   min width, which pushed Library's class cards past a 360px screen). */
+.c-page > * { min-width: 0; }
+/* Notes sits in the page like every other page: no second set of page padding. */
+.sn-index { padding: 0 !important; max-width: none; }
+
+/* Calendar: each day's date sits on a rounded glass bar; today's is olive with white text,
+   over a faint olive column (it was a hard black rectangle). */
+.calendar-day > header { margin: 6px 6px 0; border-radius: var(--r-input); border-bottom: 0 !important; background: var(--lg-sheen), var(--lg-fill) !important; box-shadow: var(--lg-highlight); }
+.calendar-day-today, [data-theme='dark'] .calendar-day-today { background: var(--olive-tint) !important; border-radius: var(--r-row); }
+.calendar-day-today > header, [data-theme='dark'] .calendar-day-today > header { background: var(--lg-sheen-olive), var(--olive) !important; box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow); }
+.calendar-day-today > header :is(span, strong, em) { color: var(--on-olive) !important; }
+
+/* Tab bars that hold more tabs than a phone is wide (Settings, a class page): full width,
+   scroll sideways with a soft fade on the side that has more. */
+@media (max-width: 767px) {
+  .c-seg.is-scroller { display: flex; width: 100%; justify-self: stretch; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+  .c-seg.is-scroller::-webkit-scrollbar { display: none; }
+  .c-seg.is-scroller > * { flex: 0 0 auto; scroll-snap-align: center; white-space: nowrap; }
+  .c-seg.is-scroller.fade-right { -webkit-mask-image: linear-gradient(to right, var(--on-olive) 82%, transparent); mask-image: linear-gradient(to right, var(--on-olive) 82%, transparent); }
+  .c-seg.is-scroller.fade-left { -webkit-mask-image: linear-gradient(to left, var(--on-olive) 82%, transparent); mask-image: linear-gradient(to left, var(--on-olive) 82%, transparent); }
+  .c-seg.is-scroller.fade-left.fade-right { -webkit-mask-image: linear-gradient(to right, transparent, var(--on-olive) 18%, var(--on-olive) 82%, transparent); mask-image: linear-gradient(to right, transparent, var(--on-olive) 18%, var(--on-olive) 82%, transparent); }
+}
+/* Stacks and sections are one column that never grows past its container (a long truncated
+   title would otherwise stretch the column and push row actions off the card). */
+:is(.c-stack, .c-section) { grid-template-columns: minmax(0, 1fr); }
+:is(.c-stack, .c-section) > * { min-width: 0; }
+
+/* Tutor pickers float above the pane (rendered at the end of <body>, see TutorSelect). */
+.tutor-select-options.is-floating { position: fixed; z-index: 260; margin: 0; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; }
+
+/* Tutor › Chats: start a new chat (about the guide, or general) or reopen a saved one. */
+.cordia-tutor-title-row { justify-content: flex-start; }
+.cordia-tutor-title-row .tutor-chats-btn { margin-left: auto; min-height: 36px; padding: 0 12px; gap: 6px; }
+.tutor-chats { display: grid; align-content: start; gap: 12px; }
+.tutor-chats-new { display: grid; gap: 8px; }
+.tutor-chats-new .c-btn { justify-content: flex-start; min-width: 0; }
+.tutor-chats-new .c-btn > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tutor-chats-new .c-meta { margin: 0; }
+.tutor-chats-title { margin: 8px 0 0; font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
+.tutor-chats-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.tutor-chat-row { display: grid; gap: 2px; width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid var(--hairline); border-radius: var(--r-input); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; transition: background var(--dur) var(--ease); }
+.tutor-chat-row:hover:not(:disabled) { background: var(--olive-tint); }
+.tutor-chat-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.4 var(--font-sans); }
+.tutor-chat-row .c-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tutor-chats-btn[aria-pressed='true'] { background: var(--olive-tint) !important; color: var(--olive-ink) !important; }
+
+/* Settings › Connectors: tiles with brand marks, like Cordia Assistant's Connections.
+   Phones show one list with a line on what each app does. */
+.cn-card { display: grid; gap: 12px; padding: 24px; }
+.cn-card > .c-section-title, .cn-card > .c-meta { margin: 0; }
+.cn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 14px; margin: 8px 0 0; padding: 0; list-style: none; }
+.cn-grid li { display: grid; }
+.cn-tile { position: relative; display: grid; justify-items: center; align-content: start; gap: 12px; padding: 24px 14px 18px; border: 1px solid var(--lg-edge); border-radius: var(--r-card); background: var(--lg-sheen), var(--lg-fill); box-shadow: var(--lg-highlight), var(--lg-shadow); color: var(--ink); text-align: center; font: inherit; cursor: pointer; transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+.cn-tile:hover { transform: translateY(-2px); box-shadow: var(--lg-highlight), var(--shadow-float); }
+.cn-tile.is-soon { opacity: .62; }
+.cn-tile-text { display: grid; gap: 2px; min-width: 0; }
+.cn-name { font: 600 15px/1.3 var(--font-sans); color: var(--ink); }
+.cn-tag, .cn-chev { display: none; }
+.cn-badge { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--r-pill); border: 1px solid var(--hairline); color: var(--muted); font: 600 13px/1 var(--font-sans); }
+.cn-badge.is-on { border-color: transparent; background: var(--success-bg); color: var(--success); }
+.cn-badge.is-warn { border-color: transparent; background: var(--warning-bg); color: var(--warning); }
+.cn-detail.is-canvas { max-height: 90svh; overflow-y: auto; }
+.cn-canvas-meta { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cn-canvas-classes { width: 100%; text-align: left; }
+.cn-icon { display: grid; place-items: center; flex: none; width: 56px; height: 56px; border-radius: 17px; color: var(--ink); background: var(--lg-sheen), var(--lg-fill-strong); box-shadow: var(--lg-highlight), 0 0 0 1px var(--hairline), var(--lg-shadow); }
+.cn-icon svg { width: 28px; height: 28px; }
+.cn-icon.is-lg { width: 72px; height: 72px; border-radius: 22px; }
+.cn-icon.is-lg svg { width: 36px; height: 36px; }
+.cn-detail { position: relative; width: min(440px, 100%); display: grid; justify-items: center; gap: 12px; padding-top: 32px; text-align: center; }
+.cn-detail .c-section-title { margin: 0; }
+.cn-close { position: absolute; top: 12px; right: 12px; }
+.cn-detail-text { margin: 0; color: var(--ink); font: 500 15px/1.55 var(--font-sans); }
+.cn-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
+.cn-feed { display: grid; gap: 8px; width: 100%; text-align: left; }
+.cn-feed .c-meta { margin: 0; }
+.cn-feed-row { display: flex; gap: 8px; }
+.cn-feed-row .c-input { flex: 1 1 auto; min-width: 0; }
+.cn-notice { margin: 0; color: var(--olive-ink); font: 600 15px/1.4 var(--font-sans); }
+.cn-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+.cn-sheet { width: min(560px, 100%); display: grid; gap: 14px; max-height: min(640px, 90svh); overflow: hidden; grid-template-rows: auto auto minmax(0, 1fr) auto auto; }
+.cn-sheet .c-sheet-head { margin-bottom: 0; }
+.cn-search { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+.cn-search .c-input { flex: 1 1 auto; min-width: 0; }
+.cn-results { overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--hairline); border-radius: var(--r-row); }
+.cn-result { width: 100%; border-left: 0; border-right: 0; border-bottom: 0; background: transparent; text-align: left; font: inherit; cursor: pointer; }
+.cn-result .c-grow { display: grid; gap: 2px; }
+.cn-row-title { font: 600 17px/1.35 var(--font-sans); color: var(--ink); }
+.cn-sheet > .c-meta { margin: 0; }
+@media (max-width: 560px) {
+  .cn-card { padding: 20px 16px; }
+  .cn-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .cn-grid li + li { border-top: 1px solid var(--hairline); }
+  .cn-tile { display: flex; align-items: center; gap: 12px; padding: 10px 0; text-align: left; border: 0; border-radius: 0; background: none; box-shadow: none; }
+  .cn-tile:hover { transform: none; box-shadow: none; }
+  .cn-tile .cn-icon { width: 42px; height: 42px; border-radius: 12px; }
+  .cn-tile .cn-icon svg { width: 22px; height: 22px; }
+  .cn-tile-text { flex: 1 1 auto; }
+  .cn-tag { display: block; overflow: hidden; color: var(--muted); font: 500 13px/1.35 var(--font-sans); white-space: nowrap; text-overflow: ellipsis; }
+  .cn-chev { display: block; flex: none; color: var(--muted); }
+}
+
+/* Quiz answers: green for right, red for wrong. The glass recipe above outranks the state
+   rules in system.css (its list holds a two-class selector), and the hover edge is
+   !important, so the states are restated here, last and stronger. */
+.quiz-option.quiz-option.quiz-option.quiz-option:is(.correct, .correct-shine, .correct-glow) {
+  background: var(--lg-sheen), var(--success-bg);
+  border-color: var(--success) !important;
+  box-shadow: 0 0 0 1px var(--success), var(--lg-highlight) !important;
+  color: var(--ink);
+}
+.quiz-option.quiz-option.quiz-option.quiz-option:is(.wrong, .wrong-shake) {
+  background: var(--lg-sheen), var(--error-bg);
+  border-color: var(--error) !important;
+  box-shadow: 0 0 0 1px var(--error), var(--lg-highlight) !important;
+  color: var(--ink);
+}
+.quiz-option.quiz-option.selected { border-color: var(--olive); box-shadow: 0 0 0 1px var(--olive), var(--lg-highlight); }

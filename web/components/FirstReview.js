@@ -12,7 +12,7 @@ export default function FirstReview({ onDone }) {
         <section className="c-sheet first-review" role="dialog" aria-modal="true" aria-labelledby="first-review-title">
           <CalendarCheck size={32} strokeWidth={1.75} aria-hidden="true" />
           <h1 id="first-review-title" className="c-title">Your first review is tomorrow</h1>
-          <p className="c-meta">A few minutes on Today each day keeps what you learned. Cordia lines the cards up for you.</p>
+          <p className="c-meta">A few minutes on your Dashboard each day keeps what you learned. Cordia lines the cards up for you.</p>
           <div className="first-review-options">
             <CanvasConnectButton className="c-btn c-btn--secondary" />
             {!installed && <a className="c-btn c-btn--secondary" href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer"><Puzzle size={20} strokeWidth={1.75} aria-hidden="true" />Get the Chrome extension</a>}

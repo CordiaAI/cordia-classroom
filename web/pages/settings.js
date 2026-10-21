@@ -10,10 +10,13 @@ import { FEATURE_COPY, FREE_SUMMARY, METERED, PRICES, PRO_BENEFITS, PRO_LIMITS, 
 import LearningStylePicker from '../components/LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
 import ExplanationPreference from '../components/ExplanationPreference';
-import { CalendarDays, Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2 } from 'lucide-react';
+import { Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2 } from 'lucide-react';
 import BodyPortal from '../components/BodyPortal';
-import CanvasSettings from '../components/CanvasSettings';
 import SharingSettings from '../components/SharingSettings';
+import PhoneSettings from '../components/PhoneSettings';
+import LearnCordia from '../components/LearnCordia';
+import ConnectorsSettings from '../components/ConnectorsSettings';
+import useScrollerTabs from '../lib/useScrollerTabs';
 import { canvasStatus } from '../lib/canvas';
 import AssistantSettings from '../components/assistant/AssistantSettings';
 
@@ -21,17 +24,18 @@ export default function SettingsPage() {
   const { ready } = useRequireAuth();
   const router = useRouter();
   const [activeSection, setActiveSection] = useState('account');
+  const tabsRef = useScrollerTabs(activeSection);
   const [profileName, setProfileName] = useState('');
 
   // /settings?section=study opens a tab directly. Old links land on the tab that now
   // holds them; the grove moved to Progress.
-  const SECTION_ALIASES = { subscription: 'plan', profile: 'account', learning: 'study', canvas: 'connections' };
+  const SECTION_ALIASES = { subscription: 'plan', profile: 'account', learning: 'study', canvas: 'connectors', connections: 'connectors' };
   useEffect(() => {
     if (!router.isReady || !router.query.section) return;
     const section = String(router.query.section);
     if (section === 'grove') { router.replace('/progress'); return; }
     const key = SECTION_ALIASES[section] || section;
-    setActiveSection(['account', 'study', 'assistant', 'appearance', 'plan', 'connections'].includes(key) ? key : 'account');
+    setActiveSection(['account', 'study', 'assistant', 'appearance', 'plan', 'connectors', 'learn'].includes(key) ? key : 'account');
   }, [router.isReady, router.query.section]);
 
   // Picking a tab updates the address, so Back and shared links land on it.
@@ -78,7 +82,7 @@ export default function SettingsPage() {
     apiFetch('/auth/me').then(identity => {
       if (!identity?.user_id) return;
       cacheUserIdentity(identity);
-      setEmail(identity.email || '');
+      setEmail(identity.email || getUserEmail() || '');
       setProfileName(identity.name || '');
     });
     const saved = localStorage.getItem('theme') || 'light';
@@ -195,7 +199,8 @@ export default function SettingsPage() {
     { key: 'assistant', label: 'Assistant' },
     { key: 'appearance', label: 'Appearance' },
     { key: 'plan', label: 'Plan & billing' },
-    { key: 'connections', label: 'Connections' },
+    { key: 'connectors', label: 'Connectors' },
+    { key: 'learn', label: 'Learn Cordia' },
   ];
   const initials = (profileName || email.split('@')[0] || '').split(/[\s._-]+/).filter(part => /^[a-z]/i.test(part)).slice(0, 2).map(part => part[0]).join('').toUpperCase();
 
@@ -214,7 +219,7 @@ export default function SettingsPage() {
       <div className="c-page profile-page">
         <header className="c-page-head"><h1 className="c-title">Settings</h1></header>
 
-        <div className="c-seg profile-tabs" role="tablist" aria-label="Settings" onKeyDown={onTabKey}>
+        <div ref={tabsRef} className="c-seg is-scroller profile-tabs" role="tablist" aria-label="Settings" onKeyDown={onTabKey}>
           {sections.map(section => (
             <button
               key={section.key}
@@ -324,16 +329,15 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {activeSection === 'connections' && (
-          <div className="profile-section c-stack" role="tabpanel" id="panel-connections" aria-labelledby="tab-connections">
-            {canvasReady && <CanvasSettings school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} />}
-            {/* Canvas settings already offer the calendar link; without them, link to it here. */}
-            {!canvasReady && (
-              <div className="c-card settings-row">
-                <span className="settings-row-label"><CalendarDays size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Calendar link</span></span>
-                <Link href="/canvas?tab=calendar" className="c-btn c-btn--secondary">Open Calendar</Link>
-              </div>
-            )}
+        {activeSection === 'learn' && (
+          <div className="profile-section" role="tabpanel" id="panel-learn" aria-labelledby="tab-learn">
+            <LearnCordia />
+          </div>
+        )}
+
+        {activeSection === 'connectors' && (
+          <div className="profile-section c-stack" role="tabpanel" id="panel-connectors" aria-labelledby="tab-connectors">
+            <ConnectorsSettings />
             <div className="c-card settings-row">
               <span className="settings-row-label"><Puzzle size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Chrome extension</span></span>
               {extensionInstalled
@@ -388,6 +392,7 @@ export default function SettingsPage() {
               </div>
               <button type="button" className="c-btn c-btn--secondary" onClick={() => { clearAuth(); router.push('/'); }}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" />Sign out</button>
             </div>
+            <PhoneSettings />
             <div className="c-card settings-row">
               <span className="settings-row-label"><Trash2 size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Delete account</span></span>
               <button type="button" className="c-btn c-btn--secondary settings-danger" onClick={() => setDeleting({ text: '', busy: false, error: '' })}>Delete account</button>
@@ -463,7 +468,7 @@ export default function SettingsPage() {
         .plan-features :global(.lucide) { color: var(--olive-ink); margin-top: 2px; }
         .plan-current-label { color: var(--olive-ink); font-weight:600; }
         .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        @media (max-width: 767px) { .billing-plans { grid-template-columns: 1fr; } .me-card { flex-wrap: wrap; } }
+        @media (max-width: 767px) { .billing-plans { grid-template-columns: 1fr; } .me-card { flex-wrap: wrap; } .me-names { flex: 1 1 0; min-width: 0; } .me-card > :global(.c-btn) { width: 100%; } .settings-row > :global(.c-btn) { width: 100%; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </>

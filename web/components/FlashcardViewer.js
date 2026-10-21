@@ -4,6 +4,8 @@ import { walkthroughEvent } from '../lib/walkthrough';
 import { requestTip } from '../lib/tips';
 import SessionFinish from './SessionFinish';
 
+const SHUFFLE_KEY = 'cordiaShuffle';
+
 function shuffledOrder(length) {
   const order = Array.from({ length }, (_, index) => index);
   for (let index = order.length - 1; index > 0; index -= 1) {
@@ -25,7 +27,15 @@ export default function FlashcardViewer({
   flashcards, guideId, title, onBack, onFinish, onExit, starred, onToggleStar, onEdit, finishExtra,
 }) {
   const total = flashcards.length;
-  const [queue, setQueue] = useState(() => flashcards.map((_, index) => index));
+  // Shuffle is a setting, not a one-off: on, cards come in random order (and stay that way
+  // next session); off, they go back to the guide's order.
+  const [shuffleOn, setShuffleOn] = useState(() => {
+    try { return localStorage.getItem(SHUFFLE_KEY) === 'on'; } catch { return false; }
+  });
+  const [queue, setQueue] = useState(() => {
+    const order = flashcards.map((_, index) => index);
+    return shuffleOn ? shuffledOrder(order.length).map(index => order[index]) : order;
+  });
   const [flipped, setFlipped] = useState(false);
   const [known, setKnown] = useState([]);
   const [missed, setMissed] = useState(() => new Set());
@@ -84,14 +94,23 @@ export default function FlashcardViewer({
     setDone(false);
   }
 
-  function shuffle() {
-    const order = shuffledOrder(queue.length);
-    setQueue(order.map(index => queue[index]));
+  function toggleShuffle() {
+    const next = !shuffleOn;
+    setShuffleOn(next);
+    try { localStorage.setItem(SHUFFLE_KEY, next ? 'on' : 'off'); } catch {}
+    setQueue(current => {
+      if (!next) return [...current].sort((a, b) => a - b);
+      const mixed = shuffledOrder(current.length).map(index => current[index]);
+      // Turning shuffle on always changes the card in front, so the tap visibly does something.
+      if (mixed.length > 1 && mixed[0] === current[0]) mixed.push(mixed.shift());
+      return mixed;
+    });
     setFlipped(false);
   }
 
   function restart() {
-    setQueue(flashcards.map((_, index) => index));
+    const order = flashcards.map((_, index) => index);
+    setQueue(shuffleOn ? shuffledOrder(order.length).map(index => order[index]) : order);
     setKnown([]);
     setMissed(new Set());
     setHistory([]);
@@ -124,7 +143,7 @@ export default function FlashcardViewer({
       <div className="c-glass fc-bar" role="toolbar" aria-label="Flashcards">
         <button type="button" className="c-icon-btn" onClick={onBack} aria-label="Back"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         <span className="fc-name c-truncate">{title}</span>
-        <button type="button" className="c-icon-btn" onClick={shuffle} aria-label="Shuffle" disabled={done}><Shuffle size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+        <button type="button" className="c-icon-btn" onClick={toggleShuffle} aria-label="Shuffle" aria-pressed={shuffleOn} title={shuffleOn ? 'Shuffle is on' : 'Shuffle is off'} disabled={done}><Shuffle size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         {onToggleStar && (
           <button type="button" className={'c-icon-btn' + (starred ? ' is-starred' : '')} onClick={onToggleStar} aria-pressed={Boolean(starred)} aria-label={starred ? 'Unstar' : 'Star'}>
             <Star size={20} strokeWidth={1.75} aria-hidden="true" fill={starred ? 'currentColor' : 'none'} />

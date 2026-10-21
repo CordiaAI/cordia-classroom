@@ -4,12 +4,12 @@ import { readFile } from 'node:fs/promises';
 
 const source = relativePath => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
-test('one navigation: Today, Library, Canvas, Assistant plus New; Tutor is a bubble; Library owns study screens, notes and lectures', async () => {
+test('one navigation: Dashboard, Library, Canvas, Assistant plus New; Tutor is a bubble; Library owns study screens, notes and lectures', async () => {
   const sidebar = await source('components/Sidebar.js');
   const navigation = sidebar.split('const navItems = [')[1].split('];')[0];
   const labels = [...navigation.matchAll(/\{ label: '([^']+)'/g)].map(match => match[1]);
 
-  assert.deepEqual(labels, ['Today', 'Library', 'Canvas', 'Assistant']);
+  assert.deepEqual(labels, ['Dashboard', 'Library', 'Canvas', 'Assistant']);
   assert.match(sidebar, /'\/smartnotes', '\/lecture'\]/);
   assert.match(sidebar, /<TutorBubble \/>/);
   assert.match(await source('components/TutorBubble.js'), /cordia:tutor-toggle/);
@@ -38,10 +38,10 @@ test('old dashboard views redirect to their own routes', async () => {
   assert.doesNotMatch(dashboard, /Study smarter/);
 });
 
-test('Today: Continue, four tool tiles, Due soon (Canvas when empty), progress strip; no Daily review card', async () => {
+test('Dashboard: Continue, four tool tiles, Due soon (Canvas when empty), progress strip; no Daily review card', async () => {
   const dashboard = await source('pages/dashboard.js');
 
-  assert.match(dashboard, /<h1 className="c-title">Today<\/h1>/);
+  assert.match(dashboard, /<h1 className="c-title">Dashboard<\/h1>/);
   assert.doesNotMatch(dashboard, /Start review|today-review/);
   assert.match(dashboard, /<CanvasConnectButton card [^>]*spot="canvas-connect"/);
   assert.match(dashboard, /href="\/progress"/);

@@ -1,3 +1,4 @@
+import { formatPhone } from './phone.mjs';
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export const REQUEST_TIMEOUT_MS = 15000;
 // AI generation routinely takes 20-60s. Aborting early charged students for guides they
@@ -56,7 +57,8 @@ function tokenIdentity(token = getToken()) {
   const combinedName = [metadata.given_name, metadata.family_name].filter(Boolean).join(' ').trim();
   return {
     userId: payload.sub || '',
-    email: payload.email || '',
+    // Accounts made with SMS sign-in have a phone and no email; the phone stands in for display.
+    email: payload.email || (payload.phone ? formatPhone(payload.phone) : ''),
     name: metadata.full_name || metadata.name || combinedName || '',
   };
 }
@@ -64,7 +66,7 @@ function tokenIdentity(token = getToken()) {
 export function setToken(token, email, refreshToken, name = '') {
   const identity = tokenIdentity(token);
   localStorage.setItem('authToken', token);
-  localStorage.setItem('userEmail', email || identity.email);
+  localStorage.setItem('userEmail', email || identity.email || '');
   if (identity.userId) localStorage.setItem('userId', identity.userId);
   const resolvedName = name || identity.name;
   if (resolvedName) localStorage.setItem('userName', resolvedName);
@@ -86,6 +88,15 @@ export function getUserEmail() {
   return typeof window !== 'undefined'
     ? localStorage.getItem('userEmail') || tokenIdentity().email
     : '';
+}
+
+// The account's verified phone (E.164 digits, no +), if it has one; from the access token.
+export function getUserPhone() {
+  return typeof window !== 'undefined' ? String(tokenPayload().phone || '') : '';
+}
+
+export function getRefreshToken() {
+  return typeof window !== 'undefined' ? localStorage.getItem('refreshToken') || '' : '';
 }
 
 export function getUserId() {
@@ -182,7 +193,7 @@ export function scheduleProactiveRefresh() {
 // API calls on the same page don't each fire their own refresh.
 let _refreshPromise = null;
 
-async function tryRefreshToken() {
+export async function tryRefreshToken() {
   if (_refreshPromise) return _refreshPromise;
   _refreshPromise = _doRefresh().finally(() => { _refreshPromise = null; });
   return _refreshPromise;

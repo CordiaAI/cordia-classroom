@@ -22,7 +22,7 @@ function createState(populated) {
       sampleGuide('a0000000-0000-4000-8000-000000000003', 'Nursing Pharmacology', { domain: 'nursing' }),
     ] : [],
     notes: populated ? [{ id: 'n1', title: 'Lecture notes', content: '<p>Mitochondria make energy.</p>', updated_at: new Date().toISOString() }] : [],
-    tutor: { id: 's1', status: 'idle', messages: [], conversation_version: 1, skills: [{ id: 'explain', label: 'Explain', available: true }] },
+    tutor: { id: 's1', status: 'idle', messages: [], conversation_version: 1, skills: [{ id: 'explain', label: 'Explain', available: true }, { id: 'organize', label: 'Organize', available: true }] },
     calls: [],
   };
 }
@@ -39,6 +39,13 @@ async function install(context, state) {
     if (url.endsWith('/auth/v1/user')) {
       if (req.method() === 'PUT') { const body = JSON.parse(req.postData() || '{}'); state.meta = { ...state.meta, ...(body.data || {}) }; }
       return route.fulfill({ json: { id: USER, user_metadata: state.meta } });
+    }
+    if (url.includes('/otp')) { state.otp = JSON.parse(req.postData() || '{}'); return route.fulfill({ json: {} }); }
+    if (url.includes('/verify')) {
+      const body = JSON.parse(req.postData() || '{}');
+      state.verified = body;
+      if (body.token !== '123456') return route.fulfill({ status: 403, json: { code: 'otp_expired', msg: 'Token has expired or is invalid' } });
+      return route.fulfill({ json: { access_token: TOKEN, refresh_token: 'r2', token_type: 'bearer', expires_in: 3600, user: { id: USER, phone: (body.phone || '').replace('+', '') } } });
     }
     if (url.includes('/signup')) return route.fulfill({ status: 422, json: { code: 'weak_password', msg: 'Password should contain at least one character of each: abcdefghijklmnopqrstuvwxyz, ABCDEFGHIJKLMNOPQRSTUVWXYZ, 0123456789, !@#$%^&*()_+-=[]{};\':"|<>?,./`~.' } });
     if (url.includes('/token')) return route.fulfill({ status: 400, json: { error: 'invalid_grant', error_description: 'Invalid login credentials' } });
@@ -103,6 +110,25 @@ async function install(context, state) {
     ] } : { connected: false });
     if (path === '/calendar/connection' && method === 'POST') return json({ connected: true, items: [] });
     if (path === '/tutor/session') return json(state.tutor);
+    if (path === '/tutor/chats') return json({ chats: state.chats || [] });
+    if (path === '/connectors' && method === 'GET') {
+      state.linked = state.linked || {};
+      return json({ connectors: [['gcal', 'Google Calendar', 'Put your deadlines on your calendar.'], ['apple_calendar', 'Apple Calendar', 'Subscribe to your deadlines on iPhone and Mac.'], ['gtasks', 'Google Tasks', 'Turn deadlines into to-dos.'], ['gdrive', 'Google Drive', 'Import course files into a guide.'], ['gdocs', 'Google Docs', 'Import notes into a guide.'], ['notion', 'Notion', 'Import notes into a guide.']].map(([id, name, tagline]) => ({ id, name, tagline, available: true, connected: Boolean(state.linked[id]) })) });
+    }
+    if ((m = path.match(/^\/connectors\/([a-z_]+)\/connect$/))) { state.linked = { ...(state.linked || {}), [m[1]]: true }; return json({ redirect_url: `/settings?section=connectors&connected=${m[1]}` }); }
+    if ((m = path.match(/^\/connectors\/([a-z_]+)$/)) && method === 'DELETE') { delete state.linked[m[1]]; return json({ ok: true }); }
+    if (path.match(/^\/connectors\/(gcal|gtasks)\/deadlines$/)) return json({ added: 3, skipped: 0 });
+    if (path === '/connectors/apple_calendar/feed') return json({ url: 'https://api.example.com/calendar-feed/u.sig.ics', webcal_url: 'about:blank' });
+    if (path.match(/^\/connectors\/[a-z]+\/files/)) return json({ files: [{ id: 'f1', title: 'Biology lecture 4 notes', kind: 'doc', edited: '2026-10-20' }, { id: 'f2', title: 'Syllabus', kind: 'pdf', edited: '2026-09-01' }] });
+    if (path.match(/^\/connectors\/[a-z]+\/import$/)) return json({ title: 'Biology lecture 4 notes', text: 'Osmosis is the movement of water across a membrane.' });
+    if (path === '/tutor/session/new') {
+      state.chats = state.chats || [];
+      if (state.tutor.messages.length) state.chats.unshift({ id: 'c' + (state.chats.length + 1), guide_id: state.tutor.active_guide_id || null, title: state.tutor.messages[0].text.slice(0, 80), updated_at: new Date().toISOString(), messages: state.tutor.messages });
+      const resumed = body.resume_id && state.chats.find(chat => chat.id === body.resume_id);
+      if (resumed) state.chats = state.chats.filter(chat => chat !== resumed);
+      state.tutor = { ...state.tutor, messages: resumed ? resumed.messages : [], active_guide_id: resumed ? resumed.guide_id : body.guide_id, conversation_version: state.tutor.conversation_version + 1 };
+      return json(state.tutor);
+    }
     if (path === '/chat') {
       state.tutor = { ...state.tutor, messages: [...state.tutor.messages, { role: 'user', text: body.question }, { role: 'ai', text: 'Here is a **simple** explanation from your guide.' }], conversation_version: state.tutor.conversation_version + 1 };
       return json({ answer: 'ok', session: state.tutor });

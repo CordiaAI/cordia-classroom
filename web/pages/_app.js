@@ -42,6 +42,8 @@ export default function App({ Component, pageProps }) {
   });
   const brandHead = (
     <Head>
+      {/* Phones: fit the screen exactly, no pinch or double-tap zoom, and run edge to edge under the notch. */}
+      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" key="viewport" />
       <title>CordiaClassroom</title>
       <meta name="application-name" content="CordiaClassroom" />
       <meta name="description" content="Turn course material into focused study guides, notes, flashcards, and practice with CordiaClassroom." />

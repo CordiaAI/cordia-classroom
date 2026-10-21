@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { CalendarDays, FileText, FolderOpen, GitPullRequest, HardDrive, ListChecks, Mail, MessagesSquare, NotebookPen, RefreshCw, Sheet, Wallet } from 'lucide-react';
 import BodyPortal from '../BodyPortal';
@@ -109,7 +110,7 @@ export default function AssistantApps({ view, catalog, setView, save, toast }) {
     <div className="c-stack">
       <div className="c-card asst-card">
         <h2 className="c-section-title">Apps</h2>
-        <p className="c-meta">Connect an app and {name} can use it when you text: check your calendar, update a sheet, add a task. Canvas deadlines come from your Canvas connection in Classroom.</p>
+        <p className="c-meta">Connect an app and {name} can use it when you text: check your calendar, update a sheet, add a task. Canvas deadlines come from your Canvas connection in Classroom. To put deadlines on your calendar or import notes into a guide, use <Link href="/settings?section=connectors">Connectors</Link>.</p>
         <div className="c-list asst-flat-list">
           {catalog.connectors.map(connector => {
             const Icon = APP_ICONS[connector.id] || FolderOpen;

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { setToken, scheduleProactiveRefresh } from '../../lib/api';
 import { authMessage } from '../../components/AuthCard';
+import { takeReturnTo } from '../../lib/returnTo.mjs';
 
 function tokenEmail(token) {
   try {
@@ -35,7 +36,9 @@ export default function OAuthCallback() {
     scheduleProactiveRefresh();
     window.history.replaceState({}, document.title, '/auth/callback');
 
-    router.replace('/dashboard');
+    const back = takeReturnTo();
+    if (back) window.location.assign(back);
+    else router.replace('/dashboard');
   }, [router]);
 
   return (

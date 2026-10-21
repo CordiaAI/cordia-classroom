@@ -92,7 +92,7 @@ export default function StudySession() {
       <div className="c-page session-empty">
         <h1 className="c-title">{queue.practice.length ? 'Practice' : 'All done'}</h1>
         <PracticeList practice={queue.practice} />
-        <button type="button" className="c-btn c-btn--secondary" onClick={() => router.push('/dashboard')}>Today</button>
+        <button type="button" className="c-btn c-btn--secondary" onClick={() => router.push('/dashboard')}>Dashboard</button>
         <style jsx>{`.session-empty { width: min(760px, 100%); margin: 0 auto; justify-items: start; }`}</style>
       </div>
     );

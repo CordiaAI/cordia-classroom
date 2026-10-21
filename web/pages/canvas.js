@@ -51,7 +51,7 @@ export default function CanvasPage() {
         {connected && (
           <div className="c-row">
             <button type="button" className="c-btn c-btn--secondary" onClick={syncNow} disabled={syncing}><RefreshCw {...ICON} />{syncing ? 'Syncing…' : 'Sync now'}</button>
-            <Link href="/settings?section=connections" className="c-icon-btn" aria-label="Canvas settings"><Settings2 {...ICON} /></Link>
+            <Link href="/settings?section=connectors" className="c-icon-btn" aria-label="Canvas settings"><Settings2 {...ICON} /></Link>
           </div>
         )}
       </header>

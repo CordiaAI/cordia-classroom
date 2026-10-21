@@ -1092,7 +1092,17 @@ def answer_question(
     """
     client = get_openai_client()
 
-    if allow_clarification:
+    general = allow_clarification and not (context or "").strip()
+    if general:
+        system_prompt = (
+            "You are Cordia Tutor having a natural study conversation. No course material is selected, so answer "
+            "from reliable general knowledge the way a patient tutor would. Say plainly when you are unsure or when "
+            "the answer depends on how the student's course defines something, and suggest choosing a study guide "
+            "for answers tied to their course. Answer the student's actual question and keep continuity with the "
+            "recent conversation. When asked to explain again, teach it a different way instead of rewording."
+        )
+        feature = "tutor_general"
+    elif allow_clarification:
         system_prompt = (
             "You are Cordia Tutor having a natural study conversation. Treat the selected course material as the "
             "authority for what the course teaches, but use reliable general knowledge to clarify definitions, "
@@ -1142,7 +1152,7 @@ def answer_question(
 
 Question: {question}
 
-Answer based on the context above:"""
+Answer based on the context above:""" if not general else f"Question: {question}"
 
     messages = [{"role": "system", "content": system_prompt}]
     earlier = conversation or []
