@@ -15,7 +15,7 @@ export default function PrivacyPolicy() {
           Privacy Policy
         </h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '0.9rem' }}>
-          Effective Date: February 25, 2026 &nbsp;|&nbsp; Last Updated: October 20, 2026
+          Effective Date: February 25, 2026 &nbsp;|&nbsp; Last Updated: October 21, 2026
         </p>
 
         <p style={{ marginBottom: '32px' }}>
@@ -43,7 +43,7 @@ export default function PrivacyPolicy() {
           <p>If you record a lecture, audio from your microphone is sent in short pieces to our servers and to our speech-to-text provider to make a transcript. The transcript, the notes and to-dos made from it, and the audio pieces are stored with your account until you delete the lecture or your account. You are responsible for having permission to record (see our Terms of Service).</p>
 
           <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>f. Canvas Connection</strong></p>
-          <p>If you connect Canvas with an access token, we store the token encrypted and use it only to read what the features need: your course list, the courses you choose to bring in (name, code, term, syllabus topics and module titles), their assignment titles and due dates, and the list of course files. A file is downloaded only when you choose it. We do not read rosters, grades, submissions or messages. Each request to Canvas is recorded in an activity log you can see in Settings. Disconnecting deletes the token and the Canvas data we stored; you can also delete the token in Canvas.</p>
+          <p>If you connect Canvas with an access token, we store the token encrypted and use it only to read what the features need: your course list, the courses you choose to bring in (name, code, term, syllabus topics and module titles), their assignment titles, due dates and whether you turned each one in, and the list of course files. A file is downloaded only when you choose it. When you open a class’s Grades tab, we read your own scores and current grade for that class to show what upcoming work would take; they are shown to you and not stored. We do not read rosters, other students’ information, submission contents or messages. Each request to Canvas is recorded in an activity log you can see in Settings. Disconnecting deletes the token and the Canvas data we stored; you can also delete the token in Canvas.</p>
 
           <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>g. Sets Shared With a Class</strong></p>
           <p>If you choose to share a study set with a class, classmates who joined that class can see and copy its title, questions and flashcards (never your private notes). Shared sets are anonymous unless you turn on "Show my first name". Classmates may report a set, and instructors may turn sharing off for their course. You can make a set private again at any time.</p>

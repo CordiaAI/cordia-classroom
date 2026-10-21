@@ -724,8 +724,8 @@ export default function PracticeWorkspace() {
         .practice-page { display: grid; gap: 20px; }
         .practice-title-row { min-width: 0; flex: 1; }
         @media (max-width: 767px) { .practice-head { flex-wrap: wrap; } .practice-title-row { flex-basis: 100%; } }
-        .practice-source-name { font-family: var(--font-display); min-width: 0; }
-        .practice-prompt { margin: 8px 0 0; font:600 20px/1.15 var(--font-display); }
+        .practice-source-name { font-family: var(--font-sans); min-width: 0; }
+        .practice-prompt { margin: 8px 0 0; font:600 20px/1.15 var(--font-sans); }
         .practice-kind { text-transform: capitalize; }
         .practice-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
         .practice-toolbar .c-seg button { display: inline-flex; align-items: center; gap: 6px; }

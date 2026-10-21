@@ -123,7 +123,7 @@ export default function AirDraw({ boardRef, pen, stroke, showPreview, onError, o
         const [x, y] = at(lm);
         context.beginPath(); context.arc(x, y, index === 8 ? 4 : 2.5, 0, Math.PI * 2); context.fill();
       });
-      context.font = '600 11px Manrope, sans-serif';
+      context.font = '600 11px Quicksand, sans-serif';
       context.fillText(`${fps.value} fps`, 6, height - 6);
     }
 

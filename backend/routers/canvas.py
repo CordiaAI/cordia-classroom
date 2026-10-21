@@ -15,6 +15,7 @@ from services import canvas_client
 from services.canvas_client import CanvasClient, CanvasError, CanvasForbiddenRequest, CanvasUnauthorized
 from services.class_catalog import clean_term, school_name_from_domain, topic_summary
 from services.class_db import add_membership, ensure_class, ensure_school
+from services.grades import estimate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/canvas", tags=["canvas"])
@@ -133,10 +134,22 @@ def _import_course(db, user_id: str, client: CanvasClient, row: dict, school: di
     db.table("canvas_assignments").delete().eq("user_id", user_id).eq("canvas_course_id", course_id).execute()
     rows = [{
         "user_id": user_id, "canvas_assignment_id": int(item["id"]), "canvas_course_id": course_id,
-        "title": str(item.get("name") or "")[:300], "due_at": item.get("due_at"),
+        "title": str(item.get("name") or "")[:300], "due_at": item.get("due_at"), "submitted": _submitted(item),
     } for item in assignments or [] if item.get("id")]
     if rows:
-        db.table("canvas_assignments").upsert(rows, on_conflict="user_id,canvas_assignment_id").execute()
+        try:
+            db.table("canvas_assignments").upsert(rows, on_conflict="user_id,canvas_assignment_id").execute()
+        except Exception:
+            # Before the deadline_done migration there is no submitted column: keep syncing without it.
+            logger.warning("canvas_assignments.submitted missing; syncing without it")
+            db.table("canvas_assignments").upsert([{k: v for k, v in row.items() if k != "submitted"} for row in rows],
+                                                  on_conflict="user_id,canvas_assignment_id").execute()
+
+
+def _submitted(item: dict) -> bool:
+    """Canvas counts it as turned in (or already graded)."""
+    sub = item.get("submission") or {}
+    return bool(sub.get("submitted_at")) or sub.get("workflow_state") in ("submitted", "graded", "pending_review") or bool(sub.get("excused"))
 
 
 def sync(db, user_id: str, *, client: Optional[CanvasClient] = None) -> None:
@@ -401,3 +414,27 @@ def download_file(course_id: int, file_id: int, authorization: str = Header(defa
         raise HTTPException(status_code=502, detail=str(exc))
     safe = re.sub(r"[^\w.\- ]", "_", name)[:150] or "canvas-file"
     return Response(content=body, media_type="application/octet-stream", headers={"Content-Disposition": f'attachment; filename="{safe}"'})
+
+
+@router.get("/courses/{course_id}/grades")
+def course_grades(course_id: int, authorization: str = Header(default="")):
+    """The student's own grade in one class, and what upcoming work would take to move it."""
+    user_id = get_user_id(authorization)
+    db = get_supabase()
+    connection = _imported_course(db, user_id, course_id)
+    client = _client(db, user_id, connection)
+    try:
+        course = client.course(course_id)
+        groups = client.assignment_groups(course_id)
+        enrollments = client.my_enrollments(course_id)
+    except CanvasUnauthorized:
+        _auto_disconnect(db, user_id)
+        raise HTTPException(status_code=409, detail="Reconnect Canvas")
+    except CanvasError:
+        raise HTTPException(status_code=502, detail="Canvas could not be reached.")
+    result = estimate(groups or [], bool(course.get("apply_assignment_group_weights")))
+    grades = next((e.get("grades") for e in enrollments or [] if e.get("type") == "StudentEnrollment" and e.get("grades")), None) or {}
+    # Canvas's own number and letter win for display; the estimate drives the what-ifs.
+    result["canvas_score"] = grades.get("current_score")
+    result["canvas_letter"] = grades.get("current_grade")
+    return result

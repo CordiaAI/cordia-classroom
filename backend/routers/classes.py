@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Header, HTTPException
@@ -14,6 +14,7 @@ from auth_utils import get_user_id
 from database import get_supabase
 from services.class_catalog import normalize_course_code, suggest_class, term_for
 from services.class_db import add_membership, ensure_class, ensure_folder, ensure_school, is_member, remove_membership, user_class_ids
+from services.deadlines import canvas_item_key, is_done, marks, select_assignments
 from services.sharing import ranked_entries, upsert_share
 
 logger = logging.getLogger(__name__)
@@ -179,11 +180,23 @@ def class_deadlines(class_id: str, authorization: str = Header(default="")):
     db = get_supabase()
     row = _member_class(db, user_id, class_id)
     courses = [c["canvas_course_id"] for c in db.table("canvas_courses").select("canvas_course_id").eq("user_id", user_id).eq("class_id", row["id"]).execute().data or []]
-    items = []
-    if courses:
-        items = db.table("canvas_assignments").select("title,due_at").eq("user_id", user_id).in_("canvas_course_id", courses).order("due_at").execute().data or []
-    now = datetime.now(timezone.utc).isoformat()
-    return {"deadlines": [i for i in items if i.get("due_at") and i["due_at"] >= now][:50]}
+    if not courses:
+        return {"deadlines": []}
+    now = datetime.now(timezone.utc)
+    # A week back, so work that is late but not turned in still shows.
+    items = select_assignments(db, user_id, course_ids=courses, start=(now - timedelta(days=7)).isoformat())
+    marked = marks(db, user_id)
+    rows = []
+    for item in items:
+        if not item.get("due_at"):
+            continue
+        key = canvas_item_key(item["canvas_assignment_id"])
+        done = is_done(key, marked, item.get("submitted"))
+        if item["due_at"] < now.isoformat() and done:
+            continue
+        rows.append({"id": key, "title": item.get("title") or "Assignment", "due_at": item["due_at"], "done": done,
+                     "submitted": bool(item.get("submitted"))})
+    return {"deadlines": rows[:50]}
 
 
 # ---------------------------------------------------------------------------

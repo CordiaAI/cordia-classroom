@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from auth_utils import get_user_id
 from database import get_supabase
+from services.deadlines import canvas_item_key, is_done, marks, select_assignments
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 logger = logging.getLogger(__name__)
@@ -220,8 +221,12 @@ def _events(text: str) -> list[dict]:
     )[:100]
 
 
-def _calendar_payload(url: str) -> dict:
+def _calendar_payload(url: str, user_id: str = "") -> dict:
     items = _events(_download_feed(url))
+    if user_id:
+        marked = marks(get_supabase(), user_id)
+        for item in items:
+            item["done"] = is_done(str(item.get("id")), marked)
     today = datetime.now(timezone.utc).date()
     return {
         "connected": True,
@@ -252,12 +257,13 @@ def _token_payload(user_id: str) -> dict | None:
     domain = rows[0]["canvas_domain"]
     now = datetime.now(timezone.utc)
     start, end = (now - timedelta(days=7)).isoformat(), (now + timedelta(days=90)).isoformat()
-    assignments = db.table("canvas_assignments").select("canvas_assignment_id,canvas_course_id,title,due_at") \
-        .eq("user_id", user_id).gte("due_at", start).lte("due_at", end).order("due_at").limit(100).execute().data or []
+    assignments = select_assignments(db, user_id, start=start, end=end, limit=100)
+    marked = marks(db, user_id)
     courses = {row["canvas_course_id"]: row.get("course_code") or row.get("name") or None
                for row in db.table("canvas_courses").select("canvas_course_id,name,course_code").eq("user_id", user_id).execute().data or []}
     items = [{
-        "id": f"canvas-{item['canvas_assignment_id']}",
+        "id": canvas_item_key(item['canvas_assignment_id']),
+        "done": is_done(canvas_item_key(item['canvas_assignment_id']), marked, item.get("submitted")),
         "title": item.get("title") or "Assignment",
         "due_at": item["due_at"],
         "all_day": False,
@@ -281,7 +287,28 @@ def get_calendar_connection(authorization: str = Header(default="")):
     url = _stored_feed(user_id)
     if not url:
         return _token_payload(user_id) or {"connected": False, "items": [], "due_today": []}
-    return _calendar_payload(url)
+    return _calendar_payload(url, user_id)
+
+
+class DoneRequest(BaseModel):
+    done: bool
+
+
+@router.put("/items/{item_key}/done")
+def set_item_done(item_key: str, body: DoneRequest, authorization: str = Header(default="")):
+    """Check a deadline off (or back on). Works for Canvas and calendar-link items alike."""
+    user_id = get_user_id(authorization)
+    if not re.fullmatch(r"[\w@.:\-]{1,200}", item_key):
+        raise HTTPException(status_code=400, detail="Unknown deadline")
+    try:
+        get_supabase().table("deadline_marks").upsert(
+            {"user_id": user_id, "item_key": item_key, "done": body.done, "updated_at": datetime.now(timezone.utc).isoformat()},
+            on_conflict="user_id,item_key",
+        ).execute()
+    except Exception:
+        logger.exception("deadline mark failed")
+        raise HTTPException(status_code=503, detail="Checking off deadlines is not available yet.")
+    return {"item_key": item_key, "done": body.done}
 
 
 @router.post("/connection")

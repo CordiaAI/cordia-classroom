@@ -237,7 +237,9 @@ ALLOWLIST = (
     _ep("users.self", r"/api/v1/users/self"),
     _ep("courses.list", r"/api/v1/courses", params=("enrollment_state",), multi={"include[]": {"term"}}, required={"enrollment_state": "active"}),
     _ep("courses.get", r"/api/v1/courses/\d+", multi={"include[]": {"syllabus_body", "term"}}),
-    _ep("assignments.list", r"/api/v1/courses/\d+/assignments", params=("order_by",)),
+    _ep("assignments.list", r"/api/v1/courses/\d+/assignments", params=("order_by",), multi={"include[]": {"submission"}}),
+    _ep("assignment_groups.list", r"/api/v1/courses/\d+/assignment_groups", multi={"include[]": {"assignments", "submission"}}),
+    _ep("enrollments.self", r"/api/v1/courses/\d+/enrollments", params=("user_id",), required={"user_id": "self"}),
     _ep("modules.list", r"/api/v1/courses/\d+/modules", multi={"include[]": {"items"}}),
     _ep("calendar_events.list", r"/api/v1/calendar_events", params=("type", "start_date", "end_date", "all_events"), multi={"context_codes[]": None}),
     _ep("files.list", r"/api/v1/courses/\d+/files", params=("search_term", "sort", "order")),
@@ -367,7 +369,15 @@ class CanvasClient:
         return self._get(f"/api/v1/courses/{int(course_id)}", [("include[]", "syllabus_body"), ("include[]", "term")]).json()
 
     def assignments(self, course_id: int) -> list:
-        return self._pages(f"/api/v1/courses/{int(course_id)}/assignments", [])
+        return self._pages(f"/api/v1/courses/{int(course_id)}/assignments", [("include[]", "submission")])
+
+    def assignment_groups(self, course_id: int) -> list:
+        """Weights, assignments and this student's own submissions, for the grade view."""
+        return self._pages(f"/api/v1/courses/{int(course_id)}/assignment_groups", [("include[]", "assignments"), ("include[]", "submission")])
+
+    def my_enrollments(self, course_id: int) -> list:
+        """Only the caller's own enrollment (user_id=self), which carries their current grade."""
+        return self._pages(f"/api/v1/courses/{int(course_id)}/enrollments", [("user_id", "self")])
 
     def modules(self, course_id: int) -> list:
         return self._pages(f"/api/v1/courses/{int(course_id)}/modules", [("include[]", "items")])

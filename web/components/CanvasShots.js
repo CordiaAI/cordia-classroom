@@ -1,6 +1,6 @@
 // Drawn copies of the three Canvas screens a student uses to find their calendar feed,
 // with the exact spot to click circled in olive. Colors are the --shot-* tokens (styles/tokens.css).
-const TEXT = { fontFamily: 'Manrope, Arial, sans-serif', fontWeight: 600 };
+const TEXT = { fontFamily: 'Quicksand, Arial, sans-serif', fontWeight: 600 };
 
 function Mark({ cx, cy, rx = 30, ry = 22 }) {
   return <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="none" className="shot-mark" strokeWidth="4" />;

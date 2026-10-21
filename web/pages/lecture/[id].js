@@ -11,6 +11,7 @@ import useSessionTracker from '../../lib/useSessionTracker';
 import { startGuideJob } from '../../lib/guideJobs';
 import { generateAndSave, newRequestId } from '../../lib/guideCreate';
 import { analyzeLecture, clock, deleteLecture, dueLabel, getLecture, updateLecture, updateTodo } from '../../lib/lectures';
+import { outlineHtml } from '../../lib/lectureOutline.mjs';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const WHY = { exam: 'On the exam', mistake: 'Common mistake', emphasis: 'Stressed', requirement: 'Required' };
@@ -49,9 +50,9 @@ export default function LecturePage() {
   }, [ready, id]);
 
   // Every lecture gets notes: written here if AI didn't run when it was saved, and filed in Notes.
-  async function writeNotes() {
-    setNotes(data?.lecture?.analysis?.analyzed ? 'idle' : 'writing');
-    const result = await analyzeLecture(id);
+  async function writeNotes({ rewrite = false } = {}) {
+    setNotes(data?.lecture?.analysis?.analyzed && !rewrite ? 'idle' : 'writing');
+    const result = await analyzeLecture(id, { rewrite });
     if (result?.analysis) setData(current => ({ ...current, lecture: { ...current.lecture, analysis: result.analysis }, todos: result.todos || current.todos }));
     setNotes(result?.analysis?.analyzed ? 'idle' : result?.reason === 'not_configured' ? 'unavailable' : 'failed');
   }
@@ -195,9 +196,13 @@ export default function LecturePage() {
       <section className="c-card lecture-card" aria-labelledby="lecture-notes">
         <div className="lecture-item-head">
           <h2 id="lecture-notes" className="c-section-title">Notes</h2>
+          {analysis.analyzed && !analysis.outline_md && notes !== 'writing' && <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={() => writeNotes({ rewrite: true })}><Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />Make full outline</button>}
           {analysis.note_id && <Link className="c-btn c-btn--quiet c-btn--sm" href={'/smartnotes?id=' + analysis.note_id}><NotebookPen size={16} strokeWidth={1.75} aria-hidden="true" />Open in Notes</Link>}
         </div>
-        {analysis.outline?.length > 0 ? analysis.outline.map((section, index) => (
+        {notes === 'writing' && analysis.analyzed ? <SectionLoader height={96} label="Writing the outline" /> : analysis.outline_md ? (
+          // Escaped by outlineHtml: no markup from the model gets through.
+          <div className="c-study lecture-outline-md" dangerouslySetInnerHTML={{ __html: outlineHtml(analysis.outline_md) }} />
+        ) : analysis.outline?.length > 0 ? analysis.outline.map((section, index) => (
           <div key={index} className="lecture-outline-section">
             <div className="lecture-item-head">
               <h3 className="lecture-outline-heading">{section.heading}</h3>
@@ -332,7 +337,7 @@ export default function LecturePage() {
         .lecture-item { display: grid; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid var(--hairline); }
         .lecture-item:last-child { padding-bottom: 0; border-bottom: 0; }
         .lecture-item-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-        .lecture-item-head strong { font: 600 var(--fs-17)/var(--lh-title) var(--font-display); color: var(--ink); }
+        .lecture-item-head strong { font: 600 var(--fs-17)/var(--lh-title) var(--font-sans); color: var(--ink); }
         .lecture-quote { margin: 0; padding-left: 12px; border-left: 2px solid var(--hairline); color: var(--muted); font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); }
         .lecture-time { justify-self: start; font-variant-numeric: tabular-nums; }
         .lecture-todo-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
@@ -341,7 +346,12 @@ export default function LecturePage() {
         .lecture-on-cal { display: inline-flex; align-items: center; gap: 4px; }
         .lecture-todo.is-done strong { text-decoration: line-through; color: var(--muted); }
         .lecture-outline-section { display: grid; gap: 8px; }
-        .lecture-outline-heading { margin: 0; font: 600 var(--fs-17)/var(--lh-title) var(--font-display); color: var(--ink); }
+        .lecture-outline-md :global(h1) { margin: 0 0 12px; font: 600 var(--fs-20)/var(--lh-title) var(--font-sans); }
+        .lecture-outline-md :global(h2) { margin: 24px 0 8px; font: 600 var(--fs-17)/var(--lh-title) var(--font-sans); color: var(--olive-ink); }
+        .lecture-outline-md :global(h3), .lecture-outline-md :global(h4) { margin: 16px 0 6px; font: 600 var(--fs-15)/var(--lh-title) var(--font-sans); }
+        .lecture-outline-md :global(ul), .lecture-outline-md :global(ol) { margin: 4px 0 8px; padding-left: 22px; }
+        .lecture-outline-md :global(li > ul) { list-style: circle; }
+        .lecture-outline-heading { margin: 0; font: 600 var(--fs-17)/var(--lh-title) var(--font-sans); color: var(--ink); }
         .lecture-terms { margin: 0; display: grid; gap: 12px; }
         .lecture-term { display: grid; grid-template-columns: minmax(120px, 220px) 1fr; gap: 16px; }
         .lecture-term dt { font: 600 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink); }
