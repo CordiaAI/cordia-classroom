@@ -49,9 +49,12 @@ CLAUDE_EFFORT = {BUILD: "medium", LIGHT: "low", VISION: "medium"}
 
 
 def _role_model(name: str, role: str) -> str:
-    """A per-role override from the environment, except Opus, which is never used."""
+    """A per-role override from the environment, except Opus, which is never used, and a model of
+    another provider (a gpt-4o left over from before the Anthropic key would fail every call)."""
     chosen = os.getenv(name, "").strip()
-    return chosen if chosen and "opus" not in chosen.lower() else _DEFAULTS[role]
+    if not chosen or "opus" in chosen.lower() or chosen.lower().startswith("claude") != ANTHROPIC:
+        return _DEFAULTS[role]
+    return chosen
 
 
 BUILD_MODEL = _role_model("CLASSROOM_BUILD_MODEL", BUILD)
