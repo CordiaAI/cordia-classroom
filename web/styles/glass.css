@@ -156,3 +156,22 @@ body { touch-action: manipulation; }
    title would otherwise stretch the column and push row actions off the card). */
 :is(.c-stack, .c-section) { grid-template-columns: minmax(0, 1fr); }
 :is(.c-stack, .c-section) > * { min-width: 0; }
+
+/* Tutor pickers float above the pane (rendered at the end of <body>, see TutorSelect). */
+.tutor-select-options.is-floating { position: fixed; z-index: 260; margin: 0; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; }
+
+/* Tutor › Chats: start a new chat (about the guide, or general) or reopen a saved one. */
+.cordia-tutor-title-row { justify-content: flex-start; }
+.cordia-tutor-title-row .tutor-chats-btn { margin-left: auto; min-height: 36px; padding: 0 12px; gap: 6px; }
+.tutor-chats { display: grid; align-content: start; gap: 12px; }
+.tutor-chats-new { display: grid; gap: 8px; }
+.tutor-chats-new .c-btn { justify-content: flex-start; min-width: 0; }
+.tutor-chats-new .c-btn > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tutor-chats-new .c-meta { margin: 0; }
+.tutor-chats-title { margin: 8px 0 0; font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
+.tutor-chats-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.tutor-chat-row { display: grid; gap: 2px; width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid var(--hairline); border-radius: var(--r-input); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; transition: background var(--dur) var(--ease); }
+.tutor-chat-row:hover:not(:disabled) { background: var(--olive-tint); }
+.tutor-chat-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.4 var(--font-sans); }
+.tutor-chat-row .c-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tutor-chats-btn[aria-pressed='true'] { background: var(--olive-tint) !important; color: var(--olive-ink) !important; }
