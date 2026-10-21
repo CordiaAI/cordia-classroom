@@ -143,8 +143,9 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
   useEffect(() => {
     if (!auto || !text) return;
     if (disabled) { setState({ phase: 'fallback', reason: 'not_configured', quiet: Boolean(fallback) }); return; }
-    if (usage) make();
-  }, [auto, text, Boolean(usage), disabled]);
+    // Start drawing at once; the server says if visuals aren't set up or none are left.
+    make();
+  }, [auto, text, disabled]);
 
   const left = visualsLeftLabel(usage);
   const visual = state.visuals?.[index];
