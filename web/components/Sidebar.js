@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import {
-  ChartNoAxesColumn, CircleHelp, CreditCard, GraduationCap, LayoutDashboard, Library, Link2, LogOut, MessageCircle, Palette, Plus, Search, Settings, Timer, User,
-} from 'lucide-react';
+import { ChartNoAxesColumn, CircleHelp, CreditCard, GraduationCap, LayoutDashboard, Library, Link2, LogOut, MessageCircle, MessageSquareText, Palette, Plus, Search, Settings, Timer, User } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -113,6 +111,7 @@ export default function Sidebar({ timerState, setTimerState }) {
     { key: 'plan', label: 'Plan', icon: CreditCard, onSelect: () => router.push('/settings?section=plan') },
     { key: 'connectors', label: 'Connectors', icon: Link2, onSelect: () => router.push('/settings?section=connectors') },
     { key: 'help', label: 'Help', icon: CircleHelp, onSelect: () => setShowHelp(true) },
+    { key: 'feedback', label: 'Send feedback', icon: MessageSquareText, onSelect: () => setShowFeedback(true) },
     { key: 'signout', label: 'Sign out', icon: LogOut, separated: true, onSelect: () => signOut() },
   ];
 
