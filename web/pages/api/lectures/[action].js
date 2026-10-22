@@ -7,12 +7,13 @@
 //   GET  /api/lectures/list            GET /api/lectures/get?id=       GET /api/lectures/todos
 //   POST /api/lectures/save            POST /api/lectures/update       POST /api/lectures/delete
 //   POST /api/lectures/todo            POST /api/lectures/analyze { id }  (AI notes for a lecture saved without them)
+//   POST /api/lectures/merge { ids }   (a lecture recorded in parts, joined into one)
 // Server env: GROQ_API_KEY or OPENAI_API_KEY (transcription, analysis; lib/server/aiProvider.mjs), SUPABASE_SERVICE_ROLE_KEY (storage, metering).
 import { MAX_CHUNK_BYTES, createLectureService } from '../../../lib/server/lectures.mjs';
 import { createLectureLibrary } from '../../../lib/server/lectureLibrary.mjs';
 
 const LIBRARY_GET = { list: 'list', get: 'get', todos: 'todos' };
-const LIBRARY_POST = { save: 'save', update: 'update', delete: 'remove', todo: 'todo', analyze: 'analyze' };
+const LIBRARY_POST = { save: 'save', update: 'update', delete: 'remove', merge: 'merge', todo: 'todo', analyze: 'analyze' };
 
 export const config = { api: { bodyParser: false }, maxDuration: 60 };
 

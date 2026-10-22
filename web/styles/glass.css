@@ -56,6 +56,14 @@
   box-shadow: inset 0 1px 2px var(--lg-border-shade), inset 0 -1px 0 var(--lg-rim-low);
 }
 
+/* Dropdowns: our own arrow, 14px in from the edge (the browser's sat against it). */
+select.c-select.c-select {
+  -webkit-appearance: none; appearance: none;
+  padding-right: 42px;
+  background: var(--select-chevron) no-repeat right 14px center / 16px 16px, var(--lg-sheen), var(--lg-fill-field);
+  text-overflow: ellipsis;
+}
+
 /* Floating things get the deeper shadow. */
 :is(.c-tutor-bubble, .c-toast, .c-tip, .wt-resume, .c-drop-hint, .c-timer-pop .focus-card, .c-menu, .c-sheet) { box-shadow: var(--lg-highlight), var(--lg-depth-float) !important; }
 /* The toast is light glass now, so its text is ink (it was light text for the old dark toast). */
@@ -92,6 +100,7 @@
 }
 @media (prefers-reduced-transparency: reduce) {
   :is(.c-card, .c-btn--secondary, .c-btn--quiet, .c-icon-btn, .c-chip, .c-pill, .c-seg, .c-tutor-bubble, .c-input, .c-select, .c-sheet, .c-menu) { background: var(--surface-raised) !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  select.c-select.c-select { background: var(--select-chevron) no-repeat right 14px center / 16px 16px, var(--surface-raised) !important; }
 }
 
 /* A glass card is its own stacking context, so an open menu inside one would slide under
