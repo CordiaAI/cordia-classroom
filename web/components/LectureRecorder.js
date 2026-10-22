@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Mic, Pause, Play, RefreshCw, Square, Upload } from 'lucide-react';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { apiFetch, authHeaders, authOnlyHeaders, getUserId, openUpgrade } from '../lib/api';
-import { ChunkedRecorder, keepAwake, levelMeter, micPermission, openMicrophone, pickMimeType, recordingSupported } from '../lib/lectureRecorder';
+import { ChunkedRecorder, keepAwake, levelMeter, micPermission, openMicrophone, pickMimeType, recordingSupported, roomVoice } from '../lib/lectureRecorder';
 import { ChunkUploader } from '../lib/lectureUploads';
 import { audioDuration, fileKind, splitAudioFile } from '../lib/lectureFile';
 import { fallbackTitle, mergedSegments, transcriptText } from '../lib/lectureText.mjs';
@@ -224,10 +224,12 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
     source.current = 'recording';
     const useBrowser = usage?.ready === false && Boolean(speechRecognition());
     uploader.current = useBrowser ? null : makeUploader(newRecordingId());
-    recorder.current = new ChunkedRecorder(stream, { onChunk: chunk => uploader.current?.add(chunk) });
+    // The teacher's voice, lifted for a room, is what's recorded and what the meter shows.
+    const voice = await roomVoice(stream);
+    recorder.current = new ChunkedRecorder(voice.stream, { onChunk: chunk => uploader.current?.add(chunk), release: voice.release });
     recorder.current.start();
     if (useBrowser) startSpeech();
-    cleanup.current.push(levelMeter(stream, setLevel), keepAwake());
+    cleanup.current.push(levelMeter(voice.stream, setLevel), keepAwake());
     const clockTimer = setInterval(() => {
       const ms = recorder.current?.elapsed() || 0;
       setElapsed(ms);

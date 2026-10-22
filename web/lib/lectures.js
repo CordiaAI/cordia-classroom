@@ -32,6 +32,7 @@ export const listLectures = () => call('list');
 export const getLecture = id => call(`get?id=${encodeURIComponent(id)}`);
 export const updateLecture = body => call('update', { method: 'POST', body });
 export const deleteLecture = id => call('delete', { method: 'POST', body: { id } });
+export const mergeLectures = ids => call('merge', { method: 'POST', body: { ids }, timeoutMs: 65000 });
 export const updateTodo = body => call('todo', { method: 'POST', body });
 export const confirmedTodos = () => call('todos');
 // Writes the notes for a lecture saved without them (and files its note in the Notes tab).

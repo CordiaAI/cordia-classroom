@@ -169,6 +169,8 @@
   --flame-glow: rgba(217, 130, 43, 0.55);
   --confetti-1: #CFDAC3;
   --confetti-2: #E8C873;
+  /* The arrow on dropdowns (select.c-select), drawn in the muted ink. */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235F655F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 [data-theme='dark'] {
@@ -231,6 +233,7 @@
   --sheen: rgba(255, 255, 255, 0.12);
   --flame: #F0A04B;
   --flame-glow: rgba(240, 160, 75, 0.5);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23B9BEB6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 /* Backdrop behind the app: pale clouds in light; a static, softly blurred olive and charcoal field in dark. */

@@ -17,6 +17,8 @@ import LectureRecorder from './LectureRecorder';
 import CordiaLoader from './CordiaLoader';
 import { heuristicTitle, sensibleTitle } from '../lib/noteMeta.mjs';
 import { localDate, saveLecture, saveTranscriptNote } from '../lib/lectures';
+import { askExtension, extensionReady, isYoutubeUrl, transcriptParagraphs } from '../lib/extensionBridge';
+import { isQuizletUrl } from '../lib/quizletImport';
 
 const MAX_FILES = 5;
 // What the build card shows while a guide is written: the real stages, not fragments of the source.
@@ -274,12 +276,27 @@ export default function NewSheet() {
         sourceType = 'file';
       } else if (mode === 'link') {
         const href = url.trim();
+        // A Quizlet set becomes cards, not a guide: open it in the card editor's importer.
+        if (isQuizletUrl(href)) {
+          setOpen(false);
+          reset();
+          router.push(`/create?import=quizlet&url=${encodeURIComponent(href)}`);
+          return;
+        }
         let read;
-        try { read = await readLink(href); } catch { throw new Error("Can't read this link. Try Upload or Paste."); }
+        if (isYoutubeUrl(href)) {
+          // YouTube turns servers away, so the extension reads the transcript in the student's browser.
+          if (!extensionReady()) throw new Error('YouTube videos are read through the Cordia Chrome extension. Add it, then try again.');
+          read = await askExtension('importYoutube', href, 75000);
+          read.text = `Video: ${read.title}${read.channel ? ` (${read.channel})` : ''}\n\n${transcriptParagraphs(read.text)}`;
+          sourceType = 'video';
+        } else {
+          try { read = await readLink(href); } catch { throw new Error("Can't read this link. Try Upload or Paste."); }
+          sourceType = 'webpage';
+        }
         source = read.text;
         title = read.title.slice(0, 120);
         sourceTitle = read.title.slice(0, 300);
-        sourceType = 'webpage';
         sourceUrl = href;
       } else {
         source = text.trim();
@@ -446,7 +463,7 @@ export default function NewSheet() {
             {mode === 'link' && (
               <label className="c-field">
                 <span className="sr-only">Link</span>
-                <input className="c-input" type="url" inputMode="url" value={url} onChange={event => setUrl(event.target.value)} placeholder="https://" autoFocus onKeyDown={event => { if (event.key === 'Enter' && ready) create(); }} />
+                <input className="c-input" type="url" inputMode="url" value={url} onChange={event => setUrl(event.target.value)} placeholder="A page, PDF, YouTube video or Quizlet set" autoFocus onKeyDown={event => { if (event.key === 'Enter' && ready) create(); }} />
               </label>
             )}
             {mode === 'record' && (
@@ -464,7 +481,7 @@ export default function NewSheet() {
           </div>
         )}
 
-        {error && <p className="new-error" role="alert">{error}</p>}
+        {error && <p className="new-error" role="alert">{error}{/Chrome extension/.test(error) && <> <a href="/install-extension">Get the extension</a></>}</p>}
 
         {mode && mode !== 'sample' && mode !== 'record' && status !== 'building' && (
           <div className="new-foot">

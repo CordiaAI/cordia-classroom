@@ -14,7 +14,7 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 /* ---------- Type roles ---------- */
 /* Page titles: Newsreader 600, slight negative tracking, balanced lines. Everything smaller is Quicksand. */
 :is(.c-title, .pricing-title, .guide-title-btn, .guide-title-input,
-  .c-brand > span, main h1:not(.sr-only), .public-main h1, .public-main h2, .public-main h3, .extension-install-step h2, .mission-page h2, .mission-page h3) {
+  main h1:not(.sr-only), .public-main h1, .public-main h2, .public-main h3, .extension-install-step h2, .mission-page h2, .mission-page h3) {
   font-family: var(--font-display) !important;
   font-weight: 600 !important;
   letter-spacing: var(--track-title) !important;
@@ -38,7 +38,9 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 .c-pill, .c-seg a, .c-seg button { font-family: var(--font-sans) !important; font-size: var(--fs-15) !important; font-weight: 600 !important; letter-spacing: 0 !important; }
 :is(.reader-q, .quiz-question-text, .practice-prompt) { font-size: var(--fs-20) !important; }
 .fc-face p { font-size: var(--fs-28) !important; font-variant-numeric: tabular-nums; }
-.c-brand > span { font-size: var(--fs-20) !important; }
+/* Wordmark: light geometric lowercase, set off from the mark by a hairline. */
+.c-brand { gap: 14px; }
+.c-brand > span { display: inline-flex; align-items: center; height: 28px; padding-left: 14px; border-left: 1px solid var(--line); font: 400 22px/1 var(--font-sans) !important; letter-spacing: 0.02em; color: var(--ink); }
 /* Reading text is body text: Quicksand 17 at 1.55, at 500 so its thin strokes stay legible. */
 .c-study, .reader-a, .reader-prose, .reader-notes { font: 500 var(--fs-17)/1.55 var(--font-sans) !important; letter-spacing: 0; }
 .c-meta { font: 500 var(--fs-13)/var(--lh-body) var(--font-sans); color: var(--muted); font-variant-numeric: tabular-nums; }

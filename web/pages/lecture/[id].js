@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowLeft, BookOpen, CalendarCheck, CalendarPlus, Check, MessageCircle, NotebookPen, Pencil, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarCheck, CalendarPlus, Check, Merge, MessageCircle, NotebookPen, Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
 import Menu from '../../components/Menu';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import MergeLectures from '../../components/MergeLectures';
 import { apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import useSessionTracker from '../../lib/useSessionTracker';
@@ -34,6 +35,7 @@ export default function LecturePage() {
   const [showTranscript, setShowTranscript] = useState(false);
   const [find, setFind] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [merging, setMerging] = useState(false);
   const [toast, setToast] = useState('');
   const [making, setMaking] = useState(false);
   const [notes, setNotes] = useState('idle'); // idle | writing | failed | unavailable
@@ -166,6 +168,7 @@ export default function LecturePage() {
           label="Lecture actions"
           items={[
             { label: 'Rename', icon: Pencil, onSelect: () => setRenaming(lecture.title) },
+            { label: 'Merge with another part', icon: Merge, onSelect: () => setMerging(true) },
             { label: 'Delete', icon: Trash2, danger: true, onSelect: () => setConfirmDelete(true) },
           ]}
         />
@@ -316,6 +319,7 @@ export default function LecturePage() {
         )}
       </section>
 
+      {merging && <MergeLectures lecture={lecture} folders={folders} onCancel={() => setMerging(false)} onMerged={merged => { setMerging(false); router.push('/lecture/' + merged.id); }} />}
       {confirmDelete && <ConfirmDialog title={`Delete ${lecture.title}?`} onConfirm={remove} onCancel={() => setConfirmDelete(false)} />}
       {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
 

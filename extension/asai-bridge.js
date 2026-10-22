@@ -41,10 +41,21 @@
       return { success: true, authenticated: Boolean(authToken), userEmail };
     }
 
+    // Classroom asks the extension to read a Quizlet set or a YouTube transcript (only these);
+    // the answer goes back with the request's id.
+    const PAGE_ACTIONS = new Set(['importQuizlet', 'importYoutube']);
+    function relay(data) {
+      const reply = result => window.postMessage({ type: 'CORDIA_EXT_RESULT', id: data.id, ...result }, window.location.origin);
+      if (!PAGE_ACTIONS.has(data.action)) return reply({ success: false, error: 'Unknown request.' });
+      chrome.runtime.sendMessage({ action: data.action, url: String(data.url || '') })
+        .then(result => reply(result || { success: false, error: 'The extension did not answer.' }))
+        .catch(error => reply({ success: false, error: error.message }));
+    }
+
     function onMessage(event) {
-      if (event.source === window && event.origin === window.location.origin && event.data?.type === 'CORDIA_AUTH_UPDATED') {
-        syncAuth();
-      }
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      if (event.data?.type === 'CORDIA_AUTH_UPDATED') syncAuth();
+      if (event.data?.type === 'CORDIA_EXT_REQUEST') relay(event.data);
     }
 
     if (chrome.runtime?.onMessage) {

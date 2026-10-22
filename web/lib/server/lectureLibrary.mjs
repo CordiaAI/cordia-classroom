@@ -377,5 +377,50 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
     return { status: 200, body: { todos: found.map(({ lectures, ...item }) => ({ ...item, lecture_title: lectures?.title || '', folder_id: lectures?.folder_id || null })) } };
   }
 
-  return { save, list, get, update, remove, todo, todos, analyze: analyzeLecture, enabled };
+  // A lecture recorded in parts, joined back into one: transcripts in order (by date, then when
+  // each was saved), each part's timings shifted past the parts before it, notes written fresh
+  // for the whole lecture. The parts and their notes pages are removed once the merge is saved.
+  const MERGE_MAX = 8;
+  async function merge(authorization, { ids = [] } = {}) {
+    if (!enabled) return NOT_SET_UP;
+    const userId = await who(authorization);
+    if (!userId) return { status: 401, body: { detail: 'Sign in again.' } };
+    const wanted = [...new Set((Array.isArray(ids) ? ids : []).filter(id => UUID.test(id || '')))];
+    if (wanted.length < 2) return { status: 400, body: { detail: 'Pick at least two lectures to merge.' } };
+    if (wanted.length > MERGE_MAX) return { status: 400, body: { detail: `Merge up to ${MERGE_MAX} lectures at a time.` } };
+    const parts = (await rows(`/lectures?user_id=eq.${userId}&id=in.(${wanted.join(',')})&select=*`)) || [];
+    if (parts.length !== wanted.length) return { status: 404, body: { detail: 'Some of those lectures were not found.' } };
+    parts.sort((a, b) => String(a.lecture_date).localeCompare(String(b.lecture_date)) || String(a.created_at).localeCompare(String(b.created_at)));
+    let offset = 0;
+    const segments = [];
+    for (const part of parts) {
+      const own = (part.segments || []).filter(item => item?.text);
+      own.forEach(item => segments.push({ start_ms: offset + Math.max(0, Number(item.start_ms) || 0), text: item.text }));
+      const lastStart = own.length ? Math.max(...own.map(item => Number(item.start_ms) || 0)) : 0;
+      // The recorded length when known; notes or old rows without one get room past their last line.
+      offset += Number(part.duration_ms) > 0 ? Number(part.duration_ms) : lastStart + 20000;
+    }
+    const first = parts[0];
+    const folders = await fetchImpl(`${apiBase}/folders`, { headers: { Authorization: authorization } }).then(response => (response.ok ? response.json() : null)).catch(() => null);
+    const saved = await save(authorization, {
+      transcript: parts.map(part => String(part.transcript || '').trim()).filter(Boolean).join('\n\n'),
+      segments,
+      lecture_date: first.lecture_date,
+      folder_id: parts.find(part => part.folder_id)?.folder_id || '',
+      source: parts.every(part => part.source === 'notes') ? 'notes' : first.source === 'upload' ? 'upload' : 'recording',
+      title: first.title,
+      duration_ms: parts.reduce((sum, part) => sum + (Number(part.duration_ms) || 0), 0),
+      classes: (folders?.folders || []).map(item => ({ id: item.id, name: item.name })),
+    });
+    if (saved.status !== 200) return saved;
+    // Only after the merged lecture exists: remove the parts and the notes pages made for them.
+    for (const part of parts) {
+      await db(`/lectures?id=eq.${part.id}&user_id=eq.${userId}`, { method: 'DELETE' }).catch(() => null);
+      const noteId = part.analysis?.note_id;
+      if (noteId) await fetchImpl(`${apiBase}/smart_notes/${encodeURIComponent(noteId)}`, { method: 'DELETE', headers: { Authorization: authorization } }).catch(() => null);
+    }
+    return { status: 200, body: { lecture: saved.body.lecture, merged: parts.length } };
+  }
+
+  return { save, list, get, update, remove, merge, todo, todos, analyze: analyzeLecture, enabled };
 }
