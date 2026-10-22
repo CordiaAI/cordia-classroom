@@ -10,12 +10,15 @@ export default function IcloudSheet({ connector, onClose, onConnected }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const firstRef = useRef(null);
+  // Focus once on open; onClose through a ref so a parent re-render never pulls focus back here.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     firstRef.current?.focus();
-    const onKey = event => { if (event.key === 'Escape') onClose(); };
+    const onKey = event => { if (event.key === 'Escape') closeRef.current(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
 
   async function submit(event) {
     event.preventDefault();
