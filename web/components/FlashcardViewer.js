@@ -190,8 +190,6 @@ export default function FlashcardViewer({
   // Quizlet-style tallies: cards missed and not yet known, and cards known.
   const learning = [...missed].filter(index => !known.includes(index)).length;
   const gotRight = known.filter(index => !missed.has(index));
-  // Up to two cards wait behind the one in front, so the deck's size is visible.
-  const behind = Math.min(2, queue.length - 1);
   const lean = drag.leaving ? (drag.leaving === 'right' ? 1 : -1) : Math.max(-1, Math.min(1, drag.dx / SWIPE_PX));
   const cardStyle = drag.leaving
     ? { transform: `translateX(${drag.leaving === 'right' ? 130 : -130}%) rotate(${drag.leaving === 'right' ? 18 : -18}deg)`, opacity: 0, transition: `transform ${FLY_MS}ms ease-in, opacity ${FLY_MS}ms ease-in` }
@@ -240,9 +238,7 @@ export default function FlashcardViewer({
             <span className="fc-count is-know" title="Know"><strong key={'k' + bump.know} className={bump.know ? 'is-bumped' : ''} aria-label={`Know: ${known.length}`}>{known.length}</strong><span className="fc-count-label">Know</span></span>
           </div>
           <div className="fc-deck">
-            {behind >= 2 && <div className="fc-ghost fc-ghost-2" aria-hidden="true" />}
-            {behind >= 1 && <div className="fc-ghost fc-ghost-1" aria-hidden="true" />}
-            {/* A new key per card: the next card rises from the deck when the last one leaves. */}
+            {/* A new key per card, so a swiped card's position never carries over to the next. */}
             <div key={`${current}-${queue.length}-${known.length}`} className="fc-top" style={cardStyle}>
               <div
                 ref={cardRef}
@@ -301,11 +297,8 @@ export default function FlashcardViewer({
         .fc-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; text-align: left; }
         .fc-deck { position: relative; display: grid; }
         .fc-deck > * { grid-area: 1 / 1; }
-        .fc-ghost { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); box-shadow: var(--shadow); transform-origin: 50% 100%; transition: transform var(--dur) var(--ease); }
-        .fc-ghost-1 { transform: translateY(12px) scale(0.955); opacity: 0.75; }
-        .fc-ghost-2 { transform: translateY(24px) scale(0.91); opacity: 0.45; }
-        .fc-top { position: relative; z-index: 1; animation: fc-rise 260ms var(--ease) backwards; touch-action: pan-y; }
-        @keyframes fc-rise { from { transform: translateY(12px) scale(0.955); } to { transform: none; } }
+        .fc-top { position: relative; z-index: 1; animation: fc-in 180ms ease-out backwards; touch-action: pan-y; }
+        @keyframes fc-in { from { opacity: 0; } }
         .fc-card { position: relative; min-height: 340px; perspective: 1400px; cursor: grab; border-radius:var(--r-card); user-select: none; -webkit-user-select: none; }
         .fc-card:active { cursor: grabbing; }
         /* A light sheen sweeps across the card as it turns. */

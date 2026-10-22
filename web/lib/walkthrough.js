@@ -73,7 +73,7 @@ export const MINI = {
   notes: { label: 'Notes', route: '/dashboard', steps: [
     { target: '[data-spot="new"]', label: 'Tap New', on: 'new-opened' },
     { target: '[data-spot="new-note"]', label: 'Tap Note', on: 'note-created' },
-    { target: '[data-spot="note-new"]', label: 'Type your notes', where: onGuide, on: 'note-written', finishable: true },
+    { target: '[data-spot="note-new"]', label: 'Press Edit, then type your notes', where: onGuide, on: 'note-written', finishable: true },
   ] },
   record: { label: 'Record a lecture', route: '/library?filter=lectures', steps: [
     { target: '[data-spot="record-lecture"]', label: 'Tap Record lecture', where: path => path === '/library', on: 'record-opened' },
