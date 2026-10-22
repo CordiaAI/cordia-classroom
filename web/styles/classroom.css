@@ -268,7 +268,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .study-scene-intro h1 span { color: var(--olive); }
 .study-scene-intro > p { max-width: 340px; color: var(--text-secondary); line-height:1.5; font-size:15px; margin-bottom: 30px; }
 .scene-continue { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 52px; padding: 14px 24px; border: 1px solid var(--glass-edge); background: var(--accent-strong); color: var(--on-olive); border-radius:20px; font:600 13px var(--font-sans); box-shadow: var(--shadow-md); cursor: pointer; transition: transform var(--motion-fast), box-shadow var(--motion-fast); }
-.scene-continue:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+.scene-continue:hover { box-shadow: var(--shadow-lg); }
 .scene-tools { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-top: 28px; }
 .scene-tools button { display: grid; justify-items: center; gap: 16px; min-height: 80px; padding: 14px 5px; color: var(--ink); border: 1px solid var(--glass-edge); border-radius:12px; background: var(--surface); backdrop-filter: blur(16px); box-shadow: var(--shadow-sm); cursor: pointer; font:500 13px var(--font-sans); transition: transform var(--motion-fast), box-shadow var(--motion-fast); }
 .scene-tools button:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
@@ -408,7 +408,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .reference-workspace-window .study-library-tabs { margin-top: 30px; }
 .classroom-class-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 18px; }
 .classroom-class-tile, .classroom-add-class { display: flex; flex-direction: column; padding: 0 0 18px; overflow: hidden; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius:12px; text-align: left; cursor: pointer; min-width: 0; transition: transform var(--motion-fast), box-shadow var(--motion-fast); }
-.classroom-class-tile:hover, .classroom-add-class:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.classroom-class-tile:hover, .classroom-add-class:hover { box-shadow: var(--shadow-md); }
 .class-tile-cover { display: flex; width: 100%; height: 110px; align-items: center; justify-content: center; background:var(--wash); }
 .class-tile-cover > span { font:500 40px var(--font-display); color: var(--olive-ink); }
 .classroom-class-tile strong { font-size:13px; font-weight:600; margin: 18px 16px 6px; }

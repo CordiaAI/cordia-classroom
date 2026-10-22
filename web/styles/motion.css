@@ -8,15 +8,6 @@ body::before {
   will-change: transform;
 }
 
-/* Cards that lean toward the cursor (desktop). The lean is set per card while hovered. */
-.today-continue, .today-progress, .plan-card, .lecture-card, .c-tilt {
-  transition: transform 260ms cubic-bezier(.2, .8, .2, 1), border-color var(--dur, 160ms), box-shadow var(--dur, 160ms);
-  transform-style: preserve-3d;
-}
-.is-tilting {
-  transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) translateY(-2px);
-}
-
 /* Quiz answers: a right answer pops and sends out a green ring; a wrong one shakes (globals.css)
    and the right one then pulses in. */
 @keyframes c-ring-out {
@@ -71,7 +62,6 @@ body::before {
 
 @media (prefers-reduced-motion: reduce) {
   body::before { transform: none; transition: none; }
-  .is-tilting { transform: none; }
   .quiz-option.quiz-option.quiz-option.quiz-option.correct-shine,
   .quiz-option.quiz-option.quiz-option.quiz-option.correct-glow,
   .quiz-option.correct, .quiz-option.wrong, .retain-fill-input.right, .retain-fill-input.wrong, .retain-feedback,
