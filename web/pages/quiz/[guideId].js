@@ -56,6 +56,9 @@ export default function QuizPage() {
     });
   }, [ready, guideId]);
 
+  // Games opens Match straight away (?mode=match).
+  useEffect(() => { if (router.query.mode === 'match') setRace(true); }, [router.query.mode]);
+
   const proLocked = plan && !plan.pro && plan.left <= 0;
 
   // A remembered Pro type the account can no longer use is turned off rather than failing on Start.

@@ -5,7 +5,7 @@ import CardPhoto from '../../components/CardPhoto';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Blocks, Brain, Download, ExternalLink, FolderInput, Layers, Lock, MessageCircle, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
+  ArrowLeft, Brain, Download, ExternalLink, FolderInput, Gamepad2, Layers, Lock, MessageCircle, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -335,18 +335,19 @@ export default function GuidePage() {
   // Flashcards and a quiz from the notes, for a guide that started as the student's own notes.
   async function makeStudySet() {
     const source = String(guide.notes || '').replace(/^(>|##|\s*-)\s?/gm, '').trim();
-    if (source.length < 40) { setToast('Write a few more notes first'); return; }
+    if (source.length < 40) { setToast('Write a few more notes first'); return false; }
     setMaking('cards');
     const generated = await apiFetch('/generate', { method: 'POST', body: JSON.stringify({ content: source, notes: false, study_guide: true, flashcards: true, request_id: newRequestId() }), timeoutMs: 6 * 60 * 1000 });
     if (!generated?.study_guide || generated.study_guide.startsWith('[Error')) {
       setMaking('');
       setToast(apiErrorMessage(generated?.detail, "Cards and quiz weren't made. Try again."));
-      return;
+      return false;
     }
     const data = await apiFetch('/guides/' + guide.id, { method: 'PATCH', body: JSON.stringify({ title: guide.title, study_guide: generated.study_guide, flashcards: generated.flashcards || [] }) });
     setMaking('');
-    if (data?.guide) { setGuide(current => ({ ...current, study_guide: data.guide.study_guide, flashcards: data.guide.flashcards })); setToast('Flashcards and quiz ready'); }
-    else setToast("Cards and quiz weren't saved. Try again.");
+    if (data?.guide) { setGuide(current => ({ ...current, study_guide: data.guide.study_guide, flashcards: data.guide.flashcards })); setToast('Flashcards and quiz ready'); return true; }
+    setToast("Cards and quiz weren't saved. Try again.");
+    return false;
   }
 
   function onSelection(kind, text) {
@@ -381,12 +382,11 @@ export default function GuidePage() {
   const explainWithAid = Boolean(learningStyle?.enabled);
   const tabs = [
     { key: 'outline', label: 'Outline', icon: NotebookText, view: true },
-    ...(hasMaterial ? [
-      { key: 'flashcards', label: 'Flashcards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: cardCount, spot: 'cards-pill', event: 'cards-opened' },
-      { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill' },
-      { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id },
-      ...(cardCount ? [{ key: 'blocks', label: 'Blocks', icon: Blocks, href: '/play/' + id }] : []),
-    ] : []),
+    // A guide that's only notes so far shows these too: opening one makes the cards and quiz first.
+    { key: 'flashcards', label: 'Flashcards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: hasMaterial ? cardCount : undefined, spot: 'cards-pill', event: 'cards-opened', needsCards: true },
+    { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill', needsCards: true },
+    { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id, needsCards: true },
+    { key: 'games', label: 'Games', icon: Gamepad2, href: '/games/' + id, needsCards: true },
     ...(nursing ? [{ key: 'nclex', label: 'NCLEX', icon: Stethoscope, href: '/nclex/' + id }] : []),
   ];
   const shareable = sharing?.class && !sharing.linked;
@@ -471,6 +471,9 @@ export default function GuidePage() {
           {tabs.map(tab => {
             const content = <><tab.icon size={20} strokeWidth={1.75} aria-hidden="true" />{tab.label}{tab.count !== undefined && <span className="c-meta">{tab.count}</span>}</>;
             if (tab.view) return <span key={tab.key} className="c-pill" aria-current="page">{content}</span>;
+            if (tab.needsCards && !hasMaterial) {
+              return <button key={tab.key} type="button" className="c-pill" data-spot={tab.spot} disabled={Boolean(making)} title="Makes flashcards and a quiz from your notes first" onClick={async () => { if (await makeStudySet()) { if (tab.event) walkthroughEvent(tab.event); router.push(tab.href); } }}>{content}</button>;
+            }
             return <Link key={tab.key} className="c-pill" href={tab.href} data-spot={tab.spot} onClick={tab.event ? () => walkthroughEvent(tab.event) : undefined}>{content}</Link>;
           })}
         </nav>
