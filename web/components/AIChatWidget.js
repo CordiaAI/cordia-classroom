@@ -608,13 +608,19 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
           </div>
         )}
         {messages.map((message, index) => (
-          <div key={`${index}-${message.role}`} className={`cordia-tutor-message ${message.role}`}>
+          <div key={`${index}-${message.role}`} className={`cordia-tutor-message ${message.role}${message.visual?.text ? ' has-visual' : ''}`}>
             {message.source && (
               <button type="button" className="cordia-tutor-source" onClick={() => openSource(message.source)} disabled={message.source.type === 'file'}>
                 Based on {message.source.title}
               </button>
             )}
             <TutorMessageText text={message.text} plain={message.role === 'user'} />
+            {/* A visual the student described: the Tutor wrote its text, Napkin draws it (cached, so reopening is free). */}
+            {message.visual?.text && (
+              <div className="cordia-tutor-visual">
+                <NapkinVisual text={message.visual.text} context={message.visual.title || ''} auto name={(message.visual.title || 'tutor-visual').replace(/[^a-z0-9]+/gi, '-').toLowerCase()} />
+              </div>
+            )}
             {canSpeak && message.role !== 'user' && message.text && (
               <button type="button" className="cordia-tutor-speak" onClick={() => toggleSpeech(index, message.text)} aria-pressed={speakingIndex === index}>
                 {speakingIndex === index ? 'Stop' : 'Listen'}

@@ -96,6 +96,7 @@ FEATURES = {
     "tutor_detailed": CallSpec(LIGHT, 700),
     "tutor_short": CallSpec(LIGHT, 200),
     "tutor_action": CallSpec(LIGHT, 300),
+    "tutor_visual": CallSpec(LIGHT, 600),
     "practice_grade": CallSpec(LIGHT, 300),
     "retain_grade": CallSpec(LIGHT, 250),
     "practice_classify": CallSpec(LIGHT, 100),

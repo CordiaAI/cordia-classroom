@@ -187,8 +187,8 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
           <img className={'nv-image' + (inverted ? ' is-inverted' : '')} src={visual.url} alt={state.alt || 'Diagram'} width={visual.width || undefined} height={visual.height || undefined} />
         </figure>
         <div className="nv-bar">
-          {!used && (
-            <button type="button" className={`c-btn c-btn--sm ${onUse ? 'c-btn--primary' : 'c-btn--secondary'}`} onClick={() => { setUsed(true); onUse?.({ ...visual, alt: state.alt, theme: state.rendered }); }}>{useLabel}</button>
+          {!used && onUse && (
+            <button type="button" className="c-btn c-btn--sm c-btn--primary" onClick={() => { setUsed(true); onUse?.({ ...visual, alt: state.alt, theme: state.rendered }); }}>{useLabel}</button>
           )}
           {state.visuals.length > 1 && !used && (
             <div className="nv-dots" role="group" aria-label="Versions">

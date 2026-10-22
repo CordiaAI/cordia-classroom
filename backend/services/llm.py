@@ -1442,6 +1442,36 @@ APP_ACTION_RULES = (
 )
 
 
+VISUAL_RULES = (
+    "You write the text a diagram tool turns into one visual for a student. Reply with only a JSON object: "
+    '{"title": "...", "text": "..."}.\n'
+    "- title: 3 to 8 words naming what the visual shows.\n"
+    "- text: 3 to 7 lines in the order the visual should show them (steps, parts, causes and effects, a comparison, "
+    "or a timeline, whichever the request asks for). Each line is a short label, a colon, then one sentence.\n"
+    "- Use the MATERIAL when it covers the request, keeping names, numbers and dates exactly as written; "
+    "with no material, use accurate general knowledge.\n"
+    "- No preamble, no markdown, no questions."
+)
+
+
+def write_visual_text(request: str, material: str = "") -> dict:
+    """{"title", "text"} for a visual the student described to the Tutor, or {} when none could be written."""
+    response = chat(get_openai_client(), "tutor_visual",
+        messages=[
+            {"role": "system", "content": VISUAL_RULES},
+            {"role": "user", "content": f"REQUEST:\n{request[:1500]}\n\nMATERIAL:\n{(material or '(none)')[:20000]}"},
+        ],
+        response_format={"type": "json_object"},
+    )
+    try:
+        parsed = _loads_model_json(response.choices[0].message.content or "{}")
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return {}
+    title = str((parsed or {}).get("title") or "").strip()[:120]
+    text = str((parsed or {}).get("text") or "").strip()[:1800]
+    return {"title": title, "text": text} if len(text) >= 20 else {}
+
+
 def plan_app_action(request: str, current: Optional[dict], guides: list, classes: list) -> dict:
     """The app action a Tutor request asks for (see APP_ACTION_RULES), or {} when it is not one."""
     class_names = {item["id"]: item.get("name") or "" for item in classes}

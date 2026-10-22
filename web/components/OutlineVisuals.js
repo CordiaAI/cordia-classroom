@@ -109,7 +109,26 @@ export function findAnchorBlock(root, anchor, { end = false } = {}) {
   const blocks = [...root.querySelectorAll('li, h1, h2, h3, p')];
   return blocks.find(el => squash(ownText(el)).includes(want))
     || blocks.find(el => want.includes(squash(ownText(el)).slice(0, 40)) && squash(ownText(el)).length > 8)
+    || closestBlock(blocks, end ? all.slice(-160) : all.slice(0, 160))
     || null;
+}
+
+// After the outline is rewritten the highlighted words may be gone: the line sharing the most
+// distinctive words with them (at least two, and a third of the line's) is the visual's line now.
+const words = text => new Set(squash(text).replace(/[^a-z0-9 ]+/g, ' ').split(' ').filter(word => word.length >= 4));
+function closestBlock(blocks, anchor) {
+  const wanted = words(anchor);
+  if (wanted.size < 2) return null;
+  let best = null;
+  let bestScore = 0;
+  for (const el of blocks) {
+    const own = words(ownText(el));
+    if (!own.size) continue;
+    const shared = [...own].filter(word => wanted.has(word)).length;
+    const score = shared + shared / own.size;
+    if (shared >= 2 && shared / own.size >= 1 / 3 && score > bestScore) { best = el; bestScore = score; }
+  }
+  return best;
 }
 
 // The highlight menu over the Outline: Visualize first, then Explain, Make card and Ask.

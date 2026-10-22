@@ -133,7 +133,8 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
       if (first) node.style.setProperty('--oe-fit', `${Math.max(MIN_FIT, Math.round(bottom - top))}px`);
       else node.style.removeProperty('--oe-fit');
     });
-    const order = nodes.map((node, index) => index).sort((x, y) => (blocks[x] && blocks[y] ? (blocks[x].compareDocumentPosition(blocks[y]) & 4 ? -1 : 1) : blocks[x] ? -1 : 1));
+    // A visual whose line can't be found at all stays at the top, never pushed under the others.
+    const order = nodes.map((node, index) => index).sort((x, y) => (blocks[x] && blocks[y] ? (blocks[x].compareDocumentPosition(blocks[y]) & 4 ? -1 : 1) : blocks[x] ? 1 : blocks[y] ? -1 : x - y));
     if (side) {
       const top = gutter.getBoundingClientRect().top;
       let floor = 0;
@@ -151,7 +152,7 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
     const box = gutter.parentElement.getBoundingClientRect();
     const gaps = new Map();
     for (const index of order) {
-      const block = blocks[index] || page.lastElementChild;
+      const block = blocks[index] || page.firstElementChild;
       if (!block) continue;
       const node = nodes[index];
       const before = gaps.get(block) || 0;
@@ -161,7 +162,7 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
       node.dataset.before = String(before);
     }
     for (const index of order) {
-      const block = blocks[index] || page.lastElementChild;
+      const block = blocks[index] || page.firstElementChild;
       if (!block) continue;
       const node = nodes[index];
       Object.assign(node.style, { position: 'absolute', marginTop: '0', top: `${block.getBoundingClientRect().bottom - box.top + GAP + Number(node.dataset.before || 0)}px` });

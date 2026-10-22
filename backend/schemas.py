@@ -132,6 +132,8 @@ class ChatResponse(BaseModel):
     link: Optional[dict] = None
     # An action the student must confirm with a button: {"kind": "delete_guide", "guide_id", "title"}.
     confirm: Optional[dict] = None
+    # A visual the student described: {"title", "text"}; the app draws it with Napkin.
+    visual: Optional[dict] = None
     skill: Optional[str] = None
     session: Optional[dict] = None
 
