@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, ChevronDown, Download, FileText, Settings2, Sparkles } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, Download, FileImage, FileSpreadsheet, FileText, FileVideo, Presentation, Search, Settings2, Sparkles } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authorizedFetch } from '../lib/api';
 import { openNewSheet } from '../lib/newSheet';
 import { SectionLoader } from './CordiaLoader';
@@ -12,6 +12,21 @@ function fileSize(bytes) {
   if (!bytes) return '';
   return bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
+
+// What a file is, from its name or type: a label and an icon for its tile.
+const KINDS = [
+  [/\.pdf$|pdf/i, 'PDF', FileText],
+  [/\.(pptx?|key|odp)$|presentation/i, 'Slides', Presentation],
+  [/\.(docx?|odt|rtf|pages)$|wordprocessing|msword/i, 'Document', FileText],
+  [/\.(xlsx?|csv|ods|numbers)$|spreadsheet|excel/i, 'Spreadsheet', FileSpreadsheet],
+  [/\.(png|jpe?g|gif|webp|heic|svg)$|^image\//i, 'Image', FileImage],
+  [/\.(mp4|mov|m4v|webm)$|^video\//i, 'Video', FileVideo],
+];
+function fileKind(file) {
+  const found = KINDS.find(([pattern]) => pattern.test(file.name || '') || pattern.test(file.type || ''));
+  return found ? { label: found[1], Icon: found[2] } : { label: 'File', Icon: FileText };
+}
+const shownName = name => String(name || 'Untitled file').replace(/\.(pdf|pptx?|docx?|xlsx?|csv|txt|key|odt|odp|ods|rtf|png|jpe?g|gif|webp|heic|svg|mp4|mov|m4v|webm)$/i, '');
 
 // One Canvas file as a browser File, through Cordia (the token never reaches the page).
 async function fetchFile(courseId, file) {
@@ -29,6 +44,7 @@ export function CourseFiles({ course }) {
   const [files, setFiles] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     // A class that hides its Files page is read link by link, which can take a while.
@@ -63,36 +79,68 @@ export function CourseFiles({ course }) {
   }
 
   if (!files) return <SectionLoader height={120} label="Loading course material" />;
+  const needle = query.trim().toLowerCase();
+  const shown = needle ? files.filter(file => String(file.name || '').toLowerCase().includes(needle)) : files;
   return (
-    <>
+    <div className="cc-files-wrap">
+      {files.length > 0 && (
+        <div className="cc-files-head">
+          <span className="c-meta">{files.length === 1 ? '1 file' : `${files.length} files`} from Canvas</span>
+          {files.length > 8 && (
+            <label className="cc-files-search">
+              <Search size={16} strokeWidth={1.75} aria-hidden="true" />
+              <input className="c-input" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Find a file" aria-label="Find a file" />
+            </label>
+          )}
+        </div>
+      )}
       {error && <p className="cc-error" role="alert">{error}</p>}
-      {files.length > 0 ? (
+      {shown.length > 0 ? (
         <ul className="cc-files">
-          {files.map(file => (
-            <li key={file.id} className="cc-file">
-              <FileText {...ICON} />
-              <span className="cc-file-name c-truncate">{file.name}</span>
-              <span className="c-meta cc-file-size">{fileSize(file.size)}</span>
-              <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={() => act(file, 'guide')} disabled={Boolean(busy)}>
-                <Sparkles {...ICON} />{busy === `guide:${file.id}` ? 'Getting it…' : 'Make guide'}
-              </button>
-              <button type="button" className="c-icon-btn" onClick={() => act(file, 'download')} disabled={Boolean(busy)} aria-label={`Download ${file.name}`}><Download {...ICON} /></button>
-            </li>
-          ))}
+          {shown.map(file => {
+            const { label, Icon } = fileKind(file);
+            return (
+              <li key={file.id} className="cc-file">
+                <span className="cc-file-tile"><Icon {...ICON} /></span>
+                <span className="cc-file-text">
+                  <span className="cc-file-name" title={file.name}>{shownName(file.name)}</span>
+                  <span className="c-meta">{[label, fileSize(file.size)].filter(Boolean).join(' · ')}</span>
+                </span>
+                <span className="cc-file-actions">
+                  {label !== 'Video' && <button type="button" className="c-btn c-btn--secondary c-btn--sm cc-file-guide" onClick={() => act(file, 'guide')} disabled={Boolean(busy)} aria-label={`Make a guide from ${file.name}`}>
+                    <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" /><span className="cc-file-guide-label">{busy === `guide:${file.id}` ? 'Getting it…' : 'Make guide'}</span>
+                  </button>}
+                  <button type="button" className="c-icon-btn" onClick={() => act(file, 'download')} disabled={Boolean(busy)} aria-label={`Download ${file.name}`}><Download {...ICON} /></button>
+                </span>
+              </li>
+            );
+          })}
         </ul>
-      ) : !error && <p className="c-meta cc-none">No files shared in this class yet.</p>}
+      ) : !error && <p className="c-meta cc-none">{needle ? 'No file matches that.' : 'No files shared in this class yet.'}</p>}
       <style jsx global>{`
-        .cc-files { list-style: none; margin: 0; padding: 0 8px 8px; display: grid; grid-template-columns: minmax(0, 1fr); }
-        .cc-file { display: flex; align-items: center; gap: 12px; min-height: 56px; border-top: 1px solid var(--line); }
-        .cc-file > .lucide { color: var(--olive-ink); flex: 0 0 auto; }
-        .cc-file-name { flex: 1; min-width: 0; font: 600 15px/1.3 var(--font-sans); }
-        .cc-file-size { white-space: nowrap; }
-        .cc-file > button { flex: 0 0 auto; }
+        .cc-files-wrap { display: grid; gap: 4px; min-width: 0; }
+        .cc-files-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 12px 4px; }
+        .cc-files-search { position: relative; display: flex; align-items: center; flex: 0 1 260px; min-width: 0; }
+        .cc-files-search .lucide { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+        .cc-files-search .c-input { width: 100%; height: 40px; margin: 0; padding: 0 12px 0 36px; line-height: 40px; }
+        .cc-files { list-style: none; margin: 0; padding: 0 4px 4px; display: grid; grid-template-columns: minmax(0, 1fr); }
+        .cc-file { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 10px 8px; border-radius: var(--r-row); }
+        .cc-file + .cc-file { border-top: 1px solid var(--line); }
+        .cc-file-tile { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--olive-tint); color: var(--olive-ink); }
+        .cc-file-text { display: grid; gap: 2px; min-width: 0; }
+        .cc-file-name { font: 600 15px/1.35 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .cc-file-actions { display: flex; align-items: center; gap: 6px; }
+        .cc-file-guide { white-space: nowrap; }
         .cc-none, .cc-error { margin: 0; padding: 8px 16px 14px; }
         .cc-error { color: var(--error); font: 600 15px/1.4 var(--font-sans); }
-        @media (max-width: 600px) { .cc-file-size { display: none; } }
+        @media (max-width: 600px) {
+          .cc-file { grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; padding: 10px 4px; }
+          .cc-file-tile { width: 36px; height: 36px; }
+          .cc-file-guide { width: 40px; padding: 0; justify-content: center; }
+          .cc-file-guide-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        }
       `}</style>
-    </>
+    </div>
   );
 }
 
