@@ -20,13 +20,17 @@ export const LIMITS = { free: 10, pro: 200 };
 export const POLL_MS = 1000;
 export const BUDGET_MS = 20000;
 export const TOTAL_MS = 180000;
-export const VARIATIONS = 3;
+export const VARIATIONS = 1;
+// A student can ask for this many new drawings of the same highlight after the first.
+export const MAX_REDRAWS = 3;
 export const BUCKET = 'visuals';
 const MAX_TEXT = 2000;
 const MAX_CONTEXT = 1500;
 
-export function cacheKey({ text, context = '', style, theme, variations = VARIATIONS }) {
+export function cacheKey({ text, context = '', style, theme, variations = VARIATIONS, redraw = 0 }) {
   const parts = variations === 2 ? [text, context, style, theme] : [text, context, style, theme, variations];
+  // Each redraw is its own drawing, so it never comes back from the cache as the one already shown.
+  if (redraw > 0) parts.push(`redraw:${redraw}`);
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 }
 
@@ -202,7 +206,7 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
     return { fallback: 'timeout' };
   }
 
-  async function generate({ authorization, text, context = '', theme = 'light', variations = VARIATIONS, resume = '' }) {
+  async function generate({ authorization, text, context = '', theme = 'light', variations = VARIATIONS, redraw = 0, resume = '' }) {
     const who = await account(authorization);
     if (!who) return { httpStatus: 401, body: { detail: 'Sign in again.' } };
     const content = String(text || '').trim().slice(0, MAX_TEXT);
@@ -210,7 +214,9 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
     const mode = theme === 'dark' ? 'dark' : 'light';
     if (!enabled) return { httpStatus: 200, body: { status: 'fallback', reason: 'not_configured', missing } };
 
-    const key = cacheKey({ text: content, context, style, theme: mode, variations });
+    const round = Math.trunc(Number(redraw) || 0);
+    if (round < 0 || round > MAX_REDRAWS) return { httpStatus: 400, body: { detail: `You can redraw a visual ${MAX_REDRAWS} times.` } };
+    const key = cacheKey({ text: content, context, style, theme: mode, variations, redraw: round });
     const [hit, counts] = await Promise.all([cached(key), usage(who)]);
     if (hit?.files?.length) {
       return { httpStatus: 200, body: { status: 'ok', cached: true, visuals: hit.files, alt: hit.alt, theme: hit.theme || mode, left: counts.left, limit: counts.limit } };

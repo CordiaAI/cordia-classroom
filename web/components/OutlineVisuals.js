@@ -7,7 +7,7 @@ import { walkthroughEvent } from '../lib/walkthrough';
 import NapkinVisual from './NapkinVisual';
 import { visualContent } from '../lib/visualText';
 
-// Visuals in a guide's Outline: highlight text, press Visualize, three Napkin versions appear right
+// Visuals in a guide's Outline: highlight text, press Visualize, a Napkin visual appears right
 // beside that line; the one the student keeps stays there. Kept visuals are saved through /api/guide-visuals, or in this browser until the
 // guide_visuals table exists.
 
@@ -171,7 +171,7 @@ export function OutlineSelectMenu({ selection, onAction }) {
   );
 }
 
-// The visual being drawn for a highlight: three Napkin versions to pick from.
+// The visual being drawn for a highlight: one Napkin version, redrawn up to 3 times to pick from.
 export function PendingVisual({ pending, title, onKeep, onCancel }) {
   const text = visualContent(pending.text, pending.section);
   const keep = visual => onKeep({ anchor: pending.text, ...visual });
