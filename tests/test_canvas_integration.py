@@ -209,6 +209,13 @@ class CanvasIntegrationTests(unittest.TestCase):
         files = canvas.list_files(course, "Bearer x")["files"]
         self.assertEqual({f["id"]: f["name"] for f in files}, {501: "Chapter 1 slides", 502: "Essay rubric.pdf"})
 
+    def test_linked_file_names_are_clean(self):
+        from services.canvas_client import _strip_tags, _usable_link_name
+        self.assertEqual(_usable_link_name(_strip_tags("Chart of Genesis 1 &amp; 2")), "Chart of Genesis 1 & 2")
+        self.assertEqual(_usable_link_name(_strip_tags("<b>Lesson 12</b> &quot;Saul&quot;")), 'Lesson 12 "Saul"')
+        for broken in ["Old Testament Timeline (", "click here", "Here", "", 'Lesson "Saul']:
+            self.assertEqual(_usable_link_name(_strip_tags(broken)), "", broken)
+
     def test_linked_pages_are_read_in_parallel(self):
         import threading
         import time as clock

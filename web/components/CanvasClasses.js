@@ -82,11 +82,12 @@ export function CourseFiles({ course }) {
         </ul>
       ) : !error && <p className="c-meta cc-none">No files shared in this class yet.</p>}
       <style jsx global>{`
-        .cc-files { list-style: none; margin: 0; padding: 0 8px 8px; display: grid; }
+        .cc-files { list-style: none; margin: 0; padding: 0 8px 8px; display: grid; grid-template-columns: minmax(0, 1fr); }
         .cc-file { display: flex; align-items: center; gap: 12px; min-height: 56px; border-top: 1px solid var(--line); }
         .cc-file > .lucide { color: var(--olive-ink); flex: 0 0 auto; }
         .cc-file-name { flex: 1; min-width: 0; font: 600 15px/1.3 var(--font-sans); }
         .cc-file-size { white-space: nowrap; }
+        .cc-file > button { flex: 0 0 auto; }
         .cc-none, .cc-error { margin: 0; padding: 8px 16px 14px; }
         .cc-error { color: var(--error); font: 600 15px/1.4 var(--font-sans); }
         @media (max-width: 600px) { .cc-file-size { display: none; } }
