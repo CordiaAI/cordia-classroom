@@ -1,0 +1,80 @@
+/* Motion shared across the app. Every effect here stops for people who ask their device for
+   less motion (the block at the end), and none of it changes layout. */
+
+/* Backdrop drift: lib/ambientMotion.js sets --bg-x / --bg-y from the mouse or phone tilt. */
+body::before {
+  transform: translate3d(var(--bg-x, 0px), var(--bg-y, 0px), 0) scale(1.04);
+  transition: transform 900ms cubic-bezier(.2, .8, .2, 1);
+  will-change: transform;
+}
+
+/* Cards that lean toward the cursor (desktop). The lean is set per card while hovered. */
+.today-continue, .today-progress, .plan-card, .lecture-card, .c-tilt {
+  transition: transform 260ms cubic-bezier(.2, .8, .2, 1), border-color var(--dur, 160ms), box-shadow var(--dur, 160ms);
+  transform-style: preserve-3d;
+}
+.is-tilting {
+  transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg)) translateY(-2px);
+}
+
+/* Quiz answers: a right answer pops and sends out a green ring; a wrong one shakes (globals.css)
+   and the right one then pulses in. */
+@keyframes c-ring-out {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 45%, transparent); }
+  100% { box-shadow: 0 0 0 14px transparent; }
+}
+@keyframes c-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.04); }
+  100% { transform: scale(1.025); }
+}
+.quiz-option.quiz-option.quiz-option.quiz-option.correct-shine {
+  animation: c-pop 360ms cubic-bezier(.2, .8, .2, 1) forwards, c-ring-out 700ms ease-out;
+}
+.quiz-option.quiz-option.quiz-option.quiz-option.correct-glow { animation: c-reveal 500ms 350ms both, quiz-glow-pulse 1.6s 850ms ease-in-out infinite; }
+@keyframes c-reveal { from { transform: scale(0.97); opacity: 0.6; } to { transform: none; opacity: 1; } }
+.quiz-option.correct { animation: c-pop 360ms cubic-bezier(.2, .8, .2, 1), c-ring-out 700ms ease-out; }
+.quiz-option.wrong { animation: quiz-shake 0.5s cubic-bezier(.36, .07, .19, .97); }
+.retain-fill-input.right { animation: c-ring-out 700ms ease-out; }
+.retain-fill-input.wrong { animation: quiz-shake 0.5s cubic-bezier(.36, .07, .19, .97); }
+.retain-feedback { animation: c-slide-in 280ms cubic-bezier(.2, .8, .2, 1); }
+@keyframes c-slide-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* Progress rings fill in when they appear and glide when the value changes. */
+.c-ring-fill { transition: stroke-dashoffset 700ms cubic-bezier(.2, .8, .2, 1); animation: c-ring-fill 900ms cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes c-ring-fill { from { stroke-dashoffset: var(--ring-full, 200); } }
+
+/* A highlight becoming a visual: the panel unfolds from its top corner and the quoted text lifts in. */
+.ov-pending { transform-origin: 0 0; animation: c-unfold 420ms cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes c-unfold {
+  from { opacity: 0; transform: perspective(900px) rotateX(-12deg) scale(0.92); clip-path: inset(0 0 70% 0 round 14px); }
+  to { opacity: 1; transform: none; clip-path: inset(0 0 0 0 round 14px); }
+}
+.ov-pending .ov-quote { display: inline-block; animation: c-lift 520ms 80ms cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes c-lift {
+  from { transform: translateY(10px); background: color-mix(in srgb, var(--olive) 22%, transparent); }
+  60% { background: color-mix(in srgb, var(--olive) 22%, transparent); }
+  to { transform: none; background: transparent; }
+}
+.ov-pending .nv { animation: c-slide-in 360ms 200ms both; }
+
+/* Streak flame: flickers once today counts, and grows at 7 and 30 days. */
+.today-flame { display: inline-grid; place-items: center; transform-origin: 50% 90%; }
+.today-flame.is-lit { color: var(--flame); animation: c-flicker 1.8s ease-in-out infinite; }
+.today-flame.is-big { transform: scale(1.18); }
+.today-flame.is-blaze { transform: scale(1.32); filter: drop-shadow(0 0 6px var(--flame-glow)); }
+.today-flame.is-lit.is-big { animation-name: c-flicker-big; }
+.today-flame.is-lit.is-blaze { animation-name: c-flicker-blaze; }
+@keyframes c-flicker { 0%, 100% { transform: scale(1) rotate(0); } 30% { transform: scale(1.08, 0.95) rotate(-3deg); } 60% { transform: scale(0.96, 1.06) rotate(2deg); } }
+@keyframes c-flicker-big { 0%, 100% { transform: scale(1.18) rotate(0); } 30% { transform: scale(1.26, 1.12) rotate(-3deg); } 60% { transform: scale(1.14, 1.24) rotate(2deg); } }
+@keyframes c-flicker-blaze { 0%, 100% { transform: scale(1.32) rotate(0); } 30% { transform: scale(1.4, 1.26) rotate(-4deg); } 60% { transform: scale(1.28, 1.4) rotate(3deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  body::before { transform: none; transition: none; }
+  .is-tilting { transform: none; }
+  .quiz-option.quiz-option.quiz-option.quiz-option.correct-shine,
+  .quiz-option.quiz-option.quiz-option.quiz-option.correct-glow,
+  .quiz-option.correct, .quiz-option.wrong, .retain-fill-input.right, .retain-fill-input.wrong, .retain-feedback,
+  .c-ring-fill, .ov-pending, .ov-pending .ov-quote, .ov-pending .nv, .today-flame.is-lit { animation: none; }
+  .c-ring-fill { transition: none; }
+}

@@ -5,6 +5,13 @@ import { requestTip } from '../lib/tips';
 import SessionFinish from './SessionFinish';
 
 const SHUFFLE_KEY = 'cordiaShuffle';
+// Swipe: past this many pixels the card is answered (right = Got it, left = Again).
+const SWIPE_PX = 110;
+const FLY_MS = 220;
+
+function reducedMotion() {
+  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
 
 function shuffledOrder(length) {
   const order = Array.from({ length }, (_, index) => index);
@@ -44,6 +51,12 @@ export default function FlashcardViewer({
   const [seconds, setSeconds] = useState(0);
   const started = useRef(Date.now());
   const cardRef = useRef(null);
+  // Drag state for swiping: the card follows the finger, then flies off or springs back.
+  const [drag, setDrag] = useState({ dx: 0, dy: 0, active: false, leaving: '' });
+  const dragStart = useRef(null);
+  const dragged = useRef(false);
+  // Bumps the matching counter when a card is answered.
+  const [bump, setBump] = useState({ know: 0, learning: 0 });
 
   const current = queue[0];
   useEffect(() => { if (flipped) walkthroughEvent('card-flipped'); }, [flipped]);
@@ -62,8 +75,9 @@ export default function FlashcardViewer({
     return { queue: [...queue], known: [...known], missed: new Set(missed) };
   }
 
-  function gotIt() {
-    if (!flipped || card === undefined) return;
+  function gotIt(swiped = false) {
+    if ((!flipped && !swiped) || card === undefined) return;
+    setBump(value => ({ ...value, know: value.know + 1 }));
     const nextKnown = [...known, current];
     const nextQueue = queue.slice(1);
     setHistory(list => [...list, snapshot()]);
@@ -73,14 +87,50 @@ export default function FlashcardViewer({
     if (!nextQueue.length) finish(nextKnown, missed);
   }
 
-  function again() {
-    if (!flipped || card === undefined) return;
+  function again(swiped = false) {
+    if ((!flipped && !swiped) || card === undefined) return;
+    setBump(value => ({ ...value, learning: value.learning + 1 }));
     const nextMissed = new Set(missed);
     nextMissed.add(current);
     setHistory(list => [...list, snapshot()]);
     setMissed(nextMissed);
     setQueue([...queue.slice(1), current]);
     setFlipped(false);
+  }
+
+  // A button or key answer flies the card off the same way a swipe does.
+  function answer(known, swiped = false) {
+    if (card === undefined || drag.leaving || (!flipped && !swiped)) return;
+    if (reducedMotion()) { if (known) gotIt(swiped); else again(swiped); return; }
+    setDrag({ dx: 0, dy: 0, active: false, leaving: known ? 'right' : 'left' });
+    setTimeout(() => {
+      if (known) gotIt(true); else again(true);
+      setDrag({ dx: 0, dy: 0, active: false, leaving: '' });
+    }, FLY_MS);
+  }
+
+  function onPointerDown(event) {
+    if (event.button !== undefined && event.button !== 0) return;
+    dragStart.current = { x: event.clientX, y: event.clientY };
+    dragged.current = false;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
+  function onPointerMove(event) {
+    if (!dragStart.current || drag.leaving) return;
+    const dx = event.clientX - dragStart.current.x;
+    const dy = event.clientY - dragStart.current.y;
+    if (!dragged.current && Math.abs(dx) < 8) return;
+    dragged.current = true;
+    setDrag({ dx, dy: dy * 0.25, active: true, leaving: '' });
+  }
+
+  function onPointerUp() {
+    if (!dragStart.current) return;
+    dragStart.current = null;
+    const dx = drag.dx;
+    if (dragged.current && Math.abs(dx) >= SWIPE_PX) answer(dx > 0, true);
+    else setDrag({ dx: 0, dy: 0, active: false, leaving: '' });
   }
 
   function back() {
@@ -128,8 +178,8 @@ export default function FlashcardViewer({
         if (event.target.closest?.('button') && event.target !== cardRef.current) return;
         event.preventDefault();
         setFlipped(value => !value);
-      } else if (event.key === '1') again();
-      else if (event.key === '2') gotIt();
+      } else if (event.key === '1') answer(false);
+      else if (event.key === '2') answer(true);
       else if (event.key === 'ArrowLeft') back();
     }
     window.addEventListener('keydown', onKey);
@@ -140,6 +190,12 @@ export default function FlashcardViewer({
   // Quizlet-style tallies: cards missed and not yet known, and cards known.
   const learning = [...missed].filter(index => !known.includes(index)).length;
   const gotRight = known.filter(index => !missed.has(index));
+  // Up to two cards wait behind the one in front, so the deck's size is visible.
+  const behind = Math.min(2, queue.length - 1);
+  const lean = drag.leaving ? (drag.leaving === 'right' ? 1 : -1) : Math.max(-1, Math.min(1, drag.dx / SWIPE_PX));
+  const cardStyle = drag.leaving
+    ? { transform: `translateX(${drag.leaving === 'right' ? 130 : -130}%) rotate(${drag.leaving === 'right' ? 18 : -18}deg)`, opacity: 0, transition: `transform ${FLY_MS}ms ease-in, opacity ${FLY_MS}ms ease-in` }
+    : drag.active ? { transform: `translate(${drag.dx}px, ${drag.dy}px) rotate(${drag.dx / 18}deg)`, transition: 'none' } : undefined;
 
   return (
     <div className="fc">
@@ -178,35 +234,51 @@ export default function FlashcardViewer({
       ) : (
         <>
           <div className="fc-progress">
-            <span className="fc-count is-learning" title="Still learning"><span className="fc-count-label">Still learning</span><strong aria-label={`Still learning: ${learning}`}>{learning}</strong></span>
+            <span className="fc-count is-learning" title="Still learning"><span className="fc-count-label">Still learning</span><strong key={'l' + bump.learning} className={bump.learning ? 'is-bumped' : ''} aria-label={`Still learning: ${learning}`}>{learning}</strong></span>
             <div className="c-bar" role="progressbar" aria-label="Progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={known.length}><span style={{ width: `${(known.length / total) * 100}%` }} /></div>
             <span className="c-meta">{position} / {total}</span>
-            <span className="fc-count is-know" title="Know"><strong aria-label={`Know: ${known.length}`}>{known.length}</strong><span className="fc-count-label">Know</span></span>
+            <span className="fc-count is-know" title="Know"><strong key={'k' + bump.know} className={bump.know ? 'is-bumped' : ''} aria-label={`Know: ${known.length}`}>{known.length}</strong><span className="fc-count-label">Know</span></span>
           </div>
-          <div
-            ref={cardRef}
-            data-spot="flashcard"
-            className={'fc-card' + (flipped ? ' is-flipped' : '')}
-            role="button"
-            tabIndex={0}
-            aria-roledescription="flashcard"
-            aria-pressed={flipped}
-            onClick={() => setFlipped(value => !value)}
-          >
-            <div className="fc-face fc-front" aria-hidden={flipped}>
-              {card?.guideTitle && <span className="c-meta">{card.guideTitle}</span>}
-              <p>{card?.front}</p>
-            </div>
-            <div className="fc-face fc-back" aria-hidden={!flipped}>
-              <p>{card?.back}</p>
-              {card?.image && <img src={card.image} alt="" />}
+          <div className="fc-deck">
+            {behind >= 2 && <div className="fc-ghost fc-ghost-2" aria-hidden="true" />}
+            {behind >= 1 && <div className="fc-ghost fc-ghost-1" aria-hidden="true" />}
+            {/* A new key per card: the next card rises from the deck when the last one leaves. */}
+            <div key={`${current}-${queue.length}-${known.length}`} className="fc-top" style={cardStyle}>
+              <div
+                ref={cardRef}
+                data-spot="flashcard"
+                className={'fc-card' + (flipped ? ' is-flipped' : '')}
+                role="button"
+                tabIndex={0}
+                aria-roledescription="flashcard"
+                aria-pressed={flipped}
+                aria-describedby="fc-swipe-hint"
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
+                onClick={() => { if (!dragged.current) setFlipped(value => !value); dragged.current = false; }}
+              >
+                <div className="fc-face fc-front" aria-hidden={flipped}>
+                  {card?.guideTitle && <span className="c-meta">{card.guideTitle}</span>}
+                  <p>{card?.front}</p>
+                </div>
+                <div className="fc-face fc-back" aria-hidden={!flipped}>
+                  <p>{card?.back}</p>
+                  {card?.image && <img src={card.image} alt="" />}
+                </div>
+                {/* Leaning while dragged: green toward Know, amber toward Still learning. */}
+                <span className="fc-lean is-know" style={{ opacity: Math.max(0, lean) }} aria-hidden="true">Know</span>
+                <span className="fc-lean is-learning" style={{ opacity: Math.max(0, -lean) }} aria-hidden="true">Still learning</span>
+              </div>
             </div>
           </div>
+          <p id="fc-swipe-hint" className="fc-swipe-hint c-meta">Swipe right if you know it, left to see it again</p>
           <div className="fc-actions" data-tip="keys">
             {flipped ? (
               <>
-                <button type="button" className="c-btn c-btn--secondary c-btn--lg" onClick={again}>Again <kbd>1</kbd></button>
-                <button type="button" className="c-btn c-btn--primary c-btn--lg" onClick={gotIt}>Got it <kbd>2</kbd></button>
+                <button type="button" className="c-btn c-btn--secondary c-btn--lg" onClick={() => answer(false)}>Again <kbd>1</kbd></button>
+                <button type="button" className="c-btn c-btn--primary c-btn--lg" onClick={() => answer(true)}>Got it <kbd>2</kbd></button>
               </>
             ) : (
               <button type="button" className="c-btn c-btn--secondary c-btn--lg" onClick={() => setFlipped(true)}>Flip <kbd>Space</kbd></button>
@@ -227,7 +299,25 @@ export default function FlashcardViewer({
         .fc-count.is-learning strong { color: var(--warning); background: var(--warning-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning) 35%, transparent); }
         .fc-count.is-know strong { color: var(--success); background: var(--success-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 35%, transparent); }
         .fc-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; text-align: left; }
-        .fc-card { position: relative; min-height: 340px; perspective: 1400px; cursor: pointer; border-radius:var(--r-card); }
+        .fc-deck { position: relative; display: grid; }
+        .fc-deck > * { grid-area: 1 / 1; }
+        .fc-ghost { border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); box-shadow: var(--shadow); transform-origin: 50% 100%; transition: transform var(--dur) var(--ease); }
+        .fc-ghost-1 { transform: translateY(12px) scale(0.955); opacity: 0.75; }
+        .fc-ghost-2 { transform: translateY(24px) scale(0.91); opacity: 0.45; }
+        .fc-top { position: relative; z-index: 1; animation: fc-rise 260ms var(--ease) backwards; touch-action: pan-y; }
+        @keyframes fc-rise { from { transform: translateY(12px) scale(0.955); } to { transform: none; } }
+        .fc-card { position: relative; min-height: 340px; perspective: 1400px; cursor: grab; border-radius:var(--r-card); user-select: none; -webkit-user-select: none; }
+        .fc-card:active { cursor: grabbing; }
+        /* A light sheen sweeps across the card as it turns. */
+        .fc-face::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(115deg, transparent 38%, var(--sheen) 50%, transparent 62%) no-repeat; background-size: 260% 100%; background-position: 130% 0; transition: background-position 700ms var(--ease); }
+        .is-flipped .fc-face::after { background-position: -40% 0; }
+        .fc-lean { position: absolute; top: 18px; z-index: 2; padding: 6px 12px; border-radius: var(--r-pill); font: 700 14px/1 var(--font-sans); letter-spacing: 0.02em; pointer-events: none; transition: opacity 120ms linear; }
+        .fc-lean.is-know { right: 18px; color: var(--success); background: var(--success-bg); box-shadow: inset 0 0 0 2px var(--success); }
+        .fc-lean.is-learning { left: 18px; color: var(--warning); background: var(--warning-bg); box-shadow: inset 0 0 0 2px var(--warning); }
+        .fc-swipe-hint { margin: 4px 0 -8px; text-align: center; }
+        @media (hover: hover) and (pointer: fine) { .fc-swipe-hint { display: none; } }
+        .fc-count strong.is-bumped { animation: fc-bump 380ms var(--ease); }
+        @keyframes fc-bump { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
         .fc-face { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 12px; padding: 32px; overflow: auto; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); box-shadow: var(--shadow); backface-visibility: hidden; transition: transform var(--dur) var(--ease); text-align: center; }
         .fc-face p { margin: 0; max-width: 34ch; font:500 20px/1.15 var(--font-sans); color: var(--ink); }
         .fc-face img { max-width: 100%; max-height: 180px; object-fit: contain; border-radius:var(--r-input); }
@@ -246,6 +336,8 @@ export default function FlashcardViewer({
         }
         @media (prefers-reduced-motion: reduce) {
           .fc-face { transition: none; }
+          .fc-top, .fc-count strong.is-bumped { animation: none; }
+          .fc-face::after { display: none; }
           .fc-back { transform: none; opacity: 0; }
           .is-flipped .fc-front { transform: none; opacity: 0; }
           .is-flipped .fc-back { opacity: 1; }

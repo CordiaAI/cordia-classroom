@@ -76,7 +76,7 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
           const read = readSections?.has(index);
           return (
             <section className="reader-block" key={pair.index}>
-              <h2 className="reader-q"><span className="c-meta">{index + 1}</span>{pair.question}</h2>
+              <h2 className="reader-q"><span className={'reader-num' + (read ? ' is-read' : '')} aria-label={read ? `${index + 1}, done` : undefined}>{read ? <Check size={14} strokeWidth={2.5} aria-hidden="true" /> : index + 1}</span>{pair.question}</h2>
               <p className="c-study reader-a" data-spot={offset === 0 ? 'reader-text' : undefined} data-tip={offset === 0 ? 'highlight' : undefined}>{pair.answer}</p>
               {pair.image && <img className="reader-img" src={pair.image} alt="" />}
               {(onRead || onExplain) && (
@@ -134,6 +134,11 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
         .reader-img { display: block; max-width: 100%; margin-top: 16px; border-radius:var(--r-input); }
         .reader-actions { display: flex; gap: 4px; margin: 16px 0 0 -12px; }
         .reader-actions :global(.is-read) { color: var(--success); }
+        /* Section numbers turn into a tick, with a small pop, once the section is marked read. */
+        .reader-num { flex: none; display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--olive-ink); font: 600 13px/1 var(--font-sans); vertical-align: 3px; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
+        .reader-num.is-read { background: var(--success-bg); color: var(--success); animation: reader-tick 420ms var(--ease); }
+        @keyframes reader-tick { 0% { transform: scale(0.6); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+        @media (prefers-reduced-motion: reduce) { .reader-num.is-read { animation: none; } }
         .reader-prose, .reader-notes { white-space: pre-wrap; width: 100%; }
         .reader-foot { display: flex; align-items: center; gap: 12px; padding-top: 16px; }
         .reader-select { position: fixed; display: flex; min-width: 0; gap: 2px; z-index: 150; }

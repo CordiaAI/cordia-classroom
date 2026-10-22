@@ -5,10 +5,12 @@ import '../styles/refine.css';
 import '../styles/tokens.css';
 import '../styles/glass.css';
 import '../styles/assistant.css';
+import '../styles/motion.css';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import { installErrorReporting } from '../lib/errorReport';
+import { installAmbientMotion } from '../lib/ambientMotion';
 import Layout from '../components/Layout';
 import UpgradeModal from '../components/UpgradeModal';
 import { scheduleProactiveRefresh, getToken } from '../lib/api';
@@ -28,6 +30,7 @@ export default function App({ Component, pageProps }) {
   // Authentication pages stay light; workspace routes honor the saved preference.
   useEffect(() => { applyTheme(router.pathname); }, [router.pathname]);
   useEffect(() => { installErrorReporting(); }, []);
+  useEffect(() => installAmbientMotion(), []);
 
   // Start proactive token refresh if already logged in; the account's saved theme wins over the cache.
   useEffect(() => {

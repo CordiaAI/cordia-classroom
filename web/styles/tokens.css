@@ -163,6 +163,12 @@
   --primary-glow: 0 0 0 4px rgba(83, 97, 73, 0.16), 0 8px 22px rgba(83, 97, 73, 0.28);
   --public-backdrop: var(--canvas);
   --login-backdrop: none;
+  /* Motion: card sheen, streak flame, celebration colours. */
+  --sheen: rgba(255, 255, 255, 0.55);
+  --flame: #D9822B;
+  --flame-glow: rgba(217, 130, 43, 0.55);
+  --confetti-1: #CFDAC3;
+  --confetti-2: #E8C873;
 }
 
 [data-theme='dark'] {
@@ -222,6 +228,9 @@
   /* Olive used as text must be the light olive on dark surfaces. */
   --accent: var(--olive-ink);
   --accent-secondary: var(--olive-ink);
+  --sheen: rgba(255, 255, 255, 0.12);
+  --flame: #F0A04B;
+  --flame-glow: rgba(240, 160, 75, 0.5);
 }
 
 /* Backdrop behind the app: pale clouds in light; a static, softly blurred olive and charcoal field in dark. */

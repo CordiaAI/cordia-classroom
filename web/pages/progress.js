@@ -6,10 +6,11 @@ import { semesterStart, streakWithFreeze } from '../lib/activity';
 import Heatmap from '../components/Heatmap';
 import RecapCard from '../components/RecapCard';
 import StudyInsights from '../components/StudyInsights';
+import KnowledgeMap from '../components/KnowledgeMap';
 import { LoadGate } from '../components/CordiaLoader';
 import { markUsed } from '../lib/progress';
 
-// Everything about how studying is going, in one place: streak, grove, year, weak spots, recap.
+// Everything about how studying is going, in one place: streak, knowledge map, year, weak spots, recap.
 export default function Progress() {
   const { ready } = useRequireAuth();
   const [data, setData] = useState(null);
@@ -52,6 +53,7 @@ export default function Progress() {
             </div>
           </section>
         )}
+        {data && <KnowledgeMap guides={data.guides} />}
         {data && <Heatmap serverWeek={data.streak?.week || []} />}
         <StudyInsights />
         {data && <RecapCard guides={data.guides} folders={data.folders} since={since} cardsStudied={data.overview?.cards_studied || 0} />}
