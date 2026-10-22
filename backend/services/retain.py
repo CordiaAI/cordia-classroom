@@ -21,9 +21,11 @@ CREDITS = (0.0, 0.5, 1.0)
 
 TERM_MAX_WORDS = 5
 MATCH_MIN, MATCH_MAX = 4, 6
+# Formats that can ask each answer shape, best first. Written is graded by AI, so it can ask any
+# answer; it comes last for short ones, so it is only used when the student didn't pick a better fit.
 FIT = {
-    "term": ("matching", "fill", "mc"),
-    "sentence": ("mc",),
+    "term": ("matching", "fill", "mc", "written"),
+    "sentence": ("mc", "written"),
     "long": ("written", "mc"),
 }
 _EXPLAIN = re.compile(r"^\s*(why|how|explain|describe|compare|contrast|discuss|what (role|effect|impact))\b", re.I)
@@ -102,7 +104,7 @@ def plan_session(questions: list, selected) -> list:
         assigned[index] = next((kind for kind in FIT[shape] if kind in chosen), "mc")
 
     def fallback(index):
-        return "fill" if "fill" in chosen else "mc"
+        return next((kind for kind in ("fill", "mc", "written") if kind in chosen), "mc")
 
     matching = [index for index, kind in assigned.items() if kind == "matching"]
     groups, current, seen = [], [], set()

@@ -7,6 +7,7 @@ import { apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import { loadStudyQueue } from '../lib/studyQueue';
 import { rememberRetainMisses, retainMisses } from '../lib/userStore';
+import { applyResults } from '../lib/spacedReview.mjs';
 import FlashcardViewer from '../components/FlashcardViewer';
 
 function PracticeList({ practice }) {
@@ -59,13 +60,9 @@ export default function StudySession() {
     });
     const requests = [...byGuide.entries()].map(([guideId, entry]) => {
       const guide = queue.guides.find(item => item.id === guideId);
-      const before = guide?.flashcard_progress || {};
-      const knownAll = [...new Set([...(before.known || []), ...entry.known])];
-      const unknownAll = [...new Set([...(before.unknown || []), ...entry.unknown])].filter(index => !knownAll.includes(index));
-      return apiFetch('/guides/' + guideId + '/flashcard-progress', {
-        method: 'PATCH',
-        body: JSON.stringify({ known: knownAll, unknown: unknownAll, last_studied: new Date().toISOString() }),
-      });
+      // Known cards come back later, missed ones tomorrow (lib/spacedReview.mjs).
+      const next = applyResults(guide?.flashcard_progress, { known: entry.known, missed: entry.unknown });
+      return apiFetch('/guides/' + guideId + '/flashcard-progress', { method: 'PATCH', body: JSON.stringify(next) });
     });
     // Retain misses answered right here are cleared.
     const stored = retainMisses();

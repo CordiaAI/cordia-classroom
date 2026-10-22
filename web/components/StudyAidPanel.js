@@ -152,6 +152,8 @@ function VisualAid({ guideId, number, cache, section }) {
                 context={[section.guideTitle, sectionText(section.before), sectionText(section.after)].filter(Boolean).join('\n\n')}
                 name={`visual-${number}`}
                 auto
+                // When Napkin can't draw, the diagram already built for this question is shown instead.
+                fallback={() => <MermaidDiagram code={data.mermaid} label={data.caption || 'Concept diagram'} />}
               />
             )}
           {practice ? (

@@ -28,7 +28,7 @@ function createState(populated) {
 }
 
 function summary(guide) {
-  const { study_guide, notes, flashcards, flashcard_progress, ...rest } = guide;
+  const { study_guide, notes, flashcards, ...rest } = guide;
   return { ...rest, flashcard_count: flashcards?.length || 0 };
 }
 

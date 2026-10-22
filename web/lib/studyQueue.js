@@ -1,15 +1,17 @@
 import { apiFetch } from './api';
 import { retainMisses } from './userStore';
+import { dueIndices } from './spacedReview.mjs';
 
-// A card is due until the student has marked it "Got it" in a finished session.
+// A card is due when it is new, or its spaced-review day has come (lib/spacedReview.mjs).
 export function dueCards(guide) {
   const cards = Array.isArray(guide?.flashcards) ? guide.flashcards : [];
-  const known = new Set(guide?.flashcard_progress?.known || []);
-  return cards.map((card, index) => ({ ...card, index })).filter(card => !known.has(card.index));
+  const due = new Set(dueIndices(guide?.flashcard_progress, cards.length));
+  return cards.map((card, index) => ({ ...card, index })).filter(card => due.has(card.index));
 }
 
+// Works on a full guide or a list summary (flashcard_count plus flashcard_progress).
 export function dueCount(guide) {
-  if (!Array.isArray(guide?.flashcards)) return Number(guide?.flashcard_count) || 0;
+  if (!Array.isArray(guide?.flashcards)) return dueIndices(guide?.flashcard_progress, Number(guide?.flashcard_count) || 0).length;
   return dueCards(guide).length;
 }
 
