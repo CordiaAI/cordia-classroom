@@ -12,7 +12,7 @@ from rate_limit import ai_rate_limit
 from pydantic import BaseModel, Field
 from typing import List, Literal, Optional
 from database import get_supabase
-from services.llm import get_openai_client, grade_written_answer
+from services.llm import explain_miss_briefly, get_openai_client, grade_written_answer
 from services.llm_calls import chat
 from auth_utils import get_user_id
 from ids import require_uuid
@@ -52,6 +52,11 @@ class SessionRequest(BaseModel):
 class WrittenAnswer(BaseModel):
     concept: int = Field(..., ge=0, le=100)
     answer: str = Field(..., min_length=1, max_length=4000)
+
+
+class MissRequest(BaseModel):
+    concept: int = Field(..., ge=0, le=100)
+    chosen: str = Field(..., min_length=1, max_length=4000)
 
 
 def _parse_qa_pairs(text: str) -> list:
@@ -345,6 +350,29 @@ def grade_written(guide_id: str, body: WrittenAnswer, authorization: str = Heade
         "answer": retain.concept_answer(question),
         "token": retain.sign_grade(user_id, guide_id, body.concept, credit),
     }
+
+
+@router.post("/{guide_id}/why", dependencies=[Depends(ai_rate_limit(max_calls=30))])
+def explain_miss(guide_id: str, body: MissRequest, authorization: str = Header(default="")):
+    """Feedback under a missed question: why the answer is right and why the choice was not."""
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+    questions = _saved_questions(supabase, guide_id, user_id)
+    if body.concept >= len(questions):
+        raise HTTPException(status_code=400, detail="Unknown question")
+    question = questions[body.concept]
+    correct = retain.concept_answer(question)
+    # The guide's own answer to this question, when the quiz wording matches it.
+    guide = supabase.table("study_guides").select("study_guide").eq("id", guide_id).eq("user_id", user_id).execute()
+    pairs = _parse_qa_pairs(((guide.data or [{}])[0].get("study_guide")) or "")
+    passage = next((pair["answer"] for pair in pairs if pair["question"].strip() == str(question.get("question") or "").strip()), "")
+    require(user_id, "light")
+    result = explain_miss_briefly(question.get("question", ""), correct, body.chosen.strip(), passage)
+    if not result:
+        raise HTTPException(status_code=502, detail="Cordia could not explain this one right now.")
+    record(user_id, "light")
+    return result
 
 
 def _checked_attempts(supabase, guide_id: str, user_id: str, attempts: list) -> list:

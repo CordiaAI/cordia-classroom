@@ -43,7 +43,7 @@ function CountUp({ value }) {
 
 // The end of every session: three numbers and what to do next. (Study time per guide is still
 // recorded for the Progress page; the grove of trees is hidden for now.)
-export default function SessionFinish({ guideId, guideTitle, cards, accuracy, minutes, kind, onRestart, onDone, doneSpot, children }) {
+export default function SessionFinish({ guideId, guideTitle, cards, accuracy, minutes, kind, onRestart, onDone, doneSpot, doneLabel = 'Done', children }) {
   useEffect(() => {
     recordStudy({ guideId, guideTitle, minutes, cards, right: Math.round((accuracy / 100) * cards), total: cards, kind });
     if (guideId) addGrowth(guideId, minutes);
@@ -67,7 +67,7 @@ export default function SessionFinish({ guideId, guideTitle, cards, accuracy, mi
       {children}
       <div className="c-row finish-actions">
         {onRestart && <button type="button" className="c-btn c-btn--secondary" onClick={onRestart}><RotateCcw size={20} strokeWidth={1.75} aria-hidden="true" />Restart</button>}
-        <button type="button" className="c-btn c-btn--primary" data-spot={doneSpot} onClick={onDone}>Done</button>
+        <button type="button" className="c-btn c-btn--primary" data-spot={doneSpot} onClick={onDone}>{doneLabel}</button>
       </div>
       <style jsx>{`
         .finish { display: grid; justify-items: center; gap: 16px; padding: 32px 24px; text-align: center; }

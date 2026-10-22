@@ -2,6 +2,7 @@ import { useRouter } from 'next/router';
 import CordiaLoader from './CordiaLoader';
 import { openUpgrade } from '../lib/api';
 import { dismissGuideJob, useGuideJobs } from '../lib/guideJobs';
+import { newGuideHref } from '../lib/checkYourself';
 
 // Top-right status for study guides building in the background, on every page.
 export default function GuideJobIndicator() {
@@ -26,7 +27,7 @@ export default function GuideJobIndicator() {
             ? <span>“{job.title}” is ready</span>
             : <span>{job.error}</span>}
           {job.status === 'done' && (
-            <button type="button" className="guide-job-open" onClick={() => { dismissGuideJob(job.id); router.push('/guide/' + job.guideId); }}>Open</button>
+            <button type="button" className="guide-job-open" onClick={() => { dismissGuideJob(job.id); router.push(newGuideHref(job.guideId)); }}>Open</button>
           )}
           {job.status === 'error' && job.upgrade && (
             <button type="button" className="guide-job-open" onClick={() => { dismissGuideJob(job.id); openUpgrade({ feature: 'guide' }); }}>View plans</button>

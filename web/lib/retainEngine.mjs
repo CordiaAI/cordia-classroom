@@ -112,7 +112,7 @@ export function recordResults(session, card, results) {
     const state = { ...concepts[result.concept] };
     const right = result.credit === 1;
     if (!state.first) {
-      state.first = { concept: result.concept, type: card.type, response: result.response ?? '', credit: result.credit, token: result.token || null };
+      state.first = { concept: result.concept, type: card.type, response: result.response ?? '', credit: result.credit, token: result.token || null, ...(result.confidence ? { confidence: result.confidence } : {}) };
       if (right) state.cleared = true;
       else { state.missed = true; state.needs = CLEAR_AFTER; }
     } else if (!state.cleared) {

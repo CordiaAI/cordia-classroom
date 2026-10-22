@@ -7,6 +7,7 @@ import {
 import { apiFetch, authHeaders } from '../lib/api';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 import { dismissGuideJob, startGuideJob, useGuideJobs } from '../lib/guideJobs';
+import { newGuideHref } from '../lib/checkYourself';
 import { MAX_SOURCE_CHARS, baseName, combinedSource, extractFileText, fileKey, generateAndSave, newRequestId } from '../lib/guideCreate';
 import { NEW_SHEET_EVENT } from '../lib/newSheet';
 import { SAMPLE_GUIDE, SAMPLE_HEADINGS } from '../lib/sampleGuide';
@@ -195,7 +196,7 @@ export default function NewSheet() {
       reset();
       setOpen(false);
       walkthroughEvent('guide-ready');
-      router.push('/guide/' + job.guideId);
+      router.push(newGuideHref(job.guideId));
     } else {
       setStatus('idle');
       setError(job.error || 'This guide could not be built.');

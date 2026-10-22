@@ -6,6 +6,7 @@ import { useRequireAuth } from '../lib/auth';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 import { dismissGuideJob, startGuideJob, useGuideJobs } from '../lib/guideJobs';
 import { MAX_SOURCE_CHARS, baseName, combinedSource, fileKey, generateAndSave, newRequestId, pairsToCards, pairsToGuide } from '../lib/guideCreate';
+import { newGuideHref } from '../lib/checkYourself';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const MANUAL_DRAFT_KEY = 'autostudy_manual_draft';
@@ -132,7 +133,7 @@ export default function CreateGuidePage() {
     const done = mine.filter(job => job.status === 'done');
     if (!done.length) return;
     done.forEach(job => { startedJobs.current.delete(job.id); dismissGuideJob(job.id); });
-    router.push(done.length === 1 ? '/guide/' + done[0].guideId : '/dashboard?view=guides');
+    router.push(done.length === 1 ? newGuideHref(done[0].guideId) : '/dashboard?view=guides');
   }, [jobs, pageIdle, router]);
 
   const applyCardCount = useCallback(count => {

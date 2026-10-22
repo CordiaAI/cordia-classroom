@@ -41,7 +41,8 @@ export default function StudySession() {
     loadStudyQueue({ guideId: typeof router.query.guideId === 'string' ? router.query.guideId : '' }).then(setQueue);
   }, [ready, router.isReady]);
 
-  const cards = queue ? [...queue.cards, ...queue.misses] : [];
+  // Quiz answers the student was sure of but got wrong come first; they're the ones worth fixing.
+  const cards = queue ? [...queue.misses.filter(card => card.sure), ...queue.cards, ...queue.misses.filter(card => !card.sure)] : [];
   // Nothing to flip: Start goes straight into the first open practice set, not a menu.
   const directPractice = queue && !cards.length && queue.practice.length ? queue.practice[0].guideId : '';
   useEffect(() => {

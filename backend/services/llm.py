@@ -681,6 +681,32 @@ def grade_written_answer(question: str, reference: str, student_answer: str) -> 
     return {"credit": credit, "explanation": str(parsed.get("explanation") or "").strip()[:800]}
 
 
+def explain_miss_briefly(question: str, correct: str, chosen: str, passage: str = "") -> dict:
+    """Two short sentences under a missed question: why the right answer is right, and why the
+    chosen one is not. Uses the guide's passage as the standard, for any subject."""
+    response = chat(get_openai_client(), "retain_why",
+        messages=[
+            {"role": "system", "content": (
+                "A student missed one practice question. Write two short sentences (under 30 words each). "
+                '"why_right": what makes the correct answer right, using the meaningful detail from the guide. '
+                '"why_wrong": why the student\'s choice does not fit this question (what it actually describes or '
+                "what it misses), without guessing at the student's thinking. Use the guide passage as the "
+                "standard and never contradict it. Return JSON: {\"why_right\": \"...\", \"why_wrong\": \"...\"}"
+            )},
+            {"role": "user", "content": (
+                f"QUESTION:\n{question[:1500]}\n\nCORRECT ANSWER:\n{correct[:1500]}\n\n"
+                f"STUDENT CHOSE:\n{chosen[:1500]}\n\nGUIDE PASSAGE:\n{(passage or correct)[:3000]}"
+            )},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+    )
+    parsed = _practice_json(response.choices[0].message.content)
+    why_right = str(parsed.get("why_right") or "").strip()[:300]
+    why_wrong = str(parsed.get("why_wrong") or "").strip()[:300]
+    return {"why_right": why_right, "why_wrong": why_wrong} if why_right else {}
+
+
 def transcribe_document_pages(page_images: list, max_pages: int = 20) -> str:
     """OCR for scanned documents: transcribe each page image (data URLs), in page order."""
     client = get_openai_client()
