@@ -432,19 +432,22 @@ export default function LibraryPage() {
         .library .lib-filters .c-chip { flex: 0 0 auto; }
         .library .lib-group { padding: 6px; }
         .library .lib-group.is-drop { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
-        .library .lib-group-head { display: flex; align-items: center; gap: 6px; min-height: 52px; padding-right: 4px; }
+        .library .lib-group-head { display: flex; align-items: center; gap: 6px; min-height: 52px; padding-right: 12px; }
         .library .lib-group-toggle .lucide { transition: transform var(--dur) var(--ease); }
         .library .lib-group-toggle .is-closed { transform: rotate(-90deg); }
         .library .lib-group-name { min-width: 0; color: var(--ink); font:600 20px/1.15 var(--font-sans); text-decoration: none; }
         .library a.lib-group-name:hover { text-decoration: underline; }
         .library .lib-loose { display: flex; align-items: center; gap: 12px; padding: 16px 18px; text-decoration: none; }
         .library .lib-list { list-style: none; margin: 0; padding: 0; }
-        .library .lib-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 4px 4px 4px 12px; border-top: 1px solid var(--line); }
+        .library .lib-list { display: grid; gap: 2px; }
+        /* Rows are soft rounded tiles: a gentle tint on hover, no lines, edges, shadow or underline. */
+        .library .lib-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 4px 12px; border: 0; border-radius: var(--r-row, 16px); }
+        .library .lib-list .lib-row:hover, .library .lib-list .lib-row:focus-within:has(:focus-visible) { border-color: transparent !important; box-shadow: none !important; background: var(--olive-tint); }
+        .library .lib-row:focus-within:has(:focus-visible) { outline: 2px solid var(--olive); outline-offset: -2px; }
         .library .lib-row.is-dragging { opacity: .5; }
         .library .lib-kind { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 auto; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
         .library .lib-row-link { display: flex; align-items: baseline; gap: 12px; flex: 1; min-width: 0; color: var(--ink); text-decoration: none; padding: 10px 0; }
         .library .lib-row-link:hover { text-decoration: none; }
-        .library .lib-row-link:hover .lib-row-title { text-decoration: underline; }
         .library .lib-row-title { font:600 17px/1.15 var(--font-sans); min-width: 0; }
         .library .lib-rename { flex: 1; min-width: 0; }
         .library .lib-star.is-on { color: var(--olive-ink); }
