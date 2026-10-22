@@ -5,6 +5,8 @@
   try {
     const API = 'https://autostudy-ai.fly.dev';
     document.documentElement.setAttribute('data-asai-extension', 'ready');
+    // What this version can import, so Classroom never waits on an older extension.
+    document.documentElement.setAttribute('data-asai-imports', 'quizlet youtube');
 
     function announce() {
       window.postMessage({ type: 'ASAI_EXTENSION_READY' }, window.location.origin);

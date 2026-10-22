@@ -12,7 +12,7 @@ export function isQuizletUrl(value) {
   }
 }
 
-export { extensionReady } from './extensionBridge.js';
+export { extensionCan, extensionReady } from './extensionBridge.js';
 
 export async function importWithExtension(url) {
   const set = await askExtension('importQuizlet', url);

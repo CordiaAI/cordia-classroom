@@ -6,6 +6,12 @@ export function extensionReady() {
   return typeof document !== 'undefined' && document.documentElement.getAttribute('data-asai-extension') === 'ready';
 }
 
+// Extensions before 2.1.3 announce themselves but can't import; they never answer a request.
+export function extensionCan(kind) {
+  if (typeof document === 'undefined') return false;
+  return (document.documentElement.getAttribute('data-asai-imports') || '').split(' ').includes(kind);
+}
+
 export function askExtension(action, url, timeoutMs = 45000) {
   return new Promise((resolve, reject) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;

@@ -17,7 +17,7 @@ import LectureRecorder from './LectureRecorder';
 import CordiaLoader from './CordiaLoader';
 import { heuristicTitle, sensibleTitle } from '../lib/noteMeta.mjs';
 import { localDate, saveLecture, saveTranscriptNote } from '../lib/lectures';
-import { askExtension, extensionReady, isYoutubeUrl, transcriptParagraphs } from '../lib/extensionBridge';
+import { askExtension, extensionCan, extensionReady, isYoutubeUrl, transcriptParagraphs } from '../lib/extensionBridge';
 import { isQuizletUrl } from '../lib/quizletImport';
 
 const MAX_FILES = 5;
@@ -286,7 +286,11 @@ export default function NewSheet() {
         let read;
         if (isYoutubeUrl(href)) {
           // YouTube turns servers away, so the extension reads the transcript in the student's browser.
-          if (!extensionReady()) throw new Error('YouTube videos are read through the Cordia Chrome extension. Add it, then try again.');
+          if (!extensionCan('youtube')) {
+            throw new Error(extensionReady()
+              ? 'Update the Cordia Chrome extension to read YouTube videos, then try again.'
+              : 'YouTube videos are read through the Cordia Chrome extension. Add it, then try again.');
+          }
           read = await askExtension('importYoutube', href, 75000);
           read.text = `Video: ${read.title}${read.channel ? ` (${read.channel})` : ''}\n\n${transcriptParagraphs(read.text)}`;
           sourceType = 'video';

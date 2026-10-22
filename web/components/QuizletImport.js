@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, Link as LinkIcon } from 'lucide-react';
 import BodyPortal from './BodyPortal';
-import { extensionReady, importWithExtension, isQuizletUrl, parseQuizletText } from '../lib/quizletImport';
+import { extensionCan, extensionReady, importWithExtension, isQuizletUrl, parseQuizletText } from '../lib/quizletImport';
 
 // "Import from Quizlet": a set link read through the extension, or Quizlet's Export text pasted in.
 // The cards land in the editor so the student can check them before saving.
@@ -11,6 +11,7 @@ export default function QuizletImport({ initialUrl = '', onImport, onCancel }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [hasExtension, setHasExtension] = useState(false);
+  const [outdated, setOutdated] = useState(false);
   const [pasteMode, setPasteMode] = useState(false);
   const firstRef = useRef(null);
 
@@ -19,13 +20,16 @@ export default function QuizletImport({ initialUrl = '', onImport, onCancel }) {
 
   // The extension marks the page once it has loaded, which can be after this sheet opens.
   useEffect(() => {
-    const ready = extensionReady();
-    setHasExtension(ready);
-    setPasteMode(!ready);
+    const check = () => {
+      const ready = extensionCan('quizlet');
+      setHasExtension(ready);
+      setOutdated(!ready && extensionReady());
+      return ready;
+    };
+    setPasteMode(!check());
     const onMessage = event => {
       if (event.source !== window || event.data?.type !== 'ASAI_EXTENSION_READY') return;
-      setHasExtension(true);
-      if (!typedRef.current) setPasteMode(false);
+      if (check() && !typedRef.current) setPasteMode(false);
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
@@ -97,7 +101,9 @@ export default function QuizletImport({ initialUrl = '', onImport, onCancel }) {
             </ol>
             <textarea ref={firstRef} className="c-input quizlet-text" value={text} onChange={event => { setText(event.target.value); setError(''); }} placeholder={'Term\tDefinition\nTerm\tDefinition'} aria-label="Quizlet export text" />
             {text.trim() && <p className="c-meta" role="status">{pasted.length} card{pasted.length === 1 ? '' : 's'} found</p>}
-            {!hasExtension && <p className="c-meta quizlet-note">With the <a href="/install-extension">Cordia extension</a>, you can import straight from a set link.</p>}
+            {!hasExtension && <p className="c-meta quizlet-note">{outdated
+              ? <>Update the <a href="/install-extension">Cordia extension</a> to import straight from a set link.</>
+              : <>With the <a href="/install-extension">Cordia extension</a>, you can import straight from a set link.</>}</p>}
             {error && <p className="quizlet-error" role="alert">{error}</p>}
             <div className="quizlet-actions">
               {hasExtension && <button type="button" className="c-btn c-btn--quiet quizlet-switch" onClick={() => { setPasteMode(false); setError(''); }}>Use a link</button>}
