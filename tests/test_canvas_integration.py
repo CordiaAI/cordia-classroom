@@ -209,6 +209,32 @@ class CanvasIntegrationTests(unittest.TestCase):
         files = canvas.list_files(course, "Bearer x")["files"]
         self.assertEqual({f["id"]: f["name"] for f in files}, {501: "Chapter 1 slides", 502: "Essay rubric.pdf"})
 
+    def test_grades_follow_canvas_number_and_class_scale(self):
+        course = COURSES[0]["id"]
+        self.connect()
+        canvas.set_import(course, canvas.ImportRequest(imported=True), "Bearer x")
+        base = FakeCanvas.request
+
+        def graded(fake, method, url, headers=None, **kwargs):
+            path = urlparse(url).path
+            if path == f"/api/v1/courses/{course}":
+                return FakeResponse(200, {**COURSES[0], "grading_standard_id": 7, "apply_assignment_group_weights": False})
+            if path == f"/api/v1/courses/{course}/assignment_groups":
+                return FakeResponse(200, [{"name": "All", "assignments": [
+                    {"id": 1, "name": "Essay", "points_possible": 100, "submission": {"score": 85}},
+                    {"id": 2, "name": "Final", "points_possible": 100, "due_at": "2099-01-01T00:00:00Z", "submission": {}},
+                ]}])
+            if path == f"/api/v1/courses/{course}/enrollments":
+                return FakeResponse(200, [{"type": "StudentEnrollment", "grades": {"current_score": 91.4, "current_grade": None}}])
+            if path == f"/api/v1/courses/{course}/grading_standards":
+                return FakeResponse(200, [{"id": 7, "grading_scheme": [{"name": "A", "value": 0.94}, {"name": "A-", "value": 0.9}, {"name": "B", "value": 0.8}, {"name": "F", "value": 0}]}])
+            return base(fake, method, url, headers=headers, **kwargs)
+
+        with patch.object(FakeCanvas, "request", graded):
+            result = canvas.course_grades(course, "Bearer x")
+        self.assertEqual((result["canvas_score"], result["letter"], result["scale_source"]), (91.4, "A-", "canvas"))
+        self.assertEqual(result["upcoming"][0]["up"]["letter"], "A")
+
     def test_linked_file_names_are_clean(self):
         from services.canvas_client import _strip_tags, _usable_link_name
         self.assertEqual(_usable_link_name(_strip_tags("Chart of Genesis 1 &amp; 2")), "Chart of Genesis 1 & 2")

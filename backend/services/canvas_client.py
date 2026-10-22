@@ -277,6 +277,7 @@ ALLOWLIST = (
     _ep("courses.get", r"/api/v1/courses/\d+", multi={"include[]": {"syllabus_body", "term"}}),
     _ep("assignments.list", r"/api/v1/courses/\d+/assignments", params=("order_by",), multi={"include[]": {"submission"}}),
     _ep("assignment_groups.list", r"/api/v1/courses/\d+/assignment_groups", multi={"include[]": {"assignments", "submission"}}),
+    _ep("grading_standards.list", r"/api/v1/courses/\d+/grading_standards"),
     _ep("enrollments.self", r"/api/v1/courses/\d+/enrollments", params=("user_id",), required={"user_id": "self"}),
     _ep("modules.list", r"/api/v1/courses/\d+/modules", multi={"include[]": {"items"}}),
     _ep("calendar_events.list", r"/api/v1/calendar_events", params=("type", "start_date", "end_date", "all_events"), multi={"context_codes[]": None}),
@@ -419,6 +420,15 @@ class CanvasClient:
     def assignment_groups(self, course_id: int) -> list:
         """Weights, assignments and this student's own submissions, for the grade view."""
         return self._pages(f"/api/v1/courses/{int(course_id)}/assignment_groups", [("include[]", "assignments"), ("include[]", "submission")])
+
+    def grading_scheme(self, course_id: int, standard_id) -> Optional[list]:
+        """The class's letter scale ([{"name", "value"}]) when Canvas lets the student read it."""
+        if not standard_id:
+            return None
+        for standard in self._pages(f"/api/v1/courses/{int(course_id)}/grading_standards", []) or []:
+            if str(standard.get("id")) == str(standard_id):
+                return standard.get("grading_scheme")
+        return None
 
     def my_enrollments(self, course_id: int) -> list:
         """Only the caller's own enrollment (user_id=self), which carries their current grade."""

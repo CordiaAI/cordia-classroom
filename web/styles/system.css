@@ -185,6 +185,7 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
 }
 .c-nav .c-nav-btn:hover, .c-nav .c-nav-btn[aria-pressed='true'] { background: var(--olive-tint); }
 .c-timerbtn { height: 40px; min-width: 40px; padding: 0 10px; gap: 6px; justify-content: center; }
+.c-feedbackbtn { height: 40px; width: 40px; padding: 0; justify-content: center; }
 .c-timerbtn.is-running { color: var(--olive-ink); }
 .c-timer-clock { font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
 .c-timer-pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; width: 300px; }

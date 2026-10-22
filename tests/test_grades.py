@@ -47,6 +47,28 @@ class GradeMath(unittest.TestCase):
         self.assertAlmostEqual(exam["up"]["points"], 96.7)
         self.assertTrue(exam["up"]["reachable"])
 
+    def test_canvas_score_anchors_the_letter_and_the_targets(self):
+        # Our recalculation says 85 (a B); Canvas says 91.4 (dropped scores, extra credit...).
+        groups = [{"name": "All", "assignments": [item(1, 100, 85), item(2, 100)]}]
+        result = grades.estimate(groups, False, now=NOW, anchor=91.4)
+        self.assertEqual((result["score"], result["letter"]), (91.4, "A"), "the letter matches Canvas's number")
+        row = result["upcoming"][0]
+        self.assertNotIn("up", row)
+        # Keeping 90 on Canvas's number = 90 - 6.4 = 83.6 in ours: (85 + x) / 200 >= 83.6% -> x = 82.2
+        self.assertEqual(row["keep"]["letter"], "A")
+        self.assertAlmostEqual(row["keep"]["points"], 82.2)
+
+    def test_the_class_grading_scale_is_used(self):
+        scale = grades.canvas_scale([{"name": "A", "value": 0.94}, {"name": "A-", "value": 0.9}, {"name": "B+", "value": 0.87},
+                                     {"name": "B", "value": 0.84}, {"name": "F", "value": 0.0}])
+        self.assertEqual(scale[0], ("A", 94.0))
+        groups = [{"name": "All", "assignments": [item(1, 100, 91), item(2, 100)]}]
+        result = grades.estimate(groups, False, now=NOW, anchor=91.4, scale=scale)
+        self.assertEqual(result["letter"], "A-")
+        self.assertEqual(result["upcoming"][0]["up"]["letter"], "A")
+        self.assertIsNone(grades.canvas_scale([{"name": "A"}]))
+        self.assertIsNone(grades.canvas_scale(None))
+
     def test_unreachable_and_already_safe(self):
         groups = [{"name": "All", "assignments": [item(1, 100, 50), item(2, 10)]}]
         row = grades.estimate(groups, False, now=NOW)["upcoming"][0]
@@ -76,6 +98,7 @@ class CanvasAllowlist(unittest.TestCase):
         cc.check_request("GET", "/api/v1/courses/5/assignment_groups", [("include[]", "assignments"), ("include[]", "submission")])
         cc.check_request("GET", "/api/v1/courses/5/enrollments", [("user_id", "self")])
         cc.check_request("GET", "/api/v1/courses/5/assignments", [("include[]", "submission")])
+        cc.check_request("GET", "/api/v1/courses/5/grading_standards", [("per_page", "100")])
         with self.assertRaises(cc.CanvasForbiddenRequest):
             cc.check_request("GET", "/api/v1/courses/5/enrollments", [("user_id", "42")])
         with self.assertRaises(cc.CanvasForbiddenRequest):
