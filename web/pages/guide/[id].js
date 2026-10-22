@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { GAMES_ON } from '../../lib/featureFlags';
 import CordiaLoader, { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
 import BodyPortal from '../../components/BodyPortal';
 import CardPhoto from '../../components/CardPhoto';
@@ -387,7 +388,7 @@ export default function GuidePage() {
     { key: 'flashcards', label: 'Flashcards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: hasMaterial ? cardCount : undefined, spot: 'cards-pill', event: 'cards-opened', needsCards: true },
     { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill', needsCards: true },
     { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id, needsCards: true },
-    { key: 'games', label: 'Games', icon: Gamepad2, href: '/games/' + id, needsCards: true },
+    ...(GAMES_ON ? [{ key: 'games', label: 'Games', icon: Gamepad2, href: '/games/' + id, needsCards: true }] : []),
     ...(nursing ? [{ key: 'nclex', label: 'NCLEX', icon: Stethoscope, href: '/nclex/' + id }] : []),
   ];
   const shareable = sharing?.class && !sharing.linked;

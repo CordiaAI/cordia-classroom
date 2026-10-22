@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { ArrowLeft, Blocks, Timer } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
+import { GAMES_ON } from '../../lib/featureFlags';
 import { walkthroughEvent } from '../../lib/walkthrough';
 
 // Games for one guide, as tiles like Connectors: each one is played with the guide's cards.
@@ -13,12 +14,15 @@ export default function GuideGames() {
   const { ready } = useRequireAuth();
   const [title, setTitle] = useState('');
 
+  // Games aren't on for students yet (lib/features.js): back to the guide.
+  useEffect(() => { if (!GAMES_ON && router.isReady) router.replace(guideId ? '/guide/' + guideId : '/library'); }, [router.isReady, guideId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!ready || !guideId) return;
     apiFetch('/guides/' + guideId).then(data => setTitle(data?.guide?.title || ''));
   }, [ready, guideId]);
 
-  if (!ready || !guideId) return null;
+  if (!GAMES_ON || !ready || !guideId) return null;
   const games = [
     { key: 'blocks', name: 'Blocks', tag: 'Answer cards to earn pieces, then clear rows and columns.', icon: Blocks, href: `/play/${guideId}` },
     { key: 'match', name: 'Match', tag: 'Pair questions with answers in 60 seconds.', icon: Timer, href: `/quiz/${guideId}?mode=match`, event: 'match-opened' },
