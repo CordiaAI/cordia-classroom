@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Plus, Upload, X } from 'lucide-react';
+import { ArrowLeft, Download, Plus, Upload, X } from 'lucide-react';
 import { apiFetch, getToken, responseJson } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 import { dismissGuideJob, startGuideJob, useGuideJobs } from '../lib/guideJobs';
 import { MAX_SOURCE_CHARS, baseName, combinedSource, fileKey, generateAndSave, newRequestId, pairsToCards, pairsToGuide } from '../lib/guideCreate';
 import { newGuideHref } from '../lib/checkYourself';
+import QuizletImport from '../components/QuizletImport';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const MANUAL_DRAFT_KEY = 'autostudy_manual_draft';
@@ -28,6 +29,7 @@ export default function CreateGuidePage() {
   // Several sources are combined into guides in rounds: pick some, queue a guide, pick from the rest.
   const [batch, setBatch] = useState(null); // { items, selected: Set<key>, includeManual, queued }
   const [choiceOpen, setChoiceOpen] = useState(false);
+  const [quizletOpen, setQuizletOpen] = useState(false);
   const fileTexts = useRef(new Map());
   const [manualPairs, setManualPairs] = useState(EMPTY_PAIRS);
   const [cardCount, setCardCount] = useState('');
@@ -110,6 +112,22 @@ export default function CreateGuidePage() {
       if (pairs.length) setManualPairs(pairs);
     });
   }, [ready, router.query.editGuideId]);
+
+  useEffect(() => {
+    if (router.query.import === 'quizlet' && !router.query.editGuideId) setQuizletOpen(true);
+  }, [router.query.import, router.query.editGuideId]);
+
+  // Imported cards replace an empty editor, or follow the cards already written.
+  function importQuizlet({ title: setTitleText, cards }) {
+    setQuizletOpen(false);
+    setError('');
+    setManualPairs(current => {
+      const kept = current.filter(pair => pair.term.trim() || pair.definition.trim());
+      return [...kept, ...cards.map(card => ({ term: card.term, definition: card.definition }))];
+    });
+    if (setTitleText && !title.trim()) setTitle(setTitleText.slice(0, 120));
+    setLastWindow('manual');
+  }
 
   useEffect(() => {
     if (!ready) return;
@@ -377,7 +395,10 @@ export default function CreateGuidePage() {
           onFocusCapture={() => setLastWindow('manual')}
           onPointerDown={() => setLastWindow('manual')}
         >
-          <h2 className="c-section-title create-window-title">Write cards</h2>
+          <div className="create-window-head">
+            <h2 className="c-section-title create-window-title">Write cards</h2>
+            {!isEdit && <button type="button" className="c-btn c-btn--quiet create-import" onClick={() => setQuizletOpen(true)}><Download size={18} strokeWidth={1.75} aria-hidden="true" />Import from Quizlet</button>}
+          </div>
           <div className="create-manual-header"><span className="c-meta">{completePairs.length} cards</span><label>Size <input className="c-input" type="number" min="1" max="100" value={cardCount} onChange={event => setCardCount(event.target.value)} onBlur={() => applyCardCount(cardCount)} /></label></div>
           <div className="create-cards-list">
             {manualPairs.map((pair, index) => (
@@ -441,6 +462,8 @@ export default function CreateGuidePage() {
           </div>
         )}
       </section>
+
+      {quizletOpen && <QuizletImport onImport={importQuizlet} onCancel={() => setQuizletOpen(false)} />}
 
       {choiceOpen && (
         <div className="c-scrim">

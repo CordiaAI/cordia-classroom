@@ -41,10 +41,18 @@
       return { success: true, authenticated: Boolean(authToken), userEmail };
     }
 
+    // Classroom asks the extension to read a Quizlet set; the answer goes back with the same id.
+    function importQuizlet(data) {
+      const reply = result => window.postMessage({ type: 'CORDIA_QUIZLET_RESULT', id: data.id, ...result }, window.location.origin);
+      chrome.runtime.sendMessage({ action: 'importQuizlet', url: String(data.url || '') })
+        .then(result => reply(result || { success: false, error: 'The extension did not answer.' }))
+        .catch(error => reply({ success: false, error: error.message }));
+    }
+
     function onMessage(event) {
-      if (event.source === window && event.origin === window.location.origin && event.data?.type === 'CORDIA_AUTH_UPDATED') {
-        syncAuth();
-      }
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      if (event.data?.type === 'CORDIA_AUTH_UPDATED') syncAuth();
+      if (event.data?.type === 'CORDIA_QUIZLET_IMPORT') importQuizlet(event.data);
     }
 
     if (chrome.runtime?.onMessage) {

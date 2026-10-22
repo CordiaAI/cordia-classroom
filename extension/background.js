@@ -224,7 +224,87 @@ async function saveStudyGuide(message) {
   return { savedGuide: saved.guide, guideUrl, redirected };
 }
 
-const ACTIONS = { captureScreen, scrapePage, extractEducationalContent, createStudyGuide, saveStudyGuide, askTutor, billingStatus };
+function quizletSetUrl(value) {
+  const url = new URL(value);
+  if (url.protocol !== 'https:' || !/(^|\.)quizlet\.com$/i.test(url.hostname)) throw new Error('Paste a quizlet.com set link.');
+  url.hash = '';
+  return url.href;
+}
+
+// Runs inside the Quizlet tab. Reads the set from the page's data, else from the term list.
+function readQuizletSet() {
+  const clean = text => String(text || '').replace(/\s+\n/g, '\n').trim();
+  const side = sideData => clean((sideData?.media || []).map(media => media?.plainText || '').filter(Boolean).join('\n'));
+  const found = [];
+  const walk = (node, depth) => {
+    if (!node || typeof node !== 'object' || depth > 40) return;
+    if (Array.isArray(node.cardSides) && node.cardSides.length >= 2) {
+      const front = node.cardSides.find(item => item.label === 'word') || node.cardSides[0];
+      const back = node.cardSides.find(item => item.label === 'definition') || node.cardSides[1];
+      found.push({ id: node.id, term: side(front), definition: side(back), rank: node.rank ?? found.length });
+      return;
+    }
+    for (const value of Array.isArray(node) ? node : Object.values(node)) walk(value, depth + 1);
+  };
+  for (const script of document.querySelectorAll('script#__NEXT_DATA__, script[type="application/json"]')) {
+    try {
+      const data = JSON.parse(script.textContent || 'null');
+      walk(data, 0);
+      // The store is often serialized a second time as a string inside the page props.
+      const nested = data?.props?.pageProps?.dehydratedReduxStateKey;
+      if (typeof nested === 'string') walk(JSON.parse(nested), 0);
+    } catch (_) { /* Not JSON. */ }
+  }
+  const seen = new Set();
+  let cards = found
+    .sort((a, b) => a.rank - b.rank)
+    .filter(card => (card.term || card.definition) && !seen.has(card.id ?? `${card.term}\u0000${card.definition}`) && seen.add(card.id ?? `${card.term}\u0000${card.definition}`))
+    .map(({ term, definition }) => ({ term, definition }));
+  if (!cards.length) {
+    const texts = [...document.querySelectorAll('.TermText, [class*="TermText"]')].map(element => clean(element.innerText));
+    for (let index = 0; index + 1 < texts.length; index += 2) cards.push({ term: texts[index], definition: texts[index + 1] });
+  }
+  const heading = document.querySelector('h1')?.innerText || document.title.replace(/\s*[|-]\s*Quizlet.*$/i, '').replace(/\s*Flashcards\s*$/i, '');
+  return { title: clean(heading), cards, blocked: /captcha|just a moment|access denied/i.test(document.title) };
+}
+
+function waitForTab(tabId, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { chrome.tabs.onUpdated.removeListener(onUpdated); reject(new Error('Quizlet took too long to load.')); }, timeoutMs);
+    function onUpdated(id, info) {
+      if (id !== tabId || info.status !== 'complete') return;
+      clearTimeout(timer);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      resolve();
+    }
+    chrome.tabs.onUpdated.addListener(onUpdated);
+  });
+}
+
+// Opens the set in a background tab with the student's own browser session (Quizlet blocks
+// servers), reads the cards, and closes the tab. Only quizlet.com links are opened.
+async function importQuizlet(message) {
+  const url = quizletSetUrl(message.url || '');
+  const tab = await chrome.tabs.create({ url, active: false });
+  try {
+    await waitForTab(tab.id, 25000);
+    let set = null;
+    // The term list can render a moment after load.
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: readQuizletSet });
+      set = result?.result;
+      if (set?.cards?.length || set?.blocked) break;
+      await new Promise(resolve => setTimeout(resolve, 800));
+    }
+    if (set?.blocked) throw new Error('Quizlet asked for a quick check. Open the set in a tab, then try again.');
+    if (!set?.cards?.length) throw new Error('No cards were found. Check that the set is public and the link opens the set itself.');
+    return { title: set.title || 'Quizlet set', cards: set.cards.slice(0, 1000) };
+  } finally {
+    chrome.tabs.remove(tab.id).catch(() => {});
+  }
+}
+
+const ACTIONS = { importQuizlet, captureScreen, scrapePage, extractEducationalContent, createStudyGuide, saveStudyGuide, askTutor, billingStatus };
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.action === 'syncClassroomAuth') {
