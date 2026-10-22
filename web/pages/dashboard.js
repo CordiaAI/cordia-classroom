@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ChevronRight, Flame, Layers, Play, Snowflake, Timer } from 'lucide-react';
+import { ChevronRight, Flame, Snowflake, Timer } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
 import { createDashboardOverview } from '../lib/dashboardOrganization';
-import { lastGuide, retainMisses } from '../lib/userStore';
-import { dueCount } from '../lib/studyQueue';
-import { dayKey as reviewDay, nextDueDay } from '../lib/spacedReview.mjs';
+import { lastGuide } from '../lib/userStore';
 import { markUsed, unmarkUsed, useProgress } from '../lib/progress';
 import { dayOneFinished, startWalkthrough, walkthroughEvent } from '../lib/walkthrough';
 import { readActivity, dayKey, streakWithFreeze } from '../lib/activity';
@@ -31,17 +29,6 @@ const LEGACY_VIEWS = { guides: '/library', classes: '/library', calendar: '/canv
 function shortDate(value) {
   const date = new Date(value || '');
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
-
-// "tomorrow" or a weekday/date, for when the next review cards come back.
-function reviewDayLabel(key) {
-  const today = reviewDay();
-  const [year, month, day] = key.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  const days = Math.round((date - new Date(`${today}T00:00:00`)) / 86400000);
-  if (days <= 1) return 'tomorrow';
-  if (days < 7) return 'on ' + date.toLocaleDateString([], { weekday: 'long' });
-  return 'on ' + date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 function plural(count, word) {
@@ -149,12 +136,6 @@ export default function Today() {
   const activity = readActivity();
   const weekMinutes = Math.round(Array.from({ length: 7 }, (_, back) => activity[dayKey(Date.now() - back * 86400000)]?.m || 0).reduce((sum, value) => sum + value, 0));
   const firstWeek = !progress.first || Date.now() - progress.first < 7 * 86400000;
-  // Daily review: flashcards whose spaced-review day has come, plus quiz misses saved here.
-  const cardTotal = guides.reduce((sum, guide) => sum + (Number(guide.flashcard_count) || 0), 0);
-  const missCount = Object.values(retainMisses()).reduce((sum, items) => sum + items.length, 0);
-  const reviewDue = guides.reduce((sum, guide) => sum + dueCount(guide), 0) + missCount;
-  const nextReview = reviewDue ? '' : guides.map(guide => nextDueDay(guide.flashcard_progress, guide.flashcard_count)).filter(Boolean).sort()[0] || '';
-  const reviewMinutes = Math.max(1, Math.round(Math.min(reviewDue, 30) * 0.25));
 
   return (
     <LoadGate ready={loaded} label="Loading your dashboard">
@@ -168,30 +149,6 @@ export default function Today() {
           <span>{loadError}</span>
           <button type="button" className="c-btn c-btn--secondary" onClick={refresh}>Retry</button>
         </div>
-      )}
-
-      {(cardTotal > 0 || missCount > 0) && (
-        <section className="c-section" aria-labelledby="review-title">
-          <h2 id="review-title" className="c-section-title">Daily review</h2>
-          {reviewDue > 0 ? (
-            <Link href="/session" className="c-card today-review" data-spot="daily-review">
-              <Layers size={24} strokeWidth={1.75} aria-hidden="true" />
-              <span className="today-review-text">
-                <strong>{plural(reviewDue, 'card')} due</strong>
-                <span className="c-meta">About {reviewMinutes} min</span>
-              </span>
-              <span className="c-btn c-btn--primary today-review-start"><Play size={18} strokeWidth={1.75} aria-hidden="true" />Start</span>
-            </Link>
-          ) : (
-            <div className="c-card today-review is-done">
-              <Layers size={24} strokeWidth={1.75} aria-hidden="true" />
-              <span className="today-review-text">
-                <strong>All caught up</strong>
-                {nextReview && <span className="c-meta">More cards {reviewDayLabel(nextReview)}</span>}
-              </span>
-            </div>
-          )}
-        </section>
       )}
 
       {continueGuide && (
@@ -254,13 +211,6 @@ export default function Today() {
         .today-due { gap: 14px; }
         .today-due-link { color: var(--ink); text-decoration: none; }
         .today-due.is-done .today-due-link { color: var(--muted); text-decoration: line-through; }
-        :global(.today-review) { display: flex; align-items: center; gap: 16px; padding: 14px 14px 14px 18px; color: var(--ink); text-decoration: none; }
-        :global(.today-review) :global(.lucide) { flex: none; color: var(--olive-ink); }
-        :global(a.today-review:hover) { text-decoration: none; border-color: var(--olive); }
-        :global(.today-review.is-done) { padding: 14px 18px; }
-        .today-review-text { flex: 1 1 auto; min-width: 0; display: grid; gap: 4px; }
-        .today-review-text strong { font: 600 17px/1.15 var(--font-sans); }
-        .today-review-start { flex: none; pointer-events: none; }
         .today-continue-title { flex: 1 1 auto; min-width: 0; font:600 17px/1.15 var(--font-sans); }
         :global(.today-progress) { display: flex; align-items: center; gap: 20px; padding: 14px 18px; color: var(--ink); text-decoration: none; flex-wrap: wrap; }
         .today-stat { display: inline-flex; align-items: center; gap: 6px; font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
