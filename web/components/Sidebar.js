@@ -152,9 +152,6 @@ export default function Sidebar({ timerState, setTimerState }) {
         </nav>
 
         <div className="c-bar-actions">
-          <button type="button" className="c-btn c-btn--secondary c-feedbackbtn" onClick={() => setShowFeedback(true)} aria-label="Send feedback" title="Send feedback">
-            <MessageSquareText size={20} strokeWidth={1.75} aria-hidden="true" />
-          </button>
           <div className="c-menu-wrap" ref={timerRef}>
             <button type="button" className={'c-btn c-btn--secondary c-timerbtn' + (isRunning ? ' is-running' : '')} data-spot="focus-btn" onClick={() => { if (!timerOpen) walkthroughEvent('focus-opened'); setTimerOpen(open => !open); }} aria-expanded={timerOpen} aria-label={isRunning ? `Focus timer, ${clock} left` : 'Focus timer'}>
               <Timer size={20} strokeWidth={1.75} aria-hidden="true" />
@@ -162,10 +159,9 @@ export default function Sidebar({ timerState, setTimerState }) {
             </button>
             {timerOpen && <div className="c-timer-pop"><StudyTimer timerState={timerState} setTimerState={setTimerState} /></div>}
           </div>
-          <button type="button" className="c-btn c-btn--secondary c-searchbtn" onClick={() => setShowSearch(true)} aria-label="Search" aria-keyshortcuts={shortcut === '⌘K' ? 'Meta+K' : 'Control+K'}>
+          {/* Search is an icon: the ⌘K / Ctrl K shortcut shows on hover. Feedback lives in the account menu. */}
+          <button type="button" className="c-btn c-btn--secondary c-searchbtn" onClick={() => setShowSearch(true)} aria-label={`Search (${shortcut})`} title={`Search (${shortcut})`} aria-keyshortcuts={shortcut === '⌘K' ? 'Meta+K' : 'Control+K'}>
             <Search size={20} strokeWidth={1.75} aria-hidden="true" />
-            <span>Search</span>
-            <kbd>{shortcut}</kbd>
           </button>
           <button type="button" className="c-btn c-btn--primary c-new-btn" data-spot="new" onClick={() => openNewSheet()}>
             <Plus size={20} strokeWidth={1.75} aria-hidden="true" />New
