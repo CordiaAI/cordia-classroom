@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Brain, Check, ClipboardPaste, FileImage, FileText, Layers, Link as LinkIcon, Mic, NotebookPen, PencilRuler, Presentation, Sparkles, Upload, X,
+  ArrowLeft, Brain, Check, ClipboardPaste, FileImage, FileText, Layers, Link as LinkIcon, Mic, Minimize2, NotebookPen, PencilRuler, Presentation, Sparkles, Upload, X,
 } from 'lucide-react';
 import { apiFetch, authHeaders } from '../lib/api';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
@@ -134,6 +134,13 @@ async function readLink(url) {
   return { title: new URL(url).hostname, text: body };
 }
 
+function recClock(ms) {
+  const total = Math.floor((Number(ms) || 0) / 1000);
+  const hours = Math.floor(total / 3600);
+  const pad = value => String(value).padStart(2, '0');
+  return hours ? `${hours}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}` : `${Math.floor(total / 60)}:${pad(total % 60)}`;
+}
+
 export default function NewSheet() {
   const router = useRouter();
   const jobs = useGuideJobs();
@@ -150,6 +157,9 @@ export default function NewSheet() {
   const [step, setStep] = useState(0);
   const [jobId, setJobId] = useState(null);
   const [recording, setRecording] = useState(false);
+  // While recording, the sheet can shrink to a pill under the header so notes can be taken anywhere.
+  const [minimized, setMinimized] = useState(false);
+  const [recStatus, setRecStatus] = useState({ phase: '', elapsed: 0 });
   const fileInput = useRef(null);
   const dropRef = useRef(null);
   const sheetRef = useRef(null);
@@ -170,10 +180,13 @@ export default function NewSheet() {
     return () => window.removeEventListener(NEW_SHEET_EVENT, onOpen);
   }, []);
 
+  // The sheet closes when a recording ends (it becomes a lecture), so the pill never outlives it.
+  useEffect(() => { if (!open) setMinimized(false); }, [open]);
+
   useEffect(() => {
     if (!open) return undefined;
     apiFetch('/folders').then(data => setFolders(data?.folders || []));
-    const onKey = event => { if (event.key === 'Escape' && !recordingRef.current) close(); };
+    const onKey = event => { if (event.key === 'Escape') close(); };
     window.addEventListener('keydown', onKey);
     sheetRef.current?.querySelector('button, input, textarea')?.focus();
     return () => window.removeEventListener('keydown', onKey);
@@ -217,8 +230,8 @@ export default function NewSheet() {
   }
 
   function close() {
-    // A recording in progress is never thrown away by a stray click or Escape.
-    if (recording) return;
+    // A recording in progress is never thrown away by a stray click or Escape: the sheet minimizes.
+    if (recording) { setMinimized(true); return; }
     setOpen(false);
     // A guide still building keeps going in the background (top-right indicator).
     if (status !== 'building') reset();
@@ -360,14 +373,23 @@ export default function NewSheet() {
 
   return (
     <BodyPortal>
-    <div className="c-scrim" onClick={close}>
+    {minimized && recording && (
+      <button type="button" className="rec-pill" onClick={() => setMinimized(false)} aria-label={`Recording ${recClock(recStatus.elapsed)}. Open the recorder`}>
+        <span className={'rec-pill-dot' + (recStatus.phase === 'paused' ? ' is-paused' : '')} aria-hidden="true" />
+        <span className="rec-pill-time">{recClock(recStatus.elapsed)}</span>
+        <span className="rec-pill-label">{recStatus.phase === 'paused' ? 'Paused' : 'Recording'}</span>
+      </button>
+    )}
+    <div className={'c-scrim' + (minimized && recording ? ' is-minimized' : '')} onClick={close}>
       <section ref={sheetRef} className="c-sheet new-sheet" role="dialog" aria-modal="true" aria-labelledby="new-sheet-title" onClick={event => event.stopPropagation()}>
         <header className="c-sheet-head">
           <div className="c-row">
             {mode && status === 'idle' && !recording && <button type="button" className="c-icon-btn" onClick={() => { setMode(''); setError(''); }} aria-label="Back"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>}
             <h2 id="new-sheet-title" className="c-title">{status === 'building' ? 'Building' : mode ? 'New guide' : 'New'}</h2>
           </div>
-          <button type="button" className="c-icon-btn" onClick={close} aria-label="Close" disabled={recording} title={recording ? 'Stop the recording first' : undefined}><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+          {recording
+            ? <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={() => setMinimized(true)} title="Keeps recording while you take notes anywhere in Cordia"><Minimize2 size={16} strokeWidth={1.75} aria-hidden="true" />Minimize</button>
+            : <button type="button" className="c-icon-btn" onClick={close} aria-label="Close"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>}
         </header>
 
         {status === 'building' ? (
@@ -428,7 +450,7 @@ export default function NewSheet() {
               </label>
             )}
             {mode === 'record' && (
-              <LectureRecorder folders={folders} folderId={folderId} onFolder={setFolderId} onActiveChange={setRecording} onDone={buildFromRecording} />
+              <LectureRecorder folders={folders} folderId={folderId} onFolder={setFolderId} onActiveChange={setRecording} onStatus={setRecStatus} onDone={buildFromRecording} />
             )}
             {folders.length > 0 && mode !== 'record' && (
               <label className="c-field new-class">
