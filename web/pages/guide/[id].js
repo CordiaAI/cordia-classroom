@@ -5,7 +5,7 @@ import CardPhoto from '../../components/CardPhoto';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Brain, Download, ExternalLink, FolderInput, Layers, Lock, MessageCircle, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
+  ArrowLeft, Blocks, Brain, Download, ExternalLink, FolderInput, Layers, Lock, MessageCircle, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -385,6 +385,7 @@ export default function GuidePage() {
       { key: 'flashcards', label: 'Flashcards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: cardCount, spot: 'cards-pill', event: 'cards-opened' },
       { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill' },
       { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id },
+      ...(cardCount ? [{ key: 'blocks', label: 'Blocks', icon: Blocks, href: '/play/' + id }] : []),
     ] : []),
     ...(nursing ? [{ key: 'nclex', label: 'NCLEX', icon: Stethoscope, href: '/nclex/' + id }] : []),
   ];
