@@ -57,6 +57,32 @@ class TutorContractTests(unittest.TestCase):
         self.assertEqual(response.json()["source"], {"type": "study_guide", "id": self.guide_id, "title": "Biology"})
         self.assertEqual(answer.call_args.kwargs["context"], "Q1: What is mitosis?\nA1: Cell division.")
 
+    @patch("routers.chat.learning_guidance", return_value="")
+    @patch("routers.chat.record")
+    @patch("routers.chat.require", return_value={"used": 0})
+    @patch("routers.chat.write_visual_text", return_value={"title": "Stages of mitosis", "text": "Prophase: chromosomes condense.\nMetaphase: they line up.\nAnaphase: they separate."})
+    @patch("routers.chat.get_user_id", return_value="student-1")
+    def test_tutor_makes_a_visual_the_student_describes(self, _auth, write, _usage, _record, _guidance):
+        db, _table = self.guide_db()
+        with patch("routers.chat.get_supabase", return_value=db):
+            response = self.client.post("/chat", headers={"Authorization": "Bearer test"},
+                                        json={"question": "Make a diagram of the stages of mitosis", "content": "", "guide_id": self.guide_id})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["action"], "visual")
+        self.assertEqual(body["visual"]["title"], "Stages of mitosis")
+        self.assertIn("Stages of mitosis", body["answer"])
+        # Written from the student's own guide.
+        self.assertEqual(write.call_args.args, ("Make a diagram of the stages of mitosis", "Q1: What is mitosis?\nA1: Cell division."))
+
+    def test_visual_requests_are_told_apart_from_questions(self):
+        from routers.chat import VISUAL_REQUEST
+        for request in ["make a diagram of the stages of mitosis", "Visualize the water cycle", "can you draw a timeline of the civil war",
+                        "create a flowchart for contract formation", "give me a mind map of chapter 3"]:
+            self.assertTrue(VISUAL_REQUEST.search(request), request)
+        for question in ["what is a diagram", "make flashcards", "open my calendar", "explain how charts are read"]:
+            self.assertFalse(VISUAL_REQUEST.search(question), question)
+
     def test_outline_edit_requests_are_told_apart_from_questions(self):
         from routers.chat import _asks_to_edit_outline
         for request in ["Fix the spelling of GihHub", "can you change GihHub to GitHub", "Add a section on Vercel to the outline",

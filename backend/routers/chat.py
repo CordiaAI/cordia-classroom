@@ -21,7 +21,7 @@ from schemas import ChatRequest, ChatResponse
 from services.entitlements import record, require
 from services.guidance import learning_guidance, style_instruction
 from services.llm import (
-    answer_question, edit_outline, explain_retain_answer, generate_practice_guide, generate_study_guide, plan_app_action,
+    answer_question, edit_outline, explain_retain_answer, generate_practice_guide, generate_study_guide, plan_app_action, write_visual_text,
     study_guide_is_complete, study_guide_to_flashcards,
 )
 from services.text_processing import chunk_text, clean_text, html_to_text
@@ -76,6 +76,14 @@ def _asks_for_app_action(question: str) -> bool:
     if QUESTION_START.search(question):
         return False
     return bool(APP_ALWAYS.search(question) or (APP_VERB.search(question) and APP_NOUN.search(question)))
+
+
+# "Make a diagram of the stages of mitosis", "visualize the water cycle", "can you draw a timeline of…".
+VISUAL_REQUEST = re.compile(
+    r"^\s*visuali[sz]e\b|\b(?:make|create|draw|generate|build|show|give|design|sketch)\b.{0,40}?"
+    r"\b(?:visual|diagram|chart|infographic|graphic|illustration|mind ?map|flow ?chart|timeline|concept map)s?\b",
+    re.IGNORECASE,
+)
 
 
 PRACTICE_REQUEST = re.compile(r"\b(create|make|generate|build)\b.*\bpractice\b.*\b(problems?|questions?|guide)\b", re.IGNORECASE)
@@ -227,6 +235,20 @@ def _create_guide(user_id: str, material: Material, class_id: Optional[str], fea
         answer=f"Created {saved['title']}{location}.",
         action="created_guide",
         guide={"id": saved["id"], "title": saved["title"], "folder_id": saved.get("folder_id")},
+        source=material.source,
+    )
+
+
+def _visual(user_id: str, question: str, material: Material) -> Optional[ChatResponse]:
+    """A visual the student described: the Tutor writes its text and the app draws it (web /api/visual)."""
+    written = write_visual_text(question, material.content)
+    if not written:
+        return None
+    record(user_id, "tutor")
+    return ChatResponse(
+        answer=f"Here's a visual: {written['title']}." if written["title"] else "Here's a visual.",
+        action="visual",
+        visual=written,
         source=material.source,
     )
 
@@ -394,6 +416,10 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
            skill: Optional[str], turn: Optional[dict], authorization: str) -> ChatResponse:
     # First: "open my calendar" or "make flashcards for X" also read as the Plan or Retain skill.
     # Not when the request plainly works on the selected material or the student picked a class above.
+    if skill not in {"edit_outline", "organize"} and VISUAL_REQUEST.search(question):
+        drawn = _visual(user_id, question, material)
+        if drawn:
+            return drawn
     about_material = bool(material.content.strip() and PRACTICE_REQUEST.search(question))
     if (skill in {None, "explain", "build_guide", "practice", "organize", "plan", "retain"} and not body.class_id
             and not about_material and _asks_for_app_action(question)):

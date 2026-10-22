@@ -124,6 +124,9 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .cordia-tutor-message { background: var(--reading-surface); border: 1px solid var(--line); border-radius:12px; line-height:1.5; }
 /* Chat bubbles: the student's message is a solid accent bubble on the right, Cordia's a raised card on the left. */
 .cordia-tutor-message.ai { align-self: flex-start; max-width: 92%; padding: 12px 14px; border-radius:20px; background: var(--sand); border-color: var(--line); box-shadow: var(--shadow-sm); }
+/* A reply carrying a visual the student asked for takes the full width, so the drawing is readable. */
+.cordia-tutor-message.ai.has-visual { width: 100%; max-width: 100%; }
+.cordia-tutor-visual { margin-top: 10px; min-width: 0; }
 .cordia-tutor-message.user { align-self: flex-end; max-width: 82%; padding: 10px 14px; border-radius:20px; background: var(--accent-strong); border-color: transparent; }
 .cordia-tutor .cordia-tutor-message.user { color: var(--accent-on); }
 .cordia-tutor-message.tutor-thinking { display: flex; align-items: center; gap: 10px; color: var(--muted-ink); font-weight:600; }
