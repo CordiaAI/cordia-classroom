@@ -175,6 +175,19 @@ def _remove_lecture_audio(supabase, user_id: str) -> None:
         logger.warning("Lecture audio cleanup skipped: %s", exc)
 
 
+def _remove_card_images(supabase, user_id: str) -> None:
+    """Photos on flashcards are stored as card-images/<user>/<photo>."""
+    bucket = supabase.storage.from_("card-images")
+    try:
+        for _ in range(100):  # 100 at a time, up to 10,000 photos
+            names = [item["name"] for item in bucket.list(user_id, {"limit": 100}) or [] if item.get("id")]
+            if not names:
+                break
+            bucket.remove([f"{user_id}/{name}" for name in names])
+    except Exception as exc:  # no bucket yet (photos not set up): nothing stored to remove
+        logger.warning("Card photo cleanup skipped: %s", exc)
+
+
 def _remove_visuals(supabase, user_id: str) -> None:
     """Diagrams and note covers the student made live in the public 'visuals' bucket."""
     marker = "/storage/v1/object/public/visuals/"
@@ -214,6 +227,7 @@ def delete_account(request: DeleteAccountRequest, authorization: str = Header(de
     supabase.table("user_profiles").delete().eq("id", user_id).execute()
     _remove_lecture_audio(supabase, user_id)
     _remove_visuals(supabase, user_id)
+    _remove_card_images(supabase, user_id)
     supabase.auth.admin.delete_user(user_id)
     logger.info("Account deleted: %s", user_id)
     return {"deleted": True}

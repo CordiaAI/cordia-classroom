@@ -35,7 +35,7 @@ export async function loadStudyQueue({ practiceGuides = 5, guideId = '' } = {}) 
     const due = dueCards(guide);
     const pool = guideId && !due.length ? (guide.flashcards || []).map((card, index) => ({ ...card, index })) : due;
     for (const card of pool) {
-      cards.push({ kind: 'card', guideId: guide.id, guideTitle: guide.title, index: card.index, front: card.front, back: card.back, image: card.image });
+      cards.push({ kind: 'card', guideId: guide.id, guideTitle: guide.title, index: card.index, front: card.front, back: card.back, image: card.image, front_image: card.front_image });
     }
   }
   const misses = [];
