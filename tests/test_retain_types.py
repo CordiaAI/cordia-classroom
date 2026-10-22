@@ -60,12 +60,14 @@ class AnswerShapeTests(unittest.TestCase):
         self.assertEqual(retain.answer_shape(SENTENCE["question"], retain.concept_answer(SENTENCE)), "sentence")
         self.assertEqual(retain.answer_shape(LONG["question"], retain.concept_answer(LONG)), "long")
 
-    def test_one_sentence_is_never_written(self):
+    def test_one_sentence_is_written_only_when_choice_is_off(self):
         one = "The poem uses iambic pentameter to imitate natural speech rhythm in English."
         self.assertEqual(retain.answer_shape("Explain the meter.", one), "long")  # "explain" + 12+ words
         self.assertEqual(retain.answer_shape("What meter is used?", one), "sentence")
-        cards = retain.plan_session([mc("What meter is used?", one)], ["written"])
-        self.assertEqual(cards, [{"type": "mc", "concepts": [0]}])
+        question = [mc("What meter is used?", one)]
+        self.assertEqual(retain.plan_session(question, ["mc", "written"]), [{"type": "mc", "concepts": [0]}])
+        # The student turned on Written alone: they get Written, not a silent switch to choices.
+        self.assertEqual(retain.plan_session(question, ["written"]), [{"type": "written", "concepts": [0]}])
 
 
 class SessionPlanTests(unittest.TestCase):
@@ -90,6 +92,11 @@ class SessionPlanTests(unittest.TestCase):
         for group in sets:
             answers = [retain.normalize(retain.concept_answer(terms[i])) for i in group["concepts"]]
             self.assertEqual(len(answers), len(set(answers)))
+
+    def test_long_answers_with_only_short_answer_types_become_choice(self):
+        # Fill in and Pairs need answers of a few words; nothing else picked means choices.
+        self.assertEqual({c["type"] for c in retain.plan_session([SENTENCE, LONG], ["fill", "matching"])}, {"mc"})
+        self.assertEqual({c["type"] for c in retain.plan_session([*TERMS, LONG], ["written"])}, {"written"})
 
     def test_no_selection_means_multiple_choice(self):
         self.assertEqual({c["type"] for c in retain.plan_session([*TERMS, LONG], [])}, {"mc"})

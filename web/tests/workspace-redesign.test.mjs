@@ -38,12 +38,15 @@ test('old dashboard views redirect to their own routes', async () => {
   assert.doesNotMatch(dashboard, /Study smarter/);
 });
 
-test('Dashboard: Continue, Due soon (Canvas when empty), progress strip; tools live under New', async () => {
+test('Dashboard: Daily review (cards due), Continue, Due soon (Canvas when empty), progress strip; tools live under New', async () => {
   const dashboard = await source('pages/dashboard.js');
   const newSheet = await source('components/NewSheet.js');
 
   assert.match(dashboard, /<h1 className="c-title">Dashboard<\/h1>/);
-  assert.doesNotMatch(dashboard, /Start review|today-review/);
+  // One slim Daily review row: cards due today open the review session; hidden with no cards.
+  assert.match(dashboard, /Daily review/);
+  assert.match(dashboard, /href="\/session"/);
+  assert.match(dashboard, /dueCount\(guide\)/);
   assert.match(dashboard, /<CanvasConnectButton card [^>]*spot="canvas-connect"/);
   assert.match(dashboard, /href="\/progress"/);
   assert.match(dashboard, /<Flame /);

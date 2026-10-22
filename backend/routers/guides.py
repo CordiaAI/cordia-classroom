@@ -57,13 +57,14 @@ class SaveGuideRequest(BaseModel):
 
 
 # Columns for list screens: everything except the large text and question sets.
-SUMMARY_COLUMNS = "id,folder_id,title,source_url,created_at,is_bookmarked,read_progress,source_type,source_title,flashcards"
+SUMMARY_COLUMNS = "id,folder_id,title,source_url,created_at,is_bookmarked,read_progress,source_type,source_title,flashcards,flashcard_progress"
 
 
 @router.get("")
 def list_guides(folder_id: Optional[str] = None, limit: int = 50, offset: int = 0, fields: str = "", authorization: str = Header(default="")):
     """List guides, optionally filtered by folder. Paginated.
-    fields=summary returns list metadata plus flashcard_count, without guide text."""
+    fields=summary returns list metadata plus flashcard_count and flashcard_progress (for the
+    Dashboard's cards-due count), without guide text."""
     user_id = get_user_id(authorization)
     supabase = get_supabase()
     summary = fields == "summary"
@@ -267,10 +268,32 @@ def toggle_bookmark(guide_id: str, authorization: str = Header(default="")):
     return {"is_bookmarked": new_val}
 
 
+_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+MAX_SCHEDULED_CARDS = 2000
+
+
 class FlashcardProgressRequest(BaseModel):
     known: list = []
     unknown: list = []
     last_studied: Optional[str] = None
+    # Spaced review (web/lib/spacedReview.mjs): {card index: {"box": 0-5, "due": "YYYY-MM-DD"}}.
+    schedule: Optional[dict] = None
+
+    @field_validator("schedule")
+    @classmethod
+    def valid_schedule(cls, value):
+        if value is None:
+            return None
+        if len(value) > MAX_SCHEDULED_CARDS:
+            raise ValueError("Too many cards")
+        clean = {}
+        for index, entry in value.items():
+            box = entry.get("box") if isinstance(entry, dict) else None
+            due = entry.get("due") if isinstance(entry, dict) else None
+            if not str(index).isdigit() or not isinstance(box, int) or not 0 <= box <= 5 or not isinstance(due, str) or not _DAY.match(due):
+                raise ValueError("Invalid schedule entry")
+            clean[str(index)] = {"box": box, "due": due}
+        return clean
 
 
 @router.patch("/{guide_id}/flashcard-progress")
@@ -280,11 +303,18 @@ def update_flashcard_progress(guide_id: str, request: FlashcardProgressRequest, 
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
+    schedule = request.schedule
+    if schedule is None:
+        # A client that doesn't schedule cards keeps the schedule already saved.
+        current = supabase.table("study_guides").select("flashcard_progress").eq("id", guide_id).eq("user_id", user_id).execute()
+        schedule = ((current.data or [{}])[0].get("flashcard_progress") or {}).get("schedule") or {}
+
     supabase.table("study_guides") \
         .update({"flashcard_progress": {
             "known": request.known,
             "unknown": request.unknown,
-            "last_studied": request.last_studied
+            "last_studied": request.last_studied,
+            "schedule": schedule,
         }}) \
         .eq("id", guide_id) \
         .eq("user_id", user_id) \

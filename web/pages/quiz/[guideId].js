@@ -17,6 +17,7 @@ const MODES = {
   matching: { label: 'Pairs', icon: PairsIcon },
 };
 const STORAGE_KEY = 'retainTypes';
+const listTypes = types => types.map(type => MODES[type]?.label || type).join(' and ');
 
 function rememberedTypes() {
   try {
@@ -80,7 +81,9 @@ export default function QuizPage() {
     const data = await apiFetch(`/quiz/${guideId}/session`, { method: 'POST', body: JSON.stringify({ types: chosen }) });
     setStarting(false);
     if (data?.cards?.length) {
-      setSession({ ...data, cards: short ? data.cards.slice(0, 3) : data.cards, selected: chosen, race: race && !short, version: Date.now() });
+      // Short-answer types (Fill in, Pairs) the student picked that no question here could use.
+      const unused = chosen.filter(type => PRO_TYPES.includes(type) && Array.isArray(data.types) && !data.types.includes(type));
+      setSession({ ...data, cards: short ? data.cards.slice(0, 3) : data.cards, selected: chosen, unused, race: race && !short, version: Date.now() });
       walkthroughEvent('quiz-started');
     }
     else setError(data?.detail || 'The quiz could not start. Make sure this guide has questions and answers.');
@@ -112,6 +115,12 @@ export default function QuizPage() {
       {session?.race ? (
         <MatchRace key={session.version} questions={session.questions} guideId={guideId} onRestart={() => setSession(null)} onDone={() => router.push('/guide/' + guideId)} />
       ) : session ? (
+        <>
+        {session.unused?.length > 0 && (
+          <p className="quiz-unused" role="status">
+            {listTypes(session.unused)} only {session.unused.length === 1 ? 'works' : 'work'} with answers of a few words, and this guide doesn't have enough of them, so {session.unused.length === 1 ? "it isn't" : "they aren't"} used here.
+          </p>
+        )}
         <QuizMode
           key={session.version}
           questions={session.questions}
@@ -121,6 +130,7 @@ export default function QuizPage() {
           onRestart={() => setSession(null)}
           onDone={() => { walkthroughEvent('guide-open'); router.push('/guide/' + guideId); }}
         />
+        </>
       ) : (
         <>
           <div className="c-seg quiz-switch" role="tablist" aria-label="Mode">
@@ -166,6 +176,7 @@ export default function QuizPage() {
         .quiz-page :global(.quiz-question-card) { width: min(720px, 100%); justify-self: center; }
         .quiz-guide { margin: -12px 0 0; font-family: var(--font-sans); }
         .quiz-switch { justify-self: start; }
+        .quiz-unused { margin: 0 0 12px; color: var(--muted); font: 500 var(--fs-13)/var(--lh-body) var(--font-sans); }
         .quiz-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .quiz-mode { position: relative; display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 120px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow); }
         .quiz-mode :global(.lucide) { color: var(--olive-ink); }

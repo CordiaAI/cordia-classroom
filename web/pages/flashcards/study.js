@@ -5,6 +5,7 @@ import { apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import FlashcardViewer from '../../components/FlashcardViewer';
 import { walkthroughEvent } from '../../lib/walkthrough';
+import { applyResults } from '../../lib/spacedReview.mjs';
 
 
 export default function FlashcardStudy() {
@@ -25,11 +26,11 @@ export default function FlashcardStudy() {
 
   const onFinish = useCallback(async ({ known, missed, seconds }) => {
     const cards = guide?.flashcards || [];
+    // Merged into what was saved before, so one round never erases earlier progress.
+    const progress = applyResults(guide?.flashcard_progress, { known, missed });
+    setGuide(current => ({ ...current, flashcard_progress: progress }));
     await Promise.all([
-      apiFetch('/guides/' + guideId + '/flashcard-progress', {
-        method: 'PATCH',
-        body: JSON.stringify({ known, unknown: missed, last_studied: new Date().toISOString() }),
-      }),
+      apiFetch('/guides/' + guideId + '/flashcard-progress', { method: 'PATCH', body: JSON.stringify(progress) }),
       apiFetch('/stats/log-session', {
         method: 'POST',
         body: JSON.stringify({ guide_id: guideId, session_type: 'flashcard', duration_seconds: seconds, metadata: { cards_studied: cards.length, cards_correct: known.length } }),
