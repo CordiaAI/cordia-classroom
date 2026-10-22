@@ -4,6 +4,42 @@ import { addGrowth, addRing } from '../lib/progress';
 import { recordStudy } from '../lib/activity';
 import { apiFetch } from '../lib/api';
 import { canvasKnownAvailable } from '../lib/canvas';
+import { useCountUp } from '../lib/motion';
+import Confetti from './Confetti';
+
+// Accuracy as a ring that fills while the number counts up.
+function ScoreRing({ value }) {
+  const shown = useCountUp(value);
+  const size = 112;
+  const stroke = 8;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const tone = value >= 90 ? 'is-great' : value >= 60 ? 'is-good' : 'is-low';
+  return (
+    <div className={'finish-ring ' + tone} role="img" aria-label={`${Math.round(value)}% accuracy`}>
+      <svg width={size} height={size} aria-hidden="true">
+        <circle className="finish-ring-track" cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} />
+        <circle className="finish-ring-fill" cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - shown / 100)} />
+      </svg>
+      <span aria-hidden="true"><strong>{Math.round(shown)}%</strong><small>accuracy</small></span>
+      <style jsx>{`
+        .finish-ring { position: relative; width: ${size}px; height: ${size}px; display: grid; place-items: center; }
+        .finish-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+        .finish-ring-track { stroke: var(--hairline); }
+        .finish-ring-fill { stroke: var(--olive); }
+        .is-great .finish-ring-fill { stroke: var(--success); }
+        .is-low .finish-ring-fill { stroke: var(--warning); }
+        .finish-ring span { display: grid; gap: 2px; justify-items: center; }
+        .finish-ring strong { font: 600 28px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .finish-ring small { color: var(--muted); font: 500 var(--fs-13)/1 var(--font-sans); }
+      `}</style>
+    </div>
+  );
+}
+
+function CountUp({ value }) {
+  return <>{Math.round(useCountUp(value, 700))}</>;
+}
 
 // The end of every session: three numbers and what to do next. (Study time per guide is still
 // recorded for the Progress page; the grove of trees is hidden for now.)
@@ -18,11 +54,13 @@ export default function SessionFinish({ guideId, guideTitle, cards, accuracy, mi
 
   return (
     <section className="c-card finish" aria-labelledby="finish-title">
-      <h2 id="finish-title" className="c-title">Done</h2>
+      {/* A perfect round gets a short burst of confetti; nothing else does, so it stays special. */}
+      {cards > 0 && Math.round(accuracy) >= 100 && <Confetti />}
+      <h2 id="finish-title" className="c-title">{Math.round(accuracy) >= 100 && cards > 0 ? 'Perfect' : 'Done'}</h2>
+      <ScoreRing value={Math.max(0, Math.min(100, accuracy))} />
       <ul className="finish-stats">
-        <li><strong>{cards}</strong><span>cards</span></li>
-        <li><strong>{Math.round(accuracy)}%</strong><span>accuracy</span></li>
-        <li><strong>{Math.max(1, Math.round(minutes))}</strong><span>min</span></li>
+        <li><strong><CountUp value={cards} /></strong><span>cards</span></li>
+        <li><strong><CountUp value={Math.max(1, Math.round(minutes))} /></strong><span>min</span></li>
       </ul>
       {/* Spacing works better than it feels, so say what happens next. */}
       <p className="c-meta finish-next">{accuracy < 100 ? 'Study this guide again soon to lock in the ones you missed.' : 'All known. A quick review in a few days keeps it that way.'}</p>

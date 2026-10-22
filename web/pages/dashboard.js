@@ -190,7 +190,8 @@ export default function Today() {
       <Link href="/progress" className="c-card today-progress" aria-label="Your progress" data-tip="insights" data-spot="insights" onClick={() => walkthroughEvent('insights-opened')}>
         {streakInfo && (
           <span className="today-stat">
-            <Flame size={20} strokeWidth={1.75} aria-hidden="true" />
+            {/* The flame flickers once today's study keeps the streak going, and grows at 7 and 30 days. */}
+            <span className={'today-flame' + (streakInfo.today ? ' is-lit' : '') + (streakInfo.days >= 30 ? ' is-blaze' : streakInfo.days >= 7 ? ' is-big' : '')} aria-hidden="true"><Flame size={20} strokeWidth={1.75} /></span>
             <strong>{plural(streakInfo.days, 'day')}</strong>
             {streakInfo.frozenThisWeek && <Snowflake size={16} strokeWidth={1.75} aria-label="Freeze used this week" className="today-freeze" />}
           </span>

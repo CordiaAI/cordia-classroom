@@ -8,7 +8,7 @@ export default function ProgressRing({ value = 0, size = 40, stroke = 4, label =
     <span className="c-ring" style={{ width: size, height: size }} role="img" aria-label={title || `${percent}% done`}>
       <svg width={size} height={size} aria-hidden="true">
         <circle className="c-ring-track" cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} />
-        <circle className="c-ring-fill" cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - pct)} />
+        <circle className="c-ring-fill" cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - pct)} style={{ '--ring-full': circumference }} />
       </svg>
       {label && size >= 40 && <span aria-hidden="true">{percent}</span>}
     </span>

@@ -73,7 +73,7 @@ export function streakWithFreeze(serverWeek = [], serverStreak = 0) {
   const thisWeek = isoWeek(new Date());
   const newFreezes = frozen.filter(week => !used.has(week));
   if (newFreezes.length) updateProgress(current => ({ freeze: [...new Set([...(current.freeze || []), ...newFreezes])].slice(-12) }));
-  return { days: Math.max(days, serverStreak || 0), frozenThisWeek: frozen.includes(thisWeek) };
+  return { days: Math.max(days, serverStreak || 0), frozenThisWeek: frozen.includes(thisWeek), today: active.has(dayKey(new Date())) };
 }
 
 export function semesterStart(now = new Date()) {
