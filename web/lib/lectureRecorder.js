@@ -28,13 +28,62 @@ export async function micPermission() {
   }
 }
 
+// Set up for a teacher across a room, not a call: echo cancellation and noise suppression are
+// built for a voice inches away and strip a distant one out with the background, so both are
+// off. The browser's own gain control stays on.
 export async function openMicrophone() {
-  return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true, channelCount: 1 } });
+}
+
+// Lifts distant speech before it is recorded: low rumble (HVAC, desk taps) cut, quiet speech
+// raised about 3x, loud and soft evened out, and peaks held under clipping. Returns the stream
+// to record plus release() (closes the audio graph and the microphone). Falls back to the raw
+// microphone where the browser can't process audio.
+export const ROOM_GAIN = 3;
+export async function roomVoice(stream) {
+  const AudioContextClass = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
+  const releaseMic = () => stream.getTracks().forEach(track => track.stop());
+  if (!AudioContextClass) return { stream, release: releaseMic };
+  let context;
+  try {
+    context = new AudioContextClass();
+    if (context.state === 'suspended') await context.resume().catch(() => {});
+    if (context.state !== 'running' || !context.createMediaStreamDestination) throw new Error('no audio processing');
+    const source = context.createMediaStreamSource(stream);
+    const rumble = context.createBiquadFilter();
+    rumble.type = 'highpass';
+    rumble.frequency.value = 90;
+    const lift = context.createGain();
+    lift.gain.value = ROOM_GAIN;
+    const even = context.createDynamicsCompressor();
+    even.threshold.value = -30;
+    even.knee.value = 20;
+    even.ratio.value = 6;
+    even.attack.value = 0.005;
+    even.release.value = 0.3;
+    const ceiling = context.createDynamicsCompressor();
+    ceiling.threshold.value = -2;
+    ceiling.knee.value = 0;
+    ceiling.ratio.value = 20;
+    ceiling.attack.value = 0.001;
+    ceiling.release.value = 0.1;
+    const out = context.createMediaStreamDestination();
+    source.connect(rumble).connect(lift).connect(even).connect(ceiling).connect(out);
+    return {
+      stream: out.stream,
+      release: () => { out.stream.getTracks().forEach(track => track.stop()); releaseMic(); context.close().catch(() => {}); },
+    };
+  } catch {
+    context?.close?.().catch(() => {});
+    return { stream, release: releaseMic };
+  }
 }
 
 export class ChunkedRecorder {
-  constructor(stream, { mimeType = pickMimeType(), chunkMs = CHUNK_MS, firstChunkMs = FIRST_CHUNK_MS, overlapMs = OVERLAP_MS, onChunk } = {}) {
+  // release: closes whatever feeds `stream` (see roomVoice), after the last chunk is written.
+  constructor(stream, { mimeType = pickMimeType(), chunkMs = CHUNK_MS, firstChunkMs = FIRST_CHUNK_MS, overlapMs = OVERLAP_MS, onChunk, release } = {}) {
     this.stream = stream;
+    this.release = release;
     this.mimeType = mimeType;
     this.chunkMs = chunkMs;
     this.firstChunkMs = firstChunkMs;
@@ -124,6 +173,7 @@ export class ChunkedRecorder {
     [...this.active].forEach(segment => { segment.endMs = end; this.stopSegment(segment); });
     await Promise.all(this.pending);
     this.stream.getTracks().forEach(track => track.stop());
+    this.release?.();
   }
 }
 
