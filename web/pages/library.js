@@ -3,7 +3,7 @@ import { LoadingArea, Reveal, useLoadGate } from '../components/CordiaLoader';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowUpDown, ArrowUpRight, AudioLines, BookOpen, ChevronDown, FolderInput, FolderPlus, Layers, Mic, NotebookPen, Pencil, Plus, Search, Star, Trash2,
+  ArrowUpDown, ArrowUpRight, AudioLines, BookOpen, ChevronDown, FolderInput, FolderPlus, Layers, Mic, NotebookPen, Pencil, Plus, Search, Star, Trash2, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
@@ -372,7 +372,8 @@ export default function LibraryPage() {
         <label className="c-search">
           <Search size={20} strokeWidth={1.75} aria-hidden="true" />
           <span className="sr-only">Search your library</span>
-          <input className="c-input" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search" />
+          <input className="c-input" type="search" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape' && query) { event.preventDefault(); setQuery(''); } }} placeholder="Search" />
+          {query && <button type="button" className="c-search-clear" onClick={() => setQuery('')} aria-label="Clear search"><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>}
         </label>
         <Menu
           label={`Sort: ${SORTS.find(item => item.key === sort).label}`}
