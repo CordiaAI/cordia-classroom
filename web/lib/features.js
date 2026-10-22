@@ -20,7 +20,6 @@ export const FEATURE_GROUPS = [
     { id: 'match', label: 'Match', icon: Shuffle },
     { id: 'cards', label: 'Cards', icon: Layers },
     { id: 'practice', label: 'Practice', icon: PencilRuler },
-    { id: 'focus', label: 'Focus', icon: Timer },
   ] },
   { label: 'Stay on track', items: [
     { id: 'insights', label: 'Insights', icon: ChartColumn },

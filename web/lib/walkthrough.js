@@ -65,10 +65,6 @@ export const MINI = {
   calendar: { label: 'Calendar', route: '/canvas?tab=calendar', steps: [
     { target: '[data-spot="calendar-feed"]', label: 'Connect Canvas', where: path => path === '/canvas', on: 'calendar-connected', finishable: true },
   ] },
-  focus: { label: 'Focus', route: '/dashboard', steps: [
-    { target: '[data-spot="focus-btn"]', label: 'Open the timer', on: 'focus-opened' },
-    { target: '[data-spot="focus-start"]', label: 'Start focus', on: 'focus-started' },
-  ] },
   // Notes live in a guide's Outline: New › Note makes a page to type in.
   notes: { label: 'Notes', route: '/dashboard', steps: [
     { target: '[data-spot="new"]', label: 'Tap New', on: 'new-opened' },
