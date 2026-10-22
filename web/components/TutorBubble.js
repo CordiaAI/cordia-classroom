@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { MessageCircle } from 'lucide-react';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 // The Tutor, one tap away on every page: a glass bubble in the bottom-right corner.
 // Wide screens open it beside the page; phones open the full Tutor page.
@@ -17,6 +18,7 @@ export default function TutorBubble() {
   if (router.pathname === '/tutor' || open) return null;
 
   function show() {
+    walkthroughEvent('ask');
     if (window.matchMedia('(max-width: 767px)').matches) router.push('/tutor');
     else window.dispatchEvent(new Event('cordia:tutor-toggle'));
   }
