@@ -11,6 +11,7 @@ const REASONS = {
   rate_limited: 'Napkin is busy. Try again in a minute.',
   timeout: 'Napkin took too long. Try again.',
   napkin_error: 'Napkin turned this one down.',
+  no_credits: "Visuals are paused for now. We're on it.",
   no_visuals: "Napkin couldn't find a picture in this text. Try a longer passage.",
   download_failed: "Napkin drew it, but it didn't come through. Try again.",
 };
