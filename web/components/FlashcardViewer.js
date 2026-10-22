@@ -137,6 +137,9 @@ export default function FlashcardViewer({
   });
 
   const position = Math.min(total, known.length + 1);
+  // Quizlet-style tallies: cards missed and not yet known, and cards known.
+  const learning = [...missed].filter(index => !known.includes(index)).length;
+  const gotRight = known.filter(index => !missed.has(index));
 
   return (
     <div className="fc">
@@ -166,13 +169,19 @@ export default function FlashcardViewer({
           onRestart={restart}
           onDone={onExit || onBack}
         >
+          <div className="fc-results">
+            <ResultList tone="learning" label="Missed" cards={[...missed].map(index => flashcards[index])} />
+            <ResultList tone="know" label="Got right" cards={gotRight.map(index => flashcards[index])} />
+          </div>
           {finishExtra}
         </SessionFinish>
       ) : (
         <>
           <div className="fc-progress">
+            <span className="fc-count is-learning" title="Still learning"><span className="fc-count-label">Still learning</span><strong aria-label={`Still learning: ${learning}`}>{learning}</strong></span>
             <div className="c-bar" role="progressbar" aria-label="Progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={known.length}><span style={{ width: `${(known.length / total) * 100}%` }} /></div>
             <span className="c-meta">{position} / {total}</span>
+            <span className="fc-count is-know" title="Know"><strong aria-label={`Know: ${known.length}`}>{known.length}</strong><span className="fc-count-label">Know</span></span>
           </div>
           <div
             ref={cardRef}
@@ -213,6 +222,11 @@ export default function FlashcardViewer({
         .fc-bar :global(.is-starred) { color: var(--olive-ink); }
         .fc-progress { display: flex; align-items: center; gap: 12px; }
         .fc-progress .c-bar { flex: 1; }
+        .fc-count { display: inline-flex; align-items: center; gap: 8px; font: 500 var(--fs-13)/1 var(--font-sans); color: var(--muted); }
+        .fc-count strong { min-width: 36px; height: 28px; padding: 0 10px; display: inline-grid; place-items: center; border-radius: var(--r-pill); font: 700 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .fc-count.is-learning strong { color: var(--warning); background: var(--warning-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning) 35%, transparent); }
+        .fc-count.is-know strong { color: var(--success); background: var(--success-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 35%, transparent); }
+        .fc-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; text-align: left; }
         .fc-card { position: relative; min-height: 340px; perspective: 1400px; cursor: pointer; border-radius:var(--r-card); }
         .fc-face { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 12px; padding: 32px; overflow: auto; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); box-shadow: var(--shadow); backface-visibility: hidden; transition: transform var(--dur) var(--ease); text-align: center; }
         .fc-face p { margin: 0; max-width: 34ch; font:500 20px/1.15 var(--font-sans); color: var(--ink); }
@@ -227,6 +241,8 @@ export default function FlashcardViewer({
           .fc-ask-label { display: none; }
           .fc-card { min-height: 300px; }
           .fc-actions :global(.c-btn) { flex: 1; min-width: 0; }
+          .fc-count-label { display: none; }
+          .fc-results { grid-template-columns: minmax(0, 1fr); }
         }
         @media (prefers-reduced-motion: reduce) {
           .fc-face { transition: none; }
@@ -236,5 +252,33 @@ export default function FlashcardViewer({
         }
       `}</style>
     </div>
+  );
+}
+
+// The cards in one tally on the finish screen, so the student sees exactly which ones.
+function ResultList({ tone, label, cards }) {
+  return (
+    <details className={'c-card fc-result is-' + tone} open={tone === 'learning' && cards.length > 0}>
+      <summary><strong>{cards.length}</strong>{label}</summary>
+      {cards.length > 0 ? (
+        <ul>
+          {cards.map((card, index) => (
+            <li key={index}><span className="fc-result-front">{card?.front}</span><span className="c-meta">{card?.back}</span></li>
+          ))}
+        </ul>
+      ) : <p className="c-meta">None</p>}
+      <style jsx>{`
+        .fc-result { padding: 12px 16px; min-width: 0; }
+        summary { display: flex; align-items: center; gap: 10px; cursor: pointer; font: 600 15px/1.2 var(--font-sans); list-style: none; }
+        summary::-webkit-details-marker { display: none; }
+        summary strong { min-width: 32px; height: 26px; padding: 0 8px; display: inline-grid; place-items: center; border-radius: var(--r-pill); font: 700 14px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .is-learning summary strong { color: var(--warning); background: var(--warning-bg); }
+        .is-know summary strong { color: var(--success); background: var(--success-bg); }
+        ul { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; max-height: 280px; overflow: auto; }
+        li { display: grid; gap: 2px; padding-top: 8px; border-top: 1px solid var(--hairline); min-width: 0; overflow-wrap: anywhere; }
+        .fc-result-front { font: 600 14px/1.3 var(--font-sans); color: var(--ink); }
+        p { margin: 8px 0 0; }
+      `}</style>
+    </details>
   );
 }
