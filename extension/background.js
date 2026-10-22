@@ -304,7 +304,99 @@ async function importQuizlet(message) {
   }
 }
 
-const ACTIONS = { importQuizlet, captureScreen, scrapePage, extractEducationalContent, createStudyGuide, saveStudyGuide, askTutor, billingStatus };
+// youtube.com/watch?v=, youtu.be/, /shorts/, /live/ and /embed/ links, as one watch link.
+function youtubeWatchUrl(value) {
+  const url = new URL(value);
+  const host = url.hostname.replace(/^(www|m|music)\./i, '').toLowerCase();
+  let id = '';
+  if (host === 'youtu.be') id = url.pathname.slice(1).split('/')[0];
+  else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    id = url.searchParams.get('v') || (url.pathname.match(/^\/(?:shorts|live|embed)\/([^/?#]+)/) || [])[1] || '';
+  }
+  if (url.protocol !== 'https:' || !/^[\w-]{11}$/.test(id)) throw new Error('Paste a YouTube video link.');
+  return `https://www.youtube.com/watch?v=${id}`;
+}
+
+// Runs inside the YouTube tab: the caption track if YouTube serves it, else the page's own
+// transcript panel. Prefers captions written by people over automatic ones.
+async function readYoutubeTranscript() {
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  document.querySelector('video')?.pause();
+  const clean = text => String(text || '').replace(/\s+/g, ' ').trim();
+  let player = null;
+  for (const script of document.querySelectorAll('script')) {
+    const source = script.textContent || '';
+    const at = source.indexOf('ytInitialPlayerResponse = {');
+    if (at < 0) continue;
+    const start = source.indexOf('{', at);
+    let depth = 0;
+    let inString = false;
+    for (let index = start; index < source.length; index++) {
+      const char = source[index];
+      if (inString) {
+        if (char === '\\') index++;
+        else if (char === '"') inString = false;
+      } else if (char === '"') inString = true;
+      else if (char === '{') depth++;
+      else if (char === '}' && --depth === 0) {
+        try { player = JSON.parse(source.slice(start, index + 1)); } catch (_) { /* Keep looking. */ }
+        break;
+      }
+    }
+    if (player) break;
+  }
+  const details = player?.videoDetails || {};
+  const title = clean(details.title || document.title.replace(/\s*-\s*YouTube$/, ''));
+  const meta = { title, channel: clean(details.author), minutes: Math.round(Number(details.lengthSeconds || 0) / 60) };
+  if (/not a bot|unusual traffic/i.test(document.body?.innerText?.slice(0, 4000) || '')) return { ...meta, blocked: true };
+  const tracks = player?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+  const rank = track => (track.kind === 'asr' ? 2 : 0) + (/^en/i.test(track.languageCode || '') ? 0 : 1);
+  const track = [...tracks].sort((a, b) => rank(a) - rank(b))[0];
+  if (track?.baseUrl) {
+    try {
+      const response = await fetch(`${track.baseUrl}&fmt=json3`, { credentials: 'include' });
+      const data = JSON.parse((await response.text()) || 'null');
+      const text = (data?.events || []).map(event => (event.segs || []).map(seg => seg.utf8 || '').join('')).join(' ');
+      if (clean(text).length > 40) return { ...meta, text: clean(text) };
+    } catch (_) { /* YouTube may refuse direct caption fetches; use the panel. */ }
+  }
+  // The transcript panel: open the description, then "Show transcript", and read the lines.
+  document.querySelector('ytd-text-inline-expander #expand, #description-inline-expander #expand')?.click();
+  await sleep(400);
+  const opener = document.querySelector('ytd-video-description-transcript-section-renderer button')
+    || [...document.querySelectorAll('button')].find(button => /show transcript/i.test(button.innerText || button.getAttribute('aria-label') || ''));
+  if (!opener) return { ...meta, noCaptions: !tracks.length };
+  opener.click();
+  let lines = [];
+  for (let wait = 0, stable = 0; wait < 30 && stable < 3; wait++) {
+    await sleep(500);
+    const nodes = document.querySelectorAll('ytd-transcript-segment-renderer .segment-text, ytd-transcript-segment-renderer yt-formatted-string.segment-text, transcript-segment-view-model [class*="segment-text"]');
+    const next = [...nodes].map(node => clean(node.innerText || node.textContent)).filter(Boolean);
+    stable = next.length && next.length === lines.length ? stable + 1 : 0;
+    lines = next;
+  }
+  return lines.length ? { ...meta, text: lines.join(' ') } : { ...meta, noCaptions: !tracks.length };
+}
+
+// Opens the video in a muted background tab (YouTube turns servers away), reads its transcript,
+// and closes the tab. Only YouTube links are opened.
+async function importYoutube(message) {
+  const url = youtubeWatchUrl(message.url || '');
+  const tab = await chrome.tabs.create({ url, active: false });
+  try {
+    chrome.tabs.update(tab.id, { muted: true }).catch(() => {});
+    await waitForTab(tab.id, 30000);
+    const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: readYoutubeTranscript });
+    const video = result?.result || {};
+    if (video.blocked) throw new Error('YouTube asked for a quick check. Open the video in a tab, then try again.');
+    if (!video.text) throw new Error(video.noCaptions ? "This video has no captions or transcript, so there's nothing to read." : "The video's transcript couldn't be read. Try again in a moment.");
+    return { title: video.title || 'YouTube video', channel: video.channel || '', minutes: video.minutes || 0, text: video.text, url };
+  } finally {
+    chrome.tabs.remove(tab.id).catch(() => {});
+  }
+}
+
+const ACTIONS = { importQuizlet, importYoutube, captureScreen, scrapePage, extractEducationalContent, createStudyGuide, saveStudyGuide, askTutor, billingStatus };
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.action === 'syncClassroomAuth') {

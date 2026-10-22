@@ -463,7 +463,7 @@ export default function CreateGuidePage() {
         )}
       </section>
 
-      {quizletOpen && <QuizletImport onImport={importQuizlet} onCancel={() => setQuizletOpen(false)} />}
+      {quizletOpen && <QuizletImport initialUrl={typeof router.query.url === 'string' ? router.query.url : ''} onImport={importQuizlet} onCancel={() => setQuizletOpen(false)} />}
 
       {choiceOpen && (
         <div className="c-scrim">

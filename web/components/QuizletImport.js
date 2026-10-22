@@ -5,8 +5,8 @@ import { extensionReady, importWithExtension, isQuizletUrl, parseQuizletText } f
 
 // "Import from Quizlet": a set link read through the extension, or Quizlet's Export text pasted in.
 // The cards land in the editor so the student can check them before saving.
-export default function QuizletImport({ onImport, onCancel }) {
-  const [url, setUrl] = useState('');
+export default function QuizletImport({ initialUrl = '', onImport, onCancel }) {
+  const [url, setUrl] = useState(initialUrl);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -14,10 +14,21 @@ export default function QuizletImport({ onImport, onCancel }) {
   const [pasteMode, setPasteMode] = useState(false);
   const firstRef = useRef(null);
 
+  const typedRef = useRef(false);
+  typedRef.current = Boolean(text.trim());
+
+  // The extension marks the page once it has loaded, which can be after this sheet opens.
   useEffect(() => {
     const ready = extensionReady();
     setHasExtension(ready);
     setPasteMode(!ready);
+    const onMessage = event => {
+      if (event.source !== window || event.data?.type !== 'ASAI_EXTENSION_READY') return;
+      setHasExtension(true);
+      if (!typedRef.current) setPasteMode(false);
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
   }, []);
 
   useEffect(() => {
