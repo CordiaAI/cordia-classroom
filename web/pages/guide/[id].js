@@ -5,7 +5,7 @@ import CardPhoto from '../../components/CardPhoto';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Brain, Download, ExternalLink, FolderInput, Gamepad2, Layers, Lock, MessageCircle, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
+  ArrowLeft, Brain, Download, ExternalLink, FolderInput, Gamepad2, Layers, Lock, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -477,9 +477,6 @@ export default function GuidePage() {
             return <Link key={tab.key} className="c-pill" href={tab.href} data-spot={tab.spot} onClick={tab.event ? () => walkthroughEvent(tab.event) : undefined}>{content}</Link>;
           })}
         </nav>
-        <button type="button" className="c-btn c-btn--secondary guide-ask" data-spot="ask-pill" onClick={() => { walkthroughEvent('ask'); ask(id, ''); }}>
-          <MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />Ask Tutor about this guide
-        </button>
       </div>
 
       {hasMaterial && <div className="c-seg guide-view" role="tablist" aria-label="Outline view">
@@ -579,7 +576,6 @@ export default function GuidePage() {
           .guide-meta { margin-left: 0; }
           .guide-notes { padding: 24px 18px; }
           .guide-head :global(.guide-study-now) { order: 5; width: 100%; justify-content: center; }
-          .guide-ask { width: 100%; justify-content: center; }
         }
       `}</style>
     </article>

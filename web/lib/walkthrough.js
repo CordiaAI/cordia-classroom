@@ -49,7 +49,7 @@ export const MINI = {
     { target: '[data-spot="quiz-start"]', label: 'Tap Start', where: onQuiz, on: 'quiz-started' },
   ] },
   ask: { label: 'Tutor', route: 'guide', steps: [
-    { target: '[data-spot="ask-pill"]', label: 'Ask the Tutor', where: onGuide, on: 'ask' },
+    { target: '[data-spot="nav-tutor"]', label: 'Ask the Tutor', where: onGuide, on: 'ask' },
   ] },
   cards: { label: 'Flashcards', route: 'guide', steps: [
     { target: '[data-spot="cards-pill"]', label: 'Tap Flashcards', where: onGuide, on: 'cards-opened' },
