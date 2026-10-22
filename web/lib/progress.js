@@ -5,7 +5,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './supabase';
 // Walkthrough, feature-use and Grove progress, saved per student on the server in
 // their Supabase account metadata (key "cordia"), with a local copy for speed and
 // offline use. It rides in the access token, so it stays small (no logs here).
-const EMPTY = { v: 1, at: 0, theme: null, wt: null, day1Status: null, done: [], used: [], tips: [], grove: {}, rings: {}, freeze: [], first: 0 };
+const EMPTY = { v: 1, at: 0, theme: null, wt: null, day1Status: null, done: [], used: [], tips: [], grove: {}, rings: {}, freeze: [], first: 0, review: null };
 const LOCAL = 'cordiaProgress';
 let state = { ...EMPTY };
 let loadedFor = '';
@@ -45,6 +45,8 @@ function merge(a, b) {
     rings: maxMap(a?.rings, b?.rings),
     freeze: union(a?.freeze, b?.freeze).slice(-12),
     first: Math.min(...[a?.first, b?.first].filter(Boolean), Date.now()),
+    // The review prompt: { asked, next, rated }. Once rated on any device it never shows again.
+    review: (a?.review?.rated && a.review) || (b?.review?.rated && b.review) || newer?.review || a?.review || b?.review || null,
   };
 }
 

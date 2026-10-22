@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { addGrowth, addRing } from '../lib/progress';
 import { recordStudy } from '../lib/activity';
@@ -6,6 +6,7 @@ import { apiFetch } from '../lib/api';
 import { canvasKnownAvailable } from '../lib/canvas';
 import { useCountUp } from '../lib/motion';
 import Confetti from './Confetti';
+import ReviewPrompt, { reviewDue } from './ReviewPrompt';
 
 // Accuracy as a ring that fills while the number counts up.
 function ScoreRing({ value }) {
@@ -52,6 +53,15 @@ export default function SessionFinish({ guideId, guideTitle, cards, accuracy, mi
     if (guideId) addRing(guideId);
   }, []);
 
+  // A good moment to ask for a review: a session that went reasonably well, by someone who's
+  // used Cordia on several days (ReviewPrompt decides when, and never asks twice in two weeks).
+  const [asking, setAsking] = useState(false);
+  useEffect(() => {
+    if (cards < 3 || accuracy < 60 || !reviewDue()) return undefined;
+    const timer = setTimeout(() => setAsking(true), 1600);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <section className="c-card finish" aria-labelledby="finish-title">
       {/* A perfect round gets a short burst of confetti; nothing else does, so it stays special. */}
@@ -65,6 +75,7 @@ export default function SessionFinish({ guideId, guideTitle, cards, accuracy, mi
       {/* Spacing works better than it feels, so say what happens next. */}
       <p className="c-meta finish-next">{accuracy < 100 ? 'Study this guide again soon to lock in the ones you missed.' : 'All known. A quick review in a few days keeps it that way.'}</p>
       {children}
+      {asking && <ReviewPrompt onClose={() => setAsking(false)} />}
       <div className="c-row finish-actions">
         {onRestart && <button type="button" className="c-btn c-btn--secondary" onClick={onRestart}><RotateCcw size={20} strokeWidth={1.75} aria-hidden="true" />Restart</button>}
         <button type="button" className="c-btn c-btn--primary" data-spot={doneSpot} onClick={onDone}>{doneLabel}</button>
