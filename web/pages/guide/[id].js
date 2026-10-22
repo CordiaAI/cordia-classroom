@@ -127,6 +127,16 @@ export default function GuidePage() {
     if (requested > 0) setPage(requested - 1);
   }, [router.isReady]);
 
+  // ?find=<question> (from a missed quiz question): By page, on the page that answers it.
+  useEffect(() => {
+    const wanted = typeof router.query.find === 'string' ? router.query.find.trim().toLowerCase() : '';
+    if (!wanted || !guide) return;
+    const index = parseQAPairs(guide.study_guide).findIndex(pair => pair.question.trim().toLowerCase() === wanted);
+    if (index < 0) return;
+    setView('pages');
+    setPage(Math.floor(index / 3));
+  }, [router.query.find, guide?.id]);
+
   // ?learn=1 opens Explain on the first question.
   useEffect(() => {
     if (router.query.learn !== '1' || !guide || !learningStyle?.enabled || openAid) return;

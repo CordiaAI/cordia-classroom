@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import CordiaLoader from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
 import { apiFetch, openUpgrade } from '../../lib/api';
@@ -8,6 +8,7 @@ import { ArrowLeft, Lock, ListChecks, PenLine, Play, RefreshCw, Repeat, TextCurs
 import MatchRace from '../../components/MatchRace';
 import QuizMode from '../../components/QuizMode';
 import { inDayOne, walkthroughEvent } from '../../lib/walkthrough';
+import { spreadCards } from '../../lib/checkYourself';
 
 // Short tile names; TYPE_LABELS stays the engine's own naming.
 const MODES = {
@@ -32,6 +33,8 @@ function rememberedTypes() {
 export default function QuizPage() {
   const router = useRouter();
   const { guideId } = router.query;
+  // ?check=1: a new guide's "Check yourself", five quick questions that start on their own.
+  const check = router.query.check === '1';
   const { ready } = useRequireAuth();
   const [types, setTypes] = useState(['mc']);
   const [plan, setPlan] = useState(null);
@@ -71,15 +74,25 @@ export default function QuizPage() {
   }
 
   useEffect(() => { if (ready && guideId) walkthroughEvent('quiz-opened'); }, [ready, guideId]);
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!ready || !guideId || !check || autoStarted.current) return;
+    autoStarted.current = true;
+    start();
+  }, [ready, guideId, check]);
+  const toGuide = () => router.push('/guide/' + guideId);
 
   async function start() {
     setStarting(true);
     setError('');
     // The day-one walkthrough runs a short 3-question multiple-choice round.
     const short = inDayOne('quiz-start');
-    const chosen = short || race ? ['mc'] : types;
+    const chosen = short || race || check ? ['mc'] : types;
     const data = await apiFetch(`/quiz/${guideId}/session`, { method: 'POST', body: JSON.stringify({ types: chosen }) });
     setStarting(false);
+    // No questions to check (a notes page, or the quiz couldn't be built): straight to reading.
+    if (check && !data?.cards?.length) { router.replace('/guide/' + guideId); return; }
+    if (check) data.cards = spreadCards(data.cards);
     if (data?.cards?.length) {
       // Short-answer types (Fill in, Pairs) the student picked that no question here could use.
       const unused = chosen.filter(type => PRO_TYPES.includes(type) && Array.isArray(data.types) && !data.types.includes(type));
@@ -103,13 +116,18 @@ export default function QuizPage() {
       <header className="c-page-head">
         <div className="c-row">
           <button type="button" className="c-icon-btn" onClick={() => router.push('/guide/' + guideId)} aria-label="Back to guide"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
-          <h1 className="c-title">Quiz</h1>
+          <h1 className="c-title">{check ? 'Check yourself' : 'Quiz'}</h1>
         </div>
-        <button type="button" className="c-btn c-btn--quiet" onClick={regenerate} disabled={regenerating || starting}>
-          <RefreshCw size={20} strokeWidth={1.75} aria-hidden="true" />{regenerating ? 'Regenerating…' : 'Regenerate'}
-        </button>
+        {check ? (
+          <button type="button" className="c-btn c-btn--quiet" onClick={toGuide}>Skip to reading</button>
+        ) : (
+          <button type="button" className="c-btn c-btn--quiet" onClick={regenerate} disabled={regenerating || starting}>
+            <RefreshCw size={20} strokeWidth={1.75} aria-hidden="true" />{regenerating ? 'Regenerating…' : 'Regenerate'}
+          </button>
+        )}
       </header>
       {title && <p className="c-section-title quiz-guide">{title}</p>}
+      {check && <p className="c-meta quiz-check-note">Five quick questions before you read. It doesn't count, and mistakes help you learn.</p>}
       {error && <div className="retain-action-error" role="alert">{error}</div>}
 
       {session?.race ? (
@@ -127,10 +145,13 @@ export default function QuizPage() {
           cards={session.cards}
           types={session.selected}
           guideId={guideId}
-          onRestart={() => setSession(null)}
+          onRestart={() => (check ? start() : setSession(null))}
           onDone={() => { walkthroughEvent('guide-open'); router.push('/guide/' + guideId); }}
+          doneLabel={check ? 'Read the guide' : undefined}
         />
         </>
+      ) : check ? (
+        <div className="quiz-check-wait"><CordiaLoader size={28} label="Getting your questions ready" /><span className="c-meta">Getting your questions ready…</span></div>
       ) : (
         <>
           <div className="c-seg quiz-switch" role="tablist" aria-label="Mode">
@@ -177,6 +198,8 @@ export default function QuizPage() {
         .quiz-guide { margin: -12px 0 0; font-family: var(--font-sans); }
         .quiz-switch { justify-self: start; }
         .quiz-unused { margin: 0 0 12px; color: var(--muted); font: 500 var(--fs-13)/var(--lh-body) var(--font-sans); }
+        .quiz-check-note { margin: -8px 0 4px; }
+        .quiz-check-wait { display: grid; justify-items: center; gap: 12px; padding: 48px 0; }
         .quiz-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .quiz-mode { position: relative; display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 120px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow); }
         .quiz-mode :global(.lucide) { color: var(--olive-ink); }

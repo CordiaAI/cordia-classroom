@@ -43,7 +43,7 @@ export async function loadStudyQueue({ practiceGuides = 5, guideId = '' } = {}) 
   for (const [guideId, items] of Object.entries(stored)) {
     const guide = guides.find(item => item.id === guideId);
     if (!guide) continue;
-    items.forEach((item, position) => misses.push({ kind: 'miss', guideId, guideTitle: guide.title, position, front: item.question, back: item.answer }));
+    items.forEach((item, position) => misses.push({ kind: 'miss', guideId, guideTitle: guide.title, position, front: item.question, back: item.answer, sure: Boolean(item.sure) }));
   }
   const recent = guides.slice(0, practiceGuides);
   const states = await Promise.all(recent.map(guide => apiFetch(`/practice/${guide.id}/state`)));

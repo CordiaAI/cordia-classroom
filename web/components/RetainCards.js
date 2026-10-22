@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api';
-import { MessageCircle, Sparkles } from 'lucide-react';
+import { BookOpen, MessageCircle, Sparkles } from 'lucide-react';
 import { requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { conceptAnswer, fillMatches, normalize, shuffled } from '../lib/retainEngine.mjs';
@@ -63,22 +63,86 @@ function NextButton({ onNext, missed }) {
   );
 }
 
+// "How sure are you?" between answering and seeing the result. Wrong answers given with
+// confidence are the ones feedback fixes best, so they're flagged and come back first.
+export const CONFIDENCE = [
+  { key: 'sure', label: 'Sure' },
+  { key: 'think', label: 'Think so' },
+  { key: 'guess', label: 'Guess' },
+];
+
+export function ConfidencePrompt({ onPick }) {
+  useEffect(() => {
+    // Keys 1-3 pick, matching the order shown.
+    function onKey(event) {
+      if (event.target.closest?.('input, textarea, [contenteditable="true"]')) return;
+      const level = CONFIDENCE[Number(event.key) - 1];
+      if (level) { event.preventDefault(); onPick(level.key); }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onPick]);
+  return (
+    <div className="retain-sure" role="group" aria-label="How sure are you?">
+      <span className="c-meta">How sure are you?</span>
+      {CONFIDENCE.map((level, index) => (
+        <button key={level.key} type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={() => onPick(level.key)}>
+          {level.label}<kbd>{index + 1}</kbd>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Under a missed question: why the right answer is right, why the choice wasn't, and where the
+// guide covers it. The two sentences come from the server (POST /quiz/{id}/why).
+export function MissFeedback({ guideId, card, question, chosen, sure }) {
+  const [why, setWhy] = useState(null);
+  useEffect(() => {
+    let active = true;
+    apiFetch(`/quiz/${guideId}/why`, { method: 'POST', body: JSON.stringify({ concept: card.concepts[0], chosen: String(chosen).slice(0, 4000) }) })
+      .then(data => { if (active) setWhy(data?.why_right ? data : {}); });
+    return () => { active = false; };
+  }, [guideId, card.id]);
+  return (
+    <div className="retain-why" role="status">
+      {sure && <p className="retain-why-sure">You were sure about this one. It comes back first next time, so it sticks.</p>}
+      {why === null && <p className="c-meta">Working out why…</p>}
+      {why?.why_right && <p><strong>Why it's right:</strong> {why.why_right}</p>}
+      {why?.why_wrong && <p><strong>Why yours isn't:</strong> {why.why_wrong}</p>}
+      <a className="retain-why-source" href={`/guide/${guideId}?find=${encodeURIComponent(question.question || '')}`} target="_blank" rel="noreferrer">
+        <BookOpen size={16} strokeWidth={1.75} aria-hidden="true" />See it in your guide
+      </a>
+    </div>
+  );
+}
+
 export function McCard({ card, question, guideId, onResult, onNext }) {
   const answer = conceptAnswer(question);
   // Always shuffled, so the right answer's position never gives it away (saved quizzes kept it first).
   const [options] = useState(() => shuffled(question.options || [], Math.floor(Math.random() * 233280)));
+  // An answer is picked, then "How sure?" (first asks only), then it's revealed.
+  const [pending, setPending] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [confidence, setConfidence] = useState('');
+
+  function reveal(option, level = '') {
+    setSelected(option);
+    setConfidence(level);
+    const right = option === answer;
+    if (!right) askTutorAboutMiss(guideId, question, option, options);
+    onResult([{ concept: card.concepts[0], credit: right ? 1 : 0, response: option, ...(level ? { confidence: level } : {}) }]);
+  }
 
   function choose(option) {
     if (selected !== null) return;
-    setSelected(option);
-    const right = option === answer;
-    if (!right) askTutorAboutMiss(guideId, question, option, options);
-    onResult([{ concept: card.concepts[0], credit: right ? 1 : 0, response: option }]);
+    // A repeat of a missed question goes straight to the answer.
+    if (card.reask) { reveal(option); return; }
+    setPending(option);
   }
 
   function optionClass(option) {
-    if (selected === null) return 'quiz-option';
+    if (selected === null) return 'quiz-option' + (pending === option ? ' selected' : '');
     if (option === answer) return 'quiz-option ' + (selected === answer ? 'correct-shine' : 'correct-glow');
     if (option === selected) return 'quiz-option wrong-shake';
     return 'quiz-option disabled';
@@ -88,8 +152,10 @@ export function McCard({ card, question, guideId, onResult, onNext }) {
     <>
       <div className="quiz-question-text">{question.question}</div>
       {options.map(option => (
-        <button key={option} type="button" className={optionClass(option)} onClick={() => choose(option)}>{option}</button>
+        <button key={option} type="button" className={optionClass(option)} aria-pressed={selected === null ? pending === option : undefined} onClick={() => choose(option)}>{option}</button>
       ))}
+      {selected === null && pending !== null && <ConfidencePrompt onPick={level => reveal(pending, level)} />}
+      {selected !== null && selected !== answer && <MissFeedback guideId={guideId} card={card} question={question} chosen={selected} sure={confidence === 'sure'} />}
       {selected !== null && <NextButton onNext={onNext} missed={selected !== answer} />}
     </>
   );
@@ -99,14 +165,24 @@ export function FillCard({ card, question, guideId, onResult, onNext }) {
   const answer = conceptAnswer(question);
   const [value, setValue] = useState('');
   const [right, setRight] = useState(null);
+  const [asking, setAsking] = useState(false);
+  const [confidence, setConfidence] = useState('');
+
+  function reveal(level = '') {
+    setAsking(false);
+    setConfidence(level);
+    const correct = fillMatches(value, answer);
+    setRight(correct);
+    if (!correct) askTutorAboutMiss(guideId, question, value.trim());
+    onResult([{ concept: card.concepts[0], credit: correct ? 1 : 0, response: value.trim(), ...(level ? { confidence: level } : {}) }]);
+  }
 
   function check(event) {
     event.preventDefault();
     if (right !== null || !value.trim()) return;
-    const correct = fillMatches(value, answer);
-    setRight(correct);
-    if (!correct) askTutorAboutMiss(guideId, question, value.trim());
-    onResult([{ concept: card.concepts[0], credit: correct ? 1 : 0, response: value.trim() }]);
+    // First asks get "How sure?" before the answer shows; repeats go straight to it.
+    if (card.reask) reveal();
+    else setAsking(true);
   }
 
   return (
@@ -119,17 +195,19 @@ export function FillCard({ card, question, guideId, onResult, onNext }) {
           onChange={event => setValue(event.target.value)}
           placeholder="Type the answer"
           aria-label="Your answer"
-          readOnly={right !== null}
+          readOnly={right !== null || asking}
           autoFocus
           autoComplete="off"
         />
-        {right === null && <button type="submit" className="c-btn c-btn--primary" disabled={!value.trim()}>Check</button>}
+        {right === null && !asking && <button type="submit" className="c-btn c-btn--primary" disabled={!value.trim()}>Check</button>}
       </div>
+      {asking && <ConfidencePrompt onPick={reveal} />}
       {right !== null && (
         <p className={'retain-feedback ' + (right ? 'right' : 'wrong')} role="status">
-          {right ? 'Correct' : <>Answer: <strong>{answer}</strong></>}
+          {right ? <>Right: <strong>{answer}</strong></> : <>Answer: <strong>{answer}</strong></>}
         </p>
       )}
+      {right === false && <MissFeedback guideId={guideId} card={card} question={question} chosen={value.trim()} sure={confidence === 'sure'} />}
       {right !== null && <NextButton onNext={onNext} missed={!right} />}
     </form>
   );

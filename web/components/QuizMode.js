@@ -10,7 +10,7 @@ import { walkthroughEvent } from '../lib/walkthrough';
 
 // Retain: every idea is asked once in its best-fitting format. A miss must then be answered
 // right two more times, a few questions apart, before it clears. The score is first-try only.
-export default function QuizMode({ questions, cards, types, guideId, onRestart, onDone }) {
+export default function QuizMode({ questions, cards, types, guideId, onRestart, onDone, doneLabel }) {
   const [session, setSession] = useState(() => createSession(questions, cards, types));
   const [answered, setAnswered] = useState(false);
   const [score, setScore] = useState(null);
@@ -29,8 +29,11 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart, 
     setSession(next);
     setAnswered(false);
     if (!currentCard(next)) {
-      // First-try misses come back in Today's Start session.
-      const misses = firstAttempts(next).filter(item => item.credit < 1).map(item => ({ question: questions[item.concept]?.question || '', answer: conceptAnswer(questions[item.concept]) })).filter(item => item.question && item.answer);
+      // First-try misses come back in the guide's Study now; ones the student was sure of come first.
+      const misses = firstAttempts(next).filter(item => item.credit < 1)
+        .map(item => ({ question: questions[item.concept]?.question || '', answer: conceptAnswer(questions[item.concept]), ...(item.confidence === 'sure' ? { sure: true } : {}) }))
+        .filter(item => item.question && item.answer)
+        .sort((a, b) => Number(Boolean(b.sure)) - Number(Boolean(a.sure)));
       rememberRetainMisses(guideId, misses);
       walkthroughEvent('quiz-done');
       setSaving(true);
@@ -55,10 +58,12 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart, 
   if (!card) {
     const finalStats = progress(session);
     const accuracy = score?.score ?? Math.round((finalStats.firstTryRight / Math.max(1, finalStats.total)) * 100);
+    const sureMisses = firstAttempts(session).filter(item => item.credit < 1 && item.confidence === 'sure').length;
     return (
-      <SessionFinish guideId={guideId} cards={finalStats.total} accuracy={accuracy} minutes={(Date.now() - startedAt) / 60000} kind="quiz" onRestart={onRestart} onDone={onDone} doneSpot="quiz-done">
+      <SessionFinish guideId={guideId} cards={finalStats.total} accuracy={accuracy} minutes={(Date.now() - startedAt) / 60000} kind="quiz" onRestart={onRestart} onDone={onDone} doneSpot="quiz-done" doneLabel={doneLabel}>
         {saving && <span className="c-meta" role="status">Saving…</span>}
         {score?.error && <p className="retain-action-error" role="alert">{score.error}</p>}
+        {sureMisses > 0 && <p className="c-meta finish-sure">{sureMisses === 1 ? 'One answer you were sure of was wrong.' : `${sureMisses} answers you were sure of were wrong.`} Those come back first in Study now, so they stick.</p>}
       </SessionFinish>
     );
   }

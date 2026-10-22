@@ -99,6 +99,7 @@ FEATURES = {
     "tutor_visual": CallSpec(LIGHT, 600),
     "practice_grade": CallSpec(LIGHT, 300),
     "retain_grade": CallSpec(LIGHT, 250),
+    "retain_why": CallSpec(LIGHT, 250),
     "practice_classify": CallSpec(LIGHT, 100),
     "quiz_distractors": CallSpec(LIGHT, 4096),
     "smart_notes_diagram": CallSpec(LIGHT, 2000),

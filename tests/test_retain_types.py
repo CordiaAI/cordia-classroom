@@ -147,6 +147,23 @@ class RetainRouteTests(unittest.TestCase):
         self.assertEqual([a["credit"] for a in stored], [1.0, 0.0, 0.0, 0.5])
         self.assertEqual([a["is_correct"] for a in stored], [True, False, False, False])
 
+    def test_why_explains_a_miss_from_the_saved_question(self):
+        db, _ = database([TERMS[0], SENTENCE])
+        explain = MagicMock(return_value={"why_right": "Mitosis is the division that copies the cell.", "why_wrong": "Meiosis makes sex cells."})
+        require, record = MagicMock(), MagicMock()
+        with patch.multiple(quiz, get_user_id=MagicMock(return_value="u1"), get_supabase=MagicMock(return_value=db),
+                            explain_miss_briefly=explain, require=require, record=record):
+            result = quiz.explain_miss(GUIDE_ID, quiz.MissRequest(concept=0, chosen="Meiosis"), "Bearer t")
+        self.assertEqual(result["why_wrong"], "Meiosis makes sex cells.")
+        # The saved question and its right answer are the standard; the student's choice is what's explained.
+        args = explain.call_args.args
+        self.assertEqual((args[0], args[1], args[2]), (TERMS[0]["question"], retain.concept_answer(TERMS[0]), "Meiosis"))
+        require.assert_called_once_with("u1", "light")
+        record.assert_called_once_with("u1", "light")
+        with patch.multiple(quiz, get_user_id=MagicMock(return_value="u1"), get_supabase=MagicMock(return_value=db)):
+            with self.assertRaises(quiz.HTTPException):
+                quiz.explain_miss(GUIDE_ID, quiz.MissRequest(concept=9, chosen="x"), "Bearer t")
+
     def test_forged_written_credit_is_worth_nothing(self):
         db, tables = database([LONG])
         with patch.object(quiz, "get_user_id", return_value="u1"), \

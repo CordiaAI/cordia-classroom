@@ -33,6 +33,37 @@ function dueLabel(iso) {
 }
 
 // "an A", "an A-", "an F", "a B+".
+// The grade as a ring that fills to the current percentage, with the letter in the middle,
+// coloured by the letter: A green, B olive, C amber, D and F red.
+const RING = { size: 76, stroke: 7 };
+function GradeRing({ letter, score }) {
+  const radius = (RING.size - RING.stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = Math.max(0, Math.min(100, Number(score) || 0)) / 100;
+  const tone = { A: 'is-a', B: 'is-b', C: 'is-c', D: 'is-low', F: 'is-low' }[String(letter || '').trim().charAt(0).toUpperCase()] || 'is-b';
+  return (
+    <span className={'cg-ring ' + tone} role="img" aria-label={letter ? `Grade ${letter}` : 'No letter grade'}>
+      <svg width={RING.size} height={RING.size} aria-hidden="true">
+        <circle className="cg-ring-track" cx={RING.size / 2} cy={RING.size / 2} r={radius} fill="none" strokeWidth={RING.stroke} />
+        <circle className="cg-ring-fill" cx={RING.size / 2} cy={RING.size / 2} r={radius} fill="none" strokeWidth={RING.stroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={circumference * (1 - pct)} style={{ '--ring-full': circumference }} />
+      </svg>
+      <span aria-hidden="true">{letter || '—'}</span>
+      <style jsx>{`
+        .cg-ring { position: relative; flex: none; width: ${RING.size}px; height: ${RING.size}px; display: grid; place-items: center; }
+        .cg-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+        .cg-ring-track { stroke: var(--hairline); }
+        .cg-ring-fill { stroke: var(--olive-ink); transition: stroke-dashoffset 700ms cubic-bezier(.2, .8, .2, 1); animation: cg-fill 900ms cubic-bezier(.2, .8, .2, 1) both; }
+        @keyframes cg-fill { from { stroke-dashoffset: var(--ring-full); } }
+        .cg-ring > span { font: 700 26px/1 var(--font-sans); letter-spacing: -0.01em; color: var(--ink); }
+        .is-a .cg-ring-fill { stroke: var(--success); }
+        .is-c .cg-ring-fill { stroke: var(--warning); }
+        .is-low .cg-ring-fill { stroke: var(--error); }
+        @media (prefers-reduced-motion: reduce) { .cg-ring-fill { animation: none; transition: none; } }
+      `}</style>
+    </span>
+  );
+}
+
 const withArticle = letter => `${/^[AEF]/i.test(letter) ? 'an' : 'a'} ${letter}`;
 
 function goalLine(goal, total, kind) {
@@ -74,7 +105,7 @@ export default function ClassGrades({ courseId, guides = [], onMakeGuide }) {
           <p className="cg-none">No graded work yet.</p>
         ) : (
           <>
-            <span className="cg-letter">{shownLetter || '—'}</span>
+            <GradeRing letter={shownLetter} score={Number(score)} />
             <span className="cg-score">
               <strong>{Number(score).toFixed(1)}%</strong>
               <span className="c-meta">Current grade in Canvas</span>
@@ -116,7 +147,6 @@ export default function ClassGrades({ courseId, guides = [], onMakeGuide }) {
 
       <style jsx>{`
         .cg-now { display: flex; align-items: center; gap: 20px; padding: 20px 24px; }
-        .cg-letter { display: grid; place-items: center; min-width: 64px; height: 64px; padding: 0 12px; border-radius: 18px; background: var(--olive-tint); color: var(--olive-ink); font: 600 var(--fs-28)/1 var(--font-display); }
         .cg-score { display: grid; gap: 2px; }
         .cg-score strong { font: 600 var(--fs-28)/1.1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .cg-none { margin: 0; font: 600 17px/1.4 var(--font-sans); }

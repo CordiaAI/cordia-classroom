@@ -57,7 +57,8 @@ async function postJson(path, body, timeoutMs) {
 
 // Lecture recording, start to finish. When the transcript is ready, onDone({ title, transcript, folderId })
 // hands it to the New sheet, which builds the guide like any other upload.
-export default function LectureRecorder({ folders = [], folderId, onFolder, onDone, onActiveChange }) {
+// onStatus({ phase, elapsed }) lets the New sheet show a small recording pill while it's minimized.
+export default function LectureRecorder({ folders = [], folderId, onFolder, onDone, onActiveChange, onStatus }) {
   const [phase, setPhase] = useState('start'); // start | consent | asking | denied | recording | paused | finishing | stuck | unsupported
   const [consentChecked, setConsentChecked] = useState(false);
   const [usage, setUsage] = useState(null);
@@ -88,6 +89,7 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
   const shown = useMemo(() => mergedSegments(segments), [segments]);
 
   useEffect(() => { onActiveChange?.(active); }, [active, onActiveChange]);
+  useEffect(() => { onStatus?.({ phase, elapsed }); }, [phase, elapsed]);
 
   useEffect(() => {
     if (!recordingSupported() || !pickMimeType()) setPhase('unsupported');
