@@ -45,7 +45,7 @@ function world({ plan = 'free', used = 0, statusAfter = 2, createResponses = [],
 
 resetRateState();
 
-// Three guide sections (art history, business law, nursing): each gets 2 stored SVG variations.
+// Three guide sections (art history, business law, nursing): each gets 1 stored SVG.
 {
   const { state, service } = world();
   const sections = [
@@ -57,19 +57,19 @@ resetRateState();
     const { httpStatus, body } = await service.generate({ authorization: AUTH, text, context, theme: 'light' });
     assert.equal(httpStatus, 200);
     assert.equal(body.status, 'ok');
-    assert.equal(body.visuals.length, 2);
+    assert.equal(body.visuals.length, 1);
     assert.ok(body.visuals.every(visual => visual.url.startsWith('https://db.example.co/storage/v1/object/public/visuals/')), 'never hotlinks Napkin');
     assert.match(body.alt, /^Diagram: /);
   }
   assert.equal(state.creates.length, 3);
-  assert.equal(state.stored.length, 6);
+  assert.equal(state.stored.length, 3);
   assert.ok(state.stored.every(file => file.body.includes('<rect')), 'the downloaded SVG is stored');
   assert.equal(state.records.length, 3);
   assert.equal(state.used, 3);
   const first = state.creates[0];
   assert.deepEqual(
     { format: first.format, language: first.language, style_id: first.style_id, number_of_visuals: first.number_of_visuals, sort_strategy: first.sort_strategy, transparent_background: first.transparent_background, color_mode: first.color_mode },
-    { format: 'svg', language: 'en-US', style_id: DEFAULT_STYLE_ID, number_of_visuals: 3, sort_strategy: 'variation', transparent_background: true, color_mode: 'light' },
+    { format: 'svg', language: 'en-US', style_id: DEFAULT_STYLE_ID, number_of_visuals: 1, sort_strategy: 'variation', transparent_background: true, color_mode: 'light' },
   );
   // Same section again: served from the cache, Napkin not called, nothing charged.
   const again = await service.generate({ authorization: AUTH, text: sections[0][0], context: sections[0][1], theme: 'light' });
@@ -177,6 +177,22 @@ resetRateState();
   const bare = createVisualService({ env: { NEXT_PUBLIC_API_URL: 'https://api.example.com' }, fetch: async () => new Response(JSON.stringify({ plan: 'free' })) });
   assert.deepEqual((await bare.generate({ authorization: AUTH, text: 'Some text here' })).body, { status: 'fallback', reason: 'not_configured', missing: ['NAPKIN_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY'] });
   console.log('ok   auth and configuration');
+}
+
+// Regenerate: each redraw is a new Napkin drawing (never the cached one), charged, and capped at 3.
+{
+  resetRateState();
+  const { state, service } = world();
+  const text = 'Recruitment basics: sourcing, screening, selection';
+  const first = await service.generate({ authorization: AUTH, text, theme: 'light' });
+  const again = await service.generate({ authorization: AUTH, text, theme: 'light', redraw: 1 });
+  assert.equal(again.body.cached, false);
+  assert.notEqual(again.body.visuals[0].url, first.body.visuals[0].url);
+  assert.equal(state.creates.length, 2);
+  assert.equal(state.used, 2);
+  assert.equal((await service.generate({ authorization: AUTH, text, theme: 'light', redraw: 4 })).httpStatus, 400);
+  assert.equal(state.creates.length, 2);
+  console.log('ok   regenerate');
 }
 
 // Napkin refuses the request: its own message comes back with the fallback.

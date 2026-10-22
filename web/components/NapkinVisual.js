@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Download, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Download, RefreshCw, Sparkles } from 'lucide-react';
 import { authOnlyHeaders, openUpgrade } from '../lib/api';
 import CordiaLoader from './CordiaLoader';
 import { currentTheme } from './MermaidDiagram';
 
 export const VISUAL_ERROR = "Couldn't make a visual. Try again.";
+// New drawings a student can ask for after the first (the server holds the same cap).
+const MAX_REDRAWS = 3;
 // Why Napkin didn't draw, in words a student can act on.
 const REASONS = {
   not_configured: "Visuals aren't set up yet.",
@@ -105,24 +107,29 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
   const [state, setState] = useState({ phase: 'idle' }); // idle | loading | ready | fallback | limit
   const [index, setIndex] = useState(0);
   const [used, setUsed] = useState(false);
-  const disabled = usage && usage.enabled === false;
+  const disabled = usage?.enabled === false;
+  const autoStarted = useRef('');
 
-  async function make() {
-    setState({ phase: 'loading' });
-    setIndex(0);
+  // redraw 0 is the first drawing; 1-3 ask Napkin for a new one, added beside the earlier ones.
+  async function make(redraw = 0) {
+    const earlier = redraw > 0 && state.phase === 'ready' ? state : null;
+    // A failed redraw goes back to the versions already made, with the reason under them.
+    const giveUp = fallbackState => (earlier ? setState({ ...earlier, note: fallbackState.reason || 'error', detail: fallbackState.detail }) : setState(fallbackState));
+    setState({ phase: 'loading', redraw });
+    if (!earlier) setIndex(0);
     setUsed(false);
     try {
       const ask = resume => fetch('/api/visual', {
         method: 'POST',
         headers: { ...authOnlyHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, context, theme: drawnTheme, ...(resume ? { resume } : {}) }),
+        body: JSON.stringify({ text, context, theme: drawnTheme, ...(redraw ? { redraw } : {}), ...(resume ? { resume } : {}) }),
       });
       const drawnTheme = currentTheme();
       let response = await ask();
       let data = await response.json().catch(() => ({}));
       // A slow drawing answers "pending"; keep asking with its ticket (the server stops at 3 minutes).
       for (let round = 0; data?.status === 'pending' && data.resume && round < 12; round += 1) {
-        setState({ phase: 'loading', slow: true });
+        setState({ phase: 'loading', redraw, slow: true });
         response = await ask(data.resume);
         data = await response.json().catch(() => ({}));
       }
@@ -130,24 +137,30 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
         const detail = data?.detail || {};
         setUsage({ ...(usageCache || {}), left: 0, limit: detail.limit });
         if (detail.plan === 'free') openUpgrade({ feature: 'visual' });
-        setState({ phase: 'limit', pro: detail.plan !== 'free' });
+        if (earlier) giveUp({ reason: 'limit' });
+        else setState({ phase: 'limit', pro: detail.plan !== 'free' });
         return;
       }
       if (data?.status === 'ok' && data.visuals?.length) {
         if (typeof data.left === 'number') setUsage({ ...(usageCache || {}), left: data.left, limit: data.limit });
-        setState({ phase: 'ready', visuals: data.visuals, alt: data.alt, rendered: data.theme });
+        const visuals = [...(earlier?.visuals || []), ...data.visuals];
+        setState({ phase: 'ready', visuals, alt: data.alt, rendered: data.theme, redraws: redraw });
+        setIndex(visuals.length - data.visuals.length);
         return;
       }
-      setState({ phase: 'fallback', reason: data?.reason, detail: typeof data?.detail === 'string' ? data.detail : '', quiet: data?.reason === 'not_configured' && Boolean(fallback) });
+      giveUp({ phase: 'fallback', reason: data?.reason, detail: typeof data?.detail === 'string' ? data.detail : '', quiet: data?.reason === 'not_configured' && Boolean(fallback) });
     } catch {
-      setState({ phase: 'fallback' });
+      giveUp({ phase: 'fallback' });
     }
   }
 
   useEffect(() => {
     if (!auto || !text) return;
     if (disabled) { setState({ phase: 'fallback', reason: 'not_configured', quiet: Boolean(fallback) }); return; }
-    // Start drawing at once; the server says if visuals aren't set up or none are left.
+    // Start drawing at once, once per text (each request is a paid Napkin drawing); the server
+    // says if visuals aren't set up or none are left.
+    if (autoStarted.current === text) return;
+    autoStarted.current = text;
     make();
   }, [auto, text, disabled]);
 
@@ -158,7 +171,7 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
     return (
       <div className="nv">
         <div className="nv-frame nv-frame--loading">
-          <div className="nv-wait"><CordiaLoader label="Making a visual" /><span className="c-meta">{state.slow ? 'Still drawing. Detailed visuals can take a minute.' : 'Drawing three versions to choose from…'}</span></div>
+          <div className="nv-wait"><CordiaLoader label="Making a visual" /><span className="c-meta">{state.slow ? 'Still drawing. Detailed visuals can take a minute.' : (state.redraw ? 'Drawing a new version…' : 'Drawing your visual…')}</span></div>
         </div>
         <VisualStyle />
       </div>
@@ -185,10 +198,19 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
             </div>
           )}
           <div className="nv-actions">
+            {!used && (state.redraws || 0) < MAX_REDRAWS && (
+              <button type="button" className="c-btn c-btn--sm c-btn--quiet" onClick={() => make((state.redraws || 0) + 1)} title={`${MAX_REDRAWS - (state.redraws || 0)} redraw${MAX_REDRAWS - (state.redraws || 0) === 1 ? '' : 's'} left`}><RefreshCw aria-hidden="true" />Regenerate</button>
+            )}
             <button type="button" className="c-icon-btn" aria-label="Download SVG" title="Download SVG" onClick={() => download(visual, 'svg', name)}><Download size={18} strokeWidth={1.75} aria-hidden="true" /></button>
             <button type="button" className="c-btn c-btn--sm c-btn--quiet" onClick={() => download(visual, 'png', name)}>PNG</button>
           </div>
         </div>
+        {state.note && (
+          <p className="nv-error" role="alert">
+            {state.note === 'limit' ? "You've used this month's visuals." : REASONS[state.note] || VISUAL_ERROR}
+            {state.note === 'napkin_error' && state.detail ? ` (${state.detail})` : ''}
+          </p>
+        )}
         <VisualStyle />
       </div>
     );
@@ -207,7 +229,7 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
       {state.phase === 'limit' && state.pro && <p className="nv-error" role="alert">Limit reached</p>}
       {!disabled && state.phase !== 'limit' && !(auto && state.phase === 'idle') && (
         <div className="nv-bar">
-          <button type="button" className="c-btn c-btn--sm c-btn--secondary" onClick={make} disabled={!text}><Sparkles aria-hidden="true" />{state.phase === 'fallback' ? 'Try again' : 'Make visual'}</button>
+          <button type="button" className="c-btn c-btn--sm c-btn--secondary" onClick={() => make()} disabled={!text}><Sparkles aria-hidden="true" />{state.phase === 'fallback' ? 'Try again' : 'Make visual'}</button>
           {left && <span className="c-meta">{left}</span>}
         </div>
       )}
