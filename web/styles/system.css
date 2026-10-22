@@ -656,7 +656,8 @@ body:has(.about) .c-fab { display: none; }
 /* A minimized lecture recording: the sheet stays mounted (so it keeps recording) but hidden, and a
    small pill under the header shows the time and opens it again. */
 .c-scrim.is-minimized { display: none; }
-.rec-pill { position: fixed; z-index: 150; top: calc(var(--bar-h, 64px) + 10px); left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 16px 0 14px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface-raised, var(--card)); box-shadow: var(--shadow-float, var(--shadow)); color: var(--ink); font: 600 14px/1 var(--font-sans); cursor: pointer; }
+/* Centred by margins, not transform: a pressed button's scale would replace the transform and make it jump. */
+.rec-pill { position: fixed; z-index: 150; top: calc(var(--bar-h, 64px) + 10px); left: 0; right: 0; width: max-content; margin: 0 auto; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 16px 0 14px; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface-raised, var(--card)); box-shadow: var(--shadow-float, var(--shadow)); color: var(--ink); font: 600 14px/1 var(--font-sans); cursor: pointer; }
 .rec-pill:hover { border-color: var(--error); }
 .rec-pill-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--error); animation: rec-pulse 1.4s ease-in-out infinite; }
 .rec-pill-dot.is-paused { background: var(--muted); animation: none; }
