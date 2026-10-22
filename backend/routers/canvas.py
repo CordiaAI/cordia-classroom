@@ -16,7 +16,7 @@ from services import canvas_client
 from services.canvas_client import CanvasClient, CanvasDenied, CanvasError, CanvasForbiddenRequest, CanvasUnauthorized
 from services.class_catalog import clean_term, school_name_from_domain, topic_summary
 from services.class_db import add_membership, ensure_class, ensure_school
-from services.grades import estimate
+from services.grades import canvas_scale, estimate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/canvas", tags=["canvas"])
@@ -453,9 +453,20 @@ def course_grades(course_id: int, authorization: str = Header(default="")):
     except CanvasError as exc:
         logger.warning("canvas grades failed course=%s: %s", course_id, exc)
         raise HTTPException(status_code=502, detail="Canvas could not be reached.")
-    result = estimate(groups or [], bool(course.get("apply_assignment_group_weights")))
     grades = next((e.get("grades") for e in enrollments or [] if e.get("type") == "StudentEnrollment" and e.get("grades")), None) or {}
-    # Canvas's own number and letter win for display; the estimate drives the what-ifs.
-    result["canvas_score"] = grades.get("current_score")
+    # The class's own letter scale, when Canvas shares it with students (many classes don't).
+    scale = None
+    try:
+        scale = canvas_scale(client.grading_scheme(course_id, course.get("grading_standard_id")))
+    except CanvasDenied:
+        pass
+    except CanvasError as exc:
+        logger.info("canvas grading scheme unavailable course=%s: %s", course_id, exc)
+    anchor = grades.get("current_score")
+    result = estimate(groups or [], bool(course.get("apply_assignment_group_weights")),
+                      anchor=float(anchor) if isinstance(anchor, (int, float)) else None, scale=scale)
+    result["scale_source"] = "canvas" if scale else "default"
+    # Canvas's own number and letter win for display; the what-ifs are anchored to that number.
+    result["canvas_score"] = anchor
     result["canvas_letter"] = grades.get("current_grade")
     return result

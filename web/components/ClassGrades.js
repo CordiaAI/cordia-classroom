@@ -32,6 +32,9 @@ function dueLabel(iso) {
   return 'Due ' + new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+// "an A", "an A-", "an F", "a B+".
+const withArticle = letter => `${/^[AEF]/i.test(letter) ? 'an' : 'a'} ${letter}`;
+
 function goalLine(goal, total, kind) {
   if (!goal?.letter || goal.points === undefined) return null;
   if (kind === 'keep') {
@@ -39,8 +42,8 @@ function goalLine(goal, total, kind) {
   }
   if (goal.already) return null;
   return goal.reachable
-    ? `${points(goal.points)}/${points(total)} (${goal.percent}%) gets you an ${goal.letter === 'A' ? 'A' : goal.letter}`
-    : `Even a perfect score won’t reach ${goal.letter === 'A' ? 'an' : 'a'} ${goal.letter} on this one alone`;
+    ? `${points(goal.points)}/${points(total)} (${goal.percent}%) gets you ${withArticle(goal.letter)}`
+    : `Even a perfect score won’t reach ${withArticle(goal.letter)} on this one alone`;
 }
 
 // A class's grade from Canvas, and what each upcoming assignment would take.
@@ -105,7 +108,11 @@ export default function ClassGrades({ courseId, guides = [], onMakeGuide }) {
         </ul>
       ) : <p className="c-meta">Nothing ungraded coming up.</p>}
 
-      <p className="c-meta cg-note">An estimate on an A 90 · B 80 · C 70 · D 60 scale. Your teacher’s scale, dropped scores or extra credit can change it.</p>
+      <p className="c-meta cg-note">
+        {data.scale_source === 'canvas'
+          ? 'An estimate using your class’s grading scale in Canvas, starting from your current grade there.'
+          : 'An estimate on an A 90 · B 80 · C 70 · D 60 scale, starting from your current grade in Canvas. Your teacher’s own scale can change it.'}
+      </p>
 
       <style jsx>{`
         .cg-now { display: flex; align-items: center; gap: 20px; padding: 20px 24px; }

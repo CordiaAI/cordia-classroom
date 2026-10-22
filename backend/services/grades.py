@@ -4,7 +4,9 @@ Grade estimates from a student's own Canvas assignment groups.
 Pure functions, no I/O: canvas.py fetches the groups and passes them in. The math follows
 Canvas's "current grade": only graded, non-excused work counts, and with group weights on,
 each group's percentage is weighted and re-normalized over the groups that have grades.
-Drop rules and custom grading schemes are not modelled, so callers label results estimates.
+Drop rules and extra credit are not modelled; when Canvas reports the current score, the estimate
+is anchored to it (the gap is carried into every what-if) and the class's own grading scale is
+used when Canvas shares it.
 """
 
 from datetime import datetime, timezone
@@ -14,13 +16,26 @@ from typing import Optional
 SCALE = (("A", 90.0), ("B", 80.0), ("C", 70.0), ("D", 60.0))
 
 
-def letter(score: Optional[float]) -> Optional[str]:
+def letter(score: Optional[float], scale=SCALE) -> Optional[str]:
     if score is None:
         return None
-    for name, cutoff in SCALE:
+    for name, cutoff in scale:
         if score >= cutoff:
             return name
     return "F"
+
+
+def canvas_scale(scheme: Optional[list]) -> Optional[tuple]:
+    """A Canvas grading scheme ([{"name": "A", "value": 0.94}, ...], values as fractions) as a
+    scale of (letter, percent cutoff), highest first; None when it isn't usable."""
+    rows = []
+    for row in scheme or []:
+        try:
+            rows.append((str(row["name"]).strip(), round(float(row["value"]) * 100, 4)))
+        except (KeyError, TypeError, ValueError):
+            return None
+    rows = [row for row in rows if row[0]]
+    return tuple(sorted(rows, key=lambda row: -row[1])) if len(rows) >= 2 else None
 
 
 def _counts(assignment: dict) -> bool:
@@ -77,15 +92,24 @@ def _needed(groups: list, weighted: bool, item: dict, target: float) -> Optional
     return {"points": round(raw, 1), "percent": round(raw / points * 100), "reachable": True, "already": False}
 
 
-def estimate(groups: list, weighted: bool, *, now: Optional[datetime] = None, limit: int = 6) -> dict:
+def estimate(groups: list, weighted: bool, *, now: Optional[datetime] = None, limit: int = 6,
+             anchor: Optional[float] = None, scale=None) -> dict:
     """Current grade plus, for each upcoming ungraded assignment, what it takes to move up a letter
-    or keep the current one."""
+    or keep the current one.
+
+    anchor: Canvas's own current score. Our recalculation can differ from it (dropped scores,
+    extra credit), so the letter comes from the anchor and each target is shifted by the gap.
+    scale: the class's grading scale from canvas_scale(), else the common one."""
     now = now or datetime.now(timezone.utc)
-    score = current_score(groups, weighted)
-    mine = letter(score)
-    cutoffs = dict(SCALE)
-    names = [name for name, _ in SCALE]
-    up = names[names.index(mine) - 1] if mine in names and names.index(mine) > 0 else ("D" if mine == "F" else None)
+    scale = scale or SCALE
+    model = current_score(groups, weighted)
+    score = anchor if anchor is not None else model
+    gap = anchor - model if anchor is not None and model is not None else 0.0
+    mine = letter(score, scale)
+    cutoffs = dict(scale)
+    names = [name for name, _ in scale]
+    index = names.index(mine) if mine in names else len(names)
+    up = names[index - 1] if index > 0 else None
     upcoming = []
     for group in groups:
         for item in group.get("assignments") or []:
@@ -106,11 +130,12 @@ def estimate(groups: list, weighted: bool, *, now: Optional[datetime] = None, li
                 "points": float(item["points_possible"]), "group": str(group.get("name") or ""),
                 "weight": float(group.get("group_weight") or 0) if weighted else None,
             }
-            if score is not None:
+            if score is not None and model is not None:
                 if up:
-                    row["up"] = {"letter": up, **(_needed(groups, weighted, item, cutoffs[up]) or {})}
-                if mine in cutoffs:
-                    row["keep"] = {"letter": mine, **(_needed(groups, weighted, item, cutoffs[mine]) or {})}
+                    row["up"] = {"letter": up, **(_needed(groups, weighted, item, cutoffs[up] - gap) or {})}
+                if mine in cutoffs and cutoffs[mine] > 0:
+                    row["keep"] = {"letter": mine, **(_needed(groups, weighted, item, cutoffs[mine] - gap) or {})}
             upcoming.append(row)
     upcoming.sort(key=lambda row: (row["due_at"] is None, row["due_at"] or ""))
-    return {"score": None if score is None else round(score, 1), "letter": mine, "weighted": weighted, "upcoming": upcoming[:limit]}
+    return {"score": None if score is None else round(score, 1), "letter": mine, "weighted": weighted,
+            "scale": [{"letter": name, "cutoff": cutoff} for name, cutoff in scale], "upcoming": upcoming[:limit]}
