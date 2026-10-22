@@ -179,6 +179,16 @@ resetRateState();
   console.log('ok   auth and configuration');
 }
 
+// Napkin refuses the request: its own message comes back with the fallback.
+{
+  resetRateState();
+  const refused = () => new Response(JSON.stringify({ error: { message: 'Invalid style_id' } }), { status: 400, headers: { 'content-type': 'application/json' } });
+  const { service } = world({ createResponses: [refused] });
+  const { body } = await service.generate({ authorization: AUTH, text: 'Recruitment basics: sourcing, screening, selection', theme: 'light' });
+  assert.deepEqual(body, { status: 'fallback', reason: 'napkin_error', detail: 'Invalid style_id' });
+  console.log('ok   Napkin error detail');
+}
+
 // A diagram with anything that could run is not used at all.
 for (const risky of ['<svg><script>x</script></svg>', '<svg><g onload="y()"/></svg>', '<svg><a href="javascript:z()">a</a></svg>', '<svg><foreignObject><p/></foreignObject></svg>', '<svg>< script>x</svg>']) {
   assert.equal(cleanSvg(risky), '', risky);

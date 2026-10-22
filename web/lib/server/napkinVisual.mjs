@@ -49,6 +49,12 @@ export function currentMonth(now = new Date()) {
   return now.toISOString().slice(0, 7);
 }
 
+// Napkin's error message, whichever field it arrives in.
+function errorText(data) {
+  const raw = data?.error?.message || data?.error || data?.message || data?.detail || '';
+  return (typeof raw === 'string' ? raw : JSON.stringify(raw)).slice(0, 200);
+}
+
 const sleepReal = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // Shared across requests in one server instance: when Napkin says the window is spent,
@@ -133,6 +139,16 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
     return `${supabaseUrl}/storage/v1/object/public/${BUCKET}/${path}`;
   }
 
+  // Napkin's own words for a failure, logged so `vercel logs` shows why a visual failed.
+  async function napkinFailure(step, response) {
+    let body = '';
+    try { body = await response.text(); } catch { /* no body */ }
+    let detail = body;
+    try { detail = errorText(JSON.parse(body)); } catch { /* not JSON */ }
+    console.warn(`[visual] Napkin ${step} failed status=${response.status}`, String(body).slice(0, 500));
+    return String(detail || `HTTP ${response.status}`).slice(0, 200);
+  }
+
   // POST /v1/visual. On 429 wait for Retry-After and try once more (if it fits the budget).
   async function createRequest(body, deadline) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -155,8 +171,9 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
         await sleep(waitMs);
         continue;
       }
-      if (!response.ok) return { fallback: 'napkin_error' };
+      if (!response.ok) return { fallback: 'napkin_error', detail: await napkinFailure('create', response) };
       const data = await response.json();
+      if (!data?.id) console.warn('[visual] Napkin create returned no id', JSON.stringify(data).slice(0, 300));
       return data?.id ? { id: data.id } : { fallback: 'napkin_error' };
     }
     return { fallback: 'rate_limited' };
@@ -166,10 +183,17 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
     while (now() + POLL_MS <= deadline) {
       await sleep(POLL_MS);
       const response = await fetchImpl(`${napkinBase}/v1/visual/${encodeURIComponent(id)}/status`, { headers: { Authorization: `Bearer ${napkinKey}`, Accept: 'application/json' } });
-      if (!response.ok) { if (response.status >= 500) continue; return { fallback: 'napkin_error' }; }
+      if (!response.ok) { if (response.status >= 500) continue; return { fallback: 'napkin_error', detail: await napkinFailure('status', response) }; }
       const data = await response.json();
-      if (data?.status === 'completed') return data.generated_files?.length ? { files: data.generated_files } : { fallback: 'no_visuals' };
-      if (data?.status === 'failed' || data?.error) return { fallback: 'napkin_error' };
+      if (data?.status === 'completed') {
+        if (!data.generated_files?.length) console.warn('[visual] Napkin finished with no files', id);
+        return data.generated_files?.length ? { files: data.generated_files } : { fallback: 'no_visuals' };
+      }
+      if (data?.status === 'failed' || data?.error) {
+        const detail = errorText(data);
+        console.warn('[visual] Napkin request failed', id, detail);
+        return { fallback: 'napkin_error', detail };
+      }
     }
     return { fallback: 'timeout' };
   }
@@ -207,26 +231,26 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
       transparent_background: true,
       color_mode: mode,
     }, deadline);
-    if (created.fallback) return { httpStatus: 200, body: { status: 'fallback', reason: created.fallback } };
+    if (created.fallback) return { httpStatus: 200, body: { status: 'fallback', reason: created.fallback, ...(created.detail ? { detail: created.detail } : {}) } };
     const startedAt = resumed?.startedAt || now();
     const result = await waitForFiles(created.id, Math.min(deadline, startedAt + TOTAL_MS));
     if (result.fallback === 'timeout' && now() + POLL_MS < startedAt + TOTAL_MS) {
       return { httpStatus: 200, body: { status: 'pending', resume: ticket(who.userId, key, created.id, startedAt) } };
     }
-    if (result.fallback) return { httpStatus: 200, body: { status: 'fallback', reason: result.fallback } };
+    if (result.fallback) return { httpStatus: 200, body: { status: 'fallback', reason: result.fallback, ...(result.detail ? { detail: result.detail } : {}) } };
 
     // Download now: Napkin's links expire after 30 minutes, and we never hotlink them.
     // All versions at once, each downloaded and stored in parallel.
     const saved = await Promise.all(result.files.slice(0, variations).map(async (file, index) => {
       try {
         const response = await fetchImpl(file.url, { headers: { Authorization: `Bearer ${napkinKey}` } });
-        if (!response.ok) return null;
+        if (!response.ok) { console.warn(`[visual] Napkin file download failed status=${response.status}`); return null; }
         const clean = cleanSvg(await response.text());
-        if (!clean) return null;
+        if (!clean) { console.warn('[visual] Napkin file was not a usable SVG'); return null; }
         // Without the "visuals" bucket (migration not run) the drawing is still shown, inline.
         const url = await store(key, index, clean).catch(() => `data:image/svg+xml;base64,${Buffer.from(clean).toString('base64')}`);
         return { url, width: file.width || null, height: file.height || null };
-      } catch { return null; /* skip this variation */ }
+      } catch (error) { console.warn('[visual] Napkin file download error', error?.message); return null; /* skip this variation */ }
     }));
     const visuals = saved.filter(Boolean);
     if (!visuals.length) return { httpStatus: 200, body: { status: 'fallback', reason: 'download_failed' } };
