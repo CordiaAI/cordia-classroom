@@ -48,14 +48,23 @@ function download(persona) {
   URL.revokeObjectURL(url);
 }
 
-function PersonaSheet({ draft, onChange, onSave, onDelete, onClose, busy, error }) {
-  const firstRef = useRef(null);
+// Focuses the sheet's first control once, when it opens, and closes it on Escape. onClose is
+// read through a ref: the parent passes a new function every render, and re-running this on
+// each keystroke pulled the cursor back to the Name field while typing "How it talks".
+function useSheetOpened(focusRef, onClose) {
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
-    firstRef.current?.focus();
-    const onKey = event => { if (event.key === 'Escape') onClose(); };
+    focusRef.current?.focus();
+    const onKey = event => { if (event.key === 'Escape') closeRef.current(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
+}
+
+function PersonaSheet({ draft, onChange, onSave, onDelete, onClose, busy, error }) {
+  const firstRef = useRef(null);
+  useSheetOpened(firstRef, onClose);
   return (
     <BodyPortal>
       <div className="c-scrim" onClick={onClose}>
@@ -83,12 +92,7 @@ function PersonaSheet({ draft, onChange, onSave, onDelete, onClose, busy, error 
 function OptInSheet({ kind, onConfirm, onClose, busy }) {
   const copy = OPT_IN[kind];
   const cancelRef = useRef(null);
-  useEffect(() => {
-    cancelRef.current?.focus();
-    const onKey = event => { if (event.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  useSheetOpened(cancelRef, onClose);
   return (
     <BodyPortal>
       <div className="c-scrim" onClick={onClose}>
