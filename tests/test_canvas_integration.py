@@ -209,6 +209,37 @@ class CanvasIntegrationTests(unittest.TestCase):
         files = canvas.list_files(course, "Bearer x")["files"]
         self.assertEqual({f["id"]: f["name"] for f in files}, {501: "Chapter 1 slides", 502: "Essay rubric.pdf"})
 
+    def test_linked_pages_are_read_in_parallel(self):
+        import threading
+        import time as clock
+        from services.canvas_client import CanvasClient
+        course = COURSES[0]["id"]
+        active, peak, lock = [0], [0], threading.Lock()
+
+        class SlowPages(FakeCanvas):
+            def request(self, method, url, headers=None, **kwargs):
+                path = urlparse(url).path
+                if path == f"/api/v1/courses/{course}/modules":
+                    items = [{"title": f"P{i}", "type": "Page", "page_url": f"p-{i}"} for i in range(12)]
+                    return FakeResponse(200, [{"name": "Week", "items": items}])
+                if "/pages/p-" in path:
+                    with lock:
+                        active[0] += 1
+                        peak[0] = max(peak[0], active[0])
+                    clock.sleep(0.05)
+                    with lock:
+                        active[0] -= 1
+                    slug = path.rsplit("-", 1)[1]
+                    return FakeResponse(200, {"body": f'<a href="/courses/{course}/files/{600 + int(slug)}">File {slug}</a>'})
+                if path == f"/api/v1/courses/{course}/assignments":
+                    return FakeResponse(200, [])
+                return super().request(method, url, headers=headers, **kwargs)
+
+        client = CanvasClient(HOST, TOKEN, http=SlowPages(), resolve=lambda _host: True)
+        files = client.linked_files(course)
+        self.assertEqual([f["id"] for f in files], [600 + i for i in range(12)], "same files, same order")
+        self.assertGreater(peak[0], 1, "linked pages were read one at a time")
+
     def test_school_that_disallows_tokens_is_refused(self):
         with self.assertRaises(HTTPException) as caught:
             canvas.connect(canvas.ConnectRequest(canvas_url="canvas.missouri.edu", token=TOKEN, acknowledged=True), "Bearer x")

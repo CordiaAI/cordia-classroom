@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
@@ -390,6 +391,7 @@ def list_files(course_id: int, authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     db = get_supabase()
     connection = _imported_course(db, user_id, course_id)
+    started = time.monotonic()
     try:
         client = _client(db, user_id, connection)
         try:
@@ -409,6 +411,7 @@ def list_files(course_id: int, authorization: str = Header(default="")):
     except CanvasError as exc:
         logger.warning("canvas files.list failed course=%s: %s", course_id, exc)
         raise HTTPException(status_code=502, detail="Canvas could not be reached.")
+    logger.info("canvas files course=%s count=%s seconds=%.1f", course_id, len(files or []), time.monotonic() - started)
     return {"files": [{"id": f.get("id"), "name": f.get("display_name"), "size": f.get("size"), "type": f.get("content-type")} for f in files or []]}
 
 

@@ -24,6 +24,7 @@ import os
 import re
 import socket
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Callable, Iterable, Optional
 from urllib.parse import parse_qsl, urlencode, urljoin, urlparse
@@ -50,6 +51,9 @@ _FILE_LINK = re.compile(r'<a\b[^>]*href="[^"]*/files/(\d+)[^"]*"[^>]*>(.*?)</a>'
 _FILE_ID = re.compile(r'/files/(\d+)')
 MAX_LINKED_PAGES = 25
 MAX_LINKED_FILES = 60
+# Linked pages and file details are read this many at a time: one by one, a class with many
+# linked pages took longer than the browser waits for its file list.
+LINKED_WORKERS = 6
 
 
 def _strip_tags(html: str) -> str:
@@ -441,28 +445,32 @@ class CanvasClient:
                     add(item["content_id"], item.get("title") or "")
                 elif item.get("type") == "Page" and item.get("page_url") and re.fullmatch(r"[A-Za-z0-9_.-]+", item["page_url"]):
                     pages.append(item["page_url"])
-        for slug in pages[:MAX_LINKED_PAGES]:
+        def page_body(slug):
             try:
-                scan(self._get(f"/api/v1/courses/{int(course_id)}/pages/{slug}").json().get("body"))
+                return self._get(f"/api/v1/courses/{int(course_id)}/pages/{slug}").json().get("body")
             except CanvasDenied:
-                continue
+                return ""
+
+        with ThreadPoolExecutor(max_workers=LINKED_WORKERS) as pool:
+            for body in pool.map(page_body, pages[:MAX_LINKED_PAGES]):
+                scan(body)
         try:
             for assignment in self.assignments(course_id) or []:
                 scan(assignment.get("description"))
         except CanvasDenied:
             pass
         # Fill in names (and sizes) the links didn't give; a file the student can't open is left out.
-        files = []
-        for entry in list(found.values())[:MAX_LINKED_FILES]:
+        def described(entry):
             if entry["display_name"]:
-                files.append(entry)
-                continue
+                return entry
             try:
                 meta = self._get(f"/api/v1/courses/{int(course_id)}/files/{entry['id']}").json()
-                files.append({"id": entry["id"], "display_name": meta.get("display_name") or "File", "size": meta.get("size"), "content-type": meta.get("content-type")})
             except CanvasDenied:
-                continue
-        return files
+                return None
+            return {"id": entry["id"], "display_name": meta.get("display_name") or "File", "size": meta.get("size"), "content-type": meta.get("content-type")}
+
+        with ThreadPoolExecutor(max_workers=LINKED_WORKERS) as pool:
+            return [entry for entry in pool.map(described, list(found.values())[:MAX_LINKED_FILES]) if entry]
 
     def download_file(self, course_id: int, file_id: int) -> tuple[str, bytes]:
         """One file the user picked. Returns (filename, bytes)."""
