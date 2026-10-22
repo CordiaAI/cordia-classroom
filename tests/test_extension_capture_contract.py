@@ -42,7 +42,7 @@ class ExtensionCaptureContractTests(unittest.TestCase):
         for pattern in domains:
             self.assertIn(pattern, self.worker)
         self.assertEqual(self.manifest["homepage_url"], "https://classroom.cordiaai.io")
-        self.assertEqual(self.manifest["version"], "2.1.2")
+        self.assertEqual(self.manifest["version"], "2.1.3")
         bridge = (ROOT / "extension" / "asai-bridge.js").read_text() if "ROOT" in globals() else ""
         if bridge:
             # Focusing the tab must not force a token refresh (it rotates the token every time).
@@ -106,9 +106,25 @@ class ExtensionCaptureContractTests(unittest.TestCase):
         self.assertIn("chrome.storage.onChanged.addListener", self.panel)
         self.assertIn("window.addEventListener('focus', initAuth)", self.panel)
 
+    def test_imports_open_only_their_own_sites_for_listed_requests(self):
+        importers = (ROOT / "extension" / "importers.js").read_text(encoding="utf-8")
+        bridge = (ROOT / "extension" / "asai-bridge.js").read_text(encoding="utf-8")
+        self.assertIn("importScripts('importers.js')", self.worker)
+        self.assertIn("const ACTIONS = { importQuizlet, importYoutube,", self.worker)
+        # Classroom can ask for these two and nothing else, and says so on the page.
+        self.assertIn("new Set(['importQuizlet', 'importYoutube'])", bridge)
+        self.assertIn("'data-asai-imports', 'quizlet youtube'", bridge)
+        # Each opens only its own site's links, in a background tab it closes again.
+        self.assertIn("quizlet\\.com$/i.test(url.hostname)", importers)
+        self.assertIn("Paste a YouTube video link.", importers)
+        self.assertEqual(importers.count("chrome.tabs.create({ url, active: false })"), 2)
+        self.assertEqual(importers.count("chrome.tabs.remove(tab.id)"), 2)
+
     def test_custom_extension_code_is_small(self):
         # 230: the Tutor sends the side panel's conversation history (2026-10-01).
         self.assertLess(len(self.worker.splitlines()), 250)
+        # 175: Quizlet set and YouTube transcript readers (2026-10-22).
+        self.assertLess(len((ROOT / "extension" / "importers.js").read_text(encoding="utf-8").splitlines()), 200)
         self.assertLess(len(self.panel.splitlines()), 340)
         # 170: shadow-DOM/frame text, Google export, and capture ordering (2026-09-27 capture audit).
         self.assertLess(len(self.scraper.splitlines()), 170)
