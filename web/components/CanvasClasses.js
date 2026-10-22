@@ -31,9 +31,14 @@ export function CourseFiles({ course }) {
   const [busy, setBusy] = useState('');
 
   useEffect(() => {
-    apiFetch(`/canvas/courses/${course.id}/files`).then(data => {
+    // A class that hides its Files page is read link by link, which can take a while.
+    apiFetch(`/canvas/courses/${course.id}/files`, { timeoutMs: 60000, reportFailure: true }).then(data => {
       if (Array.isArray(data?.files)) setFiles(data.files);
-      else { setFiles([]); setError(apiErrorMessage(data?.detail, 'Canvas could not list this class’s files.')); }
+      else {
+        setFiles([]);
+        setError(data?.failed === 'timeout' ? 'Canvas took too long to list this class’s files. Try again in a moment.'
+          : apiErrorMessage(data?.detail, 'Canvas could not list this class’s files.'));
+      }
     });
   }, [course.id]);
 
