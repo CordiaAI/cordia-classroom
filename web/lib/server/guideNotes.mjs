@@ -16,7 +16,7 @@ Return JSON: {"overview": "...", "sections": [{"heading": "...", "points": [{"te
 - Cover all of the information in the material; keep names, numbers, dates and formulas exactly as written.
 - A quoted passage, or any passage meant to be known word for word (a creed, oath, motto, poem, scripture, statute), goes in one point whole and word for word, in quotation marks, with no word limit. Never split, shorten or paraphrase it.
 - key_points: 4 to 8 of the most important takeaways, one sentence each. They sum up the outline and add nothing new.
-- No questions, no answers-to-questions phrasing, no filler such as "This section covers".`;
+- No questions, no answers-to-questions phrasing, no filler such as "This section covers", and no remarks about the material itself (how it is numbered, what is a joke or an error): write the content, not commentary on it.`;
 
 const clean = value => String(value || '').replace(/\s+/g, ' ').trim();
 

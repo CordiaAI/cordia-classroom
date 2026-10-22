@@ -10,6 +10,9 @@ const REASONS = {
   not_configured: "Visuals aren't set up yet.",
   rate_limited: 'Napkin is busy. Try again in a minute.',
   timeout: 'Napkin took too long. Try again.',
+  napkin_error: 'Napkin turned this one down.',
+  no_visuals: "Napkin couldn't find a picture in this text. Try a longer passage.",
+  download_failed: "Napkin drew it, but it didn't come through. Try again.",
 };
 
 // Visuals left this month, shared by every NapkinVisual on the page.
@@ -134,7 +137,7 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
         setState({ phase: 'ready', visuals: data.visuals, alt: data.alt, rendered: data.theme });
         return;
       }
-      setState({ phase: 'fallback', reason: data?.reason, quiet: data?.reason === 'not_configured' && Boolean(fallback) });
+      setState({ phase: 'fallback', reason: data?.reason, detail: typeof data?.detail === 'string' ? data.detail : '', quiet: data?.reason === 'not_configured' && Boolean(fallback) });
     } catch {
       setState({ phase: 'fallback' });
     }
@@ -197,6 +200,7 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
         <p className="nv-error" role="alert">
           {REASONS[state.reason] || VISUAL_ERROR}
           {state.reason === 'not_configured' && usage?.missing?.length ? ` Missing on the server: ${usage.missing.join(', ')}.` : ''}
+          {state.reason === 'napkin_error' && state.detail ? ` (${state.detail})` : ''}
         </p>
       )}
       {state.phase === 'limit' && state.pro && <p className="nv-error" role="alert">Limit reached</p>}
