@@ -152,6 +152,9 @@ export default function Sidebar({ timerState, setTimerState }) {
         </nav>
 
         <div className="c-bar-actions">
+          <button type="button" className="c-btn c-btn--secondary c-feedbackbtn" onClick={() => setShowFeedback(true)} aria-label="Send feedback" title="Send feedback">
+            <MessageSquareText size={20} strokeWidth={1.75} aria-hidden="true" />
+          </button>
           <div className="c-menu-wrap" ref={timerRef}>
             <button type="button" className={'c-btn c-btn--secondary c-timerbtn' + (isRunning ? ' is-running' : '')} data-spot="focus-btn" onClick={() => { if (!timerOpen) walkthroughEvent('focus-opened'); setTimerOpen(open => !open); }} aria-expanded={timerOpen} aria-label={isRunning ? `Focus timer, ${clock} left` : 'Focus timer'}>
               <Timer size={20} strokeWidth={1.75} aria-hidden="true" />
