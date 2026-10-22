@@ -62,6 +62,9 @@ export default function LibraryPage() {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('recent');
   const [closed, setClosed] = useState(() => new Set());
+  // Sections closed while a filter or search is on: kept apart from the saved ones, and cleared
+  // when the filter or search changes so new results are never hidden in a closed section.
+  const [narrowClosed, setNarrowClosed] = useState(() => new Set());
   const [addingClass, setAddingClass] = useState(false);
   const [addingLecture, setAddingLecture] = useState(false);
   const [renaming, setRenaming] = useState(null); // { id, value }
@@ -97,6 +100,8 @@ export default function LibraryPage() {
     router.replace('/library?filter=notes', undefined, { shallow: true });
   }, [loading, router.query.delete]);
 
+  useEffect(() => { setNarrowClosed(new Set()); }, [filter, query]);
+
   useEffect(() => {
     if (!toast) return undefined;
     const timer = setTimeout(() => setToast(''), 2500);
@@ -126,6 +131,14 @@ export default function LibraryPage() {
   }
 
   function toggleClass(id) {
+    if (narrowed) {
+      setNarrowClosed(current => {
+        const next = new Set(current);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      });
+      return;
+    }
     setClosed(current => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -306,7 +319,7 @@ export default function LibraryPage() {
   }
 
   function group({ id, name, list, folder }) {
-    const open = narrowed || !closed.has(id);
+    const open = narrowed ? !narrowClosed.has(id) : !closed.has(id);
     return (
       <section key={id} className={'c-card lib-group' + (dropId === id ? ' is-drop' : '')} {...dropProps(folder ? folder.id : null)} aria-label={name}>
         <div className="lib-group-head">

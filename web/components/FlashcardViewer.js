@@ -3,6 +3,7 @@ import { ArrowLeft, MessageCircle, Pencil, Shuffle, Star } from 'lucide-react';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { requestTip } from '../lib/tips';
 import SessionFinish from './SessionFinish';
+import { isCardImage } from '../lib/cardImages';
 
 const SHUFFLE_KEY = 'cordiaShuffle';
 // Swipe: past this many pixels the card is answered (right = Got it, left = Again).
@@ -257,11 +258,12 @@ export default function FlashcardViewer({
               >
                 <div className="fc-face fc-front" aria-hidden={flipped}>
                   {card?.guideTitle && <span className="c-meta">{card.guideTitle}</span>}
+                  {isCardImage(card?.front_image) && <img src={card.front_image} alt="" />}
                   <p>{card?.front}</p>
                 </div>
                 <div className="fc-face fc-back" aria-hidden={!flipped}>
                   <p>{card?.back}</p>
-                  {card?.image && <img src={card.image} alt="" />}
+                  {isCardImage(card?.image) && <img src={card.image} alt="" />}
                 </div>
                 {/* Leaning while dragged: green toward Know, amber toward Still learning. */}
                 <span className="fc-lean is-know" style={{ opacity: Math.max(0, lean) }} aria-hidden="true">Know</span>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
 import BodyPortal from '../../components/BodyPortal';
+import CardPhoto from '../../components/CardPhoto';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
@@ -66,23 +67,35 @@ function exportGuide(guide) {
 function MakeCard({ front: initialFront, onSave, onClose }) {
   const [front, setFront] = useState(initialFront);
   const [back, setBack] = useState('');
+  const [frontImage, setFrontImage] = useState('');
+  const [image, setImage] = useState('');
+  const [photoError, setPhotoError] = useState('');
   const [saving, setSaving] = useState(false);
   return (
     <BodyPortal>
     <div className="c-scrim" onClick={onClose}>
-      <form className="c-sheet make-card" role="dialog" aria-modal="true" aria-labelledby="make-card-title" onClick={event => event.stopPropagation()} onSubmit={async event => { event.preventDefault(); setSaving(true); await onSave({ front: front.trim(), back: back.trim() }); setSaving(false); }}>
+      <form className="c-sheet make-card" role="dialog" aria-modal="true" aria-labelledby="make-card-title" onClick={event => event.stopPropagation()} onSubmit={async event => { event.preventDefault(); setSaving(true); await onSave({ front: front.trim(), back: back.trim(), ...(frontImage ? { front_image: frontImage } : {}), ...(image ? { image } : {}) }); setSaving(false); }}>
         <header className="c-sheet-head">
           <h2 id="make-card-title" className="c-title">New card</h2>
           <button type="button" className="c-icon-btn" onClick={onClose} aria-label="Close"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         </header>
-        <label className="c-field"><span>Front</span><textarea className="c-input" value={front} onChange={event => setFront(event.target.value)} rows={3} /></label>
-        <label className="c-field"><span>Back</span><textarea className="c-input" value={back} onChange={event => setBack(event.target.value)} rows={3} autoFocus /></label>
+        <div className="c-field">
+          <div className="make-card-label"><label htmlFor="make-card-front">Front</label><CardPhoto value={frontImage} onChange={setFrontImage} onError={setPhotoError} label="Add photo to front" /></div>
+          <textarea id="make-card-front" className="c-input" value={front} onChange={event => setFront(event.target.value)} rows={3} />
+        </div>
+        <div className="c-field">
+          <div className="make-card-label"><label htmlFor="make-card-back">Back</label><CardPhoto value={image} onChange={setImage} onError={setPhotoError} label="Add photo to back" /></div>
+          <textarea id="make-card-back" className="c-input" value={back} onChange={event => setBack(event.target.value)} rows={3} autoFocus />
+        </div>
+        {photoError && <p className="make-card-error" role="alert">{photoError}</p>}
         <div className="make-card-foot"><button type="submit" data-spot="card-save" className="c-btn c-btn--primary" disabled={saving || !front.trim() || !back.trim()}>{saving ? 'Saving…' : 'Save'}</button></div>
         <style jsx>{`
           .make-card { display: grid; gap: 16px; width: min(520px, 100%); }
           .make-card .c-sheet-head { margin-bottom: 0; }
           .make-card textarea { min-height: 88px; }
           .make-card-foot { display: flex; justify-content: flex-end; }
+          .make-card-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; font:600 15px/1.5 var(--font-sans); }
+          .make-card-error { margin: 0; color: var(--error); font-weight: 600; }
         `}</style>
       </form>
     </div>

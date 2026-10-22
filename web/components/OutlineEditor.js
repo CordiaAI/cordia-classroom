@@ -186,25 +186,25 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
 
   return (
     <div className={'oe' + (hasSide ? ' has-side' : '')}>
+      {editing ? (
+        <div className="oe-tools" role="toolbar" aria-label="Notes formatting">
+          <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={() => format('heading')}><Heading2 size={16} strokeWidth={1.75} aria-hidden="true" />Heading</button>
+          <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={() => format('list')}><List size={16} strokeWidth={1.75} aria-hidden="true" />Bullet</button>
+          <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={() => format('indent')}><ListIndentIncrease size={16} strokeWidth={1.75} aria-hidden="true" />Detail</button>
+          <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={undo} disabled={!canUndo && !dirty} aria-label="Undo last change"><Undo2 size={16} strokeWidth={1.75} aria-hidden="true" />Undo</button>
+          {tools}
+          <span className="c-spacer" />
+          <span className="c-meta oe-status" role="status">{saving}</span>
+          <button type="button" className="c-btn c-btn--primary c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={finishEditing}><Check size={16} strokeWidth={1.75} aria-hidden="true" />Done</button>
+        </div>
+      ) : (
+        <div className="oe-tools oe-tools--read">
+          <span className="c-spacer" />
+          <span className="c-meta oe-status" role="status">{saving}</span>
+          <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={() => { setEditing(true); setSaving(''); requestAnimationFrame(() => pageRef.current?.focus()); }}><Pencil size={16} strokeWidth={1.75} aria-hidden="true" />Edit</button>
+        </div>
+      )}
       <div className="oe-main">
-        {editing ? (
-          <div className="oe-tools" role="toolbar" aria-label="Notes formatting">
-            <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={() => format('heading')}><Heading2 size={16} strokeWidth={1.75} aria-hidden="true" />Heading</button>
-            <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={() => format('list')}><List size={16} strokeWidth={1.75} aria-hidden="true" />Bullet</button>
-            <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={() => format('indent')}><ListIndentIncrease size={16} strokeWidth={1.75} aria-hidden="true" />Detail</button>
-            <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={undo} disabled={!canUndo && !dirty} aria-label="Undo last change"><Undo2 size={16} strokeWidth={1.75} aria-hidden="true" />Undo</button>
-            {tools}
-            <span className="c-spacer" />
-            <span className="c-meta oe-status" role="status">{saving}</span>
-            <button type="button" className="c-btn c-btn--primary c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={finishEditing}><Check size={16} strokeWidth={1.75} aria-hidden="true" />Done</button>
-          </div>
-        ) : (
-          <div className="oe-tools oe-tools--read">
-            <span className="c-spacer" />
-            <span className="c-meta oe-status" role="status">{saving}</span>
-            <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={() => { setEditing(true); setSaving(''); requestAnimationFrame(() => pageRef.current?.focus()); }}><Pencil size={16} strokeWidth={1.75} aria-hidden="true" />Edit</button>
-          </div>
-        )}
         <div
           ref={pageRef}
           className={'oe-page c-study' + (editing ? ' is-editing' : '')}
@@ -232,7 +232,9 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
       )}
       <OutlineSelectMenu selection={selection} onAction={onMenu} />
       <style jsx>{`
-        .oe { position: relative; display: grid; gap: 28px; align-items: start; }
+        .oe { position: relative; display: grid; gap: 12px 28px; align-items: start; }
+        /* The Edit / formatting bar spans the outline and its visuals, so Edit and Done sit at the far right. */
+        .oe-tools { grid-column: 1 / -1; }
         .oe.has-side { grid-template-columns: minmax(0, 1fr) minmax(320px, 46%); }
         .oe-main { display: grid; gap: 12px; min-width: 0; }
         .oe-tools { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: -8px 0 0 -12px; }

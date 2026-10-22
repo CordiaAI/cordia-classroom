@@ -8,6 +8,7 @@ import { dismissGuideJob, startGuideJob, useGuideJobs } from '../lib/guideJobs';
 import { MAX_SOURCE_CHARS, baseName, combinedSource, fileKey, generateAndSave, newRequestId, pairsToCards, pairsToGuide } from '../lib/guideCreate';
 import { newGuideHref } from '../lib/checkYourself';
 import QuizletImport from '../components/QuizletImport';
+import CardPhoto from '../components/CardPhoto';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const MANUAL_DRAFT_KEY = 'autostudy_manual_draft';
@@ -109,6 +110,13 @@ export default function CreateGuidePage() {
           question = '';
         }
       }
+      // Photos live on the saved cards, not in the Q/A text.
+      const cards = Array.isArray(data.guide.flashcards) ? data.guide.flashcards : [];
+      pairs.forEach((pair, index) => {
+        const card = cards.find(item => item?.front?.trim() === pair.term) || cards[index];
+        if (card?.front_image) pair.frontImage = card.front_image;
+        if (card?.image) pair.image = card.image;
+      });
       if (pairs.length) setManualPairs(pairs);
     });
   }, [ready, router.query.editGuideId]);
@@ -405,9 +413,15 @@ export default function CreateGuidePage() {
               <div className="create-card" key={index}>
                 <div className="create-card-num">{index + 1}</div>
                 <div className="create-card-body">
-                  <input ref={element => { termInputs.current[index] = element; }} onKeyDown={event => handleCardKey(event, index, 'term')} className="create-card-input create-card-term" value={pair.term} onChange={event => updatePair(index, 'term', event.target.value)} placeholder="Term" aria-label={`Term ${index + 1}`} />
+                  <div className="create-card-side">
+                    <input ref={element => { termInputs.current[index] = element; }} onKeyDown={event => handleCardKey(event, index, 'term')} className="create-card-input create-card-term" value={pair.term} onChange={event => updatePair(index, 'term', event.target.value)} placeholder="Term" aria-label={`Term ${index + 1}`} />
+                    <CardPhoto value={pair.frontImage} onChange={url => updatePair(index, 'frontImage', url)} onError={setError} label={`Add photo to term ${index + 1}`} />
+                  </div>
                   <div className="create-card-divider" />
-                  <input ref={element => { answerInputs.current[index] = element; }} onKeyDown={event => handleCardKey(event, index, 'definition')} className="create-card-input create-card-def" value={pair.definition} onChange={event => updatePair(index, 'definition', event.target.value)} placeholder="Definition" aria-label={`Definition ${index + 1}`} />
+                  <div className="create-card-side">
+                    <input ref={element => { answerInputs.current[index] = element; }} onKeyDown={event => handleCardKey(event, index, 'definition')} className="create-card-input create-card-def" value={pair.definition} onChange={event => updatePair(index, 'definition', event.target.value)} placeholder="Definition" aria-label={`Definition ${index + 1}`} />
+                    <CardPhoto value={pair.image} onChange={url => updatePair(index, 'image', url)} onError={setError} label={`Add photo to definition ${index + 1}`} />
+                  </div>
                 </div>
                 {manualPairs.length > 1 && <button type="button" className="create-card-remove" onClick={() => setManualPairs(pairs => pairs.filter((_, pairIndex) => pairIndex !== index))} aria-label={`Remove card ${index + 1}`}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>}
               </div>

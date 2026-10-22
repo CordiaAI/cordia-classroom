@@ -29,7 +29,12 @@ export function pairsToGuide(pairs, offset = 0) {
 }
 
 export function pairsToCards(pairs) {
-  return pairs.map(pair => ({ front: pair.term.trim(), back: pair.definition.trim(), ...(pair.image ? { image: pair.image } : {}) }));
+  return pairs.map(pair => ({
+    front: pair.term.trim(),
+    back: pair.definition.trim(),
+    ...(pair.frontImage ? { front_image: pair.frontImage } : {}),
+    ...(pair.image ? { image: pair.image } : {}),
+  }));
 }
 
 // Generates and saves one guide from source text. Runs as a background job, so it

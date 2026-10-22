@@ -14,8 +14,11 @@ from routers import auth, billing  # noqa: E402
 class DeleteAccountTests(unittest.TestCase):
     def setUp(self):
         self.db = MagicMock()
-        bucket = self.db.storage.from_.return_value
-        bucket.list.side_effect = lambda path: [{"name": "rec-1", "id": None}] if path == "u1" else [{"name": "00000.webm", "id": "x"}]
+        self.buckets = {name: MagicMock() for name in ("lecture-audio", "visuals", "card-images")}
+        self.db.storage.from_.side_effect = lambda name: self.buckets[name]
+        self.buckets["lecture-audio"].list.side_effect = lambda path: [{"name": "rec-1", "id": None}] if path == "u1" else [{"name": "00000.webm", "id": "x"}]
+        photos = [[{"name": "a.jpg", "id": "1"}, {"name": "b.png", "id": "2"}], []]
+        self.buckets["card-images"].list.side_effect = lambda path, options=None: photos.pop(0) if photos else []
 
     def run_delete(self, confirm="DELETE"):
         with patch.object(auth, "get_user_id", return_value="u1"), patch.object(auth, "get_supabase", return_value=self.db), \
@@ -36,7 +39,8 @@ class DeleteAccountTests(unittest.TestCase):
         tables = [call.args[0] for call in self.db.table.call_args_list]
         for table in ("study_guides", "smart_notes", "folders", "quiz_attempts", "study_sessions", "user_streaks", "user_profiles"):
             self.assertIn(table, tables)
-        self.db.storage.from_.return_value.remove.assert_called_once_with(["u1/rec-1/00000.webm"])
+        self.buckets["lecture-audio"].remove.assert_called_once_with(["u1/rec-1/00000.webm"])
+        self.buckets["card-images"].remove.assert_called_once_with(["u1/a.jpg", "u1/b.png"])
         self.db.auth.admin.delete_user.assert_called_once_with("u1")
 
     def test_failed_plan_cancel_stops_the_deletion(self):

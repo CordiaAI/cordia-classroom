@@ -80,15 +80,16 @@ export default function SearchModal({ onClose }) {
     <BodyPortal>
     <div className="c-scrim c-search-scrim" onClick={onClose}>
       <div className="c-sheet c-search-sheet" role="dialog" aria-modal="true" aria-label="Search" onClick={event => event.stopPropagation()}>
-        <div className="c-row">
-          <label className="c-search">
-            <Search size={20} strokeWidth={1.75} aria-hidden="true" />
-            <span className="sr-only">Search</span>
-            <input ref={inputRef} className="c-input" type="search" placeholder={typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || '') ? 'Search guides, cards and notes  ⌘K' : 'Search guides, cards and notes  Ctrl K'} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={onKeyDown} aria-controls="c-search-results" />
-          </label>
-          <button type="button" className="c-icon-btn" onClick={onClose} aria-label="Close search"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+        <div className="search-bar">
+          <Search size={20} strokeWidth={1.75} aria-hidden="true" />
+          <label className="sr-only" htmlFor="c-search-input">Search</label>
+          <input id="c-search-input" ref={inputRef} className="search-input" type="search" placeholder="Search guides, cards and notes" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={onKeyDown} aria-controls="c-search-results" autoComplete="off" spellCheck={false} />
+          <button type="button" className="search-close" onClick={onClose} aria-label="Close search">
+            <kbd className="search-esc">esc</kbd>
+            <X className="search-x" size={20} strokeWidth={1.75} aria-hidden="true" />
+          </button>
         </div>
-        <ul id="c-search-results" className="c-search-results" role="listbox" aria-label="Results">
+        <ul id="c-search-results" className="search-list" role="listbox" aria-label="Results">
           {results.map((result, index) => {
             const Icon = ICON[result.kind];
             const groupStart = index === 0 || results[index - 1].kind !== result.kind;
@@ -108,15 +109,29 @@ export default function SearchModal({ onClose }) {
       </div>
       <style jsx>{`
         .c-search-scrim { place-items: start center; padding-top: 12vh; }
-        .c-search-sheet { width: min(600px, 100%); padding: 12px; }
-        .c-search-results { list-style: none; margin: 0; padding: 0; max-height: 60vh; overflow: auto; }
-        .c-search-results:not(:empty) { margin-top: 8px; }
+        .c-search-sheet { width: min(600px, 100%); padding: 0; overflow: hidden; }
+        .search-bar { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0 12px 0 20px; color: var(--muted); }
+        .search-input { flex: 1; min-width: 0; height: 60px; padding: 0; border: 0; background: transparent; color: var(--ink); font:500 17px/1.4 var(--font-sans); outline: none; box-shadow: none; -webkit-appearance: none; appearance: none; }
+        .search-input:focus, .search-input:focus-visible { outline: none; box-shadow: none; }
+        .search-input::placeholder { color: var(--muted); }
+        .search-input::-webkit-search-cancel-button { display: none; }
+        .search-close { flex: none; display: grid; place-items: center; min-width: 44px; height: 44px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; }
+        .search-close:hover { color: var(--ink); }
+        .search-close:focus-visible { outline: 2px solid var(--olive); outline-offset: -4px; }
+        .search-esc { font:600 12px/1 var(--font-sans); padding: 6px 8px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--muted); }
+        .search-close :global(.search-x) { display: none; }
+        .search-list { list-style: none; margin: 0; padding: 0 8px; max-height: 60vh; overflow: auto; }
+        .search-list:not(:empty) { border-top: 1px solid var(--line); padding: 8px; }
         .c-search-group { padding: 10px 12px 4px; }
         .c-search-hit { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius:var(--r-input); background: transparent; color: var(--ink); font:600 15px/1.5 var(--font-sans); text-align: left; cursor: pointer; }
         .c-search-hit.is-active { background: var(--olive-tint); }
         .c-search-hit :global(.c-meta) { margin-left: auto; max-width: 40%; }
         .c-search-none { padding: 16px 12px; }
-        @media (max-width: 767px) { .c-search-scrim { place-items: end stretch; padding-top: 0; } }
+        @media (max-width: 767px) {
+          .c-search-scrim { place-items: end stretch; padding-top: 0; }
+          .search-esc { display: none; }
+          .search-close :global(.search-x) { display: block; }
+        }
       `}</style>
     </div>
     </BodyPortal>
