@@ -3,7 +3,7 @@ import { Check, Heading2, List, ListIndentIncrease, Pencil, Undo2 } from 'lucide
 import { apiFetch } from '../lib/api';
 import { domToOutline, outlineToHtml } from '../lib/outlineDoc';
 import { walkthroughEvent } from '../lib/walkthrough';
-import { KeptVisual, OutlineSelectMenu, PendingVisual, findAnchorBlock, useGuideVisuals, useOutlineSelection } from './OutlineVisuals';
+import { KeptVisual, OutlineSelectMenu, PendingVisual, findAnchorBlock, ownText, sectionTextOf, useGuideVisuals, useOutlineSelection } from './OutlineVisuals';
 
 const SAVE_MS = 900;
 const GAP = 12;
@@ -107,6 +107,62 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
     setSelection(null);
     if (kind === 'visualize') setPending({ key: Date.now(), text: picked.text, section: picked.section });
     else onAction?.(kind, picked.text);
+  }
+
+  // The lines a visual can sit by, in page order.
+  const lines = () => [...(pageRef.current?.querySelectorAll('li, h1, h2, h3, p') || [])].filter(el => ownText(el).trim());
+  const anchorTo = block => ({ anchor: ownText(block).replace(/\s+/g, ' ').trim().slice(0, 600), section: sectionTextOf(block, pageRef.current).slice(0, 500) });
+
+  // Up or down one line (the keyboard way to move a visual).
+  function moveBy(visual, step) {
+    const all = lines();
+    const at = all.indexOf(findAnchorBlock(pageRef.current, visual.anchor));
+    const target = all[Math.max(0, Math.min(all.length - 1, (at < 0 ? 0 : at) + step))];
+    if (target && target !== all[at]) visuals.update(visual, anchorTo(target));
+  }
+
+  // Drag a visual by its grip: it follows the pointer, the line under the pointer lights up, and
+  // on release the visual moves to that line.
+  function startMove(visual, event) {
+    event.preventDefault();
+    const item = event.currentTarget.closest('.oe-side-item');
+    const figure = item?.querySelector('.ov-kept');
+    if (!item || !pageRef.current) return;
+    const startY = event.clientY;
+    const current = findAnchorBlock(pageRef.current, visual.anchor);
+    let target = null;
+    figure?.classList.add('is-moving');
+    const mark = block => {
+      if (target === block) return;
+      target?.classList.remove('oe-drop-target');
+      target = block;
+      target?.classList.add('oe-drop-target');
+    };
+    const move = moveEvent => {
+      item.style.transform = `translateY(${moveEvent.clientY - startY}px)`;
+      // The line nearest the pointer, by height on the page.
+      let best = null;
+      let distance = Infinity;
+      for (const block of lines()) {
+        const box = block.getBoundingClientRect();
+        const d = moveEvent.clientY < box.top ? box.top - moveEvent.clientY : moveEvent.clientY > box.bottom ? moveEvent.clientY - box.bottom : 0;
+        if (d < distance) { best = block; distance = d; }
+      }
+      mark(best);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      item.style.transform = '';
+      figure?.classList.remove('is-moving');
+      const chosen = target;
+      mark(null);
+      if (chosen && chosen !== current) visuals.update(visual, anchorTo(chosen));
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   }
 
   // Each visual sits by its line: beside it on wide screens (pushed down to the line, never over
@@ -225,7 +281,7 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
             <div key={item.key} data-anchor={item.anchor || ''} className="oe-side-item">
               {item.pending
                 ? <PendingVisual pending={item.pending} title={guide.title} onCancel={() => setPending(null)} onKeep={async visual => { setPending(null); await visuals.keep(visual); }} />
-                : <KeptVisual visual={item.visual} onRemove={visuals.remove} />}
+                : <KeptVisual visual={item.visual} onRemove={visuals.remove} onMove={moveBy} onDragStart={startMove} onResize={(visual, width) => visuals.update(visual, { width })} />}
             </div>
           ))}
         </aside>

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import BodyPortal from './BodyPortal';
-import { Layers, Maximize2, MessageCircle, Shapes, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, GripVertical, Layers, Maximize2, MessageCircle, Shapes, Sparkles, Trash2, X } from 'lucide-react';
 import { authOnlyHeaders } from '../lib/api';
 import { readUserValue, writeUserValue } from '../lib/userStore';
 import { walkthroughEvent } from '../lib/walkthrough';
@@ -12,6 +12,9 @@ import { visualContent } from '../lib/visualText';
 // guide_visuals table exists.
 
 const localKey = guideId => `guideVisuals:${guideId}`;
+// Widths the server can't keep yet (before the width column exists), by visual id.
+const sizesKey = guideId => `guideVisualSizes:${guideId}`;
+export const MIN_WIDTH = 30;
 
 export function useGuideVisuals(guideId) {
   const [visuals, setVisuals] = useState([]);
@@ -27,7 +30,9 @@ export function useGuideVisuals(guideId) {
         if (!active) return;
         if (data?.stored && Array.isArray(data.visuals)) {
           setStored(true);
-          setVisuals([...data.visuals, ...readUserValue(localKey(guideId), [])]);
+          const sizes = readUserValue(sizesKey(guideId), {});
+          const withSizes = data.visuals.map(visual => (visual.width == null && sizes[visual.id] ? { ...visual, width: sizes[visual.id] } : visual));
+          setVisuals([...withSizes, ...readUserValue(localKey(guideId), [])]);
         } else setStored(false);
       })
       .catch(() => { if (active) setStored(false); });
@@ -70,7 +75,29 @@ export function useGuideVisuals(guideId) {
     }
   }, [guideId, saveLocal]);
 
-  return { visuals, keep, remove };
+  // Moves a visual to another line ({ anchor, section }) and/or resizes it ({ width }, % of the column).
+  const update = useCallback(async (visual, changes) => {
+    setVisuals(current => {
+      const next = current.map(item => (item.id === visual.id ? { ...item, ...changes } : item));
+      saveLocal(next);
+      return next;
+    });
+    if (visual.local) return;
+    const data = await fetch('/api/guide-visuals', {
+      method: 'PATCH',
+      headers: { ...authOnlyHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guideId, id: visual.id, ...changes }),
+    }).then(response => response.json()).catch(() => null);
+    if ('width' in changes) {
+      const sizes = readUserValue(sizesKey(guideId), {});
+      if (data?.widthStored) delete sizes[visual.id];
+      else if (changes.width == null) delete sizes[visual.id];
+      else sizes[visual.id] = changes.width;
+      writeUserValue(sizesKey(guideId), sizes);
+    }
+  }, [guideId, saveLocal]);
+
+  return { visuals, keep, update, remove };
 }
 
 // The block (heading, point or line) a node sits in, inside the editable page.
@@ -100,7 +127,7 @@ export function sectionTextOf(block, root) {
 
 // The block whose own text holds the start of `anchor` (a point's text, not its sub-points'), so
 // a kept visual finds its line again.
-const ownText = el => [...el.childNodes].filter(n => !(n.nodeType === 1 && /^(UL|OL)$/.test(n.tagName))).map(n => n.textContent).join('');
+export const ownText = el => [...el.childNodes].filter(n => !(n.nodeType === 1 && /^(UL|OL)$/.test(n.tagName))).map(n => n.textContent).join('');
 const squash = text => String(text || '').replace(/\s+/g, ' ').trim().toLowerCase();
 export function findAnchorBlock(root, anchor, { end = false } = {}) {
   const all = squash(anchor);
@@ -214,23 +241,81 @@ export function PendingVisual({ pending, title, onKeep, onCancel }) {
   );
 }
 
-// A visual the student kept: opens full size, can be removed.
-export function KeptVisual({ visual, onRemove }) {
+// A visual the student kept: opens full size, moves to another line (drag the grip, or the
+// up/down buttons) and resizes (drag the corner handle, or arrow keys on it).
+export function KeptVisual({ visual, onRemove, onMove, onDragStart, onResize }) {
   const [enlarged, setEnlarged] = useState(false);
+  const [width, setWidth] = useState(visual.width || null);
+  const figureRef = useRef(null);
+  useEffect(() => { setWidth(visual.width || null); }, [visual.width]);
   useEffect(() => {
     if (!enlarged) return undefined;
     const onKey = event => { if (event.key === 'Escape') setEnlarged(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [enlarged]);
-  const art = <img className={`ov-img ov-${visual.theme === 'dark' ? 'dark' : 'light'}`} src={visual.url} alt={visual.alt || 'Visual'} loading="lazy" />;
+
+  const clampWidth = value => Math.round(Math.min(100, Math.max(MIN_WIDTH, value)));
+  // Drag the corner: the width follows the pointer, as a % of the column, and is saved on release.
+  function startResize(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const figure = figureRef.current;
+    const column = figure?.parentElement?.getBoundingClientRect().width || 1;
+    const startX = event.clientX;
+    const startPx = figure?.getBoundingClientRect().width || column;
+    let latest = width || 100;
+    const move = moveEvent => {
+      latest = clampWidth(((startPx + moveEvent.clientX - startX) / column) * 100);
+      setWidth(latest);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      onResize?.(visual, latest);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  }
+  function resizeKey(event) {
+    const step = { ArrowLeft: -10, ArrowDown: -10, ArrowRight: 10, ArrowUp: 10 }[event.key];
+    if (event.key === 'Home' || event.key === 'End' || step) {
+      event.preventDefault();
+      const next = event.key === 'Home' ? MIN_WIDTH : event.key === 'End' ? 100 : clampWidth((width || 100) + step);
+      setWidth(next);
+      onResize?.(visual, next);
+    }
+  }
+
+  const art = <img className={`ov-img ov-${visual.theme === 'dark' ? 'dark' : 'light'}`} src={visual.url} alt={visual.alt || 'Visual'} loading="lazy" draggable={false} />;
   return (
-    <figure className="ov-kept">
+    <figure ref={figureRef} className={'ov-kept' + (width ? ' is-sized' : '')} style={width ? { width: `${width}%` } : undefined}>
       <button type="button" className="ov-open" aria-label="Open visual full size" onClick={() => setEnlarged(true)}>{art}</button>
       <div className="ov-tools">
+        {onDragStart && <button type="button" className="c-icon-btn ov-grip" aria-label="Drag to move this visual to another line" title="Drag to move" onPointerDown={event => onDragStart(visual, event)}><GripVertical size={16} strokeWidth={1.75} aria-hidden="true" /></button>}
+        {onMove && <button type="button" className="c-icon-btn ov-step" aria-label="Move visual up a line" title="Move up a line" onClick={() => onMove(visual, -1)}><ArrowUp size={16} strokeWidth={1.75} aria-hidden="true" /></button>}
+        {onMove && <button type="button" className="c-icon-btn ov-step" aria-label="Move visual down a line" title="Move down a line" onClick={() => onMove(visual, 1)}><ArrowDown size={16} strokeWidth={1.75} aria-hidden="true" /></button>}
         <button type="button" className="c-icon-btn" aria-label="Open visual full size" title="Full size" onClick={() => setEnlarged(true)}><Maximize2 size={16} strokeWidth={1.75} aria-hidden="true" /></button>
         <button type="button" className="c-icon-btn" aria-label="Remove visual" title="Remove visual" onClick={() => onRemove(visual)}><Trash2 size={16} strokeWidth={1.75} aria-hidden="true" /></button>
       </div>
+      {onResize && (
+        <span
+          className="ov-resize"
+          role="slider"
+          tabIndex={0}
+          aria-label="Visual size"
+          aria-valuemin={MIN_WIDTH}
+          aria-valuemax={100}
+          aria-valuenow={width || 100}
+          aria-valuetext={`${width || 100}% wide`}
+          title="Drag to resize"
+          onPointerDown={startResize}
+          onKeyDown={resizeKey}
+          onDoubleClick={() => { setWidth(null); onResize?.(visual, null); }}
+        />
+      )}
       {enlarged && (
         <BodyPortal>
           <div className="c-scrim ov-zoom" onClick={() => setEnlarged(false)} role="dialog" aria-modal="true" aria-label="Visual">
@@ -259,6 +344,16 @@ function OutlineVisualStyle() {
       .ov-img { display: block; width: 100%; height: auto; }
       /* Beside the outline a visual is no taller than the text it was made from (OutlineEditor sets --oe-fit). */
       .oe-side-item .ov-kept .ov-img { max-height: var(--oe-fit, none); object-fit: contain; }
+      /* A visual the student sized keeps the size they chose, whatever the text beside it. */
+      .oe-side-item .ov-kept.is-sized .ov-img { max-height: none; }
+      .ov-kept.is-sized { max-width: 100%; }
+      .ov-grip { cursor: grab; touch-action: none; }
+      .ov-grip:active { cursor: grabbing; }
+      .ov-resize { position: absolute; right: -1px; bottom: -1px; width: 22px; height: 22px; border-radius: 0 0 var(--r-row) 0; cursor: nwse-resize; touch-action: none; opacity: 0; transition: opacity .15s; background: linear-gradient(135deg, transparent 50%, var(--muted) 50%, var(--muted) 58%, transparent 58%, transparent 70%, var(--muted) 70%, var(--muted) 78%, transparent 78%); }
+      .ov-kept:hover .ov-resize, .ov-resize:focus-visible { opacity: 1; }
+      .ov-resize:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
+      .ov-kept.is-moving { z-index: 5; box-shadow: var(--shadow-float); cursor: grabbing; }
+      .oe-drop-target { border-radius: 8px; box-shadow: 0 0 0 2px var(--olive); background: var(--olive-tint); }
       .oe-side-item .ov-pending .nv-frame { min-height: 0; max-height: var(--oe-fit, none); }
       .oe-side-item .ov-pending .nv-image { max-height: calc(var(--oe-fit, 100vh) - 16px); object-fit: contain; }
       [data-theme='dark'] .ov-img.ov-light, :root:not([data-theme='dark']) .ov-img.ov-dark { filter: invert(1) hue-rotate(180deg); }
@@ -266,7 +361,7 @@ function OutlineVisualStyle() {
       .ov-tools { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
       .ov-tools .c-icon-btn { background: var(--card); }
       .ov-kept:hover .ov-tools, .ov-tools:focus-within { opacity: 1; }
-      @media (hover: none) { .ov-tools { opacity: 1; } }
+      @media (hover: none) { .ov-tools, .ov-resize { opacity: 1; } }
       .ov-zoom { display: grid; place-items: center; padding: 24px; cursor: zoom-out; }
       .ov-zoom-art { width: min(1200px, 100%); max-height: calc(100vh - 48px); overflow: auto; border-radius: var(--r-card); background: var(--paper); padding: 16px; box-shadow: var(--shadow-float); }
       .ov-zoom-art .ov-img { max-height: calc(100vh - 80px); object-fit: contain; }

@@ -9,6 +9,8 @@ import { supabaseUrlFrom } from '../supabaseUrl.mjs';
 export const MAX_PER_GUIDE = 40;
 const INLINE_PREFIX = 'data:image/svg+xml;base64,';
 const MAX_INLINE = 1_500_000;
+const COLUMNS = 'id,section,anchor,url,alt,theme,created_at';
+export const MIN_WIDTH = 30;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function userIdFromToken(authorization) {
@@ -55,7 +57,10 @@ export function createGuideVisualsService({ env = process.env, fetch: fetchImpl 
     if (!supabaseUrl || !serviceKey) return notStored;
     const userId = await owner(authorization, guideId);
     if (!userId) return { httpStatus: 404, body: { detail: 'Guide not found' } };
-    const response = await db(`/rest/v1/guide_visuals?user_id=eq.${userId}&guide_id=eq.${guideId}&select=id,section,anchor,url,alt,theme,created_at&order=created_at.asc&limit=${MAX_PER_GUIDE}`);
+    const query = columns => db(`/rest/v1/guide_visuals?user_id=eq.${userId}&guide_id=eq.${guideId}&select=${columns}&order=created_at.asc&limit=${MAX_PER_GUIDE}`);
+    // `width` needs migration 20261022140000; until then the list is read without it.
+    let response = await query(`${COLUMNS},width`);
+    if (response.status === 400) response = await query(COLUMNS);
     if (response.status === 404) return notStored;
     if (!response.ok) return { httpStatus: 502, body: { detail: "Visuals didn't load." } };
     return { httpStatus: 200, body: { stored: true, visuals: await response.json() } };
@@ -97,5 +102,32 @@ export function createGuideVisualsService({ env = process.env, fetch: fetchImpl 
     return { httpStatus: 200, body: { stored: true, removed: id } };
   }
 
-  return { list, keep, remove };
+  // Moves a kept visual to another line (anchor and section) and/or sets its width (30-100, % of
+  // the column). Answers widthStored: false while the width column doesn't exist yet, so the
+  // browser keeps the width itself.
+  async function update({ authorization, guideId, id, anchor, section, width }) {
+    if (!supabaseUrl || !serviceKey) return notStored;
+    if (!UUID.test(String(id || ''))) return { httpStatus: 400, body: { detail: 'Unknown visual' } };
+    const patch = {};
+    if (typeof anchor === 'string' && anchor.trim()) patch.anchor = clip(anchor, 600);
+    if (typeof section === 'string') patch.section = clip(section, 500);
+    const size = width === null ? null : Number.isFinite(Number(width)) ? Math.round(Math.min(100, Math.max(MIN_WIDTH, Number(width)))) : undefined;
+    if (!Object.keys(patch).length && size === undefined) return { httpStatus: 400, body: { detail: 'Nothing to change' } };
+    const userId = await owner(authorization, guideId);
+    if (!userId) return { httpStatus: 404, body: { detail: 'Guide not found' } };
+    const send = body => db(`/rest/v1/guide_visuals?id=eq.${id}&user_id=eq.${userId}&guide_id=eq.${guideId}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(body) });
+    let widthStored = size !== undefined;
+    let response = await send(size === undefined ? patch : { ...patch, width: size });
+    if (response.status === 400 && size !== undefined) {
+      widthStored = false;
+      response = Object.keys(patch).length ? await send(patch) : null;
+    }
+    if (response && response.status === 404) return notStored;
+    if (response && !response.ok) return { httpStatus: 502, body: { detail: "That change didn't save. Try again." } };
+    const [saved] = response ? await response.json() : [];
+    if (response && !saved) return { httpStatus: 404, body: { detail: 'Unknown visual' } };
+    return { httpStatus: 200, body: { stored: true, visual: saved || { id }, widthStored } };
+  }
+
+  return { list, keep, update, remove };
 }

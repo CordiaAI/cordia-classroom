@@ -108,8 +108,13 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
 .c-search {
   position: relative; display: flex; align-items: center; flex: 1 1 auto; min-width: 0;
 }
-.c-search .lucide { position: absolute; left: 14px; color: var(--muted); pointer-events: none; }
-.c-search .c-input { padding-left: 44px; }
+/* The icon sits above the field's glass (it was painted under it) and is centred on the field. */
+.c-search > .lucide { position: absolute; left: 14px; top: 50%; z-index: 1; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.c-search .c-input { width: 100%; margin: 0; padding-left: 44px; }
+.c-search .c-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+.c-search-clear { position: absolute; right: 6px; top: 50%; z-index: 1; transform: translateY(-50%); display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; }
+.c-search-clear:hover { color: var(--ink); background: var(--olive-tint); }
+.c-search:has(.c-search-clear) .c-input { padding-right: 44px; }
 
 /* ---------- Segmented, chips ---------- */
 .c-seg {

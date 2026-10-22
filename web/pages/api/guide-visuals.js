@@ -1,5 +1,6 @@
 // Visuals kept beside a guide's Outline sections. GET ?guideId: the kept visuals.
-// POST { guideId, section, anchor, url, alt, theme }: keep one. DELETE { guideId, id }: remove one.
+// POST { guideId, section, anchor, url, alt, theme }: keep one. PATCH { guideId, id, anchor?, section?, width? }:
+// move it to another line and/or resize it. DELETE { guideId, id }: remove one.
 // Answers { stored: false } until the guide_visuals table exists; the browser keeps them meanwhile.
 import { createGuideVisualsService } from '../../lib/server/guideVisuals.mjs';
 
@@ -11,9 +12,10 @@ export default async function handler(req, res) {
     let result;
     if (req.method === 'GET') result = await service.list({ authorization, guideId: req.query.guideId });
     else if (req.method === 'POST') result = await service.keep({ authorization, ...(req.body || {}) });
+    else if (req.method === 'PATCH') result = await service.update({ authorization, ...(req.body || {}) });
     else if (req.method === 'DELETE') result = await service.remove({ authorization, ...(req.body || {}) });
     else {
-      res.setHeader('Allow', 'GET, POST, DELETE');
+      res.setHeader('Allow', 'GET, POST, PATCH, DELETE');
       return res.status(405).json({ detail: 'Method not allowed' });
     }
     return res.status(result.httpStatus).json(result.body);
