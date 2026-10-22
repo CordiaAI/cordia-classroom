@@ -24,6 +24,7 @@ import os
 import re
 import socket
 import time
+from html import unescape
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Callable, Iterable, Optional
@@ -57,7 +58,24 @@ LINKED_WORKERS = 6
 
 
 def _strip_tags(html: str) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html or "")).strip()[:200]
+    """A link's visible text: tags dropped, entities decoded (&amp; -> &), spaces collapsed."""
+    return re.sub(r"\s+", " ", unescape(re.sub(r"<[^>]+>", " ", html or ""))).strip()[:200]
+
+
+_GENERIC_LINK = re.compile(r"^(?:here|click here|link|this link|download|file|view|open|pdf)\.?$", re.IGNORECASE)
+
+
+def _usable_link_name(text: str) -> str:
+    """The link text when it names the file; "" when it is generic ("click here") or cut off
+    ("Old Testament Timeline ("), so the file's own name is looked up instead."""
+    if not text or _GENERIC_LINK.match(text):
+        return ""
+    for left, right in ("()", "[]", "{}"):
+        if text.count(left) != text.count(right):
+            return ""
+    if text.count('"') % 2 or text.count("\u201c") != text.count("\u201d"):
+        return ""
+    return text
 
 
 class CanvasError(Exception):
@@ -430,7 +448,7 @@ class CanvasClient:
         def scan(html: str) -> None:
             text = str(html or "")
             for match in _FILE_LINK.finditer(text):
-                add(match.group(1), _strip_tags(match.group(2)))
+                add(match.group(1), _usable_link_name(_strip_tags(match.group(2))))
             for match in _FILE_ID.finditer(text):
                 add(match.group(1))
 
