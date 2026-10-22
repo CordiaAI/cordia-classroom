@@ -196,7 +196,7 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
 .c-timer-pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; width: 300px; }
 .c-timer-pop .focus-card { background: var(--surface-raised); box-shadow: var(--shadow-lg); }
 .c-bar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.c-searchbtn { height: 40px; width: 40px; padding: 0; justify-content: center; }
+.c-searchbtn, .c-feedbackbtn { height: 40px; width: 40px; padding: 0; justify-content: center; }
 .c-avatar {
   width: 40px; height: 40px; border-radius:50%; border: 1px solid var(--line);
   background: var(--card); color: var(--ink); font:600 13px/1 var(--font-sans); cursor: pointer;

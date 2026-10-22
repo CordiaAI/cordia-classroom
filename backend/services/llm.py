@@ -179,7 +179,7 @@ def _canonical_qa(raw_result: str) -> str:
     answer (an output cut off mid-pair) or an answer with no question, so one stray line never
     sinks the whole guide.
     """
-    pairs, question, pending = [], None, None  # pending: a label still waiting for its text
+    question, pending = None, None  # pending: a label still waiting for its text
     out = []
     for line in raw_result.split('\n'):
         match = _QA_LABEL.match(line)
