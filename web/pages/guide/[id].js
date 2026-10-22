@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
+import CordiaLoader, { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
 import BodyPortal from '../../components/BodyPortal';
 import CardPhoto from '../../components/CardPhoto';
 import Link from 'next/link';
@@ -125,6 +125,7 @@ export default function GuidePage() {
   const [renaming, setRenaming] = useState(null);
   const [openAid, setOpenAid] = useState(null);
   const [cardDraft, setCardDraft] = useState(null);
+  const [opening, setOpening] = useState(''); // the study tab waiting on cards from the notes
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [toast, setToast] = useState('');
   // The outline before "Regenerate outline", so the toast can put it back.
@@ -472,12 +473,24 @@ export default function GuidePage() {
             const content = <><tab.icon size={20} strokeWidth={1.75} aria-hidden="true" />{tab.label}{tab.count !== undefined && <span className="c-meta">{tab.count}</span>}</>;
             if (tab.view) return <span key={tab.key} className="c-pill" aria-current="page">{content}</span>;
             if (tab.needsCards && !hasMaterial) {
-              return <button key={tab.key} type="button" className="c-pill" data-spot={tab.spot} disabled={Boolean(making)} title="Makes flashcards and a quiz from your notes first" onClick={async () => { if (await makeStudySet()) { if (tab.event) walkthroughEvent(tab.event); router.push(tab.href); } }}>{content}</button>;
+              const busy = opening === tab.key;
+              return (
+                <button key={tab.key} type="button" className={'c-pill' + (busy ? ' is-making' : '')} data-spot={tab.spot} disabled={Boolean(making)} aria-busy={busy} title="Makes flashcards and a quiz from your notes first"
+                  onClick={async () => {
+                    setOpening(tab.key);
+                    const made = await makeStudySet();
+                    setOpening('');
+                    if (made) { if (tab.event) walkthroughEvent(tab.event); router.push(tab.href); }
+                  }}>
+                  {busy ? <><CordiaLoader size={20} label="" />Making cards…</> : content}
+                </button>
+              );
             }
             return <Link key={tab.key} className="c-pill" href={tab.href} data-spot={tab.spot} onClick={tab.event ? () => walkthroughEvent(tab.event) : undefined}>{content}</Link>;
           })}
         </nav>
       </div>
+      {making === 'cards' && <p className="c-meta guide-making" role="status">Making flashcards and a quiz from your notes. This takes about a minute; it opens when it's ready.</p>}
 
       {hasMaterial && <div className="c-seg guide-view" role="tablist" aria-label="Outline view">
         <button type="button" role="tab" aria-selected={view === 'outline'} className={view === 'outline' ? 'is-active' : ''} onClick={() => setView('outline')}>Outline</button>
@@ -544,6 +557,8 @@ export default function GuidePage() {
         .guide-meta :global(.c-menu-wrap > .c-icon-btn) { width: auto; height: 32px; padding: 0 12px; border-radius: var(--r-pill); border: 1px solid var(--line); }
         .guide-nclex { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; border-radius: var(--r-row); background: var(--olive-tint); font: 600 15px/1.4 var(--font-sans); }
         .guide-nclex :global(.lucide) { color: var(--olive-ink); flex: 0 0 auto; }
+        .guide-making { margin: -4px 0 0; }
+        .guide-tabs-row :global(.c-pill.is-making) { opacity: 1; color: var(--ink); }
         .guide-tabs-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .guide-tabs-row .c-pills { flex: 1 1 auto; min-width: 0; max-width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
         .guide-tabs-row .c-pills::-webkit-scrollbar { display: none; }
