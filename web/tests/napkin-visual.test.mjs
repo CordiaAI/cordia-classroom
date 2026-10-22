@@ -186,6 +186,9 @@ resetRateState();
   const { service } = world({ createResponses: [refused] });
   const { body } = await service.generate({ authorization: AUTH, text: 'Recruitment basics: sourcing, screening, selection', theme: 'light' });
   assert.deepEqual(body, { status: 'fallback', reason: 'napkin_error', detail: 'Invalid style_id' });
+  const noCredits = () => new Response(JSON.stringify({ error: 'no_credits' }), { status: 402, headers: { 'content-type': 'application/json' } });
+  const broke = world({ createResponses: [noCredits] });
+  assert.deepEqual((await broke.service.generate({ authorization: AUTH, text: 'Recruitment basics again', theme: 'light' })).body, { status: 'fallback', reason: 'no_credits' });
   console.log('ok   Napkin error detail');
 }
 

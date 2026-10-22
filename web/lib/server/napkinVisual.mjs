@@ -171,7 +171,11 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
         await sleep(waitMs);
         continue;
       }
-      if (!response.ok) return { fallback: 'napkin_error', detail: await napkinFailure('create', response) };
+      if (!response.ok) {
+        const detail = await napkinFailure('create', response);
+        // Our Napkin account is out of credits: an owner problem, not something the student can fix.
+        return /credit/i.test(detail) || response.status === 402 ? { fallback: 'no_credits' } : { fallback: 'napkin_error', detail };
+      }
       const data = await response.json();
       if (!data?.id) console.warn('[visual] Napkin create returned no id', JSON.stringify(data).slice(0, 300));
       return data?.id ? { id: data.id } : { fallback: 'napkin_error' };
