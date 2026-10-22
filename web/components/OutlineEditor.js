@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Heading2, List, ListIndentIncrease } from 'lucide-react';
+import { Check, Heading2, List, ListIndentIncrease, Pencil, Undo2 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { domToOutline, outlineToHtml } from '../lib/outlineDoc';
 import { walkthroughEvent } from '../lib/walkthrough';
@@ -8,11 +8,15 @@ import { KeptVisual, OutlineSelectMenu, PendingVisual, findAnchorBlock, useGuide
 const SAVE_MS = 900;
 const GAP = 12;
 const MIN_FIT = 160;
+// Saved versions kept for Undo, newest last.
+const UNDO_LIMIT = 50;
 
 // A guide's Outline, which is also where the student's own notes live: the AI's outline (if the
 // guide has material) and anything the student types, saved to the guide's notes as they go.
 // Highlight text for Visualize, Explain, Make card or Ask; a visual appears right beside the
 // highlighted line, and the one kept stays there.
+// It opens read-only; Edit shows the formatting buttons, Undo and the page's tools, and Done
+// goes back to reading. Undo steps back one saved change at a time (a regenerated outline too).
 // tools: extra toolbar buttons from the page (Regenerate outline on a guide with material).
 export default function OutlineEditor({ guide, version = 0, onSaved, onAction, tools = null, placeholder = 'Type your notes…' }) {
   const pageRef = useRef(null);
@@ -20,6 +24,11 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
   const saved = useRef(guide.notes || '');
   const timer = useRef(0);
   const [saving, setSaving] = useState('');
+  // Empty notes open ready to type; anything written opens for reading.
+  const [editing, setEditing] = useState(() => !(guide.notes || '').trim());
+  const history = useRef([]);
+  const [canUndo, setCanUndo] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [pending, setPending] = useState(null); // { key, text, section }
   const [selection, setSelection] = useOutlineSelection(pageRef);
   const visuals = useGuideVisuals(guide.id);
@@ -28,9 +37,17 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
   // The page is filled once per guide (and after the outline is rewritten); typing then owns it.
   useEffect(() => {
     if (!pageRef.current) return;
+    // A rewritten outline (same guide) can be undone like any other change.
+    if (version && saved.current !== (guide.notes || '')) remember(saved.current);
     pageRef.current.innerHTML = outlineToHtml(guide.notes || '');
     saved.current = guide.notes || '';
   }, [guide.id, version]);
+  useEffect(() => { history.current = []; setCanUndo(false); }, [guide.id]);
+
+  function remember(notes) {
+    history.current = [...history.current, notes].slice(-UNDO_LIMIT);
+    setCanUndo(true);
+  }
 
   async function save() {
     const notes = domToOutline(pageRef.current);
@@ -38,7 +55,9 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
     setSaving('Saving…');
     const data = await apiFetch(`/guides/${guide.id}`, { method: 'PATCH', body: JSON.stringify({ title: guide.title, notes }) });
     if (data?.guide) {
+      remember(saved.current);
       saved.current = notes;
+      setDirty(domToOutline(pageRef.current) !== notes);
       onSaved?.(notes);
       setSaving('Saved');
       walkthroughEvent('note-written');
@@ -46,11 +65,35 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
   }
 
   function onInput() {
+    setDirty(true);
     setSaving('');
     clearTimeout(timer.current);
     timer.current = setTimeout(save, SAVE_MS);
   }
   useEffect(() => () => { clearTimeout(timer.current); if (pageRef.current && domToOutline(pageRef.current) !== saved.current) save(); }, [guide.id]);
+
+  // Undo: put back the version saved before the last change, and save that.
+  async function undo() {
+    clearTimeout(timer.current);
+    const current = domToOutline(pageRef.current);
+    // Unsaved typing is the last change: undo goes back to what was last saved.
+    const previous = current !== saved.current ? saved.current : history.current[history.current.length - 1];
+    if (previous === undefined) return;
+    if (current === saved.current) history.current = history.current.slice(0, -1);
+    setCanUndo(history.current.length > 0);
+    pageRef.current.innerHTML = outlineToHtml(previous);
+    setSaving('Saving…');
+    const data = await apiFetch(`/guides/${guide.id}`, { method: 'PATCH', body: JSON.stringify({ title: guide.title, notes: previous }) });
+    setDirty(false);
+    if (data?.guide) { saved.current = previous; onSaved?.(previous); setSaving('Undone'); }
+    else setSaving('Not saved. Try again.');
+  }
+
+  function finishEditing() {
+    clearTimeout(timer.current);
+    save();
+    setEditing(false);
+  }
 
   function format(kind) {
     pageRef.current?.focus();
@@ -143,23 +186,33 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
   return (
     <div className={'oe' + (hasSide ? ' has-side' : '')}>
       <div className="oe-main">
-        <div className="oe-tools" role="toolbar" aria-label="Notes formatting">
-          <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={() => format('heading')}><Heading2 size={16} strokeWidth={1.75} aria-hidden="true" />Heading</button>
-          <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={() => format('list')}><List size={16} strokeWidth={1.75} aria-hidden="true" />Bullet</button>
-          <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={() => format('indent')}><ListIndentIncrease size={16} strokeWidth={1.75} aria-hidden="true" />Detail</button>
-          <span className="c-spacer" />
-          <span className="c-meta oe-status" role="status">{saving}</span>
-          {tools}
-        </div>
+        {editing ? (
+          <div className="oe-tools" role="toolbar" aria-label="Notes formatting">
+            <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={() => format('heading')}><Heading2 size={16} strokeWidth={1.75} aria-hidden="true" />Heading</button>
+            <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={() => format('list')}><List size={16} strokeWidth={1.75} aria-hidden="true" />Bullet</button>
+            <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={() => format('indent')}><ListIndentIncrease size={16} strokeWidth={1.75} aria-hidden="true" />Detail</button>
+            <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={undo} disabled={!canUndo && !dirty} aria-label="Undo last change"><Undo2 size={16} strokeWidth={1.75} aria-hidden="true" />Undo</button>
+            {tools}
+            <span className="c-spacer" />
+            <span className="c-meta oe-status" role="status">{saving}</span>
+            <button type="button" className="c-btn c-btn--primary c-btn--sm" onMouseDown={event => event.preventDefault()} onClick={finishEditing}><Check size={16} strokeWidth={1.75} aria-hidden="true" />Done</button>
+          </div>
+        ) : (
+          <div className="oe-tools oe-tools--read">
+            <span className="c-spacer" />
+            <span className="c-meta oe-status" role="status">{saving}</span>
+            <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={() => { setEditing(true); setSaving(''); requestAnimationFrame(() => pageRef.current?.focus()); }}><Pencil size={16} strokeWidth={1.75} aria-hidden="true" />Edit</button>
+          </div>
+        )}
         <div
           ref={pageRef}
-          className="oe-page c-study"
-          contentEditable
+          className={'oe-page c-study' + (editing ? ' is-editing' : '')}
+          contentEditable={editing}
           suppressContentEditableWarning
-          role="textbox"
-          aria-multiline="true"
-          aria-label="Outline and notes"
-          data-placeholder={placeholder}
+          role={editing ? 'textbox' : undefined}
+          aria-multiline={editing ? 'true' : undefined}
+          aria-label={editing ? 'Outline and notes' : undefined}
+          data-placeholder={editing ? placeholder : 'No notes yet. Press Edit to write some.'}
           data-spot="note-new"
           onInput={onInput}
           onBlur={() => { clearTimeout(timer.current); save(); }}
@@ -183,6 +236,8 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
         .oe-main { display: grid; gap: 12px; min-width: 0; }
         .oe-tools { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: -8px 0 0 -12px; }
         .oe-status { font-size: 13px; }
+        .oe-tools--read { margin-top: -8px; }
+        .oe-page.is-editing { box-shadow: 0 0 0 1px var(--line); border-radius: var(--r-input); padding: 12px; margin: -12px; }
         .oe-side { position: relative; display: flex; flex-direction: column; min-width: 0; }
         .oe-side-item + .oe-side-item { margin-top: ${GAP}px; }
         .oe-page { min-height: 240px; outline: none; display: grid; gap: 12px; align-content: start; }
