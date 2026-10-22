@@ -14,21 +14,37 @@ export const NOTE_SOURCE = id => `note:${id}`;
 async function guideForNote(noteId) {
   const guides = (await apiFetch('/guides?fields=summary&limit=500'))?.guides || [];
   const moved = guides.find(guide => guide.source_type === NOTE_SOURCE(noteId));
-  if (moved) return moved.id;
   const note = (await apiFetch(`/smart_notes/${encodeURIComponent(noteId)}`))?.note;
+  if (moved) {
+    if (note) await reshapeMoved(moved.id, note);
+    return moved.id;
+  }
   if (!note) throw new Error('That note could not be found.');
   const page = new DOMParser().parseFromString(`<body>${note.content || ''}</body>`, 'text/html').body;
   const saved = await apiFetch('/guides', {
     method: 'POST',
     body: JSON.stringify({
       title: note.title || 'Notes',
-      notes: domToOutline(page),
+      notes: domToOutline(page, { title: note.title }),
       source_type: NOTE_SOURCE(noteId),
       ...(note.folder_id ? { folder_id: note.folder_id } : {}),
     }),
   });
   if (!saved?.guide) throw new Error(apiErrorMessage(saved?.detail, 'That note could not be opened.'));
   return saved.guide.id;
+}
+
+// Notes moved before headings kept their levels came out with every heading as a section (the
+// title as section 1). If the student hasn't changed them since, read the note again properly.
+async function reshapeMoved(guideId, note) {
+  const page = new DOMParser().parseFromString(`<body>${note.content || ''}</body>`, 'text/html').body;
+  const before = domToOutline(page, { levels: false });
+  const after = domToOutline(page, { title: note.title });
+  if (before === after) return;
+  const guide = (await apiFetch('/guides/' + guideId))?.guide;
+  if (guide && (guide.notes || '') === before) {
+    await apiFetch('/guides/' + guideId, { method: 'PATCH', body: JSON.stringify({ title: guide.title, notes: after }) });
+  }
 }
 
 export default function SmartNotesPage() {

@@ -79,7 +79,7 @@ export function blocksFromDom(root) {
     if (node.nodeType !== 1) continue;
     const tag = node.tagName;
     if (tag === 'UL' || tag === 'OL') listItems(node, 0);
-    else if (/^H[1-6]$/.test(tag)) blocks.push({ kind: 'heading', text: inlineText(node) });
+    else if (/^H[1-6]$/.test(tag)) blocks.push({ kind: 'heading', level: Number(tag[1]), text: inlineText(node) });
     else if (tag === 'P' && node.classList?.contains('oe-overview')) blocks.push({ kind: 'overview', text: inlineText(node) });
     else if (tag === 'FIGURE' || tag === 'IMG') continue;
     else if (tag === 'DIV' && node.querySelector?.('ul,ol,h1,h2,h3,p')) blocks.push(...blocksFromDom(node));
@@ -88,4 +88,33 @@ export function blocksFromDom(root) {
   return blocks;
 }
 
-export const domToOutline = root => blocksToOutline(blocksFromDom(root));
+const plain = text => String(text || '').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
+
+// Notes with more than one heading level (a lecture's outline: # title, ## I., ### A.) keep their
+// shape: a heading that only repeats the title is dropped, the top level stays a section, and a
+// deeper heading becomes a bold point with what follows it nested under it.
+export function shapeBlocks(blocks, { title = '' } = {}) {
+  let list = blocks.filter(block => plain(block.text));
+  const first = list[0];
+  if (title && first?.kind === 'heading') {
+    const lone = first.level === 1 && list.filter(block => block.kind === 'heading' && block.level === 1).length === 1;
+    if (lone || plain(first.text).toLowerCase() === plain(title).toLowerCase()) list = list.slice(1);
+  }
+  const levels = [...new Set(list.filter(block => block.kind === 'heading').map(block => block.level || 2))];
+  if (levels.length < 2) return list;
+  const top = Math.min(...levels);
+  let nested = false;
+  return list.map(block => {
+    if (block.kind === 'heading') {
+      nested = (block.level || 2) > top;
+      return nested ? { kind: 'point', text: `**${plain(block.text)}**` } : block;
+    }
+    return nested && block.kind === 'point' ? { ...block, kind: 'detail' } : block;
+  });
+}
+
+// `levels: false` is the old reading (every heading a section), kept to recognise notes it moved.
+export const domToOutline = (root, { title = '', levels = true } = {}) => {
+  const blocks = blocksFromDom(root);
+  return blocksToOutline(levels ? shapeBlocks(blocks, { title }) : blocks);
+};
