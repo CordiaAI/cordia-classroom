@@ -46,8 +46,14 @@ const ALERT_TEXT = {
     : `${alert.title}: ${shortDate(alert.old_due)} → ${shortDate(alert.new_due)}`),
 };
 
-// "Prof. Lee" from "Prof. Lee <lee@school.edu>".
-const senderName = sender => String(sender || '').replace(/<[^>]*>/, '').trim() || String(sender || '').replace(/[<>]/g, '');
+// "Prof. Lee" from "Prof. Lee <lee@school.edu>"; the address when there's no name.
+function senderName(sender) {
+  const text = String(sender || '');
+  const open = text.indexOf('<');
+  if (open < 0) return text.trim();
+  const close = text.indexOf('>', open);
+  return text.slice(0, open).trim() || text.slice(open + 1, close < 0 ? undefined : close).trim();
+}
 
 function plural(count, word) {
   return `${count} ${word}${count === 1 ? '' : 's'}`;
