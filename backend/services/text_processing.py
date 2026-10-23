@@ -452,3 +452,53 @@ def html_to_text(text: str) -> str:
     parser.feed(text)
     parser.close()
     return "".join(parser.parts)
+
+
+_MD_HEADING = re.compile(r"^#{1,6}\s+(\S.*)$")
+_BULLET = re.compile(r"^(?:[-*•▪◦·]|\d{1,2}[.)])\s+(\S.*)$")
+
+
+def _looks_like_heading(line: str, following: str) -> bool:
+    """A short line without closing punctuation, followed by longer text: a section title."""
+    return (3 <= len(line) <= 80 and not line.endswith((".", ",", ";", ":", "?", "!")) and len(line.split()) <= 10
+            and bool(following) and len(following) > len(line))
+
+
+def text_to_outline(text: str, max_points: int = 400) -> str:
+    """Document or slide text as the outline guides use ("## Heading" then "- point" lines), so an
+    imported file opens in Library ready to read and to make cards from. Slides keep their titles
+    as headings; long paragraphs become one point each."""
+    text = clean_text(text or "")
+    if not text.strip():
+        return ""
+    lines_out: List[str] = []
+    is_slides, _ = is_slideshow_content(text)
+    if is_slides:
+        for slide in extract_slideshow_content(text):
+            lines_out.append(f"## {slide['title'][:120] or 'Slide'}")
+            lines_out.extend(f"- {line[:600]}" for line in slide["content"] if line.strip())
+    else:
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        for index, line in enumerate(lines):
+            following = lines[index + 1] if index + 1 < len(lines) else ""
+            heading = _MD_HEADING.match(line)
+            bullet = _BULLET.match(line)
+            if heading:
+                lines_out.append(f"## {heading.group(1).strip()[:120]}")
+            elif bullet:
+                lines_out.append(f"- {bullet.group(1).strip()[:600]}")
+            elif _looks_like_heading(line, following):
+                lines_out.append(f"## {line}")
+            else:
+                lines_out.append(f"- {line[:600]}")
+    points = 0
+    kept = []
+    for line in lines_out:
+        if line.startswith("- "):
+            points += 1
+            if points > max_points:
+                break
+        kept.append(line)
+    # A heading with nothing under it adds nothing.
+    return "\n".join(line for index, line in enumerate(kept)
+                     if not line.startswith("## ") or (index + 1 < len(kept) and kept[index + 1].startswith("- ")))

@@ -16,7 +16,7 @@ from services import canvas_client
 from services.canvas_client import CanvasClient, CanvasDenied, CanvasError, CanvasForbiddenRequest, CanvasUnauthorized
 from services.class_catalog import clean_term, school_name_from_domain, topic_summary
 from services.class_db import add_membership, ensure_class, ensure_school
-from services import sync_state
+from services import file_extraction, library_import, sync_state
 from services.grades import canvas_scale, estimate
 from services.llm import read_announcement
 from services.text_processing import html_to_text
@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/canvas", tags=["canvas"])
 
 SYNC_EVERY = timedelta(minutes=20)
+FILES_EVERY = timedelta(hours=6)    # Module files and pages change rarely; they're read less often.
+IMPORT_PER_RUN = 10                 # New files imported per class per run; the rest come next time.
 SYNC_NOW_FLOOR = timedelta(seconds=60)
 ACTIVITY_DAYS = 30
 REMIND_DAYS = 7
@@ -203,6 +205,79 @@ def _check_grade(db, user_id: str, client: CanvasClient, row: dict) -> None:
         })
 
 
+def auto_import_courses(user_id: str) -> set[int]:
+    return {int(c) for c in (sync_state.get(user_id, "canvas").get("stats") or {}).get("auto_import") or []}
+
+
+def _sync_modules(db, user_id: str, client: CanvasClient, courses: dict, *, force: bool = False) -> int:
+    """Every 6 hours: module files and pages of classes set to auto-import go into the class's
+    Library folder, and a module the student finished gets a "make a review set" alert once."""
+    stats = sync_state.get(user_id, "canvas").get("stats") or {}
+    last = _parse_time(stats.get("files_checked_at"))
+    if not courses or (not force and last and _now() - last < FILES_EVERY):
+        return 0
+    auto = auto_import_courses(user_id)
+    done_before = set(stats.get("modules_done") or [])
+    done_now, imported = set(done_before), 0
+    known = library_import.existing_refs(user_id, "canvas:") if auto & set(courses) else set()
+    for course_id, row in courses.items():
+        try:
+            modules = client.modules(course_id) or []
+        except CanvasError:
+            continue
+        for module in modules:
+            key = f"{course_id}:{module.get('id')}"
+            if module.get("state") == "completed" and key not in done_before:
+                done_now.add(key)
+                sync_state.add_alert(user_id, "canvas", {
+                    "kind": "module_done", "course_id": course_id, "course": row.get("name") or "",
+                    "module": str(module.get("name") or "")[:200], "at": _now().isoformat(),
+                })
+        if course_id not in auto:
+            continue
+        class_id = (db.table("canvas_courses").select("class_id").eq("user_id", user_id)
+                    .eq("canvas_course_id", course_id).limit(1).execute().data or [{}])[0].get("class_id")
+        folder_id = library_import.class_folder(user_id, class_id)
+        count = 0
+        for module in modules:
+            for item in module.get("items") or []:
+                if count >= IMPORT_PER_RUN:
+                    break
+                ref = _item_ref(course_id, item)
+                if not ref or ref in known:
+                    continue
+                text = _item_text(client, course_id, item)
+                known.add(ref)
+                if text and library_import.upsert_source(
+                        user_id, ref=ref, connector="canvas", title=str(item.get("title") or "Canvas material"), text=text,
+                        folder_id=folder_id, source_type="canvas_module",
+                        source_title=f"{row.get('name') or 'Canvas'} · {module.get('name') or 'Module'}", source_url=item.get("html_url")):
+                    count += 1
+        imported += count
+    sync_state.update_stats(user_id, "canvas", {"files_checked_at": _now().isoformat(), "modules_done": sorted(done_now)[-200:],
+                                                "imported_files": int(stats.get("imported_files") or 0) + imported})
+    return imported
+
+
+def _item_ref(course_id: int, item: dict) -> Optional[str]:
+    if item.get("type") == "File" and item.get("content_id"):
+        return f"canvas:file:{int(item['content_id'])}"
+    if item.get("type") == "Page" and item.get("page_url"):
+        return f"canvas:page:{course_id}:{item['page_url']}"[:300]
+    return None
+
+
+def _item_text(client: CanvasClient, course_id: int, item: dict) -> str:
+    try:
+        if item.get("type") == "Page":
+            return html_to_text(str(client.page(course_id, item["page_url"]).get("body") or ""))
+        name, body = client.download_file(course_id, int(item["content_id"]))
+        return file_extraction.text_from_file(name, body)
+    except (CanvasError, HTTPException) as exc:
+        logger.info("canvas module item skipped: %s", type(exc).__name__)
+        return ""
+
+
 def _sync_announcements(db, user_id: str, client: CanvasClient, courses: dict) -> None:
     """The last two weeks of announcements in imported classes; new ones get a summary and a flag."""
     if not courses:
@@ -260,6 +335,7 @@ def sync(db, user_id: str, *, client: Optional[CanvasClient] = None) -> None:
                 _import_course(db, user_id, client, row, school)
                 imported[row["canvas_course_id"]] = row
         _sync_announcements(db, user_id, client, imported)
+        _sync_modules(db, user_id, client, imported)
     except CanvasUnauthorized:
         _auto_disconnect(db, user_id)
         sync_state.record(user_id, "canvas", error="Canvas stopped accepting your token.", needs_reconnect=True)
@@ -287,6 +363,7 @@ def _status(db, user_id: str) -> dict:
     expires = token.get("expires_at") if token else None
     days = (date.fromisoformat(str(expires)[:10]) - date.today()).days if expires else None
     host = connection["canvas_domain"]
+    auto = auto_import_courses(user_id)
     return {
         "connected": connection.get("status") == "connected" and bool(token),
         "status": connection.get("status"),
@@ -303,6 +380,7 @@ def _status(db, user_id: str) -> dict:
         "courses": [{
             "id": row["canvas_course_id"], "name": row["name"], "code": row["course_code"],
             "term": row["term"], "imported": bool(row.get("imported")), "class_id": row.get("class_id"),
+            "auto_import": row["canvas_course_id"] in auto,
         } for row in sorted(courses, key=lambda r: r.get("name") or "")],
     }
 
@@ -427,6 +505,32 @@ def set_import(course_id: int, body: ImportRequest, authorization: str = Header(
     except CanvasError:
         raise HTTPException(status_code=502, detail="Canvas could not be reached.")
     return _status(db, user_id)
+
+
+class AutoImportRequest(BaseModel):
+    on: bool
+
+
+@router.put("/courses/{course_id}/auto-import")
+def set_auto_import(course_id: int, body: AutoImportRequest, authorization: str = Header(default="")):
+    """Bring this class's module files and pages into its Library folder automatically (or stop)."""
+    user_id = get_user_id(authorization)
+    db = get_supabase()
+    connection = _imported_course(db, user_id, course_id)
+    auto = auto_import_courses(user_id)
+    auto = auto | {course_id} if body.on else auto - {course_id}
+    sync_state.update_stats(user_id, "canvas", {"auto_import": sorted(auto)})
+    imported = 0
+    if body.on:
+        try:
+            row = (db.table("canvas_courses").select("*").eq("user_id", user_id).eq("canvas_course_id", course_id).limit(1).execute().data or [{}])[0]
+            imported = _sync_modules(db, user_id, _client(db, user_id, connection), {course_id: row}, force=True)
+        except CanvasUnauthorized:
+            _auto_disconnect(db, user_id)
+            raise HTTPException(status_code=409, detail="Reconnect Canvas")
+        except CanvasError:
+            pass
+    return {"auto_import": sorted(auto), "imported": imported}
 
 
 @router.post("/sync")

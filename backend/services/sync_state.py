@@ -56,6 +56,11 @@ def record(user_id: str, connector: str, *, stats: Optional[dict] = None, error:
     _write(user_id, connector, fields)
 
 
+def update_stats(user_id: str, connector: str, stats: dict) -> None:
+    """Change settings kept in stats (auto-import classes, dismissed alerts) without touching sync health."""
+    _write(user_id, connector, {"stats": {**(get(user_id, connector).get("stats") or {}), **stats}})
+
+
 def set_container(user_id: str, connector: str, container_id: Optional[str]) -> None:
     _write(user_id, connector, {"container_id": container_id})
 

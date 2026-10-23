@@ -165,6 +165,10 @@ def sync_tasks(user_id: str) -> dict:
     marked = marks(db, user_id)
     items = _open_items(user_id)
     steps = [step for step in _steps(user_id) if any(item["id"] == step["item_key"] for item in items)]
+    # Exam review sessions become subtasks of the exam, due the day of each session.
+    reviews = [block for block in db.table("study_blocks").select("*").eq("user_id", user_id).eq("kind", "review")
+               .gte("ends_at", (_now() - timedelta(days=1)).isoformat()).execute().data or []
+               if block.get("status") != "removed" and any(item["id"] == block["item_key"] for item in items)]
     done_in_google = 0
 
     # Read back first: a check-off or a deletion in Google wins over what Cordia would write.
@@ -183,12 +187,19 @@ def sync_tasks(user_id: str) -> dict:
                                                   on_conflict="user_id,item_key").execute()
                 marked[cordia_id] = True
                 done_in_google += 1
-            elif kind == "subtask":
+            elif kind == "subtask" and cordia_id.startswith("step:"):
                 step_id = cordia_id.split(":", 1)[1]
                 step = next((s for s in steps if s["id"] == step_id), None)
                 if step and not step.get("done"):
                     db.table("assignment_steps").update({"done": True, "done_at": _now().isoformat()}).eq("id", step_id).eq("user_id", user_id).execute()
                     step["done"] = True
+                    done_in_google += 1
+            elif kind == "subtask" and cordia_id.startswith("block:"):
+                block_id = cordia_id.split(":", 1)[1]
+                block = next((b for b in reviews if b["id"] == block_id), None)
+                if block and block.get("status") != "done":
+                    db.table("study_blocks").update({"status": "done", "updated_at": _now().isoformat()}).eq("id", block_id).eq("user_id", user_id).execute()
+                    block["status"] = "done"
                     done_in_google += 1
 
     def write(kind: str, cordia_id: str, title: str, due: datetime, notes: str, done: bool, parent: Optional[str] = None) -> Optional[str]:
@@ -226,6 +237,11 @@ def sync_tasks(user_id: str) -> dict:
             if parent and step.get("due_at"):
                 write("subtask", f"step:{step['id']}", step["title"], _time(step["due_at"]), f"Step {step['position'] + 1} of {item['title']}"[:1000],
                       bool(step.get("done") or done), parent)
+        for block in sorted((b for b in reviews if b["item_key"] == item["id"]), key=lambda b: b["starts_at"]):
+            start, end = _time(block["starts_at"]), _time(block["ends_at"])
+            if parent and start and end:
+                write("subtask", f"block:{block['id']}", f"Review session · {int((end - start).total_seconds() // 60)} min",
+                      start, f"Review for {item['title']}"[:1000], block.get("status") == "done" or done, parent)
     sync_state.record(user_id, "gtasks", stats={"tasks": count, "done_in_google": done_in_google})
     return {"on": True, "tasks": count, "done_in_google": done_in_google}
 

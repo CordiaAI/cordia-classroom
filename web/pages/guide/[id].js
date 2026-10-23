@@ -6,7 +6,7 @@ import CardPhoto from '../../components/CardPhoto';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Brain, Download, ExternalLink, FolderInput, Gamepad2, Layers, Lock, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
+  ArrowLeft, Brain, Download, ExternalLink, FolderInput, Gamepad2, HardDriveUpload, Layers, Lock, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -44,7 +44,8 @@ function rich(text) {
   return String(text).split(/\*\*(.+?)\*\*/g).map((part, index) => (index % 2 ? <strong key={index}>{part}</strong> : part));
 }
 
-function exportGuide(guide) {
+// The guide as Markdown: outline, questions and cards. Export downloads it; Save to Drive sends it.
+function guideMarkdown(guide) {
   const pairs = parseQAPairs(guide.study_guide);
   const notes = guideNotes(guide);
   const lines = [`# ${guide.title}`, ''];
@@ -57,7 +58,11 @@ function exportGuide(guide) {
   lines.push('## Questions', '');
   pairs.forEach((pair, index) => lines.push(`### ${index + 1}. ${pair.question}`, '', pair.answer, ''));
   if (guide.flashcards?.length) lines.push('## Cards', '', ...guide.flashcards.map(card => `- **${card.front}** — ${card.back}`), '');
-  const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+  return lines.join('\n');
+}
+
+function exportGuide(guide) {
+  const blob = new Blob([guideMarkdown(guide)], { type: 'text/markdown' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = `${(guide.title || 'guide').replace(/[^\w\s-]/g, '').trim() || 'guide'}.md`;
@@ -276,6 +281,17 @@ export default function GuidePage() {
   }
 
   // The ⋯ menu's Add to class: file the guide in one of the student's classes (or none).
+  // A copy in the student's Cordia folder in Google Drive; saving again replaces it.
+  async function saveToDrive() {
+    setToast('Saving to Drive…');
+    const data = await apiFetch('/drive/save', {
+      method: 'POST', timeoutMs: 60000,
+      body: JSON.stringify({ guide_id: id, kind: 'guide', title: guide.title, content: guideMarkdown(guide) }),
+    });
+    if (data?.file_id) setToast(`Saved to Drive: Cordia / ${data.name}`);
+    else setToast(apiErrorMessage(data?.detail, "Couldn't save to Drive.") + (/connect/i.test(data?.detail || '') ? ' Connect Google Drive in Settings › Connectors.' : ''));
+  }
+
   async function moveToClass(folderId) {
     const data = await apiFetch('/guides/' + id + '/move', { method: 'PATCH', body: JSON.stringify({ folder_id: folderId }) });
     if (data && !data.detail) {
@@ -426,6 +442,7 @@ export default function GuidePage() {
               ],
             },
             { label: 'Export', icon: Download, onSelect: () => exportGuide(guide) },
+            { label: 'Save to Drive', icon: HardDriveUpload, onSelect: saveToDrive },
             { label: 'Delete', icon: Trash2, danger: true, onSelect: () => setConfirmDelete(true) },
           ]}
         />

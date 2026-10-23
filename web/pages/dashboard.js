@@ -17,7 +17,7 @@ import LearnCordia from '../components/LearnCordia';
 import CanvasConnectButton from '../components/CanvasConnectButton';
 import DoneCheck from '../components/DoneCheck';
 import AssignmentSheet from '../components/AssignmentSheet';
-import { dismissAlert, getAlerts } from '../lib/studyPlans';
+import { buildExamReview, buildReview, dismissAlert, getAlerts } from '../lib/studyPlans';
 import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
 import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
@@ -39,6 +39,8 @@ const ALERT_TEXT = {
   missing: alert => `Missing: ${alert.title}`,
   deadline: alert => `Date change: ${alert.title}`,
   new_work: alert => `New work: ${alert.title}`,
+  exam_prep: alert => `${alert.title} in ${alert.days} day${alert.days === 1 ? '' : 's'}`,
+  module_done: alert => `Finished: ${alert.module}`,
 };
 
 function plural(count, word) {
@@ -51,6 +53,7 @@ export default function Today() {
   // Deadlines checked off here stay listed, struck through, until the next load.
   const [doneNow, setDoneNow] = useState({});
   const [planning, setPlanning] = useState(null);
+  const [reviewing, setReviewing] = useState('');
   useSessionTracker('browse');
   const legacy = LEGACY_VIEWS[router.query.view];
   const progress = useProgress();
@@ -150,6 +153,18 @@ export default function Today() {
   const weekMinutes = Math.round(Array.from({ length: 7 }, (_, back) => activity[dayKey(Date.now() - back * 86400000)]?.m || 0).reduce((sum, value) => sum + value, 0));
   const alerts = data?.alerts || [];
   const sunday = new Date().getDay() === 0;
+  // Exam prep and finished modules: gather the class's material into a review guide and open it.
+  async function review(alert) {
+    setReviewing(alert.id);
+    const data = alert.kind === 'exam_prep'
+      ? await buildExamReview(alert.item_key)
+      : await buildReview({ folderId: alert.folder_id, prefix: alert.prefix, title: `${alert.module}: review` });
+    setReviewing('');
+    if (data?.guide?.id) {
+      if (alert.kind === 'module_done') dismissAlert(alert.id);
+      router.push(`/guide/${data.guide.id}`);
+    } else update(current => ({ ...current, alerts: (current.alerts || []).map(item => (item.id === alert.id ? { ...item, summary: data?.detail || "That didn't work. Try again." } : item)) }));
+  }
   async function dismiss(alert) {
     update(current => ({ ...current, alerts: (current.alerts || []).filter(item => item.id !== alert.id) }));
     await dismissAlert(alert.id);
@@ -192,6 +207,11 @@ export default function Today() {
                   <span className="c-meta">{[alert.course, alert.summary].filter(Boolean).join(' · ')}</span>
                 </span>
                 {alert.url && <a className="c-btn c-btn--quiet c-btn--sm" href={alert.url} target="_blank" rel="noreferrer">Open</a>}
+                {(alert.kind === 'exam_prep' || (alert.kind === 'module_done' && alert.folder_id)) && (
+                  <button type="button" className="c-btn c-btn--secondary c-btn--sm" disabled={Boolean(reviewing)} onClick={() => review(alert)}>
+                    {reviewing === alert.id ? 'Gathering…' : alert.kind === 'exam_prep' ? 'Build review' : 'Make review set'}
+                  </button>
+                )}
                 <button type="button" className="c-icon-btn" aria-label="Dismiss" onClick={() => dismiss(alert)}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
               </div>
             ))}
@@ -204,7 +224,7 @@ export default function Today() {
           <h2 id="due-title" className="c-section-title">Due soon</h2>
           <span className="c-spacer" />
           <Link href="/week" className={'c-btn ' + (sunday ? 'c-btn--secondary' : 'c-btn--quiet')}>Plan your week</Link>
-          <Link href="/canvas?tab=calendar" className="c-btn c-btn--quiet">See calendar</Link>
+          <Link href="/canvas?tab=calendar" className="c-btn c-btn--quiet today-see-calendar">See calendar</Link>
         </div>
         {(dueItems.length > 0 || calendarSlow) ? (
           <div className="c-card c-list">
@@ -267,6 +287,8 @@ export default function Today() {
         @media (max-width: 767px) {
               :global(.today-progress) { gap: 14px; }
           .today-progress-more { display: none; }
+          /* The Canvas tab has the calendar; on a phone the heading keeps its one line. */
+          :global(.today-see-calendar) { display: none !important; }
         }
       `}</style>
     </div>

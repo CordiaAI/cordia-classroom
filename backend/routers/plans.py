@@ -6,6 +6,7 @@ deadline and, once scheduled, study blocks in the student's free time. Blocks an
 Google through services.google_sync when the student has turned that sync on.
 """
 
+import hashlib
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -18,8 +19,9 @@ from auth_utils import get_user_id
 from database import get_supabase
 from rate_limit import limiter
 from routers.calendar import calendar_for
-from services import composio, google_sync, planner, sync_state
+from services import composio, google_sync, library_import, planner, sync_state
 from services.llm import plan_assignment
+from services.text_processing import text_to_outline
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["plans"])
@@ -194,6 +196,38 @@ def schedule_exams(user_id: str) -> int:
     return added
 
 
+def item_folder(user_id: str, item_key: str) -> Optional[str]:
+    """The Library folder of the class a Canvas assignment belongs to."""
+    detail = canvas_detail(user_id, item_key)
+    if not detail:
+        return None
+    row = (get_supabase().table("canvas_courses").select("class_id").eq("user_id", user_id)
+           .eq("canvas_course_id", detail.get("canvas_course_id")).limit(1).execute().data or [{}])[0]
+    return library_import.class_folder(user_id, row.get("class_id"))
+
+
+def build_review(user_id: str, folder_id: str, title: str, ref: str, prefix: Optional[str] = None) -> dict:
+    """One review guide gathering the class's material (Canvas imports, Drive files and the
+    student's own guides), each source under its own headings. Building it again refreshes it."""
+    sources = library_import.folder_material(user_id, folder_id, source_title_prefix=prefix)
+    if not sources:
+        raise HTTPException(status_code=404, detail="This class has no material yet. Link a Drive folder, turn on Canvas imports, or add your own notes.")
+    lines: list[str] = []
+    for source in reversed(sources):  # Oldest first: the order the course covered it.
+        outline = source.get("notes") or ""
+        if not any(line.startswith("- ") for line in outline.splitlines()):
+            outline = text_to_outline(source.get("study_guide") or "")
+        name = (source.get("title") or "Notes")[:80]
+        if not outline.lstrip().startswith("## "):
+            lines.append(f"## {name}")
+        for line in outline.splitlines():
+            lines.append(f"## {name} · {line[3:].strip()}" if line.startswith("## ") else line)
+    db = get_supabase()
+    row = {"user_id": user_id, "title": title[:300], "notes": "\n".join(lines), "study_guide": "", "folder_id": folder_id,
+           "external_source_id": ref[:500], "source_type": "review", "source_title": f"Review of {len(sources)} sources"}
+    return (db.table("study_guides").upsert(row, on_conflict="user_id,external_source_id").execute().data or [row])[0]
+
+
 def _push(user_id: str) -> None:
     """Send changes to Google now when sync is on; the background worker catches anything missed."""
     for app, run in (("gtasks", google_sync.sync_tasks), ("gcal", google_sync.sync_calendar)):
@@ -262,6 +296,44 @@ def schedule_plan(item_key: str, body: ScheduleRequest, request: Request, author
     return {"plan": _plan(user_id, item_key), "added": len(added)}
 
 
+class ReviewRequest(BaseModel):
+    folder_id: str = Field(default="", max_length=36)
+    prefix: str = Field(default="", max_length=300)
+    title: str = Field(default="", max_length=300)
+    time_zone: str = Field(default="", max_length=64)
+
+
+@router.post("/plans/{item_key}/review-set")
+@limiter.limit("10/minute")
+def exam_review_set(item_key: str, body: ReviewRequest, request: Request, authorization: str = Header(default="")):
+    """Exam prep: gather the class's material into one review guide and space review sessions
+    before the exam (each one also a Google subtask when Tasks sync is on)."""
+    user_id = get_user_id(authorization)
+    item = _item(user_id, _key(item_key))
+    folder_id = item_folder(user_id, item_key) or body.folder_id
+    if not folder_id:
+        raise HTTPException(status_code=400, detail="Pick the class this is for.")
+    from routers.drive import _own_folder
+    _own_folder(user_id, folder_id)
+    guide = build_review(user_id, folder_id, f"{item['title']}: review", f"review:{item_key}")
+    added = schedule(user_id, item, _zone(user_id, body.time_zone)) if _is_exam(user_id, item) else []
+    _push(user_id)
+    return {"guide": {"id": guide.get("id"), "title": guide.get("title")}, "sessions": len(added)}
+
+
+@router.post("/review-sets")
+@limiter.limit("10/minute")
+def module_review_set(body: ReviewRequest, request: Request, authorization: str = Header(default="")):
+    """A review set for part of a class, e.g. one Canvas module once it's finished."""
+    user_id = get_user_id(authorization)
+    from routers.drive import _own_folder
+    folder = _own_folder(user_id, body.folder_id)
+    key = hashlib.sha256(body.prefix.encode()).hexdigest()[:12]
+    guide = build_review(user_id, folder["id"], body.title or f"{folder.get('name') or 'Class'}: review",
+                         f"review:{folder['id']}:{key}", prefix=body.prefix or None)
+    return {"guide": {"id": guide.get("id"), "title": guide.get("title")}}
+
+
 # ---- Google sync on/off ----
 
 class SyncRequest(BaseModel):
@@ -294,9 +366,28 @@ def alerts(authorization: str = Header(default="")):
     """Grade drops, missing work and announcements that change a deadline or add work."""
     user_id = get_user_id(authorization)
     db = get_supabase()
-    out = [{**a, "id": f"canvas:{a.get('at')}"} for a in (sync_state.get(user_id, "canvas").get("stats") or {}).get("alerts") or []]
-    courses = {row["canvas_course_id"]: row.get("course_code") or row.get("name") for row in
-               db.table("canvas_courses").select("canvas_course_id,name,course_code").eq("user_id", user_id).execute().data or []}
+    stats = sync_state.get(user_id, "canvas").get("stats") or {}
+    course_rows = db.table("canvas_courses").select("canvas_course_id,name,course_code,class_id").eq("user_id", user_id).execute().data or []
+    courses = {row["canvas_course_id"]: row.get("course_code") or row.get("name") for row in course_rows}
+    classes = {row["canvas_course_id"]: row.get("class_id") for row in course_rows}
+    out = []
+    for alert in stats.get("alerts") or []:
+        alert = {**alert, "id": f"canvas:{alert.get('at')}"}
+        if alert.get("kind") == "module_done":
+            # The button makes a review set from that module's imports.
+            alert["folder_id"] = library_import.class_folder(user_id, classes.get(alert.get("course_id")))
+            alert["prefix"] = f"{alert.get('course') or ''} · {alert.get('module') or ''}"
+        out.append(alert)
+    # Exams in the next 10 days without a review set yet.
+    now = _now()
+    reviewed = library_import.existing_refs(user_id, "review:")
+    dismissed = set(stats.get("exam_dismissed") or [])
+    for item in calendar_for(user_id).get("items") or []:
+        due = google_sync._time(item.get("due_at"))
+        if (due and now < due <= now + timedelta(days=10) and not item.get("done") and f"review:{item['id']}" not in reviewed
+                and item["id"] not in dismissed and _is_exam(user_id, item)):
+            out.append({"id": f"exam:{item['id']}", "kind": "exam_prep", "title": item["title"], "item_key": item["id"],
+                        "course": item.get("course"), "at": item["due_at"], "days": max(1, (due - now).days)})
     for row in db.table("canvas_assignments").select("canvas_assignment_id,canvas_course_id,title,due_at,html_url") \
             .eq("user_id", user_id).eq("missing", True).limit(20).execute().data or []:
         out.append({"id": f"missing:{row['canvas_assignment_id']}", "kind": "missing", "title": row["title"],
@@ -317,6 +408,9 @@ def dismiss_alert(alert_id: str, authorization: str = Header(default="")):
             .eq("canvas_announcement_id", int(value)).execute()
     elif kind == "canvas":
         sync_state.dismiss_alert(user_id, "canvas", value)
+    elif kind == "exam" and ITEM_KEY.fullmatch(value):
+        stats = sync_state.get(user_id, "canvas").get("stats") or {}
+        sync_state.update_stats(user_id, "canvas", {"exam_dismissed": [*(stats.get("exam_dismissed") or []), value][-100:]})
     return {"ok": True}
 
 

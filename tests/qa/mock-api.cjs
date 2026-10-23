@@ -122,7 +122,16 @@ async function install(context, state) {
     if (path === '/alerts' && method === 'GET') return json({ alerts: state.populated ? [
       { id: 'canvas:1', kind: 'grade_drop', course: 'BIO-101', from: 88.5, to: 84, at: new Date().toISOString() },
       { id: 'announcement:5', kind: 'deadline', title: 'Lab report moved', summary: 'The lab report is now due Friday at noon.', course: 'BIO-101' },
+      { id: 'exam:c2', kind: 'exam_prep', title: 'Midterm [BIO-101-002]', item_key: 'c2', days: 3, course: 'BIO-101' },
+      { id: 'canvas:m', kind: 'module_done', module: 'Week 4: Cell energy', course: 'BIO-101', folder_id: 'f1', prefix: 'BIO-101 · Week 4' },
     ] : [] });
+    if (path.match(/^\/plans\/[^/]+\/review-set$/) || path === '/review-sets') return json({ guide: { id: state.guides[0]?.id || 'g1', title: 'Review' } });
+    if (path === '/drive/links' && method === 'GET') return json({ links: state.driveLinks || [] });
+    if (path === '/drive/links' && method === 'PUT') { state.driveLinks = [...(state.driveLinks || []), { library_folder_id: body.library_folder_id, drive_folder_id: body.drive_folder_id, drive_folder_name: body.drive_folder_name }]; return json({ imported: 4, links: state.driveLinks }); }
+    if (path.startsWith('/drive/links/') && method === 'DELETE') { state.driveLinks = []; return json({ links: [] }); }
+    if (path === '/drive/folders') return json({ folders: [{ id: 'df1', name: 'BIO 101 Slides', edited: '2026-10-20' }, { id: 'df2', name: 'Readings', edited: '2026-10-11' }] });
+    if (path === '/drive/sync') return json({ imported: 0, links: state.driveLinks || [] });
+    if (path === '/drive/save') return json({ file_id: 'x', name: 'Guide.md' });
     if (path.startsWith('/alerts/')) return json({ ok: true });
     if ((m = path.match(/^\/plans\/([^/]+)(\/schedule)?$/))) {
       state.plans = state.plans || {};

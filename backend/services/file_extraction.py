@@ -161,6 +161,21 @@ def plain_text(data: bytes, extension: str) -> str:
     return decoded
 
 
+def text_from_file(name: str, data: bytes, mime: str = "") -> str:
+    """Readable text from a downloaded file (PDF, Word, PowerPoint or text), for Library imports.
+    Raises HTTPException 415 for anything else (images and scans go through the upload flow)."""
+    extension = extension_of(name) or {"text/plain": "txt", "text/csv": "csv", "application/pdf": "pdf"}.get(mime, "")
+    if extension == "pdf":
+        return pdf_text(open_pdf(data))
+    if extension == "docx":
+        return docx_text(data)
+    if extension == "pptx":
+        return pptx_slides(data).get("text", "")
+    if extension in {"txt", "md", "csv", "rtf", "html"} or mime.startswith("text/"):
+        return plain_text(data, extension or "txt")
+    raise HTTPException(status_code=415, detail="Cordia can import PDFs, Word, PowerPoint, Google Docs and text files.")
+
+
 def image_data_url(data: bytes, extension: str) -> str:
     if len(data) > MAX_IMAGE_BYTES:
         raise _too_large("Image too large (max 15MB)")

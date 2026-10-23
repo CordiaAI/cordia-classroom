@@ -4,6 +4,7 @@ Every minute it looks for users due a sync and claims each one with a conditiona
 machines never sync the same user at once:
 - Canvas every 20 minutes (assignments, grades, announcements), for connected, unpaused tokens.
 - Google Tasks and Calendar every 15 minutes, for students who turned Cordia sync on.
+- Google Drive folders linked to classes every 30 minutes (new and changed files into Library).
 - Exams found in Canvas get their review sessions scheduled once Calendar sync is on.
 On by default on Fly (FLY_APP_NAME is set there), off elsewhere; SYNC_WORKER=1 or 0 overrides.
 """
@@ -45,7 +46,7 @@ def _due_google(now: datetime) -> list[dict]:
 
 def tick() -> None:
     from routers import canvas, plans
-    from services import google_sync
+    from services import drive_sync, google_sync
     now = datetime.now(timezone.utc)
     for row in _due_canvas(now):
         if not _claim_canvas(row, now):
@@ -66,6 +67,14 @@ def tick() -> None:
         except Exception as error:
             log.info("background %s sync failed: %s", row["connector"], type(error).__name__)
             sync_state.record(row["user_id"], row["connector"], error="Sync failed. It will try again soon.")
+    for row in drive_sync.due(now):
+        if not sync_state.claim(row["user_id"], "gdrive", row.get("last_synced_at")):
+            continue
+        try:
+            drive_sync.sync_folders(row["user_id"])
+        except Exception as error:
+            log.info("background drive sync failed: %s", type(error).__name__)
+            sync_state.record(row["user_id"], "gdrive", error="Drive sync failed. It will try again soon.")
 
 
 def _loop() -> None:
