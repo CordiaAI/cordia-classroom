@@ -69,12 +69,13 @@ def list_connectors(authorization: str = Header(default="")):
         "uses": {use: on for use, on in (saved.get(item["id"]) or {"tutor": True, "assistant": True}).items()
                  if (use == "tutor" and item["id"] in TUTOR_APPS) or (use == "assistant" and item["id"] in COMPOSIO_IDS)},
         "health": _health(states.get(item["id"]) or {}),
+        **({"watch_dates": bool(((states.get(item["id"]) or {}).get("stats") or {}).get("watch_dates"))} if item["id"] in ("gmail", "outlook") else {}),
     } for item in CONNECTORS]}
 
 
 def _health(state: dict) -> dict:
     """What the card shows beyond "Connected": sync on, last sync, counts, and any problem."""
-    stats = {key: value for key, value in (state.get("stats") or {}).items() if key not in ("alerts", "time_zone")}
+    stats = {key: value for key, value in (state.get("stats") or {}).items() if isinstance(value, (int, float)) and not isinstance(value, bool)}
     return {
         "sync_on": bool(state.get("container_id")) or bool((state.get("stats") or {}).get("linked")),
         "last_synced_at": state.get("last_synced_at"),

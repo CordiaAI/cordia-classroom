@@ -228,6 +228,30 @@ def build_review(user_id: str, folder_id: str, title: str, ref: str, prefix: Opt
     return (db.table("study_guides").upsert(row, on_conflict="user_id,external_source_id").execute().data or [row])[0]
 
 
+def reflow(user_id: str, item_key: str, time_zone: str = "") -> dict:
+    """After a due date changes: open steps get new dates spaced back from it, study blocks Cordia
+    planned past the new date are taken off (blocks the student moved stay), and free time before
+    it is filled if the work still needs some. A cancelled deadline loses its planned blocks."""
+    db = get_supabase()
+    now = _now()
+    item = next((i for i in calendar_for(user_id).get("items") or [] if i["id"] == item_key), None)
+    blocks = db.table("study_blocks").select("id,starts_at,status").eq("user_id", user_id).eq("item_key", item_key).eq("status", "planned").execute().data or []
+    due = google_sync._time(item["due_at"]) if item and not item.get("cancelled") else None
+    late = [b["id"] for b in blocks if google_sync._time(b["starts_at"]) > now and (due is None or google_sync._time(b["starts_at"]) >= due)]
+    if late:
+        db.table("study_blocks").delete().in_("id", late).eq("user_id", user_id).execute()
+    moved_steps = added = 0
+    if due:
+        steps = [s for s in db.table("assignment_steps").select("id,position,done").eq("user_id", user_id).eq("item_key", item_key)
+                 .order("position").execute().data or [] if not s.get("done")]
+        for step, step_due in zip(steps, planner.stagger(len(steps), due, now)):
+            db.table("assignment_steps").update({"due_at": step_due.isoformat()}).eq("id", step["id"]).eq("user_id", user_id).execute()
+            moved_steps += 1
+        if steps or _is_exam(user_id, item):
+            added = len(schedule(user_id, item, _zone(user_id, time_zone or None)))
+    return {"blocks_removed": len(late), "steps_moved": moved_steps, "blocks_added": added}
+
+
 def _push(user_id: str) -> None:
     """Send changes to Google now when sync is on; the background worker catches anything missed."""
     for app, run in (("gtasks", google_sync.sync_tasks), ("gcal", google_sync.sync_calendar)):
@@ -334,6 +358,78 @@ def module_review_set(body: ReviewRequest, request: Request, authorization: str 
     return {"guide": {"id": guide.get("id"), "title": guide.get("title")}}
 
 
+# ---- Date changes from email and announcements (services.mail_watch) ----
+
+class DecideRequest(BaseModel):
+    time_zone: str = Field(default="", max_length=64)
+
+
+def _change(user_id: str, change_id: str) -> dict:
+    from ids import require_uuid
+    require_uuid(change_id, "change ID")
+    rows = get_supabase().table("deadline_changes").select("*").eq("id", change_id).eq("user_id", user_id).limit(1).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="That change isn't there anymore.")
+    return rows[0]
+
+
+@router.get("/deadline-changes")
+def list_changes(authorization: str = Header(default="")):
+    user_id = get_user_id(authorization)
+    rows = get_supabase().table("deadline_changes").select("id,source,item_key,kind,title,summary,sender,old_due,new_due,created_at") \
+        .eq("user_id", user_id).eq("status", "pending").order("created_at", desc=True).limit(20).execute().data or []
+    return {"changes": rows}
+
+
+@router.post("/deadline-changes/{change_id}/accept")
+@limiter.limit("20/minute")
+def accept_change(change_id: str, body: DecideRequest, request: Request, authorization: str = Header(default="")):
+    """One confirm: the new date (or the cancellation) applies to the deadline, its steps, its study
+    blocks and its Google Task. Older pending changes to the same deadline are set aside."""
+    user_id = get_user_id(authorization)
+    result = apply_change(user_id, change_id, body.time_zone)
+    _push(user_id)
+    return {"ok": True, **result}
+
+
+def apply_change(user_id: str, change_id: str, time_zone: str = "") -> dict:
+    change = _change(user_id, change_id)
+    db = get_supabase()
+    now = _now().isoformat()
+    db.table("deadline_changes").update({"status": "accepted", "decided_at": now}).eq("id", change_id).eq("user_id", user_id).execute()
+    db.table("deadline_changes").update({"status": "dismissed", "decided_at": now}).eq("user_id", user_id) \
+        .eq("item_key", change["item_key"]).eq("status", "pending").execute()
+    return reflow(user_id, change["item_key"], time_zone)
+
+
+@router.post("/deadline-changes/{change_id}/dismiss")
+def dismiss_change(change_id: str, authorization: str = Header(default="")):
+    user_id = get_user_id(authorization)
+    _change(user_id, change_id)
+    get_supabase().table("deadline_changes").update({"status": "dismissed", "decided_at": _now().isoformat()}) \
+        .eq("id", change_id).eq("user_id", user_id).execute()
+    return {"ok": True}
+
+
+class WatchRequest(BaseModel):
+    on: bool
+
+
+@router.put("/mail/{connector}/watch")
+@limiter.limit("10/minute")
+def watch_mail(connector: str, body: WatchRequest, request: Request, authorization: str = Header(default="")):
+    """Turn "Watch for date changes" on or off for Gmail or Outlook; on runs a first pass now."""
+    from services import mail_watch
+    user_id = get_user_id(authorization)
+    if connector not in mail_watch.MAIL_APPS:
+        raise HTTPException(status_code=404, detail="Unknown connector")
+    sync_state.update_stats(user_id, connector, {"watch_dates": body.on})
+    if not body.on:
+        return {"on": False}
+    composio.account_for(user_id, connector)
+    return {"on": True, **mail_watch.watch(user_id, connector)}
+
+
 # ---- Google sync on/off ----
 
 class SyncRequest(BaseModel):
@@ -392,8 +488,19 @@ def alerts(authorization: str = Header(default="")):
             .eq("user_id", user_id).eq("missing", True).limit(20).execute().data or []:
         out.append({"id": f"missing:{row['canvas_assignment_id']}", "kind": "missing", "title": row["title"],
                     "course": courses.get(row["canvas_course_id"]), "url": row.get("html_url"), "at": row.get("due_at")})
+    proposed = set()
+    try:
+        for row in db.table("deadline_changes").select("id,source,source_id,kind,title,summary,sender,old_due,new_due,item_key") \
+                .eq("user_id", user_id).eq("status", "pending").order("created_at", desc=True).limit(10).execute().data or []:
+            if row["source"] == "canvas_announcement":
+                proposed.add(row["source_id"])
+            out.append({**row, "id": f"change:{row['id']}", "change_id": row["id"], "kind": "date_change", "change": row["kind"]})
+    except Exception:
+        log.warning("deadline_changes missing; run the deadline_changes migration")
     for row in db.table("canvas_announcements").select("canvas_announcement_id,canvas_course_id,title,summary,changes,posted_at") \
             .eq("user_id", user_id).neq("changes", "none").is_("read_at", "null").order("posted_at", desc=True).limit(10).execute().data or []:
+        if str(row["canvas_announcement_id"]) in proposed:
+            continue  # Shown as a date change to accept instead.
         out.append({"id": f"announcement:{row['canvas_announcement_id']}", "kind": row["changes"], "title": row["title"],
                     "summary": row.get("summary"), "course": courses.get(row["canvas_course_id"]), "at": row.get("posted_at")})
     return {"alerts": out}
@@ -408,6 +515,8 @@ def dismiss_alert(alert_id: str, authorization: str = Header(default="")):
             .eq("canvas_announcement_id", int(value)).execute()
     elif kind == "canvas":
         sync_state.dismiss_alert(user_id, "canvas", value)
+    elif kind == "change":
+        dismiss_change(value, authorization)
     elif kind == "exam" and ITEM_KEY.fullmatch(value):
         stats = sync_state.get(user_id, "canvas").get("stats") or {}
         sync_state.update_stats(user_id, "canvas", {"exam_dismissed": [*(stats.get("exam_dismissed") or []), value][-100:]})

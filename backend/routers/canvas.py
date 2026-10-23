@@ -16,7 +16,7 @@ from services import canvas_client
 from services.canvas_client import CanvasClient, CanvasDenied, CanvasError, CanvasForbiddenRequest, CanvasUnauthorized
 from services.class_catalog import clean_term, school_name_from_domain, topic_summary
 from services.class_db import add_membership, ensure_class, ensure_school
-from services import file_extraction, library_import, sync_state
+from services import file_extraction, library_import, mail_watch, sync_state
 from services.grades import canvas_scale, estimate
 from services.llm import read_announcement
 from services.text_processing import html_to_text
@@ -307,6 +307,10 @@ def _sync_announcements(db, user_id: str, client: CanvasClient, courses: dict) -
             "title": title, "message": message, "posted_at": item.get("posted_at"),
             "summary": str(read.get("summary") or "")[:600] or None, "changes": changes,
         }, on_conflict="user_id,canvas_announcement_id").execute()
+        if changes == "deadline":
+            # Flow 3: a date the announcement moves becomes a change the student confirms.
+            mail_watch.propose(user_id, source="canvas_announcement", source_id=str(item["id"]),
+                               sender=(courses.get(course_id) or {}).get("name") or "Canvas", subject=title, text=message)
 
 
 def _submitted(item: dict) -> bool:
@@ -375,7 +379,8 @@ def _status(db, user_id: str) -> dict:
         "remind": days is not None and 0 <= days <= REMIND_DAYS,
         "sync_paused": bool(connection.get("sync_paused")),
         "last_synced_at": connection.get("last_synced_at"),
-        "stats": {k: v for k, v in (sync_state.get(user_id, "canvas").get("stats") or {}).items() if k != "alerts"},
+        "stats": {k: v for k, v in (sync_state.get(user_id, "canvas").get("stats") or {}).items()
+                  if isinstance(v, (int, float)) and not isinstance(v, bool)},
         "sync_error": sync_state.get(user_id, "canvas").get("last_error"),
         "courses": [{
             "id": row["canvas_course_id"], "name": row["name"], "code": row["course_code"],

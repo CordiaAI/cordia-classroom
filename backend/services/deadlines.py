@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-_COLUMNS = "canvas_assignment_id,canvas_course_id,title,due_at"
+_COLUMNS = "canvas_assignment_id,canvas_course_id,title,due_at,canvas_updated_at"
 
 
 def canvas_item_key(assignment_id) -> str:
@@ -50,3 +50,37 @@ def marks(db, user_id: str) -> dict:
 
 def is_done(key: str, marked: dict, submitted: bool = False) -> bool:
     return marked[key] if key in marked else bool(submitted)
+
+
+def accepted_changes(db, user_id: str) -> dict:
+    """item_key -> the latest date change the student accepted (from email or an announcement)."""
+    try:
+        rows = db.table("deadline_changes").select("item_key,kind,new_due,decided_at,sender").eq("user_id", user_id) \
+            .eq("status", "accepted").neq("item_key", "").order("decided_at", desc=True).limit(500).execute().data or []
+    except Exception:
+        logger.warning("deadline_changes missing; run the deadline_changes migration")
+        return {}
+    latest = {}
+    for row in rows:
+        latest.setdefault(row["item_key"], row)
+    return latest
+
+
+def apply_changes(items: list, changes: dict, canvas_updated: dict | None = None) -> list:
+    """The student's accepted changes on top of the source's dates. Canvas still owns due dates:
+    once Canvas itself changes an assignment after the change was accepted, Canvas's date wins."""
+    for item in items:
+        change = changes.get(str(item.get("id")))
+        if not change:
+            continue
+        updated = (canvas_updated or {}).get(str(item.get("id")))
+        if updated and change.get("decided_at") and str(updated) > str(change["decided_at"]):
+            continue
+        if change["kind"] == "cancelled":
+            item["done"] = True
+            item["cancelled"] = True
+        elif change.get("new_due"):
+            item["original_due_at"] = item["due_at"]
+            item["due_at"] = change["new_due"]
+            item["changed_by"] = change.get("sender") or ""
+    return items

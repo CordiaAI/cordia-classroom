@@ -225,6 +225,7 @@ body { touch-action: manipulation; }
 .cn-health.is-error { color: var(--error); }
 .cn-uses { display: grid; width: 100%; padding: 4px 0; border-block: 1px solid var(--hairline); text-align: left; }
 .cn-uses .c-toggle { justify-content: space-between; width: 100%; }
+.cn-watch-note { margin: 0 0 8px; }
 .cn-feed { display: grid; gap: 8px; width: 100%; text-align: left; }
 .cn-assistant { display: grid; justify-items: start; gap: 8px; width: 100%; padding-top: 12px; border-top: 1px solid var(--hairline); text-align: left; }
 .cn-group-title { margin: 20px 0 0; font: 600 var(--fs-15, 15px)/1.4 var(--font-sans); color: var(--muted); }
