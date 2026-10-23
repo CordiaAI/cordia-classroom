@@ -6,6 +6,7 @@ machines never sync the same user at once:
 - Google Tasks and Calendar every 15 minutes, for students who turned Cordia sync on.
 - Google Drive folders linked to classes every 30 minutes (new and changed files into Library).
 - Gmail and Outlook every 30 minutes for students watching for date changes (services.mail_watch).
+- The Notion course database every 30 minutes, and linked Google Doc drafts every 6 hours.
 - Exams found in Canvas get their review sessions scheduled once Calendar sync is on.
 On by default on Fly (FLY_APP_NAME is set there), off elsewhere; SYNC_WORKER=1 or 0 overrides.
 """
@@ -47,7 +48,7 @@ def _due_google(now: datetime) -> list[dict]:
 
 def tick() -> None:
     from routers import canvas, plans
-    from services import drive_sync, google_sync, mail_watch
+    from services import docs_sync, drive_sync, google_sync, mail_watch, notion_sync
     now = datetime.now(timezone.utc)
     for row in _due_canvas(now):
         if not _claim_canvas(row, now):
@@ -84,6 +85,15 @@ def tick() -> None:
         except Exception as error:
             log.info("background mail watch failed: %s", type(error).__name__)
             sync_state.record(row["user_id"], row["connector"], error="Checking mail failed. It will try again soon.")
+    for connector, rows, run in (("notion", notion_sync.due(now), notion_sync.sync_db), ("gdocs", docs_sync.due_drafts(now), docs_sync.check_drafts)):
+        for row in rows:
+            if not sync_state.claim(row["user_id"], connector, row.get("last_synced_at")):
+                continue
+            try:
+                run(row["user_id"])
+            except Exception as error:
+                log.info("background %s sync failed: %s", connector, type(error).__name__)
+                sync_state.record(row["user_id"], connector, error="Sync failed. It will try again soon.")
 
 
 def _loop() -> None:

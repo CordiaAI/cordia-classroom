@@ -41,6 +41,7 @@ const ALERT_TEXT = {
   new_work: alert => `New work: ${alert.title}`,
   exam_prep: alert => `${alert.title} in ${alert.days} day${alert.days === 1 ? '' : 's'}`,
   module_done: alert => `Finished: ${alert.module}`,
+  draft_stalled: alert => `${alert.title}: draft hasn't grown in 2 days`,
   date_change: alert => (alert.change === 'cancelled'
     ? `Cancelled: ${alert.title}`
     : `${alert.title}: ${shortDate(alert.old_due)} → ${shortDate(alert.new_due)}`),
@@ -225,9 +226,13 @@ export default function Today() {
               <div key={alert.id} className={'c-list-row today-alert is-' + alert.kind}>
                 <span className="c-grow">
                   <span className="today-alert-title">{ALERT_TEXT[alert.kind]?.(alert) || alert.title}</span>
-                  <span className="c-meta">{[alert.kind === 'date_change' ? senderName(alert.sender) : alert.course, alert.summary].filter(Boolean).join(' · ')}</span>
+                  <span className="c-meta">{[alert.kind === 'date_change' ? senderName(alert.sender) : alert.course, alert.summary,
+                    alert.kind === 'draft_stalled' && `due in ${alert.days} day${alert.days === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}</span>
                 </span>
                 {alert.url && <a className="c-btn c-btn--quiet c-btn--sm" href={alert.url} target="_blank" rel="noreferrer">Open</a>}
+                {alert.kind === 'draft_stalled' && (
+                  <Link className="c-btn c-btn--secondary c-btn--sm" href={`/tutor?assignment=${encodeURIComponent(alert.item_key)}&title=${encodeURIComponent(alert.title || '')}&ask=${encodeURIComponent('Help me get unstuck on my draft: what should I write next, based on the rubric?')}`}>Get unstuck</Link>
+                )}
                 {alert.kind === 'date_change' && (
                   <button type="button" className="c-btn c-btn--primary c-btn--sm" disabled={Boolean(reviewing)} onClick={() => accept(alert)}>
                     {reviewing === alert.id ? 'Updating…' : alert.change === 'cancelled' ? 'Remove it' : 'Update'}

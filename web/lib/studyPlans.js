@@ -49,3 +49,15 @@ export const buildReview = ({ folderId, prefix, title }) => apiFetch('/review-se
 // Date changes found in school email or Canvas announcements: nothing moves until accepted.
 export const acceptChange = id => apiFetch(`/deadline-changes/${encodeURIComponent(id)}/accept`, { method: 'POST', body: JSON.stringify({ time_zone: timeZone() }), timeoutMs: 60000 });
 export const setMailWatch = (connector, on) => apiFetch(`/mail/${connector}/watch`, { method: 'PUT', body: JSON.stringify({ on }), timeoutMs: 120000 });
+
+// Docs and Notion (backend routers/workspace.py).
+const post = (url, body, timeoutMs = 120000) => apiFetch(url, { method: 'POST', body: JSON.stringify(body), timeoutMs });
+export const exportToDocs = ({ guideId, title, markdown }) => post('/docs/export', { guide_id: guideId, title, markdown });
+export const exportToNotion = ({ guideId, title, outline, pairs }) => post('/notion/export', { guide_id: guideId, title, outline, pairs });
+export const linkDraft = (key, docId, title) => apiFetch(`${path(key)}/draft`, { method: 'PUT', body: JSON.stringify({ doc_id: docId, title }), timeoutMs: 60000 });
+export const unlinkDraft = key => apiFetch(`${path(key)}/draft`, { method: 'DELETE' });
+export const notionPages = query => apiFetch(`/notion/pages?q=${encodeURIComponent(query || '')}`);
+export const notionHome = () => apiFetch('/notion/home');
+export const notionSetup = (pageId, title) => post('/notion/setup', { page_id: pageId, title });
+export const notionSync = () => post('/notion/sync', {});
+export const addToLibrary = (connector, { id, title, folderId }) => post(`/connectors/${connector}/library`, { id, title, folder_id: folderId });

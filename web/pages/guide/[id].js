@@ -6,7 +6,7 @@ import CardPhoto from '../../components/CardPhoto';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Brain, Download, ExternalLink, FolderInput, Gamepad2, HardDriveUpload, Layers, Lock, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
+  ArrowLeft, Brain, Download, ExternalLink, FolderInput, Gamepad2, Layers, Lock, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -25,6 +25,7 @@ import { rememberGuidePage, rememberLastGuide } from '../../lib/userStore';
 import { activeStep, walkthroughEvent } from '../../lib/walkthrough';
 import { requestTip } from '../../lib/tips';
 import { readUserValue, writeUserValue } from '../../lib/userStore';
+import { exportToDocs, exportToNotion } from '../../lib/studyPlans';
 
 const NURSING_TERMS = ['nursing', 'nurse', 'nclex', 'patient', 'vital signs', 'medication administration', 'care plan', 'nursing diagnosis', 'iv therapy', 'delegation', 'scope of practice', 'sbar', 'discharge planning', 'wound care', 'fall prevention', 'infection control', 'postoperative', 'preoperative', 'lab values', 'contraindications'];
 
@@ -281,6 +282,20 @@ export default function GuidePage() {
   }
 
   // The ⋯ menu's Add to class: file the guide in one of the student's classes (or none).
+  // A formatted Google Doc, or a Notion page with each question as a toggle. Exporting again
+  // replaces the last copy.
+  async function sendTo(where) {
+    const name = where === 'docs' ? 'Google Docs' : 'Notion';
+    setToast(`Exporting to ${name}…`);
+    const data = where === 'docs'
+      ? await exportToDocs({ guideId: id, title: guide.title, markdown: guideMarkdown(guide) })
+      : await exportToNotion({ guideId: id, title: guide.title, outline: guide.notes || '', pairs: parseQAPairs(guide.study_guide).map(pair => ({ question: pair.question, answer: pair.answer })) });
+    if (data?.url) {
+      setToast(`Exported to ${name}`);
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+    } else setToast(apiErrorMessage(data?.detail, `Couldn't export to ${name}.`) + (/connect/i.test(data?.detail || '') ? ` Connect ${name} in Settings › Connectors.` : ''));
+  }
+
   // A copy in the student's Cordia folder in Google Drive; saving again replaces it.
   async function saveToDrive() {
     setToast('Saving to Drive…');
@@ -441,8 +456,16 @@ export default function GuidePage() {
                 ...(classes.length ? [] : [{ label: 'Make a class in Library', onSelect: () => router.push('/library') }]),
               ],
             },
-            { label: 'Export', icon: Download, onSelect: () => exportGuide(guide) },
-            { label: 'Save to Drive', icon: HardDriveUpload, onSelect: saveToDrive },
+            {
+              label: 'Export',
+              icon: Download,
+              items: [
+                { label: 'Download (Markdown)', onSelect: () => exportGuide(guide) },
+                { label: 'Google Docs', onSelect: () => sendTo('docs') },
+                { label: 'Notion', onSelect: () => sendTo('notion') },
+                { label: 'Save a copy to Drive', onSelect: saveToDrive },
+              ],
+            },
             { label: 'Delete', icon: Trash2, danger: true, onSelect: () => setConfirmDelete(true) },
           ]}
         />
