@@ -505,6 +505,11 @@ class CanvasClient:
         with ThreadPoolExecutor(max_workers=LINKED_WORKERS) as pool:
             return [entry for entry in pool.map(described, list(found.values())[:MAX_LINKED_FILES]) if entry]
 
+    def page(self, course_id: int, slug: str) -> dict:
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+", slug or ""):
+            raise CanvasForbiddenRequest("Unknown page")
+        return self._get(f"/api/v1/courses/{int(course_id)}/pages/{slug}").json()
+
     def download_file(self, course_id: int, file_id: int) -> tuple[str, bytes]:
         """One file the user picked. Returns (filename, bytes)."""
         meta = self._get(f"/api/v1/courses/{int(course_id)}/files/{int(file_id)}").json()

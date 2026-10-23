@@ -76,7 +76,7 @@ def _health(state: dict) -> dict:
     """What the card shows beyond "Connected": sync on, last sync, counts, and any problem."""
     stats = {key: value for key, value in (state.get("stats") or {}).items() if key not in ("alerts", "time_zone")}
     return {
-        "sync_on": bool(state.get("container_id")),
+        "sync_on": bool(state.get("container_id")) or bool((state.get("stats") or {}).get("linked")),
         "last_synced_at": state.get("last_synced_at"),
         "error": state.get("last_error"),
         "needs_reconnect": bool(state.get("needs_reconnect")),
@@ -208,18 +208,7 @@ def _drive_text(account: str, user_id: str, file_id: str) -> str:
         content = data.get("downloaded_file_content") or {}
         mime = export
     raw = composio.download(content.get("s3url") or "")
-    name = str(content.get("name") or data.get("name") or "")
-    extension = files.extension_of(name) or {"text/plain": "txt", "text/csv": "csv", "application/pdf": "pdf"}.get(mime, "")
-    if extension == "pdf":
-        return files.pdf_text(files.open_pdf(raw))
-    if extension == "docx":
-        return files.docx_text(raw)
-    if extension == "pptx":
-        slides = files.pptx_slides(raw)
-        return slides.get("text", "")
-    if extension in {"txt", "md", "csv", "rtf", "html"} or mime.startswith("text/"):
-        return files.plain_text(raw, extension or "txt")
-    raise HTTPException(status_code=415, detail="Cordia can import PDFs, Word, PowerPoint, Google Docs and text files.")
+    return files.text_from_file(str(content.get("name") or data.get("name") or ""), raw, mime)
 
 
 @router.post("/connectors/{connector}/import")

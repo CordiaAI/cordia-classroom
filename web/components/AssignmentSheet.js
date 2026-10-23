@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { CalendarClock, ListChecks, MessageCircle, X } from 'lucide-react';
+import { BookOpenCheck, CalendarClock, ListChecks, MessageCircle, X } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import DoneCheck from './DoneCheck';
 import { SectionLoader } from './CordiaLoader';
-import { getPlan, makePlan, minutesLabel, removePlan, schedulePlan, setStepDone } from '../lib/studyPlans';
+import { buildExamReview, getPlan, makePlan, minutesLabel, removePlan, schedulePlan, setStepDone } from '../lib/studyPlans';
+import { useRouter } from 'next/router';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -46,6 +47,15 @@ export default function AssignmentSheet({ item, onClose }) {
     ? `Added ${result.added} study block${result.added === 1 ? '' : 's'} before it's due.`
     : 'Your study time already covers this.'));
   const startOver = () => run('reset', async () => ((await removePlan(item.id))?.ok ? { plan: null } : null));
+  const router = useRouter();
+  // Exams: gather the class's material into one review guide, then open it.
+  async function reviewSet() {
+    setBusy('review'); setError(''); setNotice('');
+    const result = await buildExamReview(item.id);
+    setBusy('');
+    if (result?.guide?.id) router.push(`/guide/${result.guide.id}`);
+    else setError(result?.detail || "That didn't work. Try again.");
+  }
 
   const tutorHref = `/tutor?assignment=${encodeURIComponent(item.id)}&title=${encodeURIComponent(item.title || '')}`;
   const scheduled = (plan?.blocks || []).reduce((sum, block) => sum + (new Date(block.ends_at) - new Date(block.starts_at)) / 60000, 0);
@@ -69,6 +79,11 @@ export default function AssignmentSheet({ item, onClose }) {
               <button type="button" className="c-btn c-btn--primary" onClick={breakDown} disabled={Boolean(busy)}>
                 <ListChecks {...ICON} />{busy === 'plan' ? 'Breaking it down…' : 'Break it down'}
               </button>
+              {item.type === 'exam' && (
+                <button type="button" className="c-btn c-btn--secondary" onClick={reviewSet} disabled={Boolean(busy)}>
+                  <BookOpenCheck {...ICON} />{busy === 'review' ? 'Gathering…' : 'Build review set'}
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -97,6 +112,11 @@ export default function AssignmentSheet({ item, onClose }) {
                 <button type="button" className="c-btn c-btn--primary" onClick={schedule} disabled={Boolean(busy)}>
                   <CalendarClock {...ICON} />{busy === 'schedule' ? 'Finding time…' : plan.blocks.length ? 'Find more time' : 'Schedule study time'}
                 </button>
+                {item.type === 'exam' && (
+                  <button type="button" className="c-btn c-btn--secondary" onClick={reviewSet} disabled={Boolean(busy)}>
+                    <BookOpenCheck {...ICON} />{busy === 'review' ? 'Gathering…' : 'Build review set'}
+                  </button>
+                )}
                 <Link href={tutorHref} className="c-btn c-btn--secondary"><MessageCircle {...ICON} />Ask Tutor</Link>
                 <button type="button" className="c-btn c-btn--quiet" onClick={startOver} disabled={Boolean(busy)}>Start over</button>
               </div>

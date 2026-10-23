@@ -19,6 +19,17 @@ export default function CanvasCourseList({ courses = [], onChange }) {
     else setError(apiErrorMessage(data?.detail, 'Canvas could not be reached.'));
   }
 
+  // Module files and pages of an imported class come into its Library folder on their own.
+  async function setAuto(course, on) {
+    setBusy(`auto-${course.id}`);
+    setError('');
+    const data = await apiFetch(`/canvas/courses/${course.id}/auto-import`, { method: 'PUT', body: JSON.stringify({ on }), timeoutMs: 120000 });
+    setBusy(null);
+    if (!Array.isArray(data?.auto_import)) { setError(apiErrorMessage(data?.detail, 'Canvas could not be reached.')); return; }
+    const status = await apiFetch('/canvas/status');
+    if (status?.courses) onChange?.(status);
+  }
+
   if (!courses.length) return <p className="c-meta">No active classes</p>;
   return (
     <>
@@ -30,13 +41,21 @@ export default function CanvasCourseList({ courses = [], onChange }) {
               <span className="c-meta c-truncate">{[course.code ? course.name : '', course.term].filter(Boolean).join(' · ')}</span>
             </span>
             <Toggle checked={pending[course.id] ?? course.imported} disabled={busy === course.id} onChange={value => toggle(course, value)} label={`Import ${course.code || course.name}`} hideLabel />
+            {course.imported && (
+              <span className="ccl-auto">
+                <Toggle checked={Boolean(course.auto_import)} disabled={busy === `auto-${course.id}`} onChange={value => setAuto(course, value)}
+                  label={busy === `auto-${course.id}` ? 'Bringing in files…' : 'Bring module files into Library'} />
+              </span>
+            )}
           </li>
         ))}
       </ul>
       {error && <p className="ccl-error" role="alert">{error}</p>}
       <style jsx global>{`
         .ccl { list-style: none; margin: 0; padding: 0; display: grid; }
-        .ccl-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 60px; border-bottom: 1px solid var(--line); }
+        .ccl-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 16px; min-height: 60px; border-bottom: 1px solid var(--line); }
+        .ccl-auto { flex: 1 0 100%; padding-bottom: 6px; }
+        .ccl-auto .c-toggle { width: 100%; justify-content: space-between; font: 500 14px/1.3 var(--font-sans); color: var(--muted); }
         .ccl-row:last-child { border-bottom: 0; }
         .ccl-name { display: grid; gap: 2px; min-width: 0; }
         .ccl-name strong { font: 600 15px/1.3 var(--font-sans); }

@@ -14,6 +14,7 @@ import { walkthroughEvent } from '../lib/walkthrough';
 import { assistantApi } from '../lib/assistant';
 import { agoLabel, syncOff, syncOn } from '../lib/studyPlans';
 import IcloudSheet from './assistant/IcloudSheet';
+import DriveFolders from './DriveFolders';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // What each app does here, shown in its sheet.
@@ -22,7 +23,7 @@ const DETAILS = {
   gcal: 'Puts your study time on a separate "Cordia" calendar, fitted around what is already on yours. Move or delete a block and Cordia keeps your change. Nothing is added to your own calendars.',
   apple_calendar: 'Subscribes your Apple Calendar to your deadlines. It refreshes every hour on your iPhone, iPad and Mac. No Apple password needed.',
   gtasks: 'Keeps a "Cordia" list in Google Tasks: each deadline is a to-do, with its steps as subtasks. Check one off on your phone and it is done in Cordia too.',
-  gdrive: 'Find a PDF, Word, PowerPoint or Google Doc in your Drive and open it in Create, ready to make a guide.',
+  gdrive: 'Link a Drive folder to a class and new slides and readings come into Library on their own. Import a single file into Create, or save a copy of any guide back to a Cordia folder in your Drive.',
   gdocs: 'Find a Google Doc and open its text in Create, ready to make a guide.',
   notion: 'Find a Notion page and open it in Create, ready to make a guide. Share the page with Cordia in Notion first.',
   gsheets: 'Text Cordia Assistant to add a row or read a sheet: log study hours, expenses, anything.',
@@ -86,14 +87,14 @@ function AssistantAppleCalendar() {
 }
 const IMPORTS = ['gdrive', 'gdocs', 'notion'];
 const SYNC_APPS = { gcal: 'calendar', gtasks: 'list' };
-const STAT_WORDS = { tasks: 'to-do', blocks: 'study block', assignments: 'assignment', announcements: 'announcement' };
+const STAT_WORDS = { tasks: 'to-do', blocks: 'study block', assignments: 'assignment', announcements: 'announcement', files: 'file imported', imported_files: 'file imported' };
 
 // "Last synced 4 min ago · 12 assignments": what a connection is actually doing.
 function healthLine(health) {
   if (!health) return '';
   const counts = Object.entries(health.stats || {})
     .filter(([key, value]) => STAT_WORDS[key] && typeof value === 'number')
-    .map(([key, value]) => `${value} ${STAT_WORDS[key]}${value === 1 ? '' : 's'}`);
+    .map(([key, value]) => { const [noun, ...rest] = STAT_WORDS[key].split(' '); return [`${value} ${noun}${value === 1 ? '' : 's'}`, ...rest].join(' '); });
   return [health.last_synced_at && `Last synced ${agoLabel(health.last_synced_at)}`, ...counts].filter(Boolean).join(' · ');
 }
 // Create reads this draft, so an import opens there ready to make a guide.
@@ -450,6 +451,7 @@ export default function ConnectorsSettings() {
                 </div>
               )}
               {active.id === 'apple_calendar' && <AssistantAppleCalendar />}
+              {active.id === 'gdrive' && active.connected && <DriveFolders />}
               {notice && <p className="cn-notice" role="status">{notice}</p>}
               {error && <p className="cn-error" role="alert">{error}</p>}
             </div>

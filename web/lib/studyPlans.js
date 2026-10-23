@@ -40,3 +40,8 @@ export function agoLabel(iso, now = Date.now()) {
   if (minutes < 24 * 60) return `${Math.round(minutes / 60)} h ago`;
   return new Date(time).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
+
+// Exam prep: gather the class's material into one review guide (and space review sessions).
+export const buildExamReview = key => apiFetch(`${path(key)}/review-set`, { method: 'POST', body: JSON.stringify({ time_zone: timeZone() }), timeoutMs: 120000 });
+// A review set for part of a class, e.g. a finished Canvas module.
+export const buildReview = ({ folderId, prefix, title }) => apiFetch('/review-sets', { method: 'POST', body: JSON.stringify({ folder_id: folderId, prefix: prefix || '', title: title || '' }), timeoutMs: 120000 });

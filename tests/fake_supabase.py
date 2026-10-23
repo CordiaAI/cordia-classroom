@@ -52,6 +52,11 @@ class Query:
         self.filters.append(lambda r: r.get(key) == value)
         return self
 
+    def like(self, key, pattern):
+        prefix = pattern.rstrip("%")
+        self.filters.append(lambda r: str(r.get(key) or "").startswith(prefix))
+        return self
+
     def neq(self, key, value):
         self.filters.append(lambda r: r.get(key) != value)
         return self
