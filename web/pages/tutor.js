@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+import { useRouter } from 'next/router';
 import { useRequireAuth } from '../lib/auth';
 import AIChatWidget from '../components/AIChatWidget';
 import { lastGuide } from '../lib/userStore';
@@ -5,12 +7,16 @@ import { lastGuide } from '../lib/userStore';
 // The Tutor at full size. Everywhere else it opens as a side panel from "Ask".
 export default function TutorPage() {
   const { ready } = useRequireAuth();
+  const { query } = useRouter();
+  // /tutor?assignment=canvas-123&title=...: opened from an assignment, rubric and all.
+  const key = typeof query.assignment === 'string' && /^[\w@.:-]{1,200}$/.test(query.assignment) ? query.assignment : '';
+  const assignment = useMemo(() => (key ? { key, title: typeof query.title === 'string' ? query.title.slice(0, 200) : '' } : null), [key, query.title]);
   if (!ready) return null;
   return (
     <div className="tutor-page">
       <h1 className="sr-only">Tutor</h1>
       <div className="c-glass tutor-page-panel">
-        <AIChatWidget preferredGuideId={lastGuide()?.id || ''} freshOnMount />
+        <AIChatWidget preferredGuideId={assignment ? '' : lastGuide()?.id || ''} freshOnMount assignment={assignment} />
       </div>
       <style jsx>{`
         .tutor-page { display: grid; justify-items: center; }

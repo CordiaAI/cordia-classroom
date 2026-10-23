@@ -118,8 +118,37 @@ def _owned_row(table: str, columns: str, row_id: str, user_id: str, kind: str) -
     return result.data[0]
 
 
+def _assignment_text(user_id: str, key: str) -> tuple[str, Optional[dict]]:
+    """The assignment's instructions and rubric, so the Tutor can check work against each criterion."""
+    from routers.plans import canvas_detail
+    detail = canvas_detail(user_id, key)
+    if not detail:
+        return "", None
+    criteria = "\n".join(
+        f"{index}. {c.get('description') or ''} ({c.get('points') or 0} pts)" + (f": {c['long_description']}" if c.get("long_description") else "")
+        for index, c in enumerate(detail.get("rubric") or [], 1))
+    text = "\n\n".join(filter(None, [
+        f"ASSIGNMENT: {detail.get('title') or 'Assignment'}" + (f" ({detail['points_possible']} points)" if detail.get("points_possible") else ""),
+        f"INSTRUCTIONS:\n{detail['description']}" if detail.get("description") else "",
+        f"RUBRIC CRITERIA (numbered):\n{criteria}" if criteria else "",
+    ]))
+    return text, {"type": "assignment", "id": key, "title": detail.get("title") or "Assignment"}
+
+
 def _load_material(body: ChatRequest, user_id: str) -> Material:
     """A saved guide or note is read from the database; the client's copy is only a fallback."""
+    material = _load_owned_material(body, user_id)
+    if not body.assignment_key:
+        return material
+    text, source = _assignment_text(user_id, body.assignment_key)
+    if not text:
+        return material
+    # The assignment comes first; anything else the student picked (a draft, guide or file) follows it.
+    work = f"\n\nALSO SELECTED BY THE STUDENT:\n{material.content}" if material.content.strip() else ""
+    return Material((text + work)[:MAX_CONTENT_LENGTH], material.source or source, guide=material.guide, note=material.note)
+
+
+def _load_owned_material(body: ChatRequest, user_id: str) -> Material:
     sent = (body.content or "")[:MAX_CONTENT_LENGTH]
     if body.guide_id:
         guide = _owned_row("study_guides", "id,title,folder_id,study_guide,notes,source_url", body.guide_id, user_id, "guide")

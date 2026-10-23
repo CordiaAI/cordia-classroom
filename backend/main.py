@@ -21,7 +21,7 @@ from routers import (
     auth, billing, calendar, chat, feedback, folders, guides, learning, materials,
     nclex, practice, quiz, search, smart_notes, stats, tutor,
 )
-from routers import canvas, classes, admin, public_forms, connectors
+from routers import canvas, classes, admin, public_forms, connectors, plans
 from services import log_scrub
 
 # Load environment variables
@@ -43,6 +43,12 @@ app = FastAPI(
     docs_url="/docs" if os.getenv("ENVIRONMENT") != "production" else None,
     redoc_url=None,
 )
+
+@app.on_event("startup")
+def _start_sync_worker() -> None:
+    from services import sync_worker
+    sync_worker.start()
+
 
 # Attach rate limiter
 app.state.limiter = limiter
@@ -189,6 +195,7 @@ app.include_router(canvas.router)
 app.include_router(classes.router)
 app.include_router(admin.router)
 app.include_router(public_forms.router)
+app.include_router(plans.router)
 
 
 

@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "tests"))
 
 USER = "11111111-2222-4333-8444-555555555555"
 SOON = (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0)
@@ -23,11 +24,16 @@ class ConnectorTests(unittest.TestCase):
         os.environ.setdefault("RETAIN_SIGNING_KEY", "test-key")
         from fastapi.testclient import TestClient
         from main import app
+        from fake_supabase import FakeDB
         self.client = TestClient(app)
         self.auth = {"Authorization": "Bearer t"}
+        self.db = FakeDB()
         self.patches = [
             patch("routers.connectors.get_user_id", return_value=USER),
             patch("routers.connectors.calendar_for", return_value={"items": ITEMS}),
+            patch("routers.connectors.get_supabase", return_value=self.db),
+            patch("services.sync_state.get_supabase", return_value=self.db),
+            patch("services.google_sync.get_supabase", return_value=self.db),
         ]
         for p in self.patches:
             p.start()
@@ -88,44 +94,6 @@ class ConnectorTests(unittest.TestCase):
         self.assertEqual(_search_terms("summarize the photosynthesis lab from my google drive", "gdrive")[0], "photosynthesis lab")
         self.assertEqual(_search_terms("what's in Sam's Notion page on enzymes", "notion")[0], "Sam's enzymes")
 
-    def test_calendar_gets_only_open_upcoming_deadlines_once(self):
-        calls = []
-
-        def run(account, user, slug, args):
-            calls.append((slug, args))
-            if slug == "GOOGLECALENDAR_EVENTS_LIST":
-                return {"items": []}
-            return {}
-        with patch("services.composio.account_for", return_value="ca_1"), patch("services.composio.run", side_effect=run):
-            body = self.client.post("/connectors/gcal/deadlines", headers=self.auth, json={"time_zone": "America/Chicago"}).json()
-        self.assertEqual(body, {"added": 1, "skipped": 0})
-        created = [args for slug, args in calls if slug == "GOOGLECALENDAR_CREATE_EVENT"][0]
-        self.assertEqual(created["summary"], "Due: Lab report")
-        self.assertEqual(created["timezone"], "America/Chicago")
-        self.assertNotIn("+", created["start_datetime"])
-
-        def run_again(account, user, slug, args):
-            if slug == "GOOGLECALENDAR_EVENTS_LIST":
-                start = created["start_datetime"][:10]
-                return {"items": [{"summary": "Due: Lab report", "start": {"dateTime": start + "T10:00:00-05:00"}}]}
-            raise AssertionError("nothing new should be created")
-        with patch("services.composio.account_for", return_value="ca_1"), patch("services.composio.run", side_effect=run_again):
-            body = self.client.post("/connectors/gcal/deadlines", headers=self.auth, json={"time_zone": "America/Chicago"}).json()
-        self.assertEqual(body, {"added": 0, "skipped": 1})
-
-    def test_tasks_skip_open_duplicates(self):
-        inserted = []
-
-        def run(account, user, slug, args):
-            if slug == "GOOGLETASKS_LIST_TASKS":
-                return {"tasks": []}
-            inserted.append(args)
-            return {}
-        with patch("services.composio.account_for", return_value="ca_1"), patch("services.composio.run", side_effect=run):
-            self.client.post("/connectors/gtasks/deadlines", headers=self.auth, json={})
-        self.assertEqual([t["title"] for t in inserted], ["Lab report"])
-        self.assertEqual(inserted[0]["status"], "needsAction")
-
     def test_apple_feed_is_signed_and_lists_open_deadlines(self):
         url = self.client.get("/connectors/apple_calendar/feed", headers=self.auth).json()["url"]
         path = "/" + url.split("/", 3)[3]
@@ -134,6 +102,12 @@ class ConnectorTests(unittest.TestCase):
         self.assertIn("text/calendar", ics.headers["content-type"])
         self.assertIn("SUMMARY:Due: Lab report", ics.text)
         self.assertNotIn("Essay", ics.text)
+        self.db.rows("study_blocks").append({"id": "b1", "user_id": USER, "item_key": "canvas:1", "kind": "work", "status": "planned",
+                                             "starts_at": (SOON - timedelta(days=1)).isoformat(), "ends_at": (SOON - timedelta(days=1, minutes=-45)).isoformat()})
+        with patch("routers.calendar.calendar_for", return_value={"items": ITEMS}):
+            ics = self.client.get(path)
+        self.assertIn("UID:block-b1@cordiaai.io", ics.text)
+        self.assertIn("SUMMARY:Work on Lab report", ics.text)
         forged = self.client.get(f"/calendar-feed/{USER}.{'0' * 32}.ics")
         self.assertEqual(forged.status_code, 404)
 

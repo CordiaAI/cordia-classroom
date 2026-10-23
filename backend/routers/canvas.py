@@ -16,12 +16,15 @@ from services import canvas_client
 from services.canvas_client import CanvasClient, CanvasDenied, CanvasError, CanvasForbiddenRequest, CanvasUnauthorized
 from services.class_catalog import clean_term, school_name_from_domain, topic_summary
 from services.class_db import add_membership, ensure_class, ensure_school
+from services import sync_state
 from services.grades import canvas_scale, estimate
+from services.llm import read_announcement
+from services.text_processing import html_to_text
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/canvas", tags=["canvas"])
 
-SYNC_EVERY = timedelta(hours=6)
+SYNC_EVERY = timedelta(minutes=20)
 SYNC_NOW_FLOOR = timedelta(seconds=60)
 ACTIVITY_DAYS = 30
 REMIND_DAYS = 7
@@ -134,20 +137,101 @@ def _import_course(db, user_id: str, client: CanvasClient, row: dict, school: di
         add_membership(db, user_id, class_row, row["term"], "canvas")
         update["class_id"] = class_row["id"]
     db.table("canvas_courses").update(update).eq("user_id", user_id).eq("canvas_course_id", course_id).execute()
-    assignments = client.assignments(course_id)
-    db.table("canvas_assignments").delete().eq("user_id", user_id).eq("canvas_course_id", course_id).execute()
-    rows = [{
-        "user_id": user_id, "canvas_assignment_id": int(item["id"]), "canvas_course_id": course_id,
-        "title": str(item.get("name") or "")[:300], "due_at": item.get("due_at"), "submitted": _submitted(item),
-    } for item in assignments or [] if item.get("id")]
+    assignments = [item for item in client.assignments(course_id) or [] if item.get("id")]
+    rows = [_assignment_row(user_id, course_id, item) for item in assignments]
+    # Updated in place, not replaced, so first_seen_at keeps the day Cordia first saw each one.
     if rows:
+        db.table("canvas_assignments").upsert(rows, on_conflict="user_id,canvas_assignment_id").execute()
+    current = {row["canvas_assignment_id"] for row in rows}
+    stale = [row["canvas_assignment_id"] for row in db.table("canvas_assignments").select("canvas_assignment_id")
+             .eq("user_id", user_id).eq("canvas_course_id", course_id).execute().data or [] if row["canvas_assignment_id"] not in current]
+    if stale:
+        db.table("canvas_assignments").delete().eq("user_id", user_id).in_("canvas_assignment_id", stale).execute()
+    _check_grade(db, user_id, client, row)
+
+
+EXAM = re.compile(r"\b(exam|midterm|final|test)\b", re.I)
+
+
+def _rubric(item: dict) -> Optional[list]:
+    criteria = [{
+        "description": str(c.get("description") or "")[:300],
+        "long_description": str(c.get("long_description") or "")[:1000],
+        "points": c.get("points"),
+        "ratings": [{"description": str(r.get("description") or "")[:200], "points": r.get("points")} for r in (c.get("ratings") or [])[:8]],
+    } for c in (item.get("rubric") or [])[:30] if isinstance(c, dict)]
+    return criteria or None
+
+
+def _assignment_row(user_id: str, course_id: int, item: dict) -> dict:
+    sub = item.get("submission") or {}
+    title = str(item.get("name") or "")[:300]
+    return {
+        "user_id": user_id, "canvas_assignment_id": int(item["id"]), "canvas_course_id": course_id,
+        "title": title, "due_at": item.get("due_at"), "submitted": _submitted(item),
+        "points_possible": item.get("points_possible"),
+        "submission_types": [str(t)[:40] for t in item.get("submission_types") or []][:10],
+        "description": html_to_text(str(item.get("description") or ""))[:20000] or None,
+        "rubric": _rubric(item),
+        "html_url": str(item.get("html_url") or "")[:1000] or None,
+        "missing": bool(sub.get("missing")),
+        "score": sub.get("score"),
+        "is_exam": bool(EXAM.search(title)) or bool(item.get("is_quiz_assignment") and EXAM.search(title)),
+        "canvas_updated_at": item.get("updated_at"),
+    }
+
+
+def _check_grade(db, user_id: str, client: CanvasClient, row: dict) -> None:
+    """Saves the class's current grade; a drop of 2+ points since the last check goes on the alerts list."""
+    try:
+        enrollments = client.my_enrollments(row["canvas_course_id"])
+    except CanvasError:
+        return
+    grades = next((e.get("grades") for e in enrollments or [] if e.get("type") == "StudentEnrollment" and e.get("grades")), None) or {}
+    score = grades.get("current_score")
+    if not isinstance(score, (int, float)):
+        return
+    before = (db.table("canvas_courses").select("current_score").eq("user_id", user_id)
+              .eq("canvas_course_id", row["canvas_course_id"]).limit(1).execute().data or [{}])[0].get("current_score")
+    db.table("canvas_courses").update({
+        "current_score": score, "current_grade": str(grades.get("current_grade") or "")[:10] or None, "grade_checked_at": _now().isoformat(),
+    }).eq("user_id", user_id).eq("canvas_course_id", row["canvas_course_id"]).execute()
+    if isinstance(before, (int, float)) and before - score >= 2:
+        sync_state.add_alert(user_id, "canvas", {
+            "kind": "grade_drop", "course_id": row["canvas_course_id"], "course": row.get("name") or "",
+            "from": round(float(before), 1), "to": round(float(score), 1), "at": _now().isoformat(),
+        })
+
+
+def _sync_announcements(db, user_id: str, client: CanvasClient, courses: dict) -> None:
+    """The last two weeks of announcements in imported classes; new ones get a summary and a flag."""
+    if not courses:
+        return
+    since = (_now() - timedelta(days=14)).date().isoformat()
+    try:
+        found = client.announcements(list(courses), since)
+    except CanvasError as exc:
+        logger.info("canvas announcements skipped: %s", type(exc).__name__)
+        return
+    known = {row["canvas_announcement_id"] for row in db.table("canvas_announcements").select("canvas_announcement_id")
+             .eq("user_id", user_id).execute().data or []}
+    for item in found or []:
+        if not item.get("id") or int(item["id"]) in known:
+            continue
+        course_id = int(str(item.get("context_code") or "course_0").split("_")[-1] or 0)
+        message = html_to_text(str(item.get("message") or ""))[:20000]
+        title = str(item.get("title") or "")[:500]
+        read = {}
         try:
-            db.table("canvas_assignments").upsert(rows, on_conflict="user_id,canvas_assignment_id").execute()
-        except Exception:
-            # Before the deadline_done migration there is no submitted column: keep syncing without it.
-            logger.warning("canvas_assignments.submitted missing; syncing without it")
-            db.table("canvas_assignments").upsert([{k: v for k, v in row.items() if k != "submitted"} for row in rows],
-                                                  on_conflict="user_id,canvas_assignment_id").execute()
+            read = read_announcement(title, (courses.get(course_id) or {}).get("name") or "", message)
+        except Exception as exc:
+            logger.info("announcement summary failed: %s", type(exc).__name__)
+        changes = read.get("changes") if read.get("changes") in ("none", "deadline", "new_work") else "none"
+        db.table("canvas_announcements").upsert({
+            "user_id": user_id, "canvas_announcement_id": int(item["id"]), "canvas_course_id": course_id,
+            "title": title, "message": message, "posted_at": item.get("posted_at"),
+            "summary": str(read.get("summary") or "")[:600] or None, "changes": changes,
+        }, on_conflict="user_id,canvas_announcement_id").execute()
 
 
 def _submitted(item: dict) -> bool:
@@ -165,6 +249,7 @@ def sync(db, user_id: str, *, client: Optional[CanvasClient] = None) -> None:
     try:
         school = ensure_school(db, (_policy_for(db, client.host) or {}).get("school_name") or school_name_from_domain(client.host), client.host)
         existing = {row["canvas_course_id"]: row for row in db.table("canvas_courses").select("*").eq("user_id", user_id).execute().data or []}
+        imported = {}
         for course in client.courses() or []:
             if not course.get("id") or course.get("access_restricted_by_date"):
                 continue
@@ -173,12 +258,24 @@ def sync(db, user_id: str, *, client: Optional[CanvasClient] = None) -> None:
             db.table("canvas_courses").upsert(row, on_conflict="user_id,canvas_course_id").execute()
             if row["imported"]:
                 _import_course(db, user_id, client, row, school)
+                imported[row["canvas_course_id"]] = row
+        _sync_announcements(db, user_id, client, imported)
     except CanvasUnauthorized:
         _auto_disconnect(db, user_id)
+        sync_state.record(user_id, "canvas", error="Canvas stopped accepting your token.", needs_reconnect=True)
         raise
+    except CanvasError as exc:
+        sync_state.record(user_id, "canvas", error="Canvas couldn't be reached.")
+        raise exc
     cutoff = (_now() - timedelta(days=ACTIVITY_DAYS)).isoformat()
     db.table("canvas_activity").delete().eq("user_id", user_id).lt("created_at", cutoff).execute()
     db.table("canvas_connections").update({"last_synced_at": _now().isoformat()}).eq("user_id", user_id).execute()
+    sync_state.record(user_id, "canvas", stats=_canvas_counts(db, user_id))
+
+
+def _canvas_counts(db, user_id: str) -> dict:
+    count = lambda table: db.table(table).select("user_id", count="exact").eq("user_id", user_id).limit(1).execute().count or 0  # noqa: E731
+    return {"assignments": count("canvas_assignments"), "announcements": count("canvas_announcements")}
 
 
 def _status(db, user_id: str) -> dict:
@@ -201,6 +298,8 @@ def _status(db, user_id: str) -> dict:
         "remind": days is not None and 0 <= days <= REMIND_DAYS,
         "sync_paused": bool(connection.get("sync_paused")),
         "last_synced_at": connection.get("last_synced_at"),
+        "stats": {k: v for k, v in (sync_state.get(user_id, "canvas").get("stats") or {}).items() if k != "alerts"},
+        "sync_error": sync_state.get(user_id, "canvas").get("last_error"),
         "courses": [{
             "id": row["canvas_course_id"], "name": row["name"], "code": row["course_code"],
             "term": row["term"], "imported": bool(row.get("imported")), "class_id": row.get("class_id"),

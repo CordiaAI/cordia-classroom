@@ -12,15 +12,16 @@ import Toggle from './Toggle';
 import { BRAND_PATHS } from '../lib/brandIcons';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { assistantApi } from '../lib/assistant';
+import { agoLabel, syncOff, syncOn } from '../lib/studyPlans';
 import IcloudSheet from './assistant/IcloudSheet';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // What each app does here, shown in its sheet.
 const DETAILS = {
   canvas: 'Brings in your classes, deadlines, what you turned in, grades and course files. An access token does all of it; a calendar link is only for schools that block tokens.',
-  gcal: 'Adds each upcoming deadline to your Google Calendar as a 30-minute event ending when it is due. Run it again any time: deadlines already there are skipped.',
+  gcal: 'Puts your study time on a separate "Cordia" calendar, fitted around what is already on yours. Move or delete a block and Cordia keeps your change. Nothing is added to your own calendars.',
   apple_calendar: 'Subscribes your Apple Calendar to your deadlines. It refreshes every hour on your iPhone, iPad and Mac. No Apple password needed.',
-  gtasks: 'Adds each upcoming deadline to Google Tasks as a to-do due that day. To-dos already there are skipped.',
+  gtasks: 'Keeps a "Cordia" list in Google Tasks: each deadline is a to-do, with its steps as subtasks. Check one off on your phone and it is done in Cordia too.',
   gdrive: 'Find a PDF, Word, PowerPoint or Google Doc in your Drive and open it in Create, ready to make a guide.',
   gdocs: 'Find a Google Doc and open its text in Create, ready to make a guide.',
   notion: 'Find a Notion page and open it in Create, ready to make a guide. Share the page with Cordia in Notion first.',
@@ -84,9 +85,19 @@ function AssistantAppleCalendar() {
   );
 }
 const IMPORTS = ['gdrive', 'gdocs', 'notion'];
+const SYNC_APPS = { gcal: 'calendar', gtasks: 'list' };
+const STAT_WORDS = { tasks: 'to-do', blocks: 'study block', assignments: 'assignment', announcements: 'announcement' };
+
+// "Last synced 4 min ago · 12 assignments": what a connection is actually doing.
+function healthLine(health) {
+  if (!health) return '';
+  const counts = Object.entries(health.stats || {})
+    .filter(([key, value]) => STAT_WORDS[key] && typeof value === 'number')
+    .map(([key, value]) => `${value} ${STAT_WORDS[key]}${value === 1 ? '' : 's'}`);
+  return [health.last_synced_at && `Last synced ${agoLabel(health.last_synced_at)}`, ...counts].filter(Boolean).join(' · ');
+}
 // Create reads this draft, so an import opens there ready to make a guide.
 const SOURCE_DRAFT_KEY = 'autostudy_text_draft';
-const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 function ImportSheet({ connector, onClose }) {
   const router = useRouter();
@@ -257,14 +268,14 @@ export default function ConnectorsSettings() {
     else fail(data?.detail || "That didn't disconnect. Try again.");
   }
 
-  async function sendDeadlines(connector) {
+  async function setSync(connector, on) {
     setBusy(connector.id);
-    const data = await apiFetch(`/connectors/${connector.id}/deadlines`, { method: 'POST', body: JSON.stringify({ time_zone: timeZone() }) });
+    const data = on ? await syncOn(connector.id) : await syncOff(connector.id);
     setBusy('');
-    if (typeof data?.added !== 'number') { fail(data?.detail || "That didn't send. Try again."); return; }
-    const noun = connector.id === 'gtasks' ? 'to-do' : 'deadline';
-    if (data.added) say(`Added ${data.added} ${noun}${data.added === 1 ? '' : 's'} to ${connector.name}`);
-    else say(data.skipped ? `${connector.name} already has every upcoming deadline.` : 'No upcoming deadlines to add. Connect Canvas to bring them in.');
+    if (!data || data.detail) { fail(data?.detail || "That didn't work. Try again."); return; }
+    await load();
+    const place = `Cordia ${SYNC_APPS[connector.id]}`;
+    say(on ? `${connector.name} is syncing to your ${place}` : `Stopped syncing. Your ${place} stays in ${connector.name} for you to keep or delete.`);
   }
 
   async function subscribe(connector) {
@@ -313,9 +324,14 @@ export default function ConnectorsSettings() {
     }
     return (
       <>
-        {['gcal', 'gtasks'].includes(connector.id) && (
-          <button type="button" className="c-btn c-btn--primary" disabled={working} onClick={() => sendDeadlines(connector)}>{working ? 'Adding…' : connector.id === 'gcal' ? 'Add deadlines' : 'Add to-dos'}</button>
-        )}
+        {SYNC_APPS[connector.id] && (connector.health?.sync_on ? (
+          <>
+            <button type="button" className="c-btn c-btn--primary" disabled={working} onClick={() => setSync(connector, true)}>{working ? 'Syncing…' : 'Sync now'}</button>
+            <button type="button" className="c-btn c-btn--secondary" disabled={working} onClick={() => setSync(connector, false)}>Stop syncing</button>
+          </>
+        ) : (
+          <button type="button" className="c-btn c-btn--primary" disabled={working} onClick={() => setSync(connector, true)}>{working ? 'Setting up…' : `Sync to a Cordia ${SYNC_APPS[connector.id]}`}</button>
+        ))}
         {IMPORTS.includes(connector.id) && (
           <button type="button" className="c-btn c-btn--primary" disabled={working} onClick={() => { setOpen(null); setImporting(connector); }}>Import</button>
         )}
@@ -334,7 +350,9 @@ export default function ConnectorsSettings() {
             <span className="cn-name">{connector.name}</span>
             <span className="cn-tag">{connector.tagline}</span>
           </span>
-          {connector.connected && <span className="cn-badge is-on">Connected</span>}
+          {connector.connected && (connector.health?.needs_reconnect
+            ? <span className="cn-badge is-warn">Reconnect</span>
+            : <span className="cn-badge is-on">{connector.health?.sync_on ? 'Syncing' : 'Connected'}</span>)}
           {soon && <span className="cn-badge">Soon</span>}
           <ChevronRight className="cn-chev" size={18} strokeWidth={1.75} aria-hidden="true" />
         </button>
@@ -382,6 +400,11 @@ export default function ConnectorsSettings() {
               <h2 id="cn-canvas-title" className="c-section-title">Canvas</h2>
               {canvasBadge && <span className={`cn-badge ${canvasBadge.cls}`}>{canvasBadge.text}</span>}
               <p className="cn-detail-text">{DETAILS.canvas}</p>
+              {canvas.status.connected && (canvas.status.sync_error || canvas.status.last_synced_at) && (
+                <p className={'c-meta cn-health' + (canvas.status.sync_error ? ' is-error' : '')}>
+                  {canvas.status.sync_error || healthLine({ last_synced_at: canvas.status.last_synced_at, stats: canvas.status.stats })}
+                </p>
+              )}
               {canvas.status.connected && (
                 <p className="c-meta cn-canvas-meta">{canvas.status.domain} · •••• {canvas.status.last4}{canvas.status.expires_at ? ` · Expires ${displayDate(canvas.status.expires_at)}` : ''}</p>
               )}
@@ -410,6 +433,11 @@ export default function ConnectorsSettings() {
               <h2 id="cn-detail-title" className="c-section-title">{active.name}</h2>
               {active.connected && <span className="cn-badge is-on">Connected</span>}
               <p className="cn-detail-text">{DETAILS[active.id]}</p>
+              {active.connected && (active.health?.error || healthLine(active.health)) && (
+                <p className={'c-meta cn-health' + (active.health?.error ? ' is-error' : '')}>
+                  {active.health?.needs_reconnect ? `${active.health.error} Disconnect and connect it again.` : active.health?.error || healthLine(active.health)}
+                </p>
+              )}
               {uses(active)}
               <div className="cn-actions">{actions(active)}</div>
               {active.id === 'apple_calendar' && feed && (

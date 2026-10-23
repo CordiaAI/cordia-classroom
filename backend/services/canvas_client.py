@@ -281,6 +281,7 @@ ALLOWLIST = (
     _ep("enrollments.self", r"/api/v1/courses/\d+/enrollments", params=("user_id",), required={"user_id": "self"}),
     _ep("modules.list", r"/api/v1/courses/\d+/modules", multi={"include[]": {"items"}}),
     _ep("calendar_events.list", r"/api/v1/calendar_events", params=("type", "start_date", "end_date", "all_events"), multi={"context_codes[]": None}),
+    _ep("announcements.list", r"/api/v1/announcements", params=("start_date", "end_date", "active_only"), multi={"context_codes[]": None}),
     _ep("files.list", r"/api/v1/courses/\d+/files", params=("search_term", "sort", "order")),
     _ep("files.get", r"/api/v1/courses/\d+/files/\d+"),
     _ep("pages.get", r"/api/v1/courses/\d+/pages/[A-Za-z0-9_.-]+"),
@@ -441,6 +442,10 @@ class CanvasClient:
         query = [("type", "assignment"), ("start_date", start_date), ("end_date", end_date)]
         query += [("context_codes[]", f"course_{int(c)}") for c in course_ids]
         return self._pages("/api/v1/calendar_events", query)
+
+    def announcements(self, course_ids: Iterable[int], start_date: str) -> list:
+        query = [("start_date", start_date)] + [("context_codes[]", f"course_{int(c)}") for c in course_ids]
+        return self._pages("/api/v1/announcements", query)
 
     def files(self, course_id: int) -> list:
         return self._pages(f"/api/v1/courses/{int(course_id)}/files", [])

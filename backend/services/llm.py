@@ -1521,3 +1521,58 @@ def plan_app_action(request: str, current: Optional[dict], guides: list, classes
     except (json.JSONDecodeError, TypeError, ValueError):
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+ASSIGNMENT_PLAN_RULES = """You plan coursework for a student. From the assignment below, estimate how long it will take
+a typical student and break it into 2 to 6 steps they can check off, in order.
+- Base the estimate on what the assignment actually asks for: its type, length or scope, points and rubric.
+- Each step is a short action that names the real work ("Read chapters 4-5 and note the key arguments",
+  "Draft the analysis section"), not a generic label. Use only what the assignment says; do not invent requirements.
+- Step minutes add up to the estimate. A short quiz or a single reading can be 1-2 steps.
+Return JSON: {"effort_minutes": int, "basis": "one sentence on what the estimate is based on",
+"steps": [{"title": str, "minutes": int}]}"""
+
+
+def plan_assignment(title: str, course: str, description: str, points, submission_types: list, rubric: list) -> dict:
+    """An effort estimate and ordered steps for one assignment, or {} when the model gave nothing usable."""
+    criteria = "\n".join(f"- {c.get('description') or ''} ({c.get('points') or 0} pts): {c.get('long_description') or ''}"[:400]
+                         for c in rubric or [])
+    response = chat(get_openai_client(), "assignment_plan",
+        messages=[
+            {"role": "system", "content": ASSIGNMENT_PLAN_RULES},
+            {"role": "user", "content": (
+                f"COURSE: {course}\nASSIGNMENT: {title}\nPOINTS: {points if points is not None else 'unknown'}"
+                f"\nSUBMISSION: {', '.join(submission_types or []) or 'unknown'}"
+                f"\n\nDESCRIPTION:\n{description[:8000] or '(none)'}\n\nRUBRIC:\n{criteria or '(none)'}"
+            )},
+        ],
+        response_format={"type": "json_object"},
+    )
+    try:
+        parsed = _loads_model_json(response.choices[0].message.content or "{}")
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+ANNOUNCEMENT_RULES = """Summarize a course announcement for a student in one sentence (under 30 words) and say what it
+changes for them.
+- "deadline": it moves, extends or sets a due date or exam date.
+- "new_work": it adds an assignment, reading or task the student must do.
+- "none": anything else (reminders, general information, encouragement).
+Return JSON: {"summary": str, "changes": "deadline" | "new_work" | "none"}"""
+
+
+def read_announcement(title: str, course: str, message: str) -> dict:
+    response = chat(get_openai_client(), "announcement_read",
+        messages=[
+            {"role": "system", "content": ANNOUNCEMENT_RULES},
+            {"role": "user", "content": f"COURSE: {course}\nTITLE: {title}\n\n{message[:6000]}"},
+        ],
+        response_format={"type": "json_object"},
+    )
+    try:
+        parsed = _loads_model_json(response.choices[0].message.content or "{}")
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
