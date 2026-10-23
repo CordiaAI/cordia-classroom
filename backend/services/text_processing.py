@@ -454,8 +454,8 @@ def html_to_text(text: str) -> str:
     return "".join(parser.parts)
 
 
-_MD_HEADING = re.compile(r"^#{1,6}\s+(.+)$")
-_BULLET = re.compile(r"^(?:[-*•▪◦·]|\d{1,2}[.)])\s+(.+)$")
+_MD_HEADING = re.compile(r"^#{1,6}\s+(\S.*)$")
+_BULLET = re.compile(r"^(?:[-*•▪◦·]|\d{1,2}[.)])\s+(\S.*)$")
 
 
 def _looks_like_heading(line: str, following: str) -> bool:
