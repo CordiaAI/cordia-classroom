@@ -8,6 +8,7 @@ import { apiFetch } from '../lib/api';
 import { canvasStatus, displayDate } from '../lib/canvas';
 import CanvasConnectSheet from './CanvasConnectSheet';
 import CanvasCourseList from './CanvasCourseList';
+import Toggle from './Toggle';
 import { BRAND_PATHS } from '../lib/brandIcons';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { assistantApi } from '../lib/assistant';
@@ -279,6 +280,28 @@ export default function ConnectorsSettings() {
     try { await navigator.clipboard.writeText(feed); say('Calendar link copied'); } catch { fail('Copy the link above by hand.'); }
   }
 
+  // Switches an app on or off for the Tutor or Cordia Assistant; it stays connected either way.
+  async function setUse(connector, use, on) {
+    const before = connector.uses;
+    const flip = item => (item.id === connector.id ? { ...item, uses: { ...item.uses, [use]: on } } : item);
+    setConnectors(list => list.map(flip));
+    const data = await apiFetch(`/connectors/${connector.id}/uses`, { method: 'PATCH', body: JSON.stringify({ [use]: on }) });
+    if (data?.uses) { setConnectors(list => list.map(item => (item.id === connector.id ? { ...item, uses: { ...item.uses, ...data.uses } } : item))); return; }
+    setConnectors(list => list.map(item => (item.id === connector.id ? { ...item, uses: before } : item)));
+    fail(data?.detail || "That didn't save. Try again.");
+  }
+
+  function uses(connector) {
+    const list = Object.keys(connector.uses || {});
+    if (!connector.connected || !list.length) return null;
+    return (
+      <div className="cn-uses" role="group" aria-label={`Where ${connector.name} is used`}>
+        {list.includes('tutor') && <Toggle label="Use in Tutor" checked={connector.uses.tutor} onChange={on => setUse(connector, 'tutor', on)} />}
+        {list.includes('assistant') && <Toggle label="Use in Cordia Assistant" checked={connector.uses.assistant} onChange={on => setUse(connector, 'assistant', on)} />}
+      </div>
+    );
+  }
+
   function actions(connector) {
     const working = busy === connector.id;
     if (connector.id === 'apple_calendar') {
@@ -323,7 +346,7 @@ export default function ConnectorsSettings() {
   return (
     <div className="c-card cn-card">
       <h2 className="c-section-title">Connect your apps</h2>
-      <p className="c-meta">Tap one to see what it does and how to connect it. Apps you connect here also work when you text Cordia Assistant.</p>
+      <p className="c-meta">Tap one to see what it does and how to connect it. Once it's connected, choose whether the Tutor and Cordia Assistant use it.</p>
       {connectors === null ? <SectionLoader label="Loading connectors" /> : (
         <ul className="cn-grid" data-spot="connectors">
           {canvas && (
@@ -387,6 +410,7 @@ export default function ConnectorsSettings() {
               <h2 id="cn-detail-title" className="c-section-title">{active.name}</h2>
               {active.connected && <span className="cn-badge is-on">Connected</span>}
               <p className="cn-detail-text">{DETAILS[active.id]}</p>
+              {uses(active)}
               <div className="cn-actions">{actions(active)}</div>
               {active.id === 'apple_calendar' && feed && (
                 <div className="cn-feed">

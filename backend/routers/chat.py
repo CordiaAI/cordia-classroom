@@ -16,7 +16,7 @@ from auth_utils import get_user_id
 from ids import require_uuid
 from database import get_supabase
 from rate_limit import limiter
-from routers import folders, guides, smart_notes
+from routers import connectors, folders, guides, smart_notes
 from schemas import ChatRequest, ChatResponse
 from services.entitlements import record, require
 from services.guidance import learning_guidance, style_instruction
@@ -420,6 +420,14 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
         drawn = _visual(user_id, question, material)
         if drawn:
             return drawn
+    # "What's in my Notion page on X" / "quiz me on my Google Doc": the Tutor reads that app, if it's on for the Tutor.
+    if skill in {None, "explain"} and not body.class_id:
+        app = connectors.tutor_material(user_id, question)
+        if app and app.get("problem"):
+            return ChatResponse(answer=app["problem"])
+        if app:
+            source = {"type": "connector", "id": app["connector"], "title": app["title"]}
+            return _tutor_reply(body, user_id, question, Material(content=app["text"], source=source), skill, turn)
     about_material = bool(material.content.strip() and PRACTICE_REQUEST.search(question))
     if (skill in {None, "explain", "build_guide", "practice", "organize", "plan", "retain"} and not body.class_id
             and not about_material and _asks_for_app_action(question)):

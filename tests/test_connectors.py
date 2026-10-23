@@ -47,6 +47,47 @@ class ConnectorTests(unittest.TestCase):
             body = self.client.get("/connectors", headers=self.auth).json()
         self.assertTrue(next(c for c in body["connectors"] if c["id"] == "gcal")["connected"])
 
+    def test_list_says_where_each_app_is_used_and_switches_save(self):
+        with patch("services.composio.configured", return_value=True), patch("services.composio.active_accounts", return_value={}), \
+                patch("services.connector_settings.for_user", return_value={"notion": {"tutor": False, "assistant": True}}):
+            by_id = {c["id"]: c for c in self.client.get("/connectors", headers=self.auth).json()["connectors"]}
+        self.assertEqual(by_id["notion"]["uses"], {"tutor": False, "assistant": True})
+        self.assertEqual(by_id["slack"]["uses"], {"assistant": True})
+        self.assertEqual(by_id["apple_calendar"]["uses"], {})
+        with patch("services.connector_settings.save", return_value={"tutor": True, "assistant": False}) as save:
+            body = self.client.patch("/connectors/notion/uses", headers=self.auth, json={"assistant": False}).json()
+        save.assert_called_once_with(USER, "notion", {"assistant": False})
+        self.assertEqual(body["uses"], {"tutor": True, "assistant": False})
+        self.assertEqual(self.client.patch("/connectors/slack/uses", headers=self.auth, json={"tutor": True}).status_code, 400)
+
+    def test_tutor_reads_a_named_app_only_when_it_is_on_for_the_tutor(self):
+        from routers import connectors
+        self.assertIsNone(connectors.tutor_material(USER, "what's on my calendar"))
+        with patch("services.composio.configured", return_value=True), patch("services.composio.active_accounts", return_value={}):
+            self.assertIn("isn't connected", connectors.tutor_material(USER, "quiz me on my Notion page")["problem"])
+        with patch("services.composio.configured", return_value=True), patch("services.composio.active_accounts", return_value={"notion": "ca_n"}), \
+                patch("services.connector_settings.uses", return_value={"tutor": False, "assistant": True}):
+            self.assertIn("switched off for the Tutor", connectors.tutor_material(USER, "quiz me on my Notion page")["problem"])
+        calls = []
+
+        def run(account, user, slug, args):
+            calls.append((slug, args))
+            if slug == "NOTION_SEARCH_NOTION_PAGE":
+                return {"results": [{"id": "p1", "object": "page", "title": [{"plain_text": "Week 3 notes"}]}]}
+            return {"results": [{"type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "Mitosis has four phases."}]}}]}
+        with patch("services.composio.configured", return_value=True), patch("services.composio.active_accounts", return_value={"notion": "ca_n"}), \
+                patch("services.connector_settings.uses", return_value={"tutor": True, "assistant": True}), patch("services.composio.run", side_effect=run):
+            found = connectors.tutor_material(USER, 'Quiz me on my Notion page "Week 3 notes"')
+        self.assertEqual(found["title"], "Notion: Week 3 notes")
+        self.assertIn("Mitosis", found["text"])
+        self.assertEqual(calls[0][1]["query"], "Week 3 notes")
+
+    def test_search_terms_drop_filler_and_app_names(self):
+        from routers.connectors import _search_terms
+        self.assertEqual(_search_terms("explain my google doc called Cell Biology review", "gdocs"), ["Cell Biology review"])
+        self.assertEqual(_search_terms("summarize the photosynthesis lab from my google drive", "gdrive")[0], "photosynthesis lab")
+        self.assertEqual(_search_terms("what's in Sam's Notion page on enzymes", "notion")[0], "Sam's enzymes")
+
     def test_calendar_gets_only_open_upcoming_deadlines_once(self):
         calls = []
 
