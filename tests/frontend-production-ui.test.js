@@ -140,7 +140,7 @@ assert.match(retain, /correct_answer: conceptAnswer\(question\)/);
 assert.match(retainPage, /'Regenerating…' : 'Regenerate'/);
 assert.match(retainPage, /\/quiz\/.*\/regenerate/);
 assert.match(retainPage, /method: 'POST'/);
-assert.match(guidePage, /\{ key: 'practice', label: 'Practice', icon: PencilRuler, href: '\/practice\/' \+ id \}/);
+assert.match(guidePage, /\{ key: 'practice', label: 'Practice', icon: PencilRuler, href: '\/practice\/' \+ id, needsCards: true \}/);
 assert.match(practicePage, /'Regenerate' : 'Generate'/);
 assert.match(practicePage, /Drawing workspace/);
 assert.match(practicePage, /Source material/);
