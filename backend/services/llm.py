@@ -1576,3 +1576,34 @@ def read_announcement(title: str, course: str, message: str) -> dict:
     except (json.JSONDecodeError, TypeError, ValueError):
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+DATE_CHANGE_RULES = """You read a message a student received from their school (an instructor, a teaching assistant or
+the school) and find changes to the student's deadlines in it.
+Report a change only when the message clearly says that one of the listed deadlines moved, was
+extended for the student, or was cancelled. Do not report reminders, new assignments, or dates the
+message only mentions. Match each change to the listed deadline it is about; if none fits, leave it out.
+For a new date, give the full local date and time it states (use 23:59 when it gives no time).
+Return JSON: {"changes": [{"item_key": str, "kind": "moved" | "extension" | "cancelled",
+"new_due": "YYYY-MM-DDTHH:MM" or null, "summary": "one sentence, under 25 words"}]}"""
+
+
+def read_date_change(subject: str, sender: str, text: str, deadlines: list, today: str) -> list:
+    """Deadline changes a message states, matched to the student's own deadlines (item keys)."""
+    listed = "\n".join(f"{d['id']} | {d['title']} | {d.get('course') or ''} | due {d['due_at']}" for d in deadlines[:60])
+    response = chat(get_openai_client(), "date_change_read",
+        messages=[
+            {"role": "system", "content": DATE_CHANGE_RULES},
+            {"role": "user", "content": (
+                f"TODAY: {today}\nFROM: {sender[:200]}\nSUBJECT: {subject[:300]}\n\nMESSAGE:\n{text[:6000]}"
+                f"\n\nTHE STUDENT'S DEADLINES (key | title | class | due):\n{listed or '(none)'}"
+            )},
+        ],
+        response_format={"type": "json_object"},
+    )
+    try:
+        parsed = _loads_model_json(response.choices[0].message.content or "{}")
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return []
+    changes = parsed.get("changes") if isinstance(parsed, dict) else None
+    return [c for c in changes or [] if isinstance(c, dict)]

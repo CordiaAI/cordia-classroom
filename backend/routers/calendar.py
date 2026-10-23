@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from auth_utils import get_user_id
 from database import get_supabase
-from services.deadlines import canvas_item_key, is_done, marks, select_assignments
+from services.deadlines import accepted_changes, apply_changes, canvas_item_key, is_done, marks, select_assignments
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 logger = logging.getLogger(__name__)
@@ -227,6 +227,7 @@ def _calendar_payload(url: str, user_id: str = "") -> dict:
         marked = marks(get_supabase(), user_id)
         for item in items:
             item["done"] = is_done(str(item.get("id")), marked)
+        apply_changes(items, accepted_changes(get_supabase(), user_id))
     today = datetime.now(timezone.utc).date()
     return {
         "connected": True,
@@ -271,6 +272,8 @@ def _token_payload(user_id: str) -> dict | None:
         "url": f"https://{domain}/courses/{item['canvas_course_id']}/assignments/{item['canvas_assignment_id']}",
         "course": courses.get(item["canvas_course_id"]),
     } for item in assignments if item.get("due_at")]
+    apply_changes(items, accepted_changes(db, user_id),
+                  {canvas_item_key(item["canvas_assignment_id"]): item.get("canvas_updated_at") for item in assignments})
     today = now.date()
     return {
         "connected": True,

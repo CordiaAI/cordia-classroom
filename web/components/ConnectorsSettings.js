@@ -12,7 +12,7 @@ import Toggle from './Toggle';
 import { BRAND_PATHS } from '../lib/brandIcons';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { assistantApi } from '../lib/assistant';
-import { agoLabel, syncOff, syncOn } from '../lib/studyPlans';
+import { agoLabel, setMailWatch, syncOff, syncOn } from '../lib/studyPlans';
 import IcloudSheet from './assistant/IcloudSheet';
 import DriveFolders from './DriveFolders';
 
@@ -87,7 +87,7 @@ function AssistantAppleCalendar() {
 }
 const IMPORTS = ['gdrive', 'gdocs', 'notion'];
 const SYNC_APPS = { gcal: 'calendar', gtasks: 'list' };
-const STAT_WORDS = { tasks: 'to-do', blocks: 'study block', assignments: 'assignment', announcements: 'announcement', files: 'file imported', imported_files: 'file imported' };
+const STAT_WORDS = { tasks: 'to-do', blocks: 'study block', assignments: 'assignment', announcements: 'announcement', files: 'file imported', imported_files: 'file imported', date_changes: 'date change found' };
 
 // "Last synced 4 min ago · 12 assignments": what a connection is actually doing.
 function healthLine(health) {
@@ -303,6 +303,31 @@ export default function ConnectorsSettings() {
     fail(data?.detail || "That didn't save. Try again.");
   }
 
+  // Gmail and Outlook: read school mail for deadline changes to confirm on the Dashboard.
+  async function setWatch(connector, on) {
+    setBusy(`watch-${connector.id}`);
+    setConnectors(list => list.map(item => (item.id === connector.id ? { ...item, watch_dates: on } : item)));
+    const data = await setMailWatch(connector.id, on);
+    setBusy('');
+    if (!data || data.detail) {
+      setConnectors(list => list.map(item => (item.id === connector.id ? { ...item, watch_dates: !on } : item)));
+      fail(data?.detail || "That didn't save. Try again.");
+      return;
+    }
+    if (on) say(data.found ? `Found ${data.found} date change${data.found === 1 ? '' : 's'}. They're on your Dashboard to confirm.` : 'Watching for date changes. Anything found shows up on your Dashboard to confirm.');
+  }
+
+  function watchDates(connector) {
+    if (!connector.connected || !('watch_dates' in connector)) return null;
+    return (
+      <div className="cn-uses">
+        <Toggle label={busy === `watch-${connector.id}` ? 'Checking your mail…' : 'Watch for date changes'} checked={Boolean(connector.watch_dates)}
+          disabled={busy === `watch-${connector.id}`} onChange={on => setWatch(connector, on)} />
+        <p className="c-meta cn-watch-note">Reads only mail from your school. When a professor moves a date or gives you an extension, it shows on your Dashboard. Nothing changes until you confirm.</p>
+      </div>
+    );
+  }
+
   function uses(connector) {
     const list = Object.keys(connector.uses || {});
     if (!connector.connected || !list.length) return null;
@@ -440,6 +465,7 @@ export default function ConnectorsSettings() {
                 </p>
               )}
               {uses(active)}
+              {watchDates(active)}
               <div className="cn-actions">{actions(active)}</div>
               {active.id === 'apple_calendar' && feed && (
                 <div className="cn-feed">

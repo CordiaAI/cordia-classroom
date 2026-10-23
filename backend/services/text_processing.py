@@ -502,3 +502,18 @@ def text_to_outline(text: str, max_points: int = 400) -> str:
     # A heading with nothing under it adds nothing.
     return "\n".join(line for index, line in enumerate(kept)
                      if not line.startswith("## ") or (index + 1 < len(kept) and kept[index + 1].startswith("- ")))
+
+
+_CHANGE_WORDS = re.compile(
+    r"\b(?:due|deadline|extension|extended|extend|postpone[sd]?|reschedul\w*|moved?|push(?:ed)? back|delay(?:ed)?|cancel(?:l?ed)?|"
+    r"exam|quiz|test|midterm|final|assignment|paper|project|presentation|lab)\b", re.I)
+_DATE_WORDS = re.compile(
+    r"\b(?:mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun)(?:day)?\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|"
+    r"\b\d{1,2}/\d{1,2}\b|\btomorrow\b|\bnext week\b|\bnoon\b|\b\d{1,2}(?::\d{2})?\s?(?:am|pm)\b", re.I)
+
+
+def mentions_date_change(text: str) -> bool:
+    """A cheap first pass before any AI reads a message: it has to talk about schoolwork timing
+    (a deadline word and a date or time). Most mail stops here."""
+    sample = (text or "")[:8000]
+    return bool(_CHANGE_WORDS.search(sample) and _DATE_WORDS.search(sample))

@@ -45,3 +45,7 @@ export function agoLabel(iso, now = Date.now()) {
 export const buildExamReview = key => apiFetch(`${path(key)}/review-set`, { method: 'POST', body: JSON.stringify({ time_zone: timeZone() }), timeoutMs: 120000 });
 // A review set for part of a class, e.g. a finished Canvas module.
 export const buildReview = ({ folderId, prefix, title }) => apiFetch('/review-sets', { method: 'POST', body: JSON.stringify({ folder_id: folderId, prefix: prefix || '', title: title || '' }), timeoutMs: 120000 });
+
+// Date changes found in school email or Canvas announcements: nothing moves until accepted.
+export const acceptChange = id => apiFetch(`/deadline-changes/${encodeURIComponent(id)}/accept`, { method: 'POST', body: JSON.stringify({ time_zone: timeZone() }), timeoutMs: 60000 });
+export const setMailWatch = (connector, on) => apiFetch(`/mail/${connector}/watch`, { method: 'PUT', body: JSON.stringify({ on }), timeoutMs: 120000 });

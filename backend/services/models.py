@@ -107,6 +107,7 @@ FEATURES = {
     "study_aid_check": CallSpec(LIGHT, 250),
     "assignment_plan": CallSpec(LIGHT, 700),
     "announcement_read": CallSpec(LIGHT, 300),
+    "date_change_read": CallSpec(LIGHT, 500),
     # VISION
     "page_transcription": CallSpec(VISION, 1800),
     "handwriting": CallSpec(VISION, 800),

@@ -17,7 +17,7 @@ import LearnCordia from '../components/LearnCordia';
 import CanvasConnectButton from '../components/CanvasConnectButton';
 import DoneCheck from '../components/DoneCheck';
 import AssignmentSheet from '../components/AssignmentSheet';
-import { buildExamReview, buildReview, dismissAlert, getAlerts } from '../lib/studyPlans';
+import { acceptChange, buildExamReview, buildReview, dismissAlert, getAlerts } from '../lib/studyPlans';
 import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
 import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
@@ -41,7 +41,13 @@ const ALERT_TEXT = {
   new_work: alert => `New work: ${alert.title}`,
   exam_prep: alert => `${alert.title} in ${alert.days} day${alert.days === 1 ? '' : 's'}`,
   module_done: alert => `Finished: ${alert.module}`,
+  date_change: alert => (alert.change === 'cancelled'
+    ? `Cancelled: ${alert.title}`
+    : `${alert.title}: ${shortDate(alert.old_due)} → ${shortDate(alert.new_due)}`),
 };
+
+// "Prof. Lee" from "Prof. Lee <lee@school.edu>".
+const senderName = sender => String(sender || '').replace(/<[^>]*>/, '').trim() || String(sender || '').replace(/[<>]/g, '');
 
 function plural(count, word) {
   return `${count} ${word}${count === 1 ? '' : 's'}`;
@@ -165,6 +171,15 @@ export default function Today() {
       router.push(`/guide/${data.guide.id}`);
     } else update(current => ({ ...current, alerts: (current.alerts || []).map(item => (item.id === alert.id ? { ...item, summary: data?.detail || "That didn't work. Try again." } : item)) }));
   }
+  // A date change from email or an announcement: one confirm moves the deadline, its steps,
+  // study time and Google Task.
+  async function accept(alert) {
+    setReviewing(alert.id);
+    const data = await acceptChange(alert.change_id);
+    setReviewing('');
+    if (data?.ok) refresh();
+    else update(current => ({ ...current, alerts: (current.alerts || []).map(item => (item.id === alert.id ? { ...item, summary: data?.detail || "That didn't work. Try again." } : item)) }));
+  }
   async function dismiss(alert) {
     update(current => ({ ...current, alerts: (current.alerts || []).filter(item => item.id !== alert.id) }));
     await dismissAlert(alert.id);
@@ -204,9 +219,14 @@ export default function Today() {
               <div key={alert.id} className={'c-list-row today-alert is-' + alert.kind}>
                 <span className="c-grow">
                   <span className="today-alert-title">{ALERT_TEXT[alert.kind]?.(alert) || alert.title}</span>
-                  <span className="c-meta">{[alert.course, alert.summary].filter(Boolean).join(' · ')}</span>
+                  <span className="c-meta">{[alert.kind === 'date_change' ? senderName(alert.sender) : alert.course, alert.summary].filter(Boolean).join(' · ')}</span>
                 </span>
                 {alert.url && <a className="c-btn c-btn--quiet c-btn--sm" href={alert.url} target="_blank" rel="noreferrer">Open</a>}
+                {alert.kind === 'date_change' && (
+                  <button type="button" className="c-btn c-btn--primary c-btn--sm" disabled={Boolean(reviewing)} onClick={() => accept(alert)}>
+                    {reviewing === alert.id ? 'Updating…' : alert.change === 'cancelled' ? 'Remove it' : 'Update'}
+                  </button>
+                )}
                 {(alert.kind === 'exam_prep' || (alert.kind === 'module_done' && alert.folder_id)) && (
                   <button type="button" className="c-btn c-btn--secondary c-btn--sm" disabled={Boolean(reviewing)} onClick={() => review(alert)}>
                     {reviewing === alert.id ? 'Gathering…' : alert.kind === 'exam_prep' ? 'Build review' : 'Make review set'}
@@ -275,6 +295,7 @@ export default function Today() {
         .today-alert .c-grow { display: grid; gap: 2px; min-width: 0; }
         .today-alert-title { font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
         .today-alert.is-grade_drop .today-alert-title, .today-alert.is-missing .today-alert-title { color: var(--error); }
+        .today-alert.is-date_change .today-alert-title { font-variant-numeric: tabular-nums; }
         :global(.today-continue) { display: flex; align-items: center; gap: 16px; padding: 14px 18px; color: var(--ink); text-decoration: none; }
         :global(.today-continue:hover), :global(.today-progress:hover) { text-decoration: none; border-color: var(--olive); }
         .today-due { gap: 14px; }

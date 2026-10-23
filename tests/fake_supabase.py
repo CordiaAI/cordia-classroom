@@ -101,8 +101,8 @@ class Query:
         self.op, self.payload = "insert", payload
         return self
 
-    def upsert(self, payload, on_conflict=None):
-        self.op, self.payload, self.on_conflict = "upsert", payload, on_conflict
+    def upsert(self, payload, on_conflict=None, ignore_duplicates=False, **_kwargs):
+        self.op, self.payload, self.on_conflict, self.ignore = "upsert", payload, on_conflict, ignore_duplicates
         return self
 
     def update(self, payload):
@@ -148,6 +148,8 @@ class Query:
             out = []
             for item in items:
                 found = next((r for r in rows if all(r.get(k) == item.get(k) for k in keys)), None)
+                if found and getattr(self, "ignore", False):
+                    continue
                 if found:
                     found.update(copy.deepcopy(item))
                     out.append(copy.deepcopy(found))
