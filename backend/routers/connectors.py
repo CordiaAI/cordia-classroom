@@ -5,7 +5,9 @@ Composio, and Apple Calendar through a subscribed calendar feed. One connection 
 import hashlib
 import hmac
 import os
+import re
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Header, HTTPException, Request
@@ -17,6 +19,7 @@ from ids import is_uuid
 from rate_limit import limiter
 from routers.calendar import calendar_for
 from services import composio
+from services import connector_settings
 from services import file_extraction as files
 
 router = APIRouter(tags=["connectors"])
@@ -38,6 +41,8 @@ CONNECTORS = [
     {"id": "github", "name": "GitHub", "tagline": "Check issues and pull requests by text."},
 ]
 COMPOSIO_IDS = set(composio.TOOLKITS)
+# Apps the Tutor can read from when a student names them; every Composio app works in the Assistant.
+TUTOR_APPS = ("gcal", "gtasks", "gdrive", "gdocs", "notion")
 
 
 def _frontend() -> str:
@@ -54,11 +59,35 @@ def _known(connector: str) -> str:
 def list_connectors(authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     active = composio.active_accounts(user_id)
+    saved = connector_settings.for_user(user_id)
     return {"connectors": [{
         **item,
         "available": item["id"] == "apple_calendar" or composio.configured(),
         "connected": item["id"] in active,
+        # Which of the two can use it; only for apps that work there.
+        "uses": {use: on for use, on in (saved.get(item["id"]) or {"tutor": True, "assistant": True}).items()
+                 if (use == "tutor" and item["id"] in TUTOR_APPS) or (use == "assistant" and item["id"] in COMPOSIO_IDS)},
     } for item in CONNECTORS]}
+
+
+class UsesRequest(BaseModel):
+    tutor: Optional[bool] = None
+    assistant: Optional[bool] = None
+
+
+@router.patch("/connectors/{connector}/uses")
+@limiter.limit("30/minute")
+def set_uses(connector: str, body: UsesRequest, request: Request, authorization: str = Header(default="")):
+    """Switch a connected app on or off for the Tutor or Cordia Assistant; it stays connected."""
+    user_id = get_user_id(authorization)
+    _known(connector)
+    changes = {use: value for use, value in body.model_dump().items() if value is not None}
+    if "tutor" in changes and connector not in TUTOR_APPS:
+        raise HTTPException(status_code=400, detail="The Tutor doesn't use this app.")
+    try:
+        return {"uses": connector_settings.save(user_id, connector, changes)}
+    except Exception:
+        raise HTTPException(status_code=503, detail="This setting isn't available yet. Try again later.")
 
 
 @router.post("/connectors/{connector}/connect")
@@ -277,6 +306,109 @@ def import_file(connector: str, body: ImportRequest, request: Request, authoriza
     if len(text.strip()) < 10:
         raise HTTPException(status_code=422, detail="That file has no readable text.")
     return {"title": (title or "Imported notes")[:300], "text": text[:files.MAX_TEXT_CHARS]}
+
+
+# ---- The Tutor reads an app the student names ----
+
+# What a student calls each app. Plain "calendar" is left to Classroom's own calendar.
+APP_NAMES = {
+    "notion": re.compile(r"\bnotion\b", re.I),
+    "gdocs": re.compile(r"\bgoogle docs?\b|\bgdocs?\b", re.I),
+    "gdrive": re.compile(r"\bgoogle drive\b|\bmy drive\b|\bgdrive\b", re.I),
+    "gcal": re.compile(r"\bgoogle calendar\b|\bgcal\b", re.I),
+    "gtasks": re.compile(r"\bgoogle tasks?\b|\bgtasks\b", re.I),
+}
+NAMES = {item["id"]: item["name"] for item in CONNECTORS}
+FILLER = set("""a an and about at be can could do does find for from get give go have help how i in into is it its
+    me my of on open page pages please pull read file files doc docs document show summarize tell that the
+    there this to up use using what whats what's where which with would you your quiz explain notes note""".split())
+
+
+def named_app(question: str) -> Optional[str]:
+    return next((connector for connector, pattern in APP_NAMES.items() if pattern.search(question)), None)
+
+
+def _search_terms(question: str, connector: str) -> list[str]:
+    """What to search the app for: quoted words, else the words after called/named/titled, else the rest."""
+    quoted = re.findall(r"[\"“]([^\"”]{2,80})[\"”]", question)
+    if quoted:
+        return [quoted[0].strip()]
+    named = re.search(r"\b(?:called|named|titled)\s+(.{2,80}?)(?:[.?!,]|\s+(?:in|on|from)\s|$)", question, re.I)
+    if named:
+        return [named.group(1).strip()]
+    rest = APP_NAMES[connector].sub(" ", question)
+    words = [word for word in re.findall(r"[\w'-]+", rest) if word.lower() not in FILLER and len(word) > 1]
+    if not words:
+        return []
+    # The phrase first, then its longest words on their own (Drive and Docs match names literally).
+    return list(dict.fromkeys([" ".join(words[:5]), *sorted(words, key=len, reverse=True)[:2]]))
+
+
+def _upcoming_from_app(account: str, user_id: str, connector: str) -> str:
+    now = datetime.now(timezone.utc)
+    if connector == "gcal":
+        data = composio.run(account, user_id, "GOOGLECALENDAR_EVENTS_LIST", {
+            "calendarId": "primary", "timeMin": now.isoformat(), "timeMax": (now + timedelta(days=14)).isoformat(),
+            "singleEvents": True, "orderBy": "startTime", "maxResults": 50,
+        })
+        events = [item for item in data.get("items") or [] if item.get("status") != "cancelled"]
+        return "\n".join(
+            f"- {(event.get('start') or {}).get('dateTime') or (event.get('start') or {}).get('date')}: {event.get('summary') or 'Busy'}"
+            for event in events) or "No events in the next 14 days."
+    data = composio.run(account, user_id, "GOOGLETASKS_LIST_TASKS", {"tasklist_id": "@default", "showCompleted": False, "maxResults": 40})
+    tasks = [task for task in data.get("tasks") or data.get("items") or [] if task.get("status") != "completed"]
+    return "\n".join(f"- {task.get('title') or 'Untitled'}" + (f" (due {str(task['due'])[:10]})" if task.get("due") else "")
+                     for task in tasks) or "No open tasks."
+
+
+def tutor_material(user_id: str, question: str) -> Optional[dict]:
+    """When the question names a Tutor app: {"connector", "name"} plus "title"/"text" read from it,
+    or "problem" saying why not (not connected, switched off for the Tutor, nothing found). None otherwise."""
+    connector = named_app(question)
+    if not connector:
+        return None
+    name = NAMES[connector]
+    found = {"connector": connector, "name": name}
+    if not composio.configured():
+        return None
+    account = composio.active_accounts(user_id).get(connector)
+    if not account:
+        return {**found, "problem": f"{name} isn't connected. Connect it in Settings › Connectors, then ask again."}
+    if not connector_settings.uses(user_id, connector)["tutor"]:
+        return {**found, "problem": f"{name} is switched off for the Tutor. Turn it on in Settings › Connectors › {name}."}
+    if connector in {"gcal", "gtasks"}:
+        title = "Your next 14 days" if connector == "gcal" else "Your open tasks"
+        return {**found, "title": f"{name}: {title}", "text": _upcoming_from_app(account, user_id, connector)}
+    for terms in _search_terms(question, connector):
+        if connector == "gdrive":
+            data = composio.run(account, user_id, "GOOGLEDRIVE_FIND_FILE", {
+                "q": _drive_query(terms), "pageSize": 5, "orderBy": "modifiedTime desc", "fields": "files(id,name,mimeType)",
+            })
+            hits = [(f.get("id"), f.get("name")) for f in data.get("files") or [] if not str(f.get("mimeType", "")).endswith("folder")]
+        elif connector == "gdocs":
+            data = composio.run(account, user_id, "GOOGLEDOCS_SEARCH_DOCUMENTS", {
+                "query": terms, "max_results": 5, "response_detail": "minimal", "order_by": "modifiedTime desc",
+            })
+            hits = [(f.get("id"), f.get("name")) for f in data.get("files") or data.get("documents") or []]
+        else:
+            data = composio.run(account, user_id, "NOTION_SEARCH_NOTION_PAGE", {"query": terms, "page_size": 5})
+            hits = [(r.get("id"), _notion_title(r)) for r in data.get("results") or [] if r.get("object") != "database"]
+        hits = [hit for hit in hits if hit[0]]
+        if not hits:
+            continue
+        file_id, title = hits[0]
+        if connector == "gdocs":
+            text = str(composio.run(account, user_id, "GOOGLEDOCS_GET_DOCUMENT_PLAINTEXT", {"document_id": file_id, "include_tables": True}).get("plain_text") or "")
+        elif connector == "notion":
+            text = _notion_text(account, user_id, file_id)
+        else:
+            try:
+                text = _drive_text(account, user_id, file_id)
+            except HTTPException as error:
+                return {**found, "problem": f"Found {title or 'a file'} in {name}, but {error.detail[0].lower()}{error.detail[1:]}"}
+        if text.strip():
+            return {**found, "title": f"{name}: {title or 'Untitled'}", "text": text[:files.MAX_TEXT_CHARS]}
+    return {**found, "problem": f"I couldn't find that in {name}. Put the page's name in quotes, like “Week 3 notes”."}
 
 
 # ---- Apple Calendar: a subscribed feed of deadlines ----
