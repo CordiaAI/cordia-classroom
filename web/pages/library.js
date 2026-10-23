@@ -329,8 +329,8 @@ export default function LibraryPage() {
           {folder ? (
             <Link href={'/folder/' + folder.id} className="lib-group-name c-truncate">{name}</Link>
           ) : <span className="lib-group-name c-truncate">{name}</span>}
-          <span className="c-meta">{list.length}</span>
           <span className="c-spacer" />
+          <span className={'lib-group-count' + (list.length ? '' : ' is-empty')}>{list.length ? `${list.length} item${list.length === 1 ? '' : 's'}` : 'Empty'}</span>
           {folder && (
             <Menu
               label={`More for ${name}`}
@@ -437,6 +437,8 @@ export default function LibraryPage() {
         .library .lib-group-toggle .is-closed { transform: rotate(-90deg); }
         .library .lib-group-name { min-width: 0; color: var(--ink); font:600 20px/1.15 var(--font-sans); text-decoration: none; }
         .library a.lib-group-name:hover { text-decoration: underline; }
+        .library .lib-group-count { flex: none; display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 999px; background: var(--olive-tint); color: var(--olive-ink); font: 600 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .library .lib-group-count.is-empty { background: transparent; color: var(--muted); font-weight: 500; }
         .library .lib-loose { display: flex; align-items: center; gap: 12px; padding: 16px 18px; text-decoration: none; }
         .library .lib-list { list-style: none; margin: 0; padding: 0; }
         .library .lib-list { display: grid; gap: 2px; }
