@@ -34,8 +34,8 @@ async function main() {
     assert.equal(await panel.locator('.step').count(), 4);
     assert.equal(await panel.locator('#make-guide').count(), 1);
     assert.equal(await panel.locator('#tutor-form').count(), 1);
-    assert.equal(await panel.locator('.brand strong').textContent(), 'CordiaClassroom');
-    assert.match(await panel.locator('.brand img').getAttribute('src'), /cordia-classroom-logo\.png/);
+    assert.equal(await panel.locator('.wordmark strong').textContent(), 'cordia');
+    assert.match(await panel.locator('.wordmark img').getAttribute('src'), /cordia-classroom-logo\.png/);
     assert.equal(await panel.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
 
     assert.equal(await panel.locator('#make-guide').isDisabled(), true);
