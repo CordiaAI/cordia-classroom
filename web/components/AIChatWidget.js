@@ -90,7 +90,10 @@ const SKILL_PROGRESS = {
 };
 
 // freshOnMount: the full Tutor page opens on a new chat; the side panel starts one each time it opens.
-export default function AIChatWidget({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '', freshOnMount = false }) {
+export default function AIChatWidget({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '', freshOnMount = false, assignment = null }) {
+  // An assignment being worked on: its instructions and rubric go with every question until cleared.
+  const [working, setWorking] = useState(assignment);
+  useEffect(() => { setWorking(assignment); }, [assignment?.key]);
   const router = useRouter();
   const [loadedGuides, setLoadedGuides] = useState([]);
   const [notes, setNotes] = useState([]);
@@ -420,6 +423,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         skill: skillOverride || savedMode || (autoSkill !== session.active_skill ? autoSkill : null),
         retain_context: retainContext || undefined,
         class_id: needsTargetClass ? targetClassId : material?.folder_id || undefined,
+        assignment_key: working?.key || undefined,
         mode: 'short',
         rich_text: true,
       }),
@@ -593,6 +597,12 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         </div>
       ) : (
       <div className="cordia-tutor-messages" aria-live="polite">
+        {working && (
+          <div className="tutor-assignment" role="status">
+            <span className="c-grow">Working on <strong>{working.title || 'an assignment'}</strong>. The Tutor has its instructions and rubric. Paste your draft or ask what's missing.</span>
+            <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={() => setWorking(null)}>Clear</button>
+          </div>
+        )}
         {messages.length === 0 && (
           <div className="tutor-welcome">
             <h2>Ask anything</h2>

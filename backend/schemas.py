@@ -100,6 +100,8 @@ class ChatRequest(BaseModel):
     conversation_version: Optional[int] = Field(default=None, ge=0)
     skill: Optional[str] = Field(default=None, max_length=30)
     class_id: Optional[str] = Field(default=None, max_length=36)
+    # A Canvas assignment being worked on ("canvas-123"): its instructions and rubric join the material.
+    assignment_key: Optional[str] = Field(default=None, max_length=200, pattern=r"^[\w@.:\-]+$")
     retain_context: Optional[RetainExplanationContext] = None
     # Clients without a server session send the conversation so far; checked against the model's memory.
     history: List[ChatTurn] = Field(default_factory=list, max_length=400)

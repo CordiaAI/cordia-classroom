@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ChevronRight, Flame, Snowflake, Timer } from 'lucide-react';
+import { ChevronRight, Flame, ListChecks, Snowflake, Timer, X } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
@@ -16,6 +16,8 @@ import ProgressRing from '../components/ProgressRing';
 import LearnCordia from '../components/LearnCordia';
 import CanvasConnectButton from '../components/CanvasConnectButton';
 import DoneCheck from '../components/DoneCheck';
+import AssignmentSheet from '../components/AssignmentSheet';
+import { dismissAlert, getAlerts } from '../lib/studyPlans';
 import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
 import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
@@ -31,6 +33,14 @@ function shortDate(value) {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
+// What each Dashboard alert says (from GET /alerts).
+const ALERT_TEXT = {
+  grade_drop: alert => `Grade dropped: ${alert.from}% → ${alert.to}%`,
+  missing: alert => `Missing: ${alert.title}`,
+  deadline: alert => `Date change: ${alert.title}`,
+  new_work: alert => `New work: ${alert.title}`,
+};
+
 function plural(count, word) {
   return `${count} ${word}${count === 1 ? '' : 's'}`;
 }
@@ -40,6 +50,7 @@ export default function Today() {
   const { ready } = useRequireAuth();
   // Deadlines checked off here stay listed, struck through, until the next load.
   const [doneNow, setDoneNow] = useState({});
+  const [planning, setPlanning] = useState(null);
   useSessionTracker('browse');
   const legacy = LEGACY_VIEWS[router.query.view];
   const progress = useProgress();
@@ -55,7 +66,7 @@ export default function Today() {
     const safe = promise => promise.catch(() => null);
     const calendarRequest = safe(apiFetch('/calendar/connection'));
     const calendarOrSlow = Promise.race([calendarRequest, new Promise(resolve => setTimeout(() => resolve(SLOW), SLOW_MS))]);
-    const [foldersData, guidesData, statsData, streakData, onboardingData, insightsData, notesData, checklistData, calendarData, lectureTodos] = await Promise.all([
+    const [foldersData, guidesData, statsData, streakData, onboardingData, insightsData, notesData, checklistData, calendarData, lectureTodos, alertsData] = await Promise.all([
       safe(apiFetch('/folders')),
       safe(apiFetch('/guides?fields=summary&limit=500')),
       safe(apiFetch('/stats/overview')),
@@ -66,6 +77,7 @@ export default function Today() {
       safe(apiFetch('/onboarding/checklist')),
       calendarOrSlow,
       safe(confirmedTodos()),
+      safe(getAlerts()),
     ]);
     const failure = [foldersData, guidesData, statsData].find(item => !item || item.detail);
     const guideList = Array.isArray(guidesData?.guides) ? guidesData.guides : [];
@@ -97,6 +109,7 @@ export default function Today() {
       calendar: calendarData === SLOW ? readCalendarCache() : calendarData,
       calendarSlow: calendarData === SLOW && !readCalendarCache(),
       lectureItems: lectureCalendarItems(lectureTodos?.todos),
+      alerts: Array.isArray(alertsData?.alerts) ? alertsData.alerts : [],
     };
   }, { enabled: ready && !legacy });
   const loadError = data?.loadError || '';
@@ -135,6 +148,12 @@ export default function Today() {
   // Focus and study minutes over the last 7 days, from this browser's study log.
   const activity = readActivity();
   const weekMinutes = Math.round(Array.from({ length: 7 }, (_, back) => activity[dayKey(Date.now() - back * 86400000)]?.m || 0).reduce((sum, value) => sum + value, 0));
+  const alerts = data?.alerts || [];
+  const sunday = new Date().getDay() === 0;
+  async function dismiss(alert) {
+    update(current => ({ ...current, alerts: (current.alerts || []).filter(item => item.id !== alert.id) }));
+    await dismissAlert(alert.id);
+  }
   const firstWeek = !progress.first || Date.now() - progress.first < 7 * 86400000;
 
   return (
@@ -163,10 +182,28 @@ export default function Today() {
         </section>
       )}
 
+      {alerts.length > 0 && (
+        <section className="c-section" aria-label="Heads up">
+          <div className="c-card c-list">
+            {alerts.slice(0, 4).map(alert => (
+              <div key={alert.id} className={'c-list-row today-alert is-' + alert.kind}>
+                <span className="c-grow">
+                  <span className="today-alert-title">{ALERT_TEXT[alert.kind]?.(alert) || alert.title}</span>
+                  <span className="c-meta">{[alert.course, alert.summary].filter(Boolean).join(' · ')}</span>
+                </span>
+                {alert.url && <a className="c-btn c-btn--quiet c-btn--sm" href={alert.url} target="_blank" rel="noreferrer">Open</a>}
+                <button type="button" className="c-icon-btn" aria-label="Dismiss" onClick={() => dismiss(alert)}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="c-section" aria-labelledby="due-title">
         <div className="c-row">
           <h2 id="due-title" className="c-section-title">Due soon</h2>
           <span className="c-spacer" />
+          <Link href="/week" className={'c-btn ' + (sunday ? 'c-btn--secondary' : 'c-btn--quiet')}>Plan your week</Link>
           <Link href="/canvas?tab=calendar" className="c-btn c-btn--quiet">See calendar</Link>
         </div>
         {(dueItems.length > 0 || calendarSlow) ? (
@@ -177,6 +214,11 @@ export default function Today() {
                 <DoneCheck id={item.id} title={item.title} done={Boolean(doneNow[item.id])} onChange={done => setDoneNow(current => ({ ...current, [item.id]: done }))} />
                 <a className="c-grow c-truncate today-due-link" href={item.url || '/canvas?tab=calendar'} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>{item.title}</a>
                 <span className="c-meta">{shortDate(item.due_at)}</span>
+                {!item.internal && (
+                  <button type="button" className="c-icon-btn" aria-label={`Plan ${item.title}`} title="Steps and study time" onClick={() => setPlanning(item)}>
+                    <ListChecks size={18} strokeWidth={1.75} aria-hidden="true" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -202,11 +244,17 @@ export default function Today() {
         <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
       </Link>
 
+      {planning && <AssignmentSheet item={planning} onClose={() => setPlanning(null)} />}
+
       {firstWeek && (dayOneFinished(progress) || !progress.wt) ? <LearnCordia hideWhenComplete compact /> : null}
 
       <style jsx>{`
         .today-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
         .today-none { margin: 0; }
+        .today-alert { gap: 12px; }
+        .today-alert .c-grow { display: grid; gap: 2px; min-width: 0; }
+        .today-alert-title { font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
+        .today-alert.is-grade_drop .today-alert-title, .today-alert.is-missing .today-alert-title { color: var(--error); }
         :global(.today-continue) { display: flex; align-items: center; gap: 16px; padding: 14px 18px; color: var(--ink); text-decoration: none; }
         :global(.today-continue:hover), :global(.today-progress:hover) { text-decoration: none; border-color: var(--olive); }
         .today-due { gap: 14px; }

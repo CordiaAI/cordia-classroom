@@ -8,18 +8,18 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from auth_utils import get_user_id
+from database import get_supabase
 from ids import is_uuid
 from rate_limit import limiter
 from routers.calendar import calendar_for
 from services import composio
-from services import connector_settings
+from services import connector_settings, google_sync, sync_state
 from services import file_extraction as files
 
 router = APIRouter(tags=["connectors"])
@@ -60,6 +60,7 @@ def list_connectors(authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     active = composio.active_accounts(user_id)
     saved = connector_settings.for_user(user_id)
+    states = sync_state.for_user(user_id)
     return {"connectors": [{
         **item,
         "available": item["id"] == "apple_calendar" or composio.configured(),
@@ -67,7 +68,20 @@ def list_connectors(authorization: str = Header(default="")):
         # Which of the two can use it; only for apps that work there.
         "uses": {use: on for use, on in (saved.get(item["id"]) or {"tutor": True, "assistant": True}).items()
                  if (use == "tutor" and item["id"] in TUTOR_APPS) or (use == "assistant" and item["id"] in COMPOSIO_IDS)},
+        "health": _health(states.get(item["id"]) or {}),
     } for item in CONNECTORS]}
+
+
+def _health(state: dict) -> dict:
+    """What the card shows beyond "Connected": sync on, last sync, counts, and any problem."""
+    stats = {key: value for key, value in (state.get("stats") or {}).items() if key not in ("alerts", "time_zone")}
+    return {
+        "sync_on": bool(state.get("container_id")),
+        "last_synced_at": state.get("last_synced_at"),
+        "error": state.get("last_error"),
+        "needs_reconnect": bool(state.get("needs_reconnect")),
+        "stats": stats,
+    }
 
 
 class UsesRequest(BaseModel):
@@ -106,18 +120,7 @@ def disconnect(connector: str, authorization: str = Header(default="")):
     return {"ok": True}
 
 
-# ---- Deadlines to Google Calendar and Google Tasks ----
-
-class DeadlinesRequest(BaseModel):
-    time_zone: str = Field(default="UTC", max_length=64)
-
-
-def _zone(name: str) -> ZoneInfo:
-    try:
-        return ZoneInfo(name)
-    except (ZoneInfoNotFoundError, ValueError):
-        return ZoneInfo("UTC")
-
+# ---- Deadlines (the Apple Calendar feed); Google sync lives in services.google_sync ----
 
 def _upcoming(user_id: str) -> list[dict]:
     """Deadlines from now through the next 60 days that aren't checked off."""
@@ -129,75 +132,6 @@ def _upcoming(user_id: str) -> list[dict]:
 
 def _title(item: dict) -> str:
     return f"Due: {item['title']}"[:200]
-
-
-@router.post("/connectors/gcal/deadlines")
-@limiter.limit("6/minute")
-def deadlines_to_calendar(body: DeadlinesRequest, request: Request, authorization: str = Header(default="")):
-    """Each upcoming deadline becomes a 30-minute event ending at its due time. Events already
-    on the calendar with the same title and day are skipped, so it's safe to run again."""
-    user_id = get_user_id(authorization)
-    account = composio.account_for(user_id, "gcal")
-    zone = _zone(body.time_zone)
-    items = _upcoming(user_id)
-    if not items:
-        return {"added": 0, "skipped": 0}
-    first = min(datetime.fromisoformat(item["due_at"]) for item in items) - timedelta(days=1)
-    last = max(datetime.fromisoformat(item["due_at"]) for item in items) + timedelta(days=1)
-    existing = composio.run(account, user_id, "GOOGLECALENDAR_EVENTS_LIST", {
-        "calendarId": "primary", "q": "Due:", "timeMin": first.isoformat(), "timeMax": last.isoformat(),
-        "singleEvents": True, "maxResults": 250,
-    })
-    seen = {(event.get("summary"), ((event.get("start") or {}).get("dateTime") or (event.get("start") or {}).get("date") or "")[:10])
-            for event in existing.get("items") or []}
-    added = skipped = 0
-    for item in items:
-        due = datetime.fromisoformat(item["due_at"]).astimezone(zone)
-        start = due - timedelta(minutes=30)
-        if (_title(item), start.date().isoformat()) in seen:
-            skipped += 1
-            continue
-        composio.run(account, user_id, "GOOGLECALENDAR_CREATE_EVENT", {
-            "calendar_id": "primary",
-            "summary": _title(item),
-            "start_datetime": start.strftime("%Y-%m-%dT%H:%M:%S"),
-            "timezone": zone.key,
-            "event_duration_hour": 0,
-            "event_duration_minutes": 30,
-            "description": "\n".join(filter(None, [item.get("course"), item.get("url"), "Added by Cordia Classroom"])),
-        })
-        added += 1
-    return {"added": added, "skipped": skipped}
-
-
-@router.post("/connectors/gtasks/deadlines")
-@limiter.limit("6/minute")
-def deadlines_to_tasks(body: DeadlinesRequest, request: Request, authorization: str = Header(default="")):
-    """Each upcoming deadline becomes an open task due that day, unless one with its title is open."""
-    user_id = get_user_id(authorization)
-    account = composio.account_for(user_id, "gtasks")
-    zone = _zone(body.time_zone)
-    items = _upcoming(user_id)
-    if not items:
-        return {"added": 0, "skipped": 0}
-    existing = composio.run(account, user_id, "GOOGLETASKS_LIST_TASKS", {"tasklist_id": "@default", "showCompleted": False, "maxResults": 100})
-    open_titles = {task.get("title") for task in existing.get("tasks") or existing.get("items") or []}
-    added = skipped = 0
-    for item in items:
-        if item["title"][:200] in open_titles:
-            skipped += 1
-            continue
-        due = datetime.fromisoformat(item["due_at"]).astimezone(zone).date()
-        composio.run(account, user_id, "GOOGLETASKS_INSERT_TASK", {
-            "tasklist_id": "@default",
-            "title": item["title"][:200],
-            "status": "needsAction",
-            # Google Tasks keeps only the date of a due time.
-            "due": f"{due.isoformat()}T00:00:00.000Z",
-            "notes": "\n".join(filter(None, [item.get("course"), item.get("url")])),
-        })
-        added += 1
-    return {"added": added, "skipped": skipped}
 
 
 # ---- Imports from Drive, Docs and Notion ----
@@ -448,7 +382,7 @@ def calendar_feed(token: str, request: Request):
         raise HTTPException(status_code=404, detail="Not found")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Cordia Classroom//Deadlines//EN",
-             "X-WR-CALNAME:Cordia deadlines", "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H"]
+             "X-WR-CALNAME:Cordia", "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H"]
     for item in calendar_for(user_id).get("items") or []:
         if item.get("done"):
             continue
@@ -463,6 +397,16 @@ def calendar_feed(token: str, request: Request):
         if item.get("url"):
             lines.append(f"URL:{item['url']}")
         lines.append("END:VEVENT")
+    # Study blocks too, so Apple, Outlook or any calendar shows the plan without signing in to Google.
+    now = datetime.now(timezone.utc)
+    blocks = get_supabase().table("study_blocks").select("*").eq("user_id", user_id).neq("status", "removed") \
+        .gte("ends_at", (now - timedelta(days=1)).isoformat()).lte("starts_at", (now + timedelta(days=60)).isoformat()).execute().data or []
+    titles = google_sync._block_titles(user_id, blocks) if blocks else {}
+    for block in blocks:
+        start, end = (datetime.fromisoformat(block[key]).astimezone(timezone.utc) for key in ("starts_at", "ends_at"))
+        lines += ["BEGIN:VEVENT", f"UID:block-{block['id']}@cordiaai.io", f"DTSTAMP:{stamp}",
+                  f"DTSTART:{start.strftime('%Y%m%dT%H%M%SZ')}", f"DTEND:{end.strftime('%Y%m%dT%H%M%SZ')}",
+                  f"SUMMARY:{_ics_text(titles.get(block['id'], 'Study'))}", "END:VEVENT"]
     lines.append("END:VCALENDAR")
     return Response("\r\n".join(lines) + "\r\n", media_type="text/calendar; charset=utf-8",
                     headers={"Cache-Control": "private, max-age=900"})

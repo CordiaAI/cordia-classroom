@@ -20,7 +20,7 @@ os.environ["CANVAS_TOKEN_KEY"] = base64.b64encode(b"z" * 32).decode()
 
 from fake_supabase import FakeDB  # noqa: E402
 from routers import canvas, classes  # noqa: E402
-from services import canvas_client, log_scrub  # noqa: E402
+from services import canvas_client, log_scrub, sync_state  # noqa: E402
 
 TOKEN = "1234~" + "Zq9" * 21 + "w"
 HOST = "testu.instructure.com"
@@ -108,6 +108,7 @@ class CanvasIntegrationTests(unittest.TestCase):
             patch.object(classes, "get_user_id", return_value="user-1"),
             patch.object(canvas, "get_supabase", return_value=self.db),
             patch.object(classes, "get_supabase", return_value=self.db),
+            patch.object(sync_state, "get_supabase", return_value=self.db),
             patch.object(canvas_client.requests, "Session", return_value=self.canvas),
             patch.object(canvas_client, "_public_addresses", return_value=["203.0.113.10"]),
         ]
@@ -141,13 +142,16 @@ class CanvasIntegrationTests(unittest.TestCase):
         self.assertEqual(len(self.db.rows("class_memberships")), 3)
         self.assertEqual({m["source"] for m in self.db.rows("class_memberships")}, {"canvas"})
         self.assertEqual(len(self.db.rows("folders")), 3)
-        # Data minimization: titles, due dates and a turned-in flag; summary is short; no raw syllabus,
-        # scores or submission contents (grades are read live for the Grades tab and never stored).
-        self.assertEqual(set(self.db.rows("canvas_assignments")[0]), {"user_id", "canvas_assignment_id", "canvas_course_id", "title", "due_at", "submitted", "created_at"})
+        # What's kept: the assignment as Canvas describes it (instructions, rubric, points) and the
+        # student's own status and score, for planning, the rubric-aware Tutor and grade alerts.
+        # Never the raw syllabus or what the student submitted.
+        self.assertEqual(set(self.db.rows("canvas_assignments")[0]), {
+            "user_id", "canvas_assignment_id", "canvas_course_id", "title", "due_at", "submitted", "created_at",
+            "points_possible", "submission_types", "description", "rubric", "html_url", "missing", "score", "is_exam", "canvas_updated_at"})
         for row in self.db.rows("canvas_courses"):
             self.assertLessEqual(len(row["topic_summary"]), 600)
             self.assertNotIn("<p>", row["topic_summary"])
-        self.assertNotIn("score", json.dumps(self.db.tables))
+        self.assertNotIn("submission_comments", json.dumps(self.db.tables))
         listed = classes.list_classes("Bearer x")["classes"]
         self.assertEqual([c["code"] for c in listed], ["CHEM 2410", "FILM 201", "MGT 300"])
 

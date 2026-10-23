@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Check } from 'lucide-react';
 import { setDeadlineDone } from '../lib/canvas';
 
-// A deadline's checkbox. Saves right away; puts the box back if the save fails.
-export default function DoneCheck({ id, title, done, onChange }) {
+// A deadline's checkbox (or any checkbox given `save`). Saves right away; puts the box back if the save fails.
+export default function DoneCheck({ id, title, done, onChange, save = setDeadlineDone }) {
   const [checked, setChecked] = useState(Boolean(done));
   useEffect(() => setChecked(Boolean(done)), [done]);
 
@@ -13,7 +13,7 @@ export default function DoneCheck({ id, title, done, onChange }) {
     const next = !checked;
     setChecked(next);
     onChange?.(next);
-    if (!(await setDeadlineDone(id, next))) {
+    if (!(await save(id, next))) {
       setChecked(!next);
       onChange?.(!next);
     }

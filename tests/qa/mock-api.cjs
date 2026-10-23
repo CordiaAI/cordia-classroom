@@ -114,11 +114,39 @@ async function install(context, state) {
     if (path === '/tutor/chats') return json({ chats: state.chats || [] });
     if (path === '/connectors' && method === 'GET') {
       state.linked = state.linked || {};
-      return json({ connectors: [['gcal', 'Google Calendar', 'Put your deadlines on your calendar.'], ['apple_calendar', 'Apple Calendar', 'Subscribe to your deadlines on iPhone and Mac.'], ['gtasks', 'Google Tasks', 'Turn deadlines into to-dos.'], ['gdrive', 'Google Drive', 'Import course files into a guide.'], ['gdocs', 'Google Docs', 'Import notes into a guide.'], ['notion', 'Notion', 'Import notes into a guide.'], ['gsheets', 'Google Sheets', 'Text Cordia to log anything to a sheet.'], ['gmail', 'Gmail', 'Cordia texts you about emails that need a reply.'], ['outlook', 'Outlook', 'Cordia texts you about emails that need a reply.'], ['slack', 'Slack', 'Catch what you missed and reply by text.'], ['ynab', 'YNAB', 'Check your budget by text.'], ['dropbox', 'Dropbox', 'Find a file by text.'], ['github', 'GitHub', 'Check issues and pull requests by text.']].map(([id, name, tagline]) => ({ id, name, tagline, available: true, connected: Boolean(state.linked[id]) })) });
+      return json({ connectors: [['gcal', 'Google Calendar', 'Put your deadlines on your calendar.'], ['apple_calendar', 'Apple Calendar', 'Subscribe to your deadlines on iPhone and Mac.'], ['gtasks', 'Google Tasks', 'Turn deadlines into to-dos.'], ['gdrive', 'Google Drive', 'Import course files into a guide.'], ['gdocs', 'Google Docs', 'Import notes into a guide.'], ['notion', 'Notion', 'Import notes into a guide.'], ['gsheets', 'Google Sheets', 'Text Cordia to log anything to a sheet.'], ['gmail', 'Gmail', 'Cordia texts you about emails that need a reply.'], ['outlook', 'Outlook', 'Cordia texts you about emails that need a reply.'], ['slack', 'Slack', 'Catch what you missed and reply by text.'], ['ynab', 'YNAB', 'Check your budget by text.'], ['dropbox', 'Dropbox', 'Find a file by text.'], ['github', 'GitHub', 'Check issues and pull requests by text.']].map(([id, name, tagline]) => ({ id, name, tagline, available: true, connected: Boolean(state.linked[id]), uses: { tutor: true, assistant: true }, health: { sync_on: Boolean((state.syncing || {})[id]), last_synced_at: state.syncing?.[id] ? new Date(Date.now() - 240000).toISOString() : null, stats: state.syncing?.[id] ? (id === 'gcal' ? { blocks: 6 } : { tasks: 12 }) : {}, error: null, needs_reconnect: false } })) });
     }
     if ((m = path.match(/^\/connectors\/([a-z_]+)\/connect$/))) { state.linked = { ...(state.linked || {}), [m[1]]: true }; return json({ redirect_url: `/settings?section=connectors&connected=${m[1]}` }); }
     if ((m = path.match(/^\/connectors\/([a-z_]+)$/)) && method === 'DELETE') { delete state.linked[m[1]]; return json({ ok: true }); }
-    if (path.match(/^\/connectors\/(gcal|gtasks)\/deadlines$/)) return json({ added: 3, skipped: 0 });
+    if ((m = path.match(/^\/sync\/(gcal|gtasks)$/))) { state.syncing = { ...(state.syncing || {}), [m[1]]: method === 'POST' }; return json({ on: method === 'POST' }); }
+    if (path === '/alerts' && method === 'GET') return json({ alerts: state.populated ? [
+      { id: 'canvas:1', kind: 'grade_drop', course: 'BIO-101', from: 88.5, to: 84, at: new Date().toISOString() },
+      { id: 'announcement:5', kind: 'deadline', title: 'Lab report moved', summary: 'The lab report is now due Friday at noon.', course: 'BIO-101' },
+    ] : [] });
+    if (path.startsWith('/alerts/')) return json({ ok: true });
+    if ((m = path.match(/^\/plans\/([^/]+)(\/schedule)?$/))) {
+      state.plans = state.plans || {};
+      const key = decodeURIComponent(m[1]);
+      const due = Date.now() + 4 * 86400000;
+      if (method === 'POST' && !m[2]) state.plans[key] = { item_key: key, effort_minutes: 150, effort_basis: 'A 50-point lab write-up with a 4-part rubric.', blocks: [], steps: [
+        { id: 's1', title: 'Re-read the lab handout and gather your data', minutes: 30, due_at: new Date(due - 3 * 86400000).toISOString(), done: true },
+        { id: 's2', title: 'Analyze the results and make the two graphs', minutes: 60, due_at: new Date(due - 1.5 * 86400000).toISOString(), done: false },
+        { id: 's3', title: 'Write the discussion and check it against the rubric', minutes: 60, due_at: new Date(due).toISOString(), done: false },
+      ] };
+      if (m[2] && state.plans[key]) { state.plans[key].blocks = [0, 1].map(i => ({ id: 'b' + i, starts_at: new Date(Date.now() + (i + 1) * 86400000).toISOString(), ends_at: new Date(Date.now() + (i + 1) * 86400000 + 3600000).toISOString(), status: 'planned' })); return json({ plan: state.plans[key], added: 2 }); }
+      if (method === 'DELETE') { delete state.plans[key]; return json({ ok: true }); }
+      return json({ plan: state.plans[key] || null, points: 50, missing: false, rubric: [{ description: 'Data analysis', points: 20, long_description: 'Graphs are labeled and support the conclusion.' }, { description: 'Discussion', points: 20 }, { description: 'Formatting', points: 10 }] });
+    }
+    if (path.match(/^\/plans\/[^/]+\/steps\//)) return json({ step: { id: 's', done: body.done } });
+    if (path === '/week') return json({ due: [
+      { id: 'c1', title: 'Lab report [BIO-101-002]', course: 'BIO-101', due_at: new Date(Date.now() + 86400000).toISOString(), effort_minutes: 150, planned: true, scheduled_minutes: 120 },
+      { id: 'c2', title: 'Midterm [BIO-101-002]', course: 'BIO-101', due_at: new Date(Date.now() + 3 * 86400000).toISOString(), effort_minutes: null, planned: false, scheduled_minutes: 0 },
+    ], grades: [{ course: 'BIO-101', score: 84, grade: 'B' }, { course: 'EH-102', score: 92.4, grade: null }], last_week: { planned_minutes: 240, done_minutes: 180 }, next_week_minutes: 120 });
+    if (path === '/week/accept') return json({ added: 3 });
+    if (path === '/announcements') return json({ announcements: [
+      { canvas_announcement_id: 5, title: 'Lab report moved', summary: 'The lab report is now due Friday at noon.', changes: 'deadline', course: 'BIO-101' },
+      { canvas_announcement_id: 6, title: 'Welcome to week 9', summary: 'Office hours move to Tuesday this week.', changes: 'none', course: 'EH-102' },
+    ] });
     if (path === '/connectors/apple_calendar/feed') return json({ url: 'https://api.example.com/calendar-feed/u.sig.ics', webcal_url: 'about:blank' });
     if (path.match(/^\/connectors\/[a-z]+\/files/)) return json({ files: [{ id: 'f1', title: 'Biology lecture 4 notes', kind: 'doc', edited: '2026-10-20' }, { id: 'f2', title: 'Syllabus', kind: 'pdf', edited: '2026-09-01' }] });
     if (path.match(/^\/connectors\/[a-z]+\/import$/)) return json({ title: 'Biology lecture 4 notes', text: 'Osmosis is the movement of water across a membrane.' });

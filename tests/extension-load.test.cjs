@@ -14,7 +14,7 @@ async function main() {
     if (!worker) worker = await context.waitForEvent('serviceworker');
     const extensionId = new URL(worker.url()).host;
     const manifest = await worker.evaluate(() => chrome.runtime.getManifest());
-    assert.equal(manifest.version, '2.1.2');
+    assert.equal(manifest.version, '2.1.3');
     assert.equal(manifest.name, 'CordiaClassroom');
     assert.equal(manifest.action.default_icon['128'], 'icon128.png');
     assert.deepEqual(manifest.host_permissions, ['<all_urls>']);
@@ -34,8 +34,8 @@ async function main() {
     assert.equal(await panel.locator('.step').count(), 4);
     assert.equal(await panel.locator('#make-guide').count(), 1);
     assert.equal(await panel.locator('#tutor-form').count(), 1);
-    assert.equal(await panel.locator('.brand strong').textContent(), 'CordiaClassroom');
-    assert.match(await panel.locator('.brand img').getAttribute('src'), /cordia-classroom-logo\.png/);
+    assert.equal(await panel.locator('.wordmark strong').textContent(), 'cordia');
+    assert.match(await panel.locator('.wordmark img').getAttribute('src'), /cordia-classroom-logo\.png/);
     assert.equal(await panel.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
 
     assert.equal(await panel.locator('#make-guide').isDisabled(), true);

@@ -12,9 +12,12 @@ DEFAULTS = {
     "canvas_courses": {"imported": False, "topic_summary": ""},
     "class_merge_proposals": {"status": "pending"},
     "copyright_takedowns": {"status": "received"},
+    "study_blocks": {"status": "planned", "kind": "work", "step_id": None},
+    "assignment_steps": {"done": False, "done_at": None},
 }
 ID_TABLES = {"schools", "classes", "class_terms", "folders", "study_guides", "shared_sets", "shared_set_reports",
-             "class_merge_proposals", "copyright_takedowns", "instructor_blocks", "canvas_activity"}
+             "class_merge_proposals", "copyright_takedowns", "instructor_blocks", "canvas_activity",
+             "assignment_steps", "study_blocks"}
 
 
 class FakeDB:
@@ -40,13 +43,21 @@ class Query:
         self._order, self._limit, self.on_conflict, self.columns = None, None, None, None
 
     # filters
-    def select(self, columns="*", **_kwargs):
-        self.op = "select"
+    def select(self, columns="*", count=None, **_kwargs):
+        self.op, self.count = "select", count
         self.columns = None if columns.strip() == "*" else [c.strip() for c in columns.split(",")]
         return self
 
     def eq(self, key, value):
         self.filters.append(lambda r: r.get(key) == value)
+        return self
+
+    def neq(self, key, value):
+        self.filters.append(lambda r: r.get(key) != value)
+        return self
+
+    def is_(self, key, value):
+        self.filters.append(lambda r: r.get(key) is None if value in (None, "null") else r.get(key) == value)
         return self
 
     def in_(self, key, values):
@@ -116,10 +127,11 @@ class Query:
             if self._order:
                 key, desc = self._order
                 out.sort(key=lambda r: (r.get(key) is None, str(r.get(key) or "")), reverse=desc)
+            total = len(out)
             out = out[: self._limit] if self._limit else out
             if self.columns:
                 out = [{c: r.get(c) for c in self.columns} for r in out]
-            return SimpleNamespace(data=out)
+            return SimpleNamespace(data=out, count=total if getattr(self, "count", None) else None)
         if self.op == "insert":
             items = self.payload if isinstance(self.payload, list) else [self.payload]
             made = [self._new(r) for r in items]

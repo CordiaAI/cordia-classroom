@@ -121,6 +121,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .cordia-tutor-header select { border: 1px solid var(--line); background: var(--surface); border-radius:12px; font-size: 13px; padding: 9px; color: var(--ink); }
 .cordia-tutor-attach, .cordia-tutor-explain-toggle { color: var(--text-secondary); background: transparent; border-color: var(--line); font-size: 13px; }
 .cordia-tutor-messages { padding: 20px; }
+.tutor-assignment { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 10px 12px 10px 16px; border-radius: var(--r-row, 16px); background: var(--olive-tint); color: var(--ink); font: 500 14px/1.45 var(--font-sans); }
 .cordia-tutor-message { background: var(--reading-surface); border: 1px solid var(--line); border-radius:12px; line-height:1.5; }
 /* Chat bubbles: the student's message is a solid accent bubble on the right, Cordia's a raised card on the left. */
 .cordia-tutor-message.ai { align-self: flex-start; max-width: 92%; padding: 12px 14px; border-radius:20px; background: var(--sand); border-color: var(--line); box-shadow: var(--shadow-sm); }
