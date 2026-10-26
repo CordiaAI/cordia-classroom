@@ -11,7 +11,10 @@ const SIGN_OUT_EXTRA = 8;
 // (30 ms stagger, 200 ms, ease-in). Rendered on <body> so the top bar's blur can't make
 // the bubbles see-through.
 // items: [{ key, label, icon, onSelect, separated }]
-export default function AccountMenu({ open, onClose, anchorRef, items }) {
+export default function AccountMenu({ open, onClose, anchorRef, items, placement = 'below' }) {
+  // below: right-aligned under a top-bar avatar. above: beside the sidebar's account row, folding up
+  // from it.
+  const above = placement === 'above';
   const [phase, setPhase] = useState(open ? 'opening' : 'closed'); // opening | open | closing | closed
   const [anchor, setAnchor] = useState(null);
   const listRef = useRef(null);
@@ -39,12 +42,14 @@ export default function AccountMenu({ open, onClose, anchorRef, items }) {
     if (!open) return undefined;
     function place() {
       const rect = anchorRef.current?.getBoundingClientRect();
-      if (rect) setAnchor({ top: rect.bottom + GAP, right: Math.max(8, window.innerWidth - rect.right) });
+      // Above: beside the sidebar, bottom edge on the account row's, so it covers none of the sidebar.
+      const side = anchorRef.current?.closest('.c-side')?.getBoundingClientRect();
+      if (rect) setAnchor(above ? { bottom: Math.max(8, window.innerHeight - rect.bottom), left: (side?.right ?? rect.right) + GAP } : { top: rect.bottom + GAP, right: Math.max(8, window.innerWidth - rect.right) });
     }
     place();
     window.addEventListener('resize', place);
     return () => window.removeEventListener('resize', place);
-  }, [open, anchorRef]);
+  }, [open, anchorRef, above]);
 
   // First bubble takes focus; Escape and outside clicks close; focus goes back to the avatar.
   useEffect(() => {
@@ -79,11 +84,13 @@ export default function AccountMenu({ open, onClose, anchorRef, items }) {
   if (phase === 'closed' || !anchor) return null;
 
   // Each bubble's distance from the first one's spot (where they all start, stacked).
+  // Folding up, they start stacked behind the last one (nearest the account row) instead.
   let offset = 0;
   const offsets = items.map((item, index) => {
     if (index > 0) offset += BUBBLE + GAP + (item.separated ? SIGN_OUT_EXTRA : 0);
     return offset;
   });
+  const span = offsets[offsets.length - 1] || 0;
 
   return (
     <BodyPortal>
@@ -92,7 +99,7 @@ export default function AccountMenu({ open, onClose, anchorRef, items }) {
         className={`acct-bubbles is-${phase}`}
         role="menu"
         aria-label="Account"
-        style={{ top: anchor.top, right: anchor.right }}
+        style={above ? { bottom: anchor.bottom, left: anchor.left } : { top: anchor.top, right: anchor.right }}
         onKeyDown={onKeyDown}
       >
         {items.map((item, index) => (
@@ -103,10 +110,10 @@ export default function AccountMenu({ open, onClose, anchorRef, items }) {
             tabIndex={-1}
             className={'acct-bubble' + (item.separated ? ' is-separated' : '')}
             style={{
-              '--from': `${-offsets[index]}px`,
-              '--open-delay': `${index * 40}ms`,
-              '--close-delay': `${(count - 1 - index) * 30}ms`,
-              zIndex: count - index,
+              '--from': above ? `${span - offsets[index]}px` : `${-offsets[index]}px`,
+              '--open-delay': `${(above ? count - 1 - index : index) * 40}ms`,
+              '--close-delay': `${(above ? index : count - 1 - index) * 30}ms`,
+              zIndex: above ? index + 1 : count - index,
             }}
             onClick={() => { onClose(true); item.onSelect(); }}
           >

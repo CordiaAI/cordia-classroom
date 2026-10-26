@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
-import { BookOpen, Layers, NotebookPen, Search, X } from 'lucide-react';
+import { ArrowRight, BookOpen, CalendarDays, Layers, Library, NotebookPen, Search, Settings, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 
 function plain(html) {
@@ -9,6 +9,12 @@ function plain(html) {
 }
 
 let cache = null; // { guides, notes } loaded once per page session
+
+const JUMPS = [
+  { key: 'j-library', kind: 'jump', icon: Library, title: 'Library', href: '/library' },
+  { key: 'j-calendar', kind: 'jump', icon: CalendarDays, title: 'Calendar', href: '/canvas?tab=calendar' },
+  { key: 'j-settings', kind: 'jump', icon: Settings, title: 'Settings', href: '/settings' },
+];
 
 // ⌘K / Ctrl K: one search over study guides, flashcards and notes.
 export default function SearchModal({ onClose }) {
@@ -42,7 +48,12 @@ export default function SearchModal({ onClose }) {
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return [];
+    // Before typing: the newest guides and notes, and the places people jump to most.
+    if (!q) {
+      const recent = (library?.guides || []).slice(0, 5).map(guide => ({ key: 'g' + guide.id, kind: 'recent', title: guide.title, href: '/guide/' + guide.id }));
+      const notes = (library?.notes || []).slice(0, 2).map(note => ({ key: 'n' + note.id, kind: 'recent', icon: NotebookPen, title: note.title || 'Untitled', href: '/smartnotes?id=' + note.id }));
+      return [...recent, ...notes, ...JUMPS];
+    }
     const guides = guideHits.slice(0, 6).map(hit => ({ key: 'g' + hit.id, kind: 'guide', title: hit.title, href: '/guide/' + hit.id }));
     const cards = [];
     for (const guide of library?.guides || []) {
@@ -73,8 +84,8 @@ export default function SearchModal({ onClose }) {
     if (event.key === 'Enter' && results[active]) go(results[active]);
   }
 
-  const ICON = { guide: BookOpen, card: Layers, note: NotebookPen };
-  const GROUP = { guide: 'Guides', card: 'Cards', note: 'Notes' };
+  const ICON = { guide: BookOpen, card: Layers, note: NotebookPen, recent: BookOpen, jump: ArrowRight };
+  const GROUP = { guide: 'Guides', card: 'Cards', note: 'Notes', recent: 'Recent', jump: 'Go to' };
 
   return (
     <BodyPortal>
@@ -91,7 +102,7 @@ export default function SearchModal({ onClose }) {
         </div>
         <ul id="c-search-results" className="search-list" role="listbox" aria-label="Results">
           {results.map((result, index) => {
-            const Icon = ICON[result.kind];
+            const Icon = result.icon || ICON[result.kind];
             const groupStart = index === 0 || results[index - 1].kind !== result.kind;
             return (
               <li key={result.key} role="option" aria-selected={index === active}>
@@ -108,8 +119,9 @@ export default function SearchModal({ onClose }) {
         </ul>
       </div>
       <style jsx>{`
-        .c-search-scrim { place-items: start center; padding-top: 12vh; }
-        .c-search-sheet { width: min(600px, 100%); padding: 0; overflow: hidden; }
+        /* A centered panel over a dimmed page: the field on top, recent work and places below it. */
+        .c-search-scrim { place-items: start center; padding-top: 14vh; background: var(--scrim-strong); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+        .c-search-sheet { width: min(640px, 100%); padding: 0; overflow: hidden; background: var(--lg-menu, var(--card)) !important; }
         .search-bar { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0 12px 0 20px; color: var(--muted); }
         .search-input { flex: 1; min-width: 0; height: 60px; padding: 0; border: 0; background: transparent; color: var(--ink); font:500 17px/1.4 var(--font-sans); outline: none; box-shadow: none; -webkit-appearance: none; appearance: none; }
         .search-input:focus, .search-input:focus-visible { outline: none; box-shadow: none; }

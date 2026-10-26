@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ChartNoAxesColumn, CircleHelp, CreditCard, GraduationCap, LayoutDashboard, Library, Link2, LogOut, MessageCircle, MessageSquareText, Palette, Plus, Search, Settings, Timer, User } from 'lucide-react';
+import { ChartNoAxesColumn, CircleHelp, CreditCard, GraduationCap, LayoutDashboard, Library, Link2, LogOut, MessageCircle, MessageSquareText, Palette, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, User } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -53,6 +53,17 @@ export default function Sidebar({ timerState, setTimerState }) {
   const timerRef = useRef(null);
   const [shortcut, setShortcut] = useState('Ctrl K');
   const avatarRef = useRef(null);
+  const sideAvatarRef = useRef(null);
+  const [menuFrom, setMenuFrom] = useState('top'); // which avatar opened the account menu
+  // Wide screens: the sidebar folds to icons. Remembered on this device; _document applies it before paint.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => { setCollapsed(document.documentElement.dataset.side === 'collapsed'); }, []);
+  function toggleSide() {
+    const next = !collapsed;
+    setCollapsed(next);
+    document.documentElement.dataset.side = next ? 'collapsed' : 'open';
+    try { localStorage.setItem('cordiaSide', next ? 'collapsed' : 'open'); } catch { /* storage blocked */ }
+  }
   const active = activeNavHref(router.pathname, String(router.query.section || ''));
 
   useEffect(() => {
@@ -85,8 +96,8 @@ export default function Sidebar({ timerState, setTimerState }) {
   // Closing returns focus to the avatar (Escape, choosing an item); an outside click leaves focus where it landed.
   const closeMenu = useCallback(refocus => {
     setMenuOpen(false);
-    if (refocus) avatarRef.current?.focus({ preventScroll: true });
-  }, []);
+    if (refocus) (menuFrom === 'side' ? sideAvatarRef : avatarRef).current?.focus({ preventScroll: true });
+  }, [menuFrom]);
 
   useEffect(() => {
     const closeAll = () => { setMenuOpen(false); setShowSearch(false); setTimerOpen(false); };
@@ -136,6 +147,45 @@ export default function Sidebar({ timerState, setTimerState }) {
   return (
     <>
       <a className="workspace-skip-link" href="#classroom-main">Skip to content</a>
+      {/* Wide screens: the sidebar. Every item has a label; folded, the label shows on hover. */}
+      <aside className={'c-side' + (collapsed ? ' is-collapsed' : '')} aria-label="Sidebar">
+        <div className="c-side-head">
+          <Link className="c-side-brand" href="/dashboard" aria-label="Cordia Classroom, Dashboard">
+            <AcademicInfinityMark className="top-navigation-mark" title="" />
+            <span className="c-side-label">cordia</span>
+          </Link>
+          <button type="button" className="c-side-toggle" onClick={toggleSide} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!collapsed}>
+            {collapsed ? <PanelLeftOpen size={20} strokeWidth={1.75} aria-hidden="true" /> : <PanelLeftClose size={20} strokeWidth={1.75} aria-hidden="true" />}
+          </button>
+        </div>
+        <button type="button" className="c-btn c-btn--primary c-side-new" data-spot="new" onClick={() => openNewSheet()} title="New">
+          <Plus size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">New</span>
+        </button>
+        <button type="button" className="c-side-item" onClick={() => setShowSearch(true)} title={`Search (${shortcut})`} aria-keyshortcuts={shortcut === '⌘K' ? 'Meta+K' : 'Control+K'}>
+          <Search size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">Search</span><kbd className="c-side-kbd">{shortcut}</kbd>
+        </button>
+        <nav className="c-side-nav" aria-label="Primary">
+          {navItems.map(item => (
+            <Link key={item.href} className="c-side-item" href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.tip} data-spot={item.spot} title={item.label}>
+              <item.icon size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">{item.label}</span>
+            </Link>
+          ))}
+        </nav>
+        <div className="c-side-foot">
+          <button type="button" className="c-side-item" onClick={() => setShowHelp(true)} title="Help">
+            <CircleHelp size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">Help</span>
+          </button>
+          <button type="button" className="c-side-item" onClick={() => setShowFeedback(true)} title="Send feedback">
+            <MessageSquareText size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">Send feedback</span>
+          </button>
+          <button ref={sideAvatarRef} type="button" className={'c-side-item c-side-account' + (onProfile ? ' is-active' : '')} onClick={() => { setMenuFrom('side'); setMenuOpen(open => !open); }} aria-expanded={menuOpen && menuFrom === 'side'} aria-haspopup="menu" title={displayName || 'Account'}>
+            <span className="c-avatar c-side-avatar" aria-hidden="true">{initials || <User size={18} strokeWidth={1.75} />}</span>
+            <span className="c-side-label c-side-who"><strong className="c-truncate">{name || emailName || 'Account'}</strong>{email && <span className="c-truncate">{email}</span>}</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Phones: brand, search and account on top; the tab bar below. */}
       <header className="c-topbar">
         <Link className="c-brand" href="/dashboard" aria-label="Cordia Classroom, Dashboard">
           <AcademicInfinityMark className="top-navigation-mark" title="" />
@@ -152,9 +202,6 @@ export default function Sidebar({ timerState, setTimerState }) {
         </nav>
 
         <div className="c-bar-actions">
-          <button type="button" className="c-btn c-btn--secondary c-feedbackbtn" onClick={() => setShowFeedback(true)} aria-label="Send feedback" title="Send feedback">
-            <MessageSquareText size={20} strokeWidth={1.75} aria-hidden="true" />
-          </button>
           {/* Search is an icon: the ⌘K / Ctrl K shortcut shows on hover. */}
           <button type="button" className="c-btn c-btn--secondary c-searchbtn" onClick={() => setShowSearch(true)} aria-label={`Search (${shortcut})`} title={`Search (${shortcut})`} aria-keyshortcuts={shortcut === '⌘K' ? 'Meta+K' : 'Control+K'}>
             <Search size={20} strokeWidth={1.75} aria-hidden="true" />
@@ -163,10 +210,12 @@ export default function Sidebar({ timerState, setTimerState }) {
             <Plus size={20} strokeWidth={1.75} aria-hidden="true" />New
           </button>
           <div className="c-menu-wrap">
-            <button ref={avatarRef} type="button" className={'c-avatar' + (onProfile ? ' is-active' : '')} onClick={() => setMenuOpen(open => !open)} aria-expanded={menuOpen} aria-haspopup="menu" aria-label={initials ? `${initials} account menu` : 'Account menu'}>
+            <button ref={avatarRef} type="button" className={'c-avatar' + (onProfile ? ' is-active' : '')} onClick={() => { setMenuFrom('top'); setMenuOpen(open => !open); }} aria-expanded={menuOpen && menuFrom === 'top'} aria-haspopup="menu" aria-label={initials ? `${initials} account menu` : 'Account menu'}>
               {initials || <User size={20} strokeWidth={1.75} aria-hidden="true" />}
             </button>
-            <AccountMenu open={menuOpen} onClose={closeMenu} anchorRef={avatarRef} items={accountItems} />
+            {/* The sidebar has its own Help and Send feedback, so its account menu leaves them out. */}
+            <AccountMenu open={menuOpen} onClose={closeMenu} anchorRef={menuFrom === 'side' ? sideAvatarRef : avatarRef} placement={menuFrom === 'side' ? 'above' : 'below'}
+              items={menuFrom === 'side' ? accountItems.filter(item => item.key !== 'help' && item.key !== 'feedback') : accountItems} />
           </div>
         </div>
       </header>

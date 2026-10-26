@@ -667,3 +667,67 @@ body:has(.about) .c-fab { display: none; }
 body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 @keyframes rec-pulse { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .rec-pill-dot { animation: none; } }
+
+/* ---------- Sidebar (wide screens) ----------
+   Replaces the top bar from 768px up: New, Search, the four places, then Help, Feedback and the
+   account at the bottom. Folds to icons (72px) with the toggle, remembered per device; between
+   768 and 1099px it's always folded so the page keeps its width. Phones keep the top bar and tab bar. */
+:root { --side-w: 248px; }
+:root[data-side='collapsed'] { --side-w: 72px; }
+.c-side { display: none; }
+@media (min-width: 768px) {
+  :root:has(.app-shell) { --bar-h: 0px; }
+  .app-shell .c-topbar { display: none; }
+  .app-shell { padding-left: var(--side-w); transition: padding-left 200ms var(--ease); }
+  .app-shell.is-focus { padding-left: 0; }
+  .app-shell.is-focus .c-side { display: none; }
+  .c-side {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 95; width: var(--side-w);
+    display: flex; flex-direction: column; gap: 2px; padding: 14px 12px 12px;
+    overflow: hidden auto; overscroll-behavior: contain;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    backdrop-filter: blur(24px) saturate(160%);
+    border-right: 1px solid var(--glass-edge);
+    box-shadow: inset -1px 0 0 var(--glass-edge);
+    transition: width 200ms var(--ease);
+  }
+  .c-side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 4px 0 8px; margin-bottom: 8px; }
+  .c-side-brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; font: 600 20px/1.15 var(--font-display); white-space: nowrap; }
+  .c-side-brand:hover { text-decoration: none; }
+  .c-side-brand .top-navigation-mark { width: 30px; height: 26px; flex: none; }
+  .c-side-toggle { display: grid; place-items: center; flex: none; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; }
+  .c-side-toggle:hover { background: var(--olive-tint); color: var(--ink); }
+  .c-side-new { width: 100%; height: 44px; min-height: 44px; margin-bottom: 6px; white-space: nowrap; }
+  .c-side-item {
+    display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 12px;
+    border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink);
+    font: 600 15px/1 var(--font-sans); text-align: left; text-decoration: none; white-space: nowrap; cursor: pointer;
+  }
+  .c-side-item .lucide { flex: none; }
+  .c-side-item:hover { background: var(--olive-tint); text-decoration: none; }
+  .c-side-item:focus-visible, .c-side-toggle:focus-visible { outline: 2px solid var(--olive); outline-offset: -2px; }
+  .c-side-item[aria-current='page'] { background: var(--olive); color: var(--on-olive); }
+  .c-side-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .c-side-kbd { margin-left: auto; padding: 4px 7px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--muted); font: 600 12px/1 var(--font-sans); }
+  .c-side-nav { display: grid; gap: 2px; margin-top: 6px; }
+  .c-side-foot { display: grid; gap: 2px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
+  .c-side-account { height: 56px; padding: 0 8px; }
+  .c-side-account.is-active .c-side-avatar { box-shadow: 0 0 0 2px var(--olive); }
+  .c-side-avatar { flex: none; width: 36px; height: 36px; }
+  .c-side-who { display: grid; gap: 3px; min-width: 0; }
+  .c-side-who strong { font: 600 14px/1.2 var(--font-sans); }
+  .c-side-who span { color: var(--muted); font: 500 12px/1.2 var(--font-sans); }
+  /* Folded: icons only, centered; each keeps its name as a hover title and accessible label. */
+  .c-side.is-collapsed { padding-inline: 12px; }
+  .c-side.is-collapsed .c-side-label, .c-side.is-collapsed .c-side-kbd { display: none; }
+  .c-side.is-collapsed .c-side-head { flex-direction: column; padding: 0; gap: 8px; }
+  .c-side.is-collapsed :is(.c-side-item, .c-side-new) { justify-content: center; padding: 0; }
+  .c-side.is-collapsed .c-side-account { height: 48px; }
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  :root { --side-w: 72px; }
+  .c-side .c-side-label, .c-side .c-side-kbd, .c-side .c-side-toggle { display: none; }
+  .c-side .c-side-head { justify-content: center; padding: 0; }
+  .c-side :is(.c-side-item, .c-side-new) { justify-content: center; padding: 0; }
+}
