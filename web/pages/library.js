@@ -83,8 +83,8 @@ export default function LibraryPage() {
     if (!file) return;
     setReadingFile(true);
     try {
-      if (handOffUpload(await readPracticeFile(file))) router.push('/practice');
-      else setToast('Your browser blocked that. Make a guide from the file instead.');
+      handOffUpload(await readPracticeFile(file));
+      router.push('/practice');
     } catch (error) {
       setToast(error.message || 'This file could not be read.');
     } finally {

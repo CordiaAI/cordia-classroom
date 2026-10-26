@@ -1,9 +1,10 @@
 import { apiErrorMessage, authOnlyHeaders, responseJson } from './api';
 
-// Practice from a file: Library's Practice filter reads the file, then the workspace picks it up
-// (it's never saved, so it rides in this tab's sessionStorage for the one hop).
+// Practice from a file: Library's Practice filter reads the file, then the workspace picks it up.
+// It's never saved, so it's handed over in memory for the one in-app navigation (a reload of
+// /practice simply goes back to Library). Kept out of web storage on purpose.
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const KEY = 'cordiaPracticeUpload';
+let handed = null;
 export const PRACTICE_FILES = '.pdf,.docx,.pptx,.txt';
 
 export async function readPracticeFile(file) {
@@ -16,14 +17,11 @@ export async function readPracticeFile(file) {
 }
 
 export function handOffUpload(upload) {
-  try { sessionStorage.setItem(KEY, JSON.stringify(upload)); return true; } catch { return false; }
+  handed = upload;
 }
 
 export function takeUpload() {
-  try {
-    const raw = sessionStorage.getItem(KEY);
-    sessionStorage.removeItem(KEY);
-    const upload = raw ? JSON.parse(raw) : null;
-    return upload?.content ? upload : null;
-  } catch { return null; }
+  const upload = handed;
+  handed = null;
+  return upload?.content ? upload : null;
 }
