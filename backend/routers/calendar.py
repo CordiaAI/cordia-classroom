@@ -284,6 +284,74 @@ def _token_payload(user_id: str) -> dict | None:
     }
 
 
+TERM_DAYS = 150  # how far back "this term" reaches for course work
+
+
+def build_coursework(assignments: list, marked: dict, changes: dict, courses: dict, domain: str, now: datetime) -> dict:
+    """Canvas's own split of the term's work, like its Dashboard: upcoming (not turned in, not yet
+    due), missing (Canvas says missing, or past due and not turned in) and completed (turned in,
+    or checked off here). Accepted date changes apply first, so a moved deadline sorts right."""
+    items = [{
+        "id": canvas_item_key(row["canvas_assignment_id"]),
+        "title": row.get("title") or "Assignment",
+        "due_at": row.get("due_at"),
+        "course": courses.get(row.get("canvas_course_id")),
+        "points": row.get("points_possible"),
+        "score": row.get("score"),
+        "url": f"https://{domain}/courses/{row['canvas_course_id']}/assignments/{row['canvas_assignment_id']}" if domain else None,
+        "done": is_done(canvas_item_key(row["canvas_assignment_id"]), marked, row.get("submitted")),
+        "canvas_missing": bool(row.get("missing")),
+        "type": _kind(row.get("title") or ""),
+    } for row in assignments]
+    apply_changes(items, changes, {canvas_item_key(row["canvas_assignment_id"]): row.get("canvas_updated_at") for row in assignments})
+
+    def due(item):
+        try:
+            return datetime.fromisoformat(str(item["due_at"]).replace("Z", "+00:00")) if item.get("due_at") else None
+        except ValueError:
+            return None
+
+    upcoming, missing, completed = [], [], []
+    for item in items:
+        when = due(item)
+        if item.get("cancelled"):
+            continue
+        if item["done"]:
+            completed.append(item)
+        elif item["canvas_missing"] or (when and when < now):
+            missing.append(item)
+        else:
+            upcoming.append(item)
+    far = datetime.max.replace(tzinfo=timezone.utc)
+    upcoming.sort(key=lambda item: due(item) or far)
+    missing.sort(key=lambda item: due(item) or far, reverse=True)
+    completed.sort(key=lambda item: due(item) or far, reverse=True)
+    return {"counts": {"upcoming": len(upcoming), "missing": len(missing), "completed": len(completed)},
+            "upcoming": upcoming[:60], "missing": missing[:60], "completed": completed[:60]}
+
+
+@router.get("/coursework")
+def get_coursework(authorization: str = Header(default="")):
+    """The term's Canvas work in three lists with counts, for the Dashboard."""
+    user_id = get_user_id(authorization)
+    db = get_supabase()
+    rows = db.table("canvas_connections").select("canvas_domain,status").eq("user_id", user_id).limit(1).execute().data or []
+    if not rows or rows[0].get("status") != "connected":
+        return {"connected": False, "counts": {"upcoming": 0, "missing": 0, "completed": 0}, "upcoming": [], "missing": [], "completed": []}
+    now = datetime.now(timezone.utc)
+    since = (now - timedelta(days=TERM_DAYS)).isoformat()
+    columns = "canvas_assignment_id,canvas_course_id,title,due_at,canvas_updated_at,submitted,missing,points_possible,score"
+    try:
+        assignments = db.table("canvas_assignments").select(columns).eq("user_id", user_id) \
+            .or_(f"due_at.gte.{since},due_at.is.null").limit(1000).execute().data or []
+    except Exception:
+        assignments = select_assignments(db, user_id, start=since, limit=1000)
+    courses = {row["canvas_course_id"]: row.get("course_code") or row.get("name") or None
+               for row in db.table("canvas_courses").select("canvas_course_id,name,course_code").eq("user_id", user_id).execute().data or []}
+    result = build_coursework(assignments, marks(db, user_id), accepted_changes(db, user_id), courses, rows[0]["canvas_domain"], now)
+    return {"connected": True, **result}
+
+
 def calendar_for(user_id: str) -> dict:
     """The student's deadlines. A Canvas access token wins over a calendar link: it also knows
     what was turned in and which course each item belongs to. The link is for schools that

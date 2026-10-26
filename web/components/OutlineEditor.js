@@ -296,7 +296,8 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
         .oe-tools { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: -8px 0 0 -12px; }
         .oe-status { font-size: 13px; }
         .oe-tools--read { margin-top: -8px; }
-        .oe-page.is-editing { box-shadow: 0 0 0 1px var(--line); border-radius: var(--r-input); padding: 12px; margin: -12px; }
+        /* Writing: the box spans the card under the toolbar (reading keeps the 68ch measure). */
+        .oe-page.is-editing { max-width: none; box-shadow: 0 0 0 1px var(--line); border-radius: var(--r-input); padding: 12px; margin: -12px; }
         .oe-side { position: relative; display: flex; flex-direction: column; min-width: 0; }
         .oe-side-item + .oe-side-item { margin-top: ${GAP}px; }
         .oe-page { min-height: 240px; outline: none; display: grid; gap: 12px; align-content: start; }

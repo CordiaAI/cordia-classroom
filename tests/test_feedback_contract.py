@@ -164,6 +164,42 @@ class FeedbackContractTests(unittest.TestCase):
         self.assertEqual(upsert[2]["on_conflict"], "user_id,client_request_id")
         self.assertTrue(upsert[2]["ignore_duplicates"])
 
+    def test_only_the_senders_own_screenshots_are_kept(self):
+        user = "11111111-2222-4333-8444-555555555555"
+        other = "99999999-2222-4333-8444-555555555555"
+        shot = "6f0fe5fa-e5e6-4fb1-b4da-36adbc94df2e.png"
+        query = FluentQuery([{"id": "feedback-1"}])
+        db = MagicMock()
+        db.table.return_value = query
+        request = feedback.FeedbackRequest(
+            message="The button overlaps.", category="bug", client_request_id="6f0fe5fa-e5e6-4fb1-b4da-36adbc94df2f",
+            attachments=[f"{user}/{shot}", f"{other}/{shot}", "../../etc/passwd"],
+        )
+        with patch.object(feedback, "get_user_id", return_value=user), patch.object(feedback, "get_supabase", return_value=db):
+            feedback.submit_feedback(request, "Bearer valid")
+        payload = next(call for call in query.calls if call[0] == "upsert")[1][0]
+        self.assertEqual(payload["attachments"], [f"{user}/{shot}"])
+
+    def test_feedback_is_kept_when_the_attachments_column_is_missing(self):
+        calls = []
+
+        class OldTable(FluentQuery):
+            def upsert(self, row, **kwargs):
+                calls.append(row)
+                if "attachments" in row:
+                    raise RuntimeError("column feedback.attachments does not exist")
+                return super().upsert(row, **kwargs)
+
+        user = "11111111-2222-4333-8444-555555555555"
+        db = MagicMock()
+        db.table.return_value = OldTable([{"id": "feedback-1"}])
+        request = feedback.FeedbackRequest(message="Bug", category="bug", client_request_id="6f0fe5fa-e5e6-4fb1-b4da-36adbc94df30",
+                                           attachments=[f"{user}/6f0fe5fa-e5e6-4fb1-b4da-36adbc94df2e.jpg"])
+        with patch.object(feedback, "get_user_id", return_value=user), patch.object(feedback, "get_supabase", return_value=db):
+            result = feedback.submit_feedback(request, "Bearer valid")
+        self.assertTrue(result["submitted"])
+        self.assertNotIn("attachments", calls[-1])
+
     def test_duplicate_request_returns_existing_item(self):
         insert_query = FluentQuery([])
         duplicate_query = FluentQuery([{"id": "existing-feedback"}])

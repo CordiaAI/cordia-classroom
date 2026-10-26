@@ -1,6 +1,8 @@
 """Authenticated beta feedback submission and staff review routes."""
 
+import logging
 import os
+import re
 from typing import Literal, Optional
 from uuid import UUID
 
@@ -12,6 +14,12 @@ from database import get_supabase
 from ids import require_uuid
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
+log = logging.getLogger(__name__)
+ATTACHMENT_BUCKET = "feedback-attachments"
+# What /api/feedback-attachment stores: <user id>/<uuid>.<ext>, only the sender's own.
+ATTACHMENT_PATH = re.compile(r"^[0-9a-f-]{36}/[0-9a-f-]{36}\.(?:jpg|png|webp|gif)$")
+FIELDS = "id,user_id,message,category,status,page_path,app_version,guide_id,question_id,created_at"
+
 
 FeedbackCategory = Literal[
     "bug",
@@ -43,6 +51,7 @@ class FeedbackRequest(BaseModel):
     app_version: Optional[str] = Field(default=None, max_length=100)
     context: FeedbackContext = Field(default_factory=FeedbackContext)
     client_request_id: UUID
+    attachments: list[str] = Field(default_factory=list, max_length=3)
 
     @field_validator("message")
     @classmethod
@@ -107,17 +116,21 @@ def submit_feedback(request: FeedbackRequest, authorization: str = Header(defaul
         "question_id": request.context.question_id,
         "client_request_id": str(request.client_request_id),
     }
+    attachments = [path for path in request.attachments if ATTACHMENT_PATH.match(path) and path.startswith(f"{user_id.lower()}/")]
     supabase = get_supabase()
-    result = (
-        supabase
-        .table("feedback")
-        .upsert(
-            payload,
-            on_conflict="user_id,client_request_id",
-            ignore_duplicates=True,
-        )
-        .execute()
-    )
+
+    def save(row):
+        return supabase.table("feedback").upsert(row, on_conflict="user_id,client_request_id", ignore_duplicates=True).execute()
+
+    if attachments:
+        try:
+            result = save({**payload, "attachments": attachments})
+        except Exception as error:
+            # The attachments column isn't there until its migration runs: keep the feedback anyway.
+            log.warning("feedback saved without attachments: %s", str(error)[:200])
+            result = save(payload)
+    else:
+        result = save(payload)
     row = result.data[0] if result.data else None
     if not row:
         duplicate = (
@@ -148,32 +161,52 @@ def list_feedback(
     authorization: str = Header(default=""),
 ):
     _require_reviewer(authorization)
-    query = get_supabase().table("feedback").select(
-        "id,user_id,message,category,status,page_path,app_version,guide_id,question_id,created_at"
-    )
-    if category:
-        query = query.eq("category", category)
-    if status:
-        query = query.eq("status", status)
-    result = query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
-    return {"items": result.data or [], "limit": limit, "offset": offset}
+    def run(fields):
+        query = get_supabase().table("feedback").select(fields)
+        if category:
+            query = query.eq("category", category)
+        if status:
+            query = query.eq("status", status)
+        return query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+
+    try:
+        result = run(FIELDS + ",attachments")
+    except Exception:
+        result = run(FIELDS)  # before the attachments migration
+    return {"items": [_with_links(item) for item in result.data or []], "limit": limit, "offset": offset}
+
+
+def _with_links(item: dict) -> dict:
+    """Short-lived links (1 hour) to a feedback item's screenshots, for the review page."""
+    paths = [path for path in item.get("attachments") or [] if isinstance(path, str) and ATTACHMENT_PATH.match(path)]
+    links = []
+    if paths:
+        try:
+            bucket = get_supabase().storage.from_(ATTACHMENT_BUCKET)
+            for path in paths:
+                signed = bucket.create_signed_url(path, 3600) or {}
+                url = signed.get("signedURL") or signed.get("signedUrl") or signed.get("signed_url")
+                if url:
+                    links.append(url)
+        except Exception as error:
+            log.warning("feedback attachment links failed: %s", str(error)[:200])
+    return {**item, "attachment_urls": links}
 
 
 @router.get("/review/{feedback_id}")
 def get_feedback_item(feedback_id: str, authorization: str = Header(default="")):
     _require_reviewer(authorization)
     require_uuid(feedback_id, "feedback ID")
-    result = (
-        get_supabase()
-        .table("feedback")
-        .select("id,user_id,message,category,status,page_path,app_version,guide_id,question_id,created_at")
-        .eq("id", feedback_id)
-        .limit(1)
-        .execute()
-    )
+    def run(fields):
+        return get_supabase().table("feedback").select(fields).eq("id", feedback_id).limit(1).execute()
+
+    try:
+        result = run(FIELDS + ",attachments")
+    except Exception:
+        result = run(FIELDS)
     if not result.data:
         raise HTTPException(status_code=404, detail="Feedback item not found")
-    return {"item": result.data[0]}
+    return {"item": _with_links(result.data[0])}
 
 
 @router.patch("/review/{feedback_id}")

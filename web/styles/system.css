@@ -700,17 +700,18 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   .c-side-item {
     display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 12px;
     border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink);
-    font: 600 15px/1 var(--font-sans); text-align: left; text-decoration: none; white-space: nowrap; cursor: pointer;
+    font: 600 15px/1.3 var(--font-sans); text-align: left; text-decoration: none; white-space: nowrap; cursor: pointer;
   }
   .c-side-item .lucide { flex: none; }
   .c-side-item:hover { background: var(--olive-tint); text-decoration: none; }
   .c-side-item:focus-visible, .c-side-toggle:focus-visible { outline: 2px solid var(--olive); outline-offset: -2px; }
-  .c-side-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* Line height above 1, so the ellipsis clip never cuts off descenders (y, g, p). */
+  .c-side-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; padding-block: 1px; }
   .c-side-kbd { margin-left: auto; padding: 4px 7px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--muted); font: 600 12px/1 var(--font-sans); }
   /* The middle scrolls on short screens; New and Search stay on top and the account at the bottom. */
   .c-side-nav {
     flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 2px;
-    margin: 6px -12px 0; padding: 0 12px 8px; overflow: hidden auto; overscroll-behavior: contain; scrollbar-width: thin;
+    margin: 6px -12px 0; padding: 0 12px 8px; overflow: hidden auto; overscroll-behavior: contain;
   }
   /* Library and Canvas: the row, a caret that opens its list, and the list (indented under the icon). */
   .c-side-group, .c-side-subs, .c-side-section { grid-template-columns: minmax(0, 1fr); }
@@ -730,7 +731,7 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   .c-side-subs { list-style: none; margin: 0 0 4px; padding: 0 0 0 22px; display: grid; gap: 1px; }
   .c-side-sub {
     display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px 0 12px; border-left: 1px solid var(--line);
-    border-radius: 0 var(--r-input) var(--r-input) 0; color: var(--muted); font: 600 14px/1 var(--font-sans);
+    border-radius: 0 var(--r-input) var(--r-input) 0; color: var(--muted); font: 600 14px/1.3 var(--font-sans);
     text-decoration: none; white-space: nowrap; min-width: 0;
   }
   .c-side-sub .lucide { flex: none; }

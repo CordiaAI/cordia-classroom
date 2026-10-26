@@ -11,7 +11,7 @@ function escapeXml(text) {
 }
 
 // "Semester in Cordia": hours, cards and top class, shareable as a PNG.
-export default function RecapCard({ guides, folders, since, cardsStudied = 0 }) {
+export default function RecapCard({ guides, folders, since, cardsStudied = 0, serverDays = [] }) {
   const progress = useProgress();
   const treesRef = useRef(null);
   const [sharing, setSharing] = useState(false);
@@ -27,6 +27,9 @@ export default function RecapCard({ guides, folders, since, cardsStudied = 0 }) 
       cards += day.c || 0;
       for (const [guide, entry] of Object.entries(day.g || {})) byGuide[guide] = (byGuide[guide] || 0) + (entry.m || 0);
     }
+    // The server's log covers every device; this browser's is the fallback when it's not loaded.
+    const serverMinutes = serverDays.filter(day => day.date >= from).reduce((sum, day) => sum + (day.minutes || 0), 0);
+    minutes = Math.max(minutes, serverMinutes);
     const byFolder = {};
     for (const guide of guides) {
       if (!guide.folder_id) continue;
@@ -39,7 +42,7 @@ export default function RecapCard({ guides, folders, since, cardsStudied = 0 }) 
       cards: cardsStudied || cards,
       topClass: folders.find(folder => folder.id === topId)?.name || '–',
     };
-  }, [guides, folders, since, progress.grove, cardsStudied]);
+  }, [guides, folders, since, progress.grove, cardsStudied, serverDays]);
   const name = semesterName();
 
   async function share() {

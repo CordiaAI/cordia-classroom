@@ -133,7 +133,9 @@ export default function AccountMenu({ open, onClose, anchorRef, items, placement
           -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter);
           box-shadow: var(--lg-highlight), var(--lg-shadow);
           color: var(--ink); font: 500 15px/1 var(--font-sans); white-space: nowrap; cursor: pointer;
-          transition: background 160ms ease-out, border-color 160ms ease-out, transform 160ms ease-out, box-shadow 160ms ease-out;
+          /* No background transition: the fill is gradient layers, which can't animate, so a transition
+             to a plain color left the bubble see-through (a grey flash) for a moment on hover. */
+          transition: border-color 160ms ease-out, transform 160ms ease-out, box-shadow 160ms ease-out;
         }
         .acct-bubble .lucide { flex: 0 0 auto; width: 20px; height: 20px; color: var(--ink); }
         .acct-bubble.is-separated { margin-top: ${SIGN_OUT_EXTRA}px; }
@@ -141,7 +143,8 @@ export default function AccountMenu({ open, onClose, anchorRef, items, placement
         .acct-bubble:active { transform: scale(.98); }
         @media (hover: hover) {
           .acct-bubbles.is-open .acct-bubble:hover, .acct-bubbles.is-open .acct-bubble:focus-visible {
-            background: color-mix(in srgb, var(--lg-fill-strong), var(--hover-light) 6%);
+            --acct-hover: color-mix(in srgb, var(--lg-fill-menu), var(--hover-light) 6%);
+            background: var(--lg-sheen), linear-gradient(var(--acct-hover), var(--acct-hover));
             border-color: var(--hover-edge);
             transform: translateY(-1px);
           }

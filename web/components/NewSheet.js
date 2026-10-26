@@ -173,6 +173,9 @@ export default function NewSheet() {
     function onOpen(event) {
       openerRef.current = document.activeElement;
       setOpen(true);
+      // Mid-recording, New (or Record, or a dropped file) just brings the recorder back: switching
+      // mode would unmount it and end the recording.
+      if (recordingRef.current) { setMinimized(false); return; }
       setMode(event.detail?.mode || '');
       setError('');
       if (event.detail?.files?.length) addFiles(event.detail.files);
@@ -221,7 +224,7 @@ export default function NewSheet() {
   }, [jobs, jobId]);
 
   const dropActive = useFileDropZone({
-    enabled: open && status === 'idle',
+    enabled: open && status === 'idle' && !recording,
     priority: 5,
     getElement: () => dropRef.current || sheetRef.current,
     onFiles: picked => { setMode('upload'); addFiles(picked); },
@@ -335,7 +338,7 @@ export default function NewSheet() {
 
   // A finished recording is saved as a lecture (summary, what to watch for, to-dos, transcript)
   // and opens its page. Until Lectures storage is set up, it becomes a study guide instead.
-  async function buildFromRecording({ title, transcript, folderId: classId, segments = [], durationMs = 0, source = 'recording' }) {
+  async function buildFromRecording({ title, transcript, folderId: classId, segments = [], durationMs = 0, source = 'recording', myNotes = '' }) {
     const name = sensibleTitle(title, transcript) || `Lecture ${new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
     setRecording(false);
     setError('');
@@ -343,7 +346,7 @@ export default function NewSheet() {
     setBuildTitle(name);
     setStep(0);
     setStatus('building');
-    const saved = await saveLecture({ title: name, transcript, segments, duration_ms: durationMs, source, folder_id: classId || folderId || '', lecture_date: localDate(), classes: folders.map(folder => ({ id: folder.id, name: folder.name })) });
+    const saved = await saveLecture({ title: name, transcript, segments, duration_ms: durationMs, source, my_notes: myNotes, folder_id: classId || folderId || '', lecture_date: localDate(), classes: folders.map(folder => ({ id: folder.id, name: folder.name })) });
     if (saved?.lecture?.id) {
       reset();
       setOpen(false);
@@ -351,7 +354,7 @@ export default function NewSheet() {
       return;
     }
     // Lectures aren't available: keep the recording as a note (it can become a guide from there).
-    const noteId = await saveTranscriptNote({ title: name, transcript, folderId: classId || folderId });
+    const noteId = await saveTranscriptNote({ title: name, transcript: myNotes.trim() ? `My notes:\n${myNotes.trim()}\n\nTranscript:\n${transcript}` : transcript, folderId: classId || folderId });
     if (noteId) {
       reset();
       setOpen(false);

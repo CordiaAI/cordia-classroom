@@ -94,6 +94,29 @@ async function install(context, state) {
     }
     if (path === '/stats/overview') return json({ total_guides: state.guides.length, cards_studied: state.populated ? 20 : 0, avg_quiz_score: 0, current_streak: 1, minutes_today: 0 });
     if (path === '/stats/streak') return json({ current_streak: state.populated ? 1 : 0, studied_today: true, week: [] });
+    if (path === '/calendar/coursework') {
+      if (!state.coursework) return json({ connected: false, counts: { upcoming: 0, missing: 0, completed: 0 }, upcoming: [], missing: [], completed: [] });
+      const at = days => new Date(Date.now() + days * 86400000).toISOString();
+      const mk = (id, title, course, days, extra = {}) => ({ id: 'canvas-' + id, title, course, due_at: at(days), points: 50, url: 'https://school.instructure.com/courses/1/assignments/' + id, done: false, type: 'assignment', ...extra });
+      const upcoming = [mk(1, 'Concert Report #2', 'MUL-101-102', 1, { points: 60 }), mk(2, 'Concert #2 program', 'MUL-101-102', 1), mk(3, 'Narrative Timeline', 'REL-200-101', 3), mk(4, 'A05 Seven Ethical Frameworks Quiz', 'BUS-101-101', 6, { points: 100 }), mk(5, 'Packback #9', 'REL-200-101', 6, { points: 10 }), mk(6, 'A07AA Rough Draft, Resume', 'BUS-101-101', 7), mk(7, 'Reading response 8', 'ENG-102-104', 9)];
+      const missing = [mk(10, 'A03 Career Vision Statement Video Assignment', 'BUS-101-101', -6), mk(11, 'SMART Goals', 'BUS-150-103', -4), mk(12, 'Melody Video', 'MUL-101-102', -3), mk(13, 'Develop Your Skills | Financial Literacy', 'BUS-150-103', -2), mk(14, 'Week 8 quiz', 'REL-200-101', -9)];
+      const completed = Array.from({ length: 12 }, (_, i) => mk(30 + i, `Assignment ${i + 1}`, 'BUS-101-101', -(i * 3 + 1), { done: true, score: 40 + i }));
+      return json({ connected: true, counts: { upcoming: upcoming.length, missing: missing.length, completed: 170 }, upcoming, missing, completed });
+    }
+    if (path === '/stats/activity') {
+      const day = back => { const d = new Date(Date.now() - back * 86400000); return d.toISOString().slice(0, 10); };
+      const minutes = [0, 25, 40, 0, 15, 60, 35, 0, 0, 20, 45, 30, 0, 10, 55, 70, 0, 25, 30, 0, 15, 40, 85, 20, 0, 35, 50, 0, 25, 45];
+      const recent = state.populated ? minutes.map((m, i) => ({ date: day(29 - i), minutes: m, cards: m ? Math.round(m / 2) : 0 })) : minutes.map((_, i) => ({ date: day(29 - i), minutes: 0, cards: 0 }));
+      const older = state.populated ? Array.from({ length: 90 }, (_, i) => ({ date: day(40 + i * 3), minutes: (i * 37) % 70, sessions: 1, cards: 5 })).filter(d => d.minutes) : [];
+      return json({
+        days: [...older.reverse(), ...recent.filter(d => d.minutes).map(d => ({ ...d, sessions: 2 }))],
+        recent,
+        by_kind: state.populated ? { read: 420, flashcard: 310, quiz: 95, timer: 60, browse: 25 } : { read: 0, flashcard: 0, quiz: 0, timer: 0, browse: 0 },
+        hours: state.populated ? [0, 0, 0, 0, 0, 0, 0, 10, 25, 40, 30, 15, 20, 35, 45, 30, 25, 40, 60, 85, 110, 70, 30, 5] : Array(24).fill(0),
+        classes: state.populated ? [{ id: state.folders[0]?.id || 'f1', name: 'Biology 101', minutes: 520 }, { id: 'f2', name: 'CS 101 · Intro to Programming', minutes: 260 }, { id: 'f3', name: 'Art History: Renaissance', minutes: 130 }] : [],
+        quizzes: state.populated ? [62, 70, 68, 75, 81, 78, 88, 92].map((score, i) => ({ date: day(28 - i * 4), score, title: ['Cell Biology Basics', 'Nursing Pharmacology', 'Pledge Test'][i % 3] })) : [],
+      });
+    }
     if (path === '/stats/insights') return json(state.populated ? { answered: 12, strengths: [{ kind: 'mc', label: 'Definitions', correct: 7, total: 8 }], needs_work: [{ kind: 'app', label: 'Applying ideas', correct: 2, total: 4 }], tips: [{ text: 'Mix topics in one session.', source: 'Rohrer 2012' }] } : { answered: 0, strengths: [], needs_work: [], tips: [] });
     if (path.startsWith('/stats/')) return json({ ok: true });
     if (path === '/onboarding' && method === 'GET') return json(state.onboarding);

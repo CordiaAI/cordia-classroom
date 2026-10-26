@@ -105,6 +105,9 @@
   --shot-frame: #FFFFFF; --shot-edge: rgba(34, 49, 41, 0.18); --shot-chrome: #EEF1EC; --shot-line: rgba(34, 49, 41, 0.2);
   --shot-soft: #F1F3EF; --shot-nav: #394B58; --shot-nav-ink: #FFFFFF; --shot-text: #171B18; --shot-link: #0B6BC2; --shot-mark: #536149;
   --google-blue: #4285F4; --google-green: #34A853; --google-yellow: #FBBC05; --google-red: #EA4335;
+  /* Charts (Progress): one olive series; the soft step is the de-emphasis for context marks. */
+  --scroll-thumb: rgba(23, 27, 24, 0.20); --scroll-thumb-hover: rgba(23, 27, 24, 0.34);
+  --chart-mark: #536149; --chart-mark-soft: rgba(83, 97, 73, 0.32); --chart-grid: rgba(23, 27, 24, 0.08); --chart-surface: #F6F7F4;
   --heat-0: rgba(23, 27, 24, 0.06);
   --heat-1: rgba(83, 97, 73, 0.30); --heat-2: rgba(83, 97, 73, 0.50); --heat-3: rgba(83, 97, 73, 0.75); --heat-4: #536149;
 
@@ -230,6 +233,8 @@
   --focus-ring: 0 0 0 2px var(--olive-ink);
   --shot-frame: #2F3238; --shot-edge: rgba(255, 255, 255, 0.16); --shot-chrome: #24272C; --shot-line: rgba(255, 255, 255, 0.22);
   --shot-soft: #3A3E45; --shot-nav: #1E2A33; --shot-text: #FFFFFF; --shot-link: #8CC4FF; --shot-mark: #C3CFB6;
+  --scroll-thumb: rgba(255, 255, 255, 0.18); --scroll-thumb-hover: rgba(255, 255, 255, 0.30);
+  --chart-mark: #C3CFB6; --chart-mark-soft: rgba(195, 207, 182, 0.32); --chart-grid: rgba(255, 255, 255, 0.08); --chart-surface: #2B2F34;
   --heat-0: rgba(255, 255, 255, 0.06);
   --heat-1: rgba(195, 207, 182, 0.30); --heat-2: rgba(195, 207, 182, 0.50); --heat-3: rgba(195, 207, 182, 0.75); --heat-4: #C3CFB6;
   --hover-edge: rgba(255, 255, 255, 0.18);

@@ -325,3 +325,22 @@ body { touch-action: manipulation; }
   color: var(--ink);
 }
 .quiz-option.quiz-option.selected { border-color: var(--olive); box-shadow: 0 0 0 1px var(--olive), var(--lg-highlight); }
+
+/* Scrollbars in rounded panels (sheets, menus, the sidebar, the Tutor): a thin rounded thumb on a
+   clear track, kept clear of the rounded corners, instead of the square system bar that ran into them. */
+:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options),
+:is(.c-sheet, .c-menu, .tutor-drawer) * { scrollbar-gutter: auto; }
+:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar,
+:is(.c-sheet, .c-menu, .tutor-drawer) *::-webkit-scrollbar { width: 12px; height: 12px; }
+:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-track,
+:is(.c-sheet, .c-menu, .tutor-drawer) *::-webkit-scrollbar-track { background: transparent; margin: 18px 0; }
+:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-thumb,
+:is(.c-sheet, .c-menu, .tutor-drawer) *::-webkit-scrollbar-thumb { background: var(--scroll-thumb); background-clip: padding-box; border: 4px solid transparent; border-radius: 999px; min-height: 40px; }
+:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-thumb:hover,
+:is(.c-sheet, .c-menu, .tutor-drawer) *::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: padding-box; }
+:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-corner { background: transparent; }
+/* Firefox has no track margin; a thin bar in the same colors. */
+@supports (-moz-appearance: none) {
+  :is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options),
+  :is(.c-sheet, .c-menu, .tutor-drawer) * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+}
