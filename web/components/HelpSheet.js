@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
-import { Check, Inbox, Keyboard, MessageSquareText, Play, Puzzle, X } from 'lucide-react';
+import { Check, Inbox, Keyboard, Megaphone, Play, Puzzle, X } from 'lucide-react';
 import { EXTENSION_STORE_URL } from '../lib/extension';
 import { setWalkthrough } from '../lib/walkthrough';
 import LearnCordia from './LearnCordia';
@@ -34,7 +34,7 @@ export default function HelpSheet({ onClose, onFeedback, onShortcuts, canReviewF
         <LearnCordia onBeforeShow={onClose} />
         <div className="help-actions">
           <button type="button" className="c-btn c-btn--secondary" onClick={replayDayOne}><Play size={20} strokeWidth={1.75} aria-hidden="true" />Replay tour</button>
-          <button type="button" className="c-btn c-btn--secondary" onClick={onFeedback}><MessageSquareText size={20} strokeWidth={1.75} aria-hidden="true" />Feedback</button>
+          <button type="button" className="c-btn c-btn--secondary" onClick={onFeedback}><Megaphone size={20} strokeWidth={1.75} aria-hidden="true" />Feedback</button>
           <button type="button" className="c-btn c-btn--secondary" onClick={onShortcuts}><Keyboard size={20} strokeWidth={1.75} aria-hidden="true" />Keyboard shortcuts</button>
           {installed
             ? <span className="c-btn c-btn--quiet help-installed"><Check size={20} strokeWidth={1.75} aria-hidden="true" />Chrome extension installed</span>

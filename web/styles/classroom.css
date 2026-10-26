@@ -14,7 +14,9 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 /* "backwards", not "both": a transform kept after the animation makes the page the containing
    block for position: fixed, so toasts and overlays inside a page landed mid-page. */
 .workspace-route { min-width: 0; animation: window-reveal 300ms cubic-bezier(.2,.8,.2,1) backwards; }
-@keyframes window-reveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+/* No fade: while a parent is see-through, Chrome paints every frosted pane inside it as a flat
+   block until the fade ends. The page slides in instead. */
+@keyframes window-reveal { from { transform: translateY(12px); } to { transform: none; } }
 @keyframes pane-reveal { from { opacity: 0; transform: translateY(10px) scale(.995); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .top-navigation { height: 82px; margin: 0 28px; padding: 0 24px; gap: 32px; background: var(--glass-shell); border: 1px solid var(--glass-edge); border-top: 0; border-radius:0 0 20px 20px; box-shadow: var(--shadow-sm); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
 .top-navigation-brand { gap: 12px; font-weight:500; }
