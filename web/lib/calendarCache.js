@@ -11,7 +11,8 @@ export function readCalendarCache(userId = getUserId()) {
   if (!key || typeof window === 'undefined') return null;
   try {
     const value = JSON.parse(localStorage.getItem(key) || 'null');
-    return value && Array.isArray(value.items) ? { connected: true, items: value.items } : null;
+    // Links aren't taken from device storage: the fresh feed (moments later) brings them back.
+    return value && Array.isArray(value.items) ? { connected: true, items: value.items.map(({ url, ...item }) => item) } : null;
   } catch {
     return null;
   }
