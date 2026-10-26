@@ -114,3 +114,9 @@ export function deadlineTitle(item) {
 export function deadlineCourse(item) {
   return item?.course || String(item?.title || '').match(SECTION_CODE)?.[1] || '';
 }
+
+// Only web links and the app's own pages become hrefs; anything else (javascript:, data:) falls back.
+export function safeHref(url, fallback) {
+  const value = String(url || '');
+  return /^https?:\/\//i.test(value) || /^\/(?!\/)/.test(value) ? value : fallback;
+}

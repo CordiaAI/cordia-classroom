@@ -22,7 +22,7 @@ import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
 import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
 import { confirmedTodos, lectureCalendarItems, mergeCalendarItems } from '../lib/lectures';
-import { deadlineTitle } from '../lib/formatters';
+import { deadlineTitle, safeHref } from '../lib/formatters';
 
 const SLOW = Symbol('slow');
 const SLOW_MS = 4000;
@@ -264,7 +264,7 @@ export default function Today() {
             {dueItems.map(item => (
               <div key={item.id} className={'c-list-row today-due' + (doneNow[item.id] ? ' is-done' : '')}>
                 <DoneCheck id={item.id} title={item.title} done={Boolean(doneNow[item.id])} onChange={done => setDoneNow(current => ({ ...current, [item.id]: done }))} />
-                <a className="c-grow c-truncate today-due-link" href={item.url || '/canvas?tab=calendar'} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>{deadlineTitle(item)}</a>
+                <a className="c-grow c-truncate today-due-link" href={safeHref(item.url, '/canvas?tab=calendar')} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>{deadlineTitle(item)}</a>
                 <span className="c-meta">{shortDate(item.due_at)}</span>
                 {!item.internal && (
                   <button type="button" className="c-icon-btn" aria-label={`Plan ${item.title}`} title="Steps and study time" onClick={() => setPlanning(item)}>
