@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowLeft, BookOpen, CalendarCheck, CalendarPlus, Check, Merge, MessageCircle, NotebookPen, Pencil, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarCheck, CalendarPlus, Check, Folder, Merge, MessageCircle, NotebookPen, Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
 import Menu from '../../components/Menu';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -177,10 +177,13 @@ export default function LecturePage() {
       <div className="lecture-meta">
         <span className="c-meta">{meta.join(' · ')}</span>
         {folders.length > 0 && (
-          <select className="c-select lecture-class" value={lecture.folder_id || ''} onChange={event => patchLecture({ folder_id: event.target.value || null })} aria-label="Class">
-            <option value="">No class</option>
-            {folders.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
+          <label className="lecture-class">
+            <Folder size={16} strokeWidth={1.75} aria-hidden="true" />
+            <select className="c-select" value={lecture.folder_id || ''} onChange={event => patchLecture({ folder_id: event.target.value || null })} aria-label="Class">
+              <option value="">No class</option>
+              {folders.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </label>
         )}
         <span className="c-spacer" />
         <button type="button" className="c-btn c-btn--secondary" onClick={askTutor}><MessageCircle {...ICON} />Ask</button>
@@ -336,7 +339,11 @@ export default function LecturePage() {
         .lecture-title { flex: 1 1 auto; min-width: 0; text-wrap: balance; }
         .lecture-rename { flex: 1 1 auto; }
         .lecture-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-        .lecture-class { width: auto; min-width: 160px; }
+        /* The class reads as a small chip on the meta line, not a form field. */
+        .lecture-class { position: relative; display: inline-flex; align-items: center; min-width: 0; max-width: min(100%, 320px); }
+        .lecture-class :global(.lucide) { position: absolute; left: 12px; color: var(--muted); pointer-events: none; }
+        .lecture-class select.c-select.c-select { width: auto; max-width: 100%; height: 34px; padding: 0 34px 0 34px; border-radius: 999px; font: 600 14px/1.3 var(--font-sans); color: var(--ink); background: var(--select-chevron) no-repeat right 12px center / 14px 14px, var(--lg-sheen), var(--lg-fill-field); box-shadow: var(--lg-highlight); cursor: pointer; }
+        .lecture-class select.c-select.c-select:hover { border-color: var(--olive); }
         .lecture-notes-empty { display: grid; justify-items: start; gap: 12px; }
         .lecture-notes-empty .c-meta { margin: 0; }
         .lecture-notes-writing { display: grid; justify-items: center; gap: 4px; padding-bottom: 16px; }
