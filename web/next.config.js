@@ -58,8 +58,8 @@ module.exports = {
       // Classroom's own pages only: the Assistant's pages load different resources.
       source: '/((?!assistant(?:/|$)).*)',
       headers: [
-        // Report-only until production reports come back clean; then rename to Content-Security-Policy.
-        { key: 'Content-Security-Policy-Report-Only', value: contentSecurityPolicy },
+        // Enforced since 2026-10-22; violations still log via /api/csp-report.
+        { key: 'Content-Security-Policy', value: contentSecurityPolicy },
       ],
     }];
   },
