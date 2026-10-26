@@ -19,14 +19,16 @@ test('one navigation: Dashboard, Library, Canvas, Assistant plus New; Tutor is a
   assert.doesNotMatch(sidebar, /workspace-rail/);
 });
 
-test('Practice asks for a guide before showing the workspace', async () => {
+test('Practice is picked in Library; the workspace needs a guide or a file', async () => {
   const hub = await source('pages/practice/index.js');
   const workspace = await source('components/PracticeWorkspace.js');
+  const library = await source('pages/library.js');
 
   assert.match(hub, /PracticeWorkspace/);
+  assert.match(library, /\{ key: 'practice', label: 'Practice' \}/);
+  assert.match(library, /href: '\/practice\/' \+ guide\.id/);
   assert.match(workspace, /if \(!guideId && !upload\)/);
-  assert.match(workspace, /className="practice-grid practice-guide-picker"/);
-  assert.match(workspace, /Create guide or upload file/);
+  assert.match(workspace, /router\.replace\('\/library\?tab=practice'\)/);
   assert.match(workspace, /\{problems\.length \? problemIndex \+ 1 : 0\} \/ \{problems\.length \|\| 10\}/);
 });
 

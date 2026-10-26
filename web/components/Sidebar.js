@@ -34,7 +34,7 @@ const canvasItems = [
 // The sidebar's Study section: ways to study that aren't one guide's screen.
 const studyItems = [
   { label: 'Tutor', href: '/tutor', icon: MessagesSquare, here: path => path === '/tutor' },
-  { label: 'Practice', href: '/practice', icon: Target, here: path => path.startsWith('/practice') },
+  { label: 'Practice', href: '/library?tab=practice', icon: Target, here: (path, query) => path.startsWith('/practice') || (path === '/library' && (query.tab || query.filter) === 'practice') },
   { label: 'Flashcards', href: '/library?tab=flashcards', icon: Layers, here: (path, query) => path === '/library' && ['flashcards', 'cards'].includes(query.tab || query.filter) },
   { label: 'Progress', href: '/progress', icon: ChartNoAxesColumn, here: path => path === '/progress' },
 ];

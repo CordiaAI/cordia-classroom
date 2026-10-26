@@ -52,7 +52,7 @@ export default function StudyInsights({ compact = false, data }) {
         </ul>
       )}
       {!compact && needsWork.length > 0 && (
-        <button type="button" className="c-btn c-btn--secondary insights-practice" onClick={() => router.push('/practice')}>Practice these</button>
+        <button type="button" className="c-btn c-btn--secondary insights-practice" onClick={() => router.push('/library?tab=practice')}>Practice these</button>
       )}
       {!compact && insights?.tips?.length > 0 && (
         <ul className="insight-tips">

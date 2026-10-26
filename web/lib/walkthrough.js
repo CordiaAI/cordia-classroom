@@ -55,8 +55,8 @@ export const MINI = {
     { target: '[data-spot="cards-pill"]', label: 'Tap Flashcards', where: onGuide, on: 'cards-opened' },
     { target: '[data-spot="flashcard"]', label: 'flip', where: onCards, on: 'card-flipped' },
   ] },
-  practice: { label: 'Practice', route: '/practice', steps: [
-    { target: '[data-spot="practice-picker"]', label: 'Pick a guide', where: path => path === '/practice', on: 'practice-guide' },
+  practice: { label: 'Practice', route: '/library?tab=practice', steps: [
+    { target: '[data-spot="practice-picker"]', label: 'Pick a guide', where: path => path === '/library', on: 'practice-guide' },
     { target: '[data-spot="practice-canvas"]', label: 'Show your work', where: path => path === '/practice/[guideId]', on: 'practice-drew' },
   ] },
   canvas: { label: 'Canvas', route: '/canvas', steps: [
