@@ -240,12 +240,18 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
     const lecture = found?.[0];
     if (!lecture) return { status: 404, body: { detail: 'Lecture not found.' } };
     const todosNow = async () => (await rows(`/lecture_todos?lecture_id=eq.${id}&user_id=eq.${userId}&status=neq.dismissed&select=id,title,kind,due_at,said,quote,at_ms,status&order=due_at.asc.nullslast`)) || [];
+    // The note behind "Open in Notes" can be deleted from the Library; the lecture then makes a
+    // new one instead of linking to a note that isn't there.
+    const noteGone = async noteId => {
+      const response = await fetchImpl(`${apiBase}/smart_notes/${noteId}`, { headers: { Authorization: authorization } }).catch(() => null);
+      return response?.status === 404;
+    };
     // Without AI notes yet, the lecture still gets its note (the transcript) in the Notes tab.
     const keepNote = async (current, reason) => {
       const todos = await todosNow();
       let analysis = current;
-      if (!current.note_id) {
-        const noteId = await syncNote(authorization, lecture, current, todos);
+      if (!current.note_id || await noteGone(current.note_id)) {
+        const noteId = await syncNote(authorization, lecture, { ...current, note_id: '' }, todos);
         if (noteId) { analysis = { ...current, note_id: noteId }; await saveAnalysis(userId, id, analysis); }
       }
       return { status: 200, body: { analysis, todos, ...(reason ? { reason } : {}) } };

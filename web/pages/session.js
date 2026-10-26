@@ -85,13 +85,28 @@ export default function StudySession() {
   if (!queue || directPractice || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading your session" />;
 
 
+  // Nothing to flip: say why, and offer the one next step (a bare "All done" explained nothing).
   if (!cards.length) {
+    const guide = router.query.guideId ? queue.guides[0] : null;
+    const title = queue.practice.length ? 'Practice' : guide ? 'Nothing to study yet' : 'All caught up';
     return (
       <div className="c-page session-empty">
-        <h1 className="c-title">{queue.practice.length ? 'Practice' : 'All done'}</h1>
+        <h1 className="c-title">{title}</h1>
+        {!queue.practice.length && (
+          <p className="c-meta session-empty-why">
+            {guide
+              ? `${guide.title || 'This guide'} has no flashcards yet. Add notes to it, then make cards from them.`
+              : 'No cards are due today. Cards come back here when they’re due for review.'}
+          </p>
+        )}
         <PracticeList practice={queue.practice} />
-        <button type="button" className="c-btn c-btn--secondary" onClick={() => router.push('/dashboard')}>Dashboard</button>
-        <style jsx>{`.session-empty { width: min(760px, 100%); margin: 0 auto; justify-items: start; }`}</style>
+        {guide
+          ? <button type="button" className="c-btn c-btn--primary" onClick={() => router.push('/guide/' + guide.id)}>Open the guide</button>
+          : <button type="button" className="c-btn c-btn--secondary" onClick={() => router.push('/dashboard')}>Dashboard</button>}
+        <style jsx>{`
+          .session-empty { width: min(760px, 100%); margin: 0 auto; justify-items: start; }
+          .session-empty-why { margin: 0; max-width: 60ch; font-size: 16px; }
+        `}</style>
       </div>
     );
   }

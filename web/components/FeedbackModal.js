@@ -209,7 +209,7 @@ export default function FeedbackModal({ onClose }) {
             {error && <p className="feedback-error" role="alert">{error}</p>}
             <div className="feedback-actions">
               <button type="button" className="feedback-cancel" onClick={onClose}>Cancel</button>
-              <button type="submit" className="feedback-submit" disabled={submitting || !message.trim() || shots.some(shot => shot.status === 'uploading')}>
+              <button type="submit" className="c-btn c-btn--primary feedback-submit" disabled={submitting || !message.trim() || shots.some(shot => shot.status === 'uploading')}>
                 {submitting ? 'Sending…' : 'Send feedback'}
               </button>
             </div>
@@ -241,10 +241,10 @@ export default function FeedbackModal({ onClose }) {
         .feedback-context { margin: 9px 0 0; color: var(--muted-ink); font-size: 13px; line-height:1.5; }
         .feedback-error { margin: 13px 0 0; color: var(--error); font-size:13px; font-weight:600; line-height:1.5; }
         .feedback-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
-        .feedback-cancel, .feedback-submit { min-height: 46px; padding: 0 18px; border-radius:12px; font: inherit; font-size:13px; font-weight:600; cursor: pointer; }
-        .feedback-cancel { border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
-        .feedback-submit { border: 0; background: var(--ink); color: var(--on-olive); box-shadow:var(--shadow-card); }
-        .feedback-submit:disabled { cursor: default; opacity: 0.42; box-shadow: none; }
+        .feedback-cancel { min-height: 46px; padding: 0 18px; border-radius:12px; font: inherit; font-size:13px; font-weight:600; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+        /* The app's primary button: its disabled state keeps a readable label (this one had white
+           text on a white fill in dark mode). */
+        .feedback-submit { min-height: 46px; }
         .feedback-success { display: grid; justify-items: center; padding: 24px 8px; text-align: center; }
         .feedback-success span { width: 50px; height: 50px; display: grid; place-items: center; border-radius:50%; background: var(--accent-glow); color: var(--olive); font-size:20px; font-weight:600; }
         .feedback-success h2 { margin-top: 16px; }

@@ -338,7 +338,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
           {agenda.length ? agenda.map(item => (
             <a key={item.id} href={item.url || undefined} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>
               <span className="compact-date">{dueLabel(item)}</span>
-              <strong>{deadlineTitle(item)}</strong>
+              <strong title={deadlineTitle(item)}>{deadlineTitle(item)}</strong>
               <small>{deadlineCourse(item) || 'Canvas'}</small>
             </a>
           )) : <p>0 due</p>}
@@ -364,7 +364,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
           <span className={`calendar-kind calendar-kind-${item.type}`}>{item.type}</span>
           <small>{timeLabel(item)}</small>
         </span>
-        <strong>{deadlineTitle(item)}</strong>
+        <strong title={deadlineTitle(item)}>{deadlineTitle(item)}</strong>
         {deadlineCourse(item) && <small>{deadlineCourse(item)}</small>}
       </>
     );
@@ -388,7 +388,8 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
         <div className="c-row c-row--wrap">
           <button type="button" className="c-btn c-btn--quiet" onClick={() => setWeekStart(startOfWeek(new Date()))}>This week</button>
           <button type="button" className="c-btn c-btn--secondary" onClick={toggleReminders} aria-pressed={reminders}>{reminders ? <Bell {...ICON} /> : <BellOff {...ICON} />}Reminders</button>
-          <button type="button" className="c-icon-btn" onClick={() => refresh()} disabled={loading} aria-label="Refresh"><RefreshCw {...ICON} /></button>
+          {/* Connected with a token, the page's Sync now updates everything: one sync control, not two. */}
+          {!fromToken && <button type="button" className="c-icon-btn" onClick={() => refresh()} disabled={loading} aria-label="Refresh"><RefreshCw {...ICON} /></button>}
           {fromToken
             ? <Link href="/settings?section=connectors" className="c-btn c-btn--quiet">Canvas settings</Link>
             : <button type="button" className="c-icon-btn" onClick={disconnect} aria-label="Disconnect calendar"><Unlink {...ICON} /></button>}

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import Head from 'next/head';
+import { pageTitle } from '../../lib/pageTitle';
 import { GAMES_ON } from '../../lib/featureFlags';
 import CordiaLoader, { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
 import BodyPortal from '../../components/BodyPortal';
@@ -429,6 +431,7 @@ export default function GuidePage() {
   return (
     <Reveal phase={gate}>
     <article className="c-page guide">
+      <Head><title>{pageTitle(guide.title)}</title></Head>
       <header className="guide-head">
         <button type="button" className="c-icon-btn" onClick={() => (window.history.length > 1 ? router.back() : router.push('/library'))} aria-label="Back"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         {renaming !== null ? (
@@ -557,7 +560,7 @@ export default function GuidePage() {
                   <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} disabled={Boolean(making)} onClick={tidyOutline}>
                     <RefreshCw size={16} strokeWidth={1.75} aria-hidden="true" />Regenerate outline
                   </button>
-                )} onSaved={saved => setGuide(current => ({ ...current, notes: saved }))} onAction={onSelection} placeholder={hasMaterial ? 'Add your own notes anywhere…' : 'Type your notes… Use Heading for a new topic and Bullet for points.'} />}
+                )} onSaved={saved => setGuide(current => ({ ...current, notes: saved }))} onAction={onSelection} placeholder={hasMaterial ? 'Add your own notes anywhere…' : 'Type your notes. Use Heading for a new topic and Bullet for points.'} />}
         </section>
       ) : (
         <>

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import Head from 'next/head';
+import { pageTitle } from '../../lib/pageTitle';
 import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -168,6 +170,7 @@ export default function ClassPage() {
       <header className="c-page-head">
         <div className="c-row cls-title-row">
           <Link href="/library" className="c-icon-btn" aria-label="Library"><ArrowLeft {...ICON} /></Link>
+          <Head><title>{pageTitle(folder.name)}</title></Head>
           <div className="cls-title">
             {renaming !== null ? (
               <form onSubmit={saveName}>

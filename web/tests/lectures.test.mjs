@@ -40,6 +40,7 @@ function world({ env = {}, analysis, stored = { id: LECTURE, title: 'Supply and 
       }) } }] });
     }
     if (url === 'https://api.example.com/smart_notes' && method === 'POST') { state.notes.push({ created: JSON.parse(init.body) }); return json({ note: { id: 'note-1' } }); }
+    if (url.startsWith('https://api.example.com/smart_notes/') && method === 'GET') return url.endsWith('/note-gone') ? json({ detail: 'Note not found' }, 404) : json({ note: { id: url.split('/').pop() } });
     if (url.startsWith('https://api.example.com/smart_notes/') && method === 'PUT') { state.notes.push({ id: url.split('/').pop(), ...JSON.parse(init.body) }); return json({ ok: true }); }
     if (url === 'https://api.example.com/folders') return json({ folders: [{ id: CLASS, name: 'Econ 101' }] });
     if (url.startsWith('https://db.example.co/rest/v1/lectures') && method === 'POST') { state.inserts.lecture = JSON.parse(init.body); return json([{ id: LECTURE, ...state.inserts.lecture }], 201); }
@@ -139,6 +140,20 @@ console.log('ok   only quoted, supported items are kept; times snap to lines');
   assert.equal(unset.body.analysis.note_id, 'note-1', 'without AI the transcript still becomes a note');
   assert.equal((await world().library.analyze(AUTH, { id: 'nope' })).status, 404);
   console.log('ok   analyze: notes written on open, filed once in Notes');
+}
+
+{
+  // "Open in Notes" never points at a deleted note: opening the lecture makes a new one.
+  const done = { analyzed: true, summary: ['Kept.'], outline_md: '# Kept' };
+  const gone = world({ stored: { id: LECTURE, title: 'Supply and Demand Basics', transcript: 'x', segments: [], analysis: { ...done, note_id: 'note-gone' } } });
+  const remade = await gone.library.analyze(AUTH, { id: LECTURE });
+  assert.equal(remade.body.analysis.note_id, 'note-1', 'a new note replaces the deleted one');
+  assert.equal(gone.state.lecturePatches.at(-1).analysis.note_id, 'note-1');
+  assert.ok(!gone.state.urls.includes('POST https://api.openai.com/v1/chat/completions'), 'no AI runs for an analyzed lecture');
+  const kept = world({ stored: { id: LECTURE, title: 'Supply and Demand Basics', transcript: 'x', segments: [], analysis: { ...done, note_id: 'note-7' } } });
+  assert.equal((await kept.library.analyze(AUTH, { id: LECTURE })).body.analysis.note_id, 'note-7');
+  assert.equal(kept.state.notes.length, 0, 'a note that still exists is left alone');
+  console.log('ok   analyze: a deleted lecture note is made again');
 }
 
 // Calendar: lecture to-dos join the Canvas feed without doubling an assignment Canvas already has.

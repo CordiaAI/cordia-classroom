@@ -156,7 +156,7 @@ export default function FeedbackReviewPage() {
         .feedback-review-heading p { margin: 0 0 9px; color: var(--olive); font-size: 13px; font-weight:600; letter-spacing:0; }
         h1 { margin: 0; font-size: max(13px, clamp(2.5rem, 6vw, 4.8rem)); line-height:1.15; letter-spacing:-0.015em; }
         .feedback-review-heading span { display: block; max-width: 680px; margin-top: 15px; color: var(--text-secondary); line-height:1.5; }
-        .feedback-review-heading button { min-height: 44px; padding: 0 18px; border: 0; border-radius:12px; background: var(--ink); color: var(--on-olive); font: inherit; font-weight:600; cursor: pointer; }
+        .feedback-review-heading button { min-height: 44px; padding: 0 18px; border: 0; border-radius:12px; background: var(--olive); color: var(--on-olive); font: inherit; font-weight:600; cursor: pointer; }
         .feedback-filters { display: flex; gap: 12px; margin-bottom: 18px; padding: 16px; border: 1px solid var(--line); border-radius:20px; background: var(--surface); box-shadow: var(--shadow-card); }
         label { display: grid; gap: 7px; color: var(--text-secondary); font-size: 13px; font-weight:600; }
         select { min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius:12px; background: var(--surface); color: var(--ink); font: inherit; }

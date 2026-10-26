@@ -288,7 +288,7 @@ def get_overview(authorization: str = Header(default="")):
             .gte("started_at", today_start) \
             .execute()
         overview["minutes_today"] = sum(
-            s.get("duration_seconds", 0) for s in (today_sessions.data or [])
+            min(s.get("duration_seconds") or 0, MAX_SESSION_SECONDS) for s in (today_sessions.data or [])
         ) // 60
     except Exception:
         logger.warning("Returning partial overview after database error", exc_info=True)
@@ -297,6 +297,9 @@ def get_overview(authorization: str = Header(default="")):
 
 ACTIVITY_DAYS = 371  # A year of whole weeks for the year grid.
 SESSION_KINDS = ("read", "flashcard", "quiz", "timer", "browse")
+# One sitting counts at most this long. Older pages logged wall-clock time from open to close, so
+# a tab left open overnight logged up to 24 hours; those rows still count only this much.
+MAX_SESSION_SECONDS = 4 * 3600
 
 
 def _local_dt(ts, tz_offset: int):
@@ -308,6 +311,34 @@ def _local_dt(ts, tz_offset: int):
     if moment.tzinfo is not None:
         moment = moment.astimezone(timezone.utc).replace(tzinfo=None)
     return moment + timedelta(minutes=tz_offset)
+
+
+def counted_sessions(sessions: list, tz_offset: int = 0) -> list:
+    """Each logged sitting as (row, local end, pieces), pieces being (local start, seconds) split at
+    local hour boundaries. A row is written when a sitting ends (started_at is that moment), so a
+    sitting covers [end - duration, end]. Each counts at most MAX_SESSION_SECONDS, and time two
+    sittings share (two tabs open at once) counts once, so an hour never holds more than 60
+    minutes and a day never more than 24 hours."""
+    timed = [(end, row) for row in sessions if (end := _local_dt(row.get("started_at"), tz_offset)) is not None]
+    timed.sort(key=lambda pair: pair[0])
+    covered = None
+    counted = []
+    for end, row in timed:
+        try:
+            seconds = min(max(int(row.get("duration_seconds") or 0), 0), MAX_SESSION_SECONDS)
+        except (TypeError, ValueError):
+            seconds = 0
+        start = end - timedelta(seconds=seconds)
+        if covered is not None and start < covered:
+            start = covered
+        covered = end if covered is None else max(covered, end)
+        pieces = []
+        while start < end:
+            hour_end = min(end, start.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1))
+            pieces.append((start, (hour_end - start).total_seconds()))
+            start = hour_end
+        counted.append((row, end, pieces))
+    return counted
 
 
 def build_activity(sessions: list, attempts: list, guides: dict, folders: dict, today: date, tz_offset: int = 0) -> dict:
@@ -325,26 +356,23 @@ def build_activity(sessions: list, attempts: list, guides: dict, folders: dict, 
     hours = [0.0] * 24
     by_folder: dict = {}
     month_start, quarter_start = today - timedelta(days=29), today - timedelta(days=89)
-    for row in sessions:
-        local = _local_dt(row.get("started_at"), tz_offset)
-        if local is None:
-            continue
-        day = local.date()
-        minutes = max(0, int(row.get("duration_seconds") or 0)) / 60
+    for row, end, pieces in counted_sessions(sessions, tz_offset):
         meta = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
         cards = meta.get("cards_studied") if isinstance(meta.get("cards_studied"), int) else 0
-        entry = days.setdefault(day, {"minutes": 0.0, "sessions": 0, "cards": 0})
-        entry["minutes"] += minutes
+        entry = days.setdefault(end.date(), {"minutes": 0.0, "sessions": 0, "cards": 0})
         entry["sessions"] += 1
         entry["cards"] += max(0, cards)
-        if day >= quarter_start:
-            hours[local.hour] += minutes
-        if day >= month_start:
-            kind = row.get("session_type") if row.get("session_type") in by_kind else "browse"
-            by_kind[kind] += minutes
-            folder = (guides.get(row.get("guide_id")) or {}).get("folder_id")
-            if folder in folders:
-                by_folder[folder] = by_folder.get(folder, 0.0) + minutes
+        kind = row.get("session_type") if row.get("session_type") in by_kind else "browse"
+        folder = (guides.get(row.get("guide_id")) or {}).get("folder_id")
+        for start, seconds in pieces:
+            day, minutes = start.date(), seconds / 60
+            days.setdefault(day, {"minutes": 0.0, "sessions": 0, "cards": 0})["minutes"] += minutes
+            if day >= quarter_start:
+                hours[start.hour] += minutes
+            if day >= month_start:
+                by_kind[kind] += minutes
+                if folder in folders:
+                    by_folder[folder] = by_folder.get(folder, 0.0) + minutes
     quizzes = []
     for row in sorted(attempts, key=lambda a: str(a.get("completed_at") or ""))[-20:]:
         local = _local_dt(row.get("completed_at"), tz_offset)
@@ -388,6 +416,20 @@ def get_activity(authorization: str = Header(default=""), tz_offset: int = 0):
     return build_activity(sessions, attempts, guides, folders, today, tz_offset)
 
 
+@router.get("/week")
+def get_week(authorization: str = Header(default=""), tz_offset: int = 0):
+    """Minutes studied in the last 7 days and the 7 before, counted like the Progress charts, so the
+    Dashboard and Progress show the same number."""
+    tz_offset = max(-720, min(840, tz_offset))
+    user_id = get_user_id(authorization)
+    today = (datetime.utcnow() + timedelta(minutes=tz_offset)).date()
+    since = (datetime.utcnow() - timedelta(days=15)).isoformat()
+    sessions = get_supabase().table("study_sessions").select("started_at, duration_seconds, session_type") \
+        .eq("user_id", user_id).gte("started_at", since).limit(5000).execute().data or []
+    recent = build_activity(sessions, [], {}, {}, today, tz_offset)["recent"]
+    return {"minutes": sum(day["minutes"] for day in recent[-7:]), "previous_minutes": sum(day["minutes"] for day in recent[-14:-7])}
+
+
 @router.get("/insights")
 def get_study_insights(authorization: str = Header(default="")):
     """Strengths, weak spots, and research-backed study tips from the student's own results."""
@@ -406,7 +448,7 @@ def log_session(request: LogSessionRequest, authorization: str = Header(default=
     data = {
         "user_id": user_id,
         "session_type": request.session_type,
-        "duration_seconds": request.duration_seconds,
+        "duration_seconds": min(request.duration_seconds, MAX_SESSION_SECONDS),
         "metadata": request.metadata or {}
     }
     if request.guide_id:
@@ -445,7 +487,10 @@ def _log_beacon_session(data) -> dict:
     if session_type not in allowed:
         session_type = "browse"
 
-    duration = min(max(int(data.get("duration_seconds", 0)), 0), 86400)
+    try:
+        duration = min(max(int(data.get("duration_seconds", 0)), 0), MAX_SESSION_SECONDS)
+    except (TypeError, ValueError):
+        duration = 0
 
     row = {
         "user_id": user_id,

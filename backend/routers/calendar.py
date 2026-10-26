@@ -167,7 +167,9 @@ def _date(value: str):
     return None, False
 
 
-def _kind(title: str) -> str:
+def _kind(title: str, default: str = "event") -> str:
+    """What a calendar item is, from its title; `default` when the title doesn't say (Canvas
+    assignments with plain names like "Concert Report #2" are still assignments, not events)."""
     text = title.casefold()
     for name, pattern in (
         ("exam", r"\b(exam|midterm|final|test)\b"),
@@ -177,7 +179,7 @@ def _kind(title: str) -> str:
     ):
         if re.search(pattern, text):
             return name
-    return "event"
+    return default
 
 
 def _events(text: str) -> list[dict]:
@@ -197,7 +199,8 @@ def _events(text: str) -> list[dict]:
                         "title": title,
                         "due_at": due.isoformat(),
                         "all_day": all_day,
-                        "type": _kind(title),
+                        # Canvas marks assignments in the feed's UID ("event-assignment-123") and link.
+                        "type": _kind(title, "assignment" if re.search(r"assignment", (current.get("UID") or "") + (current.get("URL") or ""), re.I) else "event"),
                         # Only web links: a feed could carry javascript: or data: URLs.
                         "url": current["URL"] if re.match(r"https?://", current.get("URL") or "") else None,
                         "course": _decode(current.get("LOCATION") or "") or None,
@@ -268,7 +271,7 @@ def _token_payload(user_id: str) -> dict | None:
         "title": item.get("title") or "Assignment",
         "due_at": item["due_at"],
         "all_day": False,
-        "type": _kind(item.get("title") or ""),
+        "type": _kind(item.get("title") or "", "assignment"),
         "url": f"https://{domain}/courses/{item['canvas_course_id']}/assignments/{item['canvas_assignment_id']}",
         "course": courses.get(item["canvas_course_id"]),
     } for item in assignments if item.get("due_at")]
@@ -301,7 +304,7 @@ def build_coursework(assignments: list, marked: dict, changes: dict, courses: di
         "url": f"https://{domain}/courses/{row['canvas_course_id']}/assignments/{row['canvas_assignment_id']}" if domain else None,
         "done": is_done(canvas_item_key(row["canvas_assignment_id"]), marked, row.get("submitted")),
         "canvas_missing": bool(row.get("missing")),
-        "type": _kind(row.get("title") or ""),
+        "type": _kind(row.get("title") or "", "assignment"),
     } for row in assignments]
     apply_changes(items, changes, {canvas_item_key(row["canvas_assignment_id"]): row.get("canvas_updated_at") for row in assignments})
 

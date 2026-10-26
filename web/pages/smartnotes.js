@@ -52,9 +52,11 @@ export default function SmartNotesPage() {
   const router = useRouter();
   const { ready } = useRequireAuth();
   const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!ready || !router.isReady) return;
+    setError('');
     const { id } = router.query;
     if (!id) { router.replace('/library'); return; }
     (async () => {
@@ -68,8 +70,19 @@ export default function SmartNotesPage() {
         setError(caught.message);
       }
     })();
-  }, [ready, router.isReady, router.query.id]);
+  }, [ready, router.isReady, router.query.id, attempt]);
 
-  if (error) return <div className="c-empty" role="alert"><p>{error}</p><button type="button" className="c-btn c-btn--secondary" onClick={() => router.push('/library')}>Library</button></div>;
+  // Never a dead end: try again, or go back to the Library.
+  if (error) {
+    return (
+      <div className="c-empty" role="alert">
+        <p>{error}</p>
+        <div className="c-row c-row--wrap">
+          <button type="button" className="c-btn c-btn--primary" onClick={() => setAttempt(value => value + 1)}>Try again</button>
+          <button type="button" className="c-btn c-btn--secondary" onClick={() => router.push('/library')}>Library</button>
+        </div>
+      </div>
+    );
+  }
   return <SectionLoader height={200} label="Opening your notes" />;
 }

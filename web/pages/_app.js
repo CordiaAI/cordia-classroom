@@ -8,6 +8,7 @@ import '../styles/assistant.css';
 import '../styles/motion.css';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { routeTitle } from '../lib/pageTitle';
 import { useState, useEffect } from 'react';
 import { installErrorReporting } from '../lib/errorReport';
 import { installAmbientMotion } from '../lib/ambientMotion';
@@ -45,9 +46,10 @@ export default function App({ Component, pageProps }) {
   });
   const brandHead = (
     <Head>
-      {/* Phones: fit the screen exactly, no pinch or double-tap zoom, and run edge to edge under the notch. */}
-      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" key="viewport" />
-      <title>CordiaClassroom</title>
+      {/* Phones: fit the screen and run edge to edge under the notch. Pinch-zoom stays on (WCAG 1.4.4);
+          accidental zoom is prevented by 16px fields and no double-tap zoom (styles/glass.css). */}
+      <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" key="viewport" />
+      <title>{routeTitle(router.pathname)}</title>
       <meta name="application-name" content="CordiaClassroom" />
       <meta name="description" content="Turn course material into focused study guides, notes, flashcards, and practice with CordiaClassroom." />
       <meta property="og:site_name" content="CordiaClassroom" />

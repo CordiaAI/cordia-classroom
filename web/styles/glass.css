@@ -95,6 +95,11 @@ select.c-select.c-select {
   .c-tutor-bubble-label { display: none; }
 }
 .app-shell.is-focus .c-tutor-bubble { bottom: 24px; }
+/* Room under every page so its last row scrolls clear of the bubble (56px tall, 24px up); the
+   phone layout already leaves room above the tab bar. */
+@media (min-width: 768px) {
+  .app-shell .main-content { padding-bottom: 112px; }
+}
 
 /* Phone tab bar: New sits in the middle as a raised olive pane. */
 .c-tab-new {

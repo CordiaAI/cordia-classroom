@@ -34,6 +34,23 @@ END:VCALENDAR
         self.assertFalse(items[0]["all_day"])
         self.assertTrue(items[1]["all_day"])
 
+    def test_canvas_assignments_with_plain_titles_are_assignments(self):
+        due = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y%m%d")
+        feed = f"""BEGIN:VCALENDAR
+BEGIN:VEVENT
+UID:event-assignment-4471
+SUMMARY:Concert Report #2
+DTSTART;VALUE=DATE:{due}
+END:VEVENT
+BEGIN:VEVENT
+UID:event-calendar-event-88
+SUMMARY:Club meeting
+DTSTART;VALUE=DATE:{due}
+END:VEVENT
+END:VCALENDAR
+"""
+        self.assertEqual([item["type"] for item in _events(feed)], ["assignment", "event"])
+
     def test_parser_keeps_earlier_days_of_the_current_week(self):
         earlier = (datetime.now(timezone.utc) - timedelta(days=6)).strftime("%Y%m%d")
         stale = (datetime.now(timezone.utc) - timedelta(days=9)).strftime("%Y%m%d")
