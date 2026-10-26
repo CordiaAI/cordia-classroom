@@ -144,6 +144,18 @@ select.c-select.c-select {
 /* The title row is as tall as the expand and close buttons beside it, so the material picker
    below starts under them instead of running beneath them. */
 .tutor-drawer .cordia-tutor-title-row { padding-right: 104px; min-height: 46px; }
+/* The Tutor's message box: one frosted field. The textarea inside draws no outline or ring of
+   its own; the field shows focus once, as a soft olive glow (it had two hard olive boxes). */
+.cordia-tutor-input {
+  background: var(--lg-sheen), var(--lg-fill-field);
+  border-color: var(--lg-edge);
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+  box-shadow: var(--lg-highlight);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.cordia-tutor-input:focus-within { outline: none; border-color: var(--olive); box-shadow: var(--lg-highlight), 0 0 0 3px var(--olive-tint); }
+.cordia-tutor-input textarea:is(:focus, :focus-visible) { outline: none !important; box-shadow: none !important; }
 .cordia-tutor-input textarea { min-width: 0; }
 .cordia-tutor-input button { min-height: 38px; align-self: end; }
 @media (max-width: 767px) {
