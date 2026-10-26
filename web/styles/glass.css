@@ -216,7 +216,13 @@ body { touch-action: manipulation; }
 .cn-icon svg { width: 28px; height: 28px; }
 .cn-icon.is-lg { width: 72px; height: 72px; border-radius: 22px; }
 .cn-icon.is-lg svg { width: 36px; height: 36px; }
-.cn-detail { position: relative; width: min(440px, 100%); display: grid; justify-items: center; gap: 12px; padding-top: 32px; text-align: center; }
+.cn-detail { position: relative; width: min(440px, 100%); display: grid; justify-items: center; gap: 12px; padding-top: 32px; text-align: center; max-height: 90svh; overflow-y: auto; }
+/* "Try it": the things to do with an app, each with a link to where it happens. */
+.cn-try { display: grid; gap: 8px; width: 100%; padding-top: 12px; border-top: 1px solid var(--hairline); text-align: left; }
+.cn-try-title { margin: 0; font: 600 var(--fs-15, 15px)/1.4 var(--font-sans); color: var(--muted); }
+.cn-try ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.cn-try li { display: grid; gap: 6px; justify-items: start; color: var(--ink); font: 500 15px/1.5 var(--font-sans); }
+.cn-try li::before { content: none; }
 .cn-detail .c-section-title { margin: 0; }
 .cn-close { position: absolute; top: 12px; right: 12px; }
 .cn-detail-text { margin: 0; color: var(--ink); font: 500 15px/1.55 var(--font-sans); }

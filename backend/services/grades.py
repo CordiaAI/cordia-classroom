@@ -129,6 +129,7 @@ def estimate(groups: list, weighted: bool, *, now: Optional[datetime] = None, li
                 "submitted": bool(submission.get("submitted_at")) or submission.get("workflow_state") in {"submitted", "pending_review"},
                 "points": float(item["points_possible"]), "group": str(group.get("name") or ""),
                 "weight": float(group.get("group_weight") or 0) if weighted else None,
+                "html_url": str(item.get("html_url") or ""),
             }
             if score is not None and model is not None:
                 if up:

@@ -129,15 +129,19 @@ export function sectionTextOf(block, root) {
 // a kept visual finds its line again.
 export const ownText = el => [...el.childNodes].filter(n => !(n.nodeType === 1 && /^(UL|OL)$/.test(n.tagName))).map(n => n.textContent).join('');
 const squash = text => String(text || '').replace(/\s+/g, ' ').trim().toLowerCase();
+// A highlight across several lines starts (or ends) partway into one of them, so a line counts when
+// the highlight starts with its text, or it holds the highlight's first words. A short line that
+// merely appears somewhere inside the highlight ("Alpha Tau Omega" in an earlier list) doesn't.
 export function findAnchorBlock(root, anchor, { end = false } = {}) {
   const all = squash(anchor);
   const want = end ? all.slice(-50) : all.slice(0, 60);
   if (!root || !want) return null;
-  const blocks = [...root.querySelectorAll('li, h1, h2, h3, p')];
-  return blocks.find(el => squash(ownText(el)).includes(want))
-    || blocks.find(el => want.includes(squash(ownText(el)).slice(0, 40)) && squash(ownText(el)).length > 8)
-    || closestBlock(blocks, end ? all.slice(-160) : all.slice(0, 160))
-    || null;
+  const blocks = [...root.querySelectorAll('li, h1, h2, h3, p')].map(el => ({ el, text: squash(ownText(el)) })).filter(b => b.text.length > 2);
+  const edge = end ? all.slice(-20) : all.slice(0, 20);
+  const found = blocks.find(b => b.text.includes(want))
+    || blocks.find(b => b.text.length > 8 && (end ? all.endsWith(b.text) : all.startsWith(b.text)))
+    || (edge.length >= 12 && blocks.find(b => b.text.includes(edge)));
+  return found?.el || closestBlock(blocks.map(b => b.el), end ? all.slice(-160) : all.slice(0, 160)) || null;
 }
 
 // After the outline is rewritten the highlighted words may be gone: the line sharing the most

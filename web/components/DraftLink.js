@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { FileText, MessageCircle, Search, X } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { linkDraft, unlinkDraft } from '../lib/studyPlans';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true };
 const FEEDBACK = 'Check my draft against the rubric. For each criterion, say what is there and what is missing.';
@@ -34,7 +35,7 @@ export default function DraftLink({ item, draft: initial }) {
     setBusy(true); setError('');
     const data = await linkDraft(item.id, file.id, file.title);
     setBusy(false);
-    if (data?.draft) { setDraft(data.draft); setPicking(false); setQuery(''); }
+    if (data?.draft) { setDraft(data.draft); setPicking(false); setQuery(''); walkthroughEvent('docs-exported'); }
     else setError(apiErrorMessage(data?.detail, "That didn't link. Try again."));
   }
 

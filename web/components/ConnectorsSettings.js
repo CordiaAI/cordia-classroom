@@ -17,6 +17,8 @@ import { classLabel } from '../lib/classLabel';
 import IcloudSheet from './assistant/IcloudSheet';
 import DriveFolders from './DriveFolders';
 import NotionHome from './NotionHome';
+import Link from 'next/link';
+import { TRY } from '../lib/connectorGuide';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // What each app does here, shown in its sheet.
@@ -270,10 +272,41 @@ export default function ConnectorsSettings() {
       const back = router.query.connected;
       const app = list.find(item => item.id === back);
       if (app) setNotice(app.connected ? `${app.name} connected` : `${app.name} didn't finish connecting. Try again.`);
+      // Back from connecting: open the app's sheet, where "Try it" shows what to do with it.
+      if (app?.connected) setOpen(app.id);
     });
   }, [router.isReady]);
 
+  // Sent here for one app (?open=gdocs, from the Dashboard or Learn Cordia): open its sheet, then
+  // drop the parameter so closing the sheet keeps it closed.
+  useEffect(() => {
+    const want = router.query.open;
+    if (!want || !connectors) return;
+    if (want === 'canvas' || connectors.some(item => item.id === want)) setOpen(String(want));
+    const { open: _drop, ...rest } = router.query;
+    router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+  }, [router.query.open, connectors]);
+
   function say(text) { setNotice(text); setError(''); }
+
+  // "Try it": what to do with the app once it's connected (before then, what it will let you do).
+  function tryIt(id, connected) {
+    const list = TRY[id];
+    if (!list?.length) return null;
+    return (
+      <div className="cn-try">
+        <h3 className="cn-try-title">{connected ? 'Try it' : 'Once it\'s connected'}</h3>
+        <ul>
+          {list.map(item => (
+            <li key={item.text}>
+              <span>{item.text}</span>
+              {connected && item.href && <Link href={item.href} className="c-btn c-btn--secondary c-btn--sm" onClick={() => setOpen(null)}>{item.label}</Link>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
   function fail(text) { setError(text); setNotice(''); }
 
   async function connect(connector) {
@@ -339,6 +372,7 @@ export default function ConnectorsSettings() {
       fail(data?.detail || "That didn't save. Try again.");
       return;
     }
+    if (on) walkthroughEvent('email-watch');
     if (on) say(data.found ? `Found ${data.found} date change${data.found === 1 ? '' : 's'}. They're on your Dashboard to confirm.` : 'Watching for date changes. Anything found shows up on your Dashboard to confirm.');
   }
 
@@ -461,6 +495,7 @@ export default function ConnectorsSettings() {
               )}
               {canvas.feed && !canvas.status.connected && <p className="c-meta">Your deadlines come from a calendar link. An access token also brings what you turned in, grades and course files.</p>}
               <div className="cn-actions">{canvasActions()}</div>
+              {tryIt('canvas', Boolean(canvas.status.connected || canvas.feed))}
               {showClasses && canvas.status.connected && (
                 <div className="cn-canvas-classes">
                   <CanvasCourseList courses={canvas.status.courses} onChange={next => setCanvas(current => ({ ...current, status: next }))} />
@@ -492,6 +527,7 @@ export default function ConnectorsSettings() {
               {uses(active)}
               {watchDates(active)}
               <div className="cn-actions">{actions(active)}</div>
+              {tryIt(active.id, active.connected)}
               {active.id === 'apple_calendar' && feed && (
                 <div className="cn-feed">
                   <p className="c-meta">If Calendar didn't open, add this link in Calendar → File → New Calendar Subscription, or on iPhone in Settings → Calendar → Accounts → Add Subscribed Calendar.</p>

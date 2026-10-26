@@ -674,6 +674,11 @@ def course_grades(course_id: int, authorization: str = Header(default="")):
     result = estimate(groups or [], bool(course.get("apply_assignment_group_weights")),
                       anchor=float(anchor) if isinstance(anchor, (int, float)) else None, scale=scale)
     result["scale_source"] = "canvas" if scale else "default"
+    # Each upcoming item opens in Canvas; built from the school's host when Canvas leaves the link out.
+    host = connection.get("canvas_domain")
+    for row in result.get("upcoming") or []:
+        link = str(row.pop("html_url", "") or "")
+        row["url"] = link if link.startswith(f"https://{host}/") else (f"https://{host}/courses/{course_id}/assignments/{row['id']}" if host else None)
     # Canvas's own number and letter win for display; the what-ifs are anchored to that number.
     result["canvas_score"] = anchor
     result["canvas_letter"] = grades.get("current_grade")

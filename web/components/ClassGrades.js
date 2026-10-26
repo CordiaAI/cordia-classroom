@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BookOpen, Check, Sparkles } from 'lucide-react';
+import { BookOpen, Check, ExternalLink, Sparkles } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { SectionLoader } from './CordiaLoader';
+import { safeHref } from '../lib/formatters';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true };
 const STOP = new Set(['the', 'and', 'for', 'with', 'from', 'your', 'quiz', 'exam', 'test', 'assignment', 'homework', 'week', 'unit', 'chapter', 'module', 'part']);
@@ -123,7 +124,9 @@ export default function ClassGrades({ courseId, guides = [], onMakeGuide }) {
             return (
               <li key={item.id} className="cg-row">
                 <div className="cg-main">
-                  <strong className="cg-name">{item.name}</strong>
+                  {item.url
+                    ? <a className="cg-name" href={safeHref(item.url, '#')} target="_blank" rel="noreferrer" title="Open in Canvas">{item.name}<ExternalLink size={16} strokeWidth={1.75} aria-hidden="true" /></a>
+                    : <strong className="cg-name">{item.name}</strong>}
                   <span className="c-meta">{[dueLabel(item.due_at), `${points(item.points)} pts`, item.group && (item.weight ? `${item.group} · ${item.weight}%` : item.group)].filter(Boolean).join(' · ')}</span>
                   {up && <span className="cg-goal is-up">{up}</span>}
                   {keep && <span className="cg-goal">{keep}</span>}
@@ -155,6 +158,9 @@ export default function ClassGrades({ courseId, guides = [], onMakeGuide }) {
         .cg-row:last-child { border-bottom: 0; }
         .cg-main { flex: 1; min-width: 0; display: grid; gap: 4px; }
         .cg-name { font: 600 17px/1.3 var(--font-sans); overflow-wrap: anywhere; }
+        a.cg-name { color: var(--ink); text-decoration: none; }
+        a.cg-name:hover { text-decoration: underline; text-underline-offset: 3px; }
+        a.cg-name :global(.lucide) { margin-left: 6px; vertical-align: -2px; color: var(--muted); }
         .cg-goal { font: 500 15px/1.4 var(--font-sans); color: var(--ink); }
         .cg-goal.is-up { color: var(--olive-ink); font-weight: 600; }
         .cg-note, .cg-error { margin: 0; }

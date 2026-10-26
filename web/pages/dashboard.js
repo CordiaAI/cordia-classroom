@@ -14,6 +14,7 @@ import { loadOnboarding, saveOnboardingStep } from '../lib/onboarding';
 import { requestTip } from '../lib/tips';
 import ProgressRing from '../components/ProgressRing';
 import LearnCordia from '../components/LearnCordia';
+import AppSetup from '../components/AppSetup';
 import CanvasConnectButton from '../components/CanvasConnectButton';
 import DoneCheck from '../components/DoneCheck';
 import AssignmentSheet from '../components/AssignmentSheet';
@@ -297,6 +298,8 @@ export default function Today() {
       </Link>
 
       {planning && <AssignmentSheet item={planning} onClose={() => setPlanning(null)} />}
+
+      <AppSetup canvasConnected={Boolean(calendar?.connected)} />
 
       {firstWeek && (dayOneFinished(progress) || !progress.wt) ? <LearnCordia hideWhenComplete compact /> : null}
 

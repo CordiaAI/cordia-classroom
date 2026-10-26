@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import BodyPortal from '../BodyPortal';
-import Toggle from '../Toggle';
 import { assistantApi } from '../../lib/assistant';
 import { SurveyStep } from './AssistantSetup';
 
@@ -220,13 +219,12 @@ export default function AssistantPersonality({ view, catalog, save, reload, toas
       <div className="asst-split">
         <div className="c-stack">
           <div className="c-card asst-card">
-            <h2 className="c-section-title">Name and signature</h2>
+            <h2 className="c-section-title">Name</h2>
             <label className="c-field">
               <span>Name</span>
               <input className="c-input asst-name" maxLength={20} value={name} onChange={event => setName(event.target.value)} onBlur={commitName} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); commitName(); } }} aria-invalid={nameError ? true : undefined} />
             </label>
-            {nameError ? <p className="asst-error" role="alert">{nameError}</p> : <p className="c-meta">{name.trim().length}/20 · Shows in the sign-off of every text.</p>}
-            <Toggle label={`Sign my texts “— ${identity.assistant_name}”`} checked={identity.sign_off} onChange={value => save({ section: 'identity', sign_off: value }).then(ok => ok && requestPreview({}, 0))} />
+            {nameError ? <p className="asst-error" role="alert">{nameError}</p> : <p className="c-meta">{name.trim().length}/20 · What it calls itself.</p>}
           </div>
 
           <div className="c-card asst-card">

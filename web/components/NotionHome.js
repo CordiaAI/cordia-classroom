@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { apiErrorMessage } from '../lib/api';
 import { notionHome, notionPages, notionSetup, notionSync } from '../lib/studyPlans';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 // In the Notion sheet: the page Cordia lives under. It holds a "Cordia assignments" database that
 // stays in sync both ways, and the guides exported to Notion.
@@ -33,6 +34,7 @@ export default function NotionHome() {
     setBusy('');
     if (!data?.home) { setError(apiErrorMessage(data?.detail, "Notion didn't make the database. Try again.")); return; }
     setHome(data.home); setPicking(false); setQuery('');
+    walkthroughEvent('notion-used');
     setNotice(`"Cordia assignments" is in ${page.title}${data.added ? ` with ${data.added} assignment${data.added === 1 ? '' : 's'}` : ''}. Mark one Done there and it's done here too.`);
   }
 
