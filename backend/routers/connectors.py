@@ -30,15 +30,15 @@ CONNECTORS = [
     {"id": "apple_calendar", "name": "Apple Calendar", "tagline": "Subscribe to your deadlines on iPhone and Mac."},
     {"id": "gtasks", "name": "Google Tasks", "tagline": "Turn deadlines into to-dos."},
     {"id": "gdrive", "name": "Google Drive", "tagline": "Import course files into a guide."},
+    {"id": "dropbox", "name": "Dropbox", "tagline": "Class folders that fill your Library."},
     {"id": "gdocs", "name": "Google Docs", "tagline": "Import notes into a guide."},
     {"id": "notion", "name": "Notion", "tagline": "Import notes into a guide."},
-    {"id": "gsheets", "name": "Google Sheets", "tagline": "Text Cordia to log anything to a sheet."},
+    {"id": "gsheets", "name": "Google Sheets", "tagline": "Your grades and study time in a sheet."},
+    {"id": "github", "name": "GitHub", "tagline": "Your code on programming assignments."},
+    {"id": "slack", "name": "Slack", "tagline": "Class channels and study sessions."},
     {"id": "gmail", "name": "Gmail", "tagline": "Cordia texts you about emails that need a reply."},
     {"id": "outlook", "name": "Outlook", "tagline": "Cordia texts you about emails that need a reply."},
-    {"id": "slack", "name": "Slack", "tagline": "Catch what you missed and reply by text."},
     {"id": "ynab", "name": "YNAB", "tagline": "Check your budget by text."},
-    {"id": "dropbox", "name": "Dropbox", "tagline": "Find a file by text."},
-    {"id": "github", "name": "GitHub", "tagline": "Check issues and pull requests by text."},
 ]
 COMPOSIO_IDS = set(composio.TOOLKITS)
 # Apps the Tutor can read from when a student names them; every Composio app works in the Assistant.

@@ -16,6 +16,7 @@ import { addToLibrary, agoLabel, setMailWatch, syncOff, syncOn } from '../lib/st
 import { classLabel } from '../lib/classLabel';
 import IcloudSheet from './assistant/IcloudSheet';
 import DriveFolders from './DriveFolders';
+import { SheetsExport, SlackPanel } from './AppPanels';
 import NotionHome from './NotionHome';
 import Link from 'next/link';
 import { TRY } from '../lib/connectorGuide';
@@ -30,17 +31,17 @@ const DETAILS = {
   gdrive: 'Link a Drive folder to a class and new slides and readings come into Library on their own. Import a single file into Create, or save a copy of any guide back to a Cordia folder in your Drive.',
   gdocs: 'Import a Doc into Library, export any guide as a formatted Doc, and link the draft you\'re writing to an assignment so the Tutor can check it against the rubric.',
   notion: 'Bring Notion pages into Library, keep a Notion database of your assignments in sync, and export guides with each question as a toggle. Cordia only sees pages you share with it: when Notion asks while connecting, pick the pages Cordia should use (add more later from a page\'s ••• › Connections).',
-  gsheets: 'Text Cordia Assistant to add a row or read a sheet: log study hours, expenses, anything.',
+  gsheets: 'Export your grades and the time you study each day to a spreadsheet you own, once or kept updated daily. You can also text Cordia Assistant to add a row or read a sheet.',
   gmail: 'Cordia Assistant can text you about emails that need a reply and read recent mail when you ask.',
   outlook: 'Cordia Assistant can text you about emails that need a reply and read recent mail when you ask.',
-  slack: 'Ask Cordia Assistant what you missed in Slack and reply by text.',
+  slack: 'Watch your class and study-group channels: a moved exam becomes a change to confirm on your Dashboard, and class announcements show there too. Post study sessions with a reminder before they start.',
   ynab: 'Ask Cordia Assistant what is left in a budget category before you spend.',
-  dropbox: 'Ask Cordia Assistant to find a file in your Dropbox.',
-  github: 'Ask Cordia Assistant about your issues and pull requests.',
+  dropbox: 'Link a Dropbox folder to a class and new slides and readings come into Library on their own, or import one file at a time.',
+  github: 'Link the repo you\'re coding an assignment in: see your commits against the due date, and the Tutor reads your code with the instructions and rubric. Cordia never changes anything on GitHub.',
 };
 // Apps that work in Classroom itself; the rest are for texting Cordia Assistant. Every app
 // connected here works in both.
-const CLASSROOM_APPS = ['gcal', 'apple_calendar', 'gtasks', 'gdrive', 'gdocs', 'notion'];
+const CLASSROOM_APPS = ['gcal', 'apple_calendar', 'gtasks', 'gdrive', 'dropbox', 'gdocs', 'notion', 'gsheets', 'github', 'slack'];
 // Simple Icons has no mark for these; a plain icon stands in.
 const FALLBACK_ICONS = { outlook: Mail, ynab: Wallet };
 
@@ -89,9 +90,9 @@ function AssistantAppleCalendar() {
     </div>
   );
 }
-const IMPORTS = ['gdrive', 'gdocs', 'notion'];
+const IMPORTS = ['gdrive', 'dropbox', 'gdocs', 'notion'];
 const SYNC_APPS = { gcal: 'calendar', gtasks: 'list' };
-const STAT_WORDS = { tasks: 'to-do', blocks: 'study block', assignments: 'assignment', announcements: 'announcement', files: 'file imported', imported_files: 'file imported', date_changes: 'date change found', rows: 'assignment in Notion', drafts_tracked: 'draft tracked' };
+const STAT_WORDS = { tasks: 'to-do', blocks: 'study block', assignments: 'assignment', announcements: 'announcement', files: 'file imported', imported_files: 'file imported', date_changes: 'date change found', rows: 'assignment in Notion', drafts_tracked: 'draft tracked', repos_tracked: 'repo tracked', posts_read: 'post read', classes: 'class exported' };
 
 // "Last synced 4 min ago · 12 assignments": what a connection is actually doing.
 function healthLine(health) {
@@ -539,6 +540,9 @@ export default function ConnectorsSettings() {
               )}
               {active.id === 'apple_calendar' && <AssistantAppleCalendar />}
               {active.id === 'gdrive' && active.connected && <DriveFolders />}
+              {active.id === 'dropbox' && active.connected && <DriveFolders app="dropbox" />}
+              {active.id === 'gsheets' && active.connected && <SheetsExport />}
+              {active.id === 'slack' && active.connected && <SlackPanel />}
               {active.id === 'notion' && active.connected && <NotionHome />}
               {notice && <p className="cn-notice" role="status">{notice}</p>}
               {error && <p className="cn-error" role="alert">{error}</p>}

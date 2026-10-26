@@ -6,9 +6,15 @@ import { walkthroughEvent } from '../lib/walkthrough';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true };
 
-// In the Google Drive sheet: link a Drive folder to each class. New and changed files in it come
-// into that class in Library (now, then every 30 minutes).
-export default function DriveFolders() {
+const APPS = {
+  drive: { name: 'Drive', base: '/drive' },
+  dropbox: { name: 'Dropbox', base: '/dropbox' },
+};
+
+// In the Google Drive and Dropbox sheets: link a folder to each class. New and changed files in it
+// come into that class in Library (now, then every 30 minutes).
+export default function DriveFolders({ app = 'drive' }) {
+  const { name: appName, base } = APPS[app] || APPS.drive;
   const [links, setLinks] = useState(null);
   const [classes, setClasses] = useState([]);
   const [adding, setAdding] = useState(false);
@@ -20,23 +26,23 @@ export default function DriveFolders() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([apiFetch('/drive/links'), apiFetch('/folders')]).then(([linkData, folderData]) => {
+    Promise.all([apiFetch(`${base}/links`), apiFetch('/folders')]).then(([linkData, folderData]) => {
       setLinks(Array.isArray(linkData?.links) ? linkData.links : []);
       setClasses(Array.isArray(folderData?.folders) ? folderData.folders : []);
     });
-  }, []);
+  }, [base]);
 
   useEffect(() => {
     if (!adding) return undefined;
     let live = true;
     const timer = setTimeout(async () => {
-      const data = await apiFetch(`/drive/folders?q=${encodeURIComponent(query.trim())}`);
+      const data = await apiFetch(`${base}/folders?q=${encodeURIComponent(query.trim())}`);
       if (!live) return;
       if (Array.isArray(data?.folders)) setFound(data.folders);
-      else { setFound([]); setError(apiErrorMessage(data?.detail, "Couldn't search Drive. Try again.")); }
+      else { setFound([]); setError(apiErrorMessage(data?.detail, `Couldn't search ${appName}. Try again.`)); }
     }, query ? 350 : 0);
     return () => { live = false; clearTimeout(timer); };
-  }, [adding, query]);
+  }, [adding, query, base, appName]);
 
   const className = id => classLabel(classes.find(folder => folder.id === id)?.name || 'Class').title;
   const linkedClasses = new Set((links || []).map(link => link.library_folder_id));
@@ -44,21 +50,21 @@ export default function DriveFolders() {
 
   async function link(folder) {
     setBusy(folder.id); setError(''); setNotice('');
-    const data = await apiFetch('/drive/links', {
+    const data = await apiFetch(`${base}/links`, {
       method: 'PUT', timeoutMs: 120000,
       body: JSON.stringify({ library_folder_id: classId, drive_folder_id: folder.id, drive_folder_name: folder.name }),
     });
     setBusy('');
     if (!Array.isArray(data?.links)) { setError(apiErrorMessage(data?.detail, "That didn't link. Try again.")); return; }
     setLinks(data.links);
-    walkthroughEvent('drive-linked');
+    if (app === 'drive') walkthroughEvent('drive-linked');
     setAdding(false); setQuery(''); setFound(null);
     setNotice(`Linked. ${data.imported ? `${data.imported} file${data.imported === 1 ? '' : 's'} came into ${className(classId)}.` : 'New files will come into the class as they appear.'}`);
   }
 
   async function unlink(entry) {
     setBusy(entry.library_folder_id); setError(''); setNotice('');
-    const data = await apiFetch(`/drive/links/${entry.library_folder_id}`, { method: 'DELETE' });
+    const data = await apiFetch(`${base}/links/${entry.library_folder_id}`, { method: 'DELETE' });
     setBusy('');
     if (Array.isArray(data?.links)) { setLinks(data.links); setNotice('Unlinked. Files already in Library stay there.'); }
     else setError(apiErrorMessage(data?.detail, "That didn't unlink. Try again."));
@@ -66,9 +72,9 @@ export default function DriveFolders() {
 
   async function syncNow() {
     setBusy('sync'); setError(''); setNotice('');
-    const data = await apiFetch('/drive/sync', { method: 'POST', timeoutMs: 120000 });
+    const data = await apiFetch(`${base}/sync`, { method: 'POST', timeoutMs: 120000 });
     setBusy('');
-    if (typeof data?.imported !== 'number') { setError(apiErrorMessage(data?.detail, "Drive couldn't be reached. Try again.")); return; }
+    if (typeof data?.imported !== 'number') { setError(apiErrorMessage(data?.detail, `${appName} couldn't be reached. Try again.`)); return; }
     setNotice(data.imported ? `${data.imported} new file${data.imported === 1 ? '' : 's'} came into Library.` : 'Everything is up to date.');
   }
 
@@ -76,14 +82,14 @@ export default function DriveFolders() {
   return (
     <div className="df">
       <h3 className="df-title">Class folders</h3>
-      <p className="c-meta">Link a Drive folder to a class. New slides and readings in it come into that class in Library on their own.</p>
+      <p className="c-meta">Link a {appName} folder to a class. New slides and readings in it come into that class in Library on their own.</p>
       {links.length > 0 && (
         <ul className="df-list">
           {links.map(entry => (
             <li key={entry.library_folder_id} className="df-row">
               <span className="c-grow">
                 <strong className="c-truncate">{className(entry.library_folder_id)}</strong>
-                <span className="c-meta c-truncate">Drive: {entry.drive_folder_name}</span>
+                <span className="c-meta c-truncate">{appName}: {entry.drive_folder_name}</span>
               </span>
               <button type="button" className="c-icon-btn" aria-label={`Unlink ${entry.drive_folder_name}`} disabled={Boolean(busy)} onClick={() => unlink(entry)}><X {...ICON} /></button>
             </li>
@@ -103,14 +109,14 @@ export default function DriveFolders() {
             <>
               <label className="cn-search">
                 <Search size={20} strokeWidth={1.75} aria-hidden="true" />
-                <input className="c-input" type="search" placeholder="Search your Drive folders" aria-label="Search your Drive folders" value={query} onChange={event => setQuery(event.target.value)} />
+                <input className="c-input" type="search" placeholder={`Search your ${appName} folders`} aria-label={`Search your ${appName} folders`} value={query} onChange={event => setQuery(event.target.value)} />
               </label>
               {found === null ? null : found.length ? (
                 <div className="c-list df-results">
                   {found.map(folder => (
                     <button key={folder.id} type="button" className="c-list-row cn-result" disabled={Boolean(busy)} onClick={() => link(folder)}>
                       <span className="c-grow"><span className="cn-row-title c-truncate">{folder.name}</span>
-                        <span className="c-meta">{busy === folder.id ? 'Linking and bringing files in…' : folder.edited && `edited ${folder.edited}`}</span></span>
+                        <span className="c-meta">{busy === folder.id ? 'Linking and bringing files in…' : folder.path || (folder.edited && `edited ${folder.edited}`)}</span></span>
                     </button>
                   ))}
                 </div>

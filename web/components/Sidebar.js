@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ChartNoAxesColumn, CircleHelp, CreditCard, GraduationCap, LayoutDashboard, Library, Link2, LogOut, MessageCircle, MessageSquareText, Palette, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, User } from 'lucide-react';
+import { CalendarDays, CalendarRange, ChartNoAxesColumn, ChevronRight, CircleHelp, CreditCard, Folder, FolderPlus, GraduationCap, Layers, LayoutDashboard, Library, Link2, LogOut, MessageCircle, MessageSquareText, MessagesSquare, Palette, PanelLeftClose, PanelLeftOpen, Plus, School, Search, Settings, Target, User } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -13,6 +13,7 @@ import StudyTimer from './StudyTimer';
 import TutorBubble from './TutorBubble';
 import { openNewSheet } from '../lib/newSheet';
 import { walkthroughEvent } from '../lib/walkthrough';
+import { classLabel } from '../lib/classLabel';
 
 // One navigation: the same three places on the glass top bar and the mobile tab bar, plus New.
 // The Tutor is the bubble in the corner (TutorBubble); the calendar lives inside Canvas.
@@ -24,6 +25,23 @@ const navItems = [
   { label: 'Assistant', href: '/assistant', icon: MessageCircle, spot: 'nav-assistant' },
 ];
 
+// Under Canvas in the sidebar, like Library's classes: the places Canvas feeds.
+const canvasItems = [
+  { label: 'Classes', href: '/canvas', icon: School, here: (path, query) => path === '/canvas' && query.tab !== 'calendar' },
+  { label: 'Calendar', href: '/canvas?tab=calendar', icon: CalendarDays, here: (path, query) => (path === '/canvas' && query.tab === 'calendar') || path === '/calendar' },
+  { label: 'Your week', href: '/week', icon: CalendarRange, here: path => path === '/week' },
+];
+// The sidebar's Study section: ways to study that aren't one guide's screen.
+const studyItems = [
+  { label: 'Tutor', href: '/tutor', icon: MessagesSquare, here: path => path === '/tutor' },
+  { label: 'Practice', href: '/practice', icon: Target, here: path => path.startsWith('/practice') },
+  { label: 'Flashcards', href: '/library?tab=flashcards', icon: Layers, here: (path, query) => path === '/library' && ['flashcards', 'cards'].includes(query.tab || query.filter) },
+  { label: 'Progress', href: '/progress', icon: ChartNoAxesColumn, here: path => path === '/progress' },
+];
+const MAX_CLASSES = 8;
+// Classes for the sidebar, kept between pages so it doesn't flash empty on each navigation.
+let classCache = null;
+
 // Guides, notes, lectures, classes and every study screen live inside Library.
 const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice', '/nclex', '/folder', '/create', '/session', '/class', '/smartnotes', '/lecture'];
 
@@ -31,7 +49,7 @@ export function activeNavHref(pathname, section = '') {
   if (pathname === '/dashboard') return '/dashboard';
   if (pathname === '/assistant') return '/assistant';
   if (LIBRARY_PATHS.some(path => pathname === path || pathname.startsWith(path + '/'))) return '/library';
-  if (pathname.startsWith('/canvas') || pathname.startsWith('/calendar')) return '/canvas';
+  if (pathname.startsWith('/canvas') || pathname.startsWith('/calendar') || pathname === '/week') return '/canvas';
   return '';
 }
 
@@ -65,6 +83,51 @@ export default function Sidebar({ timerState, setTimerState }) {
     try { localStorage.setItem('cordiaSide', next ? 'collapsed' : 'open'); } catch { /* storage blocked */ }
   }
   const active = activeNavHref(router.pathname, String(router.query.section || ''));
+
+  // Library and Canvas open into their own lists (Library: each class). Which are open is remembered.
+  // Unset means "open while you're in it"; the caret sets it either way.
+  const [groups, setGroups] = useState({ '/library': true });
+  const [classes, setClasses] = useState(classCache || []);
+  useEffect(() => {
+    try { const saved = JSON.parse(localStorage.getItem('cordiaSideGroups') || 'null'); if (saved) setGroups(saved); } catch { /* storage blocked */ }
+  }, []);
+  function toggleGroup(href, open) {
+    setGroups(current => {
+      const next = { ...current, [href]: !open };
+      try { localStorage.setItem('cordiaSideGroups', JSON.stringify(next)); } catch { /* storage blocked */ }
+      return next;
+    });
+  }
+  // Classes load once, then again whenever Library or a class is opened (where they're added and renamed).
+  const onClassPages = router.pathname === '/library' || router.pathname.startsWith('/folder');
+  useEffect(() => {
+    if (classCache && !onClassPages) return undefined;
+    let live = true;
+    apiFetch('/folders').then(data => {
+      if (!live || !Array.isArray(data?.folders)) return;
+      classCache = data.folders.map(folder => ({ id: folder.id, name: classLabel(folder.name).title || 'Class' }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setClasses(classCache);
+    });
+    return () => { live = false; };
+  }, [onClassPages, router.asPath]);
+  const query = router.query || {};
+  const subLink = (item, here) => (
+    <li key={item.href}>
+      <Link className="c-side-sub" href={item.href} aria-current={here ? 'page' : undefined} title={item.label}>
+        <item.icon size={16} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">{item.label}</span>
+      </Link>
+    </li>
+  );
+  function subList(href) {
+    if (href === '/canvas') return canvasItems.map(item => subLink(item, item.here(router.pathname, query)));
+    if (href !== '/library') return null;
+    return [
+      ...classes.slice(0, MAX_CLASSES).map(folder => subLink({ label: folder.name, href: `/folder/${folder.id}`, icon: Folder }, router.pathname === '/folder/[id]' && query.id === folder.id)),
+      classes.length > MAX_CLASSES && subLink({ label: `All ${classes.length} classes`, href: '/library', icon: Library }, false),
+      subLink({ label: 'Add a class', href: '/library?add=class', icon: FolderPlus }, false),
+    ].filter(Boolean);
+  }
 
   useEffect(() => {
     setShortcut(isMac() ? '⌘K' : 'Ctrl K');
@@ -165,11 +228,33 @@ export default function Sidebar({ timerState, setTimerState }) {
           <Search size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">Search</span><kbd className="c-side-kbd">{shortcut}</kbd>
         </button>
         <nav className="c-side-nav" aria-label="Primary">
-          {navItems.map(item => (
-            <Link key={item.href} className="c-side-item" href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.tip} data-spot={item.spot} title={item.label}>
-              <item.icon size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">{item.label}</span>
-            </Link>
-          ))}
+          {navItems.map(item => {
+            const hasSub = item.href === '/library' || item.href === '/canvas';
+            const open = hasSub && !collapsed && (groups[item.href] ?? active === item.href);
+            return (
+              <div key={item.href} className="c-side-group">
+                <div className="c-side-row">
+                  <Link className="c-side-item" href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.tip} data-spot={item.spot} title={item.label}>
+                    <item.icon size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">{item.label}</span>
+                  </Link>
+                  {hasSub && (
+                    <button type="button" className={'c-side-caret' + (open ? ' is-open' : '')} onClick={() => toggleGroup(item.href, open)} aria-expanded={Boolean(open)} aria-label={`${open ? 'Hide' : 'Show'} ${item.href === '/library' ? 'classes' : 'Canvas pages'}`}>
+                      <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+                {open && <ul className="c-side-subs">{subList(item.href)}</ul>}
+              </div>
+            );
+          })}
+          <div className="c-side-section">
+            <h2 className="c-side-heading">Study</h2>
+            {studyItems.map(item => (
+              <Link key={item.href} className="c-side-item is-study" href={item.href} aria-current={item.here(router.pathname, query) ? 'page' : undefined} title={item.label}>
+                <item.icon size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">{item.label}</span>
+              </Link>
+            ))}
+          </div>
         </nav>
         <div className="c-side-foot">
           <button type="button" className="c-side-item" onClick={() => setShowHelp(true)} title="Help">

@@ -42,11 +42,24 @@ export const TRY = {
     { text: 'Switch on Watch for date changes: when a professor emails that an exam moved, it shows on your Dashboard to confirm in one tap.' },
     { text: 'Text Cordia Assistant "any emails I need to answer?"', href: '/assistant', label: 'Open Assistant' },
   ],
-  gsheets: [{ text: 'Text Cordia Assistant "log 2 hours of bio in my study sheet".', href: '/assistant', label: 'Open Assistant' }],
-  slack: [{ text: 'Text Cordia Assistant "what did I miss in my study group?"', href: '/assistant', label: 'Open Assistant' }],
+  gsheets: [
+    { text: 'Export your grades and daily study time below, and switch on Keep it updated daily.' },
+    { text: 'Text Cordia Assistant "log 2 hours of bio in my study sheet".', href: '/assistant', label: 'Open Assistant' },
+  ],
+  slack: [
+    { text: 'Watch your class channels below: a post saying an exam moved shows on your Dashboard to confirm in one tap.' },
+    { text: 'Post a study session below so your group can join; Cordia reminds the channel before it starts.' },
+    { text: 'Text Cordia Assistant "what did I miss in my study group?"', href: '/assistant', label: 'Open Assistant' },
+  ],
   ynab: [{ text: 'Text Cordia Assistant "how much is left for groceries?"', href: '/assistant', label: 'Open Assistant' }],
-  dropbox: [{ text: 'Text Cordia Assistant "find my lab report in Dropbox".', href: '/assistant', label: 'Open Assistant' }],
-  github: [{ text: 'Text Cordia Assistant "any new issues on my project?"', href: '/assistant', label: 'Open Assistant' }],
+  dropbox: [
+    { text: 'Link a class folder below: new slides and readings come into that class in Library on their own.' },
+    { text: 'Import one file with the Import button, then pick the class it belongs to.' },
+  ],
+  github: [
+    { text: 'Coding an assignment? On the Dashboard, tap the steps button by it, then Link a GitHub repo. You\'ll see your commits against the due date.', href: '/dashboard', label: 'Open Dashboard' },
+    { text: 'Then tap Ask Tutor about my code: it reads your repo with the instructions and rubric. If the repo goes quiet near the deadline, Cordia nudges you.' },
+  ],
 };
 
 // The Dashboard setup card, in the order that pays off soonest. `any` means one of these is enough.
