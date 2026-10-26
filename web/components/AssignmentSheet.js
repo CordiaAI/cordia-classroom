@@ -4,6 +4,7 @@ import { BookOpenCheck, CalendarClock, ListChecks, MessageCircle, X } from 'luci
 import BodyPortal from './BodyPortal';
 import DoneCheck from './DoneCheck';
 import DraftLink from './DraftLink';
+import RepoLink from './RepoLink';
 import { SectionLoader } from './CordiaLoader';
 import { buildExamReview, getPlan, makePlan, minutesLabel, removePlan, schedulePlan, setStepDone } from '../lib/studyPlans';
 import { useRouter } from 'next/router';
@@ -127,6 +128,7 @@ export default function AssignmentSheet({ item, onClose }) {
           {!plan && data !== null && <Link href={tutorHref} className="c-btn c-btn--quiet as-tutor"><MessageCircle {...ICON} />Ask Tutor about it</Link>}
 
           {data !== null && item.type !== 'exam' && <DraftLink item={item} draft={data?.draft} />}
+          {data !== null && item.type !== 'exam' && <RepoLink item={item} repo={data?.repo} />}
 
           {Array.isArray(data?.rubric) && data.rubric.length > 0 && (
             <div className="as-rubric">

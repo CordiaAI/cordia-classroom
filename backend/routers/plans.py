@@ -276,9 +276,10 @@ class StepRequest(BaseModel):
 def get_plan(item_key: str, authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     detail = canvas_detail(user_id, _key(item_key))
-    from services import docs_sync
+    from services import docs_sync, github_sync
     return {"plan": _plan(user_id, item_key), "rubric": detail.get("rubric"), "points": detail.get("points_possible"),
-            "missing": bool(detail.get("missing")), "draft": docs_sync.draft(user_id, item_key)}
+            "missing": bool(detail.get("missing")), "draft": docs_sync.draft(user_id, item_key),
+            "repo": github_sync.repo_for(user_id, item_key, with_activity=False)}
 
 
 @router.post("/plans/{item_key}")
@@ -475,8 +476,10 @@ def alerts(authorization: str = Header(default="")):
             alert["folder_id"] = library_import.class_folder(user_id, classes.get(alert.get("course_id")))
             alert["prefix"] = f"{alert.get('course') or ''} · {alert.get('module') or ''}"
         out.append(alert)
-    for alert in (sync_state.get(user_id, "gdocs").get("stats") or {}).get("alerts") or []:
-        out.append({**alert, "id": f"gdocs:{alert.get('at')}"})
+    # Stalled drafts (Docs), quiet repos (GitHub) and class announcements (Slack).
+    for connector in ("gdocs", "github", "slack"):
+        for alert in (sync_state.get(user_id, connector).get("stats") or {}).get("alerts") or []:
+            out.append({**alert, "id": f"{connector}:{alert.get('at')}"})
     # Exams in the next 10 days without a review set yet.
     now = _now()
     reviewed = library_import.existing_refs(user_id, "review:")
@@ -516,7 +519,7 @@ def dismiss_alert(alert_id: str, authorization: str = Header(default="")):
     if kind == "announcement" and value.isdigit():
         get_supabase().table("canvas_announcements").update({"read_at": _now().isoformat()}).eq("user_id", user_id) \
             .eq("canvas_announcement_id", int(value)).execute()
-    elif kind in ("canvas", "gdocs"):
+    elif kind in ("canvas", "gdocs", "github", "slack"):
         sync_state.dismiss_alert(user_id, kind, value)
     elif kind == "change":
         dismiss_change(value, authorization)

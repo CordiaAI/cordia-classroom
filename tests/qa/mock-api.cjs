@@ -114,12 +114,12 @@ async function install(context, state) {
     if (path === '/tutor/chats') return json({ chats: state.chats || [] });
     if (path === '/connectors' && method === 'GET') {
       state.linked = state.linked || {};
-      return json({ connectors: [['gcal', 'Google Calendar', 'Put your deadlines on your calendar.'], ['apple_calendar', 'Apple Calendar', 'Subscribe to your deadlines on iPhone and Mac.'], ['gtasks', 'Google Tasks', 'Turn deadlines into to-dos.'], ['gdrive', 'Google Drive', 'Import course files into a guide.'], ['gdocs', 'Google Docs', 'Import notes into a guide.'], ['notion', 'Notion', 'Import notes into a guide.'], ['gsheets', 'Google Sheets', 'Text Cordia to log anything to a sheet.'], ['gmail', 'Gmail', 'Cordia texts you about emails that need a reply.'], ['outlook', 'Outlook', 'Cordia texts you about emails that need a reply.'], ['slack', 'Slack', 'Catch what you missed and reply by text.'], ['ynab', 'YNAB', 'Check your budget by text.'], ['dropbox', 'Dropbox', 'Find a file by text.'], ['github', 'GitHub', 'Check issues and pull requests by text.']].map(([id, name, tagline]) => ({ id, name, tagline, available: true, connected: Boolean(state.linked[id]), ...(['gmail', 'outlook'].includes(id) ? { watch_dates: Boolean((state.watch || {})[id]) } : {}), uses: { tutor: true, assistant: true }, health: { sync_on: Boolean((state.syncing || {})[id]), last_synced_at: state.syncing?.[id] ? new Date(Date.now() - 240000).toISOString() : null, stats: state.syncing?.[id] ? (id === 'gcal' ? { blocks: 6 } : { tasks: 12 }) : {}, error: null, needs_reconnect: false } })) });
+      return json({ connectors: [['gcal', 'Google Calendar', 'Put your deadlines on your calendar.'], ['apple_calendar', 'Apple Calendar', 'Subscribe to your deadlines on iPhone and Mac.'], ['gtasks', 'Google Tasks', 'Turn deadlines into to-dos.'], ['gdrive', 'Google Drive', 'Import course files into a guide.'], ['dropbox', 'Dropbox', 'Class folders that fill your Library.'], ['gdocs', 'Google Docs', 'Import notes into a guide.'], ['notion', 'Notion', 'Import notes into a guide.'], ['gsheets', 'Google Sheets', 'Your grades and study time in a sheet.'], ['github', 'GitHub', 'Your code on programming assignments.'], ['slack', 'Slack', 'Class channels and study sessions.'], ['gmail', 'Gmail', 'Cordia texts you about emails that need a reply.'], ['outlook', 'Outlook', 'Cordia texts you about emails that need a reply.'], ['ynab', 'YNAB', 'Check your budget by text.']].map(([id, name, tagline]) => ({ id, name, tagline, available: true, connected: Boolean(state.linked[id]), ...(['gmail', 'outlook'].includes(id) ? { watch_dates: Boolean((state.watch || {})[id]) } : {}), uses: { tutor: true, assistant: true }, health: { sync_on: Boolean((state.syncing || {})[id]), last_synced_at: state.syncing?.[id] ? new Date(Date.now() - 240000).toISOString() : null, stats: state.syncing?.[id] ? (id === 'gcal' ? { blocks: 6 } : { tasks: 12 }) : {}, error: null, needs_reconnect: false } })) });
     }
     if ((m = path.match(/^\/connectors\/([a-z_]+)\/connect$/))) { state.linked = { ...(state.linked || {}), [m[1]]: true }; return json({ redirect_url: `/settings?section=connectors&connected=${m[1]}` }); }
     if ((m = path.match(/^\/connectors\/([a-z_]+)$/)) && method === 'DELETE') { delete state.linked[m[1]]; return json({ ok: true }); }
     if ((m = path.match(/^\/sync\/(gcal|gtasks)$/))) { state.syncing = { ...(state.syncing || {}), [m[1]]: method === 'POST' }; return json({ on: method === 'POST' }); }
-    if (path === '/alerts' && method === 'GET') return json({ alerts: state.populated ? [
+    if (path === '/alerts' && method === 'GET') return json({ alerts: state.populated ? [...(state.extraAlerts || []),
       { id: 'canvas:1', kind: 'grade_drop', course: 'BIO-101', from: 88.5, to: 84, at: new Date().toISOString() },
       { id: 'announcement:5', kind: 'deadline', title: 'Lab report moved', summary: 'The lab report is now due Friday at noon.', course: 'BIO-101' },
       { id: 'change:x1', change_id: 'x1', kind: 'date_change', change: 'moved', title: 'Midterm [BIO-101-002]', sender: 'Prof. Dana Lee <lee@state.edu>', summary: 'The midterm moves to Friday because of the campus closure.', old_due: new Date(Date.now() + 3 * 86400000).toISOString(), new_due: new Date(Date.now() + 5 * 86400000).toISOString() },
@@ -136,6 +136,28 @@ async function install(context, state) {
     if (path === '/drive/sync') return json({ imported: 0, links: state.driveLinks || [] });
     if (path === '/drive/save') return json({ file_id: 'x', name: 'Guide.md' });
     if (path.startsWith('/alerts/')) return json({ ok: true });
+    // Phase 5 apps (backend routers/apps.py).
+    if ((m = path.match(/^\/dropbox\/(links|folders|sync)/))) {
+      if (m[1] === 'folders') return json({ folders: [{ id: 'id:db1', name: 'BIO 101', path: '/School/BIO 101' }, { id: 'id:db2', name: 'Lab photos', path: '/School/Lab photos' }] });
+      if (m[1] === 'sync') return json({ imported: 0, links: state.dropboxLinks || [] });
+      if (method === 'PUT') { state.dropboxLinks = [{ library_folder_id: body.library_folder_id, drive_folder_id: body.drive_folder_id, drive_folder_name: body.drive_folder_name }]; return json({ imported: 3, links: state.dropboxLinks }); }
+      if (method === 'DELETE') state.dropboxLinks = [];
+      return json({ links: state.dropboxLinks || [] });
+    }
+    if (path === '/github/repos') return json({ repos: [{ full_name: 'sam/cs101-lab3', private: true, pushed: '2026-10-24', branch: 'main' }, { full_name: 'sam/portfolio', private: false, pushed: '2026-09-02', branch: 'main' }] });
+    if (path.match(/^\/plans\/[^/]+\/repo$/)) {
+      if (method === 'PUT') state.repo = { full_name: body.full_name, branch: body.branch, url: `https://github.com/${body.full_name}` };
+      if (method === 'DELETE') state.repo = null;
+      const perDay = [0, 0, 1, 0, 3, 2, 0, 0, 0, 4, 1, 0, 0, 0];
+      return json({ repo: state.repo ? { ...state.repo, activity: { per_day: perDay, total: 11, last: { at: new Date(Date.now() - 3 * 86400000).toISOString(), message: 'Parse the input file and handle empty lines', url: 'https://github.com' } } } : null });
+    }
+    if (path === '/sheets/status') return json({ auto: Boolean(state.sheetsAuto), url: state.sheetUrl || null, last: state.sheetUrl ? new Date(Date.now() - 3600000).toISOString() : null });
+    if (path === '/sheets/export') { state.sheetUrl = 'https://docs.google.com/spreadsheets/d/x/edit'; return json({ spreadsheet_id: 'x', url: state.sheetUrl, classes: 4, days: 37 }); }
+    if (path === '/sheets/auto') { state.sheetsAuto = body.on; return json({ auto: body.on, url: state.sheetUrl || null, last: null }); }
+    if (path === '/slack/channels') return json({ channels: [{ id: 'C0000001', name: 'bio-101', member: true }, { id: 'C0000002', name: 'cs101-study-group', member: true }, { id: 'C0000003', name: 'general', member: true }, { id: 'C0000004', name: 'chem-lab-help', member: false }] });
+    if (path === '/slack/watched') { if (method === 'PUT') state.slackWatched = body.channels; return json({ channels: state.slackWatched || [] }); }
+    if (path === '/slack/check') return json({ checked: 14, found: 1, posted: 1 });
+    if (path === '/slack/session') return json({ posted: true, reminder_at: new Date(Date.now() + 3600000).toISOString() });
     if ((m = path.match(/^\/plans\/([^/]+)(\/schedule)?$/))) {
       state.plans = state.plans || {};
       const key = decodeURIComponent(m[1]);
@@ -147,7 +169,7 @@ async function install(context, state) {
       ] };
       if (m[2] && state.plans[key]) { state.plans[key].blocks = [0, 1].map(i => ({ id: 'b' + i, starts_at: new Date(Date.now() + (i + 1) * 86400000).toISOString(), ends_at: new Date(Date.now() + (i + 1) * 86400000 + 3600000).toISOString(), status: 'planned' })); return json({ plan: state.plans[key], added: 2 }); }
       if (method === 'DELETE') { delete state.plans[key]; return json({ ok: true }); }
-      return json({ plan: state.plans[key] || null, points: 50, missing: false, draft: state.draft || null, rubric: [{ description: 'Data analysis', points: 20, long_description: 'Graphs are labeled and support the conclusion.' }, { description: 'Discussion', points: 20 }, { description: 'Formatting', points: 10 }] });
+      return json({ plan: state.plans[key] || null, points: 50, missing: false, draft: state.draft || null, repo: state.repo ? { full_name: state.repo.full_name, branch: state.repo.branch, url: state.repo.url } : null, rubric: [{ description: 'Data analysis', points: 20, long_description: 'Graphs are labeled and support the conclusion.' }, { description: 'Discussion', points: 20 }, { description: 'Formatting', points: 10 }] });
     }
     if (path.match(/^\/plans\/[^/]+\/steps\//)) return json({ step: { id: 's', done: body.done } });
     if (path.match(/^\/plans\/[^/]+\/draft$/)) { state.draft = method === 'PUT' ? { doc_id: body.doc_id, title: body.title, url: 'https://docs.google.com/document/d/x/edit', words: 1240 } : null; return json({ draft: state.draft }); }

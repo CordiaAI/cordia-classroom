@@ -147,6 +147,14 @@ export default function LibraryPage() {
     });
   }
 
+  // The sidebar's "Add a class" (?add=class) opens the same sheet, then drops the parameter.
+  useEffect(() => {
+    if (router.query.add !== 'class') return;
+    setAddingClass(true);
+    const { add: _drop, ...rest } = router.query;
+    router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+  }, [router.query.add]);
+
   function classAdded({ folder }) {
     setAddingClass(false);
     if (folder) setFolders(current => [folder, ...current.filter(item => item.id !== folder.id)]);

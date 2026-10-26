@@ -61,3 +61,19 @@ export const notionHome = () => apiFetch('/notion/home');
 export const notionSetup = (pageId, title) => post('/notion/setup', { page_id: pageId, title });
 export const notionSync = () => post('/notion/sync', {});
 export const addToLibrary = (connector, { id, title, folderId }) => post(`/connectors/${connector}/library`, { id, title, folder_id: folderId });
+
+// Phase 5 apps (backend routers/apps.py): a GitHub repo on an assignment, the Sheets export and Slack.
+export const githubRepos = query => apiFetch(`/github/repos?q=${encodeURIComponent(query || '')}`);
+export const getRepo = key => apiFetch(`${path(key)}/repo`, { timeoutMs: 30000 });
+export const linkRepo = (key, fullName, branch) => apiFetch(`${path(key)}/repo`, { method: 'PUT', body: JSON.stringify({ full_name: fullName, branch: branch || 'main' }), timeoutMs: 30000 });
+export const unlinkRepo = key => apiFetch(`${path(key)}/repo`, { method: 'DELETE' });
+export const sheetsStatus = () => apiFetch('/sheets/status');
+export const sheetsExport = () => post('/sheets/export', { time_zone: timeZone() });
+export const sheetsAuto = on => apiFetch('/sheets/auto', { method: 'PUT', body: JSON.stringify({ on, time_zone: timeZone() }) });
+export const slackChannels = query => apiFetch(`/slack/channels?q=${encodeURIComponent(query || '')}`);
+export const slackWatched = () => apiFetch('/slack/watched');
+export const setSlackWatched = channels => apiFetch('/slack/watched', { method: 'PUT', body: JSON.stringify({ channels }) });
+export const slackCheck = () => post('/slack/check', {});
+export const slackSession = ({ channel, topic, when, whenLabel, place, remindMinutes }) => post('/slack/session', {
+  channel, topic, when, when_label: whenLabel, place, remind_minutes: remindMinutes || null,
+});

@@ -44,6 +44,8 @@ const ALERT_TEXT = {
   exam_prep: alert => `${alert.title} in ${alert.days} day${alert.days === 1 ? '' : 's'}`,
   module_done: alert => `Finished: ${alert.module}`,
   draft_stalled: alert => `${alert.title}: draft hasn't grown in 2 days`,
+  repo_quiet: alert => `${alert.title}: no commits in 2 days`,
+  slack_post: alert => `#${alert.channel}: ${alert.title}`,
   date_change: alert => (alert.change === 'cancelled'
     ? `Cancelled: ${alert.title}`
     : `${alert.title}: ${shortDate(alert.old_due)} → ${shortDate(alert.new_due)}`),
@@ -224,16 +226,20 @@ export default function Today() {
       {alerts.length > 0 && (
         <section className="c-section" aria-label="Heads up">
           <div className="c-card c-list">
-            {alerts.slice(0, 4).map(raw => ({ ...raw, title: deadlineTitle(raw) })).map(alert => (
+            {alerts.slice(0, 4).map(raw => (raw.kind === 'slack_post' ? raw : { ...raw, title: deadlineTitle(raw) })).map(alert => (
               <div key={alert.id} className={'c-list-row today-alert is-' + alert.kind}>
                 <span className="c-grow">
                   <span className="today-alert-title">{ALERT_TEXT[alert.kind]?.(alert) || alert.title}</span>
                   <span className="c-meta">{[alert.kind === 'date_change' ? senderName(alert.sender) : alert.course, alert.summary,
-                    alert.kind === 'draft_stalled' && `due in ${alert.days} day${alert.days === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}</span>
+                    (alert.kind === 'draft_stalled' || alert.kind === 'repo_quiet') && `due in ${alert.days} day${alert.days === 1 ? '' : 's'}`,
+                    alert.kind === 'slack_post' && 'Slack'].filter(Boolean).join(' · ')}</span>
                 </span>
-                {alert.url && <a className="c-btn c-btn--quiet c-btn--sm" href={alert.url} target="_blank" rel="noreferrer">Open</a>}
+                {alert.url && <a className="c-btn c-btn--quiet c-btn--sm" href={safeHref(alert.url, '#')} target="_blank" rel="noreferrer">Open</a>}
                 {alert.kind === 'draft_stalled' && (
                   <Link className="c-btn c-btn--secondary c-btn--sm" href={`/tutor?assignment=${encodeURIComponent(alert.item_key)}&title=${encodeURIComponent(alert.title || '')}&ask=${encodeURIComponent('Help me get unstuck on my draft: what should I write next, based on the rubric?')}`}>Get unstuck</Link>
+                )}
+                {alert.kind === 'repo_quiet' && (
+                  <Link className="c-btn c-btn--secondary c-btn--sm" href={`/tutor?assignment=${encodeURIComponent(alert.item_key)}&title=${encodeURIComponent(alert.title || '')}&ask=${encodeURIComponent('Read my code against the instructions and help me pick the next thing to build.')}`}>Get unstuck</Link>
                 )}
                 {alert.kind === 'date_change' && (
                   <button type="button" className="c-btn c-btn--primary c-btn--sm" disabled={Boolean(reviewing)} onClick={() => accept(alert)}>

@@ -30,15 +30,15 @@ CONNECTORS = [
     {"id": "apple_calendar", "name": "Apple Calendar", "tagline": "Subscribe to your deadlines on iPhone and Mac."},
     {"id": "gtasks", "name": "Google Tasks", "tagline": "Turn deadlines into to-dos."},
     {"id": "gdrive", "name": "Google Drive", "tagline": "Import course files into a guide."},
+    {"id": "dropbox", "name": "Dropbox", "tagline": "Class folders that fill your Library."},
     {"id": "gdocs", "name": "Google Docs", "tagline": "Import notes into a guide."},
     {"id": "notion", "name": "Notion", "tagline": "Import notes into a guide."},
-    {"id": "gsheets", "name": "Google Sheets", "tagline": "Text Cordia to log anything to a sheet."},
+    {"id": "gsheets", "name": "Google Sheets", "tagline": "Your grades and study time in a sheet."},
+    {"id": "github", "name": "GitHub", "tagline": "Your code on programming assignments."},
+    {"id": "slack", "name": "Slack", "tagline": "Class channels and study sessions."},
     {"id": "gmail", "name": "Gmail", "tagline": "Cordia texts you about emails that need a reply."},
     {"id": "outlook", "name": "Outlook", "tagline": "Cordia texts you about emails that need a reply."},
-    {"id": "slack", "name": "Slack", "tagline": "Catch what you missed and reply by text."},
     {"id": "ynab", "name": "YNAB", "tagline": "Check your budget by text."},
-    {"id": "dropbox", "name": "Dropbox", "tagline": "Find a file by text."},
-    {"id": "github", "name": "GitHub", "tagline": "Check issues and pull requests by text."},
 ]
 COMPOSIO_IDS = set(composio.TOOLKITS)
 # Apps the Tutor can read from when a student names them; every Composio app works in the Assistant.
@@ -156,6 +156,9 @@ def _notion_title(item: dict) -> str:
 @limiter.limit("30/minute")
 def search_files(connector: str, request: Request, q: str = "", authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
+    if connector == "dropbox":
+        from services import dropbox_sync
+        return {"files": [item for item in dropbox_sync.search_files(user_id, q) if item["id"]]}
     if connector not in {"gdrive", "gdocs", "notion"}:
         raise HTTPException(status_code=404, detail="Unknown connector")
     account = composio.account_for(user_id, connector)
@@ -213,7 +216,7 @@ def _drive_text(account: str, user_id: str, file_id: str) -> str:
 
 
 def _import_text(connector: str, user_id: str, body: ImportRequest) -> tuple[str, str]:
-    if connector not in {"gdrive", "gdocs", "notion"}:
+    if connector not in {"gdrive", "gdocs", "notion", "dropbox"}:
         raise HTTPException(status_code=404, detail="Unknown connector")
     account = composio.account_for(user_id, connector)
     if connector == "gdocs":
@@ -221,6 +224,9 @@ def _import_text(connector: str, user_id: str, body: ImportRequest) -> tuple[str
         text, title = str(data.get("plain_text") or ""), data.get("title") or body.title
     elif connector == "notion":
         text, title = _notion_text(account, user_id, body.id), body.title
+    elif connector == "dropbox":
+        from services import dropbox_sync
+        text, title = dropbox_sync.file_text(account, user_id, body.id, body.title), body.title
     else:
         text, title = _drive_text(account, user_id, body.id), body.title
     if len(text.strip()) < 10:
@@ -249,7 +255,7 @@ def add_to_library(connector: str, body: LibraryRequest, request: Request, autho
     user_id = get_user_id(authorization)
     folder = _own_folder(user_id, body.folder_id)
     text, title = _import_text(connector, user_id, body)
-    names = {"gdrive": "Google Drive", "gdocs": "Google Docs", "notion": "Notion"}
+    names = {"gdrive": "Google Drive", "gdocs": "Google Docs", "notion": "Notion", "dropbox": "Dropbox"}
     guide = library_import.upsert_source(user_id, ref=f"{connector}:{body.id}", connector=connector, title=title, text=text,
                                          folder_id=folder["id"], source_type=connector, source_title=names[connector])
     if not guide:

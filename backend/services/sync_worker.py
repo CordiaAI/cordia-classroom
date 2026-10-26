@@ -7,6 +7,9 @@ machines never sync the same user at once:
 - Google Drive folders linked to classes every 30 minutes (new and changed files into Library).
 - Gmail and Outlook every 30 minutes for students watching for date changes (services.mail_watch).
 - The Notion course database every 30 minutes, and linked Google Doc drafts every 6 hours.
+- Dropbox class folders and watched Slack channels every 30 minutes, GitHub repos on assignments
+  every 6 hours, the Google Sheets export daily when it's set to keep itself updated, and Slack
+  study-session reminders when they're due.
 - Exams found in Canvas get their review sessions scheduled once Calendar sync is on.
 On by default on Fly (FLY_APP_NAME is set there), off elsewhere; SYNC_WORKER=1 or 0 overrides.
 """
@@ -48,7 +51,7 @@ def _due_google(now: datetime) -> list[dict]:
 
 def tick() -> None:
     from routers import canvas, plans
-    from services import docs_sync, drive_sync, google_sync, mail_watch, notion_sync
+    from services import docs_sync, drive_sync, dropbox_sync, github_sync, google_sync, mail_watch, notion_sync, sheets_export, slack_sync
     now = datetime.now(timezone.utc)
     for row in _due_canvas(now):
         if not _claim_canvas(row, now):
@@ -85,7 +88,9 @@ def tick() -> None:
         except Exception as error:
             log.info("background mail watch failed: %s", type(error).__name__)
             sync_state.record(row["user_id"], row["connector"], error="Checking mail failed. It will try again soon.")
-    for connector, rows, run in (("notion", notion_sync.due(now), notion_sync.sync_db), ("gdocs", docs_sync.due_drafts(now), docs_sync.check_drafts)):
+    for connector, rows, run in (("notion", notion_sync.due(now), notion_sync.sync_db), ("gdocs", docs_sync.due_drafts(now), docs_sync.check_drafts),
+                                 ("dropbox", dropbox_sync.due(now), dropbox_sync.sync_folders), ("github", github_sync.due(now), github_sync.check_repos),
+                                 ("gsheets", sheets_export.due(now), sheets_export.auto_export), ("slack", slack_sync.due(now), slack_sync.watch)):
         for row in rows:
             if not sync_state.claim(row["user_id"], connector, row.get("last_synced_at")):
                 continue
@@ -94,6 +99,11 @@ def tick() -> None:
             except Exception as error:
                 log.info("background %s sync failed: %s", connector, type(error).__name__)
                 sync_state.record(row["user_id"], connector, error="Sync failed. It will try again soon.")
+    for user_id in slack_sync.due_reminders(now):
+        try:
+            slack_sync.send_reminders(user_id, now)
+        except Exception as error:
+            log.info("slack reminders failed: %s", type(error).__name__)
 
 
 def _loop() -> None:
