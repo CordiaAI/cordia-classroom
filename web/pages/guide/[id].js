@@ -292,6 +292,7 @@ export default function GuidePage() {
       : await exportToNotion({ guideId: id, title: guide.title, outline: guide.notes || '', pairs: parseQAPairs(guide.study_guide).map(pair => ({ question: pair.question, answer: pair.answer })) });
     if (data?.url) {
       setToast(`Exported to ${name}`);
+      walkthroughEvent(where === 'docs' ? 'docs-exported' : 'notion-used');
       window.open(data.url, '_blank', 'noopener,noreferrer');
     } else setToast(apiErrorMessage(data?.detail, `Couldn't export to ${name}.`) + (/connect/i.test(data?.detail || '') ? ` Connect ${name} in Settings › Connectors.` : ''));
   }

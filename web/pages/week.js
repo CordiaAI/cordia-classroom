@@ -6,6 +6,7 @@ import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import AssignmentSheet from '../components/AssignmentSheet';
 import { acceptWeek, getAnnouncements, getWeek, minutesLabel } from '../lib/studyPlans';
 import { deadlineCourse, deadlineTitle } from '../lib/formatters';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 function dueLabel(value) {
   const date = new Date(value || '');
@@ -43,6 +44,7 @@ export default function WeekPage() {
     const result = await acceptWeek(keys);
     setBusy(false);
     if (typeof result?.added !== 'number') { setError(result?.detail || "That didn't plan. Try again."); return; }
+    walkthroughEvent('week-planned');
     setNotice(result.added ? `Added ${result.added} study block${result.added === 1 ? '' : 's'}. They're on your Cordia calendar if Google Calendar sync is on.` : 'Everything picked already has study time.');
     load();
   }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { FolderSync, Search, X } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { classLabel } from '../lib/classLabel';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -50,6 +51,7 @@ export default function DriveFolders() {
     setBusy('');
     if (!Array.isArray(data?.links)) { setError(apiErrorMessage(data?.detail, "That didn't link. Try again.")); return; }
     setLinks(data.links);
+    walkthroughEvent('drive-linked');
     setAdding(false); setQuery(''); setFound(null);
     setNotice(`Linked. ${data.imported ? `${data.imported} file${data.imported === 1 ? '' : 's'} came into ${className(classId)}.` : 'New files will come into the class as they appear.'}`);
   }

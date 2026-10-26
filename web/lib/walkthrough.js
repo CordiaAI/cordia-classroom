@@ -90,6 +90,12 @@ export const MINI = {
   ] },
   // A public page outside the app shell: "Show me" just opens it.
   extension: { label: 'Extension', route: '/install-extension', steps: [] },
+  // Apps: the app's sheet opens on its own (?open=), with what to do under "Try it".
+  'plan-week': { label: 'Plan your week', route: '/week', steps: [] },
+  docs: { label: 'Google Docs', route: '/settings?section=connectors&open=gdocs', steps: [] },
+  notion: { label: 'Notion', route: '/settings?section=connectors&open=notion', steps: [] },
+  drive: { label: 'Drive folders', route: '/settings?section=connectors&open=gdrive', steps: [] },
+  'email-watch': { label: 'Email date changes', route: '/settings?section=connectors&open=gmail', steps: [] },
   insights: { label: 'Insights', route: '/dashboard', steps: [
     { target: '[data-spot="insights"]', label: 'Your progress and weak spots', where: onToday, on: 'insights-opened' },
   ] },
@@ -102,6 +108,7 @@ const FEATURE_EVENTS = {
   'note-written': 'notes', 'insights-opened': 'insights', 'canvas-connected': 'canvas',
   'recording-started': 'record', 'visual-added': 'visual', 'match-opened': 'match', 'connector-connected': 'connectors',
   'assistant-ready': 'assistant', 'extension-opened': 'extension',
+  'week-planned': 'plan-week', 'docs-exported': 'docs', 'notion-used': 'notion', 'drive-linked': 'drive', 'email-watch': 'email-watch',
 };
 
 export const FEATURES = Object.keys(MINI);
