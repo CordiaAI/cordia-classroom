@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Flame, Snowflake } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import { semesterStart, streakWithFreeze } from '../lib/activity';
@@ -8,9 +7,11 @@ import RecapCard from '../components/RecapCard';
 import StudyInsights from '../components/StudyInsights';
 import KnowledgeMap from '../components/KnowledgeMap';
 import { LoadGate } from '../components/CordiaLoader';
+import { CHART_CSS, ClassBars, KindBars, QuizTrend, StatTiles, StudyHours, StudyTimeChart } from '../components/ProgressCharts';
 import { markUsed } from '../lib/progress';
 
-// Everything about how studying is going, in one place: streak, knowledge map, year, weak spots, recap.
+// Everything about how studying is going: headline numbers, study time, how and when you study,
+// quiz scores, the year, the knowledge map, weak spots and the recap.
 export default function Progress() {
   const { ready } = useRequireAuth();
   const [data, setData] = useState(null);
@@ -24,11 +25,13 @@ export default function Progress() {
       apiFetch('/folders'),
       apiFetch('/stats/streak?tz_offset=' + -new Date().getTimezoneOffset()),
       apiFetch('/stats/overview'),
-    ]).then(([guides, folders, streak, overview]) => setData({
+      apiFetch('/stats/activity?tz_offset=' + -new Date().getTimezoneOffset()),
+    ]).then(([guides, folders, streak, overview, activity]) => setData({
       guides: guides?.guides || [],
       folders: folders?.folders || [],
       streak: streak && !streak.detail ? streak : null,
       overview: overview && !overview.detail ? overview : null,
+      activity: activity && Array.isArray(activity.recent) ? activity : null,
     }));
   }, [ready]);
 
@@ -40,31 +43,28 @@ export default function Progress() {
     <LoadGate ready={Boolean(data)} label="Loading progress">
       <div className="c-page progress-page">
         <header className="c-page-head"><h1 className="c-title">Progress</h1></header>
-        {streak && (
-          <section className="c-card progress-streak" aria-label="Streak">
-            <Flame size={28} strokeWidth={1.75} aria-hidden="true" />
-            <div>
-              <strong>{streak.days} day{streak.days === 1 ? '' : 's'}</strong>
-              <span className="c-meta">
-                {streak.frozenThisWeek
-                  ? <><Snowflake size={14} strokeWidth={1.75} aria-hidden="true" /> Freeze used this week</>
-                  : 'One missed day a week won’t break it.'}
-              </span>
+        {data && <StatTiles activity={data.activity} streak={streak} />}
+        {data?.activity && (
+          <>
+            <StudyTimeChart recent={data.activity.recent} />
+            <div className="pc-row">
+              <KindBars byKind={data.activity.by_kind} />
+              <ClassBars classes={data.activity.classes} />
             </div>
-          </section>
+            <div className="pc-row">
+              <QuizTrend quizzes={data.activity.quizzes} />
+              <StudyHours hours={data.activity.hours} />
+            </div>
+          </>
         )}
+        {data && <Heatmap serverWeek={data.streak?.week || []} serverDays={data.activity?.days || []} />}
         {data && <KnowledgeMap guides={data.guides} />}
-        {data && <Heatmap serverWeek={data.streak?.week || []} />}
         <StudyInsights />
-        {data && <RecapCard guides={data.guides} folders={data.folders} since={since} cardsStudied={data.overview?.cards_studied || 0} />}
+        {data && <RecapCard guides={data.guides} folders={data.folders} since={since} cardsStudied={data.overview?.cards_studied || 0} serverDays={data.activity?.days || []} />}
         <style jsx>{`
           .progress-page { width: min(var(--page-max), 100%); margin: 0 auto; }
-          .progress-streak { display: flex; align-items: center; gap: 16px; padding: 20px; }
-          .progress-streak > :global(.lucide) { color: var(--olive-ink); }
-          .progress-streak div { display: grid; gap: 4px; }
-          .progress-streak strong { font: 600 28px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
-          .progress-streak .c-meta { display: inline-flex; align-items: center; gap: 4px; }
         `}</style>
+        <style jsx>{CHART_CSS}</style>
       </div>
     </LoadGate>
   );

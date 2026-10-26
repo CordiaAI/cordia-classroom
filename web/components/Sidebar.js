@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { CalendarDays, CalendarRange, ChartNoAxesColumn, ChevronRight, CircleHelp, CreditCard, Folder, FolderPlus, GraduationCap, Layers, LayoutDashboard, Library, Link2, LogOut, MessageCircle, MessageSquareText, MessagesSquare, Palette, PanelLeftClose, PanelLeftOpen, Plus, School, Search, Settings, Target, User } from 'lucide-react';
+import { AudioLines, BookOpen, CalendarDays, CalendarRange, ChartNoAxesColumn, ChevronRight, CircleHelp, CreditCard, Folder, FolderPlus, GraduationCap, Layers, LayoutDashboard, Library, Link2, LogOut, MessageCircle, MessageSquareText, Palette, PanelLeftClose, PanelLeftOpen, PencilRuler, Plus, School, Search, Settings, User } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -31,12 +31,14 @@ const canvasItems = [
   { label: 'Calendar', href: '/canvas?tab=calendar', icon: CalendarDays, here: (path, query) => (path === '/canvas' && query.tab === 'calendar') || path === '/calendar' },
   { label: 'Your week', href: '/week', icon: CalendarRange, here: path => path === '/week' },
 ];
-// The sidebar's Study section: ways to study that aren't one guide's screen.
+// The sidebar's Study section: Library's filters, one tap each (Tutor is the corner bubble and
+// Progress is in the account menu).
+const onFilter = key => (path, query) => path === '/library' && (query.tab || query.filter) === key;
 const studyItems = [
-  { label: 'Tutor', href: '/tutor', icon: MessagesSquare, here: path => path === '/tutor' },
-  { label: 'Practice', href: '/library?tab=practice', icon: Target, here: (path, query) => path.startsWith('/practice') || (path === '/library' && (query.tab || query.filter) === 'practice') },
-  { label: 'Flashcards', href: '/library?tab=flashcards', icon: Layers, here: (path, query) => path === '/library' && ['flashcards', 'cards'].includes(query.tab || query.filter) },
-  { label: 'Progress', href: '/progress', icon: ChartNoAxesColumn, here: path => path === '/progress' },
+  { label: 'Guides', href: '/library?tab=guides', icon: BookOpen, here: onFilter('guides') },
+  { label: 'Lectures', href: '/library?tab=lectures', icon: AudioLines, here: onFilter('lectures') },
+  { label: 'Flashcards', href: '/library?tab=flashcards', icon: Layers, here: (path, query) => onFilter('flashcards')(path, query) || onFilter('cards')(path, query) },
+  { label: 'Practice', href: '/library?tab=practice', icon: PencilRuler, here: (path, query) => path.startsWith('/practice') || onFilter('practice')(path, query) },
 ];
 const MAX_CLASSES = 8;
 // Classes for the sidebar, kept between pages so it doesn't flash empty on each navigation.

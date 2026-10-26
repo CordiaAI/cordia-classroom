@@ -49,7 +49,8 @@ function base64(text) {
 // the overlap between neighbouring chunks (lib/lectureText.mjs).
 //   onText({ seq, startMs, text })   a chunk's words
 //   onState({ waiting, uploading, offline, error })   for the status line
-//   onLimit()   out of recording minutes
+//   onLimit()   out of recording minutes: uploads hold (every chunk stays saved here) and the
+//               recording carries on; drained() tries them again, e.g. after an upgrade.
 export class ChunkUploader {
   constructor({ recordingId, getPrompt, keepAudio = false, onText, onState, onLimit }) {
     this.recordingId = recordingId;
@@ -64,6 +65,7 @@ export class ChunkUploader {
     this.failures = 0;
     this.error = null;        // a problem the student should see ('unavailable', 'auth', 'retrying')
     this.stopped = false;
+    this.held = false;        // out of minutes: keep chunks, stop sending them
     this.offline = typeof navigator !== 'undefined' && navigator.onLine === false;
     this.onOnline = () => { this.offline = false; this.retryAt = 0; this.report(); this.pump(); };
     this.onOffline = () => { this.offline = true; this.report(); };
@@ -86,7 +88,7 @@ export class ChunkUploader {
   }
 
   pump() {
-    if (this.stopped || this.offline || Date.now() < this.retryAt) return;
+    if (this.stopped || this.held || this.offline || Date.now() < this.retryAt) return;
     while (this.inFlight.size < CONCURRENCY && this.queue.length) {
       const item = this.queue.shift();
       this.inFlight.add(item);
@@ -121,9 +123,16 @@ export class ChunkUploader {
     }
     const status = response?.status || 0;
     if (status === 402) {
-      window.dispatchEvent(new CustomEvent(LIMIT_EVENT, { detail: data?.detail || { feature: 'lecture_minute' } }));
-      this.stopped = true;
-      this.onLimit?.();
+      // Out of minutes: never drop the audio and never end the recording. The chunk goes back in
+      // the queue (and stays in IndexedDB); uploads wait until drained() tries again.
+      this.queue.unshift(item);
+      this.queue.sort((a, b) => a.seq - b.seq);
+      if (!this.held) {
+        this.held = true;
+        this.error = 'limit';
+        window.dispatchEvent(new CustomEvent(LIMIT_EVENT, { detail: data?.detail || { feature: 'lecture_minute' } }));
+        this.onLimit?.();
+      }
       return;
     }
     if (status === 401 || status === 503) {
@@ -150,11 +159,13 @@ export class ChunkUploader {
   drained({ timeoutMs = 45000 } = {}) {
     const deadline = Date.now() + timeoutMs;
     this.retryAt = 0;
+    // One more try for chunks held at the minutes limit (the plan may have been upgraded).
+    if (this.held) { this.held = false; this.error = null; }
     return new Promise(resolve => {
       const check = () => {
         if (this.stopped || (!this.queue.length && !this.inFlight.size)) { clearInterval(timer); resolve({ ok: true, missing: 0 }); return; }
         // Retrying can't fix these; say so now instead of waiting out the timer.
-        if ((this.error === 'unavailable' || this.error === 'auth') && !this.inFlight.size) { clearInterval(timer); resolve({ ok: false, missing: this.queue.length }); return; }
+        if ((this.error === 'unavailable' || this.error === 'auth' || this.error === 'limit') && !this.inFlight.size) { clearInterval(timer); resolve({ ok: false, missing: this.queue.length }); return; }
         if (Date.now() >= deadline) { clearInterval(timer); resolve({ ok: false, missing: this.queue.length + this.inFlight.size }); return; }
         this.pump();
       };

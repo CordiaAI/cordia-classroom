@@ -110,11 +110,18 @@ export function lectureText(transcript, segments) {
 const escapeHtml = text => String(text || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 // The lecture as a note for the Notes tab: the outline, or else summary, notes by section, what to watch for, key
 // terms and to-dos. Without AI notes yet, the transcript itself in paragraphs.
+// The student's own notes, typed while recording, lead the note as they wrote them (a line each).
+function myNotesHtml(text) {
+  const lines = String(text || '').split('\n').map(line => line.trim()).filter(Boolean);
+  return lines.length ? `<h2>Your notes</h2><ul>${lines.map(line => `<li>${escapeHtml(line.replace(/^[-*•]\s*/, ''))}</li>`).join('')}</ul>` : '';
+}
+
 export function lectureNoteHtml(lecture, analysis = {}, todos = []) {
+  const mine = myNotesHtml(analysis.my_notes);
   // The full outline is the note when there is one; the transcript stays one tap away.
-  if (analysis.outline_md) return outlineHtml(analysis.outline_md);
+  if (analysis.outline_md) return mine + outlineHtml(analysis.outline_md);
   const list = items => `<ul>${items.map(item => `<li>${item}</li>`).join('')}</ul>`;
-  const parts = [];
+  const parts = mine ? [mine] : [];
   if (analysis.summary?.length) parts.push('<h2>Summary</h2>', list(analysis.summary.map(escapeHtml)));
   (analysis.outline || []).forEach(section => {
     parts.push(`<h2>${escapeHtml(section.heading)}</h2>`);
@@ -123,7 +130,7 @@ export function lectureNoteHtml(lecture, analysis = {}, todos = []) {
   if (analysis.watch_for?.length) parts.push('<h2>What to watch for</h2>', list(analysis.watch_for.map(item => `<strong>${escapeHtml(item.point)}</strong>: “${escapeHtml(item.quote)}”`)));
   if (analysis.terms?.length) parts.push('<h2>Key terms</h2>', list(analysis.terms.map(item => `<strong>${escapeHtml(item.term)}</strong>: ${escapeHtml(item.definition)}`)));
   if (todos.length) parts.push('<h2>To do</h2>', list(todos.map(item => `${escapeHtml(item.title)}${item.said ? ` (${escapeHtml(item.said)})` : ''}`)));
-  if (!parts.length) {
+  if (parts.length === (mine ? 1 : 0)) {
     const sentences = String(lecture.transcript || '').split(/(?<=[.!?])\s+/);
     const paragraphs = [];
     for (let i = 0; i < sentences.length; i += 5) paragraphs.push(sentences.slice(i, i + 5).join(' '));
@@ -258,7 +265,7 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
     if (!already && !raw && !outlineMd) return keepNote(lecture.analysis || {}, 'failed');
     const analysis = raw ? cleanAnalysis(raw, { text, starts: segments.map(item => item.start_ms), classes }) : { ...(lecture.analysis || {}), todos: [] };
     const { todos, title: _t, class_id: _c, ...stored } = analysis;
-    const next = { ...stored, analyzed: Boolean(already || raw), outline_md: outlineMd || lecture.analysis?.outline_md || '', note_id: lecture.analysis?.note_id || '' };
+    const next = { ...stored, analyzed: Boolean(already || raw), outline_md: outlineMd || lecture.analysis?.outline_md || '', note_id: lecture.analysis?.note_id || '', my_notes: lecture.analysis?.my_notes || '' };
     await insertTodos(userId, id, todos);
     next.note_id = await syncNote(authorization, lecture, next, todos) || next.note_id;
     await saveAnalysis(userId, id, next);
@@ -283,7 +290,7 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
     const { todos, title: _t, class_id: _c, ...stored } = analysis;
     const created = await db('/lectures', {
       method: 'POST', headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ user_id: userId, folder_id: folderId, title, source, lecture_date: lectureDate, duration_ms: Math.max(0, Math.round(Number(body.duration_ms) || 0)), transcript, segments, analysis: { ...stored, outline_md: outlineMd, analyzed: Boolean(raw) } }),
+      body: JSON.stringify({ user_id: userId, folder_id: folderId, title, source, lecture_date: lectureDate, duration_ms: Math.max(0, Math.round(Number(body.duration_ms) || 0)), transcript, segments, analysis: { ...stored, outline_md: outlineMd, analyzed: Boolean(raw), my_notes: String(body.my_notes || '').replace(/\r/g, '').trim().slice(0, 20000) } }),
     }).catch(() => null);
     if (!created?.ok) return NOT_SET_UP;
     const lecture = (await created.json())?.[0];

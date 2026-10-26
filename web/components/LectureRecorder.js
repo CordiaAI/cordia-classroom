@@ -16,7 +16,13 @@ const UPLOAD_PROBLEMS = {
   unavailable: "Transcription isn't set up on this site yet. Your audio is saved on this device.",
   auth: 'Sign in again to transcribe. Your audio is saved on this device.',
   retrying: 'Connection trouble. Retrying; your audio is saved on this device.',
+  limit: "You've used your recording minutes. Still recording and saving here; upgrade and press Stop to transcribe the rest.",
 };
+const MIC_RETRY_MS = 2000;
+// Notes typed while recording stay on this device until the lecture is saved (a reload keeps them).
+const DRAFT_KEY = 'cordiaLectureNotesDraft';
+function readDraft() { try { return localStorage.getItem(DRAFT_KEY) || ''; } catch { return ''; } }
+function writeDraft(text) { try { if (text) localStorage.setItem(DRAFT_KEY, text); else localStorage.removeItem(DRAFT_KEY); } catch { /* storage blocked */ } }
 
 // When server transcription isn't set up, the browser's own speech recognition is used instead
 // (Apple's in Safari, Google's in Chrome). Free and live, a little less accurate; no audio leaves
@@ -85,6 +91,16 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
   const speechEnded = useRef(null);  // resolves when recognition has stopped
   const source = useRef('recording');
   const [interim, setInterim] = useState('');
+  // Guardrails: the microphone is reopened if it drops, so only Stop ends a recording.
+  const [micNote, setMicNote] = useState('');
+  const [myNotes, setMyNotes] = useState('');
+  const myNotesRef = useRef('');
+  useEffect(() => { const draft = readDraft(); myNotesRef.current = draft; setMyNotes(draft); }, []);
+  function typeNotes(text) { myNotesRef.current = text; setMyNotes(text); writeDraft(text); }
+  const mic = useRef(null);          // the raw microphone stream
+  const voiceRef = useRef(null);     // { stream, context, release } from roomVoice
+  const meterOff = useRef(null);
+  const reconnecting = useRef(false);
   const active = ['recording', 'paused', 'finishing', 'stuck'].includes(phase);
   const shown = useMemo(() => mergedSegments(segments), [segments]);
 
@@ -198,7 +214,8 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
         setSegments(segmentsRef.current);
       },
       onState: setUpload,
-      onLimit: () => { if (recorder.current) finish(); },
+      // Out of minutes: keep recording (audio stays saved here); the banner says what to do.
+      onLimit: () => {},
     });
   }
 
@@ -226,10 +243,31 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
     uploader.current = useBrowser ? null : makeUploader(newRecordingId());
     // The teacher's voice, lifted for a room, is what's recorded and what the meter shows.
     const voice = await roomVoice(stream);
-    recorder.current = new ChunkedRecorder(voice.stream, { onChunk: chunk => uploader.current?.add(chunk), release: voice.release });
+    watchMic(stream, voice);
+    recorder.current = new ChunkedRecorder(voice.stream, { onChunk: chunk => uploader.current?.add(chunk), release: voice.release, onProblem });
     recorder.current.start();
     if (useBrowser) startSpeech();
-    cleanup.current.push(levelMeter(voice.stream, setLevel), keepAwake());
+    cleanup.current.push(() => meterOff.current?.(), keepAwake());
+    // A suspended audio graph records silence: if it won't wake, record the microphone directly.
+    let suspendedChecks = 0;
+    const graphTimer = setInterval(() => {
+      const context = voiceRef.current?.context;
+      if (!context || !recorder.current || recorder.current.paused) { suspendedChecks = 0; return; }
+      if (context.state === 'running') { suspendedChecks = 0; return; }
+      context.resume().catch(() => {});
+      suspendedChecks += 1;
+      if (suspendedChecks >= 3 && mic.current) {
+        suspendedChecks = 0;
+        const raw = mic.current.clone();
+        voiceRef.current = { stream: raw, context: null, release: () => raw.getTracks().forEach(track => track.stop()) };
+        recorder.current.replaceStream(raw, voiceRef.current.release);
+        meterOff.current?.(); meterOff.current = levelMeter(raw, setLevel);
+      }
+    }, 3000);
+    cleanup.current.push(() => clearInterval(graphTimer));
+    const onDevices = () => { if (!mic.current?.getAudioTracks().some(track => track.readyState === 'live')) reconnectMic(); };
+    navigator.mediaDevices?.addEventListener?.('devicechange', onDevices);
+    cleanup.current.push(() => navigator.mediaDevices?.removeEventListener?.('devicechange', onDevices));
     const clockTimer = setInterval(() => {
       const ms = recorder.current?.elapsed() || 0;
       setElapsed(ms);
@@ -238,6 +276,44 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
     cleanup.current.push(() => clearInterval(clockTimer));
     setPhase('recording');
     walkthroughEvent('recording-started');
+  }
+
+  // The microphone in use: its stream, the processed voice and the level meter. A track that
+  // ends (unplugged, headset switched, the system took the mic) reopens the microphone.
+  function watchMic(stream, voice) {
+    mic.current = stream;
+    voiceRef.current = voice;
+    stream.getAudioTracks().forEach(track => { track.onended = () => { if (mic.current === stream) reconnectMic(); }; });
+    meterOff.current?.();
+    meterOff.current = levelMeter(voice.stream, setLevel);
+  }
+
+  function onProblem(reason) {
+    if (reason === 'stream') reconnectMic();
+  }
+
+  // Reopens the microphone until it works (every 2 s) while a recording is on. The clock and the
+  // chunks carry on; the student sees what's happening instead of a recording that went quiet.
+  async function reconnectMic() {
+    if (reconnecting.current || !recorder.current) return;
+    reconnecting.current = true;
+    setMicNote('Microphone disconnected. Reconnecting…');
+    while (recorder.current && !recorder.current.stopped) {
+      try {
+        const stream = await openMicrophone();
+        const voice = await roomVoice(stream);
+        if (!recorder.current || recorder.current.stopped) { voice.release(); break; }
+        watchMic(stream, voice);
+        recorder.current.replaceStream(voice.stream, voice.release);
+        setMicNote('Microphone reconnected. Still recording.');
+        setTimeout(() => setMicNote(note => (note.startsWith('Microphone reconnected') ? '' : note)), 6000);
+        break;
+      } catch (caught) {
+        if (caught?.name === 'NotAllowedError') { setMicNote('The microphone was blocked. Allow it in the browser to keep recording.'); }
+        await new Promise(resolve => setTimeout(resolve, MIC_RETRY_MS));
+      }
+    }
+    reconnecting.current = false;
   }
 
   // Notes for what was said since the last update (plus a little before it for context).
@@ -311,7 +387,9 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
       segments: timed.map(({ start_ms, text }) => ({ start_ms, text })),
       durationMs: Math.max(elapsed, timed.length ? timed[timed.length - 1].start_ms + 20000 : 0),
       source: source.current,
+      myNotes: myNotesRef.current,
     });
+    writeDraft('');
   }
 
   // Upload recording: split the file, transcribe the pieces in parallel, then the same final steps.
@@ -414,6 +492,7 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
           <div className="rec-level" aria-hidden="true"><span style={{ transform: `scaleX(${phase === 'paused' ? 0 : Math.max(0.02, level)})` }} /></div>
           <p className="rec-note" role="status">{phase === 'paused' ? 'Paused' : 'Recording'}</p>
           {problem && <p className="rec-error" role="alert">{problem}</p>}
+          {micNote && <p className={micNote.startsWith('Microphone reconnected') ? 'rec-note' : 'rec-error'} role="alert">{micNote}</p>}
           <div className="rec-row">
             {phase === 'paused'
               ? <button type="button" className="c-btn c-btn--secondary" onClick={resume}><Play aria-hidden="true" />Resume</button>
@@ -433,6 +512,11 @@ export default function LectureRecorder({ folders = [], folderId, onFolder, onDo
             {suggestion && <button type="button" className="c-chip" onClick={() => onFolder?.(suggestion.id)}>Suggested: {suggestion.name}</button>}
           </div>
         )}
+        <label className="rec-mine">
+          <span>Your notes</span>
+          <textarea className="c-input" rows={5} value={myNotes} onChange={event => typeNotes(event.target.value)}
+            placeholder="Jot down anything: what the professor stressed, questions, page numbers. They're saved with the lecture." />
+        </label>
         <section className="rec-transcript" aria-label="Live transcript" aria-live="polite">
           {shown.length || interim ? shown.map(segment => <p key={segment.seq} id={`rec-at-${segment.start_ms}`}>{segment.text}</p>) : <p className="rec-note">The transcript appears here a few seconds behind.</p>}
           {interim && <p className="rec-interim">{interim}</p>}
@@ -498,6 +582,9 @@ function RecorderStyle() {
       .rec-level span { display: block; height: 100%; background: var(--olive-ink); transform-origin: left center; transition: transform 80ms linear; }
       .rec-class { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
       .rec-class .c-field { flex: 1 1 200px; }
+      .rec-mine { display: grid; gap: 6px; }
+      .rec-mine span { font: 600 var(--fs-15)/1.3 var(--font-sans); color: var(--ink); }
+      .rec-mine textarea { min-height: 120px; resize: vertical; }
       .rec-transcript { max-height: 220px; overflow: auto; padding: 16px 20px; border: 1px solid var(--hairline); border-radius: var(--r-row); background: var(--surface-card); }
       .rec-transcript p { margin: 0 0 8px; color: var(--ink); font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); }
       .rec-transcript p.rec-interim { color: var(--muted); }

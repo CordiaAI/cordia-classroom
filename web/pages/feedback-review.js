@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
+import { safeHref } from '../lib/formatters';
 
 const categoryLabels = {
   bug: 'Bug',
@@ -127,6 +128,13 @@ export default function FeedbackReviewPage() {
                 </label>
               </div>
               <p className="feedback-review-message">{selected.message}</p>
+              {(selected.attachment_urls || []).length > 0 && (
+                <div className="feedback-review-shots">
+                  {selected.attachment_urls.map((url, index) => (
+                    <a key={index} href={safeHref(url, '#')} target="_blank" rel="noreferrer"><img src={safeHref(url, '')} alt={`Screenshot ${index + 1}`} /></a>
+                  ))}
+                </div>
+              )}
               <dl>
                 <div><dt>Submitted</dt><dd>{displayDate(selected.created_at)}</dd></div>
                 <div><dt>User ID</dt><dd>{selected.user_id}</dd></div>
@@ -142,6 +150,8 @@ export default function FeedbackReviewPage() {
 
       <style jsx>{`
         .feedback-review-page { max-width: 1240px; margin: 0 auto; color: var(--ink); }
+        .feedback-review-shots { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
+        .feedback-review-shots img { display: block; max-width: 220px; max-height: 160px; border-radius: 10px; border: 1px solid var(--line); object-fit: cover; }
         .feedback-review-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
         .feedback-review-heading p { margin: 0 0 9px; color: var(--olive); font-size: 13px; font-weight:600; letter-spacing:0; }
         h1 { margin: 0; font-size: max(13px, clamp(2.5rem, 6vw, 4.8rem)); line-height:1.15; letter-spacing:-0.015em; }

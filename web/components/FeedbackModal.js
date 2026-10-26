@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, ImagePlus, X } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
 import { apiFetch } from '../lib/api';
+import { uploadFeedbackImage } from '../lib/cardImages';
+
+const MAX_SHOTS = 3;
 
 const categories = [
   ['bug', 'Bug'],
@@ -34,6 +37,42 @@ export default function FeedbackModal({ onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  // Screenshots: { id, preview, path, status: 'uploading' | 'ready' | 'failed' }
+  const [shots, setShots] = useState([]);
+  const [shotError, setShotError] = useState('');
+  const fileRef = useRef(null);
+
+  async function addShots(files) {
+    const images = [...files].filter(file => file?.type?.startsWith('image/')).slice(0, MAX_SHOTS - shots.length);
+    if (!images.length) return;
+    setShotError('');
+    const added = images.map(file => ({ id: crypto.randomUUID(), preview: URL.createObjectURL(file), path: '', status: 'uploading' }));
+    setShots(current => [...current, ...added]);
+    await Promise.all(images.map(async (file, index) => {
+      const id = added[index].id;
+      try {
+        const path = await uploadFeedbackImage(file);
+        setShots(current => current.map(shot => (shot.id === id ? { ...shot, path, status: 'ready' } : shot)));
+      } catch (caught) {
+        setShots(current => current.filter(shot => shot.id !== id));
+        setShotError(caught.message);
+      }
+    }));
+  }
+
+  function removeShot(id) {
+    setShots(current => {
+      const gone = current.find(shot => shot.id === id);
+      if (gone) URL.revokeObjectURL(gone.preview);
+      return current.filter(shot => shot.id !== id);
+    });
+  }
+
+  // Paste a screenshot straight in (Cmd/Ctrl+V) anywhere in the dialog.
+  function onPaste(event) {
+    const files = [...(event.clipboardData?.files || [])].filter(file => file.type.startsWith('image/'));
+    if (files.length) { event.preventDefault(); addShots(files); }
+  }
 
   useEffect(() => {
     const previousFocus = document.activeElement;
@@ -87,6 +126,7 @@ export default function FeedbackModal({ onClose }) {
         ...currentPageContext(router),
         app_version: process.env.NEXT_PUBLIC_APP_VERSION || null,
         client_request_id: requestIdRef.current,
+        attachments: shots.filter(shot => shot.status === 'ready').map(shot => shot.path),
       }),
     });
 
@@ -121,7 +161,7 @@ export default function FeedbackModal({ onClose }) {
             <p>Thank you for helping improve CordiaClassroom.</p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} onPaste={onPaste} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); addShots(event.dataTransfer?.files || []); }}>
             <div className="feedback-heading">
               <div>
                 <p className="feedback-kicker">BETA FEEDBACK</p>
@@ -132,7 +172,7 @@ export default function FeedbackModal({ onClose }) {
             </div>
 
             <label htmlFor="feedback-category">Category</label>
-            <select id="feedback-category" value={category} onChange={event => setCategory(event.target.value)}>
+            <select id="feedback-category" className="c-select feedback-select" value={category} onChange={event => setCategory(event.target.value)}>
               {categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
 
@@ -149,11 +189,27 @@ export default function FeedbackModal({ onClose }) {
               maxLength={2000}
               required
             />
-            <p className="feedback-context">The page path is included automatically. Query details and private tokens are not.</p>
+            <div className="feedback-shots">
+              {shots.map(shot => (
+                <div key={shot.id} className={'feedback-shot' + (shot.status === 'uploading' ? ' is-uploading' : '')}>
+                  {/* A local preview of the file being attached (blob: URL), never a remote address. */}
+                  <img src={shot.preview} alt="Attached screenshot" />
+                  <button type="button" className="feedback-shot-remove" onClick={() => removeShot(shot.id)} aria-label="Remove screenshot"><X size={14} strokeWidth={2} aria-hidden="true" /></button>
+                </div>
+              ))}
+              {shots.length < MAX_SHOTS && (
+                <button type="button" className="c-btn c-btn--secondary c-btn--sm feedback-add-shot" onClick={() => fileRef.current?.click()}>
+                  <ImagePlus size={16} strokeWidth={1.75} aria-hidden="true" />Add screenshot
+                </button>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={event => { addShots(event.target.files || []); event.target.value = ''; }} />
+            </div>
+            <p className="feedback-context">Paste or drop a screenshot here too. The page you're on is included; query details and private tokens are not.</p>
+            {shotError && <p className="feedback-error" role="alert">{shotError}</p>}
             {error && <p className="feedback-error" role="alert">{error}</p>}
             <div className="feedback-actions">
               <button type="button" className="feedback-cancel" onClick={onClose}>Cancel</button>
-              <button type="submit" className="feedback-submit" disabled={submitting || !message.trim()}>
+              <button type="submit" className="feedback-submit" disabled={submitting || !message.trim() || shots.some(shot => shot.status === 'uploading')}>
                 {submitting ? 'Sending…' : 'Send feedback'}
               </button>
             </div>
@@ -170,10 +226,16 @@ export default function FeedbackModal({ onClose }) {
         .feedback-heading p:last-child { margin: 9px 0 0; color: var(--text-secondary); font-size:15px; }
         .feedback-close { width: 38px; height: 38px; flex: 0 0 auto; border: 1px solid var(--line); border-radius:50%; background: var(--surface); color: var(--ink); font: inherit; font-size:20px; line-height:1; cursor: pointer; }
         label { display: block; margin-bottom: 8px; color: var(--ink); font-size: 13px; font-weight:600; }
-        select, textarea { width: 100%; border: 1px solid var(--line); border-radius:12px; background: var(--surface); color: var(--ink); font: inherit; }
-        select { min-height: 48px; margin-bottom: 20px; padding: 0 13px; }
+        textarea { width: 100%; border: 1px solid var(--line); border-radius:12px; background: var(--surface); color: var(--ink); font: inherit; }
+        /* The dropdown is the app's own (c-select): its chevron sits 14px in from the edge. */
+        .feedback-select { width: 100%; min-height: 48px; margin-bottom: 20px; }
         textarea { padding: 14px; resize: none; line-height:1.5; }
-        select:focus, textarea:focus, button:focus-visible { outline: 3px solid color-mix(in srgb, var(--olive) 28%, transparent); outline-offset: 2px; }
+        .feedback-select:focus-visible, textarea:focus, button:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
+        .feedback-shots { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+        .feedback-shot { position: relative; width: 72px; height: 72px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+        .feedback-shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .feedback-shot.is-uploading img { opacity: .45; }
+        .feedback-shot-remove { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--lg-menu); color: var(--ink); cursor: pointer; }
         .feedback-message-label { display: flex; align-items: center; justify-content: space-between; }
         .feedback-message-label span { color: var(--muted-ink); font-size: 13px; }
         .feedback-context { margin: 9px 0 0; color: var(--muted-ink); font-size: 13px; line-height:1.5; }

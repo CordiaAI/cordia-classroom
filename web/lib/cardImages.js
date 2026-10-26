@@ -3,6 +3,7 @@
 import { authHeaders } from './api';
 
 const MAX_SIDE = 1600;
+const SCREENSHOT_SIDE = 2000;
 
 // Only photos Cordia stored, or the inline images older cards carry, are shown on a card.
 export function isCardImage(url) {
@@ -22,11 +23,11 @@ function readAsDataUrl(blob) {
 
 // Phone photos are often 4000px and several MB: draw them at most 1600px on a side as JPEG.
 // GIFs stay as they are so they keep moving; PNGs with see-through parts stay PNG.
-async function shrink(file) {
+async function shrink(file, maxSide = MAX_SIDE) {
   if (file.type === 'image/gif') return readAsDataUrl(file);
   const bitmap = await createImageBitmap(file).catch(() => null);
   if (!bitmap) throw new Error("That photo couldn't be read. Try a JPEG or PNG.");
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
   if (scale === 1 && file.size < 900 * 1024 && /^image\/(jpeg|png|webp)$/.test(file.type)) {
     bitmap.close?.();
     return readAsDataUrl(file);
@@ -60,4 +61,15 @@ export async function uploadCardImage(file) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.url) throw new Error(data.detail || "The photo didn't upload. Try again.");
   return data.url;
+}
+
+// A screenshot or photo for feedback: a little larger (text stays readable), stored privately.
+// Returns its storage path.
+export async function uploadFeedbackImage(file) {
+  if (!file?.type?.startsWith('image/')) throw new Error('Choose a screenshot or photo.');
+  const image = await shrink(file, SCREENSHOT_SIDE);
+  const response = await fetch('/api/feedback-attachment', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ image }) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.path) throw new Error(data.detail || "The screenshot didn't upload. Try again.");
+  return data.path;
 }

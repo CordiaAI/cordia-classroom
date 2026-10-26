@@ -189,6 +189,13 @@ export default function LecturePage() {
           : <button type="button" className="c-btn c-btn--primary" onClick={makeGuide} disabled={making}><Sparkles {...ICON} />{making ? 'Building…' : 'Make study guide'}</button>}
       </div>
 
+      {String(analysis.my_notes || '').trim() && (
+        <section className="c-card lecture-card" aria-labelledby="lecture-mine">
+          <h2 id="lecture-mine" className="c-section-title">Your notes</h2>
+          <div className="c-study lecture-mine">{analysis.my_notes}</div>
+        </section>
+      )}
+
       {analysis.summary?.length > 0 && (
         <section className="c-card lecture-card" aria-labelledby="lecture-summary">
           <h2 id="lecture-summary" className="c-section-title">Summary</h2>
@@ -337,6 +344,7 @@ export default function LecturePage() {
         .lecture-card { display: grid; gap: 16px; padding: 20px; }
         .lecture-card :global(.c-section-title) { margin: 0; }
         .lecture-points { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+        .lecture-mine { white-space: pre-wrap; }
         .lecture-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
         .lecture-item { display: grid; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid var(--hairline); }
         .lecture-item:last-child { padding-bottom: 0; border-bottom: 0; }

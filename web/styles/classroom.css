@@ -11,8 +11,10 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .workspace-skip-link:focus { width: auto; height: auto; padding: 12px 20px; clip-path: none; }
 .app-shell { background: transparent; }
 .main-content { width: auto; max-width: none; margin: 0 0 0 calc(var(--workspace-rail-width) + 38px); padding: 36px 30px 60px; background: transparent; transition: margin-left var(--motion-smooth), padding-right var(--motion-smooth); }
-.workspace-route { min-width: 0; animation: window-reveal 300ms cubic-bezier(.2,.8,.2,1) both; }
-@keyframes window-reveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+/* "backwards", not "both": a transform kept after the animation makes the page the containing
+   block for position: fixed, so toasts and overlays inside a page landed mid-page. */
+.workspace-route { min-width: 0; animation: window-reveal 300ms cubic-bezier(.2,.8,.2,1) backwards; }
+@keyframes window-reveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes pane-reveal { from { opacity: 0; transform: translateY(10px) scale(.995); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .top-navigation { height: 82px; margin: 0 28px; padding: 0 24px; gap: 32px; background: var(--glass-shell); border: 1px solid var(--glass-edge); border-top: 0; border-radius:0 0 20px 20px; box-shadow: var(--shadow-sm); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
 .top-navigation-brand { gap: 12px; font-weight:500; }

@@ -18,6 +18,7 @@ import AppSetup from '../components/AppSetup';
 import CanvasConnectButton from '../components/CanvasConnectButton';
 import DoneCheck from '../components/DoneCheck';
 import AssignmentSheet from '../components/AssignmentSheet';
+import CourseWork from '../components/CourseWork';
 import { acceptChange, buildExamReview, buildReview, dismissAlert, getAlerts } from '../lib/studyPlans';
 import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
@@ -144,6 +145,14 @@ export default function Today() {
 
   useEffect(() => { if (ready && !legacy) walkthroughEvent('today-opened'); }, [ready, legacy]);
 
+  // Course work (upcoming / missing / completed this term) loads on its own so it never holds
+  // up the page; without a Canvas token the Due soon list stays.
+  const [coursework, setCoursework] = useState(null);
+  useEffect(() => {
+    if (!ready || legacy) return;
+    apiFetch('/calendar/coursework').then(result => setCoursework(result && !result.detail ? result : null)).catch(() => {});
+  }, [ready, legacy]);
+
   // Feature tips, one per session, each at its moment.
   useEffect(() => {
     if (!stats || !progress.first) return;
@@ -168,7 +177,8 @@ export default function Today() {
   // Focus and study minutes over the last 7 days, from this browser's study log.
   const activity = readActivity();
   const weekMinutes = Math.round(Array.from({ length: 7 }, (_, back) => activity[dayKey(Date.now() - back * 86400000)]?.m || 0).reduce((sum, value) => sum + value, 0));
-  const alerts = data?.alerts || [];
+  // Missing work lives in Course work's Missing tab once Canvas is connected, so it isn't repeated here.
+  const alerts = (data?.alerts || []).filter(raw => !(coursework?.connected && raw.kind === 'missing'));
   const sunday = new Date().getDay() === 0;
   // Exam prep and finished modules: gather the class's material into a review guide and open it.
   async function review(alert) {
@@ -258,6 +268,14 @@ export default function Today() {
         </section>
       )}
 
+      {coursework?.connected ? (
+        <CourseWork data={coursework} onPlan={setPlanning}
+          extraUpcoming={(data?.lectureItems || []).filter(item => !item.done && new Date(item.due_at).getTime() >= Date.now() - 86400000)}
+          actions={<>
+            <Link href="/week" className={'c-btn ' + (sunday ? 'c-btn--secondary' : 'c-btn--quiet')}>Plan your week</Link>
+            <Link href="/canvas?tab=calendar" className="c-btn c-btn--quiet today-see-calendar">See calendar</Link>
+          </>} />
+      ) : (
       <section className="c-section" aria-labelledby="due-title">
         <div className="c-row">
           <h2 id="due-title" className="c-section-title">Due soon</h2>
@@ -287,6 +305,7 @@ export default function Today() {
           <CanvasConnectButton card className="c-btn c-btn--secondary" spot="canvas-connect" />
         )}
       </section>
+      )}
 
       <Link href="/progress" className="c-card today-progress" aria-label="Your progress" data-tip="insights" data-spot="insights" onClick={() => walkthroughEvent('insights-opened')}>
         {streakInfo && (

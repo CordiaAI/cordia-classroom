@@ -5,7 +5,7 @@ Handles streak tracking, study session logging, and overview statistics.
 
 import json
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Header, Request
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, field_validator
@@ -293,6 +293,99 @@ def get_overview(authorization: str = Header(default="")):
     except Exception:
         logger.warning("Returning partial overview after database error", exc_info=True)
     return overview
+
+
+ACTIVITY_DAYS = 371  # A year of whole weeks for the year grid.
+SESSION_KINDS = ("read", "flashcard", "quiz", "timer", "browse")
+
+
+def _local_dt(ts, tz_offset: int):
+    """A stored UTC timestamp as the student's local wall-clock time (naive), or None."""
+    try:
+        moment = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if moment.tzinfo is not None:
+        moment = moment.astimezone(timezone.utc).replace(tzinfo=None)
+    return moment + timedelta(minutes=tz_offset)
+
+
+def build_activity(sessions: list, attempts: list, guides: dict, folders: dict, today: date, tz_offset: int = 0) -> dict:
+    """Charts for Progress, from the server's study log (study_sessions and quiz_attempts).
+
+    - days: every day with study in the last ACTIVITY_DAYS, {date, minutes, sessions, cards}
+    - recent: the last 30 days, one entry per day (zeros included), oldest first
+    - by_kind: minutes per kind of session over the last 30 days
+    - hours: minutes per local hour of day over the last 90 days (24 numbers)
+    - classes: minutes per class over the last 30 days, most first
+    - quizzes: the last 20 quiz scores, oldest first, {date, score, title}
+    """
+    days: dict = {}
+    by_kind = {kind: 0.0 for kind in SESSION_KINDS}
+    hours = [0.0] * 24
+    by_folder: dict = {}
+    month_start, quarter_start = today - timedelta(days=29), today - timedelta(days=89)
+    for row in sessions:
+        local = _local_dt(row.get("started_at"), tz_offset)
+        if local is None:
+            continue
+        day = local.date()
+        minutes = max(0, int(row.get("duration_seconds") or 0)) / 60
+        meta = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+        cards = meta.get("cards_studied") if isinstance(meta.get("cards_studied"), int) else 0
+        entry = days.setdefault(day, {"minutes": 0.0, "sessions": 0, "cards": 0})
+        entry["minutes"] += minutes
+        entry["sessions"] += 1
+        entry["cards"] += max(0, cards)
+        if day >= quarter_start:
+            hours[local.hour] += minutes
+        if day >= month_start:
+            kind = row.get("session_type") if row.get("session_type") in by_kind else "browse"
+            by_kind[kind] += minutes
+            folder = (guides.get(row.get("guide_id")) or {}).get("folder_id")
+            if folder in folders:
+                by_folder[folder] = by_folder.get(folder, 0.0) + minutes
+    quizzes = []
+    for row in sorted(attempts, key=lambda a: str(a.get("completed_at") or ""))[-20:]:
+        local = _local_dt(row.get("completed_at"), tz_offset)
+        if local is None or not isinstance(row.get("score"), (int, float)):
+            continue
+        quizzes.append({"date": str(local.date()), "score": round(row["score"]),
+                        "title": (guides.get(row.get("guide_id")) or {}).get("title") or "Quiz"})
+    recent = []
+    for back in range(29, -1, -1):
+        day = today - timedelta(days=back)
+        entry = days.get(day, {})
+        recent.append({"date": str(day), "minutes": round(entry.get("minutes", 0)), "cards": entry.get("cards", 0)})
+    return {
+        "days": [{"date": str(day), "minutes": round(e["minutes"]), "sessions": e["sessions"], "cards": e["cards"]}
+                 for day, e in sorted(days.items()) if day > today - timedelta(days=ACTIVITY_DAYS)],
+        "recent": recent,
+        "by_kind": {kind: round(value) for kind, value in by_kind.items()},
+        "hours": [round(value) for value in hours],
+        "classes": sorted(({"id": fid, "name": folders[fid], "minutes": round(m)} for fid, m in by_folder.items() if round(m) > 0),
+                          key=lambda c: -c["minutes"])[:6],
+        "quizzes": quizzes,
+    }
+
+
+@router.get("/activity")
+def get_activity(authorization: str = Header(default=""), tz_offset: int = 0):
+    """Study time, scores and habits for the Progress charts, in the student's local days."""
+    tz_offset = max(-720, min(840, tz_offset))
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+    today = (datetime.utcnow() + timedelta(minutes=tz_offset)).date()
+    since = (datetime.utcnow() - timedelta(days=ACTIVITY_DAYS + 1)).isoformat()
+    sessions = supabase.table("study_sessions").select("started_at, duration_seconds, session_type, guide_id, metadata") \
+        .eq("user_id", user_id).gte("started_at", since).order("started_at", desc=True).limit(5000).execute().data or []
+    attempts = supabase.table("quiz_attempts").select("guide_id, score, completed_at").eq("user_id", user_id) \
+        .order("completed_at", desc=True).limit(20).execute().data or []
+    guides = {row["id"]: row for row in (supabase.table("study_guides").select("id, title, folder_id")
+                                         .eq("user_id", user_id).limit(1000).execute().data or [])}
+    folders = {row["id"]: row.get("name") or "Class" for row in (supabase.table("folders").select("id, name")
+                                                                 .eq("user_id", user_id).execute().data or [])}
+    return build_activity(sessions, attempts, guides, folders, today, tz_offset)
 
 
 @router.get("/insights")

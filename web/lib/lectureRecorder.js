@@ -69,9 +69,19 @@ export async function roomVoice(stream) {
     ceiling.release.value = 0.1;
     const out = context.createMediaStreamDestination();
     source.connect(rumble).connect(lift).connect(even).connect(ceiling).connect(out);
+    // A suspended graph records silence: the browser can suspend it (tab in the background, a
+    // phone call on iOS), so it's woken whenever its state changes or the tab comes back.
+    const revive = () => { if (context.state !== 'running' && context.state !== 'closed') context.resume().catch(() => {}); };
+    context.onstatechange = revive;
+    document.addEventListener('visibilitychange', revive);
     return {
       stream: out.stream,
-      release: () => { out.stream.getTracks().forEach(track => track.stop()); releaseMic(); context.close().catch(() => {}); },
+      context,
+      release: () => {
+        document.removeEventListener('visibilitychange', revive);
+        context.onstatechange = null;
+        out.stream.getTracks().forEach(track => track.stop()); releaseMic(); context.close().catch(() => {});
+      },
     };
   } catch {
     context?.close?.().catch(() => {});
@@ -79,11 +89,20 @@ export async function roomVoice(stream) {
   }
 }
 
+// Guardrails: a recording only ends when the student presses Stop. If a recorder fails, its
+// stream dies (microphone unplugged, headset switched, the system took the mic) or nothing is
+// recording when it should be, onProblem(reason) fires so the owner can reopen the microphone
+// and hand over a new stream with replaceStream(); meanwhile a fresh segment is started at once.
+const WATCHDOG_MS = 2000;
+
 export class ChunkedRecorder {
   // release: closes whatever feeds `stream` (see roomVoice), after the last chunk is written.
-  constructor(stream, { mimeType = pickMimeType(), chunkMs = CHUNK_MS, firstChunkMs = FIRST_CHUNK_MS, overlapMs = OVERLAP_MS, onChunk, release } = {}) {
+  constructor(stream, { mimeType = pickMimeType(), chunkMs = CHUNK_MS, firstChunkMs = FIRST_CHUNK_MS, overlapMs = OVERLAP_MS, onChunk, release, onProblem } = {}) {
     this.stream = stream;
     this.release = release;
+    this.onProblem = onProblem;
+    this.oldReleases = [];
+    this.checkedAt = 0;
     this.mimeType = mimeType;
     this.chunkMs = chunkMs;
     this.firstChunkMs = firstChunkMs;
@@ -110,9 +129,19 @@ export class ChunkedRecorder {
     this.ticker = setInterval(() => this.tick(), 200);
   }
 
+  streamLive() {
+    return this.stream.getAudioTracks().some(track => track.readyState === 'live');
+  }
+
   startSegment() {
+    if (!this.streamLive()) { this.onProblem?.('stream'); return false; }
     const options = this.mimeType ? { mimeType: this.mimeType, audioBitsPerSecond: 48000 } : undefined;
-    const recorder = new MediaRecorder(this.stream, options);
+    let recorder;
+    try {
+      recorder = new MediaRecorder(this.stream, options);
+    } catch {
+      try { recorder = new MediaRecorder(this.stream); } catch { this.onProblem?.('recorder'); return false; }
+    }
     const segment = { seq: this.seq, startMs: this.elapsed(), recorder, parts: [], stopAt: null };
     this.seq += 1;
     recorder.ondataavailable = event => { if (event.data?.size) segment.parts.push(event.data); };
@@ -124,9 +153,52 @@ export class ChunkedRecorder {
         Promise.resolve(blob.size ? this.onChunk?.({ seq: segment.seq, startMs: segment.startMs, durationMs, blob }) : null).catch(() => {}).finally(resolve);
       };
     });
+    // A recorder that errors stops itself: what it has is still written, and a new one takes over.
+    recorder.onerror = () => {
+      if (this.stopped) return;
+      this.onProblem?.('recorder');
+      this.stopSegment(segment);
+      if (!this.paused && !this.active.some(item => item.recorder.state === 'recording')) this.startSegment();
+    };
+    try {
+      recorder.start();
+    } catch {
+      this.onProblem?.('recorder');
+      return false;
+    }
     this.pending.push(done);
-    recorder.start();
     this.active.push(segment);
+    return true;
+  }
+
+  // A new stream (the microphone reopened): the old segments stop now (their stream is gone or
+  // going), and recording carries on from the new one without a gap in the clock.
+  replaceStream(stream, release) {
+    if (this.stopped) { stream.getTracks().forEach(track => track.stop()); release?.(); return; }
+    const old = [...this.active];
+    if (this.release) this.oldReleases.push(this.release);
+    this.stream = stream;
+    this.release = release;
+    if (!this.paused) this.startSegment();
+    old.forEach(segment => this.stopSegment(segment));
+    if (this.paused) {
+      // Paused: the next segment starts on resume.
+      this.needsSegment = true;
+    }
+  }
+
+  // Something should be recording but isn't (a recorder went inactive, or the stream died).
+  watchdog() {
+    if (this.paused || this.stopped) return;
+    const now = Date.now();
+    if (now - this.checkedAt < WATCHDOG_MS) return;
+    this.checkedAt = now;
+    if (!this.streamLive()) { this.onProblem?.('stream'); return; }
+    if (!this.active.some(segment => segment.recorder.state === 'recording')) {
+      this.onProblem?.('stalled');
+      this.active.filter(segment => segment.recorder.state === 'inactive').forEach(segment => this.stopSegment(segment));
+      this.startSegment();
+    }
   }
 
   // Runs on the clock that pauses: rotate to a new recorder, then stop the old one after the overlap.
@@ -134,11 +206,12 @@ export class ChunkedRecorder {
     if (this.paused || this.stopped) return;
     const now = this.elapsed();
     if (now >= this.nextAt) {
-      const previous = this.active[this.active.length - 1];
-      if (previous) previous.stopAt = now + this.overlapMs;
-      this.startSegment();
       this.nextAt += this.chunkMs - this.overlapMs;
+      const previous = this.active[this.active.length - 1];
+      // Only hand over when the new recorder really started; otherwise the old one keeps going.
+      if (this.startSegment() && previous) previous.stopAt = now + this.overlapMs;
     }
+    this.watchdog();
     for (const segment of [...this.active]) {
       if (segment.stopAt !== null && now >= segment.stopAt) this.stopSegment(segment);
     }
@@ -162,6 +235,7 @@ export class ChunkedRecorder {
     this.paused = false;
     this.resumedAt = Date.now();
     this.active.forEach(segment => { if (segment.recorder.state === 'paused') segment.recorder.resume(); });
+    if (this.needsSegment) { this.needsSegment = false; this.startSegment(); }
   }
 
   async stop() {
@@ -174,6 +248,8 @@ export class ChunkedRecorder {
     await Promise.all(this.pending);
     this.stream.getTracks().forEach(track => track.stop());
     this.release?.();
+    this.oldReleases.forEach(release => release());
+    this.oldReleases = [];
   }
 }
 
