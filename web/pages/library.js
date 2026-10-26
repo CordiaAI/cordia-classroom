@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { LoadingArea, Reveal, useLoadGate } from '../components/CordiaLoader';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowUpDown, ArrowUpRight, AudioLines, BookOpen, ChevronDown, FolderInput, FolderPlus, Layers, Mic, NotebookPen, Pencil, Plus, Search, Star, Trash2, X,
+  ArrowUpDown, ArrowUpRight, AudioLines, BookOpen, ChevronDown, FolderInput, FolderPlus, Layers, Mic, NotebookPen, Pencil, PencilRuler, Plus, Search, Star, Trash2, Upload, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
@@ -19,6 +19,7 @@ import LectureList from '../components/LectureList';
 import { openNewSheet } from '../lib/newSheet';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { classLabel } from '../lib/classLabel';
+import { PRACTICE_FILES, handOffUpload, readPracticeFile } from '../lib/practiceUpload';
 
 const SORTS = [
   { key: 'recent', label: 'Newest' },
@@ -32,11 +33,12 @@ const FILTERS = [
   { key: 'guides', label: 'Guides' },
   { key: 'lectures', label: 'Lectures' },
   { key: 'flashcards', label: 'Flashcards' },
+  { key: 'practice', label: 'Practice' },
   { key: 'starred', label: 'Starred' },
 ];
 // Notes live in guides now, so old Notes links show them all.
 const TAB_ALIASES = { cards: 'flashcards', classes: 'all', notes: 'all' };
-const ICONS = { guide: BookOpen, note: NotebookPen, lecture: AudioLines };
+const ICONS = { guide: BookOpen, note: NotebookPen, lecture: AudioLines, practice: PencilRuler };
 
 function shortDate(value) {
   const date = new Date(value || '');
@@ -74,6 +76,22 @@ export default function LibraryPage() {
   const [toast, setToast] = useState('');
   const [confirm, setConfirm] = useState(null);
   const { pending, remove, undo } = useUndoDelete();
+  // Practice from a file that isn't in Library: read it here, then open the workspace on it.
+  const practiceFileRef = useRef(null);
+  const [readingFile, setReadingFile] = useState(false);
+  async function practiceFromFile(file) {
+    if (!file) return;
+    setReadingFile(true);
+    try {
+      handOffUpload(await readPracticeFile(file));
+      router.push('/practice');
+    } catch (error) {
+      setToast(error.message || 'This file could not be read.');
+    } finally {
+      setReadingFile(false);
+      if (practiceFileRef.current) practiceFileRef.current.value = '';
+    }
+  }
 
   useEffect(() => {
     try {
@@ -213,6 +231,9 @@ export default function LibraryPage() {
     if (['all', 'guides', 'starred'].includes(filter)) {
       guides.forEach(guide => rows.push({ kind: 'guide', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/guide/' + guide.id, progress: guide.read_progress, starred: Boolean(guide.is_bookmarked), guide }));
     }
+    if (filter === 'practice') {
+      guides.forEach(guide => rows.push({ kind: 'practice', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/practice/' + guide.id }));
+    }
     if (filter === 'flashcards') {
       (cardSets || []).forEach(guide => rows.push({ kind: 'cards', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/flashcards/study?guideId=' + guide.id, due: dueCount(cardsById.get(guide.id)), total: guide.flashcards.length }));
     }
@@ -292,11 +313,12 @@ export default function LibraryPage() {
           <Link href={item.href} className="lib-row-link">
             <span className="lib-row-title c-truncate">{item.title}</span>
             <span className="c-meta">
-              {item.kind === 'cards' ? (item.due ? `${item.due} due` : `${item.total} cards`) : [item.kind === 'note' ? 'Note' : item.kind === 'lecture' ? 'Lecture' : '', shortDate(item.date)].filter(Boolean).join(' · ')}
+              {item.kind === 'cards' ? (item.due ? `${item.due} due` : `${item.total} cards`) : [item.kind === 'note' ? 'Note' : item.kind === 'lecture' ? 'Lecture' : item.kind === 'practice' ? 'Problems with worked answers' : '', shortDate(item.date)].filter(Boolean).join(' · ')}
             </span>
           </Link>
         )}
         {item.kind === 'cards' && <Link href={item.href} className="c-btn c-btn--secondary">Study</Link>}
+        {item.kind === 'practice' && <Link href={item.href} className="c-btn c-btn--secondary" onClick={() => walkthroughEvent('practice-guide')}>Practice</Link>}
         {item.kind === 'guide' && (
           <button type="button" className={'c-icon-btn lib-star' + (item.starred ? ' is-on' : '')} onClick={() => toggleStar(item.guide)} aria-pressed={item.starred} aria-label={item.starred ? 'Unstar' : 'Star'}>
             <Star size={20} strokeWidth={1.75} aria-hidden="true" fill={item.starred ? 'currentColor' : 'none'} />
@@ -359,6 +381,11 @@ export default function LibraryPage() {
       ? <button type="button" className="c-btn c-btn--primary" data-spot="record-lecture" onClick={() => { walkthroughEvent('record-opened'); openNewSheet('record'); }}><Mic size={20} strokeWidth={1.75} aria-hidden="true" />Record lecture</button>
       : filter === 'flashcards'
         ? <button type="button" className="c-btn c-btn--primary" onClick={() => router.push('/create')}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />Make cards</button>
+      : filter === 'practice'
+        ? <>
+            <input ref={practiceFileRef} type="file" hidden accept={PRACTICE_FILES} onChange={event => practiceFromFile(event.target.files?.[0])} />
+            <button type="button" className="c-btn c-btn--primary" disabled={readingFile} onClick={() => practiceFileRef.current?.click()}><Upload size={20} strokeWidth={1.75} aria-hidden="true" />{readingFile ? 'Reading…' : 'Practice from a file'}</button>
+          </>
         : <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet()}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />New</button>;
 
   if (gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate} label="Loading Library" />;
@@ -405,7 +432,7 @@ export default function LibraryPage() {
       {addingLecture && <LectureList folders={folders} adding onAddingChange={setAddingLecture} showList={false} />}
 
       {loading || (filter === 'flashcards' && !cardSets) ? null : (
-        <div className="c-stack">
+        <div className="c-stack" data-spot={filter === 'practice' ? 'practice-picker' : undefined}>
           {groups.map(entry => group({ id: entry.folder.id, name: entry.folder.name, list: entry.list, folder: entry.folder }))}
           {looseClasses.map(item => (
             <Link key={item.id} href={'/class/' + item.id} className="c-card lib-loose">

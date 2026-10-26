@@ -63,7 +63,7 @@ function MakeOptions({ onGo }) {
   const items = [
     { label: 'Quiz', icon: Brain, href: guide ? `/quiz/${guide.id}` : '/library' },
     { label: 'Flashcards', icon: Layers, href: '/create' },
-    { label: 'Practice', icon: PencilRuler, href: '/practice' },
+    { label: 'Practice', icon: PencilRuler, href: '/library?tab=practice' },
     { label: 'Note', icon: NotebookPen, href: '/smartnotes?id=new', event: 'note-created', spot: 'new-note' },
   ];
   return (

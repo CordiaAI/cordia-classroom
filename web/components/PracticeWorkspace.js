@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { cssVar } from '../lib/cssVar';
 import { useRouter } from 'next/router';
-import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
+import { apiErrorMessage, apiFetch } from '../lib/api';
+import { PRACTICE_FILES, readPracticeFile, takeUpload } from '../lib/practiceUpload';
 import { useRequireAuth } from '../lib/auth';
-import { LoadingArea, SectionLoader } from './CordiaLoader';
-import Link from 'next/link';
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, Eraser, Eye, Flag, Hand, MessageCircle, PenLine, PencilRuler, RefreshCw, Sparkles, Trash2, Type, Undo2, Upload, Video, VideoOff, Wand2 } from 'lucide-react';
+import { LoadingArea } from './CordiaLoader';
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, Eraser, Eye, Flag, Hand, MessageCircle, PenLine, RefreshCw, Sparkles, Trash2, Type, Undo2, Upload, Video, VideoOff, Wand2 } from 'lucide-react';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { drawLatestSegment, drawStroke, farEnough, finishStroke } from '../lib/airDraw.mjs';
 import AirDraw from './AirDraw';
@@ -13,7 +13,6 @@ import AirDraw from './AirDraw';
 // Drawing in the air with the webcam is off on the live site until it tracks well enough.
 const WEBCAM_DRAWING = false;
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const SYMBOLS = ['+', '−', '×', '÷', '=', '√', 'π', 'Σ', '→'];
 const drawingsKey = guideId => `practiceDrawings:${guideId}`;
 // Pen colours (tokens in styles/tokens.css, light and dark versions).
@@ -39,7 +38,8 @@ function readableText(value) {
     .trim();
 }
 
-// The Practice tab. /practice opens it with no guide chosen; /practice/{guideId} opens a guide.
+// Practice: /practice/{guideId} works from a guide. /practice works from a file picked in
+// Library › Practice (handed over in sessionStorage); without one it goes back to that filter.
 export default function PracticeWorkspace() {
   const router = useRouter();
   const guideId = router.query.guideId || null;
@@ -69,7 +69,6 @@ export default function PracticeWorkspace() {
   const [loading, setLoading] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
-  const [guideOptions, setGuideOptions] = useState(null);
   // Drawing: every stroke (mouse, touch or hand) is kept per problem so Undo goes stroke by stroke.
   // Per-frame data lives in refs; only the toolbar uses state.
   const strokes = useRef([]);
@@ -87,9 +86,11 @@ export default function PracticeWorkspace() {
   const hasMaterial = Boolean(guide || upload);
 
   useEffect(() => {
-    if (!ready) return;
-    apiFetch('/guides?fields=summary&limit=500').then(data => setGuideOptions(Array.isArray(data?.guides) ? data.guides : []));
-  }, [ready]);
+    if (!ready || !router.isReady || guideId) return;
+    const handed = takeUpload();
+    if (handed) setUpload(handed);
+    else router.replace('/library?tab=practice');
+  }, [ready, router.isReady, guideId]);
 
   useEffect(() => {
     if (!ready || !guideId) return;
@@ -211,17 +212,8 @@ export default function PracticeWorkspace() {
     if (!file) return;
     setExtracting(true);
     setError('');
-    const form = new FormData();
-    form.append('file', file);
     try {
-      const response = await fetch(API + '/extract-file-text', {
-        method: 'POST',
-        headers: authOnlyHeaders(),
-        body: form,
-      });
-      const data = await responseJson(response);
-      if (!response.ok || !data?.text) throw new Error(apiErrorMessage(data?.detail, 'This file could not be read.'));
-      setUpload({ title: file.name, content: data.text });
+      setUpload(await readPracticeFile(file));
       setProblems([]);
       setPracticeInfo(null);
       setProblemIndex(0);
@@ -503,50 +495,19 @@ export default function PracticeWorkspace() {
 
   const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 
-  // Pick a guide first; the workspace appears only once there is material.
-  if (!guideId && !upload) {
-    return (
-      <div className="c-page practice-pick">
-        <header className="c-page-head">
-          <h1 className="c-title">Practice</h1>
-          <input ref={fileRef} type="file" hidden accept=".pdf,.docx,.pptx,.txt" onChange={event => useUploadedFile(event.target.files?.[0])} />
-          <button type="button" className="c-btn c-btn--secondary" onClick={() => fileRef.current?.click()} disabled={extracting}><Upload {...ICON} />{extracting ? 'Reading…' : 'Upload'}</button>
-        </header>
-        {error && <div className="retain-action-error" role="alert">{error}</div>}
-        {!guideOptions ? (
-          <SectionLoader height={240} label="Loading guides" />
-        ) : guideOptions.length ? (
-          <div className="practice-grid practice-guide-picker" data-spot="practice-picker">
-            {guideOptions.map(option => (
-              <Link key={option.id} href={'/practice/' + option.id} className="c-card practice-guide" onClick={() => walkthroughEvent('practice-guide')}>
-                <PencilRuler size={24} strokeWidth={1.75} aria-hidden="true" />
-                <span>{option.title || 'Untitled guide'}</span>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="c-empty"><button type="button" className="c-btn c-btn--primary" onClick={() => router.push('/create')}>Create guide or upload file</button></div>
-        )}
-        <style jsx>{`
-          .practice-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-          :global(.practice-guide) { display: grid; align-content: space-between; gap: 16px; min-height: 112px; padding: 18px; color: var(--ink); text-decoration: none; font:600 17px/1.15 var(--font-display); }
-          :global(.practice-guide:hover) { text-decoration: none; border-color: var(--olive); }
-          :global(.practice-guide .lucide) { color: var(--olive-ink); }
-        `}</style>
-      </div>
-    );
-  }
+  // Guides are picked in Library › Practice; this page only opens with material.
+  if (!guideId && !upload) return <LoadingArea label="Opening Practice" />;
 
   return (
     <div className="practice-page">
       <header className="c-page-head practice-head">
         <div className="c-row practice-title-row">
-          <button type="button" className="c-icon-btn" onClick={() => router.push(guideId ? '/guide/' + guideId : '/practice')} aria-label="Back"><ArrowLeft {...ICON} /></button>
+          <button type="button" className="c-icon-btn" onClick={() => router.push(guideId ? '/guide/' + guideId : '/library?tab=practice')} aria-label="Back"><ArrowLeft {...ICON} /></button>
           <h1 className="c-title">Practice</h1>
           <span className="c-section-title c-truncate practice-source-name">{sourceTitle}</span>
         </div>
         <div className="c-row">
-          <input ref={fileRef} type="file" hidden accept=".pdf,.docx,.pptx,.txt" onChange={event => useUploadedFile(event.target.files?.[0])} />
+          <input ref={fileRef} type="file" hidden accept={PRACTICE_FILES} onChange={event => useUploadedFile(event.target.files?.[0])} />
           <button type="button" className="c-btn c-btn--quiet" onClick={() => fileRef.current?.click()} disabled={extracting}><Upload {...ICON} />{extracting ? 'Reading…' : 'Upload'}</button>
           <button type="button" className={'c-btn ' + (problems.length ? 'c-btn--secondary' : 'c-btn--primary')} onClick={generateProblems} disabled={loading || !sourceText}>
             {problems.length ? <RefreshCw {...ICON} /> : <Sparkles {...ICON} />}

@@ -52,7 +52,11 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
   background: var(--olive-tint) !important; border-color: transparent !important; color: var(--olive-ink) !important; box-shadow: none !important;
 }
 :is(.c-nav a, .c-tabbar a, .c-pill)[aria-current='page'] .lucide { color: var(--olive-ink) !important; }
-.c-chip[aria-pressed='true'], .c-seg [aria-selected='true'], .c-seg .is-active { background: var(--surface-raised) !important; border-color: var(--hairline) !important; color: var(--ink) !important; }
+.c-seg [aria-selected='true'], .c-seg .is-active { background: var(--surface-raised) !important; border-color: var(--hairline) !important; color: var(--ink) !important; }
+/* The filter you're on (Library's Flashcards, Practice...): tinted olive with an olive edge, so it
+   reads at a glance without becoming a primary button. */
+.c-chip[aria-pressed='true'] { background: var(--lg-sheen), var(--olive-tint) !important; border-color: var(--olive) !important; color: var(--olive-ink) !important; font-weight: 600; box-shadow: var(--lg-highlight) !important; }
+.c-chip[aria-pressed='true'] .lucide { color: var(--olive-ink) !important; }
 /* Chips: glass with muted text; only "Exam" carries a small olive dot. */
 .c-chip, .calendar-kind, [data-theme='dark'] .calendar-kind, [data-theme='dark'] .calendar-kind-exam, [data-theme='dark'] .calendar-kind-quiz, [data-theme='dark'] .calendar-kind-project,
 .calendar-kind-exam, .calendar-kind-quiz, .calendar-kind-project {
