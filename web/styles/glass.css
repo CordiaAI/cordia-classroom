@@ -79,6 +79,30 @@ select.c-select.c-select {
 .c-toast { color: var(--ink); }
 .c-toast .c-btn--quiet { color: var(--olive-ink); }
 
+/* Toasts: a raised pane of glass that rises in, centered over the page. The window's center sat
+   to the left of the content (the sidebar takes the left), and the padding was lopsided, so a
+   plain "Saved" looked off-center even inside its own pill. */
+.c-toast {
+  min-height: 48px; padding: 0 24px; justify-content: center; text-align: center;
+  max-width: min(560px, calc(100vw - 32px));
+  /* Near-solid and frosted, so text scrolling under it never shows through. */
+  background: var(--lg-sheen), var(--surface-raised) !important;
+  border: 1px solid var(--lg-edge);
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+  animation: c-toast-in 260ms cubic-bezier(.2, .8, .2, 1) both;
+}
+/* With an action (Undo), the button sits snug against the right edge. */
+.c-toast:has(> button, > a) { padding-right: 6px; gap: 4px; }
+/* Undo reads as the toast's action, not a second button stacked on it. */
+.c-toast > .c-btn--quiet { background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: var(--olive-ink); font-weight: 600; }
+.c-toast > .c-btn--quiet:hover { background: var(--olive-tint) !important; }
+@keyframes c-toast-in { from { opacity: 0; transform: translate(-50%, 12px) scale(.98); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (min-width: 768px) {
+  :root:has(.app-shell:not(.is-focus) .c-side) .c-toast { left: calc(50% + (var(--side-w) + var(--side-gap)) / 2); }
+}
+@media (prefers-reduced-motion: reduce) { .c-toast { animation: none; } }
+
 /* The Tutor bubble: a round pane in the bottom-right corner, label on hover. */
 .c-tutor-bubble {
   position: fixed; right: 24px; bottom: 24px; z-index: 95;

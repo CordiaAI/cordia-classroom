@@ -144,7 +144,7 @@ export default function UpgradeModal() {
   return (
     <>
       {toast && (
-        <div className="upgrade-toast" role="status" onClick={() => setToast('')}>{toast}</div>
+        <div className="c-toast upgrade-toast" role="status" onClick={() => setToast('')}>{toast}</div>
       )}
       {open && (
         <div className="upgrade-overlay" onClick={close}>
@@ -224,7 +224,7 @@ export default function UpgradeModal() {
         .upgrade-error { color: var(--error); margin-bottom: 10px; }
         .upgrade-fineprint { margin: 10px 0 0; font-size: 13px; color: var(--muted); text-align: center; }
         .upgrade-free { margin-top: 12px; font-size:15px; }
-        .upgrade-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2100; background: var(--ink); color: var(--canvas); padding: 12px 18px; border-radius:12px; max-width: 90vw; cursor: pointer; }
+        .upgrade-toast { z-index: 2100; cursor: pointer; }
       `}</style>
     </>
   );
