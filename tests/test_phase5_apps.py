@@ -218,7 +218,7 @@ class Slack(AppTest):
 
     def test_watch_sorts_posts_into_date_changes_and_announcements(self):
         slack_sync.set_watched(USER, [{"id": "C0123456", "name": "bio-101"}])
-        ts = NOW.timestamp()
+        ts = float(self.stats("slack")["cursor"]["C0123456"])  # Posts after watching started.
         self.answers["SLACK_FETCH_CONVERSATION_HISTORY"] = {"messages": [
             {"ts": f"{ts + 3:.6f}", "text": "The midterm is moved to Thursday, Nov 6 at 2pm"},
             {"ts": f"{ts + 2:.6f}", "text": "<!channel> Lab reports are due Friday"},
