@@ -115,8 +115,12 @@ export function deadlineCourse(item) {
   return item?.course || String(item?.title || '').match(SECTION_CODE)?.[1] || '';
 }
 
-// Only web links and the app's own pages become hrefs; anything else (javascript:, data:) falls back.
+// Only https links and the app's own pages become hrefs; anything else (javascript:, data:, http:)
+// falls back. The href is rebuilt behind a fixed scheme or "/", so no stored value can choose it.
 export function safeHref(url, fallback) {
   const value = String(url || '');
-  return /^https?:\/\//i.test(value) || /^\/(?!\/)/.test(value) ? value : fallback;
+  const web = /^https:\/\/(\S+)$/i.exec(value);
+  if (web) return 'https://' + web[1];
+  const page = /^\/(?!\/)(\S*)$/.exec(value);
+  return page ? '/' + page[1] : fallback;
 }

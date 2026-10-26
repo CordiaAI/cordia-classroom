@@ -16,5 +16,6 @@ test('only web links and app pages become deadline hrefs', async () => {
   assert.equal(safeHref('/lecture/1', '/c'), '/lecture/1');
   assert.equal(safeHref('javascript:alert(1)', '/c'), '/c');
   assert.equal(safeHref('//evil.example', '/c'), '/c');
+  assert.equal(safeHref('http://plain.example', '/c'), '/c');
   assert.equal(safeHref('', '/c'), '/c');
 });
