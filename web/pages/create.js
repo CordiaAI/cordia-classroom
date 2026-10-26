@@ -239,6 +239,7 @@ export default function CreateGuidePage() {
         method: editId ? 'PATCH' : 'POST',
         body: JSON.stringify({
           title: title.trim() || 'Custom Study Guide',
+          keep_title: Boolean(title.trim()),
           study_guide: pairsToGuide(completePairs),
           flashcards: pairsToCards(completePairs),
           ...(selectedFolder ? { folder_id: selectedFolder } : {}),
@@ -270,7 +271,7 @@ export default function CreateGuidePage() {
   }
 
   // Queues one guide in the background; the student can keep working or leave the page.
-  function queueGuide(items, { includeManual, guideTitle }) {
+  function queueGuide(items, { includeManual, guideTitle, keepTitle = Boolean(guideTitle) }) {
     const source = combinedSource(items);
     const pasted = items.every(item => item.key === PASTED_KEY);
     const jobTitle = guideTitle || items.map(item => baseName(item.name)).join(' + ').slice(0, 120);
@@ -281,6 +282,7 @@ export default function CreateGuidePage() {
         source,
         requestId,
         title: jobTitle,
+        keepTitle,
         sourceTitle: items.map(item => item.name).join(', ').slice(0, 300),
         sourceType: pasted ? (sourceUrl ? 'webpage' : 'pasted_text') : 'file',
         sourceUrl: pasted ? sourceUrl : '',
@@ -360,8 +362,9 @@ export default function CreateGuidePage() {
     const rest = batch.items.filter(item => !batch.selected.has(item.key));
     if (combinedSource(chosen).length > MAX_SOURCE_CHARS) return;
     const allAtOnce = !rest.length && !batch.queued.length;
-    const guideTitle = allAtOnce && title.trim() ? title.trim() : chosen.map(item => baseName(item.name)).join(' + ').slice(0, 120);
-    queueGuide(chosen, { includeManual: batch.includeManual && !batch.queued.length, guideTitle });
+    const typed = allAtOnce && title.trim();
+    const guideTitle = typed ? title.trim() : chosen.map(item => baseName(item.name)).join(' + ').slice(0, 120);
+    queueGuide(chosen, { includeManual: batch.includeManual && !batch.queued.length, guideTitle, keepTitle: Boolean(typed) });
     if (!rest.length) {
       setBatch(null);
       setTitle('');
@@ -407,7 +410,7 @@ export default function CreateGuidePage() {
             <h2 className="c-section-title create-window-title">Write cards</h2>
             {!isEdit && <button type="button" className="c-btn c-btn--quiet create-import" onClick={() => setQuizletOpen(true)}><Download size={18} strokeWidth={1.75} aria-hidden="true" />Import from Quizlet</button>}
           </div>
-          <div className="create-manual-header"><span className="c-meta">{completePairs.length} cards</span><label>Size <input className="c-input" type="number" min="1" max="100" value={cardCount} onChange={event => setCardCount(event.target.value)} onBlur={() => applyCardCount(cardCount)} /></label></div>
+          <div className="create-manual-header"><span className="c-meta">{completePairs.length} cards</span><label>Card slots <input className="c-input" type="number" inputMode="numeric" min="1" max="100" placeholder={String(manualPairs.length)} value={cardCount} onChange={event => setCardCount(event.target.value)} onBlur={() => applyCardCount(cardCount)} /></label></div>
           <div className="create-cards-list">
             {manualPairs.map((pair, index) => (
               <div className="create-card" key={index}>

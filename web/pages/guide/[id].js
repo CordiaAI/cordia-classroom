@@ -632,6 +632,10 @@ export default function GuidePage() {
           .guide-meta { margin-left: 0; }
           .guide-notes { padding: 24px 18px; }
           .guide-head :global(.guide-study-now) { order: 5; width: 100%; justify-content: center; }
+          /* Phones: back and the actions share the top row; the title gets its own full-width row below. */
+          .guide-head > :first-child { margin-right: auto; }
+          .guide-title, .guide-rename { order: 4; flex: 1 1 100%; }
+          .guide-head :global(:is(.guide-title, .guide-title-btn, .guide-title-input)) { font-size: var(--fs-28) !important; overflow-wrap: break-word; hyphens: auto; }
         }
       `}</style>
     </article>

@@ -82,7 +82,7 @@ select.c-select.c-select {
 .c-tutor-bubble:hover { transform: translateY(-1px); }
 .c-tutor-bubble:active { transform: scale(.97); }
 @media (max-width: 767px) {
-  .c-tutor-bubble { right: 16px; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 14px); width: 56px; padding: 0; justify-content: center; }
+  .c-tutor-bubble { right: 12px; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px); width: 48px; height: 48px; min-width: 48px; padding: 0; justify-content: center; }
   .c-tutor-bubble-label { display: none; }
 }
 .app-shell.is-focus .c-tutor-bubble { bottom: 24px; }

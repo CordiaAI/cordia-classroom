@@ -455,7 +455,9 @@ export default function LibraryPage() {
         .library .lib-star.is-on { color: var(--olive-ink); }
         .library .lib-empty-group { padding: 8px 16px 14px; margin: 0; }
         @media (max-width: 767px) {
-          .library .lib-row-link { flex-direction: column; gap: 2px; }
+          /* Phones: the title takes the row's width and wraps to two lines instead of pushing the buttons off-screen. */
+          .library .lib-row-link { flex-direction: column; align-items: stretch; gap: 2px; }
+          .library .lib-row-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; overflow-wrap: anywhere; }
           /* Phones: "Add a class" moves up beside New, so the filters get the whole row. */
           .library .lib-add-class { display: none; }
           .library .lib-filters { margin: 0 -16px; padding: 2px 16px; }

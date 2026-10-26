@@ -5,6 +5,7 @@ import { useRequireAuth } from '../lib/auth';
 import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import AssignmentSheet from '../components/AssignmentSheet';
 import { acceptWeek, getAnnouncements, getWeek, minutesLabel } from '../lib/studyPlans';
+import { deadlineCourse, deadlineTitle } from '../lib/formatters';
 
 function dueLabel(value) {
   const date = new Date(value || '');
@@ -65,8 +66,8 @@ export default function WeekPage() {
                   <input type="checkbox" className="week-pick" checked={Boolean(picked[item.id])} aria-label={`Plan ${item.title}`}
                     onChange={event => setPicked(current => ({ ...current, [item.id]: event.target.checked }))} />
                   <span className="c-grow">
-                    <span className="week-title">{item.title}</span>
-                    <span className="c-meta">{[item.course, dueLabel(item.due_at), item.effort_minutes && `about ${minutesLabel(item.effort_minutes)}`,
+                    <span className="week-title">{deadlineTitle(item)}</span>
+                    <span className="c-meta">{[deadlineCourse(item), dueLabel(item.due_at), item.effort_minutes && `about ${minutesLabel(item.effort_minutes)}`,
                       item.scheduled_minutes ? `${minutesLabel(item.scheduled_minutes)} scheduled` : 'no study time yet'].filter(Boolean).join(' · ')}</span>
                   </span>
                   <button type="button" className="c-icon-btn" aria-label={`Steps for ${item.title}`} onClick={() => setPlanning(item)}><ListChecks size={18} strokeWidth={1.75} aria-hidden="true" /></button>

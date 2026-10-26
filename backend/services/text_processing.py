@@ -517,3 +517,61 @@ def mentions_date_change(text: str) -> bool:
     (a deadline word and a date or time). Most mail stops here."""
     sample = (text or "")[:8000]
     return bool(_CHANGE_WORDS.search(sample) and _DATE_WORDS.search(sample))
+
+
+# Titles arrive as whatever the source was called: a file name ("Nickels_UB2024_PPT_Ch01.pptx"), a
+# browser tab ("Chapter 6 Counting - CS 201 - Canvas"), or several file names joined for one guide.
+_FILE_EXT = re.compile(r"\.(?:pdf|pptx?|docx?|key|pages|rtf|txt|md|html?|odt|odp)$", re.I)
+_SITE_PARTS = re.compile(
+    r"^(?:canvas|instructure|blackboard(?: learn)?|moodle|d2l|brightspace|quizlet|wikipedia|youtube|google (?:docs|drive|slides)|"
+    r"onedrive|sharepoint|notion|pearson|mylab|mcgraw hill|connect|chegg|course ?hero|study guide)$", re.I)
+_FILE_WORDS = re.compile(
+    r"\b(?:pdf|pptx?|docx?|powerpoint|ppt slides|underlined|accessible|student version|final version|copy of|copy|v\d+)\b", re.I)
+_TERM_WORDS = re.compile(r"\b(?:fa|sp|su|wi|fall|spring|summer|winter)\s?'?(?:20)?\d{2}\b", re.I)
+_TRAILING_KIND = re.compile(r"\s*[-—–:|]?\s*(?:study guide|flashcards?|flash cards?|wikipedia|quizlet)$", re.I)
+_LABEL_WORDS = re.compile(
+    r"\b(?:chapter|ch|unit|module|mod|week|wk|lecture|lec|class|day|exam|test|quiz|midterm|final|lesson|part|section|topic|"
+    r"session|review|notes?|slides?|student|answers?|questions?|readings?|homework|pledge)\b", re.I)
+_GENERIC_TITLE = re.compile(
+    r"^(?:untitled(?: notes)?|notes|study guide|custom study guide|document|file preview|homework|reading|readings|slides?|page|lecture|"
+    r"(?:chapter|ch|unit|module|mod|week|wk|lecture|lec|class|day|exam|test|quiz|midterm|final|lesson|part|section|topic|session)"
+    r"\s*\.?\s*[\w.]{0,4}(?:\s+(?:review|notes|slides|mc|hy|student|pdf|answers|questions))*)$", re.I)
+
+
+def clean_title(raw: str) -> str:
+    """The name of the source with file and site leftovers taken off, for showing to a student."""
+    title = str(raw or "").strip()
+    if " " not in title:
+        title = re.sub(r"(?<=\w)[+_.-](?=\w)", " ", title.rsplit(".", 1)[0] if _FILE_EXT.search(title) else title)
+    title = _FILE_EXT.sub("", title).replace("_", " ")
+    title = re.sub(r"\b[a-z]+(?:-[a-z]+){2,}\b", lambda m: m.group(0).replace("-", " "), title)  # file-name-slugs
+    title = re.sub(r"\s*\(\d\)\s*|\s+0$", " ", title)  # "(1)" copies, "Manual 0"
+    if " + " in title:  # Several files in one guide: the first names it until something better does.
+        title = title.split(" + ", 1)[0]
+    # "Chapter 6 Counting - CS 201 - Canvas": drop the parts that name the site, not the material.
+    parts = [p for p in re.split(r"\s+[-|–—]\s+", title) if p.strip() and not _SITE_PARTS.match(p.strip())]
+    title = " - ".join(parts) if parts else title
+    title = _TERM_WORDS.sub(" ", _FILE_WORDS.sub(" ", title))
+    for _ in range(2):
+        stripped = _TRAILING_KIND.sub("", title).strip(" -—–:|,")
+        title = stripped if stripped else title
+    title = re.sub(r"\s+", " ", title).strip(" -—–:|,")
+    if title and title == title.lower():
+        title = title[0].upper() + title[1:]
+    return title[:120]
+
+
+def weak_title(raw: str) -> bool:
+    """True when a title doesn't say what the material is about: a generic label ("Chapter 7",
+    "Exam 2 MC"), a file name, several sources glued together, or mostly codes."""
+    raw = str(raw or "").strip()
+    title = clean_title(raw)
+    if not title or _GENERIC_TITLE.match(title) or " + " in raw or len(title) > 70:
+        return True
+    if _FILE_EXT.search(raw) or (" " not in raw and re.search(r"[_+]|\w-\w", raw)) or raw == raw.lower():
+        return True
+    # What's left once labels ("Chapter 6", "Exam 2 Review") and codes ("ACC 371", "UB2024") are taken off
+    # has to name a subject.
+    words = re.findall(r"[A-Za-z][A-Za-z'’]+", _LABEL_WORDS.sub(" ", title))
+    subject = [w for w in words if len(w) >= 3 and not (w.isupper() and len(w) <= 4)]
+    return len(subject) < 2 or len(subject) < len(title.split()) / 3

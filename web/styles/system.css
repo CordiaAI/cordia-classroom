@@ -237,7 +237,8 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
 .c-fab { display: none; }
 @media (max-width: 767px) {
   .c-topbar { grid-template-columns: 1fr auto; padding: 0 12px 0 16px; height: 56px; }
-  .c-topbar .c-nav, .c-topbar .c-new-btn { display: none; }
+  /* Phones: brand, search and account only. Feedback is in the account menu. */
+  .c-topbar .c-nav, .c-topbar .c-new-btn, .c-topbar .c-feedbackbtn { display: none; }
   .main-content, .app-shell .main-content { padding: 20px 16px calc(var(--tabbar-h) + 96px) !important; }
   .c-tabbar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;

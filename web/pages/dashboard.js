@@ -22,6 +22,7 @@ import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
 import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
 import { confirmedTodos, lectureCalendarItems, mergeCalendarItems } from '../lib/lectures';
+import { deadlineTitle } from '../lib/formatters';
 
 const SLOW = Symbol('slow');
 const SLOW_MS = 4000;
@@ -222,7 +223,7 @@ export default function Today() {
       {alerts.length > 0 && (
         <section className="c-section" aria-label="Heads up">
           <div className="c-card c-list">
-            {alerts.slice(0, 4).map(alert => (
+            {alerts.slice(0, 4).map(raw => ({ ...raw, title: deadlineTitle(raw) })).map(alert => (
               <div key={alert.id} className={'c-list-row today-alert is-' + alert.kind}>
                 <span className="c-grow">
                   <span className="today-alert-title">{ALERT_TEXT[alert.kind]?.(alert) || alert.title}</span>
@@ -263,7 +264,7 @@ export default function Today() {
             {dueItems.map(item => (
               <div key={item.id} className={'c-list-row today-due' + (doneNow[item.id] ? ' is-done' : '')}>
                 <DoneCheck id={item.id} title={item.title} done={Boolean(doneNow[item.id])} onChange={done => setDoneNow(current => ({ ...current, [item.id]: done }))} />
-                <a className="c-grow c-truncate today-due-link" href={item.url || '/canvas?tab=calendar'} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>{item.title}</a>
+                <a className="c-grow c-truncate today-due-link" href={item.url || '/canvas?tab=calendar'} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>{deadlineTitle(item)}</a>
                 <span className="c-meta">{shortDate(item.due_at)}</span>
                 {!item.internal && (
                   <button type="button" className="c-icon-btn" aria-label={`Plan ${item.title}`} title="Steps and study time" onClick={() => setPlanning(item)}>
@@ -310,6 +311,7 @@ export default function Today() {
         :global(.today-continue) { display: flex; align-items: center; gap: 16px; padding: 14px 18px; color: var(--ink); text-decoration: none; }
         :global(.today-continue:hover), :global(.today-progress:hover) { text-decoration: none; border-color: var(--olive); }
         .today-due { gap: 14px; }
+        .today-due .c-meta { flex: none; white-space: nowrap; }
         .today-due-link { color: var(--ink); text-decoration: none; }
         .today-due.is-done .today-due-link { color: var(--muted); text-decoration: line-through; }
         .today-continue-title { flex: 1 1 auto; min-width: 0; font:600 17px/1.15 var(--font-sans); }

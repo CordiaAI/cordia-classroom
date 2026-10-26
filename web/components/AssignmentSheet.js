@@ -7,6 +7,7 @@ import DraftLink from './DraftLink';
 import { SectionLoader } from './CordiaLoader';
 import { buildExamReview, getPlan, makePlan, minutesLabel, removePlan, schedulePlan, setStepDone } from '../lib/studyPlans';
 import { useRouter } from 'next/router';
+import { deadlineTitle } from '../lib/formatters';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -67,7 +68,7 @@ export default function AssignmentSheet({ item, onClose }) {
         <div className="c-sheet as-sheet" role="dialog" aria-modal="true" aria-labelledby="as-title" onClick={event => event.stopPropagation()}>
           <div className="c-sheet-head">
             <div className="as-head">
-              <h2 id="as-title" className="c-section-title">{item.title}</h2>
+              <h2 id="as-title" className="c-section-title">{deadlineTitle(item)}</h2>
               <p className="c-meta">{[item.course, item.due_at && `Due ${when(item.due_at, true)}`, data?.points != null && `${data.points} points`].filter(Boolean).join(' · ')}</p>
             </div>
             <button type="button" className="c-icon-btn" onClick={onClose} aria-label="Close"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>

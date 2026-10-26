@@ -20,6 +20,7 @@ export function feedLinkProblem(value) {
 }
 import { canvasStatus } from '../lib/canvas';
 import CanvasConnectSheet from './CanvasConnectSheet';
+import { deadlineCourse, deadlineTitle } from '../lib/formatters';
 
 const FEED_KEY = 'cordiaCanvasCalendarFeed';
 const REMINDER_KEY = 'cordiaCalendarReminders';
@@ -337,8 +338,8 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
           {agenda.length ? agenda.map(item => (
             <a key={item.id} href={item.url || undefined} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>
               <span className="compact-date">{dueLabel(item)}</span>
-              <strong>{item.title}</strong>
-              <small>{item.course || 'Canvas'}</small>
+              <strong>{deadlineTitle(item)}</strong>
+              <small>{deadlineCourse(item) || 'Canvas'}</small>
             </a>
           )) : <p>0 due</p>}
         </div>
@@ -363,8 +364,8 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
           <span className={`calendar-kind calendar-kind-${item.type}`}>{item.type}</span>
           <small>{timeLabel(item)}</small>
         </span>
-        <strong>{item.title}</strong>
-        {item.course && <small>{item.course}</small>}
+        <strong>{deadlineTitle(item)}</strong>
+        {deadlineCourse(item) && <small>{deadlineCourse(item)}</small>}
       </>
     );
     const className = `calendar-item${past ? ' calendar-item-past' : ''}${item.done ? ' calendar-item-done' : ''}`;
@@ -409,7 +410,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
                 {isToday && <em>Today</em>}
               </header>
               <div className="calendar-day-items">
-                {dayItems.length ? dayItems.map(itemCard) : <p className="calendar-day-empty" aria-label="Nothing due">–</p>}
+                {dayItems.length ? dayItems.map(itemCard) : <p className="calendar-day-empty">Nothing due</p>}
               </div>
             </section>
           );

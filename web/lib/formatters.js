@@ -104,3 +104,13 @@ export function formatDate(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
+
+// Canvas calendar feeds end every title with the section code ("Essay 2 [ENG-101-004]"). The class
+// is shown on its own line, so the title drops it; the code is kept as the class when none is known.
+const SECTION_CODE = /\s*\[([^\]]{2,80})\]\s*$/;
+export function deadlineTitle(item) {
+  return String(item?.title || '').replace(SECTION_CODE, '') || item?.title || '';
+}
+export function deadlineCourse(item) {
+  return item?.course || String(item?.title || '').match(SECTION_CODE)?.[1] || '';
+}

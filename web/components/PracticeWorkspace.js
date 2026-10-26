@@ -728,7 +728,14 @@ export default function PracticeWorkspace() {
       <style jsx>{`
         .practice-page { display: grid; gap: 20px; }
         .practice-title-row { min-width: 0; flex: 1; }
-        @media (max-width: 767px) { .practice-head { flex-wrap: wrap; } .practice-title-row { flex-basis: 100%; } }
+        @media (max-width: 767px) {
+          .practice-head { flex-wrap: wrap; }
+          .practice-page { grid-template-columns: minmax(0, 1fr); }
+          .practice-head { min-width: 0; max-width: 100%; }
+          .practice-title-row { flex-basis: 100%; flex-wrap: wrap; min-width: 0; max-width: 100%; }
+          /* Phones: the guide's name sits on one line under "Practice", not squeezed beside it. */
+          .practice-source-name { flex: 1 1 100%; min-width: 0; max-width: 100%; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-15) !important; color: var(--muted); }
+        }
         .practice-source-name { font-family: var(--font-sans); min-width: 0; }
         .practice-prompt { margin: 8px 0 0; font:600 20px/1.15 var(--font-sans); }
         .practice-kind { text-transform: capitalize; }

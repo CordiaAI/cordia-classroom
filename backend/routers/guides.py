@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from database import get_supabase
+from services.llm import guide_title
 from services.sharing import on_guide_changed
 from auth_utils import get_user_id
 from ids import is_uuid, require_uuid
@@ -27,6 +28,7 @@ class SaveGuideRequest(BaseModel):
     source_type: Optional[str] = Field(default=None, max_length=50)
     source_title: Optional[str] = Field(default=None, max_length=500)
     source_id: Optional[str] = Field(default=None, max_length=500)
+    keep_title: bool = False  # The student typed the title: save it as typed.
 
     model_config = {"str_max_length": 5_000_000}
 
@@ -110,7 +112,7 @@ def save_guide(request: SaveGuideRequest, authorization: str = Header(default=""
 
     data = {
         "user_id": user_id,
-        "title": request.title,
+        "title": guide_title(request.title, request.notes or request.study_guide or "", keep=request.keep_title),
         "notes": request.notes,
         "study_guide": request.study_guide,
         "source_url": request.source_url,
@@ -152,6 +154,7 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
     # 1. Prepare only the fields that were provided in the request
     # This converts the Pydantic model to a dict, excluding unset values
     update_data = request.model_dump(exclude_unset=True)
+    update_data.pop("keep_title", None)
     require_own_folder(supabase, user_id, update_data.get("folder_id"))
 
     # 2. Perform the update in Supabase
