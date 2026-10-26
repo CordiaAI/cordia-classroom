@@ -36,6 +36,15 @@ class FakeDB:
         return Query(self, name)
 
 
+def _value(row, key):
+    """A column, or a JSON field read with Postgres' arrow ("stats->>auto" is text, like PostgREST)."""
+    if "->>" not in key:
+        return row.get(key)
+    column, field = key.split("->>", 1)
+    value = (row.get(column) or {}).get(field)
+    return None if value is None else str(value).lower() if isinstance(value, bool) else str(value)
+
+
 class Query:
     def __init__(self, db, name):
         self.db, self.name = db, name
@@ -49,7 +58,7 @@ class Query:
         return self
 
     def eq(self, key, value):
-        self.filters.append(lambda r: r.get(key) == value)
+        self.filters.append(lambda r: _value(r, key) == value)
         return self
 
     def like(self, key, pattern):
@@ -79,7 +88,7 @@ class Query:
         return self
 
     def lte(self, key, value):
-        self.filters.append(lambda r: r.get(key) is not None and str(r.get(key)) <= str(value))
+        self.filters.append(lambda r: _value(r, key) is not None and str(_value(r, key)) <= str(value))
         return self
 
     def ilike(self, key, pattern):

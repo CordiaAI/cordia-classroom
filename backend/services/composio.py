@@ -5,6 +5,7 @@ Classroom login), so an app connected in either one is connected in both. Compos
 of what is connected; Classroom stores nothing about it.
 """
 
+import json
 import logging
 import os
 from urllib.parse import urlparse
@@ -157,7 +158,14 @@ def run(account_id: str, user_id: str, slug: str, arguments: dict) -> dict:
     if not response.ok or body.get("successful") is False:
         log.warning("composio %s failed %s %s", slug, response.status_code, str(body.get("error"))[:300])
         raise HTTPException(status_code=502, detail="The app didn't respond. Try again in a minute.")
-    return body.get("data") or {}
+    data = body.get("data") or {}
+    # A few tools hand back their result as a JSON string rather than an object.
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except ValueError:
+            data = {"text": data}
+    return data if isinstance(data, dict) else {"items": data}
 
 
 # Files Composio hands back for download live on its own storage.
