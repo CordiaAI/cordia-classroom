@@ -234,7 +234,11 @@ export default function Today() {
       )}
 
       {alerts.length > 0 && (
-        <section className="c-section" aria-label="Heads up">
+        <section className="c-section" aria-labelledby="updates-title">
+          <div className="c-row today-updates-head">
+            <h2 id="updates-title" className="c-section-title">Class updates</h2>
+            <span className="c-meta">Changes and new work from your classes and apps</span>
+          </div>
           <div className="c-card c-list">
             {alerts.slice(0, 4).map(raw => (raw.kind === 'slack_post' ? raw : { ...raw, title: deadlineTitle(raw) })).map(alert => (
               <div key={alert.id} className={'c-list-row today-alert is-' + alert.kind}>
@@ -333,6 +337,9 @@ export default function Today() {
         .today-none { margin: 0; }
         .today-alert { gap: 12px; }
         .today-alert .c-grow { display: grid; gap: 2px; min-width: 0; }
+        .today-updates-head { align-items: baseline; gap: 12px; flex-wrap: wrap; }
+        .today-updates-head .c-section-title { margin: 0; }
+        .today-updates-head .c-meta { margin: 0; }
         .today-alert-title { font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
         .today-alert.is-grade_drop .today-alert-title, .today-alert.is-missing .today-alert-title { color: var(--error); }
         .today-alert.is-date_change .today-alert-title { font-variant-numeric: tabular-nums; }

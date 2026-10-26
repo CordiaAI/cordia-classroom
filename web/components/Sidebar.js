@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { AudioLines, BookOpen, CalendarDays, CalendarRange, ChartNoAxesColumn, ChevronRight, CircleHelp, CreditCard, Folder, FolderPlus, GraduationCap, Layers, LayoutDashboard, Library, Link2, LogOut, MessageCircle, MessageSquareText, Palette, PanelLeftClose, PanelLeftOpen, PencilRuler, Plus, School, Search, Settings, User } from 'lucide-react';
+import { AudioLines, BookOpen, CalendarDays, CalendarRange, ChartNoAxesColumn, ChevronRight, CircleHelp, CreditCard, Folder, FolderPlus, GraduationCap, Layers, House, Library, Link2, LogOut, MessageCircle, Megaphone, Palette, PanelLeftClose, PanelLeftOpen, PencilRuler, Plus, School, Search, Settings, User } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -18,7 +18,7 @@ import { classLabel } from '../lib/classLabel';
 // One navigation: the same three places on the glass top bar and the mobile tab bar, plus New.
 // The Tutor is the bubble in the corner (TutorBubble); the calendar lives inside Canvas.
 const navItems = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, spot: 'nav-today' },
+  { label: 'Dashboard', href: '/dashboard', icon: House, spot: 'nav-today' },
   { label: 'Library', href: '/library', icon: Library, spot: 'nav-library' },
   { label: 'Canvas', href: '/canvas', icon: GraduationCap, spot: 'nav-canvas', tip: 'calendar' },
   // Cordia Assistant has its own page (pages/assistant.js).
@@ -187,7 +187,7 @@ export default function Sidebar({ timerState, setTimerState }) {
     { key: 'plan', label: 'Plan', icon: CreditCard, onSelect: () => router.push('/settings?section=plan') },
     { key: 'connectors', label: 'Connectors', icon: Link2, onSelect: () => router.push('/settings?section=connectors') },
     { key: 'help', label: 'Help', icon: CircleHelp, onSelect: () => setShowHelp(true) },
-    { key: 'feedback', label: 'Send feedback', icon: MessageSquareText, onSelect: () => setShowFeedback(true) },
+    { key: 'feedback', label: 'Send feedback', icon: Megaphone, onSelect: () => setShowFeedback(true) },
     { key: 'signout', label: 'Sign out', icon: LogOut, separated: true, onSelect: () => signOut() },
   ];
 
@@ -263,7 +263,7 @@ export default function Sidebar({ timerState, setTimerState }) {
             <CircleHelp size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">Help</span>
           </button>
           <button type="button" className="c-side-item" onClick={() => setShowFeedback(true)} title="Send feedback">
-            <MessageSquareText size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">Send feedback</span>
+            <Megaphone size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">Send feedback</span>
           </button>
           <button ref={sideAvatarRef} type="button" className={'c-side-item c-side-account' + (onProfile ? ' is-active' : '')} onClick={() => { setMenuFrom('side'); setMenuOpen(open => !open); }} aria-expanded={menuOpen && menuFrom === 'side'} aria-haspopup="menu" title={displayName || 'Account'}>
             <span className="c-avatar c-side-avatar" aria-hidden="true">{initials || <User size={18} strokeWidth={1.75} />}</span>

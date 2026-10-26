@@ -17,6 +17,15 @@
    scroll container with a stale strip (the selected tab looked cut off on its right). */
 .c-pills .c-pill { -webkit-backdrop-filter: none; backdrop-filter: none; }
 
+/* One frost per spot: anything already on a frosted surface doesn't blur again. It looks the
+   same (the pane under it is already blurred), and a list of rows with a blurred star, menu and
+   icon each made Chrome paint flat blocks for a moment while loading or scrolling. Popovers that
+   float over other content keep theirs. */
+:is(.c-card, .c-glass, .c-side, .c-sheet, .c-topbar, .c-tabbar) :not(.c-menu, .c-sheet, .c-toast, .c-tip, .c-tutor-bubble, .c-drop-hint) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 /* Quiet buttons and icon buttons stay lighter so rows of them don't feel heavy. */
 :is(.c-btn--quiet, .c-icon-btn) { box-shadow: var(--lg-highlight); }
 :is(.c-btn--quiet, .c-icon-btn):hover:not(:disabled) { background: var(--lg-sheen), var(--lg-fill-strong); }
