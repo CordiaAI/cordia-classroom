@@ -96,11 +96,43 @@ select.c-select.c-select {
 .c-tab-new-dot { display: grid; place-items: center; width: 36px; height: 28px; border-radius: var(--r-pill); color: var(--on-olive); }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :is(.c-btn--secondary, .c-btn--quiet, .c-icon-btn, .c-chip, .c-pill, .c-seg, .c-avatar, .c-searchbtn, .c-timerbtn, .c-tutor-bubble, .c-input, .c-select) { background: var(--card); }
+  :is(.c-btn--secondary, .c-btn--quiet, .c-icon-btn, .c-chip, .c-pill, .c-seg, .c-avatar, .c-searchbtn, .c-timerbtn, .c-tutor-bubble, .c-input, .c-select, .c-side, .c-menu.ov-select, .c-menu.reader-select) { background: var(--card) !important; }
 }
 @media (prefers-reduced-transparency: reduce) {
-  :is(.c-card, .c-btn--secondary, .c-btn--quiet, .c-icon-btn, .c-chip, .c-pill, .c-seg, .c-tutor-bubble, .c-input, .c-select, .c-sheet, .c-menu) { background: var(--surface-raised) !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  :is(.c-card, .c-btn--secondary, .c-btn--quiet, .c-icon-btn, .c-chip, .c-pill, .c-seg, .c-tutor-bubble, .c-input, .c-select, .c-sheet, .c-menu, .c-side) { background: var(--surface-raised) !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
   select.c-select.c-select { background: var(--select-chevron) no-repeat right 14px center / 16px 16px, var(--surface-raised) !important; }
+}
+
+/* The sidebar: a floating pane of frosted glass, like the cards, with the deeper float shadow. */
+@media (min-width: 768px) {
+  .c-side {
+    background: var(--lg-sheen), var(--lg-grain), var(--lg-fill);
+    border-color: var(--lg-edge);
+    -webkit-backdrop-filter: var(--lg-filter);
+    backdrop-filter: var(--lg-filter);
+    box-shadow: var(--lg-highlight), var(--lg-depth-float);
+  }
+  /* Where you are: a raised clear pane with the olive mark, the same as the phone tab bar. */
+  .c-side :is(.c-side-item, .c-side-sub)[aria-current='page'] {
+    background: var(--lg-sheen), var(--lg-fill-strong);
+    border-color: var(--lg-edge);
+    box-shadow: var(--lg-highlight), var(--lg-shadow);
+    color: var(--ink);
+  }
+  .c-side .c-side-item { border: 1px solid transparent; }
+  .c-side :is(.c-side-item, .c-side-sub)[aria-current='page'] .lucide { color: var(--olive-ink); }
+  .c-side .c-side-sub[aria-current='page'] { border: 1px solid var(--lg-edge); border-left: 2px solid var(--olive); }
+  .c-side-row .c-side-item[aria-current='page'] + .c-side-caret { color: var(--muted); }
+  .c-side-row .c-side-item[aria-current='page'] + .c-side-caret:hover { background: var(--lg-fill-strong); color: var(--ink); }
+}
+
+/* The highlight menu over notes: frosted glass rather than a solid menu (the text under it
+   blurs away, so it still reads). */
+.c-menu:is(.ov-select, .reader-select) {
+  background: var(--lg-sheen), var(--lg-grain), var(--lg-fill-strong) !important;
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+  box-shadow: var(--lg-highlight), var(--lg-depth-float) !important;
 }
 
 /* A glass card is its own stacking context, so an open menu inside one would slide under

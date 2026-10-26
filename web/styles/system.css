@@ -686,12 +686,8 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
     position: fixed; top: var(--side-gap); bottom: var(--side-gap); left: var(--side-gap); z-index: 95; width: var(--side-w);
     display: flex; flex-direction: column; gap: 2px; padding: 14px 12px 12px;
     overflow: hidden;
-    background: var(--glass);
-    -webkit-backdrop-filter: blur(24px) saturate(160%);
-    backdrop-filter: blur(24px) saturate(160%);
     border: 1px solid var(--glass-edge);
-    border-radius: 24px;
-    box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow-lg);
+    border-radius: 24px; /* Fill, blur and shadow: the liquid glass recipe in glass.css. */
     transition: width 200ms var(--ease);
   }
   .c-side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 4px 0 8px; margin-bottom: 8px; }
@@ -709,7 +705,6 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   .c-side-item .lucide { flex: none; }
   .c-side-item:hover { background: var(--olive-tint); text-decoration: none; }
   .c-side-item:focus-visible, .c-side-toggle:focus-visible { outline: 2px solid var(--olive); outline-offset: -2px; }
-  .c-side-item[aria-current='page'] { background: var(--olive); color: var(--on-olive); }
   .c-side-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .c-side-kbd { margin-left: auto; padding: 4px 7px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--muted); font: 600 12px/1 var(--font-sans); }
   /* The middle scrolls on short screens; New and Search stay on top and the account at the bottom. */
@@ -731,8 +726,6 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   .c-side-caret .lucide { transition: transform 160ms var(--ease); }
   .c-side-caret.is-open .lucide { transform: rotate(90deg); }
   .c-side-caret:hover { background: var(--olive-tint); color: var(--ink); }
-  .c-side-row .c-side-item[aria-current='page'] + .c-side-caret { color: var(--on-olive); }
-  .c-side-row .c-side-item[aria-current='page'] + .c-side-caret:hover { background: color-mix(in srgb, var(--on-olive) 16%, transparent); }
   .c-side-caret:focus-visible { outline: 2px solid var(--olive); outline-offset: -2px; }
   .c-side-subs { list-style: none; margin: 0 0 4px; padding: 0 0 0 22px; display: grid; gap: 1px; }
   .c-side-sub {
@@ -743,11 +736,8 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   .c-side-sub .lucide { flex: none; }
   .c-side-sub:hover { background: var(--olive-tint); color: var(--ink); text-decoration: none; }
   .c-side-sub:focus-visible { outline: 2px solid var(--olive); outline-offset: -2px; }
-  .c-side-sub[aria-current='page'] { border-left: 2px solid var(--olive); background: var(--olive-tint); color: var(--ink); }
   .c-side-section { display: grid; gap: 2px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
   .c-side-heading { margin: 0 0 2px; padding: 0 12px; color: var(--muted); font: 700 12px/1.6 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; }
-  /* Study screens sit inside Library, so here the current one is tinted rather than filled. */
-  .c-side-item.is-study[aria-current='page'] { background: var(--olive-tint); color: var(--ink); }
   .c-side-foot { flex: none; display: grid; gap: 2px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
   .c-side-head, .c-side-new, .c-side > .c-side-item { flex: none; }
   .c-side-account { height: 56px; padding: 0 8px; }
