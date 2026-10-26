@@ -72,6 +72,14 @@ export default function Instructors() {
     <PublicPage title="Instructors — Cordia Classroom" description="Turn off class sharing for your course." path="/instructors">
       <section className="ins">
         <h1 className="ins-title">Instructors</h1>
+        <div className="ins-intro">
+          <p>Students in the same course can share their study sets with each other. If you’d rather they didn’t for a course you teach, turn sharing off: sets already shared become private, and no new ones can be shared. Students can still study with their own materials.</p>
+          <ol className="ins-steps">
+            <li>Pick your school and enter your school email.</li>
+            <li>Open the sign-in link we email you.</li>
+            <li>Enter the course code, like MGT 300.</li>
+          </ol>
+        </div>
         <div className="ins-card">
           {done ? (
             <p className="ins-line" role="status"><ShieldOff {...ICON} />Sharing is off for {done}</p>
@@ -85,7 +93,7 @@ export default function Instructors() {
               <button type="submit" className="c-btn c-btn--primary" disabled={busy || !code.trim()}>Turn off sharing</button>
             </form>
           ) : sent ? (
-            <p className="ins-line" role="status"><Mail {...ICON} />Check {email}</p>
+            <p className="ins-line" role="status"><Mail {...ICON} />Check {email} and open the link to continue.</p>
           ) : (
             <form className="ins-form" onSubmit={sendLink}>
               <label className="ins-field ins-school">
@@ -110,6 +118,9 @@ export default function Instructors() {
       <style jsx global>{`
         .ins { width: min(520px, 100%); margin: 0 auto; display: grid; gap: 24px; }
         .ins-title { margin: 0; font: 500 40px/1.08 'Newsreader', Georgia, serif; letter-spacing: -0.02em; }
+        .ins-intro { display: grid; gap: 12px; color: var(--muted); font: 500 16px/1.55 var(--font-sans); }
+        .ins-intro p { margin: 0; }
+        .ins-steps { margin: 0; padding-left: 22px; display: grid; gap: 4px; }
         .ins-card { display: grid; gap: 16px; padding: 28px; border-radius: 28px; background: var(--surface-card); border: 1px solid var(--hairline); box-shadow: var(--shadow-float); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); }
         .ins-form { display: grid; gap: 16px; }
         .ins-field { position: relative; display: grid; gap: 6px; font: 600 13px/1 var(--font-sans); }

@@ -103,6 +103,7 @@ async function install(context, state) {
       const completed = Array.from({ length: 12 }, (_, i) => mk(30 + i, `Assignment ${i + 1}`, 'BUS-101-101', -(i * 3 + 1), { done: true, score: 40 + i }));
       return json({ connected: true, counts: { upcoming: upcoming.length, missing: missing.length, completed: 170 }, upcoming, missing, completed });
     }
+    if (path === '/stats/week') return json({ minutes: state.populated ? 95 : 0, previous_minutes: state.populated ? 60 : 0 });
     if (path === '/stats/activity') {
       const day = back => { const d = new Date(Date.now() - back * 86400000); return d.toISOString().slice(0, 10); };
       const minutes = [0, 25, 40, 0, 15, 60, 35, 0, 0, 20, 45, 30, 0, 10, 55, 70, 0, 25, 30, 0, 15, 40, 85, 20, 0, 35, 50, 0, 25, 45];

@@ -464,7 +464,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 /* Dark windows use charcoal glass and white accents over the olive atmosphere. */
 [data-theme='dark'] :is(.btn, .btn-green, .scene-continue, .rail-create, .cordia-tutor-input > button) { color: var(--accent-on); }
 [data-theme='dark'] .filter-pills .pill-active { color: var(--accent-on); }
-[data-theme='dark'] :is(.top-navigation-mark, .tutor-brand-mark) { filter: brightness(0) invert(1); }
+[data-theme='dark'] :is(.top-navigation-mark, .tutor-brand-mark, .public-mark, .extension-install-logo) { filter: brightness(0) invert(1); }
 [data-theme='dark'] .class-tile-cover { background-image:var(--surface-card); }
 [data-theme='dark'] .class-tile-cover > span { color: var(--ink); }
 /* Tutor controls share the sidebar's crisp type and tactile glass surfaces. */

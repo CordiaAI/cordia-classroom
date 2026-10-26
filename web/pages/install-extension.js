@@ -70,8 +70,9 @@ export default function InstallExtensionPage() {
 
       <style jsx>{`
         .extension-install-page { width: min(var(--page-max), 100%); margin: 0 auto; padding: 16px 0 40px; }
-        .extension-install-hero { display: flex; align-items: center; gap: 18px; margin-bottom: 30px; }
-        .extension-install-logo { width: 62px; height: 62px; border-radius:20px; box-shadow: var(--shadow-md); }
+        .extension-install-hero { display: flex; align-items: center; gap: 18px; margin-bottom: 30px; padding: 24px 28px; }
+        /* The mark sits in its own space (it was flush against the card's edge; dark mode shows it light). */
+        .extension-install-hero :global(.extension-install-logo) { flex: none; }
         .extension-install-eyebrow { color: var(--accent); font-size:13px; font-weight:600; letter-spacing:0; text-transform:none; margin-bottom: 5px; }
         h1 { font-size: max(13px, clamp(1.7rem, 4vw, 2.35rem)); letter-spacing:-0.015em; line-height:1.15; margin: 0 0 8px; }
         .extension-install-hero p:last-child { color: var(--text-secondary); line-height:1.5; max-width: 590px; }
@@ -92,7 +93,7 @@ export default function InstallExtensionPage() {
         .extension-install-footer { margin-top: 22px; padding: 20px; border-radius:var(--radius-lg); text-align: center; background: var(--accent-glow); }
         .extension-install-footer p { color: var(--text-secondary); font-size:13px; margin-bottom: 13px; }
         .extension-install-footer .btn { display: inline-block; text-decoration: none; }
-        @media (max-width: 560px) { .extension-install-hero { align-items: flex-start; } .extension-install-logo { width: 48px; height: 48px; } .extension-install-step { padding: 16px; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; } }
+        @media (max-width: 560px) { .extension-install-hero { align-items: flex-start; } .extension-install-step { padding: 16px; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; } }
       `}</style>
     </div>
     </PublicPage>

@@ -51,6 +51,25 @@ class ActivityTests(unittest.TestCase):
         self.assertEqual(result["quizzes"], [{"date": "2026-10-10", "score": 70, "title": "Cell biology"},
                                              {"date": "2026-10-24", "score": 92, "title": "Renaissance art"}])
 
+    def test_a_tab_left_open_counts_at_most_four_hours(self):
+        result = build_activity([session("2026-10-24T23:00:00Z", 24 * 60)], [], GUIDES, FOLDERS, TODAY)
+        self.assertEqual(sum(day["minutes"] for day in result["days"]), 240)
+
+    def test_overlapping_sittings_count_once(self):
+        # Two tabs open together: 13:00-14:00 and 13:30-14:30 are 90 minutes, not 120.
+        rows = [session("2026-10-24T14:00:00Z", 60), session("2026-10-24T14:30:00Z", 60, "flashcard")]
+        result = build_activity(rows, [], GUIDES, FOLDERS, TODAY)
+        self.assertEqual(result["days"], [{"date": "2026-10-24", "minutes": 90, "sessions": 2, "cards": 0}])
+        self.assertEqual(result["by_kind"]["read"] + result["by_kind"]["flashcard"], 90)
+
+    def test_no_day_passes_24_hours_and_midnight_splits(self):
+        # Sittings back to back all day, plus one running past midnight.
+        rows = [session(f"2026-10-24T{hour:02d}:00:00Z", 240) for hour in (4, 8, 12, 16, 20)] + [session("2026-10-25T01:00:00Z", 120)]
+        days = {day["date"]: day["minutes"] for day in build_activity(rows, [], GUIDES, FOLDERS, TODAY)["days"]}
+        self.assertLessEqual(days["2026-10-24"], 24 * 60)
+        self.assertEqual(days["2026-10-25"], 60)
+        self.assertEqual(days["2026-10-24"], 20 * 60 + 60)
+
     def test_bad_rows_are_skipped(self):
         rows = [{"started_at": "not a date", "duration_seconds": 60}, {"started_at": None}]
         self.assertEqual(build_activity(rows, [], {}, {}, TODAY)["days"], [])

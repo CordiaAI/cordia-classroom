@@ -7,6 +7,7 @@ import { dueIndices } from '../lib/spacedReview.mjs';
 import { readUserValue, writeUserValue } from '../lib/userStore';
 import { isCardImage } from '../lib/cardImages';
 import { prefersReducedMotion } from '../lib/motion';
+import { useActiveClock } from '../lib/activeClock';
 
 const BEST_KEY = 'blocksBest';
 const PAD = 8; // board padding
@@ -32,7 +33,8 @@ function Piece({ cells, color, size, gap = 3 }) {
 // a row add a 1x1 helper. Cards due for review are asked first, and the answers count as review.
 export default function BlockGame({ guide, onResults, onDone }) {
   const cards = useMemo(() => (guide.flashcards || []).filter(card => card?.front && card?.back), [guide.flashcards]);
-  const startedAt = useRef(Date.now());
+  const clock = useActiveClock(); // active time only
+  const played = useRef(0);
   const order = useRef(questionOrder(cards.length, dueIndices(guide.flashcard_progress, cards.length)));
   const asked = useRef(0);
   const [board, setBoard] = useState(() => Array.from({ length: SIZE }, () => Array(SIZE).fill(null)));
@@ -87,7 +89,9 @@ export default function BlockGame({ guide, onResults, onDone }) {
   }, [score]);
 
   useEffect(() => {
-    if (phase === 'over') onResults?.({ known, missed, seconds: Math.round((Date.now() - startedAt.current) / 1000) });
+    if (phase !== 'over') return;
+    played.current = clock.current?.seconds() || 0;
+    onResults?.({ known, missed, seconds: played.current });
   }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function answer(option) {
@@ -237,7 +241,7 @@ export default function BlockGame({ guide, onResults, onDone }) {
   if (phase === 'over') {
     const total = known.length + missed.length;
     return (
-      <SessionFinish guideId={guide.id} guideTitle={guide.title} cards={total} accuracy={total ? (known.length / total) * 100 : 0} minutes={(Date.now() - startedAt.current) / 60000} kind="blocks" onRestart={onDone ? () => onDone('again') : undefined} onDone={() => onDone?.('done')}>
+      <SessionFinish guideId={guide.id} guideTitle={guide.title} cards={total} accuracy={total ? (known.length / total) * 100 : 0} minutes={played.current / 60} kind="blocks" onRestart={onDone ? () => onDone('again') : undefined} onDone={() => onDone?.('done')}>
         <p className="bg-final"><strong>{score}</strong> points · {lines} line{lines === 1 ? '' : 's'}{score >= best && score > 0 ? ' · New best' : best ? ` · Best ${best}` : ''}</p>
         <style jsx>{`
           .bg-final { margin: 0; font: 500 17px/1.4 var(--font-sans); color: var(--ink); }

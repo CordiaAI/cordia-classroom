@@ -13,7 +13,7 @@ const KINDS = [
   { key: 'flashcard', label: 'Flashcards' },
   { key: 'quiz', label: 'Quizzes' },
   { key: 'timer', label: 'Focus timer' },
-  { key: 'browse', label: 'Other' },
+  { key: 'browse', label: 'Dashboard, Library, Canvas' },
 ];
 
 function shortDay(iso) {
@@ -83,7 +83,7 @@ export function StatTiles({ activity, streak }) {
   const average = quizzes.length ? Math.round(quizzes.reduce((sum, quiz) => sum + quiz.score, 0) / quizzes.length) : null;
   const tiles = [
     { label: 'Streak', value: streak ? `${streak.days} day${streak.days === 1 ? '' : 's'}` : '—', note: streak?.frozenThisWeek ? 'Freeze used this week' : 'One missed day a week won’t break it' },
-    { label: 'This week', value: minutesLabel(week), note: activity ? (delta === 0 ? 'Same as last week' : `${delta > 0 ? '↑' : '↓'} ${minutesLabel(Math.abs(delta))} vs last week`) : '' },
+    { label: 'Last 7 days', value: minutesLabel(week), note: activity ? (delta === 0 ? 'Same as the 7 before' : `${delta > 0 ? '↑' : '↓'} ${minutesLabel(Math.abs(delta))} vs the 7 days before`) : '' },
     { label: 'Cards reviewed', value: cards.toLocaleString(), note: 'Last 30 days' },
     { label: 'Quiz average', value: average === null ? '—' : `${average}%`, note: quizzes.length ? `Last ${quizzes.length} quiz${quizzes.length === 1 ? '' : 'zes'}` : 'No quizzes yet' },
   ];

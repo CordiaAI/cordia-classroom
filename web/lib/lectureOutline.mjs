@@ -4,8 +4,9 @@ const escapeHtml = text => String(text || '').replace(/[&<>"']/g, char => ({ '&'
 const inline = text => escapeHtml(text).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 
 // The outline's Markdown as note HTML: #..#### headings, nested * / - bullets and 1. lists
-// (nesting by indent), other lines as paragraphs. Everything is escaped.
-export function outlineHtml(markdown) {
+// (nesting by indent), other lines as paragraphs. Everything is escaped. headingShift moves every
+// heading down (1: # becomes <h2>), for a page that already has its own <h1>.
+export function outlineHtml(markdown, { headingShift = 0 } = {}) {
   const out = [];
   const stack = []; // open lists: { tag, indent }
   const closeTo = indent => {
@@ -19,7 +20,7 @@ export function outlineHtml(markdown) {
     const item = line.match(/^(?:([*\-•])|(\d+)[.)])\s+(.*)$/);
     if (heading) {
       closeTo(-1);
-      const level = Math.min(4, heading[1].length);
+      const level = Math.min(6, Math.min(4, heading[1].length) + headingShift);
       out.push(`<h${level}>${inline(heading[2])}</h${level}>`);
     } else if (item) {
       const tag = item[1] ? 'ul' : 'ol';

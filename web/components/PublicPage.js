@@ -24,7 +24,7 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
         <header className="public-nav">
           <Link href="/" className="public-brand" aria-label="Cordia Classroom home"><AcademicInfinityMark className="public-mark" title="" /><span>cordia</span></Link>
           <nav aria-label="Public">
-            <Link href="/mission">Approach</Link>
+            <Link href="/mission">Features</Link>
             <Link href="/pricing">Pricing</Link>
             {signedIn
               ? <Link href="/dashboard" className="public-signin">Open Cordia</Link>
@@ -34,7 +34,7 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
         <main className="public-main">{children}</main>
         <footer className="public-footer">
           <nav aria-label="Site">
-            <Link href="/mission">Approach</Link>
+            <Link href="/mission">Features</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/instructors">For instructors</Link>
             <Link href="/install-extension">Get the Chrome extension</Link>

@@ -9,12 +9,12 @@ export default function MissionPage() {
     },
     {
       title: 'NCLEX Question Generation',
-      subtitle: 'Nursing User Group (More specific user groups to be added soon!)',
+      subtitle: 'For nursing students',
       description: 'CordiaClassroom turns the material you are learning into NCLEX-style questions, so nursing students can practice in the same format as their exams in a couple of clicks.',
     },
     {
-      title: 'CordiaClassroom Never Allows the AI to Search for Answers on the Web.',
-      description: 'The main issue with simply asking an LLM to create a study guide is that the answers and questions are NOT DIRECTLY from your class material. CordiaClassroom makes this super simple and easy. It only uses the context that was captured as its knowledge! This way it is the exact material from your classes.',
+      title: 'Only Your Class Material, Never the Web',
+      description: 'When you ask a general AI chatbot for a study guide, its questions and answers often come from somewhere other than your class. CordiaClassroom never searches the web: it uses only the material you captured, so everything you study comes from your own classes.',
     },
     {
       title: 'One Cordia Tutor',
@@ -31,9 +31,9 @@ export default function MissionPage() {
   ];
 
   return (
-    <PublicPage title="Our approach — Cordia Classroom" description="How Cordia Classroom turns your own course material into study guides, quizzes and flashcards." path="/mission">
+    <PublicPage title="Features — Cordia Classroom" description="How Cordia Classroom turns your own course material into study guides, quizzes and flashcards." path="/mission">
     <div className="fade-in mission-page" style={{ width: 'min(var(--page-max), 100%)', margin: '0 auto' }}>
-      <h1 style={{ marginBottom: 4 }}>CordiaClassroom Features</h1>
+      <h1 style={{ marginBottom: 4 }}>Features</h1>
       <p style={{ color: 'var(--text-muted)', fontSize: 15, marginBottom: 28, lineHeight: 1.5 }}>
         CordiaClassroom was built by a college student, for college students. Our mission is to make studying smarter, faster, and more accessible for every student — regardless of major or learning style.
       </p>

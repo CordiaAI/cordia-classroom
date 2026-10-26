@@ -4,6 +4,7 @@ import { walkthroughEvent } from '../lib/walkthrough';
 import { requestTip } from '../lib/tips';
 import SessionFinish from './SessionFinish';
 import { isCardImage } from '../lib/cardImages';
+import { useActiveClock } from '../lib/activeClock';
 
 const SHUFFLE_KEY = 'cordiaShuffle';
 // Swipe: past this many pixels the card is answered (right = Got it, left = Again).
@@ -50,7 +51,7 @@ export default function FlashcardViewer({
   const [history, setHistory] = useState([]);
   const [done, setDone] = useState(false);
   const [seconds, setSeconds] = useState(0);
-  const started = useRef(Date.now());
+  const clock = useActiveClock(); // active time only: a card left open in a hidden tab doesn't count
   const cardRef = useRef(null);
   // Drag state for swiping: the card follows the finger, then flies off or springs back.
   const [drag, setDrag] = useState({ dx: 0, dy: 0, active: false, leaving: '' });
@@ -66,7 +67,7 @@ export default function FlashcardViewer({
   const card = flashcards[current];
 
   const finish = useCallback((nextKnown, nextMissed) => {
-    const elapsed = Math.round((Date.now() - started.current) / 1000);
+    const elapsed = clock.current?.seconds() || 0;
     setSeconds(elapsed);
     setDone(true);
     onFinish?.({ known: nextKnown, missed: [...nextMissed].filter(index => !nextKnown.includes(index)), seconds: elapsed });
@@ -167,7 +168,7 @@ export default function FlashcardViewer({
     setHistory([]);
     setFlipped(false);
     setDone(false);
-    started.current = Date.now();
+    clock.current?.reset();
   }
 
   useEffect(() => {

@@ -61,6 +61,7 @@ export default function WeekPage() {
 
         <section className="c-section" aria-labelledby="week-due">
           <h2 id="week-due" className="c-section-title">Due in the next 7 days</h2>
+          {week?.due?.length > 0 && <p className="c-meta week-hint">Checked items get study time when you plan your week.</p>}
           {week?.due?.length ? (
             <div className="c-card c-list">
               {week.due.map(item => (
@@ -89,20 +90,21 @@ export default function WeekPage() {
 
         <section className="c-section week-stats" aria-label="Study time and grades">
           <div className="c-card week-stat">
-            <span className="c-meta">Last week</span>
+            <span className="c-meta">Study blocks last week</span>
             <strong>{minutesLabel(last.done_minutes)} done</strong>
             <span className="c-meta">of {minutesLabel(last.planned_minutes)} planned</span>
           </div>
           <div className="c-card week-stat">
-            <span className="c-meta">This week</span>
+            <span className="c-meta">Study blocks this week</span>
             <strong>{minutesLabel(week?.next_week_minutes)}</strong>
-            <span className="c-meta">scheduled</span>
+            <span className="c-meta">planned on your calendar</span>
           </div>
           {(week?.grades || []).map(grade => (
             <div key={grade.course} className="c-card week-stat">
               <span className="c-meta c-truncate">{grade.course}</span>
-              <strong>{grade.grade || `${Math.round(grade.score)}%`}</strong>
-              <span className="c-meta">{grade.grade ? `${Math.round(grade.score)}%` : 'current grade'}</span>
+              {/* One format on every card: the percent, with the letter grade under it when Canvas has one. */}
+              <strong>{Number.isFinite(grade.score) ? `${Math.round(grade.score)}%` : grade.grade}</strong>
+              <span className="c-meta">{grade.grade && Number.isFinite(grade.score) ? `Grade ${grade.grade}` : 'current grade'}</span>
             </div>
           ))}
         </section>
@@ -126,6 +128,7 @@ export default function WeekPage() {
         {planning && <AssignmentSheet item={planning} onClose={() => { setPlanning(null); load(); }} />}
         <style jsx>{`
           .week :global(.week-back) { justify-self: start; margin-bottom: 4px; }
+          .week-hint { margin: -4px 0 0; }
           .week-row, .week-news { gap: 14px; }
           .week-row .c-grow, .week-news .c-grow { display: grid; gap: 2px; min-width: 0; }
           .week-title { font: 600 15px/1.4 var(--font-sans); color: var(--ink); }

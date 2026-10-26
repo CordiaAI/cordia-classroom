@@ -19,7 +19,7 @@ import CanvasConnectButton from '../components/CanvasConnectButton';
 import DoneCheck from '../components/DoneCheck';
 import AssignmentSheet from '../components/AssignmentSheet';
 import CourseWork from '../components/CourseWork';
-import { acceptChange, buildExamReview, buildReview, dismissAlert, getAlerts } from '../lib/studyPlans';
+import { acceptChange, buildExamReview, buildReview, dismissAlert, getAlerts, minutesLabel } from '../lib/studyPlans';
 import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
 import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
@@ -87,7 +87,7 @@ export default function Today() {
     const safe = promise => promise.catch(() => null);
     const calendarRequest = safe(apiFetch('/calendar/connection'));
     const calendarOrSlow = Promise.race([calendarRequest, new Promise(resolve => setTimeout(() => resolve(SLOW), SLOW_MS))]);
-    const [foldersData, guidesData, statsData, streakData, onboardingData, insightsData, notesData, checklistData, calendarData, lectureTodos, alertsData] = await Promise.all([
+    const [foldersData, guidesData, statsData, streakData, onboardingData, insightsData, notesData, checklistData, calendarData, lectureTodos, alertsData, studyWeek] = await Promise.all([
       safe(apiFetch('/folders')),
       safe(apiFetch('/guides?fields=summary&limit=500')),
       safe(apiFetch('/stats/overview')),
@@ -99,6 +99,7 @@ export default function Today() {
       calendarOrSlow,
       safe(confirmedTodos()),
       safe(getAlerts()),
+      safe(apiFetch('/stats/week?tz_offset=' + tz)),
     ]);
     const failure = [foldersData, guidesData, statsData].find(item => !item || item.detail);
     const guideList = Array.isArray(guidesData?.guides) ? guidesData.guides : [];
@@ -131,6 +132,7 @@ export default function Today() {
       calendarSlow: calendarData === SLOW && !readCalendarCache(),
       lectureItems: lectureCalendarItems(lectureTodos?.todos),
       alerts: Array.isArray(alertsData?.alerts) ? alertsData.alerts : [],
+      studyWeek: Number.isFinite(studyWeek?.minutes) ? studyWeek.minutes : null,
     };
   }, { enabled: ready && !legacy });
   const loadError = data?.loadError || '';
@@ -174,9 +176,10 @@ export default function Today() {
     .filter(item => new Date(item.due_at).getTime() >= Date.now() - 86400000 && !item.done)
     .sort((a, b) => new Date(a.due_at) - new Date(b.due_at))
     .slice(0, 3);
-  // Focus and study minutes over the last 7 days, from this browser's study log.
+  // Study time over the last 7 days, counted by the server the same way as Progress (this
+  // browser's own log only until the server answers).
   const activity = readActivity();
-  const weekMinutes = Math.round(Array.from({ length: 7 }, (_, back) => activity[dayKey(Date.now() - back * 86400000)]?.m || 0).reduce((sum, value) => sum + value, 0));
+  const weekMinutes = data?.studyWeek ?? Math.round(Array.from({ length: 7 }, (_, back) => activity[dayKey(Date.now() - back * 86400000)]?.m || 0).reduce((sum, value) => sum + value, 0));
   // Missing work lives in Course work's Missing tab once Canvas is connected, so it isn't repeated here.
   const alerts = (data?.alerts || []).filter(raw => !(coursework?.connected && raw.kind === 'missing'));
   const sunday = new Date().getDay() === 0;
@@ -320,7 +323,7 @@ export default function Today() {
             {streakInfo.frozenThisWeek && <Snowflake size={16} strokeWidth={1.75} aria-label="Freeze used this week" className="today-freeze" />}
           </span>
         )}
-        <span className="today-stat"><Timer size={20} strokeWidth={1.75} aria-hidden="true" /><strong>{weekMinutes} min</strong><span className="c-meta">this week</span></span>
+        <span className="today-stat"><Timer size={20} strokeWidth={1.75} aria-hidden="true" /><strong>{minutesLabel(weekMinutes)}</strong><span className="c-meta">last 7 days</span></span>
         <span className="c-spacer" />
         <span className="c-meta today-progress-more">Progress</span>
         <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />

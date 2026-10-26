@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Head from 'next/head';
+import { pageTitle } from '../../lib/pageTitle';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ArrowLeft, BookOpen, CalendarCheck, CalendarPlus, Check, Folder, Merge, MessageCircle, NotebookPen, Pencil, Sparkles, Trash2, X } from 'lucide-react';
@@ -60,8 +62,9 @@ export default function LecturePage() {
   }
 
   useEffect(() => {
-    const current = data?.lecture?.analysis;
-    if (!data?.lecture || notesAsked.current || (current?.analyzed && current?.note_id)) return;
+    // Once per visit: writes the notes if AI didn't run yet, and remakes the lecture's note if it
+    // was deleted (an analyzed lecture only gets that check; no AI runs).
+    if (!data?.lecture || notesAsked.current) return;
     notesAsked.current = true;
     writeNotes();
   }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -155,6 +158,7 @@ export default function LecturePage() {
   return (
     <Reveal phase={gate}>
     <article className="c-page lecture">
+      <Head><title>{pageTitle(lecture.title)}</title></Head>
       <header className="lecture-head">
         <button type="button" className="c-icon-btn" onClick={() => router.push('/library?tab=lectures')} aria-label="Back"><ArrowLeft {...ICON} /></button>
         {renaming !== null ? (
@@ -214,7 +218,7 @@ export default function LecturePage() {
         </div>
         {notes === 'writing' && analysis.analyzed ? <SectionLoader height={96} label="Writing the outline" /> : analysis.outline_md ? (
           // Escaped by outlineHtml: no markup from the model gets through.
-          <div className="c-study lecture-outline-md" dangerouslySetInnerHTML={{ __html: outlineHtml(analysis.outline_md) }} />
+          <div className="c-study lecture-outline-md" dangerouslySetInnerHTML={{ __html: outlineHtml(analysis.outline_md, { headingShift: 1 }) }} />
         ) : analysis.outline?.length > 0 ? analysis.outline.map((section, index) => (
           <div key={index} className="lecture-outline-section">
             <div className="lecture-item-head">
@@ -365,9 +369,10 @@ export default function LecturePage() {
         .lecture-on-cal { display: inline-flex; align-items: center; gap: 4px; }
         .lecture-todo.is-done strong { text-decoration: line-through; color: var(--muted); }
         .lecture-outline-section { display: grid; gap: 8px; }
-        .lecture-outline-md :global(h1) { margin: 0 0 12px; font: 600 var(--fs-20)/var(--lh-title) var(--font-sans); }
-        .lecture-outline-md :global(h2) { margin: 24px 0 8px; font: 600 var(--fs-17)/var(--lh-title) var(--font-sans); color: var(--olive-ink); }
-        .lecture-outline-md :global(h3), .lecture-outline-md :global(h4) { margin: 16px 0 6px; font: 600 var(--fs-15)/var(--lh-title) var(--font-sans); }
+        /* The page title is the only h1: the outline's headings start at h2. */
+        .lecture-outline-md :global(h2) { margin: 0 0 12px; font: 600 var(--fs-20)/var(--lh-title) var(--font-sans); }
+        .lecture-outline-md :global(h3) { margin: 24px 0 8px; font: 600 var(--fs-17)/var(--lh-title) var(--font-sans); color: var(--olive-ink); }
+        .lecture-outline-md :global(h4), .lecture-outline-md :global(h5) { margin: 16px 0 6px; font: 600 var(--fs-15)/var(--lh-title) var(--font-sans); }
         .lecture-outline-md :global(ul), .lecture-outline-md :global(ol) { margin: 4px 0 8px; padding-left: 22px; }
         .lecture-outline-md :global(li > ul) { list-style: circle; }
         .lecture-outline-heading { margin: 0; font: 600 var(--fs-17)/var(--lh-title) var(--font-sans); color: var(--ink); }
