@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Bell, BellOff, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, ExternalLink, KeyRound, RefreshCw, Unlink } from 'lucide-react';
+import { Bell, BellOff, CalendarCheck, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, ExternalLink, KeyRound, RefreshCw, Unlink } from 'lucide-react';
 import { apiErrorMessage, apiFetch, getUserId } from '../lib/api';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { CanvasCalendarFeed, CanvasCalendarNav, CanvasFeedLink } from './CanvasShots';
@@ -96,6 +96,9 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
   // To-dos confirmed from lectures show alongside the Canvas feed.
   const [lectureItems, setLectureItems] = useState([]);
   useEffect(() => { confirmedTodos().then(data => setLectureItems(lectureCalendarItems(data?.todos))); }, []);
+  // Study blocks from Plan my week (and assignment plans) show too, with or without Canvas.
+  const [blocks, setBlocks] = useState([]);
+  useEffect(() => { apiFetch('/calendar/blocks').then(data => setBlocks(Array.isArray(data?.blocks) ? data.blocks : [])); }, []);
   // Canvas token connection (all classes and course files), offered when the backend has it.
   const [canvasReady, setCanvasReady] = useState(false);
   const [tokenOpen, setTokenOpen] = useState(false);
@@ -235,6 +238,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     );
   }
 
+  let connectCard = null;
   if (!connected) {
     if (compact) {
       return (
@@ -254,11 +258,11 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     const linkProblem = feedLinkProblem(feedUrl);
     const sheet = tokenOpen && <CanvasConnectSheet school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} onClose={() => setTokenOpen(false)} onConnected={data => { if (data?.connected) { setCanvasReady(false); refresh(); } }} />;
     if (canvasReady && !feedOpen) {
-      return (
+      connectCard = (
         <section className="c-card cal-connect cal-connect--one" aria-label="Connect Canvas">
           <KeyRound size={28} strokeWidth={1.75} aria-hidden="true" />
-          <h2 className="c-section-title">Connect Canvas</h2>
-          <p className="c-meta">Bring in every class’s deadlines, kept in sync.</p>
+          <h2 className="c-section-title">Add your Canvas deadlines</h2>
+          <p className="c-meta">Your study blocks and lecture to-dos are below. Connect Canvas to add every class’s deadlines, kept in sync.</p>
           <button type="button" className="c-btn c-btn--primary" data-spot="calendar-feed" onClick={() => setTokenOpen(true)}>Connect Canvas</button>
           <button type="button" className="c-btn c-btn--quiet" onClick={() => setFeedOpen(true)}>Use a calendar link instead</button>
           {sheet}
@@ -269,8 +273,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
           `}</style>
         </section>
       );
-    }
-    return (
+    } else connectCard = (
       <section className="c-card cal-connect" aria-label="Connect Canvas calendar">
         <ol className="cal-steps">
           {steps.map((step, index) => (
@@ -315,7 +318,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     );
   }
 
-  const allItems = mergeCalendarItems(items, lectureItems);
+  const allItems = mergeCalendarItems(connected ? items : [], lectureItems);
   const allToday = localDueToday(allItems);
   const todayIds = new Set(allToday.map(item => item.id));
   const upcoming = allItems
@@ -353,6 +356,10 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
   const weekItems = allItems
     .filter(item => dateValue(item) >= weekStart.getTime() && dateValue(item) < weekEnd)
     .sort((a, b) => dateValue(a) - dateValue(b));
+  const weekBlocks = blocks.filter(block => {
+    const start = new Date(block.starts_at).getTime();
+    return start >= weekStart.getTime() && start < weekEnd;
+  });
   const todayKey = new Date().toDateString();
   const rangeLabel = `${days[0].toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${days[6].toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
 
@@ -375,33 +382,59 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
       : <div key={item.id} className={className}>{body}</div>;
   }
 
+  // A study block: the time it's planned for and what it's for. It opens Your week, where the plan lives.
+  function blockCard(block) {
+    const start = new Date(block.starts_at);
+    const end = new Date(block.ends_at);
+    const clock = date => date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return (
+      <Link key={'block-' + block.id} href="/week" className={'calendar-item calendar-item-block' + (end.getTime() < Date.now() ? ' calendar-item-past' : '')} title={`Study block: ${block.title}`}>
+        <span className="calendar-item-meta">
+          <span className="calendar-kind calendar-kind-study">{block.kind === 'review' ? 'Review' : 'Study'}</span>
+          <small>{clock(start)} – {clock(end)}</small>
+        </span>
+        <strong title={block.title}>{block.title}</strong>
+      </Link>
+    );
+  }
+
   const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
+  const summary = [connected && weekSummary(weekItems), weekBlocks.length && `${weekBlocks.length} study block${weekBlocks.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
   return (
+    <div className="cal-stack">
     <section className="calendar-dashboard">
       <header className="cal-head">
         <div className="c-row">
           <button type="button" className="c-icon-btn" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week"><ChevronLeft {...ICON} /></button>
           <h2 className="c-section-title">{rangeLabel}</h2>
           <button type="button" className="c-icon-btn" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week"><ChevronRight {...ICON} /></button>
-          <span className="c-meta">{weekSummary(weekItems)}</span>
+          {summary && <span className="c-meta">{summary}</span>}
         </div>
         <div className="c-row c-row--wrap">
           <button type="button" className="c-btn c-btn--quiet" onClick={() => setWeekStart(startOfWeek(new Date()))}>This week</button>
-          <button type="button" className="c-btn c-btn--secondary" onClick={toggleReminders} aria-pressed={reminders}>{reminders ? <Bell {...ICON} /> : <BellOff {...ICON} />}Reminders</button>
-          {/* Connected with a token, the page's Sync now updates everything: one sync control, not two. */}
-          {!fromToken && <button type="button" className="c-icon-btn" onClick={() => refresh()} disabled={loading} aria-label="Refresh"><RefreshCw {...ICON} /></button>}
-          {fromToken
+          <Link href="/week" className="c-btn c-btn--secondary"><CalendarCheck {...ICON} />Plan my week</Link>
+          {connected && <button type="button" className="c-btn c-btn--secondary" onClick={toggleReminders} aria-pressed={reminders}>{reminders ? <Bell {...ICON} /> : <BellOff {...ICON} />}Reminders</button>}
+          {/* Connected with a token, the Canvas page's Sync now updates everything: one sync control, not two. */}
+          {connected && !fromToken && <button type="button" className="c-icon-btn" onClick={() => refresh()} disabled={loading} aria-label="Refresh"><RefreshCw {...ICON} /></button>}
+          {connected && (fromToken
             ? <Link href="/settings?section=connectors" className="c-btn c-btn--quiet">Canvas settings</Link>
-            : <button type="button" className="c-icon-btn" onClick={disconnect} aria-label="Disconnect calendar"><Unlink {...ICON} /></button>}
+            : <button type="button" className="c-icon-btn" onClick={disconnect} aria-label="Disconnect calendar"><Unlink {...ICON} /></button>)}
         </div>
         <style jsx>{`
           .cal-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+          .cal-stack { display: grid; gap: 24px; }
         `}</style>
       </header>
-      {error && <div className="canvas-inline-error" role="alert">{error}</div>}
+      {connected && error && <div className="canvas-inline-error" role="alert">{error}</div>}
       <div className="calendar-week">
         {days.map(day => {
           const dayItems = weekItems.filter(item => new Date(item.due_at).toDateString() === day.toDateString());
+          // Deadlines and study blocks in time order.
+          const entries = [
+            ...dayItems.map(item => ({ at: dateValue(item), node: itemCard(item) })),
+            ...weekBlocks.filter(block => new Date(block.starts_at).toDateString() === day.toDateString())
+              .map(block => ({ at: new Date(block.starts_at).getTime(), node: blockCard(block) })),
+          ].sort((a, b) => a.at - b.at);
           const isToday = day.toDateString() === todayKey;
           return (
             <section key={day.toISOString()} className={`calendar-day${isToday ? ' calendar-day-today' : ''}`} aria-label={day.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}>
@@ -411,13 +444,15 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
                 {isToday && <em>Today</em>}
               </header>
               <div className="calendar-day-items">
-                {dayItems.length ? dayItems.map(itemCard) : <p className="calendar-day-empty">Nothing due</p>}
+                {entries.length ? entries.map(entry => entry.node) : <p className="calendar-day-empty">{connected ? 'Nothing due' : 'Nothing planned'}</p>}
               </div>
             </section>
           );
         })}
       </div>
     </section>
+    {connectCard}
+    </div>
   );
 }
 

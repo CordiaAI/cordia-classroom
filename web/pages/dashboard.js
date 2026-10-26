@@ -29,7 +29,7 @@ import { deadlineTitle, safeHref } from '../lib/formatters';
 const SLOW = Symbol('slow');
 const SLOW_MS = 4000;
 
-const LEGACY_VIEWS = { guides: '/library', classes: '/library', calendar: '/canvas?tab=calendar', notes: '/smartnotes' };
+const LEGACY_VIEWS = { guides: '/library', classes: '/library', calendar: '/calendar', notes: '/smartnotes' };
 
 function shortDate(value) {
   const date = new Date(value || '');
@@ -280,7 +280,7 @@ export default function Today() {
           extraUpcoming={(data?.lectureItems || []).filter(item => !item.done && new Date(item.due_at).getTime() >= Date.now() - 86400000)}
           actions={<>
             <Link href="/week" className={'c-btn ' + (sunday ? 'c-btn--secondary' : 'c-btn--quiet')}>Plan your week</Link>
-            <Link href="/canvas?tab=calendar" className="c-btn c-btn--quiet today-see-calendar">See calendar</Link>
+            <Link href="/calendar" className="c-btn c-btn--quiet today-see-calendar">See calendar</Link>
           </>} />
       ) : (
       <section className="c-section" aria-labelledby="due-title">
@@ -288,7 +288,7 @@ export default function Today() {
           <h2 id="due-title" className="c-section-title">Due soon</h2>
           <span className="c-spacer" />
           <Link href="/week" className={'c-btn ' + (sunday ? 'c-btn--secondary' : 'c-btn--quiet')}>Plan your week</Link>
-          <Link href="/canvas?tab=calendar" className="c-btn c-btn--quiet today-see-calendar">See calendar</Link>
+          <Link href="/calendar" className="c-btn c-btn--quiet today-see-calendar">See calendar</Link>
         </div>
         {(dueItems.length > 0 || calendarSlow) ? (
           <div className="c-card c-list">
@@ -296,7 +296,7 @@ export default function Today() {
             {dueItems.map(item => (
               <div key={item.id} className={'c-list-row today-due' + (doneNow[item.id] ? ' is-done' : '')}>
                 <DoneCheck id={item.id} title={item.title} done={Boolean(doneNow[item.id])} onChange={done => setDoneNow(current => ({ ...current, [item.id]: done }))} />
-                <a className="c-grow c-truncate today-due-link" href={safeHref(item.url, '/canvas?tab=calendar')} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>{deadlineTitle(item)}</a>
+                <a className="c-grow c-truncate today-due-link" href={safeHref(item.url, '/calendar')} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>{deadlineTitle(item)}</a>
                 <span className="c-meta">{shortDate(item.due_at)}</span>
                 {!item.internal && (
                   <button type="button" className="c-icon-btn" aria-label={`Plan ${item.title}`} title="Steps and study time" onClick={() => setPlanning(item)}>

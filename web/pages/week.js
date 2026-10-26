@@ -45,7 +45,7 @@ export default function WeekPage() {
     setBusy(false);
     if (typeof result?.added !== 'number') { setError(result?.detail || "That didn't plan. Try again."); return; }
     walkthroughEvent('week-planned');
-    setNotice(result.added ? `Added ${result.added} study block${result.added === 1 ? '' : 's'}. They're on your Cordia calendar if Google Calendar sync is on.` : 'Everything picked already has study time.');
+    setNotice(result.added ? `Added ${result.added} study block${result.added === 1 ? '' : 's'} to your calendar.` : 'Everything picked already has study time.');
     load();
   }
 
@@ -84,7 +84,7 @@ export default function WeekPage() {
               <span className="c-meta">Breaks each pick into steps and fits study time into your free time.</span>
             </div>
           )}
-          {notice && <p className="cn-notice" role="status">{notice}</p>}
+          {notice && <p className="cn-notice" role="status">{notice} <Link href="/calendar">Open calendar</Link></p>}
           {error && <p className="cn-error" role="alert">{error}</p>}
         </section>
 

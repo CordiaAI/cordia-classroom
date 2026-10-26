@@ -12,7 +12,7 @@ let cache = null; // { guides, notes } loaded once per page session
 
 const JUMPS = [
   { key: 'j-library', kind: 'jump', icon: Library, title: 'Library', href: '/library' },
-  { key: 'j-calendar', kind: 'jump', icon: CalendarDays, title: 'Calendar', href: '/canvas?tab=calendar' },
+  { key: 'j-calendar', kind: 'jump', icon: CalendarDays, title: 'Calendar', href: '/calendar' },
   { key: 'j-settings', kind: 'jump', icon: Settings, title: 'Settings', href: '/settings' },
 ];
 

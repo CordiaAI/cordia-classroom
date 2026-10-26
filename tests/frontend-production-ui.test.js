@@ -24,7 +24,7 @@ const provenanceMigration = read('supabase', 'migrations', '20260916000000_guide
 const rlsMigration = read('supabase', 'migrations', '20260915035012_harden_classroom_rls.sql');
 const flashcardLibrary = read('web', 'pages', 'flashcards.js');
 const library = read('web', 'pages', 'library.js');
-const calendarPage = read('web', 'pages', 'canvas.js');
+const calendarPage = read('web', 'pages', 'calendar.js');
 const system = read('web', 'styles', 'system.css');
 const authCard = read('web', 'components', 'AuthCard.js');
 const publicPage = read('web', 'components', 'PublicPage.js');
@@ -75,7 +75,7 @@ assert.match(navigation, /displayName/);
 assert.match(calendarDashboard, /Due today/);
 assert.match(calendarPage, /<CalendarDashboard \/>/);
 assert.match(navigation, /label: 'Canvas', href: '\/canvas'/);
-assert.match(dashboard, /calendar: '\/canvas\?tab=calendar'/);
+assert.match(dashboard, /calendar: '\/calendar'/);
 assert.match(dashboard, /Some Classroom data could not be refreshed/);
 assert.match(dashboard, /guides: guideList/);
 assert.match(dashboard, /role="alert"/);

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { AudioLines, BookOpen, CalendarDays, CalendarRange, ChartNoAxesColumn, ChevronRight, CircleHelp, CreditCard, Folder, FolderPlus, GraduationCap, Layers, House, Library, Link2, LogOut, MessageCircle, Megaphone, Palette, PanelLeftClose, PanelLeftOpen, PencilRuler, Plus, School, Search, Settings, User } from 'lucide-react';
+import { AudioLines, BookOpen, CalendarDays, ChartNoAxesColumn, ChevronRight, CircleHelp, CreditCard, Folder, FolderPlus, GraduationCap, Layers, House, Library, Link2, LogOut, MessageCircle, Megaphone, Palette, PanelLeftClose, PanelLeftOpen, PencilRuler, Plus, Search, Settings, User } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -16,21 +16,18 @@ import { walkthroughEvent } from '../lib/walkthrough';
 import { classLabel } from '../lib/classLabel';
 
 // One navigation: the same three places on the glass top bar and the mobile tab bar, plus New.
-// The Tutor is the bubble in the corner (TutorBubble); the calendar lives inside Canvas.
+// The Tutor is the bubble in the corner (TutorBubble). Calendar is its own place: study blocks and
+// lecture to-dos show without Canvas, and Canvas adds its deadlines when connected.
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: House, spot: 'nav-today' },
   { label: 'Library', href: '/library', icon: Library, spot: 'nav-library' },
-  { label: 'Canvas', href: '/canvas', icon: GraduationCap, spot: 'nav-canvas', tip: 'calendar' },
+  { label: 'Calendar', href: '/calendar', icon: CalendarDays, spot: 'nav-calendar', tip: 'calendar' },
+  // Not on the phone tab bar (five fit); the calendar's connect card and the dashboard reach it.
+  { label: 'Canvas', href: '/canvas', icon: GraduationCap, spot: 'nav-canvas', phone: false },
   // Cordia Assistant has its own page (pages/assistant.js).
   { label: 'Assistant', href: '/assistant', icon: MessageCircle, spot: 'nav-assistant' },
 ];
 
-// Under Canvas in the sidebar, like Library's classes: the places Canvas feeds.
-const canvasItems = [
-  { label: 'Classes', href: '/canvas', icon: School, here: (path, query) => path === '/canvas' && query.tab !== 'calendar' },
-  { label: 'Calendar', href: '/canvas?tab=calendar', icon: CalendarDays, here: (path, query) => (path === '/canvas' && query.tab === 'calendar') || path === '/calendar' },
-  { label: 'Your week', href: '/week', icon: CalendarRange, here: path => path === '/week' },
-];
 // The sidebar's Study section: Library's filters, one tap each (Tutor is the corner bubble and
 // Progress is in the account menu).
 const onFilter = key => (path, query) => path === '/library' && (query.tab || query.filter) === key;
@@ -51,7 +48,8 @@ export function activeNavHref(pathname, section = '') {
   if (pathname === '/dashboard') return '/dashboard';
   if (pathname === '/assistant') return '/assistant';
   if (LIBRARY_PATHS.some(path => pathname === path || pathname.startsWith(path + '/'))) return '/library';
-  if (pathname.startsWith('/canvas') || pathname.startsWith('/calendar') || pathname === '/week') return '/canvas';
+  if (pathname.startsWith('/calendar') || pathname === '/week') return '/calendar';
+  if (pathname.startsWith('/canvas')) return '/canvas';
   return '';
 }
 
@@ -122,7 +120,6 @@ export default function Sidebar({ timerState, setTimerState }) {
     </li>
   );
   function subList(href) {
-    if (href === '/canvas') return canvasItems.map(item => subLink(item, item.here(router.pathname, query)));
     if (href !== '/library') return null;
     return [
       ...classes.slice(0, MAX_CLASSES).map(folder => subLink({ label: folder.name, href: `/folder/${folder.id}`, icon: Folder }, router.pathname === '/folder/[id]' && query.id === folder.id)),
@@ -231,7 +228,7 @@ export default function Sidebar({ timerState, setTimerState }) {
         </button>
         <nav className="c-side-nav" aria-label="Primary">
           {navItems.map(item => {
-            const hasSub = item.href === '/library' || item.href === '/canvas';
+            const hasSub = item.href === '/library';
             const open = hasSub && !collapsed && (groups[item.href] ?? active === item.href);
             return (
               <div key={item.href} className="c-side-group">
@@ -240,7 +237,7 @@ export default function Sidebar({ timerState, setTimerState }) {
                     <item.icon size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">{item.label}</span>
                   </Link>
                   {hasSub && (
-                    <button type="button" className={'c-side-caret' + (open ? ' is-open' : '')} onClick={() => toggleGroup(item.href, open)} aria-expanded={Boolean(open)} aria-label={`${open ? 'Hide' : 'Show'} ${item.href === '/library' ? 'classes' : 'Canvas pages'}`}>
+                    <button type="button" className={'c-side-caret' + (open ? ' is-open' : '')} onClick={() => toggleGroup(item.href, open)} aria-expanded={Boolean(open)} aria-label={`${open ? 'Hide' : 'Show'} classes`}>
                       <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
                     </button>
                   )}
@@ -318,7 +315,7 @@ export default function Sidebar({ timerState, setTimerState }) {
           <span className="c-tab-new-dot"><Plus size={22} strokeWidth={2} aria-hidden="true" /></span>
           New
         </button>
-        {navItems.slice(2).map(item => (
+        {navItems.slice(2).filter(item => item.phone !== false).map(item => (
           <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-spot={item.spot}>
             <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
             {item.label}

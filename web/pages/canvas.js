@@ -6,31 +6,24 @@ import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { canvasStatus } from '../lib/canvas';
-import { walkthroughEvent } from '../lib/walkthrough';
-import CalendarDashboard from '../components/CalendarDashboard';
 import CanvasClasses from '../components/CanvasClasses';
 import CanvasConnectButton from '../components/CanvasConnectButton';
 import { SectionLoader } from '../components/CordiaLoader';
 
-const TABS = [['classes', 'Classes'], ['calendar', 'Calendar']];
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 
-// Everything from Canvas in one place: your classes with their course material, and the calendar.
+// Your Canvas classes with their course material. The calendar is its own page (/calendar).
 export default function CanvasPage() {
   const router = useRouter();
   const { ready } = useRequireAuth();
   useSessionTracker('browse');
-  const tab = TABS.some(([key]) => key === router.query.tab) ? router.query.tab : 'classes';
   const [status, setStatus] = useState(undefined);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => { if (ready) canvasStatus().then(setStatus); }, [ready]);
-  useEffect(() => { if (ready && tab === 'calendar') walkthroughEvent('calendar-opened'); }, [ready, tab]);
-
-  function setTab(key) {
-    router.replace(key === 'classes' ? '/canvas' : `/canvas?tab=${key}`, undefined, { shallow: true });
-  }
+  // Old links to the Calendar tab open the Calendar page.
+  useEffect(() => { if (router.query.tab === 'calendar') router.replace('/calendar'); }, [router.query.tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function syncNow() {
     setSyncing(true);
@@ -57,13 +50,7 @@ export default function CanvasPage() {
       </header>
       {error && <p className="canvas-error" role="alert">{error}</p>}
 
-      <div className="c-seg canvas-tabs" role="tablist" aria-label="Canvas">
-        {TABS.map(([key, label]) => (
-          <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button>
-        ))}
-      </div>
-
-      {tab === 'calendar' ? <CalendarDashboard /> : status === undefined ? (
+      {status === undefined ? (
         <SectionLoader height={200} label="Loading Canvas" />
       ) : connected ? (
         <CanvasClasses status={status} onStatus={setStatus} />
@@ -75,13 +62,12 @@ export default function CanvasPage() {
       ) : (
         <div className="c-empty">
           <span className="c-section-title">Canvas classes are almost ready</span>
-          <p className="c-meta">Your Canvas calendar works now in the Calendar tab.</p>
-          <button type="button" className="c-btn c-btn--secondary" onClick={() => setTab('calendar')}>Open Calendar</button>
+          <p className="c-meta">Your Canvas calendar works now on the Calendar page.</p>
+          <Link href="/calendar" className="c-btn c-btn--secondary">Open Calendar</Link>
         </div>
       )}
       <style jsx>{`
         .canvas-page { width: min(var(--page-max), 100%); margin: 0 auto; }
-        .canvas-tabs { justify-self: start; }
         .canvas-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
         .canvas-note { margin: 0; }
       `}</style>

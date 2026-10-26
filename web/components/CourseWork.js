@@ -63,7 +63,7 @@ export default function CourseWork({ data, extraUpcoming = [], onPlan, actions }
             <div key={item.id} className={'c-list-row cw-row' + (done && tab !== 'completed' ? ' is-done' : '')}>
               <DoneCheck id={item.id} title={item.title} done={done} onChange={value => setDoneNow(current => ({ ...current, [item.id]: value }))} />
               <span className="c-grow cw-main">
-                <a className="c-truncate cw-title" href={safeHref(item.url, '/canvas?tab=calendar')} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>
+                <a className="c-truncate cw-title" href={safeHref(item.url, '/calendar')} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>
                   {deadlineTitle(item)}{item.url && !item.internal && <ExternalLink size={14} strokeWidth={1.75} aria-hidden="true" />}
                 </a>
                 <span className="c-meta c-truncate">
@@ -86,7 +86,7 @@ export default function CourseWork({ data, extraUpcoming = [], onPlan, actions }
           </button>
         )}
       </div>
-      {tab === 'missing' && list.length > 0 && <p className="c-meta cw-note">Missing means Canvas marked it missing, or it's past due and not turned in. <Link href="/canvas?tab=calendar">See calendar</Link></p>}
+      {tab === 'missing' && list.length > 0 && <p className="c-meta cw-note">Missing means Canvas marked it missing, or it's past due and not turned in. <Link href="/calendar">See calendar</Link></p>}
       <style jsx>{`
         .cw-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
         .cw-count { display: grid; justify-items: center; gap: 6px; padding: 18px 12px; border: 1px solid transparent; cursor: pointer; text-align: center; color: var(--ink); }

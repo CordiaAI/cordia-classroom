@@ -33,6 +33,27 @@ class CalendarConnectionTests(unittest.TestCase):
         self.assertEqual(saved["feed_url"], "https://canvas.example.edu/feeds/calendars/user_Tok3n.ics")
         self.assertNotIn("feed_url", result)
 
+    def test_study_blocks_are_the_students_own_with_titles(self):
+        rows = [{"id": "b1", "item_key": "canvas:1", "kind": "work", "step_id": "s1", "starts_at": "2026-10-27T16:00:00+00:00", "ends_at": "2026-10-27T16:45:00+00:00"},
+                {"id": "b2", "item_key": "canvas:2", "kind": None, "step_id": None, "starts_at": "2026-10-28T16:00:00+00:00", "ends_at": "2026-10-28T17:00:00+00:00"}]
+        query = MagicMock()
+        for name in ("select", "eq", "neq", "gte", "lte", "order", "limit"):
+            getattr(query, name).return_value = query
+        query.execute.return_value = SimpleNamespace(data=rows)
+        database = MagicMock()
+        database.table.return_value = query
+        with (
+            patch.object(calendar, "get_user_id", return_value="user-9"),
+            patch.object(calendar, "get_supabase", return_value=database),
+            patch("services.google_sync._block_titles", return_value={"b1": "Essay: Outline"}),
+        ):
+            result = calendar.study_blocks("Bearer token")
+        database.table.assert_called_with("study_blocks")
+        query.eq.assert_any_call("user_id", "user-9")
+        query.neq.assert_any_call("status", "removed")
+        self.assertEqual([block["title"] for block in result["blocks"]], ["Essay: Outline", "Study"])
+        self.assertEqual(result["blocks"][1]["kind"], "work")
+
     def test_get_connection_returns_calendar_without_revealing_feed_url(self):
         payload = {"connected": True, "items": [], "due_today": [], "updated_at": "now"}
         with (
