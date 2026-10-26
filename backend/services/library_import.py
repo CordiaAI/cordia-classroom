@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from database import get_supabase
+from services.llm import guide_title
 from services.text_processing import text_to_outline
 
 log = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ def upsert_source(user_id: str, *, ref: str, connector: str, title: str, text: s
             _link(user_id, connector, found["id"], ref, outline, now)
         return found
     row = {
-        "user_id": user_id, "title": (title or "Imported material")[:300], "notes": outline, "study_guide": "",
+        "user_id": user_id, "title": guide_title(title or "Imported material", outline)[:300], "notes": outline, "study_guide": "",
         "external_source_id": ref, "source_type": source_type[:40], "source_title": source_title[:300],
     }
     if folder_id:

@@ -2764,6 +2764,11 @@ a.calendar-item:hover { border-color: var(--ink); }
   .calendar-week { grid-template-columns: 1fr; }
   .calendar-day { min-height: 0; }
   .calendar-day + .calendar-day { border-top: 1px solid var(--line); border-left: 0; }
+  /* A day with nothing due is one short line (its header says so), so the days that matter fit on screen. */
+  .calendar-day:has(.calendar-day-empty) .calendar-day-items { display: none; }
+  .calendar-day:has(.calendar-day-empty) > header { margin-bottom: 6px; }
+  .calendar-day:has(.calendar-day-empty) > header::after { content: 'Nothing due'; margin-left: auto; color: var(--muted-ink); font-size: 13px; font-weight: 500; }
+  .calendar-day-today:has(.calendar-day-empty) > header::after { content: none; }
   .calendar-dashboard .canvas-dashboard-header { align-items: flex-start; flex-direction: column; }
   .calendar-actions { width: 100%; flex-wrap: wrap; }
 }

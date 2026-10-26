@@ -22,6 +22,7 @@ import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
 import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
 import { confirmedTodos, lectureCalendarItems, mergeCalendarItems } from '../lib/lectures';
+import { deadlineTitle, safeHref } from '../lib/formatters';
 
 const SLOW = Symbol('slow');
 const SLOW_MS = 4000;
@@ -41,6 +42,7 @@ const ALERT_TEXT = {
   new_work: alert => `New work: ${alert.title}`,
   exam_prep: alert => `${alert.title} in ${alert.days} day${alert.days === 1 ? '' : 's'}`,
   module_done: alert => `Finished: ${alert.module}`,
+  draft_stalled: alert => `${alert.title}: draft hasn't grown in 2 days`,
   date_change: alert => (alert.change === 'cancelled'
     ? `Cancelled: ${alert.title}`
     : `${alert.title}: ${shortDate(alert.old_due)} → ${shortDate(alert.new_due)}`),
@@ -221,13 +223,17 @@ export default function Today() {
       {alerts.length > 0 && (
         <section className="c-section" aria-label="Heads up">
           <div className="c-card c-list">
-            {alerts.slice(0, 4).map(alert => (
+            {alerts.slice(0, 4).map(raw => ({ ...raw, title: deadlineTitle(raw) })).map(alert => (
               <div key={alert.id} className={'c-list-row today-alert is-' + alert.kind}>
                 <span className="c-grow">
                   <span className="today-alert-title">{ALERT_TEXT[alert.kind]?.(alert) || alert.title}</span>
-                  <span className="c-meta">{[alert.kind === 'date_change' ? senderName(alert.sender) : alert.course, alert.summary].filter(Boolean).join(' · ')}</span>
+                  <span className="c-meta">{[alert.kind === 'date_change' ? senderName(alert.sender) : alert.course, alert.summary,
+                    alert.kind === 'draft_stalled' && `due in ${alert.days} day${alert.days === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}</span>
                 </span>
                 {alert.url && <a className="c-btn c-btn--quiet c-btn--sm" href={alert.url} target="_blank" rel="noreferrer">Open</a>}
+                {alert.kind === 'draft_stalled' && (
+                  <Link className="c-btn c-btn--secondary c-btn--sm" href={`/tutor?assignment=${encodeURIComponent(alert.item_key)}&title=${encodeURIComponent(alert.title || '')}&ask=${encodeURIComponent('Help me get unstuck on my draft: what should I write next, based on the rubric?')}`}>Get unstuck</Link>
+                )}
                 {alert.kind === 'date_change' && (
                   <button type="button" className="c-btn c-btn--primary c-btn--sm" disabled={Boolean(reviewing)} onClick={() => accept(alert)}>
                     {reviewing === alert.id ? 'Updating…' : alert.change === 'cancelled' ? 'Remove it' : 'Update'}
@@ -258,7 +264,7 @@ export default function Today() {
             {dueItems.map(item => (
               <div key={item.id} className={'c-list-row today-due' + (doneNow[item.id] ? ' is-done' : '')}>
                 <DoneCheck id={item.id} title={item.title} done={Boolean(doneNow[item.id])} onChange={done => setDoneNow(current => ({ ...current, [item.id]: done }))} />
-                <a className="c-grow c-truncate today-due-link" href={item.url || '/canvas?tab=calendar'} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>{item.title}</a>
+                <a className="c-grow c-truncate today-due-link" href={safeHref(item.url, '/canvas?tab=calendar')} target={item.url && !item.internal ? '_blank' : undefined} rel={item.url && !item.internal ? 'noreferrer' : undefined}>{deadlineTitle(item)}</a>
                 <span className="c-meta">{shortDate(item.due_at)}</span>
                 {!item.internal && (
                   <button type="button" className="c-icon-btn" aria-label={`Plan ${item.title}`} title="Steps and study time" onClick={() => setPlanning(item)}>
@@ -305,6 +311,7 @@ export default function Today() {
         :global(.today-continue) { display: flex; align-items: center; gap: 16px; padding: 14px 18px; color: var(--ink); text-decoration: none; }
         :global(.today-continue:hover), :global(.today-progress:hover) { text-decoration: none; border-color: var(--olive); }
         .today-due { gap: 14px; }
+        .today-due .c-meta { flex: none; white-space: nowrap; }
         .today-due-link { color: var(--ink); text-decoration: none; }
         .today-due.is-done .today-due-link { color: var(--muted); text-decoration: line-through; }
         .today-continue-title { flex: 1 1 auto; min-width: 0; font:600 17px/1.15 var(--font-sans); }

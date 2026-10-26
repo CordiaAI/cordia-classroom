@@ -12,9 +12,11 @@ import Toggle from './Toggle';
 import { BRAND_PATHS } from '../lib/brandIcons';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { assistantApi } from '../lib/assistant';
-import { agoLabel, setMailWatch, syncOff, syncOn } from '../lib/studyPlans';
+import { addToLibrary, agoLabel, setMailWatch, syncOff, syncOn } from '../lib/studyPlans';
+import { classLabel } from '../lib/classLabel';
 import IcloudSheet from './assistant/IcloudSheet';
 import DriveFolders from './DriveFolders';
+import NotionHome from './NotionHome';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // What each app does here, shown in its sheet.
@@ -24,8 +26,8 @@ const DETAILS = {
   apple_calendar: 'Subscribes your Apple Calendar to your deadlines. It refreshes every hour on your iPhone, iPad and Mac. No Apple password needed.',
   gtasks: 'Keeps a "Cordia" list in Google Tasks: each deadline is a to-do, with its steps as subtasks. Check one off on your phone and it is done in Cordia too.',
   gdrive: 'Link a Drive folder to a class and new slides and readings come into Library on their own. Import a single file into Create, or save a copy of any guide back to a Cordia folder in your Drive.',
-  gdocs: 'Find a Google Doc and open its text in Create, ready to make a guide.',
-  notion: 'Find a Notion page and open it in Create, ready to make a guide. Share the page with Cordia in Notion first.',
+  gdocs: 'Import a Doc into Library, export any guide as a formatted Doc, and link the draft you\'re writing to an assignment so the Tutor can check it against the rubric.',
+  notion: 'Bring Notion pages into Library, keep a Notion database of your assignments in sync, and export guides with each question as a toggle. Cordia only sees pages you share with it: when Notion asks while connecting, pick the pages Cordia should use (add more later from a page\'s ••• › Connections).',
   gsheets: 'Text Cordia Assistant to add a row or read a sheet: log study hours, expenses, anything.',
   gmail: 'Cordia Assistant can text you about emails that need a reply and read recent mail when you ask.',
   outlook: 'Cordia Assistant can text you about emails that need a reply and read recent mail when you ask.',
@@ -87,7 +89,7 @@ function AssistantAppleCalendar() {
 }
 const IMPORTS = ['gdrive', 'gdocs', 'notion'];
 const SYNC_APPS = { gcal: 'calendar', gtasks: 'list' };
-const STAT_WORDS = { tasks: 'to-do', blocks: 'study block', assignments: 'assignment', announcements: 'announcement', files: 'file imported', imported_files: 'file imported', date_changes: 'date change found' };
+const STAT_WORDS = { tasks: 'to-do', blocks: 'study block', assignments: 'assignment', announcements: 'announcement', files: 'file imported', imported_files: 'file imported', date_changes: 'date change found', rows: 'assignment in Notion', drafts_tracked: 'draft tracked' };
 
 // "Last synced 4 min ago · 12 assignments": what a connection is actually doing.
 function healthLine(health) {
@@ -102,6 +104,18 @@ const SOURCE_DRAFT_KEY = 'autostudy_text_draft';
 
 function ImportSheet({ connector, onClose }) {
   const router = useRouter();
+  // Where an import goes: Create (to review first) or straight into a class in Library.
+  const [classes, setClasses] = useState([]);
+  const [target, setTarget] = useState('');
+  const [added, setAdded] = useState(null);
+  useEffect(() => { apiFetch('/folders').then(data => setClasses(Array.isArray(data?.folders) ? data.folders : [])); }, []);
+  async function addToClass(file) {
+    setBusy(file.id); setError(''); setAdded(null);
+    const data = await addToLibrary(connector.id, { id: file.id, title: file.title, folderId: target });
+    setBusy('');
+    if (data?.guide?.id) setAdded(data.guide);
+    else setError(data?.detail || "That didn't import. Try again.");
+  }
   const [query, setQuery] = useState('');
   const [found, setFound] = useState(null);
   const [busy, setBusy] = useState('');
@@ -125,6 +139,7 @@ function ImportSheet({ connector, onClose }) {
   }, [connector.id, query]);
 
   async function pick(file) {
+    if (target) { addToClass(file); return; }
     setBusy(file.id); setError('');
     const data = await apiFetch(`/connectors/${connector.id}/import`, { method: 'POST', body: JSON.stringify({ id: file.id, title: file.title }) });
     if (!data?.text) { setBusy(''); setError(data?.detail || "That didn't import. Try again."); return; }
@@ -140,6 +155,15 @@ function ImportSheet({ connector, onClose }) {
             <h2 id="cn-import-title" className="c-section-title">Import from {connector.name}</h2>
             <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={onClose}>Close</button>
           </div>
+          {classes.length > 0 && (
+            <label className="cn-target">
+              <span className="c-meta">Add to</span>
+              <select className="c-input" value={target} onChange={event => { setTarget(event.target.value); setAdded(null); }}>
+                <option value="">Create (review it first)</option>
+                {classes.map(folder => <option key={folder.id} value={folder.id}>{classLabel(folder.name).title} in Library</option>)}
+              </select>
+            </label>
+          )}
           <label className="cn-search">
             <Search {...ICON} />
             <input ref={inputRef} className="c-input" type="search" placeholder={`Search ${connector.name}`} aria-label={`Search ${connector.name}`} value={query} onChange={event => setQuery(event.target.value)} />
@@ -158,8 +182,9 @@ function ImportSheet({ connector, onClose }) {
               ))}
             </div>
           )}
+          {added && <p className="cn-notice" role="status">Added <a href={`/guide/${added.id}`}>{added.title}</a> to Library.</p>}
           {error && <p className="cn-error" role="alert">{error}</p>}
-          <p className="c-meta">Imports open in Create so you can check the text before making a guide.</p>
+          <p className="c-meta">{target ? 'It goes into the class as notes, ready for cards and quizzes. Importing it again brings in changes.' : 'Imports open in Create so you can check the text before making a guide.'}</p>
         </div>
       </div>
     </BodyPortal>
@@ -478,6 +503,7 @@ export default function ConnectorsSettings() {
               )}
               {active.id === 'apple_calendar' && <AssistantAppleCalendar />}
               {active.id === 'gdrive' && active.connected && <DriveFolders />}
+              {active.id === 'notion' && active.connected && <NotionHome />}
               {notice && <p className="cn-notice" role="status">{notice}</p>}
               {error && <p className="cn-error" role="alert">{error}</p>}
             </div>

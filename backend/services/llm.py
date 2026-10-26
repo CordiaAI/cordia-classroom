@@ -1607,3 +1607,47 @@ def read_date_change(subject: str, sender: str, text: str, deadlines: list, toda
         return []
     changes = parsed.get("changes") if isinstance(parsed, dict) else None
     return [c for c in changes or [] if isinstance(c, dict)]
+
+
+GUIDE_TITLE_RULES = """You name a student's study material for their library. Read the start of the material and the
+name it came with, then write a title that says what it is about.
+- 3 to 8 words, Title Case, under 60 characters.
+- Lead with the subject itself. When the material covers two or three main parts, you may follow the
+  subject with a colon and those parts, e.g. "Cellular Respiration: Glycolysis, Krebs Cycle".
+- Keep a chapter, unit, week, lecture, module or exam number from the current name as a short prefix,
+  e.g. "Chapter 7: ..." or "Exam 2 Review: ...".
+- Leave out file and site words (PDF, slides, PowerPoint, Canvas), "Study Guide", "Notes", course codes,
+  school terms and dates, unless nothing else identifies the material.
+- Use only what the material says; never guess a subject it doesn't cover.
+Return JSON: {"title": str}"""
+
+
+def name_guide(current: str, material: str) -> str:
+    """A title naming what a guide covers, or "" when the material doesn't give enough to go on."""
+    sample = (material or "").strip()[:4000]
+    if len(sample) < 80:
+        return ""
+    try:
+        response = chat(get_openai_client(), "guide_title",
+            messages=[
+                {"role": "system", "content": GUIDE_TITLE_RULES},
+                {"role": "user", "content": f"CURRENT NAME: {current or '(none)'}\n\nMATERIAL:\n{sample}"},
+            ],
+            response_format={"type": "json_object"}, timeout=12,
+        )
+        title = str((_loads_model_json(response.choices[0].message.content or "{}") or {}).get("title") or "")
+    except Exception as error:
+        logger.info("guide title not written: %s", type(error).__name__)
+        return ""
+    title = " ".join(title.replace('"', "").split()).strip(" .-—:")
+    return title if 3 <= len(title) <= 90 and "\n" not in title else ""
+
+
+def guide_title(raw: str, material: str = "", keep: bool = False) -> str:
+    """The title a new guide is saved under. A name the student typed is kept as is; a source's name
+    is cleaned, and named from the material when it still doesn't say what the guide covers."""
+    from services.text_processing import clean_title, weak_title
+    if keep:
+        return (raw or "").strip()[:500] or "Study guide"
+    cleaned = clean_title(raw) or "Study guide"
+    return (name_guide(cleaned, material) or cleaned) if weak_title(raw) else cleaned

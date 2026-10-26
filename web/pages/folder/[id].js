@@ -240,7 +240,10 @@ export default function ClassPage() {
         .cls-needs-code :global(.cls-add) { width: 100%; box-shadow: none; padding: 0; background: none; border: 0; }
         :global(.folder-row-link) { display: flex; align-items: baseline; gap: 12px; min-width: 0; color: var(--ink); text-decoration: none; }
         .folder-row-title { font:600 17px/1.15 var(--font-sans); min-width: 0; }
-        @media (max-width: 767px) { :global(.folder-row-link) { flex-direction: column; gap: 2px; } }
+        @media (max-width: 767px) {
+          :global(.folder-row-link) { flex-direction: column; align-items: stretch; gap: 2px; }
+          .folder-row-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; overflow-wrap: anywhere; }
+        }
       `}</style>
     </div>
     </Reveal>

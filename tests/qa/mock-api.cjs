@@ -147,9 +147,16 @@ async function install(context, state) {
       ] };
       if (m[2] && state.plans[key]) { state.plans[key].blocks = [0, 1].map(i => ({ id: 'b' + i, starts_at: new Date(Date.now() + (i + 1) * 86400000).toISOString(), ends_at: new Date(Date.now() + (i + 1) * 86400000 + 3600000).toISOString(), status: 'planned' })); return json({ plan: state.plans[key], added: 2 }); }
       if (method === 'DELETE') { delete state.plans[key]; return json({ ok: true }); }
-      return json({ plan: state.plans[key] || null, points: 50, missing: false, rubric: [{ description: 'Data analysis', points: 20, long_description: 'Graphs are labeled and support the conclusion.' }, { description: 'Discussion', points: 20 }, { description: 'Formatting', points: 10 }] });
+      return json({ plan: state.plans[key] || null, points: 50, missing: false, draft: state.draft || null, rubric: [{ description: 'Data analysis', points: 20, long_description: 'Graphs are labeled and support the conclusion.' }, { description: 'Discussion', points: 20 }, { description: 'Formatting', points: 10 }] });
     }
     if (path.match(/^\/plans\/[^/]+\/steps\//)) return json({ step: { id: 's', done: body.done } });
+    if (path.match(/^\/plans\/[^/]+\/draft$/)) { state.draft = method === 'PUT' ? { doc_id: body.doc_id, title: body.title, url: 'https://docs.google.com/document/d/x/edit', words: 1240 } : null; return json({ draft: state.draft }); }
+    if (path === '/notion/home') return json({ home: state.notionHome || null });
+    if (path === '/notion/pages') return json({ pages: [{ id: 'np1', title: 'School 2026', edited: '2026-10-20' }, { id: 'np2', title: 'BIO notes', edited: '2026-10-11' }] });
+    if (path === '/notion/setup') { state.notionHome = { id: body.page_id, title: body.title }; return json({ on: true, added: 7, home: state.notionHome }); }
+    if (path === '/notion/sync') return json({ on: true, added: 0, done_in_notion: 1 });
+    if (path === '/docs/export' || path === '/notion/export') return json({ url: 'about:blank' });
+    if (path.match(/^\/connectors\/[a-z]+\/library$/)) return json({ guide: { id: 'g1', title: 'Biology lecture 4 notes' } });
     if (path === '/week') return json({ due: [
       { id: 'c1', title: 'Lab report [BIO-101-002]', course: 'BIO-101', due_at: new Date(Date.now() + 86400000).toISOString(), effort_minutes: 150, planned: true, scheduled_minutes: 120 },
       { id: 'c2', title: 'Midterm [BIO-101-002]', course: 'BIO-101', due_at: new Date(Date.now() + 3 * 86400000).toISOString(), effort_minutes: null, planned: false, scheduled_minutes: 0 },

@@ -25,6 +25,7 @@ async function guideForNote(noteId) {
     method: 'POST',
     body: JSON.stringify({
       title: note.title || 'Notes',
+      keep_title: Boolean(note.title && !/^untitled/i.test(note.title)),
       notes: domToOutline(page, { title: note.title }),
       source_type: NOTE_SOURCE(noteId),
       ...(note.folder_id ? { folder_id: note.folder_id } : {}),

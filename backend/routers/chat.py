@@ -127,10 +127,16 @@ def _assignment_text(user_id: str, key: str) -> tuple[str, Optional[dict]]:
     criteria = "\n".join(
         f"{index}. {c.get('description') or ''} ({c.get('points') or 0} pts)" + (f": {c['long_description']}" if c.get("long_description") else "")
         for index, c in enumerate(detail.get("rubric") or [], 1))
+    from services import docs_sync
+    try:
+        draft = docs_sync.draft_text(user_id, key)
+    except HTTPException:
+        draft = ""  # Docs unreachable: the Tutor still has the instructions and rubric.
     text = "\n\n".join(filter(None, [
         f"ASSIGNMENT: {detail.get('title') or 'Assignment'}" + (f" ({detail['points_possible']} points)" if detail.get("points_possible") else ""),
         f"INSTRUCTIONS:\n{detail['description']}" if detail.get("description") else "",
         f"RUBRIC CRITERIA (numbered):\n{criteria}" if criteria else "",
+        f"THE STUDENT'S DRAFT (linked Google Doc):\n{draft[:60000]}" if draft.strip() else "",
     ]))
     return text, {"type": "assignment", "id": key, "title": detail.get("title") or "Assignment"}
 

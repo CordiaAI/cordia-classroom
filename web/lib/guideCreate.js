@@ -39,7 +39,7 @@ export function pairsToCards(pairs) {
 
 // Generates and saves one guide from source text. Runs as a background job, so it
 // only uses the values passed in, never page state.
-export async function generateAndSave({ source, requestId, title, sourceTitle, sourceType, sourceUrl, externalSourceId, folderId, notes, flashcards, manualPairs }) {
+export async function generateAndSave({ source, requestId, title, keepTitle = false, sourceTitle, sourceType, sourceUrl, externalSourceId, folderId, notes, flashcards, manualPairs }) {
   const generated = await apiFetch('/generate', {
     method: 'POST',
     body: JSON.stringify({ content: source, notes, study_guide: true, flashcards, request_id: requestId }),
@@ -74,6 +74,8 @@ export async function generateAndSave({ source, requestId, title, sourceTitle, s
     method: 'POST',
     body: JSON.stringify({
       title,
+      // Without a typed name, the server cleans the file or page name, or names the guide from its content.
+      keep_title: keepTitle,
       notes: generated.notes || null,
       study_guide: studyGuide,
       flashcards: cards,

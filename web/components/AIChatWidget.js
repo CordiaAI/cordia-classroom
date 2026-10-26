@@ -90,7 +90,7 @@ const SKILL_PROGRESS = {
 };
 
 // freshOnMount: the full Tutor page opens on a new chat; the side panel starts one each time it opens.
-export default function AIChatWidget({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '', freshOnMount = false, assignment = null }) {
+export default function AIChatWidget({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '', freshOnMount = false, assignment = null, initialPrompt = '' }) {
   // An assignment being worked on: its instructions and rubric go with every question until cleared.
   const [working, setWorking] = useState(assignment);
   useEffect(() => { setWorking(assignment); }, [assignment?.key]);
@@ -106,7 +106,8 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const [savedMode, setSavedMode] = useState('');
   const [skillOverride, setSkillOverride] = useState('');
   const [targetClassId, setTargetClassId] = useState('');
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(initialPrompt || '');
+  useEffect(() => { if (initialPrompt) setInput(initialPrompt); }, [initialPrompt]);
   const [retainContext, setRetainContext] = useState(null);
   const [savedDraft, setSavedDraft] = useState('');
   const [loading, setLoading] = useState(false);

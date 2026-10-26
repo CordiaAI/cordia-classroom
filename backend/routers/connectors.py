@@ -212,11 +212,7 @@ def _drive_text(account: str, user_id: str, file_id: str) -> str:
     return files.text_from_file(str(content.get("name") or data.get("name") or ""), raw, mime)
 
 
-@router.post("/connectors/{connector}/import")
-@limiter.limit("10/minute")
-def import_file(connector: str, body: ImportRequest, request: Request, authorization: str = Header(default="")):
-    """The file's text, for the student to review on Create before making a guide."""
-    user_id = get_user_id(authorization)
+def _import_text(connector: str, user_id: str, body: ImportRequest) -> tuple[str, str]:
     if connector not in {"gdrive", "gdocs", "notion"}:
         raise HTTPException(status_code=404, detail="Unknown connector")
     account = composio.account_for(user_id, connector)
@@ -229,7 +225,36 @@ def import_file(connector: str, body: ImportRequest, request: Request, authoriza
         text, title = _drive_text(account, user_id, body.id), body.title
     if len(text.strip()) < 10:
         raise HTTPException(status_code=422, detail="That file has no readable text.")
-    return {"title": (title or "Imported notes")[:300], "text": text[:files.MAX_TEXT_CHARS]}
+    return text, (title or "Imported notes")[:300]
+
+
+@router.post("/connectors/{connector}/import")
+@limiter.limit("10/minute")
+def import_file(connector: str, body: ImportRequest, request: Request, authorization: str = Header(default="")):
+    """The file's text, for the student to review on Create before making a guide."""
+    text, title = _import_text(connector, get_user_id(authorization), body)
+    return {"title": title, "text": text[:files.MAX_TEXT_CHARS]}
+
+
+class LibraryRequest(ImportRequest):
+    folder_id: str = Field(..., max_length=36)
+
+
+@router.post("/connectors/{connector}/library")
+@limiter.limit("10/minute")
+def add_to_library(connector: str, body: LibraryRequest, request: Request, authorization: str = Header(default="")):
+    """Straight into a class in Library as a notes guide (no Create step); importing again refreshes it."""
+    from routers.drive import _own_folder
+    from services import library_import
+    user_id = get_user_id(authorization)
+    folder = _own_folder(user_id, body.folder_id)
+    text, title = _import_text(connector, user_id, body)
+    names = {"gdrive": "Google Drive", "gdocs": "Google Docs", "notion": "Notion"}
+    guide = library_import.upsert_source(user_id, ref=f"{connector}:{body.id}", connector=connector, title=title, text=text,
+                                         folder_id=folder["id"], source_type=connector, source_title=names[connector])
+    if not guide:
+        raise HTTPException(status_code=422, detail="That file has no readable text.")
+    return {"guide": {"id": guide.get("id"), "title": guide.get("title")}}
 
 
 # ---- The Tutor reads an app the student names ----
