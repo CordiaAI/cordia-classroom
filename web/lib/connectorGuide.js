@@ -4,7 +4,7 @@
 // href it's a link to the place it happens; without, it happens right there in the sheet.
 export const TRY = {
   canvas: [
-    { text: 'See every deadline for the week in one place.', href: '/canvas?tab=calendar', label: 'Open calendar' },
+    { text: 'See every deadline for the week in one place.', href: '/calendar', label: 'Open calendar' },
     { text: 'Plan your week: pick what to work on and Cordia finds the time.', href: '/week', label: 'Plan your week' },
     { text: 'On a class, open Grades to see what each assignment needs to keep or raise your grade.', href: '/library', label: 'Open Library' },
   ],

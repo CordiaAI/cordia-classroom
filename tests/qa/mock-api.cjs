@@ -128,6 +128,11 @@ async function install(context, state) {
     if ((m = path.match(/^\/smart_notes\/([^/]+)$/)) && method === 'PUT') { const n = state.notes.find(item => item.id === m[1]); if (n) Object.assign(n, body); return json({ note: n }); }
     if ((m = path.match(/^\/smart_notes\/([^/]+)$/)) && method === 'DELETE') { state.notes = state.notes.filter(n => n.id !== m[1]); return json({ deleted: true }); }
     if ((m = path.match(/^\/smart_notes\/([^/]+)$/))) return json({ note: state.notes.find(n => n.id === m[1]) || state.notes[0] });
+    if (path === '/calendar/blocks') {
+      const at = (days, hour, minutes) => { const d = new Date(); d.setDate(d.getDate() + days); d.setHours(hour, 0, 0, 0); return [d.toISOString(), new Date(d.getTime() + minutes * 60000).toISOString()]; };
+      return json({ blocks: state.blocks === false ? [] : [[0, 16, 45, 'work', 'Lab report: Write the methods'], [1, 15, 60, 'work', 'Lab report: Draft results'], [2, 18, 30, 'review', 'Review: Midterm']]
+        .map(([days, hour, minutes, kind, title], index) => { const [starts_at, ends_at] = at(days, hour, minutes); return { id: 'b' + index, item_key: 'canvas:' + index, kind, title, starts_at, ends_at }; }) });
+    }
     if (path === '/calendar/connection' && method === 'GET') return json(state.populated ? { connected: true, items: [
       { id: 'c1', title: 'Lab report [BIO-101-002]', due_at: new Date(Date.now() + 86400000).toISOString(), type: 'assignment', url: 'https://school.instructure.com/courses/1/assignments/1' },
       { id: 'c2', title: 'Midterm [BIO-101-002]', due_at: new Date(Date.now() + 3 * 86400000).toISOString(), type: 'exam' },

@@ -2758,6 +2758,9 @@ a.calendar-item:hover { border-color: var(--ink); }
 .calendar-kind-exam,
 .calendar-kind-quiz { background: var(--surface-card); color: var(--warning); }
 .calendar-kind-project { background: var(--surface-card); color: var(--olive-ink); }
+/* Study blocks (Plan my week) read as time set aside, not a deadline: an olive edge and tint. */
+.calendar-item-block { border-left: 3px solid var(--olive); background: var(--olive-tint); }
+.calendar-kind-study { color: var(--olive-ink); }
 
 @media (max-width: 840px) {
   .calendar-steps,

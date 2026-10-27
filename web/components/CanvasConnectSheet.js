@@ -98,7 +98,7 @@ export default function CanvasConnectSheet({ school = '', initialDomain = '', on
         ) : blocked ? (
           <div className="ccs-blocked">
             <p className="ccs-line" role="status">Your school doesn't allow tokens</p>
-            <button type="button" className="c-btn c-btn--primary" onClick={() => { onClose(); router.push('/canvas?tab=calendar'); }}>Use Calendar feed</button>
+            <button type="button" className="c-btn c-btn--primary" onClick={() => { onClose(); router.push('/calendar'); }}>Use Calendar feed</button>
           </div>
         ) : (
           <form className="ccs-form" onSubmit={connect}>

@@ -368,6 +368,24 @@ def calendar_for(user_id: str) -> dict:
     return _calendar_payload(url, user_id)
 
 
+@router.get("/blocks")
+def study_blocks(authorization: str = Header(default=""), days_back: int = 14, days_ahead: int = 60):
+    """Study blocks (from Plan my week and assignment plans) for the in-app calendar, which shows
+    them with or without Canvas. Google Calendar and the calendar feed get the same blocks."""
+    from services.google_sync import _block_titles
+    user_id = get_user_id(authorization)
+    now = datetime.now(timezone.utc)
+    rows = get_supabase().table("study_blocks").select("id,item_key,kind,step_id,starts_at,ends_at") \
+        .eq("user_id", user_id).neq("status", "removed") \
+        .gte("ends_at", (now - timedelta(days=max(0, min(days_back, 120)))).isoformat()) \
+        .lte("starts_at", (now + timedelta(days=max(1, min(days_ahead, 180)))).isoformat()) \
+        .order("starts_at").limit(500).execute().data or []
+    titles = _block_titles(user_id, rows) if rows else {}
+    return {"blocks": [{"id": row["id"], "item_key": row["item_key"], "kind": row.get("kind") or "work",
+                        "title": titles.get(row["id"], "Study"), "starts_at": row["starts_at"], "ends_at": row["ends_at"]}
+                       for row in rows]}
+
+
 @router.get("/connection")
 def get_calendar_connection(authorization: str = Header(default="")):
     return calendar_for(get_user_id(authorization))

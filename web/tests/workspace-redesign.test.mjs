@@ -4,12 +4,12 @@ import { readFile } from 'node:fs/promises';
 
 const source = relativePath => readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 
-test('one navigation: Dashboard, Library, Canvas, Assistant plus New; Tutor is a bubble; Library owns study screens, notes and lectures', async () => {
+test('one navigation: Dashboard, Library, Calendar, Canvas, Assistant plus New; Tutor is a bubble; Library owns study screens, notes and lectures', async () => {
   const sidebar = await source('components/Sidebar.js');
   const navigation = sidebar.split('const navItems = [')[1].split('];')[0];
   const labels = [...navigation.matchAll(/\{ label: '([^']+)'/g)].map(match => match[1]);
 
-  assert.deepEqual(labels, ['Dashboard', 'Library', 'Canvas', 'Assistant']);
+  assert.deepEqual(labels, ['Dashboard', 'Library', 'Calendar', 'Canvas', 'Assistant']);
   assert.match(sidebar, /'\/smartnotes', '\/lecture'\]/);
   assert.match(sidebar, /<TutorBubble \/>/);
   assert.match(await source('components/TutorBubble.js'), /cordia:tutor-toggle/);
@@ -35,7 +35,7 @@ test('Practice is picked in Library; the workspace needs a guide or a file', asy
 test('old dashboard views redirect to their own routes', async () => {
   const dashboard = await source('pages/dashboard.js');
 
-  assert.match(dashboard, /const LEGACY_VIEWS = \{ guides: '\/library', classes: '\/library', calendar: '\/canvas\?tab=calendar', notes: '\/smartnotes' \}/);
+  assert.match(dashboard, /const LEGACY_VIEWS = \{ guides: '\/library', classes: '\/library', calendar: '\/calendar', notes: '\/smartnotes' \}/);
   assert.match(dashboard, /router\.replace\(legacy\)/);
   assert.doesNotMatch(dashboard, /Study smarter/);
 });
