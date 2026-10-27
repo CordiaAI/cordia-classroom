@@ -80,3 +80,37 @@ test('Make outline rewrites an older lecture without re-running its analysis', a
   assert.equal(state.notes.at(-1).content, outlineHtml(OUTLINE));
   assert.equal(state.patches.at(-1).analysis.note_id, 'note-1');
 });
+
+// A 40-minute class was one call that ran past the server's time limit, so its notes never came.
+test('a long lecture is written in parts at once and joined into one outline', async () => {
+  const { joinOutlines, mergeAnalyses, splitLecture, PART_CHARS } = await import('../lib/server/lectureLibrary.mjs');
+  const sentence = index => `Point ${index} explains how a customer moves from awareness to purchase. `;
+  const long = Array.from({ length: 500 }, (_, index) => sentence(index)).join('');
+  const parts = splitLecture(long);
+  assert.ok(parts.length >= 5, 'about six parts for a 40-minute class');
+  assert.ok(parts.every(part => part.length <= PART_CHARS * 1.3), 'each part stays small enough to finish in time');
+  assert.equal(parts.join(' '), long.trim(), 'no words are lost or repeated');
+
+  assert.equal(joinOutlines(['# Journey\n## I. Awareness\n* Ads\nNote: unrelated side conversation was left out.', '# Journey again\n## I. Consideration\n* Compare', '## I. Purchase\n* Buy\n## Key Takeaways\n1. Five steps']),
+    '# Journey\n## I. Awareness\n* Ads\n\n## II. Consideration\n* Compare\n\n## III. Purchase\n* Buy\n## Key Takeaways\n1. Five steps\n\nNote: unrelated side conversation was left out.');
+
+  const merged = mergeAnalyses([{ title: 'Purchase Journey', summary: ['A1', 'A2'], terms: [{ term: 'Awareness', definition: 'x' }] }, null, { summary: ['B1'], terms: [{ term: 'awareness', definition: 'y' }, { term: 'Evoked set', definition: 'z' }], class_id: 'c1' }]);
+  assert.deepEqual(merged.summary, ['A1', 'B1', 'A2'], 'the summary covers every part');
+  assert.deepEqual(merged.terms.map(item => item.term), ['Awareness', 'Evoked set']);
+  assert.equal(merged.title, 'Purchase Journey');
+  assert.equal(merged.class_id, 'c1');
+
+  const { library, state } = world();
+  const { status } = await library.save(AUTH, { transcript: long, lecture_date: '2026-10-20' });
+  assert.equal(status, 200);
+  const outlineCalls = state.calls.filter(call => call.messages[0].content === OUTLINE_RULES);
+  assert.equal(outlineCalls.length, parts.length, 'one outline call per part');
+  assert.ok(outlineCalls.every(call => call.max_tokens <= 5000));
+  assert.ok(outlineCalls[1].messages[1].content.includes('Leave out the "# " title line'));
+  assert.equal(state.calls.filter(call => call.messages[0].content === ANALYSIS_RULES).length, parts.length);
+  const saved = state.inserts.lecture.analysis;
+  assert.ok(saved.analyzed && saved.outline_md.startsWith('# Business Structures'));
+  assert.equal((saved.outline_md.match(/^# /gm) || []).length, 1, 'one title');
+  assert.equal(saved.title, undefined);
+  assert.equal(state.inserts.lecture.title, 'Forms of Business Ownership');
+});

@@ -2,9 +2,10 @@ import Anthropic from '@anthropic-ai/sdk';
 
 // One writing call (a system prompt and one user message) to whichever provider chatProvider()
 // picked. Returns { text, cutOff } or null when the call failed. `json` asks for a JSON object.
-export async function aiChat(provider, { system, user, maxTokens, json = false, timeoutMs = 30000, fetchImpl = globalThis.fetch }) {
+// `retries` 0 keeps a call inside its timeout (a retry after a timeout would double it).
+export async function aiChat(provider, { system, user, maxTokens, json = false, timeoutMs = 30000, retries = 1, fetchImpl = globalThis.fetch }) {
   if (!provider?.key) return null;
-  if (provider.name === 'anthropic') return claude(provider, { system, user, maxTokens, json, timeoutMs, fetchImpl });
+  if (provider.name === 'anthropic') return claude(provider, { system, user, maxTokens, json, timeoutMs, retries, fetchImpl });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -39,8 +40,8 @@ export async function aiChat(provider, { system, user, maxTokens, json = false, 
 // targets are Opus models only, which Classroom never uses.
 const THINKING_HEADROOM = 4000;
 
-async function claude(provider, { system, user, maxTokens, json, timeoutMs, fetchImpl }) {
-  const client = new Anthropic({ apiKey: provider.key, fetch: fetchImpl, timeout: timeoutMs, maxRetries: 1 });
+async function claude(provider, { system, user, maxTokens, json, timeoutMs, retries, fetchImpl }) {
+  const client = new Anthropic({ apiKey: provider.key, fetch: fetchImpl, timeout: timeoutMs, maxRetries: retries });
   try {
     const message = await client.beta.messages.create({
       model: provider.chatModel,
