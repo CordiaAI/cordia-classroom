@@ -3,8 +3,10 @@ Folders router for CordiaClassroom.
 Handles CRUD operations for class folders.
 """
 
+import os
+
 from fastapi import APIRouter, HTTPException, Header
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from database import get_supabase
 from auth_utils import get_user_id
 from ids import require_uuid
@@ -24,6 +26,35 @@ class FolderNameRequest(BaseModel):
         if len(v) > 100:
             raise ValueError("Folder name too long")
         return v.strip()
+
+
+class FolderCoverRequest(BaseModel):
+    """A Napkin visual already drawn and stored by the web app (/api/visual)."""
+    url: str = Field(max_length=500)
+    alt: str = Field(default="", max_length=200)
+    text: str = Field(default="", max_length=2000)
+    redraw: int = Field(default=0, ge=0, le=3)
+    theme: str = Field(default="light", pattern="^(light|dark)$")
+
+
+def _visual_url(url: str) -> bool:
+    """Only drawings in our own public visuals bucket can be a cover."""
+    base = (os.getenv("SUPABASE_URL") or "").rstrip("/")
+    return bool(base) and url.startswith(f"{base}/storage/v1/object/public/visuals/") and not any(c.isspace() for c in url)
+
+
+def _set_cover(folder_id: str, user_id: str, cover):
+    try:
+        result = get_supabase().table("folders").update({"cover": cover}) \
+            .eq("id", folder_id).eq("user_id", user_id).execute()
+    except Exception as error:
+        # Before the folder_covers migration runs, the column does not exist.
+        if "cover" in str(error):
+            raise HTTPException(status_code=503, detail="Class covers need a database update first")
+        raise
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Class not found")
+    return {"folder": result.data[0]}
 
 
 @router.get("")
@@ -74,6 +105,23 @@ def rename_folder(folder_id: str, request: FolderNameRequest, authorization: str
     if not result.data:
         raise HTTPException(status_code=404, detail="Class not found")
     return {"folder": result.data[0]}
+
+
+@router.put("/{folder_id}/cover")
+def set_folder_cover(folder_id: str, request: FolderCoverRequest, authorization: str = Header(default="")):
+    """Save the class's cover for Library's card view."""
+    require_uuid(folder_id, "folder ID")
+    user_id = get_user_id(authorization)
+    if not _visual_url(request.url):
+        raise HTTPException(status_code=400, detail="That cover can't be used")
+    return _set_cover(folder_id, user_id, request.model_dump())
+
+
+@router.delete("/{folder_id}/cover")
+def remove_folder_cover(folder_id: str, authorization: str = Header(default="")):
+    """Back to the plain placeholder cover."""
+    require_uuid(folder_id, "folder ID")
+    return _set_cover(folder_id, get_user_id(authorization), None)
 
 
 @router.delete("/{folder_id}")

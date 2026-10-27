@@ -3,7 +3,7 @@ import { LoadingArea, Reveal, useLoadGate } from '../components/CordiaLoader';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowUpDown, ArrowUpRight, AudioLines, BookOpen, ChevronDown, FolderInput, FolderPlus, Layers, Mic, NotebookPen, Pencil, PencilRuler, Plus, Search, Star, Trash2, Upload, X,
+  ArrowUpDown, ArrowUpRight, AudioLines, BookOpen, ChevronDown, FolderInput, FolderPlus, ImageIcon, Layers, LayoutGrid, List, Mic, NotebookPen, Pencil, PencilRuler, Plus, Search, Star, Trash2, Upload, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
@@ -20,6 +20,12 @@ import { openNewSheet } from '../lib/newSheet';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { classLabel } from '../lib/classLabel';
 import { PRACTICE_FILES, handOffUpload, readPracticeFile } from '../lib/practiceUpload';
+import ClassCard from '../components/ClassCard';
+import ClassCoverSheet from '../components/ClassCoverSheet';
+import { useVisualUsage } from '../components/NapkinVisual';
+import { coverText, drawCover } from '../lib/classCover';
+
+const VIEW_KEY = 'cordiaLibraryView';
 
 const SORTS = [
   { key: 'recent', label: 'Newest' },
@@ -75,6 +81,13 @@ export default function LibraryPage() {
   const gate = useLoadGate(!loading || Boolean(loadError));
   const [toast, setToast] = useState('');
   const [confirm, setConfirm] = useState(null);
+  // Rows (classes that open in place) or cards (one card per class, with its Napkin cover).
+  const [view, setView] = useState('rows');
+  const [coverFor, setCoverFor] = useState(null); // the folder whose cover is being changed
+  const [drawingId, setDrawingId] = useState(null);
+  const [coversPaused, setCoversPaused] = useState(false);
+  const triedCovers = useRef(new Set());
+  const visualUsage = useVisualUsage();
   const { pending, remove, undo } = useUndoDelete();
   // Practice from a file that isn't in Library: read it here, then open the workspace on it.
   const practiceFileRef = useRef(null);
@@ -97,8 +110,37 @@ export default function LibraryPage() {
     try {
       const saved = JSON.parse(localStorage.getItem('cordiaClosedClasses') || '[]');
       if (Array.isArray(saved)) setClosed(new Set(saved));
+      if (localStorage.getItem(VIEW_KEY) === 'cards') setView('cards');
     } catch {}
   }, []);
+
+  function chooseView(next) {
+    setView(next);
+    try { localStorage.setItem(VIEW_KEY, next); } catch {}
+  }
+
+  // The titles inside a class, which its cover is drawn from.
+  function classTitles(folderId) {
+    return [...guides, ...lectures, ...notes].filter(item => item.folder_id === folderId).map(item => item.title);
+  }
+
+  // In card view, a class with something in it and no cover yet gets one drawn, one class at a
+  // time, until visuals run out or aren't set up. Each first drawing uses one visual.
+  useEffect(() => {
+    if (view !== 'cards' || loading || drawingId || coversPaused || !visualUsage) return;
+    if (visualUsage.enabled === false || visualUsage.left <= 0) return;
+    const folder = folders.find(item => !item.cover?.url && !triedCovers.current.has(item.id) && classTitles(item.id).length);
+    if (!folder) return;
+    triedCovers.current.add(folder.id);
+    setDrawingId(folder.id);
+    drawCover(folder, classTitles(folder.id))
+      .then(result => {
+        if (result.cover) setFolders(current => current.map(item => (item.id === folder.id ? { ...item, cover: result.cover } : item)));
+        else if (result.stop) setCoversPaused(true);
+      })
+      .catch(() => {})
+      .finally(() => setDrawingId(null));
+  }, [view, loading, drawingId, coversPaused, visualUsage, folders, guides, lectures, notes]);
 
   useEffect(() => { if (ready) loadData(); }, [ready]);
 
@@ -365,9 +407,7 @@ export default function LibraryPage() {
             <Menu
               label={`More for ${name}`}
               items={[
-                { label: 'Open class', icon: ArrowUpRight, onSelect: () => router.push('/folder/' + folder.id) },
-                { label: 'Rename class', icon: Pencil, onSelect: () => router.push('/folder/' + folder.id + '?rename=1') },
-                { label: 'Delete class', icon: Trash2, danger: true, onSelect: () => deleteClass(folder) },
+                ...classMenu(folder),
               ]}
             />
           )}
@@ -375,6 +415,15 @@ export default function LibraryPage() {
         {open && (list.length ? <ul className="lib-list">{list.map(row)}</ul> : <p className="c-meta lib-empty-group">Nothing here yet. Drag items in, or use Move to class.</p>)}
       </section>
     );
+  }
+
+  function classMenu(folder) {
+    return [
+      { label: 'Open class', icon: ArrowUpRight, onSelect: () => router.push('/folder/' + folder.id) },
+      { label: 'Change cover', icon: ImageIcon, onSelect: () => setCoverFor(folder) },
+      { label: 'Rename class', icon: Pencil, onSelect: () => router.push('/folder/' + folder.id + '?rename=1') },
+      { label: 'Delete class', icon: Trash2, danger: true, onSelect: () => deleteClass(folder) },
+    ];
   }
 
   const primary = filter === 'lectures'
@@ -410,6 +459,10 @@ export default function LibraryPage() {
           <input className="c-input" type="search" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape' && query) { event.preventDefault(); setQuery(''); } }} placeholder="Search" />
           {query && <button type="button" className="c-search-clear" onClick={() => setQuery('')} aria-label="Clear search"><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>}
         </label>
+        <div className="lib-view" role="group" aria-label="View">
+          <button type="button" className="c-icon-btn" aria-pressed={view === 'rows'} aria-label="Rows" title="Rows" onClick={() => chooseView('rows')}><List size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+          <button type="button" className="c-icon-btn" aria-pressed={view === 'cards'} aria-label="Cards" title="Cards" onClick={() => chooseView('cards')}><LayoutGrid size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+        </div>
         <Menu
           label={`Sort: ${SORTS.find(item => item.key === sort).label}`}
           trigger={<ArrowUpDown size={20} strokeWidth={1.75} aria-hidden="true" />}
@@ -433,14 +486,23 @@ export default function LibraryPage() {
 
       {loading || (filter === 'flashcards' && !cardSets) ? null : (
         <div className="c-stack" data-spot={filter === 'practice' ? 'practice-picker' : undefined}>
-          {groups.map(entry => group({ id: entry.folder.id, name: entry.folder.name, list: entry.list, folder: entry.folder }))}
-          {looseClasses.map(item => (
+          {view === 'cards' && (groups.length > 0 || looseClasses.length > 0) && (
+            <div className="lib-cards">
+              {groups.map(({ folder, list }) => (
+                <ClassCard key={folder.id} name={folder.name} href={'/folder/' + folder.id} count={list.length} cover={folder.cover} drawing={drawingId === folder.id}
+                  menuItems={classMenu(folder)} dropProps={dropProps(folder.id)} isDrop={dropId === folder.id} />
+              ))}
+              {looseClasses.map(item => <ClassCard key={item.id} name={`${item.code}${item.name ? `: ${item.name}` : ''}`} href={'/class/' + item.id} count={0} />)}
+            </div>
+          )}
+          {view === 'rows' && groups.map(entry => group({ id: entry.folder.id, name: entry.folder.name, list: entry.list, folder: entry.folder }))}
+          {view === 'rows' && looseClasses.map(item => (
             <Link key={item.id} href={'/class/' + item.id} className="c-card lib-loose">
               <span className="lib-group-name c-truncate">{item.code}{item.name ? ` ${item.name}` : ''}</span>
               <span className="c-meta">Class sets</span>
             </Link>
           ))}
-          {(unfiled.length > 0 || !narrowed) && group({ id: 'none', name: 'Unfiled', list: unfiled })}
+          {(unfiled.length > 0 || (!narrowed && view === 'rows')) && group({ id: 'none', name: 'Unfiled', list: unfiled })}
           {narrowed && !items.length && <p className="c-meta lib-empty-group">{query.trim() ? '0 results' : 'Nothing here yet.'}</p>}
         </div>
       )}
@@ -452,6 +514,10 @@ export default function LibraryPage() {
         </div>
       )}
       {!pending && toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
+      {coverFor && (
+        <ClassCoverSheet folder={coverFor} defaultText={coverText(coverFor.name, classTitles(coverFor.id))} onClose={() => setCoverFor(null)}
+          onSaved={folder => { setFolders(current => current.map(item => (item.id === folder.id ? { ...item, ...folder } : item))); setCoverFor(null); setToast('Cover saved'); }} />
+      )}
       {confirm && <ConfirmDialog title={confirm.title} confirmLabel="Delete" onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
 
       <style jsx global>{`
@@ -459,6 +525,10 @@ export default function LibraryPage() {
         .library .lib-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
         .library .lib-tools { display: flex; align-items: center; gap: 8px; }
         .library .lib-add-class-icon { display: none; }
+        .library .lib-view { display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px; background: var(--olive-tint); }
+        .library .lib-view .c-icon-btn[aria-pressed='true'] { background: var(--surface-raised); color: var(--ink); box-shadow: var(--shadow-card); }
+        .library .lib-view .c-icon-btn[aria-pressed='false'] { color: var(--muted); }
+        .library .lib-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
         @media (max-width: 767px) { .library .lib-add-class-icon { display: inline-grid; } }
         .library .lib-filter-row { flex-wrap: nowrap; min-width: 0; }
         /* Six filters: on narrow phones they scroll inside their row, never the page. */
@@ -496,6 +566,7 @@ export default function LibraryPage() {
           /* Phones: "Add a class" moves up beside New, so the filters get the whole row. */
           .library .lib-add-class { display: none; }
           .library .lib-filters { margin: 0 -16px; padding: 2px 16px; }
+          .library .lib-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
         }
       `}</style>
     </div>

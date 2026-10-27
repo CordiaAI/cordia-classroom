@@ -45,6 +45,26 @@ export function useVisualUsage() {
   return usage;
 }
 
+// One Napkin drawing from /api/visual. A slow drawing answers "pending"; keep asking with its
+// ticket (the server stops at 3 minutes). Keeps the shared "visuals left" count current.
+export async function requestVisual({ text, context = '', theme = 'light', redraw = 0, onSlow }) {
+  const ask = resume => fetch('/api/visual', {
+    method: 'POST',
+    headers: { ...authOnlyHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, context, theme, ...(redraw ? { redraw } : {}), ...(resume ? { resume } : {}) }),
+  });
+  let response = await ask();
+  let data = await response.json().catch(() => ({}));
+  for (let round = 0; data?.status === 'pending' && data.resume && round < 12; round += 1) {
+    onSlow?.();
+    response = await ask(data.resume);
+    data = await response.json().catch(() => ({}));
+  }
+  if (response.status === 402) setUsage({ ...(usageCache || {}), left: 0, limit: data?.detail?.limit });
+  else if (typeof data?.left === 'number') setUsage({ ...(usageCache || {}), left: data.left, limit: data.limit });
+  return { status: response.status, data };
+}
+
 function useTheme() {
   const [theme, setTheme] = useState('light');
   useEffect(() => {
@@ -119,30 +139,15 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
     if (!earlier) setIndex(0);
     setUsed(false);
     try {
-      const ask = resume => fetch('/api/visual', {
-        method: 'POST',
-        headers: { ...authOnlyHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, context, theme: drawnTheme, ...(redraw ? { redraw } : {}), ...(resume ? { resume } : {}) }),
-      });
-      const drawnTheme = currentTheme();
-      let response = await ask();
-      let data = await response.json().catch(() => ({}));
-      // A slow drawing answers "pending"; keep asking with its ticket (the server stops at 3 minutes).
-      for (let round = 0; data?.status === 'pending' && data.resume && round < 12; round += 1) {
-        setState({ phase: 'loading', redraw, slow: true });
-        response = await ask(data.resume);
-        data = await response.json().catch(() => ({}));
-      }
-      if (response.status === 402) {
+      const { status, data } = await requestVisual({ text, context, theme: currentTheme(), redraw, onSlow: () => setState({ phase: 'loading', redraw, slow: true }) });
+      if (status === 402) {
         const detail = data?.detail || {};
-        setUsage({ ...(usageCache || {}), left: 0, limit: detail.limit });
         if (detail.plan === 'free') openUpgrade({ feature: 'visual' });
         if (earlier) giveUp({ reason: 'limit' });
         else setState({ phase: 'limit', pro: detail.plan !== 'free' });
         return;
       }
       if (data?.status === 'ok' && data.visuals?.length) {
-        if (typeof data.left === 'number') setUsage({ ...(usageCache || {}), left: data.left, limit: data.limit });
         const visuals = [...(earlier?.visuals || []), ...data.visuals];
         setState({ phase: 'ready', visuals, alt: data.alt, rendered: data.theme, redraws: redraw });
         setIndex(visuals.length - data.visuals.length);
