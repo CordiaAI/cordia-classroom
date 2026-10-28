@@ -35,13 +35,16 @@ def existing_refs(user_id: str, prefix: str) -> set[str]:
 _FILE_NAME_LINE = re.compile(r"^[-*•\s]*\S.*\.(?:pptx?|pdf|docx?|txt)\s*$", re.IGNORECASE)
 
 
+def names_only(notes: str) -> bool:
+    """Notes that are nothing but file names: a page imported as just the links to its slides."""
+    lines = [line for line in (notes or "").splitlines() if line.strip()]
+    return bool(lines) and all(_FILE_NAME_LINE.match(line) for line in lines)
+
+
 def thin_refs(user_id: str, prefix: str) -> set[str]:
-    """Imported guides that hold only file names (a page that was just links to its slides), to read again."""
+    """Imported guides that hold only file names, to read again."""
     rows = get_supabase().table("study_guides").select("external_source_id,notes").eq("user_id", user_id) \
         .like("external_source_id", f"{prefix}%").limit(5000).execute().data or []
-    def names_only(notes: str) -> bool:
-        lines = [line for line in (notes or "").splitlines() if line.strip()]
-        return bool(lines) and all(_FILE_NAME_LINE.match(line) for line in lines)
     return {row["external_source_id"] for row in rows if row.get("external_source_id") and names_only(row.get("notes"))}
 
 

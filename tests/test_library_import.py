@@ -230,5 +230,30 @@ class CanvasModules(Base):
         self.assertEqual(Client.downloads, [9])
 
 
+    def test_opening_a_file_name_only_guide_reads_its_slides_now(self):
+        from routers import canvas
+        from services import library_import
+        body = '<a href="https://school.instructure.com/courses/3/files/9?wrap=1">Chapters 18 - 20-1.pptx</a>'
+
+        class Client:
+            def download_file(self, course_id, file_id):
+                return "slides.txt", TEXT.encode()
+
+            def page(self, course_id, slug):
+                return {"body": body}
+        notes = "- Chapters 18 - 20-1.pptx"
+        self.db.rows("study_guides").append({"id": "g-old", "user_id": USER, "title": "Chapters 18 - 20", "notes": notes, "source_type": "canvas_module",
+                                             "external_source_id": "canvas:page:3:chapters-18-20-2", "folder_id": FOLDER})
+        self.db.rows("connector_links").append({"user_id": USER, "connector": "canvas", "kind": "file", "cordia_id": "g-old",
+                                                "external_id": "canvas:page:3:chapters-18-20-2", "synced_hash": library_import._hash(notes)})
+        with patch("routers.canvas.get_user_id", return_value=USER), patch("routers.canvas._imported_course", return_value={}), \
+                patch("routers.canvas._client", return_value=Client()):
+            result = canvas.refresh_guide("g-old", "Bearer t")
+            self.assertTrue(result["refreshed"])
+            self.assertIn("ATP is the energy currency", result["notes"])
+            # A guide with real notes is left alone, with no call to Canvas.
+            self.assertFalse(canvas.refresh_guide("g-old", "Bearer t")["refreshed"])
+
+
 if __name__ == "__main__":
     unittest.main()
