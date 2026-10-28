@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { Bookmark, Check, Flag, Layers } from 'lucide-react';
 import { apiFetch, apiErrorMessage } from '../lib/api';
 import DoneCheck from './DoneCheck';
+import { SectionLoader } from './CordiaLoader';
 import Menu from './Menu';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
@@ -65,13 +66,14 @@ function SetRow({ entry, onSaved, onReported }) {
 }
 
 // Sets classmates shared with this class: versions, "Studied by N", Save a copy, Report.
-export function ClassSets({ classId, onToast }) {
-  const [data, setData] = useState(null);
+// `initial` is the /classes/{id} answer when the page already has it, so nothing loads twice.
+export function ClassSets({ classId, onToast, initial }) {
+  const [data, setData] = useState(initial?.class ? initial : null);
   useEffect(() => {
-    if (!classId) return;
+    if (!classId || (initial?.class && initial.class.id === classId)) return;
     apiFetch('/classes/' + classId).then(result => setData(result?.class ? result : { error: apiErrorMessage(result?.detail, 'Class not found') }));
-  }, [classId]);
-  if (!data) return <div className="c-skeleton" style={{ height: 120, borderRadius: 20 }} />;
+  }, [classId]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!data) return <SectionLoader height={120} label="Loading class sets" />;
   if (data.error) return <p className="cp-line" role="alert">{data.error}</p>;
   if (data.class.sharing_blocked) return <p className="cp-line">Sharing is off for this class</p>;
   if (!data.sets.length) return <div className="c-empty"><Layers size={32} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">No shared sets yet</span></div>;
@@ -93,7 +95,7 @@ export function ClassSets({ classId, onToast }) {
 // Your own Canvas deadlines for this class.
 export function ClassDeadlines({ classId, deadlines }) {
   if (!classId) return null;
-  if (!deadlines) return <div className="c-skeleton" style={{ height: 120, borderRadius: 20 }} />;
+  if (!deadlines) return <SectionLoader height={120} label="Loading deadlines" />;
   if (!deadlines.length) return <p className="cp-line">No deadlines</p>;
   return (
     <ul className="c-card cp-list">

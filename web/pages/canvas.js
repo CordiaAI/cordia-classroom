@@ -8,7 +8,7 @@ import { apiErrorMessage, apiFetch } from '../lib/api';
 import { canvasStatus } from '../lib/canvas';
 import CanvasClasses from '../components/CanvasClasses';
 import CanvasConnectButton from '../components/CanvasConnectButton';
-import { SectionLoader } from '../components/CordiaLoader';
+import { LoadingArea, Reveal, useLoadGate } from '../components/CordiaLoader';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -20,8 +20,17 @@ export default function CanvasPage() {
   const [status, setStatus] = useState(undefined);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
+  const [folders, setFolders] = useState(undefined);
 
-  useEffect(() => { if (ready) canvasStatus().then(setStatus); }, [ready]);
+  // The classes and their Cordia covers arrive together, so the page appears once, whole.
+  useEffect(() => {
+    if (!ready) return;
+    Promise.all([canvasStatus(), apiFetch('/folders').catch(() => null)]).then(([next, folderData]) => {
+      setFolders(folderData?.folders || []);
+      setStatus(next);
+    });
+  }, [ready]);
+  const gate = useLoadGate(status !== undefined && folders !== undefined);
   // Old links to the Calendar tab open the Calendar page.
   useEffect(() => { if (router.query.tab === 'calendar') router.replace('/calendar'); }, [router.query.tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -35,9 +44,11 @@ export default function CanvasPage() {
   }
 
   if (!ready) return null;
+  if (gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate} label="Loading Canvas" />;
   const connected = Boolean(status?.connected);
 
   return (
+    <Reveal phase={gate}>
     <div className="c-page canvas-page">
       <header className="c-page-head">
         <h1 className="c-title">Canvas</h1>
@@ -50,10 +61,8 @@ export default function CanvasPage() {
       </header>
       {error && <p className="canvas-error" role="alert">{error}</p>}
 
-      {status === undefined ? (
-        <SectionLoader height={200} label="Loading Canvas" />
-      ) : connected ? (
-        <CanvasClasses status={status} onStatus={setStatus} />
+      {connected ? (
+        <CanvasClasses status={status} onStatus={setStatus} folders={folders} />
       ) : status ? (
         <div className="c-stack">
           <CanvasConnectButton card className="c-btn c-btn--primary" spot="canvas-connect" />
@@ -72,5 +81,6 @@ export default function CanvasPage() {
         .canvas-note { margin: 0; }
       `}</style>
     </div>
+    </Reveal>
   );
 }

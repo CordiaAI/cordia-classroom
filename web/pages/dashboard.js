@@ -19,6 +19,7 @@ import CanvasConnectButton from '../components/CanvasConnectButton';
 import DoneCheck from '../components/DoneCheck';
 import AssignmentSheet from '../components/AssignmentSheet';
 import CourseWork from '../components/CourseWork';
+import { canvasStatus } from '../lib/canvas';
 import { acceptChange, buildExamReview, buildReview, dismissAlert, getAlerts, minutesLabel } from '../lib/studyPlans';
 import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
@@ -27,7 +28,8 @@ import { confirmedTodos, lectureCalendarItems, mergeCalendarItems } from '../lib
 import { deadlineTitle, safeHref } from '../lib/formatters';
 
 const SLOW = Symbol('slow');
-const SLOW_MS = 4000;
+// A slow source holds the page (with the loader) this long, then the page shows and it fills in.
+const SLOW_MS = 8000;
 
 const LEGACY_VIEWS = { guides: '/library', classes: '/library', calendar: '/calendar', notes: '/smartnotes' };
 
@@ -81,13 +83,16 @@ export default function Today() {
   }, [ready, legacy, router]);
 
   // Every source loads together and the page appears once, from cache when returning.
-  // The calendar feed can be slow: past 4 s the page shows and Due soon fills in on its own.
+  // The calendar feed can be slow: past 8 s the page shows and Due soon fills in on its own.
   const { data, ready: loaded, update, refresh } = useCachedPage('today', async () => {
     const tz = -new Date().getTimezoneOffset();
     const safe = promise => promise.catch(() => null);
     const calendarRequest = safe(apiFetch('/calendar/connection'));
-    const calendarOrSlow = Promise.race([calendarRequest, new Promise(resolve => setTimeout(() => resolve(SLOW), SLOW_MS))]);
-    const [foldersData, guidesData, statsData, streakData, onboardingData, insightsData, notesData, checklistData, calendarData, lectureTodos, alertsData, studyWeek] = await Promise.all([
+    const orSlow = request => Promise.race([request, new Promise(resolve => setTimeout(() => resolve(SLOW), SLOW_MS))]);
+    const calendarOrSlow = orSlow(calendarRequest);
+    // Course work (upcoming / missing / completed) is part of the first view, not a card that pops in.
+    const courseworkRequest = safe(apiFetch('/calendar/coursework'));
+    const [foldersData, guidesData, statsData, streakData, onboardingData, insightsData, notesData, checklistData, calendarData, lectureTodos, alertsData, studyWeek, courseworkData, appsData, canvasData] = await Promise.all([
       safe(apiFetch('/folders')),
       safe(apiFetch('/guides?fields=summary&limit=500')),
       safe(apiFetch('/stats/overview')),
@@ -100,7 +105,12 @@ export default function Today() {
       safe(confirmedTodos()),
       safe(getAlerts()),
       safe(apiFetch('/stats/week?tz_offset=' + tz)),
+      orSlow(courseworkRequest),
+      safe(apiFetch('/connectors')),
+      safe(canvasStatus()),
     ]);
+    const usableCoursework = result => (result && result !== SLOW && !result.detail ? result : null);
+    if (courseworkData === SLOW) courseworkRequest.then(result => update(current => ({ ...current, coursework: usableCoursework(result) })));
     const failure = [foldersData, guidesData, statsData].find(item => !item || item.detail);
     const guideList = Array.isArray(guidesData?.guides) ? guidesData.guides : [];
     // New account, nothing made yet: the day-one walkthrough starts with "About you".
@@ -133,6 +143,9 @@ export default function Today() {
       lectureItems: lectureCalendarItems(lectureTodos?.todos),
       alerts: Array.isArray(alertsData?.alerts) ? alertsData.alerts : [],
       studyWeek: Number.isFinite(studyWeek?.minutes) ? studyWeek.minutes : null,
+      coursework: usableCoursework(courseworkData),
+      apps: appsData || null,
+      canvas: canvasData || null,
     };
   }, { enabled: ready && !legacy });
   const loadError = data?.loadError || '';
@@ -147,13 +160,8 @@ export default function Today() {
 
   useEffect(() => { if (ready && !legacy) walkthroughEvent('today-opened'); }, [ready, legacy]);
 
-  // Course work (upcoming / missing / completed this term) loads on its own so it never holds
-  // up the page; without a Canvas token the Due soon list stays.
-  const [coursework, setCoursework] = useState(null);
-  useEffect(() => {
-    if (!ready || legacy) return;
-    apiFetch('/calendar/coursework').then(result => setCoursework(result && !result.detail ? result : null)).catch(() => {});
-  }, [ready, legacy]);
+  // Course work (upcoming / missing / completed this term); without a Canvas token Due soon shows.
+  const coursework = data?.coursework || null;
 
   // Feature tips, one per session, each at its moment.
   useEffect(() => {
@@ -331,7 +339,7 @@ export default function Today() {
 
       {planning && <AssignmentSheet item={planning} onClose={() => setPlanning(null)} />}
 
-      <AppSetup canvasConnected={Boolean(calendar?.connected)} />
+      <AppSetup canvasConnected={Boolean(calendar?.connected)} apps={data?.apps} canvas={data?.canvas} />
 
       {firstWeek && (dayOneFinished(progress) || !progress.wt) ? <LearnCordia hideWhenComplete compact /> : null}
 

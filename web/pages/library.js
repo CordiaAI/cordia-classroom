@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LoadingArea, Reveal, useLoadGate } from '../components/CordiaLoader';
+import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../components/CordiaLoader';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
@@ -468,7 +468,7 @@ export default function LibraryPage() {
       {addingClass && <AddClass withName onCancel={() => setAddingClass(false)} onAdded={classAdded} />}
       {addingLecture && <LectureList folders={folders} adding onAddingChange={setAddingLecture} showList={false} />}
 
-      {loading || (filter === 'flashcards' && !cardSets) ? null : (
+      {loading ? null : filter === 'flashcards' && !cardSets ? <SectionLoader height={240} label="Loading your flashcards" /> : (
         <div className="c-stack" data-spot={filter === 'practice' ? 'practice-picker' : undefined}>
           {view === 'cards' && !narrowed && (groups.length > 0 || looseClasses.length > 0) && (
             <div className="lib-cards">

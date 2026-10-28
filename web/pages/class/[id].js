@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { ArrowLeft } from 'lucide-react';
 import { useRequireAuth } from '../../lib/auth';
 import { apiFetch, apiErrorMessage } from '../../lib/api';
+import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { ClassDeadlines, ClassSets } from '../../components/ClassSets';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
@@ -15,17 +16,19 @@ export default function SharedClassPage() {
   const router = useRouter();
   const { id } = router.query;
   const [info, setInfo] = useState(null);
+  const [classData, setClassData] = useState(null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('sets');
   const [deadlines, setDeadlines] = useState(null);
   const [toast, setToast] = useState('');
+  const gate = useLoadGate(Boolean(info || error));
 
   useEffect(() => {
     if (!ready || !id) return;
     Promise.all([apiFetch('/folders'), apiFetch('/classes/' + id)]).then(([folders, result]) => {
       const folder = (folders?.folders || []).find(item => item.class_id === id);
       if (folder) { router.replace('/folder/' + folder.id); return; }
-      if (result?.class) setInfo(result.class);
+      if (result?.class) { setClassData(result); setInfo(result.class); }
       else setError(apiErrorMessage(result?.detail, 'Class not found'));
     });
   }, [ready, id]);
@@ -41,7 +44,9 @@ export default function SharedClassPage() {
   }, [toast]);
 
   if (!ready) return null;
+  if (gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate} label="Loading class" />;
   return (
+    <Reveal phase={gate}>
     <div className="c-page cp">
       <header className="cp-head">
         <Link href="/library" className="c-icon-btn" aria-label="Back to Library"><ArrowLeft {...ICON} /></Link>
@@ -54,7 +59,7 @@ export default function SharedClassPage() {
             <button type="button" role="tab" aria-selected={tab === 'sets'} className={tab === 'sets' ? 'is-active' : ''} onClick={() => setTab('sets')}>Class sets</button>
             <button type="button" role="tab" aria-selected={tab === 'deadlines'} className={tab === 'deadlines' ? 'is-active' : ''} onClick={() => setTab('deadlines')}>Deadlines</button>
           </div>
-          {tab === 'sets' ? <ClassSets classId={id} onToast={setToast} /> : <ClassDeadlines classId={id} deadlines={deadlines} />}
+          {tab === 'sets' ? <ClassSets classId={id} onToast={setToast} initial={classData} /> : <ClassDeadlines classId={id} deadlines={deadlines} />}
         </>
       )}
       {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
@@ -65,5 +70,6 @@ export default function SharedClassPage() {
         .cp-tabs { justify-self: start; }
       `}</style>
     </div>
+    </Reveal>
   );
 }

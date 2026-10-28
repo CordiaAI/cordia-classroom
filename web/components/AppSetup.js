@@ -12,7 +12,9 @@ const HIDE_KEY = 'cordiaAppSetupHidden';
 // student. Connected ones say so and link to their first "Try it"; the rest go to their sheet in
 // Settings › Connectors, which explains how to connect and what to do next. Hidden once all are
 // connected, or when the student closes it.
-export default function AppSetup({ canvasConnected = false }) {
+// `apps` (the /connectors answer) comes with the Dashboard's own load, so the card is there from
+// the first frame instead of appearing after the page.
+export default function AppSetup({ canvasConnected = false, apps, canvas: canvasGiven }) {
   const [state, setState] = useState(null); // { connected: Set }
   const [hidden, setHidden] = useState(true);
 
@@ -20,14 +22,14 @@ export default function AppSetup({ canvasConnected = false }) {
     if (readUserValue(HIDE_KEY, false)) return undefined;
     setHidden(false);
     let live = true;
-    Promise.all([apiFetch('/connectors'), canvasConnected ? null : canvasStatus()]).then(([apps, canvas]) => {
+    Promise.all([apps === undefined ? apiFetch('/connectors') : apps, canvasConnected ? null : canvasGiven !== undefined ? canvasGiven : canvasStatus()]).then(([list, canvas]) => {
       if (!live) return;
-      const connected = new Set((apps?.connectors || []).filter(app => app.connected).map(app => app.id));
+      const connected = new Set((list?.connectors || []).filter(app => app.connected).map(app => app.id));
       if (canvasConnected || canvas?.connected) connected.add('canvas');
-      setState({ connected, loaded: Array.isArray(apps?.connectors) });
+      setState({ connected, loaded: Array.isArray(list?.connectors) });
     });
     return () => { live = false; };
-  }, [canvasConnected]);
+  }, [canvasConnected, apps, canvasGiven]);
 
   if (hidden || !state?.loaded) return null;
   const rows = SETUP.map(step => {
