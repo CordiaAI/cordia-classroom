@@ -40,6 +40,7 @@ export default function ClassPage() {
   const { ready } = useRequireAuth();
   const [folder, setFolder] = useState(null);
   const [cls, setCls] = useState(null);
+  const [classData, setClassData] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [folders, setFolders] = useState([]);
   const [items, setItems] = useState([]);
@@ -80,19 +81,25 @@ export default function ClassPage() {
     const all = foldersData?.folders || [];
     const current = all.find(item => item.id === id);
     if (!current) { setLoadError('This class no longer exists or you do not have access to it.'); return; }
+    // Everything for a Canvas-linked class (its tabs, code, deadlines) arrives before the page shows.
+    if (current.class_id) {
+      const safe = promise => promise.catch(() => null);
+      const [status, classResult, deadlineResult, sharing] = await Promise.all([
+        safe(canvasStatus()), safe(apiFetch('/classes/' + current.class_id)), safe(apiFetch(`/classes/${current.class_id}/deadlines`)), safe(apiFetch('/sharing/settings')),
+      ]);
+      setCourse((status?.courses || []).find(item => item.imported && item.class_id === current.class_id) || null);
+      setCls(classResult?.class || null);
+      setClassData(classResult?.class ? classResult : null);
+      setDeadlines(deadlineResult?.deadlines || []);
+      setShowName(typeof sharing?.show_first_name === 'boolean' ? sharing.show_first_name : null);
+    }
     setFolders(all);
-    setFolder(current);
     setItems([
       ...(guidesData?.guides || []).map(guide => ({ kind: 'guide', id: guide.id, title: guide.title, date: guide.created_at, href: '/guide/' + guide.id, progress: guide.read_progress })),
       ...(notesData?.notes || []).filter(note => note.folder_id === id).map(note => ({ kind: 'note', id: note.id, title: note.title || 'Untitled Notes', date: note.updated_at, href: '/smartnotes?id=' + note.id })),
       ...(lectureData?.lectures || []).filter(lecture => lecture.folder_id === id).map(lecture => ({ kind: 'lecture', id: lecture.id, title: lecture.title, date: lecture.lecture_date ? `${lecture.lecture_date}T12:00:00` : lecture.created_at, href: '/lecture/' + lecture.id })),
     ].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)));
-    if (current.class_id) {
-      canvasStatus().then(status => setCourse((status?.courses || []).find(item => item.imported && item.class_id === current.class_id) || null));
-      apiFetch('/classes/' + current.class_id).then(result => setCls(result?.class || null));
-      apiFetch(`/classes/${current.class_id}/deadlines`).then(result => setDeadlines(result?.deadlines || []));
-      apiFetch('/sharing/settings').then(data => setShowName(typeof data?.show_first_name === 'boolean' ? data.show_first_name : null));
-    }
+    setFolder(current);
   }
 
   function setTab(key) {
@@ -231,7 +238,7 @@ export default function ClassPage() {
       ) : tab === 'files' && course ? <div className="c-card cls-files"><CourseFiles course={course} /></div>
         : tab === 'grades' && course ? <ClassGrades courseId={course.id} guides={items.filter(item => item.kind === 'guide')} onMakeGuide={() => setTab('files')} />
         : !folder.class_id ? needsCode
-        : tab === 'sets' ? <ClassSets classId={folder.class_id} onToast={setToast} />
+        : tab === 'sets' ? <ClassSets classId={folder.class_id} onToast={setToast} initial={classData} />
         : <ClassDeadlines classId={folder.class_id} deadlines={deadlines} />}
 
       {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}

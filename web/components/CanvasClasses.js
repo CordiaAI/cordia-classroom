@@ -148,12 +148,18 @@ export function CourseFiles({ course }) {
 }
 
 // Canvas → Classes: every imported class with its course material and its Cordia class.
-export default function CanvasClasses({ status, onStatus }) {
-  const [folders, setFolders] = useState([]);
+export default function CanvasClasses({ status, onStatus, folders: given }) {
+  const [folders, setFolders] = useState(given || []);
   const [open, setOpen] = useState(() => new Set());
   const [choosing, setChoosing] = useState(false);
   const [view, chooseView] = useListView();
-  useEffect(() => { apiFetch('/folders').then(data => setFolders(data?.folders || [])); }, [status?.courses?.length]);
+  // The page passes the classes it loaded; a change in Canvas courses (Choose classes) reloads them.
+  const courseCount = status?.courses?.length;
+  const [loadedFor, setLoadedFor] = useState(given ? courseCount : null);
+  useEffect(() => {
+    if (loadedFor === courseCount) return;
+    apiFetch('/folders').then(data => { setFolders(data?.folders || []); setLoadedFor(courseCount); });
+  }, [courseCount, loadedFor]);
 
   const imported = (status?.courses || []).filter(course => course.imported);
   const folderFor = course => folders.find(folder => course.class_id && folder.class_id === course.class_id);

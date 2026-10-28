@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import CordiaLoader from '../../components/CordiaLoader';
+import CordiaLoader, { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
 import { apiFetch, openUpgrade } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -45,16 +45,21 @@ export default function QuizPage() {
   const [history, setHistory] = useState([]);
   const [title, setTitle] = useState('');
   const [race, setRace] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!ready || !guideId) return;
     setTypes(rememberedTypes());
-    apiFetch(`/quiz/${guideId}/history`).then(data => setHistory(data?.attempts || []));
-    apiFetch(`/guides/${guideId}`).then(data => setTitle(data?.guide?.title || ''));
-    apiFetch('/billing/status').then(data => {
-      if (data?.features) setPlan({ pro: data.plan === 'classroom_plus' || data.unlimited, left: data.features.retain_types?.remaining ?? 0 });
+    // Title, past scores and plan arrive together, so the page appears once, whole.
+    const safe = promise => promise.catch(() => null);
+    Promise.all([safe(apiFetch(`/quiz/${guideId}/history`)), safe(apiFetch(`/guides/${guideId}`)), safe(apiFetch('/billing/status'))]).then(([past, guide, billing]) => {
+      setHistory(past?.attempts || []);
+      setTitle(guide?.guide?.title || '');
+      if (billing?.features) setPlan({ pro: billing.plan === 'classroom_plus' || billing.unlimited, left: billing.features.retain_types?.remaining ?? 0 });
+      setLoaded(true);
     });
   }, [ready, guideId]);
+  const gate = useLoadGate(loaded);
 
   // Games opens Match straight away (?mode=match).
   useEffect(() => { if (router.query.mode === 'match') setRace(true); }, [router.query.mode]);
@@ -114,7 +119,9 @@ export default function QuizPage() {
     else setError(data?.detail || 'Could not regenerate the questions.');
   }
 
+  if (gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate} label="Loading quiz" />;
   return (
+    <Reveal phase={gate}>
     <div className="c-page quiz-page">
       <header className="c-page-head">
         <div className="c-row">
@@ -215,5 +222,6 @@ export default function QuizPage() {
         @media (max-width: 767px) { .quiz-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } .quiz-start { width: 100%; } }
       `}</style>
     </div>
+    </Reveal>
   );
 }

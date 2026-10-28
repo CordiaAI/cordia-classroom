@@ -90,15 +90,18 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
   const [cached] = useState(() => readCalendarCache());
   const [status, setStatus] = useState(cached ? 'connected' : 'checking'); // checking | connected | disconnected | error
   const connected = status === 'connected';
-  const gate = useLoadGate(status !== 'checking');
+  // Deadlines, lecture to-dos, study blocks and the Canvas offer arrive before the week shows.
+  const [extrasIn, setExtrasIn] = useState(0);
+  const arrived = () => setExtrasIn(count => count + 1);
+  const gate = useLoadGate(status !== 'checking' && extrasIn >= 3);
   const [items, setItems] = useState(() => cached?.items || []);
   const [dueToday, setDueToday] = useState(() => localDueToday(cached?.items || []));
   // To-dos confirmed from lectures show alongside the Canvas feed.
   const [lectureItems, setLectureItems] = useState([]);
-  useEffect(() => { confirmedTodos().then(data => setLectureItems(lectureCalendarItems(data?.todos))); }, []);
+  useEffect(() => { confirmedTodos().catch(() => null).then(data => { setLectureItems(lectureCalendarItems(data?.todos)); arrived(); }); }, []);
   // Study blocks from Plan my week (and assignment plans) show too, with or without Canvas.
   const [blocks, setBlocks] = useState([]);
-  useEffect(() => { apiFetch('/calendar/blocks').then(data => setBlocks(Array.isArray(data?.blocks) ? data.blocks : [])); }, []);
+  useEffect(() => { apiFetch('/calendar/blocks').catch(() => null).then(data => { setBlocks(Array.isArray(data?.blocks) ? data.blocks : []); arrived(); }); }, []);
   // Canvas token connection (all classes and course files), offered when the backend has it.
   const [canvasReady, setCanvasReady] = useState(false);
   const [tokenOpen, setTokenOpen] = useState(false);
@@ -106,7 +109,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
   const [feedOpen, setFeedOpen] = useState(false);
   // Deadlines from the access token (not a calendar link) are managed in Settings.
   const [fromToken, setFromToken] = useState(false);
-  useEffect(() => { canvasStatus().then(data => setCanvasReady(Boolean(data) && !data.connected)); }, []);
+  useEffect(() => { canvasStatus().catch(() => null).then(data => { setCanvasReady(Boolean(data) && !data.connected); arrived(); }); }, []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [reminders, setReminders] = useState(false);
@@ -225,9 +228,9 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     notifyDueToday(dueToday, userId);
   }
 
-  // Never show the connect steps while we don't know yet: show the loader instead.
-  if (status === 'checking') {
-    return compact ? <SectionLoader height={183} label="Loading calendar" /> : <LoadingArea phase={gate} label="Loading calendar" />;
+  // Never show the connect steps, or a week still missing its blocks, while loading: the loader instead.
+  if (status === 'checking' || gate === 'waiting' || gate === 'loader') {
+    return compact ? <SectionLoader height={183} label="Loading calendar" /> : <LoadingArea phase={gate === 'loader' ? 'loader' : 'waiting'} label="Loading calendar" />;
   }
   if (status === 'error') {
     return (
