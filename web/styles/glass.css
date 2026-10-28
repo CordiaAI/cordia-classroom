@@ -39,7 +39,7 @@
 :is(.c-btn--primary, .btn, .btn-green):hover:not(:disabled) { background: var(--lg-sheen-olive), var(--olive-press); }
 
 /* Selected states: olive glass for pills and chips; a raised clear pane for segment tabs. */
-:is(.c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-chip[aria-pressed='true'], .quiz-mode.is-on) {
+:is(.c-pill[aria-current='page'], .c-pill[aria-selected='true'], .quiz-mode.is-on) {
   background: var(--lg-sheen-olive), var(--olive);
   color: var(--on-olive);
   border-color: var(--lg-edge);

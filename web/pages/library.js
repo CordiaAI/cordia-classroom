@@ -22,8 +22,7 @@ import { classLabel } from '../lib/classLabel';
 import { PRACTICE_FILES, handOffUpload, readPracticeFile } from '../lib/practiceUpload';
 import ClassCard from '../components/ClassCard';
 import ClassCoverSheet from '../components/ClassCoverSheet';
-import { useVisualUsage } from '../components/NapkinVisual';
-import { coverText, drawCover } from '../lib/classCover';
+import { designCover } from '../lib/classCover';
 
 const VIEW_KEY = 'cordiaLibraryView';
 
@@ -84,10 +83,8 @@ export default function LibraryPage() {
   // Rows (classes that open in place) or cards (one card per class, with its Napkin cover).
   const [view, setView] = useState('rows');
   const [coverFor, setCoverFor] = useState(null); // the folder whose cover is being changed
-  const [drawingId, setDrawingId] = useState(null);
-  const [coversPaused, setCoversPaused] = useState(false);
+  const [designingId, setDesigningId] = useState(null);
   const triedCovers = useRef(new Set());
-  const visualUsage = useVisualUsage();
   const { pending, remove, undo } = useUndoDelete();
   // Practice from a file that isn't in Library: read it here, then open the workspace on it.
   const practiceFileRef = useRef(null);
@@ -119,28 +116,24 @@ export default function LibraryPage() {
     try { localStorage.setItem(VIEW_KEY, next); } catch {}
   }
 
-  // The titles inside a class, which its cover is drawn from.
+  // The titles inside a class, which its cover's icons are picked from.
   function classTitles(folderId) {
     return [...guides, ...lectures, ...notes].filter(item => item.folder_id === folderId).map(item => item.title);
   }
 
-  // In card view, a class with something in it and no cover yet gets one drawn, one class at a
-  // time, until visuals run out or aren't set up. Each first drawing uses one visual.
+  // In card view every class shows a cover at once (its colour and keyword icons); one class at
+  // a time, a quick AI call picks better icons from its material and the cover is kept.
   useEffect(() => {
-    if (view !== 'cards' || loading || drawingId || coversPaused || !visualUsage) return;
-    if (visualUsage.enabled === false || visualUsage.left <= 0) return;
-    const folder = folders.find(item => !item.cover?.url && !triedCovers.current.has(item.id) && classTitles(item.id).length);
+    if (view !== 'cards' || loading || designingId) return;
+    const folder = folders.find(item => item.cover?.kind !== 'design' && !triedCovers.current.has(item.id));
     if (!folder) return;
     triedCovers.current.add(folder.id);
-    setDrawingId(folder.id);
-    drawCover(folder, classTitles(folder.id))
-      .then(result => {
-        if (result.cover) setFolders(current => current.map(item => (item.id === folder.id ? { ...item, cover: result.cover } : item)));
-        else if (result.stop) setCoversPaused(true);
-      })
+    setDesigningId(folder.id);
+    designCover(folder, classTitles(folder.id))
+      .then(cover => setFolders(current => current.map(item => (item.id === folder.id ? { ...item, cover } : item))))
       .catch(() => {})
-      .finally(() => setDrawingId(null));
-  }, [view, loading, drawingId, coversPaused, visualUsage, folders, guides, lectures, notes]);
+      .finally(() => setDesigningId(null));
+  }, [view, loading, designingId, folders, guides, lectures, notes]);
 
   useEffect(() => { if (ready) loadData(); }, [ready]);
 
@@ -489,7 +482,7 @@ export default function LibraryPage() {
           {view === 'cards' && (groups.length > 0 || looseClasses.length > 0) && (
             <div className="lib-cards">
               {groups.map(({ folder, list }) => (
-                <ClassCard key={folder.id} name={folder.name} href={'/folder/' + folder.id} count={list.length} cover={folder.cover} drawing={drawingId === folder.id}
+                <ClassCard key={folder.id} folder={folder} name={folder.name} href={'/folder/' + folder.id} count={list.length} titles={classTitles(folder.id)}
                   menuItems={classMenu(folder)} dropProps={dropProps(folder.id)} isDrop={dropId === folder.id} />
               ))}
               {looseClasses.map(item => <ClassCard key={item.id} name={`${item.code}${item.name ? `: ${item.name}` : ''}`} href={'/class/' + item.id} count={0} />)}
@@ -515,7 +508,7 @@ export default function LibraryPage() {
       )}
       {!pending && toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
       {coverFor && (
-        <ClassCoverSheet folder={coverFor} defaultText={coverText(coverFor.name, classTitles(coverFor.id))} onClose={() => setCoverFor(null)}
+        <ClassCoverSheet folder={coverFor} titles={classTitles(coverFor.id)} onClose={() => setCoverFor(null)}
           onSaved={folder => { setFolders(current => current.map(item => (item.id === folder.id ? { ...item, ...folder } : item))); setCoverFor(null); setToast('Cover saved'); }} />
       )}
       {confirm && <ConfirmDialog title={confirm.title} confirmLabel="Delete" onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
@@ -535,6 +528,9 @@ export default function LibraryPage() {
         .library .lib-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; }
         .library .lib-filters::-webkit-scrollbar { display: none; }
         .library .lib-filters .c-chip { flex: 0 0 auto; }
+        /* Like the sidebar: the chosen filter is a raised pane, the rest are plain until hovered. */
+        .library .lib-filters .c-chip:not([aria-pressed='true']) { background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: var(--muted); }
+        .library .lib-filters .c-chip:not([aria-pressed='true']):hover { background: var(--olive-tint) !important; color: var(--ink); }
         .library .lib-group { padding: 6px; }
         .library .lib-group.is-drop { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
         .library .lib-group-head { display: flex; align-items: center; gap: 6px; min-height: 52px; padding-right: 12px; }

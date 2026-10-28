@@ -56,8 +56,9 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 /* The filter you're on (Library's Flashcards, Practice...): tinted olive with an olive edge, so it
    reads at a glance without becoming a primary button. */
 /* The selected filter is solid olive, so where you are reads at a glance (the pale tint didn't). */
-.c-chip[aria-pressed='true'] { background: var(--lg-sheen-olive), var(--olive) !important; border-color: var(--olive) !important; color: var(--on-olive) !important; font-weight: 600; box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow) !important; }
-.c-chip[aria-pressed='true'] .lucide { color: var(--on-olive) !important; }
+/* A chosen filter reads like the open place in the sidebar: a raised clear pane, ink text, olive icon. */
+.c-chip[aria-pressed='true'] { background: var(--lg-sheen), var(--lg-fill-strong) !important; border-color: var(--lg-edge) !important; color: var(--ink) !important; font-weight: 600; box-shadow: var(--lg-highlight), var(--lg-shadow) !important; }
+.c-chip[aria-pressed='true'] .lucide { color: var(--olive-ink) !important; }
 /* Chips: glass with muted text; only "Exam" carries a small olive dot. */
 .c-chip, .calendar-kind, [data-theme='dark'] .calendar-kind, [data-theme='dark'] .calendar-kind-exam, [data-theme='dark'] .calendar-kind-quiz, [data-theme='dark'] .calendar-kind-project,
 .calendar-kind-exam, .calendar-kind-quiz, .calendar-kind-project {
