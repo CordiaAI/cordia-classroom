@@ -527,7 +527,7 @@ export default function LibraryPage() {
         /* Six filters: on narrow phones they scroll inside their row, never the page. */
         .library .lib-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; }
         .library .lib-filters::-webkit-scrollbar { display: none; }
-        .library .lib-filters .c-chip { flex: 0 0 auto; }
+        .library .lib-filters .c-chip { flex: 0 0 auto; min-width: 64px; padding: 0 16px; justify-content: center; }
         /* Like the sidebar: the chosen filter is a raised pane, the rest are plain until hovered. */
         .library .lib-filters .c-chip:not([aria-pressed='true']) { background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: var(--muted); }
         .library .lib-filters .c-chip:not([aria-pressed='true']):hover { background: var(--olive-tint) !important; color: var(--ink); }
