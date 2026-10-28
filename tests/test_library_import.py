@@ -196,5 +196,39 @@ class CanvasModules(Base):
         self.assertEqual([a["kind"] for a in alerts], ["module_done"])  # Once, not every run.
 
 
+    def test_a_page_that_only_links_to_the_slides_imports_the_slides(self):
+        from routers import canvas
+        from services import library_import
+        body = '<p><a class="instructure_file_link" href="https://school.instructure.com/courses/3/files/9?wrap=1" data-api-endpoint="https://school.instructure.com/api/v1/courses/3/files/9">Chapters 18 - 20-1.pptx</a></p>'
+
+        class Client:
+            downloads = []
+
+            def modules(self, course_id):
+                return [{"id": 1, "name": "Power Points", "items": [
+                    {"type": "Page", "page_url": "chapters-18-20-2", "title": "Chapters 18 - 20"},
+                    {"type": "File", "content_id": 9, "title": "Chapters 18 - 20-1.pptx"}]}]
+
+            def download_file(self, course_id, file_id):
+                Client.downloads.append(file_id)
+                return "slides.txt", TEXT.encode()
+
+            def page(self, course_id, slug):
+                return {"body": body}
+        self.db.rows("canvas_courses").append({"user_id": USER, "canvas_course_id": 3, "name": "BUS 150", "class_id": "class-1"})
+        self.db.rows("connector_settings").append({"user_id": USER, "connector": "canvas", "stats": {"auto_import": [3]}})
+        # Imported before linked files were read: just the link's name. The student never edited it.
+        self.db.rows("study_guides").append({"id": "g-old", "user_id": USER, "title": "Chapters 18 - 20", "notes": "- Chapters 18 - 20-1.pptx",
+                                             "external_source_id": "canvas:page:3:chapters-18-20-2", "folder_id": FOLDER})
+        self.db.rows("connector_links").append({"user_id": USER, "connector": "canvas", "kind": "file", "cordia_id": "g-old",
+                                                "external_id": "canvas:page:3:chapters-18-20-2", "synced_hash": library_import._hash("- Chapters 18 - 20-1.pptx")})
+        canvas._sync_modules(self.db, USER, Client(), {3: {"name": "BUS 150"}}, force=True)
+        guides = self.db.rows("study_guides")
+        self.assertEqual(len(guides), 1, "the slides aren't imported a second time as their own guide")
+        self.assertIn("ATP is the energy currency", guides[0]["notes"])
+        self.assertNotIn(".pptx", guides[0]["notes"], "the link's name gives way to the slides themselves")
+        self.assertEqual(Client.downloads, [9])
+
+
 if __name__ == "__main__":
     unittest.main()

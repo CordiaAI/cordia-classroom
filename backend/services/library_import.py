@@ -11,6 +11,7 @@ ready to read and to make cards, a quiz or practice from. No AI runs at import t
 
 import hashlib
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -29,6 +30,19 @@ def existing_refs(user_id: str, prefix: str) -> set[str]:
     rows = get_supabase().table("study_guides").select("external_source_id").eq("user_id", user_id) \
         .like("external_source_id", f"{prefix}%").limit(5000).execute().data or []
     return {row["external_source_id"] for row in rows if row.get("external_source_id")}
+
+
+_FILE_NAME_LINE = re.compile(r"^[-*•\s]*\S.*\.(?:pptx?|pdf|docx?|txt)\s*$", re.IGNORECASE)
+
+
+def thin_refs(user_id: str, prefix: str) -> set[str]:
+    """Imported guides that hold only file names (a page that was just links to its slides), to read again."""
+    rows = get_supabase().table("study_guides").select("external_source_id,notes").eq("user_id", user_id) \
+        .like("external_source_id", f"{prefix}%").limit(5000).execute().data or []
+    def names_only(notes: str) -> bool:
+        lines = [line for line in (notes or "").splitlines() if line.strip()]
+        return bool(lines) and all(_FILE_NAME_LINE.match(line) for line in lines)
+    return {row["external_source_id"] for row in rows if row.get("external_source_id") and names_only(row.get("notes"))}
 
 
 def class_folder(user_id: str, class_id: Optional[str]) -> Optional[str]:
