@@ -5,6 +5,9 @@ import { apiErrorMessage, apiFetch, authorizedFetch } from '../lib/api';
 import { openNewSheet } from '../lib/newSheet';
 import { SectionLoader } from './CordiaLoader';
 import CanvasCourseList from './CanvasCourseList';
+import ClassCard from './ClassCard';
+import ViewToggle from './ViewToggle';
+import { useListView } from '../lib/listView';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -149,6 +152,7 @@ export default function CanvasClasses({ status, onStatus }) {
   const [folders, setFolders] = useState([]);
   const [open, setOpen] = useState(() => new Set());
   const [choosing, setChoosing] = useState(false);
+  const [view, chooseView] = useListView();
   useEffect(() => { apiFetch('/folders').then(data => setFolders(data?.folders || [])); }, [status?.courses?.length]);
 
   const imported = (status?.courses || []).filter(course => course.imported);
@@ -161,6 +165,7 @@ export default function CanvasClasses({ status, onStatus }) {
         <span className="c-meta">{imported.length} class{imported.length === 1 ? '' : 'es'} from {status.domain}</span>
         <span className="c-spacer" />
         <button type="button" className="c-btn c-btn--quiet" onClick={() => setChoosing(value => !value)} aria-expanded={choosing}><Settings2 {...ICON} />Choose classes</button>
+        {imported.length > 0 && <ViewToggle view={view} onChange={chooseView} />}
       </div>
       {choosing && <div className="c-card cc-choose"><CanvasCourseList courses={status.courses || []} onChange={onStatus} /></div>}
       {!imported.length && !choosing && (
@@ -169,7 +174,15 @@ export default function CanvasClasses({ status, onStatus }) {
           <button type="button" className="c-btn c-btn--primary" onClick={() => setChoosing(true)}>Choose classes</button>
         </div>
       )}
-      {imported.map(course => {
+      {view === 'cards' && imported.length > 0 && (
+        <div className="cc-grid">
+          {imported.map(course => {
+            const folder = folderFor(course);
+            return <ClassCard key={course.id} folder={folder} name={folder?.name || (course.code && !String(course.name || '').includes(course.code) ? `${course.code}: ${course.name || ''}` : course.name || course.code)} href={folder ? '/folder/' + folder.id : undefined} meta={course.term || 'Canvas'} />;
+          })}
+        </div>
+      )}
+      {view === 'rows' && imported.map(course => {
         const folder = folderFor(course);
         const expanded = open.has(course.id);
         return (
@@ -190,6 +203,8 @@ export default function CanvasClasses({ status, onStatus }) {
       })}
       <style jsx global>{`
         .cc-choose { padding: 8px 20px; }
+        .cc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+        @media (max-width: 767px) { .cc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } }
         .cc-class { padding: 8px; }
         .cc-head { display: flex; align-items: center; gap: 6px; min-height: 56px; }
         .cc-head .cc-closed { transform: rotate(-90deg); }
