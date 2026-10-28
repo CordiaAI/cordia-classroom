@@ -30,7 +30,9 @@ def get_openai_client():
     else Groq (OpenAI-compatible) when GROQ_API_KEY is set, else OpenAI from OPENAI_API_KEY.
     A missing key is a deploy error, so it raises."""
     if ANTHROPIC:
-        return anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"], max_retries=2)
+        # A key pasted with quotes or a trailing newline is sent as-is and rejected ("Invalid bearer token").
+        key = os.environ["ANTHROPIC_API_KEY"].strip().strip("'\"").strip()
+        return anthropic.Anthropic(api_key=key, max_retries=2)
     if GROQ:
         return OpenAI(api_key=os.environ["GROQ_API_KEY"], base_url=GROQ_BASE_URL)
     return OpenAI(api_key=os.environ["OPENAI_API_KEY"])
