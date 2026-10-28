@@ -8,7 +8,7 @@ import CardPhoto from '../../components/CardPhoto';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Brain, Download, ExternalLink, FolderInput, Gamepad2, Layers, Lock, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
+  ArrowLeft, Brain, Download, ExternalLink, FolderInput, Gamepad2, GraduationCap, Layers, Lock, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -438,6 +438,7 @@ export default function GuidePage() {
   const tabs = [
     { key: 'outline', label: 'Outline', icon: NotebookText, view: true },
     // A guide that's only notes so far shows these too: opening one makes the cards and quiz first.
+    { key: 'learn', label: 'Learn', icon: GraduationCap, href: '/learn/' + id, spot: 'learn-pill', needsCards: true },
     { key: 'flashcards', label: 'Flashcards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: hasMaterial ? cardCount : undefined, spot: 'cards-pill', event: 'cards-opened', needsCards: true },
     { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill', needsCards: true },
     { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id, needsCards: true },

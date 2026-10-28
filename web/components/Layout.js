@@ -11,7 +11,7 @@ import { useFileDragging } from '../lib/fileDrop';
 
 const WIDE = ['/guide/[id]', '/practice', '/practice/[guideId]', '/smartnotes', '/canvas', '/tutor'];
 // Study screens run in focus mode: no top bar or tab bar, just the screen's own exit.
-const FOCUS = ['/session', '/flashcards/study', '/quiz/[guideId]', '/nclex/[guideId]', '/practice/[guideId]'];
+const FOCUS = ['/session', '/flashcards/study', '/quiz/[guideId]', '/nclex/[guideId]', '/practice/[guideId]', '/learn/[guideId]'];
 
 export default function Layout({ children, timerState, setTimerState }) {
   const router = useRouter();

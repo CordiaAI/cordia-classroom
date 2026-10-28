@@ -91,5 +91,37 @@ class FlashcardScheduleTests(unittest.TestCase):
                 guides.FlashcardProgressRequest(schedule=bad)
 
 
+    def test_flashcards_keep_learn_progress(self):
+        learn = {"levels": {"0": {"l": 3, "at": "2026-10-28", "q": "what makes atp"}}, "test_date": "2026-11-02"}
+        saved = self._save({"learn": learn}, known=[0])
+        self.assertEqual(saved["learn"], learn)
+
+
+class LearnProgressTests(unittest.TestCase):
+    def _save(self, saved_progress, **body):
+        query = FakeQuery([{"flashcard_progress": saved_progress}])
+        query.update = MagicMock(return_value=query)
+        database = MagicMock()
+        database.table.return_value = query
+        with patch.object(guides, "get_user_id", return_value="student-1"), \
+             patch.object(guides, "get_supabase", return_value=database):
+            guides.update_learn_progress("a0000000-0000-4000-8000-000000000001", guides.LearnProgressRequest(**body), "Bearer t")
+        return query.update.call_args.args[0]["flashcard_progress"]
+
+    def test_learn_is_saved_beside_the_flashcard_schedule(self):
+        before = {"known": [1], "schedule": {"1": {"box": 2, "due": "2026-10-30"}}}
+        saved = self._save(before, levels={"0": {"l": 2, "at": "2026-10-28", "q": "what makes atp", "sure": True}}, test_date="2026-11-02")
+        self.assertEqual(saved["schedule"], before["schedule"])
+        self.assertEqual(saved["learn"], {"levels": {"0": {"l": 2, "at": "2026-10-28", "q": "what makes atp", "sure": True}}, "test_date": "2026-11-02"})
+
+    def test_bad_levels_and_dates_are_refused(self):
+        for bad in ({"x": {"l": 1, "q": "a"}}, {"0": {"l": 4, "q": "a"}}, {"0": {"l": 1, "q": "a", "at": "today"}}, {"0": {"l": 1}}):
+            with self.assertRaises(ValueError):
+                guides.LearnProgressRequest(levels=bad)
+        with self.assertRaises(ValueError):
+            guides.LearnProgressRequest(test_date="next week")
+        self.assertIsNone(guides.LearnProgressRequest(test_date="").test_date)
+
+
 if __name__ == "__main__":
     unittest.main()

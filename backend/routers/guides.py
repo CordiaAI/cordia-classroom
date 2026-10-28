@@ -306,11 +306,10 @@ def update_flashcard_progress(guide_id: str, request: FlashcardProgressRequest, 
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
-    schedule = request.schedule
-    if schedule is None:
-        # A client that doesn't schedule cards keeps the schedule already saved.
-        current = supabase.table("study_guides").select("flashcard_progress").eq("id", guide_id).eq("user_id", user_id).execute()
-        schedule = ((current.data or [{}])[0].get("flashcard_progress") or {}).get("schedule") or {}
+    current = supabase.table("study_guides").select("flashcard_progress").eq("id", guide_id).eq("user_id", user_id).execute()
+    saved = (current.data or [{}])[0].get("flashcard_progress") or {}
+    # A client that doesn't schedule cards keeps the schedule already saved; Learn's progress is kept too.
+    schedule = request.schedule if request.schedule is not None else saved.get("schedule") or {}
 
     supabase.table("study_guides") \
         .update({"flashcard_progress": {
@@ -318,11 +317,62 @@ def update_flashcard_progress(guide_id: str, request: FlashcardProgressRequest, 
             "unknown": request.unknown,
             "last_studied": request.last_studied,
             "schedule": schedule,
+            **({"learn": saved["learn"]} if saved.get("learn") else {}),
         }}) \
         .eq("id", guide_id) \
         .eq("user_id", user_id) \
         .execute()
 
+    return {"updated": True}
+
+
+MAX_LEARN_LEVEL = 3
+
+
+class LearnProgressRequest(BaseModel):
+    # Learn (web/lib/learnEngine.mjs): {question index: {"l": 0-3, "at": "YYYY-MM-DD", "q": fingerprint, "sure"?: true}}.
+    levels: dict = {}
+    test_date: Optional[str] = None
+
+    @field_validator("levels")
+    @classmethod
+    def valid_levels(cls, value):
+        if len(value) > MAX_SCHEDULED_CARDS:
+            raise ValueError("Too many questions")
+        clean = {}
+        for index, entry in value.items():
+            if not str(index).isdigit() or not isinstance(entry, dict):
+                raise ValueError("Invalid level entry")
+            level, day, mark = entry.get("l"), entry.get("at"), entry.get("q")
+            if not isinstance(level, int) or not 0 <= level <= MAX_LEARN_LEVEL or not isinstance(mark, str) or len(mark) > 64:
+                raise ValueError("Invalid level entry")
+            if day is not None and not (isinstance(day, str) and _DAY.match(day)):
+                raise ValueError("Invalid level entry")
+            clean[str(index)] = {"l": level, "at": day, "q": mark, **({"sure": True} if entry.get("sure") is True else {})}
+        return clean
+
+    @field_validator("test_date")
+    @classmethod
+    def valid_test_date(cls, value):
+        if value in (None, ""):
+            return None
+        if not _DAY.match(value):
+            raise ValueError("Invalid test date")
+        return value
+
+
+@router.patch("/{guide_id}/learn-progress")
+def update_learn_progress(guide_id: str, request: LearnProgressRequest, authorization: str = Header(default="")):
+    """Save Learn's mastery levels and test date beside the flashcard progress."""
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+    current = supabase.table("study_guides").select("flashcard_progress").eq("id", guide_id).eq("user_id", user_id).execute()
+    if not current.data:
+        raise HTTPException(status_code=404, detail="Study guide not found")
+    progress = current.data[0].get("flashcard_progress") or {}
+    progress["learn"] = {"levels": request.levels, "test_date": request.test_date}
+    supabase.table("study_guides").update({"flashcard_progress": progress}).eq("id", guide_id).eq("user_id", user_id).execute()
     return {"updated": True}
 
 
