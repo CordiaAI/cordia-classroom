@@ -712,6 +712,10 @@ export default function PracticeWorkspace() {
         .practice-size { display: inline-flex; align-items: center; gap: 8px; }
         .practice-size input { width: 112px; accent-color: var(--olive); }
         .practice-evaluation { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+        /* The answer sits on the card itself, in a rounded box like the board above it. */
+        .practice-answer-inline { background: transparent; }
+        .practice-answer-inline textarea { min-height: 96px; padding: 14px 16px; border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--surface-card); }
+        .practice-answer-inline button[type='submit'] { justify-self: end; min-width: 160px; }
       `}</style>
     </div>
   );
