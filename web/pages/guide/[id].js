@@ -112,6 +112,13 @@ function MakeCard({ front: initialFront, onSave, onClose }) {
   );
 }
 
+// Notes that are nothing but file names ("- Chapters 18 - 20-1.pptx").
+const FILE_NAME_LINE = /^[-*•\s]*\S.*\.(?:pptx?|pdf|docx?|txt)\s*$/i;
+function fileNamesOnly(notes) {
+  const lines = String(notes || '').split('\n').filter(line => line.trim());
+  return lines.length > 0 && lines.every(line => FILE_NAME_LINE.test(line));
+}
+
 export default function GuidePage() {
   const router = useRouter();
   const { id } = router.query;
@@ -249,12 +256,24 @@ export default function GuidePage() {
     if (data?.ok) { await loadGuide(); setSharing(current => ({ ...current, update_available: false })); setToast('Updated'); }
   }
 
+  // A Canvas page that only links to its slides came in as just the file names: read the files.
+  async function fetchCanvasFiles(guideId) {
+    setToast('Getting the slides from Canvas…');
+    const data = await apiFetch('/canvas/guides/' + guideId + '/refresh', { method: 'POST' });
+    if (data?.refreshed && data.notes) {
+      setGuide(current => (current && current.id === guideId ? { ...current, notes: data.notes } : current));
+      setNotesVersion(value => value + 1);
+      setToast('Slides added');
+    } else setToast("Couldn't read the slides from Canvas");
+  }
+
   async function loadGuide() {
     setLoadError('');
     loadSharing();
     const data = await apiFetch('/guides/' + id);
     if (data?.guide) {
       setGuide(data.guide);
+      if (data.guide.source_type === 'canvas_module' && fileNamesOnly(data.guide.notes)) fetchCanvasFiles(data.guide.id);
       rememberLastGuide({ id: data.guide.id, title: data.guide.title, page: Number(router.query.page) > 0 ? Number(router.query.page) - 1 : 0 });
       walkthroughEvent('guide-open');
     } else {

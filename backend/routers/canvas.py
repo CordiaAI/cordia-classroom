@@ -631,6 +631,33 @@ def _imported_course(db, user_id: str, course_id: int) -> dict:
     return connection
 
 
+_PAGE_REF = re.compile(r"canvas:page:(\d+):([A-Za-z0-9_.-]+)")
+
+
+@router.post("/guides/{guide_id}/refresh")
+def refresh_guide(guide_id: str, authorization: str = Header(default="")):
+    """A Canvas guide that came in as only file names (a page that just links its slides) reads
+    those files now, when it's opened, instead of waiting for the next module sync."""
+    user_id = get_user_id(authorization)
+    db = get_supabase()
+    fields = "id,title,notes,external_source_id,folder_id,source_type,source_title,source_url"
+    guide = (db.table("study_guides").select(fields).eq("id", guide_id).eq("user_id", user_id).limit(1).execute().data or [None])[0]
+    if not guide:
+        raise HTTPException(status_code=404, detail="Guide not found")
+    match = _PAGE_REF.fullmatch(guide.get("external_source_id") or "")
+    if not match or not library_import.names_only(guide.get("notes") or ""):
+        return {"refreshed": False, "notes": guide.get("notes") or ""}
+    course_id = int(match.group(1))
+    client = _client(db, user_id, _imported_course(db, user_id, course_id))
+    text, _ = _item_text(client, course_id, {"type": "Page", "page_url": match.group(2)})
+    if text:
+        library_import.upsert_source(user_id, ref=guide["external_source_id"], connector="canvas", title=guide.get("title") or "", text=text,
+                                     folder_id=guide.get("folder_id"), source_type=guide.get("source_type") or "canvas_module",
+                                     source_title=guide.get("source_title") or "", source_url=guide.get("source_url"))
+    notes = ((db.table("study_guides").select("notes").eq("id", guide_id).eq("user_id", user_id).limit(1).execute().data or [{}])[0].get("notes") or "")
+    return {"refreshed": notes != (guide.get("notes") or ""), "notes": notes}
+
+
 @router.get("/courses/{course_id}/files")
 def list_files(course_id: int, authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
