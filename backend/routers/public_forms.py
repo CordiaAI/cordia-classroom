@@ -15,7 +15,7 @@ from services.class_catalog import normalize_course_code
 from services.class_db import ensure_class
 
 router = APIRouter(tags=["public"])
-COPYRIGHT_EMAIL = "copyright@cordiacode.com"
+COPYRIGHT_EMAIL = "support@cordiaai.io"
 
 
 def _school_email_domains(school: dict) -> list[str]:
