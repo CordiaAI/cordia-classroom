@@ -54,10 +54,14 @@ export function ExplainAnswer() {
   );
 }
 
-function NextButton({ onNext, missed }) {
+// onExplain: the card shows its own explanation of the miss, only when asked for.
+function NextButton({ onNext, missed, onExplain }) {
   return (
     <div className="quiz-next-row">
-      {missed && <><AskWhy /><ExplainAnswer /></>}
+      {missed && <AskWhy />}
+      {missed && (onExplain === undefined ? <ExplainAnswer /> : onExplain && (
+        <button type="button" className="c-btn c-btn--secondary quiz-ask" onClick={onExplain}><Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain</button>
+      ))}
       <button type="button" className="c-btn c-btn--primary quiz-next" onClick={onNext} autoFocus>Next</button>
     </div>
   );
@@ -117,7 +121,8 @@ export function MissFeedback({ guideId, card, question, chosen, sure }) {
   );
 }
 
-export function McCard({ card, question, guideId, onResult, onNext }) {
+// askSure: false skips "How sure are you?" (Learn lets the student turn it off).
+export function McCard({ card, question, guideId, onResult, onNext, askSure = true }) {
   const answer = conceptAnswer(question);
   // Always shuffled, so the right answer's position never gives it away (saved quizzes kept it first).
   const [options] = useState(() => shuffled(question.options || [], Math.floor(Math.random() * 233280)));
@@ -125,6 +130,7 @@ export function McCard({ card, question, guideId, onResult, onNext }) {
   const [pending, setPending] = useState(null);
   const [selected, setSelected] = useState(null);
   const [confidence, setConfidence] = useState('');
+  const [explained, setExplained] = useState(false);
 
   function reveal(option, level = '') {
     setSelected(option);
@@ -137,7 +143,7 @@ export function McCard({ card, question, guideId, onResult, onNext }) {
   function choose(option) {
     if (selected !== null) return;
     // A repeat of a missed question goes straight to the answer.
-    if (card.reask) { reveal(option); return; }
+    if (card.reask || !askSure) { reveal(option); return; }
     setPending(option);
   }
 
@@ -155,18 +161,19 @@ export function McCard({ card, question, guideId, onResult, onNext }) {
         <button key={option} type="button" className={optionClass(option)} aria-pressed={selected === null ? pending === option : undefined} onClick={() => choose(option)}>{option}</button>
       ))}
       {selected === null && pending !== null && <ConfidencePrompt onPick={level => reveal(pending, level)} />}
-      {selected !== null && selected !== answer && <MissFeedback guideId={guideId} card={card} question={question} chosen={selected} sure={confidence === 'sure'} />}
-      {selected !== null && <NextButton onNext={onNext} missed={selected !== answer} />}
+      {explained && <MissFeedback guideId={guideId} card={card} question={question} chosen={selected} sure={confidence === 'sure'} />}
+      {selected !== null && <NextButton onNext={onNext} missed={selected !== answer} onExplain={explained ? null : () => setExplained(true)} />}
     </>
   );
 }
 
-export function FillCard({ card, question, guideId, onResult, onNext }) {
+export function FillCard({ card, question, guideId, onResult, onNext, askSure = true }) {
   const answer = conceptAnswer(question);
   const [value, setValue] = useState('');
   const [right, setRight] = useState(null);
   const [asking, setAsking] = useState(false);
   const [confidence, setConfidence] = useState('');
+  const [explained, setExplained] = useState(false);
 
   function reveal(level = '') {
     setAsking(false);
@@ -181,7 +188,7 @@ export function FillCard({ card, question, guideId, onResult, onNext }) {
     event.preventDefault();
     if (right !== null || !value.trim()) return;
     // First asks get "How sure?" before the answer shows; repeats go straight to it.
-    if (card.reask) reveal();
+    if (card.reask || !askSure) reveal();
     else setAsking(true);
   }
 
@@ -207,8 +214,8 @@ export function FillCard({ card, question, guideId, onResult, onNext }) {
           {right ? <>Right: <strong>{answer}</strong></> : <>Answer: <strong>{answer}</strong></>}
         </p>
       )}
-      {right === false && <MissFeedback guideId={guideId} card={card} question={question} chosen={value.trim()} sure={confidence === 'sure'} />}
-      {right !== null && <NextButton onNext={onNext} missed={!right} />}
+      {explained && <MissFeedback guideId={guideId} card={card} question={question} chosen={value.trim()} sure={confidence === 'sure'} />}
+      {right !== null && <NextButton onNext={onNext} missed={!right} onExplain={explained ? null : () => setExplained(true)} />}
     </form>
   );
 }

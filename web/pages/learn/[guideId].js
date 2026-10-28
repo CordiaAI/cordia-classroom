@@ -14,11 +14,13 @@ import {
 } from '../../lib/learnEngine.mjs';
 import { FillCard, McCard, WrittenCard } from '../../components/RetainCards';
 import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
+import Toggle from '../../components/Toggle';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const TYPE_NAMES = { mc: 'Choose', fill: 'Type it', written: 'Explain it', self: 'Recall it' };
 const LEVEL_CLASS = ['is-new', 'is-learning', 'is-familiar', 'is-mastered'];
 const localKey = id => 'cordiaLearn:' + id;
+const SURE_KEY = 'cordiaLearnAskSure';
 
 function readLocal(id) {
   try { return JSON.parse(localStorage.getItem(localKey(id)) || 'null'); } catch { return null; }
@@ -88,8 +90,18 @@ export default function LearnPage() {
   const [round, setRound] = useState(null);
   const [roundNumber, setRoundNumber] = useState(0);
   const [answered, setAnswered] = useState(false);
+  const [askSure, setAskSure] = useState(true);
   const roundStart = useRef(Date.now());
   const today = dayKey();
+
+  useEffect(() => {
+    try { setAskSure(localStorage.getItem(SURE_KEY) !== 'off'); } catch { /* default on */ }
+  }, []);
+
+  function changeAskSure(on) {
+    setAskSure(on);
+    try { localStorage.setItem(SURE_KEY, on ? 'on' : 'off'); } catch { /* this visit only */ }
+  }
 
   useEffect(() => {
     if (!ready || !guideId) return;
@@ -206,6 +218,11 @@ export default function LearnPage() {
             <p className="c-meta">{plan ? whenLabel(plan) : 'Add the date and Learn paces you so everything is mastered the day before.'}</p>
           </section>
 
+          <section className="c-card learn-panel learn-sure">
+            <Toggle checked={askSure} onChange={changeAskSure} label="Ask how sure I am" />
+            <p className="c-meta">After each choice: Sure, Think so or Guess. It helps a lot: ideas you already know skip ahead, lucky guesses don't count as learned, and confident misses come back first.</p>
+          </section>
+
           <div className="learn-actions">
             {!allMastered || tally.fading > 0 ? (
               <button type="button" className="c-btn c-btn--primary c-btn--lg" onClick={startRound}>
@@ -219,7 +236,7 @@ export default function LearnPage() {
 
           <ul className="learn-how">
             <li><GraduationCap {...ICON} /><span><strong>Rounds of {Math.min(7, tally.total)}.</strong> Choose the answer first, then type it from memory. Only recall counts as mastered.</span></li>
-            <li><Check {...ICON} /><span><strong>Guesses don't count.</strong> Say how sure you are. A lucky guess stays in Learning, and a confident miss comes back first.</span></li>
+            <li><Check {...ICON} /><span><strong>Guesses don't count.</strong> {askSure ? 'A lucky guess stays in Learning, and a confident miss comes back first.' : 'Turn on "Ask how sure I am" so lucky guesses aren\'t counted as learned.'}</span></li>
             <li><Repeat {...ICON} /><span><strong>Misses come back</strong> later in the same round, and mastered ideas return after {5} days so they stay fresh for the test.</span></li>
           </ul>
         </div>
@@ -233,8 +250,8 @@ export default function LearnPage() {
             <span className="c-meta learn-type">{card.again ? 'Again' : TYPE_NAMES[card.type]}</span>
           </div>
           <div className="c-bar" role="progressbar" aria-label="Round" aria-valuemin={0} aria-valuemax={round.queue.length} aria-valuenow={round.position}><span style={{ width: Math.round((round.position / round.queue.length) * 100) + '%' }} /></div>
-          {card.type === 'mc' && <McCard key={card.id} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
-          {card.type === 'fill' && <FillCard key={card.id} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
+          {card.type === 'mc' && <McCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
+          {card.type === 'fill' && <FillCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
           {card.type === 'written' && <WrittenCard key={card.id} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} onSwitch={switchToSelf} />}
           {card.type === 'self' && <SelfCheckCard key={card.id + '-self'} card={retainCard} question={question} onResult={onResult} onNext={onNext} />}
         </div>
@@ -286,7 +303,8 @@ export default function LearnPage() {
         .is-learning.learn-seg, .is-learning.learn-dot { background: var(--warning); }
         .is-new.learn-seg, .is-new.learn-dot { background: var(--border-default); }
         .learn-fade { display: flex; align-items: center; gap: 6px; margin: 0; }
-        .learn-test .c-meta { margin: 0; }
+        .learn-test .c-meta, .learn-sure .c-meta { margin: 0; }
+        .learn-sure { gap: 8px; }
         .learn-date { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font: 600 16px/1.3 var(--font-sans); }
         .learn-date span { display: inline-flex; align-items: center; gap: 8px; }
         .learn-date input { width: auto; min-width: 170px; }
