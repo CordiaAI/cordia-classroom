@@ -18,6 +18,8 @@ import { canvasStatus } from '../../lib/canvas';
 import { CourseFiles } from '../../components/CanvasClasses';
 import ClassGrades from '../../components/ClassGrades';
 import useScrollerTabs from '../../lib/useScrollerTabs';
+import { useListView } from '../../lib/listView';
+import ViewToggle from '../../components/ViewToggle';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // Course files and Grades show for a class brought in from Canvas.
@@ -33,6 +35,7 @@ function shortDate(value) {
 // A class with a course code is the same thing as the shared class (folders.class_id).
 export default function ClassPage() {
   const router = useRouter();
+  const [view, chooseView] = useListView();
   const { id } = router.query;
   const { ready } = useRequireAuth();
   const [folder, setFolder] = useState(null);
@@ -190,23 +193,26 @@ export default function ClassPage() {
         </div>
       </header>
 
-      <div ref={tabsRef} className="c-seg is-scroller cls-tabs" role="tablist" aria-label="Class">
-        {tabs.map(([key, label]) => (
-          <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button>
-        ))}
+      <div className="cls-tabs-row">
+        <div ref={tabsRef} className="c-seg is-scroller cls-tabs" role="tablist" aria-label="Class">
+          {tabs.map(([key, label]) => (
+            <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button>
+          ))}
+        </div>
+        {tab === 'material' && items.length > 0 && <ViewToggle view={view} onChange={chooseView} />}
       </div>
 
       {tab === 'material' ? (
         items.length === 0 ? (
           <div className="c-empty"><BookOpen size={32} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Nothing here yet</span></div>
         ) : (
-          <div className="c-card c-list">
+          <div className={view === 'cards' ? 'item-grid' : 'c-card c-list'}>
             {items.map(item => (
               <div key={item.kind + item.id} className="c-list-row">
                 {item.kind === 'guide' ? <ProgressRing value={item.progress} size={36} label={false} />
                   : item.kind === 'note' ? <NotebookPen {...ICON} /> : <AudioLines {...ICON} />}
-                <Link href={item.href} className="c-grow folder-row-link">
-                  <span className="folder-row-title c-truncate">{item.title}</span>
+                <Link href={item.href} className="c-grow folder-row-link ig-main">
+                  <span className="folder-row-title c-truncate ig-title">{item.title}</span>
                   <span className="c-meta">{[item.kind === 'note' ? 'Note' : item.kind === 'lecture' ? 'Lecture' : '', shortDate(item.date)].filter(Boolean).join(' · ')}</span>
                 </Link>
                 {item.kind === 'guide' && (
@@ -239,6 +245,7 @@ export default function ClassPage() {
         .cls-files { padding: 8px; }
         .cls-tabs button { flex: 0 0 auto; white-space: nowrap; }
         .cls-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }
+        .cls-tabs-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
         .cls-needs-code { display: grid; gap: 12px; padding: 20px; justify-items: start; }
         .cls-needs-code :global(.cls-add) { width: 100%; box-shadow: none; padding: 0; background: none; border: 0; }
         :global(.folder-row-link) { display: flex; align-items: baseline; gap: 12px; min-width: 0; color: var(--ink); text-decoration: none; }

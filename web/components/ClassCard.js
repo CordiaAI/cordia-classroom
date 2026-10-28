@@ -6,7 +6,7 @@ import { coverFor } from '../lib/coverDesign.mjs';
 
 // A class in Library's card view: its cover (colour and subject icons), name, and how much is in
 // it. The whole card opens the class; the menu holds the rest.
-export default function ClassCard({ folder, name, href, count, titles = [], menuItems, dropProps = {}, isDrop = false }) {
+export default function ClassCard({ folder, name, href, count, meta, titles = [], menuItems, dropProps = {}, isDrop = false }) {
   const { title, code } = classLabel(name);
   const cover = coverFor(folder || { name }, titles);
   const body = (
@@ -15,17 +15,19 @@ export default function ClassCard({ folder, name, href, count, titles = [], menu
       <span className="cc-body">
         {code && code !== title && <span className="cc-code">{code}</span>}
         <span className="cc-title">{title}</span>
-        <span className={'cc-count' + (count ? '' : ' is-empty')}>{count ? `${count} item${count === 1 ? '' : 's'}` : 'Empty'}</span>
+        {meta ? <span className="cc-meta c-meta">{meta}</span>
+          : <span className={'cc-count' + (count ? '' : ' is-empty')}>{count ? `${count} item${count === 1 ? '' : 's'}` : 'Empty'}</span>}
       </span>
     </>
   );
   return (
-    <article className={'c-card cc' + (isDrop ? ' is-drop' : '')} {...dropProps} aria-label={name}>
+    <article className={'c-card cc cc-card' + (isDrop ? ' is-drop' : '')} {...dropProps} aria-label={name}>
       {href ? <Link href={href} className="cc-link">{body}</Link> : <div className="cc-link">{body}</div>}
       {menuItems?.length > 0 && <div className="cc-menu"><Menu label={`More for ${name}`} items={menuItems} /></div>}
       <style jsx global>{`
-        .cc { position: relative; display: block; padding: 0; overflow: hidden; }
-        .cc.is-drop { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
+        /* .cc-card: the Canvas page's class list also uses .cc for its own wrapper. */
+        .cc-card { position: relative; display: block; padding: 0; overflow: hidden; }
+        .cc-card.is-drop { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
         .cc-link { display: grid; color: var(--ink); text-decoration: none; }
         .cc-link:hover { text-decoration: none; }
         .cc-link:focus-visible { outline: 2px solid var(--olive); outline-offset: -2px; border-radius: inherit; }

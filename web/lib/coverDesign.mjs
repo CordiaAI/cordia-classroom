@@ -29,7 +29,7 @@ const KEYWORDS = [
   [/philosoph|ethic|logic/i, ['Brain', 'Scale', 'Lightbulb']],
   [/law|legal|court|constitution/i, ['Scale', 'Gavel', 'Landmark']],
   [/politic|government|civic/i, ['Vote', 'Landmark', 'Flag']],
-  [/business|management|manag|entrepreneur|marketing|professional|career|resume/i, ['Briefcase', 'Handshake', 'ChartLine']],
+  [/business|management|manag|entrepreneur|marketing|professional|prof experience|internship|career|resume/i, ['Briefcase', 'Handshake', 'ChartLine']],
   [/account|financ|econom|budget|invest|bank/i, ['DollarSign', 'ChartPie', 'PiggyBank']],
   [/psych|mind|behavio|cognit/i, ['Brain', 'Smile', 'Users']],
   [/sociol|anthropolog|communit|fratern|soror|pledge|chapter meeting/i, ['Users', 'Handshake', 'Award']],
