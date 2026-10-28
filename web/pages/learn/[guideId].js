@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, CalendarClock, Check, Eye, GraduationCap, Play, Repeat, Target } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarClock, Check, Eye, GraduationCap, Layers, ListChecks, PenLine, Play, Repeat, Target, TextCursorInput } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import useSessionTracker from '../../lib/useSessionTracker';
@@ -10,17 +10,25 @@ import { rememberRetainMisses } from '../../lib/userStore';
 import { conceptAnswer } from '../../lib/retainEngine.mjs';
 import {
   FAMILIAR, LEARNING, LEVELS, MASTERED,
-  advance, answer, counts, createRound, currentCard, dayKey, readiness, restoreLevels, saveableLevels, testPlan,
+  DEFAULT_TYPES, LEARN_TYPES, advance, answer, cleanTypes, counts, createRound, currentCard, dayKey, readiness, restoreLevels, saveableLevels, testPlan,
 } from '../../lib/learnEngine.mjs';
 import { FillCard, McCard, WrittenCard } from '../../components/RetainCards';
 import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import Toggle from '../../components/Toggle';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
-const TYPE_NAMES = { mc: 'Choose', fill: 'Type it', written: 'Explain it', self: 'Recall it' };
+const TYPE_NAMES = { mc: 'Choose', fill: 'Type it', written: 'Explain it', self: 'Flashcard' };
 const LEVEL_CLASS = ['is-new', 'is-learning', 'is-familiar', 'is-mastered'];
 const localKey = id => 'cordiaLearn:' + id;
 const SURE_KEY = 'cordiaLearnAskSure';
+const TYPES_KEY = 'cordiaLearnTypes';
+// The ways to learn, like Quiz's question types.
+const WAYS = {
+  mc: { label: 'Choice', icon: ListChecks, note: 'Pick from four' },
+  fill: { label: 'Type it', icon: TextCursorInput, note: 'Short answers' },
+  written: { label: 'Written', icon: PenLine, note: 'Explain it, AI checks' },
+  self: { label: 'Flashcards', icon: Layers, note: 'Flip and be honest' },
+};
 
 function readLocal(id) {
   try { return JSON.parse(localStorage.getItem(localKey(id)) || 'null'); } catch { return null; }
@@ -91,12 +99,24 @@ export default function LearnPage() {
   const [roundNumber, setRoundNumber] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [askSure, setAskSure] = useState(true);
+  const [types, setTypes] = useState(DEFAULT_TYPES);
   const roundStart = useRef(Date.now());
   const today = dayKey();
 
   useEffect(() => {
-    try { setAskSure(localStorage.getItem(SURE_KEY) !== 'off'); } catch { /* default on */ }
+    try {
+      setAskSure(localStorage.getItem(SURE_KEY) !== 'off');
+      setTypes(cleanTypes(JSON.parse(localStorage.getItem(TYPES_KEY) || 'null')));
+    } catch { /* defaults */ }
   }, []);
+
+  // At least one way stays on.
+  function toggleType(type) {
+    const next = types.includes(type) ? types.filter(item => item !== type) : LEARN_TYPES.filter(item => item === type || types.includes(item));
+    if (!next.length) return;
+    setTypes(next);
+    try { localStorage.setItem(TYPES_KEY, JSON.stringify(next)); } catch { /* this visit only */ }
+  }
 
   function changeAskSure(on) {
     setAskSure(on);
@@ -135,7 +155,7 @@ export default function LearnPage() {
   }
 
   function startRound() {
-    const next = createRound(questions, levels, today);
+    const next = createRound(questions, levels, today, types);
     if (!next.queue.length) return;
     setRound(next);
     setRoundNumber(number => number + 1);
@@ -218,6 +238,26 @@ export default function LearnPage() {
             <p className="c-meta">{plan ? whenLabel(plan) : 'Add the date and Learn paces you so everything is mastered the day before.'}</p>
           </section>
 
+          <section className="learn-ways" aria-labelledby="learn-ways-title">
+            <h2 id="learn-ways-title" className="c-section-title">How do you want to learn?</h2>
+            <div className="learn-way-grid" role="group" aria-label="Ways to learn">
+              {LEARN_TYPES.map(type => {
+                const way = WAYS[type];
+                const on = types.includes(type);
+                return (
+                  <button key={type} type="button" className={'learn-way' + (on ? ' is-on' : '')} aria-pressed={on} onClick={() => toggleType(type)}>
+                    <way.icon size={26} strokeWidth={1.75} aria-hidden="true" />
+                    <span>{way.label}</span>
+                    <small>{way.note}</small>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="c-meta">{!types.some(type => type !== 'mc')
+              ? 'Only Choice: an idea is mastered by choosing it right once it\'s familiar. Add Type it or Written to master by recalling, which sticks better for a test.'
+              : 'New ideas start with your first pick; familiar ones are asked from memory to master them.'}</p>
+          </section>
+
           <section className="c-card learn-panel learn-sure">
             <Toggle checked={askSure} onChange={changeAskSure} label="Ask how sure I am" />
             <p className="c-meta">After each choice: Sure, Think so or Guess. It helps a lot: ideas you already know skip ahead, lucky guesses don't count as learned, and confident misses come back first.</p>
@@ -235,7 +275,7 @@ export default function LearnPage() {
           </div>
 
           <ul className="learn-how">
-            <li><GraduationCap {...ICON} /><span><strong>Rounds of {Math.min(7, tally.total)}.</strong> Choose the answer first, then type it from memory. Only recall counts as mastered.</span></li>
+            <li><GraduationCap {...ICON} /><span><strong>Rounds of {Math.min(7, tally.total)}.</strong> Recognise the answer first, then recall it from memory. Recall is what masters an idea.</span></li>
             <li><Check {...ICON} /><span><strong>Guesses don't count.</strong> {askSure ? 'A lucky guess stays in Learning, and a confident miss comes back first.' : 'Turn on "Ask how sure I am" so lucky guesses aren\'t counted as learned.'}</span></li>
             <li><Repeat {...ICON} /><span><strong>Misses come back</strong> later in the same round, and mastered ideas return after {5} days so they stay fresh for the test.</span></li>
           </ul>
@@ -305,6 +345,14 @@ export default function LearnPage() {
         .learn-fade { display: flex; align-items: center; gap: 6px; margin: 0; }
         .learn-test .c-meta, .learn-sure .c-meta { margin: 0; }
         .learn-sure { gap: 8px; }
+        .learn-ways { display: grid; gap: 10px; }
+        .learn-ways h2, .learn-ways .c-meta { margin: 0; }
+        .learn-way-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+        .learn-way { display: grid; justify-items: center; align-content: center; gap: 6px; min-height: 112px; padding: 12px 8px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 15px/1.2 var(--font-sans); text-align: center; cursor: pointer; }
+        .learn-way .lucide { color: var(--olive-ink); }
+        .learn-way small { color: var(--muted); font: 500 12px/1.3 var(--font-sans); }
+        .learn-way.is-on { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
+        .learn-way:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
         .learn-date { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font: 600 16px/1.3 var(--font-sans); }
         .learn-date span { display: inline-flex; align-items: center; gap: 8px; }
         .learn-date input { width: auto; min-width: 170px; }
@@ -326,6 +374,7 @@ export default function LearnPage() {
         @media (max-width: 520px) {
           .learn-actions .c-btn { flex: 1; justify-content: center; }
           .learn-ready-num { font-size: 36px; }
+          .learn-way-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
       `}</style>
     </div>
