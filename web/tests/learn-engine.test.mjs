@@ -24,7 +24,7 @@ test('mastery needs recall: choices move an idea to Familiar at most', () => {
   assert.equal(levels[0].l, LEARNING);
   ({ levels } = answer(levels, round, { ...currentCard(round), type: 'mc' }, 1, { confidence: 'sure', today: TODAY }));
   assert.equal(levels[0].l, FAMILIAR);
-  ({ levels } = answer(levels, round, { ...currentCard(round), type: 'fill' }, 1, { today: TODAY }));
+  ({ levels } = answer(levels, round, { ...currentCard(round), type: 'fill', recall: true }, 1, { today: TODAY }));
   assert.equal(levels[0].l, MASTERED);
 });
 
@@ -78,4 +78,17 @@ test('readiness and the daily target before a test', () => {
   assert.deepEqual(testPlan(tally, '2026-10-30', TODAY), { daysLeft: 2, remaining: 1, perDay: 1, past: false });
   assert.equal(testPlan(tally, '2026-10-27', TODAY).past, true);
   assert.equal(testPlan(tally, '', TODAY), null);
+});
+
+test('the ways to learn decide each card, and recall still masters with any of them', async () => {
+  const { askCard, cleanTypes, DEFAULT_TYPES } = await import('../lib/learnEngine.mjs');
+  assert.deepEqual(cleanTypes([]), DEFAULT_TYPES);
+  assert.deepEqual(askCard(term, { l: NEW }, TODAY, ['fill', 'written']), { type: 'fill', recall: false });
+  assert.deepEqual(askCard(long, { l: FAMILIAR }, TODAY, ['mc', 'self']), { type: 'self', recall: true });
+  assert.deepEqual(askCard(long, { l: FAMILIAR }, TODAY, ['mc']), { type: 'mc', recall: true });
+  const levels = { 0: { l: FAMILIAR, at: null } };
+  const round = createRound([term], levels, TODAY, ['mc']);
+  const card = currentCard(round);
+  assert.equal(card.type, 'mc');
+  assert.equal(answer(levels, round, card, 1, { confidence: 'sure', today: TODAY }).levels[0].l, MASTERED);
 });

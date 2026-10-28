@@ -62,9 +62,28 @@ export function isTerm(question) {
   return conceptAnswer(question).split(/\s+/).filter(Boolean).length <= TERM_MAX_WORDS;
 }
 
-export function askType(question, entry, today = dayKey()) {
-  if (entry.l >= FAMILIAR || isFading(entry, today)) return isTerm(question) ? 'fill' : 'written';
-  return 'mc';
+// The ways a student can pick to learn with. mc and self (a flashcard flip) recognise an answer;
+// fill (short answers), written (long answers, checked by AI) and self recall it.
+export const LEARN_TYPES = ['mc', 'fill', 'written', 'self'];
+export const DEFAULT_TYPES = ['mc', 'fill', 'written'];
+
+export function cleanTypes(types) {
+  const picked = LEARN_TYPES.filter(type => (types || []).includes(type));
+  return picked.length ? picked : DEFAULT_TYPES;
+}
+
+// A new or learning idea is recognised first; a familiar or fading one is recalled. Each stage uses
+// the first of the student's picks that suits the answer, else whatever they did pick.
+export function askCard(question, entry, today = dayKey(), types = DEFAULT_TYPES) {
+  const picked = cleanTypes(types);
+  const recall = entry.l >= FAMILIAR || isFading(entry, today);
+  const recallOrder = isTerm(question) ? ['fill', 'written', 'self'] : ['written', 'self'];
+  const order = recall ? [...recallOrder, 'mc'] : ['mc', 'self', ...recallOrder];
+  return { type: order.find(type => picked.includes(type)) || picked[0], recall };
+}
+
+export function askType(question, entry, today = dayKey(), types = DEFAULT_TYPES) {
+  return askCard(question, entry, today, types).type;
 }
 
 // Next round: ideas the student got wrong while sure come first, then ones in progress (highest
@@ -84,10 +103,11 @@ export function pickRound(questions, levels, today = dayKey(), size = ROUND_SIZE
     .slice(0, size);
 }
 
-export function createRound(questions, levels, today = dayKey()) {
+export function createRound(questions, levels, today = dayKey(), types = DEFAULT_TYPES) {
   const picked = pickRound(questions, levels, today);
   return {
-    queue: picked.map((concept, i) => ({ id: i, concept, type: askType(questions[concept], levels[concept], today), again: false })),
+    types: cleanTypes(types),
+    queue: picked.map((concept, i) => ({ id: i, concept, ...askCard(questions[concept], levels[concept], today, types), again: false })),
     position: 0,
     nextId: picked.length,
     results: {},
@@ -99,7 +119,7 @@ export function createRound(questions, levels, today = dayKey()) {
 export function answer(levels, round, card, credit, { confidence = '', today = dayKey() } = {}) {
   const entry = { ...levels[card.concept] };
   const before = entry.l;
-  const recall = card.type !== 'mc';
+  const recall = card.recall ?? card.type !== 'mc';
   if (credit === 1) {
     // A new idea answered right and sure is already known: it skips straight to Familiar.
     // The repeat of a miss, seconds after seeing the answer, only confirms Learning.
@@ -119,10 +139,12 @@ export function answer(levels, round, card, credit, { confidence = '', today = d
   const next = { ...round, results: { ...round.results } };
   const prior = next.results[card.concept];
   next.results[card.concept] = { from: prior ? prior.from : before, to: entry.l, missed: Boolean(prior?.missed) || credit !== 1 };
-  // A miss comes back once near the end of the round, as multiple choice if it was a recall.
+  // A miss comes back once near the end of the round, as multiple choice if it was a recall and
+  // the student learns with choices.
   if (credit !== 1 && !card.again) {
     const queue = [...next.queue];
-    queue.push({ id: next.nextId, concept: card.concept, type: recall && credit === 0 ? 'mc' : card.type, again: true });
+    const easier = recall && credit === 0 && cleanTypes(round.types).includes('mc') ? 'mc' : card.type;
+    queue.push({ id: next.nextId, concept: card.concept, type: easier, recall: easier === card.type ? recall : false, again: true });
     next.queue = queue;
     next.nextId += 1;
   }
