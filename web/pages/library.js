@@ -3,7 +3,7 @@ import { LoadingArea, Reveal, useLoadGate } from '../components/CordiaLoader';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowUpDown, ArrowUpRight, AudioLines, BookOpen, ChevronDown, FolderInput, FolderPlus, ImageIcon, Layers, LayoutGrid, List, Mic, NotebookPen, Pencil, PencilRuler, Plus, Search, Star, Trash2, Upload, X,
+  ArrowUpDown, ArrowUpRight, AudioLines, BookOpen, ChevronDown, FolderInput, FolderPlus, ImageIcon, Layers, Mic, NotebookPen, Pencil, PencilRuler, Plus, Search, Star, Trash2, Upload, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
@@ -23,8 +23,8 @@ import { PRACTICE_FILES, handOffUpload, readPracticeFile } from '../lib/practice
 import ClassCard from '../components/ClassCard';
 import ClassCoverSheet from '../components/ClassCoverSheet';
 import { designCover } from '../lib/classCover';
-
-const VIEW_KEY = 'cordiaLibraryView';
+import { useListView } from '../lib/listView';
+import ViewToggle from '../components/ViewToggle';
 
 const SORTS = [
   { key: 'recent', label: 'Newest' },
@@ -80,8 +80,8 @@ export default function LibraryPage() {
   const gate = useLoadGate(!loading || Boolean(loadError));
   const [toast, setToast] = useState('');
   const [confirm, setConfirm] = useState(null);
-  // Rows (classes that open in place) or cards (one card per class, with its Napkin cover).
-  const [view, setView] = useState('rows');
+  // Rows (classes that open in place) or cards (a card per class with its cover; items as tiles).
+  const [view, chooseView] = useListView();
   const [coverFor, setCoverFor] = useState(null); // the folder whose cover is being changed
   const [designingId, setDesigningId] = useState(null);
   const triedCovers = useRef(new Set());
@@ -107,14 +107,8 @@ export default function LibraryPage() {
     try {
       const saved = JSON.parse(localStorage.getItem('cordiaClosedClasses') || '[]');
       if (Array.isArray(saved)) setClosed(new Set(saved));
-      if (localStorage.getItem(VIEW_KEY) === 'cards') setView('cards');
     } catch {}
   }, []);
-
-  function chooseView(next) {
-    setView(next);
-    try { localStorage.setItem(VIEW_KEY, next); } catch {}
-  }
 
   // The titles inside a class, which its cover's icons are picked from.
   function classTitles(folderId) {
@@ -341,12 +335,12 @@ export default function LibraryPage() {
           : item.kind === 'cards' ? <span className="lib-kind"><Layers size={20} strokeWidth={1.75} aria-hidden="true" /></span>
           : <span className="lib-kind"><Icon size={20} strokeWidth={1.75} aria-hidden="true" /></span>}
         {editing ? (
-          <form className="lib-rename" onSubmit={saveRename}>
+          <form className="lib-rename ig-main" onSubmit={saveRename}>
             <input className="c-input" value={renaming.value} onChange={event => setRenaming({ ...renaming, value: event.target.value })} onBlur={saveRename} onKeyDown={event => { if (event.key === 'Escape') setRenaming(null); }} aria-label="Guide title" autoFocus />
           </form>
         ) : (
-          <Link href={item.href} className="lib-row-link">
-            <span className="lib-row-title c-truncate">{item.title}</span>
+          <Link href={item.href} className="lib-row-link ig-main">
+            <span className="lib-row-title c-truncate ig-title">{item.title}</span>
             <span className="c-meta">
               {item.kind === 'cards' ? (item.due ? `${item.due} due` : `${item.total} cards`) : [item.kind === 'note' ? 'Note' : item.kind === 'lecture' ? 'Lecture' : item.kind === 'practice' ? 'Problems with worked answers' : '', shortDate(item.date)].filter(Boolean).join(' · ')}
             </span>
@@ -355,7 +349,7 @@ export default function LibraryPage() {
         {item.kind === 'cards' && <Link href={item.href} className="c-btn c-btn--secondary">Study</Link>}
         {item.kind === 'practice' && <Link href={item.href} className="c-btn c-btn--secondary" onClick={() => walkthroughEvent('practice-guide')}>Practice</Link>}
         {item.kind === 'guide' && (
-          <button type="button" className={'c-icon-btn lib-star' + (item.starred ? ' is-on' : '')} onClick={() => toggleStar(item.guide)} aria-pressed={item.starred} aria-label={item.starred ? 'Unstar' : 'Star'}>
+          <button type="button" className={'c-icon-btn lib-star ig-star' + (item.starred ? ' is-on' : '')} onClick={() => toggleStar(item.guide)} aria-pressed={item.starred} aria-label={item.starred ? 'Unstar' : 'Star'}>
             <Star size={20} strokeWidth={1.75} aria-hidden="true" fill={item.starred ? 'currentColor' : 'none'} />
           </button>
         )}
@@ -405,7 +399,7 @@ export default function LibraryPage() {
             />
           )}
         </div>
-        {open && (list.length ? <ul className="lib-list">{list.map(row)}</ul> : <p className="c-meta lib-empty-group">Nothing here yet. Drag items in, or use Move to class.</p>)}
+        {open && (list.length ? <ul className={'lib-list' + (view === 'cards' ? ' item-grid' : '')}>{list.map(row)}</ul> : <p className="c-meta lib-empty-group">Nothing here yet. Drag items in, or use Move to class.</p>)}
       </section>
     );
   }
@@ -452,10 +446,7 @@ export default function LibraryPage() {
           <input className="c-input" type="search" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Escape' && query) { event.preventDefault(); setQuery(''); } }} placeholder="Search" />
           {query && <button type="button" className="c-search-clear" onClick={() => setQuery('')} aria-label="Clear search"><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>}
         </label>
-        <div className="lib-view" role="group" aria-label="View">
-          <button type="button" className="c-icon-btn" aria-pressed={view === 'rows'} aria-label="Rows" title="Rows" onClick={() => chooseView('rows')}><List size={20} strokeWidth={1.75} aria-hidden="true" /></button>
-          <button type="button" className="c-icon-btn" aria-pressed={view === 'cards'} aria-label="Cards" title="Cards" onClick={() => chooseView('cards')}><LayoutGrid size={20} strokeWidth={1.75} aria-hidden="true" /></button>
-        </div>
+        <ViewToggle view={view} onChange={chooseView} />
         <Menu
           label={`Sort: ${SORTS.find(item => item.key === sort).label}`}
           trigger={<ArrowUpDown size={20} strokeWidth={1.75} aria-hidden="true" />}
@@ -479,7 +470,7 @@ export default function LibraryPage() {
 
       {loading || (filter === 'flashcards' && !cardSets) ? null : (
         <div className="c-stack" data-spot={filter === 'practice' ? 'practice-picker' : undefined}>
-          {view === 'cards' && (groups.length > 0 || looseClasses.length > 0) && (
+          {view === 'cards' && !narrowed && (groups.length > 0 || looseClasses.length > 0) && (
             <div className="lib-cards">
               {groups.map(({ folder, list }) => (
                 <ClassCard key={folder.id} folder={folder} name={folder.name} href={'/folder/' + folder.id} count={list.length} titles={classTitles(folder.id)}
@@ -488,7 +479,7 @@ export default function LibraryPage() {
               {looseClasses.map(item => <ClassCard key={item.id} name={`${item.code}${item.name ? `: ${item.name}` : ''}`} href={'/class/' + item.id} count={0} />)}
             </div>
           )}
-          {view === 'rows' && groups.map(entry => group({ id: entry.folder.id, name: entry.folder.name, list: entry.list, folder: entry.folder }))}
+          {(view === 'rows' || narrowed) && groups.map(entry => group({ id: entry.folder.id, name: entry.folder.name, list: entry.list, folder: entry.folder }))}
           {view === 'rows' && looseClasses.map(item => (
             <Link key={item.id} href={'/class/' + item.id} className="c-card lib-loose">
               <span className="lib-group-name c-truncate">{item.code}{item.name ? ` ${item.name}` : ''}</span>
@@ -518,9 +509,6 @@ export default function LibraryPage() {
         .library .lib-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
         .library .lib-tools { display: flex; align-items: center; gap: 8px; }
         .library .lib-add-class-icon { display: none; }
-        .library .lib-view { display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px; background: var(--olive-tint); }
-        .library .lib-view .c-icon-btn[aria-pressed='true'] { background: var(--surface-raised); color: var(--ink); box-shadow: var(--shadow-card); }
-        .library .lib-view .c-icon-btn[aria-pressed='false'] { color: var(--muted); }
         .library .lib-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
         @media (max-width: 767px) { .library .lib-add-class-icon { display: inline-grid; } }
         .library .lib-filter-row { flex-wrap: nowrap; min-width: 0; }
