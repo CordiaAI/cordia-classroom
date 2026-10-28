@@ -241,6 +241,8 @@ body { touch-action: manipulation; }
 .calendar-day-today, [data-theme='dark'] .calendar-day-today { background: var(--olive-tint) !important; border-radius: var(--r-row); }
 .calendar-day-today > header, [data-theme='dark'] .calendar-day-today > header { background: var(--lg-sheen-olive), var(--olive) !important; box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow); }
 .calendar-day-today > header :is(span, strong, em) { color: var(--on-olive) !important; }
+/* Flat: the day bars and the cards under them carry no drop shadow. */
+.calendar-day > header, .calendar-day-today > header, .calendar-item { box-shadow: none !important; }
 
 /* Tab bars that hold more tabs than a phone is wide (Settings, a class page): full width,
    scroll sideways with a soft fade on the side that has more. */
