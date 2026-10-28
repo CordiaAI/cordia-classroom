@@ -220,6 +220,8 @@ def _sync_modules(db, user_id: str, client: CanvasClient, courses: dict, *, forc
     done_before = set(stats.get("modules_done") or [])
     done_now, imported = set(done_before), 0
     known = library_import.existing_refs(user_id, "canvas:") if auto & set(courses) else set()
+    # Pages imported as just their link text get another go now that linked files are read.
+    thin = library_import.thin_refs(user_id, "canvas:page:") if auto & set(courses) else set()
     for course_id, row in courses.items():
         try:
             modules = client.modules(course_id) or []
@@ -244,14 +246,18 @@ def _sync_modules(db, user_id: str, client: CanvasClient, courses: dict, *, forc
                 if count >= IMPORT_PER_RUN:
                     break
                 ref = _item_ref(course_id, item)
-                if not ref or ref in known:
+                if not ref or (ref in known and ref not in thin):
                     continue
-                text = _item_text(client, course_id, item)
+                again = ref in known
+                text, files_read = _item_text(client, course_id, item)
                 known.add(ref)
+                thin.discard(ref)
+                # A file a page already brought in isn't imported again as its own guide.
+                known.update(files_read)
                 if text and library_import.upsert_source(
                         user_id, ref=ref, connector="canvas", title=str(item.get("title") or "Canvas material"), text=text,
                         folder_id=folder_id, source_type="canvas_module",
-                        source_title=f"{row.get('name') or 'Canvas'} · {module.get('name') or 'Module'}", source_url=item.get("html_url")):
+                        source_title=f"{row.get('name') or 'Canvas'} · {module.get('name') or 'Module'}", source_url=item.get("html_url")) and not again:
                     count += 1
         imported += count
     sync_state.update_stats(user_id, "canvas", {"files_checked_at": _now().isoformat(), "modules_done": sorted(done_now)[-200:],
@@ -267,15 +273,46 @@ def _item_ref(course_id: int, item: dict) -> Optional[str]:
     return None
 
 
-def _item_text(client: CanvasClient, course_id: int, item: dict) -> str:
+# A Page is often only a link to the slides or reading ("Chapters 18 - 20.pptx"). Its text alone
+# would make a guide that says just the file name, so the files it links are read too.
+MAX_PAGE_FILES = 3
+THIN_PAGE_CHARS = 300
+
+
+def _page_file_ids(html: str) -> list[int]:
+    ids: list[int] = []
+    for match in canvas_client._FILE_ID.finditer(html or ""):
+        file_id = int(match.group(1))
+        if file_id not in ids:
+            ids.append(file_id)
+    return ids
+
+
+def _item_text(client: CanvasClient, course_id: int, item: dict) -> tuple[str, list[str]]:
+    """The item's readable text, and the refs of the files read for it."""
     try:
         if item.get("type") == "Page":
-            return html_to_text(str(client.page(course_id, item["page_url"]).get("body") or ""))
+            body = str(client.page(course_id, item["page_url"]).get("body") or "")
+            page_text = html_to_text(body)
+            files, refs = [], []
+            for file_id in _page_file_ids(body)[:MAX_PAGE_FILES]:
+                try:
+                    name, data = client.download_file(course_id, file_id)
+                    text = file_extraction.text_from_file(name, data)
+                except (CanvasError, HTTPException) as exc:
+                    logger.info("canvas page file skipped: %s", type(exc).__name__)
+                    continue
+                if text.strip():
+                    files.append(text)
+                    refs.append(f"canvas:file:{file_id}")
+            # A page that is little more than its links is replaced by what they link to.
+            parts = files if files and len(page_text.strip()) < THIN_PAGE_CHARS else [page_text, *files]
+            return "\n\n".join(part for part in parts if part.strip()), refs
         name, body = client.download_file(course_id, int(item["content_id"]))
-        return file_extraction.text_from_file(name, body)
+        return file_extraction.text_from_file(name, body), []
     except (CanvasError, HTTPException) as exc:
         logger.info("canvas module item skipped: %s", type(exc).__name__)
-        return ""
+        return "", []
 
 
 def _sync_announcements(db, user_id: str, client: CanvasClient, courses: dict) -> None:
