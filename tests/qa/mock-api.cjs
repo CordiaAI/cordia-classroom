@@ -239,6 +239,8 @@ async function install(context, state) {
       return json({ questions, cards: questions.map((_, i) => ({ type: 'mc', concepts: [i] })) });
     }
     if ((m = path.match(/^\/quiz\/([^/]+)\/submit$/))) return json({ score: 67 });
+    if ((m = path.match(/^\/quiz\/([^/]+)\/why$/))) return json({ why_right: 'The guide defines it this way.', why_wrong: 'That option describes a different idea.' });
+    if ((m = path.match(/^\/guides\/([^/]+)\/learn-progress$/)) && method === 'PATCH') { state.learn = body; return json({ updated: true }); }
     if ((m = path.match(/^\/practice\/([^/]+)\/state$/))) return json({ practice: null });
     if (path === '/generate') return json({ study_guide: 'Q1: Where is ATP made?\nA1: In the mitochondria, through cellular respiration.', notes: '- ATP stores energy', flashcards: [{ front: 'ATP', back: 'Energy carrier' }] });
     if (path === '/lectures/usage') return json({ minutes_used: 36, minutes_limit: 120, minutes_left: 84, plan: 'free' });
