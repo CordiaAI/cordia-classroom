@@ -48,6 +48,87 @@ Write Markdown only, in this shape:
 - The transcript comes from speech recognition. When a word was plainly misheard and the context makes the intended word certain, write the intended word. When a date, number or name is unclear or conflicts with the rest, write what was said and add "(confirm)".
 - Never add facts, definitions or advice the speaker did not give.`;
 
+// A long lecture is written in parts, all at once. One call for a 40-minute class runs past the
+// server's time limit and the notes never arrive, so each part gets its own short call and the
+// parts are joined in order.
+export const PART_CHARS = 6000;
+export function splitLecture(text, size = PART_CHARS) {
+  const value = String(text || '').trim();
+  if (value.length <= size) return value ? [value] : [];
+  const target = Math.ceil(value.length / Math.ceil(value.length / size));
+  const cuts = [0];
+  while (cuts.at(-1) < value.length) {
+    const start = cuts.at(-1);
+    let end = Math.min(value.length, start + target);
+    if (end < value.length) {
+      // Break at a line, else at a sentence end, in the last fifth of the part.
+      const from = start + Math.floor(target * 0.8);
+      const tail = value.slice(from, end);
+      const line = tail.lastIndexOf('\n');
+      const sentence = Math.max(tail.lastIndexOf('. '), tail.lastIndexOf('? '), tail.lastIndexOf('! '));
+      if (line >= 0) end = from + line + 1;
+      else if (sentence >= 0) end = from + sentence + 2;
+    }
+    cuts.push(end);
+  }
+  // A scrap left over from breaking early joins the part before it.
+  if (cuts.length > 2 && value.length - cuts.at(-2) < target * 0.3) cuts.splice(-2, 1);
+  const parts = cuts.slice(1).map((end, index) => value.slice(cuts[index], end).trim());
+  return parts.filter(Boolean);
+}
+
+function partNote(index, count, kind) {
+  const where = `This is part ${index + 1} of ${count} of one lecture; the other parts are handled separately.`;
+  if (kind === 'analysis') return `${where} Cover only this part. Give the title of the whole lecture as far as this part shows it.\n`;
+  const start = index === 0 ? 'Start with the "# " title line.' : 'Leave out the "# " title line and start at the first "## " section.';
+  const end = index < count - 1 ? ' Leave out Key Takeaways and the side-conversation note; the lecture goes on after this part.' : '';
+  return `${where} ${start}${end}\n`;
+}
+
+const ROMAN = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+const roman = number => ROMAN.reduce((out, [value, letters]) => { while (number >= value) { out += letters; number -= value; } return out; }, '');
+
+// The parts' outlines as one: one title, sections numbered straight through, the
+// side-conversation note once at the end.
+export function joinOutlines(parts) {
+  let section = 0;
+  let sideTalk = false;
+  const lines = [];
+  parts.forEach((part, index) => {
+    for (const line of String(part).split('\n')) {
+      if (/^note: unrelated side conversation/i.test(line.trim())) { sideTalk = true; continue; }
+      if (index > 0 && /^#\s/.test(line)) continue;
+      const heading = /^##\s+(?:[IVXLCDM]+\.\s+)?(.+)$/.exec(line);
+      if (heading && !/^key takeaways/i.test(heading[1].trim())) { section += 1; lines.push(`## ${roman(section)}. ${heading[1].trim()}`); continue; }
+      lines.push(line);
+    }
+    lines.push('');
+  });
+  return `${lines.join('\n').replace(/\n{3,}/g, '\n\n').trim()}${sideTalk ? '\n\nNote: unrelated side conversation was left out.' : ''}`;
+}
+
+// The parts' findings as one analysis. The summary takes each part's first point, then each
+// part's second, so it covers the whole lecture and not just its start.
+export function mergeAnalyses(list) {
+  const found = list.filter(item => item && typeof item === 'object');
+  if (!found.length) return null;
+  const all = key => found.flatMap(item => (Array.isArray(item[key]) ? item[key] : []));
+  const seen = new Set();
+  const terms = all('terms').filter(item => {
+    const key = String(item?.term || '').trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const summaries = found.map(item => (Array.isArray(item.summary) ? item.summary : []));
+  const summary = [];
+  for (let round = 0; round < 5; round += 1) summaries.forEach(points => { if (points[round]) summary.push(points[round]); });
+  const votes = {};
+  found.forEach(item => { if (item.class_id) votes[item.class_id] = (votes[item.class_id] || 0) + 1; });
+  const classId = Object.keys(votes).sort((a, b) => votes[b] - votes[a])[0] || '';
+  return { title: found.find(item => item.title)?.title || '', class_id: classId, summary, watch_for: all('watch_for'), todos: all('todos'), outline: all('outline'), terms, questions: all('questions') };
+}
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const words = text => String(text || '').toLowerCase().replace(/[’']/g, "'").match(/[\p{L}\p{N}']+/gu) || [];
@@ -166,8 +247,9 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
   }
 
   // One writing call; null when it failed. A cut-off answer would not parse, so it is logged.
+  // 45 s with no retry, so even a slow call ends inside the 60 s request and the lecture is saved.
   async function complete(system, user, { json = false, maxTokens = 8000 } = {}) {
-    const out = await aiChat(provider, { system, user, maxTokens, json, timeoutMs: 55000, fetchImpl });
+    const out = await aiChat(provider, { system, user, maxTokens, json, timeoutMs: 45000, retries: 0, fetchImpl });
     if (out?.cutOff) console.error('Lecture AI answer was cut off at', maxTokens, 'tokens');
     return out?.text || null;
   }
@@ -176,23 +258,32 @@ export function createLectureLibrary({ env = process.env, fetch: fetchImpl = glo
     if (!openaiKey || text.trim().length < 40) return null;
     const date = new Date(`${lectureDate}T12:00:00Z`);
     const weekday = date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
-    const content = await complete(ANALYSIS_RULES,
-      `Lecture date: ${lectureDate} (${weekday})\nClasses:\n${classes.map(item => `${item.id}: ${item.name}`).join('\n') || '(none)'}\n\nLecture:\n${text.slice(0, 80000)}`,
-      { json: true, maxTokens: 8000 });
-    try {
-      return content ? JSON.parse(content) : null;
-    } catch {
-      return null;
-    }
+    const head = `Lecture date: ${lectureDate} (${weekday})\nClasses:\n${classes.map(item => `${item.id}: ${item.name}`).join('\n') || '(none)'}\n\n`;
+    const parse = content => { try { return content ? JSON.parse(content) : null; } catch { return null; } };
+    const parts = splitLecture(text.slice(0, 80000));
+    if (parts.length === 1) return parse(await complete(ANALYSIS_RULES, `${head}Lecture:\n${parts[0]}`, { json: true, maxTokens: 8000 }));
+    const found = await Promise.all(parts.map((part, index) => complete(ANALYSIS_RULES, `${partNote(index, parts.length, 'analysis')}${head}Lecture:\n${part}`, { json: true, maxTokens: 4000 }).then(parse)));
+    return mergeAnalyses(found);
   }
 
   // The full study outline, as Markdown. Plain text in, so the [ms] markers don't cost tokens.
   async function writeOutline(transcript, { lectureDate }) {
     const text = cleanSpeech(transcript);
     if (!openaiKey || text.length < 200) return '';
-    const markdown = await complete(OUTLINE_RULES, `Lecture date: ${lectureDate}\n\nTranscript:\n${text.slice(0, 80000)}`, { maxTokens: 16000 });
-    const clean = String(markdown || '').replace(/^```(?:markdown)?\s*|```\s*$/g, '').trim();
-    return /^#{1,4}\s|^[*\-]\s/m.test(clean) ? clean.slice(0, 60000) : '';
+    const tidy = markdown => String(markdown || '').replace(/^```(?:markdown)?\s*|```\s*$/g, '').trim();
+    const usable = clean => /^#{1,4}\s|^[*\-]\s/m.test(clean);
+    const parts = splitLecture(text.slice(0, 80000));
+    if (parts.length === 1) {
+      const clean = tidy(await complete(OUTLINE_RULES, `Lecture date: ${lectureDate}\n\nTranscript:\n${parts[0]}`, { maxTokens: 16000 }));
+      return usable(clean) ? clean.slice(0, 60000) : '';
+    }
+    const written = (await Promise.all(parts.map((part, index) => complete(OUTLINE_RULES, `${partNote(index, parts.length, 'outline')}Lecture date: ${lectureDate}\n\nTranscript:\n${part}`, { maxTokens: 5000 })))).map(tidy);
+    // A missing part would leave a silent gap in the notes, so it's all parts or none (Try again).
+    if (written.some(clean => !usable(clean))) {
+      console.error('Lecture outline: part failed', written.map(usable));
+      return '';
+    }
+    return joinOutlines(written).slice(0, 60000);
   }
 
   async function rows(path) {
