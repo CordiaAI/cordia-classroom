@@ -3,7 +3,8 @@ Folders router for CordiaClassroom.
 Handles CRUD operations for class folders.
 """
 
-import os
+import re
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field, field_validator
@@ -29,18 +30,18 @@ class FolderNameRequest(BaseModel):
 
 
 class FolderCoverRequest(BaseModel):
-    """A Napkin visual already drawn and stored by the web app (/api/visual)."""
-    url: str = Field(max_length=500)
-    alt: str = Field(default="", max_length=200)
-    text: str = Field(default="", max_length=2000)
-    redraw: int = Field(default=0, ge=0, le=3)
-    theme: str = Field(default="light", pattern="^(light|dark)$")
+    """A designed cover for Library's card view: one of eight colours and up to three icon names
+    from the web app's fixed list (lib/coverDesign.mjs). Names only, never an image or a URL."""
+    kind: Literal["design"] = "design"
+    color: int = Field(default=0, ge=0, le=7)
+    icons: list[str] = Field(min_length=1, max_length=3)
 
-
-def _visual_url(url: str) -> bool:
-    """Only drawings in our own public visuals bucket can be a cover."""
-    base = (os.getenv("SUPABASE_URL") or "").rstrip("/")
-    return bool(base) and url.startswith(f"{base}/storage/v1/object/public/visuals/") and not any(c.isspace() for c in url)
+    @field_validator("icons")
+    @classmethod
+    def validate_icons(cls, v):
+        if not all(re.fullmatch(r"[A-Z][A-Za-z0-9]{1,30}", name or "") for name in v):
+            raise ValueError("Unknown icon")
+        return list(dict.fromkeys(v))
 
 
 def _set_cover(folder_id: str, user_id: str, cover):
@@ -112,8 +113,6 @@ def set_folder_cover(folder_id: str, request: FolderCoverRequest, authorization:
     """Save the class's cover for Library's card view."""
     require_uuid(folder_id, "folder ID")
     user_id = get_user_id(authorization)
-    if not _visual_url(request.url):
-        raise HTTPException(status_code=400, detail="That cover can't be used")
     return _set_cover(folder_id, user_id, request.model_dump())
 
 

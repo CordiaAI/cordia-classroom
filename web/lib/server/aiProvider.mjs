@@ -30,3 +30,9 @@ export function chatProvider(env = process.env) {
   }
   return aiProvider(env);
 }
+
+// Small, quick jobs (picking a class's cover icons): Haiku when Claude is set up.
+export function smallChatProvider(env = process.env) {
+  const provider = chatProvider(env);
+  return provider.name === 'anthropic' ? { ...provider, chatModel: 'claude-haiku-5-5' } : provider;
+}
