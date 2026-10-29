@@ -55,6 +55,7 @@ def study_rows(user_id: str, tz: str = "UTC", now: Optional[datetime] = None) ->
     now = now or _now()
     zone = _zone(tz)
     since = (now - timedelta(days=DAYS)).isoformat()
+    from routers.stats import clamp_duration
     sessions = get_supabase().table("study_sessions").select("started_at,duration_seconds,session_type") \
         .eq("user_id", user_id).gte("started_at", since).limit(5000).execute().data or []
     days: dict = defaultdict(lambda: {"sessions": 0, "seconds": 0, "quiz": 0, "flashcards": 0})
@@ -67,7 +68,7 @@ def study_rows(user_id: str, tz: str = "UTC", now: Optional[datetime] = None) ->
             at = at.replace(tzinfo=timezone.utc)
         day = days[at.astimezone(zone).date().isoformat()]
         day["sessions"] += 1
-        day["seconds"] += int(row.get("duration_seconds") or 0)
+        day["seconds"] += clamp_duration(row.get("duration_seconds"))  # old overnight-tab rows count at most 3h
         kind = str(row.get("session_type") or "")
         if kind in ("quiz", "nclex", "exam"):
             day["quiz"] += 1

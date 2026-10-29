@@ -92,7 +92,35 @@ def list_guides(folder_id: Optional[str] = None, limit: int = 50, offset: int = 
         for guide in guides:
             cards = guide.pop("flashcards", None)
             guide["flashcard_count"] = len(cards) if isinstance(cards, list) else 0
+            learned = flashcard_learn_levels(cards, guide.get("flashcard_progress"))
+            if learned:
+                guide["flashcard_learn"] = learned
     return {"guides": guides}
+
+
+def _learn_fingerprint(question) -> str:
+    """Learn's question fingerprint (fingerprint() in web/lib/learnEngine.mjs)."""
+    return re.sub(r"[^a-z0-9]+", " ", str(question or "").lower()).strip()[:48]
+
+
+def flashcard_learn_levels(cards, progress) -> dict:
+    """{card index: Learn level 0-3} for flashcards whose question Learn has a level for. Learn's
+    ideas are the guide's quiz questions, made from the same Q&A pairs as the cards, so a card and
+    an idea are the same when their question fingerprints match. Lets the Progress knowledge map
+    show Learn's progress without sending every card."""
+    levels = ((progress or {}).get("learn") or {}).get("levels") if isinstance(progress, dict) else None
+    if not isinstance(cards, list) or not isinstance(levels, dict):
+        return {}
+    by_question = {}
+    for entry in levels.values():
+        if isinstance(entry, dict) and isinstance(entry.get("l"), int) and entry.get("q"):
+            by_question[entry["q"]] = max(by_question.get(entry["q"], 0), entry["l"])
+    matched = {}
+    for index, card in enumerate(cards):
+        level = by_question.get(_learn_fingerprint(card.get("front") if isinstance(card, dict) else ""))
+        if level:
+            matched[str(index)] = level
+    return matched
 
 
 def require_own_folder(supabase, user_id: str, folder_id: Optional[str]) -> None:
