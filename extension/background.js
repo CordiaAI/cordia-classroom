@@ -56,7 +56,7 @@ async function activeWebTab() {
 }
 
 async function syncClassroomAuth(forceRefresh = false) {
-  const tabs = await chrome.tabs.query({ url: ['https://classroom.cordiaai.io/*', 'https://classroom.cordiacode.com/*'] });
+  const tabs = await chrome.tabs.query({ url: ['https://classroom.cordiaai.io/*'] });
   for (const tab of tabs) {
     try {
       return await chrome.tabs.sendMessage(tab.id, { action: 'syncCordiaAuth', forceRefresh });

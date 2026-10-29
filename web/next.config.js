@@ -37,12 +37,7 @@ module.exports = {
     ];
   },
   async redirects() {
-    return [{
-      source: '/:path*',
-      has: [{ type: 'host', value: 'autostudyai.online' }],
-      destination: 'https://classroom.cordiaai.io/:path*',
-      permanent: true,
-    },
+    return [
     // Old pages: card sets live in Library's Cards tab; the Games hub only ever held Blocks.
     { source: '/flashcards', destination: '/library?tab=cards', permanent: false },
     { source: '/games/:guideId', destination: '/play/:guideId', permanent: false }];
