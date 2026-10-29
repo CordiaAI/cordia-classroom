@@ -14,13 +14,21 @@ const LEVELS = [
   { key: 'mastered', label: 'Mastered' },
 ];
 
-// Box 0 or missed = learning; box 1-2 or known = known; box 3+ = mastered (lib/spacedReview.mjs).
-export function cardLevel(progress, index) {
+const ORDER = LEVELS.map(level => level.key);
+// Learn's levels (lib/learnEngine.mjs) on this scale: New, Learning, Familiar = known, Mastered.
+const LEARN_SCALE = ['new', 'learning', 'known', 'mastered'];
+
+// Flashcards: box 0 or missed = learning; box 1-2 or known = known; box 3+ = mastered
+// (lib/spacedReview.mjs). Learn's level for the same question (learnLevels, the guide summary's
+// flashcard_learn) counts too; the stronger of the two wins, so studying in either shows here.
+export function cardLevel(progress, index, learnLevels) {
   const entry = progress?.schedule?.[index];
-  if (entry) return entry.box >= 3 ? 'mastered' : entry.box >= 1 ? 'known' : 'learning';
-  if ((progress?.known || []).includes(index)) return 'known';
-  if ((progress?.unknown || []).includes(index)) return 'learning';
-  return 'new';
+  let level = 'new';
+  if (entry) level = entry.box >= 3 ? 'mastered' : entry.box >= 1 ? 'known' : 'learning';
+  else if ((progress?.known || []).includes(index)) level = 'known';
+  else if ((progress?.unknown || []).includes(index)) level = 'learning';
+  const learned = LEARN_SCALE[learnLevels?.[index]] || 'new';
+  return ORDER.indexOf(learned) > ORDER.indexOf(level) ? learned : level;
 }
 
 function seeded(seed) {
@@ -47,7 +55,7 @@ function buildScene(guides) {
       points.push({
         cluster: clusterIndex,
         card,
-        level: cardLevel(cluster.guide.flashcard_progress, card),
+        level: cardLevel(cluster.guide.flashcard_progress, card, cluster.guide.flashcard_learn),
         x: cluster.x * 0.82 + (random() - 0.5) * spread,
         y: cluster.y * 0.82 + (random() - 0.5) * spread,
         z: cluster.z * 0.82 + (random() - 0.5) * spread,
@@ -226,7 +234,7 @@ export default function KnowledgeMap({ guides }) {
         <ul>
           {scene.clusters.map(({ guide }) => {
             const count = Math.min(MAX_CARDS, Number(guide.flashcard_count) || 0);
-            const learned = Array.from({ length: count }, (_, index) => cardLevel(guide.flashcard_progress, index)).filter(level => level === 'known' || level === 'mastered').length;
+            const learned = Array.from({ length: count }, (_, index) => cardLevel(guide.flashcard_progress, index, guide.flashcard_learn)).filter(level => level === 'known' || level === 'mastered').length;
             return <li key={guide.id}><Link href={'/flashcards/study?guideId=' + guide.id}>{guide.title || 'Untitled guide'}</Link><span className="c-meta">{learned} of {count} known</span></li>;
           })}
         </ul>

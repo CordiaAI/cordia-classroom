@@ -1,30 +1,23 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { apiFetch, getToken } from './api';
 import { addGrowth } from './progress';
 import { recordStudy } from './activity';
 import { activeClock } from './activeClock';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const MIN_LOGGED_SECONDS = 3; // shorter visits aren't logged
 
 /**
  * Tracks time spent on a page and logs sessions for streak/minutes tracking.
  * - On mount: logs a 0-duration session (updates streak immediately)
- * - On unmount/beforeunload: sends the active time (visible, not idle) via sendBeacon
+ * - When the tab is hidden, the page is left, or the screen unmounts: sends the active time since
+ *   the last send (visible, not idle; lib/activeClock.js) via sendBeacon and starts counting again.
+ *   Sending on hide means a tab closed from the background (no unload event on phones) still logs
+ *   what was studied, and one forgotten tab can't pile up one long sitting.
  */
 export default function useSessionTracker(sessionType = 'browse', guideId = null) {
-  const loggedRef = useRef(false);
-
   useEffect(() => {
-    loggedRef.current = false;
     const clock = activeClock();
-    // Active time on a guide grows its tree and joins the local study log.
-    let grown = false;
-    function grow() {
-      if (grown || !guideId || sessionType !== 'read') return;
-      grown = true;
-      const minutes = clock.seconds() / 60;
-      if (minutes >= 0.25) { addGrowth(guideId, minutes); recordStudy({ guideId, minutes, kind: 'read' }); }
-    }
 
     // Log initial session to update streak
     const body = { session_type: sessionType, duration_seconds: 0 };
@@ -34,34 +27,34 @@ export default function useSessionTracker(sessionType = 'browse', guideId = null
       body: JSON.stringify(body),
     });
 
-    function sendBeacon() {
-      if (loggedRef.current) return;
-      loggedRef.current = true;
-
+    function flush() {
       const elapsed = clock.seconds();
-      if (elapsed < 3) return; // Don't log trivial visits
-
+      if (elapsed < MIN_LOGGED_SECONDS) return;
+      clock.reset();
+      // Active time on a guide grows its tree and joins the local study log.
+      if (guideId && sessionType === 'read' && elapsed >= 15) {
+        addGrowth(guideId, elapsed / 60);
+        recordStudy({ guideId, minutes: elapsed / 60, kind: 'read' });
+      }
       const token = getToken();
       if (!token) return;
-
       const payload = {
         authorization: 'Bearer ' + token,
         session_type: sessionType,
         duration_seconds: elapsed,
       };
       if (guideId) payload.guide_id = guideId;
-
-      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-      navigator.sendBeacon(API + '/stats/beacon', blob);
+      navigator.sendBeacon(API + '/stats/beacon', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
     }
 
-    function onUnload() { grow(); sendBeacon(); }
-    window.addEventListener('beforeunload', onUnload);
+    function onVisibility() { if (document.hidden) flush(); }
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', flush);
 
     return () => {
-      window.removeEventListener('beforeunload', onUnload);
-      grow();
-      sendBeacon();
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', flush);
+      flush();
       clock.stop();
     };
   }, [sessionType, guideId]);

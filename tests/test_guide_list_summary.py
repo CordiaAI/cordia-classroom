@@ -60,6 +60,14 @@ class GuideListSummaryTests(unittest.TestCase):
         self.assertEqual(query.range_args, (0, 99))
         self.assertEqual(result["guides"][0]["flashcards"], [{"front": "a"}])
 
+    def test_summary_carries_learn_levels_matched_to_cards(self):
+        progress = {"learn": {"levels": {"0": {"l": 3, "at": "2026-10-28", "q": "what makes atp"},
+                                         "1": {"l": 0, "q": "what is a cell"}}}}
+        result, _ = self._list([{"id": "g1", "flashcards": [{"front": "What is a cell?"}, {"front": "What makes ATP?"}],
+                                 "flashcard_progress": progress}, {"id": "g2", "flashcards": [{"front": "a"}]}], fields="summary")
+        self.assertEqual(result["guides"][0]["flashcard_learn"], {"1": 3})
+        self.assertNotIn("flashcard_learn", result["guides"][1])
+
     def test_summary_includes_flashcard_progress_for_the_due_count(self):
         self.assertIn("flashcard_progress", guides.SUMMARY_COLUMNS.split(","))
 
