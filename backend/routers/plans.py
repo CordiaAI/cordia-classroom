@@ -188,11 +188,15 @@ def schedule_exams(user_id: str) -> int:
     db = get_supabase()
     exams = [i for i in calendar_for(user_id).get("items") or [] if not i.get("done") and _is_exam(user_id, i)
              and now < google_sync._time(i["due_at"]) <= now + timedelta(days=14)]
+    if not exams:
+        return 0
+    # Already planned, or every session was removed by the student: leave it.
+    planned = {row["item_key"] for row in db.table("study_blocks").select("item_key").eq("user_id", user_id)
+               .in_("item_key", [item["id"] for item in exams]).execute().data or []}
     added = 0
     for item in exams:
-        if db.table("study_blocks").select("id").eq("user_id", user_id).eq("item_key", item["id"]).limit(1).execute().data:
-            continue  # Already planned, or every session was removed by the student: leave it.
-        added += len(schedule(user_id, item, _zone(user_id, None)))
+        if item["id"] not in planned:
+            added += len(schedule(user_id, item, _zone(user_id, None)))
     return added
 
 
@@ -242,11 +246,13 @@ def reflow(user_id: str, item_key: str, time_zone: str = "") -> dict:
         db.table("study_blocks").delete().in_("id", late).eq("user_id", user_id).execute()
     moved_steps = added = 0
     if due:
-        steps = [s for s in db.table("assignment_steps").select("id,position,done").eq("user_id", user_id).eq("item_key", item_key)
+        steps = [s for s in db.table("assignment_steps").select("*").eq("user_id", user_id).eq("item_key", item_key)
                  .order("position").execute().data or [] if not s.get("done")]
-        for step, step_due in zip(steps, planner.stagger(len(steps), due, now)):
-            db.table("assignment_steps").update({"due_at": step_due.isoformat()}).eq("id", step["id"]).eq("user_id", user_id).execute()
-            moved_steps += 1
+        # All new dates in one write (whole rows, so the upsert only ever updates).
+        moved = [{**step, "due_at": step_due.isoformat()} for step, step_due in zip(steps, planner.stagger(len(steps), due, now))]
+        if moved:
+            db.table("assignment_steps").upsert(moved, on_conflict="id").execute()
+        moved_steps = len(moved)
         if steps or _is_exam(user_id, item):
             added = len(schedule(user_id, item, _zone(user_id, time_zone or None)))
     return {"blocks_removed": len(late), "steps_moved": moved_steps, "blocks_added": added}
@@ -341,10 +347,18 @@ def exam_review_set(item_key: str, body: ReviewRequest, request: Request, author
         raise HTTPException(status_code=400, detail="Pick the class this is for.")
     from routers.drive import _own_folder
     _own_folder(user_id, folder_id)
-    guide = build_review(user_id, folder_id, f"{item['title']}: review", f"review:{item_key}")
+    ref = f"review:{item_key}"
+    db = get_supabase()
+    before = (db.table("study_guides").select("notes,study_guide").eq("user_id", user_id)
+              .eq("external_source_id", ref).limit(1).execute().data or [{}])[0]
+    guide = build_review(user_id, folder_id, f"{item['title']}: review", ref)
+    # Building again with the same material keeps its questions, so Learn progress isn't lost.
+    if before.get("study_guide") and before.get("notes") == guide.get("notes") and guide.get("id"):
+        db.table("study_guides").update({"study_guide": before["study_guide"]}).eq("id", guide["id"]).eq("user_id", user_id).execute()
     added = schedule(user_id, item, _zone(user_id, body.time_zone)) if _is_exam(user_id, item) else []
     _push(user_id)
-    return {"guide": {"id": guide.get("id"), "title": guide.get("title")}, "sessions": len(added)}
+    # due_at: the exam date Learn paces the review set to.
+    return {"guide": {"id": guide.get("id"), "title": guide.get("title")}, "sessions": len(added), "due_at": item.get("due_at")}
 
 
 @router.post("/review-sets")

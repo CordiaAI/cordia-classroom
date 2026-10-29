@@ -92,7 +92,7 @@ def learning_profile_for_user(user_id: str) -> dict:
 class LogSessionRequest(BaseModel):
     guide_id: Optional[str] = None
     session_type: str = Field(..., max_length=20)
-    duration_seconds: int = Field(default=0, ge=0, le=86400)  # max 24 hours
+    duration_seconds: int = Field(default=0, ge=0)  # clamped to MAX_SESSION_SECONDS when saved
     metadata: Optional[dict] = Field(default_factory=dict)
 
     @field_validator("session_type")
@@ -287,9 +287,7 @@ def get_overview(authorization: str = Header(default="")):
             .eq("user_id", user_id) \
             .gte("started_at", today_start) \
             .execute()
-        overview["minutes_today"] = sum(
-            min(s.get("duration_seconds") or 0, MAX_SESSION_SECONDS) for s in (today_sessions.data or [])
-        ) // 60
+        overview["minutes_today"] = sum(clamp_duration(s.get("duration_seconds")) for s in (today_sessions.data or [])) // 60
     except Exception:
         logger.warning("Returning partial overview after database error", exc_info=True)
     return overview
@@ -297,9 +295,34 @@ def get_overview(authorization: str = Header(default="")):
 
 ACTIVITY_DAYS = 371  # A year of whole weeks for the year grid.
 SESSION_KINDS = ("read", "flashcard", "quiz", "timer", "browse")
-# One sitting counts at most this long. Older pages logged wall-clock time from open to close, so
-# a tab left open overnight logged up to 24 hours; those rows still count only this much.
-MAX_SESSION_SECONDS = 4 * 3600
+# One sitting counts at most this long. Pages before 2026-10-27 logged wall-clock time from open to
+# close, so a tab left open overnight logged up to 24 hours; those rows still count only this much.
+MAX_SESSION_SECONDS = 3 * 3600
+
+
+def clamp_duration(value) -> int:
+    """A logged duration as whole seconds between 0 and MAX_SESSION_SECONDS."""
+    try:
+        return min(max(int(value or 0), 0), MAX_SESSION_SECONDS)
+    except (TypeError, ValueError):
+        return 0
+
+
+def session_row(user_id: str, session_type: str, duration, guide_id: Optional[str] = None, metadata: Optional[dict] = None) -> dict:
+    """A study_sessions row for a sitting that ends now: started_at..ended_at spans the active time."""
+    seconds = clamp_duration(duration)
+    ended = datetime.now(timezone.utc)
+    row = {
+        "user_id": user_id,
+        "session_type": session_type,
+        "duration_seconds": seconds,
+        "started_at": (ended - timedelta(seconds=seconds)).isoformat(),
+        "ended_at": ended.isoformat(),
+        "metadata": metadata or {},
+    }
+    if guide_id:
+        row["guide_id"] = guide_id
+    return row
 
 
 def _local_dt(ts, tz_offset: int):
@@ -313,21 +336,31 @@ def _local_dt(ts, tz_offset: int):
     return moment + timedelta(minutes=tz_offset)
 
 
+def _sitting(row: dict, tz_offset: int):
+    """(local end, counted seconds) for one row, or None. Rows written by session_row carry
+    started_at..ended_at; older rows have no ended_at and were written when the sitting ended, so
+    their started_at is the end. Either way a sitting counts at most MAX_SESSION_SECONDS and never
+    more than the time between its start and end."""
+    seconds = clamp_duration(row.get("duration_seconds"))
+    started = _local_dt(row.get("started_at"), tz_offset)
+    ended = _local_dt(row.get("ended_at"), tz_offset) if row.get("ended_at") else None
+    if started is None:
+        return None
+    if ended is not None and ended > started:
+        return ended, min(seconds, int((ended - started).total_seconds()))
+    return started, seconds
+
+
 def counted_sessions(sessions: list, tz_offset: int = 0) -> list:
     """Each logged sitting as (row, local end, pieces), pieces being (local start, seconds) split at
-    local hour boundaries. A row is written when a sitting ends (started_at is that moment), so a
-    sitting covers [end - duration, end]. Each counts at most MAX_SESSION_SECONDS, and time two
-    sittings share (two tabs open at once) counts once, so an hour never holds more than 60
-    minutes and a day never more than 24 hours."""
-    timed = [(end, row) for row in sessions if (end := _local_dt(row.get("started_at"), tz_offset)) is not None]
-    timed.sort(key=lambda pair: pair[0])
+    local hour boundaries; a sitting covers [end - seconds, end] (see _sitting). Time two sittings
+    share (two tabs open at once) counts once, so an hour never holds more than 60 minutes and a
+    day never more than 24 hours."""
+    timed = [(*sitting, row) for row in sessions if (sitting := _sitting(row, tz_offset)) is not None]
+    timed.sort(key=lambda item: item[0])
     covered = None
     counted = []
-    for end, row in timed:
-        try:
-            seconds = min(max(int(row.get("duration_seconds") or 0), 0), MAX_SESSION_SECONDS)
-        except (TypeError, ValueError):
-            seconds = 0
+    for end, seconds, row in timed:
         start = end - timedelta(seconds=seconds)
         if covered is not None and start < covered:
             start = covered
@@ -405,7 +438,7 @@ def get_activity(authorization: str = Header(default=""), tz_offset: int = 0):
     supabase = get_supabase()
     today = (datetime.utcnow() + timedelta(minutes=tz_offset)).date()
     since = (datetime.utcnow() - timedelta(days=ACTIVITY_DAYS + 1)).isoformat()
-    sessions = supabase.table("study_sessions").select("started_at, duration_seconds, session_type, guide_id, metadata") \
+    sessions = supabase.table("study_sessions").select("started_at, ended_at, duration_seconds, session_type, guide_id, metadata") \
         .eq("user_id", user_id).gte("started_at", since).order("started_at", desc=True).limit(5000).execute().data or []
     attempts = supabase.table("quiz_attempts").select("guide_id, score, completed_at").eq("user_id", user_id) \
         .order("completed_at", desc=True).limit(20).execute().data or []
@@ -424,7 +457,7 @@ def get_week(authorization: str = Header(default=""), tz_offset: int = 0):
     user_id = get_user_id(authorization)
     today = (datetime.utcnow() + timedelta(minutes=tz_offset)).date()
     since = (datetime.utcnow() - timedelta(days=15)).isoformat()
-    sessions = get_supabase().table("study_sessions").select("started_at, duration_seconds, session_type") \
+    sessions = get_supabase().table("study_sessions").select("started_at, ended_at, duration_seconds, session_type") \
         .eq("user_id", user_id).gte("started_at", since).limit(5000).execute().data or []
     recent = build_activity(sessions, [], {}, {}, today, tz_offset)["recent"]
     return {"minutes": sum(day["minutes"] for day in recent[-7:]), "previous_minutes": sum(day["minutes"] for day in recent[-14:-7])}
@@ -445,16 +478,8 @@ def log_session(request: LogSessionRequest, authorization: str = Header(default=
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
-    data = {
-        "user_id": user_id,
-        "session_type": request.session_type,
-        "duration_seconds": min(request.duration_seconds, MAX_SESSION_SECONDS),
-        "metadata": request.metadata or {}
-    }
-    if request.guide_id:
-        data["guide_id"] = request.guide_id
-
-    supabase.table("study_sessions").insert(data).execute()
+    row = session_row(user_id, request.session_type, request.duration_seconds, request.guide_id, request.metadata)
+    supabase.table("study_sessions").insert(row).execute()
     _update_streak(user_id)
 
     return {"logged": True}
@@ -487,21 +512,8 @@ def _log_beacon_session(data) -> dict:
     if session_type not in allowed:
         session_type = "browse"
 
-    try:
-        duration = min(max(int(data.get("duration_seconds", 0)), 0), MAX_SESSION_SECONDS)
-    except (TypeError, ValueError):
-        duration = 0
-
-    row = {
-        "user_id": user_id,
-        "session_type": session_type,
-        "duration_seconds": duration,
-        "metadata": {}
-    }
     guide_id = data.get("guide_id")
-    if guide_id and is_uuid(guide_id):
-        row["guide_id"] = guide_id
-
+    row = session_row(user_id, session_type, data.get("duration_seconds"), guide_id if guide_id and is_uuid(guide_id) else None)
     supabase.table("study_sessions").insert(row).execute()
     _update_streak(user_id)
 

@@ -5,9 +5,11 @@ import BodyPortal from './BodyPortal';
 import DoneCheck from './DoneCheck';
 import DraftLink from './DraftLink';
 import RepoLink from './RepoLink';
+import { EXTRA_CONNECTORS_ON } from '../lib/featureFlags';
 import { SectionLoader } from './CordiaLoader';
 import { buildExamReview, getPlan, makePlan, minutesLabel, removePlan, schedulePlan, setStepDone } from '../lib/studyPlans';
 import { useRouter } from 'next/router';
+import { dayKey } from '../lib/learnEngine.mjs';
 import { deadlineTitle } from '../lib/formatters';
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true };
@@ -51,12 +53,12 @@ export default function AssignmentSheet({ item, onClose }) {
     : 'Your study time already covers this.'));
   const startOver = () => run('reset', async () => ((await removePlan(item.id))?.ok ? { plan: null } : null));
   const router = useRouter();
-  // Exams: gather the class's material into one review guide, then open it.
+  // Exams: gather the class's material into one review set, then learn it paced to the exam date.
   async function reviewSet() {
     setBusy('review'); setError(''); setNotice('');
     const result = await buildExamReview(item.id);
     setBusy('');
-    if (result?.guide?.id) router.push(`/guide/${result.guide.id}`);
+    if (result?.guide?.id) router.push(`/learn/${result.guide.id}?test=${dayKey(result.due_at || item.due_at)}`);
     else setError(result?.detail || "That didn't work. Try again.");
   }
 
@@ -128,7 +130,7 @@ export default function AssignmentSheet({ item, onClose }) {
           {!plan && data !== null && <Link href={tutorHref} className="c-btn c-btn--quiet as-tutor"><MessageCircle {...ICON} />Ask Tutor about it</Link>}
 
           {data !== null && item.type !== 'exam' && <DraftLink item={item} draft={data?.draft} />}
-          {data !== null && item.type !== 'exam' && <RepoLink item={item} repo={data?.repo} />}
+          {EXTRA_CONNECTORS_ON && data !== null && item.type !== 'exam' && <RepoLink item={item} repo={data?.repo} />}
 
           {Array.isArray(data?.rubric) && data.rubric.length > 0 && (
             <div className="as-rubric">

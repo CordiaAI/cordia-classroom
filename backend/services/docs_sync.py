@@ -147,13 +147,10 @@ def check_drafts(user_id: str) -> int:
     return nudged
 
 
-def due_drafts(now: datetime) -> list[dict]:
-    cutoff = (now - DRAFT_EVERY).isoformat()
-    users = {r["user_id"] for r in get_supabase().table("connector_links").select("user_id").eq("connector", "gdocs").eq("kind", "page")
-             .like("cordia_id", "draft:%").limit(200).execute().data or []}
-    out = []
-    for user_id in list(users)[:20]:
-        state = sync_state.get(user_id, "gdocs")
-        if not state.get("last_synced_at") or state["last_synced_at"] < cutoff:
-            out.append({"user_id": user_id, "last_synced_at": state.get("last_synced_at")})
-    return out
+def users_with_drafts(user_ids: list[str]) -> set[str]:
+    """Which of these students have a linked Google Doc draft (one query, for the sync worker)."""
+    if not user_ids:
+        return set()
+    rows = get_supabase().table("connector_links").select("user_id").eq("connector", "gdocs").eq("kind", "page") \
+        .like("cordia_id", "draft:%").in_("user_id", list(user_ids)).execute().data or []
+    return {row["user_id"] for row in rows}

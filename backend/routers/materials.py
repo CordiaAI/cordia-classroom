@@ -5,6 +5,8 @@ Pipeline: the extension or web app sends a page (/ingest) or a file
 guide. /render-pptx previews slide decks.
 """
 import logging
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 
 from fastapi import APIRouter, Header, HTTPException, Request, UploadFile
 from fastapi.responses import Response
@@ -32,6 +34,8 @@ router = APIRouter(tags=["materials"])
 MAX_CONTENT_LENGTH = 500_000
 SLIDE_DECK_TYPES = (".pptx", ".ppt", ".odp")
 SCREENSHOT_ONLY = "[Screenshot fallback]"
+# Page text at least this long (the extension's own "the page has text" bar) makes the screenshot unnecessary.
+SCREENSHOT_TEXT_THRESHOLD = 400
 
 
 @router.post("/render-pptx")
@@ -65,8 +69,13 @@ def extract_file_text(request: Request, file: UploadFile = None, authorization: 
     user_id = get_user_id(authorization)
     if file is None:
         raise HTTPException(status_code=400, detail="No file uploaded")
-    extension = files.extension_of(file.filename)
-    data = files.read_upload(file)
+    return readable_text(user_id, file.filename, files.read_upload(file))
+
+
+def readable_text(user_id: str, filename: str, data: bytes) -> dict:
+    """{"text": …} for a file's bytes (PPTX also returns its slides). Scans and photos are read
+    by vision, charged as one light action. Also used for Canvas files read server-side."""
+    extension = files.extension_of(filename)
 
     if extension == "pptx":
         return files.pptx_slides(data)
@@ -122,7 +131,13 @@ def ingest(body: IngestRequest, request: Request, authorization: str = Header(de
             logger.warning("Screenshot fallback produced no readable educational text")
 
     sections = build_review_sections(content)
-    logger.info("Prepared capture slideshow=%s images=%s sections=%s", is_slideshow, len(images), len(sections))
+    # The screenshot only helps when the page text is thin; a vision call on a fully read page
+    # adds a slow step and nothing the text doesn't already hold.
+    text_chars = sum(len(section["text"].strip()) for section in sections)
+    if text_chars >= SCREENSHOT_TEXT_THRESHOLD:
+        images = []
+    logger.info("Prepared capture slideshow=%s images=%s sections=%s text_chars=%s",
+                is_slideshow, len(images), len(sections), text_chars)
     return IngestResponse(
         content_type=body.content_type,
         detected_slideshow=is_slideshow,
@@ -183,12 +198,20 @@ def generate(body: GenerateRequest, request: Request, authorization: str = Heade
         logger.warning("No content chunks after cleaning")
         return GenerateResponse(notes="No meaningful content found to process.")
 
-    notes = None
-    if body.notes:
+    def write_notes():
         points = generate_notes_ai("\n\n".join(chunks))
-        notes = "\n".join(f"- {point}" for point in points) if points else None
+        return "\n".join(f"- {point}" for point in points) if points else None
 
-    study_guide, guide_cards = _guide(user_id, chunks, has_images) if body.study_guide else (None, [])
+    # Notes and the guide read the same chunks and nothing else: write them at the same time.
+    notes = None
+    if body.notes and body.study_guide:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            notes_job = pool.submit(copy_context().run, write_notes)
+            study_guide, guide_cards = _guide(user_id, chunks, has_images)
+            notes = notes_job.result()
+    else:
+        notes = write_notes() if body.notes else None
+        study_guide, guide_cards = _guide(user_id, chunks, has_images) if body.study_guide else (None, [])
 
     flashcards = None
     if body.flashcards:

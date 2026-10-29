@@ -211,9 +211,3 @@ def check_repos(user_id: str) -> int:
             count += 1
     sync_state.record(user_id, "github", stats={"repos_tracked": len(rows), "nudged": nudged})
     return count
-
-
-def due(now: datetime) -> list[dict]:
-    cutoff = (now - EVERY).isoformat()
-    return get_supabase().table("connector_settings").select("user_id,last_synced_at").eq("connector", "github") \
-        .eq("stats->>linked", "true").or_(f"last_synced_at.is.null,last_synced_at.lt.{cutoff}").limit(20).execute().data or []

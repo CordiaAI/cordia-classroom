@@ -1,9 +1,9 @@
-import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Check } from 'lucide-react';
 import { useProgress } from '../lib/progress';
 import { FEATURE_GROUPS, FEATURE_LIST } from '../lib/features';
 import { showMe } from '../lib/showMe';
+import { openHelp } from '../lib/help';
 
 const NEXT_COUNT = 6;
 
@@ -42,7 +42,7 @@ export default function LearnCordia({ onBeforeShow, hideWhenComplete = false, co
           </ul>
         </div>
       ))}
-      {compact && <Link href="/settings?section=learn" className="c-btn c-btn--quiet learn-all" onClick={onBeforeShow}>See all {FEATURE_LIST.length}</Link>}
+      {compact && <button type="button" className="c-btn c-btn--quiet learn-all" onClick={() => { onBeforeShow?.(); openHelp(); }}>See all {FEATURE_LIST.length}</button>}
       <style jsx>{`
         .learn { display: grid; gap: 8px; padding: 20px; }
         .learn-group { display: grid; gap: 4px; }

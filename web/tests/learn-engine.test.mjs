@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   FAMILIAR, LEARNING, MASTERED, NEW, ROUND_SIZE,
-  answer, askType, counts, createRound, currentCard, fingerprint, pickRound, readiness, restoreLevels, saveableLevels, testPlan,
+  answer, askType, counts, createRound, currentCard, fingerprint, linkedTestDate, pickRound, readiness, restoreLevels, saveableLevels, testPlan,
 } from '../lib/learnEngine.mjs';
 
 const q = (question, answerText) => ({ question, options: [answerText, 'x', 'y', 'z'], correct_index: 0 });
@@ -91,4 +91,14 @@ test('the ways to learn decide each card, and recall still masters with any of t
   const card = currentCard(round);
   assert.equal(card.type, 'mc');
   assert.equal(answer(levels, round, card, 1, { confidence: 'sure', today: TODAY }).levels[0].l, MASTERED);
+});
+
+test('a test date from a link is taken when none is saved or it is still ahead', () => {
+  assert.equal(linkedTestDate('2026-11-05', '', TODAY), '2026-11-05');
+  assert.equal(linkedTestDate('2026-11-05', '2026-11-20', TODAY), '2026-11-05');
+  assert.equal(linkedTestDate('2026-11-05', '2026-11-05', TODAY), '');
+  assert.equal(linkedTestDate('2026-10-27', '', TODAY), '');
+  assert.equal(linkedTestDate(TODAY, '', TODAY), TODAY);
+  assert.equal(linkedTestDate(TODAY, '2026-11-01', TODAY), '');
+  assert.equal(linkedTestDate('nope', '', TODAY), '');
 });

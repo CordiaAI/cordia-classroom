@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import { pageTitle } from '../../lib/pageTitle';
-import { GAMES_ON } from '../../lib/featureFlags';
 import CordiaLoader, { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
 import BodyPortal from '../../components/BodyPortal';
 import CardPhoto from '../../components/CardPhoto';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Brain, Download, ExternalLink, FolderInput, Gamepad2, GraduationCap, Layers, Lock, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
+  ArrowLeft, Brain, Download, ExternalLink, FolderInput, GraduationCap, Layers, Lock, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -17,7 +16,8 @@ import useSessionTracker from '../../lib/useSessionTracker';
 import StudyAidPanel from '../../components/StudyAidPanel';
 import StudyDocument from '../../components/StudyDocument';
 import OutlineEditor from '../../components/OutlineEditor';
-import { newRequestId } from '../../lib/guideCreate';
+import { fileNamesOnly, makesStudySetOnOpen, needsStudySet } from '../../lib/studySet.mjs';
+import { makeStudySet as makeStudySetFor } from '../../lib/autoStudySet';
 import { classLabel } from '../../lib/classLabel';
 import Menu from '../../components/Menu';
 import ClassChip from '../../components/ClassChip';
@@ -112,13 +112,6 @@ function MakeCard({ front: initialFront, onSave, onClose }) {
   );
 }
 
-// Notes that are nothing but file names ("- Chapters 18 - 20-1.pptx").
-const FILE_NAME_LINE = /^[-*•\s]*\S.*\.(?:pptx?|pdf|docx?|txt)\s*$/i;
-function fileNamesOnly(notes) {
-  const lines = String(notes || '').split('\n').filter(line => line.trim());
-  return lines.length > 0 && lines.every(line => FILE_NAME_LINE.test(line));
-}
-
 export default function GuidePage() {
   const router = useRouter();
   const { id } = router.query;
@@ -142,6 +135,8 @@ export default function GuidePage() {
   const [openAid, setOpenAid] = useState(null);
   const [cardDraft, setCardDraft] = useState(null);
   const [opening, setOpening] = useState(''); // the study tab waiting on cards from the notes
+  const studySetAsked = useRef('');
+  const [studySetError, setStudySetError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [toast, setToast] = useState('');
   // The outline before "Regenerate outline", so the toast can put it back.
@@ -387,23 +382,30 @@ export default function GuidePage() {
     else setToast(apiErrorMessage(data?.detail, "The old outline wasn't put back."));
   }
 
-  // Flashcards and a quiz from the notes, for a guide that started as the student's own notes.
-  async function makeStudySet() {
-    const source = String(guide.notes || '').replace(/^(>|##|\s*-)\s?/gm, '').trim();
-    if (source.length < 40) { setToast('Write a few more notes first'); return false; }
+  // Flashcards and questions from the notes (lib/autoStudySet.js): on the student's tap for their
+  // own notes, on its own for material that came in as notes only (Canvas, Drive, review sets).
+  async function makeStudySet({ auto = false } = {}) {
+    if (!needsStudySet(guide)) { setToast('Write a few more notes first'); return false; }
     setMaking('cards');
-    const generated = await apiFetch('/generate', { method: 'POST', body: JSON.stringify({ content: source, notes: false, study_guide: true, flashcards: true, request_id: newRequestId() }), timeoutMs: 6 * 60 * 1000 });
-    if (!generated?.study_guide || generated.study_guide.startsWith('[Error')) {
-      setMaking('');
-      setToast(apiErrorMessage(generated?.detail, "Cards and quiz weren't made. Try again."));
-      return false;
-    }
-    const data = await apiFetch('/guides/' + guide.id, { method: 'PATCH', body: JSON.stringify({ title: guide.title, study_guide: generated.study_guide, flashcards: generated.flashcards || [] }) });
+    setStudySetError('');
+    const made = await makeStudySetFor(guide);
     setMaking('');
-    if (data?.guide) { setGuide(current => ({ ...current, study_guide: data.guide.study_guide, flashcards: data.guide.flashcards })); setToast('Flashcards and quiz ready'); return true; }
-    setToast("Cards and quiz weren't saved. Try again.");
+    if (made.guide) {
+      setGuide(current => (current && current.id === made.guide.id ? { ...current, study_guide: made.guide.study_guide, flashcards: made.guide.flashcards } : current));
+      setToast(auto ? 'Questions ready' : 'Flashcards and quiz ready');
+      return true;
+    }
+    if (auto) setStudySetError(made.error);
+    else setToast(made.error);
     return false;
   }
+
+  // Imported material with notes but no questions: make them now, once per visit.
+  useEffect(() => {
+    if (!guide?.id || studySetAsked.current === guide.id || !makesStudySetOnOpen(guide)) return;
+    studySetAsked.current = guide.id;
+    makeStudySet({ auto: true });
+  }, [guide?.id, guide?.notes]);
 
   function onSelection(kind, text) {
     if (kind === 'card') { setCardDraft(text); walkthroughEvent('make-card-open'); }
@@ -435,14 +437,19 @@ export default function GuidePage() {
   const sourceHref = externalSourceUrl
     || (guide.source_type === 'study_guide' && guide.source_id ? `/guide/${guide.source_id}` : '');
   const explainWithAid = Boolean(learningStyle?.enabled);
+  // Quiz, Timed test and Match live in Learn's "Test yourself". The Quiz tab shows only while a
+  // walkthrough step points at it (lib/walkthrough.js).
+  const quizStep = activeStep()?.target === '[data-spot="quiz-pill"]';
+  // Imported notes get their questions on their own (above); their study tabs open straight away
+  // and wait on that same request.
+  const autoSet = makesStudySetOnOpen(guide);
   const tabs = [
     { key: 'outline', label: 'Outline', icon: NotebookText, view: true },
     // A guide that's only notes so far shows these too: opening one makes the cards and quiz first.
     { key: 'learn', label: 'Learn', icon: GraduationCap, href: '/learn/' + id, spot: 'learn-pill', needsCards: true },
     { key: 'flashcards', label: 'Flashcards', icon: Layers, href: '/flashcards/study?guideId=' + id, count: hasMaterial ? cardCount : undefined, spot: 'cards-pill', event: 'cards-opened', needsCards: true },
-    { key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill', needsCards: true },
+    ...(quizStep ? [{ key: 'quiz', label: 'Quiz', icon: Brain, href: '/quiz/' + id, spot: 'quiz-pill', needsCards: true }] : []),
     { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id, needsCards: true },
-    ...(GAMES_ON ? [{ key: 'games', label: 'Games', icon: Gamepad2, href: '/games/' + id, needsCards: true }] : []),
     ...(nursing ? [{ key: 'nclex', label: 'NCLEX', icon: Stethoscope, href: '/nclex/' + id }] : []),
   ];
   const shareable = sharing?.class && !sharing.linked;
@@ -537,10 +544,10 @@ export default function GuidePage() {
           {tabs.map(tab => {
             const content = <><tab.icon size={20} strokeWidth={1.75} aria-hidden="true" />{tab.label}{tab.count !== undefined && <span className="c-meta">{tab.count}</span>}</>;
             if (tab.view) return <span key={tab.key} className="c-pill" aria-current="page">{content}</span>;
-            if (tab.needsCards && !hasMaterial) {
+            if (tab.needsCards && !hasMaterial && !(autoSet && tab.key !== 'practice')) {
               const busy = opening === tab.key;
               return (
-                <button key={tab.key} type="button" className={'c-pill' + (busy ? ' is-making' : '')} data-spot={tab.spot} disabled={Boolean(making)} aria-busy={busy} title="Makes flashcards and a quiz from your notes first"
+                <button key={tab.key} type="button" className={'c-pill' + (busy ? ' is-making' : '')} data-spot={tab.spot} disabled={Boolean(making)} aria-busy={busy} title={autoSet ? 'Ready once the questions are made' : 'Makes flashcards and a quiz from your notes first'}
                   onClick={async () => {
                     setOpening(tab.key);
                     const made = await makeStudySet();
@@ -555,7 +562,15 @@ export default function GuidePage() {
           })}
         </nav>
       </div>
-      {making === 'cards' && <p className="c-meta guide-making" role="status">Making flashcards and a quiz from your notes. This takes about a minute; it opens when it's ready.</p>}
+      {making === 'cards' && (autoSet
+        ? <p className="guide-making guide-auto-set" role="status"><CordiaLoader size={20} label="" />Making questions from your notes… Learn and Flashcards are ready to open; they start when this finishes.</p>
+        : <p className="c-meta guide-making" role="status">Making flashcards and a quiz from your notes. This takes about a minute; it opens when it's ready.</p>)}
+      {studySetError && autoSet && making !== 'cards' && (
+        <p className="guide-making guide-auto-set is-error" role="alert">
+          {studySetError}
+          <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={() => makeStudySet({ auto: true })}>Try again</button>
+        </p>
+      )}
 
       {hasMaterial && <div className="c-seg guide-view" role="tablist" aria-label="Outline view">
         <button type="button" role="tab" aria-selected={view === 'outline'} className={view === 'outline' ? 'is-active' : ''} onClick={() => setView('outline')}>Outline</button>
@@ -564,7 +579,7 @@ export default function GuidePage() {
 
       {view === 'outline' || !hasMaterial ? (
         <section className="c-card guide-notes" aria-label="Outline" aria-busy={notesState === 'making' && !notesWritten}>
-          {!hasMaterial && (
+          {!hasMaterial && !autoSet && (
             <div className="guide-make">
               <p className="c-meta">Your notes. Turn them into a tidy outline, or into flashcards and a quiz, whenever you're ready.</p>
               <div className="c-row c-row--wrap">
@@ -623,6 +638,8 @@ export default function GuidePage() {
         .guide-nclex { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; border-radius: var(--r-row); background: var(--olive-tint); font: 600 15px/1.4 var(--font-sans); }
         .guide-nclex :global(.lucide) { color: var(--olive-ink); flex: 0 0 auto; }
         .guide-making { margin: -4px 0 0; }
+        .guide-auto-set { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
+        .guide-auto-set.is-error { color: var(--error); }
         .guide-tabs-row :global(.c-pill.is-making) { opacity: 1; color: var(--ink); }
         .guide-tabs-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .guide-tabs-row .c-pills { flex: 1 1 auto; min-width: 0; max-width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }

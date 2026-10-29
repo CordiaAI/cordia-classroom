@@ -79,7 +79,6 @@ class CallSpec(NamedTuple):
 FEATURES = {
     # BUILD
     "study_guide": CallSpec(BUILD, 12000),
-    "smart_notes_guide": CallSpec(BUILD, 8000),
     "nclex_questions": CallSpec(BUILD, 16000),
     "practice_questions": CallSpec(BUILD, 16000),
     "exam_questions": CallSpec(BUILD, 16000),
@@ -102,7 +101,6 @@ FEATURES = {
     "retain_why": CallSpec(LIGHT, 250),
     "practice_classify": CallSpec(LIGHT, 100),
     "quiz_distractors": CallSpec(LIGHT, 4096),
-    "smart_notes_diagram": CallSpec(LIGHT, 2000),
     "study_aid": CallSpec(LIGHT, 700),
     "study_aid_check": CallSpec(LIGHT, 250),
     "assignment_plan": CallSpec(LIGHT, 700),

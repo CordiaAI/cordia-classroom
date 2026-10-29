@@ -69,17 +69,28 @@ test('Library: one list grouped by class, kind filters (no Notes: notes live in 
   assert.match(undo, /export const UNDO_MS = 6000/);
 });
 
-test('create keeps manual cards and the file picker with one Create button', async () => {
+test('create is only for writing cards and Quizlet import; uploads go through the New sheet', async () => {
   const create = await source('pages/create.js');
+  const sheet = await source('components/NewSheet.js');
   const shared = await source('lib/guideCreate.js');
 
   assert.match(create, /Write cards/);
-  assert.match(create, /Upload/);
   assert.match(create, /isEdit \? 'Update' : 'Create'/);
-  assert.match(create, /Add your cards\?/);
-  assert.match(create, /startGuideJob/);
+  assert.match(create, /QuizletImport/);
+  assert.match(create, /openNewSheet\('upload'\)/);
+  assert.doesNotMatch(create, /startGuideJob|extract-file-text|useFileDropZone|generateAndSave/);
+  assert.match(sheet, /startGuideJob/);
   assert.match(shared, /export async function generateAndSave/);
-  assert.doesNotMatch(create, /create-tabs|Paste Text/);
+});
+
+test('New › Note makes an empty notes guide and opens it', async () => {
+  const sheet = await source('components/NewSheet.js');
+  const smartnotes = await source('pages/smartnotes.js');
+
+  assert.match(sheet, /async function newNote\(\)/);
+  assert.match(sheet, /source_type: 'notes'/);
+  assert.doesNotMatch(sheet, /smartnotes\?id=new/);
+  assert.doesNotMatch(smartnotes, /id === 'new'\) \{\n\s+const saved/);
 });
 
 test('New sheet offers Upload, Paste, Link, Record and a sample', async () => {
@@ -97,4 +108,42 @@ test('walkthrough steps advance only on real actions', async () => {
   assert.equal((walkthrough.split('export const DAY_ONE = [')[1].split('\n];')[0].match(/^ {2}\[/gm) || []).length, 4);
   assert.match(controller, /if \(event\.detail\?\.name === active\.on\) advance\(current\)/);
   assert.doesNotMatch(controller, /setTimeout\(\(\) => advance/);
+});
+
+test('Settings: Account (with theme), Tutor (with Explain style), Plan, Connectors; old tabs still land', async () => {
+  const settings = await source('pages/settings.js');
+
+  for (const key of ['account', 'tutor', 'plan', 'connectors']) assert.match(settings, new RegExp(`\\{ key: '${key}', label: `));
+  assert.doesNotMatch(settings, /key: 'study'|key: 'appearance'|key: 'learn'|<LearnCordia/);
+  assert.match(settings, /study: 'tutor', appearance: 'account'/);
+  assert.match(settings, /section === 'learn'\).*openHelp\(\)/);
+  assert.match(settings, /aria-label="Theme"/);
+  assert.match(settings, /<LearningStylePicker /);
+});
+
+test('classes and Canvas status are fetched once and shared; Library cards come from the summary', async () => {
+  const folders = await source('lib/folders.js');
+  const canvas = await source('lib/canvas.js');
+  const library = await source('pages/library.js');
+  const sidebar = await source('components/Sidebar.js');
+
+  assert.match(folders, /export function loadFolders\(\)/);
+  assert.match(folders, /export function invalidateFolders\(/);
+  assert.match(canvas, /statusCache\.token === token && Date\.now\(\) - statusCache\.at < STATUS_TTL_MS/);
+  for (const name of ['connectCanvas', 'syncCanvas', 'disconnectCanvas']) assert.match(canvas, new RegExp(`export const ${name} = `));
+  assert.match(sidebar, /onFoldersChanged\(load\)/);
+  assert.doesNotMatch(sidebar, /apiFetch\('\/folders'\)/);
+  assert.match(library, /loadFolders\(\), apiFetch\('\/guides\?fields=summary&limit=500'\)/);
+  assert.doesNotMatch(library, /\/guides\?limit=100/);
+  assert.match(library, /dueCount\(guide\)/);
+});
+
+test('Sheets, GitHub, Slack and Dropbox stay hidden unless their flag is on', async () => {
+  const flags = await source('lib/featureFlags.js');
+  const connectors = await source('components/ConnectorsSettings.js');
+  const assignment = await source('components/AssignmentSheet.js');
+
+  assert.match(flags, /export const EXTRA_CONNECTORS = \['gsheets', 'github', 'slack', 'dropbox'\]/);
+  assert.match(connectors, /data\.connectors\.filter\(shown\)/);
+  assert.match(assignment, /EXTRA_CONNECTORS_ON && data !== null && item\.type !== 'exam' && <RepoLink/);
 });

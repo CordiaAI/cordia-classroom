@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { INTERVALS, addDays, applyResults, dueIndices, nextDueDay } from '../lib/spacedReview.mjs';
+import { INTERVALS, addDays, applyResults, dueIndices } from '../lib/spacedReview.mjs';
 
 const day = (key, hour = 10) => new Date(`${key}T${String(hour).padStart(2, '0')}:00:00`);
 
@@ -11,7 +11,6 @@ test('new cards are due now; a card climbs a box each time it is known and reset
   assert.deepEqual(progress.schedule[2], { box: 0, due: '2026-10-23' });
   assert.deepEqual(dueIndices(progress, 3, '2026-10-22'), []);
   assert.deepEqual(dueIndices(progress, 3, '2026-10-23'), [0, 1, 2]);
-  assert.equal(nextDueDay(progress, 3, '2026-10-22'), '2026-10-23');
 
   // Known again the next day: box 1, back in 2 days. Missed: back to tomorrow.
   progress = applyResults(progress, { known: [0, 2], missed: [1] }, day('2026-10-23'));

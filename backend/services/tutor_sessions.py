@@ -381,25 +381,6 @@ def wait_for_browser_result(user_id: str, turn: dict, answer: str):
     return result.data[0]
 
 
-def update_tutor_skill(user_id: str, session_id: str, skill: str):
-    _owned_session(user_id, session_id)
-    selected = validate_skill(skill)
-    result = (
-        get_supabase().table("tutor_sessions")
-        .update({
-            "active_skill": selected,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        })
-        .eq("id", session_id)
-        .eq("user_id", user_id)
-        .eq("status", "idle")
-        .execute()
-    )
-    if not result.data:
-        raise HTTPException(status_code=409, detail="Wait for Cordia Tutor to finish before changing skills")
-    return result.data[0]
-
-
 def claim_tutor_turn(
     user_id: str,
     session_id: str,

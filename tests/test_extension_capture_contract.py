@@ -22,14 +22,20 @@ class ExtensionCaptureContractTests(unittest.TestCase):
         for removed in ("getTutorSession", "setTutorSkill", "updateBrowserContext", "requestActiveTabAccess"):
             self.assertNotIn(removed, self.worker + self.panel)
 
-    def test_panel_defers_save_and_redirects_only_after_confirmation(self):
+    def test_panel_saves_on_its_own_and_offers_open_guide(self):
         self.assertIn("action: 'saveStudyGuide'", self.panel)
         self.assertIn("if (!saved?.guide?.id)", self.worker)
-        self.assertIn("chrome.tabs.update(message.tabId", self.worker)
-        self.assertIn("chrome.tabs.create({ url: guideUrl })", self.worker)
         self.assertIn("classroom.cordiaai.io/guide/", self.worker)
+        # Saved as soon as it's written; the student's tab is never navigated away.
+        self.assertIn("await saveStudyGuide();", self.panel)
+        self.assertNotIn("chrome.tabs.update(", self.worker)
+        self.assertIn("chrome.tabs.create({ url: state.guideUrl })", self.panel)
+        self.assertIn("'Open guide'", self.panel)
         self.assertIn('id="save-bubble"', self.html)
-        self.assertIn('Save to Classroom', self.html)
+        self.assertIn('Save to Classroom', self.html)  # the retry label when a save fails
+
+    def test_screenshot_is_sent_only_for_thin_pages(self):
+        self.assertIn("(state.scraped?.text || '').trim().length < 400", self.panel)
 
     def test_site_access_is_declared_not_runtime_choreography(self):
         self.assertEqual(self.manifest["host_permissions"], ["<all_urls>"])

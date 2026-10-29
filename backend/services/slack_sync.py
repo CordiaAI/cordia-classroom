@@ -174,12 +174,6 @@ def send_reminders(user_id: str, now: Optional[datetime] = None) -> int:
     return sent
 
 
-def due(now: datetime) -> list[dict]:
-    cutoff = (now - EVERY).isoformat()
-    return get_supabase().table("connector_settings").select("user_id,last_synced_at").eq("connector", "slack") \
-        .eq("stats->>watching", "true").or_(f"last_synced_at.is.null,last_synced_at.lt.{cutoff}").limit(20).execute().data or []
-
-
 def due_reminders(now: datetime) -> list[str]:
     rows = get_supabase().table("connector_settings").select("user_id,stats").eq("connector", "slack") \
         .lte("stats->>next_reminder", now.isoformat()).limit(50).execute().data or []

@@ -259,207 +259,6 @@ def _postprocess_study_guide(raw_result: str, start_index: int = 1) -> tuple:
     return '\n'.join(processed_lines), current_q_num
 
 
-def _smart_notes_html_to_markdown(html: str) -> str:
-    """Convert SmartNotes HTML into structured markdown that preserves
-    the visual hierarchy the student wrote (headings, bold, bullets,
-    indentation). The hierarchy is what GPT-4o uses to recognize
-    label/explanation relationships per the SmartNotes prompt rules.
-    """
-    if not html:
-        return ""
-
-    s = html
-
-    # Normalize line breaks
-    s = re.sub(r'<br\s*/?>', '\n', s, flags=re.IGNORECASE)
-
-    # Headings → markdown headings (preserve level so hierarchy is visible)
-    for level in range(1, 7):
-        s = re.sub(
-            rf'<h{level}[^>]*>(.*?)</h{level}>',
-            lambda m, lvl=level: '\n' + ('#' * lvl) + ' ' + m.group(1).strip() + '\n',
-            s, flags=re.IGNORECASE | re.DOTALL,
-        )
-
-    # Bold / strong → **text**
-    s = re.sub(r'<(?:strong|b)[^>]*>(.*?)</(?:strong|b)>', r'**\1**', s, flags=re.IGNORECASE | re.DOTALL)
-
-    # Italic / emphasis → *text*
-    s = re.sub(r'<(?:em|i)[^>]*>(.*?)</(?:em|i)>', r'*\1*', s, flags=re.IGNORECASE | re.DOTALL)
-
-    # Underline → keep as marker so model still sees emphasis
-    s = re.sub(r'<u[^>]*>(.*?)</u>', r'__\1__', s, flags=re.IGNORECASE | re.DOTALL)
-
-    # List items: convert nested <ul>/<ol> to indented bullets, preserving depth.
-    # Walk the string left-to-right, tracking list-nesting depth so children
-    # of a child <ul> end up indented twice. This matters for rule #2 where
-    # a student writes a bolded title and nests bullets under it.
-    def _convert_lists(text: str) -> str:
-        out = []
-        depth = 0
-        i = 0
-        token_re = re.compile(r'<(/?)(ul|ol|li)[^>]*>', re.IGNORECASE)
-        while i < len(text):
-            m = token_re.search(text, i)
-            if not m:
-                out.append(text[i:])
-                break
-            out.append(text[i:m.start()])
-            closing = m.group(1) == '/'
-            tag = m.group(2).lower()
-            if tag in ('ul', 'ol'):
-                if closing:
-                    depth = max(0, depth - 1)
-                else:
-                    depth += 1
-            elif tag == 'li':
-                if not closing:
-                    indent = '  ' * max(0, depth - 1)
-                    out.append('\n' + indent + '- ')
-                # closing </li>: nothing — newline comes from next <li> or end of list
-            i = m.end()
-        return ''.join(out)
-
-    s = _convert_lists(s)
-
-    # Paragraphs and divs → blank-line separators
-    s = re.sub(r'</p\s*>', '\n\n', s, flags=re.IGNORECASE)
-    s = re.sub(r'<p[^>]*>', '', s, flags=re.IGNORECASE)
-    s = re.sub(r'</div\s*>', '\n', s, flags=re.IGNORECASE)
-    s = re.sub(r'<div[^>]*>', '', s, flags=re.IGNORECASE)
-
-    # Strip any remaining tags
-    s = re.sub(r'<[^>]+>', '', s)
-
-    # Decode common HTML entities
-    entities = {
-        '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>',
-        '&quot;': '"', '&#39;': "'", '&apos;': "'", '&mdash;': '—',
-        '&ndash;': '–', '&hellip;': '…', '&rsquo;': '’', '&lsquo;': '‘',
-        '&rdquo;': '”', '&ldquo;': '“',
-    }
-    for k, v in entities.items():
-        s = s.replace(k, v)
-    s = re.sub(r'&#(\d+);', lambda m: chr(int(m.group(1))), s)
-
-    # Collapse runs of 3+ newlines to exactly 2; trim trailing whitespace per line
-    s = '\n'.join(line.rstrip() for line in s.split('\n'))
-    s = re.sub(r'\n{3,}', '\n\n', s).strip()
-    return s
-
-
-_SMART_NOTES_STUDY_GUIDE_PROMPT = """Convert the student's class notes below into an exam-ready study guide of Q&A pairs.
-
-The notes use whatever structure the student chose — headings, bolded titles, bullet lists, indentation, term/definition pairs. That structure is your map: it tells you what is a label and what is an explanation, what belongs together, and what is its own concept.
-
-CRITICAL RULES — these override any default behavior:
-
-1. EXACT WORDING. When the notes contain a term and its definition, the term is the question and the definition is the answer. Use the EXACT wording the student wrote for the answer. Do NOT paraphrase, summarize, or rewrite into your own words. The student's phrasing IS the answer.
-
-2. STRUCTURAL RELATIONSHIPS. Look for any visible relationship between a label/concept and an explanation that follows or is nested under it. Examples (not exhaustive — apply this principle to any analogous structure):
-   • A bolded title with bullets indented under it → the title is the question, the bullets are the answer
-   • A heading with a paragraph below → the heading is the question, the paragraph is the answer
-   • A term followed by a colon and an explanation → the term is the question, the explanation is the answer
-   • An indented detail under a parent line → the parent is the question, the indented text is the answer
-   The student's structure tells you which label belongs with which explanation. Use it.
-
-3. LIST DISTINCTION. There are two kinds of bullet lists — decide which each one is:
-   (a) A list of things INCLUDED in one concept (parts, components, examples, members of a category that are not individually defined). → ONE question, with the items combined as a comma-separated answer.
-   (b) A list of SEPARATE BUT RELATED topics — each bullet is its own concept with its own meaning, often itself a label with detail underneath. → A SEPARATE question for EACH bullet.
-   Decide by context: if the parent label means "what is included in / what are the parts of X", it's (a). If the parent is a category and each bullet is a distinct concept (e.g. "Types of arrhythmias" with each type explained), it's (b).
-
-4. NEVER COMBINE. Never merge multiple concepts, terms, definitions, or questions into a single Q&A. If a topic has many distinct facts, write multiple questions — one per fact — and word each question to target the one specific thing that distinguishes that fact. Multiple narrow questions are always better than one combined question.
-
-5. EXAM-LEVEL QUESTIONS. Every question must be the kind a student would actually see on a college-level exam. Frame the question to target exactly one thing the answer reveals. Prefer "What is X?", "Why does X cause Y?", "How does X differ from Y?", "What are the [specific aspect] of X?" over vague openers like "Tell me about X" or "Describe X."
-
-ANTI-HALLUCINATION GUARD:
-• Use ONLY information explicitly written in the notes below.
-• NEVER invent facts, definitions, or explanations the student didn't write.
-• If part of the notes is not educational content (todos, reminders, scratch text), skip that part.
-• If the entire note has no educational content, respond with exactly: NO_EDUCATIONAL_CONTENT
-
-NOTES:
-{markdown}
-
-FORMAT (output only this — no preamble, no commentary):
-Q1: [question]
-A1: [answer using the student's exact wording when applicable]
-
-Q2: [question]
-A2: [answer]
-
-Continue until every term, concept, and structural relationship in the notes has become a Q&A pair.
-"""
-
-
-def generate_study_guide_from_notes(html_content: str) -> str:
-    """
-    Generate an exam-ready study guide from a SmartNote's HTML content.
-    Uses GPT-4o with a prompt tailored to student-written notes — preserves
-    the student's exact wording for definitions, respects the structural
-    cues the student wrote (bold, headings, bullets), and never combines
-    distinct concepts.
-
-    Returns the same Q1:/A1: text format as generate_study_guide() so the
-    rest of the system (manual editor parser, /guides save endpoint,
-    flashcards, NCLEX, quiz) works unchanged. Returns "" if the notes
-    contain no educational content.
-    """
-    client = get_openai_client()
-
-    markdown = _smart_notes_html_to_markdown(html_content)
-    if not markdown.strip():
-        return ""
-
-    # Cap the input. Student notes are typically short; this is a guard
-    # against pathological inputs, not a chunking strategy.
-    if len(markdown) > 25000:
-        markdown = markdown[:25000]
-
-    prompt = _SMART_NOTES_STUDY_GUIDE_PROMPT.format(markdown=markdown)
-
-    response = chat(client, "smart_notes_guide",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You convert student-written class notes into exam-ready Q&A study guides. "
-                    "You respect the student's exact wording for definitions and never paraphrase. "
-                    "You use the student's structure (headings, bold, bullets, indentation) to recognize "
-                    "label/explanation relationships. You never combine distinct concepts into one question."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.1,
-    )
-    raw = response.choices[0].message.content.strip()
-    if "NO_EDUCATIONAL_CONTENT" in raw:
-        logger.info("SmartNotes study guide: no educational content detected")
-        return ""
-
-    # Renumber for safety; do NOT truncate answers — rule #1 requires
-    # preserving the student's exact wording, including long definitions.
-    lines = raw.split('\n')
-    out_lines = []
-    n = 1
-    for line in lines:
-        line = line.rstrip()
-        qm = re.match(r'^Q\d+:\s*(.*)', line)
-        am = re.match(r'^A\d+:\s*(.*)', line)
-        if qm:
-            out_lines.append(f"Q{n}: {qm.group(1)}")
-        elif am:
-            out_lines.append(f"A{n}: {am.group(1)}")
-            n += 1
-        else:
-            out_lines.append(line)
-    result = '\n'.join(out_lines).strip()
-    q_count = len(re.findall(r'^Q\d+:', result, re.MULTILINE))
-    logger.info(f"SmartNotes study guide generated — {q_count} Q&A pairs from {len(markdown)} chars")
-    return result
-
-
 _PRACTICE_KINDS = {
     "calculation", "word_problem", "code", "debugging", "scenario",
     "analysis", "explanation", "design", "recall",
@@ -898,6 +697,10 @@ def study_guide_is_complete(content: str) -> bool:
     return found_pair and not awaiting_answer
 
 
+# Guide batches written at once; enough to cut a long deck's wait without tripping provider rate limits.
+GUIDE_BATCH_WORKERS = 4
+
+
 def generate_study_guide(chunks: List[str], has_images: bool = False, learning_guidance: str = "") -> str:
     """
     Generate a comprehensive study guide with AI-generated questions and answers.
@@ -940,8 +743,7 @@ def generate_study_guide(chunks: List[str], has_images: bool = False, learning_g
         f"{len(batches)} batch(es), batch_chars=[{', '.join(str(len(b)) for b in batches)}]"
     )
 
-    all_results = []
-    for i, batch_text in enumerate(batches):
+    def write_batch(i, batch_text):
         prompt = _build_study_guide_prompt(
             batch_text[:30000],
             learning_guidance=learning_guidance,
@@ -958,10 +760,25 @@ def generate_study_guide(chunks: List[str], has_images: bool = False, learning_g
         # Detect if AI found no educational content (anti-hallucination guard)
         if "NO_EDUCATIONAL_CONTENT" in result:
             logger.warning(f"Study guide batch {i+1}: no educational content detected, skipping")
-            continue
-        all_results.append(result)
+            return None
         q_count = len(re.findall(r'^Q\d+:', result, re.MULTILINE))
         logger.info(f"Study guide batch {i+1}/{len(batches)} complete — {q_count} Q&A pairs, {len(batch_text)} chars input")
+        return result
+
+    # Batches are independent: write them at the same time, then merge in source order.
+    # A failed batch still fails the guide, as before (a guide with a silent gap is worse).
+    if len(batches) == 1:
+        results = [write_batch(0, batches[0])]
+    else:
+        with ThreadPoolExecutor(max_workers=min(GUIDE_BATCH_WORKERS, len(batches))) as pool:
+            futures = [pool.submit(copy_context().run, write_batch, i, text) for i, text in enumerate(batches)]
+            try:
+                results = [future.result() for future in futures]
+            except Exception:
+                for future in futures:
+                    future.cancel()
+                raise
+    all_results = [result for result in results if result]
 
     if not all_results:
         return ""

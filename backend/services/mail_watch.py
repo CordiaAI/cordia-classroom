@@ -157,9 +157,3 @@ def watch(user_id: str, connector: str) -> dict:
     sync_state.record(user_id, connector, stats={"seen": seen[-SEEN_KEEP:], "school_messages": int(stats.get("school_messages") or 0) + checked,
                                                  "date_changes": int(stats.get("date_changes") or 0) + found})
     return {"checked": checked, "found": found}
-
-
-def due(now: datetime) -> list[dict]:
-    cutoff = (now - EVERY).isoformat()
-    return get_supabase().table("connector_settings").select("user_id,connector,last_synced_at").in_("connector", list(MAIL_APPS)) \
-        .eq("stats->>watch_dates", "true").or_(f"last_synced_at.is.null,last_synced_at.lt.{cutoff}").limit(20).execute().data or []

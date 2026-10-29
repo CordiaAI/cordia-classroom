@@ -9,6 +9,8 @@ import MatchRace from '../../components/MatchRace';
 import QuizMode from '../../components/QuizMode';
 import { inDayOne, walkthroughEvent } from '../../lib/walkthrough';
 import { spreadCards } from '../../lib/checkYourself';
+import { needsStudySet } from '../../lib/studySet.mjs';
+import { makeStudySet } from '../../lib/autoStudySet';
 
 // Short tile names; TYPE_LABELS stays the engine's own naming.
 const MODES = {
@@ -46,22 +48,30 @@ export default function QuizPage() {
   const [title, setTitle] = useState('');
   const [race, setRace] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [making, setMaking] = useState(false);
 
   useEffect(() => {
     if (!ready || !guideId) return;
     setTypes(rememberedTypes());
     // Title, past scores and plan arrive together, so the page appears once, whole.
     const safe = promise => promise.catch(() => null);
-    Promise.all([safe(apiFetch(`/quiz/${guideId}/history`)), safe(apiFetch(`/guides/${guideId}`)), safe(apiFetch('/billing/status'))]).then(([past, guide, billing]) => {
+    Promise.all([safe(apiFetch(`/quiz/${guideId}/history`)), safe(apiFetch(`/guides/${guideId}`)), safe(apiFetch('/billing/status'))]).then(async ([past, guide, billing]) => {
       setHistory(past?.attempts || []);
       setTitle(guide?.guide?.title || '');
       if (billing?.features) setPlan({ pro: billing.plan === 'classroom_plus' || billing.unlimited, left: billing.features.retain_types?.remaining ?? 0 });
       setLoaded(true);
+      // Notes without questions yet (a Canvas import): the questions are made from them first.
+      if (needsStudySet(guide?.guide)) {
+        setMaking(true);
+        const made = await makeStudySet(guide.guide);
+        setMaking(false);
+        if (made.error) setError(made.error);
+      }
     });
   }, [ready, guideId]);
   const gate = useLoadGate(loaded);
 
-  // Games opens Match straight away (?mode=match).
+  // Learn's Match opens it straight away (?mode=match).
   useEffect(() => { if (router.query.mode === 'match') setRace(true); }, [router.query.mode]);
 
   const proLocked = plan && !plan.pro && plan.left <= 0;
@@ -160,6 +170,8 @@ export default function QuizPage() {
           doneLabel={check ? 'Read the guide' : undefined}
         />
         </>
+      ) : making ? (
+        <div className="quiz-check-wait"><CordiaLoader size={28} label="Making questions from your notes" /><span className="c-meta">Making questions from your notes…</span></div>
       ) : check ? (
         <div className="quiz-check-wait"><CordiaLoader size={28} label="Getting your questions ready" /><span className="c-meta">Getting your questions ready…</span></div>
       ) : (

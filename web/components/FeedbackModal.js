@@ -17,7 +17,7 @@ const categories = [
 
 function currentPageContext(router) {
   const value = candidate => Array.isArray(candidate) ? candidate[0] : candidate;
-  const guideRoute = ['/guide/[id]', '/practice/[guideId]', '/quiz/[guideId]', '/flashcards/[guideId]'].includes(router.pathname);
+  const guideRoute = ['/guide/[id]', '/practice/[guideId]', '/quiz/[guideId]', '/flashcards/study'].includes(router.pathname);
   return {
     page_path: (router.asPath || '/').split('?', 1)[0].split('#', 1)[0],
     context: {

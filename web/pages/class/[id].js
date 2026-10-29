@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { ArrowLeft } from 'lucide-react';
 import { useRequireAuth } from '../../lib/auth';
 import { apiFetch, apiErrorMessage } from '../../lib/api';
+import { loadFolders } from '../../lib/folders';
 import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { ClassDeadlines, ClassSets } from '../../components/ClassSets';
 
@@ -25,7 +26,7 @@ export default function SharedClassPage() {
 
   useEffect(() => {
     if (!ready || !id) return;
-    Promise.all([apiFetch('/folders'), apiFetch('/classes/' + id)]).then(([folders, result]) => {
+    Promise.all([loadFolders(), apiFetch('/classes/' + id)]).then(([folders, result]) => {
       const folder = (folders?.folders || []).find(item => item.class_id === id);
       if (folder) { router.replace('/folder/' + folder.id); return; }
       if (result?.class) { setClassData(result); setInfo(result.class); }

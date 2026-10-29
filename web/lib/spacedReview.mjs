@@ -40,13 +40,6 @@ export function dueIndices(progress, count, today = dayKey()) {
   return Array.from({ length: Math.max(0, count || 0) }, (_, index) => index).filter(index => isDue(progress, index, today));
 }
 
-// The soonest day after today that any card comes back, for "All caught up" messages.
-export function nextDueDay(progress, count, today = dayKey()) {
-  return Array.from({ length: Math.max(0, count || 0) }, (_, index) => cardDue(progress, index))
-    .filter(day => day > today)
-    .sort()[0] || '';
-}
-
 // Progress after a session: known cards move up a box, missed cards go back to the first.
 export function applyResults(progress, { known = [], missed = [] }, now = new Date()) {
   const today = dayKey(now);

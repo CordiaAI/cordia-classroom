@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, CalendarClock, Check, Eye, GraduationCap, Layers, ListChecks, PenLine, Play, Repeat, Target, TextCursorInput } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Brain, CalendarClock, Check, Eye, GraduationCap, Layers, ListChecks, PenLine, Play, Repeat, Shuffle, Target, TextCursorInput, Timer } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import useSessionTracker from '../../lib/useSessionTracker';
@@ -10,10 +10,14 @@ import { rememberRetainMisses } from '../../lib/userStore';
 import { conceptAnswer } from '../../lib/retainEngine.mjs';
 import {
   FAMILIAR, LEARNING, LEVELS, MASTERED,
-  DEFAULT_TYPES, LEARN_TYPES, advance, answer, cleanTypes, counts, createRound, currentCard, dayKey, readiness, restoreLevels, saveableLevels, testPlan,
+  DEFAULT_TYPES, LEARN_TYPES, advance, answer, cleanTypes, counts, createRound, currentCard, dayKey, linkedTestDate, readiness, restoreLevels, saveableLevels, testPlan,
 } from '../../lib/learnEngine.mjs';
+import { applyTest } from '../../lib/timedTest.mjs';
+import { needsStudySet } from '../../lib/studySet.mjs';
+import { makeStudySet } from '../../lib/autoStudySet';
+import TimedTest from '../../components/TimedTest';
 import { FillCard, McCard, WrittenCard } from '../../components/RetainCards';
-import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
+import CordiaLoader, { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import Toggle from '../../components/Toggle';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
@@ -94,6 +98,8 @@ export default function LearnPage() {
   const [levels, setLevels] = useState({});
   const [testDate, setTestDate] = useState('');
   const [error, setError] = useState('');
+  // A guide with notes but no questions yet (a Canvas import, a review set) gets them made here.
+  const [making, setMaking] = useState(false);
   const [screen, setScreen] = useState('home');
   const [round, setRound] = useState(null);
   const [roundNumber, setRoundNumber] = useState(0);
@@ -123,28 +129,43 @@ export default function LearnPage() {
     try { localStorage.setItem(SURE_KEY, on ? 'on' : 'off'); } catch { /* this visit only */ }
   }
 
-  useEffect(() => {
-    if (!ready || !guideId) return;
+  async function load() {
     const safe = promise => promise.catch(() => null);
-    Promise.all([
-      safe(apiFetch(`/guides/${guideId}`)),
-      safe(apiFetch(`/quiz/${guideId}/session`, { method: 'POST', body: JSON.stringify({ types: ['mc', 'written'] }) })),
-    ]).then(([guideData, session]) => {
-      const guide = guideData?.guide;
-      setTitle(guide?.title || '');
-      const list = Array.isArray(session?.questions) ? session.questions : [];
-      // The account's saved progress wins; this browser's copy covers a backend that hasn't got it yet.
-      const saved = guide?.flashcard_progress?.learn || readLocal(guideId) || {};
-      setLevels(restoreLevels(list, saved.levels || {}));
-      setTestDate(saved.test_date || '');
-      if (!list.length) setError(session?.detail || 'Learn needs questions and answers. Open the guide and make its study set first.');
-      setQuestions(list);
-    });
-  }, [ready, guideId]);
-  const gate = useLoadGate(questions !== null);
+    const startSession = () => safe(apiFetch(`/quiz/${guideId}/session`, { method: 'POST', body: JSON.stringify({ types: ['mc', 'written'] }) }));
+    setError('');
+    let [guideData, session] = await Promise.all([safe(apiFetch(`/guides/${guideId}`)), startSession()]);
+    let guide = guideData?.guide;
+    setTitle(guide?.title || '');
+    if (needsStudySet(guide)) {
+      setMaking(true);
+      const made = await makeStudySet(guide);
+      if (made.error) { setError(made.error); setQuestions([]); setMaking(false); return; }
+      guide = made.guide;
+      session = await startSession();
+    }
+    const list = Array.isArray(session?.questions) ? session.questions : [];
+    // The account's saved progress wins; this browser's copy covers a backend that hasn't got it yet.
+    const saved = guide?.flashcard_progress?.learn || readLocal(guideId) || {};
+    const restored = restoreLevels(list, saved.levels || {});
+    // An exam's "Study now" passes its date (?test=YYYY-MM-DD) so Learn paces to it.
+    const linked = list.length ? linkedTestDate(router.query.test, saved.test_date || '', today) : '';
+    setLevels(restored);
+    setTestDate(linked || saved.test_date || '');
+    if (linked) save(restored, linked, list);
+    if (!list.length) setError(session?.detail || (guide && !String(guide.notes || '').trim()
+      ? 'This guide has no notes or questions to learn from yet.'
+      : 'Learn needs questions and answers. Open the guide and make its study set first.'));
+    setQuestions(list);
+    setMaking(false);
+  }
 
-  function save(nextLevels, nextDate = testDate) {
-    const body = { levels: saveableLevels(questions, nextLevels), test_date: nextDate || null };
+  useEffect(() => {
+    if (ready && guideId) load();
+  }, [ready, guideId]);
+  const gate = useLoadGate(questions !== null || making);
+
+  function save(nextLevels, nextDate = testDate, list = questions) {
+    const body = { levels: saveableLevels(list, nextLevels), test_date: nextDate || null };
     try { localStorage.setItem(localKey(guideId), JSON.stringify(body)); } catch { /* the account copy is enough */ }
     apiFetch(`/guides/${guideId}/learn-progress`, { method: 'PATCH', body: JSON.stringify(body) }).catch(() => {});
   }
@@ -185,9 +206,20 @@ export default function LearnPage() {
     save(levels);
     const results = Object.entries(done.results);
     const missed = results.filter(([, item]) => item.missed).map(([concept]) => questions[concept]);
-    rememberRetainMisses(guideId, missed.map(question => ({ question: question.question, answer: conceptAnswer(question) })).filter(item => item.question && item.answer));
+    const cleared = results.filter(([, item]) => !item.missed).map(([concept]) => questions[concept]?.question).filter(Boolean);
+    rememberRetainMisses(guideId, missed.map(question => ({ question: question.question, answer: conceptAnswer(question) })).filter(item => item.question && item.answer), { cleared });
     recordStudy({ guideId, guideTitle: title, minutes: (Date.now() - roundStart.current) / 60000, cards: results.length, right: results.length - missed.length, total: results.length, kind: 'quiz' });
     setScreen('checkpoint');
+  }
+
+  // A timed test is marked: what it missed drops back to Learning for the next rounds.
+  function testDone(result) {
+    const next = applyTest(levels, result.missed, today);
+    setLevels(next);
+    save(next);
+    const missed = result.missed.map(item => questions[item.concept]);
+    rememberRetainMisses(guideId, missed.map(question => ({ question: question.question, answer: conceptAnswer(question) })).filter(item => item.question && item.answer));
+    recordStudy({ guideId, guideTitle: title, minutes: result.used / 60, cards: result.total, right: result.right, total: result.checked, kind: 'quiz' });
   }
 
   // A written answer that can't be checked right now becomes a self-check.
@@ -196,12 +228,26 @@ export default function LearnPage() {
   }
 
   if (gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate} label="Getting Learn ready" />;
+  if (making || questions === null) return (
+    <div className="c-page learn-page">
+      <div className="learn-making" role="status">
+        <CordiaLoader size={48} label="Making questions from your notes" />
+        <p className="c-section-title">Making questions from your notes…</p>
+        <p className="c-meta">This takes about a minute. Learn opens when they're ready.</p>
+      </div>
+      <style jsx>{`
+        .learn-making { display: grid; justify-items: center; gap: 12px; min-height: calc(100vh - var(--bar-h) - 160px); align-content: center; text-align: center; }
+        .learn-making p { margin: 0; }
+      `}</style>
+    </div>
+  );
 
   const tally = counts(questions, levels, today);
   const ready_ = readiness(tally);
   const plan = testPlan(tally, testDate, today);
   const allMastered = tally.total > 0 && tally.mastered === tally.total;
   const card = screen === 'round' ? currentCard(round) : null;
+  const inside = screen === 'round' || screen === 'timed';
   const retainCard = card && { id: card.id, type: card.type, concepts: [card.concept], reask: card.again };
   const question = card && questions[card.concept];
   const roundSize = round ? new Set(round.queue.map(item => item.concept)).size : 0;
@@ -212,12 +258,17 @@ export default function LearnPage() {
     <div className="c-page learn-page">
       <header className="c-page-head">
         <div className="c-row">
-          <button type="button" className="c-icon-btn" onClick={() => (screen === 'round' ? setScreen('home') : router.push('/guide/' + guideId))} aria-label={screen === 'round' ? 'Stop this round' : 'Back to guide'}><ArrowLeft {...ICON} /></button>
+          <button type="button" className="c-icon-btn" onClick={() => (inside ? setScreen('home') : router.push('/guide/' + guideId))} aria-label={screen === 'round' ? 'Stop this round' : screen === 'timed' ? 'Leave the test' : 'Back to guide'}><ArrowLeft {...ICON} /></button>
           <h1 className="c-title">Learn</h1>
         </div>
       </header>
       {title && <p className="c-section-title learn-guide">{title}</p>}
-      {error && <div className="retain-action-error" role="alert">{error} <Link href={'/guide/' + guideId}>Open the guide</Link></div>}
+      {error && (
+        <div className="retain-action-error" role="alert">
+          {error} <Link href={'/guide/' + guideId}>Open the guide</Link>
+          <button type="button" className="c-btn c-btn--secondary c-btn--sm learn-retry" onClick={load}>Try again</button>
+        </div>
+      )}
 
       {screen === 'home' && tally.total > 0 && (
         <div className="learn-home">
@@ -274,6 +325,15 @@ export default function LearnPage() {
             )}
           </div>
 
+          <section className="learn-ways" aria-labelledby="learn-test-title">
+            <h2 id="learn-test-title" className="c-section-title">Test yourself</h2>
+            <div className="learn-way-grid learn-test-grid">
+              <Link href={'/quiz/' + guideId} className="learn-way"><Brain size={26} strokeWidth={1.75} aria-hidden="true" /><span>Quiz</span><small>Every idea, misses repeat</small></Link>
+              <button type="button" className="learn-way" onClick={() => setScreen('timed')}><Timer size={26} strokeWidth={1.75} aria-hidden="true" /><span>Timed test</span><small>A mock exam on the clock</small></button>
+              <Link href={'/quiz/' + guideId + '?mode=match'} className="learn-way"><Shuffle size={26} strokeWidth={1.75} aria-hidden="true" /><span>Match</span><small>Pair them up in 60 seconds</small></Link>
+            </div>
+          </section>
+
           <ul className="learn-how">
             <li><GraduationCap {...ICON} /><span><strong>Rounds of {Math.min(7, tally.total)}.</strong> Recognise the answer first, then recall it from memory. Recall is what masters an idea.</span></li>
             <li><Check {...ICON} /><span><strong>Guesses don't count.</strong> {askSure ? 'A lucky guess stays in Learning, and a confident miss comes back first.' : 'Turn on "Ask how sure I am" so lucky guesses aren\'t counted as learned.'}</span></li>
@@ -295,6 +355,10 @@ export default function LearnPage() {
           {card.type === 'written' && <WrittenCard key={card.id} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} onSwitch={switchToSelf} />}
           {card.type === 'self' && <SelfCheckCard key={card.id + '-self'} card={retainCard} question={question} onResult={onResult} onNext={onNext} />}
         </div>
+      )}
+
+      {screen === 'timed' && (
+        <TimedTest guideId={guideId} questions={questions} types={types} onDone={testDone} onExit={() => setScreen('home')} onRound={startRound} />
       )}
 
       {screen === 'checkpoint' && round && (
@@ -357,6 +421,9 @@ export default function LearnPage() {
         .learn-date span { display: inline-flex; align-items: center; gap: 8px; }
         .learn-date input { width: auto; min-width: 170px; }
         .learn-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+        .learn-test-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        a.learn-way { text-decoration: none; }
+        .learn-retry { margin-left: 8px; }
         .learn-how { display: grid; gap: 12px; margin: 4px 0 0; padding: 0; list-style: none; }
         .learn-how li { display: flex; gap: 12px; color: var(--muted); font: 500 15px/1.45 var(--font-sans); }
         .learn-how li .lucide { flex: none; margin-top: 2px; color: var(--olive-ink); }
@@ -375,6 +442,7 @@ export default function LearnPage() {
           .learn-actions .c-btn { flex: 1; justify-content: center; }
           .learn-ready-num { font-size: 36px; }
           .learn-way-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .learn-test-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         }
       `}</style>
     </div>

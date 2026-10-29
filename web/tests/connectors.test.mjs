@@ -14,5 +14,5 @@ test('Settings has a Connectors tab that talks only to the backend', async () =>
   }
   assert.match(connectors, /apiFetch\('\/connectors'\)/);
   assert.doesNotMatch(connectors, /composio|COMPOSIO/i, 'the Composio key stays on the server');
-  assert.match(connectors, /autostudy_text_draft/, 'imports open in Create');
+  assert.match(connectors, /openNewSheet\('paste', \{ text: data\.text, title: data\.title \}\)/, 'imports open in the New sheet');
 });

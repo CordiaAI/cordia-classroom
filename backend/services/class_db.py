@@ -49,16 +49,13 @@ def ensure_class(db, school_id: str, raw_code: str, display_name: str = "") -> O
         db.table("classes").update({"display_name": display_name[:200]}).eq("id", row["id"]).execute()
         row = {**row, "display_name": display_name[:200]}
     if created or normalized.ambiguous:
-        for other in similar_codes(normalized.code, by_code):
-            db.table("class_merge_proposals").insert({
-                "school_id": school_id, "raw_code": raw_code[:200], "from_class_id": row["id"],
-                "into_class_id": by_code[other]["id"], "confidence": 0.7, "status": "pending",
-            }).execute()
+        proposal = {"school_id": school_id, "raw_code": raw_code[:200], "from_class_id": row["id"], "status": "pending"}
+        proposals = [{**proposal, "into_class_id": by_code[other]["id"], "confidence": 0.7}
+                     for other in similar_codes(normalized.code, by_code)]
         if normalized.ambiguous and created:
-            db.table("class_merge_proposals").insert({
-                "school_id": school_id, "raw_code": raw_code[:200], "from_class_id": row["id"],
-                "into_class_id": None, "confidence": 0.5, "status": "pending",
-            }).execute()
+            proposals.append({**proposal, "into_class_id": None, "confidence": 0.5})
+        if proposals:  # one write for all of them
+            db.table("class_merge_proposals").insert(proposals).execute()
     return row
 
 

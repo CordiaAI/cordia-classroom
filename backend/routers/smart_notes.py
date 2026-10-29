@@ -1,17 +1,10 @@
-import re
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Header, Depends
-from rate_limit import ai_rate_limit
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, field_validator
 from typing import Optional
 from database import get_supabase
 from auth_utils import get_user_id
 from ids import is_uuid, require_uuid
-from services.entitlements import record, require
-from services.llm import (
-    generate_study_guide_from_notes, get_openai_client, study_guide_is_complete, study_guide_to_flashcards,
-)
-from services.llm_calls import chat
 
 
 router = APIRouter(prefix="/smart_notes", tags=["smart_notes"])
@@ -49,17 +42,6 @@ class UpdateNoteRequest(BaseModel):
         if not is_uuid(v):
             raise ValueError("Invalid folder ID")
         return v
-
-
-class DiagramRequest(BaseModel):
-    content: str
-
-    @field_validator("content")
-    @classmethod
-    def validate_content(cls, v):
-        if not v or not v.strip():
-            raise ValueError("Content is required")
-        return v[:10_000]
 
 
 @router.get("")
@@ -152,88 +134,3 @@ def delete_note(note_id: str, authorization: str = Header(default="")):
         .eq("user_id", user_id) \
         .execute()
     return {"deleted": True}
-
-
-@router.post("/{note_id}/study_guide", dependencies=[Depends(ai_rate_limit())])
-def generate_study_guide_from_note(note_id: str, authorization: str = Header(default="")):
-    """Generate a preview study guide from a SmartNote's content.
-    Does NOT save to study_guides — the frontend shows a preview and the
-    user picks Approve (which posts to /guides), Edit (manual editor),
-    or Cancel.
-    """
-    require_uuid(note_id, "note ID")
-    user_id = get_user_id(authorization)
-    supabase = get_supabase()
-
-    result = supabase.table("smart_notes") \
-        .select("id, title, content") \
-        .eq("id", note_id) \
-        .eq("user_id", user_id) \
-        .execute()
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Note not found")
-
-    note = result.data[0]
-    html_content = note.get("content") or ""
-    if not html_content.strip():
-        raise HTTPException(status_code=400, detail="Note is empty — add some content first")
-
-    require(user_id, "guide")
-    study_guide = generate_study_guide_from_notes(html_content)
-
-    if not study_guide:
-        raise HTTPException(status_code=422, detail="Couldn't find educational content in this note")
-
-    pairs = [
-        {"question": pair["front"], "answer": pair["back"]}
-        for pair in study_guide_to_flashcards(study_guide)
-    ]
-
-    if not pairs or not study_guide_is_complete(study_guide):
-        raise HTTPException(status_code=422, detail="No Q&A pairs could be generated from this note")
-
-    title = (note.get("title") or "Untitled Notes").strip()
-    suggested_title = title if title.lower().endswith("study guide") else f"{title} — Study Guide"
-
-    record(user_id, "guide")
-    return {
-        "title": suggested_title,
-        "study_guide": study_guide,
-        "pairs": pairs,
-        "notes_html": html_content,  # passed back so frontend can save as the notes field
-        "source": {"type": "smartnote", "id": note["id"], "title": title},
-    }
-
-
-@router.post("/diagram", dependencies=[Depends(ai_rate_limit())])
-def generate_diagram(request: DiagramRequest, authorization: str = Header(default="")):
-    user_id = get_user_id(authorization)
-    require(user_id, "light")
-    response = chat(get_openai_client(), "smart_notes_diagram",
-        messages=[{
-            "role": "system",
-            "content": (
-                "You generate Mermaid.js diagrams for student notes. "
-                "The user has manually selected this text specifically because they want a visual that will help them understand the content. "
-                " BEFORE creating the diagram, understand the topic/field of study and determine if there is a specific type of diagram that would best represent the information or specific way it should be represented. (e.g., a list of ip packet headers should not be a flow chart diagram, but in the form of a packet with the corrent length based off the bits. if a user lists a process, it shouldn't be labeled as a table or graph, but as a flow chart with labeled conditions). "
-                "Always try to create the most useful diagram possible — If you cannot seem to determine the field of study and an already used/represnted visual example (in the industry already) then use sequenceDiagram for "
-                "communication/protocol flows, flowchart for processes, graph for relationships, "
-                "mindmap for hierarchies, or classDiagram for structures. "
-                "Output ONLY raw valid Mermaid.js syntax — no markdown fences, no explanation. "
-                "Keep diagrams concise (max 14 nodes). "
-                "If you cannot figure out how to visualize something and think it cannot be visualized, then simply create a classification diagram or think of a way to just help put in a visual the way somebody would remember it in their head." 
-            )
-        }, {
-            "role": "user",
-            "content": request.content
-        }]
-    )
-
-    text = response.choices[0].message.content.strip()
-    # Strip markdown fences if the model wrapped output anyway
-    text = re.sub(r'^```(?:mermaid)?\s*', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\s*```$', '', text).strip()
-    if not text or 'NO_DIAGRAM' in text:
-        return {"mermaid": None}
-    record(user_id, "light")
-    return {"mermaid": text}

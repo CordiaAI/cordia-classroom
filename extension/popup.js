@@ -6,6 +6,7 @@ const state = {
 const makeButton = document.getElementById('make-guide');
 const saveButton = document.getElementById('save-guide');
 const saveBubble = document.getElementById('save-bubble');
+const saveLabel = document.getElementById('save-label');
 const result = document.getElementById('result');
 const resultTitle = document.getElementById('result-title');
 const resultContent = document.getElementById('result-content');
@@ -141,7 +142,8 @@ async function scrape() {
 async function extract() {
   step('extract', 'active');
   announce('Finding the material worth studying…', 'working');
-  const images = state.screenshot ? [{ data: state.screenshot, context: 'Visible study material' }] : [];
+  // The screenshot only helps a page with under 400 chars of text (the server uses the same bar).
+  const images = state.screenshot && (state.scraped?.text || '').trim().length < 400 ? [{ data: state.screenshot, context: 'Visible study material' }] : [];
   const content = state.scraped?.text || (state.screenshot ? '[Screenshot fallback]' : '');
   if (!content) throw new Error('Chrome could not read or capture this page. Reload the extension, then try again.');
   const response = await runtime({
@@ -179,8 +181,10 @@ async function makeStudyGuide() {
   makeButton.disabled = true;
   saveBubble.hidden = true;
   saveBubble.classList.remove('saved');
+  saveLabel.textContent = 'Ready for Classroom';
   saveButton.disabled = false;
   saveButton.textContent = 'Save to Classroom';
+  state.guideUrl = null;
   result.hidden = true;
   resetSteps();
   state.scraped = null;
@@ -204,7 +208,7 @@ async function makeStudyGuide() {
     result.hidden = false;
     document.getElementById('guide-title').textContent = state.title;
     saveBubble.hidden = false;
-    announce('Guide ready. Review it, then save it to Classroom.', 'ready');
+    await saveStudyGuide();
   } catch (error) {
     announce(error.message || 'The guide could not be created.', 'error');
   } finally {
@@ -271,7 +275,8 @@ async function askTutor(event) {
   }
 }
 
-async function saveStudyGuide() {
+async function saveStudyGuide() { // runs by itself once a guide is ready; then the button opens it
+  if (state.guideUrl) return chrome.tabs.create({ url: state.guideUrl });
   if (!state.generated || saveButton.disabled) return;
   saveButton.disabled = true;
   saveButton.textContent = 'Saving…';
@@ -285,7 +290,6 @@ async function saveStudyGuide() {
     flashcards: state.generated.flashcards,
     url: source.url || '',
     sourceType: source.sourceType || 'webpage',
-    tabId: source.tabId,
   });
   if (!response?.success || !response.savedGuide?.id) {
     saveButton.disabled = false;
@@ -293,18 +297,14 @@ async function saveStudyGuide() {
     announce(response?.error || 'The guide could not be saved. Try again.', 'error');
     return;
   }
+  state.guideUrl = response.guideUrl;
   saveBubble.classList.add('saved');
-  saveButton.textContent = 'Saved';
+  saveLabel.textContent = 'Saved to Classroom';
+  saveButton.disabled = false;
+  saveButton.textContent = 'Open guide';
   state.requestSource = null;
   refreshPlan();
-  if (response.redirected) {
-    announce('Saved. Opening your guide in CordiaClassroom…', 'ready');
-  } else {
-    connectLink.href = response.guideUrl;
-    connectLink.textContent = 'Open guide';
-    connectLink.hidden = false;
-    announce('Saved to Classroom. Open the guide here.', 'ready');
-  }
+  announce('Saved to Classroom. Open the guide anytime.', 'ready');
 }
 
 makeButton.addEventListener('click', makeStudyGuide);

@@ -5,8 +5,8 @@ import { useRouter } from 'next/router';
 import { PencilRuler } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
-import { loadStudyQueue } from '../lib/studyQueue';
-import { rememberRetainMisses, retainMisses } from '../lib/userStore';
+import { learnAfterReview, loadStudyQueue } from '../lib/studyQueue';
+import { clearRetainMisses } from '../lib/userStore';
 import { applyResults } from '../lib/spacedReview.mjs';
 import FlashcardViewer from '../components/FlashcardViewer';
 
@@ -27,8 +27,8 @@ function PracticeList({ practice }) {
   );
 }
 
-// Daily review: due flashcards, then Retain misses, then open practice problems.
-// With ?guideId= it is that guide's Study now.
+// Daily review: Retain misses, due flashcards and Learn ideas in one round (lib/studyQueue.js),
+// then open practice problems. With ?guideId= it is that guide's Study now.
 export default function StudySession() {
   const router = useRouter();
   const { ready } = useRequireAuth();
@@ -41,38 +41,38 @@ export default function StudySession() {
     loadStudyQueue({ guideId: typeof router.query.guideId === 'string' ? router.query.guideId : '' }).then(setQueue);
   }, [ready, router.isReady]);
 
-  // Quiz answers the student was sure of but got wrong come first; they're the ones worth fixing.
-  const cards = queue ? [...queue.misses.filter(card => card.sure), ...queue.cards, ...queue.misses.filter(card => !card.sure)] : [];
+  const cards = queue ? queue.items : [];
   // Nothing to flip: Start goes straight into the first open practice set, not a menu.
   const directPractice = queue && !cards.length && queue.practice.length ? queue.practice[0].guideId : '';
   useEffect(() => {
     if (directPractice) router.replace('/practice/' + directPractice);
   }, [directPractice, router]);
 
+  // Each answer is saved to every record its question came from (lib/studyQueue.js).
   const onFinish = useCallback(async ({ known, missed, seconds }) => {
-    const byGuide = new Map();
     const knownSet = new Set(known);
-    cards.forEach((card, index) => {
-      if (card.kind !== 'card') return;
-      const entry = byGuide.get(card.guideId) || { known: [], unknown: [] };
-      if (knownSet.has(index)) entry.known.push(card.index);
-      else if (missed.includes(index)) entry.unknown.push(card.index);
+    const missedSet = new Set(missed);
+    const byGuide = new Map();
+    cards.forEach((card, position) => {
+      const right = knownSet.has(position);
+      if (!right && !missedSet.has(position)) return;
+      const entry = byGuide.get(card.guideId) || { known: [], unknown: [], learn: [], cleared: [] };
+      if (card.index !== undefined) (right ? entry.known : entry.unknown).push(card.index);
+      if (card.concept !== undefined) entry.learn.push({ concept: card.concept, known: right });
+      if (card.miss && right) entry.cleared.push(card.front);
       byGuide.set(card.guideId, entry);
     });
-    const requests = [...byGuide.entries()].map(([guideId, entry]) => {
+    const requests = [...byGuide.entries()].map(async ([guideId, entry]) => {
       const guide = queue.guides.find(item => item.id === guideId);
+      if (entry.cleared.length) clearRetainMisses(guideId, entry.cleared);
       // Known cards come back later, missed ones tomorrow (lib/spacedReview.mjs).
-      const next = applyResults(guide?.flashcard_progress, { known: entry.known, missed: entry.unknown });
-      return apiFetch('/guides/' + guideId + '/flashcard-progress', { method: 'PATCH', body: JSON.stringify(next) });
-    });
-    // Retain misses answered right here are cleared.
-    const stored = retainMisses();
-    const clearedByGuide = {};
-    cards.forEach((card, index) => {
-      if (card.kind === 'miss' && knownSet.has(index)) (clearedByGuide[card.guideId] ||= new Set()).add(card.position);
-    });
-    Object.entries(clearedByGuide).forEach(([guideId, positions]) => {
-      rememberRetainMisses(guideId, (stored[guideId] || []).filter((_, position) => !positions.has(position)));
+      if (entry.known.length || entry.unknown.length) {
+        const next = applyResults(guide?.flashcard_progress, { known: entry.known, missed: entry.unknown });
+        await apiFetch('/guides/' + guideId + '/flashcard-progress', { method: 'PATCH', body: JSON.stringify(next) });
+      }
+      // After the flashcard save: both read and rewrite flashcard_progress, so they must not overlap.
+      const learn = learnAfterReview(guide, entry.learn);
+      if (learn) await apiFetch('/guides/' + guideId + '/learn-progress', { method: 'PATCH', body: JSON.stringify(learn) });
     });
     requests.push(apiFetch('/stats/log-session', {
       method: 'POST',
