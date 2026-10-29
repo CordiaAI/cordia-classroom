@@ -197,9 +197,8 @@ class CanvasIntegrationTests(unittest.TestCase):
         self.assertGreater(len(self.canvas.calls), calls)
         self.assertFalse(canvas.canvas_status(BackgroundTasks(), "Bearer x")["syncing"])
         self.assertTrue(all(method == "GET" for method, _, _ in self.canvas.calls))
-        activity = canvas.activity("Bearer x")["activity"]
-        self.assertTrue(activity and {"endpoint", "status", "created_at"} == set(activity[0]))
-        self.assertIn("courses.list", {a["endpoint"] for a in activity})
+        # Every call is logged by endpoint name and status only.
+        self.assertIn("courses.list", {a["endpoint"] for a in self.db.rows("canvas_activity")})
 
         # Background sync is scheduled only when 6 hours have passed.
         tasks = BackgroundTasks()

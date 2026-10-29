@@ -141,7 +141,7 @@ class QuizReadTests(unittest.TestCase):
     def test_saved_quiz_is_read_without_the_guide_text(self):
         cached = [{"question": "Saved?", "options": ["Yes", "No"], "correct_index": 0}]
         self.guide(quiz_questions=cached)
-        self.assertEqual(quiz.generate_quiz(GUIDE_ID, "Bearer t")["questions"], cached)
+        self.assertEqual(quiz._quiz_for_guide(GUIDE_ID, "Bearer t")["questions"], cached)
         self.assertEqual(self.db.selects, [("study_guides", "quiz_questions")])
 
     def test_session_on_a_saved_quiz_reads_once_and_writes_nothing(self):
@@ -157,7 +157,7 @@ class QuizReadTests(unittest.TestCase):
     def test_guide_text_is_read_only_to_build_a_quiz(self):
         self.guide(quiz_questions=None)
         with patch.object(quiz, "remaining", return_value=0):
-            result = quiz.generate_quiz(GUIDE_ID, "Bearer t")
+            result = quiz._quiz_for_guide(GUIDE_ID, "Bearer t")
         self.assertEqual(len(result["questions"]), 4)
         self.assertEqual(self.db.selects, [("study_guides", "quiz_questions"), ("study_guides", "study_guide")])
 

@@ -79,7 +79,6 @@ class CallSpec(NamedTuple):
 FEATURES = {
     # BUILD
     "study_guide": CallSpec(BUILD, 12000),
-    "smart_notes_guide": CallSpec(BUILD, 8000),
     "nclex_questions": CallSpec(BUILD, 16000),
     "practice_questions": CallSpec(BUILD, 16000),
     "exam_questions": CallSpec(BUILD, 16000),

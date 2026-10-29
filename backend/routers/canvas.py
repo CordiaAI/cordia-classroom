@@ -633,16 +633,6 @@ def disconnect(authorization: str = Header(default="")):
     return {"connected": False, "status": "none", "settings_url": f"https://{host}/profile/settings" if host else None}
 
 
-@router.get("/activity")
-def activity(authorization: str = Header(default="")):
-    user_id = get_user_id(authorization)
-    db = get_supabase()
-    since = (_now() - timedelta(days=ACTIVITY_DAYS)).isoformat()
-    rows = db.table("canvas_activity").select("endpoint,status,created_at").eq("user_id", user_id).gte("created_at", since) \
-        .order("created_at", desc=True).limit(200).execute().data or []
-    return {"activity": rows}
-
-
 def _imported_course(db, user_id: str, course_id: int) -> dict:
     connection = _connection(db, user_id)
     row = (db.table("canvas_courses").select("canvas_course_id,imported").eq("user_id", user_id).eq("canvas_course_id", course_id).limit(1).execute().data or [None])[0]

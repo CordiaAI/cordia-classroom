@@ -312,12 +312,6 @@ def start_quiz_warmup(guide: Optional[dict], user_id: str) -> None:
         threading.Thread(target=prewarm_quiz, args=(guide["id"], user_id), daemon=True).start()
 
 
-@router.get("/{guide_id}/generate", dependencies=[Depends(ai_rate_limit())])
-def generate_quiz(guide_id: str, authorization: str = Header(default="")):
-    """Load the saved Pro Retain quiz or build an instant free quiz."""
-    return _quiz_for_guide(guide_id, authorization)
-
-
 @router.post("/{guide_id}/regenerate", dependencies=[Depends(ai_rate_limit())])
 def regenerate_quiz(guide_id: str, authorization: str = Header(default="")):
     """Replace the current distractors using the user's plan rules."""
