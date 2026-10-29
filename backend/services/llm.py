@@ -898,6 +898,10 @@ def study_guide_is_complete(content: str) -> bool:
     return found_pair and not awaiting_answer
 
 
+# Guide batches written at once; enough to cut a long deck's wait without tripping provider rate limits.
+GUIDE_BATCH_WORKERS = 4
+
+
 def generate_study_guide(chunks: List[str], has_images: bool = False, learning_guidance: str = "") -> str:
     """
     Generate a comprehensive study guide with AI-generated questions and answers.
@@ -940,8 +944,7 @@ def generate_study_guide(chunks: List[str], has_images: bool = False, learning_g
         f"{len(batches)} batch(es), batch_chars=[{', '.join(str(len(b)) for b in batches)}]"
     )
 
-    all_results = []
-    for i, batch_text in enumerate(batches):
+    def write_batch(i, batch_text):
         prompt = _build_study_guide_prompt(
             batch_text[:30000],
             learning_guidance=learning_guidance,
@@ -958,10 +961,25 @@ def generate_study_guide(chunks: List[str], has_images: bool = False, learning_g
         # Detect if AI found no educational content (anti-hallucination guard)
         if "NO_EDUCATIONAL_CONTENT" in result:
             logger.warning(f"Study guide batch {i+1}: no educational content detected, skipping")
-            continue
-        all_results.append(result)
+            return None
         q_count = len(re.findall(r'^Q\d+:', result, re.MULTILINE))
         logger.info(f"Study guide batch {i+1}/{len(batches)} complete — {q_count} Q&A pairs, {len(batch_text)} chars input")
+        return result
+
+    # Batches are independent: write them at the same time, then merge in source order.
+    # A failed batch still fails the guide, as before (a guide with a silent gap is worse).
+    if len(batches) == 1:
+        results = [write_batch(0, batches[0])]
+    else:
+        with ThreadPoolExecutor(max_workers=min(GUIDE_BATCH_WORKERS, len(batches))) as pool:
+            futures = [pool.submit(copy_context().run, write_batch, i, text) for i, text in enumerate(batches)]
+            try:
+                results = [future.result() for future in futures]
+            except Exception:
+                for future in futures:
+                    future.cancel()
+                raise
+    all_results = [result for result in results if result]
 
     if not all_results:
         return ""

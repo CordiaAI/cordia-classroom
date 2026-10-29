@@ -7,6 +7,7 @@ import re
 import json
 import random
 import logging
+import threading
 from fastapi import APIRouter, HTTPException, Header, Depends
 from rate_limit import ai_rate_limit
 from pydantic import BaseModel, Field
@@ -14,10 +15,11 @@ from typing import List, Literal, Optional
 from database import get_supabase
 from services.llm import explain_miss_briefly, get_openai_client, grade_written_answer
 from services.llm_calls import chat
+from services.models import current_user_id
 from auth_utils import get_user_id
 from ids import require_uuid
 from services import retain
-from services.entitlements import plan_for, record, remaining, require, subscription_row
+from services.entitlements import LIMITS, plan_for, record, remaining, require, subscription_row
 
 
 logger = logging.getLogger(__name__)
@@ -164,28 +166,31 @@ def _save_quiz(supabase, guide_id: str, user_id: str, questions: list) -> None:
         logger.warning("Failed to cache quiz questions for guide %s", guide_id, exc_info=True)
 
 
+def _guide_columns(supabase, guide_id: str, user_id: str, columns: str) -> dict:
+    result = supabase.table("study_guides").select(columns).eq("id", guide_id).eq("user_id", user_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Guide not found")
+    return result.data[0]
+
+
 def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False):
     """Load or generate a Retain quiz, optionally replacing saved distractors."""
     require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
-    supabase = get_supabase()
-
-    result = supabase.table("study_guides") \
-        .select("study_guide, quiz_questions") \
-        .eq("id", guide_id) \
-        .eq("user_id", user_id) \
-        .execute()
-
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Guide not found")
+    return {"questions": _load_quiz(get_supabase(), guide_id, user_id, regenerate)[0]}
 
 
+def _load_quiz(supabase, guide_id: str, user_id: str, regenerate: bool = False) -> tuple:
+    """(questions, saved): the guide's Retain quiz, built on first use. saved is False only
+    when the questions are an unsaved fallback, so the next visit retries the AI distractors."""
     # A quiz is generated once, then stays attached to its guide until the user regenerates it.
-    cached = result.data[0].get("quiz_questions")
-    if cached and not regenerate:
-        return {"questions": cached}
+    # Read the small question set first; the guide text is only needed to build one.
+    if not regenerate:
+        cached = _guide_columns(supabase, guide_id, user_id, "quiz_questions").get("quiz_questions")
+        if cached:
+            return cached, True
 
-    study_guide_text = result.data[0].get("study_guide", "")
+    study_guide_text = _guide_columns(supabase, guide_id, user_id, "study_guide").get("study_guide", "")
     if not study_guide_text:
         raise HTTPException(status_code=400, detail="No study guide content to generate quiz from")
 
@@ -208,7 +213,7 @@ def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False)
                 detail="At least two distinct study-guide answers are needed for Retain",
             )
         _save_quiz(supabase, guide_id, user_id, questions)
-        return {"questions": questions}
+        return questions, True
 
     require(user_id, "ai_quiz")
     client = get_openai_client()
@@ -279,8 +284,32 @@ Return ONLY the JSON object, no other text:"""
     if distractors_list:
         _save_quiz(supabase, guide_id, user_id, questions)
 
-    record(user_id, "ai_quiz")
-    return {"questions": questions}
+    # A guide's first quiz is charged once, even if the save-time warm-up and a first Learn race.
+    record(user_id, "ai_quiz", None if regenerate else f"first:{guide_id}")
+    return questions, bool(distractors_list)
+
+
+def prewarm_quiz(guide_id: str, user_id: str) -> None:
+    """Build a just-saved guide's Retain quiz so the first Learn opens instantly.
+
+    Only for accounts with more AI quizzes than the free monthly preview: a free student keeps
+    that one AI quiz for the guide they choose to study (their first Learn builds it, as before).
+    """
+    current_user_id.set(user_id)  # usage rows name the student, as in a request
+    try:
+        if remaining(user_id, "ai_quiz") <= LIMITS["free"]["ai_quiz"]:
+            return
+        _load_quiz(get_supabase(), guide_id, user_id)
+    except Exception:
+        # The first Learn simply builds it instead.
+        logger.warning("Quiz warm-up failed for guide %s", guide_id, exc_info=True)
+
+
+def start_quiz_warmup(guide: Optional[dict], user_id: str) -> None:
+    """After a guide with Q&A is saved, build its quiz on a background thread (never delays the save)."""
+    guide = guide or {}
+    if guide.get("id") and _parse_qa_pairs(guide.get("study_guide") or ""):
+        threading.Thread(target=prewarm_quiz, args=(guide["id"], user_id), daemon=True).start()
 
 
 @router.get("/{guide_id}/generate", dependencies=[Depends(ai_rate_limit())])
@@ -309,11 +338,11 @@ def _saved_questions(supabase, guide_id: str, user_id: str) -> list:
 @router.post("/{guide_id}/session", dependencies=[Depends(ai_rate_limit())])
 def start_session(guide_id: str, body: SessionRequest, authorization: str = Header(default="")):
     """The questions plus which format asks each idea, from the types the student turned on."""
-    questions = _quiz_for_guide(guide_id, authorization)["questions"]
+    require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
-    saved = supabase.table("study_guides").select("quiz_questions").eq("id", guide_id).eq("user_id", user_id).execute()
-    if not (saved.data and saved.data[0].get("quiz_questions") == questions):
+    questions, saved = _load_quiz(supabase, guide_id, user_id)
+    if not saved:
         # Answers are checked against the saved questions, so a session always starts from them.
         _save_quiz(supabase, guide_id, user_id, questions)
     cards = retain.plan_session(questions, body.types)

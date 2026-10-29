@@ -10,6 +10,17 @@ export async function canvasStatus() {
   return available ? data : null;
 }
 
+// "Sync now" answers at once with syncing: true and runs in the background; this polls the
+// status until that sync is over (or ~2 minutes pass) and returns the final status.
+export async function settleCanvasSync(status, { every = 3000, tries = 40 } = {}) {
+  let current = status;
+  for (let i = 0; current?.syncing && i < tries; i += 1) {
+    await new Promise(resolve => setTimeout(resolve, every));
+    current = (await canvasStatus()) || current;
+  }
+  return current;
+}
+
 export function canvasKnownAvailable() {
   return available;
 }

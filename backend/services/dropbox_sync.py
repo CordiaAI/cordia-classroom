@@ -9,7 +9,7 @@ Single files import the same way as Drive's, through /connectors/dropbox/files a
 
 import base64
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -160,9 +160,3 @@ def sync_folders(user_id: str, only: Optional[str] = None) -> dict:
             checked[folder] = started
     sync_state.record(user_id, "dropbox", stats={"folders_checked": checked, "files": int(stats.get("files") or 0) + imported})
     return {"imported": imported}
-
-
-def due(now: datetime, every: timedelta = timedelta(minutes=30)) -> list[dict]:
-    cutoff = (now - every).isoformat()
-    return get_supabase().table("connector_settings").select("user_id,last_synced_at").eq("connector", "dropbox") \
-        .eq("stats->>linked", "true").or_(f"last_synced_at.is.null,last_synced_at.lt.{cutoff}").limit(20).execute().data or []

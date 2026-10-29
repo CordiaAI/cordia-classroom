@@ -5,7 +5,7 @@ import BodyPortal from './BodyPortal';
 import ConfirmDialog from './ConfirmDialog';
 import { SectionLoader } from './CordiaLoader';
 import { apiFetch } from '../lib/api';
-import { canvasStatus, displayDate } from '../lib/canvas';
+import { canvasStatus, displayDate, settleCanvasSync } from '../lib/canvas';
 import CanvasConnectSheet from './CanvasConnectSheet';
 import CanvasCourseList from './CanvasCourseList';
 import Toggle from './Toggle';
@@ -221,8 +221,10 @@ export default function ConnectorsSettings() {
   async function syncCanvas() {
     setBusy('canvas'); setError('');
     const data = await apiFetch('/canvas/sync', { method: 'POST' });
+    // The sync runs in the background; wait for it before saying it's done.
+    const done = data && 'connected' in data ? await settleCanvasSync(data) : null;
     setBusy('');
-    if (data && 'connected' in data) { setCanvas(current => ({ ...current, status: data })); say('Canvas synced'); }
+    if (done) { setCanvas(current => ({ ...current, status: done })); if (!done.sync_error) say('Canvas synced'); }
     else fail(data?.detail || "Canvas couldn't be reached. Try again.");
   }
 

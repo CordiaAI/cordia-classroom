@@ -5,7 +5,7 @@ import { RefreshCw, Settings2 } from 'lucide-react';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
 import { apiErrorMessage, apiFetch } from '../lib/api';
-import { canvasStatus } from '../lib/canvas';
+import { canvasStatus, settleCanvasSync } from '../lib/canvas';
 import CanvasClasses from '../components/CanvasClasses';
 import CanvasConnectButton from '../components/CanvasConnectButton';
 import { LoadingArea, Reveal, useLoadGate } from '../components/CordiaLoader';
@@ -38,9 +38,13 @@ export default function CanvasPage() {
     setSyncing(true);
     setError('');
     const data = await apiFetch('/canvas/sync', { method: 'POST' });
+    if (data && 'connected' in data) {
+      setStatus(data);
+      const done = await settleCanvasSync(data);
+      setStatus(done);
+      if (done.sync_error) setError(done.sync_error);
+    } else setError(apiErrorMessage(data?.detail, 'Canvas could not be reached.'));
     setSyncing(false);
-    if (data && 'connected' in data) setStatus(data);
-    else setError(apiErrorMessage(data?.detail, 'Canvas could not be reached.'));
   }
 
   if (!ready) return null;

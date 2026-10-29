@@ -2,16 +2,19 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from auth_utils import get_user_id
 from database import get_supabase
+from rate_limit import limiter
+from routers.materials import readable_text
 from services import canvas_client
 from services.canvas_client import CanvasClient, CanvasDenied, CanvasError, CanvasForbiddenRequest, CanvasUnauthorized
 from services.class_catalog import clean_term, school_name_from_domain, topic_summary
@@ -365,13 +368,18 @@ def sync(db, user_id: str, *, client: Optional[CanvasClient] = None) -> None:
     try:
         school = ensure_school(db, (_policy_for(db, client.host) or {}).get("school_name") or school_name_from_domain(client.host), client.host)
         existing = {row["canvas_course_id"]: row for row in db.table("canvas_courses").select("*").eq("user_id", user_id).execute().data or []}
-        imported = {}
+        rows = []
         for course in client.courses() or []:
             if not course.get("id") or course.get("access_restricted_by_date"):
                 continue
             row = _course_row(user_id, course, school["id"])
             row["imported"] = bool(existing.get(row["canvas_course_id"], {}).get("imported"))
-            db.table("canvas_courses").upsert(row, on_conflict="user_id,canvas_course_id").execute()
+            rows.append(row)
+        # Every course in one write; imported classes are then refreshed one by one.
+        if rows:
+            db.table("canvas_courses").upsert(rows, on_conflict="user_id,canvas_course_id").execute()
+        imported = {}
+        for row in rows:
             if row["imported"]:
                 _import_course(db, user_id, client, row, school)
                 imported[row["canvas_course_id"]] = row
@@ -419,6 +427,7 @@ def _status(db, user_id: str) -> dict:
         "stats": {k: v for k, v in (sync_state.get(user_id, "canvas").get("stats") or {}).items()
                   if isinstance(v, (int, float)) and not isinstance(v, bool)},
         "sync_error": sync_state.get(user_id, "canvas").get("last_error"),
+        "syncing": user_id in _syncing,
         "courses": [{
             "id": row["canvas_course_id"], "name": row["name"], "code": row["course_code"],
             "term": row["term"], "imported": bool(row.get("imported")), "class_id": row.get("class_id"),
@@ -427,7 +436,21 @@ def _status(db, user_id: str) -> dict:
     }
 
 
+# Students whose sync is running in this process, so a second click or status poll doesn't start another.
+_syncing: set[str] = set()
+_syncing_lock = threading.Lock()
+
+
+def _claim_sync(user_id: str) -> bool:
+    with _syncing_lock:
+        if user_id in _syncing:
+            return False
+        _syncing.add(user_id)
+        return True
+
+
 def _sync_in_background(user_id: str) -> None:
+    """Runs a sync claimed with _claim_sync. Errors land in sync_state (shown as sync_error)."""
     db = get_supabase()
     try:
         sync(db, user_id)
@@ -435,6 +458,8 @@ def _sync_in_background(user_id: str) -> None:
         logger.info("Canvas token rejected; connection removed")
     except (CanvasError, HTTPException) as exc:
         logger.info(f"Canvas sync skipped: {type(exc).__name__}")
+    finally:
+        _syncing.discard(user_id)
 
 
 def _sync_due(connection: dict) -> bool:
@@ -473,7 +498,7 @@ def canvas_status(background: BackgroundTasks, authorization: str = Header(defau
     user_id = get_user_id(authorization)
     db = get_supabase()
     connection = _connection(db, user_id)
-    if connection and _sync_due(connection) and connection.get("last_synced_at"):
+    if connection and _sync_due(connection) and connection.get("last_synced_at") and _claim_sync(user_id):
         background.add_task(_sync_in_background, user_id)
     return _status(db, user_id)
 
@@ -576,21 +601,16 @@ def set_auto_import(course_id: int, body: AutoImportRequest, authorization: str 
 
 
 @router.post("/sync")
-def sync_now(authorization: str = Header(default="")):
+def sync_now(background: BackgroundTasks, authorization: str = Header(default="")):
+    """Start a sync and answer at once with the current status (syncing: true while it runs)."""
     user_id = get_user_id(authorization)
     db = get_supabase()
     connection = _connection(db, user_id)
     if not connection or connection.get("status") != "connected":
         raise HTTPException(status_code=409, detail="Reconnect Canvas")
     last = _parse_time(connection.get("last_synced_at"))
-    if last and _now() - last < SYNC_NOW_FLOOR:
-        return _status(db, user_id)
-    try:
-        sync(db, user_id)
-    except CanvasUnauthorized:
-        raise HTTPException(status_code=409, detail="Reconnect Canvas")
-    except CanvasError:
-        raise HTTPException(status_code=502, detail="Canvas could not be reached.")
+    if not (last and _now() - last < SYNC_NOW_FLOOR) and _claim_sync(user_id):
+        background.add_task(_sync_in_background, user_id)
     return _status(db, user_id)
 
 
@@ -687,14 +707,11 @@ def list_files(course_id: int, authorization: str = Header(default="")):
     return {"files": [{"id": f.get("id"), "name": f.get("display_name"), "size": f.get("size"), "type": f.get("content-type")} for f in files or []]}
 
 
-@router.get("/courses/{course_id}/files/{file_id}")
-def download_file(course_id: int, file_id: int, authorization: str = Header(default="")):
-    """The one file the student picked; the browser feeds it into the normal upload flow."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+def _download(db, user_id: str, course_id: int, file_id: int) -> tuple[str, bytes]:
+    """(name, bytes) of one file in an imported class, with errors a student can act on."""
     connection = _imported_course(db, user_id, course_id)
     try:
-        name, body = _client(db, user_id, connection).download_file(course_id, file_id)
+        return _client(db, user_id, connection).download_file(course_id, file_id)
     except CanvasUnauthorized:
         _auto_disconnect(db, user_id)
         raise HTTPException(status_code=409, detail="Reconnect Canvas")
@@ -702,8 +719,25 @@ def download_file(course_id: int, file_id: int, authorization: str = Header(defa
         raise HTTPException(status_code=400, detail="Canvas served this file from another host.")
     except CanvasError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.get("/courses/{course_id}/files/{file_id}")
+def download_file(course_id: int, file_id: int, authorization: str = Header(default="")):
+    """The one file the student picked, to save on their device."""
+    user_id = get_user_id(authorization)
+    name, body = _download(get_supabase(), user_id, course_id, file_id)
     safe = re.sub(r"[^\w.\- ]", "_", name)[:150] or "canvas-file"
     return Response(content=body, media_type="application/octet-stream", headers={"Content-Disposition": f'attachment; filename="{safe}"'})
+
+
+@router.post("/courses/{course_id}/files/{file_id}/text")
+@limiter.limit("20/minute")
+def file_text(course_id: int, file_id: int, request: Request, authorization: str = Header(default="")):
+    """"Make guide" on a Canvas file: read it here instead of the browser downloading and
+    re-uploading it. Same reading (and limits) as an upload: {"name", "text"}."""
+    user_id = get_user_id(authorization)
+    name, body = _download(get_supabase(), user_id, course_id, file_id)
+    return {**readable_text(user_id, name, body), "name": name}
 
 
 @router.get("/courses/{course_id}/grades")

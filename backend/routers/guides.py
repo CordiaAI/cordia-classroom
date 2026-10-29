@@ -10,6 +10,7 @@ from typing import Optional
 from database import get_supabase
 from services.llm import guide_title
 from services.sharing import on_guide_changed
+from routers.quiz import start_quiz_warmup
 from auth_utils import get_user_id
 from ids import is_uuid, require_uuid
 
@@ -141,6 +142,7 @@ def save_guide(request: SaveGuideRequest, authorization: str = Header(default=""
     ).execute()
 
     if result.data:
+        start_quiz_warmup(result.data[0], user_id)
         return {"guide": result.data[0]}
     raise HTTPException(status_code=500, detail="Failed to save guide")
 
@@ -171,15 +173,24 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
         on_guide_changed(supabase, user_id, guide_id)
     return {"guide": result.data[0]}
     
+# Smaller column sets for screens that don't show the guide text (default: every column).
+GUIDE_FIELDS = {
+    "meta": "id,title,folder_id,flashcard_progress,source_type,created_at",
+    "cards": "id,title,flashcards,flashcard_progress,is_bookmarked",
+}
+
+
 @router.get("/{guide_id}")
-def get_guide(guide_id: str, authorization: str = Header(default="")):
-    """Get a single study guide."""
+def get_guide(guide_id: str, fields: str = "", authorization: str = Header(default="")):
+    """Get a single study guide. fields=meta or fields=cards returns only those columns."""
     require_uuid(guide_id, "guide ID")
+    if fields and fields not in GUIDE_FIELDS:
+        raise HTTPException(status_code=400, detail="fields must be meta or cards")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
     result = supabase.table("study_guides") \
-        .select("*") \
+        .select(GUIDE_FIELDS.get(fields, "*")) \
         .eq("id", guide_id) \
         .eq("user_id", user_id) \
         .execute()

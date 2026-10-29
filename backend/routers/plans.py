@@ -188,11 +188,15 @@ def schedule_exams(user_id: str) -> int:
     db = get_supabase()
     exams = [i for i in calendar_for(user_id).get("items") or [] if not i.get("done") and _is_exam(user_id, i)
              and now < google_sync._time(i["due_at"]) <= now + timedelta(days=14)]
+    if not exams:
+        return 0
+    # Already planned, or every session was removed by the student: leave it.
+    planned = {row["item_key"] for row in db.table("study_blocks").select("item_key").eq("user_id", user_id)
+               .in_("item_key", [item["id"] for item in exams]).execute().data or []}
     added = 0
     for item in exams:
-        if db.table("study_blocks").select("id").eq("user_id", user_id).eq("item_key", item["id"]).limit(1).execute().data:
-            continue  # Already planned, or every session was removed by the student: leave it.
-        added += len(schedule(user_id, item, _zone(user_id, None)))
+        if item["id"] not in planned:
+            added += len(schedule(user_id, item, _zone(user_id, None)))
     return added
 
 
@@ -242,11 +246,13 @@ def reflow(user_id: str, item_key: str, time_zone: str = "") -> dict:
         db.table("study_blocks").delete().in_("id", late).eq("user_id", user_id).execute()
     moved_steps = added = 0
     if due:
-        steps = [s for s in db.table("assignment_steps").select("id,position,done").eq("user_id", user_id).eq("item_key", item_key)
+        steps = [s for s in db.table("assignment_steps").select("*").eq("user_id", user_id).eq("item_key", item_key)
                  .order("position").execute().data or [] if not s.get("done")]
-        for step, step_due in zip(steps, planner.stagger(len(steps), due, now)):
-            db.table("assignment_steps").update({"due_at": step_due.isoformat()}).eq("id", step["id"]).eq("user_id", user_id).execute()
-            moved_steps += 1
+        # All new dates in one write (whole rows, so the upsert only ever updates).
+        moved = [{**step, "due_at": step_due.isoformat()} for step, step_due in zip(steps, planner.stagger(len(steps), due, now))]
+        if moved:
+            db.table("assignment_steps").upsert(moved, on_conflict="id").execute()
+        moved_steps = len(moved)
         if steps or _is_exam(user_id, item):
             added = len(schedule(user_id, item, _zone(user_id, time_zone or None)))
     return {"blocks_removed": len(late), "steps_moved": moved_steps, "blocks_added": added}

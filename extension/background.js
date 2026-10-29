@@ -209,21 +209,8 @@ async function saveStudyGuide(message) {
     }),
   }), 'The guide was generated but could not be saved.');
   if (!saved?.guide?.id) throw new Error('CordiaClassroom did not confirm the saved guide.');
-  const guideUrl = `https://classroom.cordiaai.io/guide/${encodeURIComponent(saved.guide.id)}`;
-  let redirected = false;
-  try {
-    if (message.tabId) {
-      await chrome.tabs.update(message.tabId, { url: guideUrl });
-      redirected = true;
-    }
-  } catch (_) { /* The source tab may have closed after generation. */ }
-  if (!redirected) {
-    try {
-      await chrome.tabs.create({ url: guideUrl });
-      redirected = true;
-    } catch (_) { /* The confirmed save still succeeds even if Chrome blocks navigation. */ }
-  }
-  return { savedGuide: saved.guide, guideUrl, redirected };
+  // The panel saves as soon as the guide is ready and offers "Open guide"; it never navigates the student's tab.
+  return { savedGuide: saved.guide, guideUrl: `https://classroom.cordiaai.io/guide/${encodeURIComponent(saved.guide.id)}` };
 }
 
 const ACTIONS = { importQuizlet, importYoutube, captureScreen, scrapePage, extractEducationalContent, createStudyGuide, saveStudyGuide, askTutor, billingStatus };

@@ -11,7 +11,7 @@
 
 import hashlib
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -163,10 +163,3 @@ def save_copy(user_id: str, guide_id: str, kind: str, title: str, content: str) 
         "container_id": folder, "synced_hash": hashlib.sha256(content.encode()).hexdigest()[:32], "updated_at": _now().isoformat(),
     }, on_conflict="user_id,connector,kind,cordia_id").execute()
     return {"file_id": file_id, "name": name, "url": made.get("webViewLink") or f"https://drive.google.com/file/d/{file_id}/view"}
-
-
-def due(now: datetime, every: timedelta = timedelta(minutes=30)) -> list[dict]:
-    """Students with linked folders whose last Drive sync is older than `every`."""
-    cutoff = (now - every).isoformat()
-    return get_supabase().table("connector_settings").select("user_id,last_synced_at").eq("connector", "gdrive") \
-        .eq("stats->>linked", "true").or_(f"last_synced_at.is.null,last_synced_at.lt.{cutoff}").limit(20).execute().data or []

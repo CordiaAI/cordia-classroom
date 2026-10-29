@@ -31,6 +31,13 @@ function fileKind(file) {
 }
 const shownName = name => String(name || 'Untitled file').replace(/\.(pdf|pptx?|docx?|xlsx?|csv|txt|key|odt|odp|ods|rtf|png|jpe?g|gif|webp|heic|svg|mp4|mov|m4v|webm)$/i, '');
 
+// A Canvas file read on the server, ready for the New sheet: no download and re-upload in the browser.
+async function readFile(courseId, file) {
+  const data = await apiFetch(`/canvas/courses/${courseId}/files/${file.id}/text`, { method: 'POST', timeoutMs: 180000, reportFailure: true });
+  if (typeof data?.text !== 'string') throw new Error(apiErrorMessage(data?.detail, 'Cordia could not read this file.'));
+  return { name: data.name || file.name || 'Canvas file', type: file.type || '', size: file.size || 0, lastModified: 0, readText: data.text };
+}
+
 // One Canvas file as a browser File, through Cordia (the token never reaches the page).
 async function fetchFile(courseId, file) {
   const response = await authorizedFetch(`/canvas/courses/${courseId}/files/${file.id}`);
@@ -65,9 +72,9 @@ export function CourseFiles({ course }) {
     setBusy(`${kind}:${file.id}`);
     setError('');
     try {
-      const picked = await fetchFile(course.id, file);
-      if (kind === 'guide') openNewSheet('upload', { files: [picked] });
+      if (kind === 'guide') openNewSheet('upload', { files: [await readFile(course.id, file)] });
       else {
+        const picked = await fetchFile(course.id, file);
         const url = URL.createObjectURL(picked);
         const link = document.createElement('a');
         link.href = url;

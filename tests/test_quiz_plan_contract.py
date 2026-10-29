@@ -110,7 +110,7 @@ class QuizPlanContractTests(unittest.TestCase):
 
         self.assertEqual(len(result["questions"]), 4)
         self.assertEqual(query.updated, {"quiz_questions": result["questions"]})
-        record_usage.assert_called_once_with("student-1", "ai_quiz")
+        record_usage.assert_called_once_with("student-1", "ai_quiz", f"first:{GUIDE_ID}")
         prompt = client.chat.completions.create.call_args.kwargs["messages"][1]["content"]
         self.assertIn("incorrect terminology", prompt)
         self.assertIn("missing or altering one essential factor", prompt)

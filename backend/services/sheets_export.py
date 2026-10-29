@@ -154,9 +154,3 @@ def status(user_id: str) -> dict:
     stats = state.get("stats") or {}
     return {"auto": bool(stats.get("auto")), "url": f"https://docs.google.com/spreadsheets/d/{sheet}/edit" if sheet else None,
             "last": state.get("last_synced_at")}
-
-
-def due(now: datetime) -> list[dict]:
-    cutoff = (now - EVERY).isoformat()
-    return get_supabase().table("connector_settings").select("user_id,last_synced_at").eq("connector", "gsheets") \
-        .eq("stats->>auto", "true").or_(f"last_synced_at.is.null,last_synced_at.lt.{cutoff}").limit(20).execute().data or []

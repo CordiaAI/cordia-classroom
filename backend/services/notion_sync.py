@@ -174,12 +174,6 @@ def _md(text) -> str:
     return " ".join(str(text or "").replace("<", "‹").replace(">", "›").split())[:1900]
 
 
-def due(now: datetime) -> list[dict]:
-    cutoff = (now - timedelta(minutes=30)).isoformat()
-    return get_supabase().table("connector_settings").select("user_id,last_synced_at").eq("connector", "notion") \
-        .not_.is_("container_id", "null").or_(f"last_synced_at.is.null,last_synced_at.lt.{cutoff}").limit(20).execute().data or []
-
-
 def parent(user_id: str) -> Optional[dict]:
     stats = sync_state.get(user_id, "notion").get("stats") or {}
     return {"id": stats["parent_page_id"], "title": stats.get("parent_title") or "Notion page"} if stats.get("parent_page_id") else None

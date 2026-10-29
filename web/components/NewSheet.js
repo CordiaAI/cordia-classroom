@@ -272,7 +272,7 @@ export default function NewSheet() {
       let sourceUrl = '';
       if (mode === 'upload') {
         const items = [];
-        for (const file of files) items.push({ key: fileKey(file), name: file.name, text: await extractFileText(file) });
+        for (const file of files) items.push({ key: fileKey(file), name: file.name, text: file.readText ?? await extractFileText(file) });
         source = combinedSource(items);
         title = items.map(item => baseName(item.name)).join(' + ').slice(0, 120);
         sourceTitle = items.map(item => item.name).join(', ').slice(0, 300);

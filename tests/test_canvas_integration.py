@@ -120,6 +120,28 @@ class CanvasIntegrationTests(unittest.TestCase):
             p.stop()
         logging.getLogger().removeHandler(self.handler)
 
+    @staticmethod
+    def run_tasks(tasks):
+        for task in tasks.tasks:
+            task.func(*task.args, **task.kwargs)
+
+    def test_sync_writes_every_course_in_one_upsert(self):
+        self.connect()
+        writes = []
+        table = self.db.table
+
+        def counting(name):
+            query = table(name)
+            if name == "canvas_courses":
+                original = query.upsert
+                query.upsert = lambda payload, **kw: (writes.append(payload), original(payload, **kw))[1]
+            return query
+
+        with patch.object(self.db, "table", side_effect=counting):
+            canvas.sync(self.db, "user-1")
+        self.assertEqual(len(writes), 1)
+        self.assertEqual(sorted(r["canvas_course_id"] for r in writes[0]), [101, 102, 103])
+
     def connect(self):
         return canvas.connect(canvas.ConnectRequest(canvas_url=f"https://{HOST}", token=TOKEN, expires_at="2026-12-15", acknowledged=True), "Bearer x")
 
@@ -155,13 +177,25 @@ class CanvasIntegrationTests(unittest.TestCase):
         listed = classes.list_classes("Bearer x")["classes"]
         self.assertEqual([c["code"] for c in listed], ["CHEM 2410", "FILM 201", "MGT 300"])
 
-        # Sync: blocked inside 60s, runs after.
+        # Sync: blocked inside 60s; after that it starts in the background and answers at once.
         calls = len(self.canvas.calls)
-        canvas.sync_now("Bearer x")
+        tasks = BackgroundTasks()
+        status = canvas.sync_now(tasks, "Bearer x")
+        self.assertEqual((len(tasks.tasks), status["syncing"]), (0, False))
         self.assertEqual(len(self.canvas.calls), calls)
         self.db.rows("canvas_connections")[0]["last_synced_at"] = (datetime.now(timezone.utc) - timedelta(hours=7)).isoformat()
-        canvas.sync_now("Bearer x")
+        tasks = BackgroundTasks()
+        status = canvas.sync_now(tasks, "Bearer x")
+        self.assertTrue(status["syncing"])
+        self.assertTrue(status["connected"])
+        self.assertEqual(len(self.canvas.calls), calls)  # nothing ran inside the request
+        # A second click while it runs doesn't start another sync.
+        again = BackgroundTasks()
+        self.assertTrue(canvas.sync_now(again, "Bearer x")["syncing"])
+        self.assertEqual(len(again.tasks), 0)
+        self.run_tasks(tasks)
         self.assertGreater(len(self.canvas.calls), calls)
+        self.assertFalse(canvas.canvas_status(BackgroundTasks(), "Bearer x")["syncing"])
         self.assertTrue(all(method == "GET" for method, _, _ in self.canvas.calls))
         activity = canvas.activity("Bearer x")["activity"]
         self.assertTrue(activity and {"endpoint", "status", "created_at"} == set(activity[0]))
@@ -172,17 +206,20 @@ class CanvasIntegrationTests(unittest.TestCase):
         canvas.canvas_status(tasks, "Bearer x")
         self.assertEqual(len(tasks.tasks), 0)
 
-        # 401: auto-disconnect and ask to reconnect.
+        # 401: the background sync auto-disconnects; the next status asks to reconnect.
         self.canvas.unauthorized = True
         self.db.rows("canvas_connections")[0]["last_synced_at"] = (datetime.now(timezone.utc) - timedelta(hours=7)).isoformat()
-        with self.assertRaises(HTTPException) as caught:
-            canvas.sync_now("Bearer x")
-        self.assertEqual(caught.exception.detail, "Reconnect Canvas")
+        tasks = BackgroundTasks()
+        canvas.sync_now(tasks, "Bearer x")
+        self.run_tasks(tasks)
         self.assertEqual(self.db.rows("canvas_tokens"), [])
         self.assertEqual(self.db.rows("canvas_courses"), [])
         self.assertEqual(self.db.rows("canvas_assignments"), [])
         self.assertEqual(self.db.rows("canvas_connections")[0]["status"], "needs_reconnect")
         self.assertEqual(canvas.canvas_status(BackgroundTasks(), "Bearer x")["status"], "needs_reconnect")
+        with self.assertRaises(HTTPException) as caught:
+            canvas.sync_now(BackgroundTasks(), "Bearer x")
+        self.assertEqual(caught.exception.detail, "Reconnect Canvas")
 
         # Reconnect, then disconnect deletes everything.
         self.canvas.unauthorized = False

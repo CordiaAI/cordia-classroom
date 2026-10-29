@@ -17,6 +17,7 @@ from ids import require_uuid
 from database import get_supabase
 from rate_limit import limiter
 from routers import connectors, folders, guides, smart_notes
+from routers.quiz import start_quiz_warmup
 from schemas import ChatRequest, ChatResponse
 from services.entitlements import record, require
 from services.guidance import learning_guidance, style_instruction
@@ -270,6 +271,7 @@ def _create_guide(user_id: str, material: Material, class_id: Optional[str], fea
         raise HTTPException(status_code=500, detail=f"{saved_name} could not be saved")
     record(user_id, feature)
     saved = created.data[0]
+    start_quiz_warmup(saved, user_id)
     location = " in the same class" if saved.get("folder_id") else " in Study Guides"
     return ChatResponse(
         answer=f"Created {saved['title']}{location}.",

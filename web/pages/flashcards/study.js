@@ -18,7 +18,7 @@ export default function FlashcardStudy() {
 
   useEffect(() => {
     if (!ready || !guideId) return;
-    apiFetch('/guides/' + guideId).then(data => {
+    apiFetch('/guides/' + guideId + '?fields=cards').then(data => {
       if (data?.guide) { setGuide(data.guide); walkthroughEvent('cards-opened'); }
       else setError('These cards could not be loaded.');
     });
