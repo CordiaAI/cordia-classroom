@@ -14,10 +14,10 @@ import { Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2 } from 'lucide-rea
 import BodyPortal from '../components/BodyPortal';
 import SharingSettings from '../components/SharingSettings';
 import PhoneSettings from '../components/PhoneSettings';
-import LearnCordia from '../components/LearnCordia';
 import ConnectorsSettings from '../components/ConnectorsSettings';
 import useScrollerTabs from '../lib/useScrollerTabs';
 import { canvasStatus } from '../lib/canvas';
+import { openHelp } from '../lib/help';
 
 export default function SettingsPage() {
   const { ready } = useRequireAuth();
@@ -26,17 +26,19 @@ export default function SettingsPage() {
   const tabsRef = useScrollerTabs(activeSection);
   const [profileName, setProfileName] = useState('');
 
-  // /settings?section=study opens a tab directly. Old links land on the tab that now
-  // holds them; the grove moved to Progress.
-  const SECTION_ALIASES = { subscription: 'plan', profile: 'account', learning: 'study', canvas: 'connectors', connections: 'connectors' };
+  // /settings?section=tutor opens a tab directly. Old links land on the tab that now holds them:
+  // Study is part of Tutor, Appearance part of Account; the grove moved to Progress and Learn
+  // Cordia lives in Help.
+  const SECTION_ALIASES = { subscription: 'plan', profile: 'account', learning: 'tutor', study: 'tutor', appearance: 'account', canvas: 'connectors', connections: 'connectors' };
   useEffect(() => {
     if (!router.isReady || !router.query.section) return;
     const section = String(router.query.section);
     if (section === 'grove') { router.replace('/progress'); return; }
     // The Assistant moved to its own page; its app still links here when an app connects.
     if (section === 'assistant') { const { section: _s, ...rest } = router.query; router.replace({ pathname: '/assistant', query: rest }); return; }
+    if (section === 'learn') { setActiveSection('account'); router.replace('/settings', undefined, { shallow: true }); openHelp(); return; }
     const key = SECTION_ALIASES[section] || section;
-    setActiveSection(['account', 'study', 'tutor', 'appearance', 'plan', 'connectors', 'learn'].includes(key) ? key : 'account');
+    setActiveSection(['account', 'tutor', 'plan', 'connectors'].includes(key) ? key : 'account');
   }, [router.isReady, router.query.section]);
 
   // Picking a tab updates the address, so Back and shared links land on it.
@@ -65,11 +67,8 @@ export default function SettingsPage() {
   // Theme state
   const [theme, setTheme] = useState('light');
 
-  // Study style
+  // Study style (in Tutor)
   const { learningStyle, saveStyle } = useLearningStyle();
-  useEffect(() => {
-    if (activeSection === 'study' && learningStyle?.enabled === false) setActiveSection('tutor');
-  }, [activeSection, learningStyle?.enabled]);
   const [savingStyle, setSavingStyle] = useState(false);
 
   async function chooseStyle(style) {
@@ -199,13 +198,9 @@ export default function SettingsPage() {
 
   const sections = [
     { key: 'account', label: 'Account' },
-    // Study only holds the Explain view picker now; without it, Tutor is where explaining is set.
-    ...(learningStyle?.enabled === false ? [] : [{ key: 'study', label: 'Study' }]),
     { key: 'tutor', label: 'Tutor' },
-    { key: 'appearance', label: 'Appearance' },
     { key: 'plan', label: 'Plan & billing' },
     { key: 'connectors', label: 'Connectors' },
-    { key: 'learn', label: 'Learn Cordia' },
   ];
   const initials = (profileName || email.split('@')[0] || '').split(/[\s._-]+/).filter(part => /^[a-z]/i.test(part)).slice(0, 2).map(part => part[0]).join('').toUpperCase();
 
@@ -334,12 +329,6 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {activeSection === 'learn' && (
-          <div className="profile-section" role="tabpanel" id="panel-learn" aria-labelledby="tab-learn">
-            <LearnCordia />
-          </div>
-        )}
-
         {activeSection === 'connectors' && (
           <div className="profile-section c-stack" role="tabpanel" id="panel-connectors" aria-labelledby="tab-connectors">
             <ConnectorsSettings />
@@ -353,26 +342,9 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {activeSection === 'appearance' && (
-          <div className="profile-section" role="tabpanel" id="panel-appearance" aria-labelledby="tab-appearance">
-            <div className="c-card settings-row">
-              <span className="c-section-title">Theme</span>
-              <div className="c-seg" role="group" aria-label="Theme">
-                <button type="button" className={theme !== 'dark' ? 'is-active' : ''} aria-pressed={theme !== 'dark'} onClick={() => setAppearance('light')}><Sun size={18} strokeWidth={1.75} aria-hidden="true" /> Light</button>
-                <button type="button" className={theme === 'dark' ? 'is-active' : ''} aria-pressed={theme === 'dark'} onClick={() => setAppearance('dark')}><Moon size={18} strokeWidth={1.75} aria-hidden="true" /> Dark</button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {activeSection === 'tutor' && (
           <div className="profile-section c-stack" role="tabpanel" id="panel-tutor" aria-labelledby="tab-tutor">
             <TutorSettings />
-          </div>
-        )}
-
-        {activeSection === 'study' && (
-          <div className="profile-section c-stack" role="tabpanel" id="panel-study" aria-labelledby="tab-study">
             {learningStyle?.enabled && (
               <div className="c-card settings-card">
                 <h2 className="c-section-title">Explain things to me with…</h2>
@@ -395,6 +367,13 @@ export default function SettingsPage() {
                 <span className="c-meta">{email}</span>
               </div>
               <button type="button" className="c-btn c-btn--secondary" onClick={() => { clearAuth(); router.push('/'); }}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" />Sign out</button>
+            </div>
+            <div className="c-card settings-row">
+              <span className="c-section-title">Theme</span>
+              <div className="c-seg" role="group" aria-label="Theme">
+                <button type="button" className={theme !== 'dark' ? 'is-active' : ''} aria-pressed={theme !== 'dark'} onClick={() => setAppearance('light')}><Sun size={18} strokeWidth={1.75} aria-hidden="true" /> Light</button>
+                <button type="button" className={theme === 'dark' ? 'is-active' : ''} aria-pressed={theme === 'dark'} onClick={() => setAppearance('dark')}><Moon size={18} strokeWidth={1.75} aria-hidden="true" /> Dark</button>
+              </div>
             </div>
             <PhoneSettings />
             <div className="c-card settings-row">

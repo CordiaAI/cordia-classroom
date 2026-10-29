@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../lib/api';
+import { loadFolders } from '../lib/folders';
 
 export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -93,7 +94,7 @@ export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
   async function openSaveForm() {
     setShowSave(true);
     setSaveTitle('NCLEX Practice — ' + new Date().toLocaleDateString());
-    const data = await apiFetch('/folders');
+    const data = await loadFolders();
     if (data?.folders) setFolders(data.folders);
   }
 

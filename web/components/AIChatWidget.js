@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
+import { loadFolders } from '../lib/folders';
 import NapkinVisual from './NapkinVisual';
 import { ArrowUp, BookOpen, Layers, ListTree, MessageCircle, MessagesSquare, Paperclip, PencilRuler, Plus, Trash2, X as CloseIcon } from 'lucide-react';
 import { lastGuide } from '../lib/userStore';
@@ -186,7 +187,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
       Promise.all([
         providedGuides ? null : apiFetch('/guides?fields=summary&limit=200'),
         apiFetch('/smart_notes'),
-        apiFetch('/folders'),
+        loadFolders(),
       ]).then(([guideData, noteData, folderData]) => {
         if (!active) return;
         if (Array.isArray(guideData?.guides)) setLoadedGuides(guideData.guides);

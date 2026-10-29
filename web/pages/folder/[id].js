@@ -14,6 +14,7 @@ import ProgressRing from '../../components/ProgressRing';
 import AddClass from '../../components/AddClass';
 import { ClassDeadlines, ClassSets } from '../../components/ClassSets';
 import { openNewSheet } from '../../lib/newSheet';
+import { invalidateFolders, loadFolders } from '../../lib/folders';
 import { canvasStatus } from '../../lib/canvas';
 import { CourseFiles } from '../../components/CanvasClasses';
 import ClassGrades from '../../components/ClassGrades';
@@ -74,7 +75,7 @@ export default function ClassPage() {
   async function loadData() {
     setLoadError('');
     const [foldersData, guidesData, notesData, lectureData] = await Promise.all([
-      apiFetch('/folders'), apiFetch('/guides?fields=summary&folder_id=' + encodeURIComponent(id)), apiFetch('/smart_notes'), listLectures().catch(() => null),
+      loadFolders(), apiFetch('/guides?fields=summary&folder_id=' + encodeURIComponent(id)), apiFetch('/smart_notes'), listLectures().catch(() => null),
     ]);
     const failure = [foldersData, guidesData].find(data => !data || data.detail);
     if (failure) { setLoadError(apiErrorMessage(failure?.detail, 'This class could not be loaded.')); return; }
@@ -129,7 +130,7 @@ export default function ClassPage() {
     const previous = folder.name;
     setFolder(current => ({ ...current, name }));
     const data = await apiFetch('/folders/' + id, { method: 'PATCH', body: JSON.stringify({ name }) });
-    if (data?.folder) setToast('Renamed');
+    if (data?.folder) { invalidateFolders(); setToast('Renamed'); }
     else { setFolder(current => ({ ...current, name: previous })); setToast(apiErrorMessage(data?.detail, 'Could not rename this class.')); }
   }
 
@@ -139,6 +140,7 @@ export default function ClassPage() {
       onConfirm: async () => {
         // Deleting the class also leaves its shared class, so it doesn't come back as a link.
         await Promise.all([apiFetch('/folders/' + id, { method: 'DELETE' }), folder.class_id && apiFetch('/classes/' + folder.class_id, { method: 'DELETE' })]);
+        invalidateFolders();
         router.push('/library');
       },
     });

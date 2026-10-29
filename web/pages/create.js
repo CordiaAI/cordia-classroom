@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { ArrowLeft, Download, Plus, Upload, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { loadFolders } from '../lib/folders';
 import { useRequireAuth } from '../lib/auth';
 import { pairsToCards, pairsToGuide } from '../lib/guideCreate';
 import { openNewSheet } from '../lib/newSheet';
@@ -107,7 +108,7 @@ export default function CreateGuidePage() {
 
   useEffect(() => {
     if (!ready) return;
-    apiFetch('/folders').then(data => {
+    loadFolders().then(data => {
       const nextFolders = data?.folders || [];
       setFolders(nextFolders);
       const folderId = router.query.folder;

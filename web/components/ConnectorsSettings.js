@@ -5,7 +5,8 @@ import BodyPortal from './BodyPortal';
 import ConfirmDialog from './ConfirmDialog';
 import { SectionLoader } from './CordiaLoader';
 import { apiFetch } from '../lib/api';
-import { canvasStatus, displayDate } from '../lib/canvas';
+import { canvasStatus, disconnectCanvas, displayDate, syncCanvas } from '../lib/canvas';
+import { loadFolders } from '../lib/folders';
 import CanvasConnectSheet from './CanvasConnectSheet';
 import CanvasCourseList from './CanvasCourseList';
 import Toggle from './Toggle';
@@ -21,6 +22,7 @@ import NotionHome from './NotionHome';
 import Link from 'next/link';
 import { TRY } from '../lib/connectorGuide';
 import { openNewSheet } from '../lib/newSheet';
+import { EXTRA_CONNECTORS, EXTRA_CONNECTORS_ON } from '../lib/featureFlags';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // What each app does here, shown in its sheet.
@@ -43,6 +45,8 @@ const DETAILS = {
 // Apps that work in Classroom itself; the rest are for texting Cordia Assistant. Every app
 // connected here works in both.
 const CLASSROOM_APPS = ['gcal', 'apple_calendar', 'gtasks', 'gdrive', 'dropbox', 'gdocs', 'notion', 'gsheets', 'github', 'slack'];
+// Sheets, GitHub, Slack and Dropbox are hidden unless switched on (lib/featureFlags.js).
+const shown = connector => EXTRA_CONNECTORS_ON || !EXTRA_CONNECTORS.includes(connector.id);
 // Simple Icons has no mark for these; a plain icon stands in.
 const FALLBACK_ICONS = { outlook: Mail, ynab: Wallet };
 
@@ -108,7 +112,7 @@ function ImportSheet({ connector, onClose }) {
   const [classes, setClasses] = useState([]);
   const [target, setTarget] = useState('');
   const [added, setAdded] = useState(null);
-  useEffect(() => { apiFetch('/folders').then(data => setClasses(Array.isArray(data?.folders) ? data.folders : [])); }, []);
+  useEffect(() => { loadFolders().then(data => setClasses(Array.isArray(data?.folders) ? data.folders : [])); }, []);
   async function addToClass(file) {
     setBusy(file.id); setError(''); setAdded(null);
     const data = await addToLibrary(connector.id, { id: file.id, title: file.title, folderId: target });
@@ -218,7 +222,7 @@ export default function ConnectorsSettings() {
 
   async function syncCanvas() {
     setBusy('canvas'); setError('');
-    const data = await apiFetch('/canvas/sync', { method: 'POST' });
+    const data = await syncCanvas();
     setBusy('');
     if (data && 'connected' in data) { setCanvas(current => ({ ...current, status: data })); say('Canvas synced'); }
     else fail(data?.detail || "Canvas couldn't be reached. Try again.");
@@ -227,7 +231,7 @@ export default function ConnectorsSettings() {
   async function disconnectCanvas() {
     setCanvasRemoving(false);
     setBusy('canvas');
-    const data = await apiFetch('/canvas', { method: 'DELETE' });
+    const data = await disconnectCanvas();
     setBusy('');
     if (data && 'connected' in data) {
       await loadCanvas();
@@ -258,12 +262,13 @@ export default function ConnectorsSettings() {
 
   async function load() {
     const data = await apiFetch('/connectors');
-    if (Array.isArray(data?.connectors)) {
-      setConnectors(data.connectors);
-      if (data.connectors.some(item => item.connected)) walkthroughEvent('connector-connected');
+    const list = Array.isArray(data?.connectors) ? data.connectors.filter(shown) : null;
+    if (list) {
+      setConnectors(list);
+      if (list.some(item => item.connected)) walkthroughEvent('connector-connected');
     }
     else { setConnectors([]); setError(data?.detail || "Connectors couldn't load. Try again."); }
-    return data?.connectors || [];
+    return list || [];
   }
   useEffect(() => {
     if (!router.isReady) return;

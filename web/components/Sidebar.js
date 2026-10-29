@@ -14,6 +14,8 @@ import TutorBubble from './TutorBubble';
 import { openNewSheet } from '../lib/newSheet';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { classLabel } from '../lib/classLabel';
+import { latestFolders, loadFolders, onFoldersChanged } from '../lib/folders';
+import { HELP_EVENT } from '../lib/help';
 
 // One navigation: the same three places on the glass top bar and the mobile tab bar, plus New.
 // The Tutor is the bubble in the corner (TutorBubble). Calendar is its own place: study blocks and
@@ -38,8 +40,8 @@ const studyItems = [
   { label: 'Practice', href: '/library?tab=practice', icon: PencilRuler, here: (path, query) => path.startsWith('/practice') || onFilter('practice')(path, query) },
 ];
 const MAX_CLASSES = 8;
-// Classes for the sidebar, kept between pages so it doesn't flash empty on each navigation.
-let classCache = null;
+const sidebarClasses = folders => (folders || []).map(folder => ({ id: folder.id, name: classLabel(folder.name).title || 'Class' }))
+  .sort((a, b) => a.name.localeCompare(b.name));
 
 // Guides, notes, lectures, classes and every study screen live inside Library.
 const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice', '/nclex', '/folder', '/create', '/session', '/class', '/smartnotes', '/lecture'];
@@ -87,7 +89,7 @@ export default function Sidebar({ timerState, setTimerState }) {
   // Library and Canvas open into their own lists (Library: each class). Which are open is remembered.
   // Unset means "open while you're in it"; the caret sets it either way.
   const [groups, setGroups] = useState({ '/library': true });
-  const [classes, setClasses] = useState(classCache || []);
+  const [classes, setClasses] = useState(() => sidebarClasses(latestFolders()));
   useEffect(() => {
     try { const saved = JSON.parse(localStorage.getItem('cordiaSideGroups') || 'null'); if (saved) setGroups(saved); } catch { /* storage blocked */ }
   }, []);
@@ -98,19 +100,14 @@ export default function Sidebar({ timerState, setTimerState }) {
       return next;
     });
   }
-  // Classes load once, then again whenever Library or a class is opened (where they're added and renamed).
-  const onClassPages = router.pathname === '/library' || router.pathname.startsWith('/folder');
+  // Classes come from the shared folders list, and again whenever a class is added, renamed or deleted.
   useEffect(() => {
-    if (classCache && !onClassPages) return undefined;
     let live = true;
-    apiFetch('/folders').then(data => {
-      if (!live || !Array.isArray(data?.folders)) return;
-      classCache = data.folders.map(folder => ({ id: folder.id, name: classLabel(folder.name).title || 'Class' }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-      setClasses(classCache);
-    });
-    return () => { live = false; };
-  }, [onClassPages, router.asPath]);
+    const load = () => loadFolders().then(data => { if (live && Array.isArray(data?.folders)) setClasses(sidebarClasses(data.folders)); });
+    load();
+    const off = onFoldersChanged(load);
+    return () => { live = false; off(); };
+  }, []);
   const query = router.query || {};
   const subLink = (item, here) => (
     <li key={item.href}>
@@ -151,8 +148,11 @@ export default function Sidebar({ timerState, setTimerState }) {
       const typing = event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"]');
       if (event.key === '?' && !typing) setShowShortcuts(true);
     };
+    // Help opens from anywhere (Learn Cordia's "See all", old Settings links).
+    const onHelp = () => setShowHelp(true);
     window.addEventListener('keydown', onKey);
-    return () => { alive = false; window.removeEventListener('keydown', onKey); };
+    window.addEventListener(HELP_EVENT, onHelp);
+    return () => { alive = false; window.removeEventListener('keydown', onKey); window.removeEventListener(HELP_EVENT, onHelp); };
   }, []);
 
   // Closing returns focus to the avatar (Escape, choosing an item); an outside click leaves focus where it landed.
@@ -180,7 +180,7 @@ export default function Sidebar({ timerState, setTimerState }) {
   const accountItems = [
     { key: 'progress', label: 'Progress', icon: ChartNoAxesColumn, onSelect: () => router.push('/progress') },
     { key: 'profile', label: 'Settings', icon: Settings, onSelect: () => router.push('/settings') },
-    { key: 'appearance', label: 'Appearance', icon: Palette, onSelect: () => router.push('/settings?section=appearance') },
+    { key: 'appearance', label: 'Appearance', icon: Palette, onSelect: () => router.push('/settings?section=account') },
     { key: 'plan', label: 'Plan', icon: CreditCard, onSelect: () => router.push('/settings?section=plan') },
     { key: 'connectors', label: 'Connectors', icon: Link2, onSelect: () => router.push('/settings?section=connectors') },
     { key: 'help', label: 'Help', icon: CircleHelp, onSelect: () => setShowHelp(true) },

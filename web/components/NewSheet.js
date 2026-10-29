@@ -5,6 +5,7 @@ import {
   ArrowLeft, Brain, Check, ClipboardPaste, FileImage, FileText, Layers, Link as LinkIcon, Mic, Minimize2, NotebookPen, PencilRuler, Presentation, Sparkles, Upload, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../lib/api';
+import { loadFolders } from '../lib/folders';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 import { dismissGuideJob, startGuideJob, useGuideJobs } from '../lib/guideJobs';
 import { newGuideHref } from '../lib/checkYourself';
@@ -195,7 +196,7 @@ export default function NewSheet() {
 
   useEffect(() => {
     if (!open) return undefined;
-    apiFetch('/folders').then(data => setFolders(data?.folders || []));
+    loadFolders().then(data => setFolders(data?.folders || []));
     const onKey = event => { if (event.key === 'Escape') close(); };
     window.addEventListener('keydown', onKey);
     sheetRef.current?.querySelector('button, input, textarea')?.focus();

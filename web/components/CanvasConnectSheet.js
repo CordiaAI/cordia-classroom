@@ -2,8 +2,8 @@ import BodyPortal from './BodyPortal';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Check, ClipboardPaste, Copy, ExternalLink, KeyRound, X } from 'lucide-react';
-import { apiFetch, apiErrorMessage } from '../lib/api';
-import { canvasHost, schoolPolicy, termEndDate } from '../lib/canvas';
+import { apiErrorMessage } from '../lib/api';
+import { canvasHost, connectCanvas, schoolPolicy, termEndDate } from '../lib/canvas';
 import CanvasCourseList from './CanvasCourseList';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
@@ -65,10 +65,7 @@ export default function CanvasConnectSheet({ school = '', initialDomain = '', on
     if (!host || !token.trim() || !understood || busy) return;
     setBusy(true);
     setError('');
-    const data = await apiFetch('/canvas/connect', {
-      method: 'POST',
-      body: JSON.stringify({ canvas_url: host, token: token.trim(), expires_at: expires || null, acknowledged: understood }),
-    });
+    const data = await connectCanvas({ canvas_url: host, token: token.trim(), expires_at: expires || null, acknowledged: understood });
     setToken('');
     setBusy(false);
     if (data?.connected) {

@@ -8,7 +8,7 @@ import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../component
 import Menu from '../../components/Menu';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import MergeLectures from '../../components/MergeLectures';
-import { apiFetch } from '../../lib/api';
+import { loadFolders } from '../../lib/folders';
 import { useRequireAuth } from '../../lib/auth';
 import useSessionTracker from '../../lib/useSessionTracker';
 import { startGuideJob } from '../../lib/guideJobs';
@@ -50,7 +50,7 @@ export default function LecturePage() {
       if (result?.lecture) setData(result);
       else setError(result?.detail || "This lecture couldn't be loaded.");
     });
-    apiFetch('/folders').then(result => setFolders(result?.folders || []));
+    loadFolders().then(result => setFolders(result?.folders || []));
   }, [ready, id]);
 
   // Every lecture gets notes: written here if AI didn't run when it was saved, and filed in Notes.

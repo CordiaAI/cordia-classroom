@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { RefreshCw, Settings2 } from 'lucide-react';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
-import { apiErrorMessage, apiFetch } from '../lib/api';
-import { canvasStatus } from '../lib/canvas';
+import { apiErrorMessage } from '../lib/api';
+import { canvasStatus, syncCanvas } from '../lib/canvas';
+import { loadFolders } from '../lib/folders';
 import CanvasClasses from '../components/CanvasClasses';
 import CanvasConnectButton from '../components/CanvasConnectButton';
 import { LoadingArea, Reveal, useLoadGate } from '../components/CordiaLoader';
@@ -25,7 +26,7 @@ export default function CanvasPage() {
   // The classes and their Cordia covers arrive together, so the page appears once, whole.
   useEffect(() => {
     if (!ready) return;
-    Promise.all([canvasStatus(), apiFetch('/folders').catch(() => null)]).then(([next, folderData]) => {
+    Promise.all([canvasStatus(), loadFolders().catch(() => null)]).then(([next, folderData]) => {
       setFolders(folderData?.folders || []);
       setStatus(next);
     });
@@ -37,7 +38,7 @@ export default function CanvasPage() {
   async function syncNow() {
     setSyncing(true);
     setError('');
-    const data = await apiFetch('/canvas/sync', { method: 'POST' });
+    const data = await syncCanvas();
     setSyncing(false);
     if (data && 'connected' in data) setStatus(data);
     else setError(apiErrorMessage(data?.detail, 'Canvas could not be reached.'));

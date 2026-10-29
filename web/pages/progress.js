@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api';
+import { loadFolders } from '../lib/folders';
 import { useRequireAuth } from '../lib/auth';
 import { semesterStart, streakWithFreeze } from '../lib/activity';
 import Heatmap from '../components/Heatmap';
@@ -26,7 +27,7 @@ export default function Progress() {
     const tz = -new Date().getTimezoneOffset();
     const keep = (key, read) => promise => promise.catch(() => null).then(value => setData(current => ({ ...current, [key]: read(value) })));
     keep('guides', value => value?.guides || [])(apiFetch('/guides?fields=summary&limit=500'));
-    keep('folders', value => value?.folders || [])(apiFetch('/folders'));
+    keep('folders', value => value?.folders || [])(loadFolders());
     keep('streak', value => (value && !value.detail ? value : null))(apiFetch('/stats/streak?tz_offset=' + tz));
     keep('overview', value => (value && !value.detail ? value : null))(apiFetch('/stats/overview'));
     keep('activity', value => (value && Array.isArray(value.recent) ? value : null))(apiFetch('/stats/activity?tz_offset=' + tz));
