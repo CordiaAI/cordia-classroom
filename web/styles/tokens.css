@@ -38,6 +38,9 @@
   --olive-press: #3D4937;
   --olive-ink: #536149;                    /* olive used as text or icon */
   --olive-tint: rgba(83, 97, 73, 0.12);
+  --glow-size: 520px;                      /* the cursor glow (motion.css) */
+  --glow-a: rgba(83, 97, 73, 0.24);
+  --glow-b: rgba(142, 174, 208, 0.16);
   --on-olive: #FFFFFF;
   --success: #2F6B3F;
   --success-bg: rgba(57, 114, 75, 0.12);
@@ -206,6 +209,8 @@
   --olive-press: #3D4937;
   --olive-ink: #CFDAC3;
   --olive-tint: rgba(195, 207, 182, 0.12);
+  --glow-a: rgba(195, 207, 182, 0.16);
+  --glow-b: rgba(142, 174, 208, 0.10);
   --success: #8FD1A0;
   --success-bg: rgba(143, 209, 160, 0.14);
   --warning: #F2C14E;

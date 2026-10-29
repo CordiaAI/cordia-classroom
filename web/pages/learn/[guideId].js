@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Brain, CalendarClock, Check, Eye, GraduationCap, Layers, ListChecks, PenLine, Play, Repeat, Shuffle, Target, TextCursorInput, Timer } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Brain, CalendarClock, Check, GraduationCap, Layers, ListChecks, PenLine, Play, Repeat, Shuffle, Target, TextCursorInput, Timer } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import useSessionTracker from '../../lib/useSessionTracker';
@@ -17,12 +17,12 @@ import { applyTest } from '../../lib/timedTest.mjs';
 import { needsStudySet } from '../../lib/studySet.mjs';
 import { makeStudySet } from '../../lib/autoStudySet';
 import TimedTest from '../../components/TimedTest';
-import { FillCard, McCard, WrittenCard } from '../../components/RetainCards';
+import { ClozeCard, FillCard, McCard, WrittenCard } from '../../components/RetainCards';
 import CordiaLoader, { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import Toggle from '../../components/Toggle';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
-const TYPE_NAMES = { mc: 'Choose', fill: 'Type it', written: 'Explain it', self: 'Flashcard' };
+const TYPE_NAMES = { mc: 'Choose', fill: 'Type it', written: 'Type it', cloze: 'Fill the blank', self: 'Flashcard' };
 const LEVEL_CLASS = ['is-new', 'is-learning', 'is-familiar', 'is-mastered'];
 const localKey = id => 'cordiaLearn:' + id;
 const SURE_KEY = 'cordiaLearnAskSure';
@@ -30,8 +30,8 @@ const TYPES_KEY = 'cordiaLearnTypes';
 // The ways to learn, like Quiz's question types.
 const WAYS = {
   mc: { label: 'Choice', icon: ListChecks, note: 'Pick from four' },
-  fill: { label: 'Type it', icon: TextCursorInput, note: 'Short answers' },
-  written: { label: 'Written', icon: PenLine, note: 'Explain it, AI checks' },
+  type: { label: 'Type it', icon: PenLine, note: 'Answer from memory' },
+  cloze: { label: 'Fill the blank', icon: TextCursorInput, note: 'Type the missing word' },
   self: { label: 'Flashcards', icon: Layers, note: 'Flip and be honest' },
 };
 
@@ -48,30 +48,57 @@ function whenLabel(plan) {
   return `${days} to go. Master about ${plan.perDay} a day to be ready the day before.`;
 }
 
-// When a written answer can't be checked by AI: show the answer and let the student say how it went.
-function SelfCheckCard({ card, question, onResult, onNext }) {
-  const [shown, setShown] = useState(false);
+// Flashcards: the question on the front; flip it (tap or Space) to see the answer, then say
+// honestly whether you knew it (1 / 2). Also used when a written answer can't be checked by AI.
+function FlipCard({ card, question, onResult, onNext }) {
+  const [flipped, setFlipped] = useState(false);
   const [done, setDone] = useState(null);
   const timing = useAnswerTiming();
-  // The answer is recalled before "Show answer"; that's when it's timed.
-  function show() {
-    timing.done();
-    setShown(true);
+  const answerText = conceptAnswer(question);
+
+  function flip() {
+    if (done !== null) return;
+    timing.done(); // the answer is recalled before the first flip; that's when it's timed
+    setFlipped(value => !value);
   }
   function mark(credit) {
+    if (!flipped || done !== null) return;
     setDone(credit);
     onResult([{ concept: card.concepts[0], credit, response: '', timing: timing.done() }]);
   }
+
+  useEffect(() => {
+    function onKey(event) {
+      if (event.target.closest?.('input, textarea, [contenteditable="true"]') || event.metaKey || event.ctrlKey) return;
+      if (event.key === ' ' && done === null) { event.preventDefault(); flip(); }
+      else if (event.key === '1') mark(0);
+      else if (event.key === '2') mark(1);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   return (
     <>
-      <div className="quiz-question-text">{question.question}</div>
-      <p className="c-meta">Say or write the answer to yourself, then check it.</p>
-      {!shown && <button type="button" className="c-btn c-btn--secondary" onClick={show}><Eye {...ICON} />Show answer</button>}
-      {shown && <p className="retain-guide-answer"><span>Answer</span>{conceptAnswer(question)}</p>}
-      {shown && done === null && (
-        <div className="quiz-next-row">
-          <button type="button" className="c-btn c-btn--secondary" onClick={() => mark(0)}>I missed it</button>
-          <button type="button" className="c-btn c-btn--primary" onClick={() => mark(1)}>I got it</button>
+      <button type="button" className={'learn-flip' + (flipped ? ' is-flipped' : '')} onClick={flip} disabled={done !== null}
+        aria-label={flipped ? `Answer: ${answerText}` : `${question.question}. Flip to see the answer`}>
+        <span className="learn-flip-inner">
+          <span className="learn-flip-face learn-flip-front" aria-hidden={flipped}>
+            <small>Question</small>
+            <span className="learn-flip-text">{question.question}</span>
+            <span className="c-meta">Think of the answer, then flip · <kbd>Space</kbd></span>
+          </span>
+          <span className="learn-flip-face learn-flip-back" aria-hidden={!flipped}>
+            <small>Answer</small>
+            <span className="learn-flip-text">{answerText}</span>
+          </span>
+        </span>
+      </button>
+      {flipped && done === null && (
+        <div className="quiz-next-row learn-flip-marks">
+          <span className="c-meta">Did you know it?</span>
+          <button type="button" className="c-btn c-btn--secondary" onClick={() => mark(0)}>I missed it <kbd>1</kbd></button>
+          <button type="button" className="c-btn c-btn--primary" onClick={() => mark(1)}>I got it <kbd>2</kbd></button>
         </div>
       )}
       {done !== null && <div className="quiz-next-row"><button type="button" className="c-btn c-btn--primary quiz-next" onClick={onNext} autoFocus>Next</button></div>}
@@ -388,7 +415,8 @@ export default function LearnPage() {
           {card.type === 'mc' && <McCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
           {card.type === 'fill' && <FillCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
           {card.type === 'written' && <WrittenCard key={card.id} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} onSwitch={switchToSelf} />}
-          {card.type === 'self' && <SelfCheckCard key={card.id + '-self'} card={retainCard} question={question} onResult={onResult} onNext={onNext} />}
+          {card.type === 'cloze' && <ClozeCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
+          {card.type === 'self' && <FlipCard key={card.id + '-self'} card={retainCard} question={question} onResult={onResult} onNext={onNext} />}
         </div>
       )}
 
@@ -447,6 +475,20 @@ export default function LearnPage() {
         .learn-ways { display: grid; gap: 10px; }
         .learn-ways h2, .learn-ways .c-meta { margin: 0; }
         .learn-way-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+        .learn-flip { display: block; width: 100%; margin: 4px 0 14px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: center; cursor: pointer; perspective: 1400px; }
+        .learn-flip:disabled { cursor: default; }
+        .learn-flip:focus-visible { outline: none; }
+        .learn-flip:focus-visible .learn-flip-face { box-shadow: 0 0 0 3px var(--olive-tint); }
+        .learn-flip-inner { position: relative; display: grid; min-height: 240px; transform-style: preserve-3d; transition: transform 520ms var(--ease); }
+        .learn-flip.is-flipped .learn-flip-inner { transform: rotateY(180deg); }
+        .learn-flip-face { grid-area: 1 / 1; display: grid; align-content: center; justify-items: center; gap: 14px; padding: 28px 24px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+        .learn-flip-back { transform: rotateY(180deg); background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--card); }
+        .learn-flip-face small { color: var(--muted); font: 600 12px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; }
+        .learn-flip-text { max-width: 36ch; color: var(--ink); font: 500 22px/1.4 var(--font-sans); }
+        .learn-flip:not(:disabled):hover .learn-flip-face { border-color: var(--olive); }
+        .learn-flip-marks { align-items: center; }
+        .learn-flip-marks .c-meta { margin-right: auto; }
+        @media (prefers-reduced-motion: reduce) { .learn-flip-inner { transition: none; } }
         .learn-way { display: grid; justify-items: center; align-content: center; gap: 6px; min-height: 112px; padding: 12px 8px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 15px/1.2 var(--font-sans); text-align: center; cursor: pointer; }
         .learn-way .lucide { color: var(--olive-ink); }
         .learn-way small { color: var(--muted); font: 500 12px/1.3 var(--font-sans); }

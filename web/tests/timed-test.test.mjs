@@ -15,9 +15,11 @@ test('every idea with an answer is asked once, in a mix of the chosen ways that 
   items.filter(item => item.type === 'fill').forEach(item => assert.ok([0, 2].includes(item.concept)));
 });
 
-test('flashcards alone become choices, and short answers are never typed when only long ones fit', () => {
+test('flashcards alone become choices; Type it writes long answers; Fill the blank needs a long enough answer', () => {
   assert.ok(buildTest(questions, ['self'], 3).every(item => item.type === 'mc'));
-  assert.deepEqual(buildTest([long], ['fill'], 1).map(item => item.type), ['mc']);
+  assert.deepEqual(buildTest([long], ['type'], 1).map(item => item.type), ['written']);
+  assert.deepEqual(buildTest([long], ['cloze'], 1).map(item => item.type), ['cloze']);
+  assert.deepEqual(buildTest([term], ['cloze'], 1).map(item => item.type), ['fill']);
 });
 
 test('the clock: a minute per question by default, and the student can pick half or two', () => {
@@ -35,6 +37,8 @@ test('choices and typed answers are marked locally; written ones wait for AI', (
   assert.equal(markLocal({ type: 'fill' }, term, 'mitochondria'), 1);
   assert.equal(markLocal({ type: 'fill' }, term, ''), 0);
   assert.equal(markLocal({ type: 'written' }, long, 'Because of competition'), null);
+  assert.equal(markLocal({ type: 'cloze' }, long, 'compete'), 0);
+  assert.equal(markLocal({ type: 'cloze' }, long, 'sellers'), 1, 'the blank is the answer\'s longest meaningful word');
 });
 
 test('score counts unanswered as missed and leaves unchecked answers out', () => {

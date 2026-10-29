@@ -13,7 +13,7 @@ export const MAX_QUEUED = 200;
 export const MAX_TRIES = 5;
 
 // Card types in the app -> learning_events.format.
-const FORMATS = { mc: 'choice', fill: 'typed', written: 'written', self: 'flashcard', flashcard: 'flashcard', matching: 'pairs', pairs: 'pairs', practice: 'practice' };
+const FORMATS = { mc: 'choice', fill: 'typed', written: 'written', cloze: 'fill_free', self: 'flashcard', flashcard: 'flashcard', matching: 'pairs', pairs: 'pairs', practice: 'practice' };
 
 export function formatFor(type) {
   return FORMATS[type] || null;

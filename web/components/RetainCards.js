@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../lib/api';
 import { BookOpen, MessageCircle, Sparkles } from 'lucide-react';
 import { requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { noteView, useAnswerTiming } from '../lib/learningEvents';
 import { conceptAnswer, fillMatches, normalize, shuffled } from '../lib/retainEngine.mjs';
+import { makeCloze } from '../lib/learnEngine.mjs';
 
 // A wrong answer of any type opens the Tutor's "why was I wrong" help.
 // The context for "why was I wrong", sent when the student taps Ask why.
@@ -221,6 +222,69 @@ export function FillCard({ card, question, guideId, onResult, onNext, askSure = 
       {right !== null && (
         <p className={'retain-feedback ' + (right ? 'right' : 'wrong')} role="status">
           {right ? <>Right: <strong>{answer}</strong></> : <>Answer: <strong>{answer}</strong></>}
+        </p>
+      )}
+      {explained && <MissFeedback guideId={guideId} card={card} question={question} chosen={value.trim()} sure={confidence === 'sure'} />}
+      {right !== null && <NextButton onNext={onNext} missed={!right} onExplain={explained ? null : () => setExplained(true)} />}
+    </form>
+  );
+}
+
+// Fill the blank: the answer with its key word missing (learnEngine.makeCloze); the student types
+// the word. An answer too short to blank is asked whole.
+export function ClozeCard({ card, question, guideId, onResult, onNext, askSure = true }) {
+  const cloze = useMemo(() => makeCloze(conceptAnswer(question)), [question]);
+  const [value, setValue] = useState('');
+  const [right, setRight] = useState(null);
+  const [asking, setAsking] = useState(false);
+  const [confidence, setConfidence] = useState('');
+  const [explained, setExplained] = useState(false);
+  const timing = useAnswerTiming();
+  if (!cloze) return <FillCard card={card} question={question} guideId={guideId} onResult={onResult} onNext={onNext} askSure={askSure} />;
+
+  function reveal(level = '') {
+    setAsking(false);
+    setConfidence(level);
+    const correct = fillMatches(value, cloze.missing);
+    setRight(correct);
+    if (!correct) askTutorAboutMiss(guideId, question, value.trim());
+    onResult([{ concept: card.concepts[0], credit: correct ? 1 : 0, response: value.trim(), timing: timing.done(), answerChars: value.trim().length, ...(level ? { confidence: level } : {}) }]);
+  }
+
+  function check(event) {
+    event.preventDefault();
+    if (right !== null || !value.trim()) return;
+    timing.done();
+    if (card.reask || !askSure) reveal();
+    else setAsking(true);
+  }
+
+  return (
+    <form onSubmit={check}>
+      <div className="quiz-question-text">{question.question}</div>
+      <p className="retain-cloze">
+        {cloze.before}
+        <span className={'retain-cloze-blank' + (right === true ? ' right' : right === false ? ' wrong' : '')}>{right === null ? <span aria-label="missing word">______</span> : cloze.missing}</span>
+        {cloze.after}
+      </p>
+      <div className="retain-fill-row">
+        <input
+          className={'retain-fill-input' + (right === true ? ' right' : right === false ? ' wrong' : '')}
+          value={value}
+          onChange={event => setValue(event.target.value)}
+          onKeyDown={timing.key}
+          placeholder="The missing word"
+          aria-label="The missing word"
+          readOnly={right !== null || asking}
+          autoFocus
+          autoComplete="off"
+        />
+        {right === null && !asking && <button type="submit" className="c-btn c-btn--primary" disabled={!value.trim()}>Check</button>}
+      </div>
+      {asking && <ConfidencePrompt onPick={reveal} />}
+      {right !== null && (
+        <p className={'retain-feedback ' + (right ? 'right' : 'wrong')} role="status">
+          {right ? <>Right: <strong>{cloze.missing}</strong></> : <>The word: <strong>{cloze.missing}</strong></>}
         </p>
       )}
       {explained && <MissFeedback guideId={guideId} card={card} question={question} chosen={value.trim()} sure={confidence === 'sure'} />}

@@ -105,23 +105,25 @@ const term = { question: 'What organelle makes ATP?', options: ['Mitochondria', 
 const long = { question: 'Why does the market price fall when supply rises?', options: ['Sellers compete for the same buyers, so each must offer a lower price to make a sale', 'x', 'y', 'z'], correct_index: 0 };
 
 test('Learn\'s format decision records the candidates, what was ruled out and why', () => {
-  const fresh = formatDecision(term, { l: NEW }, '2026-10-28', ['mc', 'fill', 'written']);
+  const fresh = formatDecision(term, { l: NEW }, '2026-10-28', ['mc', 'type']);
   assert.equal(fresh.chosen, 'mc');
-  assert.deepEqual(fresh.candidates, ['mc', 'fill', 'written', 'self']);
-  assert.deepEqual(fresh.mask, { self: 'turned_off' });
-  assert.deepEqual(fresh.eligible, ['mc', 'fill', 'written']);
+  assert.deepEqual(fresh.candidates, ['mc', 'fill', 'written', 'cloze', 'self']);
+  assert.deepEqual(fresh.mask, { written: 'short_answer', cloze: 'turned_off', self: 'turned_off' });
+  assert.deepEqual(fresh.eligible, ['mc', 'fill']);
   assert.equal(fresh.source, 'rule');
   assert.equal(fresh.recall, false);
 
-  const recall = formatDecision(long, { l: FAMILIAR }, '2026-10-28', ['mc', 'fill', 'written']);
+  const recall = formatDecision(long, { l: FAMILIAR }, '2026-10-28', ['mc', 'type', 'cloze']);
   assert.equal(recall.chosen, 'written');
   assert.equal(recall.mask.fill, 'long_answer');
+  assert.equal(recall.mask.cloze, undefined);
   assert.equal(recall.recall, true);
 
   const onlyChoice = formatDecision(long, { l: FAMILIAR }, '2026-10-28', ['mc']);
   assert.equal(onlyChoice.chosen, 'mc');
   assert.equal(onlyChoice.source, 'student', 'the student\'s own settings left one format');
 
-  const again = formatDecision(term, { l: FAMILIAR }, '2026-10-28', ['mc', 'fill'], 'mc');
+  const again = formatDecision(term, { l: FAMILIAR }, '2026-10-28', ['mc', 'type'], 'mc');
   assert.equal(again.chosen, 'mc', 'a repeat after a miss keeps the format it was asked in');
+  assert.equal(formatFor('cloze'), 'fill_free');
 });
