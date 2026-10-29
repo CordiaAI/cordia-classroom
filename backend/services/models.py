@@ -102,7 +102,6 @@ FEATURES = {
     "retain_why": CallSpec(LIGHT, 250),
     "practice_classify": CallSpec(LIGHT, 100),
     "quiz_distractors": CallSpec(LIGHT, 4096),
-    "smart_notes_diagram": CallSpec(LIGHT, 2000),
     "study_aid": CallSpec(LIGHT, 700),
     "study_aid_check": CallSpec(LIGHT, 250),
     "assignment_plan": CallSpec(LIGHT, 700),

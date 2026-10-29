@@ -15,7 +15,6 @@ from services.tutor_sessions import (
     public_tutor_session,
     start_tutor_chat,
     update_browser_context,
-    update_tutor_skill,
     tutor_browser_content,
 )
 
@@ -80,11 +79,6 @@ class NewTutorChat(BaseModel):
     resume_id: Optional[str] = Field(default=None, max_length=36)
 
 
-class TutorSkillUpdate(BaseModel):
-    session_id: str = Field(..., max_length=36)
-    skill: str = Field(..., max_length=30)
-
-
 @router.get("/session")
 def current_tutor_session(authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
@@ -102,12 +96,6 @@ def browser_context(body: BrowserContextUpdate, authorization: str = Header(defa
     user_id = get_user_id(authorization)
     row = update_browser_context(user_id, body.session_id, body.model_dump())
     return public_tutor_session(row)
-
-
-@router.patch("/session/skill")
-def tutor_skill(body: TutorSkillUpdate, authorization: str = Header(default="")):
-    user_id = get_user_id(authorization)
-    return public_tutor_session(update_tutor_skill(user_id, body.session_id, body.skill))
 
 
 @router.get("/chats")
