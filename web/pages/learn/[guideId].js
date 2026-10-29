@@ -10,8 +10,9 @@ import { rememberRetainMisses } from '../../lib/userStore';
 import { conceptAnswer } from '../../lib/retainEngine.mjs';
 import {
   FAMILIAR, LEARNING, LEVELS, MASTERED,
-  DEFAULT_TYPES, LEARN_TYPES, advance, answer, cleanTypes, counts, createRound, currentCard, dayKey, linkedTestDate, readiness, restoreLevels, saveableLevels, testPlan,
+  DEFAULT_TYPES, LEARN_TYPES, advance, answer, cleanTypes, counts, createRound, currentCard, dayKey, formatDecision, linkedTestDate, readiness, restoreLevels, saveableLevels, testPlan,
 } from '../../lib/learnEngine.mjs';
+import { logAnswer, logFormatDecision, useAnswerTiming } from '../../lib/learningEvents';
 import { applyTest } from '../../lib/timedTest.mjs';
 import { needsStudySet } from '../../lib/studySet.mjs';
 import { makeStudySet } from '../../lib/autoStudySet';
@@ -51,15 +52,21 @@ function whenLabel(plan) {
 function SelfCheckCard({ card, question, onResult, onNext }) {
   const [shown, setShown] = useState(false);
   const [done, setDone] = useState(null);
+  const timing = useAnswerTiming();
+  // The answer is recalled before "Show answer"; that's when it's timed.
+  function show() {
+    timing.done();
+    setShown(true);
+  }
   function mark(credit) {
     setDone(credit);
-    onResult([{ concept: card.concepts[0], credit, response: '' }]);
+    onResult([{ concept: card.concepts[0], credit, response: '', timing: timing.done() }]);
   }
   return (
     <>
       <div className="quiz-question-text">{question.question}</div>
       <p className="c-meta">Say or write the answer to yourself, then check it.</p>
-      {!shown && <button type="button" className="c-btn c-btn--secondary" onClick={() => setShown(true)}><Eye {...ICON} />Show answer</button>}
+      {!shown && <button type="button" className="c-btn c-btn--secondary" onClick={show}><Eye {...ICON} />Show answer</button>}
       {shown && <p className="retain-guide-answer"><span>Answer</span>{conceptAnswer(question)}</p>}
       {shown && done === null && (
         <div className="quiz-next-row">
@@ -107,6 +114,9 @@ export default function LearnPage() {
   const [askSure, setAskSure] = useState(true);
   const [types, setTypes] = useState(DEFAULT_TYPES);
   const roundStart = useRef(Date.now());
+  const sessionStart = useRef(Date.now());
+  // Each card's logged format decision, by card id; its answer points at it.
+  const decisions = useRef({});
   const today = dayKey();
 
   useEffect(() => {
@@ -175,9 +185,28 @@ export default function LearnPage() {
     save(levels, value);
   }
 
+  // Logs why this card is asked in its format, before it shows (phase 1: fixed rules, no exploration).
+  function decide(card, reason = null) {
+    if (!card || (decisions.current[card.id] && !reason)) return;
+    const question = questions[card.concept];
+    const entry = levels[card.concept];
+    const decision = formatDecision(question, entry, today, types, card.type);
+    const daysToExam = testDate ? Math.round((new Date(testDate + 'T12:00:00') - new Date(today + 'T12:00:00')) / 86400000) : null;
+    decisions.current[card.id] = logFormatDecision({
+      guideId,
+      question: question.question,
+      decision,
+      context: {
+        level: entry.l, again: Boolean(card.again), days_to_exam: daysToExam,
+        minutes_in_session: Math.round((Date.now() - sessionStart.current) / 60000), ...(reason ? { reason } : {}),
+      },
+    });
+  }
+
   function startRound() {
     const next = createRound(questions, levels, today, types);
     if (!next.queue.length) return;
+    decide(currentCard(next));
     setRound(next);
     setRoundNumber(number => number + 1);
     setAnswered(false);
@@ -188,6 +217,10 @@ export default function LearnPage() {
   function onResult(results) {
     const [result] = results;
     const card = currentCard(round);
+    results.forEach(item => logAnswer({
+      guideId, question: questions[item.concept]?.question, mode: 'learn', type: card.type, credit: item.credit,
+      confidence: item.confidence, timing: item.timing, answerChars: item.answerChars, decisionId: decisions.current[card.id],
+    }));
     const next = answer(levels, round, card, result.credit, { confidence: result.confidence || '', today });
     setLevels(next.levels);
     setRound(next.round);
@@ -197,7 +230,7 @@ export default function LearnPage() {
   function onNext() {
     const next = advance(round);
     setAnswered(false);
-    if (currentCard(next)) { setRound(next); return; }
+    if (currentCard(next)) { decide(currentCard(next)); setRound(next); return; }
     setRound(next);
     finishRound(next);
   }
@@ -218,12 +251,14 @@ export default function LearnPage() {
     setLevels(next);
     save(next);
     const missed = result.missed.map(item => questions[item.concept]);
+    result.logged?.forEach(item => logAnswer({ guideId, question: questions[item.concept]?.question, mode: 'timed_test', ...item }));
     rememberRetainMisses(guideId, missed.map(question => ({ question: question.question, answer: conceptAnswer(question) })).filter(item => item.question && item.answer));
     recordStudy({ guideId, guideTitle: title, minutes: result.used / 60, cards: result.total, right: result.right, total: result.checked, kind: 'quiz' });
   }
 
   // A written answer that can't be checked right now becomes a self-check.
   function switchToSelf() {
+    decide({ ...currentCard(round), type: 'self' }, 'grading_unavailable');
     setRound(current => ({ ...current, queue: current.queue.map((item, index) => (index === current.position ? { ...item, type: 'self' } : item)) }));
   }
 

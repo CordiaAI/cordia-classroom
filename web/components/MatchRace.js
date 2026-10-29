@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { conceptAnswer, shuffled } from '../lib/retainEngine.mjs';
 import { readUserValue, writeUserValue } from '../lib/userStore';
+import { logAnswer } from '../lib/learningEvents';
+import { answerTimer } from '../lib/learningEvents.mjs';
 import SessionFinish from './SessionFinish';
 import { prefersReducedMotion } from '../lib/motion';
 
@@ -50,6 +52,8 @@ export default function MatchRace({ questions, guideId, onRestart, onDone }) {
   const [attempts, setAttempts] = useState(0);
   const [over, setOver] = useState(false);
   const best = useRef(readUserValue('cordiaMatchBest', {})?.[guideId] || 0);
+  // Each try is timed from when its question was picked.
+  const pickTimer = useRef(null);
 
   const batch = useMemo(() => {
     if (!pool.length) return [];
@@ -68,6 +72,12 @@ export default function MatchRace({ questions, guideId, onRestart, onDone }) {
   }, [over]);
 
   useEffect(() => {
+    const onVisibility = () => pickTimer.current?.visibility(document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
+  useEffect(() => {
     if (!over) return;
     const all = readUserValue('cordiaMatchBest', {}) || {};
     if (matched > (all[guideId] || 0)) writeUserValue('cordiaMatchBest', { ...all, [guideId]: matched });
@@ -75,9 +85,14 @@ export default function MatchRace({ questions, guideId, onRestart, onDone }) {
 
   function choose(side, item) {
     if (over || cleared.has(item.id) || merging !== null) return;
-    if (side === 'q') { setPicked(item.id); return; }
+    if (side === 'q') { setPicked(item.id); pickTimer.current = answerTimer(() => performance.now(), document.hidden); return; }
     if (picked === null) return;
     setAttempts(value => value + 1);
+    logAnswer({
+      guideId, question: pool.find(entry => entry.id === picked)?.q, mode: 'match', type: 'pairs', credit: picked === item.id ? 1 : 0,
+      timing: pickTimer.current?.done() || null,
+    });
+    pickTimer.current = answerTimer(() => performance.now(), document.hidden); // a wrong try keeps the question picked
     if (picked === item.id) {
       const next = new Set(cleared);
       next.add(item.id);

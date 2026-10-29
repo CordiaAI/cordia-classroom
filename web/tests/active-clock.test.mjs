@@ -1,4 +1,4 @@
-// Study time is active time: a hidden tab or two idle minutes stop the clock, so a tab left open
+// Study time is active time: a hidden tab or an idle minute stops the clock, so a tab left open
 // overnight no longer logs 24 hours.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -30,9 +30,11 @@ test('time counts while the student is active', () => {
   clock.stop();
 });
 
-test('an idle page stops counting two minutes after the last input', () => {
+test('an idle page stops counting a minute after the last input', () => {
+  assert.equal(IDLE_MS, 60000);
   now = 0;
   const clock = activeClock();
+  now = minutes(1); input();
   now = minutes(2); input();
   now = minutes(60 * 8); // left open overnight
   assert.equal(clock.seconds(), (2 * 60000 + IDLE_MS) / 1000);
@@ -49,8 +51,11 @@ test('a hidden tab does not count', () => {
   now = minutes(300); // a background tab for hours
   assert.equal(clock.seconds(), 120);
   hide(false);
+  now = minutes(301); input();
   now = minutes(302); input();
   assert.equal(clock.seconds(), 240);
+  now = minutes(305); // three idle minutes: only the first counts
+  assert.equal(clock.seconds(), 300);
   clock.reset();
   assert.equal(clock.seconds(), 0);
   clock.stop();

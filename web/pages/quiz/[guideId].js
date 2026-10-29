@@ -3,6 +3,7 @@ import CordiaLoader, { LoadingArea, Reveal, useLoadGate } from '../../components
 import { useRouter } from 'next/router';
 import { apiFetch, openUpgrade } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
+import useSessionTracker from '../../lib/useSessionTracker';
 import { PRO_TYPES, TYPE_LABELS } from '../../lib/retainEngine.mjs';
 import { ArrowLeft, Lock, ListChecks, PenLine, Play, RefreshCw, Repeat, TextCursorInput, Shuffle as PairsIcon, Timer } from 'lucide-react';
 import MatchRace from '../../components/MatchRace';
@@ -38,6 +39,7 @@ export default function QuizPage() {
   // ?check=1: a new guide's "Check yourself", five quick questions that start on their own.
   const check = router.query.check === '1';
   const { ready } = useRequireAuth();
+  useSessionTracker('quiz', typeof guideId === 'string' ? guideId : null); // active time only
   const [types, setTypes] = useState(['mc']);
   const [plan, setPlan] = useState(null);
   const [session, setSession] = useState(null);
@@ -168,6 +170,7 @@ export default function QuizPage() {
           onRestart={() => (check ? start() : setSession(null))}
           onDone={() => { walkthroughEvent('guide-open'); router.push('/guide/' + guideId); }}
           doneLabel={check ? 'Read the guide' : undefined}
+          mode={check ? 'check' : 'quiz'}
         />
         </>
       ) : making ? (

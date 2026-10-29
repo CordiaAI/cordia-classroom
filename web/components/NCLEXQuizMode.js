@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { apiFetch } from '../lib/api';
 import { loadFolders } from '../lib/folders';
+import { logAnswer } from '../lib/learningEvents';
+import { answerTimer } from '../lib/learningEvents.mjs';
 
 export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -18,6 +20,17 @@ export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
 
   const q = questions[currentIndex];
   const isSata = q.type === 'sata';
+  // Each question is timed from when it shows to the answer (select-all: to Submit).
+  const timer = useRef(null);
+  useEffect(() => { timer.current = answerTimer(() => performance.now(), document.hidden); }, [currentIndex, questions]);
+  useEffect(() => {
+    const onVisibility = () => timer.current?.visibility(document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+  function logNclex(isCorrect) {
+    logAnswer({ guideId, question: q.stem, mode: 'nclex', type: 'mc', credit: isCorrect ? 1 : 0, timing: timer.current?.done() });
+  }
 
   function toggleSata(i) {
     if (answered) return;
@@ -33,6 +46,7 @@ export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
     const isCorrect =
       correctSet.size === selectedSet.size &&
       [...correctSet].every(i => selectedSet.has(i));
+    logNclex(isCorrect);
 
     const newAnswers = [...answers, {
       question_index: currentIndex,
@@ -51,6 +65,7 @@ export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
     if (answered) return;
     setSelected(i);
     const isCorrect = q.correct_indices.includes(i);
+    logNclex(isCorrect);
     const newAnswers = [...answers, {
       question_index: currentIndex,
       selected_indices: [i],

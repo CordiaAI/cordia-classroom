@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { AID_TABS, defaultAidTab } from '../lib/learningStyle';
+import { noteView } from '../lib/learningEvents';
 import MermaidDiagram from './MermaidDiagram';
 import NapkinVisual from './NapkinVisual';
 
@@ -252,6 +253,8 @@ export default function StudyAidPanel({ guideId, number, style, onClose, section
   const [tab, setTab] = useState(defaultAidTab(style));
   const cache = useRef({});
   const Aid = AIDS[tab];
+  // The view seen counts toward this question's next answer in the learning log.
+  useEffect(() => { noteView(guideId, section?.question, tab); }, [guideId, section?.question, tab]);
   return (
     <section className="study-aid-panel" aria-label="Learn it your way">
       <div className="study-aid-tabs" role="tablist">

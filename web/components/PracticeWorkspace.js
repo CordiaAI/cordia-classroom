@@ -4,9 +4,12 @@ import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { PRACTICE_FILES, readPracticeFile, takeUpload } from '../lib/practiceUpload';
 import { useRequireAuth } from '../lib/auth';
+import useSessionTracker from '../lib/useSessionTracker';
 import { LoadingArea } from './CordiaLoader';
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, Eraser, Eye, Flag, Hand, MessageCircle, PenLine, RefreshCw, Sparkles, Trash2, Type, Undo2, Upload, Video, VideoOff, Wand2 } from 'lucide-react';
 import { walkthroughEvent } from '../lib/walkthrough';
+import { logAnswer } from '../lib/learningEvents';
+import { answerTimer } from '../lib/learningEvents.mjs';
 import { drawLatestSegment, drawStroke, farEnough, finishStroke } from '../lib/airDraw.mjs';
 import AirDraw from './AirDraw';
 
@@ -44,6 +47,8 @@ export default function PracticeWorkspace() {
   const router = useRouter();
   const guideId = router.query.guideId || null;
   const { ready } = useRequireAuth();
+  // Practice is retrieval, so its active time is logged with quizzes (the Progress charts' kinds).
+  useSessionTracker('quiz', typeof guideId === 'string' ? guideId : null);
   const canvasRef = useRef(null);
   const boardRef = useRef(null);
   const drawing = useRef(false);
@@ -176,6 +181,14 @@ export default function PracticeWorkspace() {
   const sourceTitle = upload?.title || guide?.title || 'Study material';
   const sourceText = readableText(upload?.content || guide?.study_guide || guide?.notes);
   const current = problems[problemIndex];
+  // Each answer is timed from when the problem shows (or from the last check of it).
+  const answerClock = useRef(null);
+  useEffect(() => { answerClock.current = answerTimer(() => performance.now(), document.hidden); }, [problemIndex, problems]);
+  useEffect(() => {
+    const onVisibility = () => answerClock.current?.visibility(document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
   const currentTokens = tokens[problemIndex] || [];
   const sourceBlocks = sourceText ? sourceText.split(/\n\s*\n/).filter(block => block.trim()) : [];
 
@@ -441,6 +454,8 @@ export default function PracticeWorkspace() {
     const studentAnswer = String(answers[problemIndex] || '').trim();
     if (!current || !studentAnswer) return;
     const index = problemIndex;
+    const timing = answerClock.current?.done() || null;
+    answerClock.current = answerTimer(() => performance.now(), document.hidden);
     setGrading(true);
     const data = await apiFetch('/practice/grade', {
       method: 'POST',
@@ -458,6 +473,7 @@ export default function PracticeWorkspace() {
       return;
     }
     setEvaluations(all => ({ ...all, [index]: { status: data.correct ? 'correct' : 'retry', message: data.explanation } }));
+    if (guideId && !upload) logAnswer({ guideId, question: current.prompt, mode: 'practice', type: 'practice', credit: data.correct ? 1 : 0, timing, answerChars: studentAnswer.length });
     setRevealed(all => ({ ...all, [index]: true }));
     // The Tutor posts its reply to a missed answer; open it so the student sees it.
     if (!data.correct) window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { guideId, refresh: true } }));
@@ -640,6 +656,7 @@ export default function PracticeWorkspace() {
               className="c-input"
               value={answers[problemIndex] || ''}
               onChange={event => setAnswers(all => ({ ...all, [problemIndex]: event.target.value }))}
+              onKeyDown={() => answerClock.current?.key()}
               placeholder={current?.answer_format || 'Answer'}
               disabled={!current}
             />

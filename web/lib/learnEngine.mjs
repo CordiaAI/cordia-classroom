@@ -82,6 +82,25 @@ export function askCard(question, entry, today = dayKey(), types = DEFAULT_TYPES
   return { type: order.find(type => picked.includes(type)) || picked[0], recall };
 }
 
+// Why askCard chose what it did, for the decision log: every format, the ones ruled out and why,
+// and the one chosen. chosen overrides askCard (a missed question asked again in an easier type).
+// Phase 1 has no randomness: the rule picks one, so its probability is 1. When the student's own
+// picks leave a single format, the choice was theirs.
+export function formatDecision(question, entry, today = dayKey(), types = DEFAULT_TYPES, chosen = null) {
+  const picked = cleanTypes(types);
+  const asked = askCard(question, entry, today, types);
+  const type = chosen || asked.type;
+  const term = isTerm(question);
+  const mask = {};
+  LEARN_TYPES.forEach(option => {
+    if (!picked.includes(option)) mask[option] = 'turned_off';
+    else if (option === 'fill' && !term) mask[option] = 'long_answer';
+  });
+  delete mask[type]; // the fallback can use a format the length rule would skip
+  const eligible = LEARN_TYPES.filter(option => !mask[option]);
+  return { candidates: [...LEARN_TYPES], eligible, mask, chosen: type, recall: asked.recall, source: eligible.length === 1 ? 'student' : 'rule' };
+}
+
 export function askType(question, entry, today = dayKey(), types = DEFAULT_TYPES) {
   return askCard(question, entry, today, types).type;
 }
