@@ -384,3 +384,100 @@ body { touch-action: manipulation; }
   :is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options),
   :is(.c-sheet, .c-menu, .tutor-drawer) * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
 }
+
+/* ---------- Glass audit (every page, both themes): surfaces that were drawn flat ----------
+   Same recipe as the rest. !important because these components style themselves in scoped
+   (styled-jsx) rules that outrank a plain class here; only fill, edge and shadow change. */
+
+/* Tiles and buttons: Learn's ways and Test yourself, the New sheet, calendar items, Past chats,
+   the list / grid toggle. */
+:is(.learn-way, .new-option, .new-make-btn, .new-sample, .calendar-item, .tutor-past-chats, .c-viewtoggle, .plan-badge) {
+  background: var(--lg-sheen), var(--lg-fill) !important;
+  border-color: var(--lg-edge) !important;
+  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
+}
+:is(.learn-way, .new-option, .new-make-btn, .new-sample, .calendar-item, .tutor-past-chats):hover:not(:disabled) {
+  background: var(--lg-sheen), var(--lg-fill-strong) !important;
+}
+.c-viewtoggle { box-shadow: var(--lg-highlight) !important; }
+/* The calendar stays shadowless (asked for): glass fill and rim only, and study blocks keep
+   their olive left edge. */
+.calendar-item { box-shadow: var(--lg-highlight) !important; }
+.calendar-item-block { border-left-color: var(--olive) !important; }
+.c-viewtoggle .c-icon-btn[aria-pressed='true'] { background: var(--lg-sheen), var(--lg-fill-strong) !important; box-shadow: var(--lg-highlight), var(--lg-shadow) !important; }
+
+/* Tinted ones keep their tint, laid over the glass: study blocks, the sample, a chosen way. */
+:is(.calendar-item-block, .new-sample) {
+  background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--lg-sheen), var(--lg-fill) !important;
+}
+.learn-way.is-on { box-shadow: 0 0 0 2px var(--olive), var(--lg-highlight), var(--lg-shadow) !important; border-color: transparent !important; }
+
+/* Selected rows and tabs: a raised pane with the olive tint, not a flat tint. */
+:is(.c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-nav a[aria-current='page'], .c-search-hit.is-active, .c-side-account[aria-expanded='true']) {
+  background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--lg-sheen), var(--lg-fill-strong) !important;
+  border-color: var(--lg-edge) !important;
+  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
+}
+.c-seg [aria-checked='true'] {
+  background: var(--lg-sheen), var(--lg-fill-strong) !important;
+  border-color: var(--hairline) !important;
+  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
+}
+
+/* Primary actions everywhere, including Pricing's. A disabled button is a quiet pane of glass,
+   not a flat grey block. */
+.pricing-btn:not(.is-secondary):not(.is-current) {
+  background: var(--lg-sheen-olive), var(--olive) !important;
+  border: 1px solid var(--lg-edge) !important;
+  box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow) !important;
+}
+:is(.pricing-btn.is-secondary, .pricing-btn.is-current) {
+  background: var(--lg-sheen), var(--lg-fill) !important;
+  border-color: var(--lg-edge) !important;
+  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
+}
+:is(.c-btn, .btn, .btn-outline):disabled {
+  background: var(--lg-sheen), var(--lg-fill) !important;
+  border-color: var(--lg-edge) !important;
+  box-shadow: var(--lg-highlight) !important;
+  color: var(--muted) !important;
+}
+
+/* Panels: flashcard faces, the practice board and its toolbar, Create's settings. Card faces
+   flip in 3D, where a backdrop blur breaks the flip, so they keep fill, sheen and rim only. */
+:is(.fc-face, .learn-flip-face, .practice-board, .practice-toolbar, .create-split-settings) {
+  background: var(--lg-card) !important;
+  border-color: var(--lg-edge) !important;
+  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
+}
+:is(.practice-toolbar, .create-split-settings) {
+  -webkit-backdrop-filter: var(--lg-filter);
+  backdrop-filter: var(--lg-filter);
+}
+.learn-flip-back { background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--lg-card) !important; }
+
+/* Every text box is a field pane, whether or not it uses .c-input. */
+textarea:not(.c-input) {
+  background: var(--lg-sheen), var(--lg-fill-field) !important;
+  border: 1px solid var(--lg-edge) !important;
+  box-shadow: inset 0 1px 2px var(--lg-border-shade), inset 0 -1px 0 var(--lg-rim-low) !important;
+}
+
+/* Dialogs: Upgrade's plan options and buttons, Feedback's Cancel and close, the Tutor's Send. */
+:is(.upgrade-intervals button, .feedback-cancel, .feedback-close, .upgrade-later) {
+  background: var(--lg-sheen), var(--lg-fill) !important;
+  border: 1px solid var(--lg-edge) !important;
+  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
+}
+.upgrade-later { box-shadow: var(--lg-highlight) !important; }
+.upgrade-intervals button:is(.active, [aria-checked='true']) {
+  background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--lg-sheen), var(--lg-fill-strong) !important;
+  box-shadow: 0 0 0 2px var(--olive), var(--lg-highlight), var(--lg-shadow) !important;
+  border-color: transparent !important;
+}
+:is(.btn-upgrade, .cordia-tutor-send) {
+  background: var(--lg-sheen-olive), var(--olive) !important;
+  border: 1px solid var(--lg-edge) !important;
+  box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow) !important;
+}
+:is(.btn-upgrade, .cordia-tutor-send):hover:not(:disabled) { background: var(--lg-sheen-olive), var(--olive-press) !important; }
