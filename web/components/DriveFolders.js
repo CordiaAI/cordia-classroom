@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FolderSync, Search, X } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
+import { loadFolders } from '../lib/folders';
 import { classLabel } from '../lib/classLabel';
 import { walkthroughEvent } from '../lib/walkthrough';
 
@@ -26,7 +27,7 @@ export default function DriveFolders({ app = 'drive' }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([apiFetch(`${base}/links`), apiFetch('/folders')]).then(([linkData, folderData]) => {
+    Promise.all([apiFetch(`${base}/links`), loadFolders()]).then(([linkData, folderData]) => {
       setLinks(Array.isArray(linkData?.links) ? linkData.links : []);
       setClasses(Array.isArray(folderData?.folders) ? folderData.folders : []);
     });

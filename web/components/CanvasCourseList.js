@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { apiFetch, apiErrorMessage } from '../lib/api';
+import { canvasStatus, invalidateCanvasStatus } from '../lib/canvas';
 import Toggle from './Toggle';
 
 // Classes found in Canvas, each with an import toggle.
@@ -15,7 +16,7 @@ export default function CanvasCourseList({ courses = [], onChange }) {
     const data = await apiFetch(`/canvas/courses/${course.id}`, { method: 'PUT', body: JSON.stringify({ imported }) });
     setBusy(null);
     setPending(current => { const next = { ...current }; delete next[course.id]; return next; });
-    if (data?.courses) onChange?.(data);
+    if (data?.courses) { invalidateCanvasStatus(); onChange?.(data); }
     else setError(apiErrorMessage(data?.detail, 'Canvas could not be reached.'));
   }
 
@@ -26,7 +27,8 @@ export default function CanvasCourseList({ courses = [], onChange }) {
     const data = await apiFetch(`/canvas/courses/${course.id}/auto-import`, { method: 'PUT', body: JSON.stringify({ on }), timeoutMs: 120000 });
     setBusy(null);
     if (!Array.isArray(data?.auto_import)) { setError(apiErrorMessage(data?.detail, 'Canvas could not be reached.')); return; }
-    const status = await apiFetch('/canvas/status');
+    invalidateCanvasStatus();
+    const status = await canvasStatus();
     if (status?.courses) onChange?.(status);
   }
 

@@ -28,15 +28,6 @@ async function withStore(mode, run) {
 const save = item => withStore('readwrite', store => store.put(item)).catch(() => {});
 const remove = key => withStore('readwrite', store => store.delete(key)).catch(() => {});
 
-export async function savedChunks(recordingId) {
-  try {
-    const all = await withStore('readonly', store => store.getAll());
-    return (all || []).filter(item => item.recordingId === recordingId).sort((a, b) => a.seq - b.seq);
-  } catch {
-    return [];
-  }
-}
-
 function base64(text) {
   const bytes = new TextEncoder().encode(text || '');
   let binary = '';

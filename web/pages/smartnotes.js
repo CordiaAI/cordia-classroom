@@ -5,8 +5,7 @@ import { useRequireAuth } from '../lib/auth';
 import { domToOutline } from '../lib/outlineDoc';
 import { SectionLoader } from '../components/CordiaLoader';
 
-// Notes live in a guide's Outline now. This page only forwards old links:
-//   /smartnotes?id=new  -> a new guide that is just your notes
+// Notes live in a guide's Outline now (New › Note makes one). This page only forwards old links:
 //   /smartnotes?id=<id> -> that old note, moved into a guide (once; later visits open the guide)
 //   /smartnotes         -> Library
 export const NOTE_SOURCE = id => `note:${id}`;
@@ -58,14 +57,10 @@ export default function SmartNotesPage() {
     if (!ready || !router.isReady) return;
     setError('');
     const { id } = router.query;
-    if (!id) { router.replace('/library'); return; }
+    if (!id || id === 'new') { router.replace('/library'); return; }
     (async () => {
       try {
-        if (id === 'new') {
-          const saved = await apiFetch('/guides', { method: 'POST', body: JSON.stringify({ title: 'Untitled notes', notes: '', source_type: 'notes' }) });
-          if (!saved?.guide) throw new Error(apiErrorMessage(saved?.detail, 'A new page could not be made. Try again.'));
-          router.replace(`/guide/${saved.guide.id}`);
-        } else router.replace(`/guide/${await guideForNote(String(id))}`);
+        router.replace(`/guide/${await guideForNote(String(id))}`);
       } catch (caught) {
         setError(caught.message);
       }

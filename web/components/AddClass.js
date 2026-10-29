@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { apiFetch, apiErrorMessage } from '../lib/api';
+import { invalidateFolders } from '../lib/folders';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -45,7 +46,7 @@ export default function AddClass({ onAdded, onCancel, folderId = '', withName = 
       // Just a name: a private Library class with no shared sets.
       const data = await apiFetch('/folders', { method: 'POST', body: JSON.stringify({ name: name.trim() }) });
       setBusy(false);
-      if (data?.folder) onAdded({ folder: data.folder });
+      if (data?.folder) { invalidateFolders(); onAdded({ folder: data.folder }); }
       else setError(apiErrorMessage(data?.detail, 'Class not created.'));
       return;
     }
@@ -56,6 +57,7 @@ export default function AddClass({ onAdded, onCancel, folderId = '', withName = 
     });
     setBusy(false);
     if (data?.class) {
+      invalidateFolders();
       if (schoolText.trim()) try { localStorage.setItem('cordiaSchool', school?.name || schoolText.trim()); } catch {}
       onAdded({ class: data.class, folder: data.folder || null });
     } else setError(apiErrorMessage(data?.detail, 'Use a course code like MGT 300'));

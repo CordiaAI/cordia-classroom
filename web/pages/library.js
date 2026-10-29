@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../components/CordiaLoader';
+import { LoadingArea, Reveal, useLoadGate } from '../components/CordiaLoader';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
@@ -19,6 +19,7 @@ import LectureList from '../components/LectureList';
 import { openNewSheet } from '../lib/newSheet';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { classLabel } from '../lib/classLabel';
+import { invalidateFolders, loadFolders } from '../lib/folders';
 import { PRACTICE_FILES, handOffUpload, readPracticeFile } from '../lib/practiceUpload';
 import ClassCard from '../components/ClassCard';
 import ClassCoverSheet from '../components/ClassCoverSheet';
@@ -65,7 +66,6 @@ export default function LibraryPage() {
   const [guides, setGuides] = useState([]);
   const [notes, setNotes] = useState([]);
   const [lectures, setLectures] = useState([]);
-  const [cardSets, setCardSets] = useState(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('recent');
   const [closed, setClosed] = useState(() => new Set());
@@ -131,13 +131,6 @@ export default function LibraryPage() {
 
   useEffect(() => { if (ready) loadData(); }, [ready]);
 
-  // Due counts need each guide's cards, so the Flashcards filter loads them when opened.
-  useEffect(() => {
-    if (ready && filter === 'flashcards' && !cardSets) {
-      apiFetch('/guides?limit=100').then(data => setCardSets((data?.guides || []).filter(guide => guide.flashcards?.length)));
-    }
-  }, [ready, filter, cardSets]);
-
   // The notes editor's "Delete note" lands here, so the delete gets the same Undo as guides.
   useEffect(() => {
     const id = String(router.query.delete || '');
@@ -159,7 +152,7 @@ export default function LibraryPage() {
     setLoading(true);
     setLoadError('');
     const [foldersData, guidesData, notesData, lectureData, classData] = await Promise.all([
-      apiFetch('/folders'), apiFetch('/guides?fields=summary&limit=500'), apiFetch('/smart_notes'), listLectures().catch(() => null), apiFetch('/classes'),
+      loadFolders(), apiFetch('/guides?fields=summary&limit=500'), apiFetch('/smart_notes'), listLectures().catch(() => null), apiFetch('/classes'),
     ]);
     const failure = [foldersData, guidesData].find(data => !data || data.detail);
     if (failure) setLoadError(apiErrorMessage(failure?.detail, 'Your library could not be loaded.'));
@@ -213,6 +206,7 @@ export default function LibraryPage() {
       title: `Delete ${folder.name}?`,
       onConfirm: async () => {
         await Promise.all([apiFetch('/folders/' + folder.id, { method: 'DELETE' }), folder.class_id && apiFetch('/classes/' + folder.class_id, { method: 'DELETE' })]);
+        invalidateFolders();
         setConfirm(null);
         loadData();
       },
@@ -255,7 +249,6 @@ export default function LibraryPage() {
   // Every guide, note and lecture as one kind of row, filtered, searched and sorted.
   const items = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const cardsById = new Map((cardSets || []).map(guide => [guide.id, guide]));
     const rows = [];
     if (['all', 'guides', 'starred'].includes(filter)) {
       guides.forEach(guide => rows.push({ kind: 'guide', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/guide/' + guide.id, progress: guide.read_progress, starred: Boolean(guide.is_bookmarked), guide }));
@@ -264,7 +257,8 @@ export default function LibraryPage() {
       guides.forEach(guide => rows.push({ kind: 'practice', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/practice/' + guide.id }));
     }
     if (filter === 'flashcards') {
-      (cardSets || []).forEach(guide => rows.push({ kind: 'cards', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/flashcards/study?guideId=' + guide.id, due: dueCount(cardsById.get(guide.id)), total: guide.flashcards.length }));
+      // The list summary carries each guide's card count and progress, enough for the due count.
+      guides.filter(guide => Number(guide.flashcard_count) > 0).forEach(guide => rows.push({ kind: 'cards', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/flashcards/study?guideId=' + guide.id, due: dueCount(guide), total: guide.flashcard_count }));
     }
     if (filter === 'all') {
       // Older notes not yet moved into a guide; opening one moves it (pages/smartnotes.js).
@@ -280,7 +274,7 @@ export default function LibraryPage() {
     else if (sort === 'progress') list.sort((a, b) => (b.progress || 0) - (a.progress || 0));
     else list.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     return list;
-  }, [guides, notes, lectures, cardSets, filter, query, sort, pending?.id]);
+  }, [guides, notes, lectures, filter, query, sort, pending?.id]);
 
   if (!ready) return null;
 
@@ -468,7 +462,7 @@ export default function LibraryPage() {
       {addingClass && <AddClass withName onCancel={() => setAddingClass(false)} onAdded={classAdded} />}
       {addingLecture && <LectureList folders={folders} adding onAddingChange={setAddingLecture} showList={false} />}
 
-      {loading ? null : filter === 'flashcards' && !cardSets ? <SectionLoader height={240} label="Loading your flashcards" /> : (
+      {loading ? null : (
         <div className="c-stack" data-spot={filter === 'practice' ? 'practice-picker' : undefined}>
           {view === 'cards' && !narrowed && (groups.length > 0 || looseClasses.length > 0) && (
             <div className="lib-cards">
