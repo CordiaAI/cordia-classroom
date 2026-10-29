@@ -63,7 +63,7 @@ const FORMATS = [
 function MakeOptions({ onGo, onNote, busy }) {
   const guide = lastGuide();
   const items = [
-    { label: 'Quiz', icon: Brain, href: guide ? `/quiz/${guide.id}` : '/library' },
+    { label: 'Quiz', icon: Brain, href: guide ? `/quiz/${encodeURIComponent(guide.id)}` : '/library' },
     { label: 'Flashcards', icon: Layers, href: '/create' },
     { label: 'Practice', icon: PencilRuler, href: '/library?tab=practice' },
     { label: 'Note', icon: NotebookPen, note: true, event: 'note-created', spot: 'new-note' },

@@ -200,7 +200,7 @@ export default function Today() {
   const remembered = lastGuide();
   const continueGuide = (remembered && guides.find(guide => guide.id === remembered.id)) || overview.continueGuide;
   const continueHref = continueGuide
-    ? `/guide/${continueGuide.id}${remembered?.id === continueGuide.id && remembered.page ? `?page=${remembered.page + 1}` : ''}`
+    ? `/guide/${encodeURIComponent(continueGuide.id)}${remembered?.id === continueGuide.id && remembered.page ? `?page=${remembered.page + 1}` : ''}`
     : null;
   // Canvas deadlines plus to-dos confirmed from lectures, soonest first.
   const dueItems = mergeCalendarItems(calendar?.connected ? calendar.items || [] : [], data?.lectureItems || [])
@@ -290,8 +290,8 @@ export default function Today() {
               <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
             </Link>
             <span className="today-continue-study">
-              <Link href={'/learn/' + continueGuide.id} className="c-btn c-btn--secondary c-btn--sm"><GraduationCap size={18} strokeWidth={1.75} aria-hidden="true" />Learn</Link>
-              <Link href={'/flashcards/study?guideId=' + continueGuide.id} className="c-btn c-btn--secondary c-btn--sm"><Layers size={18} strokeWidth={1.75} aria-hidden="true" />Cards</Link>
+              <Link href={'/learn/' + encodeURIComponent(continueGuide.id)} className="c-btn c-btn--secondary c-btn--sm"><GraduationCap size={18} strokeWidth={1.75} aria-hidden="true" />Learn</Link>
+              <Link href={'/flashcards/study?guideId=' + encodeURIComponent(continueGuide.id)} className="c-btn c-btn--secondary c-btn--sm"><Layers size={18} strokeWidth={1.75} aria-hidden="true" />Cards</Link>
             </span>
           </div>
         </section>
