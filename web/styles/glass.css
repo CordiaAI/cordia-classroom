@@ -190,7 +190,9 @@ select.c-select.c-select {
   box-shadow: var(--lg-highlight);
   transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-.cordia-tutor-input:focus-within { outline: none; border-color: var(--olive); box-shadow: var(--lg-highlight), 0 0 0 3px var(--olive-tint); }
+.cordia-tutor-input:focus-within { border-color: var(--olive); box-shadow: var(--lg-highlight), 0 0 0 3px var(--olive-tint); }
+/* The field's box is this wrapper, so the keyboard focus ring goes on it (system.css). */
+.cordia-tutor-input:has(textarea:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .cordia-tutor-input textarea:is(:focus, :focus-visible) { outline: none !important; box-shadow: none !important; }
 .cordia-tutor-input textarea { min-width: 0; }
 .cordia-tutor-input button { min-height: 38px; align-self: end; }

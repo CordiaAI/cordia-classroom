@@ -414,7 +414,7 @@ export default function SettingsPage() {
         .delete-sheet p { margin: 0; }
         .delete-error { color: var(--error); font-weight: 600; }
         .delete-actions { display: flex; justify-content: flex-end; gap: 8px; }
-        :global(.delete-confirm:not(:disabled)) { background: var(--error) !important; border-color: var(--error) !important; color: var(--on-olive) !important; }
+        :global(.delete-confirm:not(:disabled)) { background: var(--error-solid) !important; border-color: var(--error-solid) !important; color: var(--on-error) !important; }
         :global(.settings-danger) { color: var(--error) !important; }
         .profile-page { width: min(var(--page-max), 100%); margin: 0 auto; }
         .profile-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }

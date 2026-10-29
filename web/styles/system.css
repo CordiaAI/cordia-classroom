@@ -14,11 +14,6 @@ body {
 }
 h1, h2, h3, h4 { color: var(--ink); }
 a { color: var(--olive-ink); }
-:where(button, a, input, textarea, select, summary, [role='button'], [role='tab'], [tabindex]):focus-visible {
-  outline: 2px solid var(--olive);
-  outline-offset: 2px;
-}
-[data-theme='dark'] :where(button, a, input, textarea, select, summary, [role='button'], [role='tab'], [tabindex]):focus-visible { outline-color: var(--olive-ink); }
 ::selection { background: var(--surface-card); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .lucide { flex: 0 0 auto; }
@@ -62,6 +57,8 @@ a { color: var(--olive-ink); }
   border-radius:var(--r-pill); background: var(--wash); font:600 13px/1 var(--font-sans);
 }
 .c-btn--secondary kbd { background: var(--olive-tint); color: var(--ink); }
+/* On olive: an inverted chip (olive on the label colour), 6.6:1 light and 5.1:1 dark. The white wash was 2.8:1. */
+.c-btn--primary kbd { background: var(--on-olive); color: var(--olive); }
 
 .c-icon-btn {
   display: inline-grid; place-items: center; flex: 0 0 auto;
@@ -401,7 +398,6 @@ body:has(.about) .c-fab { display: none; }
 .tutor-starter-actions .c-chip { min-height: 36px; padding: 0 14px; }
 .cordia-tutor-input { display: flex; align-items: flex-end; gap: 8px; margin: 12px; padding: 6px 6px 6px 14px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); }
 .cordia-tutor-input textarea { flex: 1; min-height: 40px; max-height: 160px; padding: 9px 0; border: 0; background: transparent; color: var(--ink); font:500 15px/1.5 var(--font-sans); resize: none; outline: none; }
-.cordia-tutor-input:focus-within { outline: 2px solid var(--olive); outline-offset: 0; }
 .cordia-tutor-input textarea:focus-visible { outline: none; }
 .cordia-tutor-input .cordia-tutor-send { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border: 0; border-radius:50%; background: var(--olive); color: var(--on-olive); cursor: pointer; }
 [data-theme='dark'] .cordia-tutor-input .cordia-tutor-send { background: var(--olive) !important; color: var(--ink) !important; }
@@ -424,6 +420,12 @@ body:has(.about) .c-fab { display: none; }
 .quiz-option.correct-shine, .quiz-option.correct-glow { border-color: var(--success); background: var(--success-bg); color: var(--ink); }
 .quiz-option.wrong-shake { border-color: var(--error); background: var(--error-bg); color: var(--ink); }
 .quiz-option.disabled { opacity: .55; }
+/* The answer's state in words and an icon, not only green and red (components/RetainCards.js McCard). */
+.quiz-option:has(.quiz-option-mark) { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.quiz-option-text { min-width: 0; }
+.quiz-option-mark { flex: none; display: inline-flex; align-items: center; gap: 4px; font: 700 13px/1.2 var(--font-sans); white-space: nowrap; }
+.quiz-option-mark.is-right { color: var(--success); }
+.quiz-option-mark.is-wrong { color: var(--error); }
 .quiz-progress { display: flex; align-items: center; gap: 12px; }
 .quiz-progress .c-bar { flex: 1; }
 .quiz-repeat { display: inline-flex; align-items: center; gap: 4px; }
@@ -602,22 +604,28 @@ body:has(.about) .c-fab { display: none; }
 .c-list > .c-list-row:first-child { border-top-left-radius: inherit; border-top-right-radius: inherit; }
 .c-list > .c-list-row:last-child { border-bottom-left-radius: inherit; border-bottom-right-radius: inherit; }
 
-/* Keyboard focus: the same lift plus a 2px olive ring. */
+/* Keyboard focus, everywhere: a solid 2px ring in --focus-ring, 2px out (3:1 or better on every
+   surface in both themes). !important so no component's own outline, or outline: none, can hide it.
+   Two fields draw their box on a wrapper, which takes the ring instead: the Tutor's message box
+   (glass.css) and the search bar (SearchModal). */
+:focus-visible:not(.cordia-tutor-input textarea, .search-input) {
+  outline: 2px solid var(--focus-ring) !important;
+  outline-offset: 2px !important;
+}
+
+/* Keyboard focus: the same lift as hover; the ring is the rule above. */
 :is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a):not(:disabled):focus-visible {
   border-color: var(--lg-edge) !important;
   box-shadow: var(--lift-shadow) !important;
   transform: var(--lift);
-  outline: 2px solid var(--olive); outline-offset: 2px;
 }
 :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .sn-card, a.calendar-item):focus-visible,
 :is(.lib-row, div.c-list-row:has(> a[href])):focus-within:has(:focus-visible) {
   transform: var(--lift-card);
   border-color: var(--lg-edge) !important;
   box-shadow: var(--lift-shadow-card) !important;
-  outline: 2px solid var(--olive); outline-offset: 2px;
 }
-.c-icon-btn:not(:disabled):focus-visible { box-shadow: var(--lift-shadow); transform: var(--lift); outline: 2px solid var(--olive); outline-offset: 2px; }
-[data-theme='dark'] :is(.c-btn, .c-pill, .c-chip, .c-icon-btn, a.c-card, button.c-card, a.c-list-row, .c-nav a, .lib-row, .sn-card, a.calendar-item):focus-visible { outline-color: var(--olive-ink); }
+.c-icon-btn:not(:disabled):focus-visible { box-shadow: var(--lift-shadow); transform: var(--lift); }
 
 /* Press: settle back down with a small squeeze (cards keep their lift). */
 :is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a, .c-icon-btn):not(:disabled):active { transform: scale(.98); }
@@ -637,7 +645,7 @@ body:has(.about) .c-fab { display: none; }
 .c-toggle-track span { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--on-olive); box-shadow: var(--shadow-sm); transition: transform 160ms ease-out; }
 .c-toggle input:checked + .c-toggle-track { background: var(--olive); border-color: var(--olive); }
 .c-toggle input:checked + .c-toggle-track span { transform: translateX(18px); }
-.c-toggle input:focus-visible + .c-toggle-track { outline: 2px solid var(--olive); outline-offset: 2px; }
+.c-toggle input:focus-visible + .c-toggle-track { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .c-toggle-track, .c-toggle-track span { transition: none; } }
 
 /* ---------- Numbered steps (Canvas connect, Chrome extension) ---------- */
@@ -724,7 +732,6 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   .c-side-item { transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
   /* The sidebar is already glass, so its hover pane uses the lighter fill: subtler than the current item. */
   .c-side-item:hover { background: var(--lg-sheen), var(--lg-fill); box-shadow: var(--lg-highlight); transform: var(--lift); text-decoration: none; }
-  :is(.c-side-item, .c-side-toggle, .c-side-add, .c-side-all):focus-visible { outline: 2px solid var(--olive); outline-offset: -2px; }
   /* Line height above 1, so the ellipsis clip never cuts off descenders (y, g, p). */
   .c-side-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; padding-block: 1px; }
   .c-side-kbd { margin-left: auto; padding: 4px 7px; border-radius: var(--r-pill); background: var(--hairline); color: var(--muted); font: 600 12px/1 var(--font-sans); }
@@ -736,7 +743,8 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   /* The middle scrolls on short screens; New and Search stay on top and the account at the bottom. */
   .c-side-nav {
     flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1px;
-    margin: 4px -12px 0; padding: 0 12px 8px; overflow: hidden auto; overscroll-behavior: contain;
+    /* 4px of top padding keeps the first item's focus ring inside the scroll box. */
+    margin: 0 -12px; padding: 4px 12px 8px; overflow: hidden auto; overscroll-behavior: contain;
   }
   .c-side-nav .c-side-item { height: 38px; }
   /* Classes: a label with its + (add a class), then up to five classes as colour dot + course code. */

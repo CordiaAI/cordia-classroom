@@ -96,7 +96,7 @@
 .asst-sheet { display: grid; gap: 16px; width: min(560px, 100%); max-height: calc(100dvh - 48px); overflow-y: auto; }
 .asst-sheet p { margin: 0; }
 .asst-sheet-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.asst-delete-confirm:not(:disabled) { background: var(--error-solid) !important; border-color: var(--error-solid) !important; color: var(--on-olive) !important; }
+.asst-delete-confirm:not(:disabled) { background: var(--error-solid) !important; border-color: var(--error-solid) !important; color: var(--on-error) !important; }
 
 @media (max-width: 767px) {
   .asst-split { grid-template-columns: 1fr; }

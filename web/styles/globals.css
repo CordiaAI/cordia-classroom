@@ -1462,7 +1462,7 @@ input::placeholder { color: var(--text-muted); }
 }
 .create-banner-info { background: var(--bg-secondary); border: 1px solid var(--border-default); color: var(--accent); }
 .create-banner-error { background: var(--error-bg, var(--error-solid)); border: 1px solid var(--error); color: var(--error); }
-.create-banner-error button { flex: 0 0 auto; border: 0; border-radius:999px; padding: 7px 12px; background: var(--error-solid); color: var(--on-olive); font-weight:600; cursor: pointer; }
+.create-banner-error button { flex: 0 0 auto; border: 0; border-radius:999px; padding: 7px 12px; background: var(--error-solid); color: var(--on-error); font-weight:600; cursor: pointer; }
 
 /* Fields */
 .create-field { margin-bottom: 20px; }
@@ -1915,7 +1915,7 @@ input::placeholder { color: var(--text-muted); }
 .cordia-tutor-input.has-mic { grid-template-columns: 1fr auto auto; }
 .cordia-tutor-input .cordia-tutor-mic { display: grid; place-items: center; background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line, var(--border-subtle)); }
 .cordia-tutor-input .cordia-tutor-mic svg { width: 16px; height: 16px; }
-.cordia-tutor-input .cordia-tutor-mic.is-listening { background: var(--error-solid); color: var(--on-olive); box-shadow: none; animation: cordia-mic-pulse 1.2s ease-in-out infinite; }
+.cordia-tutor-input .cordia-tutor-mic.is-listening { background: var(--error-solid); color: var(--on-error); box-shadow: none; animation: cordia-mic-pulse 1.2s ease-in-out infinite; }
 @keyframes cordia-mic-pulse { 50% { box-shadow: 0 0 0 5px var(--error-bg); } }
 .cordia-tutor-speak { display: block; width: fit-content; margin-top: 8px; padding: 4px 10px; border: 1px solid var(--line); border-radius:999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; font-weight:600; cursor: pointer; }
 .cordia-tutor-limit { padding: 0 12px 10px; color: var(--muted-ink, var(--text-muted)); font-size: 13px; }
@@ -2233,7 +2233,6 @@ h1, h2, h3, .login-form-title, .section-header h2 { font-family: var(--font-sans
 body { background: var(--canvas); color: var(--ink); }
 a { color: var(--olive); }
 button, a, input, textarea, select { transition: color var(--motion-fast), background-color var(--motion-fast), border-color var(--motion-fast), box-shadow var(--motion-smooth), transform var(--motion-smooth); }
-button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid color-mix(in srgb, var(--olive) 24%, transparent); outline-offset: 3px; }
 ::selection { background: color-mix(in srgb, var(--olive) 24%, var(--surface-card)); color: var(--ink); }
 
 .app-shell { min-height: 100vh; background: var(--canvas); }
@@ -2753,9 +2752,10 @@ a.calendar-item:hover { border-color: var(--ink); }
 .calendar-item small { overflow: hidden; color: var(--muted-ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .calendar-item-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 6px; }
 .calendar-item-meta .calendar-kind { min-width: 0; padding: 3px 7px; }
-.calendar-item-past { opacity: 0.55; }
-.calendar-item-done strong { text-decoration: line-through; color: var(--muted); }
-.calendar-item-done { opacity: 0.6; }
+/* Past and done items stay readable: muted titles, not a faded card (muted text at 60% was ~2.4:1).
+   Done ones are also struck through. */
+.calendar-item-past strong, .calendar-item-done strong { color: var(--muted); }
+.calendar-item-done strong { text-decoration: line-through; }
 .calendar-kind { min-width: 64px; padding: 5px 7px; border-radius:999px; background: var(--surface-card); color: var(--olive); font-size: 13px; font-weight:600; text-align: center; text-transform: capitalize; }
 .calendar-kind-exam,
 .calendar-kind-quiz { background: var(--surface-card); color: var(--warning); }

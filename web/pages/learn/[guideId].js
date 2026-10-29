@@ -344,9 +344,9 @@ export default function LearnPage() {
           </section>
 
           <section className="c-card learn-panel learn-test">
-            <label className="learn-date">
+            <label className="learn-date" htmlFor="learn-test-date">
               <span><CalendarClock {...ICON} />Test date</span>
-              <input type="date" className="c-input" value={testDate} min={today} onChange={event => changeDate(event.target.value)} />
+              <input id="learn-test-date" type="date" className="c-input" value={testDate} min={today} onChange={event => changeDate(event.target.value)} />
             </label>
             <p className="c-meta">{plan ? whenLabel(plan) : 'Add the date and Learn paces you so everything is mastered the day before.'}</p>
           </section>
