@@ -85,7 +85,6 @@ async def validation_error(request: Request, exc: RequestValidationError):
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://classroom.cordiacode.com",
     "https://classroom.cordiaai.io",
 ]
 if os.getenv("FRONTEND_URL"):

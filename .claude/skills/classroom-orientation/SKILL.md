@@ -12,11 +12,11 @@ description: Use at the start of any CordiaClassroom (AutoStudyai repo) coding s
 - Say what it means for the product and what decision is needed, not the git mechanics.
 - Jackson's model: code gets pushed to GitHub, then goes live (Vercel does it automatically; the backends need a manual deploy).
 
-## Domains (rebrand to cordiaai.io, 2026-09-30)
+## Domains (cordiaai.io only, since 2026-10-29)
 - Primary: `https://classroom.cordiaai.io` (canonical, og:url, sitemap, robots, privacy/terms, extension homepage/popup/saved-guide links, support@cordiaai.io). Fly secret `FRONTEND_URL` = this (drives Stripe success/return URLs + a CORS extra origin).
-- **Legacy `https://classroom.cordiacode.com` must keep working until extension v2.0 is live in the Chrome Web Store**: it stays in `ALLOWED_ORIGINS`, extension `content_scripts.matches` and the `background.js` tab query. Do not remove it anywhere before then.
+- `cordiacode.com` and `autostudyai.online` are retired (2026-10-29): never reference them in code, copy, CORS, the extension or redirects. `cordiaai.io` is the company domain; `classroom.cordiaai.io` is the study app.
 - Extension v2.0.0 zip for the Web Store: `extension/dist/cordia-classroom-extension-2.0.0.zip` (manifest.json at zip root; rebuild with `cd extension && zip -qr dist/<name>.zip . -x 'dist/*' README.md`). API stays on `autostudy-ai.fly.dev`.
-- Do NOT rename localStorage keys (users would lose drafts). `autostudyai.online` still redirects (next.config.js) to the new domain.
+- Do NOT rename localStorage keys (users would lose drafts).
 - GitHub remote is `CordiaAI/cordia-classroom` (moved from ItzJLaugh/AutoStudyai).
 
 ## Layout
@@ -80,7 +80,6 @@ Baseline (2026-09-26, main 416e039): 111 Python tests pass, 10/12 node tests pas
 
 ## State snapshot (2026-09-26 — refresh when stale)
 - Work lands mostly as direct commits to `main` (recent revert pairs for visual redesigns).
-- Draft PR #23 (`claude/wonderful-faraday-1dp3p2`, drop legacy autostudyai.online CORS) is 12 behind; rebase before merging or its diff reverts newer main work.
 - `feat/classroom-production-readiness` has 13 unique unmerged commits (RLS hardening, Tutor grounding, provenance) — likely superseded partly; needs owner decision.
 - `master` is a stale May 2026 branch (2 unique commits); everything else is merged → safe to delete.
 

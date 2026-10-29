@@ -184,7 +184,7 @@ class SharingFlowTests(unittest.TestCase):
             classes.share_default(mgt["id"], classes.ShareDefaultRequest(share=True, guide_id=guide_id), "")
         set_id = self.db.rows("shared_sets")[0]["id"]
         with patch.object(public_forms, "get_supabase", return_value=self.db):
-            public_forms.takedown(public_forms.TakedownRequest(name="Pub", email="legal@pub.com", work="Chapter 3", location=f"https://classroom.cordiacode.com/class/x?set={set_id}", statement=True))
+            public_forms.takedown(public_forms.TakedownRequest(name="Pub", email="legal@pub.com", work="Chapter 3", location=f"https://classroom.cordiaai.io/class/x?set={set_id}", statement=True))
         self.assertEqual(self.db.rows("shared_sets")[0]["status"], "taken_down")
 
 

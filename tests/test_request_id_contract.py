@@ -25,12 +25,12 @@ class RequestIdContractTests(unittest.TestCase):
         self.assertNotEqual(first.headers["X-Request-ID"], second.headers["X-Request-ID"])
 
     def test_browser_can_read_support_reference(self):
-        response = self.client.get("/", headers={"Origin": "https://classroom.cordiacode.com"})
+        response = self.client.get("/", headers={"Origin": "https://classroom.cordiaai.io"})
 
         self.assertIn("X-Request-ID", response.headers["access-control-expose-headers"])
 
-    def test_both_classroom_domains_pass_cors_preflight(self):
-        for origin in ("https://classroom.cordiaai.io", "https://classroom.cordiacode.com"):
+    def test_classroom_domain_passes_cors_preflight(self):
+        for origin in ("https://classroom.cordiaai.io",):
             with self.subTest(origin=origin):
                 response = self.client.options("/", headers={
                     "Origin": origin,

@@ -52,7 +52,6 @@ assert.match(documentPage, /cordia-classroom-icon\.png/);
 assert.match(appPage, /application-name" content="CordiaClassroom"/);
 assert.match(appPage, /og:site_name" content="CordiaClassroom"/);
 assert.doesNotMatch(documentPage, /autostudy/i);
-assert.match(nextConfig, /type: 'host', value: 'autostudyai\.online'/);
-assert.match(nextConfig, /https:\/\/classroom\.cordiaai\.io\/\:path\*/);
+assert.doesNotMatch(nextConfig, /autostudyai\.online|cordiacode\.com/);
 
 console.log('UI shell contract passed');
