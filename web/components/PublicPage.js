@@ -58,7 +58,7 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
         .public-mark { width: 30px; height: 26px; object-fit: contain; }
         .public-nav nav { display: flex; align-items: center; gap: 4px; }
         .public-nav nav a { display: inline-flex; align-items: center; height: 40px; padding: 0 14px; border-radius:999px; color: var(--ink); font:600 var(--fs-15)/1 var(--font-sans); text-decoration: none; }
-        .public-nav nav a:hover { background: var(--olive-tint); text-decoration: none; }
+        .public-nav nav a:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); text-decoration: none; }
         .public-nav nav a.public-signin { background: var(--olive); color: var(--on-olive); }
         .public-main { width: min(1120px, 100%); margin: 0 auto; padding: 48px 24px 80px; }
         .public-doc { color: var(--text-secondary); }

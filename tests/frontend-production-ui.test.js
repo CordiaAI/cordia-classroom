@@ -73,7 +73,9 @@ assert.match(navigation, /apiFetch\('\/auth\/me'\)/);
 assert.match(navigation, /displayName/);
 assert.match(calendarDashboard, /Due today/);
 assert.match(calendarPage, /<CalendarDashboard \/>/);
-assert.match(navigation, /label: 'Canvas', href: '\/canvas'/);
+// Canvas is not in the sidebar; its page opens from Settings › Connectors.
+assert.doesNotMatch(navigation, /label: 'Canvas', href: '\/canvas'/);
+assert.match(read('web', 'components', 'ConnectorsSettings.js'), /href="\/canvas"/);
 assert.match(dashboard, /calendar: '\/calendar'/);
 assert.match(dashboard, /Some Classroom data could not be refreshed/);
 assert.match(dashboard, /guides: guideList/);

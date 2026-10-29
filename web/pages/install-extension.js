@@ -82,7 +82,7 @@ export default function InstallExtensionPage() {
         h2 { font-size:15px; margin: 4px 0 6px; color: var(--text-primary); }
         .extension-install-step p { color: var(--text-secondary); font-size:13px; line-height:1.5; }
         .extension-install-store-link { display: inline-flex; gap: 6px; align-items: center; margin-top: 13px; padding: 8px 12px; border-radius:12px; background: var(--accent-glow); color: var(--accent); font-size:13px; font-weight:600; }
-        .extension-install-store-link:hover { text-decoration: none; background: var(--bg-hover); }
+        .extension-install-store-link:hover { text-decoration: none; box-shadow: var(--lift-shadow); transform: var(--lift); }
         .extension-install-illustration { margin-top: 16px; border: 1px solid var(--border-subtle); border-radius:12px; overflow: hidden; background: var(--bg-primary); }
         .extension-install-toolbar { min-height: 62px; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg-tertiary); }
         .extension-install-url { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius:12px; padding: 7px 10px; background: var(--bg-secondary); color: var(--text-muted); font-size:13px; }

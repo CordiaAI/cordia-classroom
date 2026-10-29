@@ -57,7 +57,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 :is(.modal, .sn-modal, .feedback-modal, .upgrade-dialog, .oauth-callback-card, .class-guide-popover, .profile-menu, .context-menu) { background: var(--surface-raised); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow-lg); }
 :is(.dashboard-class-rail, .study-rail-card, .continue-card, .compact-calendar, .settings-section, .create-window, .practice-source-panel, .practice-main, .guide-reader-window, .tutor-drawer) { backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
 .btn, .overview-primary, .create-submit-btn, .sn-save-btn, .sn-open-btn { border: 1px solid var(--accent-strong); border-radius:12px; background: var(--accent-strong); color: var(--on-olive); box-shadow: var(--shadow-sm); font-weight:600; }
-.btn:hover:not(:disabled), .overview-primary:hover:not(:disabled) { background: var(--accent-dark); box-shadow: var(--shadow-md); }
+.btn:hover:not(:disabled), .overview-primary:hover:not(:disabled) { box-shadow: var(--shadow-md); }
 .btn-outline, .btn-gray, .overview-secondary { border-color: var(--line); border-radius:12px; background: var(--surface); color: var(--ink); box-shadow: none; }
 .dashboard-workspace-grid { grid-template-columns: 190px minmax(0, 1fr) 230px; gap: 26px; }
 .dashboard-workspace-grid.without-classes { grid-template-columns: minmax(0, 1fr) 230px; }
@@ -176,14 +176,14 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .login-page .login-input-row { background: var(--reading-surface); border-color: var(--line); }
 .login-input-row:focus-within { box-shadow: 0 0 0 3px var(--accent-glow); }
 .login-cta-btn { background: var(--accent-strong) !important; min-height: 50px; border-radius:12px; }
-.login-cta-btn:hover { background: var(--accent-dark) !important; }
+.login-cta-btn:hover { box-shadow: var(--lift-shadow); transform: var(--lift); }
 .login-oauth-button { background: var(--reading-surface); border-color: var(--line); box-shadow: none; font-size: 13px; border-radius:12px; }
 .login-form-wrap { max-width: none; }
 .login-brand-name, .login-form-title, .login-brand-tagline, .login-editorial-title { color: var(--ink); }
 .guide-job { animation: pane-reveal 250ms ease both; }
 @media (hover: hover) {
   :is(.workspace-shortcuts button, .rail-create, .btn-outline, .overview-secondary, .login-oauth-button):hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-  .workspace-rail nav button:hover { background: var(--bg-hover); }
+  .workspace-rail nav button:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); }
   .workspace-shortcuts button { background-image:var(--wash); background-size: 150% 100%; background-position: 90% 0; transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background-position var(--dur) var(--ease); }
   .workspace-shortcuts button:hover { background-position: 0 0; }
 }
@@ -484,7 +484,8 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .tutor-select-option { position: relative; display: flex; flex-direction: column; align-items: flex-start; flex-shrink: 0; gap: 3px; min-height: 44px; padding: 11px 30px 11px 12px; border: 1px solid var(--line); border-radius:12px; background: var(--surface); color: var(--ink); text-align: left; font:600 13px/1.5 var(--font-sans); cursor: pointer; animation: tutor-option-fall 380ms var(--option-delay, 0ms) both; }
 .tutor-select-option > span { overflow-wrap: anywhere; }
 .tutor-select-option small { font:600 13px/1.5 var(--font-sans); color: var(--text-secondary); }
-.tutor-select-option[aria-selected='true'], .tutor-select-option:hover { background: var(--accent-glow); border-color: var(--olive); }
+.tutor-select-option[aria-selected='true'] { background: var(--accent-glow); border-color: var(--olive); }
+.tutor-select-option:hover:not([aria-selected='true']) { background: var(--lift-pane); box-shadow: var(--lift-shadow); }
 .tutor-select-option:focus-visible { outline-offset: -3px; }
 .tutor-select-option:disabled { opacity: .5; cursor: default; }
 .tutor-select-option .tutor-select-check { position: absolute; top: 12px; right: 10px; }

@@ -35,7 +35,7 @@ export default function CardPhoto({ value, onChange, label = 'Add photo', onErro
       <input ref={inputRef} type="file" accept="image/*" hidden onChange={event => { pick(event.target.files?.[0]); event.target.value = ''; }} />
       <style jsx>{`
         .card-photo-add { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; }
-        .card-photo-add:hover:not(:disabled) { color: var(--olive); background: var(--olive-tint); }
+        .card-photo-add:hover:not(:disabled) { background: var(--lift-pane); box-shadow: var(--lift-shadow); transform: var(--lift); }
         .card-photo-add:disabled { cursor: progress; }
         .card-photo { position: relative; flex: none; display: inline-block; width: 64px; height: 48px; }
         .card-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }

@@ -116,7 +116,7 @@ export default function CourseWork({ data, extraUpcoming = [], onPlan, actions }
         .cw-list { display: grid; }
         .cw-row { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: var(--r-input); }
         .cw-row + .cw-row { border-top: 1px solid var(--border-subtle); }
-        .cw-row:hover { background: var(--surface-raised); }
+        .cw-row:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); }
         .cw-date { display: grid; flex: none; place-items: center; width: 46px; height: 46px; border-radius: 12px; background: var(--olive-tint); color: var(--olive-ink); }
         .cw-date small { font: 600 11px/1 var(--font-sans); text-transform: uppercase; letter-spacing: 0.04em; }
         .cw-date strong { font: 600 18px/1 var(--font-sans); }

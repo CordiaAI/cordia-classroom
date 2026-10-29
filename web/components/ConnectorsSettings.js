@@ -500,7 +500,11 @@ export default function ConnectorsSettings() {
                 <p className="c-meta cn-canvas-meta">{canvas.status.domain} · •••• {canvas.status.last4}{canvas.status.expires_at ? ` · Expires ${displayDate(canvas.status.expires_at)}` : ''}</p>
               )}
               {canvas.feed && !canvas.status.connected && <p className="c-meta">Your deadlines come from a calendar link. An access token also brings what you turned in, grades and course files.</p>}
-              <div className="cn-actions">{canvasActions()}</div>
+              <div className="cn-actions">
+                {canvasActions()}
+                {/* Canvas left the sidebar; its page (classes and course material) opens from here. */}
+                <Link className="c-btn c-btn--quiet" href="/canvas">Open Canvas page</Link>
+              </div>
               {tryIt('canvas', Boolean(canvas.status.connected || canvas.feed))}
               {showClasses && canvas.status.connected && (
                 <div className="cn-canvas-classes">
