@@ -347,10 +347,18 @@ def exam_review_set(item_key: str, body: ReviewRequest, request: Request, author
         raise HTTPException(status_code=400, detail="Pick the class this is for.")
     from routers.drive import _own_folder
     _own_folder(user_id, folder_id)
-    guide = build_review(user_id, folder_id, f"{item['title']}: review", f"review:{item_key}")
+    ref = f"review:{item_key}"
+    db = get_supabase()
+    before = (db.table("study_guides").select("notes,study_guide").eq("user_id", user_id)
+              .eq("external_source_id", ref).limit(1).execute().data or [{}])[0]
+    guide = build_review(user_id, folder_id, f"{item['title']}: review", ref)
+    # Building again with the same material keeps its questions, so Learn progress isn't lost.
+    if before.get("study_guide") and before.get("notes") == guide.get("notes") and guide.get("id"):
+        db.table("study_guides").update({"study_guide": before["study_guide"]}).eq("id", guide["id"]).eq("user_id", user_id).execute()
     added = schedule(user_id, item, _zone(user_id, body.time_zone)) if _is_exam(user_id, item) else []
     _push(user_id)
-    return {"guide": {"id": guide.get("id"), "title": guide.get("title")}, "sessions": len(added)}
+    # due_at: the exam date Learn paces the review set to.
+    return {"guide": {"id": guide.get("id"), "title": guide.get("title")}, "sessions": len(added), "due_at": item.get("due_at")}
 
 
 @router.post("/review-sets")

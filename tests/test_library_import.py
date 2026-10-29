@@ -130,6 +130,27 @@ class ReviewSets(Base):
         only = plans.build_review(USER, FOLDER, "Module 1 review", "review:m1", prefix="BIO 101 · Module 1")
         self.assertNotIn("Osmosis", only["notes"])
 
+    def test_building_the_exam_review_again_keeps_its_questions_and_returns_the_exam_date(self):
+        from routers import plans
+        from services import library_import
+        library_import.upsert_source(USER, ref="canvas:file:1", connector="canvas", title="Lecture 1", text=TEXT, folder_id=FOLDER,
+                                     source_type="canvas_module", source_title="BIO 101 · Module 1")
+        item = {"id": "canvas-9", "title": "Midterm", "due_at": "2026-11-05T15:00:00+00:00"}
+        build = plans.exam_review_set.__wrapped__
+        with patch("routers.plans.get_user_id", return_value=USER), patch("routers.plans._item", return_value=item), \
+                patch("routers.plans.item_folder", return_value=FOLDER), patch("routers.drive._own_folder"), \
+                patch("routers.plans._is_exam", return_value=False), patch("routers.plans._push"):
+            first = build("canvas-9", plans.ReviewRequest(), None)
+            self.assertEqual(first["due_at"], item["due_at"])
+            review = next(g for g in self.db.rows("study_guides") if g.get("source_type") == "review")
+            review["study_guide"] = "Q1: What makes ATP?\nA1: Mitochondria."
+            build("canvas-9", plans.ReviewRequest(), None)
+            self.assertEqual(review["study_guide"], "Q1: What makes ATP?\nA1: Mitochondria.")
+            library_import.upsert_source(USER, ref="canvas:file:2", connector="canvas", title="Lecture 2", text="Osmosis\nWater moves across membranes.",
+                                         folder_id=FOLDER, source_type="canvas_module", source_title="BIO 101 · Module 2")
+            build("canvas-9", plans.ReviewRequest(), None)
+            self.assertEqual(review["study_guide"], "")
+
     def test_no_material_says_how_to_add_some(self):
         from fastapi import HTTPException
         from routers import plans

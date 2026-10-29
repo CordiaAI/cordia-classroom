@@ -186,3 +186,11 @@ export function testPlan(tally, testDate, today = dayKey()) {
   const studyDays = Math.max(1, daysLeft);
   return { daysLeft, remaining, perDay: Math.ceil(remaining / studyDays), past: false };
 }
+
+// A test date passed in a link (an exam's "Study now", ?test=YYYY-MM-DD) is taken when none is
+// saved or it is still ahead; a past date is ignored. Returns the date to save, or ''.
+export function linkedTestDate(given, saved, today = dayKey()) {
+  const date = String(given || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(date + 'T12:00:00').getTime()) || date < today || date === saved) return '';
+  return !saved || date > today ? date : '';
+}
