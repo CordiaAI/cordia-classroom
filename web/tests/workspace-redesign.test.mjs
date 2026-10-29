@@ -69,17 +69,28 @@ test('Library: one list grouped by class, kind filters (no Notes: notes live in 
   assert.match(undo, /export const UNDO_MS = 6000/);
 });
 
-test('create keeps manual cards and the file picker with one Create button', async () => {
+test('create is only for writing cards and Quizlet import; uploads go through the New sheet', async () => {
   const create = await source('pages/create.js');
+  const sheet = await source('components/NewSheet.js');
   const shared = await source('lib/guideCreate.js');
 
   assert.match(create, /Write cards/);
-  assert.match(create, /Upload/);
   assert.match(create, /isEdit \? 'Update' : 'Create'/);
-  assert.match(create, /Add your cards\?/);
-  assert.match(create, /startGuideJob/);
+  assert.match(create, /QuizletImport/);
+  assert.match(create, /openNewSheet\('upload'\)/);
+  assert.doesNotMatch(create, /startGuideJob|extract-file-text|useFileDropZone|generateAndSave/);
+  assert.match(sheet, /startGuideJob/);
   assert.match(shared, /export async function generateAndSave/);
-  assert.doesNotMatch(create, /create-tabs|Paste Text/);
+});
+
+test('New › Note makes an empty notes guide and opens it', async () => {
+  const sheet = await source('components/NewSheet.js');
+  const smartnotes = await source('pages/smartnotes.js');
+
+  assert.match(sheet, /async function newNote\(\)/);
+  assert.match(sheet, /source_type: 'notes'/);
+  assert.doesNotMatch(sheet, /smartnotes\?id=new/);
+  assert.doesNotMatch(smartnotes, /id === 'new'\) \{\n\s+const saved/);
 });
 
 test('New sheet offers Upload, Paste, Link, Record and a sample', async () => {

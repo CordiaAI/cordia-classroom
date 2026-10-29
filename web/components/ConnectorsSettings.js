@@ -20,6 +20,7 @@ import { SheetsExport, SlackPanel } from './AppPanels';
 import NotionHome from './NotionHome';
 import Link from 'next/link';
 import { TRY } from '../lib/connectorGuide';
+import { openNewSheet } from '../lib/newSheet';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // What each app does here, shown in its sheet.
@@ -28,7 +29,7 @@ const DETAILS = {
   gcal: 'Puts your study time on a separate "Cordia" calendar, fitted around what is already on yours. Move or delete a block and Cordia keeps your change. Nothing is added to your own calendars.',
   apple_calendar: 'Subscribes your Apple Calendar to your deadlines. It refreshes every hour on your iPhone, iPad and Mac. No Apple password needed.',
   gtasks: 'Keeps a "Cordia" list in Google Tasks: each deadline is a to-do, with its steps as subtasks. Check one off on your phone and it is done in Cordia too.',
-  gdrive: 'Link a Drive folder to a class and new slides and readings come into Library on their own. Import a single file into Create, or save a copy of any guide back to a Cordia folder in your Drive.',
+  gdrive: 'Link a Drive folder to a class and new slides and readings come into Library on their own. Import a single file to make a guide, or save a copy of any guide back to a Cordia folder in your Drive.',
   gdocs: 'Import a Doc into Library, export any guide as a formatted Doc, and link the draft you\'re writing to an assignment so the Tutor can check it against the rubric.',
   notion: 'Bring Notion pages into Library, keep a Notion database of your assignments in sync, and export guides with each question as a toggle. Cordia only sees pages you share with it: when Notion asks while connecting, pick the pages Cordia should use (add more later from a page\'s ••• › Connections).',
   gsheets: 'Export your grades and the time you study each day to a spreadsheet you own, once or kept updated daily. You can also text Cordia Assistant to add a row or read a sheet.',
@@ -102,12 +103,8 @@ function healthLine(health) {
     .map(([key, value]) => { const [noun, ...rest] = STAT_WORDS[key].split(' '); return [`${value} ${noun}${value === 1 ? '' : 's'}`, ...rest].join(' '); });
   return [health.last_synced_at && `Last synced ${agoLabel(health.last_synced_at)}`, ...counts].filter(Boolean).join(' · ');
 }
-// Create reads this draft, so an import opens there ready to make a guide.
-const SOURCE_DRAFT_KEY = 'autostudy_text_draft';
-
 function ImportSheet({ connector, onClose }) {
-  const router = useRouter();
-  // Where an import goes: Create (to review first) or straight into a class in Library.
+  // Where an import goes: the New sheet's Paste (to review first) or straight into a class in Library.
   const [classes, setClasses] = useState([]);
   const [target, setTarget] = useState('');
   const [added, setAdded] = useState(null);
@@ -146,8 +143,9 @@ function ImportSheet({ connector, onClose }) {
     setBusy(file.id); setError('');
     const data = await apiFetch(`/connectors/${connector.id}/import`, { method: 'POST', body: JSON.stringify({ id: file.id, title: file.title }) });
     if (!data?.text) { setBusy(''); setError(data?.detail || "That didn't import. Try again."); return; }
-    try { localStorage.setItem(SOURCE_DRAFT_KEY, JSON.stringify({ title: data.title, content: data.text })); } catch { /* storage blocked */ }
-    router.push('/create');
+    setBusy('');
+    onClose();
+    openNewSheet('paste', { text: data.text, title: data.title });
   }
 
   return (
@@ -162,7 +160,7 @@ function ImportSheet({ connector, onClose }) {
             <label className="cn-target">
               <span className="c-meta">Add to</span>
               <select className="c-input" value={target} onChange={event => { setTarget(event.target.value); setAdded(null); }}>
-                <option value="">Create (review it first)</option>
+                <option value="">New guide (review it first)</option>
                 {classes.map(folder => <option key={folder.id} value={folder.id}>{classLabel(folder.name).title} in Library</option>)}
               </select>
             </label>
@@ -187,7 +185,7 @@ function ImportSheet({ connector, onClose }) {
           )}
           {added && <p className="cn-notice" role="status">Added <a href={`/guide/${added.id}`}>{added.title}</a> to Library.</p>}
           {error && <p className="cn-error" role="alert">{error}</p>}
-          <p className="c-meta">{target ? 'It goes into the class as notes, ready for cards and quizzes. Importing it again brings in changes.' : 'Imports open in Create so you can check the text before making a guide.'}</p>
+          <p className="c-meta">{target ? 'It goes into the class as notes, ready for cards and quizzes. Importing it again brings in changes.' : 'Imports open in New so you can check the text before making a guide.'}</p>
         </div>
       </div>
     </BodyPortal>

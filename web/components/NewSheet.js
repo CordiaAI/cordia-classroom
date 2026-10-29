@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import {
   ArrowLeft, Brain, Check, ClipboardPaste, FileImage, FileText, Layers, Link as LinkIcon, Mic, Minimize2, NotebookPen, PencilRuler, Presentation, Sparkles, Upload, X,
 } from 'lucide-react';
-import { apiFetch, authHeaders } from '../lib/api';
+import { apiErrorMessage, apiFetch, authHeaders } from '../lib/api';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 import { dismissGuideJob, startGuideJob, useGuideJobs } from '../lib/guideJobs';
 import { newGuideHref } from '../lib/checkYourself';
@@ -58,20 +58,21 @@ const FORMATS = [
 ];
 
 // Study tools made from what's already in Classroom: a quiz on the last guide, cards, practice, a note.
-function MakeOptions({ onGo }) {
+// A note is a guide with no material yet: the student's own notes, opened straight away.
+function MakeOptions({ onGo, onNote, busy }) {
   const guide = lastGuide();
   const items = [
     { label: 'Quiz', icon: Brain, href: guide ? `/quiz/${guide.id}` : '/library' },
     { label: 'Flashcards', icon: Layers, href: '/create' },
     { label: 'Practice', icon: PencilRuler, href: '/library?tab=practice' },
-    { label: 'Note', icon: NotebookPen, href: '/smartnotes?id=new', event: 'note-created', spot: 'new-note' },
+    { label: 'Note', icon: NotebookPen, note: true, event: 'note-created', spot: 'new-note' },
   ];
   return (
     <section className="new-make" aria-labelledby="new-make-title">
       <h3 id="new-make-title" className="c-meta new-make-title">Or make a new</h3>
       <div className="new-make-row">
         {items.map(item => (
-          <button key={item.label} type="button" className="new-make-btn" data-spot={item.spot} onClick={() => { if (item.event) walkthroughEvent(item.event); onGo(item.href); }}>
+          <button key={item.label} type="button" className="new-make-btn" data-spot={item.spot} disabled={busy} onClick={() => { if (item.event) walkthroughEvent(item.event); if (item.note) onNote(); else onGo(item.href); }}>
             <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />{item.label}
           </button>
         ))}
@@ -82,6 +83,7 @@ function MakeOptions({ onGo }) {
         .new-make-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
         .new-make-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur); }
         .new-make-btn:hover { border-color: var(--olive); }
+        .new-make-btn:disabled { opacity: .6; cursor: default; }
         .new-make-btn :global(.lucide) { color: var(--olive-ink); }
         @media (max-width: 520px) { .new-make-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
       `}</style>
@@ -153,7 +155,7 @@ export default function NewSheet() {
   const [url, setUrl] = useState('');
   const [folders, setFolders] = useState([]);
   const [folderId, setFolderId] = useState('');
-  const [status, setStatus] = useState('idle'); // idle | reading | building
+  const [status, setStatus] = useState('idle'); // idle | reading | building | note
   const [error, setError] = useState('');
   const [buildTitle, setBuildTitle] = useState('');
   const [step, setStep] = useState(0);
@@ -168,6 +170,8 @@ export default function NewSheet() {
   const openerRef = useRef(null);
   const recordingRef = useRef(false);
   recordingRef.current = recording;
+  // The name an opened-with text comes with (an imported Doc), used instead of a made-up one.
+  const pasteTitleRef = useRef('');
 
   useEffect(() => {
     function onOpen(event) {
@@ -179,6 +183,7 @@ export default function NewSheet() {
       setMode(event.detail?.mode || '');
       setError('');
       if (event.detail?.files?.length) addFiles(event.detail.files);
+      if (event.detail?.text) { setText(event.detail.text); pasteTitleRef.current = event.detail.title || ''; }
       walkthroughEvent('new-opened');
     }
     window.addEventListener(NEW_SHEET_EVENT, onOpen);
@@ -231,6 +236,7 @@ export default function NewSheet() {
   });
 
   function reset() {
+    pasteTitleRef.current = '';
     setMode(''); setFiles([]); setText(''); setUrl(''); setStatus('idle'); setError(''); setBuildTitle(''); setStep(0); setJobId(null);
   }
 
@@ -307,7 +313,7 @@ export default function NewSheet() {
         sourceUrl = href;
       } else {
         source = text.trim();
-        title = (source.length >= 10 ? await titleFor(source) : '') || 'Pasted notes';
+        title = pasteTitleRef.current.slice(0, 120) || (source.length >= 10 ? await titleFor(source) : '') || 'Pasted notes';
         sourceTitle = title;
       }
       startBuild({ source, title, sourceTitle, sourceType, sourceUrl, folderId });
@@ -367,6 +373,21 @@ export default function NewSheet() {
       setStatus('idle');
       setError(caught.message || 'Something went wrong.');
     }
+  }
+
+  // New › Note: an empty guide that is just the student's notes, opened to type in.
+  async function newNote() {
+    setError('');
+    setStatus('note');
+    const saved = await apiFetch('/guides', { method: 'POST', body: JSON.stringify({ title: 'Untitled notes', keep_title: true, notes: '', source_type: 'notes', ...(folderId ? { folder_id: folderId } : {}) }) });
+    if (!saved?.guide) {
+      setStatus('idle');
+      setError(apiErrorMessage(saved?.detail, 'A new page could not be made. Try again.'));
+      return;
+    }
+    reset();
+    setOpen(false);
+    router.push(`/guide/${saved.guide.id}`);
   }
 
   // The sample needs no AI: the steps play through, then it is saved as a real guide.
@@ -434,7 +455,7 @@ export default function NewSheet() {
         ) : !mode ? (
           <>
             <NewOptions onPick={setMode} onSample={trySample} />
-            <MakeOptions onGo={href => { close(); router.push(href); }} />
+            <MakeOptions busy={status === 'note'} onNote={newNote} onGo={href => { close(); router.push(href); }} />
           </>
         ) : (
           <div className="new-panel">
