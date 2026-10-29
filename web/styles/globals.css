@@ -678,6 +678,10 @@ input::placeholder { color: var(--text-muted); }
 .retain-pro-badge { position: absolute; top: 10px; right: 12px; padding: 2px 8px; border-radius:999px; background: var(--olive); color: var(--on-olive); font-size:13px; font-weight:600; }
 .retain-start { width: 100%; margin-top: 4px; }
 .retain-fill-row { display: flex; gap: 10px; margin-bottom: 12px; }
+.retain-cloze { margin: 0 0 14px; color: var(--ink); font-size: 17px; line-height: 1.6; }
+.retain-cloze-blank { display: inline-block; min-width: 4ch; margin: 0 2px; padding: 0 6px; border-radius: 8px; background: var(--olive-tint); color: var(--olive-ink); font-weight: 600; }
+.retain-cloze-blank.right { background: var(--success-bg, var(--olive-tint)); color: var(--success, var(--olive-ink)); }
+.retain-cloze-blank.wrong { background: var(--error-bg); color: var(--error); }
 .retain-fill-input, .retain-written-input { width: 100%; min-width: 0; padding: 12px 14px; border: 1.5px solid var(--border-default); border-radius:12px; background: var(--bg-primary); color: var(--text-primary); font: inherit; }
 .retain-written-input { display: block; margin-bottom: 12px; resize: none; line-height:1.5; }
 .retain-fill-input:focus, .retain-written-input:focus { outline: none; border-color: var(--olive); }

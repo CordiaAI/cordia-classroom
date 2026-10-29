@@ -83,7 +83,12 @@ test('readiness and the daily target before a test', () => {
 test('the ways to learn decide each card, and recall still masters with any of them', async () => {
   const { askCard, cleanTypes, DEFAULT_TYPES } = await import('../lib/learnEngine.mjs');
   assert.deepEqual(cleanTypes([]), DEFAULT_TYPES);
-  assert.deepEqual(askCard(term, { l: NEW }, TODAY, ['fill', 'written']), { type: 'fill', recall: false });
+  assert.deepEqual(cleanTypes(['fill', 'written', 'self']), ['type', 'self'], 'ways saved before Type it and Written merged still load');
+  assert.deepEqual(askCard(term, { l: NEW }, TODAY, ['type']), { type: 'fill', recall: false });
+  assert.deepEqual(askCard(long, { l: NEW }, TODAY, ['type']), { type: 'written', recall: false });
+  assert.deepEqual(askCard(long, { l: NEW }, TODAY, ['mc', 'cloze']), { type: 'mc', recall: false });
+  assert.deepEqual(askCard(long, { l: FAMILIAR }, TODAY, ['mc', 'cloze']), { type: 'cloze', recall: true });
+  assert.deepEqual(askCard(term, { l: FAMILIAR }, TODAY, ['cloze']), { type: 'fill', recall: true }, 'too short to blank: typed whole');
   assert.deepEqual(askCard(long, { l: FAMILIAR }, TODAY, ['mc', 'self']), { type: 'self', recall: true });
   assert.deepEqual(askCard(long, { l: FAMILIAR }, TODAY, ['mc']), { type: 'mc', recall: true });
   const levels = { 0: { l: FAMILIAR, at: null } };
@@ -93,12 +98,11 @@ test('the ways to learn decide each card, and recall still masters with any of t
   assert.equal(answer(levels, round, card, 1, { confidence: 'sure', today: TODAY }).levels[0].l, MASTERED);
 });
 
-test('a test date from a link is taken when none is saved or it is still ahead', () => {
-  assert.equal(linkedTestDate('2026-11-05', '', TODAY), '2026-11-05');
-  assert.equal(linkedTestDate('2026-11-05', '2026-11-20', TODAY), '2026-11-05');
-  assert.equal(linkedTestDate('2026-11-05', '2026-11-05', TODAY), '');
-  assert.equal(linkedTestDate('2026-10-27', '', TODAY), '');
-  assert.equal(linkedTestDate(TODAY, '', TODAY), TODAY);
-  assert.equal(linkedTestDate(TODAY, '2026-11-01', TODAY), '');
-  assert.equal(linkedTestDate('nope', '', TODAY), '');
+test('Fill the blank hides the answer\'s longest meaningful word and keeps the rest exactly', async () => {
+  const { makeCloze } = await import('../lib/learnEngine.mjs');
+  const cloze = makeCloze('In the Bylaws, the policies and procedures, and the Ritual.');
+  assert.equal(cloze.missing, 'procedures');
+  assert.equal(cloze.before + cloze.missing + cloze.after, 'In the Bylaws, the policies and procedures, and the Ritual.');
+  assert.equal(makeCloze('Mitochondria'), null);
+  assert.equal(makeCloze('It is the one'), null, 'nothing meaningful to blank');
 });

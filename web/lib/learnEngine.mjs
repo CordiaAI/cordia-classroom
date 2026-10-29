@@ -62,43 +62,90 @@ export function isTerm(question) {
   return conceptAnswer(question).split(/\s+/).filter(Boolean).length <= TERM_MAX_WORDS;
 }
 
-// The ways a student can pick to learn with. mc and self (a flashcard flip) recognise an answer;
-// fill (short answers), written (long answers, checked by AI) and self recall it.
-export const LEARN_TYPES = ['mc', 'fill', 'written', 'self'];
-export const DEFAULT_TYPES = ['mc', 'fill', 'written'];
+// The ways a student picks to learn with, and the cards each one asks:
+//   mc    Choice: pick from four (recognition)
+//   type  Type it: short answers typed and checked on the spot (fill), longer ones written and
+//         checked by AI (written)
+//   cloze Fill the blank: the answer with its key word missing, typed in (cued recall); answers
+//         too short to blank are asked as Type it
+//   self  Flashcards: flip the card, then say honestly whether you knew it
+export const LEARN_TYPES = ['mc', 'type', 'cloze', 'self'];
+export const DEFAULT_TYPES = ['mc', 'cloze', 'type'];
+// Every card a round can show, for the decision log.
+export const CARD_TYPES = ['mc', 'fill', 'written', 'cloze', 'self'];
+const OLD_TYPES = { fill: 'type', written: 'type' }; // ways saved before Type it and Written merged
 
 export function cleanTypes(types) {
-  const picked = LEARN_TYPES.filter(type => (types || []).includes(type));
+  const given = (types || []).map(type => OLD_TYPES[type] || type);
+  const picked = LEARN_TYPES.filter(type => given.includes(type));
   return picked.length ? picked : DEFAULT_TYPES;
 }
 
+const CLOZE_MIN_WORDS = 4;
+const CLOZE_SKIP = new Set(['that', 'this', 'with', 'from', 'have', 'their', 'there', 'which', 'when', 'where', 'what',
+  'into', 'than', 'then', 'they', 'them', 'were', 'been', 'being', 'also', 'because', 'about', 'each', 'other', 'some',
+  'such', 'only', 'very', 'more', 'most', 'these', 'those', 'will', 'would', 'could', 'should', 'does', 'your', 'over',
+  'under', 'between', 'through', 'while', 'after', 'before', 'both', 'many', 'much']);
+
+// Fill the blank: the answer's longest meaningful word becomes the blank (the first, if tied).
+// { before, missing, after }: before ends with any punctuation stuck to the word, after starts
+// with it. null when the answer is too short to blank.
+export function makeCloze(answer) {
+  const words = String(answer || '').trim().split(/\s+/).filter(Boolean);
+  if (words.length < CLOZE_MIN_WORDS) return null;
+  let best = -1;
+  let core = null;
+  words.forEach((word, index) => {
+    const match = word.match(/^([^\p{L}\p{N}]*)([\p{L}\p{N}][\p{L}\p{N}'’-]*[\p{L}\p{N}]|[\p{L}\p{N}])([^\p{L}\p{N}]*)$/u);
+    if (!match || match[2].length < 4 || CLOZE_SKIP.has(match[2].toLowerCase())) return;
+    if (!core || match[2].length > core[2].length) { best = index; core = match; }
+  });
+  if (!core) return null;
+  return {
+    before: words.slice(0, best).join(' ') + (best > 0 ? ' ' : '') + core[1],
+    missing: core[2],
+    after: core[3] + (best < words.length - 1 ? ' ' + words.slice(best + 1).join(' ') : ''),
+  };
+}
+
+// The card a way asks for this question.
+export function cardFor(way, question) {
+  if (way === 'type') return isTerm(question) ? 'fill' : 'written';
+  if (way === 'cloze') return makeCloze(conceptAnswer(question)) ? 'cloze' : 'fill';
+  return way;
+}
+
 // A new or learning idea is recognised first; a familiar or fading one is recalled. Each stage uses
-// the first of the student's picks that suits the answer, else whatever they did pick.
+// the first of the student's ways in its order, asked in the card that suits the answer.
 export function askCard(question, entry, today = dayKey(), types = DEFAULT_TYPES) {
   const picked = cleanTypes(types);
   const recall = entry.l >= FAMILIAR || isFading(entry, today);
-  const recallOrder = isTerm(question) ? ['fill', 'written', 'self'] : ['written', 'self'];
-  const order = recall ? [...recallOrder, 'mc'] : ['mc', 'self', ...recallOrder];
-  return { type: order.find(type => picked.includes(type)) || picked[0], recall };
+  const order = recall ? ['type', 'cloze', 'self', 'mc'] : ['mc', 'cloze', 'self', 'type'];
+  const way = order.find(option => picked.includes(option));
+  return { type: cardFor(way, question), recall };
 }
 
-// Why askCard chose what it did, for the decision log: every format, the ones ruled out and why,
-// and the one chosen. chosen overrides askCard (a missed question asked again in an easier type).
+// Why askCard chose what it did, for the decision log: every card, the ones ruled out and why,
+// and the one chosen. chosen overrides askCard (a missed question asked again in an easier card).
 // Phase 1 has no randomness: the rule picks one, so its probability is 1. When the student's own
-// picks leave a single format, the choice was theirs.
+// picks leave a single card, the choice was theirs.
 export function formatDecision(question, entry, today = dayKey(), types = DEFAULT_TYPES, chosen = null) {
   const picked = cleanTypes(types);
   const asked = askCard(question, entry, today, types);
   const type = chosen || asked.type;
   const term = isTerm(question);
+  const blankable = Boolean(makeCloze(conceptAnswer(question)));
+  const wayOf = { mc: 'mc', fill: 'type', written: 'type', cloze: 'cloze', self: 'self' };
   const mask = {};
-  LEARN_TYPES.forEach(option => {
-    if (!picked.includes(option)) mask[option] = 'turned_off';
+  CARD_TYPES.forEach(option => {
+    if (!picked.includes(wayOf[option]) && !(option === 'fill' && picked.includes('cloze') && !blankable)) mask[option] = 'turned_off';
     else if (option === 'fill' && !term) mask[option] = 'long_answer';
+    else if (option === 'written' && term) mask[option] = 'short_answer';
+    else if (option === 'cloze' && !blankable) mask[option] = 'short_answer';
   });
-  delete mask[type]; // the fallback can use a format the length rule would skip
-  const eligible = LEARN_TYPES.filter(option => !mask[option]);
-  return { candidates: [...LEARN_TYPES], eligible, mask, chosen: type, recall: asked.recall, source: eligible.length === 1 ? 'student' : 'rule' };
+  delete mask[type];
+  const eligible = CARD_TYPES.filter(option => !mask[option]);
+  return { candidates: [...CARD_TYPES], eligible, mask, chosen: type, recall: asked.recall, source: eligible.length === 1 ? 'student' : 'rule' };
 }
 
 export function askType(question, entry, today = dayKey(), types = DEFAULT_TYPES) {

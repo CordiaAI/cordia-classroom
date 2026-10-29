@@ -3,7 +3,7 @@ import { LoadingArea, Reveal, useLoadGate } from '../components/CordiaLoader';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowUpDown, ArrowUpRight, AudioLines, BookOpen, ChevronDown, FolderInput, FolderPlus, ImageIcon, Layers, Mic, NotebookPen, Pencil, PencilRuler, Plus, Search, Star, Trash2, Upload, X,
+  ArrowUpDown, ArrowUpRight, AudioLines, BookOpen, ChevronDown, FolderInput, FolderPlus, ImageIcon, Layers, Mic, NotebookPen, Pencil, PencilRuler, Plus, Search, Star, Target, Trash2, Upload, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
@@ -37,6 +37,7 @@ const SORTS = [
 const FILTERS = [
   { key: 'all', label: 'All' },
   { key: 'guides', label: 'Guides' },
+  { key: 'learn', label: 'Learn' },
   { key: 'lectures', label: 'Lectures' },
   { key: 'flashcards', label: 'Flashcards' },
   { key: 'practice', label: 'Practice' },
@@ -44,7 +45,14 @@ const FILTERS = [
 ];
 // Notes live in guides now, so old Notes links show them all.
 const TAB_ALIASES = { cards: 'flashcards', classes: 'all', notes: 'all' };
-const ICONS = { guide: BookOpen, note: NotebookPen, lecture: AudioLines, practice: PencilRuler };
+const ICONS = { guide: BookOpen, note: NotebookPen, lecture: AudioLines, practice: PencilRuler, learn: Target };
+
+// A guide's Learn progress for its Library row: "4 of 9 mastered", or not started.
+function learnLabel(guide) {
+  const levels = Object.values(guide?.flashcard_progress?.learn?.levels || {});
+  const mastered = levels.filter(entry => Number(entry?.l) === 3).length;
+  return levels.length ? `${mastered} mastered so far` : 'Not started';
+}
 
 function shortDate(value) {
   const date = new Date(value || '');
@@ -253,6 +261,9 @@ export default function LibraryPage() {
     if (['all', 'guides', 'starred'].includes(filter)) {
       guides.forEach(guide => rows.push({ kind: 'guide', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/guide/' + guide.id, progress: guide.read_progress, starred: Boolean(guide.is_bookmarked), guide }));
     }
+    if (filter === 'learn') {
+      guides.forEach(guide => rows.push({ kind: 'learn', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/learn/' + guide.id, meta: learnLabel(guide) }));
+    }
     if (filter === 'practice') {
       guides.forEach(guide => rows.push({ kind: 'practice', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/practice/' + guide.id }));
     }
@@ -336,12 +347,13 @@ export default function LibraryPage() {
           <Link href={item.href} className="lib-row-link ig-main">
             <span className="lib-row-title c-truncate ig-title">{item.title}</span>
             <span className="c-meta">
-              {item.kind === 'cards' ? (item.due ? `${item.due} due` : `${item.total} cards`) : [item.kind === 'note' ? 'Note' : item.kind === 'lecture' ? 'Lecture' : item.kind === 'practice' ? 'Problems with worked answers' : '', shortDate(item.date)].filter(Boolean).join(' · ')}
+              {item.kind === 'cards' ? (item.due ? `${item.due} due` : `${item.total} cards`) : [item.kind === 'note' ? 'Note' : item.kind === 'lecture' ? 'Lecture' : item.kind === 'practice' ? 'Problems with worked answers' : item.kind === 'learn' ? item.meta : '', shortDate(item.date)].filter(Boolean).join(' · ')}
             </span>
           </Link>
         )}
         {item.kind === 'cards' && <Link href={item.href} className="c-btn c-btn--secondary">Study</Link>}
         {item.kind === 'practice' && <Link href={item.href} className="c-btn c-btn--secondary" onClick={() => walkthroughEvent('practice-guide')}>Practice</Link>}
+        {item.kind === 'learn' && <Link href={item.href} className="c-btn c-btn--secondary">Learn</Link>}
         {item.kind === 'guide' && (
           <button type="button" className={'c-icon-btn lib-star ig-star' + (item.starred ? ' is-on' : '')} onClick={() => toggleStar(item.guide)} aria-pressed={item.starred} aria-label={item.starred ? 'Unstar' : 'Star'}>
             <Star size={20} strokeWidth={1.75} aria-hidden="true" fill={item.starred ? 'currentColor' : 'none'} />

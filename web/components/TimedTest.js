@@ -3,12 +3,13 @@ import { Clock, Play, Sparkles } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { conceptAnswer, shuffled } from '../lib/retainEngine.mjs';
 import { answerTimer } from '../lib/learningEvents.mjs';
+import { makeCloze } from '../lib/learnEngine.mjs';
 import { DEFAULT_MINUTES, MINUTE_CHOICES, buildTest, clock, markLocal, testResults, timeLimitSeconds } from '../lib/timedTest.mjs';
 import CordiaLoader from './CordiaLoader';
 import { MissFeedback } from './RetainCards';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
-const FORMAT = { mc: 'Choose', fill: 'Type it', written: 'Explain it' };
+const FORMAT = { mc: 'Choose', fill: 'Type it', written: 'Type it', cloze: 'Fill the blank' };
 const minutesLabel = minutes => (minutes === 0.5 ? '30 sec' : `${minutes} min`);
 
 // A missed idea on the results screen; Explain asks why the right answer is right.
@@ -195,6 +196,15 @@ export default function TimedTest({ guideId, questions, types, onDone, onExit, o
       {item.type === 'mc' && (options.current[item.id] || []).map(option => (
         <button key={option} type="button" className={'quiz-option' + (value === option ? ' selected' : '')} aria-pressed={value === option} onClick={() => setValue(option)}>{option}</button>
       ))}
+      {item.type === 'cloze' && (() => {
+        const cloze = makeCloze(conceptAnswer(question));
+        return (
+          <>
+            <p className="retain-cloze">{cloze.before}<span className="retain-cloze-blank" aria-label="missing word">______</span>{cloze.after}</p>
+            <input key={item.id} className="retain-fill-input" value={value} onChange={event => setValue(event.target.value)} onKeyDown={() => timer.current?.key()} placeholder="The missing word" aria-label="The missing word" autoFocus autoComplete="off" />
+          </>
+        );
+      })()}
       {item.type === 'fill' && (
         <input key={item.id} className="retain-fill-input" value={value} onChange={event => setValue(event.target.value)} onKeyDown={() => timer.current?.key()} placeholder="Type the answer" aria-label="Your answer" autoFocus autoComplete="off" />
       )}

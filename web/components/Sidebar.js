@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { AudioLines, BookOpen, CalendarDays, ChartNoAxesColumn, ChevronRight, CircleHelp, CreditCard, Folder, FolderPlus, GraduationCap, Layers, House, Library, Link2, LogOut, MessageCircle, Megaphone, Palette, PanelLeftClose, PanelLeftOpen, PencilRuler, Plus, Search, Settings, User } from 'lucide-react';
+import { AudioLines, BookOpen, CalendarDays, ChartNoAxesColumn, ChevronRight, CircleHelp, CreditCard, Folder, FolderPlus, GraduationCap, Layers, House, Library, Link2, LogOut, MessageCircle, Megaphone, Palette, PanelLeftClose, PanelLeftOpen, PencilRuler, Plus, Search, Settings, Target, User } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -35,6 +35,8 @@ const navItems = [
 const onFilter = key => (path, query) => path === '/library' && (query.tab || query.filter) === key;
 const studyItems = [
   { label: 'Guides', href: '/library?tab=guides', icon: BookOpen, here: onFilter('guides') },
+  // Learn opens on a guide, so this lists the guides to learn (or is lit while learning one).
+  { label: 'Learn', href: '/library?tab=learn', icon: Target, here: (path, query) => path.startsWith('/learn') || onFilter('learn')(path, query) },
   { label: 'Lectures', href: '/library?tab=lectures', icon: AudioLines, here: onFilter('lectures') },
   { label: 'Flashcards', href: '/library?tab=flashcards', icon: Layers, here: (path, query) => onFilter('flashcards')(path, query) || onFilter('cards')(path, query) },
   { label: 'Practice', href: '/library?tab=practice', icon: PencilRuler, here: (path, query) => path.startsWith('/practice') || onFilter('practice')(path, query) },
