@@ -34,7 +34,8 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart, 
         .map(item => ({ question: questions[item.concept]?.question || '', answer: conceptAnswer(questions[item.concept]), ...(item.confidence === 'sure' ? { sure: true } : {}) }))
         .filter(item => item.question && item.answer)
         .sort((a, b) => Number(Boolean(b.sure)) - Number(Boolean(a.sure)));
-      rememberRetainMisses(guideId, misses);
+      const cleared = firstAttempts(next).filter(item => item.credit === 1).map(item => questions[item.concept]?.question).filter(Boolean);
+      rememberRetainMisses(guideId, misses, { cleared });
       walkthroughEvent('quiz-done');
       setSaving(true);
       const data = await apiFetch(`/quiz/${guideId}/submit`, {

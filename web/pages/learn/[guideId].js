@@ -206,7 +206,8 @@ export default function LearnPage() {
     save(levels);
     const results = Object.entries(done.results);
     const missed = results.filter(([, item]) => item.missed).map(([concept]) => questions[concept]);
-    rememberRetainMisses(guideId, missed.map(question => ({ question: question.question, answer: conceptAnswer(question) })).filter(item => item.question && item.answer));
+    const cleared = results.filter(([, item]) => !item.missed).map(([concept]) => questions[concept]?.question).filter(Boolean);
+    rememberRetainMisses(guideId, missed.map(question => ({ question: question.question, answer: conceptAnswer(question) })).filter(item => item.question && item.answer), { cleared });
     recordStudy({ guideId, guideTitle: title, minutes: (Date.now() - roundStart.current) / 60000, cards: results.length, right: results.length - missed.length, total: results.length, kind: 'quiz' });
     setScreen('checkpoint');
   }
