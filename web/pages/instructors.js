@@ -128,7 +128,7 @@ export default function Instructors() {
         .ins-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
         .ins-suggest { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin: 4px 0 0; padding: 4px; list-style: none; border-radius: 16px; background: var(--surface-raised); box-shadow: var(--shadow-float); }
         .ins-suggest button { width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none; font: 500 15px/1.3 var(--font-sans); text-align: left; cursor: pointer; color: var(--ink); }
-        .ins-suggest button:hover { background: var(--olive-tint); }
+        .ins-suggest button:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); }
       `}</style>
     </PublicPage>
   );

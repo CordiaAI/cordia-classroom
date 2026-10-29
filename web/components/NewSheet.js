@@ -526,7 +526,8 @@ export default function NewSheet() {
         .new-sheet { width: min(560px, 100%); }
         .new-panel { display: grid; gap: 16px; }
         .new-drop { display: grid; justify-items: center; gap: 12px; width: 100%; padding: 32px 16px; border: 2px dashed var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); cursor: pointer; font:600 17px/1.15 var(--font-sans); }
-        .new-drop:hover, .new-drop.is-over { border-color: var(--olive); background: var(--olive-tint); }
+        .new-drop.is-over { border-color: var(--olive); background: var(--olive-tint); }
+        .new-drop:hover { box-shadow: var(--lift-shadow); transform: var(--lift); }
         .new-drop :global(.lucide) { color: var(--olive-ink); }
         .new-formats { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font:600 13px/1 var(--font-sans); color: var(--muted); }
         .new-formats > span { display: inline-flex; align-items: center; gap: 6px; }

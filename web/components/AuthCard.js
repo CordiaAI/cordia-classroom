@@ -285,7 +285,7 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
         .auth-tabs { width: 100%; }
         .auth-tabs :global(button), .auth-tabs :global(a) { flex: 1; }
         .auth-google { display: flex; align-items: center; justify-content: center; gap: 10px; height: 48px; border: 1px solid var(--hairline); border-radius:999px; background: var(--surface-card); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; }
-        .auth-google:hover:not(:disabled) { background: var(--surface-card); }
+        .auth-google:hover:not(:disabled) { box-shadow: var(--lift-shadow); transform: var(--lift); }
         .auth-or { display: flex; align-items: center; gap: 12px; color: var(--muted); font:500 13px/1 var(--font-sans); }
         .auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--olive-tint); }
         .auth-form { display: grid; gap: 14px; }

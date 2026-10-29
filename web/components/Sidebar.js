@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { AudioLines, BookOpen, CalendarDays, ChartNoAxesColumn, ChevronRight, CircleHelp, CreditCard, Folder, FolderPlus, GraduationCap, Layers, House, Library, Link2, LogOut, MessageCircle, Megaphone, Palette, PanelLeftClose, PanelLeftOpen, PencilRuler, Plus, Search, Settings, Target, User } from 'lucide-react';
+import { CalendarDays, ChartNoAxesColumn, CircleHelp, CreditCard, Ellipsis, FolderPlus, GraduationCap, House, Library, Link2, LogOut, MessageCircle, Megaphone, Moon, Palette, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Sun, User } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -14,39 +14,46 @@ import TutorBubble from './TutorBubble';
 import { openNewSheet } from '../lib/newSheet';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { classLabel } from '../lib/classLabel';
+import { coverFor } from '../lib/coverDesign.mjs';
 import { latestFolders, loadFolders, onFoldersChanged } from '../lib/folders';
 import { HELP_EVENT } from '../lib/help';
+import { forgetDueCount, freshDueCount, loadDueCount } from '../lib/studyDue';
+import { setThemePreference, themePreference } from '../lib/theme';
 
-// One navigation: the same three places on the glass top bar and the mobile tab bar, plus New.
-// The Tutor is the bubble in the corner (TutorBubble). Calendar is its own place: study blocks and
-// lecture to-dos show without Canvas, and Canvas adds its deadlines when connected.
+// The sidebar (wide screens), top to bottom: New, Search, the main places, your classes, the
+// Assistant, then the account row with its menu. Study modes (guides, Learn, lectures, flashcards,
+// practice) are Library filters and guide tabs; Canvas is in Settings › Connectors and on the
+// Dashboard. The Tutor is the bubble in the corner (TutorBubble).
 const navItems = [
+  { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: House, spot: 'nav-today' },
+  // Study now (pages/session.js): due flashcards, Learn ideas, misses and open practice in one round.
+  { key: 'study', label: 'Study now', href: '/session', icon: GraduationCap, spot: 'nav-study', badge: true },
+  { key: 'library', label: 'Library', href: '/library', icon: Library, spot: 'nav-library' },
+  { key: 'calendar', label: 'Calendar', href: '/calendar', icon: CalendarDays, spot: 'nav-calendar', tip: 'calendar' },
+  { key: 'progress', label: 'Progress', href: '/progress', icon: ChartNoAxesColumn, spot: 'nav-progress' },
+];
+// Cordia Assistant has its own page (pages/assistant.js); it sits under the classes.
+const assistantItem = { key: 'assistant', label: 'Assistant', href: '/assistant', icon: MessageCircle, spot: 'nav-assistant' };
+
+// The phone tab bar keeps its five: Dashboard, Library, New (between them), Calendar, Assistant.
+const tabItems = [
   { label: 'Dashboard', href: '/dashboard', icon: House, spot: 'nav-today' },
   { label: 'Library', href: '/library', icon: Library, spot: 'nav-library' },
-  { label: 'Calendar', href: '/calendar', icon: CalendarDays, spot: 'nav-calendar', tip: 'calendar' },
-  // Not on the phone tab bar (five fit); the calendar's connect card and the dashboard reach it.
-  { label: 'Canvas', href: '/canvas', icon: GraduationCap, spot: 'nav-canvas', phone: false },
-  // Cordia Assistant has its own page (pages/assistant.js).
+  { label: 'Calendar', href: '/calendar', icon: CalendarDays, spot: 'nav-calendar' },
   { label: 'Assistant', href: '/assistant', icon: MessageCircle, spot: 'nav-assistant' },
 ];
 
-// The sidebar's Study section: Library's filters, one tap each (Tutor is the corner bubble and
-// Progress is in the account menu).
-const onFilter = key => (path, query) => path === '/library' && (query.tab || query.filter) === key;
-const studyItems = [
-  { label: 'Guides', href: '/library?tab=guides', icon: BookOpen, here: onFilter('guides') },
-  // Learn opens on a guide, so this lists the guides to learn (or is lit while learning one).
-  { label: 'Learn', href: '/library?tab=learn', icon: Target, here: (path, query) => path.startsWith('/learn') || onFilter('learn')(path, query) },
-  { label: 'Lectures', href: '/library?tab=lectures', icon: AudioLines, here: onFilter('lectures') },
-  { label: 'Flashcards', href: '/library?tab=flashcards', icon: Layers, here: (path, query) => onFilter('flashcards')(path, query) || onFilter('cards')(path, query) },
-  { label: 'Practice', href: '/library?tab=practice', icon: PencilRuler, here: (path, query) => path.startsWith('/practice') || onFilter('practice')(path, query) },
-];
-const MAX_CLASSES = 8;
-const sidebarClasses = folders => (folders || []).map(folder => ({ id: folder.id, name: classLabel(folder.name).title || 'Class' }))
-  .sort((a, b) => a.name.localeCompare(b.name));
+// Classes: the first five by what the sidebar shows (course code, else name), each with its cover colour.
+export const MAX_CLASSES = 5;
+export function sidebarClasses(folders) {
+  return (folders || []).map(folder => {
+    const { title, code } = classLabel(folder.name);
+    return { id: folder.id, name: title || 'Class', code: code || title || 'Class', tone: (coverFor(folder).color % 8) + 1 };
+  }).sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+}
 
-// Guides, notes, lectures, classes and every study screen live inside Library.
-const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice', '/nclex', '/folder', '/create', '/session', '/class', '/smartnotes', '/lecture'];
+// Guides, notes, lectures, classes and every study screen live inside Library (the phone tab bar).
+const LIBRARY_PATHS = ['/library', '/guide', '/flashcards', '/quiz', '/practice', '/nclex', '/learn', '/folder', '/create', '/session', '/class', '/smartnotes', '/lecture'];
 
 export function activeNavHref(pathname, section = '') {
   if (pathname === '/dashboard') return '/dashboard';
@@ -57,11 +64,22 @@ export function activeNavHref(pathname, section = '') {
   return '';
 }
 
+// The one sidebar item for this page: a nav key, 'class:<id>' for a class listed in the sidebar,
+// or '' (Settings and other pages outside the list). Only that item is marked current.
+export function sideCurrent(pathname, query = {}, classIds = []) {
+  if (pathname === '/session') return 'study';
+  if (pathname === '/progress') return 'progress';
+  if (pathname === '/folder/[id]' && classIds.includes(String(query.id || ''))) return 'class:' + query.id;
+  const href = activeNavHref(pathname);
+  if (href === '/canvas') return '';
+  return href ? href.slice(1) : '';
+}
+
 function isMac() {
   return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
 }
 
-export default function Sidebar({ timerState, setTimerState }) {
+export default function Sidebar({ timerState, setTimerState, focus = false }) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -72,37 +90,37 @@ export default function Sidebar({ timerState, setTimerState }) {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [timerOpen, setTimerOpen] = useState(false);
   const [canReviewFeedback, setCanReviewFeedback] = useState(false);
+  const [dark, setDark] = useState(false);
   const timerRef = useRef(null);
   const [shortcut, setShortcut] = useState('Ctrl K');
   const avatarRef = useRef(null);
   const sideAvatarRef = useRef(null);
   const [menuFrom, setMenuFrom] = useState('top'); // which avatar opened the account menu
   // Wide screens: the sidebar folds to icons. Remembered on this device; _document applies it before paint.
+  // From 768 to 1099px it is always folded (system.css), so it counts as folded there too.
   const [collapsed, setCollapsed] = useState(false);
-  useEffect(() => { setCollapsed(document.documentElement.dataset.side === 'collapsed'); }, []);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    setCollapsed(document.documentElement.dataset.side === 'collapsed');
+    const media = window.matchMedia('(max-width: 1099px)');
+    const update = () => setNarrow(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
   function toggleSide() {
     const next = !collapsed;
     setCollapsed(next);
     document.documentElement.dataset.side = next ? 'collapsed' : 'open';
     try { localStorage.setItem('cordiaSide', next ? 'collapsed' : 'open'); } catch { /* storage blocked */ }
   }
+  // Names show as tooltips only when folded to icons; with labels showing they'd only repeat them.
+  const folded = collapsed || narrow;
+  const tip = label => (folded ? label : undefined);
   const active = activeNavHref(router.pathname, String(router.query.section || ''));
 
-  // Library and Canvas open into their own lists (Library: each class). Which are open is remembered.
-  // Unset means "open while you're in it"; the caret sets it either way.
-  const [groups, setGroups] = useState({ '/library': true });
-  const [classes, setClasses] = useState(() => sidebarClasses(latestFolders()));
-  useEffect(() => {
-    try { const saved = JSON.parse(localStorage.getItem('cordiaSideGroups') || 'null'); if (saved) setGroups(saved); } catch { /* storage blocked */ }
-  }, []);
-  function toggleGroup(href, open) {
-    setGroups(current => {
-      const next = { ...current, [href]: !open };
-      try { localStorage.setItem('cordiaSideGroups', JSON.stringify(next)); } catch { /* storage blocked */ }
-      return next;
-    });
-  }
   // Classes come from the shared folders list, and again whenever a class is added, renamed or deleted.
+  const [classes, setClasses] = useState(() => (latestFolders() ? sidebarClasses(latestFolders()) : null));
   useEffect(() => {
     let live = true;
     const load = () => loadFolders().then(data => { if (live && Array.isArray(data?.folders)) setClasses(sidebarClasses(data.folders)); });
@@ -110,22 +128,25 @@ export default function Sidebar({ timerState, setTimerState }) {
     const off = onFoldersChanged(load);
     return () => { live = false; off(); };
   }, []);
+  const shownClasses = (classes || []).slice(0, MAX_CLASSES);
   const query = router.query || {};
-  const subLink = (item, here) => (
-    <li key={item.href}>
-      <Link className="c-side-sub" href={item.href} aria-current={here ? 'page' : undefined} title={item.label}>
-        <item.icon size={16} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">{item.label}</span>
-      </Link>
-    </li>
-  );
-  function subList(href) {
-    if (href !== '/library') return null;
-    return [
-      ...classes.slice(0, MAX_CLASSES).map(folder => subLink({ label: folder.name, href: `/folder/${folder.id}`, icon: Folder }, router.pathname === '/folder/[id]' && query.id === folder.id)),
-      classes.length > MAX_CLASSES && subLink({ label: `All ${classes.length} classes`, href: '/library', icon: Library }, false),
-      subLink({ label: 'Add a class', href: '/library?add=class', icon: FolderPlus }, false),
-    ].filter(Boolean);
-  }
+  const current = sideCurrent(router.pathname, query, shownClasses.map(item => String(item.id)));
+
+  // Study now's count. Study screens hide the sidebar, and studying changes the count, so leaving
+  // one loads it again; otherwise a count up to five minutes old is kept. Phones don't show it.
+  const [due, setDue] = useState(null);
+  const wasStudying = useRef(false);
+  useEffect(() => {
+    if (focus) { wasStudying.current = true; return undefined; }
+    if (!window.matchMedia('(min-width: 768px)').matches) return undefined;
+    const force = wasStudying.current;
+    wasStudying.current = false;
+    if (force) forgetDueCount();
+    else setDue(current => current ?? freshDueCount());
+    let live = true;
+    loadDueCount({ force }).then(count => { if (live) setDue(count); });
+    return () => { live = false; };
+  }, [focus, router.pathname]);
 
   useEffect(() => {
     setShortcut(isMac() ? '⌘K' : 'Ctrl K');
@@ -162,6 +183,11 @@ export default function Sidebar({ timerState, setTimerState }) {
     setMenuOpen(false);
     if (refocus) (menuFrom === 'side' ? sideAvatarRef : avatarRef).current?.focus({ preventScroll: true });
   }, [menuFrom]);
+  function toggleMenu(from) {
+    setDark(themePreference() === 'dark');
+    setMenuFrom(from);
+    setMenuOpen(open => !open);
+  }
 
   useEffect(() => {
     const closeAll = () => { setMenuOpen(false); setShowSearch(false); setTimerOpen(false); };
@@ -179,6 +205,8 @@ export default function Sidebar({ timerState, setTimerState }) {
     return () => { document.removeEventListener('pointerdown', onDown); window.removeEventListener('keydown', onKey); };
   }, [timerOpen]);
 
+  // The phone top bar's menu has everything; the sidebar's has Settings, Help, Send feedback,
+  // the theme and Sign out (Progress is in the sidebar; Appearance, Plan and Connectors are in Settings).
   const accountItems = [
     { key: 'progress', label: 'Progress', icon: ChartNoAxesColumn, onSelect: () => router.push('/progress') },
     { key: 'profile', label: 'Settings', icon: Settings, onSelect: () => router.push('/settings') },
@@ -188,6 +216,12 @@ export default function Sidebar({ timerState, setTimerState }) {
     { key: 'help', label: 'Help', icon: CircleHelp, onSelect: () => setShowHelp(true) },
     { key: 'feedback', label: 'Send feedback', icon: Megaphone, onSelect: () => setShowFeedback(true) },
     { key: 'signout', label: 'Sign out', icon: LogOut, separated: true, onSelect: () => signOut() },
+  ];
+  const themeItem = { key: 'theme', label: dark ? 'Light theme' : 'Dark theme', icon: dark ? Sun : Moon, onSelect: () => setThemePreference(dark ? 'light' : 'dark') };
+  const sideMenuItems = [
+    ...accountItems.filter(item => ['profile', 'help', 'feedback'].includes(item.key)),
+    themeItem,
+    ...accountItems.filter(item => item.key === 'signout'),
   ];
 
   function signOut() {
@@ -204,9 +238,23 @@ export default function Sidebar({ timerState, setTimerState }) {
     .map(part => part[0])
     .join('')
     .toUpperCase();
-  const onProfile = ['/settings', '/billing', '/progress'].includes(router.pathname);
+  const onProfile = ['/settings', '/billing'].includes(router.pathname);
   const { minutes = 25, seconds = 0, isRunning = false } = timerState || {};
   const clock = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const dueText = due > 0 ? `${due} ${due === 1 ? 'item' : 'items'} due` : '';
+
+  const sideLink = item => (
+    <Link key={item.key} className="c-side-item" href={item.href} aria-current={current === item.key ? 'page' : undefined} data-tip={item.tip} data-spot={item.spot}
+      title={tip(item.badge && dueText ? `${item.label} · ${dueText}` : item.label)}>
+      <item.icon size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">{item.label}</span>
+      {item.badge && due > 0 && (
+        <>
+          <span className="c-side-badge" aria-hidden="true">{due > 99 ? '99+' : due}</span>
+          <span className="sr-only">, {dueText}</span>
+        </>
+      )}
+    </Link>
+  );
 
   return (
     <>
@@ -218,55 +266,53 @@ export default function Sidebar({ timerState, setTimerState }) {
             <AcademicInfinityMark className="top-navigation-mark" title="" />
             <span className="c-side-label">cordia</span>
           </Link>
-          <button type="button" className="c-side-toggle" onClick={toggleSide} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!collapsed}>
+          <button type="button" className="c-side-toggle" onClick={toggleSide} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={tip('Expand sidebar')} aria-expanded={!collapsed}>
             {collapsed ? <PanelLeftOpen size={20} strokeWidth={1.75} aria-hidden="true" /> : <PanelLeftClose size={20} strokeWidth={1.75} aria-hidden="true" />}
           </button>
         </div>
-        <button type="button" className="c-btn c-btn--primary c-side-new" data-spot="new" onClick={() => openNewSheet()} title="New">
+        <button type="button" className="c-btn c-btn--primary c-side-new" data-spot="new" onClick={() => openNewSheet()} aria-label="New" title={tip('New')}>
           <Plus size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">New</span>
         </button>
-        <button type="button" className="c-side-item" onClick={() => setShowSearch(true)} title={`Search (${shortcut})`} aria-keyshortcuts={shortcut === '⌘K' ? 'Meta+K' : 'Control+K'}>
-          <Search size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">Search</span><kbd className="c-side-kbd">{shortcut}</kbd>
+        <button type="button" className="c-side-item" onClick={() => setShowSearch(true)} aria-label={`Search (${shortcut})`} title={tip(`Search (${shortcut})`)} aria-keyshortcuts={shortcut === '⌘K' ? 'Meta+K' : 'Control+K'}>
+          <Search size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">Search</span><kbd className="c-side-kbd" aria-hidden="true">{shortcut}</kbd>
         </button>
         <nav className="c-side-nav" aria-label="Primary">
-          {navItems.map(item => {
-            const hasSub = item.href === '/library';
-            const open = hasSub && !collapsed && (groups[item.href] ?? active === item.href);
-            return (
-              <div key={item.href} className="c-side-group">
-                <div className="c-side-row">
-                  <Link className="c-side-item" href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.tip} data-spot={item.spot} title={item.label}>
-                    <item.icon size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">{item.label}</span>
-                  </Link>
-                  {hasSub && (
-                    <button type="button" className={'c-side-caret' + (open ? ' is-open' : '')} onClick={() => toggleGroup(item.href, open)} aria-expanded={Boolean(open)} aria-label={`${open ? 'Hide' : 'Show'} classes`}>
-                      <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
-                    </button>
-                  )}
-                </div>
-                {open && <ul className="c-side-subs">{subList(item.href)}</ul>}
-              </div>
-            );
-          })}
-          <div className="c-side-section">
-            <h2 className="c-side-heading">Study</h2>
-            {studyItems.map(item => (
-              <Link key={item.href} className="c-side-item is-study" href={item.href} aria-current={item.here(router.pathname, query) ? 'page' : undefined} title={item.label}>
-                <item.icon size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">{item.label}</span>
+          {navItems.map(sideLink)}
+          <div className="c-side-section" role="group" aria-labelledby="c-side-classes">
+            <div className="c-side-heading-row">
+              <h2 id="c-side-classes" className="c-side-heading">Classes</h2>
+              <Link className="c-side-add" href="/library?add=class" aria-label="Add a class">
+                <Plus size={16} strokeWidth={2} aria-hidden="true" />
               </Link>
-            ))}
+            </div>
+            {classes && classes.length > 0 && (
+              <ul className="c-side-classes">
+                {shownClasses.map(item => (
+                  <li key={item.id}>
+                    <Link className="c-side-item c-side-class" href={`/folder/${item.id}`} aria-current={current === 'class:' + item.id ? 'page' : undefined}
+                      aria-label={item.code === item.name ? item.name : `${item.code}, ${item.name}`} title={tip(item.code)}>
+                      <span className="c-side-dot" style={{ '--dot': `var(--cover-ink-${item.tone})` }} aria-hidden="true" />
+                      <span className="c-side-label">{item.code}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {classes && classes.length > MAX_CLASSES && <Link className="c-side-all" href="/library">See all {classes.length}</Link>}
+            {classes && classes.length === 0 && (
+              <Link className="c-side-item c-side-empty" href="/library?add=class" title={tip('Add a class')}>
+                <FolderPlus size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">Add a class</span>
+              </Link>
+            )}
           </div>
+          {sideLink(assistantItem)}
         </nav>
         <div className="c-side-foot">
-          <button type="button" className="c-side-item" onClick={() => setShowHelp(true)} title="Help">
-            <CircleHelp size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">Help</span>
-          </button>
-          <button type="button" className="c-side-item" onClick={() => setShowFeedback(true)} title="Send feedback">
-            <Megaphone size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">Send feedback</span>
-          </button>
-          <button ref={sideAvatarRef} type="button" className={'c-side-item c-side-account' + (onProfile ? ' is-active' : '')} onClick={() => { setMenuFrom('side'); setMenuOpen(open => !open); }} aria-expanded={menuOpen && menuFrom === 'side'} aria-haspopup="menu" title={displayName || 'Account'}>
+          <button ref={sideAvatarRef} type="button" className={'c-side-item c-side-account' + (onProfile ? ' is-active' : '')} onClick={() => toggleMenu('side')} aria-expanded={menuOpen && menuFrom === 'side'} aria-haspopup="menu"
+            aria-label={`${displayName || 'Account'}, account menu`} title={tip(displayName || 'Account')}>
             <span className="c-avatar c-side-avatar" aria-hidden="true">{initials || <User size={18} strokeWidth={1.75} />}</span>
             <span className="c-side-label c-side-who"><strong className="c-truncate">{name || emailName || 'Account'}</strong>{email && <span className="c-truncate">{email}</span>}</span>
+            <Ellipsis className="c-side-dots" size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
       </aside>
@@ -279,8 +325,8 @@ export default function Sidebar({ timerState, setTimerState }) {
         </Link>
 
         <nav className="c-nav" aria-label="Primary">
-          {navItems.map(item => (
-            <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-tip={item.tip} data-spot={item.spot}>
+          {[...navItems, assistantItem].map(item => (
+            <Link key={item.href} href={item.href} aria-current={current === item.key ? 'page' : undefined} data-tip={item.tip} data-spot={item.spot}>
               <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
               {item.label}
             </Link>
@@ -296,18 +342,17 @@ export default function Sidebar({ timerState, setTimerState }) {
             <Plus size={20} strokeWidth={1.75} aria-hidden="true" />New
           </button>
           <div className="c-menu-wrap">
-            <button ref={avatarRef} type="button" className={'c-avatar' + (onProfile ? ' is-active' : '')} onClick={() => { setMenuFrom('top'); setMenuOpen(open => !open); }} aria-expanded={menuOpen && menuFrom === 'top'} aria-haspopup="menu" aria-label={initials ? `${initials} account menu` : 'Account menu'}>
+            <button ref={avatarRef} type="button" className={'c-avatar' + (onProfile ? ' is-active' : '')} onClick={() => toggleMenu('top')} aria-expanded={menuOpen && menuFrom === 'top'} aria-haspopup="menu" aria-label={initials ? `${initials} account menu` : 'Account menu'}>
               {initials || <User size={20} strokeWidth={1.75} aria-hidden="true" />}
             </button>
-            {/* The sidebar has its own Help and Send feedback, so its account menu leaves them out. */}
             <AccountMenu open={menuOpen} onClose={closeMenu} anchorRef={menuFrom === 'side' ? sideAvatarRef : avatarRef} placement={menuFrom === 'side' ? 'above' : 'below'}
-              items={menuFrom === 'side' ? accountItems.filter(item => item.key !== 'help' && item.key !== 'feedback') : accountItems} />
+              items={menuFrom === 'side' ? sideMenuItems : accountItems} />
           </div>
         </div>
       </header>
 
       <nav className="c-tabbar" aria-label="Primary">
-        {navItems.slice(0, 2).map(item => (
+        {tabItems.slice(0, 2).map(item => (
           <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-spot={item.spot}>
             <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
             {item.label}
@@ -317,7 +362,7 @@ export default function Sidebar({ timerState, setTimerState }) {
           <span className="c-tab-new-dot"><Plus size={22} strokeWidth={2} aria-hidden="true" /></span>
           New
         </button>
-        {navItems.slice(2).filter(item => item.phone !== false).map(item => (
+        {tabItems.slice(2).map(item => (
           <Link key={item.href} href={item.href} aria-current={active === item.href ? 'page' : undefined} data-spot={item.spot}>
             <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
             {item.label}

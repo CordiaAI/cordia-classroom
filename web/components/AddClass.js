@@ -103,7 +103,7 @@ export default function AddClass({ onAdded, onCancel, folderId = '', withName = 
         .cls-label { font-size: 13px; }
         .cls-suggest { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; margin-top: 4px; padding: 4px; list-style: none; max-height: 264px; overflow-y: auto; background: var(--canvas) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
         .cls-suggest button { display: flex; align-items: baseline; gap: 8px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none; color: var(--ink); font: 500 15px/1.3 var(--font-sans); text-align: left; cursor: pointer; }
-        .cls-suggest button:hover, .cls-suggest button:focus-visible { background: var(--hover); }
+        .cls-suggest button:hover, .cls-suggest button:focus-visible { background: var(--lift-pane); box-shadow: var(--lg-highlight); }
         .cls-add-actions { display: flex; gap: 4px; }
         .cls-error { grid-column: 1 / -1; margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
         /* Phones stack the fields, so the suggestions push Add down instead of covering it. */

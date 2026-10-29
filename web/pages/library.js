@@ -524,7 +524,7 @@ export default function LibraryPage() {
         .library .lib-filters .c-chip { flex: 0 0 auto; min-width: 64px; padding: 0 16px; justify-content: center; }
         /* Like the sidebar: the chosen filter is a raised pane, the rest are plain until hovered. */
         .library .lib-filters .c-chip:not([aria-pressed='true']) { background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: var(--muted); }
-        .library .lib-filters .c-chip:not([aria-pressed='true']):hover { background: var(--olive-tint) !important; color: var(--ink); }
+        .library .lib-filters .c-chip:not([aria-pressed='true']):hover { color: var(--ink); }
         .library .lib-group { padding: 6px; }
         .library .lib-group.is-drop { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
         .library .lib-group-head { display: flex; align-items: center; gap: 6px; min-height: 52px; padding-right: 12px; }
@@ -539,7 +539,7 @@ export default function LibraryPage() {
         .library .lib-list { display: grid; gap: 2px; }
         /* Rows are soft rounded tiles: a gentle tint on hover, no lines, edges, shadow or underline. */
         .library .lib-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 4px 12px; border: 0; border-radius: var(--r-row, 16px); }
-        .library .lib-list .lib-row:hover, .library .lib-list .lib-row:focus-within:has(:focus-visible) { border-color: transparent !important; box-shadow: none !important; background: var(--olive-tint); }
+        .library .lib-list .lib-row:hover, .library .lib-list .lib-row:focus-within:has(:focus-visible) { border-color: transparent !important; border-radius: var(--r-input); box-shadow: var(--lift-shadow) !important; background: var(--lift-pane); transform: var(--lift); }
         .library .lib-row:focus-within:has(:focus-visible) { outline: 2px solid var(--olive); outline-offset: -2px; }
         .library .lib-row.is-dragging { opacity: .5; }
         .library .lib-kind { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 auto; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }

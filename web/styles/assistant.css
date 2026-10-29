@@ -52,7 +52,7 @@
 .asst-option strong { font-weight: 600; }
 .asst-option[aria-checked='true'] { background: var(--olive-tint); border-color: transparent; color: var(--olive-ink); }
 .asst-option[aria-checked='true'] .c-meta { color: var(--olive-ink); }
-@media (hover: hover) { .asst-option:hover { background: var(--olive-tint); } }
+@media (hover: hover) { .asst-option:hover { background: var(--lift-pane); box-shadow: var(--lift-shadow); transform: var(--lift); } }
 
 /* Style sliders beside a sample text. */
 .asst-split { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: 16px; align-items: start; }

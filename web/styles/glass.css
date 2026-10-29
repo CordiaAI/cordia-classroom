@@ -28,7 +28,7 @@
 
 /* Quiet buttons and icon buttons stay lighter so rows of them don't feel heavy. */
 :is(.c-btn--quiet, .c-icon-btn) { box-shadow: var(--lg-highlight); }
-:is(.c-btn--quiet, .c-icon-btn):hover:not(:disabled) { background: var(--lg-sheen), var(--lg-fill-strong); }
+.c-btn--quiet:hover:not(:disabled) { background: var(--lift-pane); }
 
 /* Primary actions: olive glass with the same rim and sheen. */
 :is(.c-btn--primary, .btn, .btn-green, .c-tab-new-dot) {
@@ -36,7 +36,7 @@
   border: 1px solid var(--lg-edge);
   box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow);
 }
-:is(.c-btn--primary, .btn, .btn-green):hover:not(:disabled) { background: var(--lg-sheen-olive), var(--olive-press); }
+/* Hover keeps the olive: the lift and deeper shadow come from the hover system in system.css. */
 
 /* Selected states: olive glass for pills and chips; a raised clear pane for segment tabs. */
 :is(.c-pill[aria-current='page'], .c-pill[aria-selected='true'], .quiz-mode.is-on) {
@@ -96,7 +96,7 @@ select.c-select.c-select {
 .c-toast:has(> button, > a) { padding-right: 6px; gap: 4px; }
 /* Undo reads as the toast's action, not a second button stacked on it. */
 .c-toast > .c-btn--quiet { background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: var(--olive-ink); font-weight: 600; }
-.c-toast > .c-btn--quiet:hover { background: var(--olive-tint) !important; }
+.c-toast > .c-btn--quiet:hover { background: var(--lift-pane) !important; }
 @keyframes c-toast-in { from { opacity: 0; transform: translate(-50%, 12px) scale(.98); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (min-width: 768px) {
   :root:has(.app-shell:not(.is-focus) .c-side) .c-toast { left: calc(50% + (var(--side-w) + var(--side-gap)) / 2); }
@@ -150,18 +150,16 @@ select.c-select.c-select {
     backdrop-filter: var(--lg-filter);
     box-shadow: var(--lg-highlight), var(--lg-depth-float);
   }
-  /* Where you are: a raised clear pane with the olive mark, the same as the phone tab bar. */
-  .c-side :is(.c-side-item, .c-side-sub)[aria-current='page'] {
-    background: var(--lg-sheen), var(--lg-fill-strong);
+  /* Where you are: a raised pane with the olive tint and olive icon, the same as selected pills.
+     Only the current page wears it; hover is the plain wash in system.css. */
+  .c-side .c-side-item { border: 1px solid transparent; }
+  .c-side .c-side-item[aria-current='page'] {
+    background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--lg-sheen), var(--lg-fill-strong);
     border-color: var(--lg-edge);
     box-shadow: var(--lg-highlight), var(--lg-shadow);
     color: var(--ink);
   }
-  .c-side .c-side-item { border: 1px solid transparent; }
-  .c-side :is(.c-side-item, .c-side-sub)[aria-current='page'] .lucide { color: var(--olive-ink); }
-  .c-side .c-side-sub[aria-current='page'] { border: 1px solid var(--lg-edge); border-left: 2px solid var(--olive); }
-  .c-side-row .c-side-item[aria-current='page'] + .c-side-caret { color: var(--muted); }
-  .c-side-row .c-side-item[aria-current='page'] + .c-side-caret:hover { background: var(--lg-fill-strong); color: var(--ink); }
+  .c-side .c-side-item[aria-current='page'] .lucide { color: var(--olive-ink); }
 }
 
 /* The highlight menu over notes: frosted glass rather than a solid menu (the text under it
@@ -273,7 +271,7 @@ body { touch-action: manipulation; }
 .tutor-chats-title { margin: 8px 0 0; font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
 .tutor-chats-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .tutor-chat-row { display: grid; gap: 2px; width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid var(--hairline); border-radius: var(--r-input); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; transition: background var(--dur) var(--ease); }
-.tutor-chat-row:hover:not(:disabled) { background: var(--olive-tint); }
+.tutor-chat-row:hover:not(:disabled) { background: var(--lift-pane); box-shadow: var(--lift-shadow); transform: var(--lift); }
 .tutor-chat-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.4 var(--font-sans); }
 .tutor-chat-row .c-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tutor-chats-btn[aria-pressed='true'] { background: var(--olive-tint) !important; color: var(--olive-ink) !important; }
@@ -413,7 +411,7 @@ body { touch-action: manipulation; }
 .learn-way.is-on { box-shadow: 0 0 0 2px var(--olive), var(--lg-highlight), var(--lg-shadow) !important; border-color: transparent !important; }
 
 /* Selected rows and tabs: a raised pane with the olive tint, not a flat tint. */
-:is(.c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-nav a[aria-current='page'], .c-search-hit.is-active, .c-side-account[aria-expanded='true']) {
+:is(.c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-nav a[aria-current='page'], .c-search-hit.is-active) {
   background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--lg-sheen), var(--lg-fill-strong) !important;
   border-color: var(--lg-edge) !important;
   box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
@@ -480,4 +478,4 @@ textarea:not(.c-input) {
   border: 1px solid var(--lg-edge) !important;
   box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow) !important;
 }
-:is(.btn-upgrade, .cordia-tutor-send):hover:not(:disabled) { background: var(--lg-sheen-olive), var(--olive-press) !important; }
+:is(.btn-upgrade, .cordia-tutor-send):hover:not(:disabled) { background: var(--lg-sheen-olive), var(--olive) !important; box-shadow: var(--lift-shadow) !important; transform: var(--lift); }

@@ -46,16 +46,14 @@ a { color: var(--olive-ink); }
 .c-btn:hover, .btn:hover { text-decoration: none; }
 .c-btn:disabled, .btn:disabled, .btn-outline:disabled { opacity: 1; background: var(--card-sunk); border-color: var(--line); color: var(--muted); box-shadow: none; cursor: default; }
 .c-btn--primary, .btn, .btn-green { background: var(--olive); color: var(--on-olive); border-color: var(--olive); box-shadow: none; }
-.c-btn--primary:hover:not(:disabled), .btn:hover:not(:disabled) { background: var(--olive-press); border-color: var(--olive-press); }
-.c-btn--primary:active:not(:disabled), .btn:active:not(:disabled) { background: var(--olive-press); transform: scale(.98); }
+.c-btn--primary:active:not(:disabled), .btn:active:not(:disabled) { transform: scale(.98); }
 .c-btn--secondary, .btn-outline, .btn-gray {
   background: var(--glass); color: var(--ink); border-color: var(--glass-edge);
   backdrop-filter: blur(24px) saturate(160%);
   box-shadow: inset 0 1px 0 var(--glass-edge);
 }
-.c-btn--secondary:hover:not(:disabled), .btn-outline:hover:not(:disabled) { background: var(--card); }
 .c-btn--quiet { background: transparent; color: var(--olive-ink); border-color: transparent; padding: 0 12px; }
-.c-btn--quiet:hover:not(:disabled) { background: var(--olive-tint); }
+.c-btn--quiet:hover:not(:disabled) { background: var(--lift-pane); }
 .c-btn--danger { color: var(--error); }
 .c-btn--block { width: 100%; }
 .c-btn--lg { height: 52px; min-height: 52px; padding: 0 32px; font-size: 17px; }
@@ -72,7 +70,6 @@ a { color: var(--olive-ink); }
   background: transparent; color: var(--ink); cursor: pointer;
   transition: background var(--dur) var(--ease);
 }
-.c-icon-btn:hover:not(:disabled) { background: var(--olive-tint); }
 .c-icon-btn:disabled { opacity: .4; cursor: default; }
 .c-icon-btn[aria-pressed='true'], .c-icon-btn.is-on { color: var(--olive-ink); }
 .c-icon-btn--glass { background: var(--glass); border-color: var(--glass-edge); backdrop-filter: blur(24px) saturate(160%); box-shadow: inset 0 1px 0 var(--glass-edge); }
@@ -113,7 +110,7 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
 .c-search .c-input { width: 100%; margin: 0; padding-left: 44px; }
 .c-search .c-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
 .c-search-clear { position: absolute; right: 6px; top: 50%; z-index: 1; transform: translateY(-50%); display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; }
-.c-search-clear:hover { color: var(--ink); background: var(--olive-tint); }
+.c-search-clear:hover { color: var(--ink); background: var(--lift-pane); box-shadow: var(--lg-highlight); }
 .c-search:has(.c-search-clear) .c-input { padding-right: 44px; }
 
 /* ---------- Segmented, chips ---------- */
@@ -181,14 +178,15 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
   border-radius:var(--r-pill); color: var(--ink); text-decoration: none;
   font:600 15px/1 var(--font-sans);
 }
-.c-nav a:hover { background: var(--olive-tint); text-decoration: none; }
+.c-nav a:hover { text-decoration: none; }
 .c-nav a[aria-current='page'] { background: var(--olive); color: var(--on-olive); }
 .c-nav .c-nav-btn {
   display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 0;
   border-radius:var(--r-pill); background: transparent; color: var(--ink); cursor: pointer;
   font:600 15px/1 var(--font-sans);
 }
-.c-nav .c-nav-btn:hover, .c-nav .c-nav-btn[aria-pressed='true'] { background: var(--olive-tint); }
+.c-nav .c-nav-btn[aria-pressed='true'] { background: var(--olive-tint); }
+.c-nav .c-nav-btn:hover { background: var(--lift-pane); box-shadow: var(--lift-shadow); transform: var(--lift); }
 .c-timerbtn { height: 40px; min-width: 40px; padding: 0 10px; gap: 6px; justify-content: center; }
 .c-timerbtn:not(.is-running) { width: 40px; padding: 0; }
 .c-timerbtn.is-running { color: var(--olive-ink); }
@@ -217,7 +215,7 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
   border: 0; border-radius:var(--r-input); background: transparent; color: var(--ink);
   font:600 15px/1 var(--font-sans); text-align: left; text-decoration: none; cursor: pointer;
 }
-.c-menu [role='menuitem']:hover, .c-menu [role='menuitem']:focus-visible { background: var(--olive-tint); text-decoration: none; }
+.c-menu [role='menuitem']:hover, .c-menu [role='menuitem']:focus-visible { background: var(--lift-pane); box-shadow: var(--lift-shadow); transform: var(--lift); text-decoration: none; }
 .c-menu [role='menuitem'].is-danger { color: var(--error); }
 .c-menu hr { margin: 6px 8px; border: 0; border-top: 1px solid var(--line); }
 .c-menu-wrap { position: relative; }
@@ -288,7 +286,7 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
   box-shadow: inset 0 1px 0 var(--glass-edge);
   color: var(--ink); font:600 15px/1 var(--font-sans); text-decoration: none; cursor: pointer;
 }
-.c-pill:hover { background: var(--card); text-decoration: none; }
+.c-pill:hover { text-decoration: none; }
 .c-pill[aria-current='page'], .c-pill[aria-selected='true'] { background: var(--olive); border-color: var(--olive); color: var(--on-olive); }
 .c-pill .c-meta { color: inherit; opacity: .85; }
 
@@ -344,7 +342,7 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
   border-top: 1px solid var(--line); color: var(--ink); text-decoration: none;
 }
 .c-list-row:first-child { border-top: 0; }
-.c-list-row:hover { text-decoration: none; background: var(--olive-tint); }
+.c-list-row:hover { text-decoration: none; }
 .c-list-row .c-grow { flex: 1 1 auto; min-width: 0; }
 .c-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -548,79 +546,86 @@ body:has(.about) .c-fab { display: none; }
 /* Note cards and the note page are cream paper in both themes, so their text stays paper ink. */
 
 /* ---------- Hover, focus and press (one system for every control) ----------
-   Cause of "hover stopped working": the glass layer above sets card border, background and
-   shadow with !important, which overrode every card hover rule. These rules win over it.
-   Hover only where a mouse can hover; keyboard focus gets the same state plus the olive ring.
-   Nothing changes size: only color, shadow and transform. */
+   Hover lifts: a control rises 1px with the glass rim and a deeper shadow, a card 2px, and its
+   colour never changes (no tint, no wash, no darker olive). Things with no surface of their own
+   (nav links, menu items, rows in a list) show a clear raised pane of glass. The glass layer sets
+   card border, background and shadow with !important, so these rules use it too. Hover only
+   where a mouse can hover; keyboard focus gets the same lift plus the olive ring. */
 
-:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .c-nav a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar):not(:disabled) {
+:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a):not(:disabled) {
   cursor: pointer;
-  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease), transform var(--dur) var(--ease);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
 :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .lib-row, .sn-card, a.calendar-item, div.c-list-row:has(> a[href])) {
   cursor: pointer;
-  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-.c-icon-btn:not(:disabled) { cursor: pointer; transition: background-color var(--dur) var(--ease), transform var(--dur) var(--ease); }
+.c-icon-btn:not(:disabled) { cursor: pointer; transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
 
-/* Buttons and pills: brighten (a wash over whatever color they have) and the edge brightens. */
 @media (hover: hover) {
-  :is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .c-nav a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar):not(:disabled):not(.is-current):hover {
-    border-color: var(--hover-edge) !important;
-    box-shadow: inset 0 0 0 100vmax var(--hover-wash), var(--lg-highlight) !important;
+  :is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar):not(:disabled):not(.is-current):hover {
+    border-color: var(--lg-edge) !important;
+    box-shadow: var(--lift-shadow) !important;
+    transform: var(--lift);
     text-decoration: none;
   }
-  /* Primary olive buttons keep their olive (no darkening) and get a soft olive glow. */
-  :is(.c-btn--primary, .btn, .btn-upgrade, .pricing-btn:not(.is-secondary):not(.is-current)):not(:disabled):hover {
-    background-color: var(--olive) !important;
-    border-color: var(--hover-edge) !important;
-    box-shadow:var(--shadow-card);
+  /* Olive buttons keep their olive and their own rim: only the shadow deepens. */
+  :is(.c-btn--primary, .btn, .btn-green, .btn-upgrade, .pricing-btn:not(.is-secondary):not(.is-current)):not(:disabled):hover {
+    box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-depth-float) !important;
   }
-  /* Cards, tiles and rows that open something: lift 2px, glass edge brightens, deeper shadow. */
+  /* Cards, tiles and rows that open something: lift 2px with the deeper float shadow. */
   :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .lib-row, .sn-card, a.calendar-item, div.c-list-row:has(> a[href])):hover {
-    transform: translateY(-2px);
-    border-color: var(--hover-edge) !important;
-    box-shadow: var(--lg-highlight), var(--hover-shadow), inset 0 0 0 100vmax var(--hover-wash) !important;
+    transform: var(--lift-card);
+    border-color: var(--lg-edge) !important;
+    box-shadow: var(--lift-shadow-card) !important;
     text-decoration: none;
   }
-  /* Icon buttons: a round tint behind the icon. */
-  .c-icon-btn:not(:disabled):hover { background-color: var(--olive-tint); }
-  /* Rows inside a list card stay put and only tint: lifting with a shadow drew a square block
-     over the card's rounded corners. */
+  /* Icon buttons are glass already: they lift and keep their fill. Nav links get the clear pane. */
+  .c-icon-btn:not(:disabled):hover { box-shadow: var(--lift-shadow); transform: var(--lift); }
+  .c-nav a:not([aria-current='page']):hover {
+    background: var(--lift-pane);
+    box-shadow: var(--lift-shadow);
+    transform: var(--lift);
+    text-decoration: none;
+  }
+  /* Rows inside a list card rise as a rounded pane of their own, so the lift never draws a square
+     block over the card's rounded corners. */
   .c-list > :is(a.c-list-row, button.c-list-row, div.c-list-row:has(> a[href])):hover {
-    transform: none;
-    border-color: var(--line) !important;
-    box-shadow: inset 0 0 0 100vmax var(--hover-wash) !important;
+    transform: var(--lift);
+    border-color: transparent !important;
+    border-radius: var(--r-input);
+    background: var(--lift-pane) !important;
+    box-shadow: var(--lift-shadow) !important;
   }
 }
-/* The end rows of a list card follow its rounded corners, so a row's tint stays inside it. */
+/* The end rows of a list card follow its rounded corners. */
 .c-list > .c-list-row:first-child { border-top-left-radius: inherit; border-top-right-radius: inherit; }
 .c-list > .c-list-row:last-child { border-bottom-left-radius: inherit; border-bottom-right-radius: inherit; }
 
-/* Keyboard focus: the same state plus a 2px olive ring. */
-:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .c-nav a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar):not(:disabled):focus-visible {
-  border-color: var(--hover-edge) !important;
-  box-shadow: inset 0 0 0 100vmax var(--hover-wash), var(--lg-highlight) !important;
+/* Keyboard focus: the same lift plus a 2px olive ring. */
+:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a):not(:disabled):focus-visible {
+  border-color: var(--lg-edge) !important;
+  box-shadow: var(--lift-shadow) !important;
+  transform: var(--lift);
   outline: 2px solid var(--olive); outline-offset: 2px;
 }
-:is(.c-btn--primary, .btn, .btn-upgrade):not(:disabled):focus-visible { background-color: var(--olive) !important; box-shadow:var(--shadow-card); }
 :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .sn-card, a.calendar-item):focus-visible,
 :is(.lib-row, div.c-list-row:has(> a[href])):focus-within:has(:focus-visible) {
-  transform: translateY(-2px);
-  border-color: var(--hover-edge) !important;
-  box-shadow: var(--lg-highlight), var(--hover-shadow), inset 0 0 0 100vmax var(--hover-wash) !important;
+  transform: var(--lift-card);
+  border-color: var(--lg-edge) !important;
+  box-shadow: var(--lift-shadow-card) !important;
   outline: 2px solid var(--olive); outline-offset: 2px;
 }
-.c-icon-btn:not(:disabled):focus-visible { background-color: var(--olive-tint); outline: 2px solid var(--olive); outline-offset: 2px; }
+.c-icon-btn:not(:disabled):focus-visible { box-shadow: var(--lift-shadow); transform: var(--lift); outline: 2px solid var(--olive); outline-offset: 2px; }
 [data-theme='dark'] :is(.c-btn, .c-pill, .c-chip, .c-icon-btn, a.c-card, button.c-card, a.c-list-row, .c-nav a, .lib-row, .sn-card, a.calendar-item):focus-visible { outline-color: var(--olive-ink); }
 
-/* Press: a small squeeze (cards keep their lift). */
-:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-nav a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .study-aid-tab, .c-icon-btn, .quiz-option, .c-avatar):not(:disabled):active { transform: scale(.98); }
-:is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .sn-card, a.calendar-item):active { transform: translateY(-2px) scale(.98); }
+/* Press: settle back down with a small squeeze (cards keep their lift). */
+:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a, .c-icon-btn):not(:disabled):active { transform: scale(.98); }
+:is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .sn-card, a.calendar-item):active { transform: var(--lift-card) scale(.98); }
 
-/* Reduced motion: color change only, no lift or squeeze. */
+/* Reduced motion: no lift or squeeze; the shadow and pane still show. */
 @media (prefers-reduced-motion: reduce) {
-  :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .lib-row, .sn-card, a.calendar-item, div.c-list-row:has(> a[href]), .c-btn, .btn, .c-pill, .c-chip, .c-icon-btn, .c-nav a, .quiz-option):is(:hover, :focus-visible, :focus-within, :active) { transform: none !important; }
+  :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .lib-row, .sn-card, a.calendar-item, div.c-list-row:has(> a[href]), .c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-icon-btn, .c-nav a, .c-side-item, .c-menu [role='menuitem']):is(:hover, :focus-visible, :focus-within, :active) { transform: none !important; }
 }
 .cordia-tutor-attachments li .c-truncate { flex: 1; min-width: 0; }
 
@@ -680,9 +685,12 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 
 /* ---------- Sidebar (wide screens) ----------
    Replaces the top bar from 768px up: a rounded glass panel floating 12px in from the edges. New,
-   Search, the four places (Library opens into its classes, Canvas into Classes, Calendar and Your
-   week), a Study section, then Help, Feedback and the account at the bottom. Folds to icons (72px) with the toggle, remembered per device; between
-   768 and 1099px it's always folded so the page keeps its width. Phones keep the top bar and tab bar. */
+   Search, Dashboard · Study now · Library · Calendar · Progress, your classes, Assistant, then one
+   divider and the account row (its ⋯ menu has Settings, Help, Send feedback and the theme). Folds to
+   icons (72px) with the toggle, remembered per device; between 768 and 1099px it's always folded so
+   the page keeps its width. Phones keep the top bar and tab bar.
+   One item is current (aria-current): a raised olive-tinted pane. Hover lifts a clear pane of glass
+   (no tint, no shadow), so it never reads as selected. */
 :root { --side-w: 248px; --side-gap: 12px; }
 :root[data-side='collapsed'] { --side-w: 72px; }
 .c-side { display: none; }
@@ -705,74 +713,77 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   .c-side-brand:hover { text-decoration: none; }
   .c-side-brand .top-navigation-mark { width: 30px; height: 26px; flex: none; }
   .c-side-toggle { display: grid; place-items: center; flex: none; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; }
-  .c-side-toggle:hover { background: var(--olive-tint); color: var(--ink); }
+  .c-side-toggle:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); color: var(--ink); }
   .c-side-new { width: 100%; height: 44px; min-height: 44px; margin-bottom: 6px; white-space: nowrap; }
   .c-side-item {
-    display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 12px;
+    position: relative; display: flex; align-items: center; gap: 12px; width: 100%; height: 40px; padding: 0 12px;
     border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink);
     font: 600 15px/1.3 var(--font-sans); text-align: left; text-decoration: none; white-space: nowrap; cursor: pointer;
   }
   .c-side-item .lucide { flex: none; }
-  .c-side-item:hover { background: var(--olive-tint); text-decoration: none; }
-  .c-side-item:focus-visible, .c-side-toggle:focus-visible { outline: 2px solid var(--olive); outline-offset: -2px; }
+  .c-side-item { transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+  /* The sidebar is already glass, so its hover pane uses the lighter fill: subtler than the current item. */
+  .c-side-item:hover { background: var(--lg-sheen), var(--lg-fill); box-shadow: var(--lg-highlight); transform: var(--lift); text-decoration: none; }
+  :is(.c-side-item, .c-side-toggle, .c-side-add, .c-side-all):focus-visible { outline: 2px solid var(--olive); outline-offset: -2px; }
   /* Line height above 1, so the ellipsis clip never cuts off descenders (y, g, p). */
   .c-side-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; padding-block: 1px; }
-  .c-side-kbd { margin-left: auto; padding: 4px 7px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--muted); font: 600 12px/1 var(--font-sans); }
+  .c-side-kbd { margin-left: auto; padding: 4px 7px; border-radius: var(--r-pill); background: var(--hairline); color: var(--muted); font: 600 12px/1 var(--font-sans); }
+  /* Study now's count. */
+  .c-side-badge {
+    flex: none; margin-left: auto; min-width: 22px; height: 20px; padding: 0 6px; border-radius: var(--r-pill);
+    background: var(--olive); color: var(--on-olive); font: 700 12px/20px var(--font-sans); text-align: center; font-variant-numeric: tabular-nums;
+  }
   /* The middle scrolls on short screens; New and Search stay on top and the account at the bottom. */
   .c-side-nav {
-    flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 2px;
-    margin: 6px -12px 0; padding: 0 12px 8px; overflow: hidden auto; overscroll-behavior: contain;
+    flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1px;
+    margin: 4px -12px 0; padding: 0 12px 8px; overflow: hidden auto; overscroll-behavior: contain;
   }
-  /* Library and Canvas: the row, a caret that opens its list, and the list (indented under the icon). */
-  .c-side-group, .c-side-subs, .c-side-section { grid-template-columns: minmax(0, 1fr); }
-  .c-side-nav .c-side-item { height: 40px; }
-  .c-side-row .c-side-caret { top: 4px; }
-  .c-side-group { display: grid; gap: 2px; }
-  .c-side-row { position: relative; }
-  .c-side-row .c-side-item { padding-right: 40px; }
-  .c-side-caret {
-    position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
-    border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer;
-  }
-  .c-side-caret .lucide { transition: transform 160ms var(--ease); }
-  .c-side-caret.is-open .lucide { transform: rotate(90deg); }
-  .c-side-caret:hover { background: var(--olive-tint); color: var(--ink); }
-  .c-side-caret:focus-visible { outline: 2px solid var(--olive); outline-offset: -2px; }
-  .c-side-subs { list-style: none; margin: 0 0 4px; padding: 0 0 0 22px; display: grid; gap: 1px; }
-  .c-side-sub {
-    display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px 0 12px; border-left: 1px solid var(--line);
-    border-radius: 0 var(--r-input) var(--r-input) 0; color: var(--muted); font: 600 14px/1.3 var(--font-sans);
-    text-decoration: none; white-space: nowrap; min-width: 0;
-  }
-  .c-side-sub .lucide { flex: none; }
-  .c-side-sub:hover { background: var(--olive-tint); color: var(--ink); text-decoration: none; }
-  .c-side-sub:focus-visible { outline: 2px solid var(--olive); outline-offset: -2px; }
-  .c-side-section { display: grid; gap: 2px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
-  .c-side-heading { margin: 0 0 2px; padding: 0 12px; color: var(--muted); font: 700 12px/1.6 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; }
+  .c-side-nav .c-side-item { height: 38px; }
+  /* Classes: a label with its + (add a class), then up to five classes as colour dot + course code. */
+  .c-side-section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; margin: 12px 0 6px; }
+  .c-side-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 28px; padding: 0 4px 0 12px; }
+  .c-side-heading { margin: 0; color: var(--muted); font: 700 12px/1.6 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; }
+  .c-side-add { display: grid; place-items: center; width: 26px; height: 26px; border-radius: var(--r-pill); color: var(--muted); text-decoration: none; }
+  .c-side-add:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); color: var(--ink); text-decoration: none; }
+  .c-side-classes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; }
+  .c-side-class { font-size: 14px; }
+  /* The dot takes the icon's 20px slot, so codes line up with the labels above. */
+  .c-side-dot { flex: none; width: 10px; height: 10px; margin: 0 5px; border-radius: 50%; background: var(--dot, var(--olive)); box-shadow: inset 0 0 0 1px var(--hairline); }
+  .c-side-all { display: flex; align-items: center; height: 30px; padding: 0 12px 0 44px; border-radius: var(--r-input); color: var(--muted); font: 600 13px/1.3 var(--font-sans); text-decoration: none; }
+  .c-side-all:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); color: var(--ink); text-decoration: none; }
+  .c-side-empty { color: var(--muted); font-size: 14px; }
+  .c-side-empty:hover { color: var(--ink); }
+  /* The one divider, then the account row. */
   .c-side-foot { flex: none; display: grid; gap: 2px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
   .c-side-head, .c-side-new, .c-side > .c-side-item { flex: none; }
   .c-side-account { height: 56px; padding: 0 8px; }
+  .c-side-account[aria-expanded='true'] { background: var(--lift-pane); box-shadow: var(--lg-highlight); }
   .c-side-account.is-active .c-side-avatar { box-shadow: 0 0 0 2px var(--olive); }
   .c-side-avatar { flex: none; width: 36px; height: 36px; }
-  .c-side-who { display: grid; gap: 3px; min-width: 0; }
+  .c-side-who { display: grid; gap: 3px; min-width: 0; flex: 1 1 auto; }
   .c-side-who strong { font: 600 14px/1.2 var(--font-sans); }
   .c-side-who span { color: var(--muted); font: 500 12px/1.2 var(--font-sans); }
-  /* Folded: icons only, centered; each keeps its name as a hover title and accessible label. */
+  .c-side-dots { flex: none; margin-left: auto; color: var(--muted); }
+  /* Folded: icons only, centered; each keeps its name as a tooltip and accessible label. Class
+     dots stay, with the course code as the tooltip; Study now's count sits on its icon. */
   .c-side.is-collapsed { padding-inline: 12px; }
-  .c-side.is-collapsed .c-side-label, .c-side.is-collapsed .c-side-kbd,
-  .c-side.is-collapsed :is(.c-side-caret, .c-side-heading) { display: none; }
-  .c-side.is-collapsed .c-side-row .c-side-item { padding-right: 0; }
+  .c-side.is-collapsed :is(.c-side-label, .c-side-kbd, .c-side-heading-row, .c-side-all, .c-side-dots) { display: none; }
   .c-side.is-collapsed .c-side-head { flex-direction: column; padding: 0; gap: 8px; }
   .c-side.is-collapsed :is(.c-side-item, .c-side-new) { justify-content: center; padding: 0; }
+  .c-side.is-collapsed .c-side-section { margin-top: 8px; padding-top: 8px; }
   .c-side.is-collapsed .c-side-account { height: 48px; }
+  .c-side.is-collapsed .c-side-badge { position: absolute; top: 1px; right: 4px; min-width: 18px; height: 16px; padding: 0 4px; font-size: 11px; line-height: 16px; }
 }
 @media (min-width: 768px) and (max-width: 1099px) {
   :root { --side-w: 72px; }
-  .c-side .c-side-label, .c-side .c-side-kbd, .c-side .c-side-toggle,
-  .c-side :is(.c-side-caret, .c-side-heading, .c-side-subs) { display: none; }
-  .c-side .c-side-row .c-side-item { padding-right: 0; }
+  .c-side :is(.c-side-label, .c-side-kbd, .c-side-toggle, .c-side-heading-row, .c-side-all, .c-side-dots) { display: none; }
   .c-side .c-side-head { justify-content: center; padding: 0; }
   .c-side :is(.c-side-item, .c-side-new) { justify-content: center; padding: 0; }
+  .c-side .c-side-section { margin-top: 8px; padding-top: 8px; }
+  .c-side .c-side-badge { position: absolute; top: 1px; right: 4px; min-width: 18px; height: 16px; padding: 0 4px; font-size: 11px; line-height: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .c-side, .app-shell { transition: none; }
 }
 
 /* Rows / Cards switch (components/ViewToggle.js). */
@@ -785,7 +796,7 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
    Study or Practice button at the bottom. */
 .item-grid { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; padding: 6px; list-style: none; margin: 0; }
 .item-grid > * { display: grid !important; grid-template-columns: auto 1fr auto auto; align-items: center; align-content: start; gap: 12px 4px; min-height: 132px; padding: 14px !important; border: 1px solid var(--hairline) !important; border-radius: var(--r-card) !important; background: var(--surface-card); }
-.item-grid > *:hover { background: var(--olive-tint); }
+.item-grid > *:hover { transform: var(--lift-card); box-shadow: var(--lift-shadow-card) !important; }
 .item-grid > * > :first-child { grid-column: 1; grid-row: 1; }
 .item-grid > * > .ig-star { grid-column: 3; grid-row: 1; }
 .item-grid > * > .c-menu-wrap { grid-column: 4; grid-row: 1; }
