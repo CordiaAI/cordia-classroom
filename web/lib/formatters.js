@@ -24,25 +24,6 @@ export function parseQAPairs(text) {
   return pairs;
 }
 
-/**
- * Parse "- bullet\n- bullet" text into string[]
- */
-// Notes as an outline: "## Heading" lines start a section, "- point" lines fill it. Older flat
-// notes (points only) come back as one section without a heading.
-export function parseOutline(text) {
-  const sections = [];
-  let current = null;
-  for (const raw of String(text || '').split('\n')) {
-    const line = raw.trim();
-    if (line.startsWith('## ')) { current = { heading: line.slice(3).trim(), points: [] }; sections.push(current); }
-    else if (line.startsWith('- ')) {
-      if (!current) { current = { heading: '', points: [] }; sections.push(current); }
-      current.points.push(line.slice(2).trim());
-    }
-  }
-  return sections.filter(section => section.points.length);
-}
-
 // A guide's Notes, written like a study guide (lib/server/guideNotes.mjs writes it):
 //   > overview
 //   ## Topic heading
@@ -88,21 +69,13 @@ export function guideNotes(guide) {
   return { overview: '', sections: [], keyPoints: parseQAPairs(guide?.study_guide).map(pair => pair.answer).filter(Boolean) };
 }
 
+// "- bullet\n- bullet" text as string[].
 export function parseNotes(text) {
   if (!text) return [];
   return text.split('\n')
     .map(l => l.trim())
     .filter(l => l.startsWith('- '))
     .map(l => l.substring(2));
-}
-
-/**
- * Format ISO date string to readable format
- */
-export function formatDate(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 // Canvas calendar feeds end every title with the section code ("Essay 2 [ENG-101-004]"). The class

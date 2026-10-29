@@ -2,7 +2,6 @@
 
 export const DEFAULT_TITLE = 'Untitled Notes';
 export const MIN_CHARS = 25;      // one short sentence is enough for a title and a cover
-export const TYPING_CHARS = 80;   // while typing, wait for a little more before naming the note
 export const REGROW = 1.5;        // remake the cover once the note is this much longer…
 export const REGROW_CHARS = 150;  // …and at least this many characters longer
 
