@@ -3,6 +3,7 @@ import { apiFetch } from '../lib/api';
 import { BookOpen, MessageCircle, Sparkles } from 'lucide-react';
 import { requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
+import { noteView, useAnswerTiming } from '../lib/learningEvents';
 import { conceptAnswer, fillMatches, normalize, shuffled } from '../lib/retainEngine.mjs';
 
 // A wrong answer of any type opens the Tutor's "why was I wrong" help.
@@ -34,6 +35,7 @@ export function AskWhy() {
   return (
     <button type="button" className="c-btn c-btn--secondary quiz-ask" data-spot="ask-why" data-tip="ask" onClick={() => {
       walkthroughEvent('ask');
+      if (lastMiss) noteView(lastMiss.guideId, lastMiss.retainContext.question, 'ask_why');
       if (lastMiss) window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { ...lastMiss, send: true } }));
     }}>
       <MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />Ask why
@@ -47,6 +49,7 @@ export function ExplainAnswer() {
     <button type="button" className="c-btn c-btn--secondary quiz-ask" onClick={() => {
       if (!lastMiss) return;
       const { question, correct_answer: answer } = lastMiss.retainContext;
+      noteView(lastMiss.guideId, question, 'tutor_explain');
       window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { guideId: lastMiss.guideId, prompt: `Explain this simply, with an example: ${question} (answer: ${answer})`, send: true } }));
     }}>
       <Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain
@@ -104,6 +107,7 @@ export function MissFeedback({ guideId, card, question, chosen, sure }) {
   const [why, setWhy] = useState(null);
   useEffect(() => {
     let active = true;
+    noteView(guideId, question.question, 'explain');
     apiFetch(`/quiz/${guideId}/why`, { method: 'POST', body: JSON.stringify({ concept: card.concepts[0], chosen: String(chosen).slice(0, 4000) }) })
       .then(data => { if (active) setWhy(data?.why_right ? data : {}); });
     return () => { active = false; };
@@ -131,17 +135,19 @@ export function McCard({ card, question, guideId, onResult, onNext, askSure = tr
   const [selected, setSelected] = useState(null);
   const [confidence, setConfidence] = useState('');
   const [explained, setExplained] = useState(false);
+  const timing = useAnswerTiming();
 
   function reveal(option, level = '') {
     setSelected(option);
     setConfidence(level);
     const right = option === answer;
     if (!right) askTutorAboutMiss(guideId, question, option, options);
-    onResult([{ concept: card.concepts[0], credit: right ? 1 : 0, response: option, ...(level ? { confidence: level } : {}) }]);
+    onResult([{ concept: card.concepts[0], credit: right ? 1 : 0, response: option, timing: timing.done(), ...(level ? { confidence: level } : {}) }]);
   }
 
   function choose(option) {
     if (selected !== null) return;
+    timing.done(); // the answer is the pick; "How sure?" comes after it
     // A repeat of a missed question goes straight to the answer.
     if (card.reask || !askSure) { reveal(option); return; }
     setPending(option);
@@ -174,6 +180,7 @@ export function FillCard({ card, question, guideId, onResult, onNext, askSure = 
   const [asking, setAsking] = useState(false);
   const [confidence, setConfidence] = useState('');
   const [explained, setExplained] = useState(false);
+  const timing = useAnswerTiming();
 
   function reveal(level = '') {
     setAsking(false);
@@ -181,12 +188,13 @@ export function FillCard({ card, question, guideId, onResult, onNext, askSure = 
     const correct = fillMatches(value, answer);
     setRight(correct);
     if (!correct) askTutorAboutMiss(guideId, question, value.trim());
-    onResult([{ concept: card.concepts[0], credit: correct ? 1 : 0, response: value.trim(), ...(level ? { confidence: level } : {}) }]);
+    onResult([{ concept: card.concepts[0], credit: correct ? 1 : 0, response: value.trim(), timing: timing.done(), answerChars: value.trim().length, ...(level ? { confidence: level } : {}) }]);
   }
 
   function check(event) {
     event.preventDefault();
     if (right !== null || !value.trim()) return;
+    timing.done();
     // First asks get "How sure?" before the answer shows; repeats go straight to it.
     if (card.reask || !askSure) reveal();
     else setAsking(true);
@@ -200,6 +208,7 @@ export function FillCard({ card, question, guideId, onResult, onNext, askSure = 
           className={'retain-fill-input' + (right === true ? ' right' : right === false ? ' wrong' : '')}
           value={value}
           onChange={event => setValue(event.target.value)}
+          onKeyDown={timing.key}
           placeholder="Type the answer"
           aria-label="Your answer"
           readOnly={right !== null || asking}
@@ -228,6 +237,7 @@ export function MatchingCard({ card, questions, guideId, onResult, onNext }) {
   const [picked, setPicked] = useState(null);
   const [checked, setChecked] = useState(false);
   const used = new Set(Object.values(placed));
+  const timing = useAnswerTiming();
 
   function place(index, answer) {
     if (checked || !answer) return;
@@ -250,9 +260,10 @@ export function MatchingCard({ card, questions, guideId, onResult, onNext }) {
 
   function check() {
     setChecked(true);
+    const time = timing.done(); // one time for the whole set of pairs
     const results = rows.map(row => {
       const right = normalize(placed[row.index]) === normalize(row.answer);
-      return { concept: row.index, credit: right ? 1 : 0, response: placed[row.index] || '' };
+      return { concept: row.index, credit: right ? 1 : 0, response: placed[row.index] || '', timing: time };
     });
     const miss = rows.find((row, i) => results[i].credit !== 1);
     if (miss) askTutorAboutMiss(guideId, miss.question, placed[miss.index] || '(no match)', bank);
@@ -310,10 +321,12 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
   const [busy, setBusy] = useState(false);
   const [grade, setGrade] = useState(null);
   const [error, setError] = useState('');
+  const timing = useAnswerTiming();
 
   async function check(event) {
     event.preventDefault();
     if (busy || grade || !value.trim()) return;
+    const time = timing.done(); // the answer, not the grading round trip
     setBusy(true);
     setError('');
     const data = await apiFetch(`/quiz/${guideId}/grade`, {
@@ -327,7 +340,7 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
     }
     setGrade(data);
     if (data.credit !== 1) askTutorAboutMiss(guideId, question, value.trim());
-    onResult([{ concept, credit: data.credit, response: value.trim(), token: data.token }]);
+    onResult([{ concept, credit: data.credit, response: value.trim(), token: data.token, timing: time, answerChars: value.trim().length }]);
   }
 
   const [tone, label] = grade ? VERDICTS[grade.credit] : [];
@@ -338,6 +351,7 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
         className="retain-written-input"
         value={value}
         onChange={event => setValue(event.target.value)}
+        onKeyDown={timing.key}
         placeholder="Your answer"
         aria-label="Your answer"
         rows={4}

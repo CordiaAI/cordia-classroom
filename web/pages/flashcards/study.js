@@ -76,6 +76,7 @@ export default function FlashcardStudy() {
     <FlashcardViewer
       flashcards={guide.flashcards}
       guideId={guideId}
+      logMode="flashcards"
       title={guide.title}
       starred={guide.is_bookmarked}
       onToggleStar={toggleStar}

@@ -119,6 +119,7 @@ export default function StudySession() {
       onBack={() => router.push(router.query.guideId ? '/guide/' + router.query.guideId : '/dashboard')}
       onFinish={onFinish}
       finishExtra={<PracticeList practice={queue.practice} />}
+      logMode="study_now"
     />
     </Reveal>
   );

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Clock, Play, Sparkles } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { conceptAnswer, shuffled } from '../lib/retainEngine.mjs';
+import { answerTimer } from '../lib/learningEvents.mjs';
 import { DEFAULT_MINUTES, MINUTE_CHOICES, buildTest, clock, markLocal, testResults, timeLimitSeconds } from '../lib/timedTest.mjs';
 import CordiaLoader from './CordiaLoader';
 import { MissFeedback } from './RetainCards';
@@ -41,6 +42,10 @@ export default function TimedTest({ guideId, questions, types, onDone, onExit, o
   const started = useRef(0);
   const deadline = useRef(0);
   const finishing = useRef(false);
+  // Each answer's timing, by item id, and the clock for the question on screen.
+  const timings = useRef({});
+  const timer = useRef(null);
+  const startTimer = () => { timer.current = answerTimer(() => performance.now(), document.hidden); };
 
   const limit = timeLimitSeconds(items.length, minutes);
   const left = Math.max(0, Math.round((deadline.current - now) / 1000));
@@ -49,6 +54,8 @@ export default function TimedTest({ guideId, questions, types, onDone, onExit, o
     const test = buildTest(questions, types);
     options.current = Object.fromEntries(test.filter(item => item.type === 'mc').map(item => [item.id, shuffled(questions[item.concept].options || [], item.id * 7919 + Date.now() % 1000)]));
     grading.current = {};
+    timings.current = {};
+    startTimer();
     finishing.current = false;
     setItems(test);
     setPosition(0);
@@ -62,8 +69,10 @@ export default function TimedTest({ guideId, questions, types, onDone, onExit, o
 
   useEffect(() => {
     if (screen !== 'running') return undefined;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
+    const ticker = setInterval(() => setNow(Date.now()), 1000);
+    const onVisibility = () => timer.current?.visibility(document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { clearInterval(ticker); document.removeEventListener('visibilitychange', onVisibility); };
   }, [screen]);
 
   // Time's up: whatever is answered is handed in.
@@ -85,6 +94,8 @@ export default function TimedTest({ guideId, questions, types, onDone, onExit, o
     event?.preventDefault();
     const item = items[position];
     const kept = keep(item, value.trim());
+    timings.current[item.id] = timer.current?.done();
+    startTimer();
     setResponses(kept);
     setValue('');
     if (position + 1 < items.length) setPosition(position + 1);
@@ -94,6 +105,8 @@ export default function TimedTest({ guideId, questions, types, onDone, onExit, o
   async function finish(given) {
     if (finishing.current) return;
     finishing.current = true;
+    const onScreen = items[position];
+    if (onScreen && !timings.current[onScreen.id]) timings.current[onScreen.id] = timer.current?.done();
     const used = Math.min(limit, Math.round((Date.now() - started.current) / 1000));
     setScreen('marking');
     const credits = {};
@@ -102,7 +115,12 @@ export default function TimedTest({ guideId, questions, types, onDone, onExit, o
       if (!response) return;
       credits[item.id] = item.type === 'written' ? await (grading.current[item.id] || null) : markLocal(item, questions[item.concept], response);
     }));
-    const marked = { ...testResults(items, credits), used, responses: given };
+    // Answers that were given and checked, for the learning log (unanswered ones aren't answers).
+    const logged = items.filter(item => given[item.id] && typeof credits[item.id] === 'number').map(item => ({
+      concept: item.concept, type: item.type, credit: credits[item.id], timing: timings.current[item.id] || null,
+      answerChars: item.type === 'mc' ? null : given[item.id].length,
+    }));
+    const marked = { ...testResults(items, credits), used, responses: given, logged };
     setResult(marked);
     setScreen('results');
     onDone(marked);
@@ -178,10 +196,10 @@ export default function TimedTest({ guideId, questions, types, onDone, onExit, o
         <button key={option} type="button" className={'quiz-option' + (value === option ? ' selected' : '')} aria-pressed={value === option} onClick={() => setValue(option)}>{option}</button>
       ))}
       {item.type === 'fill' && (
-        <input key={item.id} className="retain-fill-input" value={value} onChange={event => setValue(event.target.value)} placeholder="Type the answer" aria-label="Your answer" autoFocus autoComplete="off" />
+        <input key={item.id} className="retain-fill-input" value={value} onChange={event => setValue(event.target.value)} onKeyDown={() => timer.current?.key()} placeholder="Type the answer" aria-label="Your answer" autoFocus autoComplete="off" />
       )}
       {item.type === 'written' && (
-        <textarea key={item.id} className="retain-written-input" value={value} onChange={event => setValue(event.target.value)} placeholder="Your answer" aria-label="Your answer" rows={4} maxLength={4000} autoFocus />
+        <textarea key={item.id} className="retain-written-input" value={value} onChange={event => setValue(event.target.value)} onKeyDown={() => timer.current?.key()} placeholder="Your answer" aria-label="Your answer" rows={4} maxLength={4000} autoFocus />
       )}
       <div className="quiz-next-row">
         <button type="button" className="c-btn c-btn--quiet" onClick={() => finish(keep(item, value.trim()))}>Hand in now</button>

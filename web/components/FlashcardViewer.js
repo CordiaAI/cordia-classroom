@@ -5,6 +5,8 @@ import { requestTip } from '../lib/tips';
 import SessionFinish from './SessionFinish';
 import { isCardImage } from '../lib/cardImages';
 import { useActiveClock } from '../lib/activeClock';
+import { logAnswer } from '../lib/learningEvents';
+import { answerTimer } from '../lib/learningEvents.mjs';
 
 const SHUFFLE_KEY = 'cordiaShuffle';
 // Swipe: past this many pixels the card is answered (right = Got it, left = Again).
@@ -32,8 +34,9 @@ export function askAboutCard(card, guideId) {
 
 // One flashcard session. Missed cards go to the back of the queue until known.
 // cards: [{ front, back, image?, guideId? }]. onFinish({ known: [i], missed: [i], seconds }).
+// logMode: how each Got it / Again is logged ('flashcards', 'study_now'); none logs nothing.
 export default function FlashcardViewer({
-  flashcards, guideId, title, onBack, onFinish, onExit, starred, onToggleStar, onEdit, finishExtra,
+  flashcards, guideId, title, onBack, onFinish, onExit, starred, onToggleStar, onEdit, finishExtra, logMode = '',
 }) {
   const total = flashcards.length;
   // Shuffle is a setting, not a one-off: on, cards come in random order (and stay that way
@@ -61,6 +64,18 @@ export default function FlashcardViewer({
   const [bump, setBump] = useState({ know: 0, learning: 0 });
 
   const current = queue[0];
+  // Each card is timed from when it shows to Got it / Again.
+  const cardTimer = useRef(null);
+  useEffect(() => { cardTimer.current = answerTimer(() => performance.now(), document.hidden); }, [queue]);
+  useEffect(() => {
+    const onVisibility = () => cardTimer.current?.visibility(document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+  function logCard(credit) {
+    if (!logMode || !card) return;
+    logAnswer({ guideId: card.guideId || guideId, question: card.front, mode: logMode, type: 'flashcard', credit, timing: cardTimer.current?.done() });
+  }
   useEffect(() => { if (flipped) walkthroughEvent('card-flipped'); }, [flipped]);
   // First flashcard session on a keyboard computer: point out Space, 1 and 2.
   useEffect(() => { if (window.matchMedia('(pointer: fine)').matches) requestTip('keys'); }, []);
@@ -79,6 +94,7 @@ export default function FlashcardViewer({
 
   function gotIt(swiped = false) {
     if ((!flipped && !swiped) || card === undefined) return;
+    logCard(1);
     setBump(value => ({ ...value, know: value.know + 1 }));
     const nextKnown = [...known, current];
     const nextQueue = queue.slice(1);
@@ -91,6 +107,7 @@ export default function FlashcardViewer({
 
   function again(swiped = false) {
     if ((!flipped && !swiped) || card === undefined) return;
+    logCard(0);
     setBump(value => ({ ...value, learning: value.learning + 1 }));
     const nextMissed = new Set(missed);
     nextMissed.add(current);

@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react';
 
 // Study time counts only while the page is visible and the student is doing something. A hidden
-// tab, or no input for IDLE_MS, pauses the clock (pages used to log wall-clock time, so a tab
-// left open overnight logged 24 hours of study). The IDLE_MS after the last input still count:
-// reading a screen without touching anything is studying, for a while.
-export const IDLE_MS = 2 * 60 * 1000;
+// tab, or a minute with no input, pauses the clock (pages used to log wall-clock time, so a tab
+// left open overnight logged 24 hours of study). The minute after the last input still counts:
+// reading a question or a card without touching anything is studying, for that long.
+export const IDLE_MS = 60 * 1000;
 const INPUT_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'scroll'];
 // Input closer together than this doesn't need the clock brought up to date.
 const SETTLE_GAP_MS = 15000;

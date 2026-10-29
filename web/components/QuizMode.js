@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { apiFetch } from '../lib/api';
 import { advance, createSession, currentCard, firstAttempts, progress, recordResults } from '../lib/retainEngine.mjs';
+import { logAnswer } from '../lib/learningEvents';
 import { Repeat } from 'lucide-react';
 import SessionFinish from './SessionFinish';
 import { FillCard, MatchingCard, McCard, WrittenCard } from './RetainCards';
@@ -10,7 +11,8 @@ import { walkthroughEvent } from '../lib/walkthrough';
 
 // Retain: every idea is asked once in its best-fitting format. A miss must then be answered
 // right two more times, a few questions apart, before it clears. The score is first-try only.
-export default function QuizMode({ questions, cards, types, guideId, onRestart, onDone, doneLabel }) {
+// mode: how the answers are logged ('quiz', or 'check' for a new guide's Check yourself).
+export default function QuizMode({ questions, cards, types, guideId, onRestart, onDone, doneLabel, mode = 'quiz' }) {
   const [session, setSession] = useState(() => createSession(questions, cards, types));
   const [answered, setAnswered] = useState(false);
   const [score, setScore] = useState(null);
@@ -20,6 +22,11 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart, 
   const stats = progress(session);
 
   function onResult(results) {
+    const shown = currentCard(session);
+    results.forEach(item => logAnswer({
+      guideId, question: questions[item.concept]?.question, mode, type: shown?.type, credit: item.credit,
+      confidence: item.confidence, timing: item.timing, answerChars: item.answerChars,
+    }));
     setSession(current => recordResults(current, currentCard(current), results));
     setAnswered(true);
   }
