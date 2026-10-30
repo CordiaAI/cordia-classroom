@@ -111,10 +111,11 @@ const phone = await browser.newContext({ bypassCSP: true, viewport: { width: 390
 const phonePage = await phone.newPage();
 await phonePage.goto(`${WEB}/login`);
 await phonePage.evaluate(({ token, refresh }) => { localStorage.setItem('authToken', token); localStorage.setItem('refreshToken', refresh); localStorage.setItem('theme', 'dark'); }, { token: signUp.session.access_token, refresh: signUp.session.refresh_token });
-const third = await authorize(inspector, INSPECTOR);
+// A new app, so Supabase asks again instead of sending the already-approved one straight back.
+const phoneApp = await register('Claude', INSPECTOR);
+const third = await authorize(phoneApp, INSPECTOR);
 await phonePage.goto(third.consentUrl);
-await phonePage.getByRole('heading', { name: /Connect MCP Inspector/ }).waitFor().catch(() => {});
-// Already approved once: Supabase may send the student straight back instead.
+await phonePage.getByRole('heading', { name: 'Connect Claude to Cordia?' }).waitFor();
 const overflow = await phonePage.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 check('phone: no sideways scroll', overflow <= 0, String(overflow));
 await shot('consent-phone-dark', phonePage);
@@ -123,7 +124,7 @@ await phone.close();
 // 6. Settings › Connectors lists the app; Disconnect cuts it off at once.
 await page.goto(`${WEB}/settings?section=connectors`);
 await page.getByRole('heading', { name: 'Connected AI apps' }).waitFor();
-await page.getByText('MCP Inspector').waitFor();
+await page.getByText('MCP Inspector', { exact: true }).waitFor();
 check('Settings: app listed with last use', await page.getByText(/Last used/).isVisible());
 await page.getByRole('heading', { name: 'Connected AI apps' }).scrollIntoViewIfNeeded();
 await shot('settings-connected-apps');

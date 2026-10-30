@@ -126,7 +126,7 @@ export default function OAuthConsent() {
               <button type="button" className="c-btn c-btn--secondary" onClick={() => decide('deny')} disabled={Boolean(busy)}>{busy === 'deny' ? 'Cancelling…' : 'Cancel'}</button>
               <button type="button" className="c-btn c-btn--primary" onClick={() => decide('approve')} disabled={Boolean(busy) || !state.allowed}>{busy === 'approve' ? 'Connecting…' : 'Allow'}</button>
             </div>
-            <p className="consent-fine">You can disconnect {name} anytime in Settings › Connected apps.</p>
+            <p className="consent-fine">You can disconnect {name} anytime in Settings › Connectors.</p>
           </>
         )}
 
