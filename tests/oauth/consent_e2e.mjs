@@ -39,6 +39,15 @@ const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: p
 const context = await browser.newContext({ bypassCSP: true, viewport: { width: 1280, height: 860 } });
 const page = await context.newPage();
 page.on('pageerror', error => console.log(`page error: ${error.message}`));
+page.on('response', response => { if (response.url().startsWith(API)) console.log(`  ${response.request().method()} ${response.url().replace(API, '')} -> ${response.status()}`); });
+// On any failure, say where the page was and what it showed.
+const onFailure = async error => {
+  console.log(`FAIL  ${error.message.split('\n')[0]}`);
+  try { console.log(`  at ${page.url()}\n  page says: ${(await page.locator('body').innerText()).slice(0, 400).replace(/\s+/g, ' ')}`); await shot('failure'); } catch { /* page gone */ }
+  process.exit(1);
+};
+process.on('uncaughtException', onFailure);
+process.on('unhandledRejection', onFailure);
 const shot = async (name, target = page) => { if (SHOTS) await target.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true }); };
 
 // 1. Discovery and the 401 challenge on the real Next routes.
