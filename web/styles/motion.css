@@ -8,27 +8,6 @@ body::before {
   will-change: transform;
 }
 
-/* Cursor glow: a soft, blurred light that trails the mouse (lib/ambientMotion.js sets --glow-x /
-   --glow-y) and slowly changes shape. Behind everything, mouse only, off for reduced motion. */
-body::after {
-  content: ''; position: fixed; left: 0; top: 0; z-index: -1; pointer-events: none;
-  width: var(--glow-size); height: var(--glow-size);
-  margin: calc(var(--glow-size) / -2) 0 0 calc(var(--glow-size) / -2);
-  background: radial-gradient(closest-side, var(--glow-a), var(--glow-b) 55%, transparent);
-  filter: blur(48px);
-  opacity: 0;
-  transform: translate3d(var(--glow-x, -999px), var(--glow-y, -999px), 0);
-  transition: opacity 600ms ease;
-  animation: c-glow-morph 16s ease-in-out infinite;
-}
-:root[data-glow='on'] body::after { opacity: 1; }
-@keyframes c-glow-morph {
-  0%, 100% { border-radius: 42% 58% 55% 45% / 48% 42% 58% 52%; scale: 1; rotate: 0deg; }
-  33% { border-radius: 58% 42% 46% 54% / 40% 56% 44% 60%; scale: 1.08 0.94; rotate: 40deg; }
-  66% { border-radius: 48% 52% 60% 40% / 58% 46% 54% 42%; scale: 0.94 1.06; rotate: -30deg; }
-}
-@media (hover: none) { body::after { display: none; } }
-
 /* Quiz answers: a right answer pops and sends out a green ring; a wrong one shakes (globals.css)
    and the right one then pulses in. */
 @keyframes c-ring-out {
@@ -83,7 +62,6 @@ body::after {
 
 @media (prefers-reduced-motion: reduce) {
   body::before { transform: none; transition: none; }
-  body::after { display: none; }
   .quiz-option.quiz-option.quiz-option.quiz-option.correct-shine,
   .quiz-option.quiz-option.quiz-option.quiz-option.correct-glow,
   .quiz-option.correct, .quiz-option.wrong, .retain-fill-input.right, .retain-fill-input.wrong, .retain-feedback,
