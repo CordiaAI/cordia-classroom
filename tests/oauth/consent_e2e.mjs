@@ -38,6 +38,7 @@ const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: p
 // The local stack is plain http, which the production CSP (https Supabase only) would block.
 const context = await browser.newContext({ bypassCSP: true, viewport: { width: 1280, height: 860 } });
 const page = await context.newPage();
+page.on('pageerror', error => console.log(`page error: ${error.message}`));
 const shot = async (name, target = page) => { if (SHOTS) await target.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true }); };
 
 // 1. Discovery and the 401 challenge on the real Next routes.
@@ -51,7 +52,7 @@ const inspector = await register('MCP Inspector', INSPECTOR);
 const first = await authorize(inspector, INSPECTOR);
 check('authorize sends the student to /oauth/consent', first.consentUrl?.startsWith(`${WEB}/oauth/consent?authorization_id=`), first.consentUrl);
 await page.goto(first.consentUrl);
-await page.waitForURL(/\/login\?next=/);
+await page.waitForURL(/\/login\?next=/, { waitUntil: 'commit' });
 check('signed out: sent to sign in with the way back', decodeURIComponent(page.url()).includes('/login?next=/oauth/consent?authorization_id='), page.url());
 
 // Sign in (as the app's own sign-in does) and come back.
@@ -65,7 +66,7 @@ await shot('consent-desktop');
 let code = '';
 await page.route('http://localhost:6274/**', route => { code = new URL(route.request().url()).searchParams.get('code') || ''; route.fulfill({ status: 200, body: 'ok' }); });
 await page.getByRole('button', { name: 'Allow' }).click();
-await page.waitForURL(/localhost:6274/);
+await page.waitForURL(/localhost:6274/, { waitUntil: 'commit' });
 check('Allow: back to the app with a code', Boolean(code));
 const tokens = await (await fetch(`${API}/auth/v1/oauth/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
   body: new URLSearchParams({ grant_type: 'authorization_code', code, code_verifier: first.verifier, client_id: inspector.client_id, redirect_uri: INSPECTOR }) })).json();
