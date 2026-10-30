@@ -3,8 +3,9 @@
 // move it to another line and/or resize it. DELETE { guideId, id }: remove one.
 // Answers { stored: false } until the guide_visuals table exists; the browser keeps them meanwhile.
 import { createGuideVisualsService } from '../../lib/server/guideVisuals.mjs';
+import { withAppTokensOnly } from '../../lib/server/connectedApps.mjs';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const service = createGuideVisualsService();
   const authorization = req.headers.authorization || '';
@@ -24,3 +25,5 @@ export default async function handler(req, res) {
     return res.status(200).json({ stored: false });
   }
 }
+
+export default withAppTokensOnly(handler);

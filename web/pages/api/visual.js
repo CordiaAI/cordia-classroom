@@ -4,10 +4,11 @@
 // Server env (never sent to the browser): NAPKIN_API_KEY, NAPKIN_STYLE_ID (optional),
 // SUPABASE_SERVICE_ROLE_KEY (storage, cache and usage).
 import { createVisualService } from '../../lib/server/napkinVisual.mjs';
+import { withAppTokensOnly } from '../../lib/server/connectedApps.mjs';
 
 export const config = { maxDuration: 60 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const service = createVisualService();
   const authorization = req.headers.authorization || '';
@@ -27,3 +28,5 @@ export default async function handler(req, res) {
     return res.status(200).json({ status: 'fallback', reason: 'server_error' });
   }
 }
+
+export default withAppTokensOnly(handler);

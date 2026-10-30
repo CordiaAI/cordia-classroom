@@ -1,10 +1,11 @@
 // Screenshots on feedback. POST { image: data URL } -> { path } in the private "feedback-attachments"
 // bucket (feedback keeps the path; reviewers get short-lived links). Server env: SUPABASE_SERVICE_ROLE_KEY.
 import { createImageStore } from '../../lib/server/cardImages.mjs';
+import { withAppTokensOnly } from '../../lib/server/connectedApps.mjs';
 
 export const config = { api: { bodyParser: { sizeLimit: '7mb' } } };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -18,3 +19,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ detail: "The screenshot didn't upload. Try again." });
   }
 }
+
+export default withAppTokensOnly(handler);

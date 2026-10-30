@@ -73,6 +73,22 @@ class LocalJwtAuthTests(unittest.TestCase):
              patch.object(auth_utils, "get_auth_supabase", return_value=client):
             self.assertEqual(auth_utils.get_user_id("Bearer " + self.token()), "student-1")
 
+    def test_connected_app_tokens_are_rejected_even_when_validly_signed(self):
+        # With the access-token hook on: role mcp_client and the MCP audience.
+        hooked = self.token(client_id="claude", role="mcp_client", aud="cordia-mcp")
+        # If the hook were ever switched off: the plain OAuth token still carries client_id.
+        plain = self.token(client_id="claude")
+        role_only = self.token(role="mcp_client")
+        for token in (hooked, plain, role_only):
+            with self.assertRaises(HTTPException) as ctx:
+                auth_utils.get_user_id("Bearer " + token)
+            self.assertEqual(ctx.exception.status_code, 401)
+
+    def test_connected_app_token_never_reaches_the_supabase_fallback(self):
+        legacy = jwt.encode({"sub": "student-2", "client_id": "claude"}, "secret-long-enough-for-hmac-sha256-keys", algorithm="HS256")
+        with self.assertRaises(HTTPException):
+            auth_utils.get_user_id("Bearer " + legacy)
+
 
 if __name__ == "__main__":
     unittest.main()

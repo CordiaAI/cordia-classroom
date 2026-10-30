@@ -11,6 +11,7 @@
 // Server env: GROQ_API_KEY or OPENAI_API_KEY (transcription, analysis; lib/server/aiProvider.mjs), SUPABASE_SERVICE_ROLE_KEY (storage, metering).
 import { MAX_CHUNK_BYTES, createLectureService } from '../../../lib/server/lectures.mjs';
 import { createLectureLibrary } from '../../../lib/server/lectureLibrary.mjs';
+import { withAppTokensOnly } from '../../../lib/server/connectedApps.mjs';
 
 const LIBRARY_GET = { list: 'list', get: 'get', todos: 'todos' };
 const LIBRARY_POST = { save: 'save', update: 'update', delete: 'remove', merge: 'merge', todo: 'todo', analyze: 'analyze' };
@@ -28,7 +29,7 @@ async function readBody(req, limit) {
   return Buffer.concat(parts);
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const service = createLectureService();
   const authorization = req.headers.authorization || '';
@@ -74,3 +75,5 @@ export default async function handler(req, res) {
     return res.status(502).json({ detail: "Couldn't reach transcription. It will be retried." });
   }
 }
+
+export default withAppTokensOnly(handler);
