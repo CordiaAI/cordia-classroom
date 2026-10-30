@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request, Header
 from pydantic import BaseModel, Field
 from supabase_auth.errors import AuthApiError, AuthInvalidJwtError
 from database import get_supabase, get_auth_supabase
-from auth_utils import get_user_id
+from auth_utils import get_user_id, reject_oauth_client_token
 from rate_limit import client_ip
 
 logger = logging.getLogger(__name__)
@@ -117,6 +117,7 @@ def get_current_user(authorization: str = Header(default="")):
         token = authorization[7:].strip()
         if not token or len(token) > 4096:
             raise HTTPException(status_code=401, detail="Invalid token")
+        reject_oauth_client_token(token)
 
         result = get_auth_supabase().auth.get_user(token)
 

@@ -3,10 +3,11 @@
 //   POST /api/notes/meta { note_id, title, cover }
 // Server env: GROQ_API_KEY or OPENAI_API_KEY (titles, outlines), NAPKIN_API_KEY + SUPABASE_SERVICE_ROLE_KEY (covers).
 import { createNoteMetaService } from '../../../lib/server/noteMeta.mjs';
+import { withAppTokensOnly } from '../../../lib/server/connectedApps.mjs';
 
 export const config = { maxDuration: 60 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const service = createNoteMetaService();
   const authorization = req.headers.authorization || '';
@@ -23,3 +24,5 @@ export default async function handler(req, res) {
     return res.status(200).json({ reason: 'server_error' });
   }
 }
+
+export default withAppTokensOnly(handler);

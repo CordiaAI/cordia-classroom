@@ -3,11 +3,12 @@
 import { aiChat } from '../../lib/server/aiChat.mjs';
 import { smallChatProvider } from '../../lib/server/aiProvider.mjs';
 import { COVER_ICONS, cleanIcons, keywordIcons } from '../../lib/coverDesign.mjs';
+import { withAppTokensOnly } from '../../lib/server/connectedApps.mjs';
 
 const RULES = `You choose icons for a class's cover in a study app. From the allowed icon names, pick the 3 that best show what the class is about, judging from its name and the titles of its material. Prefer icons for the subject itself over generic study icons. Answer with JSON only: {"icons": ["Name", "Name", "Name"]}.
 Allowed icon names: ${COVER_ICONS.join(', ')}`;
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -25,3 +26,5 @@ export default async function handler(req, res) {
   try { icons = cleanIcons(JSON.parse(out?.text || '{}').icons); } catch { /* not JSON */ }
   return res.status(200).json({ icons: icons.length ? [...icons, ...fallback.filter(icon => !icons.includes(icon))].slice(0, 3) : fallback, ai: icons.length > 0 });
 }
+
+export default withAppTokensOnly(handler);

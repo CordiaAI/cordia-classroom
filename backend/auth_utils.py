@@ -17,6 +17,26 @@ logger = logging.getLogger(__name__)
 _ASYMMETRIC_ALGORITHMS = ["ES256", "RS256"]
 _jwks_client = None
 
+# Tokens Supabase's OAuth server issues to connected apps (Claude and other MCP clients) carry a
+# client_id, and the access-token hook gives them the mcp_client role and their own audience
+# (supabase/migrations/*_oauth_lockdown.sql). The app's routes never accept them; only the
+# dedicated /mcp/* routes will, and they verify those tokens on their own.
+OAUTH_CLIENT_ROLE = "mcp_client"
+
+
+def is_oauth_client_token(token: str) -> bool:
+    """True for a token issued to a connected app. Read without verifying: it only ever rejects."""
+    try:
+        claims = jwt.decode(token, options={"verify_signature": False})
+    except jwt.InvalidTokenError:
+        return False
+    return bool(claims.get("client_id")) or claims.get("role") == OAUTH_CLIENT_ROLE
+
+
+def reject_oauth_client_token(token: str) -> None:
+    if is_oauth_client_token(token):
+        raise HTTPException(status_code=401, detail="Connected-app tokens can't be used here")
+
 
 def _get_jwks_client():
     """One cached client per process; signing keys are refetched at most hourly."""
@@ -67,6 +87,7 @@ def get_user_id(authorization: str) -> str:
     token = authorization[7:].strip()
     if not token or len(token) > 4096:
         raise HTTPException(status_code=401, detail="Invalid token")
+    reject_oauth_client_token(token)
 
     try:
         user_id = _verify_locally(token)
