@@ -51,8 +51,10 @@ API="$API" ANON="$ANON" SERVICE="$SERVICE" DB_URL="$DB_URL" node "$ROOT/tests/oa
 if [ -n "${E2E_WEB:-}" ]; then
   echo "== consent page, /mcp and Connected apps in a browser"
   export NEXT_PUBLIC_SUPABASE_URL="$API" NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$ANON" NEXT_PUBLIC_VERCEL_ENV=preview VERCEL_ENV=preview
-  npx next build > "$WORK/next-build.log" 2>&1 || { tail -40 "$WORK/next-build.log"; exit 1; }
-  npx next start -p 3105 > "$WORK/next.log" 2>&1 &
+  if curl -s -o /dev/null http://localhost:3105; then echo "Port 3105 is already in use (an old next start?)"; exit 1; fi
+  ./node_modules/.bin/next build > "$WORK/next-build.log" 2>&1 || { tail -40 "$WORK/next-build.log"; exit 1; }
+  # Run next directly (not through npx) so the trap below stops the server itself.
+  ./node_modules/.bin/next start -p 3105 > "$WORK/next.log" 2>&1 &
   NEXT_PID=$!
   trap 'kill $NEXT_PID 2>/dev/null || true; cleanup' EXIT
   for _ in $(seq 1 60); do curl -fs -o /dev/null http://localhost:3105/login && break; sleep 1; done
