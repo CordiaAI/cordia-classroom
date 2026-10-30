@@ -26,6 +26,7 @@ import ClassCoverSheet from '../components/ClassCoverSheet';
 import { designCover } from '../lib/classCover';
 import { useListView } from '../lib/listView';
 import ViewToggle from '../components/ViewToggle';
+import useScrollerTabs from '../lib/useScrollerTabs';
 
 const SORTS = [
   { key: 'recent', label: 'Newest' },
@@ -67,6 +68,7 @@ export default function LibraryPage() {
   useSessionTracker('browse');
   const asked = String(router.query.tab || router.query.filter || 'all');
   const filter = FILTERS.some(item => item.key === asked) ? asked : TAB_ALIASES[asked] || 'all';
+  const filtersRef = useScrollerTabs(filter);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [folders, setFolders] = useState([]);
@@ -460,9 +462,10 @@ export default function LibraryPage() {
         />
       </div>
       <div className="c-row lib-filter-row">
-        <div className="c-chips lib-filters" role="group" aria-label="Show">
+        {/* The same segmented tabs as Settings and a class page. */}
+        <div ref={filtersRef} className="c-seg is-scroller lib-filters" role="tablist" aria-label="Show">
           {FILTERS.map(item => (
-            <button key={item.key} type="button" className="c-chip" aria-pressed={filter === item.key} onClick={() => setFilter(item.key)}>
+            <button key={item.key} type="button" role="tab" aria-selected={filter === item.key} className={filter === item.key ? 'is-active' : ''} onClick={() => setFilter(item.key)}>
               {item.key === 'starred' && <Star size={16} strokeWidth={1.75} aria-hidden="true" />}{item.label}
             </button>
           ))}
@@ -518,13 +521,10 @@ export default function LibraryPage() {
         .library .lib-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
         @media (max-width: 767px) { .library .lib-add-class-icon { display: inline-grid; } }
         .library .lib-filter-row { flex-wrap: nowrap; min-width: 0; }
-        /* Six filters: on narrow phones they scroll inside their row, never the page. */
-        .library .lib-filters { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+        /* Seven filters: on narrow screens they scroll inside their bar, never the page. */
+        .library .lib-filters { max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; }
         .library .lib-filters::-webkit-scrollbar { display: none; }
-        .library .lib-filters .c-chip { flex: 0 0 auto; min-width: 64px; padding: 0 16px; justify-content: center; }
-        /* Like the sidebar: the chosen filter is a raised pane, the rest are plain until hovered. */
-        .library .lib-filters .c-chip:not([aria-pressed='true']) { background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: var(--muted); }
-        .library .lib-filters .c-chip:not([aria-pressed='true']):hover { color: var(--ink); }
+        .library .lib-filters button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
         .library .lib-group { padding: 6px; }
         .library .lib-group.is-drop { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
         .library .lib-group-head { display: flex; align-items: center; gap: 6px; min-height: 52px; padding-right: 12px; }
@@ -554,7 +554,6 @@ export default function LibraryPage() {
           .library .lib-row-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; overflow-wrap: anywhere; }
           /* Phones: "Add a class" moves up beside New, so the filters get the whole row. */
           .library .lib-add-class { display: none; }
-          .library .lib-filters { margin: 0 -16px; padding: 2px 16px; }
           .library .lib-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
         }
       `}</style>

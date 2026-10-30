@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { CalendarDays, ChartNoAxesColumn, CircleHelp, CreditCard, Ellipsis, FolderPlus, GraduationCap, House, Library, Link2, LogOut, MessageCircle, Megaphone, Moon, Palette, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Sun, User } from 'lucide-react';
+import { CalendarDays, ChartNoAxesColumn, CircleHelp, CreditCard, Ellipsis, FolderPlus, House, Library, Link2, LogOut, MessageCircle, Megaphone, Moon, Palette, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Sun, User } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -17,7 +17,6 @@ import { classLabel } from '../lib/classLabel';
 import { coverFor } from '../lib/coverDesign.mjs';
 import { latestFolders, loadFolders, onFoldersChanged } from '../lib/folders';
 import { HELP_EVENT } from '../lib/help';
-import { forgetDueCount, freshDueCount, loadDueCount } from '../lib/studyDue';
 import { setThemePreference, themePreference } from '../lib/theme';
 
 // The sidebar (wide screens), top to bottom: New, Search, the main places, your classes, the
@@ -26,8 +25,6 @@ import { setThemePreference, themePreference } from '../lib/theme';
 // Dashboard. The Tutor is the bubble in the corner (TutorBubble).
 const navItems = [
   { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: House, spot: 'nav-today' },
-  // Study now (pages/session.js): due flashcards, Learn ideas, misses and open practice in one round.
-  { key: 'study', label: 'Study now', href: '/session', icon: GraduationCap, spot: 'nav-study', badge: true },
   { key: 'library', label: 'Library', href: '/library', icon: Library, spot: 'nav-library' },
   { key: 'calendar', label: 'Calendar', href: '/calendar', icon: CalendarDays, spot: 'nav-calendar', tip: 'calendar' },
   { key: 'progress', label: 'Progress', href: '/progress', icon: ChartNoAxesColumn, spot: 'nav-progress' },
@@ -67,7 +64,6 @@ export function activeNavHref(pathname, section = '') {
 // The one sidebar item for this page: a nav key, 'class:<id>' for a class listed in the sidebar,
 // or '' (Settings and other pages outside the list). Only that item is marked current.
 export function sideCurrent(pathname, query = {}, classIds = []) {
-  if (pathname === '/session') return 'study';
   if (pathname === '/progress') return 'progress';
   if (pathname === '/folder/[id]' && classIds.includes(String(query.id || ''))) return 'class:' + query.id;
   const href = activeNavHref(pathname);
@@ -79,7 +75,7 @@ function isMac() {
   return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
 }
 
-export default function Sidebar({ timerState, setTimerState, focus = false }) {
+export default function Sidebar({ timerState, setTimerState }) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -131,22 +127,6 @@ export default function Sidebar({ timerState, setTimerState, focus = false }) {
   const shownClasses = (classes || []).slice(0, MAX_CLASSES);
   const query = router.query || {};
   const current = sideCurrent(router.pathname, query, shownClasses.map(item => String(item.id)));
-
-  // Study now's count. Study screens hide the sidebar, and studying changes the count, so leaving
-  // one loads it again; otherwise a count up to five minutes old is kept. Phones don't show it.
-  const [due, setDue] = useState(null);
-  const wasStudying = useRef(false);
-  useEffect(() => {
-    if (focus) { wasStudying.current = true; return undefined; }
-    if (!window.matchMedia('(min-width: 768px)').matches) return undefined;
-    const force = wasStudying.current;
-    wasStudying.current = false;
-    if (force) forgetDueCount();
-    else setDue(current => current ?? freshDueCount());
-    let live = true;
-    loadDueCount({ force }).then(count => { if (live) setDue(count); });
-    return () => { live = false; };
-  }, [focus, router.pathname]);
 
   useEffect(() => {
     setShortcut(isMac() ? '⌘K' : 'Ctrl K');
@@ -241,18 +221,10 @@ export default function Sidebar({ timerState, setTimerState, focus = false }) {
   const onProfile = ['/settings', '/billing'].includes(router.pathname);
   const { minutes = 25, seconds = 0, isRunning = false } = timerState || {};
   const clock = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  const dueText = due > 0 ? `${due} ${due === 1 ? 'item' : 'items'} due` : '';
 
   const sideLink = item => (
-    <Link key={item.key} className="c-side-item" href={item.href} aria-current={current === item.key ? 'page' : undefined} data-tip={item.tip} data-spot={item.spot}
-      title={tip(item.badge && dueText ? `${item.label} · ${dueText}` : item.label)}>
+    <Link key={item.key} className="c-side-item" href={item.href} aria-current={current === item.key ? 'page' : undefined} data-tip={item.tip} data-spot={item.spot} title={tip(item.label)}>
       <item.icon size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">{item.label}</span>
-      {item.badge && due > 0 && (
-        <>
-          <span className="c-side-badge" aria-hidden="true">{due > 99 ? '99+' : due}</span>
-          <span className="sr-only">, {dueText}</span>
-        </>
-      )}
     </Link>
   );
 

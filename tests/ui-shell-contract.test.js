@@ -31,10 +31,10 @@ for (const token of ['--canvas: #EDF2F4', '--ink: #171B18', '--muted: rgba(23, 2
 }
 assert.match(system, /prefers-reduced-motion/);
 assert.match(tokens, /--lg-filter: blur\(34px\) saturate\(115%\)/);
-// The sidebar: five places (Study now is the Study now round), then classes and the Assistant, each
+// The sidebar: four places, then classes and the Assistant, each
 // a real route; the phone tab bar keeps Dashboard, Library, New, Calendar, Assistant. The Tutor is a bubble.
 const nav = sidebar.split('const navItems = [')[1].split('];')[0];
-assert.deepEqual([...nav.matchAll(/label: '([^']+)', href: '([^']+)'/g)].map(match => `${match[1]} ${match[2]}`), ['Dashboard /dashboard', 'Study now /session', 'Library /library', 'Calendar /calendar', 'Progress /progress']);
+assert.deepEqual([...nav.matchAll(/label: '([^']+)', href: '([^']+)'/g)].map(match => `${match[1]} ${match[2]}`), ['Dashboard /dashboard', 'Library /library', 'Calendar /calendar', 'Progress /progress']);
 assert.match(sidebar, /const assistantItem = \{ key: 'assistant', label: 'Assistant', href: '\/assistant'/);
 const tabs = sidebar.split('const tabItems = [')[1].split('];')[0];
 assert.deepEqual([...tabs.matchAll(/label: '([^']+)', href: '([^']+)'/g)].map(match => `${match[1]} ${match[2]}`), ['Dashboard /dashboard', 'Library /library', 'Calendar /calendar', 'Assistant /assistant']);
