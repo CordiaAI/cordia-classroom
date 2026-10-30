@@ -128,7 +128,9 @@ for (const table of ['canvas_courses', 'study_guides']) {
     console.log(execFileSync('psql', [process.env.DB_URL, '-At', '-c', "select entity::regclass, claims_role::text, claims->>'role', claims->>'client_id' is not null from realtime.subscription"]).toString());
   }
   await student.from(table).insert(table === 'canvas_courses' ? { canvas_course_id: 2, name: 'HIST 210' } : { title: 'Cells' });
-  await sleep(3000);
+  // Wait for the app's own copy of the change (up to 10s), then a moment more for any leak.
+  for (let i = 0; i < 40 && !asApp.events.length; i++) await sleep(250);
+  await sleep(1000);
   if (process.env.DEBUG_REALTIME) console.log(table, 'oauth events:', JSON.stringify(asOAuth.events).slice(0, 300));
   check(`control: app token gets ${table} changes`, asApp.events.length > 0, asApp.status());
   check(`Realtime ${table} changes: oauth gets no row data`, asOAuth.events.length === 0, `${asOAuth.status()}, ${asOAuth.events.length} with data, ${asOAuth.denied.length} denied notices`);
