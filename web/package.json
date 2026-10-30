@@ -14,14 +14,17 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^1.0.0",
     "@mediapipe/tasks-vision": "1.0.1",
+    "@modelcontextprotocol/server": "2.4.0",
     "@supabase/supabase-js": "^2.117.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
+    "jose": "6.2.14",
     "lucide-react": "1.50.0",
     "mermaid": "12.2.0",
     "next": "16.4.2",
     "pdfjs-dist": "^6.3.289",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "zod": "4.6.7"
   }
 }
