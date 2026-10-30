@@ -98,7 +98,7 @@ const evil = await register('Totally Claude', 'https://evil.example/cb');
 const second = await authorize(evil, 'https://evil.example/cb');
 await page.goto(second.consentUrl);
 await page.getByRole('heading', { name: 'Connect Totally Claude to Cordia?' }).waitFor();
-check('consent: unknown host warned and Allow disabled', await page.getByRole('alert').isVisible() && await page.getByRole('button', { name: 'Allow' }).isDisabled());
+check('consent: unknown host warned and Allow disabled', await page.getByRole('alert').filter({ hasText: 'isn’t an app Cordia works with' }).isVisible() && await page.getByRole('button', { name: 'Allow' }).isDisabled());
 await shot('consent-blocked');
 let leftForEvil = false;
 await page.route('https://evil.example/**', route => { leftForEvil = true; route.abort(); });
