@@ -693,7 +693,7 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 
 /* ---------- Sidebar (wide screens) ----------
    Replaces the top bar from 768px up: a rounded glass panel floating 12px in from the edges. New,
-   Search, Dashboard · Study now · Library · Calendar · Progress, your classes, Assistant, then one
+   Search, Dashboard · Library · Calendar · Progress, your classes, Assistant, then one
    divider and the account row (its ⋯ menu has Settings, Help, Send feedback and the theme). Folds to
    icons (72px) with the toggle, remembered per device; between 768 and 1099px it's always folded so
    the page keeps its width. Phones keep the top bar and tab bar.
@@ -735,11 +735,6 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   /* Line height above 1, so the ellipsis clip never cuts off descenders (y, g, p). */
   .c-side-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; padding-block: 1px; }
   .c-side-kbd { margin-left: auto; padding: 4px 7px; border-radius: var(--r-pill); background: var(--hairline); color: var(--muted); font: 600 12px/1 var(--font-sans); }
-  /* Study now's count. */
-  .c-side-badge {
-    flex: none; margin-left: auto; min-width: 22px; height: 20px; padding: 0 6px; border-radius: var(--r-pill);
-    background: var(--olive); color: var(--on-olive); font: 700 12px/20px var(--font-sans); text-align: center; font-variant-numeric: tabular-nums;
-  }
   /* The middle scrolls on short screens; New and Search stay on top and the account at the bottom. */
   .c-side-nav {
     flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1px;
@@ -773,14 +768,13 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   .c-side-who span { color: var(--muted); font: 500 12px/1.2 var(--font-sans); }
   .c-side-dots { flex: none; margin-left: auto; color: var(--muted); }
   /* Folded: icons only, centered; each keeps its name as a tooltip and accessible label. Class
-     dots stay, with the course code as the tooltip; Study now's count sits on its icon. */
+     dots stay, with the course code as the tooltip. */
   .c-side.is-collapsed { padding-inline: 12px; }
   .c-side.is-collapsed :is(.c-side-label, .c-side-kbd, .c-side-heading-row, .c-side-all, .c-side-dots) { display: none; }
   .c-side.is-collapsed .c-side-head { flex-direction: column; padding: 0; gap: 8px; }
   .c-side.is-collapsed :is(.c-side-item, .c-side-new) { justify-content: center; padding: 0; }
   .c-side.is-collapsed .c-side-section { margin-top: 8px; padding-top: 8px; }
   .c-side.is-collapsed .c-side-account { height: 48px; }
-  .c-side.is-collapsed .c-side-badge { position: absolute; top: 1px; right: 4px; min-width: 18px; height: 16px; padding: 0 4px; font-size: 11px; line-height: 16px; }
 }
 @media (min-width: 768px) and (max-width: 1099px) {
   :root { --side-w: 72px; }
@@ -788,7 +782,6 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   .c-side .c-side-head { justify-content: center; padding: 0; }
   .c-side :is(.c-side-item, .c-side-new) { justify-content: center; padding: 0; }
   .c-side .c-side-section { margin-top: 8px; padding-top: 8px; }
-  .c-side .c-side-badge { position: absolute; top: 1px; right: 4px; min-width: 18px; height: 16px; padding: 0 4px; font-size: 11px; line-height: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .c-side, .app-shell { transition: none; }
