@@ -139,6 +139,7 @@ export default function OAuthConsent() {
 
       <style jsx>{`
         .consent-page { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; background: var(--canvas) url('/classroom-clouds.webp') center / cover no-repeat fixed; }
+        :global([data-theme="dark"]) .consent-page { background-image: none; }
         .consent { display: grid; gap: 16px; width: min(460px, 100%); padding: 28px; border-radius: 20px; background: var(--surface-card); border: 1px solid var(--hairline); box-shadow: var(--shadow-card); color: var(--ink); -webkit-backdrop-filter: blur(20px) saturate(140%); backdrop-filter: blur(20px) saturate(140%); }
         .consent-brand { display: inline-flex; align-items: center; gap: 12px; color: var(--ink); }
         .consent-brand :global(.consent-mark) { width: 30px; height: 26px; }
