@@ -2,10 +2,11 @@
 -- allow-list. Expect ZERO rows. Run it against production after the lockdown migration and after
 -- every MCP migration, and CI runs it on a local database (tests/test_oauth_lockdown.py).
 --
--- The allow-list is empty until the MCP migrations add their views and functions here, one by one.
+-- The allow-list: every view and function an MCP migration grants to mcp_client, one by one.
 with allowed(kind, name) as (
-  values ('none', 'none')
-  -- e.g. ('function', 'public.mcp_search_my_materials(text,uuid,text[],integer)')
+  values ('none', 'none'),
+  -- 20261031130000_mcp_connected_apps.sql: is this app still connected? (records last use)
+  ('function', 'public.mcp_session_check()')
 ),
 -- Platform schemas Supabase grants to PUBLIC and owns (supabase_admin), so no migration of ours
 -- can revoke them, and which the Data API does not expose (exposed schemas: public,

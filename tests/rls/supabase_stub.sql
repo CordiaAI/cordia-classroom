@@ -43,3 +43,20 @@ drop policy if exists "Allow insert for authenticated users" on public.user_prof
 create policy "Allow insert for authenticated users" on public.user_profiles for insert with check (true);
 grant select, insert on public.user_profiles to authenticated;
 
+
+-- Supabase Auth's OAuth 2.1 server tables (only the columns our functions use).
+create table if not exists auth.oauth_clients (
+  id uuid primary key default gen_random_uuid(),
+  client_name text,
+  registration_type text not null default 'dynamic',
+  created_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+create table if not exists auth.oauth_consents (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  client_id uuid not null references auth.oauth_clients(id) on delete cascade,
+  granted_at timestamptz not null default now(),
+  revoked_at timestamptz,
+  unique (user_id, client_id)
+);

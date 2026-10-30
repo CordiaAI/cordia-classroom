@@ -16,6 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BIN = next(iter(sorted(glob.glob("/usr/lib/postgresql/*/bin"))), "")
 MIGRATIONS = os.path.join(ROOT, "supabase", "migrations")
 LOCKDOWN = os.path.join(MIGRATIONS, "20261031120000_oauth_lockdown.sql")
+CONNECTED_APPS = os.path.join(MIGRATIONS, "20261031130000_mcp_connected_apps.sql")
 CHECK = os.path.join(ROOT, "supabase", "checks", "oauth_lockdown.sql")
 
 
@@ -54,6 +55,17 @@ class OAuthLockdownDatabaseTests(unittest.TestCase):
         result = self.psql(os.path.join(ROOT, "tests", "rls", "oauth_lockdown_rls.sql"))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("LOCKDOWN OK", result.stdout)
+        result = self.psql(CHECK, "-At")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "", "mcp_client can reach objects outside the allow-list")
+
+    def test_connected_apps_check_records_use_and_cleanup_spares_connected_apps(self):
+        for path in (os.path.join(ROOT, "tests", "rls", "supabase_stub.sql"), LOCKDOWN, CONNECTED_APPS, CONNECTED_APPS):
+            result = self.psql(path)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        result = self.psql(os.path.join(ROOT, "tests", "rls", "mcp_connected_apps_rls.sql"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("CONNECTED APPS OK", result.stdout)
         result = self.psql(CHECK, "-At")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "", "mcp_client can reach objects outside the allow-list")
