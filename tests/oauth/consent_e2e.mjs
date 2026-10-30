@@ -68,7 +68,9 @@ await page.goto(first.consentUrl);
 await page.waitForURL(/\/login\?next=/, { waitUntil: 'commit' });
 check('signed out: sent to sign in with the way back', decodeURIComponent(page.url()).includes('/login?next=/oauth/consent?authorization_id='), page.url());
 
-// Sign in (as the app's own sign-in does) and come back.
+// Sign in (as the app's own sign-in does) and come back. Stored from a plain page: the login page
+// would try to renew the session through the backend, which isn't running here, and drop it.
+await page.goto(`${WEB}/privacy`);
 await page.evaluate(({ token, refresh, mail }) => { localStorage.setItem('authToken', token); localStorage.setItem('refreshToken', refresh); localStorage.setItem('userEmail', mail); }, { token: signUp.session.access_token, refresh: signUp.session.refresh_token, mail: email });
 await page.goto(first.consentUrl);
 await page.getByRole('heading', { name: 'Connect MCP Inspector to Cordia?' }).waitFor();
@@ -109,7 +111,7 @@ check('Cancel on a blocked app never redirects there', !leftForEvil);
 // 5. Phone, dark theme.
 const phone = await browser.newContext({ bypassCSP: true, viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: 'dark' });
 const phonePage = await phone.newPage();
-await phonePage.goto(`${WEB}/login`);
+await phonePage.goto(`${WEB}/privacy`);
 await phonePage.evaluate(({ token, refresh }) => { localStorage.setItem('authToken', token); localStorage.setItem('refreshToken', refresh); localStorage.setItem('theme', 'dark'); }, { token: signUp.session.access_token, refresh: signUp.session.refresh_token });
 // A new app, so Supabase asks again instead of sending the already-approved one straight back.
 const phoneApp = await register('Claude', INSPECTOR);
