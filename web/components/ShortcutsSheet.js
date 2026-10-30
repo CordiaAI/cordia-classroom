@@ -5,6 +5,7 @@ import BodyPortal from './BodyPortal';
 const GROUPS = [
   { title: 'Anywhere', keys: [['⌘K / Ctrl K', 'Search'], ['?', 'This list'], ['Esc', 'Close a panel or window']] },
   { title: 'Flashcards and review', keys: [['Space or Enter', 'Flip'], ['1', 'Again'], ['2', 'Got it'], ['←', 'Back one card']] },
+  { title: 'Learn and quizzes', keys: [['1 – 4', 'Pick a choice'], ['1 – 3', 'How sure you are']] },
   { title: 'Tutor panel', keys: [['← →', 'Resize (on the handle)'], ['Shift + ← →', 'Resize faster']] },
   { title: 'Notes', keys: [['Tab / Shift Tab', 'Indent / outdent'], ['Typing shortcuts', 'Listed in the editor']] },
 ];

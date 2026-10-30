@@ -42,9 +42,10 @@
   --glow-a: rgba(83, 97, 73, 0.24);
   --glow-b: rgba(142, 174, 208, 0.16);
   --on-olive: #FFFFFF;
+  --on-error: #FFFFFF;                     /* label on a filled red button, both themes */
   --success: #2F6B3F;
   --success-bg: rgba(57, 114, 75, 0.12);
-  --warning: #8A5D00;
+  --warning: #7F5600;                      /* 5.2:1 on its own tint over a card (was 4.4–4.6) */
   --warning-bg: rgba(154, 103, 0, 0.12);
   --error: #B42318;
   --error-bg: rgba(180, 35, 24, 0.08);
@@ -78,7 +79,8 @@
   /* Shadows: one for cards, one for floating things */
   --shadow-card: 0 1px 2px rgba(16, 24, 16, 0.04), 0 8px 24px rgba(16, 24, 16, 0.06);
   --shadow-float: 0 2px 8px rgba(16, 24, 16, 0.06), 0 18px 48px rgba(16, 24, 16, 0.14);
-  --focus-ring: 0 0 0 2px var(--olive);
+  /* Keyboard focus ring (system.css): 3:1 or better against every surface in this theme. */
+  --focus-ring: #536149;
 
   /* Radii */
   --r-input: 12px; --r-row: 16px; --r-card: 20px; --r-panel: 28px; --r-pill: 999px;
@@ -161,7 +163,7 @@
   --shadow-sm: var(--shadow-card);
   --shadow-md: var(--shadow-card);
   --shadow-lg: var(--shadow-float);
-  --shadow-glow: var(--focus-ring);
+  --shadow-glow: 0 0 0 2px var(--focus-ring);
   --radius: var(--r-input);
   --radius-lg: var(--r-card);
   --motion-fast: var(--dur) var(--ease);
@@ -203,7 +205,7 @@
 
 [data-theme='dark'] {
   color-scheme: dark;
-  --ink: #FFFFFF;
+  --ink: #ECECEA;                          /* 12.2:1 on the dark card; pure white glared */
   --muted: rgba(255, 255, 255, 0.64);
   --canvas: #1A1D20;
   --surface-card: rgba(39, 42, 48, 0.55);
@@ -213,9 +215,12 @@
   --photo-veil: rgba(26, 29, 32, 0.80);
   --scrim: rgba(0, 0, 0, 0.45);
   --scrim-strong: rgba(0, 0, 0, 0.55); /* search: dims the page more than a sheet does */
-  --olive: #536149;
+  /* Lighter olive so filled buttons and their edges stand out from the dark glass (3.96:1 on the
+     card, was 2.17), with a dark label on it (5.05:1). Olive as text stays --olive-ink. */
+  --olive: #7A8C6B;
   --olive-press: #3D4937;
   --olive-ink: #CFDAC3;
+  --on-olive: #12160F;
   --olive-tint: rgba(195, 207, 182, 0.12);
   --glow-a: rgba(195, 207, 182, 0.16);
   --glow-b: rgba(142, 174, 208, 0.10);
@@ -260,7 +265,7 @@
   --lg-depth: 0 1px 2px rgba(0, 0, 0, 0.22), 0 10px 26px -12px rgba(0, 0, 0, 0.45);
   --lg-depth-float: 0 2px 8px rgba(0, 0, 0, 0.30), 0 22px 48px -14px rgba(0, 0, 0, 0.55);
   --lg-press: rgba(255, 255, 255, 0.06);
-  --focus-ring: 0 0 0 2px var(--olive-ink);
+  --focus-ring: #CFDAC3;
   --shot-frame: #2F3238; --shot-edge: rgba(255, 255, 255, 0.16); --shot-chrome: #24272C; --shot-line: rgba(255, 255, 255, 0.22);
   --shot-soft: #3A3E45; --shot-nav: #1E2A33; --shot-text: #FFFFFF; --shot-link: #8CC4FF; --shot-mark: #C3CFB6;
   --scroll-thumb: rgba(255, 255, 255, 0.18); --scroll-thumb-hover: rgba(255, 255, 255, 0.30);

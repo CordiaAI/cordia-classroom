@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../lib/api';
-import { BookOpen, MessageCircle, Sparkles } from 'lucide-react';
+import { BookOpen, Check, MessageCircle, Sparkles, X } from 'lucide-react';
 import { requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { noteView, useAnswerTiming } from '../lib/learningEvents';
@@ -154,6 +154,18 @@ export function McCard({ card, question, guideId, onResult, onNext, askSure = tr
     setPending(option);
   }
 
+  // Keys 1-4 pick the choice with that number, the order shown.
+  useEffect(() => {
+    if (selected !== null || pending !== null) return undefined;
+    function onKey(event) {
+      if (event.target.closest?.('input, textarea, select, [contenteditable="true"]') || event.metaKey || event.ctrlKey || event.altKey) return;
+      const option = options[Number(event.key) - 1];
+      if (option !== undefined && Number(event.key) <= 4) { event.preventDefault(); choose(option); }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   function optionClass(option) {
     if (selected === null) return 'quiz-option' + (pending === option ? ' selected' : '');
     if (option === answer) return 'quiz-option ' + (selected === answer ? 'correct-shine' : 'correct-glow');
@@ -161,12 +173,24 @@ export function McCard({ card, question, guideId, onResult, onNext, askSure = tr
     return 'quiz-option disabled';
   }
 
+  // Right and wrong are never colour alone: an icon and a word on the option, and a spoken status.
+  function optionMark(option) {
+    if (selected === null) return null;
+    if (option === answer) return <span className="quiz-option-mark is-right"><Check size={16} strokeWidth={2.25} aria-hidden="true" />Correct</span>;
+    if (option === selected) return <span className="quiz-option-mark is-wrong"><X size={16} strokeWidth={2.25} aria-hidden="true" />Your answer</span>;
+    return null;
+  }
+  const status = selected === null ? '' : selected === answer ? 'Correct' : `Not quite. The answer is: ${answer}`;
+
   return (
     <>
       <div className="quiz-question-text">{question.question}</div>
       {options.map(option => (
-        <button key={option} type="button" className={optionClass(option)} aria-pressed={selected === null ? pending === option : undefined} onClick={() => choose(option)}>{option}</button>
+        <button key={option} type="button" className={optionClass(option)} aria-pressed={selected === null ? pending === option : option === selected} onClick={() => choose(option)}>
+          <span className="quiz-option-text">{option}</span>{optionMark(option)}
+        </button>
       ))}
+      <p className="sr-only" role="status" aria-live="polite">{status}</p>
       {selected === null && pending !== null && <ConfidencePrompt onPick={level => reveal(pending, level)} />}
       {explained && <MissFeedback guideId={guideId} card={card} question={question} chosen={selected} sure={confidence === 'sure'} />}
       {selected !== null && <NextButton onNext={onNext} missed={selected !== answer} onExplain={explained ? null : () => setExplained(true)} />}

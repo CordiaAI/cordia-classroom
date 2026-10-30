@@ -125,6 +125,8 @@ export default function SearchModal({ onClose }) {
         .search-bar { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0 12px 0 20px; color: var(--muted); }
         .search-input { flex: 1; min-width: 0; height: 60px; padding: 0; border: 0; background: transparent; color: var(--ink); font:500 17px/1.4 var(--font-sans); outline: none; box-shadow: none; -webkit-appearance: none; appearance: none; }
         .search-input:focus, .search-input:focus-visible { outline: none; box-shadow: none; }
+        /* The bar is the field's box, flush with the panel's top edge, so its focus ring sits just inside it. */
+        .search-bar:has(.search-input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: inherit; }
         .search-input::placeholder { color: var(--muted); }
         .search-input::-webkit-search-cancel-button { display: none; }
         .search-close { flex: none; display: grid; place-items: center; min-width: 44px; height: 44px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; }

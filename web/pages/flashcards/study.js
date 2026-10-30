@@ -73,6 +73,8 @@ export default function FlashcardStudy() {
 
   return (
     <Reveal phase={gate}>
+    {/* The page's heading for screen readers; the viewer shows the title in its bar. */}
+    <h1 className="sr-only">Flashcards: {guide.title || 'Untitled guide'}</h1>
     <FlashcardViewer
       flashcards={guide.flashcards}
       guideId={guideId}
