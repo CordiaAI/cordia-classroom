@@ -34,6 +34,14 @@ select 'inherits another role', r.rolname
 from pg_auth_members m join pg_roles r on r.oid = m.roleid
 where m.member = (select oid from pg_roles where rolname = 'mcp_client')
 union all
+-- Realtime sends Postgres changes only for published tables. Production publishes none and the
+-- app doesn't use Realtime; a denied subscriber would still learn that a change happened, so any
+-- table added here needs review.
+select 'realtime publication', format('%I.%I', t.schemaname, t.tablename)
+from pg_publication_tables t
+where t.pubname = 'supabase_realtime'
+  and (('realtime publication', format('%I.%I', t.schemaname, t.tablename))) not in (select kind, name from allowed)
+union all
 select 'schema usage', s.nspname
 from checked_schemas s
 where exists (select 1 from pg_roles where rolname = 'mcp_client')

@@ -2,7 +2,8 @@
   "name": "cordia-classroom-release-checks",
   "private": true,
   "scripts": {
-    "test": "node --test tests/*.js tests/*.cjs web/tests/*.mjs"
+    "test": "node --test tests/*.js tests/*.cjs web/tests/*.mjs",
+    "test:oauth-local": "bash tests/oauth/run_local_probe.sh"
   },
   "devDependencies": {
     "playwright": "1.63.0"
