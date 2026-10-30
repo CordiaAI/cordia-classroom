@@ -128,7 +128,9 @@ for (const table of ['canvas_courses', 'study_guides']) {
     console.log(execFileSync('psql', [process.env.DB_URL, '-At', '-c', "select entity::regclass, claims_role::text, claims->>'role', claims->>'client_id' is not null from realtime.subscription"]).toString());
   }
   await student.from(table).insert(table === 'canvas_courses' ? { canvas_course_id: 2, name: 'HIST 210' } : { title: 'Cells' });
-  await sleep(3000);
+  // Wait for the app's own copy of the change (up to 10s), then a moment more for any leak.
+  for (let i = 0; i < 40 && !asApp.events.length; i++) await sleep(250);
+  await sleep(1000);
   if (process.env.DEBUG_REALTIME) console.log(table, 'oauth events:', JSON.stringify(asOAuth.events).slice(0, 300));
   check(`control: app token gets ${table} changes`, asApp.events.length > 0, asApp.status());
   check(`Realtime ${table} changes: oauth gets no row data`, asOAuth.events.length === 0, `${asOAuth.status()}, ${asOAuth.events.length} with data, ${asOAuth.denied.length} denied notices`);
@@ -161,6 +163,41 @@ const signIn = await app.auth.signInWithPassword({ email, password });
 check('control: original password still works', !signIn.error, signIn.error?.message);
 const stillIn = await fetch(`${API}/auth/v1/user`, { headers: headers(appToken) });
 check('control: app session survives', stillIn.status === 200, String(stillIn.status));
+
+// The MCP endpoint itself (web/lib/mcp/endpoint.mjs, run in-process against this stack): real
+// signing keys, issuer, audience and the per-request grant check.
+const { createMcpEndpoint } = await import(new URL('../../web/lib/mcp/endpoint.mjs', import.meta.url));
+const mcp = createMcpEndpoint({ supabaseUrl: API, issuer: `${API}/auth/v1`, audience: MCP_AUDIENCE, publishableKey: ANON, allowedOrigins: ['claude.ai'] });
+const initialize = token => mcp(new Request('https://classroom.cordiacode.com/mcp', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+  body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'probe', version: '1' } } }),
+}));
+const noToken = await initialize('');
+check('MCP: no token gets 401 with resource_metadata', noToken.status === 401 && /resource_metadata="[^"]+\/\.well-known\/oauth-protected-resource\/mcp"/.test(noToken.headers.get('www-authenticate') || ''), noToken.headers.get('www-authenticate'));
+const withApp = await initialize(appToken);
+check('MCP: app sign-in token refused', withApp.status === 401, String(withApp.status));
+const withOAuth = await initialize(refreshed.access_token);
+const session = await withOAuth.text();
+check('MCP: connected-app token gets a session', withOAuth.status === 200 && session.includes('Cordia Classroom'), `${withOAuth.status} ${session.slice(0, 120)}`);
+const sessionCheck = await fetch(`${API}/rest/v1/rpc/mcp_session_check`, { method: 'POST', headers: headers(refreshed.access_token), body: '{}' });
+check('RPC mcp_session_check: connected app gets true', sessionCheck.status === 200 && (await sessionCheck.text()).trim() === 'true', String(sessionCheck.status));
+const appCheck = await fetch(`${API}/rest/v1/rpc/mcp_session_check`, { method: 'POST', headers: headers(appToken), body: '{}' });
+check('RPC mcp_session_check: app token refused', refused(appCheck.status), String(appCheck.status));
+const activity = await (await fetch(`${API}/rest/v1/mcp_connection_activity?select=client_id,last_used_at`, { headers: headers(appToken) })).json();
+check('Connected apps: last use recorded for the student', Array.isArray(activity) && activity.some(row => row.client_id === client.client_id), JSON.stringify(activity).slice(0, 120));
+const directActivity = await fetch(`${API}/rest/v1/mcp_connection_activity?select=*`, { headers: headers(refreshed.access_token) });
+check('REST mcp_connection_activity: oauth read refused', refused(directActivity.status), String(directActivity.status));
+const grants = await (await fetch(`${API}/auth/v1/user/oauth/grants`, { headers: headers(appToken) })).json();
+check('Connected apps: grant listed for the student', Array.isArray(grants) && grants.some(grant => grant.client?.id === client.client_id && grant.client?.name === 'Probe Client'), JSON.stringify(grants).slice(0, 160));
+// Disconnect in Settings: the still-unexpired access token stops working at once.
+const revoke = await fetch(`${API}/auth/v1/user/oauth/grants?client_id=${client.client_id}`, { method: 'DELETE', headers: headers(appToken) });
+check('Connected apps: Disconnect revokes the grant', revoke.status < 300, String(revoke.status));
+const afterRevoke = await initialize(refreshed.access_token);
+check('MCP: token refused right after Disconnect', afterRevoke.status === 401 && /disconnected/i.test(await afterRevoke.text()), String(afterRevoke.status));
+const refreshAfter = await fetch(`${API}/auth/v1/oauth/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
+  body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshed.refresh_token, client_id: client.client_id }) });
+check('Connected apps: refresh token dead after Disconnect', refreshAfter.status >= 400, String(refreshAfter.status));
 
 const failed = results.filter(result => !result.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);

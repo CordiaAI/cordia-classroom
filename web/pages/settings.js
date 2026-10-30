@@ -15,6 +15,7 @@ import BodyPortal from '../components/BodyPortal';
 import SharingSettings from '../components/SharingSettings';
 import PhoneSettings from '../components/PhoneSettings';
 import ConnectorsSettings from '../components/ConnectorsSettings';
+import ConnectedApps from '../components/ConnectedApps';
 import useScrollerTabs from '../lib/useScrollerTabs';
 import { canvasStatus } from '../lib/canvas';
 import { openHelp } from '../lib/help';
@@ -338,6 +339,7 @@ export default function SettingsPage() {
                 ? <span className="c-meta">Installed</span>
                 : <a className="c-btn c-btn--secondary" href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer">Get extension</a>}
             </div>
+            <ConnectedApps />
             {canvasReady && <SharingSettings />}
           </div>
         )}

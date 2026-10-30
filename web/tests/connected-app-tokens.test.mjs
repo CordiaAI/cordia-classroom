@@ -42,6 +42,8 @@ test('every API route that reads a bearer token is wrapped', () => {
   for (const path of apiFiles(join(web, 'pages', 'api'))) {
     const source = readFileSync(path, 'utf8');
     if (!/authorization/i.test(source)) continue;
+    // The MCP server: the one route that takes connected-app tokens, and only those.
+    if (relative(web, path) === join('pages', 'api', 'mcp.js')) continue;
     if (!/export default withAppTokensOnly\(/.test(source)) unwrapped.push(relative(web, path));
   }
   assert.deepEqual(unwrapped, []);
