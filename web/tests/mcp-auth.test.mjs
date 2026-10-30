@@ -116,3 +116,21 @@ test('discovery document points at Supabase Auth for the URL the client used', (
     resource_policy_uri: 'https://preview-abc.vercel.app/privacy',
   });
 });
+
+test('served from the pages router: /mcp and discovery are rewrites, and there is no app/ folder', async () => {
+  const { existsSync, readFileSync } = await import('node:fs');
+  const config = readFileSync(new URL('../next.config.js', import.meta.url), 'utf8');
+  assert.match(config, /\{ source: '\/mcp', destination: '\/api\/mcp' \}/);
+  assert.match(config, /\{ source: '\/\.well-known\/oauth-protected-resource\/mcp', destination: '\/api\/oauth-protected-resource' \}/);
+  // An app/ folder would replace Cordia's 404 page with Next's default one.
+  assert.equal(existsSync(new URL('../app', import.meta.url)), false);
+});
+
+test('the pages/api adapter passes method, headers, body and the public host through', async () => {
+  const { toWebRequest } = await import('../lib/server/webRequest.mjs');
+  const request = toWebRequest({ method: 'POST', url: '/api/mcp', headers: { host: 'internal:3000', 'x-forwarded-host': 'classroom.cordiacode.com', 'x-forwarded-proto': 'https', authorization: 'Bearer t' } }, Buffer.from('{"a":1}'));
+  assert.equal(request.url, 'https://classroom.cordiacode.com/api/mcp');
+  assert.equal(request.headers.get('authorization'), 'Bearer t');
+  assert.equal(await request.text(), '{"a":1}');
+  assert.equal(protectedResourceMetadata(request, config).resource, 'https://classroom.cordiacode.com/mcp');
+});

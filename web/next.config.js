@@ -31,8 +31,15 @@ const assistantUrl = process.env.ASSISTANT_URL;
 module.exports = {
   reactStrictMode: true,
   async rewrites() {
-    if (!assistantUrl) return [];
+    // The MCP server and its OAuth discovery document (pages/api/mcp.js, oauth-protected-resource.js).
+    const mcp = [
+      { source: '/mcp', destination: '/api/mcp' },
+      { source: '/.well-known/oauth-protected-resource', destination: '/api/oauth-protected-resource' },
+      { source: '/.well-known/oauth-protected-resource/mcp', destination: '/api/oauth-protected-resource' },
+    ];
+    if (!assistantUrl) return mcp;
     return [
+      ...mcp,
       { source: '/assistant/:path*', destination: `${assistantUrl}/assistant/:path*` },
     ];
   },
