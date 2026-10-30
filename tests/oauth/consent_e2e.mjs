@@ -38,12 +38,16 @@ const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: p
 // The local stack is plain http, which the production CSP (https Supabase only) would block.
 const context = await browser.newContext({ bypassCSP: true, viewport: { width: 1280, height: 860 } });
 const page = await context.newPage();
+const browserLog = [];
 page.on('pageerror', error => console.log(`page error: ${error.message}`));
+page.on('console', message => browserLog.push(`console ${message.type()}: ${message.text().slice(0, 200)}`));
+page.on('requestfailed', request => browserLog.push(`request failed: ${request.url()} ${request.failure()?.errorText}`));
 page.on('response', response => { if (response.url().startsWith(API)) console.log(`  ${response.request().method()} ${response.url().replace(API, '')} -> ${response.status()}`); });
 // On any failure, say where the page was and what it showed.
 const onFailure = async error => {
   console.log(`FAIL  ${error.message.split('\n')[0]}`);
   try { console.log(`  at ${page.url()}\n  page says: ${(await page.locator('body').innerText()).slice(0, 400).replace(/\s+/g, ' ')}`); await shot('failure'); } catch { /* page gone */ }
+  console.log(browserLog.slice(-25).map(line => `  ${line}`).join('\n'));
   process.exit(1);
 };
 process.on('uncaughtException', onFailure);
