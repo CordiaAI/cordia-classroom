@@ -51,3 +51,33 @@ revoke execute on function public.is_class_member(uuid) from public, anon;
 grant execute on function public.is_class_member(uuid) to authenticated;
 
 -- Published for the probe only (production publishes none); applied after the lockdown check runs.
+
+-- Tables the MCP read tools use (columns they touch), with production's policies.
+alter table public.study_guides add column folder_id uuid, add column notes text, add column study_guide text, add column flashcards jsonb,
+  add column flashcard_progress jsonb, add column quiz_questions jsonb, add column practice_state jsonb, add column source_type text,
+  add column source_title text, add column source_url text, add column created_at timestamptz default now();
+create table public.folders (id uuid primary key default gen_random_uuid(), user_id uuid default auth.uid(), name text not null, class_id uuid, created_at timestamptz default now());
+alter table public.folders enable row level security;
+create policy "Users can view own folders" on public.folders for select using (auth.uid() = user_id);
+create policy "Users can insert own folders" on public.folders for insert with check (auth.uid() = user_id);
+create table public.smart_notes (id uuid primary key default gen_random_uuid(), user_id uuid, title text, content text, folder_id uuid, created_at timestamptz default now(), updated_at timestamptz default now());
+create table public.lectures (id uuid primary key default gen_random_uuid(), user_id uuid, folder_id uuid, title text, source text, lecture_date date, duration_ms integer, transcript text, segments jsonb, analysis jsonb, guide_id uuid, created_at timestamptz default now(), updated_at timestamptz default now());
+create table public.lecture_todos (id uuid primary key default gen_random_uuid(), user_id uuid, lecture_id uuid, title text, kind text, due_at timestamptz, said text, quote text, at_ms integer, status text, created_at timestamptz default now());
+create table public.study_sessions (id uuid primary key default gen_random_uuid(), user_id uuid default auth.uid(), guide_id uuid, session_type text, started_at timestamptz, ended_at timestamptz, duration_seconds integer, metadata jsonb);
+create table public.quiz_attempts (id uuid primary key default gen_random_uuid(), user_id uuid default auth.uid(), guide_id uuid, score integer, total_questions integer, correct_answers integer, answers jsonb, completed_at timestamptz);
+create table public.user_streaks (user_id uuid primary key, current_streak integer, longest_streak integer, last_study_date date, updated_at timestamptz);
+create table public.learning_events (id bigserial primary key, user_id uuid, item_id text, guide_id uuid, mode text, outcome text, confidence text, occurred_at timestamptz default now());
+create table public.classes (id uuid primary key default gen_random_uuid(), course_code_normalized text, display_name text);
+create table public.class_terms (id uuid primary key default gen_random_uuid(), class_id uuid references public.classes(id));
+create table public.class_memberships (user_id uuid, class_term_id uuid references public.class_terms(id), source text);
+do $$
+declare t text;
+begin
+  foreach t in array array['smart_notes', 'lectures', 'lecture_todos', 'study_sessions', 'quiz_attempts', 'user_streaks', 'learning_events', 'classes', 'class_terms', 'class_memberships'] loop
+    execute format('alter table public.%I enable row level security', t);
+  end loop;
+  foreach t in array array['study_sessions', 'quiz_attempts', 'user_streaks'] loop
+    execute format('create policy "own rows" on public.%I for select using (auth.uid() = user_id)', t);
+  end loop;
+end $$;
+grant select, insert, update on public.folders, public.study_sessions, public.quiz_attempts to authenticated;

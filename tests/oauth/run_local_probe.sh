@@ -33,7 +33,7 @@ open(p,'w').write(s)
 PY
 mkdir -p supabase/migrations
 cp "$ROOT/tests/oauth/fixture.sql" supabase/migrations/20261031000000_fixture.sql
-cp "$ROOT/supabase/migrations/20261031120000_oauth_lockdown.sql" "$ROOT/supabase/migrations/20261031130000_mcp_connected_apps.sql" supabase/migrations/
+cp "$ROOT/supabase/migrations/20261031120000_oauth_lockdown.sql" "$ROOT/supabase/migrations/20261031130000_mcp_connected_apps.sql" "$ROOT/supabase/migrations/20261101120000_mcp_read_access.sql" supabase/migrations/
 $CLI start > "$WORK/start.log" 2>&1 || { cat "$WORK/start.log"; exit 1; }
 STATUS="$($CLI status -o json 2>/dev/null)"
 DB_URL="$(echo "$STATUS" | python3 -c "import sys,json;print(json.load(sys.stdin)['DB_URL'])")"
