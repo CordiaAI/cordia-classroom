@@ -127,13 +127,20 @@ for (const table of ['canvas_courses', 'study_guides']) {
     const { execFileSync } = await import('node:child_process');
     console.log(execFileSync('psql', [process.env.DB_URL, '-At', '-c', "select entity::regclass, claims_role::text, claims->>'role', claims->>'client_id' is not null from realtime.subscription"]).toString());
   }
-  await student.from(table).insert(table === 'canvas_courses' ? { canvas_course_id: 2, name: 'HIST 210' } : { title: 'Cells' });
+  await student.from(table).insert(table === 'canvas_courses' ? { canvas_course_id: 2, name: 'HIST 210' } : { title: 'Cells', source_title: 'HIST 210 · Module 1', source_url: 'https://school.instructure.com/x' });
   // Wait for the app's own copy of the change (up to 10s), then a moment more for any leak.
   for (let i = 0; i < 40 && !asApp.events.length; i++) await sleep(250);
   await sleep(1000);
   if (process.env.DEBUG_REALTIME) console.log(table, 'oauth events:', JSON.stringify(asOAuth.events).slice(0, 300));
   check(`control: app token gets ${table} changes`, asApp.events.length > 0, asApp.status());
-  check(`Realtime ${table} changes: oauth gets no row data`, asOAuth.events.length === 0, `${asOAuth.status()}, ${asOAuth.events.length} with data, ${asOAuth.denied.length} denied notices`);
+  if (table === 'canvas_courses') {
+    check(`Realtime ${table} changes: oauth gets no row data`, asOAuth.events.length === 0, `${asOAuth.status()}, ${asOAuth.events.length} with data, ${asOAuth.denied.length} denied notices`);
+  } else {
+    // The student's own guides are readable by connected apps now, but never their Canvas columns.
+    // (Production publishes no table to Realtime; supabase/checks/oauth_lockdown.sql flags any.)
+    const leaked = asOAuth.events.filter(event => event.new?.source_title || event.new?.source_url);
+    check(`Realtime ${table} changes: oauth never gets the Canvas columns`, leaked.length === 0, `${asOAuth.events.length} events, keys ${Object.keys(asOAuth.events[0]?.new || {}).join(',')}`);
+  }
   await asApp.stop(); await asOAuth.stop();
 }
 {
@@ -228,8 +235,9 @@ check('tool search: own guide, card and lecture with its timestamp', hits.some(h
   && hits.some(hit => hit.kind === 'lecture' && hit.timestamp_seconds === 95), JSON.stringify(hits.map(hit => [hit.kind, hit.title])));
 check('tool search: no assignment guide, no other student, no Canvas names', !leaks(found.content?.[0]?.text || ''), (found.content?.[0]?.text || '').slice(0, 200));
 const listed = await callTool('list_study_sets', {});
-check('tool list_study_sets: only the student\'s non-assignment set, course "Course 1"', listed.structuredContent?.study_sets?.length === 1 && listed.structuredContent.study_sets[0].course?.name === 'Course 1'
-  && !leaks(listed.content[0].text), listed.content?.[0]?.text?.slice(0, 200));
+const listedSets = listed.structuredContent?.study_sets || [];
+check('tool list_study_sets: own sets, no assignment guide, course "Course 1"', listedSets.length > 0 && !listedSets.some(set => set.title === 'Lab report guide')
+  && listedSets.find(set => set.id === cellGuide)?.course?.name === 'Course 1' && !leaks(listed.content[0].text), listed.content?.[0]?.text?.slice(0, 200));
 check('tool dates are in the student\'s time zone', /-0[56]:00"/.test(listed.content?.[0]?.text || ''));
 const theirs = await callTool('get_study_set', { study_set_id: otherGuide.id });
 const nowhere = await callTool('get_study_set', { study_set_id: crypto.randomUUID() });
