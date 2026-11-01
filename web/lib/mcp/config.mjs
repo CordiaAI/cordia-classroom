@@ -5,9 +5,18 @@ import { DEFAULT_SUPABASE_PUBLISHABLE_KEY, supabaseUrlFrom } from '../supabaseUr
 // (supabase/migrations/20261031120000_oauth_lockdown.sql). Keep the two in step.
 export const MCP_TOKEN_AUDIENCE = 'https://classroom.cordiacode.com/mcp';
 export const MCP_SERVER_NAME = 'Cordia Classroom';
-export const MCP_SERVER_VERSION = '0.1.0';
+export const MCP_SERVER_VERSION = '0.2.0';
 export const SUPPORT_EMAIL = 'jsmoore588@gmail.com';
 export const PRIVACY_PATH = '/privacy';
+
+// How a connected AI should use this server (refined in Phase 4).
+export const MCP_INSTRUCTIONS = [
+  'Cordia Classroom holds this student\'s own course material: study sets, lecture notes and transcripts, flashcards, quizzes and progress.',
+  'For questions about their courses, call search_my_materials first, answer from what it returns, and cite titles and lecture timestamps. If Cordia has nothing relevant, say so before using general knowledge.',
+  'When quizzing, ask one question at a time and collect the student\'s answer and confidence before revealing anything.',
+  'Use get_progress weak_topics to choose what to review.',
+  'This connector can\'t see assignments, grades or due dates from Canvas or other LMSs, so don\'t promise them.',
+].join(' ');
 
 // Where connected apps may send students back to after the consent page, and which browser
 // origins may call /mcp. Hostnames only. Preview and local builds also allow localhost, for MCP
@@ -37,6 +46,8 @@ export function mcpConfig(env = process.env) {
     audience: env.MCP_TOKEN_AUDIENCE || MCP_TOKEN_AUDIENCE,
     publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || env.SUPABASE_PUBLISHABLE_KEY || DEFAULT_SUPABASE_PUBLISHABLE_KEY,
     allowedOrigins: connectedAppHosts(env.MCP_ALLOWED_ORIGINS, { production }),
+    // The FastAPI backend's /mcp/* routes (get_progress uses the app's Progress functions there).
+    apiUrl: (env.CLASSROOM_API_URL || env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, ''),
   };
 }
 
