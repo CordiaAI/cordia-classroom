@@ -2,7 +2,8 @@
 // A student signs up and fills Canvas, connector, Assistant, billing and Storage data; an OAuth
 // client registers itself, the student approves, and the client's token then tries every surface.
 // Every connected-app check must be refused; the app-token controls must succeed, which proves
-// the data is really there. Exits 1 on any failure.
+// the data is really there. Exits 1 on any failure. Pass/fail lines never carry detail taken from
+// the connected app's own responses (CodeQL treats anything derived from its token as sensitive).
 import crypto from 'node:crypto';
 
 // The web app's own supabase-js (this script lives outside web/).
@@ -62,8 +63,8 @@ const exchange = await fetch(`${API}/auth/v1/oauth/token`, { method: 'POST', hea
 const tokens = await exchange.json();
 const oauthToken = tokens.access_token;
 const claims = claimsOf(oauthToken);
-check('hook: role is mcp_client', claims.role === 'mcp_client', claims.role);
-check('hook: aud is the MCP resource', claims.aud === MCP_AUDIENCE, claims.aud);
+check('hook: role is mcp_client', claims.role === 'mcp_client');
+check('hook: aud is the MCP resource', claims.aud === MCP_AUDIENCE);
 check('hook: client_id kept', Boolean(claims.client_id));
 const refreshed = await (await fetch(`${API}/auth/v1/oauth/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
   body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: client.client_id }) })).json();
@@ -137,12 +138,12 @@ for (const table of ['canvas_courses', 'study_guides']) {
   if (process.env.DEBUG_REALTIME) console.log(table, 'oauth events:', JSON.stringify(asOAuth.events).slice(0, 300));
   check(`control: app token gets ${table} changes`, asApp.events.length > 0, asApp.status());
   if (table === 'canvas_courses') {
-    check(`Realtime ${table} changes: oauth gets no row data`, asOAuth.events.length === 0, `${asOAuth.status()}, ${asOAuth.events.length} with data, ${asOAuth.denied.length} denied notices`);
+    check(`Realtime ${table} changes: oauth gets no row data`, asOAuth.events.length === 0);
   } else {
     // The student's own guides are readable by connected apps now, but never their Canvas columns.
     // (Production publishes no table to Realtime; supabase/checks/oauth_lockdown.sql flags any.)
     const leaked = asOAuth.events.filter(event => event.new?.source_title || event.new?.source_url);
-    check(`Realtime ${table} changes: oauth never gets the Canvas columns`, leaked.length === 0, `${asOAuth.events.length} events, keys ${Object.keys(asOAuth.events[0]?.new || {}).join(',')}`);
+    check(`Realtime ${table} changes: oauth never gets the Canvas columns`, leaked.length === 0);
   }
   await asApp.stop(); await asOAuth.stop();
 }
@@ -189,7 +190,7 @@ const withApp = await initialize(appToken);
 check('MCP: app sign-in token refused', withApp.status === 401, String(withApp.status));
 const withOAuth = await initialize(refreshed.access_token);
 const session = await withOAuth.text();
-check('MCP: connected-app token gets a session', withOAuth.status === 200 && session.includes('Cordia Classroom'), `${withOAuth.status} ${session.slice(0, 120)}`);
+check('MCP: connected-app token gets a session', withOAuth.status === 200 && session.includes('Cordia Classroom'));
 const sessionCheck = await fetch(`${API}/rest/v1/rpc/mcp_session_check`, { method: 'POST', headers: headers(refreshed.access_token), body: '{}' });
 check('RPC mcp_session_check: connected app gets true', sessionCheck.status === 200 && (await sessionCheck.text()).trim() === 'true', String(sessionCheck.status));
 const appCheck = await fetch(`${API}/rest/v1/rpc/mcp_session_check`, { method: 'POST', headers: headers(appToken), body: '{}' });
