@@ -80,9 +80,6 @@ create table if not exists public.study_sessions (id uuid primary key default ge
 create table if not exists public.quiz_attempts (id uuid primary key default gen_random_uuid(), user_id uuid, guide_id uuid, score integer, total_questions integer, correct_answers integer, answers jsonb, completed_at timestamptz);
 create table if not exists public.user_streaks (user_id uuid primary key, current_streak integer, longest_streak integer, last_study_date date, updated_at timestamptz);
 create table if not exists public.learning_events (id bigserial primary key, user_id uuid, item_id text, guide_id uuid, mode text, outcome text, confidence text, occurred_at timestamptz default now());
-create table if not exists public.classes (id uuid primary key default gen_random_uuid(), course_code_normalized text, display_name text);
-create table if not exists public.class_terms (id uuid primary key default gen_random_uuid(), class_id uuid references public.classes(id));
-create table if not exists public.class_memberships (user_id uuid, class_term_id uuid references public.class_terms(id), source text);
 do $$
 declare t text;
 begin

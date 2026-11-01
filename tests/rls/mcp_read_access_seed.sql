@@ -1,5 +1,9 @@
 -- Data for mcp_read_access_rls.sql, loaded BEFORE 20261101120000_mcp_read_access.sql so its
 -- folder backfill has something to mark.
+-- Class tables as the Canvas migration makes them (only the columns used here).
+create table if not exists public.classes (id uuid primary key default gen_random_uuid(), course_code_normalized text, display_name text);
+create table if not exists public.class_terms (id uuid primary key default gen_random_uuid(), class_id uuid references public.classes(id));
+create table if not exists public.class_memberships (user_id uuid, class_term_id uuid references public.class_terms(id), source text);
 insert into auth.users (id) values ('11111111-1111-1111-1111-111111111111'), ('33333333-3333-3333-3333-333333333333') on conflict do nothing;
 insert into public.classes (id, course_code_normalized, display_name) values
   ('cccccccc-0000-0000-0000-000000000001', 'BIO 101', 'Biology'),
