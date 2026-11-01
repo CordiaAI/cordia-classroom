@@ -1,9 +1,9 @@
 import { readUserValue, writeUserValue } from './userStore';
+import { saveStudyDayToServer } from './serverCopies';
 import { getProgress, groveKey, updateProgress } from './progress';
 
-// Day-by-day study log for the heatmap, recap and streak freezes. Kept in this
-// browser per student (it is too large for the account record); it starts the
-// day this version is first opened.
+// Day-by-day study log for the heatmap, recap and streak freezes. The server keeps it (study_days,
+// one row per day) and this browser keeps a copy that lib/serverSync.js refreshes on load.
 const KEY = 'cordiaActivity';
 const KEEP_DAYS = 400;
 
@@ -37,6 +37,14 @@ export function recordStudy({ guideId, guideTitle, minutes = 0, cards = 0, right
   const cutoff = dayKey(Date.now() - KEEP_DAYS * 86400000);
   for (const key of Object.keys(log)) if (key < cutoff) delete log[key];
   writeUserValue(KEY, log);
+  saveStudyDayToServer(today, day);
+}
+
+export const KEEP_ACTIVITY_DAYS = KEEP_DAYS;
+
+// The server's copy replaces this browser's (lib/serverSync.js).
+export function replaceActivity(log) {
+  writeUserValue(KEY, log && typeof log === 'object' && !Array.isArray(log) ? log : {});
 }
 
 function isoWeek(date) {

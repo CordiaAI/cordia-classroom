@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
-import { ArrowRight, BookOpen, CalendarDays, Layers, Library, NotebookPen, Search, Settings, X } from 'lucide-react';
+import { ArrowRight, BookOpen, CalendarDays, Layers, Library, Mic, NotebookPen, Search, Settings, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { supabaseRest } from '../lib/serverCopies';
+import { searchRows } from '../lib/searchResults.mjs';
 
 function plain(html) {
   return String(html || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
@@ -16,11 +18,14 @@ const JUMPS = [
   { key: 'j-settings', kind: 'jump', icon: Settings, title: 'Settings', href: '/settings' },
 ];
 
-// ⌘K / Ctrl K: one search over study guides, flashcards and notes.
+// ⌘K / Ctrl K: one search over study guides, flashcards, notes and lectures.
 export default function SearchModal({ onClose }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [guideHits, setGuideHits] = useState([]);
+  // null until the shared search answers; it stays null (and the older search runs) if the
+  // migration that adds it hasn't been applied yet.
+  const [found, setFound] = useState(null);
   const [library, setLibrary] = useState(cache);
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
@@ -39,8 +44,11 @@ export default function SearchModal({ onClose }) {
   useEffect(() => {
     clearTimeout(debounceRef.current);
     const q = query.trim();
-    if (!q) { setGuideHits([]); return; }
+    if (!q) { setGuideHits([]); setFound(null); return; }
     debounceRef.current = setTimeout(async () => {
+      const shared = await supabaseRest()('/rest/v1/rpc/search_my_materials', { method: 'POST', body: { search: q.slice(0, 500), max_results: 24 } }).catch(() => null);
+      if (shared?.ok && Array.isArray(shared.data)) { setFound(searchRows(shared.data)); return; }
+      setFound(null);
       const data = await apiFetch('/search?q=' + encodeURIComponent(q));
       setGuideHits(data?.results || []);
     }, 200);
@@ -54,6 +62,7 @@ export default function SearchModal({ onClose }) {
       const notes = (library?.notes || []).slice(0, 2).map(note => ({ key: 'n' + note.id, kind: 'recent', icon: NotebookPen, title: note.title || 'Untitled', href: '/smartnotes?id=' + note.id }));
       return [...recent, ...notes, ...JUMPS];
     }
+    if (found) return found;
     const guides = guideHits.slice(0, 6).map(hit => ({ key: 'g' + hit.id, kind: 'guide', title: hit.title, href: '/guide/' + hit.id }));
     const cards = [];
     for (const guide of library?.guides || []) {
@@ -68,7 +77,7 @@ export default function SearchModal({ onClose }) {
       .slice(0, 6)
       .map(note => ({ key: 'n' + note.id, kind: 'note', title: note.title || 'Untitled', href: '/smartnotes?id=' + note.id }));
     return [...guides, ...cards, ...notes];
-  }, [query, guideHits, library]);
+  }, [query, guideHits, library, found]);
 
   useEffect(() => setActive(0), [results.length]);
 
@@ -84,8 +93,8 @@ export default function SearchModal({ onClose }) {
     if (event.key === 'Enter' && results[active]) go(results[active]);
   }
 
-  const ICON = { guide: BookOpen, card: Layers, note: NotebookPen, recent: BookOpen, jump: ArrowRight };
-  const GROUP = { guide: 'Guides', card: 'Cards', note: 'Notes', recent: 'Recent', jump: 'Go to' };
+  const ICON = { guide: BookOpen, card: Layers, note: NotebookPen, lecture: Mic, recent: BookOpen, jump: ArrowRight };
+  const GROUP = { guide: 'Guides', card: 'Cards', note: 'Notes', lecture: 'Lectures', recent: 'Recent', jump: 'Go to' };
 
   return (
     <BodyPortal>
@@ -94,7 +103,7 @@ export default function SearchModal({ onClose }) {
         <div className="search-bar">
           <Search size={20} strokeWidth={1.75} aria-hidden="true" />
           <label className="sr-only" htmlFor="c-search-input">Search</label>
-          <input id="c-search-input" ref={inputRef} className="search-input" type="search" placeholder="Search guides, cards and notes" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={onKeyDown} aria-controls="c-search-results" autoComplete="off" spellCheck={false} />
+          <input id="c-search-input" ref={inputRef} className="search-input" type="search" placeholder="Search guides, cards, notes and lectures" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={onKeyDown} aria-controls="c-search-results" autoComplete="off" spellCheck={false} />
           <button type="button" className="search-close" onClick={onClose} aria-label="Close search">
             <kbd className="search-esc">esc</kbd>
             <X className="search-x" size={20} strokeWidth={1.75} aria-hidden="true" />

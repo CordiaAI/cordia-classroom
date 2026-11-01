@@ -1,4 +1,5 @@
 import { getUserId } from './api';
+import { saveRetainMissesToServer } from './serverCopies';
 
 // Small per-account preferences kept in this browser. Keys are suffixed with the
 // signed-in user id so two accounts on one computer never share them.
@@ -39,31 +40,10 @@ export function rememberGuidePage(guideId, page) {
   if (last?.id === guideId) writeUserValue('cordiaLastGuide', { ...last, page });
 }
 
-// Retain misses (Quiz and Learn rounds) are kept here so Study now can bring them back, per guide:
-// [{ question, answer, sure? }], ones the student was sure of first, at most MAX_RETAIN_MISSES.
-// A round's misses are added to what was saved, so a round with no misses keeps earlier ones; an
-// item leaves only when it is answered right (clearRetainMisses, or `cleared` here).
-export const MAX_RETAIN_MISSES = 50;
-
-// Questions are the same idea when their words match, ignoring case and punctuation.
-export function questionKey(text) {
-  return String(text || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-export function mergeRetainMisses(saved, misses, cleared = []) {
-  const drop = new Set(cleared.map(item => questionKey(item?.question ?? item)));
-  const merged = new Map();
-  for (const item of [...(misses || []), ...(saved || [])]) {
-    const key = questionKey(item?.question);
-    if (!key || !item.answer || drop.has(key)) continue;
-    const earlier = merged.get(key);
-    // The newest answer text wins; being sure-and-wrong once keeps the item first.
-    if (earlier) { if (item.sure) earlier.sure = true; continue; }
-    merged.set(key, { question: item.question, answer: item.answer, ...(item.sure ? { sure: true } : {}) });
-  }
-  const list = [...merged.values()];
-  return [...list.filter(item => item.sure), ...list.filter(item => !item.sure)].slice(0, MAX_RETAIN_MISSES);
-}
+// Retain misses (Quiz and Learn rounds) live on the server (retain_misses) with a copy in this
+// browser; the merge rules are in retainMisses.mjs, which the MCP server shares.
+import { MAX_RETAIN_MISSES, mergeRetainMisses, questionKey } from './retainMisses.mjs';
+export { MAX_RETAIN_MISSES, mergeRetainMisses, questionKey };
 
 function saveRetainMisses(guideId, update) {
   if (!guideId) return;
@@ -72,6 +52,7 @@ function saveRetainMisses(guideId, update) {
   if (next.length) all[guideId] = next;
   else delete all[guideId];
   writeUserValue('cordiaRetainMisses', all);
+  saveRetainMissesToServer(guideId, next);
 }
 
 // A round's misses join the guide's list; `cleared` (questions answered right) leave it.
@@ -87,4 +68,9 @@ export function clearRetainMisses(guideId, questions) {
 export function retainMisses() {
   const all = readUserValue('cordiaRetainMisses', {}) || {};
   return all && typeof all === 'object' && !Array.isArray(all) ? all : {};
+}
+
+// The server's copy replaces this browser's (lib/serverSync.js).
+export function replaceRetainMisses(all) {
+  writeUserValue('cordiaRetainMisses', all && typeof all === 'object' && !Array.isArray(all) ? all : {});
 }
