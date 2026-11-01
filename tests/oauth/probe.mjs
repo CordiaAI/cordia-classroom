@@ -127,9 +127,12 @@ for (const table of ['canvas_courses', 'study_guides']) {
     const { execFileSync } = await import('node:child_process');
     console.log(execFileSync('psql', [process.env.DB_URL, '-At', '-c', "select entity::regclass, claims_role::text, claims->>'role', claims->>'client_id' is not null from realtime.subscription"]).toString());
   }
-  await student.from(table).insert(table === 'canvas_courses' ? { canvas_course_id: 2, name: 'HIST 210' } : { title: 'Cells', source_title: 'HIST 210 · Module 1', source_url: 'https://school.instructure.com/x' });
-  // Wait for the app's own copy of the change (up to 10s), then a moment more for any leak.
-  for (let i = 0; i < 40 && !asApp.events.length; i++) await sleep(250);
+  // Realtime can take a moment to start sending a new subscription's changes: insert again (up to
+  // three times) until the app's own copy arrives, then wait a moment more for any leak.
+  for (let attempt = 0; attempt < 3 && !asApp.events.length; attempt++) {
+    await student.from(table).insert(table === 'canvas_courses' ? { canvas_course_id: 2 + attempt, name: 'HIST 210' } : { title: 'Cells', source_title: 'HIST 210 · Module 1', source_url: 'https://school.instructure.com/x' });
+    for (let i = 0; i < 32 && !asApp.events.length; i++) await sleep(250);
+  }
   await sleep(1000);
   if (process.env.DEBUG_REALTIME) console.log(table, 'oauth events:', JSON.stringify(asOAuth.events).slice(0, 300));
   check(`control: app token gets ${table} changes`, asApp.events.length > 0, asApp.status());
