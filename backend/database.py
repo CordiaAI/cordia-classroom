@@ -95,3 +95,24 @@ def get_auth_supabase() -> Client:
             flow_type="implicit",
         ),
     )
+
+
+# The project's publishable (browser-safe) key, the fallback for SUPABASE_PUBLISHABLE_KEY; the web
+# app uses the same one (web/lib/supabaseUrl.mjs).
+DEFAULT_PUBLISHABLE_KEY = "sb_publishable_dzIE5FrkoKgAZUc9h8SkNA_xPxCzdGM"
+
+
+def get_student_supabase(token: str) -> Client:
+    """A Supabase client that acts as the student who owns `token` (a connected app's token, for the
+    /mcp/* routes): Row Level Security and the token's role decide what it can read. Never the
+    service-role key."""
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_PUBLISHABLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or DEFAULT_PUBLISHABLE_KEY
+    if not url:
+        raise ValueError("Supabase URL not configured")
+    return create_client(
+        url,
+        key,
+        options=SyncClientOptions(auto_refresh_token=False, persist_session=False, headers={"Authorization": f"Bearer {token}"}),
+    )
+

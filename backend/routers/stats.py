@@ -33,9 +33,11 @@ def _build_learning_profile(scores: list) -> dict:
     return {"evidence_count": len(scores), "average": average, "generation_guidance": guidance}
 
 
-def _student_results(user_id: str) -> dict:
-    """Graded quiz/Retain attempts and Practice sets with the questions they came from."""
-    supabase = get_supabase()
+def _student_results(user_id: str, db=None) -> dict:
+    """Graded quiz/Retain attempts and Practice sets with the questions they came from.
+
+    db: the app's service client (default), or a client acting as the student (the MCP's)."""
+    supabase = db or get_supabase()
     attempts = (
         supabase.table("quiz_attempts")
         .select("guide_id, score, answers, completed_at")
@@ -163,9 +165,12 @@ def get_streak(authorization: str = Header(default=""), tz_offset: int = 0):
     # Clamp offset to valid range (-720 to +840 minutes)
     tz_offset = max(-720, min(840, tz_offset))
 
-    user_id = get_user_id(authorization)
-    supabase = get_supabase()
+    return streak_summary(get_supabase(), get_user_id(authorization), tz_offset)
 
+
+def streak_summary(supabase, user_id: str, tz_offset: int) -> dict:
+    """The streak, longest streak, "studied today" and this week's days, in the student's local days.
+    supabase: the app's service client, or a client acting as the student (the MCP's)."""
     # Determine "today" in the user's local timezone
     user_now = datetime.utcnow() + timedelta(minutes=tz_offset)
     user_today = user_now.date()
@@ -437,16 +442,23 @@ def get_activity(authorization: str = Header(default=""), tz_offset: int = 0):
     user_id = get_user_id(authorization)
     supabase = get_supabase()
     today = (datetime.utcnow() + timedelta(minutes=tz_offset)).date()
+    sessions, attempts, guides = activity_rows(supabase, user_id)
+    folders = {row["id"]: row.get("name") or "Class" for row in (supabase.table("folders").select("id, name")
+                                                                 .eq("user_id", user_id).execute().data or [])}
+    return build_activity(sessions, attempts, guides, folders, today, tz_offset)
+
+
+def activity_rows(supabase, user_id: str, attempts_limit: int = 20) -> tuple:
+    """(sessions, quiz attempts, guides by id) that build_activity reads, from the app's service client
+    or a client acting as the student (the MCP's)."""
     since = (datetime.utcnow() - timedelta(days=ACTIVITY_DAYS + 1)).isoformat()
     sessions = supabase.table("study_sessions").select("started_at, ended_at, duration_seconds, session_type, guide_id, metadata") \
         .eq("user_id", user_id).gte("started_at", since).order("started_at", desc=True).limit(5000).execute().data or []
     attempts = supabase.table("quiz_attempts").select("guide_id, score, completed_at").eq("user_id", user_id) \
-        .order("completed_at", desc=True).limit(20).execute().data or []
+        .order("completed_at", desc=True).limit(attempts_limit).execute().data or []
     guides = {row["id"]: row for row in (supabase.table("study_guides").select("id, title, folder_id")
                                          .eq("user_id", user_id).limit(1000).execute().data or [])}
-    folders = {row["id"]: row.get("name") or "Class" for row in (supabase.table("folders").select("id, name")
-                                                                 .eq("user_id", user_id).execute().data or [])}
-    return build_activity(sessions, attempts, guides, folders, today, tz_offset)
+    return sessions, attempts, guides
 
 
 @router.get("/week")
