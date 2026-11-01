@@ -7,15 +7,38 @@ import {
   originValidationResponse,
   requireBearerAuth,
 } from '@modelcontextprotocol/server';
-import { MCP_SERVER_NAME, MCP_SERVER_VERSION, PRIVACY_PATH, mcpConfig, resourceUrlFor } from './config.mjs';
-import { createTokenVerifier } from './auth.mjs';
+import { MCP_INSTRUCTIONS, MCP_SERVER_NAME, MCP_SERVER_VERSION, PRIVACY_PATH, mcpConfig, resourceUrlFor } from './config.mjs';
+import { createTokenVerifier, studentClient } from './auth.mjs';
+import { loadCourses } from './courses.mjs';
+import { registerReadTools } from './readTools.mjs';
+import { zoneOf } from './zoned.mjs';
 
 const ALLOW_HEADERS = 'Authorization, Content-Type, Accept, Mcp-Protocol-Version, Mcp-Session-Id, Last-Event-ID';
 const EXPOSE_HEADERS = 'WWW-Authenticate, Mcp-Session-Id, Mcp-Protocol-Version';
 
-// Tools, prompts and instructions arrive in later phases; for now a signed-in client can connect.
-export function createServer() {
-  return new McpServer({ name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION });
+// What one request's tools work with: a Supabase client acting as the student (their token, so RLS
+// applies), links on the host the client used, the student's time zone, and their course labels.
+export function studentContext(config, authInfo, request) {
+  const db = studentClient(config, authInfo.token);
+  let courses = null;
+  let loaded = null;
+  const ctx = {
+    db,
+    userId: authInfo.extra?.userId,
+    baseUrl: request ? resourceUrlFor(request).origin : new URL(config.audience).origin,
+    timeZone: 'UTC',
+    courses: () => courses || (courses = loadCourses(db)),
+    fetchBackend: path => fetch(`${config.apiUrl}${path}`, { headers: { Authorization: `Bearer ${authInfo.token}` }, signal: AbortSignal.timeout(20000) }),
+    load: () => loaded || (loaded = db.from('user_profiles').select('timezone').eq('id', ctx.userId).maybeSingle()
+      .then(({ data }) => { ctx.timeZone = zoneOf(data?.timezone || 'UTC'); }, () => {})),
+  };
+  return ctx;
+}
+
+export function createServer(context = {}, config = mcpConfig()) {
+  const server = new McpServer({ name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION }, { instructions: MCP_INSTRUCTIONS });
+  if (context.authInfo) registerReadTools(server, studentContext(config, context.authInfo, context.requestInfo));
+  return server;
 }
 
 // Browsers may call /mcp only from an allowed origin (Claude and ChatGPT call it server to server,
@@ -38,7 +61,7 @@ function withHeaders(response, headers) {
   return out;
 }
 
-export function createMcpEndpoint(config = mcpConfig(), { verifier = createTokenVerifier(config), serverFactory = createServer } = {}) {
+export function createMcpEndpoint(config = mcpConfig(), { verifier = createTokenVerifier(config), serverFactory = context => createServer(context, config) } = {}) {
   const handler = createMcpHandler(serverFactory, { legacy: 'stateless' });
   const expectedResource = new URL(config.audience);
 

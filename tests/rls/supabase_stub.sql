@@ -60,3 +60,38 @@ create table if not exists auth.oauth_consents (
   revoked_at timestamptz,
   unique (user_id, client_id)
 );
+
+-- Tables the MCP read migration grants on (only the columns it touches), with the dashboard-era
+-- own-row policies production has.
+alter table public.folders add column if not exists created_at timestamptz default now();
+alter table public.folders add column if not exists class_id uuid;
+alter table public.study_guides add column if not exists notes text;
+alter table public.study_guides add column if not exists flashcard_progress jsonb;
+alter table public.study_guides add column if not exists quiz_questions jsonb;
+alter table public.study_guides add column if not exists practice_state jsonb;
+alter table public.study_guides add column if not exists source_type text;
+alter table public.study_guides add column if not exists source_title text;
+alter table public.study_guides add column if not exists source_url text;
+alter table public.study_guides add column if not exists created_at timestamptz default now();
+create table if not exists public.smart_notes (id uuid primary key default gen_random_uuid(), user_id uuid, title text, content text, folder_id uuid, created_at timestamptz default now(), updated_at timestamptz default now());
+create table if not exists public.lectures (id uuid primary key default gen_random_uuid(), user_id uuid, folder_id uuid, title text, source text, lecture_date date, duration_ms integer, transcript text, segments jsonb, analysis jsonb, guide_id uuid, created_at timestamptz default now(), updated_at timestamptz default now());
+create table if not exists public.lecture_todos (id uuid primary key default gen_random_uuid(), user_id uuid, lecture_id uuid, title text, kind text, due_at timestamptz, said text, quote text, at_ms integer, status text, created_at timestamptz default now());
+create table if not exists public.study_sessions (id uuid primary key default gen_random_uuid(), user_id uuid, guide_id uuid, session_type text, started_at timestamptz, ended_at timestamptz, duration_seconds integer, metadata jsonb);
+create table if not exists public.quiz_attempts (id uuid primary key default gen_random_uuid(), user_id uuid, guide_id uuid, score integer, total_questions integer, correct_answers integer, answers jsonb, completed_at timestamptz);
+create table if not exists public.user_streaks (user_id uuid primary key, current_streak integer, longest_streak integer, last_study_date date, updated_at timestamptz);
+create table if not exists public.learning_events (id bigserial primary key, user_id uuid, item_id text, guide_id uuid, mode text, outcome text, confidence text, occurred_at timestamptz default now());
+do $$
+declare t text;
+begin
+  foreach t in array array['folders', 'study_guides', 'study_sessions', 'quiz_attempts', 'user_streaks'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists "own rows" on public.%I', t);
+    execute format('create policy "own rows" on public.%I for select using (auth.uid() = user_id)', t);
+  end loop;
+  foreach t in array array['smart_notes', 'lectures', 'lecture_todos', 'learning_events'] loop
+    execute format('alter table public.%I enable row level security', t);
+  end loop;
+end $$;
+drop policy if exists "Users can read own profile" on public.user_profiles;
+create policy "Users can read own profile" on public.user_profiles for select using (auth.uid() = id);
+grant select, insert, update, delete on public.folders, public.study_guides, public.smart_notes, public.lectures to authenticated;

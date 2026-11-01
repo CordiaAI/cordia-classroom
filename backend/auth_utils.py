@@ -38,6 +38,42 @@ def reject_oauth_client_token(token: str) -> None:
         raise HTTPException(status_code=401, detail="Connected-app tokens can't be used here")
 
 
+# The audience the access-token hook writes into connected-app tokens
+# (supabase/migrations/*_oauth_lockdown.sql; web/lib/mcp/config.mjs has the same value).
+MCP_TOKEN_AUDIENCE = os.getenv("MCP_TOKEN_AUDIENCE", "https://classroom.cordiacode.com/mcp")
+
+
+def verify_mcp_token(authorization: str) -> tuple:
+    """(user_id, token) for a connected app's valid token, for the /mcp/* routes only.
+
+    Checks the signature against Supabase's published keys, the issuer, expiry, the MCP audience,
+    the mcp_client role and the client_id. App sign-in tokens are refused (wrong audience). Whether
+    the student still has the app connected is checked by the route (mcp_session_check)."""
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing connected-app token")
+    token = authorization[7:].strip()
+    client = _get_jwks_client()
+    if client is None:
+        raise HTTPException(status_code=503, detail="Sign-in keys unavailable")
+    try:
+        if jwt.get_unverified_header(token).get("alg") not in _ASYMMETRIC_ALGORITHMS:
+            raise jwt.InvalidTokenError("unsupported algorithm")
+        signing_key = client.get_signing_key_from_jwt(token)
+        claims = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=_ASYMMETRIC_ALGORITHMS,
+            audience=MCP_TOKEN_AUDIENCE,
+            issuer=f"{os.getenv('SUPABASE_URL', '').rstrip('/')}/auth/v1",
+            options={"require": ["exp", "sub"]},
+        )
+    except (jwt.InvalidTokenError, jwt.PyJWKClientError):
+        raise HTTPException(status_code=401, detail="Invalid or expired connected-app token")
+    if claims.get("role") != OAUTH_CLIENT_ROLE or not claims.get("client_id"):
+        raise HTTPException(status_code=401, detail="Not a connected-app token")
+    return claims["sub"], token
+
+
 def _get_jwks_client():
     """One cached client per process; signing keys are refetched at most hourly."""
     global _jwks_client

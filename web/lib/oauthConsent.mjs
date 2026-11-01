@@ -2,6 +2,7 @@
 // a connected app's request, and Settings lists and disconnects apps. The app keeps its own
 // session (lib/api.js), so these call Supabase Auth's endpoints with that access token.
 import { connectedAppHosts, isProductionDeploy } from './mcp/config.mjs';
+import { restClient } from './supabaseRest.mjs';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
@@ -37,26 +38,9 @@ export function clientName(client) {
   return name.slice(0, 60) || 'This app';
 }
 
-// Calls Supabase as the signed-in student. `refresh` renews the app's session once on 401.
-export function oauthApi({ supabaseUrl, publishableKey, getToken, refresh }) {
-  async function call(path, { method = 'GET', body } = {}) {
-    const send = () => fetch(`${supabaseUrl}${path}`, {
-      method,
-      headers: {
-        apikey: publishableKey,
-        Authorization: `Bearer ${getToken()}`,
-        'Content-Type': 'application/json',
-        ...(path.startsWith('/auth/') ? { 'X-Supabase-Api-Version': '2024-01-01' } : {}),
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    let response = await send();
-    if (response.status === 401 && refresh && await refresh()) response = await send();
-    const text = await response.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch { data = null; }
-    return { ok: response.ok, status: response.status, data };
-  }
+// Supabase Auth's endpoints for consent and grants, called as the signed-in student.
+export function oauthApi(options) {
+  const call = restClient(options);
   const id = value => encodeURIComponent(String(value));
   return {
     authorization: authorizationId => call(`/auth/v1/oauth/authorizations/${id(authorizationId)}`),

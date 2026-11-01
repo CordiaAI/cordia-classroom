@@ -17,6 +17,7 @@ BIN = next(iter(sorted(glob.glob("/usr/lib/postgresql/*/bin"))), "")
 MIGRATIONS = os.path.join(ROOT, "supabase", "migrations")
 LOCKDOWN = os.path.join(MIGRATIONS, "20261031120000_oauth_lockdown.sql")
 CONNECTED_APPS = os.path.join(MIGRATIONS, "20261031130000_mcp_connected_apps.sql")
+READ_ACCESS = os.path.join(MIGRATIONS, "20261101120000_mcp_read_access.sql")
 CHECK = os.path.join(ROOT, "supabase", "checks", "oauth_lockdown.sql")
 
 
@@ -66,6 +67,20 @@ class OAuthLockdownDatabaseTests(unittest.TestCase):
         result = self.psql(os.path.join(ROOT, "tests", "rls", "mcp_connected_apps_rls.sql"))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("CONNECTED APPS OK", result.stdout)
+        result = self.psql(CHECK, "-At")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "", "mcp_client can reach objects outside the allow-list")
+
+
+    def test_read_access_isolates_students_hides_canvas_columns_and_searches(self):
+        stub = os.path.join(ROOT, "tests", "rls", "supabase_stub.sql")
+        seed = os.path.join(ROOT, "tests", "rls", "mcp_read_access_seed.sql")
+        for path in (stub, LOCKDOWN, CONNECTED_APPS, seed, READ_ACCESS, READ_ACCESS):
+            result = self.psql(path)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        result = self.psql(os.path.join(ROOT, "tests", "rls", "mcp_read_access_rls.sql"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("READ ACCESS OK", result.stdout)
         result = self.psql(CHECK, "-At")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "", "mcp_client can reach objects outside the allow-list")

@@ -2,7 +2,8 @@
 // A student signs up and fills Canvas, connector, Assistant, billing and Storage data; an OAuth
 // client registers itself, the student approves, and the client's token then tries every surface.
 // Every connected-app check must be refused; the app-token controls must succeed, which proves
-// the data is really there. Exits 1 on any failure.
+// the data is really there. Exits 1 on any failure. Pass/fail lines never carry detail taken from
+// the connected app's own responses (CodeQL treats anything derived from its token as sensitive).
 import crypto from 'node:crypto';
 
 // The web app's own supabase-js (this script lives outside web/).
@@ -62,8 +63,8 @@ const exchange = await fetch(`${API}/auth/v1/oauth/token`, { method: 'POST', hea
 const tokens = await exchange.json();
 const oauthToken = tokens.access_token;
 const claims = claimsOf(oauthToken);
-check('hook: role is mcp_client', claims.role === 'mcp_client', claims.role);
-check('hook: aud is the MCP resource', claims.aud === MCP_AUDIENCE, claims.aud);
+check('hook: role is mcp_client', claims.role === 'mcp_client');
+check('hook: aud is the MCP resource', claims.aud === MCP_AUDIENCE);
 check('hook: client_id kept', Boolean(claims.client_id));
 const refreshed = await (await fetch(`${API}/auth/v1/oauth/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' },
   body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token, client_id: client.client_id }) })).json();
@@ -127,13 +128,23 @@ for (const table of ['canvas_courses', 'study_guides']) {
     const { execFileSync } = await import('node:child_process');
     console.log(execFileSync('psql', [process.env.DB_URL, '-At', '-c', "select entity::regclass, claims_role::text, claims->>'role', claims->>'client_id' is not null from realtime.subscription"]).toString());
   }
-  await student.from(table).insert(table === 'canvas_courses' ? { canvas_course_id: 2, name: 'HIST 210' } : { title: 'Cells' });
-  // Wait for the app's own copy of the change (up to 10s), then a moment more for any leak.
-  for (let i = 0; i < 40 && !asApp.events.length; i++) await sleep(250);
+  // Realtime can take a moment to start sending a new subscription's changes: insert again (up to
+  // three times) until the app's own copy arrives, then wait a moment more for any leak.
+  for (let attempt = 0; attempt < 3 && !asApp.events.length; attempt++) {
+    await student.from(table).insert(table === 'canvas_courses' ? { canvas_course_id: 2 + attempt, name: 'HIST 210' } : { title: 'Cells', source_title: 'HIST 210 · Module 1', source_url: 'https://school.instructure.com/x' });
+    for (let i = 0; i < 32 && !asApp.events.length; i++) await sleep(250);
+  }
   await sleep(1000);
   if (process.env.DEBUG_REALTIME) console.log(table, 'oauth events:', JSON.stringify(asOAuth.events).slice(0, 300));
   check(`control: app token gets ${table} changes`, asApp.events.length > 0, asApp.status());
-  check(`Realtime ${table} changes: oauth gets no row data`, asOAuth.events.length === 0, `${asOAuth.status()}, ${asOAuth.events.length} with data, ${asOAuth.denied.length} denied notices`);
+  if (table === 'canvas_courses') {
+    check(`Realtime ${table} changes: oauth gets no row data`, asOAuth.events.length === 0);
+  } else {
+    // The student's own guides are readable by connected apps now, but never their Canvas columns.
+    // (Production publishes no table to Realtime; supabase/checks/oauth_lockdown.sql flags any.)
+    const leaked = asOAuth.events.filter(event => event.new?.source_title || event.new?.source_url);
+    check(`Realtime ${table} changes: oauth never gets the Canvas columns`, leaked.length === 0);
+  }
   await asApp.stop(); await asOAuth.stop();
 }
 {
@@ -167,7 +178,7 @@ check('control: app session survives', stillIn.status === 200, String(stillIn.st
 // The MCP endpoint itself (web/lib/mcp/endpoint.mjs, run in-process against this stack): real
 // signing keys, issuer, audience and the per-request grant check.
 const { createMcpEndpoint } = await import(new URL('../../web/lib/mcp/endpoint.mjs', import.meta.url));
-const mcp = createMcpEndpoint({ supabaseUrl: API, issuer: `${API}/auth/v1`, audience: MCP_AUDIENCE, publishableKey: ANON, allowedOrigins: ['claude.ai'] });
+const mcp = createMcpEndpoint({ supabaseUrl: API, issuer: `${API}/auth/v1`, audience: MCP_AUDIENCE, publishableKey: ANON, allowedOrigins: ['claude.ai'], apiUrl: 'http://127.0.0.1:9' });
 const initialize = token => mcp(new Request('https://classroom.cordiacode.com/mcp', {
   method: 'POST',
   headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(token ? { authorization: `Bearer ${token}` } : {}) },
@@ -179,7 +190,7 @@ const withApp = await initialize(appToken);
 check('MCP: app sign-in token refused', withApp.status === 401, String(withApp.status));
 const withOAuth = await initialize(refreshed.access_token);
 const session = await withOAuth.text();
-check('MCP: connected-app token gets a session', withOAuth.status === 200 && session.includes('Cordia Classroom'), `${withOAuth.status} ${session.slice(0, 120)}`);
+check('MCP: connected-app token gets a session', withOAuth.status === 200 && session.includes('Cordia Classroom'));
 const sessionCheck = await fetch(`${API}/rest/v1/rpc/mcp_session_check`, { method: 'POST', headers: headers(refreshed.access_token), body: '{}' });
 check('RPC mcp_session_check: connected app gets true', sessionCheck.status === 200 && (await sessionCheck.text()).trim() === 'true', String(sessionCheck.status));
 const appCheck = await fetch(`${API}/rest/v1/rpc/mcp_session_check`, { method: 'POST', headers: headers(appToken), body: '{}' });
@@ -190,6 +201,62 @@ const directActivity = await fetch(`${API}/rest/v1/mcp_connection_activity?selec
 check('REST mcp_connection_activity: oauth read refused', refused(directActivity.status), String(directActivity.status));
 const grants = await (await fetch(`${API}/auth/v1/user/oauth/grants`, { headers: headers(appToken) })).json();
 check('Connected apps: grant listed for the student', Array.isArray(grants) && grants.some(grant => grant.client?.id === client.client_id && grant.client?.name === 'Probe Client'), JSON.stringify(grants).slice(0, 160));
+// The read tools, with the connected app's real token: RLS and the column grants decide what they
+// see. A Canvas-made course, a Canvas page guide (with Canvas columns filled in), an assignment guide,
+// a lecture, and another student's guide.
+const { data: folder } = await student.from('folders').insert({ name: 'BIO 101 Biology' }).select('id').single();
+await service.from('folders').update({ lms_named: true }).eq('id', folder.id);
+const { data: guideRows, error: guideError } = await student.from('study_guides').insert([
+  { title: 'Cell biology', folder_id: folder.id, notes: '## Cells\n- The **mitochondria** makes ATP', study_guide: 'Q1: What makes ATP?\nA1: Mitochondria',
+    flashcards: [{ front: 'What makes ATP?', back: 'Mitochondria' }], source_type: 'canvas_module', source_title: 'BIO 101 · Module 3', source_url: 'https://school.instructure.com/courses/1' },
+  { title: 'Lab report guide', source_type: 'assignment', notes: 'mitochondria rubric points' },
+]).select('id, title');
+check('control: app token saves guides', !guideError && guideRows?.length === 2, guideError?.message);
+const cellGuide = guideRows?.find(row => row.title === 'Cell biology')?.id;
+await service.from('lectures').insert({ user_id: signUp.user.id, folder_id: folder.id, title: 'Lecture 4', transcript: 'Cells today. The mitochondria is on the exam.',
+  segments: [{ start_ms: 0, text: 'Cells today.' }, { start_ms: 95000, text: 'The mitochondria is on the exam.' }],
+  analysis: { summary: ['Cells'], watch_for: [{ point: 'Mitochondria', why: 'exam', quote: 'The mitochondria is on the exam.', at_ms: 95000 }] } });
+const zone = await student.rpc('set_my_timezone', { tz: 'America/Chicago' });
+check('control: app saves the time zone', !zone.error, zone.error?.message);
+const otherEmail = `other${Date.now()}@example.test`;
+const { data: other } = await app.auth.signUp({ email: otherEmail, password });
+const { data: otherGuide } = await service.from('study_guides').insert({ user_id: other.user.id, title: 'Other mitochondria', notes: 'mitochondria' }).select('id').single();
+let rpcId = 10;
+async function callTool(name, args) {
+  const response = await mcp(new Request('https://classroom.cordiacode.com/mcp', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${refreshed.access_token}` },
+    body: JSON.stringify({ jsonrpc: '2.0', id: rpcId++, method: 'tools/call', params: { name, arguments: args } }),
+  }));
+  const text = await response.text();
+  const message = JSON.parse(text.startsWith('{') ? text : text.split('\n').find(line => line.startsWith('data:')).slice(5));
+  return message.result || { isError: true, content: [{ text: JSON.stringify(message.error) }] };
+}
+const leaks = text => /instructure|BIO 101|Module 3|Lab report|Other mitochondria/.test(text);
+const found = await callTool('search_my_materials', { query: 'mitochondria' });
+const hits = found.structuredContent?.results || [];
+check('tool search: own guide, card and lecture with its timestamp', hits.some(hit => hit.kind === 'study_guide' && hit.id === cellGuide) && hits.some(hit => hit.kind === 'flashcard')
+  && hits.some(hit => hit.kind === 'lecture' && hit.timestamp_seconds === 95), JSON.stringify(hits.map(hit => [hit.kind, hit.title])));
+check('tool search: no assignment guide, no other student, no Canvas names', !leaks(found.content?.[0]?.text || ''), (found.content?.[0]?.text || '').slice(0, 200));
+const listed = await callTool('list_study_sets', {});
+const listedSets = listed.structuredContent?.study_sets || [];
+check('tool list_study_sets: own sets, no assignment guide, course "Course 1"', listedSets.length > 0 && !listedSets.some(set => set.title === 'Lab report guide')
+  && listedSets.find(set => set.id === cellGuide)?.course?.name === 'Course 1' && !leaks(listed.content[0].text), listed.content?.[0]?.text?.slice(0, 200));
+check('tool dates are in the student\'s time zone', /-0[56]:00"/.test(listed.content?.[0]?.text || ''));
+const theirs = await callTool('get_study_set', { study_set_id: otherGuide.id });
+const nowhere = await callTool('get_study_set', { study_set_id: crypto.randomUUID() });
+check('tool get_study_set: another student\'s set looks exactly like a missing one', theirs.isError && nowhere.isError && theirs.content[0].text === nowhere.content[0].text);
+const due = await callTool('get_due_cards', {});
+check('tool get_due_cards: the new card is due', due.structuredContent?.cards?.some(card => card.front === 'What makes ATP?'), JSON.stringify(due.structuredContent || due.content).slice(0, 200));
+const lectures = await callTool('list_lectures', {});
+const lectureId = lectures.structuredContent?.lectures?.[0]?.id;
+const lecture = lectureId ? await callTool('get_lecture', { lecture_id: lectureId }) : { structuredContent: null };
+check('tool get_lecture: watch-for with its timestamp', lecture.structuredContent?.watch_for?.[0]?.timestamp_seconds === 95);
+const direct = await fetch(`${API}/rest/v1/study_guides?select=source_title,source_url`, { headers: headers(refreshed.access_token) });
+check('REST: the Canvas columns stay closed to the token', refused(direct.status), String(direct.status));
+const folderName = await fetch(`${API}/rest/v1/folders?select=name`, { headers: headers(refreshed.access_token) });
+check('REST: folder names stay closed to the token', refused(folderName.status), String(folderName.status));
+
 // Disconnect in Settings: the still-unexpired access token stops working at once.
 const revoke = await fetch(`${API}/auth/v1/user/oauth/grants?client_id=${client.client_id}`, { method: 'DELETE', headers: headers(appToken) });
 check('Connected apps: Disconnect revokes the grant', revoke.status < 300, String(revoke.status));

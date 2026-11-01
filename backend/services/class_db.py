@@ -70,11 +70,16 @@ def add_membership(db, user_id: str, class_row: dict, term: str, source: str) ->
         {"user_id": user_id, "class_term_id": term_row["id"], "source": source},
         on_conflict="user_id,class_term_id",
     ).execute()
-    ensure_folder(db, user_id, class_row)
+    ensure_folder(db, user_id, class_row, lms_named=source in LMS_SOURCES)
     return term_row
 
 
-def ensure_folder(db, user_id: str, class_row: dict) -> dict:
+# Classes that came from Canvas or its calendar feed. A folder made for one is named from Canvas, so
+# connected apps (the MCP) call it "Course 1" until the student renames it (folders.lms_named).
+LMS_SOURCES = ("canvas", "calendar")
+
+
+def ensure_folder(db, user_id: str, class_row: dict, lms_named: bool = False) -> dict:
     """The Library folder that stands for this class."""
     found = _first(db.table("folders").select("*").eq("user_id", user_id).eq("class_id", class_row["id"]).limit(1).execute())
     if found:
@@ -82,7 +87,15 @@ def ensure_folder(db, user_id: str, class_row: dict) -> dict:
     name = class_row["course_code_normalized"]
     if class_row.get("display_name"):
         name = f"{name} {class_row['display_name']}"[:100]
-    return _first(db.table("folders").insert({"user_id": user_id, "name": name, "class_id": class_row["id"]}).execute())
+    row = {"user_id": user_id, "name": name, "class_id": class_row["id"]}
+    if lms_named:
+        try:
+            return _first(db.table("folders").insert({**row, "lms_named": True}).execute())
+        except Exception as error:
+            # Before the migration that adds lms_named has run: make the folder without it.
+            if "lms_named" not in str(error):
+                raise
+    return _first(db.table("folders").insert(row).execute())
 
 
 def user_class_ids(db, user_id: str) -> list[str]:

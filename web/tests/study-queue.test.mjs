@@ -26,7 +26,12 @@ globalThis.localStorage = {
   getItem: key => (store.has(key) ? store.get(key) : null),
   setItem: (key, value) => store.set(key, String(value)),
 };
-const userStoreSource = load('lib/userStore.js', { "import { getUserId } from './api';": "const getUserId = () => 'student-1';" });
+// Saves to the server are recorded instead of sent.
+globalThis.savedToServer = [];
+const userStoreSource = load('lib/userStore.js', {
+  "import { getUserId } from './api';": "const getUserId = () => 'student-1';",
+  "import { saveRetainMissesToServer } from './serverCopies';": 'const saveRetainMissesToServer = (guideId, items) => globalThis.savedToServer.push([guideId, items.length]);',
+});
 const userStore = await import(dataUrl(userStoreSource));
 const queueLib = await import(dataUrl(load('lib/studyQueue.js', {
   "import { apiFetch } from './api';": 'const apiFetch = () => Promise.resolve(null);',
@@ -55,6 +60,14 @@ test('new misses join the list once, sure ones first, capped', () => {
   userStore.rememberRetainMisses('g1', Array.from({ length: 60 }, (_, n) => miss('Question ' + n)));
   assert.equal(saved('g1').length, userStore.MAX_RETAIN_MISSES);
   assert.equal(saved('g1')[0].question, 'what is OSMOSIS', 'a sure miss is never pushed out by unsure ones');
+});
+
+test('every change to a guide’s misses is saved to the server too', () => {
+  store.clear();
+  globalThis.savedToServer.length = 0;
+  userStore.rememberRetainMisses('g9', [miss('What is osmosis?')]);
+  userStore.clearRetainMisses('g9', ['What is osmosis?']);
+  assert.deepEqual(globalThis.savedToServer, [['g9', 1], ['g9', 0]]);
 });
 
 test('only questions answered right leave the list', () => {

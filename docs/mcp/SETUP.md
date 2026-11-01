@@ -68,3 +68,45 @@ shows the connector as connected. In Phase 1 the server has no tools yet.
    "can't be approved", change only the host in the address bar to this PR's Vercel preview
    (keep `/oauth/consent?authorization_id=…`). Sign in there if asked, then choose Allow.
 4. Inspector shows "Cordia Classroom" connected.
+
+## Phase 2: the read tools
+
+| Tool | What it returns | Logic it shares with the app |
+|---|---|---|
+| `search_my_materials` | Ranked hits across study sets, flashcards, notes and lectures (lecture hits carry a timestamp) | `search_my_materials()` in Postgres, which the app's ⌘K search also calls |
+| `list_study_sets` | The student's study sets, newest first, paged | — |
+| `get_study_set` | Notes, outline, key terms; flashcards, quiz and practice on request, paged | `lib/guideText.mjs` (the guide page's parsers), `lib/spacedReview.mjs` |
+| `list_lectures` / `get_lecture` | Lectures; outline, "Watch for" quotes with timestamps, to-dos, terms, questions, own notes, paged transcript | the lecture page's analysis |
+| `get_due_cards` | What Study now would review, in its order (sure misses, due cards, Learn ideas, other misses) | `lib/studyQueue.mjs` |
+| `get_progress` | Streak, active minutes, quiz accuracy, best hours, weakest study sets | the backend's Progress functions via `GET /mcp/progress`, `lib/streak.mjs` |
+| `get_job_status` | A background study-set job (created in Phase 3) | — |
+
+All tools are read-only (readOnlyHint true, destructiveHint false, idempotentHint true,
+openWorldHint false). Every query runs as the student through their connected-app token, so RLS and
+the column grants in `20261101120000_mcp_read_access.sql` decide what each tool can see:
+- own rows only;
+- never `source_title`, `source_url`, `source_id`, `external_source_id` or `folders.name`;
+- never a guide built from a Canvas assignment.
+
+Courses named by Canvas or the calendar feed show as "Course 1", "Course 2"…, each with up to three
+of its study set titles.
+
+### Turning it on
+
+1. In the Supabase SQL editor, run `supabase/migrations/20261101120000_mcp_read_access.sql`.
+2. Run `supabase/checks/oauth_lockdown.sql`. It must return no rows.
+3. Merge the PR so Vercel deploys the tools.
+4. Deploy the backend: `cd backend && fly deploy` (for `/mcp/progress` and the folder labels).
+   Then watch `fly logs`.
+5. Open Cordia once while signed in. This saves the time zone and uploads Retain misses and the
+   study log.
+
+Optional backend variable: `SUPABASE_PUBLISHABLE_KEY`. It defaults to `SUPABASE_ANON_KEY`, then to
+the project's publishable key. The service-role key is never used for `/mcp/*`.
+
+### Testing
+
+- **Claude.ai.** Open the Cordia connector; it should now list 8 tools. Try "What did my professor
+  say about mitochondria?" (search, with lecture timestamps), "Quiz me on what's due" (get_due_cards)
+  and "How's my studying going this month?" (get_progress).
+- **MCP Inspector.** Connect as in Phase 1. Then Tools → List Tools, and run each one.
