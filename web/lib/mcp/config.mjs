@@ -16,9 +16,9 @@ export const PRIVACY_PATH = '/privacy';
 export const MCP_INSTRUCTIONS = [
   'Cordia Classroom holds this student\'s own course material: study sets, lecture notes and transcripts, flashcards, quizzes and progress.',
   'For questions about their courses, call search_my_materials first, answer from what it returns, and cite titles and lecture timestamps. If Cordia has nothing relevant, say so before using general knowledge.',
-  'When quizzing, ask one question at a time and collect the student\'s answer and confidence before revealing anything. Log every answer with record_answer.',
+  'When quizzing, ask one question at a time and collect the student\'s answer and confidence before revealing anything. Judge answers by meaning, not exact wording. Log every answer with record_answer, with a new idempotency_key each time.',
   'Use get_progress weak_topics to choose what to review.',
-  'Add to the Library (create_study_set, add_flashcards, save_note) only when the student asks.',
+  'Add to the Library (create_study_set, add_flashcards, save_note) only when the student asks. After create_study_set, check get_job_status until the set is done.',
   'This connector can\'t see assignments, grades or due dates from Canvas or other LMSs, so don\'t promise them.',
 ].join(' ');
 

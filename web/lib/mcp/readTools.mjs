@@ -360,7 +360,7 @@ export const READ_TOOLS = [
   {
     name: 'search_my_materials',
     title: 'Search my study materials',
-    description: 'Searches the student\'s own Cordia study sets, flashcards, notes and lecture recordings. Use this first for any question about their courses, so answers match what their professor taught, and cite the returned titles and lecture timestamps. Not for general knowledge.',
+    description: 'Searches the student\'s own Cordia study sets, flashcards, notes and lecture transcripts, and returns ranked matches with titles, links and lecture timestamps.',
     input: {
       query: z.string().min(1).max(500).describe('What to look for, in the student\'s words.'),
       course_id: id.optional().describe('Only this course (a course id from another result).'),
@@ -380,7 +380,7 @@ export const READ_TOOLS = [
   {
     name: 'list_study_sets',
     title: 'List my study sets',
-    description: 'Lists the student\'s study sets, newest first, optionally in one course or matching a title. Use it to find a study set\'s id; use search_my_materials to find what a set says.',
+    description: 'Lists the student\'s study sets, newest first, optionally in one course or matching a title, with each set\'s id.',
     input: {
       course_id: id.optional(),
       query: z.string().min(1).max(200).optional().describe('Words in the title.'),
@@ -399,7 +399,7 @@ export const READ_TOOLS = [
   {
     name: 'get_study_set',
     title: 'Get a study set',
-    description: 'Gets one study set\'s notes, outline and key terms, and on request its flashcards, quiz and practice problems. Use it after search or list returned the set\'s id; large sets come in pages (pass next_cursor).',
+    description: 'Gets one study set\'s notes, outline and key terms, and on request its flashcards, quiz and practice problems. Large sets come in pages.',
     input: {
       study_set_id: id,
       include: z.array(z.enum(SECTIONS)).max(6).optional().describe('Sections to return; default notes, outline and key_terms.'),
@@ -423,7 +423,7 @@ export const READ_TOOLS = [
   {
     name: 'list_lectures',
     title: 'List my lectures',
-    description: 'Lists the student\'s recorded lectures, newest first, optionally in one course. Use it to find a lecture\'s id for get_lecture.',
+    description: 'Lists the student\'s recorded lectures, newest first, optionally in one course, with each lecture\'s id.',
     input: {
       course_id: id.optional(),
       cursor: z.string().max(200).optional(),
@@ -440,7 +440,7 @@ export const READ_TOOLS = [
   {
     name: 'get_lecture',
     title: 'Get a lecture',
-    description: 'Gets one recorded lecture: its outline, the "Watch for" points the professor stressed (with quotes and timestamps), to-dos mentioned, key terms, questions asked in class and the student\'s own notes. Ask for the transcript only when needed; it comes in pages.',
+    description: 'Gets one recorded lecture: its outline, the "Watch for" points the professor stressed (with quotes and timestamps), to-dos mentioned, key terms, questions asked in class and the student\'s own notes. The transcript is included on request, in pages.',
     input: {
       lecture_id: id,
       include_transcript: z.boolean().default(false),
@@ -463,7 +463,7 @@ export const READ_TOOLS = [
   {
     name: 'get_due_cards',
     title: 'Get cards due for review',
-    description: 'Gets what Cordia\'s Study now would review today, in the same order: questions the student missed while sure, then due flashcards, Learn ideas and other misses. Never show a card\'s back before the student has answered, and log each answer with record_answer.',
+    description: 'Gets what Cordia\'s Study now would review today, in the same order: questions the student missed while sure, then due flashcards, Learn ideas and other misses.',
     input: {
       study_set_id: id.optional(),
       course_id: id.optional(),
@@ -485,7 +485,7 @@ export const READ_TOOLS = [
   {
     name: 'get_progress',
     title: 'Get my study progress',
-    description: 'Gets the student\'s streak, active study minutes, quiz accuracy over time, best study hours and weakest study sets, counted the way Cordia\'s Progress page counts them. Use weak_topics to choose what to review.',
+    description: 'Gets the student\'s streak, active study minutes, quiz accuracy over time, best study hours and weakest study sets, counted the way Cordia\'s Progress page counts them.',
     input: {
       course_id: id.optional(),
       range: z.enum(['7d', '30d', 'semester']).default('30d'),
@@ -505,7 +505,7 @@ export const READ_TOOLS = [
   {
     name: 'get_job_status',
     title: 'Check a study set job',
-    description: 'Checks a study set that Cordia is making in the background (from create_study_set): queued, running, done or failed. When done, it gives the new study set\'s id and link.',
+    description: 'Reports a study set Cordia is making in the background: queued, running, done or failed. When done, it includes the new study set\'s id and link.',
     input: { job_id: id },
     output: {
       job_id: z.string(), status: z.enum(['queued', 'running', 'done', 'failed']), progress: z.number().nullable(),

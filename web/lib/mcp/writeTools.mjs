@@ -148,7 +148,7 @@ export const WRITE_TOOLS = [
   {
     name: 'record_answer',
     title: 'Record an answer',
-    description: 'Records one answer in Cordia\'s spaced review, Learn and progress, the same as answering in the app. Ask one question at a time, get the student\'s answer and confidence before revealing anything, judge correctness by meaning rather than exact wording, and call this once per answer with a new idempotency_key.',
+    description: 'Records one answer and the student\'s confidence in Cordia\'s spaced review, Learn and progress, the same as answering in the app. An idempotency_key is only ever counted once.',
     annotations: { idempotentHint: true },
     input: {
       item_type: z.enum(['flashcard', 'quiz_question', 'practice']).describe('flashcard for card and learn_idea items; quiz_question for quiz questions and missed questions; practice for practice problems.'),
@@ -169,7 +169,7 @@ export const WRITE_TOOLS = [
   {
     name: 'create_study_set',
     title: 'Create a study set',
-    description: 'Starts making a study set (notes, study guide and flashcards) from pasted text or a public web link, counted against the student\'s plan like the app. It returns a job_id at once; check get_job_status until it is done. Not for Canvas or other LMS pages (the student uses the Cordia extension for those).',
+    description: 'Starts making a study set (notes, study guide and flashcards) from pasted text or a public web link, counted against the student\'s plan like the app. It returns a job_id at once; the set is usually ready in about a minute. Canvas and other LMS pages are not supported.',
     annotations: { idempotentHint: false },
     input: {
       source: z.discriminatedUnion('type', [
@@ -186,7 +186,7 @@ export const WRITE_TOOLS = [
   {
     name: 'add_flashcards',
     title: 'Add flashcards',
-    description: 'Adds flashcards to one of the student\'s study sets, after the cards it already has; cards it already has are skipped. Use it when the student asks to keep cards made in this conversation; it never changes or removes existing cards.',
+    description: 'Adds flashcards to one of the student\'s study sets, after the cards it already has. Cards the set already has are skipped, and existing cards are never changed or removed.',
     annotations: { idempotentHint: false },
     input: {
       study_set_id: id,
@@ -198,7 +198,7 @@ export const WRITE_TOOLS = [
   {
     name: 'save_note',
     title: 'Save a note',
-    description: 'Saves a new note page (Markdown) in the student\'s Cordia Library, optionally in a course and next to a study set, labelled as added from this app. Use it when the student asks to keep something from this conversation; it always creates a new page and never edits an existing one.',
+    description: 'Saves a new note page (Markdown) in the student\'s Cordia Library, optionally in a course and next to a study set, labelled as added from this app. It always creates a new page and never edits an existing one.',
     annotations: { idempotentHint: false },
     input: {
       title: z.string().min(1).max(200),
