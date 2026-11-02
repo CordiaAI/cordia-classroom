@@ -18,6 +18,7 @@ MIGRATIONS = os.path.join(ROOT, "supabase", "migrations")
 LOCKDOWN = os.path.join(MIGRATIONS, "20261031120000_oauth_lockdown.sql")
 CONNECTED_APPS = os.path.join(MIGRATIONS, "20261031130000_mcp_connected_apps.sql")
 READ_ACCESS = os.path.join(MIGRATIONS, "20261101120000_mcp_read_access.sql")
+WRITE_TOOLS = os.path.join(MIGRATIONS, "20261102120000_mcp_write_tools.sql")
 CHECK = os.path.join(ROOT, "supabase", "checks", "oauth_lockdown.sql")
 
 
@@ -81,6 +82,19 @@ class OAuthLockdownDatabaseTests(unittest.TestCase):
         result = self.psql(os.path.join(ROOT, "tests", "rls", "mcp_read_access_rls.sql"))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("READ ACCESS OK", result.stdout)
+        result = self.psql(CHECK, "-At")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "", "mcp_client can reach objects outside the allow-list")
+
+    def test_write_tools_are_add_only_idempotent_and_isolated(self):
+        stub = os.path.join(ROOT, "tests", "rls", "supabase_stub.sql")
+        seed = os.path.join(ROOT, "tests", "rls", "mcp_read_access_seed.sql")
+        for path in (stub, LOCKDOWN, CONNECTED_APPS, seed, READ_ACCESS, WRITE_TOOLS, WRITE_TOOLS):
+            result = self.psql(path)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        result = self.psql(os.path.join(ROOT, "tests", "rls", "mcp_write_tools_rls.sql"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("WRITE TOOLS OK", result.stdout)
         result = self.psql(CHECK, "-At")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "", "mcp_client can reach objects outside the allow-list")

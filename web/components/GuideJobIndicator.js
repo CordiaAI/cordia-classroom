@@ -24,7 +24,7 @@ export default function GuideJobIndicator() {
       {finished.map(job => (
         <div key={job.id} className={`guide-job guide-job-${job.status}`}>
           {job.status === 'done'
-            ? <span>“{job.title}” is ready</span>
+            ? <span>“{job.title}” is ready{job.from ? ` (from ${job.from})` : ''}</span>
             : <span>{job.error}</span>}
           {job.status === 'done' && (
             <button type="button" className="guide-job-open" onClick={() => { dismissGuideJob(job.id); router.push(newGuideHref(job.guideId)); }}>Open</button>

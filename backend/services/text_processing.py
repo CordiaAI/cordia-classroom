@@ -454,6 +454,68 @@ def html_to_text(text: str) -> str:
     return "".join(parser.parts)
 
 
+class _PageText(_HtmlText):
+    """A web page's readable text, by the same rules as the app's link reader (NewSheet readLink):
+    scripts, styles, navigation, headers, footers, sidebars and forms are left out, and the page's
+    <main> or <article> is used when it has one."""
+    SKIP = {"script", "style", "noscript", "nav", "footer", "header", "aside", "form", "svg", "template", "iframe", "head"}
+    MAIN = {"main", "article"}
+
+    def __init__(self):
+        super().__init__()
+        self.skipping = 0
+        self.in_main = 0
+        self.main_parts = []
+        self.title = []
+        self.in_title = False
+
+    def _break(self, tag):
+        if tag in self.BLOCKS:
+            self.parts.append("\n")
+            if self.in_main:
+                self.main_parts.append("\n")
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "title":
+            self.in_title = True
+        if tag in self.SKIP:
+            self.skipping += 1
+        elif tag in self.MAIN:
+            self.in_main += 1
+        self._break(tag)
+
+    def handle_endtag(self, tag):
+        if tag == "title":
+            self.in_title = False
+        if tag in self.SKIP:
+            self.skipping = max(0, self.skipping - 1)
+        elif tag in self.MAIN:
+            self.in_main = max(0, self.in_main - 1)
+        self._break(tag)
+
+    def handle_data(self, data):
+        if self.in_title:
+            self.title.append(data)
+        if self.skipping:
+            return
+        self.parts.append(data)
+        if self.in_main:
+            self.main_parts.append(data)
+
+
+def page_text(html: str) -> Tuple[str, str]:
+    """(title, readable text) of a web page."""
+    parser = _PageText()
+    parser.feed(html or "")
+    parser.close()
+    main = "".join(parser.main_parts).strip()
+    text = main if len(main) >= 200 else "".join(parser.parts)
+    text = re.sub(r"[ \t\r\f\v]+", " ", text)
+    text = re.sub(r" *\n *", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return re.sub(r"\s+", " ", "".join(parser.title)).strip(), text
+
+
 _MD_HEADING = re.compile(r"^#{1,6}\s+(\S.*)$")
 _BULLET = re.compile(r"^(?:[-*•▪◦·]|\d{1,2}[.)])\s+(\S.*)$")
 

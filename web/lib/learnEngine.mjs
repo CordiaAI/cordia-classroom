@@ -260,3 +260,12 @@ export function linkedTestDate(given, saved, today = dayKey()) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(date + 'T12:00:00').getTime()) || date < today || date === saved) return '';
   return !saved || date > today ? date : '';
 }
+
+// The saved levels (saveableLevels) that differ between two saves, for saving just those ideas.
+export function changedLevels(before, after) {
+  const out = {};
+  for (const [index, entry] of Object.entries(after || {})) {
+    if (JSON.stringify(before?.[index] || null) !== JSON.stringify(entry)) out[index] = entry;
+  }
+  return out;
+}

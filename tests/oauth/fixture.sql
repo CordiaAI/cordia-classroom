@@ -81,3 +81,16 @@ begin
   end loop;
 end $$;
 grant select, insert, update on public.folders, public.study_sessions, public.quiz_attempts to authenticated;
+
+-- Columns the MCP write tools use, and stand-ins for the plan-usage functions the backend calls
+-- (nothing used yet, so every plan limit has room).
+alter table public.study_guides add column source_guide_id uuid, add column external_source_id text, add column source_id text;
+alter table public.learning_events add column decision_id uuid, add column format text, add column first_key_ms integer, add column submit_ms integer,
+  add column hidden_ms integer not null default 0, add column rapid_guess boolean not null default false, add column answer_chars integer,
+  add column view_shown text, add column fsrs_rating smallint, add column same_day boolean not null default false,
+  add column arm text not null default 'fsrs', add column params_version text not null default 'none';
+create or replace function public.feature_usage_counts(p_user_id uuid, p_month text) returns table (feature text, used integer)
+language sql stable as $$ select null::text, 0 where false $$;
+create or replace function public.record_feature_usage(p_user_id uuid, p_feature text, p_month text, p_request_key text) returns void
+language sql as $$ select $$;
+revoke execute on function public.feature_usage_counts(uuid, text), public.record_feature_usage(uuid, text, text, text) from public, anon, authenticated;

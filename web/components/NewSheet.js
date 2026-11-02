@@ -336,7 +336,7 @@ export default function NewSheet() {
       title,
       run: () => generateAndSave({
         source, requestId, title, sourceTitle, sourceType, sourceUrl,
-        externalSourceId: '', folderId: classId, notes: true, flashcards: true, manualPairs: null,
+        externalSourceId: '', folderId: classId, notes: true, flashcards: true,
       }),
     });
     setJobId(id);

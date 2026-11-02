@@ -502,6 +502,7 @@ export default function GuidePage() {
         />
         <Link href={'/session?guideId=' + id} className="c-btn c-btn--primary guide-study-now"><Play size={20} strokeWidth={1.75} aria-hidden="true" />Study now</Link>
       </header>
+      {guide.origin === 'mcp' && <p className="c-meta guide-origin">Added from {guide.origin_client || 'a connected AI app'}</p>}
       {sharing?.update_available && (
         <button type="button" className="c-chip guide-update" onClick={pullUpdate}><RefreshCw size={16} strokeWidth={1.75} aria-hidden="true" />Update available</button>
       )}
@@ -630,6 +631,7 @@ export default function GuidePage() {
       <style jsx>{`
         .guide { gap: 16px; }
         .guide-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .guide-origin { margin: -4px 0 0 48px; font-size: 13px; }
         .guide-title { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-wrap: anywhere; }
         .guide-title :global(.guide-rename-btn) { flex: 0 0 auto; color: var(--muted); }
         .guide-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: -8px 0 0 48px; }

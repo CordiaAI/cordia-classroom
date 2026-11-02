@@ -72,7 +72,7 @@ export default function Walkthrough() {
   // Building: it moves on once the first guide is open. If it finished while the profile
   // questions were up, open it.
   const jobs = useGuideJobs();
-  const built = jobs.find(job => job.status === 'done' && job.guideId);
+  const built = jobs.find(job => job.status === 'done' && job.guideId && !job.serverId);
   useEffect(() => {
     if (step?.id !== 'build') return;
     if (router.pathname === '/guide/[id]') advance(wtRef.current);

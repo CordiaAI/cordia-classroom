@@ -44,3 +44,24 @@ export function mergeDay(a = {}, b = {}) {
     g: guides,
   };
 }
+
+// One study moment added to a day: minutes, cards, right/total answers, and the guide's minutes and
+// kinds under its key (the guide id's first 8 characters, lib/progress.js groveKey). Pure: the app's
+// recordStudy (lib/activity.js) and the MCP server's record_answer both use it.
+export function addStudy(day, { guideId = '', guideTitle = '', minutes = 0, cards = 0, right = 0, total = 0, kind = '' } = {}) {
+  const next = { m: Number(day?.m) || 0, c: Number(day?.c) || 0, r: Number(day?.r) || 0, t: Number(day?.t) || 0, g: { ...(day?.g || {}) } };
+  next.m = Math.round((next.m + minutes) * 10) / 10;
+  next.c += cards;
+  next.r += right;
+  next.t += total;
+  const key = String(guideId || '').slice(0, 8);
+  if (key && !['__proto__', 'constructor', 'prototype'].includes(key)) {
+    const saved = Object.hasOwn(next.g, key) && next.g[key];
+    const entry = saved ? { n: saved.n || '', m: Number(saved.m) || 0, k: [...(saved.k || [])] } : { n: guideTitle || '', m: 0, k: [] };
+    entry.m = Math.round((entry.m + minutes) * 10) / 10;
+    if (guideTitle) entry.n = guideTitle;
+    if (kind && !entry.k.includes(kind)) entry.k.push(kind);
+    next.g[key] = entry;
+  }
+  return next;
+}

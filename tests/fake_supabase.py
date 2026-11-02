@@ -17,7 +17,7 @@ DEFAULTS = {
 }
 ID_TABLES = {"schools", "classes", "class_terms", "folders", "study_guides", "shared_sets", "shared_set_reports",
              "class_merge_proposals", "copyright_takedowns", "instructor_blocks", "canvas_activity",
-             "assignment_steps", "study_blocks"}
+             "assignment_steps", "study_blocks", "generation_jobs"}
 
 
 class FakeDB:
@@ -106,7 +106,7 @@ class Query:
         return self
 
     # writes
-    def insert(self, payload):
+    def insert(self, payload, **_kwargs):
         self.op, self.payload = "insert", payload
         return self
 

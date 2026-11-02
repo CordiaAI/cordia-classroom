@@ -15,6 +15,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, Optional
 
+from postgrest.types import ReturnMethod
+
 logger = logging.getLogger(__name__)
 
 PARAMS_VERSION = "none"
@@ -179,7 +181,8 @@ def write_batch(supabase, user_id: str, decisions: list[dict], events: list[dict
         since = (now - MAX_EVENT_AGE - timedelta(days=1)).isoformat()
         earlier = supabase.table("learning_events").select("item_id, occurred_at").eq("user_id", user_id) \
             .in_("item_id", items).gte("occurred_at", since).execute().data or []
-        supabase.table("learning_events").insert(event_rows(user_id, events, earlier, tz_offset, now)).execute()
+        # No rows back: a connected app's answers are written as the student, who can't read every column.
+        supabase.table("learning_events").insert(event_rows(user_id, events, earlier, tz_offset, now), returning=ReturnMethod.minimal).execute()
         return {"logged": True, "decisions": len(decisions), "events": len(events)}
     except Exception as error:
         _note_failure(error)

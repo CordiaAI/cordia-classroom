@@ -9,6 +9,7 @@ import '../styles/motion.css';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { syncServerCopies } from '../lib/serverSync';
+import { showConnectedAppSets } from '../lib/guideJobs';
 import { routeTitle } from '../lib/pageTitle';
 import { useState, useEffect } from 'react';
 import { installErrorReporting } from '../lib/errorReport';
@@ -40,7 +41,7 @@ export default function App({ Component, pageProps }) {
     scheduleProactiveRefresh();
   }, []);
   // Time zone, Retain misses and the study log: once per load, as soon as someone is signed in.
-  useEffect(() => { if (getToken()) syncServerCopies(); }, [router.pathname]);
+  useEffect(() => { if (getToken()) { syncServerCopies(); showConnectedAppSets(); } }, [router.pathname]);
   // The account's saved theme replaces the local cache as soon as the account loads.
   const progress = useProgress();
   useEffect(() => { if (progress.theme) syncThemeFromAccount(); }, [progress.theme]);

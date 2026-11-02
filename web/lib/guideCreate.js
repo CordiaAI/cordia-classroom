@@ -37,9 +37,55 @@ export function pairsToCards(pairs) {
   }));
 }
 
-// Generates and saves one guide from source text. Runs as a background job, so it
-// only uses the values passed in, never page state.
-export async function generateAndSave({ source, requestId, title, keepTitle = false, sourceTitle, sourceType, sourceUrl, externalSourceId, folderId, notes, flashcards, manualPairs }) {
+function limitError(detail, fallback) {
+  const message = typeof detail === 'string' ? detail : detail?.message;
+  const error = new Error(message || fallback);
+  error.upgrade = detail?.code === 'limit_reached' || Boolean(detail?.upgrade_url);
+  return error;
+}
+
+const JOB_POLL_MS = 2500;
+const JOB_WAIT_MS = 12 * 60 * 1000;
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// Waits for a study set the server is building (POST /study-set-jobs), then returns the saved guide.
+async function waitForJob(jobId, title) {
+  const until = Date.now() + JOB_WAIT_MS;
+  let misses = 0;
+  while (Date.now() < until) {
+    await wait(JOB_POLL_MS);
+    const data = await apiFetch('/study-set-jobs/' + jobId, { reportFailure: true });
+    if (!data || data.failed) {
+      if (++misses >= 8) throw new Error("Couldn't reach Classroom while building the guide. It will be in your Library when it's ready.");
+      continue;
+    }
+    misses = 0;
+    if (data.job?.status === 'done' && data.guide) return data.guide;
+    if (data.job?.status === 'failed') throw limitError(data.job.error, `CordiaClassroom could not build “${title}” from this material.`);
+  }
+  throw new Error('The guide is taking longer than usual. It will be in your Library when it’s ready.');
+}
+
+// Generates and saves one guide from source text. Runs as a background job, so it only uses the
+// values passed in, never page state. The server builds it (services/generation_jobs.py), so it
+// carries on if the student closes the page; before that server code is deployed, the guide is
+// built in two requests while the page waits (/generate, then /guides).
+export async function generateAndSave({ source, requestId, title, keepTitle = false, sourceTitle, sourceType, sourceUrl, externalSourceId, folderId, notes, flashcards }) {
+  const queued = await apiFetch('/study-set-jobs', {
+    method: 'POST',
+    body: JSON.stringify({
+      content: source, title, keep_title: keepTitle, notes: Boolean(notes), flashcards: Boolean(flashcards),
+      source_type: sourceType || null, source_title: sourceTitle || null, source_url: sourceUrl || null,
+      external_source_id: externalSourceId || null, folder_id: folderId || null,
+    }),
+    reportFailure: true,
+  });
+  if (queued?.job?.id) return waitForJob(queued.job.id, title);
+  if (queued?.detail && queued.detail !== 'Not Found') {
+    if (queued.failed) throw new Error("Couldn't reach Classroom while building the guide. Try again.");
+    throw limitError(queued.detail, 'Study guide generation failed.');
+  }
+
   const generated = await apiFetch('/generate', {
     method: 'POST',
     body: JSON.stringify({ content: source, notes, study_guide: true, flashcards, request_id: requestId }),
@@ -52,22 +98,9 @@ export async function generateAndSave({ source, requestId, title, keepTitle = fa
       ? 'The guide took too long to come back. Try again; you will not be charged twice.'
       : "Couldn't reach Classroom while building the guide. Try again; you will not be charged twice.");
   }
-  if (generated.detail) {
-    const detail = typeof generated.detail === 'string' ? generated.detail : generated.detail.message;
-    const error = new Error(detail || 'Study guide generation failed.');
-    error.upgrade = generated.detail.code === 'limit_reached' || Boolean(generated.detail.upgrade_url);
-    throw error;
-  }
+  if (generated.detail) throw limitError(generated.detail, 'Study guide generation failed.');
   if (!generated.study_guide || generated.study_guide.startsWith('[Error')) {
     throw new Error(`CordiaClassroom could not build “${title}” from this material.`);
-  }
-
-  let studyGuide = generated.study_guide;
-  let cards = generated.flashcards || null;
-  if (manualPairs?.length) {
-    const numbers = [...studyGuide.matchAll(/^Q(\d+):/gm)].map(match => Number(match[1]));
-    studyGuide = `${studyGuide.trimEnd()}\n${pairsToGuide(manualPairs, numbers.length ? Math.max(...numbers) : 0)}`;
-    if (flashcards) cards = [...(cards || []), ...pairsToCards(manualPairs)];
   }
 
   const saved = await apiFetch('/guides', {
@@ -77,8 +110,8 @@ export async function generateAndSave({ source, requestId, title, keepTitle = fa
       // Without a typed name, the server cleans the file or page name, or names the guide from its content.
       keep_title: keepTitle,
       notes: generated.notes || null,
-      study_guide: studyGuide,
-      flashcards: cards,
+      study_guide: generated.study_guide,
+      flashcards: generated.flashcards || null,
       source_url: sourceUrl || null,
       external_source_id: externalSourceId || null,
       source_type: sourceType,

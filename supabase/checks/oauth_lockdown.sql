@@ -22,7 +22,19 @@ with allowed(kind, name) as (
   ('column', 'public.learning_events.user_id'), ('column', 'public.learning_events.item_id'), ('column', 'public.learning_events.guide_id'), ('column', 'public.learning_events.outcome'), ('column', 'public.learning_events.confidence'), ('column', 'public.learning_events.occurred_at'),
   ('column', 'public.retain_misses.user_id'), ('column', 'public.retain_misses.guide_id'), ('column', 'public.retain_misses.items'), ('column', 'public.retain_misses.updated_at'),
   ('column', 'public.study_days.user_id'), ('column', 'public.study_days.day'), ('column', 'public.study_days.minutes'), ('column', 'public.study_days.cards'), ('column', 'public.study_days.right_count'), ('column', 'public.study_days.total'), ('column', 'public.study_days.guides'), ('column', 'public.study_days.updated_at'),
-  ('column', 'public.generation_jobs.id'), ('column', 'public.generation_jobs.user_id'), ('column', 'public.generation_jobs.kind'), ('column', 'public.generation_jobs.status'), ('column', 'public.generation_jobs.progress'), ('column', 'public.generation_jobs.study_set_id'), ('column', 'public.generation_jobs.error'), ('column', 'public.generation_jobs.created_at'), ('column', 'public.generation_jobs.updated_at')
+  ('column', 'public.generation_jobs.id'), ('column', 'public.generation_jobs.user_id'), ('column', 'public.generation_jobs.kind'), ('column', 'public.generation_jobs.status'), ('column', 'public.generation_jobs.progress'), ('column', 'public.generation_jobs.study_set_id'), ('column', 'public.generation_jobs.error'), ('column', 'public.generation_jobs.created_at'), ('column', 'public.generation_jobs.updated_at'),
+  -- 20261102120000_mcp_write_tools.sql: the write tools, each a SECURITY DEFINER function with its
+  -- own checks (own guides only, never an assignment guide, add-only), the rate limiter and the
+  -- metadata-only audit log; the job's title; and logging the student's own answers (mode 'mcp').
+  ('function', 'public.mcp_record_answer(answer_key text, guide uuid, cards jsonb, learn jsonb, misses jsonb, practice jsonb, study_day jsonb, result jsonb)'),
+  ('function', 'public.mcp_add_flashcards(guide uuid, cards jsonb)'),
+  ('function', 'public.mcp_save_note(title text, notes text, course uuid, study_set uuid)'),
+  ('function', 'public.queue_study_set_job(source_kind text, source_text text, source_url text, title text, course uuid, outputs text[])'),
+  ('function', 'public.mcp_take_call(kind text)'),
+  ('function', 'public.mcp_log_tool_call(tool text, status text, error_code text, latency_ms integer)'),
+  ('column', 'public.generation_jobs.title'),
+  ('column', 'public.learning_events.decision_id'), ('column', 'public.learning_events.mode'), ('column', 'public.learning_events.format'), ('column', 'public.learning_events.first_key_ms'), ('column', 'public.learning_events.submit_ms'), ('column', 'public.learning_events.hidden_ms'), ('column', 'public.learning_events.rapid_guess'), ('column', 'public.learning_events.answer_chars'), ('column', 'public.learning_events.view_shown'), ('column', 'public.learning_events.fsrs_rating'), ('column', 'public.learning_events.same_day'), ('column', 'public.learning_events.arm'), ('column', 'public.learning_events.params_version'),
+  ('sequence', 'public.learning_events_id_seq')
 ),
 -- Platform schemas Supabase grants to PUBLIC and owns (supabase_admin), so no migration of ours
 -- can revoke them, and which the Data API does not expose (exposed schemas: public,

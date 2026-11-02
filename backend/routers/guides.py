@@ -133,10 +133,9 @@ def require_own_folder(supabase, user_id: str, folder_id: Optional[str]) -> None
         raise HTTPException(status_code=404, detail="Folder not found")
 
 
-@router.post("")
-def save_guide(request: SaveGuideRequest, authorization: str = Header(default="")):
-    """Save a new study guide."""
-    user_id = get_user_id(authorization)
+def create_guide(user_id: str, request: SaveGuideRequest, extra: Optional[dict] = None) -> dict:
+    """Saves a new guide for the student and returns its row: POST /guides and the study-set worker
+    (services/generation_jobs.py). `extra` sets server-only columns (origin, origin_client)."""
     supabase = get_supabase()
 
     data = {
@@ -145,6 +144,7 @@ def save_guide(request: SaveGuideRequest, authorization: str = Header(default=""
         "notes": request.notes,
         "study_guide": request.study_guide,
         "source_url": request.source_url,
+        **(extra or {}),
     }
 
     if request.folder_id:
@@ -171,8 +171,14 @@ def save_guide(request: SaveGuideRequest, authorization: str = Header(default=""
 
     if result.data:
         start_quiz_warmup(result.data[0], user_id)
-        return {"guide": result.data[0]}
+        return result.data[0]
     raise HTTPException(status_code=500, detail="Failed to save guide")
+
+
+@router.post("")
+def save_guide(request: SaveGuideRequest, authorization: str = Header(default="")):
+    """Save a new study guide."""
+    return {"guide": create_guide(get_user_id(authorization), request)}
 
 @router.patch("/{guide_id}")
 def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = Header(default="")):

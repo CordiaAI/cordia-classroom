@@ -1,6 +1,7 @@
 import { readUserValue, writeUserValue } from './userStore';
 import { saveStudyDayToServer } from './serverCopies';
 import { freezeStreak, isoWeek } from './streak.mjs';
+import { addStudy } from './studyDays.mjs';
 import { getProgress, groveKey, updateProgress } from './progress';
 
 // Day-by-day study log for the heatmap, recap and streak freezes. The server keeps it (study_days,
@@ -20,20 +21,8 @@ export function readActivity() {
 export function recordStudy({ guideId, guideTitle, minutes = 0, cards = 0, right = 0, total = 0, kind = '' }) {
   const log = readActivity();
   const today = dayKey();
-  const day = log[today] || { m: 0, c: 0, r: 0, t: 0, g: {} };
-  day.m = Math.round((day.m + minutes) * 10) / 10;
-  day.c += cards;
-  day.r += right;
-  day.t += total;
-  // The key comes from the URL; never let it name an Object built-in.
-  const groveId = guideId ? groveKey(guideId) : '';
-  if (groveId && !['__proto__', 'constructor', 'prototype'].includes(groveId)) {
-    const entry = (Object.hasOwn(day.g, groveId) && day.g[groveId]) || { n: guideTitle || '', m: 0, k: [] };
-    entry.m = Math.round((entry.m + minutes) * 10) / 10;
-    if (guideTitle) entry.n = guideTitle;
-    if (kind && !entry.k.includes(kind)) entry.k.push(kind);
-    day.g[groveId] = entry;
-  }
+  // The key comes from the URL; addStudy never lets it name an Object built-in.
+  const day = addStudy(log[today], { guideId: guideId ? groveKey(guideId) : '', guideTitle, minutes, cards, right, total, kind });
   log[today] = day;
   const cutoff = dayKey(Date.now() - KEEP_DAYS * 86400000);
   for (const key of Object.keys(log)) if (key < cutoff) delete log[key];

@@ -58,3 +58,16 @@ export function applyResults(progress, { known = [], missed = [] }, now = new Da
   const unknownAll = [...new Set([...(before.unknown || []), ...missed])].filter(index => !knownAll.includes(index));
   return { known: knownAll, unknown: unknownAll, last_studied: now.toISOString(), schedule };
 }
+
+// What a session changed, for saving just those cards (merge_study_progress in the database, which
+// both the app and connected apps save through): { [index]: { box, due, known } } from the progress
+// applyResults returned.
+export function scheduleChanges(progress, indices) {
+  const known = new Set(progress?.known || []);
+  const out = {};
+  for (const index of new Set(indices)) {
+    const entry = progress?.schedule?.[index];
+    if (entry) out[index] = { box: entry.box, due: entry.due, known: known.has(index) };
+  }
+  return out;
+}
