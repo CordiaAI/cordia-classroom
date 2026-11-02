@@ -74,6 +74,18 @@ class Query:
         self.filters.append(lambda r: r.get(key) is None if value in (None, "null") else r.get(key) == value)
         return self
 
+    @property
+    def not_(self):
+        """`.not_.is_(key, "null")`: the next filter, negated."""
+        query = self
+
+        class Negated:
+            def is_(self, key, value):
+                query.filters.append(lambda r: not (r.get(key) is None if value in (None, "null") else r.get(key) == value))
+                return query
+
+        return Negated()
+
     def in_(self, key, values):
         values = list(values)
         self.filters.append(lambda r: r.get(key) in values)

@@ -64,9 +64,12 @@ shows the connector as connected. In Phase 1 the server has no tools yet.
 **MCP Inspector.**
 1. Run `npx @modelcontextprotocol/inspector`.
 2. Choose Streamable HTTP, URL `https://classroom.cordiacode.com/mcp`, then Connect.
-3. Inspector's callback is on localhost, which production refuses. When the consent page says
-   "can't be approved", change only the host in the address bar to this PR's Vercel preview
-   (keep `/oauth/consent?authorization_id=…`). Sign in there if asked, then choose Allow.
+3. Inspector's callback is on localhost. Production refuses it ("can't be approved"), and that is
+   intended. Supabase always opens the request on the Site URL's consent page first, and a request
+   opened there can't then be approved from a preview's address (Supabase answers 400 or 403), so
+   swapping the host doesn't work either. Use Inspector only against a local stack
+   (`supabase start` plus `npm run dev` in `web/`), where localhost callbacks are allowed. Check
+   production with Claude.ai.
 4. Inspector shows "Cordia Classroom" connected.
 
 ## Phase 2: the read tools
@@ -219,8 +222,7 @@ anything is revealed, and correctness judged by meaning.
 
 ### End-to-end checklist (before submitting)
 
-1. **MCP Inspector against a preview deploy.** Connect as in Phase 1, using the preview's host on
-   the consent page. Then:
+1. **MCP Inspector against a local stack** (optional; see Phase 1 for why not production). Then:
    - Tools › List Tools shows 12; run each one.
    - Prompts › List Prompts shows 3; get each one.
 2. **Claude.ai custom connector.** Add `https://classroom.cordiacode.com/mcp`, sign in with the demo

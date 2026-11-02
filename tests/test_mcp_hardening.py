@@ -2,6 +2,7 @@
 1 and 2), and a connected app's study set goes all the way through: queued, claimed, built, saved
 and reported done."""
 import ast
+import re
 import sys
 import unittest
 from datetime import datetime, timezone
@@ -13,7 +14,7 @@ BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 sys.path.insert(0, str(ROOT / "tests"))
 
-from fake_supabase import FakeDB  # noqa: E402
+from fake_supabase import FakeDB, Query  # noqa: E402
 
 # Code that talks to an LMS or another connected service, or reads what they stored.
 FORBIDDEN_MODULES = {
@@ -79,6 +80,57 @@ class HardRuleTests(unittest.TestCase):
             source = _path(module).read_text().lower()
             for host in ("instructure.com", "blackboard.com", "moodlecloud.com", "brightspace.com", "schoology.com"):
                 self.assertNotIn(host, source, f"{module} names {host}")
+
+
+def column_grants() -> dict:
+    """Columns the connected-app role may read, for tables it reads column by column (the migrations'
+    `grant select (a, b) on public.t to mcp_client`)."""
+    grants = {}
+    for sql in sorted((ROOT / "supabase" / "migrations").glob("*.sql")):
+        for columns, table in re.findall(r"grant select \(([^)]*)\) on public\.(\w+) to mcp_client", sql.read_text()):
+            grants.setdefault(table, set()).update(c.strip() for c in columns.split(","))
+    return grants
+
+
+class GrantedQuery(Query):
+    """Fails like Postgres (403 from Supabase) when a read names a column the role can't read, or `*`."""
+
+    def select(self, columns="*", count=None, **kwargs):
+        allowed = self.db.grants.get(self.name)
+        if allowed is not None:
+            asked = {c.strip() for c in columns.split(",")}
+            refused = sorted(asked - allowed)
+            if refused:
+                raise PermissionError(f"permission denied for table {self.name}: {', '.join(refused)}")
+        return super().select(columns, count, **kwargs)
+
+
+class GrantedDB(FakeDB):
+    def __init__(self, grants):
+        super().__init__()
+        self.grants = grants
+
+    def table(self, name):
+        return GrantedQuery(self, name)
+
+
+class ConnectedAppReadTests(unittest.TestCase):
+    """Reads made as the student through a connected app only name columns the app's role may read."""
+
+    def test_grants_are_parsed(self):
+        self.assertIn("last_study_date", column_grants()["user_streaks"])
+        self.assertNotIn("updated_at", column_grants()["user_streaks"])
+
+    def test_get_progress_reads_only_granted_columns(self):
+        from routers import mcp
+        db = GrantedDB(column_grants())
+        db.table("user_streaks").insert({"user_id": "student-1", "current_streak": 2, "longest_streak": 3,
+                                         "last_study_date": "2026-11-01", "updated_at": "2026-11-01T00:00:00+00:00"}).execute()
+        db.table("study_sessions").insert({"user_id": "student-1", "guide_id": "g1", "session_type": "quiz", "duration_seconds": 600,
+                                           "started_at": datetime.now(timezone.utc).isoformat(), "ended_at": None, "metadata": {}}).execute()
+        with patch.object(mcp, "_student", return_value=("student-1", db)):
+            summary = mcp._progress("Bearer token", "", "")
+        self.assertEqual(summary["time_zone"], "UTC")
 
 
 class StudySetLifecycleTests(unittest.TestCase):

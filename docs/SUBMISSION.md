@@ -198,7 +198,7 @@ All seven acknowledgments apply as written:
 ## Before you submit
 
 - [ ] The connector is connected in Claude, and each of the 12 tools and 3 prompts has run there.
-- [ ] Each tool has run in MCP Inspector against a preview deploy (see `docs/mcp/SETUP.md`).
+- [ ] Each tool has run in MCP Inspector against a local stack (see `docs/mcp/SETUP.md`), or in Claude.ai.
 - [ ] The demo account is seeded and its password is ready for the portal.
 - [ ] You've reviewed the privacy policy section (it's marked for your review in the code).
 - [ ] cordiacode.com has a square favicon, so Claude shows the Cordia mark (optional).
@@ -252,6 +252,6 @@ the apex domain's favicon on custom connectors until it supports `serverInfo.ico
 1. Merge the PR. Vercel deploys the page, the privacy section and the tests.
 2. Run `cd backend && fly deploy`, then `fly logs`.
 3. Seed the demo account, then sign in to it once to check it.
-4. Run the end-to-end checklist in `docs/mcp/SETUP.md` (MCP Inspector, then Claude.ai, then every
+4. Run the end-to-end checklist in `docs/mcp/SETUP.md` (Claude.ai, then every
    tool and prompt).
 5. Submit in the developer portal.
