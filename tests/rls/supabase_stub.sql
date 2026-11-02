@@ -95,3 +95,18 @@ end $$;
 drop policy if exists "Users can read own profile" on public.user_profiles;
 create policy "Users can read own profile" on public.user_profiles for select using (auth.uid() = id);
 grant select, insert, update, delete on public.folders, public.study_guides, public.smart_notes, public.lectures to authenticated;
+
+-- Columns the MCP write migration grants on or writes (production has them).
+alter table public.study_guides add column if not exists source_guide_id uuid;
+alter table public.learning_events add column if not exists decision_id uuid;
+alter table public.learning_events add column if not exists format text;
+alter table public.learning_events add column if not exists first_key_ms integer;
+alter table public.learning_events add column if not exists submit_ms integer;
+alter table public.learning_events add column if not exists hidden_ms integer not null default 0;
+alter table public.learning_events add column if not exists rapid_guess boolean not null default false;
+alter table public.learning_events add column if not exists answer_chars integer;
+alter table public.learning_events add column if not exists view_shown text;
+alter table public.learning_events add column if not exists fsrs_rating smallint;
+alter table public.learning_events add column if not exists same_day boolean not null default false;
+alter table public.learning_events add column if not exists arm text not null default 'fsrs';
+alter table public.learning_events add column if not exists params_version text not null default 'none';
