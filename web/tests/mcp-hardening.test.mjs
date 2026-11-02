@@ -88,5 +88,9 @@ test('descriptions describe the tool: 1 to 3 sentences, no other tools or sites 
     const fields = new Set(TOOLS.flatMap(item => [...Object.keys(item.input), ...Object.keys(item.output)]));
     const mentioned = [...text.matchAll(/\b[a-z]+(?:_[a-z]+)+\b/g)].map(match => match[0]).filter(word => word !== tool.name && !fields.has(word));
     for (const other of mentioned) assert.ok(TOOLS.some(item => item.name === other), `${tool.name} mentions only Cordia's own tools and fields (${other})`);
+    // The directory's rule: descriptions say what the tool does. How Claude should behave lives in
+    // the server instructions (MCP_INSTRUCTIONS), so no description names another tool or gives orders.
+    assert.ok(!TOOLS.some(item => item.name !== tool.name && text.includes(item.name)), `${tool.name}: names no other tool`);
+    assert.ok(!/\b(use (it|this)|ask (one|the student)|never show|call this|check \w+ until|judge|cite)\b/i.test(text), `${tool.name}: no instructions to the model`);
   }
 });
