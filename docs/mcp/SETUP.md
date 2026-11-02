@@ -174,3 +174,32 @@ does), and only for the `user_id` on a job row that the student's own request cr
   - "Add these three flashcards to my Cell biology set."
 - **Local.** `bash tests/oauth/run_local_probe.sh` runs every write tool with a real connected-app
   token against a local stack and the real backend.
+
+## Phase 4: prompts, instructions and icon
+
+**Prompts.** A student can pick one of these in their AI app (`lib/mcp/prompts.mjs`). Each is a
+short message that names the tools to use.
+
+| Prompt | Arguments | What it does |
+|---|---|---|
+| `study_now` | `course_id` (optional) | Today's review from `get_due_cards`, in Study now's order. Every answer is logged with `record_answer`. |
+| `quiz_me` | `study_set_id` | Ten questions from one study set, mixing flashcards and quiz questions. Every answer is logged. |
+| `review_lecture` | `lecture_id` | Walks through the lecture's "Watch for" points with quotes and timestamps, then quizzes on them. These answers aren't logged, because they aren't Cordia cards. It offers to save misses as a note. |
+
+All three use the same quiz rules: one question at a time, the student's confidence before
+anything is revealed, and correctness judged by meaning.
+
+**Instructions.** `MCP_INSTRUCTIONS` in `lib/mcp/config.mjs` sets these rules:
+- Search first and cite titles and lecture timestamps.
+- Quiz one question at a time and log every answer.
+- Use `weak_topics` to choose what to review.
+- Add to the Library only when the student asks.
+- Never promise Canvas or other LMS data.
+
+**Icon.** The server reports `serverInfo.icons`: the Cordia mark at
+`https://classroom.cordiacode.com/cordia-mcp-icon.png` (512×512), plus a description and website.
+- Clients that follow the MCP spec (2025-11-25) show this icon.
+- Claude.ai doesn't use it for custom connectors yet. It shows the favicon Google has for the
+  connector's apex domain, `cordiacode.com` (see `anthropics/claude-ai-mcp#152`).
+- To change the icon in Claude.ai, give `cordiacode.com` a square favicon, for example
+  `<link rel="icon" href="/favicon.png">` pointing to the same Cordia mark.
