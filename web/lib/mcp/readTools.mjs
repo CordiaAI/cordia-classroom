@@ -463,7 +463,7 @@ export const READ_TOOLS = [
   {
     name: 'get_due_cards',
     title: 'Get cards due for review',
-    description: 'Gets what Cordia\'s Study now would review today, in the same order: questions the student missed while sure, then due flashcards, Learn ideas and other misses. Never show a card\'s back before the student has answered.',
+    description: 'Gets what Cordia\'s Study now would review today, in the same order: questions the student missed while sure, then due flashcards, Learn ideas and other misses. Never show a card\'s back before the student has answered, and log each answer with record_answer.',
     input: {
       study_set_id: id.optional(),
       course_id: id.optional(),

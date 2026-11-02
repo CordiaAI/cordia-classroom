@@ -7,7 +7,8 @@ import {
   originValidationResponse,
   requireBearerAuth,
 } from '@modelcontextprotocol/server';
-import { MCP_INSTRUCTIONS, MCP_SERVER_NAME, MCP_SERVER_VERSION, PRIVACY_PATH, mcpConfig, resourceUrlFor } from './config.mjs';
+import { MCP_ICON_PATH, MCP_INSTRUCTIONS, MCP_SERVER_DESCRIPTION, MCP_SERVER_NAME, MCP_SERVER_VERSION, PRIVACY_PATH, mcpConfig, resourceUrlFor } from './config.mjs';
+import { registerPrompts } from './prompts.mjs';
 import { createTokenVerifier, studentClient } from './auth.mjs';
 import { loadCourses } from './courses.mjs';
 import { registerReadTools } from './readTools.mjs';
@@ -46,12 +47,27 @@ export function studentContext(config, authInfo, request) {
   return ctx;
 }
 
+// Name, version, icon, site and description, as the MCP initialize result reports them.
+export function serverInfo(origin) {
+  return {
+    name: MCP_SERVER_NAME,
+    title: MCP_SERVER_NAME,
+    version: MCP_SERVER_VERSION,
+    description: MCP_SERVER_DESCRIPTION,
+    websiteUrl: origin,
+    icons: [{ src: new URL(MCP_ICON_PATH, origin).href, mimeType: 'image/png', sizes: ['512x512'] }],
+  };
+}
+
 export function createServer(context = {}, config = mcpConfig()) {
-  const server = new McpServer({ name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION }, { instructions: MCP_INSTRUCTIONS });
+  let origin = new URL(config.audience).origin;
+  try { if (context.requestInfo) origin = resourceUrlFor(context.requestInfo).origin; } catch { /* the production origin */ }
+  const server = new McpServer(serverInfo(origin), { instructions: MCP_INSTRUCTIONS });
   if (context.authInfo) {
     const ctx = studentContext(config, context.authInfo, context.requestInfo);
     registerReadTools(server, ctx);
     registerWriteTools(server, ctx);
+    registerPrompts(server);
   }
   return server;
 }
