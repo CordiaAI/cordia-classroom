@@ -175,7 +175,8 @@ def streak_summary(supabase, user_id: str, tz_offset: int) -> dict:
     user_now = datetime.utcnow() + timedelta(minutes=tz_offset)
     user_today = user_now.date()
 
-    result = supabase.table("user_streaks").select("*").eq("user_id", user_id).execute()
+    # Named columns: a connected app may read only these (supabase/migrations/20261101120000_mcp_read_access.sql).
+    result = supabase.table("user_streaks").select("user_id, current_streak, longest_streak, last_study_date").eq("user_id", user_id).execute()
 
     if not result.data:
         # Build empty Sunday-aligned week
