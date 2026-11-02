@@ -185,9 +185,9 @@ short message that names the tools to use.
 
 | Prompt | Arguments | What it does |
 |---|---|---|
-| `study_now` | `course_id` (optional) | Today's review from `get_due_cards`, in Study now's order. Every answer is logged with `record_answer`. |
-| `quiz_me` | `study_set_id` | Ten questions from one study set, mixing flashcards and quiz questions. Every answer is logged. |
-| `review_lecture` | `lecture_id` | Walks through the lecture's "Watch for" points with quotes and timestamps, then quizzes on them. These answers aren't logged, because they aren't Cordia cards. It offers to save misses as a note. |
+| `study_now` | `course`: a course name or id (optional) | Today's review from `get_due_cards`, in Study now's order. Every answer is logged with `record_answer`. |
+| `quiz_me` | `study_set`: a title or id (optional; empty picks the weakest set from `get_progress`) | Ten questions from one study set, mixing flashcards and quiz questions. Every answer is logged. |
+| `review_lecture` | `lecture`: a title or id (optional; empty picks the most recent lecture, found with `list_lectures`) | Walks through the lecture's "Watch for" points with quotes and timestamps, then quizzes on them. These answers aren't logged, because they aren't Cordia cards. It offers to save misses as a note. |
 
 All three use the same quiz rules: one question at a time, the student's confidence before
 anything is revealed, and correctness judged by meaning.

@@ -281,3 +281,14 @@ class McpStudySetRouteTests(unittest.TestCase):
             self.mcp._queue_study_set("Bearer t", self.body(type="text", text="Mitochondria make ATP. " * 5))
         self.assertEqual(ctx.exception.detail["upgrade_url"], "/settings?section=subscription")
         self.assertEqual(self.db.rows("generation_jobs")[0]["status"], "failed")
+
+    def test_a_repeated_request_returns_the_job_already_made_without_failing_it(self):
+        # queue_study_set_job returns the earlier job for the same request; it may already be done,
+        # and a plan limit reached since then must not mark it failed.
+        done = self.db.table("generation_jobs").insert({"user_id": "student-1", "status": "done"}).execute().data[0]
+        self.db.rpc = lambda name, args: type("R", (), {"execute": lambda _self: type("D", (), {"data": done["id"]})()})()
+        with patch("services.entitlements.require", side_effect=LimitReached("guide", 3, 3, "free")) as require:
+            result = self.mcp._queue_study_set("Bearer t", self.body(type="text", text="Mitochondria make ATP. " * 5))
+        self.assertEqual(result, {"job_id": done["id"], "status": "done"})
+        require.assert_not_called()
+        self.assertEqual(self.db.rows("generation_jobs")[0]["status"], "done")

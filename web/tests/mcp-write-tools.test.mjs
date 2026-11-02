@@ -148,7 +148,7 @@ test('record_answer: saves everything in one call, logs the answer once, and a r
   assert.equal(sent.study_day.right_count, 0);
   assert.deepEqual(sent.study_day.guides[GUIDE.slice(0, 8)].k, ['cards']);
   assert.equal(first.structuredContent.replayed, false);
-  assert.ok(first.structuredContent.remaining_due >= 1);
+  assert.ok(first.structuredContent.remaining_due_in_set >= 1);
   assert.equal(ctx.sent.length, 1);
   assert.equal(ctx.sent[0].path, '/mcp/learning-events');
   assert.deepEqual(ctx.sent[0].body.events[0], { guide_id: GUIDE, fingerprint: 'powerhouse of the cell', format: 'flashcard', outcome: 'again', confidence: 'guess', answer_chars: 8, occurred_at: null });
@@ -176,6 +176,7 @@ test('record_answer: unknown, foreign and mismatched items are refused the same 
 test('create_study_set: queued at once; plan limits and refused links come back as clear errors', async () => {
   const replies = {
     ok: { status: 200, body: { job_id: U(70), status: 'queued' } },
+    repeat: { status: 200, body: { job_id: U(70), status: 'done' } },
     limit: { status: 402, body: { detail: { message: 'You have used all 3 study guides this month.', upgrade_url: '/settings?section=subscription' } } },
     lms: { status: 422, body: { detail: 'Cordia can\'t read Canvas, Blackboard, Moodle or other LMS pages from here. Open the page in your browser and use the Cordia extension to add it.' } },
   };
@@ -185,6 +186,11 @@ test('create_study_set: queued at once; plan limits and refused links come back 
     assert.equal(ctx.sent[0].path, '/mcp/study-sets');
     assert.equal(ctx.sent[0].method, 'POST');
     if (name === 'ok') assert.deepEqual([result.structuredContent.job_id, result.structuredContent.status], [U(70), 'queued']);
+    // The same request sent again: the job already made, and no second study set.
+    if (name === 'repeat') {
+      assert.deepEqual([result.structuredContent.job_id, result.structuredContent.status], [U(70), 'done']);
+      assert.match(result.structuredContent.message, /did not make a second study set.*get_job_status/);
+    }
     if (name === 'limit') assert.match(result.content[0].text, /3 study guides.*https:\/\/classroom\.cordiacode\.com\/settings\?section=subscription/);
     if (name === 'lms') assert.match(result.content[0].text, /extension/);
   }

@@ -37,7 +37,7 @@ The portal reads these from the server. Every tool has a `title` and all four hi
 | `add_flashcards` | Add flashcards | – | – | – | – |
 | `save_note` | Save a note | – | – | – | – |
 
-**Prompts:** `study_now`, `quiz_me` (`study_set_id`), `review_lecture` (`lecture_id`).
+**Prompts:** `study_now` (`course`), `quiz_me` (`study_set`), `review_lecture` (`lecture`). Each argument is optional and takes a name or an id.
 
 **Server info:**
 - name and title "Cordia Classroom", version 0.4.0

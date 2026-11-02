@@ -132,6 +132,9 @@ begin
     made := public.queue_study_set_job('text', repeat('Mitochondria make ATP. ', 5), null, 'Set ' || i);
   end loop;
   if (select count(*) from public.generation_jobs where status = 'queued' and title like 'Set _') <> 3 then raise exception 'jobs not queued'; end if;
+  -- The same request again (a retry) gives back the job already made, even with three queued.
+  if public.queue_study_set_job('text', repeat('Mitochondria make ATP. ', 5), null, 'Set 3') <> made then raise exception 'repeat request made a second job'; end if;
+  if (select count(*) from public.generation_jobs where title = 'Set 3') <> 1 then raise exception 'repeat request duplicated the job'; end if;
   begin
     perform public.queue_study_set_job('text', repeat('Mitochondria make ATP. ', 5));
     raise exception 'fourth job queued';
