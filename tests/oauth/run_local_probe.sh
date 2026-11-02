@@ -33,7 +33,7 @@ open(p,'w').write(s)
 PY
 mkdir -p supabase/migrations
 cp "$ROOT/tests/oauth/fixture.sql" supabase/migrations/20261031000000_fixture.sql
-cp "$ROOT/supabase/migrations/20261031120000_oauth_lockdown.sql" "$ROOT/supabase/migrations/20261031130000_mcp_connected_apps.sql" "$ROOT/supabase/migrations/20261101120000_mcp_read_access.sql" supabase/migrations/
+cp "$ROOT/supabase/migrations/20261031120000_oauth_lockdown.sql" "$ROOT/supabase/migrations/20261031130000_mcp_connected_apps.sql" "$ROOT/supabase/migrations/20261101120000_mcp_read_access.sql" "$ROOT/supabase/migrations/20261102120000_mcp_write_tools.sql" supabase/migrations/
 $CLI start > "$WORK/start.log" 2>&1 || { cat "$WORK/start.log"; exit 1; }
 STATUS="$($CLI status -o json 2>/dev/null)"
 DB_URL="$(echo "$STATUS" | python3 -c "import sys,json;print(json.load(sys.stdin)['DB_URL'])")"
@@ -46,7 +46,15 @@ cd "$ROOT/web"
 API="$(echo "$STATUS" | python3 -c "import sys,json;print(json.load(sys.stdin)['API_URL'])")"
 ANON="$(echo "$STATUS" | python3 -c "import sys,json;print(json.load(sys.stdin)['ANON_KEY'])")"
 SERVICE="$(echo "$STATUS" | python3 -c "import sys,json;print(json.load(sys.stdin)['SERVICE_ROLE_KEY'])")"
-API="$API" ANON="$ANON" SERVICE="$SERVICE" DB_URL="$DB_URL" node "$ROOT/tests/oauth/probe.mjs"
+# The backend's /mcp/* routes against the stack (create_study_set, the answer log); no AI keys, and
+# its workers off, so a queued study set stays queued.
+PYTHON="$ROOT/.venv/bin/python"; [ -x "$PYTHON" ] || PYTHON=python3
+(cd "$ROOT/backend" && SUPABASE_URL="$API" SUPABASE_SERVICE_ROLE_KEY="$SERVICE" SUPABASE_PUBLISHABLE_KEY="$ANON" LEARNING_EVENTS_ENABLED=true \
+  GENERATION_WORKER=0 SYNC_WORKER=0 exec "$PYTHON" -m uvicorn main:app --port 8765 > "$WORK/backend.log" 2>&1) &
+BACKEND_PID=$!
+trap 'kill $BACKEND_PID 2>/dev/null || true; cleanup' EXIT
+for _ in $(seq 1 30); do curl -fs -o /dev/null http://127.0.0.1:8765/ && break; sleep 1; done
+API="$API" ANON="$ANON" SERVICE="$SERVICE" DB_URL="$DB_URL" BACKEND=http://127.0.0.1:8765 node "$ROOT/tests/oauth/probe.mjs" || { echo "== backend log"; tail -30 "$WORK/backend.log"; exit 1; }
 
 if [ -n "${E2E_WEB:-}" ]; then
   echo "== consent page, /mcp and Connected apps in a browser"
@@ -56,7 +64,7 @@ if [ -n "${E2E_WEB:-}" ]; then
   # Run next directly (not through npx) so the trap below stops the server itself.
   ./node_modules/.bin/next start -p 3105 > "$WORK/next.log" 2>&1 &
   NEXT_PID=$!
-  trap 'kill $NEXT_PID 2>/dev/null || true; cleanup' EXIT
+  trap 'kill $NEXT_PID $BACKEND_PID 2>/dev/null || true; cleanup' EXIT
   for _ in $(seq 1 60); do curl -fs -o /dev/null http://localhost:3105/login && break; sleep 1; done
   API="$API" ANON="$ANON" WEB=http://localhost:3105 SHOTS="${SHOTS:-}" node "$ROOT/tests/oauth/consent_e2e.mjs"
 fi

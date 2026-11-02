@@ -110,3 +110,67 @@ the project's publishable key. The service-role key is never used for `/mcp/*`.
   say about mitochondria?" (search, with lecture timestamps), "Quiz me on what's due" (get_due_cards)
   and "How's my studying going this month?" (get_progress).
 - **MCP Inspector.** Connect as in Phase 1. Then Tools → List Tools, and run each one.
+
+## Phase 3: the write tools
+
+| Tool | What it does | Logic it shares with the app |
+|---|---|---|
+| `record_answer` | Records one answer (flashcard, Learn idea, quiz question, missed question or practice problem) with the student's confidence | Study now's rules: `lib/studyAnswer.mjs` on `lib/spacedReview.mjs`, `lib/learnEngine.mjs`, `lib/retainMisses.mjs`, `lib/studyDays.mjs`; the answer log via the backend's `learning_events.write_batch` |
+| `create_study_set` | Queues a study set from pasted text or a public link and returns a `job_id` at once | The backend's `/generate` and `/guides` code (`build_materials`, `create_guide`) and plan limits (`entitlements.require/record`), run by the study-set worker |
+| `add_flashcards` | Appends cards to a study set, skipping exact duplicates | — |
+| `save_note` | Saves Markdown as a new page in the Library, like New › Note | `lib/outlineDoc.js`'s outline format (`lib/markdownOutline.mjs`) |
+
+Annotations: readOnlyHint false, destructiveHint false, openWorldHint false; idempotentHint true for
+`record_answer` (its `idempotency_key` makes a repeat return the first result) and false for the
+others. Nothing is deleted or overwritten.
+
+**How writes stay safe.** Every write is a database function (`20261102120000_mcp_write_tools.sql`)
+run with the student's connected-app token. Each one takes the student from the token, checks the
+study set is theirs and isn't a Canvas assignment guide, and only adds. The token can't update any
+table directly.
+
+**One save for the app and Claude.** The flashcard schedule and Learn levels live in one JSON
+column per guide. `apply_study_progress()` merges only the cards and ideas just answered, under a
+row lock. The app (`merge_study_progress()`, through `lib/progressSave.js`) and `record_answer` both
+save through it, so neither overwrites the other's answers.
+
+**Study-set jobs.** `create_study_set` calls `POST /mcp/study-sets`.
+1. The route checks the link: only http or https, no LMS link, no private or internal address.
+2. It queues the job with the student's token (`queue_study_set_job()`: at most 3 waiting and 10 an
+   hour) and checks the plan's monthly study sets.
+3. The worker in `services/generation_jobs.py` claims the job, builds the set and saves it labelled
+   "Added from <app>".
+4. The student sees "<title> is ready (from Claude)" in the app.
+5. The app's own New sheet and lecture page now queue their study sets the same way, so a set keeps
+   building if the page is closed. Until the backend is deployed, they fall back to the old two
+   requests.
+
+The worker uses the service role (it reads the plan, charges usage and saves the guide, as the app
+does), and only for the `user_id` on a job row that the student's own request created.
+
+**Rate limits and audit log.**
+- **Rate limits:** `mcp_take_call()` allows 120 reads and 30 writes a minute per student.
+- **Audit log:** `mcp_tool_calls` records the tool, status, an error code and the time taken. It
+  never stores arguments or results, admins alone can read it, and it is kept for 90 days. A daily
+  job (`mcp-activity-cleanup`) also drops answer receipts after 30 days and job inputs a day after
+  the job ends.
+
+### Turning it on
+
+1. In the Supabase SQL editor, run `supabase/migrations/20261102120000_mcp_write_tools.sql`.
+2. Run `supabase/checks/oauth_lockdown.sql`. It must return no rows.
+3. Merge the PR. Vercel deploys the tools and the app changes.
+4. Deploy the backend: `cd backend && fly deploy`. This adds the study-set worker, `/study-set-jobs`
+   and `/mcp/study-sets`. Then watch `fly logs`.
+
+### Testing
+
+- **Claude.ai.** The connector lists 12 tools. Try these:
+  - "Quiz me on what's due and log my answers." Check the cards' next review dates in Cordia
+    afterwards.
+  - "Make a study set from this text: …", then "Is it done yet?".
+  - "Save this summary as a note in my Biology course." It appears in the Library with
+    "Added from Claude".
+  - "Add these three flashcards to my Cell biology set."
+- **Local.** `bash tests/oauth/run_local_probe.sh` runs every write tool with a real connected-app
+  token against a local stack and the real backend.

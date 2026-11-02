@@ -178,7 +178,7 @@ check('control: app session survives', stillIn.status === 200, String(stillIn.st
 // The MCP endpoint itself (web/lib/mcp/endpoint.mjs, run in-process against this stack): real
 // signing keys, issuer, audience and the per-request grant check.
 const { createMcpEndpoint } = await import(new URL('../../web/lib/mcp/endpoint.mjs', import.meta.url));
-const mcp = createMcpEndpoint({ supabaseUrl: API, issuer: `${API}/auth/v1`, audience: MCP_AUDIENCE, publishableKey: ANON, allowedOrigins: ['claude.ai'], apiUrl: 'http://127.0.0.1:9' });
+const mcp = createMcpEndpoint({ supabaseUrl: API, issuer: `${API}/auth/v1`, audience: MCP_AUDIENCE, publishableKey: ANON, allowedOrigins: ['claude.ai'], apiUrl: process.env.BACKEND || 'http://127.0.0.1:9' });
 const initialize = token => mcp(new Request('https://classroom.cordiacode.com/mcp', {
   method: 'POST',
   headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(token ? { authorization: `Bearer ${token}` } : {}) },
@@ -256,6 +256,61 @@ const direct = await fetch(`${API}/rest/v1/study_guides?select=source_title,sour
 check('REST: the Canvas columns stay closed to the token', refused(direct.status), String(direct.status));
 const folderName = await fetch(`${API}/rest/v1/folders?select=name`, { headers: headers(refreshed.access_token) });
 check('REST: folder names stay closed to the token', refused(folderName.status), String(folderName.status));
+
+// The write tools (Phase 3), with the same real token.
+const asService = async (table, filter) => (await service.from(table).select('*').match(filter)).data || [];
+const answer = { item_type: 'flashcard', item_id: `${cellGuide}:card:0`, correct: true, confidence: 'sure', idempotency_key: 'probe-answer-1', response_text: 'mitochondria' };
+const first = await callTool('record_answer', answer);
+const repeat = await callTool('record_answer', answer);
+const [afterAnswer] = await asService('study_guides', { id: cellGuide });
+check('tool record_answer: saved once, a repeat replays the first result', first.structuredContent?.replayed === false && repeat.structuredContent?.replayed === true
+  && afterAnswer?.flashcard_progress?.schedule?.['0']?.box === 0 && first.structuredContent?.next_due_on === repeat.structuredContent?.next_due_on, JSON.stringify(first.structuredContent || first.content).slice(0, 200));
+const [day] = await asService('study_days', { user_id: signUp.user.id });
+check('tool record_answer: counted once in the study log', day?.cards === 1 && day?.right_count === 1, JSON.stringify(day));
+const logged = await asService('learning_events', { user_id: signUp.user.id, mode: 'mcp' });
+check('tool record_answer: answer logged once, as mode mcp, without the answer text', logged.length === 1 && logged[0].format === 'flashcard' && logged[0].outcome === 'got_it' && logged[0].answer_chars === 12, JSON.stringify(logged));
+const theirAnswer = await callTool('record_answer', { ...answer, item_id: `${otherGuide.id}:card:0`, idempotency_key: 'probe-answer-2' });
+const noAnswer = await callTool('record_answer', { ...answer, item_id: `${crypto.randomUUID()}:card:0`, idempotency_key: 'probe-answer-3' });
+check('tool record_answer: another student\'s set looks exactly like a missing one', theirAnswer.isError && noAnswer.isError && theirAnswer.content[0].text === noAnswer.content[0].text);
+const added = await callTool('add_flashcards', { study_set_id: cellGuide, cards: [{ front: 'what makes ATP?', back: 'mitochondria' }, { front: 'Krebs cycle', back: 'Citric acid cycle' }] });
+const [withCards] = await asService('study_guides', { id: cellGuide });
+check('tool add_flashcards: appended, duplicate skipped, labelled', added.structuredContent?.added_count === 1 && added.structuredContent?.skipped_duplicates === 1
+  && withCards.flashcards.length === 2 && withCards.flashcards[0].front === 'What makes ATP?' && withCards.flashcards[1].added_by === 'Probe Client', JSON.stringify(added.structuredContent || added.content));
+const toAssignment = await callTool('add_flashcards', { study_set_id: guideRows.find(row => row.title === 'Lab report guide').id, cards: [{ front: 'a', back: 'b' }] });
+check('tool add_flashcards: never an assignment guide', toAssignment.isError === true);
+const merged = await student.rpc('merge_study_progress', { guide: cellGuide, cards: { 1: { box: 0, due: '2030-01-01', known: false } } });
+check('app save merges card by card: the answer from the connected app is kept', !merged.error && merged.data?.schedule?.['0']?.box === 0 && merged.data?.schedule?.['1']?.box === 0, merged.error?.message || JSON.stringify(merged.data).slice(0, 160));
+const note = await callTool('save_note', { title: 'Probe note', content: '# Cells\n- ATP comes from the **mitochondria**', study_set_id: cellGuide });
+const [noteRow] = note.structuredContent ? await asService('study_guides', { id: note.structuredContent.note_id }) : [];
+check('tool save_note: a new labelled page in the Library', noteRow?.source_type === 'notes' && noteRow?.origin === 'mcp' && noteRow?.origin_client === 'Probe Client' && noteRow?.notes === '## Cells\n- ATP comes from the **mitochondria**', JSON.stringify(note.structuredContent || note.content));
+if (process.env.BACKEND) {
+  const queued = await callTool('create_study_set', { source: { type: 'text', text: 'Mitochondria make ATP through cellular respiration in the inner membrane.' }, title: 'Probe set' });
+  const jobId = queued.structuredContent?.job_id;
+  const status = jobId ? await callTool('get_job_status', { job_id: jobId }) : null;
+  const [job] = jobId ? await asService('generation_jobs', { id: jobId }) : [];
+  check('tool create_study_set: queued at once under the student, checked by get_job_status', status?.structuredContent?.status === 'queued' && job?.user_id === signUp.user.id && job?.source === 'mcp' && job?.client_name === 'Probe Client',
+    JSON.stringify(queued.structuredContent || queued.content).slice(0, 200));
+  const lms = await callTool('create_study_set', { source: { type: 'url', url: 'https://school.instructure.com/courses/1/pages/cells' } });
+  check('tool create_study_set: LMS links refused with the extension hint', lms.isError && /extension/.test(lms.content[0].text), lms.content?.[0]?.text);
+  const metadata = await callTool('create_study_set', { source: { type: 'url', url: 'http://169.254.169.254/latest/meta-data/' } });
+  check('tool create_study_set: internal addresses refused', metadata.isError && /private or internal/.test(metadata.content[0].text), metadata.content?.[0]?.text);
+}
+const directUpdate = await fetch(`${API}/rest/v1/study_guides?id=eq.${cellGuide}`, { method: 'PATCH', headers: { ...headers(refreshed.access_token), 'content-type': 'application/json' }, body: JSON.stringify({ title: 'hijacked' }) });
+check('REST: the token cannot edit a guide directly', refused(directUpdate.status), String(directUpdate.status));
+const directProgress = await fetch(`${API}/rest/v1/rpc/merge_study_progress`, { method: 'POST', headers: { ...headers(refreshed.access_token), 'content-type': 'application/json' }, body: JSON.stringify({ guide: cellGuide, cards: { 0: { box: 5, due: '2030-01-01', known: true } } }) });
+check('RPC merge_study_progress: refused to the token (answers go through record_answer)', refused(directProgress.status), String(directProgress.status));
+const audit = await asService('mcp_tool_calls', { user_id: signUp.user.id });
+check('audit log: one metadata row per tool call, nothing else', audit.length >= 12 && audit.every(row => Object.keys(row).sort().join() === 'client_id,created_at,error_code,id,latency_ms,status,tool_name,user_id')
+  && audit.some(row => row.tool_name === 'record_answer' && row.status === 'ok') && audit.some(row => row.tool_name === 'add_flashcards' && row.status === 'error' && row.error_code === 'not_found'), JSON.stringify(audit.slice(0, 3)));
+const auditRead = await fetch(`${API}/rest/v1/mcp_tool_calls?select=*`, { headers: headers(refreshed.access_token) });
+check('REST mcp_tool_calls: the token cannot read the audit log', refused(auditRead.status) || (await auditRead.clone().text()) === '[]', String(auditRead.status));
+let allowed = 0;
+for (let i = 0; i < 31; i += 1) {
+  const take = await fetch(`${API}/rest/v1/rpc/mcp_take_call`, { method: 'POST', headers: { ...headers(refreshed.access_token), 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'write' }) });
+  if ((await take.text()).trim() === 'true') allowed += 1;
+}
+const limited = await callTool('save_note', { title: 'Over the limit', content: 'text' });
+check('rate limit: writes stop at 30 a minute', allowed < 31 && limited.isError && /30 at most/.test(limited.content[0].text), `${allowed} allowed; ${limited.content?.[0]?.text}`);
 
 // Disconnect in Settings: the still-unexpired access token stops working at once.
 const revoke = await fetch(`${API}/auth/v1/user/oauth/grants?client_id=${client.client_id}`, { method: 'DELETE', headers: headers(appToken) });
