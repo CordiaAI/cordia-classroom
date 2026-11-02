@@ -7,7 +7,7 @@ import { apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import { learnAfterReview, loadStudyQueue } from '../lib/studyQueue';
 import { clearRetainMisses } from '../lib/userStore';
-import { applyResults } from '../lib/spacedReview.mjs';
+import { saveStudyResults } from '../lib/progressSave';
 import FlashcardViewer from '../components/FlashcardViewer';
 
 function PracticeList({ practice }) {
@@ -65,14 +65,9 @@ export default function StudySession() {
     const requests = [...byGuide.entries()].map(async ([guideId, entry]) => {
       const guide = queue.guides.find(item => item.id === guideId);
       if (entry.cleared.length) clearRetainMisses(guideId, entry.cleared);
-      // Known cards come back later, missed ones tomorrow (lib/spacedReview.mjs).
-      if (entry.known.length || entry.unknown.length) {
-        const next = applyResults(guide?.flashcard_progress, { known: entry.known, missed: entry.unknown });
-        await apiFetch('/guides/' + guideId + '/flashcard-progress', { method: 'PATCH', body: JSON.stringify(next) });
-      }
-      // After the flashcard save: both read and rewrite flashcard_progress, so they must not overlap.
-      const learn = learnAfterReview(guide, entry.learn);
-      if (learn) await apiFetch('/guides/' + guideId + '/learn-progress', { method: 'PATCH', body: JSON.stringify(learn) });
+      // Known cards come back later, missed ones tomorrow (lib/spacedReview.mjs); Learn ideas move
+      // up or back. Saved together, card by card, so answers saved meanwhile elsewhere are kept.
+      await saveStudyResults(guideId, guide?.flashcard_progress, { known: entry.known, missed: entry.unknown }, learnAfterReview(guide, entry.learn));
     });
     requests.push(apiFetch('/stats/log-session', {
       method: 'POST',

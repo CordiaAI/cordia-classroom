@@ -7,6 +7,7 @@ import { apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import { GAMES_ON } from '../../lib/featureFlags';
 import { applyResults } from '../../lib/spacedReview.mjs';
+import { saveStudyResults } from '../../lib/progressSave';
 
 // Blocks for one guide: its cards earn the pieces, and the answers count toward card review.
 export default function PlayBlocks() {
@@ -35,7 +36,7 @@ export default function PlayBlocks() {
     const progress = applyResults(guide.flashcard_progress, { known, missed });
     setGuide(current => ({ ...current, flashcard_progress: progress }));
     await Promise.all([
-      apiFetch('/guides/' + guideId + '/flashcard-progress', { method: 'PATCH', body: JSON.stringify(progress) }),
+      saveStudyResults(guideId, guide.flashcard_progress, { known, missed }),
       apiFetch('/stats/log-session', {
         method: 'POST',
         body: JSON.stringify({ guide_id: guideId, session_type: 'flashcard', duration_seconds: seconds, metadata: { game: 'blocks', cards_studied: known.length + missed.length, cards_correct: known.length } }),

@@ -6,13 +6,23 @@ export function ok(data) {
   return { content: [{ type: 'text', text: JSON.stringify(data) }], structuredContent: data };
 }
 
-export function failure(message) {
-  return { content: [{ type: 'text', text: message }], isError: true };
+// code: a short reason for the audit log (never the message itself): not_found, invalid_input,
+// limit_reached, rate_limited, unavailable, tool_error.
+const codes = new WeakMap();
+
+export function failure(message, code = 'tool_error') {
+  const result = { content: [{ type: 'text', text: message }], isError: true };
+  codes.set(result, code);
+  return result;
+}
+
+export function errorCode(result) {
+  return codes.get(result) || 'tool_error';
 }
 
 // The same answer whether the item doesn't exist or belongs to someone else (RLS hides both).
-export const notFound = what => failure(`No ${what} with that id in your Cordia account. Use the list or search tools to find the right id.`);
-export const unavailable = what => failure(`Cordia couldn't read your ${what} right now. Try again in a moment.`);
+export const notFound = what => failure(`No ${what} with that id in your Cordia account. Use the list or search tools to find the right id.`, 'not_found');
+export const unavailable = what => failure(`Cordia couldn't read your ${what} right now. Try again in a moment.`, 'unavailable');
 
 // Keeps as many items as fit: build(items) makes the result; items are dropped from the end until
 // its JSON is within MAX_CHARS. Returns { data, kept }.

@@ -5,7 +5,7 @@ import { DEFAULT_SUPABASE_PUBLISHABLE_KEY, supabaseUrlFrom } from '../supabaseUr
 // (supabase/migrations/20261031120000_oauth_lockdown.sql). Keep the two in step.
 export const MCP_TOKEN_AUDIENCE = 'https://classroom.cordiacode.com/mcp';
 export const MCP_SERVER_NAME = 'Cordia Classroom';
-export const MCP_SERVER_VERSION = '0.2.0';
+export const MCP_SERVER_VERSION = '0.3.0';
 export const SUPPORT_EMAIL = 'jsmoore588@gmail.com';
 export const PRIVACY_PATH = '/privacy';
 
@@ -13,7 +13,7 @@ export const PRIVACY_PATH = '/privacy';
 export const MCP_INSTRUCTIONS = [
   'Cordia Classroom holds this student\'s own course material: study sets, lecture notes and transcripts, flashcards, quizzes and progress.',
   'For questions about their courses, call search_my_materials first, answer from what it returns, and cite titles and lecture timestamps. If Cordia has nothing relevant, say so before using general knowledge.',
-  'When quizzing, ask one question at a time and collect the student\'s answer and confidence before revealing anything.',
+  'When quizzing, ask one question at a time and collect the student\'s answer and confidence before revealing anything. Log every answer with record_answer.',
   'Use get_progress weak_topics to choose what to review.',
   'This connector can\'t see assignments, grades or due dates from Canvas or other LMSs, so don\'t promise them.',
 ].join(' ');

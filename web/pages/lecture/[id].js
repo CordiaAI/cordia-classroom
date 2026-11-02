@@ -120,7 +120,7 @@ export default function LecturePage() {
       run: async () => {
         const guide = await generateAndSave({
           source: lecture.transcript, requestId: newRequestId(), title, sourceTitle: title, sourceType: 'lecture', sourceUrl: '',
-          externalSourceId: '', folderId: lecture.folder_id || '', notes: true, flashcards: true, manualPairs: null,
+          externalSourceId: '', folderId: lecture.folder_id || '', notes: true, flashcards: true,
         });
         await updateLecture({ id: lecture.id, guide_id: guide.id });
         setData(current => (current ? { ...current, lecture: { ...current.lecture, guide_id: guide.id } } : current));

@@ -6,6 +6,7 @@ import { useRequireAuth } from '../../lib/auth';
 import FlashcardViewer from '../../components/FlashcardViewer';
 import { walkthroughEvent } from '../../lib/walkthrough';
 import { applyResults } from '../../lib/spacedReview.mjs';
+import { saveStudyResults } from '../../lib/progressSave';
 import { needsStudySet } from '../../lib/studySet.mjs';
 import { makeStudySet } from '../../lib/autoStudySet';
 
@@ -45,7 +46,7 @@ export default function FlashcardStudy() {
     const progress = applyResults(guide?.flashcard_progress, { known, missed });
     setGuide(current => ({ ...current, flashcard_progress: progress }));
     await Promise.all([
-      apiFetch('/guides/' + guideId + '/flashcard-progress', { method: 'PATCH', body: JSON.stringify(progress) }),
+      saveStudyResults(guideId, guide?.flashcard_progress, { known, missed }),
       apiFetch('/stats/log-session', {
         method: 'POST',
         body: JSON.stringify({ guide_id: guideId, session_type: 'flashcard', duration_seconds: seconds, metadata: { cards_studied: cards.length, cards_correct: known.length } }),

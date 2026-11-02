@@ -11,6 +11,7 @@ import { MCP_INSTRUCTIONS, MCP_SERVER_NAME, MCP_SERVER_VERSION, PRIVACY_PATH, mc
 import { createTokenVerifier, studentClient } from './auth.mjs';
 import { loadCourses } from './courses.mjs';
 import { registerReadTools } from './readTools.mjs';
+import { registerWriteTools } from './writeTools.mjs';
 import { zoneOf } from './zoned.mjs';
 
 const ALLOW_HEADERS = 'Authorization, Content-Type, Accept, Mcp-Protocol-Version, Mcp-Session-Id, Last-Event-ID';
@@ -28,7 +29,17 @@ export function studentContext(config, authInfo, request) {
     baseUrl: request ? resourceUrlFor(request).origin : new URL(config.audience).origin,
     timeZone: 'UTC',
     courses: () => courses || (courses = loadCourses(db)),
-    fetchBackend: path => fetch(`${config.apiUrl}${path}`, { headers: { Authorization: `Bearer ${authInfo.token}` }, signal: AbortSignal.timeout(20000) }),
+    clientId: authInfo.clientId,
+    fetchBackend: (path, { method = 'GET', body } = {}) => fetch(`${config.apiUrl}${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${authInfo.token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(20000),
+    }),
+    // Rate limit (false: over it) and audit log, in the database as the student. Before the Phase 3
+    // migration runs, calls are allowed and not logged.
+    takeCall: kind => db.rpc('mcp_take_call', { kind }).then(({ data, error }) => (error ? null : data !== false), () => null),
+    logCall: (tool, status, code, latency) => db.rpc('mcp_log_tool_call', { tool, status, error_code: code, latency_ms: latency }).then(() => {}, () => {}),
     load: () => loaded || (loaded = db.from('user_profiles').select('timezone').eq('id', ctx.userId).maybeSingle()
       .then(({ data }) => { ctx.timeZone = zoneOf(data?.timezone || 'UTC'); }, () => {})),
   };
@@ -37,7 +48,11 @@ export function studentContext(config, authInfo, request) {
 
 export function createServer(context = {}, config = mcpConfig()) {
   const server = new McpServer({ name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION }, { instructions: MCP_INSTRUCTIONS });
-  if (context.authInfo) registerReadTools(server, studentContext(config, context.authInfo, context.requestInfo));
+  if (context.authInfo) {
+    const ctx = studentContext(config, context.authInfo, context.requestInfo);
+    registerReadTools(server, ctx);
+    registerWriteTools(server, ctx);
+  }
   return server;
 }
 

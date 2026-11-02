@@ -12,6 +12,7 @@ import { conceptAnswer } from '../retainEngine.mjs';
 import { questionKey } from '../retainMisses.mjs';
 import { freezeStreak, semesterStart } from '../streak.mjs';
 import { loadCourses } from './courses.mjs';
+import { registerTools } from './register.mjs';
 import { clip, decodeCursor, encodeCursor, failure, fitItems, notFound, ok, unavailable } from './output.mjs';
 import { localDate, localDay, zonedIso } from './zoned.mjs';
 
@@ -59,7 +60,7 @@ const STUDY_SET_STATUS = 'ready';
 
 async function listStudySets(ctx, { course_id, query, cursor, limit }) {
   const state = decodeCursor(cursor);
-  if (!state) return failure('That cursor is not valid. Call list_study_sets again without a cursor.');
+  if (!state) return failure('That cursor is not valid. Call list_study_sets again without a cursor.', 'invalid_input');
   let request = ctx.db.from('study_guides').select(SET_COLUMNS).order('created_at', { ascending: false }).order('id').range(state.o, state.o + limit);
   if (course_id) request = request.eq('folder_id', course_id);
   if (query && escapeLike(query)) request = request.ilike('title', `%${escapeLike(query)}%`);
@@ -140,7 +141,7 @@ function sectionItems(guide, name, today) {
 
 async function getStudySet(ctx, { study_set_id, include, cursor }) {
   const state = decodeCursor(cursor);
-  if (!state) return failure('That cursor is not valid. Call get_study_set again without a cursor.');
+  if (!state) return failure('That cursor is not valid. Call get_study_set again without a cursor.', 'invalid_input');
   const { data: guide, error } = await ctx.db.from('study_guides')
     .select('id, title, folder_id, created_at, source_type, notes, study_guide, flashcards, flashcard_progress, quiz_questions, practice_state')
     .eq('id', study_set_id).maybeSingle();
@@ -177,7 +178,7 @@ async function getStudySet(ctx, { study_set_id, include, cursor }) {
 // 4. list_lectures -----------------------------------------------------------------------------
 async function listLectures(ctx, { course_id, cursor, limit }) {
   const state = decodeCursor(cursor);
-  if (!state) return failure('That cursor is not valid. Call list_lectures again without a cursor.');
+  if (!state) return failure('That cursor is not valid. Call list_lectures again without a cursor.', 'invalid_input');
   let request = ctx.db.from('lectures').select('id, title, folder_id, lecture_date, duration_ms, created_at, summary:analysis->summary')
     .order('created_at', { ascending: false }).order('id').range(state.o, state.o + limit);
   if (course_id) request = request.eq('folder_id', course_id);
@@ -204,7 +205,7 @@ const seconds = ms => (Number.isFinite(Number(ms)) && ms !== null ? Math.round(N
 
 async function getLecture(ctx, { lecture_id, include_transcript, cursor }) {
   const state = decodeCursor(cursor);
-  if (!state) return failure('That cursor is not valid. Call get_lecture again without a cursor.');
+  if (!state) return failure('That cursor is not valid. Call get_lecture again without a cursor.', 'invalid_input');
   const columns = 'id, title, folder_id, lecture_date, duration_ms, created_at, analysis' + (include_transcript ? ', segments, transcript' : '');
   const { data: lecture, error } = await ctx.db.from('lectures').select(columns).eq('id', lecture_id).maybeSingle();
   if (error) return unavailable('lecture');
@@ -514,20 +515,5 @@ export const READ_TOOLS = [
 ];
 
 export function registerReadTools(server, ctx) {
-  for (const tool of READ_TOOLS) {
-    server.registerTool(tool.name, {
-      title: tool.title,
-      description: tool.description,
-      inputSchema: z.object(tool.input).strict(),
-      outputSchema: z.object(tool.output),
-      annotations: { title: tool.title, ...READ_ONLY },
-    }, async args => {
-      try {
-        await ctx.load();
-        return await tool.run(ctx, args);
-      } catch {
-        return failure('Something went wrong in Cordia. Try again in a moment.');
-      }
-    });
-  }
+  registerTools(server, ctx, READ_TOOLS, READ_ONLY, 'read');
 }

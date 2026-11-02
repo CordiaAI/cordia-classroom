@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Brain, CalendarClock, Check, GraduationCap, Layers, ListChecks, PenLine, Play, Repeat, Shuffle, Target, TextCursorInput, Timer } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
+import { saveLearnLevels } from '../../lib/progressSave';
 import { useRequireAuth } from '../../lib/auth';
 import useSessionTracker from '../../lib/useSessionTracker';
 import { recordStudy } from '../../lib/activity';
@@ -130,6 +131,8 @@ export default function LearnPage() {
   const [title, setTitle] = useState('');
   const [questions, setQuestions] = useState(null);
   const [levels, setLevels] = useState({});
+  // The levels the account has saved, so a save sends only the ideas that changed since.
+  const savedLevels = useRef({});
   const [testDate, setTestDate] = useState('');
   const [error, setError] = useState('');
   // A guide with notes but no questions yet (a Canvas import, a review set) gets them made here.
@@ -184,6 +187,7 @@ export default function LearnPage() {
     // The account's saved progress wins; this browser's copy covers a backend that hasn't got it yet.
     const saved = guide?.flashcard_progress?.learn || readLocal(guideId) || {};
     const restored = restoreLevels(list, saved.levels || {});
+    savedLevels.current = guide?.flashcard_progress?.learn?.levels || {};
     // An exam's "Study now" passes its date (?test=YYYY-MM-DD) so Learn paces to it.
     const linked = list.length ? linkedTestDate(router.query.test, saved.test_date || '', today) : '';
     setLevels(restored);
@@ -204,7 +208,9 @@ export default function LearnPage() {
   function save(nextLevels, nextDate = testDate, list = questions) {
     const body = { levels: saveableLevels(list, nextLevels), test_date: nextDate || null };
     try { localStorage.setItem(localKey(guideId), JSON.stringify(body)); } catch { /* the account copy is enough */ }
-    apiFetch(`/guides/${guideId}/learn-progress`, { method: 'PATCH', body: JSON.stringify(body) }).catch(() => {});
+    const before = savedLevels.current;
+    savedLevels.current = body.levels;
+    saveLearnLevels(guideId, before, body).catch(() => {});
   }
 
   function changeDate(value) {
