@@ -55,7 +55,7 @@ The portal reads these from the server. Every tool has a `title` and all four hi
 | Categories (1–5) | Education; Productivity **[YOU: pick from the portal's list]** |
 | Documentation URL | https://classroom.cordiacode.com/connect/claude |
 | Privacy policy URL | https://classroom.cordiacode.com/privacy (section 6, "Connected AI Apps") |
-| Support contact | jsmoore588@gmail.com |
+| Support contact | jude@cordiaai.io |
 | Icon | `web/public/cordia-mcp-icon.png` (512×512 PNG, the Cordia mark) |
 | URL slug | `cordia-classroom` **[YOU: the slug is permanent once published]** |
 

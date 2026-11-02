@@ -9,7 +9,7 @@ export const MCP_SERVER_VERSION = '0.4.0';
 export const MCP_SERVER_DESCRIPTION = 'Your own Cordia study sets, lecture notes, flashcards and progress: search them, get quizzed, and save new cards and notes back to your Library.';
 // The connector's icon: the Cordia mark (served from web/public).
 export const MCP_ICON_PATH = '/cordia-mcp-icon.png';
-export const SUPPORT_EMAIL = 'jsmoore588@gmail.com';
+export const SUPPORT_EMAIL = 'jude@cordiaai.io';
 export const PRIVACY_PATH = '/privacy';
 
 // How a connected AI should use this server.

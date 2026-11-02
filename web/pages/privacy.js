@@ -199,7 +199,7 @@ export default function PrivacyPolicy() {
           </p>
           <p style={{ marginTop: '12px' }}>
             <strong style={{ color: 'var(--text-primary)' }}>CordiaClassroom</strong><br />
-            Email: <a href="mailto:support@cordiaai.io" style={{ color: 'var(--accent)' }}>support@cordiaai.io</a><br />
+            Email: <a href="mailto:jude@cordiaai.io" style={{ color: 'var(--accent)' }}>jude@cordiaai.io</a><br />
             Website: <a href="https://classroom.cordiaai.io" style={{ color: 'var(--accent)' }}>https://classroom.cordiaai.io</a>
           </p>
         </Section>
