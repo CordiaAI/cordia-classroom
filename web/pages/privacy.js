@@ -15,7 +15,7 @@ export default function PrivacyPolicy() {
           Privacy Policy
         </h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '0.9rem' }}>
-          Effective Date: February 25, 2026 &nbsp;|&nbsp; Last Updated: October 21, 2026
+          Effective Date: February 25, 2026 &nbsp;|&nbsp; Last Updated: November 2, 2026
         </p>
 
         <p style={{ marginBottom: '32px' }}>
@@ -75,6 +75,7 @@ export default function PrivacyPolicy() {
           <p>We do not sell, trade, or rent your personal information to third parties. We may share data only in the following limited circumstances:</p>
           <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
             <li><strong style={{ color: 'var(--text-primary)' }}>Service Providers:</strong> We use trusted third-party providers to operate the Service, including Supabase (database, file storage and authentication), Groq and OpenAI (AI content generation, image reading and speech-to-text), Napkin AI (diagrams and note covers, which receive the text being illustrated), Stripe (payment processing), Vercel (web hosting and anonymous analytics), and Fly.io (backend hosting). If you connect Canvas, requests go to your school's Canvas (Instructure) site using your token. These providers are contractually obligated to protect your data and may only use it to perform services on our behalf.</li>
+            <li style={{ marginTop: '8px' }}><strong style={{ color: 'var(--text-primary)' }}>AI Apps You Connect:</strong> If you connect an AI app such as Claude, it receives the study material it requests for you, as described in section 6. You can disconnect it at any time.</li>
             <li style={{ marginTop: '8px' }}><strong style={{ color: 'var(--text-primary)' }}>Legal Requirements:</strong> We may disclose your information if required to do so by law, regulation, or valid legal process (e.g., a court order or subpoena).</li>
             <li style={{ marginTop: '8px' }}><strong style={{ color: 'var(--text-primary)' }}>Business Transfers:</strong> In the event of a merger, acquisition, or sale of all or a portion of our assets, your information may be transferred as part of that transaction. We will notify you of any such change via email or a prominent notice on our platform.</li>
           </ul>
@@ -104,7 +105,38 @@ export default function PrivacyPolicy() {
           </ul>
         </Section>
 
-        <Section title="6. Cookies and Local Storage">
+        <Section id="connected-ai-apps" title="6. Connected AI Apps (Claude and Others)">
+          {/* REVIEW: owner to review this section before it goes live. */}
+          <p>
+            You can connect CordiaClassroom to an AI app that supports the Model Context Protocol, such as Claude. Nothing is
+            shared until you approve the connection on CordiaClassroom's consent page, which names the app and lists what it
+            will be able to do.
+          </p>
+          <p style={{ marginTop: '12px' }}><strong style={{ color: 'var(--text-primary)' }}>What a connected app can access.</strong> Your
+            study sets, notes, lecture transcripts and notes, flashcards, quiz and practice results, and study progress. When you
+            ask it to, it can also record your answers, create study sets, add flashcards and save new notes to your Library.
+            Course names that came from Canvas or a calendar feed are shown to it as "Course 1", "Course 2" and so on.</p>
+          <p style={{ marginTop: '12px' }}><strong style={{ color: 'var(--text-primary)' }}>What it can't access.</strong> Data from
+            Canvas or another learning management system (assignments, due dates, grades, announcements, rosters), your other
+            connected accounts, your texting assistant, your payment details, or anyone else's account. It cannot delete anything
+            or change your account, plan or settings.</p>
+          <p style={{ marginTop: '12px' }}><strong style={{ color: 'var(--text-primary)' }}>Your conversations.</strong> CordiaClassroom
+            does not store your conversations with the AI app. Our server receives only the requests the app sends to it (for
+            example, a search or an answer to record) and keeps only what you ask it to save, like any other study material in
+            your account. When you ask for a study set from text or a link, that text or link is kept until the set is made and
+            deleted within a day after. What the AI app itself does with your conversation and with the material it reads from
+            CordiaClassroom is governed by that app's own privacy policy.</p>
+          <p style={{ marginTop: '12px' }}><strong style={{ color: 'var(--text-primary)' }}>Records we keep.</strong> For each request
+            from a connected app we record which tool was used, whether it worked, an error code if it didn't, how long it took,
+            which app sent it and when. We never record what you asked or what was returned. Only our administrators can see
+            these records, and they are deleted after 90 days. To keep an answer from being counted twice, we keep a short
+            receipt of each recorded answer for 30 days.</p>
+          <p style={{ marginTop: '12px' }}><strong style={{ color: 'var(--text-primary)' }}>Turning it off.</strong> Choose Disconnect
+            under Settings › Connectors › Connected AI apps. The app loses access immediately. You can also remove the connection
+            in the AI app's own settings.</p>
+        </Section>
+
+        <Section title="7. Cookies and Local Storage">
           <p>
             The CordiaClassroom web platform uses browser local storage to maintain your authenticated session and
             to remember preferences such as your theme and drafts. We do not use third-party tracking cookies or
@@ -112,7 +144,7 @@ export default function PrivacyPolicy() {
           </p>
         </Section>
 
-        <Section title="7. Security">
+        <Section title="8. Security">
           <p>
             We implement industry-standard security measures to protect your data, including HTTPS encryption
             for all data in transit, hashed password storage, and access controls on our database. However,
@@ -121,7 +153,7 @@ export default function PrivacyPolicy() {
           </p>
         </Section>
 
-        <Section title="8. Children's Privacy">
+        <Section title="9. Children's Privacy">
           <p>
             The Service is not directed to children under the age of 13. We do not knowingly collect personal
             information from children under 13. If you believe a child under 13 has provided us with personal
@@ -129,7 +161,7 @@ export default function PrivacyPolicy() {
           </p>
         </Section>
 
-        <Section title="9. Your Rights">
+        <Section title="10. Your Rights">
           <p>Depending on your jurisdiction, you may have the right to:</p>
           <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
             <li>Access the personal data we hold about you</li>
@@ -144,14 +176,14 @@ export default function PrivacyPolicy() {
           </p>
         </Section>
 
-        <Section title="10. Third-Party Links">
+        <Section title="11. Third-Party Links">
           <p>
             The Service may contain links to third-party websites. We are not responsible for the privacy
             practices of those websites and encourage you to review their privacy policies independently.
           </p>
         </Section>
 
-        <Section title="11. Changes to This Privacy Policy">
+        <Section title="12. Changes to This Privacy Policy">
           <p>
             We may update this Privacy Policy from time to time. When we do, we will update the "Last Updated"
             date at the top of this page. If changes are material, we will notify you by email or by posting
@@ -160,7 +192,7 @@ export default function PrivacyPolicy() {
           </p>
         </Section>
 
-        <Section title="12. Contact Us">
+        <Section title="13. Contact Us">
           <p>
             If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices,
             please contact us at:
@@ -176,9 +208,9 @@ export default function PrivacyPolicy() {
   );
 }
 
-function Section({ title, children }) {
+function Section({ id, title, children }) {
   return (
-    <div style={{ marginBottom: '36px' }}>
+    <div id={id} style={{ marginBottom: '36px', scrollMarginTop: '80px' }}>
       <h2 style={{
         fontSize: '1.15rem',
         fontWeight: '600',

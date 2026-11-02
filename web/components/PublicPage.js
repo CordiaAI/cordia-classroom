@@ -38,6 +38,7 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
             <Link href="/pricing">Pricing</Link>
             <Link href="/instructors">For instructors</Link>
             <Link href="/install-extension">Get the Chrome extension</Link>
+            <Link href="/connect/claude">Use with Claude</Link>
             <Link href="/copyright">Copyright and takedowns</Link>
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
