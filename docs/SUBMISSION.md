@@ -43,7 +43,7 @@ The portal reads these from the server. Every tool has a `title` and all four hi
 - name and title "Cordia Classroom", version 0.4.0
 - a description
 - `websiteUrl`
-- `icons`: the Cordia mark at `https://classroom.cordiacode.com/cordia-mcp-icon.png`
+- `icons`: the Classroom logo at `https://classroom.cordiacode.com/cordia-classroom-icon.png`
 - `instructions`
 
 ## 3. Listing
@@ -56,7 +56,7 @@ The portal reads these from the server. Every tool has a `title` and all four hi
 | Documentation URL | https://classroom.cordiacode.com/connect/claude |
 | Privacy policy URL | https://classroom.cordiacode.com/privacy (section 6, "Connected AI Apps") |
 | Support contact | jude@cordiaai.io |
-| Icon | `web/public/cordia-mcp-icon.png` (512×512 PNG, the Cordia mark) |
+| Icon | `web/public/cordia-classroom-icon.png` (512×512 PNG, the Classroom logo: the Cordia mark with the book) |
 | URL slug | `cordia-classroom` **[YOU: the slug is permanent once published]** |
 
 **Description (≤2,000 characters):**
