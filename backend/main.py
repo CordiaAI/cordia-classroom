@@ -21,7 +21,7 @@ from routers import (
     auth, billing, calendar, chat, feedback, folders, guides, learning, materials,
     nclex, practice, quiz, search, smart_notes, stats, tutor,
 )
-from routers import canvas, classes, admin, public_forms, connectors, drive, plans, workspace, apps, mcp
+from routers import canvas, classes, admin, public_forms, connectors, drive, plans, workspace, apps, mcp, jobs
 from services import log_scrub
 
 # Load environment variables
@@ -46,8 +46,9 @@ app = FastAPI(
 
 @app.on_event("startup")
 def _start_sync_worker() -> None:
-    from services import sync_worker
+    from services import generation_jobs, sync_worker
     sync_worker.start()
+    generation_jobs.start()
 
 
 # Attach rate limiter
@@ -199,6 +200,7 @@ app.include_router(drive.router)
 app.include_router(workspace.router)
 app.include_router(apps.router)
 app.include_router(mcp.router)
+app.include_router(jobs.router)
 
 
 

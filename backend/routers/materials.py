@@ -183,6 +183,39 @@ def _guide(user_id: str, chunks: list, has_images: bool) -> tuple:
     return study_guide, cards
 
 
+def build_materials(user_id: str, raw_text: str, images: list, notes: bool, study_guide: bool, flashcards: bool) -> dict:
+    """Notes, a study guide and/or flashcards from the student's material: what /generate returns,
+    and what the study-set worker (services/generation_jobs.py) builds. The caller checks and
+    charges the plan's study sets (require before, record after)."""
+    chunks, has_images = _study_chunks(raw_text, images)
+    if not chunks:
+        logger.warning("No content chunks after cleaning")
+        return {"notes": "No meaningful content found to process.", "study_guide": None, "flashcards": None, "empty": True}
+
+    def write_notes():
+        points = generate_notes_ai("\n\n".join(chunks))
+        return "\n".join(f"- {point}" for point in points) if points else None
+
+    # Notes and the guide read the same chunks and nothing else: write them at the same time.
+    written = None
+    if notes and study_guide:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            notes_job = pool.submit(copy_context().run, write_notes)
+            guide, guide_cards = _guide(user_id, chunks, has_images)
+            written = notes_job.result()
+    else:
+        written = write_notes() if notes else None
+        guide, guide_cards = _guide(user_id, chunks, has_images) if study_guide else (None, [])
+
+    cards = None
+    if flashcards:
+        # Cards come from the guide when there is one, so guide and cards can't disagree.
+        cards = guide_cards if guide else generate_flashcards(chunks)
+        if not cards:
+            raise HTTPException(status_code=422, detail="CordiaClassroom could not build flashcards from this material.")
+    return {"notes": written, "study_guide": guide, "flashcards": cards, "empty": False}
+
+
 @router.post("/generate", response_model=GenerateResponse)
 @limiter.limit("15/minute")
 def generate(body: GenerateRequest, request: Request, authorization: str = Header(default="")):
@@ -192,33 +225,8 @@ def generate(body: GenerateRequest, request: Request, authorization: str = Heade
     if not raw_text:
         raise HTTPException(status_code=422, detail="Select at least one study section")
     require(user_id, "guide")
-
-    chunks, has_images = _study_chunks(raw_text, [image.model_dump() for image in body.images])
-    if not chunks:
-        logger.warning("No content chunks after cleaning")
-        return GenerateResponse(notes="No meaningful content found to process.")
-
-    def write_notes():
-        points = generate_notes_ai("\n\n".join(chunks))
-        return "\n".join(f"- {point}" for point in points) if points else None
-
-    # Notes and the guide read the same chunks and nothing else: write them at the same time.
-    notes = None
-    if body.notes and body.study_guide:
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            notes_job = pool.submit(copy_context().run, write_notes)
-            study_guide, guide_cards = _guide(user_id, chunks, has_images)
-            notes = notes_job.result()
-    else:
-        notes = write_notes() if body.notes else None
-        study_guide, guide_cards = _guide(user_id, chunks, has_images) if body.study_guide else (None, [])
-
-    flashcards = None
-    if body.flashcards:
-        # Cards come from the guide when there is one, so guide and cards can't disagree.
-        flashcards = guide_cards if study_guide else generate_flashcards(chunks)
-        if not flashcards:
-            raise HTTPException(status_code=422, detail="CordiaClassroom could not build flashcards from this material.")
-
+    built = build_materials(user_id, raw_text, [image.model_dump() for image in body.images], body.notes, body.study_guide, body.flashcards)
+    if built["empty"]:
+        return GenerateResponse(notes=built["notes"])
     record(user_id, "guide", body.request_id)
-    return GenerateResponse(notes=notes, study_guide=study_guide, flashcards=flashcards)
+    return GenerateResponse(notes=built["notes"], study_guide=built["study_guide"], flashcards=built["flashcards"])
