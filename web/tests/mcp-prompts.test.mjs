@@ -34,7 +34,7 @@ test('server info: the Cordia mark as the icon, a description and the instructio
   const { result } = await call('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } });
   const info = result.serverInfo;
   assert.equal(info.name, 'Cordia Classroom');
-  assert.deepEqual(info.icons, [{ src: 'https://classroom.cordiacode.com/cordia-mcp-icon.png', mimeType: 'image/png', sizes: ['512x512'] }]);
+  assert.deepEqual(info.icons, [{ src: 'https://classroom.cordiacode.com/cordia-classroom-icon.png', mimeType: 'image/png', sizes: ['512x512'] }]);
   assert.ok(existsSync(new URL(`../public${MCP_ICON_PATH}`, import.meta.url)), 'the icon is served from web/public');
   assert.equal(info.websiteUrl, 'https://classroom.cordiacode.com');
   assert.ok(info.description.length > 20);

@@ -200,7 +200,7 @@ anything is revealed, and correctness judged by meaning.
 - Never promise Canvas or other LMS data.
 
 **Icon.** The server reports `serverInfo.icons`: the Cordia mark at
-`https://classroom.cordiacode.com/cordia-mcp-icon.png` (512×512), plus a description and website.
+`https://classroom.cordiacode.com/cordia-classroom-icon.png` (512×512, the Classroom logo), plus a description and website.
 - Clients that follow the MCP spec (2025-11-25) show this icon.
 - Claude.ai doesn't use it for custom connectors yet. It shows the favicon Google has for the
   connector's apex domain, `cordiacode.com` (see `anthropics/claude-ai-mcp#152`).
