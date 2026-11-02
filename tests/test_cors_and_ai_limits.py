@@ -23,6 +23,7 @@ class CorsOriginTests(unittest.TestCase):
 
     def test_own_origins_are_allowed(self):
         self.assertTrue(self.allowed("https://classroom.cordiaai.io"))
+        self.assertTrue(self.allowed("https://classroom.cordiacode.com"))
         self.assertTrue(self.allowed("chrome-extension://eddmfjcnfjfbaknmeccjbjdgpeipjbaf"))
         self.assertTrue(self.allowed("https://cordia-classroom-git-main-itzjlaughs-projects.vercel.app"))
         self.assertTrue(self.allowed("https://cordia-classroom-git-claude-wizardly-mendel-nfmcrg-cordia-ai.vercel.app"))
@@ -31,6 +32,7 @@ class CorsOriginTests(unittest.TestCase):
     def test_other_extensions_and_vercel_apps_are_refused(self):
         self.assertFalse(self.allowed("chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
         self.assertFalse(self.allowed("https://evil.vercel.app"))
+        self.assertFalse(self.allowed("https://cordiacode.com"))
         self.assertFalse(self.allowed("https://cordia-classroom-git-x-someone-else.vercel.app"))
 
 
