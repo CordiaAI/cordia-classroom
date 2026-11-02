@@ -53,7 +53,7 @@ async function recordAnswer(ctx, { item_type, item_id, correct, confidence, resp
     correct,
     next_due_on: change.nextDueOn,
     strength: change.strength,
-    remaining_due: remainingDue(after, change.misses ?? misses, today),
+    remaining_due_in_set: remainingDue(after, change.misses ?? misses, today),
     study_set: { id: guide.id, title: guide.title || 'Untitled' },
     url: link(ctx, `/session?guideId=${guide.id}`),
   };
@@ -107,11 +107,15 @@ async function createStudySet(ctx, { source, title, course_id, outputs }) {
     return failure(detail, response.status === 429 ? 'limit_reached' : 'invalid_input');
   }
   if (!response.ok || !body?.job_id) return unavailable('Library');
+  // The same request sent again returns the job already made for it, which may be further along.
+  const status = ['queued', 'running', 'done'].includes(body.status) ? body.status : 'queued';
   return ok({
     job_id: body.job_id,
-    status: 'queued',
-    estimated_seconds: 90,
-    message: 'Cordia is making the study set. Check on it with get_job_status in about a minute; it also shows in the student\'s Cordia app when it\'s ready.',
+    status,
+    estimated_seconds: status === 'done' ? 0 : 90,
+    message: status === 'queued'
+      ? 'Cordia is making the study set. Check on it with get_job_status in about a minute; it also shows in the student\'s Cordia app when it\'s ready.'
+      : 'Cordia already has this request from the last few minutes, so it did not make a second study set. Check on it with get_job_status.',
   });
 }
 
@@ -157,7 +161,8 @@ export const WRITE_TOOLS = [
     },
     output: {
       item_id: z.string(), correct: z.boolean(), next_due_on: z.string().nullable(), strength: z.string().nullable(),
-      remaining_due: z.number().int(), study_set: z.object({ id: z.string(), title: z.string() }), url: z.string(), replayed: z.boolean(),
+      remaining_due_in_set: z.number().int().describe('Items still due today in this answer\'s study set (study_set), not across all sets; get_due_cards gives the total.'),
+      study_set: z.object({ id: z.string(), title: z.string() }), url: z.string(), replayed: z.boolean(),
     },
     run: recordAnswer,
   },
@@ -175,7 +180,7 @@ export const WRITE_TOOLS = [
       course_id: id.optional(),
       outputs: z.array(z.enum(['notes', 'study_guide', 'flashcards'])).min(1).max(3).optional().describe('What to make; default all three. A study guide is always made.'),
     },
-    output: { job_id: z.string(), status: z.literal('queued'), estimated_seconds: z.number().int(), message: z.string() },
+    output: { job_id: z.string(), status: z.enum(['queued', 'running', 'done']), estimated_seconds: z.number().int(), message: z.string() },
     run: createStudySet,
   },
   {

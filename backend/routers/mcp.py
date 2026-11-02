@@ -127,16 +127,20 @@ def _queue_study_set(authorization: str, body: StudySetRequest) -> dict:
     except Exception as error:
         raise _db_error(error)
     # The plan's monthly study sets, checked for the student on the job row their own token created.
-    rows = db.table("generation_jobs").select("id,user_id").eq("id", job_id).limit(1).execute().data or []
+    rows = db.table("generation_jobs").select("id,user_id,status").eq("id", job_id).limit(1).execute().data or []
     if not rows or rows[0]["user_id"] != user_id:
         raise HTTPException(status_code=503, detail="The study set could not be queued.")
-    try:
-        require(rows[0]["user_id"], "guide")
-    except LimitReached as error:
-        from services.generation_jobs import fail
-        fail(rows[0]["id"], error.detail["message"])
-        raise
-    return {"job_id": job_id, "status": "queued"}
+    status = rows[0].get("status") or "queued"
+    # A repeated request gets back the job already made for it (queue_study_set_job), which may be
+    # running or done: only a job still waiting is checked against the plan.
+    if status == "queued":
+        try:
+            require(rows[0]["user_id"], "guide")
+        except LimitReached as error:
+            from services.generation_jobs import fail
+            fail(rows[0]["id"], error.detail["message"])
+            raise
+    return {"job_id": job_id, "status": status}
 
 
 @router.post("/study-sets")
