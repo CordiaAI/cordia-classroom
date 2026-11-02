@@ -492,7 +492,8 @@ export const READ_TOOLS = [
     },
     output: {
       range: z.string(), since: z.string(), time_zone: z.string(), course,
-      streak_days: z.number().int(), studied_today: z.boolean(), active_study_minutes: z.number(),
+      streak_days: z.number().int().describe('Consecutive study days in the student\'s time zone, with one missed day a week forgiven, as the Progress page counts them. Not limited by range.'),
+      studied_today: z.boolean(), active_study_minutes: z.number(),
       quiz_accuracy_trend: z.array(z.object({ date: z.string(), accuracy: z.number(), study_set_id: z.string().nullable(), study_set: z.string() })),
       best_study_hours: z.array(z.object({ hour: z.number().int(), minutes: z.number() })),
       weak_topics: z.array(z.object({ topic: z.string(), accuracy: z.number(), last_seen: z.string(), study_set_id: z.string().nullable(), url: z.string().nullable() })),
