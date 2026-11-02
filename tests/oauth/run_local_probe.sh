@@ -54,6 +54,7 @@ PYTHON="$ROOT/.venv/bin/python"; [ -x "$PYTHON" ] || PYTHON=python3
 BACKEND_PID=$!
 trap 'kill $BACKEND_PID 2>/dev/null || true; cleanup' EXIT
 for _ in $(seq 1 30); do curl -fs -o /dev/null http://127.0.0.1:8765/ && break; sleep 1; done
+curl -fs -o /dev/null http://127.0.0.1:8765/ || { echo "FAIL  the backend did not start"; tail -30 "$WORK/backend.log"; exit 1; }
 API="$API" ANON="$ANON" SERVICE="$SERVICE" DB_URL="$DB_URL" BACKEND=http://127.0.0.1:8765 node "$ROOT/tests/oauth/probe.mjs" || { echo "== backend log"; tail -30 "$WORK/backend.log"; exit 1; }
 
 if [ -n "${E2E_WEB:-}" ]; then
