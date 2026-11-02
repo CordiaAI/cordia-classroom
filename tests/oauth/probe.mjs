@@ -230,8 +230,11 @@ async function callTool(name, args) {
   }));
   const text = await response.text();
   const message = JSON.parse(text.startsWith('{') ? text : text.split('\n').find(line => line.startsWith('data:')).slice(5));
-  return message.result || { isError: true, content: [{ text: JSON.stringify(message.error) }] };
+  const result = message.result || { isError: true, content: [{ text: JSON.stringify(message.error) }] };
+  toolOutputs.push(JSON.stringify(result));
+  return result;
 }
+const toolOutputs = [];
 const leaks = text => /instructure|BIO 101|Module 3|Lab report|Other mitochondria/.test(text);
 const found = await callTool('search_my_materials', { query: 'mitochondria' });
 const hits = found.structuredContent?.results || [];
@@ -295,6 +298,31 @@ if (process.env.BACKEND) {
   const metadata = await callTool('create_study_set', { source: { type: 'url', url: 'http://169.254.169.254/latest/meta-data/' } });
   check('tool create_study_set: internal addresses refused', metadata.isError && /private or internal/.test(metadata.content[0].text), metadata.content?.[0]?.text);
 }
+// Isolation, tool by tool: another student's id gets exactly the answer a made-up id gets.
+const { data: otherFolder } = await service.from('folders').insert({ user_id: other.user.id, name: 'Other course' }).select('id').single();
+const { data: otherLecture } = await service.from('lectures').insert({ user_id: other.user.id, title: 'Other lecture', transcript: 'mitochondria' }).select('id').single();
+const { data: otherJob } = await service.from('generation_jobs').insert({ user_id: other.user.id, status: 'done', source: 'app', title: 'Other job' }).select('id').single();
+const made = crypto.randomUUID();
+const isolation = [
+  ['get_lecture', id => ({ lecture_id: id }), otherLecture.id],
+  ['get_due_cards', id => ({ study_set_id: id }), otherGuide.id],
+  ['get_job_status', id => ({ job_id: id }), otherJob.id],
+  ['add_flashcards', id => ({ study_set_id: id, cards: [{ front: 'a', back: 'b' }] }), otherGuide.id],
+  ['save_note', id => ({ title: 'x', content: 'y', study_set_id: id }), otherGuide.id],
+  ['save_note', id => ({ title: 'x', content: 'y', course_id: id }), otherFolder.id],
+  ...(process.env.BACKEND ? [['create_study_set', id => ({ source: { type: 'text', text: 'Mitochondria make ATP for the cell to use.' }, course_id: id }), otherFolder.id]] : []),
+];
+for (const [name, args, theirs] of isolation) {
+  const asTheirs = await callTool(name, args(theirs));
+  const asMissing = await callTool(name, args(made));
+  check(`isolation ${name}: another student's id looks exactly like a missing one`, asTheirs.isError && asMissing.isError && asTheirs.content[0].text === asMissing.content[0].text,
+    `${asTheirs.content?.[0]?.text} | ${asMissing.content?.[0]?.text}`);
+}
+const theirCourse = await callTool('list_study_sets', { course_id: otherFolder.id });
+check('isolation list_study_sets: another student\'s course lists nothing', theirCourse.structuredContent?.study_sets?.length === 0);
+check('no tool output ever held Canvas data or another student\'s material', !toolOutputs.some(text => leaks(text) || /Other lecture|Other course|Other job/.test(text)),
+  toolOutputs.find(text => leaks(text) || /Other lecture|Other course|Other job/.test(text))?.slice(0, 160));
+
 const directUpdate = await fetch(`${API}/rest/v1/study_guides?id=eq.${cellGuide}`, { method: 'PATCH', headers: { ...headers(refreshed.access_token), 'content-type': 'application/json' }, body: JSON.stringify({ title: 'hijacked' }) });
 check('REST: the token cannot edit a guide directly', refused(directUpdate.status), String(directUpdate.status));
 const directProgress = await fetch(`${API}/rest/v1/rpc/merge_study_progress`, { method: 'POST', headers: { ...headers(refreshed.access_token), 'content-type': 'application/json' }, body: JSON.stringify({ guide: cellGuide, cards: { 0: { box: 5, due: '2030-01-01', known: true } } }) });

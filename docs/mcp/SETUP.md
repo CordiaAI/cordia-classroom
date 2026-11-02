@@ -203,3 +203,28 @@ anything is revealed, and correctness judged by meaning.
   connector's apex domain, `cordiacode.com` (see `anthropics/claude-ai-mcp#152`).
 - To change the icon in Claude.ai, give `cordiacode.com` a square favicon, for example
   `<link rel="icon" href="/favicon.png">` pointing to the same Cordia mark.
+
+## Phase 5: hardening, docs and submission
+
+**What's added:**
+- **Tests:**
+  - every tool's annotations against a snapshot;
+  - limits on every input;
+  - isolation for every tool that takes an id, run in the probe against a real stack;
+  - an import-graph test that keeps the backend's `/mcp` routes away from LMS and connector code;
+  - the full study-set job lifecycle.
+- **Public docs:** `/connect/claude`, and section 6 of the privacy policy.
+- **Demo content:** `backend/scripts/seed_demo_account.py`.
+- **Submission:** `docs/SUBMISSION.md`, the submission packet and deployment checklist.
+
+### End-to-end checklist (before submitting)
+
+1. **MCP Inspector against a preview deploy.** Connect as in Phase 1, using the preview's host on
+   the consent page. Then:
+   - Tools › List Tools shows 12; run each one.
+   - Prompts › List Prompts shows 3; get each one.
+2. **Claude.ai custom connector.** Add `https://classroom.cordiacode.com/mcp`, sign in with the demo
+   account and choose Allow.
+3. **Every tool and prompt in Claude.** Use the reviewer steps in `docs/SUBMISSION.md` (section 8),
+   then check the results in the Cordia app.
+4. **Disconnect.** In Settings › Connectors, Claude's next call fails and asks to reconnect.

@@ -16,7 +16,7 @@ export function themePreference() {
 }
 
 // Public pages stay light; Pricing and the policy pages follow the account's theme when signed in.
-const LIGHT_WHEN_SIGNED_OUT = ['/pricing', '/privacy', '/terms', '/honor-code', '/mission'];
+const LIGHT_WHEN_SIGNED_OUT = ['/pricing', '/privacy', '/terms', '/honor-code', '/mission', '/connect/claude'];
 export function isLightOnly(pathname) {
   if (LIGHT_WHEN_SIGNED_OUT.includes(pathname)) {
     try { return !localStorage.getItem('authToken'); } catch { return true; }
