@@ -15,6 +15,7 @@ import { startGuideJob } from '../../lib/guideJobs';
 import { generateAndSave, newRequestId } from '../../lib/guideCreate';
 import { analyzeLecture, clock, deleteLecture, dueLabel, getLecture, updateLecture, updateTodo } from '../../lib/lectures';
 import { outlineHtml } from '../../lib/lectureOutline.mjs';
+import { collapseLoops } from '../../lib/lectureText.mjs';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const WHY = { exam: 'On the exam', mistake: 'Common mistake', emphasis: 'Stressed', requirement: 'Required' };
@@ -77,7 +78,13 @@ export default function LecturePage() {
 
   const lecture = data?.lecture;
   const analysis = lecture?.analysis || {};
-  const segments = useMemo(() => (lecture?.segments?.length ? lecture.segments : lecture?.transcript ? [{ start_ms: 0, text: lecture.transcript }] : []), [lecture]);
+  // Recordings made before transcripts were cleaned can hold Whisper loops ("Tm. Tm. Tm."): shown
+  // without them. Typed notes are shown exactly as written.
+  const segments = useMemo(() => {
+    const raw = lecture?.segments?.length ? lecture.segments : lecture?.transcript ? [{ start_ms: 0, text: lecture.transcript }] : [];
+    if (lecture?.source === 'notes') return raw;
+    return raw.map(segment => ({ ...segment, text: collapseLoops(segment.text) })).filter(segment => segment.text);
+  }, [lecture]);
   const timed = segments.length > 1 || (segments[0]?.start_ms || 0) > 0;
   const shownSegments = find.trim() ? segments.filter(segment => segment.text.toLowerCase().includes(find.trim().toLowerCase())) : segments;
 
