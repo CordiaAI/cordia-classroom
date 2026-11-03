@@ -12,6 +12,7 @@
 import { aiProvider, chatProvider } from './aiProvider.mjs';
 import { aiChat } from './aiChat.mjs';
 import { supabaseUrlFrom } from '../supabaseUrl.mjs';
+import { collapseLoops, whisperText } from '../lectureText.mjs';
 export const LIMITS = { free: 120, pro: 1500 };
 export const MAX_CHUNK_BYTES = 4_300_000; // under Vercel's 4.5 MB request limit
 const FEATURE = 'lecture_minute';
@@ -161,8 +162,12 @@ export function createLectureService({ env = process.env, fetch: fetchImpl = glo
     const form = new FormData();
     form.append('file', new Blob([audio], { type: String(contentType).split(';')[0] }), `chunk.${ext}`);
     form.append('model', transcribeModel);
-    form.append('response_format', 'json');
-    if (prompt) form.append('prompt', String(prompt).slice(-600));
+    // Whisper models send each segment's confidence (verbose_json), so made-up text over music or
+    // noise can be dropped (lib/lectureText.mjs). Other models only send text.
+    form.append('response_format', /^whisper/i.test(transcribeModel) ? 'verbose_json' : 'json');
+    // The prompt carries the transcript so far: a loop left in it would be copied into this part.
+    const hint = collapseLoops(prompt).slice(-600);
+    if (hint) form.append('prompt', hint);
     const data = await openai('/audio/transcriptions', { method: 'POST', body: form });
     if (!data) return { status: 502, body: { detail: "Couldn't transcribe this part. It will be retried." } };
     await charge(who, recordingId, startMs, durationMs);
@@ -170,7 +175,7 @@ export function createLectureService({ env = process.env, fetch: fetchImpl = glo
       const path = `${who.userId}/${recordingId}/${String(seq).padStart(5, '0')}.${ext}`;
       db(`/storage/v1/object/lecture-audio/${path}`, { method: 'POST', headers: { 'Content-Type': String(contentType).split(';')[0], 'x-upsert': 'true' }, body: audio }).catch(() => {});
     }
-    return { status: 200, body: { seq, start_ms: startMs, text: String(data.text || '').trim() } };
+    return { status: 200, body: { seq, start_ms: startMs, text: whisperText(data) } };
   }
 
   async function notes(authorization, { segments = [], classes = [] } = {}) {

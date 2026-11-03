@@ -24,12 +24,53 @@ export function mergeOverlap(previous, next, maxWords = 30) {
 
 // Remove spoken fillers, doubled words ("the the") and extra spaces; keeps every real word.
 export function cleanSpokenText(text) {
-  return String(text || '')
+  return collapseLoops(text)
     .replace(FILLERS, ' ')
     .replace(/\b(\w+)(?: \1\b)+/gi, '$1')
     .replace(/[ \t]{2,}/g, ' ')
     .replace(/\s+([,.;:!?])/g, '$1')
     .trim();
+}
+
+// Whisper invents text over music, games and noise: loops ("Tm. Tm. Tm."), runs of a music
+// marker ("音楽 音楽", Japanese for "music") and lines in another language. These keep only speech.
+
+// What Whisper writes for music or noise rather than words.
+const MUSIC_MARK = '(?:音楽|音樂|音乐|♪|♫|\\[(?:music|applause|laughter|noise|silence)\\]|\\((?:music|applause|laughter|noise|silence)\\))';
+const ONLY_MARKS = new RegExp(`^(?:[\\s.,!?、。…~-]|${MUSIC_MARK})*$`, 'iu');
+const MARK_RUNS = new RegExp(`(?:${MUSIC_MARK}[\\s.,、。…]*){2,}`, 'giu');
+
+// Whisper's own confidence for one segment (verbose_json). Drops what it marks as unreliable:
+// text repetitive enough to be a loop, low confidence, or probably not speech.
+// The first two are OpenAI's Whisper cut-offs; the last catches confident text over music.
+export function keepWhisperSegment(segment) {
+  const text = String(segment?.text || '').trim();
+  if (!text || ONLY_MARKS.test(text)) return false;
+  const ratio = Number(segment.compression_ratio);
+  const logprob = Number(segment.avg_logprob);
+  const silent = Number(segment.no_speech_prob);
+  if (ratio > 2.4 || logprob < -1) return false;
+  if (silent >= 0.8 || (silent > 0.6 && logprob < -0.5)) return false;
+  return true;
+}
+
+// A phrase of one to four words said three or more times in a row becomes one; runs of music
+// markers go. Someone saying "no, no, no" keeps one "no"; a minute of "Tm. Tm. Tm." keeps one.
+export function collapseLoops(text) {
+  return String(text || '')
+    .replace(MARK_RUNS, ' ')
+    .replace(/(?<!\S)(\S+(?:\s+\S+){0,3}?)(?:[\s,]+\1(?!\S)){2,}/giu, '$1')
+    .replace(/(\p{L}{1,6}?)\1{3,}/gu, '$1')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+// One Whisper reply to text: the kept segments when it sent them (verbose_json), else its text.
+export function whisperText(data) {
+  const segments = Array.isArray(data?.segments) ? data.segments : null;
+  const text = segments ? segments.filter(keepWhisperSegment).map(segment => String(segment.text).trim()).join(' ') : String(data?.text || '');
+  const kept = collapseLoops(text);
+  return ONLY_MARKS.test(kept) ? '' : kept;
 }
 
 // Timed segments ({ seq, start_ms, text }) in order, each with the overlap against the one
