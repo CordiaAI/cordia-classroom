@@ -115,6 +115,23 @@ class FillInTheBlankTests(unittest.TestCase):
         self.assertFalse(retain.fill_matches("1865", "1863"))
         self.assertFalse(retain.fill_matches("", "Equity"))
 
+    def test_verdict_close_is_part_of_the_answer_with_nothing_contradicting_it(self):
+        self.assertEqual(retain.fill_verdict("Alpha Sigma", "Oregon Alpha Sigma."), "close")
+        self.assertEqual(retain.fill_verdict("Oregon Alpha Sigma chapter", "Oregon Alpha Sigma"), "close")
+        self.assertEqual(retain.fill_verdict("Treaty of Versailes", "The Treaty of Versailles of 1919"), "wrong")  # the year is missing
+        self.assertEqual(retain.fill_verdict("Treaty Versailles 1919", "The Treaty of Versailles of 1919"), "close")
+        self.assertEqual(retain.fill_verdict("Alpha Tau", "Oregon Alpha Sigma"), "wrong")
+        self.assertEqual(retain.fill_verdict("photosynthesis", "Cellular respiration"), "wrong")
+        self.assertEqual(retain.fill_verdict("mitosis", "Mitosis"), "right")
+        self.assertEqual(retain.fill_verdict("", "Mitosis"), "wrong")
+
+    def test_a_typed_answer_the_student_counted_right_keeps_its_credit(self):
+        question = {"question": "Which chapter?", "options": ["Oregon Alpha Sigma", "x", "y", "z"], "correct_index": 0}
+        mine = {"type": "fill", "response": "Alpha Sigma", "credit": 1, "self_marked": True}
+        self.assertEqual(retain.first_try_credit(question, mine, "u1", GUIDE_ID), 1.0)
+        self.assertEqual(retain.first_try_credit(question, {**mine, "self_marked": False}, "u1", GUIDE_ID), 0.0)
+        self.assertEqual(retain.first_try_credit(question, {**mine, "credit": 0}, "u1", GUIDE_ID), 0.0)
+
 
 class SignedGradeTests(unittest.TestCase):
     def test_only_an_unaltered_grade_counts(self):

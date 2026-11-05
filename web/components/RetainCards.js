@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../lib/api';
 import { BookOpen, Check, MessageCircle, X } from 'lucide-react';
 import { dismissTip, requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { noteView, useAnswerTiming } from '../lib/learningEvents';
-import { choiceText, conceptAnswer, fillMatches, normalize, shuffled } from '../lib/retainEngine.mjs';
+import { choiceText, conceptAnswer, fillVerdict, normalize, shuffled } from '../lib/retainEngine.mjs';
 import { makeCloze } from '../lib/learnEngine.mjs';
 
 // A wrong answer of any type opens the Tutor's "why was I wrong" help.
@@ -187,30 +187,84 @@ export function McCard({ card, question, guideId, onResult, onNext, askSure = tr
   );
 }
 
+// The typed-answer flow shared by FillCard and ClozeCard. A plainly right answer counts at once.
+// Otherwise the student sees the answer and decides: a close one ("Alpha Sigma" for "Oregon Alpha
+// Sigma") asks "Count it right?"; a wrong one offers "I was right". The choice is recorded (marked
+// self_marked when they count it right) and the next question follows.
+function useTypedAnswer({ card, question, guideId, onResult, onNext, expected, value, timing }) {
+  const [verdict, setVerdict] = useState(null); // right | close | wrong
+  const [credit, setCredit] = useState(null);
+  const [confidence, setConfidence] = useState('');
+  const [advancing, setAdvancing] = useState(false);
+  const next = useRef(onNext);
+  next.current = onNext;
+  // After the render that carries the recorded answer, so the round moves on from the new state.
+  useEffect(() => {
+    if (!advancing) return undefined;
+    const timer = setTimeout(() => next.current(), 0);
+    return () => clearTimeout(timer);
+  }, [advancing]);
+
+  function record(points, level, selfMarked = false) {
+    setCredit(points);
+    onResult([{ concept: card.concepts[0], credit: points, response: value.trim(), timing: timing.done(), answerChars: value.trim().length, ...(level ? { confidence: level } : {}), ...(selfMarked ? { selfMarked: true } : {}) }]);
+  }
+  function reveal(level = '') {
+    setConfidence(level);
+    const result = fillVerdict(value, expected);
+    setVerdict(result);
+    if (result === 'right') record(1, level);
+    else askTutorAboutMiss(guideId, question, value.trim());
+  }
+  function decide(points, selfMarked = false) {
+    if (credit !== null) return;
+    record(points, confidence, selfMarked);
+    setAdvancing(true);
+  }
+  return { verdict, credit, confidence, reveal, decide };
+}
+
+// What shows once a typed answer is checked and isn't plainly right: the student's choice.
+function TypedDecision({ verdict, expected, label, onDecide, onExplain }) {
+  if (verdict === 'close') {
+    return (
+      <>
+        <p className="retain-feedback partial" role="status">Almost. The full answer is <strong>{choiceText(expected)}</strong>. Does yours mean the same?</p>
+        <div className="quiz-next-row">
+          <button type="button" className="c-btn c-btn--secondary" onClick={() => onDecide(0)}>Count it wrong</button>
+          <button type="button" className="c-btn c-btn--primary quiz-next" onClick={() => onDecide(1, true)} autoFocus>Count it right</button>
+        </div>
+      </>
+    );
+  }
+  return (
+    <>
+      <p className="retain-feedback wrong" role="status">{label}: <strong>{expected}</strong></p>
+      <div className="quiz-next-row">
+        {onExplain !== null && <AskWhy onExplain={onExplain} />}
+        <button type="button" className="c-btn c-btn--secondary" onClick={() => onDecide(1, true)}>I was right</button>
+        <button type="button" className="c-btn c-btn--primary quiz-next" onClick={() => onDecide(0)} autoFocus>Next</button>
+      </div>
+    </>
+  );
+}
+
+const verdictClass = verdict => (verdict === 'right' ? ' right' : verdict === 'close' ? ' partial' : verdict === 'wrong' ? ' wrong' : '');
+
 export function FillCard({ card, question, guideId, onResult, onNext, askSure = true }) {
   const answer = conceptAnswer(question);
   const [value, setValue] = useState('');
-  const [right, setRight] = useState(null);
   const [asking, setAsking] = useState(false);
-  const [confidence, setConfidence] = useState('');
   const [explained, setExplained] = useState(false);
   const timing = useAnswerTiming();
-
-  function reveal(level = '') {
-    setAsking(false);
-    setConfidence(level);
-    const correct = fillMatches(value, answer);
-    setRight(correct);
-    if (!correct) askTutorAboutMiss(guideId, question, value.trim());
-    onResult([{ concept: card.concepts[0], credit: correct ? 1 : 0, response: value.trim(), timing: timing.done(), answerChars: value.trim().length, ...(level ? { confidence: level } : {}) }]);
-  }
+  const typed = useTypedAnswer({ card, question, guideId, onResult, onNext, expected: answer, value, timing });
 
   function check(event) {
     event.preventDefault();
-    if (right !== null || !value.trim()) return;
+    if (typed.verdict !== null || !value.trim()) return;
     timing.done();
     // First asks get "How sure?" before the answer shows; repeats go straight to it.
-    if (card.reask || !askSure) reveal();
+    if (card.reask || !askSure) typed.reveal();
     else setAsking(true);
   }
 
@@ -219,26 +273,25 @@ export function FillCard({ card, question, guideId, onResult, onNext, askSure = 
       <div className="quiz-question-text">{question.question}</div>
       <div className="retain-fill-row">
         <input
-          className={'retain-fill-input' + (right === true ? ' right' : right === false ? ' wrong' : '')}
+          className={'retain-fill-input' + verdictClass(typed.verdict)}
           value={value}
           onChange={event => setValue(event.target.value)}
           onKeyDown={timing.key}
           placeholder="Type the answer"
           aria-label="Your answer"
-          readOnly={right !== null || asking}
+          readOnly={typed.verdict !== null || asking}
           autoFocus
           autoComplete="off"
         />
-        {right === null && !asking && <button type="submit" className="c-btn c-btn--primary" disabled={!value.trim()}>Check</button>}
+        {typed.verdict === null && !asking && <button type="submit" className="c-btn c-btn--primary" disabled={!value.trim()}>Check</button>}
       </div>
-      {asking && <ConfidencePrompt onPick={reveal} />}
-      {right !== null && (
-        <p className={'retain-feedback ' + (right ? 'right' : 'wrong')} role="status">
-          {right ? <>Right: <strong>{answer}</strong></> : <>Answer: <strong>{answer}</strong></>}
-        </p>
+      {asking && <ConfidencePrompt onPick={level => { setAsking(false); typed.reveal(level); }} />}
+      {typed.verdict === 'right' && <p className="retain-feedback right" role="status">Right: <strong>{answer}</strong></p>}
+      {explained && <MissFeedback guideId={guideId} card={card} question={question} chosen={value.trim()} sure={typed.confidence === 'sure'} />}
+      {typed.verdict === 'right' && <NextButton onNext={onNext} missed={false} />}
+      {(typed.verdict === 'close' || typed.verdict === 'wrong') && typed.credit === null && (
+        <TypedDecision verdict={typed.verdict} expected={answer} label="Answer" onDecide={typed.decide} onExplain={explained ? null : () => setExplained(true)} />
       )}
-      {explained && <MissFeedback guideId={guideId} card={card} question={question} chosen={value.trim()} sure={confidence === 'sure'} />}
-      {right !== null && <NextButton onNext={onNext} missed={!right} onExplain={explained ? null : () => setExplained(true)} />}
     </form>
   );
 }
@@ -248,27 +301,17 @@ export function FillCard({ card, question, guideId, onResult, onNext, askSure = 
 export function ClozeCard({ card, question, guideId, onResult, onNext, askSure = true }) {
   const cloze = useMemo(() => makeCloze(conceptAnswer(question)), [question]);
   const [value, setValue] = useState('');
-  const [right, setRight] = useState(null);
   const [asking, setAsking] = useState(false);
-  const [confidence, setConfidence] = useState('');
   const [explained, setExplained] = useState(false);
   const timing = useAnswerTiming();
+  const typed = useTypedAnswer({ card, question, guideId, onResult, onNext, expected: cloze?.missing || '', value, timing });
   if (!cloze) return <FillCard card={card} question={question} guideId={guideId} onResult={onResult} onNext={onNext} askSure={askSure} />;
-
-  function reveal(level = '') {
-    setAsking(false);
-    setConfidence(level);
-    const correct = fillMatches(value, cloze.missing);
-    setRight(correct);
-    if (!correct) askTutorAboutMiss(guideId, question, value.trim());
-    onResult([{ concept: card.concepts[0], credit: correct ? 1 : 0, response: value.trim(), timing: timing.done(), answerChars: value.trim().length, ...(level ? { confidence: level } : {}) }]);
-  }
 
   function check(event) {
     event.preventDefault();
-    if (right !== null || !value.trim()) return;
+    if (typed.verdict !== null || !value.trim()) return;
     timing.done();
-    if (card.reask || !askSure) reveal();
+    if (card.reask || !askSure) typed.reveal();
     else setAsking(true);
   }
 
@@ -277,31 +320,30 @@ export function ClozeCard({ card, question, guideId, onResult, onNext, askSure =
       <div className="quiz-question-text">{question.question}</div>
       <p className="retain-cloze">
         {cloze.before}
-        <span className={'retain-cloze-blank' + (right === true ? ' right' : right === false ? ' wrong' : '')}>{right === null ? <span aria-label="missing word">______</span> : cloze.missing}</span>
+        <span className={'retain-cloze-blank' + verdictClass(typed.verdict)}>{typed.verdict === null ? <span aria-label="missing word">______</span> : cloze.missing}</span>
         {cloze.after}
       </p>
       <div className="retain-fill-row">
         <input
-          className={'retain-fill-input' + (right === true ? ' right' : right === false ? ' wrong' : '')}
+          className={'retain-fill-input' + verdictClass(typed.verdict)}
           value={value}
           onChange={event => setValue(event.target.value)}
           onKeyDown={timing.key}
           placeholder="The missing word"
           aria-label="The missing word"
-          readOnly={right !== null || asking}
+          readOnly={typed.verdict !== null || asking}
           autoFocus
           autoComplete="off"
         />
-        {right === null && !asking && <button type="submit" className="c-btn c-btn--primary" disabled={!value.trim()}>Check</button>}
+        {typed.verdict === null && !asking && <button type="submit" className="c-btn c-btn--primary" disabled={!value.trim()}>Check</button>}
       </div>
-      {asking && <ConfidencePrompt onPick={reveal} />}
-      {right !== null && (
-        <p className={'retain-feedback ' + (right ? 'right' : 'wrong')} role="status">
-          {right ? <>Right: <strong>{cloze.missing}</strong></> : <>The word: <strong>{cloze.missing}</strong></>}
-        </p>
+      {asking && <ConfidencePrompt onPick={level => { setAsking(false); typed.reveal(level); }} />}
+      {typed.verdict === 'right' && <p className="retain-feedback right" role="status">Right: <strong>{cloze.missing}</strong></p>}
+      {explained && <MissFeedback guideId={guideId} card={card} question={question} chosen={value.trim()} sure={typed.confidence === 'sure'} />}
+      {typed.verdict === 'right' && <NextButton onNext={onNext} missed={false} />}
+      {(typed.verdict === 'close' || typed.verdict === 'wrong') && typed.credit === null && (
+        <TypedDecision verdict={typed.verdict} expected={cloze.missing} label="The word" onDecide={typed.decide} onExplain={explained ? null : () => setExplained(true)} />
       )}
-      {explained && <MissFeedback guideId={guideId} card={card} question={question} chosen={value.trim()} sure={confidence === 'sure'} />}
-      {right !== null && <NextButton onNext={onNext} missed={!right} onExplain={explained ? null : () => setExplained(true)} />}
     </form>
   );
 }

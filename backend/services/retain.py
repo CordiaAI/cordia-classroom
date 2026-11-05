@@ -95,6 +95,42 @@ def fill_matches(response: str, answer: str) -> bool:
     return False
 
 
+_FILLER = {"the", "a", "an", "of", "and", "in", "on", "at", "to", "for", "is", "are", "was", "were", "by", "with", "its", "it"}
+
+
+def _key_words(text: str) -> list:
+    return [word for word in str(text or "").split(" ") if word and word not in _FILLER]
+
+
+def _same_word(a: str, b: str) -> bool:
+    if a == b or re.sub(r"s$", "", a) == re.sub(r"s$", "", b):
+        return True
+    return len(a) >= 5 and len(b) >= 5 and not re.search(r"\d", a + b) and _distance(a, b) <= max(len(a), len(b)) // 5
+
+
+def fill_verdict(response: str, answer: str) -> str:
+    """'right' (fill_matches), 'close' (part of the answer, nothing contradicting it: "Alpha Sigma"
+    for "Oregon Alpha Sigma") or 'wrong'. Close: every number in the answer is there, the typed
+    words cover at least half of the answer's key words, at most one typed word isn't in it.
+    Mirrors web/lib/retainEngine.mjs fillVerdict; the student decides whether close counts."""
+    if fill_matches(response, answer):
+        return "right"
+    given = _key_words(normalize(response))
+    if not given:
+        return "wrong"
+    for accepted in _accepted(answer):
+        target = _key_words(accepted)
+        if not target:
+            continue
+        if any(re.search(r"\d", word) and word not in given for word in target):
+            continue
+        covered = sum(1 for word in target if any(_same_word(typed, word) for typed in given))
+        extra = sum(1 for typed in given if not any(_same_word(typed, word) for word in target))
+        if covered and covered * 2 >= len(target) and extra <= 1:
+            return "close"
+    return "wrong"
+
+
 def plan_session(questions: list, selected) -> list:
     """Cards in guide order: {"type", "concepts": [index, ...]}, one first ask per idea."""
     chosen = [kind for kind in TYPES if kind in set(selected or ())] or ["mc"]
@@ -163,7 +199,11 @@ def first_try_credit(question: dict, attempt: dict, user_id: str, guide_id: str)
     if kind in ("mc", "matching"):
         return 1.0 if normalize(response) and normalize(response) == normalize(answer) else 0.0
     if kind == "fill":
-        return 1.0 if fill_matches(response, answer) else 0.0
+        if fill_matches(response, answer):
+            return 1.0
+        # The student looked at the right answer and said theirs meant the same ("Count it as
+        # right" / "I was right"). Their call, like a flashcard's Got it: it only moves their own score.
+        return 1.0 if attempt.get("self_marked") and attempt.get("credit") == 1 else 0.0
     if kind == "written":
         return verified_credit(user_id, guide_id, attempt.get("concept"), attempt.get("credit"), attempt.get("token"))
     return 0.0

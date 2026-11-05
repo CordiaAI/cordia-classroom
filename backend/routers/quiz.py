@@ -40,6 +40,7 @@ class RetainAttempt(BaseModel):
     response: str = Field(default="", max_length=4000)
     credit: Optional[float] = None
     token: Optional[str] = Field(default=None, max_length=128)
+    self_marked: bool = False  # a typed answer the student counted as right after seeing the answer
 
 
 class QuizSubmission(BaseModel):
