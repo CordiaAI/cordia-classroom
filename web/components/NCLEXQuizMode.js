@@ -29,7 +29,7 @@ export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
   function logNclex(isCorrect) {
-    logAnswer({ guideId, question: q.stem, mode: 'nclex', type: 'mc', credit: isCorrect ? 1 : 0, timing: timer.current?.done() });
+    logAnswer({ guideId, question: q.stem, mode: 'nclex', type: 'mc', credit: isCorrect ? 1 : 0, timing: timer.current?.done(), nOptions: q.options?.length });
   }
 
   function toggleSata(i) {

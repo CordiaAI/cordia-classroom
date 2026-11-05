@@ -965,7 +965,7 @@ Second gate (depends on the reports; Phase 0 doesn't wait on these):
 
 | Phase | Status |
 | --- | --- |
-| 0 Instrumentation | In progress |
+| 0 Instrumentation | In progress. 0.2 ✅ code (migration `20261105120000` NOT APPLIED; logging works before and after it). 0.4 ✅ `/admin/metrics` (live after `fly deploy`). 0.5 ✅ script (owner runs dry run, then `--apply`). 0.1 and 0.6: read-only SQL in `supabase/checks/phase0_readonly.sql` for the owner (this session lost database access). 0.3 next. |
 | 1 Onboarding v2 | Approved, not started |
 | 2 Unified memory (FSRS) | Approved, not started |
 | 3 Study plans | Approved, not started |

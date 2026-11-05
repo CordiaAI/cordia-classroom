@@ -2,6 +2,8 @@
 
 Rows hold raw values only. FSRS ratings, rapid-guess flags and memory state are derived later, so
 learning_events.fsrs_rating stays null, rapid_guess false, arm 'fsrs' and params_version 'none'.
+rapid_guess stays false on purpose: no research report gives a threshold, and inferring from response
+times may count as health data under Washington's MHMDA (docs/research/11, plans/pending/personalization.md).
 An idea is item_id '<guide_id>:<fingerprint>', the fingerprint being Learn's
 (web/lib/learnEngine.mjs fingerprint).
 
@@ -146,6 +148,7 @@ def event_rows(user_id: str, events: list[dict], earlier: Iterable[dict], tz_off
             "hidden_ms": event.get("hidden_ms") or 0,
             "rapid_guess": False,
             "answer_chars": event.get("answer_chars"),
+            "n_options": event.get("n_options"),
             "view_shown": event.get("view_shown"),
             "fsrs_rating": None,
             "same_day": same_day[index],
@@ -153,7 +156,27 @@ def event_rows(user_id: str, events: list[dict], earlier: Iterable[dict], tz_off
             "params_version": PARAMS_VERSION,
             "occurred_at": event["occurred_at"].isoformat(),
         })
+    # A batch with no choice answers leaves the column out (a connected app's never have one).
+    if all(row["n_options"] is None for row in rows):
+        for row in rows:
+            del row["n_options"]
     return rows
+
+
+def _missing_column(error: Exception, column: str) -> bool:
+    text = str(error)
+    return column in text and any(mark in text for mark in ("PGRST204", "42703", "does not exist", "Could not find"))
+
+
+def _insert_events(supabase, rows: list[dict]) -> None:
+    """Inserts answers. Until the n_options migration has run, retries without that column."""
+    try:
+        supabase.table("learning_events").insert(rows, returning=ReturnMethod.minimal).execute()
+    except Exception as error:
+        if not rows or "n_options" not in rows[0] or not _missing_column(error, "n_options"):
+            raise
+        supabase.table("learning_events").insert([{k: v for k, v in row.items() if k != "n_options"} for row in rows],
+                                                 returning=ReturnMethod.minimal).execute()
 
 
 def write_batch(supabase, user_id: str, decisions: list[dict], events: list[dict], tz_offset: int = 0) -> dict:
@@ -182,7 +205,7 @@ def write_batch(supabase, user_id: str, decisions: list[dict], events: list[dict
         earlier = supabase.table("learning_events").select("item_id, occurred_at").eq("user_id", user_id) \
             .in_("item_id", items).gte("occurred_at", since).execute().data or []
         # No rows back: a connected app's answers are written as the student, who can't read every column.
-        supabase.table("learning_events").insert(event_rows(user_id, events, earlier, tz_offset, now), returning=ReturnMethod.minimal).execute()
+        _insert_events(supabase, event_rows(user_id, events, earlier, tz_offset, now))
         return {"logged": True, "decisions": len(decisions), "events": len(events)}
     except Exception as error:
         _note_failure(error)

@@ -105,6 +105,7 @@ class LearningEvent(_Item):
     submit_ms: Optional[int] = Field(default=None, ge=0, le=MAX_MS)
     hidden_ms: int = Field(default=0, ge=0, le=MAX_MS)
     answer_chars: Optional[int] = Field(default=None, ge=0, le=100000)
+    n_options: Optional[int] = Field(default=None, ge=2, le=50)  # choices shown (choice and matching)
     view_shown: Optional[str] = Field(default=None, max_length=40)
     occurred_at: Optional[datetime] = None
 
