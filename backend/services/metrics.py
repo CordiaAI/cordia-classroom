@@ -7,7 +7,9 @@ Definitions (docs/research/09-onboarding-retention.md, "Metrics"):
 
 Recall formats are typed, free fill-in and written answers (docs/research/01 rule 4, research 08's
 grade mapping, brief section 5.1). Flashcard flips, multiple choice, matching and word-bank fill-ins
-are recognition: they count as study activity for D1/D7 but not as recall answers.
+are recognition: they count as study activity for D1/D7 but not as recall answers. A correct answer
+the student marked "Guess" is not a recall win either (owner decision G1); a wrong one still counts
+as an answer given.
 
 Exam date: until onboarding stores the answer with a time (plan step 1.2), "saved an exam date" is
 any of the student's guides having a Learn test date when the report runs. That over-counts slightly
@@ -57,16 +59,21 @@ def _rate(successes: int, total: int) -> dict:
             "interval": wilson(successes, total)}
 
 
+def _counts_as_recall(answer: dict) -> bool:
+    if answer.get("format") not in RECALL_FORMATS or answer.get("mode") == "backfill":
+        return False
+    return not (answer.get("confidence") == "guess" and answer.get("outcome") in ("right", "partly"))
+
+
 def user_outcomes(signed_up: datetime, guides: Iterable[dict], answers: Iterable[dict],
                   activity: Iterable[datetime], now: datetime) -> dict:
     """One student's activation and returns. guides: {created_at, test_date}; answers:
-    {occurred_at, format, mode}; activity: times of any study (answers and sessions)."""
+    {occurred_at, format, mode, outcome, confidence}; activity: times of any study (answers and sessions)."""
     window_end = signed_up + ACTIVATION_WINDOW
     guides = list(guides)
     made_guide = any((t := _when(g.get("created_at"))) and signed_up <= t < window_end for g in guides)
     recall = sum(1 for a in answers
-                 if a.get("format") in RECALL_FORMATS and a.get("mode") != "backfill"
-                 and (t := _when(a.get("occurred_at"))) and signed_up <= t < window_end)
+                 if _counts_as_recall(a) and (t := _when(a.get("occurred_at"))) and signed_up <= t < window_end)
     exam_date = any(g.get("test_date") for g in guides)
     days = {int((t - signed_up) / DAY) for t in activity if t is not None and t >= signed_up}
     return {
@@ -131,7 +138,7 @@ def activation_report(users: list[dict], guides: list[dict], answers: list[dict]
         "notes": [
             "Directional only: small samples, so read the intervals, not the point rates.",
             "Exam date counts any guide with a Learn test date, saved at any time (onboarding answers will add the time).",
-            "Recall answers: typed, free fill-in and written; flashcards, choice, matching and word-bank fill-ins are recognition.",
+            "Recall answers: typed, free fill-in and written, not counting correct guesses; flashcards, choice, matching and word-bank fill-ins are recognition.",
         ],
     }
 
@@ -175,7 +182,7 @@ def load_activation(db, days: int = 30, now: Optional[datetime] = None) -> dict:
         guides += _all(lambda a, b: db.table("study_guides")
                        .select("user_id, created_at, test_date:flashcard_progress->learn->>test_date")
                        .in_("user_id", chunk).range(a, b))
-        answers += _all(lambda a, b: db.table("learning_events").select("user_id, occurred_at, format, mode")
+        answers += _all(lambda a, b: db.table("learning_events").select("user_id, occurred_at, format, mode, outcome, confidence")
                         .in_("user_id", chunk).gte("occurred_at", since.isoformat()).range(a, b))
         sessions += _all(lambda a, b: db.table("study_sessions").select("user_id, started_at")
                          .in_("user_id", chunk).gte("started_at", since.isoformat()).range(a, b))

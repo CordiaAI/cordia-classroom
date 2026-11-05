@@ -213,7 +213,7 @@ RetainCards}.js`, `web/pages/play/[guideId].js`, `backend/routers/admin.py`.
 #### Step 0.4: Recall activation and D1/D7 recall return (Size: S)
 - Acceptance criteria:
   - Recall activation per report 09: within 24 h of signup, made a guide AND ≥3 recall-format answers
-    (typed, fill, written) AND an exam date saved (a guide's Learn test date, or a plan's from
+    (typed, fill, written; a correct "Guess" doesn't count, G1) AND an exam date saved (a guide's Learn test date, or a plan's from
     Phase 3).
   - D1 and D7 return per report 09 (any study session on day 1 / days 6–8) are computed alongside it.
   - The figures are admin-only (`/admin/metrics`), by signup week and by experiment arm once 1.1 lands.
@@ -288,7 +288,7 @@ Files to touch: `web/lib/walkthrough.js`, `web/components/{Walkthrough,AboutYou,
 #### Step 1.3: Questions during the build (Size: M)
 - Acceptance criteria:
   - The About you step becomes report 10's onboarding set (wording verbatim from report 10), split per
-    G2. Recommended split, inside report 09's 45–60 s build window:
+    G2 (decided), inside report 09's 45–60 s build window:
     - while the guide builds: major + year (Q4 list); "Your next big exam — when is it?" (Canvas
       prefilled; "No exam yet — just keeping up"); "It's the night before a quiz. What are you most
       likely doing?" (five options);
@@ -298,6 +298,9 @@ Files to touch: `web/lib/walkthrough.js`, `web/components/{Walkthrough,AboutYou,
       and morning/evening ("If you could pick, when does your brain work best?").
   - Every question has a "why we ask" line and a skip; no demographics, anxiety or personality items.
     Results are called "starting settings", never a type.
+  - Picking a major stores the student's report-02 archetype (one of nine) on their profile
+    (`user_profiles.study_archetype`, with `archetype_version`), even though only 4–5 templates ship
+    (G3). Majors map to archetypes in `web/lib/majors.mjs`; 4.1 moves the map into the database.
   - Total day one ≤5 minutes to the first recall win (report 09), timed by the QA script.
 - Verification command: `web:test`, `build`. The QA Playwright run times the flow.
 - Files likely touched: `web/components/AboutYou.js` (rewritten as `OnboardingQuestions.js`),
@@ -412,8 +415,8 @@ Files to touch: the shared scheduler package `packages/scheduler/` (ts-fsrs), mi
     - Hard means pass;
     - Easy only for typed + Sure + fast on a mature item.
   - The ladder: Mastered = a recall success since the last lapse AND R ≥ 0.90; falls back to Familiar
-    below 0.85.
-  - Exam-ready = first-try recall correct on ≥3 separate study days.
+    below 0.85. A correct "Guess" is never a recall success (G1), though FSRS rates it Hard (a pass).
+  - Exam-ready = first-try recall correct, not guessed, on ≥3 separate study days.
 - Verification command: as 2.1.
 - Files likely touched: `memory/grades`, `memory/ladder`.
 - Test seams: table-driven unit tests, one row per rule.
@@ -602,7 +605,9 @@ All of it is deterministic, with no LLM in the engine.
 - Acceptance criteria:
   - `majors`, `study_archetypes` and `major_overrides` exist, seeded from report 02's JSON (archetype,
     default modes, learn formats, tutor mode, dashboard pinned/tucked, suggested connectors, major
-    exams), with G3 deciding nine archetypes or 4–5 templates. Majors per Q4.
+    exams). All nine archetypes are stored; each points at one of the 4–5 shipped templates (G3):
+    memorization/health; quantitative and programming; reading/writing; business and social science;
+    arts, education and undeclared. Majors per Q4.
   - Widget gaps: Study now, Lectures, Class sets, Grades and Plan my week are pages or tabs today, not
     Dashboard cards; each gets a card in 4.2. Report 02's "proposed additions" (NGN builders, code
     sandbox, etc.) are out of this plan. Connectors hidden behind a flag (GitHub, Slack, Dropbox,
@@ -853,7 +858,7 @@ copy ("Explain things to me with…") changes per the decision log, below.
 | `20261105120000_learning_events_n_options.sql` | `learning_events.n_options`; `mode` adds `probe`, `backfill` |
 | `20261105130000_decision_outcomes.sql` | `decision_outcomes` (report 08 fields), RLS service-only |
 | `20261106120000_experiments.sql` | `experiment_assignments` |
-| `20261106130000_onboarding_answers.sql` | `onboarding_answers` (versioned weak priors); widen `onboarding_progress.step` check |
+| `20261106130000_onboarding_answers.sql` | `onboarding_answers` (versioned weak priors); `user_profiles.study_archetype`, `archetype_version`; widen `onboarding_progress.step` check |
 | `20261110120000_item_memory.sql` | `item_memory` plus its write function and grants (`mcp_client` via `mcp_record_answer` only) |
 | `20261117120000_study_plans.sql` | `study_plans`, `plan_tasks`, `plan_changes`, `quick_check_runs` |
 | `20261124120000_majors_archetypes.sql` | `majors`, `study_archetypes`, `major_overrides` + seed |
@@ -898,6 +903,9 @@ and ships with an RLS test.
 | Bandit | Postponed; rules plus ≤10–20% logged uniform randomisation among enabled options, propensities stored; future reward = delayed-recall residual | Resolved |
 | Grades | Calibrator, not reward; insights tiered and wording-gated in code; no aggregate under 10 students | Resolved |
 | Recall formats | Typed, fill, written count as recall; flips, choice and match are recognition | Reports 01, 08; brief §5.1 |
+| Correct + Guess (G1) | A pass (FSRS Hard) for scheduling; not a recall win for activation, Mastered or exam-ready | Owner, Nov 5 |
+| Onboarding split (G2) | Build: major+year, exam date, night-before habit. Reveal: study trigger. Day 2: expected/target grade, morning/evening | Owner, Nov 5 |
+| Templates (G3) | Ship 4–5 templates first; store each student's report-02 archetype on their profile now, so templates can split later without asking again | Owner, Nov 5 |
 | Rapid guess | Not computed (no report threshold; MHMDA caution) | Reports 08, 11 |
 | Consents | Four, per report 11 | Report 11 |
 | SMS window | 8 a.m.–8 p.m. local, ≤3 a week | Report 11 example D, stricter of the two |
@@ -916,15 +924,7 @@ and ships with an RLS test.
 
 ## Not yet specified
 
-Second gate (depends on the reports; Phase 0 doesn't wait on these):
-- **G1. Correct + Guess.** Keep report 08's mapping (FSRS Hard, a pass) but don't let a guessed correct
-  answer count as a recall success for activation, Mastered or exam-ready? Recommended: yes.
-- **G2. Onboarding length.** Ask 3 questions while the guide builds (major+year, exam date,
-  night-before), the if-then trigger on the reveal, and move expected grade and morning/evening to
-  day 2? Recommended: yes (fits report 09's 45–60 s; report 10's full set would not).
-- **G3. Archetypes.** Ship report 04's 4–5 templates first (memorization/health, quantitative/
-  programming, reading/writing, business/social science, undeclared), with report 02's nine kept as
-  data for later? Recommended: yes.
+Second gate: G1–G3 answered Nov 5 (see the decision log). Still open:
 - **Later, not a question now:** a Cordia-wide FSRS fit at ~2–5k first-try reviews (report 08) is a
   follow-up plan after Phase 2.
 

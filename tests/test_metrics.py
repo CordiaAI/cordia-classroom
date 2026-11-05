@@ -55,6 +55,15 @@ class UserOutcomeTests(unittest.TestCase):
             self.assertEqual(self.outcome([guide], answers(3, fmt))["overall"]["activation"]["yes"], 1, fmt)
         self.assertEqual(self.outcome([guide], answers(3, mode="backfill"))["overall"]["activation"]["yes"], 0)
 
+    def test_a_correct_guess_is_not_a_recall_win_but_a_wrong_answer_counts_as_given(self):
+        guide = {"user_id": "u1", "created_at": at(0.5), "test_date": "2026-10-20"}
+        guessed = [{**a, "outcome": "right", "confidence": "guess"} for a in answers(3)]
+        self.assertEqual(self.outcome([guide], guessed)["overall"]["activation"]["yes"], 0)
+        wrong_guesses = [{**a, "outcome": "wrong", "confidence": "guess"} for a in answers(3)]
+        self.assertEqual(self.outcome([guide], wrong_guesses)["overall"]["activation"]["yes"], 1)
+        sure = [{**a, "outcome": "right", "confidence": "sure"} for a in answers(3)]
+        self.assertEqual(self.outcome([guide], sure)["overall"]["activation"]["yes"], 1)
+
     def test_d1_and_d7_count_any_study_and_only_once_those_days_are_over(self):
         report = self.outcome(events=answers(1, "flashcard", hours=30), sessions=[{"user_id": "u1", "started_at": at(24 * 7 + 2)}])
         self.assertEqual((report["overall"]["d1_return"]["yes"], report["overall"]["d7_return"]["yes"]), (1, 1))
