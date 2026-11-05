@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  advance, createSession, currentCard, fillMatches, firstAttempts, progress, recordResults, reaskType,
+  advance, choiceText, createSession, currentCard, fillMatches, firstAttempts, progress, recordResults, reaskType,
 } from '../lib/retainEngine.mjs';
 
 const q = (question, answer) => ({ question, options: [answer, 'Other A', 'Other B', 'Other C'], correct_index: 0 });
@@ -75,4 +75,20 @@ test('fill in the blank checks match the server rules', () => {
   assert.equal(fillMatches('DNA', 'Deoxyribonucleic acid (DNA)'), true);
   assert.equal(fillMatches('meiosis', 'Mitosis'), false);
   assert.equal(fillMatches('1865', '1863'), false);
+});
+
+test('choices end alike: a lone closing period goes, abbreviations and ellipses keep theirs', () => {
+  const cases = [
+    ['ATP is made in the mitochondria.', 'ATP is made in the mitochondria'],
+    ['Mitochondria', 'Mitochondria'],
+    ['It rose 5.5', 'It rose 5.5'],
+    ['Cells, tissues, organs, etc.', 'Cells, tissues, organs, etc.'],
+    ['Founded in the U.S.', 'Founded in the U.S.'],
+    ['It trails off...', 'It trails off...'],
+    ['  Spaced.  ', 'Spaced'],
+  ];
+  for (const [raw, shown] of cases) {
+    assert.equal(choiceText(raw), shown, raw);
+    assert.equal(choiceText(shown), shown);
+  }
 });

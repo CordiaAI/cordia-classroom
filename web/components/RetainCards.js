@@ -4,7 +4,7 @@ import { BookOpen, Check, MessageCircle, Sparkles, X } from 'lucide-react';
 import { requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { noteView, useAnswerTiming } from '../lib/learningEvents';
-import { conceptAnswer, fillMatches, normalize, shuffled } from '../lib/retainEngine.mjs';
+import { choiceText, conceptAnswer, fillMatches, normalize, shuffled } from '../lib/retainEngine.mjs';
 import { makeCloze } from '../lib/learnEngine.mjs';
 
 // A wrong answer of any type opens the Tutor's "why was I wrong" help.
@@ -128,9 +128,10 @@ export function MissFeedback({ guideId, card, question, chosen, sure }) {
 
 // askSure: false skips "How sure are you?" (Learn lets the student turn it off).
 export function McCard({ card, question, guideId, onResult, onNext, askSure = true }) {
-  const answer = conceptAnswer(question);
+  // Choices are shown with matching endings (choiceText), so the answer's period doesn't give it away.
+  const answer = choiceText(conceptAnswer(question));
   // Always shuffled, so the right answer's position never gives it away (saved quizzes kept it first).
-  const [options] = useState(() => shuffled(question.options || [], Math.floor(Math.random() * 233280)));
+  const [options] = useState(() => shuffled((question.options || []).map(choiceText), Math.floor(Math.random() * 233280)));
   // An answer is picked, then "How sure?" (first asks only), then it's revealed.
   const [pending, setPending] = useState(null);
   const [selected, setSelected] = useState(null);

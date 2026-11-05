@@ -78,6 +78,47 @@ def _parse_qa_pairs(text: str) -> list:
     return pairs
 
 
+# Abbreviations whose closing period stays (see choice_text).
+_KEEP_PERIOD = {"etc", "vs", "inc", "jr", "sr", "dr", "st", "mr", "mrs", "ms", "no", "approx", "co", "ltd", "al"}
+
+
+def choice_text(text) -> str:
+    """One choice as shown: without a lone closing period. The correct answer is the guide's own
+    sentence ("... in the mitochondria.") while wrong choices are written without one, so the period
+    gave the answer away. Abbreviations ("etc.", "U.S.") and ellipses keep theirs. Mirrors
+    web/lib/retainEngine.mjs choiceText; grading ignores periods either way."""
+    value = str(text if text is not None else "").strip()
+    if not value.endswith(".") or value.endswith(".."):
+        return value
+    last = value[:-1].split()[-1] if value[:-1].split() else ""
+    if "." in last or last.lower() in _KEEP_PERIOD:
+        return value
+    return value[:-1].rstrip()
+
+
+def _choices(answer: str, distractors: list) -> tuple:
+    """(options, correct_index): the answer and its distractors with matching endings, shuffled,
+    dropping a distractor that becomes the answer once the period goes."""
+    shown = choice_text(answer)
+    rest, seen = [], {shown.casefold()}
+    for value in distractors:
+        value = choice_text(value)
+        if value and value.casefold() not in seen:
+            seen.add(value.casefold())
+            rest.append(value)
+    options = [shown, *rest]
+    random.shuffle(options)
+    return options, options.index(shown)
+
+
+def even_choices(question: dict) -> dict:
+    """A saved question with its choices' endings matched (quizzes saved before this kept them)."""
+    options = question.get("options")
+    if not isinstance(options, list):
+        return question
+    return {**question, "options": [choice_text(option) for option in options]}
+
+
 def _other_answers(qa_pairs: list, index: int) -> list:
     """Return distinct guide answers, closest in length to the correct answer."""
     answer = qa_pairs[index]["answer"]
@@ -118,12 +159,11 @@ def _standard_questions(qa_pairs: list) -> list:
         distractors = _not_longest(answer, random.sample(shortlist, min(3, len(shortlist))), candidates)
         if not distractors:
             continue
-        options = [answer, *distractors]
-        random.shuffle(options)
+        options, correct_index = _choices(answer, distractors)
         questions.append({
             "question": pair["question"],
             "options": options,
-            "correct_index": options.index(answer),
+            "correct_index": correct_index,
         })
     return questions
 
@@ -188,7 +228,7 @@ def _load_quiz(supabase, guide_id: str, user_id: str, regenerate: bool = False) 
     if not regenerate:
         cached = _guide_columns(supabase, guide_id, user_id, "quiz_questions").get("quiz_questions")
         if cached:
-            return cached, True
+            return [even_choices(q) if isinstance(q, dict) else q for q in cached], True
 
     study_guide_text = _guide_columns(supabase, guide_id, user_id, "study_guide").get("study_guide", "")
     if not study_guide_text:
@@ -268,9 +308,7 @@ Return ONLY the JSON object, no other text:"""
         )
         if not distractors:
             continue
-        options = [correct_answer, *distractors]
-        random.shuffle(options)
-        correct_index = options.index(correct_answer)
+        options, correct_index = _choices(correct_answer, distractors)
         questions.append({
             "question": pair["question"],
             "options": options,

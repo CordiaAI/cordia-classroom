@@ -1,7 +1,8 @@
 // Photos on flashcards: only real images from a signed-in student, stored under their own folder.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createCardImages, sniffImage, MAX_BYTES } from '../lib/server/cardImages.mjs';
+import { createCardImages, createImageStore, sniffImage, MAX_BYTES } from '../lib/server/cardImages.mjs';
+import { DEFAULT_SUPABASE_URL } from '../lib/supabaseUrl.mjs';
 
 const USER = '11111111-2222-4333-8444-555555555555';
 const b64 = value => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -52,4 +53,22 @@ test('says photos are not set up until the bucket exists', async () => {
   const result = await world({ storeStatus: 400, storeBody: '{"error":"Bucket not found"}' }).service.upload(AUTH, { image: dataUrl(PNG) });
   assert.equal(result.status, 503);
   assert.equal(result.body.code, 'not_configured');
+});
+
+test('works with only the service key set, as in production (the project URL is built in)', async () => {
+  const calls = [];
+  const fetch = async (url, init = {}) => {
+    calls.push(url);
+    if (url.endsWith('/billing/status')) return new Response('{}', { status: 200 });
+    if (url.includes('/storage/v1/object/feedback-attachments/')) return new Response('{}', { status: 200 });
+    throw new Error(`unexpected ${url}`);
+  };
+  const store = createImageStore({ env: { NEXT_PUBLIC_API_URL: 'https://api.example.com', SUPABASE_SERVICE_ROLE_KEY: 'svc' }, fetch, kind: 'feedback' });
+  const result = await store.upload(AUTH, { image: dataUrl(PNG) });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.match(result.body.path, new RegExp(`^${USER}/[0-9a-f-]{36}\\.png$`));
+  assert.ok(calls.some(url => url.startsWith(`${DEFAULT_SUPABASE_URL}/storage/v1/object/feedback-attachments/`)));
+  // Without the service key it is honestly not set up.
+  const bare = createImageStore({ env: { NEXT_PUBLIC_API_URL: 'https://api.example.com' }, fetch, kind: 'feedback' });
+  assert.equal((await bare.upload(AUTH, { image: dataUrl(PNG) })).body.code, 'not_configured');
 });

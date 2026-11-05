@@ -20,6 +20,18 @@ export function conceptAnswer(question) {
   return Number.isInteger(index) && index >= 0 && index < options.length ? String(options[index]) : '';
 }
 
+// One choice as shown: without a lone closing period, so the guide's own answer (a sentence ending
+// in ".") doesn't stand out among wrong choices written without one. Abbreviations ("etc.", "U.S.")
+// and ellipses keep theirs. Mirrors backend/routers/quiz.py choice_text.
+const KEEP_PERIOD = new Set(['etc', 'vs', 'inc', 'jr', 'sr', 'dr', 'st', 'mr', 'mrs', 'ms', 'no', 'approx', 'co', 'ltd', 'al']);
+export function choiceText(text) {
+  const value = String(text ?? '').trim();
+  if (!value.endsWith('.') || value.endsWith('..')) return value;
+  const last = value.slice(0, -1).split(/\s+/).pop() || '';
+  if (last.includes('.') || KEEP_PERIOD.has(last.toLowerCase())) return value;
+  return value.slice(0, -1).trimEnd();
+}
+
 export function normalize(text) {
   return String(text || '')
     .normalize('NFKD').replace(/[̀-ͯ]/g, '')

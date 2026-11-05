@@ -8,7 +8,7 @@ import { buildStudyQueue } from '../studyQueue.mjs';
 import { parseQAPairs, parseStudyNotes } from '../guideText.mjs';
 import { cardDue } from '../spacedReview.mjs';
 import { itemFingerprint } from '../learningEvents.mjs';
-import { conceptAnswer } from '../retainEngine.mjs';
+import { choiceText, conceptAnswer } from '../retainEngine.mjs';
 import { questionKey } from '../retainMisses.mjs';
 import { freezeStreak, semesterStart } from '../streak.mjs';
 import { loadCourses } from './courses.mjs';
@@ -126,8 +126,8 @@ function sectionItems(guide, name, today) {
     return (Array.isArray(guide.quiz_questions) ? guide.quiz_questions : []).map((question, index) => ({
       question_id: `${guide.id}:quiz:${index}`,
       question: clip(question.question, 600),
-      options: Array.isArray(question.options) ? question.options.map(option => clip(option, 300)) : [],
-      answer: clip(conceptAnswer(question), 600),
+      options: Array.isArray(question.options) ? question.options.map(option => clip(choiceText(option), 300)) : [],
+      answer: clip(choiceText(conceptAnswer(question)), 600),
     }));
   }
   const evaluations = guide.practice_state?.progress?.evaluations || {};

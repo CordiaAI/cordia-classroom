@@ -2,6 +2,7 @@
 // is really a JPEG, PNG, WebP or GIF under 3 MB -> store it in the public "card-images" bucket at
 // <user id>/<random>.<ext> -> return its URL for the card. Server env: SUPABASE_SERVICE_ROLE_KEY.
 import { randomUUID } from 'node:crypto';
+import { supabaseUrlFrom } from '../supabaseUrl.mjs';
 
 export const MAX_BYTES = 3 * 1024 * 1024;
 const BUCKET = 'card-images';
@@ -30,7 +31,9 @@ export function createCardImages(options = {}) {
 export function createImageStore({ env = process.env, fetch: fetchImpl = fetch, kind = 'card' } = {}) {
   const store = STORES[kind] || STORES.card;
   const apiBase = (env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-  const supabaseUrl = (env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+  // Same lookup as every other server feature: the project's built-in URL when the env doesn't set one
+  // (production sets only the service key, so reading NEXT_PUBLIC_SUPABASE_URL alone said "not set up").
+  const supabaseUrl = supabaseUrlFrom(env);
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || '';
   const NOT_SET_UP = { status: 503, body: { detail: store.notSetUp, code: 'not_configured' } };
 
