@@ -144,7 +144,9 @@ class ProfileApiTests(unittest.TestCase):
             self.client.patch("/profiles/me", headers=auth("ana"), json={"profile_visibility": visibility})
             view = self.client.get("/profiles/ana", headers=auth("ben")).json()
             self.assertTrue(view["limited"])
-            self.assertEqual({k for k in view if k not in ("guides", "folders", "classrooms", "badges")},
+            # Besides the lists, only the basics and the viewer's own standing with them (Stage 2).
+            viewer_state = ("relationship", "can_follow", "follows_need_approval", "can_friend", "friend_note")
+            self.assertEqual({k for k in view if k not in ("guides", "folders", "classrooms", "badges") + viewer_state},
                              {"id", "username", "display_name", "initials", "is_self", "limited"})
             own = self.client.get("/profiles/ana", headers=auth("ana")).json()
             self.assertTrue(own["is_self"])

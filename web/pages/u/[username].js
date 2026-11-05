@@ -7,6 +7,8 @@ import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader'
 import Menu from '../../components/Menu';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import FeedbackModal from '../../components/FeedbackModal';
+import FollowButton from '../../components/FollowButton';
+import FriendButton from '../../components/FriendButton';
 import { blockUser, loadProfile } from '../../lib/profiles';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
@@ -27,6 +29,13 @@ export default function ProfilePage() {
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [toast, setToast] = useState('');
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = setTimeout(() => setToast(''), 2600);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     if (!ready || !username) return undefined;
@@ -45,6 +54,13 @@ export default function ProfilePage() {
   if (gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate} label="Loading profile" />;
 
   const profile = result?.profile;
+
+  // A follow or friend change: the button updates at once, then the profile is read again so the
+  // counts (and "Follows you") match the server.
+  function relate(changes) {
+    setResult(current => ({ ...current, profile: { ...current.profile, relationship: { ...current.profile.relationship, ...changes } } }));
+    loadProfile(username).then(data => { if (data.profile) setResult(data); });
+  }
 
   async function block() {
     setConfirmBlock(false);
@@ -98,15 +114,30 @@ export default function ProfilePage() {
                     {(profile.badges || []).map(badge => <li key={badge.key || badge.label} className="up-badge">{badge.label}</li>)}
                   </ul>
                 )}
+                {profile.counts && (
+                  <p className="up-counts">
+                    <span><strong>{profile.counts.followers}</strong> {profile.counts.followers === 1 ? 'follower' : 'followers'}</span>
+                    <span><strong>{profile.counts.following}</strong> following</span>
+                    <span><strong>{profile.counts.friends}</strong> {profile.counts.friends === 1 ? 'friend' : 'friends'}</span>
+                  </p>
+                )}
+                {profile.relationship?.follows_you && profile.relationship.friendship !== 'friends' && <p className="c-meta up-follows-you">Follows you</p>}
+                {profile.friend_note && <p className="c-meta up-follows-you">{profile.friend_note}</p>}
               </div>
               <div className="up-actions">
                 {profile.is_self ? (
                   <Link href="/settings/privacy" className="c-btn c-btn--secondary"><Pencil {...ICON} />Edit profile</Link>
                 ) : (
+                  <>
+                  <FriendButton userId={profile.id} username={profile.username} state={profile.relationship?.friendship}
+                    note={profile.friend_note} onChange={friendship => relate({ friendship })} onError={setToast} />
+                  <FollowButton userId={profile.id} username={profile.username} state={profile.relationship?.following}
+                    needsApproval={profile.follows_need_approval} onChange={following => relate({ following })} onError={setToast} />
                   <Menu label={`More for @${profile.username}`} items={[
                     { label: 'Block', icon: Ban, danger: true, onSelect: () => setConfirmBlock(true) },
                     { label: 'Report', icon: Flag, onSelect: () => setReporting(true) },
                   ]} />
+                  </>
                 )}
               </div>
             </section>
@@ -156,6 +187,7 @@ export default function ProfilePage() {
             onCancel={() => setConfirmBlock(false)}
           />
         )}
+        {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
         {reporting && (
           <FeedbackModal initialCategory="other" initialMessage={`Report @${profile.username}: `} onClose={() => setReporting(false)} />
         )}
@@ -173,7 +205,10 @@ export default function ProfilePage() {
           .up-facts li { display: inline-flex; align-items: center; gap: 6px; }
           .up-facts :global(svg) { color: var(--olive-ink); }
           .up-badge { padding: 2px 10px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--olive-ink); font-weight: 600; }
-          .up-actions { display: flex; gap: 8px; }
+          .up-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+          .up-counts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 0; color: var(--muted); font: 500 15px/1.4 var(--font-sans); }
+          .up-counts strong { color: var(--ink); font-weight: 600; }
+          .up-follows-you { margin: 2px 0 0; }
           .up-tabs { justify-self: start; }
           .up-panel { display: grid; gap: 8px; }
           .up-none { margin: 0; color: var(--muted); text-align: center; padding: 32px 16px; }
@@ -184,8 +219,8 @@ export default function ProfilePage() {
           @media (max-width: 767px) {
             .up-head { gap: 12px; padding: 16px; }
             .up-avatar { width: 56px; height: 56px; font-size: 20px; }
-            .up-head.is-self { grid-template-columns: auto minmax(0, 1fr); }
-            .up-head.is-self .up-actions { grid-column: 1 / -1; }
+            .up-head { grid-template-columns: auto minmax(0, 1fr); }
+            .up-actions { grid-column: 1 / -1; justify-content: flex-start; }
             .up-head.is-self .up-actions :global(.c-btn) { flex: 1; }
           }
         `}</style>

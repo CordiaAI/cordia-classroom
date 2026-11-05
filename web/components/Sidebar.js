@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { CalendarDays, ChartNoAxesColumn, CircleHelp, CreditCard, Ellipsis, FolderPlus, House, Library, Link2, LogOut, MessageCircle, Megaphone, Moon, Palette, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Sun, User } from 'lucide-react';
+import { CalendarDays, ChartNoAxesColumn, CircleHelp, CreditCard, Ellipsis, FolderPlus, House, Library, Link2, LogOut, MessageCircle, Megaphone, Moon, Palette, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Sun, User, Users } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -11,6 +11,8 @@ import AccountMenu from './AccountMenu';
 import ShortcutsSheet from './ShortcutsSheet';
 import StudyTimer from './StudyTimer';
 import TutorBubble from './TutorBubble';
+import NotificationBell from './NotificationBell';
+import { loadSocialSummary, onSocialSummary } from '../lib/social';
 import { openNewSheet } from '../lib/newSheet';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { classLabel } from '../lib/classLabel';
@@ -86,6 +88,11 @@ export default function Sidebar({ timerState, setTimerState }) {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [timerOpen, setTimerOpen] = useState(false);
   const [canReviewFeedback, setCanReviewFeedback] = useState(false);
+  // Friend and follow requests waiting on you: the badge on Friends in the account menu.
+  const [requests, setRequests] = useState(0);
+  const countRequests = summary => setRequests((summary?.incoming_friend_requests || 0) + (summary?.incoming_follow_requests || 0));
+  useEffect(() => onSocialSummary(countRequests), []);
+  useEffect(() => { loadSocialSummary().then(countRequests); }, [router.pathname]);
   const [dark, setDark] = useState(false);
   const timerRef = useRef(null);
   const [shortcut, setShortcut] = useState('Ctrl K');
@@ -189,6 +196,7 @@ export default function Sidebar({ timerState, setTimerState }) {
   // the theme and Sign out (Progress is in the sidebar; Appearance, Plan and Connectors are in Settings).
   const accountItems = [
     { key: 'progress', label: 'Progress', icon: ChartNoAxesColumn, onSelect: () => router.push('/progress') },
+    { key: 'friends', label: 'Friends', icon: Users, badge: requests || null, badgeLabel: `${requests} ${requests === 1 ? 'request' : 'requests'}`, onSelect: () => router.push('/friends') },
     { key: 'profile', label: 'Settings', icon: Settings, onSelect: () => router.push('/settings') },
     { key: 'appearance', label: 'Appearance', icon: Palette, onSelect: () => router.push('/settings?section=account') },
     { key: 'plan', label: 'Plan', icon: CreditCard, onSelect: () => router.push('/settings?section=plan') },
@@ -199,7 +207,7 @@ export default function Sidebar({ timerState, setTimerState }) {
   ];
   const themeItem = { key: 'theme', label: dark ? 'Light theme' : 'Dark theme', icon: dark ? Sun : Moon, onSelect: () => setThemePreference(dark ? 'light' : 'dark') };
   const sideMenuItems = [
-    ...accountItems.filter(item => ['profile', 'help', 'feedback'].includes(item.key)),
+    ...accountItems.filter(item => ['friends', 'profile', 'help', 'feedback'].includes(item.key)),
     themeItem,
     ...accountItems.filter(item => item.key === 'signout'),
   ];
@@ -248,6 +256,7 @@ export default function Sidebar({ timerState, setTimerState }) {
         <button type="button" className="c-side-item" onClick={() => setShowSearch(true)} aria-label={`Search (${shortcut})`} title={tip(`Search (${shortcut})`)} aria-keyshortcuts={shortcut === '⌘K' ? 'Meta+K' : 'Control+K'}>
           <Search size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">Search</span><kbd className="c-side-kbd" aria-hidden="true">{shortcut}</kbd>
         </button>
+        <NotificationBell variant="side" tip={tip} />
         <nav className="c-side-nav" aria-label="Primary">
           {navItems.map(sideLink)}
           <div className="c-side-section" role="group" aria-labelledby="c-side-classes">
@@ -310,6 +319,7 @@ export default function Sidebar({ timerState, setTimerState }) {
           <button type="button" className="c-btn c-btn--secondary c-searchbtn" onClick={() => setShowSearch(true)} aria-label={`Search (${shortcut})`} title={`Search (${shortcut})`} aria-keyshortcuts={shortcut === '⌘K' ? 'Meta+K' : 'Control+K'}>
             <Search size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
+          <NotificationBell variant="top" />
           <button type="button" className="c-btn c-btn--primary c-new-btn" data-spot="new" onClick={() => openNewSheet()}>
             <Plus size={20} strokeWidth={1.75} aria-hidden="true" />New
           </button>

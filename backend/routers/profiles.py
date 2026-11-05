@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 from auth_utils import get_user_id
 from database import get_supabase
 from rate_limit import ai_rate_limit
-from services import usernames
+from services import social_graph, usernames
 from services.blocks import is_blocked
 
 logger = logging.getLogger(__name__)
@@ -38,17 +38,8 @@ def _own_profile(db, user_id: str) -> dict:
     return {**row, "exists": True} if row else {"id": user_id}
 
 
-def _first_name(profile: dict) -> str:
-    return (profile.get("name") or "").strip().split(" ")[0]
-
-
-def _shown_name(profile: dict) -> str:
-    return (profile.get("display_name") or "").strip() or _first_name(profile) or profile.get("username") or ""
-
-
-def _initials(profile: dict) -> str:
-    words = [w for w in _shown_name(profile).replace(".", " ").replace("_", " ").split() if w]
-    return "".join(w[0] for w in words[:2]).upper() or "?"
+_shown_name = social_graph.shown_name
+_initials = social_graph.initials
 
 
 def _streak(db, user_id: str) -> int:
@@ -206,8 +197,7 @@ def get_profile(username: str, authorization: str = Header(default="")):
         raise HTTPException(status_code=404, detail="Profile not found")
     is_self = viewer == owner
     visibility = profile.get("profile_visibility") or "public"
-    # "friends" profiles show only the basics until friendships exist (Stage 2).
-    full = is_self or visibility == "public"
+    full = is_self or visibility == "public" or (visibility == "friends" and social_graph.are_friends(db, viewer, owner))
     out = {
         "id": owner,
         "username": profile.get("username"),
@@ -221,7 +211,15 @@ def get_profile(username: str, authorization: str = Header(default="")):
         "folders": [],
         "classrooms": [],
     }
+    if not is_self:
+        out["relationship"] = social_graph.relationship(db, viewer, owner)
+        out["can_follow"] = True
+        out["follows_need_approval"] = (profile.get("allow_follows") or "everyone") == "approval"
+        friend_problem = social_graph.may_request_friend(db, viewer, profile)
+        out["can_friend"] = friend_problem is None or out["relationship"]["friendship"] != "none"
+        out["friend_note"] = friend_problem if out["relationship"]["friendship"] == "none" else None
     if full:
+        out["counts"] = social_graph.counts(db, owner)
         if profile.get("show_real_name") and profile.get("name"):
             out["real_name"] = profile["name"].strip()
         if profile.get("show_school") is not False and profile.get("university"):
