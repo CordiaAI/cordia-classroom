@@ -1,4 +1,4 @@
--- Lectures (NOT APPLIED: waiting for the owner's OK; run on a dev/preview database first).
+-- Lectures (APPLIED by hand in the SQL editor, verified live 2026-11-05 (not in Supabase's migration history)).
 --
 -- 1. lectures: one row per lecture: a recording's transcript, an uploaded recording, or notes /
 --    a transcript typed or pasted in. No audio is stored. analysis holds what the AI pulled out

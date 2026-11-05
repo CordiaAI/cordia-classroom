@@ -1,4 +1,4 @@
--- Napkin AI visuals (NOT APPLIED: waiting for the owner's OK; run on a dev/preview database first,
+-- Napkin AI visuals (APPLIED by hand in the SQL editor, verified live 2026-11-05 (not in Supabase's migration history),
 -- after 20261016120000_lecture_recording.sql).
 --
 -- 1. Visuals are metered like other AI features: Free 10 and Pro 200 a month, one usage_ledger

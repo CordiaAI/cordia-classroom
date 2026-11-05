@@ -1,4 +1,4 @@
--- Lecture recording (NOT APPLIED: waiting for the owner's OK; run on a dev/preview database first).
+-- Lecture recording (APPLIED by hand in the SQL editor, verified live 2026-11-05 (not in Supabase's migration history)).
 --
 -- 1. Recording minutes are metered like other AI features: one usage_ledger row per minute of
 --    audio per recording (request_key "<recording_id>:<minute>" makes retries free).

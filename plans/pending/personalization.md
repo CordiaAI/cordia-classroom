@@ -906,6 +906,7 @@ and ships with an RLS test.
 | Recall formats | Typed, fill, written count as recall; flips, choice and match are recognition | Reports 01, 08; brief §5.1 |
 | Correct + Guess (G1) | A pass (FSRS Hard) for scheduling; not a recall win for activation, Mastered or exam-ready | Owner, Nov 5 |
 | Onboarding split (G2) | Build: major+year, exam date, night-before habit. Reveal: study trigger. Day 2: expected/target grade, morning/evening | Owner, Nov 5 |
+| Scheduler package for the Assistant | Private `@cordiaai/scheduler` on GitHub Packages, built from `packages/scheduler/`; the Assistant pins an exact version | Owner, Nov 5 |
 | Templates (G3) | Ship 4–5 templates first; store each student's report-02 archetype on their profile now, so templates can split later without asking again | Owner, Nov 5 |
 | Rapid guess | Not computed (no report threshold; MHMDA caution) | Reports 08, 11 |
 | Consents | Four, per report 11 | Report 11 |
@@ -930,11 +931,7 @@ Second gate: G1–G3 answered Nov 5 (see the decision log). Still open:
   follow-up plan after Phase 2.
 
 - **Phase 1:** resolved by Q14 (80/20, directional).
-- **Phase 2:** how the Assistant (a separate repo) gets the shared scheduler package. Recommendation: a
-  private package `@cordiaai/scheduler` published to GitHub Packages from `packages/scheduler/`, with
-  the Assistant pinning an exact version. The alternative is a git dependency on a tag, which npm
-  can't do for a subfolder without a separate repo. Asked in the second gate; Phase 0 and 1 don't
-  depend on it.
+- **Phase 2:** resolved: GitHub Packages (decision log).
 - **Phase 6:** whether Canvas returns `score_statistics` for students at USA South (some schools hide
   it). Probe with one real token at 6.3 pickup.
 - **Phase 7:** fog: the item-bank generation and review workflow (who verifies, how) is a separate plan.
@@ -966,7 +963,7 @@ Second gate: G1–G3 answered Nov 5 (see the decision log). Still open:
 
 | Phase | Status |
 | --- | --- |
-| 0 Instrumentation | Code done (PR CordiaAI/cordia-classroom#197). 0.2, 0.3, 0.4, 0.5 ✅; migrations `20261105120000` and `20261105130000` NOT APPLIED; backend live after `fly deploy`. 0.1 and 0.6 wait on the owner's read-only SQL results (`supabase/checks/phase0_readonly.sql`). |
+| 0 Instrumentation | Done in PR CordiaAI/cordia-classroom#197 (merged). 0.6 ✅ live: longest session since Oct 31 is 25 min, none over 3 h (17 day-long rows from before the fix remain). 0.1 ✅ `supabase/schema/` snapshot; constraints and three hand-applied migrations confirmed by queries 6–7. Owner: apply migrations `20261105120000`, `20261105130000` (and `20261026130000_feedback_attachments`, never applied), then `fly deploy`. |
 | 1 Onboarding v2 | Approved, not started |
 | 2 Unified memory (FSRS) | Approved, not started |
 | 3 Study plans | Approved, not started |

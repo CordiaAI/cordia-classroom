@@ -1,4 +1,4 @@
--- Connector sync, phase 1: Canvas + Google Calendar + Google Tasks (NOT APPLIED: waiting for the owner's OK).
+-- Connector sync, phase 1: Canvas + Google Calendar + Google Tasks (APPLIED by hand in the SQL editor, verified live 2026-11-05 (not in Supabase's migration history)).
 -- Needs 20261023120000_connector_settings.sql first.
 --
 -- Ground rules this supports:

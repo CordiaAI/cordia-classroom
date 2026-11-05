@@ -1,8 +1,8 @@
 # Live schema vs. this repo (personalization plan step 0.1)
 
-Read on 2026-11-05 from the live project's migration history (`supabase_migrations.schema_migrations`,
-run by the owner). The live table and policy snapshot (`live-2026-11.sql`) is added once the
-column, constraint and policy queries in `supabase/checks/phase0_readonly.sql` have been run.
+Read on 2026-11-05 from the live project (queries in `supabase/checks/phase0_readonly.sql`, run by
+the owner). `live-2026-11.sql` holds the 64 public tables with their columns, constraints and
+policies.
 
 ## How migrations reach production
 
@@ -55,8 +55,13 @@ Applied by hand in the SQL editor (live, not recorded), oldest first:
 Waiting for the owner (PR CordiaAI/cordia-classroom#197): 20261105120000_learning_events_n_options,
 20261105130000_decision_outcomes.
 
-Fourteen of the hand-applied files still say "NOT APPLIED" in their header. Those headers get a dated
-"applied by hand" line once the column/constraint/policy snapshot confirms each one is live.
+Headers checked against the live columns, constraints and policies (2026-11-05):
+- Ten hand-applied files now say "APPLIED by hand … verified live 2026-11-05".
+- `20261026130000_feedback_attachments` is **not applied**: `feedback.attachments` doesn't exist.
+  Feedback still saves without screenshots until it runs (the dialog says screenshots aren't set up).
+- `20261022120000_card_images` (a storage bucket), `20261026120000_slack_deadline_source` (a check
+  constraint past the editor's 100-row limit) and `20261026140000_drop_legacy_guide_cap` (a trigger)
+  can't be confirmed from columns; query 7 in `supabase/checks/phase0_readonly.sql` checks them.
 
 ## Core tables with no create statement in the repo
 

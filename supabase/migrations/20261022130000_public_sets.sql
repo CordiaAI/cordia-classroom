@@ -1,4 +1,4 @@
--- Public sets (NOT APPLIED: waiting for the owner's OK).
+-- Public sets (APPLIED by hand in the SQL editor, verified live 2026-11-05 (not in Supabase's migration history)).
 --
 -- Today a guide can be shared with its class (shared_sets, visibility 'class'): a snapshot of the
 -- title, guide text and cards that classmates study or save a copy of. This lets a student make

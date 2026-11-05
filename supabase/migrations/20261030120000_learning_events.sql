@@ -1,5 +1,5 @@
 -- Adaptive learning engine, phase 1: honest logging.
--- NOT APPLIED: waiting for owner's OK. Run on a dev/preview database first.
+-- APPLIED by hand in the SQL editor, verified live 2026-11-05 (not in Supabase's migration history).
 --
 -- From the build spec's "Draft migrations" section; only the four phase 1 tables (item_memory,
 -- fsrs_params, recall_probes and exam_targets come with phase 2).

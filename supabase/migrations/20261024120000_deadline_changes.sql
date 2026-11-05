@@ -1,4 +1,4 @@
--- Deadline changes found in email and Canvas announcements (NOT APPLIED: waiting for the owner's OK).
+-- Deadline changes found in email and Canvas announcements (APPLIED by hand in the SQL editor, verified live 2026-11-05 (not in Supabase's migration history)).
 --
 -- Phase 3: when a professor, TA or school address emails something like "the exam moved to
 -- Thursday" or "you have an extension to Monday" (or a Canvas announcement says a date moved),

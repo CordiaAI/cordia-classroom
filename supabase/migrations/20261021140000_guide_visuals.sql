@@ -1,4 +1,4 @@
--- Visuals a student keeps in a guide's Outline (NOT APPLIED: waiting for the owner's OK; run after
+-- Visuals a student keeps in a guide's Outline (APPLIED by hand in the SQL editor, verified live 2026-11-05 (not in Supabase's migration history); run after
 -- 20261016130000_napkin_visuals.sql).
 --
 -- Highlight text in the Outline -> Visualize -> three Napkin versions appear beside it -> the one
