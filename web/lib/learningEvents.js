@@ -161,10 +161,11 @@ export function logFormatDecision({ guideId, question, decision, context = {} })
       candidates: map(decision.candidates),
       mask_reasons: Object.fromEntries(Object.entries(decision.mask).map(([type, reason]) => [formatFor(type), reason])),
       eligible: map(decision.eligible),
-      probs: { [chosen]: 1 },
+      // From the policy that made the choice (rules: probability 1, no seed), never assumed here.
+      probs: Object.fromEntries(Object.entries(decision.probs || { [decision.chosen]: 1 }).map(([type, p]) => [formatFor(type), p]).filter(([type]) => type)),
       chosen,
-      propensity: 1,
-      seed: 0, // no randomness in phase 1
+      propensity: decision.propensity ?? 1,
+      seed: decision.seed ?? 0,
       context: { ...context, recall: decision.recall, local_hour: new Date().getHours(), device: device() },
     });
     schedule();

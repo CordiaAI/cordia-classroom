@@ -12,6 +12,7 @@ machines never sync the same user at once:
   every 6 hours, the Google Sheets export daily when it's set to keep itself updated, and Slack
   study-session reminders when they're due (checked every minute).
 - Exams found in Canvas get their review sessions scheduled once Calendar sync is on.
+- Once a day, what happened after each adaptive decision (services.decision_outcomes).
 On by default on Fly (FLY_APP_NAME is set there), off elsewhere; SYNC_WORKER=1 or 0 overrides.
 """
 
@@ -157,6 +158,11 @@ def _loop() -> None:
             send_reminders()
         except Exception:
             log.exception("slack reminder check failed")
+        try:
+            from services import decision_outcomes
+            decision_outcomes.run_if_due(get_supabase)
+        except Exception:
+            log.exception("decision outcomes failed")
         time.sleep(REMINDER_SECONDS)
 
 

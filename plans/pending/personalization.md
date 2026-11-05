@@ -201,7 +201,8 @@ RetainCards}.js`, `web/pages/play/[guideId].js`, `backend/routers/admin.py`.
   - `logFormatDecision` takes `probs`, `propensity` and `seed` from the policy (1/1/0 while rules are
     deterministic), not hard-coded at the call site.
   - A nightly job writes `delayed_recall` (the next first-try recall-format answer on the same idea ≥1
-    day later) and `returned_within_48h`. `p_pred`/`residual` stay null until Phase 2.
+    day later; a correct "Guess" scores 0, G1) and `returned_within_48h` (any answer 6–48 h after the
+    decision, so the same sitting doesn't count). `p_pred`/`residual` stay null until Phase 2.
 - Verification command: `py:test`. In production, `select count(*) from decision_outcomes`, nonzero 2
   days after deploy.
 - Files likely touched: migration `20261105130000_decision_outcomes.sql`,
@@ -856,7 +857,7 @@ copy ("Explain things to me with…") changes per the decision log, below.
 | --- | --- |
 | `supabase/schema/live-2026-11.sql` | Not a migration: a read-only snapshot of the live schema (baseline) |
 | `20261105120000_learning_events_n_options.sql` | `learning_events.n_options`; `mode` adds `probe`, `backfill` |
-| `20261105130000_decision_outcomes.sql` | `decision_outcomes` (report 08 fields), RLS service-only |
+| `20261105130000_decision_outcomes.sql` | `decision_outcomes` (report 08 fields plus `learning_event_id`), unique per decision and type, RLS service-only |
 | `20261106120000_experiments.sql` | `experiment_assignments` |
 | `20261106130000_onboarding_answers.sql` | `onboarding_answers` (versioned weak priors); `user_profiles.study_archetype`, `archetype_version`; widen `onboarding_progress.step` check |
 | `20261110120000_item_memory.sql` | `item_memory` plus its write function and grants (`mcp_client` via `mcp_record_answer` only) |
@@ -965,7 +966,7 @@ Second gate: G1–G3 answered Nov 5 (see the decision log). Still open:
 
 | Phase | Status |
 | --- | --- |
-| 0 Instrumentation | In progress. 0.2 ✅ code (migration `20261105120000` NOT APPLIED; logging works before and after it). 0.4 ✅ `/admin/metrics` (live after `fly deploy`). 0.5 ✅ script (owner runs dry run, then `--apply`). 0.1 and 0.6: read-only SQL in `supabase/checks/phase0_readonly.sql` for the owner (this session lost database access). 0.3 next. |
+| 0 Instrumentation | Code done (PR CordiaAI/cordia-classroom#197). 0.2, 0.3, 0.4, 0.5 ✅; migrations `20261105120000` and `20261105130000` NOT APPLIED; backend live after `fly deploy`. 0.1 and 0.6 wait on the owner's read-only SQL results (`supabase/checks/phase0_readonly.sql`). |
 | 1 Onboarding v2 | Approved, not started |
 | 2 Unified memory (FSRS) | Approved, not started |
 | 3 Study plans | Approved, not started |

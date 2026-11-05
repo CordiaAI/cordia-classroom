@@ -120,6 +120,8 @@ test('Learn\'s format decision records the candidates, what was ruled out and wh
   assert.deepEqual(fresh.eligible, ['mc', 'fill']);
   assert.equal(fresh.source, 'rule');
   assert.equal(fresh.recall, false);
+  // The rule policy states its own probabilities: the chosen format with probability 1, no seed.
+  assert.deepEqual([fresh.probs, fresh.propensity, fresh.seed], [{ mc: 1 }, 1, 0]);
 
   const recall = formatDecision(long, { l: FAMILIAR }, '2026-10-28', ['mc', 'type', 'cloze']);
   assert.equal(recall.chosen, 'written');
