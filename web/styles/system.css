@@ -272,7 +272,10 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
 .c-empty .lucide { color: var(--olive-ink); }
 
 /* Pills (feature row) */
-.c-pills { display: flex; gap: 8px; overflow-x: auto; padding: 2px; scrollbar-width: none; }
+/* A scrolling row clips whatever hangs outside it, so the pills' shadows were cut off in one
+   straight line under the row. The padding gives the shadows room; the matching negative margin
+   keeps the row exactly where it was. */
+.c-pills { display: flex; gap: 8px; overflow-x: auto; padding: 6px 10px 16px; margin: -6px -10px -16px; scrollbar-width: none; }
 .c-pills::-webkit-scrollbar { display: none; }
 .c-pill {
   display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto;
