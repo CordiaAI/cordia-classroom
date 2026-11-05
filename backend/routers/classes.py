@@ -15,7 +15,7 @@ from database import get_supabase
 from services.class_catalog import normalize_course_code, suggest_class, term_for
 from services.class_db import add_membership, ensure_class, ensure_folder, ensure_school, is_member, remove_membership, user_class_ids
 from services.deadlines import canvas_item_key, is_done, marks, select_assignments
-from services.sharing import ranked_entries, upsert_share
+from services.sharing import ranked_entries, sync_guide_visibility, upsert_share
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["classes"])
@@ -270,6 +270,7 @@ def unfile_guide(body: UndoFileRequest, authorization: str = Header(default=""))
         raise HTTPException(status_code=404, detail="Folder not found")
     db.table("study_guides").update({"folder_id": folder_id}).eq("id", guide["id"]).eq("user_id", user_id).execute()
     db.table("shared_sets").update({"visibility": "private"}).eq("guide_id", guide["id"]).eq("owner_id", user_id).execute()
+    sync_guide_visibility(db, user_id, guide["id"], "private")
     return {"ok": True}
 
 
@@ -359,8 +360,8 @@ def put_sharing_settings(body: SharingSettings, authorization: str = Header(defa
     user_id = get_user_id(authorization)
     db = get_supabase()
     db.table("sharing_settings").upsert({"user_id": user_id, "show_first_name": body.show_first_name}, on_conflict="user_id").execute()
-    from services.sharing import owner_name
-    db.table("shared_sets").update({"owner_name": owner_name(db, user_id)}).eq("owner_id", user_id).execute()
+    from services.sharing import refresh_owner_names
+    refresh_owner_names(db, user_id)
     return {"show_first_name": body.show_first_name}
 
 
@@ -430,6 +431,11 @@ def report_set(set_id: str, body: ReportRequest, authorization: str = Header(def
     open_reports = db.table("shared_set_reports").select("reporter_id").eq("set_id", row["id"]).eq("status", "open").execute().data or []
     if len({r["reporter_id"] for r in open_reports}) >= 3:
         db.table("shared_sets").update({"status": "hidden"}).eq("id", row["id"]).eq("status", "visible").execute()
+        try:  # the guide's own page goes with it until an admin decides
+            db.table("study_guides").update({"review_status": "held", "hold_reason": "Reported by classmates"}) \
+                .eq("id", row.get("guide_id")).eq("review_status", "ok").execute()
+        except Exception:
+            pass
     return {"ok": True}
 
 

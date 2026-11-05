@@ -22,7 +22,7 @@ from routers import (
     nclex, practice, quiz, search, smart_notes, stats, tutor,
 )
 from routers import canvas, classes, admin, public_forms, connectors, drive, plans, workspace, apps, mcp, jobs
-from routers import notifications, profiles, social
+from routers import notifications, profiles, social, guide_sharing
 from services import log_scrub
 
 # Load environment variables
@@ -178,6 +178,7 @@ app.add_middleware(
 # Include Supabase-backed routers
 app.include_router(auth.router)
 app.include_router(folders.router)
+app.include_router(guide_sharing.router)  # before guides: /guides/saved isn't a guide id
 app.include_router(guides.router)
 app.include_router(stats.router)
 app.include_router(search.router)

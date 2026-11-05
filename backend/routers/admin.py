@@ -71,8 +71,14 @@ def queue(authorization: str = Header(default="")):
     merges = db.table("class_merge_proposals").select("*").eq("status", "pending").execute().data or []
     merge_class_ids = list({m[k] for m in merges for k in ("from_class_id", "into_class_id") if m.get(k)})
     merge_classes = {c["id"]: c["course_code_normalized"] for c in (db.table("classes").select("id,course_code_normalized").in_("id", merge_class_ids).execute().data or [] if merge_class_ids else [])}
+    try:
+        guides = db.table("study_guides").select("id,title,visibility,review_status,hold_reason,created_at") \
+            .in_("review_status", ["held", "hidden"]).order("created_at", desc=True).limit(200).execute().data or []
+    except Exception:  # before the Stage 3 migration
+        guides = []
     return {
         "sets": [{**s, "class": classes.get(s["class_id"]), "reports": by_set.get(s["id"])} for s in sets.values()],
+        "guides": guides,
         "merges": [{**m, "from": merge_classes.get(m.get("from_class_id")), "into": merge_classes.get(m.get("into_class_id"))} for m in merges],
         "takedowns": db.table("copyright_takedowns").select("*").eq("status", "received").order("created_at").execute().data or [],
         "policy": db.table("canvas_school_policy").select("*").order("domain").execute().data or [],
@@ -89,6 +95,32 @@ def decide_set(set_id: str, body: SetDecision, authorization: str = Header(defau
     set_id = _id(set_id)
     db.table("shared_sets").update({"status": body.status, "hold_reason": None, "updated_at": _now()}).eq("id", set_id).execute()
     db.table("shared_set_reports").update({"status": "dismissed" if body.status == "visible" else "upheld"}).eq("set_id", set_id).eq("status", "open").execute()
+    # The guide behind the set follows the decision, so its own page agrees with Class sets.
+    row = (db.table("shared_sets").select("guide_id").eq("id", set_id).limit(1).execute().data or [None])[0]
+    if row and row.get("guide_id"):
+        _decide_guide(db, row["guide_id"], "ok" if body.status == "visible" else "hidden")
+    return {"ok": True}
+
+
+def _decide_guide(db, guide_id: str, status: str) -> None:
+    try:
+        db.table("study_guides").update({"review_status": status, "hold_reason": None}).eq("id", guide_id).execute()
+    except Exception:  # before the Stage 3 migration
+        pass
+
+
+class GuideDecision(BaseModel):
+    status: Literal["ok", "hidden"]
+
+
+@router.post("/guides/{guide_id}")
+def decide_guide(guide_id: str, body: GuideDecision, authorization: str = Header(default="")):
+    """Release a held guide (ok) or keep it hidden from everyone but its owner."""
+    _, db = require_admin(authorization)
+    guide_id = _id(guide_id)
+    _decide_guide(db, guide_id, body.status)
+    db.table("shared_sets").update({"status": "visible" if body.status == "ok" else "hidden", "hold_reason": None, "updated_at": _now()}) \
+        .eq("guide_id", guide_id).in_("status", ["held", "hidden", "visible"]).execute()
     return {"ok": True}
 
 
@@ -131,8 +163,14 @@ def decide_takedown(takedown_id: str, body: TakedownDecision, authorization: str
     row = (db.table("copyright_takedowns").select("*").eq("id", _id(takedown_id)).limit(1).execute().data or [None])[0]
     if not row:
         raise HTTPException(status_code=404, detail="Takedown not found")
-    if row.get("set_id") and body.action == "rejected":
-        db.table("shared_sets").update({"status": "visible"}).eq("id", row["set_id"]).eq("status", "taken_down").execute()
+    # A report holds the guide and its class set; the decision either removes them or lets them back.
+    if row.get("set_id"):
+        if body.action == "rejected":
+            db.table("shared_sets").update({"status": "visible", "hold_reason": None}).eq("id", row["set_id"]).in_("status", ["held", "taken_down"]).execute()
+        else:
+            db.table("shared_sets").update({"status": "taken_down"}).eq("id", row["set_id"]).execute()
+    if row.get("guide_id"):
+        _decide_guide(db, row["guide_id"], "ok" if body.action == "rejected" else "hidden")
     db.table("copyright_takedowns").update({"status": body.action, "actioned_at": _now()}).eq("id", row["id"]).execute()
     return {"ok": True}
 

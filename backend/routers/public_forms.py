@@ -88,29 +88,43 @@ class TakedownRequest(BaseModel):
     statement: bool
 
 
+COPYRIGHT_HOLD = "Copyright report"
 _SET_ID = re.compile(r"set=([0-9a-fA-F-]{36})|/sets?/([0-9a-fA-F-]{36})")
 
 
 @router.post("/copyright/takedown", dependencies=[Depends(ai_rate_limit(5, 3600))])
 def takedown(body: TakedownRequest):
-    """Hides the named set at once, pending review (well inside the 24-hour promise)."""
+    """Holds the named guide or class set at once for an admin to review (well inside the 24-hour
+    promise). The link can be a guide page (/sets/<guide id>) or an older class set link."""
     if not body.statement:
         raise HTTPException(status_code=400, detail="Confirm the statement to continue")
     db = get_supabase()
     set_id: Optional[str] = None
+    guide_id: Optional[str] = None
     found = _SET_ID.search(body.location)
     if found:
         candidate = found.group(1) or found.group(2)
         try:
             candidate = str(uuid.UUID(candidate))
-            if db.table("shared_sets").select("id").eq("id", candidate).limit(1).execute().data:
-                set_id = candidate
         except ValueError:
-            pass
-    db.table("copyright_takedowns").insert({
+            candidate = None
+        if candidate:
+            shared = (db.table("shared_sets").select("id,guide_id").eq("id", candidate).limit(1).execute().data or [None])[0]
+            if not shared:
+                shared = (db.table("shared_sets").select("id,guide_id").eq("guide_id", candidate).limit(1).execute().data or [None])[0]
+                if shared or db.table("study_guides").select("id").eq("id", candidate).limit(1).execute().data:
+                    guide_id = candidate
+            if shared:
+                set_id, guide_id = shared["id"], guide_id or shared.get("guide_id")
+    row = {
         "set_id": set_id, "claimant_name": body.name.strip(), "claimant_email": str(body.email),
         "work_description": body.work.strip(), "location": body.location.strip(),
-    }).execute()
+    }
+    if guide_id:
+        row["guide_id"] = guide_id
+    db.table("copyright_takedowns").insert(row).execute()
     if set_id:
-        db.table("shared_sets").update({"status": "taken_down"}).eq("id", set_id).in_("status", ["visible", "held", "hidden"]).execute()
+        db.table("shared_sets").update({"status": "held", "hold_reason": COPYRIGHT_HOLD}).eq("id", set_id).in_("status", ["visible", "held"]).execute()
+    if guide_id:
+        db.table("study_guides").update({"review_status": "held", "hold_reason": COPYRIGHT_HOLD}).eq("id", guide_id).neq("review_status", "hidden").execute()
     return {"ok": True, "contact": COPYRIGHT_EMAIL}

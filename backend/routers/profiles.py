@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 from auth_utils import get_user_id
 from database import get_supabase
 from rate_limit import ai_rate_limit
-from services import social_graph, usernames
+from services import guide_access, social_graph, usernames
 from services.blocks import is_blocked
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,11 @@ def _me(db, user_id: str) -> dict:
         "show_real_name": bool(profile.get("show_real_name")),
         "can_change_username_at": next_change.isoformat() if next_change and next_change > datetime.now(timezone.utc) else None,
     })
+    try:  # its own query, so /profiles/me keeps working before the Stage 3 migration
+        accepted = _one(db.table("user_profiles").select("honor_code_accepted_at").eq("id", user_id).limit(1).execute())
+        out["honor_code_accepted"] = bool(accepted and accepted.get("honor_code_accepted_at"))
+    except Exception:
+        out["honor_code_accepted"] = False
     if not profile.get("username"):
         email_name = (profile.get("email") or "").split("@")[0]
         out["suggestions"] = usernames.suggestions(db, user_id, profile.get("display_name") or "", profile.get("name") or "", email_name)
@@ -206,8 +211,8 @@ def get_profile(username: str, authorization: str = Header(default="")):
         "is_self": is_self,
         "limited": not full,
         "badges": [],
-        # Filled in by later stages: public guides (3), public folders and classrooms (5).
-        "guides": [],
+        # Public folders and classrooms arrive in Stage 5.
+        "guides": guide_access.profile_guides(db, viewer, owner) if full else [],
         "folders": [],
         "classrooms": [],
     }
