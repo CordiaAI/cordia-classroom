@@ -13,7 +13,8 @@ import { aiProvider, chatProvider } from './aiProvider.mjs';
 import { aiChat } from './aiChat.mjs';
 import { supabaseUrlFrom } from '../supabaseUrl.mjs';
 import { collapseLoops, whisperText } from '../lectureText.mjs';
-export const LIMITS = { free: 120, pro: 1500 };
+// Fallback only: /billing/status sends each tier's real limit (backend/services/entitlements.py).
+export const LIMITS = { free: 30, pro: 150, weapon: 1200 };
 export const MAX_CHUNK_BYTES = 4_300_000; // under Vercel's 4.5 MB request limit
 const FEATURE = 'lecture_minute';
 const ID = /^[A-Za-z0-9_-]{8,64}$/;
@@ -87,7 +88,8 @@ export function createLectureService({ env = process.env, fetch: fetchImpl = glo
     const userId = userIdFromToken(authorization);
     if (!userId) return null;
     const plan = !data?.plan || data.plan === 'free' ? 'free' : 'pro';
-    const limit = Number(data?.features?.[FEATURE]?.limit) || LIMITS[plan];
+    const tier = LIMITS[data?.tier] !== undefined ? data.tier : (plan === 'free' ? 'free' : 'weapon');
+    const limit = Number(data?.features?.[FEATURE]?.limit) || LIMITS[tier];
     return { userId, plan, limit, unlimited: Boolean(data?.unlimited) };
   }
 

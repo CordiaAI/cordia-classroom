@@ -1,8 +1,12 @@
 """Single source of truth for CordiaClassroom plans, limits and usage.
 
-Entitlement:  Stripe -> webhook -> user_subscriptions -> plan_for()
+Tiers:        free, pro (Classroom Pro $4.99), weapon (Academic Weapon $9.99)
+Entitlement:  Stripe -> webhook -> user_subscriptions -> tier_for()
 Usage:        one usage_ledger row per successful AI action -> counts per month
 Enforcement:  require() before the AI call, record() only after it succeeds.
+
+The published extension reads only `plan` ("classroom_plus" = paid, "free"), so that field
+keeps its old meaning for every paid tier; `tier` says which paid tier it is.
 """
 
 import os
@@ -13,13 +17,20 @@ from fastapi import HTTPException
 
 from database import get_supabase
 
-PRO = "classroom_plus"
-PRO_PLAN_NAMES = {"pro", "classroom_plus"}
+PRO = "classroom_plus"  # the `plan` value every paid tier reports (extension compatibility)
+TIERS = ("free", "pro", "weapon")
+PAID_TIERS = ("pro", "weapon")
+TIER_NAMES = {"free": "Free", "pro": "Classroom Pro", "weapon": "Academic Weapon"}
+# user_subscriptions.plan value per paid tier. "pro" and "classroom_plus" are rows from the old
+# single $9.99 plan, which had every feature, so they resolve to Academic Weapon.
+STORED_PLAN = {"pro": "classroom_pro", "weapon": "academic_weapon"}
+PLAN_TIER = {"classroom_pro": "pro", "academic_weapon": "weapon", "pro": "weapon", "classroom_plus": "weapon"}
 ACTIVE_STATUSES = {"active", "trialing"}
 # Stripe keeps a subscription past_due while it retries a failed payment, then cancels it
-# (Dashboard > Billing > Revenue recovery). Pro lasts exactly as long as Stripe says.
+# (Dashboard > Billing > Revenue recovery). A paid tier lasts exactly as long as Stripe says.
 PRO_STATUSES = ACTIVE_STATUSES | {"past_due"}
 TRIAL_DAYS = 7
+TRIAL_TIER = "weapon"  # the trial shows everything, then drops to Free (owner plan 2026-11-03)
 
 # Monthly limits. "guide" is shared by every creation path: web create, extension,
 # tutor-built guide and SmartNote -> guide (3 total, not 3 each).
@@ -34,20 +45,34 @@ LIMITS = {
         "retain_types": 1,
         "light": 30,
         # Lecture recording, counted in minutes of audio transcribed.
-        "lecture_minute": 120,
+        "lecture_minute": 30,
         # Napkin visuals, made and stored by the web app's /api/visual route.
         "visual": 10,
     },
+    # The study loop: cheap features stay generous, expensive ones are capped.
     "pro": {
-        "guide": 100,
-        "tutor": 1000,
+        "guide": 15,
+        "tutor": 300,
         "learn_my_way": 300,
-        "practice": 100,
+        "practice": 15,
         "ai_quiz": 200,
         "nclex": 50,
         "retain_types": 300,
         "light": 500,
-        "lecture_minute": 1500,
+        "lecture_minute": 150,
+        "visual": 10,
+    },
+    # Automation and the expensive features.
+    "weapon": {
+        "guide": 100,
+        "tutor": 1000,
+        "learn_my_way": 300,
+        "practice": 75,
+        "ai_quiz": 200,
+        "nclex": 50,
+        "retain_types": 300,
+        "light": 500,
+        "lecture_minute": 1200,
         "visual": 200,
     },
 }
@@ -116,19 +141,23 @@ def subscription_row(user_id: str) -> Optional[dict]:
     return rows.data[0] if rows.data else None
 
 
-def plan_for(row: Optional[dict]) -> str:
-    """'pro' or 'free'. Paid, promo, trial and manual grants all resolve here."""
-    if not row or row.get("plan") not in PRO_PLAN_NAMES:
-        return "free"
-    if row.get("status") not in PRO_STATUSES:
+def tier_for(row: Optional[dict]) -> str:
+    """'free', 'pro' or 'weapon'. Paid, promo, trial and manual grants all resolve here."""
+    tier = PLAN_TIER.get((row or {}).get("plan"))
+    if not tier or row.get("status") not in PRO_STATUSES:
         return "free"
     # A no-card trial ends at pro_trial_ends_at even if Stripe's end-of-trial webhook
-    # is late or missed: never keep Pro past the trial end, and never charge.
+    # is late or missed: never keep a paid tier past the trial end, and never charge.
     if row.get("status") == "trialing" and row.get("pro_trial_started_at"):
         trial_ends = _ts(row.get("pro_trial_ends_at"))
         if trial_ends and trial_ends <= _now():
             return "free"
-    return "pro"
+    return tier
+
+
+def plan_for(row: Optional[dict]) -> str:
+    """'pro' for any paid tier, otherwise 'free'."""
+    return "free" if tier_for(row) == "free" else "pro"
 
 
 def usage_counts(user_id: str, month: Optional[str] = None) -> dict:
@@ -146,15 +175,18 @@ def entitlement(user_id: str) -> dict:
     """Everything the UI needs: plan, trial state, and per-feature remaining counts."""
     now = _now()
     row = subscription_row(user_id) or {}
-    plan = plan_for(row)
+    tier = tier_for(row)
+    plan = "free" if tier == "free" else "pro"
     unlimited = user_id in _unlimited_ids()
-    limits = LIMITS[plan]
+    limits = LIMITS[tier]
     used = usage_counts(user_id)
     trial_started = _ts(row.get("pro_trial_started_at"))
     trial_ends = _ts(row.get("pro_trial_ends_at"))
     on_trial = plan == "pro" and row.get("status") == "trialing" and trial_started is not None
     return {
         "plan": PRO if plan == "pro" else "free",
+        "tier": tier,
+        "tier_name": TIER_NAMES[tier],
         "status": row.get("status") or "none",
         "source": row.get("source") or ("stripe" if row else None),
         "billing_interval": None if on_trial else row.get("billing_interval"),
@@ -181,7 +213,8 @@ def entitlement(user_id: str) -> dict:
 
 
 class LimitReached(HTTPException):
-    def __init__(self, feature: str, used: int, limit: int, plan: str):
+    def __init__(self, feature: str, used: int, limit: int, tier: str):
+        higher = [t for t in TIERS[TIERS.index(tier) + 1:] if LIMITS[t][feature] > limit]
         super().__init__(
             status_code=402,
             detail={
@@ -190,7 +223,10 @@ class LimitReached(HTTPException):
                 "label": FEATURE_LABELS[feature],
                 "used": used,
                 "limit": limit,
-                "plan": PRO if plan == "pro" else "free",
+                "plan": "free" if tier == "free" else PRO,
+                "tier": tier,
+                # The cheapest tier that raises this limit, or None at the top.
+                "upgrade_tier": higher[0] if higher else None,
                 "resets_at": next_reset(),
                 "message": limit_message(feature, limit),
                 "upgrade_url": "/settings?section=subscription",
@@ -201,8 +237,8 @@ class LimitReached(HTTPException):
 def remaining(user_id: str, feature: str) -> int:
     if user_id in _unlimited_ids():
         return 10**6
-    plan = plan_for(subscription_row(user_id))
-    return max(0, LIMITS[plan][feature] - usage_counts(user_id)[feature])
+    tier = tier_for(subscription_row(user_id))
+    return max(0, LIMITS[tier][feature] - usage_counts(user_id)[feature])
 
 
 def require(user_id: str, feature: str) -> None:
@@ -211,11 +247,11 @@ def require(user_id: str, feature: str) -> None:
         raise ValueError(f"Unknown feature: {feature}")
     if user_id in _unlimited_ids():
         return
-    plan = plan_for(subscription_row(user_id))
+    tier = tier_for(subscription_row(user_id))
     used = usage_counts(user_id)[feature]
-    limit = LIMITS[plan][feature]
+    limit = LIMITS[tier][feature]
     if used >= limit:
-        raise LimitReached(feature, used, limit, plan)
+        raise LimitReached(feature, used, limit, tier)
 
 
 def record(user_id: str, feature: str, request_key: Optional[str] = None) -> None:

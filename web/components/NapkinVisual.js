@@ -142,7 +142,8 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
       const { status, data } = await requestVisual({ text, context, theme: currentTheme(), redraw, onSlow: () => setState({ phase: 'loading', redraw, slow: true }) });
       if (status === 402) {
         const detail = data?.detail || {};
-        if (detail.plan === 'free') openUpgrade({ feature: 'visual' });
+        // Free and Pro students can move up; Academic Weapon is the top, so it just says so.
+        if (detail.tier !== 'weapon' && (detail.plan === 'free' || detail.tier)) openUpgrade({ feature: 'visual' });
         if (earlier) giveUp({ reason: 'limit' });
         else setState({ phase: 'limit', pro: detail.plan !== 'free' });
         return;
