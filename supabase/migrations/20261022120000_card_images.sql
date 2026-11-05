@@ -1,4 +1,4 @@
--- Photos on flashcards (NOT APPLIED: waiting for the owner's OK).
+-- Photos on flashcards (APPLIED by hand in the SQL editor, verified live 2026-11-05 (not in Supabase's migration history)).
 --
 -- A student adds a photo to the front or back of a card (Create page and the guide's New card
 -- sheet). The browser shrinks it to at most 1600px, the web server (pages/api/card-image.js, service

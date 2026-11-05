@@ -1,5 +1,5 @@
 -- Personalization plan, step 0.2: how many choices a multiple-choice or matching answer had.
--- NOT APPLIED: waiting for the owner's OK. Run on a preview database first.
+-- APPLIED by the owner in the SQL editor on 2026-11-05 (not in Supabase's migration history)
 --
 -- A right answer out of 2 choices says less than one out of 5, so the count is kept with the answer.
 -- Null for formats with no choices (typed, written, fill, flashcards, practice).

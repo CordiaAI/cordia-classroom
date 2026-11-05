@@ -1,8 +1,8 @@
 # Live schema vs. this repo (personalization plan step 0.1)
 
-Read on 2026-11-05 from the live project's migration history (`supabase_migrations.schema_migrations`,
-run by the owner). The live table and policy snapshot (`live-2026-11.sql`) is added once the
-column, constraint and policy queries in `supabase/checks/phase0_readonly.sql` have been run.
+Read on 2026-11-05 from the live project (queries in `supabase/checks/phase0_readonly.sql`, run by
+the owner). `live-2026-11.sql` holds the 65 public tables with their columns, all 285 constraints and the
+policies.
 
 ## How migrations reach production
 
@@ -52,11 +52,15 @@ Applied by hand in the SQL editor (live, not recorded), oldest first:
 20261031120000_oauth_lockdown, 20261031130000_mcp_connected_apps, 20261101120000_mcp_read_access,
 20261102120000_mcp_write_tools, 20261102180000_study_set_job_repeat.
 
-Waiting for the owner (PR CordiaAI/cordia-classroom#197): 20261105120000_learning_events_n_options,
-20261105130000_decision_outcomes.
+Applied by the owner on 2026-11-05 (SQL editor): 20261026130000_feedback_attachments,
+20261105120000_learning_events_n_options, 20261105130000_decision_outcomes.
 
-Fourteen of the hand-applied files still say "NOT APPLIED" in their header. Those headers get a dated
-"applied by hand" line once the column/constraint/policy snapshot confirms each one is live.
+Headers checked against the live columns, constraints, policies, buckets and triggers (2026-11-05):
+every migration here is applied. Thirteen hand-applied files say "APPLIED by hand … verified live
+2026-11-05"; the three applied by the owner that day (feedback_attachments, which had been missed,
+learning_events_n_options and decision_outcomes) say so too. The old 5-guide trigger is gone.
+
+Pending: `20261105140000_trim_day_long_sessions` (trims 17 pre-fix day-long sessions to 3 hours).
 
 ## Core tables with no create statement in the repo
 

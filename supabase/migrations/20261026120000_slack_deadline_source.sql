@@ -1,4 +1,4 @@
--- Slack posts can suggest deadline changes too (NOT APPLIED: waiting for the owner's OK).
+-- Slack posts can suggest deadline changes too (APPLIED by hand in the SQL editor, verified live 2026-11-05 (not in Supabase's migration history)).
 --
 -- Phase 5: when a class or study-group Slack channel the student follows says a date moved,
 -- Cordia records the same pending suggestion as for email (services.mail_watch.propose), with

@@ -25,3 +25,16 @@ from pg_policies where schemaname = 'public' order by 1, 2;
 
 -- Which migrations Supabase has recorded (to match against supabase/migrations/).
 select version, name from supabase_migrations.schema_migrations order by version;
+
+-- Query 6 (step 0.1): every constraint, one row per table, so the editor's 100-row limit isn't hit.
+select conrelid::regclass as table_name,
+       string_agg(conname || ': ' || pg_get_constraintdef(oid), E'\n' order by conname) as constraints
+from pg_constraint where connamespace = 'public'::regnamespace
+group by conrelid order by 1;
+
+-- Query 7 (step 0.1): the three hand-applied migrations the column list can't confirm.
+select
+  exists (select 1 from storage.buckets where id = 'card-images') as card_images_bucket,
+  exists (select 1 from storage.buckets where id = 'feedback-attachments') as feedback_attachments_bucket,
+  (select pg_get_constraintdef(oid) from pg_constraint where conname = 'deadline_changes_source_check') as deadline_changes_sources,
+  exists (select 1 from pg_trigger where tgname = 'enforce_free_guide_creation_limit') as legacy_guide_cap_still_there;

@@ -1,4 +1,4 @@
--- Connector settings (NOT APPLIED: waiting for the owner's OK).
+-- Connector settings (APPLIED by hand in the SQL editor, verified live 2026-11-05 (not in Supabase's migration history)).
 --
 -- Each app in Settings > Connectors can be switched on or off for the Tutor and for Cordia
 -- Assistant separately; the app stays connected either way. No row means both are on.
