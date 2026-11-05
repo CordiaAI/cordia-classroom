@@ -176,7 +176,7 @@ def load_activation(db, days: int = 30, now: Optional[datetime] = None) -> dict:
     ids = [u["id"] for u in users]
     if not ids:
         return activation_report([], [], [], [], now)
-    guides, answers, sessions, arms = [], [], [], {}
+    guides, answers, sessions = [], [], []
     for start in range(0, len(ids), 100):
         chunk = ids[start:start + 100]
         guides += _all(lambda a, b: db.table("study_guides")
@@ -186,4 +186,6 @@ def load_activation(db, days: int = 30, now: Optional[datetime] = None) -> dict:
                         .in_("user_id", chunk).gte("occurred_at", since.isoformat()).range(a, b))
         sessions += _all(lambda a, b: db.table("study_sessions").select("user_id, started_at")
                          .in_("user_id", chunk).gte("started_at", since.isoformat()).range(a, b))
+    from services.experiments import arms_by_user
+    arms = arms_by_user(db)
     return activation_report(users, guides, answers, sessions, now, arms)

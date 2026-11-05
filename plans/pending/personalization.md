@@ -263,7 +263,9 @@ Files to touch: `web/lib/walkthrough.js`, `web/components/{Walkthrough,AboutYou,
   - `experiment_assignments(user_id, experiment, arm, stratum, assigned_at)` exists. Assignment
     happens at the first `/onboarding` read.
   - 80% of signups get onboarding v2; a 20% holdout keeps the old flow for the whole term. Assignment
-    is a deterministic hash of the user id, balanced within sign-in method and Canvas yes/no.
+    is a deterministic hash of the student and experiment ids (simple randomisation); the stratum
+    (sign-in method, Canvas yes/no) is stored and the report splits by it. Assignment starts only when
+    `ONBOARDING_EXPERIMENT=on`, set when v2's screens ship, so no one is labelled v2 before it exists.
   - The primary metric is recall activation (0.4). With ~37 signups a month the results are
     directional: the report shows both rates with intervals and makes no ship/no-ship call. Report
     09's guardrail is shown alongside: SMS STOP rate (pause a variant above ~5% a week).
@@ -964,7 +966,7 @@ Second gate: G1–G3 answered Nov 5 (see the decision log). Still open:
 | Phase | Status |
 | --- | --- |
 | 0 Instrumentation | ✅ Done (PR CordiaAI/cordia-classroom#197 merged; migrations applied and backend deployed by the owner Nov 5). Schema baseline in `supabase/schema/`. Live checks of screenshots, `n_options` and the daily job: owner runs `supabase/checks/phase0_live.sql`. |
-| 1 Onboarding v2 | In progress |
+| 1 Onboarding v2 | In progress. 1.1 ✅ backend (`services/experiments.py`; assigns only while `ONBOARDING_EXPERIMENT=on`, which waits until v2's screens ship). 1.2 ✅ backend (`POST /onboarding/answers`, question list in `services/onboarding_questions.py`). Migrations `20261106120000`, `20261106130000` NOT APPLIED. Next: 1.3 majors list and the build-time questions. |
 | 2 Unified memory (FSRS) | Approved, not started |
 | 3 Study plans | Approved, not started |
 | 4 Archetypes and layouts | Approved, not started |

@@ -35,19 +35,19 @@ class OnboardingProgressTests(unittest.TestCase):
         stub, _ = table_with([])
         with patch("routers.learning.get_supabase", return_value=stub):
             response = self.client.get("/onboarding", headers=AUTH)
-        self.assertEqual(response.json(), {"step": "style", "completed": False})
+        self.assertEqual(response.json(), {"step": "style", "completed": False, "arm": None})
 
     def test_saved_step_is_resumed(self, _user):
         stub, _ = table_with([{"step": "smartnotes", "completed_at": None}])
         with patch("routers.learning.get_supabase", return_value=stub):
             response = self.client.get("/onboarding", headers=AUTH)
-        self.assertEqual(response.json(), {"step": "smartnotes", "completed": False})
+        self.assertEqual(response.json(), {"step": "smartnotes", "completed": False, "arm": None})
 
     def test_unreadable_progress_never_blocks_the_app(self, _user):
         stub, _ = table_with(error=RuntimeError("relation does not exist"))
         with patch("routers.learning.get_supabase", return_value=stub):
             response = self.client.get("/onboarding", headers=AUTH)
-        self.assertEqual(response.json(), {"step": "done", "completed": True})
+        self.assertEqual(response.json(), {"step": "done", "completed": True, "arm": None})
 
     def test_finishing_records_completion_for_this_student_only(self, _user):
         stub, query = table_with([])

@@ -46,6 +46,17 @@ class OnboardingUpdate(BaseModel):
     step: OnboardingStep
 
 
+class OnboardingAnswer(BaseModel):
+    question_id: str = Field(..., max_length=40)
+    version: int = Field(..., ge=1, le=100)
+    answer: dict
+    source: Literal["onboarding", "drip", "settings"] = "onboarding"
+
+
+class OnboardingAnswers(BaseModel):
+    answers: list[OnboardingAnswer] = Field(..., min_length=1, max_length=20)
+
+
 class StudyAidRequest(BaseModel):
     guide_id: str = Field(..., max_length=36)
     number: int = Field(..., ge=1, le=10000)
@@ -183,9 +194,34 @@ def get_onboarding(authorization: str = Header(default="")):
     except Exception:
         # Never block the app on the wizard: report it finished when progress is unreadable.
         logger.warning("Onboarding progress unavailable", exc_info=True)
-        return {"step": "done", "completed": True}
+        return {"step": "done", "completed": True, "arm": None}
     row = rows[0] if rows else {}
-    return {"step": row.get("step") or "style", "completed": bool(row.get("completed_at"))}
+    # The onboarding experiment (step 1.1): only a student who hasn't started onboarding can join it.
+    from services.experiments import onboarding_arm
+    arm = onboarding_arm(get_supabase(), user_id, new_student=not rows)
+    return {"step": row.get("step") or "style", "completed": bool(row.get("completed_at")), "arm": arm}
+
+
+@router.post("/onboarding/answers")
+def save_onboarding_answers(body: OnboardingAnswers, authorization: str = Header(default="")):
+    """Answers to onboarding and day 2-7 questions (step 1.2), each with its question's version."""
+    from services.onboarding_questions import InvalidAnswer, check
+    user_id = get_user_id(authorization)
+    now = datetime.now(timezone.utc).isoformat()
+    rows = []
+    for item in body.answers:
+        try:
+            stored = check(item.question_id, item.version, item.answer)
+        except InvalidAnswer as error:
+            raise HTTPException(status_code=422, detail=str(error))
+        rows.append({"user_id": user_id, "question_id": item.question_id, "question_version": item.version,
+                     "answer": stored, "source": item.source, "answered_at": now})
+    try:
+        get_supabase().table("onboarding_answers").insert(rows).execute()
+    except Exception:
+        logger.warning("Onboarding answers not saved", exc_info=True)
+        raise HTTPException(status_code=503, detail="Your answers weren't saved. Try again.")
+    return {"saved": len(rows)}
 
 
 @router.get("/onboarding/checklist")
