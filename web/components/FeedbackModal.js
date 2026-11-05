@@ -27,13 +27,14 @@ function currentPageContext(router) {
   };
 }
 
-export default function FeedbackModal({ onClose }) {
+// initialCategory / initialMessage: a starting point (e.g. reporting a profile), still editable.
+export default function FeedbackModal({ onClose, initialCategory = 'bug', initialMessage = '' }) {
   const router = useRouter();
   const dialogRef = useRef(null);
   const submittingRef = useRef(false);
   const requestIdRef = useRef(null);
-  const [message, setMessage] = useState('');
-  const [category, setCategory] = useState('bug');
+  const [message, setMessage] = useState(initialMessage);
+  const [category, setCategory] = useState(initialCategory);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');

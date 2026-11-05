@@ -7,6 +7,7 @@ import TipHost from './TipHost';
 import Walkthrough from './Walkthrough';
 import TimerEngine from './TimerEngine';
 import CanvasReminder from './CanvasReminder';
+import UsernameClaim from './UsernameClaim';
 import { useFileDragging } from '../lib/fileDrop';
 
 const WIDE = ['/guide/[id]', '/practice', '/practice/[guideId]', '/smartnotes', '/canvas', '/tutor'];
@@ -36,6 +37,7 @@ export default function Layout({ children, timerState, setTimerState }) {
       <NewSheet />
       <TipHost />
       <CanvasReminder />
+      <UsernameClaim />
       <Walkthrough />
       <TimerEngine timerState={timerState} setTimerState={setTimerState} />
       {!pageOwnsTutor && <TutorDrawer preferredGuideId={activeGuideId} preferredNoteId={activeNoteId} />}
