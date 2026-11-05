@@ -7,14 +7,10 @@ personalization planning prompt (resolved decisions copied into the decision log
 `main@adc88da`, read-only queries against the live Supabase project, and the eleven research reports in
 `docs/research/01…11`.
 
-> **Report availability.** The eleven reports were not in the repo, on any GitHub branch, or in this
-> session's uploads when this plan was written (Nov 4). After approval (Nov 4, ~19:00 UTC) the owner
-> pushed them to `claude/confident-hypatia-3k9xkv`, but the push did not reach GitHub: the branch's
-> newest commit is still the plan itself, and no branch holds `docs/research/` or the brief. Every figure below that comes from the prompt's
-> "Resolved conflicts" list is used as given. Anything that needs a report's exact content (report 08's
-> core schema, report 02's archetype JSON, report 05's blueprint weights, report 09's time budget,
-> report 10's question wording, report 11's consent text) is cited as "report NN" and listed under
-> **Not yet specified**: it is read from the file at that step's pickup, never invented here.
+> **Reports.** The brief and the eleven reports are in the repo since Nov 5 (`Cordia-Classroom-Brief.md`,
+> `docs/research/01…11`). Every item this plan first deferred as "read at pickup" is now filled in
+> from them, with the report and section cited. Where the reports disagree with each other or with a
+> resolved decision, the decision stands and the conflict is listed under **What the reports change**.
 
 ---
 
@@ -93,6 +89,59 @@ personalization planning prompt (resolved decisions copied into the decision log
 
 ---
 
+## What the reports change (Nov 5)
+
+Filled in from the reports:
+- **`decision_outcomes`** (report 08 "Core schema"): `decision_id, outcome_type (delayed_recall |
+  returned_within_48h | sms_converted_2h), value, p_pred, residual, observed_at`. `p_pred` and
+  `residual` (y − p̂) stay null until FSRS predicts recall (Phase 2).
+- **Activation** (report 09 §Metrics): within 24 h of signup, (a) made a guide, (b) answered ≥3 recall
+  questions, (c) saved an exam date. **D1/D7 return**: any study session on day 1 / within days 6–8.
+- **Recall formats** (report 01 rule 4, report 08 mapping, brief §5.1): typed, fill, written.
+  Flashcard flips and multiple choice/match are recognition: they count for D1/D7 return but not as
+  recall answers for activation or Mastered. (The first draft wrongly listed flashcards as recall.)
+- **Onboarding questions** (report 10 "Recommended First-Week Sequencing") and **drip days 2–7**, with
+  wording, now in steps 1.3 and 1.7. First name is not a report-10 question: it stays prefilled from
+  sign-in, never asked.
+- **Quick Check** (report 06 §A–D), **plan rules** (report 01 rules 7–28), **NCLEX-RN 2026 weights**
+  (report 05), **consent texts A, B, D, G** (report 11), **per-test outcome fields and tiers**
+  (report 07) are in their steps below.
+
+Not in any report:
+- **A rapid-guess threshold.** No report gives one. Report 11 says response-time inferences may count
+  as consumer health data under Washington's MHMDA (unsettled). So `rapid_guess` stays false and is
+  dropped from Phase 0; latency is still logged as `submit_ms`.
+- **A BKT learn (transit) rate.** Quick Check is a single sitting, so it uses none (static BKT with
+  report 06's guess/slip).
+- **The four Mini-IPIP conscientiousness items' exact wording**: taken from the Assistant's code.
+
+Where the reports disagree with a resolved decision (the decision stands; listed so it's visible):
+- **FSRS library (Q9/Q2):** report 08 recommends py-fsrs and notes "ts-fsrs 6 ships" FSRS-7. Step 2.1
+  pins the newest ts-fsrs release that is ≥2 weeks old *and* runs 21-parameter FSRS-6 (FSRS-7 is not
+  used).
+- **Correct + Guess:** report 08 → Hard (plan), report 01 → a miss, report 06 → no credit. Second-gate
+  question G1.
+- **Experiment design (Q14):** report 09 recommends 50/50 with a Bayesian ship rule plus a separate
+  holdout. The owner chose 80/20 directional. Report 11's rule is met: the holdout keeps every study
+  feature; only the onboarding differs.
+- **Onboarding time budget:** report 09 allows 3 questions in 45–60 s during the build; report 10 says
+  the whole onboarding takes under 2 minutes and asks 7 items. Second-gate question G2.
+- **Exam path order (Q7):** report 05 says LSAT → bar → NCLEX; reports 02/04 say MCAT/CPA after
+  NCLEX. LSAT next stands (owner).
+- **ACT/high school, LTI 1.3, anxiety question:** reports 02/05/10 propose ACT, reports 03/07 an LTI
+  route, report 10 an opt-in anxiety item. All stay out (Never list).
+- **Number of templates:** report 02 has nine archetypes; report 04 says ship 4–5. Second-gate G3.
+- **Consents:** report 11 lists four (adds "use de-identified data to improve defaults"). Step 6.1 now
+  has four.
+- **SMS hours:** report 11 example D says 8 a.m.–8 p.m.; the Assistant allows until 9 p.m. The
+  stricter 8–8 is used in the opt-in text and the Assistant (step 1.8).
+- **Per-user FSRS fitting:** reports 01/08 recommend a Cordia-wide fit at ~2–5k first-try reviews, then
+  per-user fits. The Never list now says "not in this plan" instead of "never", and the global fit is
+  listed under Not yet specified.
+- **The n ≥ 10 rule** comes from report 11 §6 (cited wrongly to report 07 before).
+
+---
+
 ## Phases
 
 Order as proposed in the prompt (Q1 confirms it). Sizes: XS ≤1 file, S 2–3, M 4–6, L+ broken down.
@@ -132,8 +181,8 @@ RetainCards}.js`, `web/pages/play/[guideId].js`, `backend/routers/admin.py`.
 
 #### Step 0.2: Fill the event gaps (Size: S)
 - Acceptance criteria:
-  - `n_options` is logged for choice items. `rapid_guess` is set server-side from `submit_ms` (the
-    threshold comes from report 08).
+  - `n_options` is logged for choice and match items (null otherwise). `rapid_guess` stays false: no
+    report gives a threshold, and report 11 flags latency inferences under MHMDA.
   - `play/[guideId]` flashcards log events.
   - Check yourself logs `mode='check'` with confidence (already the case), and `quiz_attempts` gains
     no new column.
@@ -147,11 +196,12 @@ RetainCards}.js`, `web/pages/play/[guideId].js`, `backend/routers/admin.py`.
 
 #### Step 0.3: Decision outcomes and honest propensities (Size: S)
 - Acceptance criteria:
-  - `decision_outcomes` exists, with fields from report 08 "Core schema" (decision id, outcome event
-    id, delayed-recall result, measured at).
-  - `logFormatDecision` writes the real `probs`, `propensity` and `seed` (all 1/1/0 while rules are
-    deterministic, written as such by the policy rather than hard-coded).
-  - A nightly job links decisions to their next first-try recall of the same item ≥1 day later.
+  - `decision_outcomes(decision_id, outcome_type, value, p_pred, residual, observed_at)` exists
+    (report 08). `outcome_type` is `delayed_recall`, `returned_within_48h` or `sms_converted_2h`.
+  - `logFormatDecision` takes `probs`, `propensity` and `seed` from the policy (1/1/0 while rules are
+    deterministic), not hard-coded at the call site.
+  - A nightly job writes `delayed_recall` (the next first-try recall-format answer on the same idea ≥1
+    day later) and `returned_within_48h`. `p_pred`/`residual` stay null until Phase 2.
 - Verification command: `py:test`. In production, `select count(*) from decision_outcomes`, nonzero 2
   days after deploy.
 - Files likely touched: migration `20261105130000_decision_outcomes.sql`,
@@ -162,13 +212,11 @@ RetainCards}.js`, `web/pages/play/[guideId].js`, `backend/routers/admin.py`.
 
 #### Step 0.4: Recall activation and D1/D7 recall return (Size: S)
 - Acceptance criteria:
-  - Recall activation is computed per user: within 24 h of signup, made a guide AND ≥3 recall-format
-    answers AND an exam date saved (`flashcard_progress.learn.test_date`, or a plan's test date from
+  - Recall activation per report 09: within 24 h of signup, made a guide AND ≥3 recall-format answers
+    (typed, fill, written) AND an exam date saved (a guide's Learn test date, or a plan's from
     Phase 3).
-  - D1 and D7 recall return are computed alongside it.
-  - The figures are exposed only to admins (`/admin/metrics`). No per-student metric is shown to
-    students.
-  - "Recall format" is the definition from report 08 (typed, written, flashcard self-check, fill).
+  - D1 and D7 return per report 09 (any study session on day 1 / days 6–8) are computed alongside it.
+  - The figures are admin-only (`/admin/metrics`), by signup week and by experiment arm once 1.1 lands.
 - Verification command: `py:test`. In production, the admin endpoint returns rates for the last 30
   days' signups.
 - Files likely touched: `backend/routers/admin.py`, `backend/services/metrics.py` (new),
@@ -216,7 +264,8 @@ Files to touch: `web/lib/walkthrough.js`, `web/components/{Walkthrough,AboutYou,
   - 80% of signups get onboarding v2; a 20% holdout keeps the old flow for the whole term. Assignment
     is a deterministic hash of the user id, balanced within sign-in method and Canvas yes/no.
   - The primary metric is recall activation (0.4). With ~37 signups a month the results are
-    directional: the report shows both rates with intervals and makes no ship/no-ship call.
+    directional: the report shows both rates with intervals and makes no ship/no-ship call. Report
+    09's guardrail is shown alongside: SMS STOP rate (pause a variant above ~5% a week).
 - Verification command: `py:test`. Production read: arm counts per day.
 - Files likely touched: migration `20261106120000_experiments.sql`, `backend/services/experiments.py`,
   `backend/routers/learning.py`, `web/lib/onboarding.js`.
@@ -238,16 +287,18 @@ Files to touch: `web/lib/walkthrough.js`, `web/components/{Walkthrough,AboutYou,
 
 #### Step 1.3: Questions during the build (Size: M)
 - Acceptance criteria:
-  - The About you step becomes the report-10 set:
-    - first name, prefilled from sign-in;
-    - major: searchable, CIP-coded, plus Undeclared and Other, second major allowed (Q4);
-    - year;
-    - next exam and date, prefilled from Canvas `is_exam`;
-    - expected and target grade;
-    - night-before strategy (Q3), morning or evening (Q5), and the if-then trigger (Q6), which creates
-      a `study_blocks` row.
-  - It is shown while the guide builds, and every question can be skipped.
-  - The flow stays inside report 09's time budget, measured by the QA script.
+  - The About you step becomes report 10's onboarding set (wording verbatim from report 10), split per
+    G2. Recommended split, inside report 09's 45–60 s build window:
+    - while the guide builds: major + year (Q4 list); "Your next big exam — when is it?" (Canvas
+      prefilled; "No exam yet — just keeping up"); "It's the night before a quiz. What are you most
+      likely doing?" (five options);
+    - after the 3-question check, on the reveal: "Pick your study trigger: right after ___ I'll open
+      Cordia ___." which creates a `study_blocks` row;
+    - moved to day 2: expected/target grade ("Be honest — what grade do you expect on it right now?")
+      and morning/evening ("If you could pick, when does your brain work best?").
+  - Every question has a "why we ask" line and a skip; no demographics, anxiety or personality items.
+    Results are called "starting settings", never a type.
+  - Total day one ≤5 minutes to the first recall win (report 09), timed by the QA script.
 - Verification command: `web:test`, `build`. The QA Playwright run times the flow.
 - Files likely touched: `web/components/AboutYou.js` (rewritten as `OnboardingQuestions.js`),
   `web/lib/majors.mjs` (new), `web/lib/walkthrough.js`, `backend/routers/learning.py`.
@@ -260,7 +311,7 @@ Files to touch: `web/lib/walkthrough.js`, `web/components/{Walkthrough,AboutYou,
   - The onboarding check is 3 recall-leaning items, typed or fill where the answer is short (choice
     only as fallback), with Sure / Think so / Guess.
   - It logs `mode='check'` and ends on a first recall win (the easiest item is ordered last).
-  - Check yourself elsewhere stays at 5 or becomes 3, per Q5.
+  - Check yourself elsewhere stays at 5 (Q5), until Phase 3's Quick Check replaces it (report 06).
 - Verification command: `web:test`, `build`.
 - Files likely touched: `web/pages/quiz/[guideId].js`, `web/lib/checkYourself.js`,
   `web/components/QuizMode.js`.
@@ -296,16 +347,19 @@ Files to touch: `web/lib/walkthrough.js`, `web/components/{Walkthrough,AboutYou,
 
 #### Step 1.7: Days 2–7 drip questions (Size: S)
 - Acceptance criteria:
-  - One question a day, after a completed session, from report 10's list:
-    - time available;
-    - licensure exam;
-    - Mini-IPIP conscientiousness (the Assistant's items, reused);
-    - procrastination;
-    - setback;
-    - explain preference;
-    - WOOP obstacle;
-    - plan fit.
-  - No anxiety question. Each answer is stored with its question version.
+  - One question a day, in-app after a completed session (SMS only within quiet hours), report 10's
+    order:
+    - Day 2: time per weekday (10/20/30/45+ min); expected/target grade and morning/evening if moved
+      here by G2; "Is a licensing or entrance exam in your future?" (NCLEX / MCAT / LSAT / Bar / CPA /
+      Not yet; ACT removed).
+    - Day 3: Mini-IPIP conscientiousness (the Assistant's 4 items). Report 10's exam-nerves item is
+      not asked (anxiety is out of v1).
+    - Day 4: start timing ("A paper is due in 10 days…") and setback ("You studied hard and got a C…").
+    - Day 5: "For hard topics, which helps you start?" (sets `first_view_pref`) and the WOOP obstacle.
+    - Day 6: re-show the if-then plan (rehearsal, no new question).
+    - Day 7: "was this week's plan too much, about right, or too little?" (load ±25%), plus an
+      editable "here's what we learned about how you study" summary and a reset control.
+  - Each answer is stored with its question id and version.
 - Verification command: `web:test`.
 - Files likely touched: `web/components/DripQuestion.js` (new), `web/lib/dripQuestions.mjs`,
   `backend/routers/learning.py`.
@@ -314,7 +368,9 @@ Files to touch: `web/lib/walkthrough.js`, `web/components/{Walkthrough,AboutYou,
 
 #### Step 1.8: SMS opt-in during onboarding (Size: S, Assistant repo)
 - Acceptance criteria:
-  - An optional opt-in uses the adult wording from report 11 (consent example D).
+  - An optional opt-in uses report 11 example D verbatim, with "[N]/day" replaced by "up to 3 a week"
+    and the 8 a.m.–8 p.m. window (the Assistant's 9 p.m. end moves to 8 p.m.), plus "I'm 18 or older".
+    Held for owner/lawyer approval of the final text (Q8).
   - It records consent through the Assistant's API and links the existing `assistant_links` flow.
   - The first text quotes the student's if-then words.
 - Verification command: Assistant repo tests, plus the Classroom `build`.
@@ -473,8 +529,10 @@ Verified when a student picks a test date and gets:
 All of it is deterministic, with no LLM in the engine.
 
 #### Step 3.1: Plan and diagnostic tables (Size: S)
-- Acceptance criteria: `study_plans`, `plan_tasks`, `plan_changes` and `quick_check_runs`, with fields
-  per report 01 §B–G and report 06.
+- Acceptance criteria: `study_plans` (exam, date, horizon, desired-retention schedule, capacity),
+  `plan_tasks` (day, kind: review/new/mock/D−1 quiz, minutes, ideas), `plan_changes` (reason, delta)
+  and `quick_check_runs` (cluster, item, answer, confidence, P(known) after), per report 01 rules 7–28
+  and report 06 §A.
 - Verification command: `rls:test`.
 - Files likely touched: migration `20261117120000_study_plans.sql`.
 - Test seams: RLS test.
@@ -482,9 +540,12 @@ All of it is deterministic, with no LLM in the engine.
 
 #### Step 3.2: Quick Check engine (Size: M)
 - Acceptance criteria:
-  - Items are selected by section clusters, with BKT-style updates (fixed guess/slip per report 06) and
-    an "I don't know yet" button.
-  - Default 15 items, min 8, max 20; skippable; "See my map now" after 10. No model-SE stopping.
+  - 8–12 clusters; a medium "hub" concept per cluster first; ≤3 items per cluster; no concept twice;
+    60–70% type-it, 30–40% choice, no written. Static BKT: prior 0.3 (0.5 if the Canvas module grade
+    ≥85%); type-it guess 0.05/slip 0.10, choice guess 0.25/slip 0.10; neighbour updates per report 06
+    §A; "confidently wrong" never spreads. "I don't know yet" counts as wrong, not confidently wrong.
+  - Stops at the first of: 20 items; ≥12 items with every cluster probed and none in 0.35–0.65; "See
+    my map now" (after 10); 10 minutes. Skippable ("Just start studying"). Never marks Mastered.
 - Verification command: `py:test`/`web:test`.
 - Files likely touched: `memory/quickcheck`, `web/pages/plan/[guideId]/check.js` (new).
 - Test seams: engine unit tests with seeded answers.
@@ -492,9 +553,11 @@ All of it is deterministic, with no LLM in the engine.
 
 #### Step 3.3: Knowledge map seeding (Size: S)
 - Acceptance criteria:
-  - Four states (strong / shaky / check these first / not checked yet) seed Learn levels and FSRS per
-    report 06 §C.
-  - The results screen follows report 06 §D: it never leads with a percentage on a low score.
+  - Report 06 §C's table seeds map state, Learn level and FSRS (e.g. type-it correct + Sure → Strong,
+    Familiar, Good; wrong + Sure → Check these first, Again, re-check in 1 then 3 days). Inferred
+    concepts: ≥0.75 "Strong (likely)" seeded Learning; 0.40–0.75 Shaky (likely); else Not checked yet.
+  - Results wording is report 06 §D verbatim (three bands; never a percentage or "X/15" headline; lead
+    with something right). Its "research shows…" line goes through the report 03 claims checklist.
 - Verification command: as above.
 - Files likely touched: `memory/seed`, `web/components/KnowledgeMap.js`.
 - Test seams: unit tests.
@@ -502,10 +565,13 @@ All of it is deterministic, with no LLM in the engine.
 
 #### Step 3.4: Plan engine (Size: M)
 - Acceptance criteria:
-  - Horizon rules, mock count `min(4, max(1, floor(D/7)))`, a D−1 review quiz, the sleep window, the
-    triage priority score and 25/5 blocks, all per report 01.
-  - Output is a task list for each day.
-  - Re-planning after missed days; triage mode under 3 days.
+  - Report 01: horizon table; gap `clamp(FSRS_interval, 1 day, max(1, f×D_remaining))`; nothing after
+    the test; last-5-day load ≤1.5× the 14-day mean; mocks `min(4, max(1, floor(D/7)))` ≥3 days apart,
+    last on D−2…D−4; a 10–20 min D−1 quiz; 25/5 blocks; never <7 h sleep.
+  - Triage when required sessions × items exceed capacity before D: priority = w_topic × (1 − R_now) ×
+    learnability, ordered per rule 26; drop items with R_exam ≥ 0.95; at D ≤ 2 coverage beats mastery.
+  - Output is a task list for each day; re-plans after missed days (no streak pressure for 48 h after a
+    missed exam-prep day, report 09).
 - Verification command: `py:test` (engine lives in the backend: no LLM, the nightly re-plan runs in the
   worker).
 - Files likely touched: `backend/services/plans/engine.py`, `backend/routers/plans.py`.
@@ -534,9 +600,13 @@ All of it is deterministic, with no LLM in the engine.
 ### Phase 4: Major archetypes and default layouts
 #### Step 4.1: Majors and archetypes data (Size: S)
 - Acceptance criteria:
-  - `majors`, `study_archetypes` and `major_overrides` exist, seeded from report 02's JSON (nine
-    archetypes) and the major list per Q4.
-  - The mapping from report widgets to real Cordia components is listed in this plan.
+  - `majors`, `study_archetypes` and `major_overrides` exist, seeded from report 02's JSON (archetype,
+    default modes, learn formats, tutor mode, dashboard pinned/tucked, suggested connectors, major
+    exams), with G3 deciding nine archetypes or 4–5 templates. Majors per Q4.
+  - Widget gaps: Study now, Lectures, Class sets, Grades and Plan my week are pages or tabs today, not
+    Dashboard cards; each gets a card in 4.2. Report 02's "proposed additions" (NGN builders, code
+    sandbox, etc.) are out of this plan. Connectors hidden behind a flag (GitHub, Slack, Dropbox,
+    Sheets) are never suggested.
 - Verification command: `rls:test`, a seed test.
 - Files likely touched: migration `20261124120000_majors_archetypes.sql`,
   `supabase/seed/majors.sql`.
@@ -618,8 +688,10 @@ All of it is deterministic, with no LLM in the engine.
 ### Phase 6: The outcome loop
 #### Step 6.1: Consents (Size: S)
 - Acceptance criteria:
-  - Three separate consents per report 11 examples A and B: sync course data, sync grades, use grades
-    to personalise. Each is stored with its version and can be revoked in Settings.
+  - Four separate consents per report 11: (a) sync course data, (b) sync grades, (c) use grades to
+    personalise, (d) use de-identified data to improve defaults. Wording from examples A and B
+    (held for approval, Q8). Each stored with its version, revocable in Settings, with "reset my
+    profile".
   - Grade features stay off without them.
 - Verification command: `rls:test`, `build`.
 - Files likely touched: migration `20261201120000_consents.sql`, `web/pages/settings.js`.
@@ -638,10 +710,14 @@ All of it is deterministic, with no LLM in the engine.
 
 #### Step 6.3: Outcomes with class-relative scores (Size: M)
 - Acceptance criteria:
-  - `study_outcomes` per report 07.
+  - `study_outcomes` with report 07's per-test fields: assignment, exam format, confirmed-is-exam,
+    linked topics; score/submitted/graded/posted, late/missing/excused; mean, median, quartiles,
+    min/max, `stats_available`, `stats_reason_missing`; `z_score`, `z_method`; the 21-day window
+    snapshot; readiness shown the day before; predicted score; outside study; `grade_source`.
   - The Canvas allowlist gains `include[]=submission&include[]=score_statistics`.
-  - IQR-based z-scores, with the reason recorded when statistics are missing; fallback to
-    within-student course-relative scores.
+  - z = (score − median) / ((upper_q − lower_q) / 1.349), with the reason recorded when statistics are
+    missing (hidden, fewer than 5 graded, not fetched); fallback to within-student course-relative
+    scores.
   - Manual and screenshot grade entry (vision via Sonnet; Canvas tokens may expire after 120 days).
 - Verification command: `py:test` (allowlist tests in `test_canvas_client.py`).
 - Files likely touched: `backend/services/canvas_client.py`, `backend/routers/canvas.py`,
@@ -661,9 +737,13 @@ All of it is deterministic, with no LLM in the engine.
 #### Step 6.5: Study receipt and tiered insights (Size: M)
 - Acceptance criteria:
   - Tier 0/1 come first.
-  - Tier 2 only once the model and the minimum-data rule exist (4+ linked tests, posterior ≥ 0.80).
+  - Tier 1 after ≥3 posted tests, descriptive only. Tier 2 only when all of report 07's conditions
+    hold: ≥4 posted linked tests with ≥3 class-relative; ≥2 above and ≥2 below the student's median;
+    posterior ≥0.80 (0.90 if it contradicts the population prior); most study done in Cordia. Insights
+    are re-checked after every grade and withdrawn if they drop below the bar.
   - Text comes only from tier-gated templates in code; a test fails on causal wording from
-    observational data; no aggregate from fewer than 10 students.
+    observational data ("raised your grade", "you're a visual learner"); no aggregate from fewer than
+    10 students (report 11 §6).
 - Verification command: `py:test` (wording guard), `build`.
 - Files likely touched: `backend/services/insights.py`, `web/components/StudyReceipt.js`.
 - Test seams: template tests.
@@ -699,7 +779,13 @@ All of it is deterministic, with no LLM in the engine.
 
 #### Step 7.3: NCLEX-RN path, first (Size: S)
 - Acceptance criteria:
-  - Seed the 2026 test-plan blueprint weights from report 05; original content only.
+  - Seed the 2026 test plan (Apr 1, 2026 – Mar 31, 2029) weights from report 05: Management of Care 18,
+    Safety and Infection Control 13, Health Promotion 9, Psychosocial 9, Basic Care and Comfort 9,
+    Pharmacological and Parenteral 16, Reduction of Risk 12, Physiological Adaptation 14 (midpoints of
+    NCSBN's ranges, stored with the ranges). Path phases 5/40/35/20 (diagnostic / recall repair /
+    clinical judgment / readiness). Original content only.
+  - Named "Cordia Exam Path for the NCLEX-RN® exam", with an "educational practice, not clinical
+    advice" line (report 11).
   - Content provenance: pasted "recalled exam" material is rejected.
   - The item bank is not generated in this plan.
 - Verification command: `py:test`.
@@ -713,7 +799,9 @@ path has real usage (owner's call, from the 0.4 admin metrics).
 #### Step 7.4: Trademark renames and footer (Size: S; can ship any time after approval)
 - Acceptance criteria:
   - Every NCLEX surface reads "NCLEX®-style practice".
-  - The non-affiliation footer (report 11 example G) appears on every page that names an exam.
+  - Report 11 example G's footer (NCLEX® line, plus LSAT® when that path ships) appears on every page
+    that names an exam: "…None of these organizations is affiliated with, sponsors, or endorses Cordia
+    Classroom. Cordia's practice questions are original and are not actual exam questions."
   - Items are labelled "original practice questions, not actual exam questions"; no exam name appears
     in a product name.
 - Verification command: `web:test` (a copy test greps the strings), `build`.
@@ -809,6 +897,10 @@ and ships with an RLS test.
 | Readiness | Weighted mean predicted recall on exam day, shown as a range, never a pass probability | Resolved |
 | Bandit | Postponed; rules plus ≤10–20% logged uniform randomisation among enabled options, propensities stored; future reward = delayed-recall residual | Resolved |
 | Grades | Calibrator, not reward; insights tiered and wording-gated in code; no aggregate under 10 students | Resolved |
+| Recall formats | Typed, fill, written count as recall; flips, choice and match are recognition | Reports 01, 08; brief §5.1 |
+| Rapid guess | Not computed (no report threshold; MHMDA caution) | Reports 08, 11 |
+| Consents | Four, per report 11 | Report 11 |
+| SMS window | 8 a.m.–8 p.m. local, ≤3 a week | Report 11 example D, stricter of the two |
 | Anxiety questions | Out of v1 (Washington MHMDA) | Resolved |
 | Personality | Reuse the Assistant's Mini-IPIP conscientiousness items only | Resolved |
 | SMS | Georgia State model: course- and date-specific, two-way, ≤3/week, back off after 2 ignored, quiet hours, no grades, no promotion | Resolved |
@@ -824,18 +916,24 @@ and ships with an RLS test.
 
 ## Not yet specified
 
-- **All phases:** the exact content of reports 01, 02, 05, 06, 07, 08, 09, 10 and 11 is read at each
-  step's pickup. Until the files are in `docs/research/` on GitHub, steps 0.2 (rapid-guess threshold),
-  0.3 (decision_outcomes fields), 1.3/1.7 (question wording), 1.8/6.1 (consent text), 3.2–3.4 (BKT
-  parameters, horizon rules), 4.1 (archetype JSON) and 7.3 (blueprint weights) cannot start.
+Second gate (depends on the reports; Phase 0 doesn't wait on these):
+- **G1. Correct + Guess.** Keep report 08's mapping (FSRS Hard, a pass) but don't let a guessed correct
+  answer count as a recall success for activation, Mastered or exam-ready? Recommended: yes.
+- **G2. Onboarding length.** Ask 3 questions while the guide builds (major+year, exam date,
+  night-before), the if-then trigger on the reveal, and move expected grade and morning/evening to
+  day 2? Recommended: yes (fits report 09's 45–60 s; report 10's full set would not).
+- **G3. Archetypes.** Ship report 04's 4–5 templates first (memorization/health, quantitative/
+  programming, reading/writing, business/social science, undeclared), with report 02's nine kept as
+  data for later? Recommended: yes.
+- **Later, not a question now:** a Cordia-wide FSRS fit at ~2–5k first-try reviews (report 08) is a
+  follow-up plan after Phase 2.
+
 - **Phase 1:** resolved by Q14 (80/20, directional).
 - **Phase 2:** how the Assistant (a separate repo) gets the shared scheduler package. Recommendation: a
   private package `@cordiaai/scheduler` published to GitHub Packages from `packages/scheduler/`, with
   the Assistant pinning an exact version. The alternative is a git dependency on a tag, which npm
   can't do for a subfolder without a separate repo. Asked in the second gate; Phase 0 and 1 don't
   depend on it.
-- **Phase 4:** which report-02 widgets have no Cordia component. This is listed at 4.1 pickup, once the
-  JSON is readable.
 - **Phase 6:** whether Canvas returns `score_statistics` for students at USA South (some schools hide
   it). Probe with one real token at 6.3 pickup.
 - **Phase 7:** fog: the item-bank generation and review workflow (who verifies, how) is a separate plan.
@@ -857,7 +955,8 @@ and ships with an RLS test.
   - touch the Canvas slideshow capture;
   - expose service-role or Napkin keys;
   - high-school or under-18 features, ACT/SAT, licensed exam content;
-  - the contextual bandit, per-user FSRS optimisation, LTI 1.3, cross-student knowledge tracing;
+  - the contextual bandit, FSRS parameter fitting (global or per user: not in this plan), LTI 1.3,
+    cross-student knowledge tracing;
   - the Readiness Certificate, test-anxiety questions, pass-probability numbers;
   - causal claims from observational grade data;
   - a cross-student statistic from fewer than 10 students.
@@ -866,7 +965,7 @@ and ships with an RLS test.
 
 | Phase | Status |
 | --- | --- |
-| 0 Instrumentation | In progress (0.3 waits for report 08) |
+| 0 Instrumentation | In progress |
 | 1 Onboarding v2 | Approved, not started |
 | 2 Unified memory (FSRS) | Approved, not started |
 | 3 Study plans | Approved, not started |
