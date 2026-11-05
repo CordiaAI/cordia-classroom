@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../lib/api';
-import { BookOpen, Check, MessageCircle, Sparkles, X } from 'lucide-react';
-import { requestTip } from '../lib/tips';
+import { BookOpen, Check, MessageCircle, X } from 'lucide-react';
+import { dismissTip, requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { noteView, useAnswerTiming } from '../lib/learningEvents';
 import { choiceText, conceptAnswer, fillMatches, normalize, shuffled } from '../lib/retainEngine.mjs';
@@ -32,10 +32,15 @@ export function askTutorAboutMiss(guideId, question, selectedAnswer, options = [
   requestTip('ask');
 }
 
-export function AskWhy() {
+// One "Ask why" after a miss. onExplain (multiple choice, fill-in, cloze): the card shows why the
+// right answer is right and why the student's isn't, on the spot. Without one (matching, written)
+// it opens the Tutor on the miss. The Tutor stays a tap away in the corner either way.
+export function AskWhy({ onExplain }) {
   return (
     <button type="button" className="c-btn c-btn--secondary quiz-ask" data-spot="ask-why" data-tip="ask" onClick={() => {
       walkthroughEvent('ask');
+      dismissTip('ask'); // found it: the "Ask why" tip never needs to show again
+      if (onExplain) { onExplain(); return; }
       if (lastMiss) noteView(lastMiss.guideId, lastMiss.retainContext.question, 'ask_why');
       if (lastMiss) window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { ...lastMiss, send: true } }));
     }}>
@@ -44,28 +49,11 @@ export function AskWhy() {
   );
 }
 
-// Beside Ask why: a plain explanation of the right answer, not of the mistake.
-export function ExplainAnswer() {
-  return (
-    <button type="button" className="c-btn c-btn--secondary quiz-ask" onClick={() => {
-      if (!lastMiss) return;
-      const { question, correct_answer: answer } = lastMiss.retainContext;
-      noteView(lastMiss.guideId, question, 'tutor_explain');
-      window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', { detail: { guideId: lastMiss.guideId, prompt: `Explain this simply, with an example: ${question} (answer: ${answer})`, send: true } }));
-    }}>
-      <Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain
-    </button>
-  );
-}
-
-// onExplain: the card shows its own explanation of the miss, only when asked for.
+// onExplain: the card's own explanation of the miss; null once it is showing (no button then).
 function NextButton({ onNext, missed, onExplain }) {
   return (
     <div className="quiz-next-row">
-      {missed && <AskWhy />}
-      {missed && (onExplain === undefined ? <ExplainAnswer /> : onExplain && (
-        <button type="button" className="c-btn c-btn--secondary quiz-ask" onClick={onExplain}><Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain</button>
-      ))}
+      {missed && onExplain !== null && <AskWhy onExplain={onExplain} />}
       <button type="button" className="c-btn c-btn--primary quiz-next" onClick={onNext} autoFocus>Next</button>
     </div>
   );
