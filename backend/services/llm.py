@@ -520,6 +520,45 @@ def explain_miss_briefly(question: str, correct: str, chosen: str, passage: str 
     return {"why_right": why_right, "why_wrong": why_wrong} if why_right else {}
 
 
+MEMORY_STYLES = {
+    "funny": "funny: a playful image, pun or silly scene",
+    "link": "a link to something familiar (a date, place, saying or everyday thing it matches)",
+    "rhyme": "a short rhyme or catchy line",
+    "picture": "a vivid picture to see in the mind",
+    "letters": "first letters or an acronym, when the answer has parts; otherwise a vivid link",
+}
+
+
+def memory_hook(question: str, answer: str, style: str = "link", interests=(), previous: str = "") -> dict:
+    """A short memory hook for a missed question ("Help me remember"), in the student's preferred
+    style, drawing on their interests only when that makes a clearer link. Kept only when it
+    states the answer and is written to the student; {} otherwise."""
+    from services.retain import mentions_answer
+    likes = ", ".join(str(item).replace("_", " ") for item in interests or ()) or "none given"
+    response = chat(get_openai_client(), "retain_remember",
+        messages=[
+            {"role": "system", "content": (
+                "Write one memory hook that helps a student remember the answer to a question they "
+                "just missed. One or two sentences, under 40 words, written to them as \"you\". "
+                f"Style: {MEMORY_STYLES.get(style, MEMORY_STYLES['link'])}. Their interests may give "
+                "the link, but only when one fits naturally; never force it. The hook must contain "
+                "the answer exactly as given and must never change, round or blur it. Any comparison "
+                "you state as fact must be true; otherwise make it plainly wordplay. Playful is good; "
+                "never mocking, crude, or about the student themselves. "
+                'Return JSON: {"hook": "..."}'
+            )},
+            {"role": "user", "content": (
+                f"QUESTION:\n{question[:1500]}\n\nANSWER:\n{answer[:1000]}\n\nINTERESTS: {likes}"
+                + (f"\n\nTAKE A DIFFERENT ANGLE FROM THIS ONE:\n{previous[:400]}" if previous else "")
+            )},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.8,
+    )
+    hook = student_feedback(_practice_json(response.choices[0].message.content).get("hook"))
+    return {"hook": hook} if hook and mentions_answer(hook, answer) else {}
+
+
 def transcribe_document_pages(page_images: list, max_pages: int = 20) -> str:
     """OCR for scanned documents: transcribe each page image (data URLs), in page order."""
     client = get_openai_client()

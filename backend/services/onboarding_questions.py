@@ -6,6 +6,10 @@ this file only names each question, its version and the answers it accepts, so a
 always says which version of which question it answered. Changing a question's options means a new
 version, never an edit in place.
 
+memory_style and interests (About-you screen) shape the "Help me remember" hooks a student gets
+after a missed question (llm.memory_hook): the kind of hook they like, and up to three interests a
+hook may draw on.
+
 Not here on purpose: anxiety and exam-nerves items (out of v1, Washington MHMDA), demographics, and
 personality "types". Answers are starting settings the student can change.
 """
@@ -15,7 +19,7 @@ from __future__ import annotations
 import re
 from datetime import date
 
-# id -> (version, kind, allowed values for choice kinds)
+# id -> (version, kind, allowed values for choice and multi kinds)
 QUESTIONS: dict[str, tuple[int, str, tuple[str, ...]]] = {
     # While the guide builds (G2)
     "major": (1, "major", ()),
@@ -24,6 +28,10 @@ QUESTIONS: dict[str, tuple[int, str, tuple[str, ...]]] = {
     "night_before": (1, "choice", ("reread", "highlight_rewrite", "quiz_flashcards", "practice_problems", "start_from_scratch")),
     # On the reveal (G2): "Pick your study trigger: right after ___ I'll open Cordia ___."
     "study_trigger": (1, "trigger", ()),
+    # About-you screen: for "Help me remember" hooks after a miss
+    "memory_style": (1, "choice", ("funny", "link", "rhyme", "picture", "letters")),
+    "interests": (1, "multi", ("sports", "music", "gaming", "movies_tv", "food", "outdoors", "art_design",
+                               "fashion", "tech", "animals", "books", "travel")),
     # Day 2 (G2, report 10 Q2/Q5/Q8/Q15)
     "expected_grade": (1, "choice", ("a", "b", "c", "not_sure")),
     "target_grade": (1, "choice", ("a", "b", "c", "not_sure")),
@@ -66,6 +74,11 @@ def check(question_id: str, version: int, answer) -> dict:
         if value not in options:
             raise InvalidAnswer(f"{question_id} takes one of: {', '.join(options)}")
         return {"value": value}
+    if kind == "multi":
+        if not isinstance(value, list) or not 1 <= len(value) <= 3 or len(set(value)) != len(value) \
+                or any(item not in options for item in value):
+            raise InvalidAnswer(f"{question_id} takes one to three of: {', '.join(options)}")
+        return {"value": list(value)}
     if kind == "major":
         # The major's id from the curated list (step 1.3), or free text for "Other"; a second major
         # is optional.

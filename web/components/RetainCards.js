@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../lib/api';
-import { BookOpen, Check, MessageCircle, X } from 'lucide-react';
+import { BookOpen, Check, Lightbulb, MessageCircle, X } from 'lucide-react';
 import { dismissTip, requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { noteView, useAnswerTiming } from '../lib/learningEvents';
@@ -49,11 +49,65 @@ export function AskWhy({ onExplain }) {
   );
 }
 
+// "Help me remember" after a miss: shows a memory hook under the card (MemoryHook). onRemember is
+// null once the hook is showing, so the button goes.
+export function RememberButton({ onRemember }) {
+  if (!onRemember) return null;
+  return (
+    <button type="button" className="c-btn c-btn--secondary quiz-remember" onClick={onRemember}>
+      <Lightbulb size={20} strokeWidth={1.75} aria-hidden="true" />Help me remember
+    </button>
+  );
+}
+
+// A short memory hook for the missed question, in the style the student picked on the About-you
+// screen (POST /quiz/{id}/remember). Each one uses a light AI reading; "Another one" asks for a
+// different angle. Logged as the view shown, so the next answer says whether a hook came before it.
+export function MemoryHook({ guideId, concept, question }) {
+  const [hook, setHook] = useState(null); // null: working; '': failed
+  const [error, setError] = useState('');
+  const [round, setRound] = useState(0);
+  const previous = useRef('');
+  useEffect(() => {
+    let active = true;
+    setHook(null);
+    setError('');
+    apiFetch(`/quiz/${guideId}/remember`, { method: 'POST', body: JSON.stringify({ concept, previous: previous.current || null }) })
+      .then(data => {
+        if (!active) return;
+        if (data?.hook) {
+          previous.current = data.hook;
+          noteView(guideId, question.question, 'mnemonic');
+          setHook(data.hook);
+        } else {
+          setHook('');
+          setError(typeof data?.detail === 'string' ? data.detail : "Couldn't make one. Try again.");
+        }
+      });
+    return () => { active = false; };
+  }, [guideId, concept, round]);
+  return (
+    <div className="retain-hook" role="status">
+      <span className="retain-hook-title"><Lightbulb size={18} strokeWidth={1.75} aria-hidden="true" />Help me remember</span>
+      {hook === null && <p className="c-meta">Thinking of a way to remember it…</p>}
+      {hook && <p>{hook}</p>}
+      {hook === '' && <p className="c-meta">{error}</p>}
+      {hook !== null && (
+        <button type="button" className="retain-hook-again" onClick={() => setRound(value => value + 1)}>
+          {hook ? 'Another one' : 'Try again'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // onExplain: the card's own explanation of the miss; null once it is showing (no button then).
-function NextButton({ onNext, missed, onExplain }) {
+// onRemember: shows a memory hook (RememberButton); null once it is showing.
+function NextButton({ onNext, missed, onExplain, onRemember }) {
   return (
     <div className="quiz-next-row">
       {missed && onExplain !== null && <AskWhy onExplain={onExplain} />}
+      {missed && <RememberButton onRemember={onRemember} />}
       <button type="button" className="c-btn c-btn--primary quiz-next" onClick={onNext} autoFocus>Next</button>
     </div>
   );
@@ -125,6 +179,7 @@ export function McCard({ card, question, guideId, onResult, onNext, askSure = tr
   const [selected, setSelected] = useState(null);
   const [confidence, setConfidence] = useState('');
   const [explained, setExplained] = useState(false);
+  const [remembering, setRemembering] = useState(false);
   const timing = useAnswerTiming();
 
   function reveal(option, level = '') {
@@ -182,7 +237,8 @@ export function McCard({ card, question, guideId, onResult, onNext, askSure = tr
       <p className="sr-only" role="status" aria-live="polite">{status}</p>
       {selected === null && pending !== null && <ConfidencePrompt onPick={level => reveal(pending, level)} />}
       {explained && <MissFeedback guideId={guideId} card={card} question={question} chosen={selected} sure={confidence === 'sure'} />}
-      {selected !== null && <NextButton onNext={onNext} missed={selected !== answer} onExplain={explained ? null : () => setExplained(true)} />}
+      {remembering && <MemoryHook guideId={guideId} concept={card.concepts[0]} question={question} />}
+      {selected !== null && <NextButton onNext={onNext} missed={selected !== answer} onExplain={explained ? null : () => setExplained(true)} onRemember={remembering ? null : () => setRemembering(true)} />}
     </>
   );
 }
@@ -225,12 +281,13 @@ function useTypedAnswer({ card, question, guideId, onResult, onNext, expected, v
 }
 
 // What shows once a typed answer is checked and isn't plainly right: the student's choice.
-function TypedDecision({ verdict, expected, label, onDecide, onExplain }) {
+function TypedDecision({ verdict, expected, label, onDecide, onExplain, onRemember }) {
   if (verdict === 'close') {
     return (
       <>
         <p className="retain-feedback partial" role="status">Almost. The full answer is <strong>{choiceText(expected)}</strong>. Does yours mean the same?</p>
         <div className="quiz-next-row">
+          <RememberButton onRemember={onRemember} />
           <button type="button" className="c-btn c-btn--secondary" onClick={() => onDecide(0)}>Count it wrong</button>
           <button type="button" className="c-btn c-btn--primary quiz-next" onClick={() => onDecide(1, true)} autoFocus>Count it right</button>
         </div>
@@ -242,6 +299,7 @@ function TypedDecision({ verdict, expected, label, onDecide, onExplain }) {
       <p className="retain-feedback wrong" role="status">{label}: <strong>{expected}</strong></p>
       <div className="quiz-next-row">
         {onExplain !== null && <AskWhy onExplain={onExplain} />}
+        <RememberButton onRemember={onRemember} />
         <button type="button" className="c-btn c-btn--secondary" onClick={() => onDecide(1, true)}>I was right</button>
         <button type="button" className="c-btn c-btn--primary quiz-next" onClick={() => onDecide(0)} autoFocus>Next</button>
       </div>
@@ -256,6 +314,7 @@ export function FillCard({ card, question, guideId, onResult, onNext, askSure = 
   const [value, setValue] = useState('');
   const [asking, setAsking] = useState(false);
   const [explained, setExplained] = useState(false);
+  const [remembering, setRemembering] = useState(false);
   const timing = useAnswerTiming();
   const typed = useTypedAnswer({ card, question, guideId, onResult, onNext, expected: answer, value, timing });
 
@@ -288,9 +347,10 @@ export function FillCard({ card, question, guideId, onResult, onNext, askSure = 
       {asking && <ConfidencePrompt onPick={level => { setAsking(false); typed.reveal(level); }} />}
       {typed.verdict === 'right' && <p className="retain-feedback right" role="status">Right: <strong>{answer}</strong></p>}
       {explained && <MissFeedback guideId={guideId} card={card} question={question} chosen={value.trim()} sure={typed.confidence === 'sure'} />}
+      {remembering && <MemoryHook guideId={guideId} concept={card.concepts[0]} question={question} />}
       {typed.verdict === 'right' && <NextButton onNext={onNext} missed={false} />}
       {(typed.verdict === 'close' || typed.verdict === 'wrong') && typed.credit === null && (
-        <TypedDecision verdict={typed.verdict} expected={answer} label="Answer" onDecide={typed.decide} onExplain={explained ? null : () => setExplained(true)} />
+        <TypedDecision verdict={typed.verdict} expected={answer} label="Answer" onDecide={typed.decide} onExplain={explained ? null : () => setExplained(true)} onRemember={remembering ? null : () => setRemembering(true)} />
       )}
     </form>
   );
@@ -303,6 +363,7 @@ export function ClozeCard({ card, question, guideId, onResult, onNext, askSure =
   const [value, setValue] = useState('');
   const [asking, setAsking] = useState(false);
   const [explained, setExplained] = useState(false);
+  const [remembering, setRemembering] = useState(false);
   const timing = useAnswerTiming();
   const typed = useTypedAnswer({ card, question, guideId, onResult, onNext, expected: cloze?.missing || '', value, timing });
   if (!cloze) return <FillCard card={card} question={question} guideId={guideId} onResult={onResult} onNext={onNext} askSure={askSure} />;
@@ -340,9 +401,10 @@ export function ClozeCard({ card, question, guideId, onResult, onNext, askSure =
       {asking && <ConfidencePrompt onPick={level => { setAsking(false); typed.reveal(level); }} />}
       {typed.verdict === 'right' && <p className="retain-feedback right" role="status">Right: <strong>{cloze.missing}</strong></p>}
       {explained && <MissFeedback guideId={guideId} card={card} question={question} chosen={value.trim()} sure={typed.confidence === 'sure'} />}
+      {remembering && <MemoryHook guideId={guideId} concept={card.concepts[0]} question={question} />}
       {typed.verdict === 'right' && <NextButton onNext={onNext} missed={false} />}
       {(typed.verdict === 'close' || typed.verdict === 'wrong') && typed.credit === null && (
-        <TypedDecision verdict={typed.verdict} expected={cloze.missing} label="The word" onDecide={typed.decide} onExplain={explained ? null : () => setExplained(true)} />
+        <TypedDecision verdict={typed.verdict} expected={cloze.missing} label="The word" onDecide={typed.decide} onExplain={explained ? null : () => setExplained(true)} onRemember={remembering ? null : () => setRemembering(true)} />
       )}
     </form>
   );
@@ -440,6 +502,7 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
   const [busy, setBusy] = useState(false);
   const [grade, setGrade] = useState(null);
   const [error, setError] = useState('');
+  const [remembering, setRemembering] = useState(false);
   const timing = useAnswerTiming();
 
   async function check(event) {
@@ -495,7 +558,8 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
           {grade.credit !== 1 && <p className="retain-guide-answer"><span>Answer</span>{grade.answer}</p>}
         </div>
       )}
-      {grade && <NextButton onNext={onNext} missed={grade.credit !== 1} />}
+      {remembering && <MemoryHook guideId={guideId} concept={concept} question={question} />}
+      {grade && <NextButton onNext={onNext} missed={grade.credit !== 1} onRemember={remembering ? null : () => setRemembering(true)} />}
     </form>
   );
 }

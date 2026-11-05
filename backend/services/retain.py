@@ -131,6 +131,22 @@ def fill_verdict(response: str, answer: str) -> str:
     return "wrong"
 
 
+def mentions_answer(text: str, answer: str) -> bool:
+    """Whether a piece of writing (a memory hook) states the answer: every number in it, and all of
+    its key words (at least half when it has more than six), allowing plurals and small typos."""
+    words = _key_words(normalize(text))
+    if not words:
+        return False
+    for accepted in _accepted(answer):
+        target = _key_words(accepted)
+        if not target or any(re.search(r"\d", word) and word not in words for word in target):
+            continue
+        covered = sum(1 for word in target if any(_same_word(given, word) for given in words))
+        if covered == len(target) or (len(target) > 6 and covered * 2 >= len(target)):
+            return True
+    return False
+
+
 def plan_session(questions: list, selected) -> list:
     """Cards in guide order: {"type", "concepts": [index, ...]}, one first ask per idea."""
     chosen = [kind for kind in TYPES if kind in set(selected or ())] or ["mc"]

@@ -679,7 +679,12 @@ body:has(.about) .c-fab { display: none; }
 .retain-why-sure { color: var(--error); font-weight: 600; }
 .retain-why-source { display: inline-flex; align-items: center; gap: 6px; justify-self: start; color: var(--olive-ink); font-weight: 600; }
 .finish-sure { margin: 0; max-width: 46ch; }
-@media (prefers-reduced-motion: reduce) { .retain-why { animation: none; } }
+/* "Help me remember": a memory hook under a missed question, in the olive tint (help, not error). */
+.retain-hook { display: grid; gap: 8px; margin-top: 14px; padding: 14px 16px; border-radius: var(--r-input); background: var(--olive-tint); color: var(--ink); font: 500 15px/1.5 var(--font-sans); animation: c-slide-in 280ms cubic-bezier(.2, .8, .2, 1); }
+.retain-hook p { margin: 0; }
+.retain-hook-title { display: inline-flex; align-items: center; gap: 6px; color: var(--olive-ink); font: 600 13px/1 var(--font-sans); }
+.retain-hook-again { justify-self: start; padding: 0; border: 0; background: none; color: var(--olive-ink); font: 600 14px/1.4 var(--font-sans); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .retain-why, .retain-hook { animation: none; } }
 
 /* A minimized lecture recording: the sheet stays mounted (so it keeps recording) but hidden, and a
    small pill under the header shows the time and opens it again. */

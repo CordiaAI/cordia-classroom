@@ -80,6 +80,14 @@ class QuestionTests(unittest.TestCase):
             with self.assertRaises(InvalidAnswer):
                 check(bad[0], 1, bad[1])
 
+    def test_memory_questions(self):
+        self.assertEqual(check("memory_style", 1, {"value": "funny"}), {"value": "funny"})
+        self.assertEqual(check("interests", 1, {"value": ["music", "food"]}), {"value": ["music", "food"]})
+        self.assertEqual(check("interests", 1, {"skipped": True}), {"skipped": True})
+        for bad in ([], ["music", "food", "tech", "books"], ["music", "music"], ["knitting"], "music"):
+            with self.assertRaises(InvalidAnswer):
+                check("interests", 1, {"value": bad})
+
     def test_no_act_option_and_no_anxiety_question(self):
         self.assertNotIn("act", QUESTIONS["licensure_exam"][2])
         self.assertFalse([q for q in QUESTIONS if "anx" in q or "nerve" in q])
