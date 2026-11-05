@@ -115,6 +115,23 @@ class FillInTheBlankTests(unittest.TestCase):
         self.assertFalse(retain.fill_matches("1865", "1863"))
         self.assertFalse(retain.fill_matches("", "Equity"))
 
+    def test_verdict_close_is_part_of_the_answer_with_nothing_contradicting_it(self):
+        self.assertEqual(retain.fill_verdict("Alpha Sigma", "Oregon Alpha Sigma."), "close")
+        self.assertEqual(retain.fill_verdict("Oregon Alpha Sigma chapter", "Oregon Alpha Sigma"), "close")
+        self.assertEqual(retain.fill_verdict("Treaty of Versailes", "The Treaty of Versailles of 1919"), "wrong")  # the year is missing
+        self.assertEqual(retain.fill_verdict("Treaty Versailles 1919", "The Treaty of Versailles of 1919"), "close")
+        self.assertEqual(retain.fill_verdict("Alpha Tau", "Oregon Alpha Sigma"), "wrong")
+        self.assertEqual(retain.fill_verdict("photosynthesis", "Cellular respiration"), "wrong")
+        self.assertEqual(retain.fill_verdict("mitosis", "Mitosis"), "right")
+        self.assertEqual(retain.fill_verdict("", "Mitosis"), "wrong")
+
+    def test_a_typed_answer_the_student_counted_right_keeps_its_credit(self):
+        question = {"question": "Which chapter?", "options": ["Oregon Alpha Sigma", "x", "y", "z"], "correct_index": 0}
+        mine = {"type": "fill", "response": "Alpha Sigma", "credit": 1, "self_marked": True}
+        self.assertEqual(retain.first_try_credit(question, mine, "u1", GUIDE_ID), 1.0)
+        self.assertEqual(retain.first_try_credit(question, {**mine, "self_marked": False}, "u1", GUIDE_ID), 0.0)
+        self.assertEqual(retain.first_try_credit(question, {**mine, "credit": 0}, "u1", GUIDE_ID), 0.0)
+
 
 class SignedGradeTests(unittest.TestCase):
     def test_only_an_unaltered_grade_counts(self):
@@ -231,3 +248,22 @@ class RetainRouteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StudentFeedbackTests(unittest.TestCase):
+    """What a student sees under a marked answer is written to them, never the marker's notes."""
+
+    def test_marker_notes_are_dropped_and_notes_to_the_student_kept(self):
+        from services.llm import student_feedback
+        self.assertEqual(student_feedback("The student correctly identified Glazebrook, Marshall and Ross."), "")
+        self.assertEqual(student_feedback("The learner's answer omits full names."), "")
+        self.assertEqual(student_feedback("You named all three founders who attended."), "You named all three founders who attended.")
+        self.assertEqual(student_feedback(None), "")
+
+    def test_the_grader_returns_only_the_note_for_the_student(self):
+        from services import llm
+        reply = '{"reasoning": "The student listed all three attendees; typos are minor.", "verdict": "right", "feedback": "You got all three attendees."}'
+        fake = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=reply))])
+        with patch.object(llm, "get_openai_client", return_value=None), patch.object(llm, "chat", return_value=fake):
+            result = llm.grade_written_answer("Who attended?", "Glazebrook, Marshall and Ross", "Glasebrook, Marshal, Ross")
+        self.assertEqual(result, {"credit": 1.0, "explanation": "You got all three attendees."})

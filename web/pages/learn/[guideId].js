@@ -18,7 +18,7 @@ import { applyTest } from '../../lib/timedTest.mjs';
 import { needsStudySet } from '../../lib/studySet.mjs';
 import { makeStudySet } from '../../lib/autoStudySet';
 import TimedTest from '../../components/TimedTest';
-import { ClozeCard, FillCard, McCard, WrittenCard } from '../../components/RetainCards';
+import { ClozeCard, FillCard, McCard, MemoryHook, RememberButton, WrittenCard } from '../../components/RetainCards';
 import CordiaLoader, { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import Toggle from '../../components/Toggle';
 
@@ -50,12 +50,24 @@ function whenLabel(plan) {
 }
 
 // Flashcards: the question on the front; flip it (tap or Space) to see the answer, then say
-// honestly whether you knew it (1 / 2). Also used when a written answer can't be checked by AI.
-function FlipCard({ card, question, onResult, onNext }) {
+// honestly whether you knew it (1 / 2), which moves straight on to the next card (no Next button,
+// like the Flashcards screen). Also used when a written answer can't be checked by AI.
+const FLIP_NEXT_MS = 250;
+function FlipCard({ card, question, guideId, onResult, onNext }) {
+  const [remembering, setRemembering] = useState(false);
   const [flipped, setFlipped] = useState(false);
   const [done, setDone] = useState(null);
   const timing = useAnswerTiming();
   const answerText = conceptAnswer(question);
+  // Moves on once the answer is saved: this runs after the render that carries it, so onNext sees
+  // the updated round (calling it inside mark() would read the round from before the answer).
+  const next = useRef(onNext);
+  next.current = onNext;
+  useEffect(() => {
+    if (done === null) return undefined;
+    const timer = setTimeout(() => next.current(), FLIP_NEXT_MS);
+    return () => clearTimeout(timer);
+  }, [done]);
 
   function flip() {
     if (done !== null) return;
@@ -95,14 +107,15 @@ function FlipCard({ card, question, onResult, onNext }) {
           </span>
         </span>
       </button>
+      {remembering && <MemoryHook guideId={guideId} concept={card.concepts[0]} question={question} />}
       {flipped && done === null && (
         <div className="quiz-next-row learn-flip-marks">
+          <RememberButton onRemember={remembering ? null : () => setRemembering(true)} />
           <span className="c-meta">Did you know it?</span>
           <button type="button" className="c-btn c-btn--secondary" onClick={() => mark(0)}>I missed it <kbd>1</kbd></button>
           <button type="button" className="c-btn c-btn--primary" onClick={() => mark(1)}>I got it <kbd>2</kbd></button>
         </div>
       )}
-      {done !== null && <div className="quiz-next-row"><button type="button" className="c-btn c-btn--primary quiz-next" onClick={onNext} autoFocus>Next</button></div>}
     </>
   );
 }
@@ -422,7 +435,7 @@ export default function LearnPage() {
           {card.type === 'fill' && <FillCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
           {card.type === 'written' && <WrittenCard key={card.id} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} onSwitch={switchToSelf} />}
           {card.type === 'cloze' && <ClozeCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
-          {card.type === 'self' && <FlipCard key={card.id + '-self'} card={retainCard} question={question} onResult={onResult} onNext={onNext} />}
+          {card.type === 'self' && <FlipCard key={card.id + '-self'} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
         </div>
       )}
 

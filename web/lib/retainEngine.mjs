@@ -79,6 +79,34 @@ export function fillMatches(response, answer) {
   return false;
 }
 
+// Words that carry no meaning on their own, left out when comparing typed answers word by word.
+const FILLER = new Set(['the', 'a', 'an', 'of', 'and', 'in', 'on', 'at', 'to', 'for', 'is', 'are', 'was', 'were', 'by', 'with', 'its', 'it']);
+const keyWords = text => String(text || '').split(' ').filter(word => word && !FILLER.has(word));
+function sameWord(a, b) {
+  if (a === b) return true;
+  if (a.replace(/s$/, '') === b.replace(/s$/, '')) return true;
+  return a.length >= 5 && b.length >= 5 && !/\d/.test(a + b) && distance(a, b) <= Math.floor(Math.max(a.length, b.length) / 5);
+}
+
+// A typed answer: 'right' (fillMatches), 'close' (part of the answer, nothing that contradicts it:
+// "Alpha Sigma" for "Oregon Alpha Sigma") or 'wrong'. Close = every number in the answer is there,
+// the typed words cover at least half of the answer's key words, and at most one typed word isn't
+// in the answer. The student decides whether a close answer counts. Mirrors backend fill_verdict.
+export function fillVerdict(response, answer) {
+  if (fillMatches(response, answer)) return 'right';
+  const given = keyWords(normalize(response));
+  if (!given.length) return 'wrong';
+  for (const accepted of acceptedAnswers(answer)) {
+    const target = keyWords(accepted);
+    if (!target.length) continue;
+    if (target.some(word => /\d/.test(word) && !given.includes(word))) continue;
+    const covered = target.filter(word => given.some(typed => sameWord(typed, word))).length;
+    const extra = given.filter(typed => !target.some(word => sameWord(typed, word))).length;
+    if (covered > 0 && covered * 2 >= target.length && extra <= 1) return 'close';
+  }
+  return 'wrong';
+}
+
 function isTerm(question) {
   return conceptAnswer(question).split(/\s+/).filter(Boolean).length <= TERM_MAX_WORDS;
 }
@@ -124,7 +152,7 @@ export function recordResults(session, card, results) {
     const state = { ...concepts[result.concept] };
     const right = result.credit === 1;
     if (!state.first) {
-      state.first = { concept: result.concept, type: card.type, response: result.response ?? '', credit: result.credit, token: result.token || null, ...(result.confidence ? { confidence: result.confidence } : {}) };
+      state.first = { concept: result.concept, type: card.type, response: result.response ?? '', credit: result.credit, token: result.token || null, ...(result.confidence ? { confidence: result.confidence } : {}), ...(result.selfMarked ? { self_marked: true } : {}) };
       if (right) state.cleared = true;
       else { state.missed = true; state.needs = CLEAR_AFTER; }
     } else if (!state.cleared) {

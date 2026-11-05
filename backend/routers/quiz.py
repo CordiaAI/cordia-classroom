@@ -13,7 +13,7 @@ from rate_limit import ai_rate_limit
 from pydantic import BaseModel, Field
 from typing import List, Literal, Optional
 from database import get_supabase
-from services.llm import explain_miss_briefly, get_openai_client, grade_written_answer
+from services.llm import explain_miss_briefly, get_openai_client, grade_written_answer, memory_hook
 from services.llm_calls import chat
 from services.models import current_user_id
 from auth_utils import get_user_id
@@ -40,6 +40,7 @@ class RetainAttempt(BaseModel):
     response: str = Field(default="", max_length=4000)
     credit: Optional[float] = None
     token: Optional[str] = Field(default=None, max_length=128)
+    self_marked: bool = False  # a typed answer the student counted as right after seeing the answer
 
 
 class QuizSubmission(BaseModel):
@@ -59,6 +60,11 @@ class WrittenAnswer(BaseModel):
 class MissRequest(BaseModel):
     concept: int = Field(..., ge=0, le=100)
     chosen: str = Field(..., min_length=1, max_length=4000)
+
+
+class RememberRequest(BaseModel):
+    concept: int = Field(..., ge=0, le=100)
+    previous: Optional[str] = Field(default=None, max_length=600)
 
 
 def _parse_qa_pairs(text: str) -> list:
@@ -432,6 +438,50 @@ def explain_miss(guide_id: str, body: MissRequest, authorization: str = Header(d
     result = explain_miss_briefly(question.get("question", ""), correct, body.chosen.strip(), passage)
     if not result:
         raise HTTPException(status_code=502, detail="Cordia could not explain this one right now.")
+    record(user_id, "light")
+    return result
+
+
+def _memory_preferences(supabase, user_id: str) -> tuple:
+    """The student's newest memory_style and interests answers (About-you screen), or defaults."""
+    style, interests = "link", []
+    try:
+        rows = (supabase.table("onboarding_answers").select("question_id, answer, answered_at")
+                .eq("user_id", user_id).in_("question_id", ["memory_style", "interests"])
+                .order("answered_at", desc=True).limit(20).execute()).data or []
+    except Exception:
+        logger.warning("Memory preferences unavailable", exc_info=True)
+        return style, interests
+    seen = set()
+    for row in rows:
+        question_id, answer = row.get("question_id"), row.get("answer") or {}
+        if question_id in seen:
+            continue
+        seen.add(question_id)
+        value = answer.get("value") if isinstance(answer, dict) else None
+        if question_id == "memory_style" and isinstance(value, str):
+            style = value
+        elif question_id == "interests" and isinstance(value, list):
+            interests = [str(item) for item in value[:3]]
+    return style, interests
+
+
+@router.post("/{guide_id}/remember", dependencies=[Depends(ai_rate_limit(max_calls=30))])
+def help_me_remember(guide_id: str, body: RememberRequest, authorization: str = Header(default="")):
+    """A memory hook for a missed question, in the student's style ("Help me remember")."""
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+    questions = _saved_questions(supabase, guide_id, user_id)
+    if body.concept >= len(questions):
+        raise HTTPException(status_code=400, detail="Unknown question")
+    question = questions[body.concept]
+    style, interests = _memory_preferences(supabase, user_id)
+    require(user_id, "light")
+    result = memory_hook(question.get("question", ""), retain.concept_answer(question), style, interests,
+                         (body.previous or "").strip())
+    if not result:
+        raise HTTPException(status_code=502, detail="Cordia couldn't come up with one right now. Try again.")
     record(user_id, "light")
     return result
 

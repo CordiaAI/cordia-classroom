@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  advance, choiceText, createSession, currentCard, fillMatches, firstAttempts, progress, recordResults, reaskType,
+  advance, choiceText, createSession, currentCard, fillMatches, fillVerdict, firstAttempts, progress, recordResults, reaskType,
 } from '../lib/retainEngine.mjs';
 
 const q = (question, answer) => ({ question, options: [answer, 'Other A', 'Other B', 'Other C'], correct_index: 0 });
@@ -91,4 +91,22 @@ test('choices end alike: a lone closing period goes, abbreviations and ellipses 
     assert.equal(choiceText(raw), shown, raw);
     assert.equal(choiceText(shown), shown);
   }
+});
+
+test('typed answers: part of the answer with nothing contradicting it is close, and the student decides', () => {
+  assert.equal(fillVerdict('Alpha Sigma', 'Oregon Alpha Sigma.'), 'close');
+  assert.equal(fillVerdict('Oregon Alpha Sigma chapter', 'Oregon Alpha Sigma'), 'close');
+  assert.equal(fillVerdict('Treaty of Versailes', 'The Treaty of Versailles of 1919'), 'wrong'); // the year is missing
+  assert.equal(fillVerdict('Treaty Versailles 1919', 'The Treaty of Versailles of 1919'), 'close');
+  assert.equal(fillVerdict('Alpha Tau', 'Oregon Alpha Sigma'), 'wrong');
+  assert.equal(fillVerdict('photosynthesis', 'Cellular respiration'), 'wrong');
+  assert.equal(fillVerdict('mitosis', 'Mitosis'), 'right');
+  assert.equal(fillVerdict('', 'Mitosis'), 'wrong');
+});
+
+test('a typed answer the student counted right reaches the quiz score marked as theirs', () => {
+  const qs = [{ question: 'Which chapter?', options: ['Oregon Alpha Sigma', 'B', 'C', 'D'], correct_index: 0 }];
+  const session = createSession(qs, [{ type: 'fill', concepts: [0] }], ['fill']);
+  const after = recordResults(session, currentCard(session), [{ concept: 0, credit: 1, response: 'Alpha Sigma', selfMarked: true }]);
+  assert.deepEqual(firstAttempts(after).map(a => [a.credit, a.self_marked]), [[1, true]]);
 });

@@ -54,11 +54,18 @@ export default function TipHost() {
     };
     window.addEventListener('scroll', place, true);
     window.addEventListener('resize', place);
+    // The thing the tip points at can go away without a scroll (a button that hides once used):
+    // the tip goes with it.
+    const gone = setInterval(() => {
+      const target = document.querySelector(`[data-tip="${tip.id}"]`);
+      if (!target || !target.getClientRects().length) setTip(null);
+    }, 300);
     const leave = () => setTip(null);
     router.events.on('routeChangeStart', leave);
     return () => {
       window.removeEventListener('scroll', place, true);
       window.removeEventListener('resize', place);
+      clearInterval(gone);
       router.events.off('routeChangeStart', leave);
     };
   }, [tip?.id, router.events]);
