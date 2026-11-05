@@ -491,7 +491,7 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
       )}
       {grade && (
         <div className={'retain-feedback ' + tone} role="status">
-          <strong>{label}</strong> {grade.explanation}
+          <strong>{label}.</strong>{grade.explanation ? ` ${grade.explanation}` : ''}
           {grade.credit !== 1 && <p className="retain-guide-answer"><span>Answer</span>{grade.answer}</p>}
         </div>
       )}

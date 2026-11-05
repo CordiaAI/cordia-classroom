@@ -462,10 +462,12 @@ def grade_written_answer(question: str, reference: str, student_answer: str) -> 
                 "fine. Use only the guide's answer as the standard; never reward or require facts "
                 "it does not contain. Verdicts: \"right\" if the answer covers the guide answer's "
                 "essential points; \"partial\" if it gets some essential points but misses or "
-                "confuses others; \"wrong\" if it misses the main idea or is incorrect. In 1-2 "
-                "encouraging sentences, say what was right and, if not right, what was missing, "
-                "without restating the whole answer. "
-                'Return JSON: {"verdict": "right"|"partial"|"wrong", "explanation": "..."}'
+                "confuses others; \"wrong\" if it misses the main idea or is incorrect. "
+                "\"reasoning\" is your private check against the guide answer; the student never sees it. "
+                "\"feedback\" is shown to the student: one encouraging sentence (under 25 words) spoken to "
+                "them as \"you\", saying what they got and, if not right, what was missing, without "
+                "restating the whole answer, grading notes, or mentioning typos. "
+                'Return JSON: {"reasoning": "...", "verdict": "right"|"partial"|"wrong", "feedback": "..."}'
             )},
             {"role": "user", "content": (
                 f"QUESTION:\n{question[:2000]}\n\nGUIDE ANSWER:\n{reference[:3000]}"
@@ -479,7 +481,16 @@ def grade_written_answer(question: str, reference: str, student_answer: str) -> 
     credit = {"right": 1.0, "partial": 0.5, "wrong": 0.0}.get(str(parsed.get("verdict") or "").lower())
     if credit is None:
         return {}
-    return {"credit": credit, "explanation": str(parsed.get("explanation") or "").strip()[:800]}
+    return {"credit": credit, "explanation": student_feedback(parsed.get("feedback"))}
+
+
+def student_feedback(text) -> str:
+    """The note a student sees under a marked answer. A note that reads like the marker's own
+    notes ("The student correctly identified...") is dropped; the verdict alone shows instead."""
+    note = str(text or "").strip()[:300]
+    if re.search(r"\bthe (student|learner|user)\b|\b(student|learner)'s\b", note, re.IGNORECASE):
+        return ""
+    return note
 
 
 def explain_miss_briefly(question: str, correct: str, chosen: str, passage: str = "") -> dict:
@@ -490,8 +501,9 @@ def explain_miss_briefly(question: str, correct: str, chosen: str, passage: str 
             {"role": "system", "content": (
                 "A student missed one practice question. Write two short sentences (under 30 words each). "
                 '"why_right": what makes the correct answer right, using the meaningful detail from the guide. '
-                '"why_wrong": why the student\'s choice does not fit this question (what it actually describes or '
-                "what it misses), without guessing at the student's thinking. Use the guide passage as the "
+                '"why_wrong": why their choice does not fit this question (what it actually describes or '
+                "what it misses), without guessing at their thinking. Both are shown to the student: write to "
+                "them as \"you\"/\"your answer\", never \"the student\". Use the guide passage as the "
                 "standard and never contradict it. Return JSON: {\"why_right\": \"...\", \"why_wrong\": \"...\"}"
             )},
             {"role": "user", "content": (
@@ -504,7 +516,7 @@ def explain_miss_briefly(question: str, correct: str, chosen: str, passage: str 
     )
     parsed = _practice_json(response.choices[0].message.content)
     why_right = str(parsed.get("why_right") or "").strip()[:300]
-    why_wrong = str(parsed.get("why_wrong") or "").strip()[:300]
+    why_wrong = student_feedback(parsed.get("why_wrong"))
     return {"why_right": why_right, "why_wrong": why_wrong} if why_right else {}
 
 

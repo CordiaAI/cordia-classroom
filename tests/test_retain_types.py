@@ -248,3 +248,22 @@ class RetainRouteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StudentFeedbackTests(unittest.TestCase):
+    """What a student sees under a marked answer is written to them, never the marker's notes."""
+
+    def test_marker_notes_are_dropped_and_notes_to_the_student_kept(self):
+        from services.llm import student_feedback
+        self.assertEqual(student_feedback("The student correctly identified Glazebrook, Marshall and Ross."), "")
+        self.assertEqual(student_feedback("The learner's answer omits full names."), "")
+        self.assertEqual(student_feedback("You named all three founders who attended."), "You named all three founders who attended.")
+        self.assertEqual(student_feedback(None), "")
+
+    def test_the_grader_returns_only_the_note_for_the_student(self):
+        from services import llm
+        reply = '{"reasoning": "The student listed all three attendees; typos are minor.", "verdict": "right", "feedback": "You got all three attendees."}'
+        fake = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=reply))])
+        with patch.object(llm, "get_openai_client", return_value=None), patch.object(llm, "chat", return_value=fake):
+            result = llm.grade_written_answer("Who attended?", "Glazebrook, Marshall and Ross", "Glasebrook, Marshal, Ross")
+        self.assertEqual(result, {"credit": 1.0, "explanation": "You got all three attendees."})
