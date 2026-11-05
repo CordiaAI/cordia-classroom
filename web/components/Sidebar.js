@@ -154,6 +154,13 @@ export default function Sidebar({ timerState, setTimerState }) {
         event.preventDefault();
         setShowSearch(true);
       }
+      // TEMPORARY (owner request, for testing): Option+F / Alt+F opens Send feedback from anywhere,
+      // even while typing. event.code, because Option+F on a Mac types "ƒ". Remove this block later.
+      if (event.altKey && !event.metaKey && !event.ctrlKey && event.code === 'KeyF') {
+        event.preventDefault();
+        setShowFeedback(true);
+        return;
+      }
       // "?" lists every shortcut, except while typing.
       const typing = event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"]');
       if (event.key === '?' && !typing) setShowShortcuts(true);

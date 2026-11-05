@@ -65,13 +65,11 @@ export function RememberButton({ onRemember }) {
 // different angle. Logged as the view shown, so the next answer says whether a hook came before it.
 export function MemoryHook({ guideId, concept, question }) {
   const [hook, setHook] = useState(null); // null: working; '': failed
-  const [error, setError] = useState('');
   const [round, setRound] = useState(0);
   const previous = useRef('');
   useEffect(() => {
     let active = true;
     setHook(null);
-    setError('');
     apiFetch(`/quiz/${guideId}/remember`, { method: 'POST', body: JSON.stringify({ concept, previous: previous.current || null }) })
       .then(data => {
         if (!active) return;
@@ -80,8 +78,8 @@ export function MemoryHook({ guideId, concept, question }) {
           noteView(guideId, question.question, 'mnemonic');
           setHook(data.hook);
         } else {
+          // Never the server's raw message ("Not Found"); the limit shows its own upgrade dialog.
           setHook('');
-          setError(typeof data?.detail === 'string' ? data.detail : "Couldn't make one. Try again.");
         }
       });
     return () => { active = false; };
@@ -91,7 +89,7 @@ export function MemoryHook({ guideId, concept, question }) {
       <span className="retain-hook-title"><Lightbulb size={18} strokeWidth={1.75} aria-hidden="true" />Help me remember</span>
       {hook === null && <p className="c-meta">Thinking of a way to remember it…</p>}
       {hook && <p>{hook}</p>}
-      {hook === '' && <p className="c-meta">{error}</p>}
+      {hook === '' && <p className="c-meta">Couldn't come up with one right now.</p>}
       {hook !== null && (
         <button type="button" className="retain-hook-again" onClick={() => setRound(value => value + 1)}>
           {hook ? 'Another one' : 'Try again'}

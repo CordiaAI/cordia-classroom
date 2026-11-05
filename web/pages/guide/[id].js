@@ -679,8 +679,8 @@ export default function GuidePage() {
         .guide-auto-set.is-error { color: var(--error); }
         .guide-tabs-row :global(.c-pill.is-making) { opacity: 1; color: var(--ink); }
         .guide-tabs-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-        .guide-tabs-row .c-pills { flex: 1 1 auto; min-width: 0; max-width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-        .guide-tabs-row .c-pills::-webkit-scrollbar { display: none; }
+        /* Scrolling (phones) or wrapping (mouse and room) comes from .c-pills in system.css. */
+        .guide-tabs-row .c-pills { flex: 1 1 auto; min-width: 0; max-width: 100%; }
         .guide-tabs-row .c-pills :global(.c-pill) { flex: 0 0 auto; }
         .guide-tabs-row, .guide-head { min-width: 0; max-width: 100%; }
         .guide-view { justify-self: start; }
