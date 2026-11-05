@@ -243,6 +243,12 @@ class GuideVisibilityTests(unittest.TestCase):
         self.assertEqual(self.row()["version"], 2)
         self.assertEqual(self.call("get", "cat", f"/guides/{GUIDE}/public").status_code, 200)
 
+    def test_renaming_is_screened_too(self):
+        self.accept_honor_code()
+        self.call("patch", "ana", f"/guides/{GUIDE}/visibility", json={"visibility": "public"})
+        self.call("patch", "ana", f"/guides/{GUIDE}/rename", json={"title": "Final exam answer key"})
+        self.assertEqual((self.row()["review_status"], self.row()["version"]), ("held", 2))
+
     def test_edits_make_a_new_version(self):
         self.call("patch", "ana", f"/guides/{GUIDE}", json={"title": "Supply chains", "notes": "new"})
         self.assertEqual(self.row()["version"], 2)

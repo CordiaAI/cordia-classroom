@@ -234,22 +234,28 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
         on_guide_changed(supabase, user_id, guide_id)
     guide = result.data[0]
     if {"title", "notes", "study_guide", "flashcards"} & set(update_data):
-        guide = _new_version(supabase, user_id, guide)
+        guide = {**guide, **(_new_version(supabase, user_id, guide_id) or {})}
     return {"guide": guide}
 
 
-def _new_version(db, user_id: str, guide: dict) -> dict:
+def _new_version(db, user_id: str, guide_id: str) -> Optional[dict]:
     """An edit makes a new version (saves pin the one they saw) and re-runs the leak check on a
-    shared guide."""
+    shared guide. Returns the columns that changed."""
     try:
         from services.guide_review import rescreen
+        guide = (db.table("study_guides").select("id,title,study_guide,flashcards,visibility,version,review_status,hold_reason")
+                 .eq("id", guide_id).eq("user_id", user_id).limit(1).execute().data or [None])[0]
+        if not guide:
+            return None
         version = int(guide.get("version") or 1) + 1
-        db.table("study_guides").update({"version": version}).eq("id", guide["id"]).eq("user_id", user_id).execute()
-        return rescreen(db, {**guide, "version": version})
+        db.table("study_guides").update({"version": version}).eq("id", guide_id).eq("user_id", user_id).execute()
+        checked = rescreen(db, {**guide, "version": version})
+        return {key: checked.get(key) for key in ("version", "review_status", "hold_reason")}
     except Exception as exc:  # before the Stage 3 migration
         logger.warning(f"Guide version bump skipped: {type(exc).__name__}")
-        return guide
-    
+        return None
+
+
 # Smaller column sets for screens that don't show the guide text (default: every column).
 GUIDE_FIELDS = {
     "meta": "id,title,folder_id,flashcard_progress,source_type,created_at",
@@ -330,6 +336,7 @@ def rename_guide(guide_id: str, request: RenameGuideRequest, authorization: str 
         .execute()
 
     on_guide_changed(supabase, user_id, guide_id)
+    _new_version(supabase, user_id, guide_id)
     return {"title": request.title}
 
 

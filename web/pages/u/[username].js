@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Ban, Flag, Flame, GraduationCap, Lock, Pencil } from 'lucide-react';
+import { ArrowLeft, Ban, Flag, Flame, GraduationCap, Layers, Lock, Pencil } from 'lucide-react';
 import { useRequireAuth } from '../../lib/auth';
 import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import Menu from '../../components/Menu';
@@ -171,6 +171,21 @@ export default function ProfilePage() {
                     {(profile[item.key] || []).length === 0 && (
                       <p className="c-card up-none">{profile.is_self && item.key === 'guides' ? 'Guides you make public will show here.' : item.empty}</p>
                     )}
+                    {item.key === 'guides' && profile.guides.length > 0 && (
+                      <ul className="c-card up-guides">
+                        {profile.guides.map(guide => (
+                          <li key={guide.id}>
+                            <Link href={`/sets/${guide.id}`} className="up-guide">
+                              <span className="up-guide-icon"><Layers {...ICON} /></span>
+                              <span className="up-guide-text">
+                                <strong className="c-truncate">{guide.title}</strong>
+                                <span className="c-meta">{guide.question_count} {guide.question_count === 1 ? 'question' : 'questions'}</span>
+                              </span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 ))}
               </>
@@ -195,6 +210,13 @@ export default function ProfilePage() {
         <style jsx>{`
           .up { width: min(760px, 100%); margin: 0 auto; display: grid; gap: 16px; }
           .up-top { display: flex; }
+          .up-guides { list-style: none; margin: 0; padding: 6px; display: grid; }
+          .up-guides li + li { border-top: 1px solid var(--line); }
+          .up :global(.up-guide) { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 6px 10px; color: var(--ink); text-decoration: none; min-width: 0; }
+          .up :global(.up-guide:hover strong) { text-decoration: underline; text-underline-offset: 3px; }
+          .up-guide-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
+          .up-guide-text { display: grid; gap: 2px; min-width: 0; }
+          .up-guide-text strong { font: 600 15px/1.3 var(--font-sans); }
           .up-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 20px; }
           .up-avatar { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 26px/1 var(--font-sans); }
           .up-who { display: grid; gap: 4px; min-width: 0; }

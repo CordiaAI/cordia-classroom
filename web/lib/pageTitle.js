@@ -15,7 +15,7 @@ const TITLES = {
   '/feedback-review': 'Feedback', '/admin': 'Admin', '/auth/callback': 'Signing in', '/oauth/consent': 'Connect an app', '/reset-password': 'Reset password',
   '/guide/[id]': 'Study guide', '/lecture/[id]': 'Lecture', '/folder/[id]': 'Class', '/class/[id]': 'Class',
   '/quiz/[guideId]': 'Quiz', '/practice/[guideId]': 'Practice', '/nclex/[guideId]': 'NCLEX practice',
-  '/play/[guideId]': 'Blocks', '/404': 'Page not found', '/u/[username]': 'Profile', '/settings/privacy': 'Profile and privacy', '/friends': 'Friends',
+  '/play/[guideId]': 'Blocks', '/404': 'Page not found', '/u/[username]': 'Profile', '/settings/privacy': 'Profile and privacy', '/friends': 'Friends', '/sets/[id]': 'Study guide',
 };
 
 export const routeTitle = pathname => pageTitle(TITLES[pathname]);

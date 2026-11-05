@@ -7,7 +7,7 @@ import CardPhoto from '../../components/CardPhoto';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Brain, Download, ExternalLink, FolderInput, GraduationCap, Layers, Lock, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, Users, X,
+  ArrowLeft, Brain, Download, ExternalLink, FolderInput, GraduationCap, Layers, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -21,6 +21,11 @@ import { makeStudySet as makeStudySetFor } from '../../lib/autoStudySet';
 import { classLabel } from '../../lib/classLabel';
 import Menu from '../../components/Menu';
 import ClassChip from '../../components/ClassChip';
+import VisibilityChip from '../../components/VisibilityChip';
+import PublishSheet from '../../components/PublishSheet';
+import { loadMyProfile } from '../../lib/profiles';
+import { setGuideVisibility } from '../../lib/guideSharing';
+import { firstPublishStep } from '../../lib/guideVisibility.mjs';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useLearningStyle } from '../../lib/learningStyle';
 import { rememberGuidePage, rememberLastGuide } from '../../lib/userStore';
@@ -143,6 +148,8 @@ export default function GuidePage() {
   // The outline before "Regenerate outline", so the toast can put it back.
   const [undoNotes, setUndoNotes] = useState(null);
   const [sharing, setSharing] = useState(null);
+  const [toastAction, setToastAction] = useState(null); // { label, run } shown beside the toast
+  const [firstPublish, setFirstPublish] = useState(false);
   const prevRevealed = useRef(0);
   const { learningStyle } = useLearningStyle();
   const gate = useLoadGate(Boolean(guide) || Boolean(loadError));
@@ -186,7 +193,7 @@ export default function GuidePage() {
 
   useEffect(() => {
     if (!toast) return undefined;
-    const timer = setTimeout(() => { setToast(''); setUndoNotes(null); }, undoNotes === null ? 2500 : 8000);
+    const timer = setTimeout(() => { setToast(''); setUndoNotes(null); setToastAction(null); }, undoNotes === null && !toastAction ? 2500 : 8000);
     return () => clearTimeout(timer);
   }, [toast]);
 
@@ -239,12 +246,30 @@ export default function GuidePage() {
     setSharing(data && 'visibility' in data ? data : null);
   }
 
-  async function setVisibility(visibility) {
-    const data = await apiFetch('/sharing/guides/' + id, { method: 'PUT', body: JSON.stringify({ visibility }) });
-    if (data?.visibility) {
-      setSharing(current => ({ ...current, visibility: data.visibility, status: data.status }));
-      setToast(data.status === 'held' ? 'Held for review' : data.visibility === 'class' ? `Shared with ${sharing.class.code}` : 'Private');
-    } else setToast(apiErrorMessage(data?.detail, 'Could not change sharing'));
+  // Visibility changes from the chip: keep the guide (and the class set state) in step.
+  function onVisibility(result) {
+    setGuide(current => ({ ...current, visibility: result.visibility, attribution: result.attribution, review_status: result.review_status, hold_reason: result.hold_reason }));
+    loadSharing();
+  }
+
+  // Once per student, on a guide they just made: new guides are public (after the Honor Code), so
+  // say so with "Make private" one tap away; someone who hasn't accepted it gets the Honor Code sheet.
+  async function firstPublishCheck(loaded) {
+    const step = firstPublishStep(loaded, { asked: Boolean(readUserValue('cordiaPublishAsked', false)) });
+    if (step === 'notice') {
+      writeUserValue('cordiaPublishAsked', true);
+      setToastAction({ label: 'Make private', run: () => makePrivate() });
+      setToast('New guides are public');
+      return;
+    }
+    if (step !== 'ask') return;
+    const me = await loadMyProfile();
+    if (me && !me.honor_code_accepted) setFirstPublish(true);
+  }
+
+  async function makePrivate() {
+    const { result, error } = await setGuideVisibility(id, { visibility: 'private' });
+    if (result) { onVisibility(result); setToastAction(null); setToast('Private'); } else setToast(error);
   }
 
   async function pullUpdate() {
@@ -272,6 +297,7 @@ export default function GuidePage() {
       if (data.guide.source_type === 'canvas_module' && fileNamesOnly(data.guide.notes)) fetchCanvasFiles(data.guide.id);
       rememberLastGuide({ id: data.guide.id, title: data.guide.title, page: Number(router.query.page) > 0 ? Number(router.query.page) - 1 : 0 });
       walkthroughEvent('guide-open');
+      firstPublishCheck(data.guide);
     } else {
       setLoadError(apiErrorMessage(data?.detail, 'This study guide could not be loaded.'));
     }
@@ -455,8 +481,6 @@ export default function GuidePage() {
     { key: 'practice', label: 'Practice', icon: PencilRuler, href: '/practice/' + id, needsCards: true },
     ...(nursing ? [{ key: 'nclex', label: 'NCLEX', icon: Stethoscope, href: '/nclex/' + id }] : []),
   ];
-  const shareable = sharing?.class && !sharing.linked;
-  const shared = shareable && sharing.visibility === 'class';
 
   return (
     <Reveal phase={gate}>
@@ -518,19 +542,13 @@ export default function GuidePage() {
               : sourceTitle}
           </span>
         )}
-        {shareable && (sharing.class.sharing_blocked
-          ? <span className="c-chip guide-share"><Lock size={16} strokeWidth={1.75} aria-hidden="true" />Sharing off for {sharing.class.code}</span>
-          : (
-            <Menu
-              label={shared ? `Shared with ${sharing.class.code}` : 'Private'}
-              trigger={<span className="guide-share-label">{shared ? <Users size={16} strokeWidth={1.75} aria-hidden="true" /> : <Lock size={16} strokeWidth={1.75} aria-hidden="true" />}{shared ? `Shared with ${sharing.class.code}` : 'Private'}</span>}
-              align="left"
-              items={[
-                { label: 'Private', icon: Lock, current: !shared, onSelect: () => setVisibility('private') },
-                { label: `Share with ${sharing.class.code}`, icon: Users, current: shared, onSelect: () => setVisibility('class') },
-              ]}
-            />
-          ))}
+        <VisibilityChip
+          guide={guide}
+          course={sharing?.class || null}
+          copy={Boolean(sharing?.linked || guide.linked_set_id || guide.forked_from_guide_id)}
+          onChange={onVisibility}
+          onToast={message => { setToastAction(null); setToast(message); }}
+        />
       </div>
 
       {nclexNew && (
@@ -628,7 +646,23 @@ export default function GuidePage() {
         <div className="c-toast" role="status">
           <span>{toast}</span>
           {undoNotes !== null && <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={undoRegenerate}>Undo</button>}
+          {toastAction && <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={toastAction.run}>{toastAction.label}</button>}
         </div>
+      )}
+      {firstPublish && (
+        <PublishSheet
+          visibility="public"
+          fresh
+          attribution={guide.attribution}
+          onClose={() => { writeUserValue('cordiaPublishAsked', true); setFirstPublish(false); }}
+          onPublish={async chosen => {
+            const { result, error } = await setGuideVisibility(id, { visibility: 'public', attribution: chosen, accept_honor_code: true });
+            writeUserValue('cordiaPublishAsked', true);
+            setFirstPublish(false);
+            if (result) { onVisibility(result); setToast(result.review_status === 'held' ? 'Held for review' : 'Public'); } else setToast(error);
+          }}
+          onPrivate={() => { writeUserValue('cordiaPublishAsked', true); setFirstPublish(false); setToast('Kept private'); }}
+        />
       )}
 
       <style jsx>{`
@@ -638,8 +672,6 @@ export default function GuidePage() {
         .guide-title { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-wrap: anywhere; }
         .guide-title :global(.guide-rename-btn) { flex: 0 0 auto; color: var(--muted); }
         .guide-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: -8px 0 0 48px; }
-        .guide-share-label { display: inline-flex; align-items: center; gap: 6px; font: 600 13px/1 var(--font-sans); white-space: nowrap; }
-        .guide-meta :global(.c-menu-wrap > .c-icon-btn) { width: auto; height: 32px; padding: 0 12px; border-radius: var(--r-pill); border: 1px solid var(--line); }
         .guide-nclex { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; border-radius: var(--r-row); background: var(--olive-tint); font: 600 15px/1.4 var(--font-sans); }
         .guide-nclex :global(.lucide) { color: var(--olive-ink); flex: 0 0 auto; }
         .guide-making { margin: -4px 0 0; }
