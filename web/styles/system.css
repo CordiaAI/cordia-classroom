@@ -275,7 +275,12 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
 /* A scrolling row clips whatever hangs outside it, so the pills' shadows were cut off in one
    straight line under the row. The padding gives the shadows room; the matching negative margin
    keeps the row exactly where it was. */
-.c-pills { display: flex; gap: 8px; overflow-x: auto; padding: 6px 10px 16px; margin: -6px -10px -16px; scrollbar-width: none; }
+.c-pills { display: flex; gap: 8px; overflow-x: auto; padding: 6px 10px 28px; margin: -6px -10px -28px; scrollbar-width: none; }
+/* Where there's a mouse and room, the row doesn't scroll at all, so nothing can clip a shadow
+   (the hover shadow reaches further than any padding would cover); it wraps if it ever must. */
+@media (hover: hover) and (min-width: 768px) {
+  .c-pills { flex-wrap: wrap; overflow: visible; padding: 0; margin: 0; }
+}
 .c-pills::-webkit-scrollbar { display: none; }
 .c-pill {
   display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto;
