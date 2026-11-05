@@ -10,7 +10,7 @@ import { FEATURE_COPY, FREE_SUMMARY, METERED, TIERS, TIER_ORDER, isPaid, resetLa
 import LearningStylePicker from '../components/LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
 import TutorSettings from '../components/TutorSettings';
-import { Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2 } from 'lucide-react';
+import { Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2, UserRound } from 'lucide-react';
 import BodyPortal from '../components/BodyPortal';
 import SharingSettings from '../components/SharingSettings';
 import PhoneSettings from '../components/PhoneSettings';
@@ -383,6 +383,10 @@ export default function SettingsPage() {
                 <button type="button" className={theme !== 'dark' ? 'is-active' : ''} aria-pressed={theme !== 'dark'} onClick={() => setAppearance('light')}><Sun size={18} strokeWidth={1.75} aria-hidden="true" /> Light</button>
                 <button type="button" className={theme === 'dark' ? 'is-active' : ''} aria-pressed={theme === 'dark'} onClick={() => setAppearance('dark')}><Moon size={18} strokeWidth={1.75} aria-hidden="true" /> Dark</button>
               </div>
+            </div>
+            <div className="c-card settings-row">
+              <span className="settings-row-label"><UserRound size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Profile and privacy</span></span>
+              <Link href="/settings/privacy" className="c-btn c-btn--secondary">Open</Link>
             </div>
             <PhoneSettings />
             <div className="c-card settings-row">
