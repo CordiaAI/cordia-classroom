@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
-import { guideNotes, hasStudyNotes, isStudyGuideNotes, parseQAPairs, parseStudyNotes } from '../../lib/formatters';
+import { guideNotes, hasStudyNotes, isStudyGuideNotes, parseQAPairs } from '../../lib/formatters';
 import useSessionTracker from '../../lib/useSessionTracker';
 import StudyAidPanel from '../../components/StudyAidPanel';
 import StudyDocument from '../../components/StudyDocument';
@@ -127,7 +127,8 @@ export default function GuidePage() {
   const [classes, setClasses] = useState([]);
   useEffect(() => { apiFetch('/folders').then(data => setClasses(data?.folders || [])); }, []);
   // Every guide has outline notes: one without them gets them written the first time it opens.
-  const [notesState, setNotesState] = useState('idle'); // idle | making | done
+  // The guide whose outline request has finished (written or not); until then a loader shows.
+  const [notesTriedFor, setNotesTriedFor] = useState('');
   const notesAsked = useRef('');
   const [page, setPage] = useState(0);
   const [revealed, setRevealed] = useState(new Set());
@@ -194,12 +195,12 @@ export default function GuidePage() {
     // Only guides made from material; a guide that is the student's own notes is never rewritten.
     if (!guide?.id || notesAsked.current === guide.id || isStudyGuideNotes(guide.notes) || !String(guide.study_guide || '').trim()) return;
     notesAsked.current = guide.id;
-    setNotesState('making');
+    const guideId = guide.id;
     fetch('/api/guide-notes', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ guide_id: guide.id }) })
       .then(response => (response.ok ? response.json() : null))
       .then(data => { if (data?.notes) { setGuide(current => (current && current.id === guide.id ? { ...current, notes: data.notes } : current)); setNotesVersion(value => value + 1); } })
       .catch(() => {})
-      .finally(() => setNotesState('done'));
+      .finally(() => setNotesTriedFor(guideId));
   }, [guide?.id]);
 
   // The Tutor edited this guide's outline: load the new outline into the page.
@@ -428,7 +429,9 @@ export default function GuidePage() {
 
   const pairs = parseQAPairs(guide.study_guide);
   const notes = guideNotes(guide);
-  const notesWritten = hasStudyNotes(parseStudyNotes(guide.notes));
+  // Notes not yet in outline form are about to be rewritten: show the loader from the first paint,
+  // never the old notes first.
+  const outlinePending = Boolean(String(guide.study_guide || '').trim()) && !isStudyGuideNotes(guide.notes) && notesTriedFor !== guide.id;
   const cardCount = guide.flashcards?.length || 0;
   // A guide with no material is the student's own notes until they make cards and a quiz from it.
   const hasMaterial = Boolean(String(guide.study_guide || '').trim());
@@ -579,7 +582,7 @@ export default function GuidePage() {
       </div>}
 
       {view === 'outline' || !hasMaterial ? (
-        <section className="c-card guide-notes" aria-label="Outline" aria-busy={notesState === 'making' && !notesWritten}>
+        <section className="c-card guide-notes" aria-label="Outline" aria-busy={outlinePending}>
           {!hasMaterial && !autoSet && (
             <div className="guide-make">
               <p className="c-meta">Your notes. Turn them into a tidy outline, or into flashcards and a quiz, whenever you're ready.</p>
@@ -589,7 +592,7 @@ export default function GuidePage() {
               </div>
             </div>
           )}
-          {(notesState === 'making' && !notesWritten) || (making === 'outline' && hasMaterial)
+          {outlinePending || (making === 'outline' && hasMaterial)
             ? <SectionLoader height={160} label="Writing the outline" />
             : <OutlineEditor guide={guide} version={notesVersion}
                 tools={hasMaterial && (

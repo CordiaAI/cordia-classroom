@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 import { createPortal } from 'react-dom';
 
 const PAD = 8;
@@ -18,6 +20,16 @@ function visibleElement(selector) {
 export default function Spotlight({ target, label, index, total, onSkip, passive = false, finishable = false, onFinish }) {
   const [rect, setRect] = useState(null);
   const frame = useRef(0);
+  // The label's real size, so it can be kept fully on screen (it wraps on narrow screens).
+  const labelRef = useRef(null);
+  const [labelSize, setLabelSize] = useState({ w: 0, h: 0 });
+  useIsoLayoutEffect(() => {
+    const node = labelRef.current;
+    if (!node) return;
+    const w = node.offsetWidth;
+    const h = node.offsetHeight;
+    if (Math.abs(w - labelSize.w) > 0.5 || Math.abs(h - labelSize.h) > 0.5) setLabelSize({ w, h });
+  });
 
   useEffect(() => {
     let alive = true;
@@ -55,13 +67,24 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
     bottom: Math.min(vh, rect.top + rect.height + PAD),
   };
 
-  // Label beside the control: below if there is room, else above; arrow points at it.
+  // Label beside the control: below if there is room, else above; arrow points at it. It is
+  // measured and kept 16px inside the screen on every side, with the arrow still on the control.
+  const EDGE = 16;
   let labelStyle = { left: '50%', bottom: 96, transform: 'translateX(-50%)' };
   let arrow = 'none';
   if (hole) {
-    const centerX = Math.min(vw - 120, Math.max(120, (hole.left + hole.right) / 2));
-    if (vh - hole.bottom > 90) { labelStyle = { top: hole.bottom + 14, left: centerX, transform: 'translateX(-50%)' }; arrow = 'up'; }
-    else { labelStyle = { top: hole.top - 14, left: centerX, transform: 'translate(-50%, -100%)' }; arrow = 'down'; }
+    const lw = labelSize.w;
+    const lh = labelSize.h || 48;
+    const targetX = (hole.left + hole.right) / 2;
+    const left = Math.max(EDGE, Math.min(vw - EDGE - lw, targetX - lw / 2));
+    const arrowX = Math.max(22, Math.min(lw - 22, targetX - left));
+    const below = hole.bottom + 14;
+    const above = hole.top - 14 - lh;
+    let top;
+    if (below + lh <= vh - EDGE) { top = below; arrow = 'up'; }
+    else if (above >= EDGE) { top = above; arrow = 'down'; }
+    else { top = Math.max(EDGE, vh - EDGE - lh); arrow = 'none'; }
+    labelStyle = { top, left, '--arrow-x': `${arrowX}px` };
   }
 
   // Skip sits bottom-right on desktop and just under the top bar on phones, and moves left if
@@ -89,7 +112,7 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
       ) : !passive && <div className="spot-dim" style={{ inset: 0, background: 'var(--scrim)', pointerEvents: 'none' }} />}
 
       {label && (
-        <div className={`spot-label arrow-${arrow}`} style={labelStyle} role="status" aria-live="polite">
+        <div ref={labelRef} className={`spot-label arrow-${arrow}`} style={labelStyle} role="status" aria-live="polite">
           <strong>{label}</strong>
           {dots}
           {finishable && <button type="button" className="c-btn c-btn--quiet spot-finish" onClick={onFinish}>Done</button>}
@@ -102,16 +125,16 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
         .spot-dim { position: fixed; background: var(--spot-dim); pointer-events: auto; }
         .spot-ring { position: fixed; border-radius:12px; box-shadow: 0 0 0 2px var(--olive), 0 0 0 8px var(--olive-tint), 0 0 32px 8px var(--olive-tint); pointer-events: none; transition: top var(--dur) var(--ease), left var(--dur) var(--ease), width var(--dur) var(--ease), height var(--dur) var(--ease); }
         .spot-label {
-          position: fixed; display: flex; align-items: center; gap: 12px; padding: 10px 16px; max-width: calc(100vw - 32px);
-          border-radius:999px; pointer-events: auto;
+          position: fixed; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 16px; max-width: calc(100vw - 32px); box-sizing: border-box;
+          border-radius:22px; pointer-events: auto;
           background: var(--glass); border: 1px solid var(--glass-edge);
           -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
           box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow);
-          color: var(--ink); font:600 17px/1.15 var(--font-sans); white-space: nowrap;
+          color: var(--ink); font:600 17px/1.25 var(--font-sans); overflow-wrap: anywhere;
           animation: spot-in 220ms var(--ease) both;
         }
         :global(:root:not([data-theme='dark'])) .spot-label { background: var(--surface-card); }
-        .spot-label::after { content: ''; position: absolute; left: 50%; width: 14px; height: 14px; transform: translateX(-50%) rotate(45deg); background: inherit; border: inherit; }
+        .spot-label::after { content: ''; position: absolute; left: var(--arrow-x, 50%); width: 14px; height: 14px; transform: translateX(-50%) rotate(45deg); background: inherit; border: inherit; }
         .spot-label.arrow-up::after { top: -8px; border-right: 0; border-bottom: 0; }
         .spot-label.arrow-down::after { bottom: -8px; border-left: 0; border-top: 0; }
         .spot-label.arrow-none::after { display: none; }
