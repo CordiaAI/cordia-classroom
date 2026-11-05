@@ -118,6 +118,16 @@ export default function AboutYou({ index = 1, total = 4 }) {
         .about-group { display: grid; gap: 10px; margin: 0; padding: 0; border: 0; }
         .about-group legend { margin-bottom: 10px; }
         .about-group :global(.about-chip) { height: 44px; padding: 0 18px; font-size: 15px; }
+        /* Picked reads like the guide's Outline / By page switch: the choice is a raised white pane,
+           the rest sit flat in the sheet with muted text. */
+        .about-group :global(.about-chip[aria-pressed='false']) {
+          background: transparent !important; box-shadow: none !important; border-color: var(--hairline) !important;
+          color: var(--muted) !important; font-weight: 500 !important; -webkit-backdrop-filter: none; backdrop-filter: none;
+        }
+        .about-group :global(.about-chip[aria-pressed='true']) {
+          background: var(--lg-sheen), var(--surface-raised) !important; border-color: var(--lg-edge) !important;
+          box-shadow: var(--lg-highlight), var(--shadow) !important; color: var(--ink) !important; font-weight: 600 !important;
+        }
         .about-group :global(.about-chip:disabled) { opacity: 0.45; cursor: default; }
         .about-hint { margin-left: 6px; font-weight: 400; }
         .about-other { margin-top: 4px; }
