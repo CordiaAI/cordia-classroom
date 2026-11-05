@@ -50,12 +50,23 @@ function whenLabel(plan) {
 }
 
 // Flashcards: the question on the front; flip it (tap or Space) to see the answer, then say
-// honestly whether you knew it (1 / 2). Also used when a written answer can't be checked by AI.
+// honestly whether you knew it (1 / 2), which moves straight on to the next card (no Next button,
+// like the Flashcards screen). Also used when a written answer can't be checked by AI.
+const FLIP_NEXT_MS = 250;
 function FlipCard({ card, question, onResult, onNext }) {
   const [flipped, setFlipped] = useState(false);
   const [done, setDone] = useState(null);
   const timing = useAnswerTiming();
   const answerText = conceptAnswer(question);
+  // Moves on once the answer is saved: this runs after the render that carries it, so onNext sees
+  // the updated round (calling it inside mark() would read the round from before the answer).
+  const next = useRef(onNext);
+  next.current = onNext;
+  useEffect(() => {
+    if (done === null) return undefined;
+    const timer = setTimeout(() => next.current(), FLIP_NEXT_MS);
+    return () => clearTimeout(timer);
+  }, [done]);
 
   function flip() {
     if (done !== null) return;
@@ -102,7 +113,6 @@ function FlipCard({ card, question, onResult, onNext }) {
           <button type="button" className="c-btn c-btn--primary" onClick={() => mark(1)}>I got it <kbd>2</kbd></button>
         </div>
       )}
-      {done !== null && <div className="quiz-next-row"><button type="button" className="c-btn c-btn--primary quiz-next" onClick={onNext} autoFocus>Next</button></div>}
     </>
   );
 }
