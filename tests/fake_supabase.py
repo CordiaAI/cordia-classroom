@@ -15,6 +15,8 @@ DEFAULTS = {
     "study_blocks": {"status": "planned", "kind": "work", "step_id": None},
     "assignment_steps": {"done": False, "done_at": None},
 }
+# bigserial ids: 1, 2, 3, ...
+SERIAL_TABLES = {"notifications", "social_rate_events"}
 ID_TABLES = {"schools", "classes", "class_terms", "folders", "study_guides", "shared_sets", "shared_set_reports",
              "class_merge_proposals", "copyright_takedowns", "instructor_blocks", "canvas_activity",
              "assignment_steps", "study_blocks", "generation_jobs", "lectures"}
@@ -144,6 +146,8 @@ class Query:
 
     def _new(self, row):
         row = {**DEFAULTS.get(self.name, {}), **copy.deepcopy(row)}
+        if self.name in SERIAL_TABLES and not row.get("id"):
+            row["id"] = 1 + max((r.get("id") or 0 for r in self.db.rows(self.name)), default=0)
         if self.name in ID_TABLES and not row.get("id"):
             row["id"] = str(uuid.uuid4()) if self.name != "canvas_activity" else len(self.db.rows(self.name)) + 1
         if "created_at" not in row:

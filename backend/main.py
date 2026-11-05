@@ -22,7 +22,7 @@ from routers import (
     nclex, practice, quiz, search, smart_notes, stats, tutor,
 )
 from routers import canvas, classes, admin, public_forms, connectors, drive, plans, workspace, apps, mcp, jobs
-from routers import profiles, social
+from routers import notifications, profiles, social
 from services import log_scrub
 
 # Load environment variables
@@ -205,6 +205,7 @@ app.include_router(mcp.router)
 app.include_router(jobs.router)
 app.include_router(profiles.router)
 app.include_router(social.router)
+app.include_router(notifications.router)
 
 
 

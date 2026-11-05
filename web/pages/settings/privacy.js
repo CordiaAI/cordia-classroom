@@ -10,7 +10,7 @@ import { claimUsername, loadBlocks, loadMyProfile, saveProfileSettings, unblockU
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const VISIBILITY = [
   { value: 'public', label: 'Everyone', hint: 'Anyone signed in to Cordia can see your profile.' },
-  { value: 'friends', label: 'Friends', hint: 'Only friends see more than your name. Until friends arrive, this works like Only me.' },
+  { value: 'friends', label: 'Friends', hint: 'Friends see your whole profile; everyone else sees only your username and display name.' },
   { value: 'private', label: 'Only me', hint: 'Others see only your username and display name.' },
 ];
 const FOLLOWS = [{ value: 'everyone', label: 'Anyone' }, { value: 'approval', label: 'Ask me first' }];

@@ -116,9 +116,11 @@ export default function AccountMenu({ open, onClose, anchorRef, items, placement
               zIndex: above ? index + 1 : count - index,
             }}
             onClick={() => { onClose(true); item.onSelect(); }}
+            aria-label={item.badge ? `${item.label}, ${item.badgeLabel || item.badge}` : undefined}
           >
             <item.icon size={20} strokeWidth={1.75} aria-hidden="true" />
             {item.label}
+            {item.badge ? <span className="acct-badge" aria-hidden="true">{item.badge}</span> : null}
           </button>
         ))}
       </div>
@@ -139,6 +141,8 @@ export default function AccountMenu({ open, onClose, anchorRef, items, placement
         }
         .acct-bubble .lucide { flex: 0 0 auto; width: 20px; height: 20px; color: var(--ink); }
         .acct-bubble.is-separated { margin-top: ${SIGN_OUT_EXTRA}px; }
+        /* A count on an item (Friends: requests waiting on you). */
+        .acct-badge { display: grid; place-items: center; min-width: 22px; height: 22px; margin-left: auto; padding: 0 7px; border-radius: 999px; background: var(--olive); color: var(--on-olive); font: 600 13px/1 var(--font-sans); }
         .acct-bubble:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
         .acct-bubble:active { transform: scale(.98); }
         @media (hover: hover) {
