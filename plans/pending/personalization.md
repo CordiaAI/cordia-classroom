@@ -1,13 +1,16 @@
 # Cordia personalization system: phased plan
 
-Status: **PROPOSAL, waiting for owner approval.** No feature code, migrations or PRs until approved.
+Status: **APPROVED Nov 4, 2026**, with the owner's answers recorded in the decision log (Q1–Q18).
+Phase 0 is in progress. Migrations stay files; the owner applies them.
 Inputs: `Cordia-Classroom-Brief.md` (Oct 29, 2026; §21 streams, §22 engine, §23 working rules), the
 personalization planning prompt (resolved decisions copied into the decision log below), the code at
 `main@adc88da`, read-only queries against the live Supabase project, and the eleven research reports in
 `docs/research/01…11`.
 
 > **Report availability.** The eleven reports were not in the repo, on any GitHub branch, or in this
-> session's uploads when this plan was written (Nov 4). Every figure below that comes from the prompt's
+> session's uploads when this plan was written (Nov 4). After approval (Nov 4, ~19:00 UTC) the owner
+> pushed them to `claude/confident-hypatia-3k9xkv`, but the push did not reach GitHub: the branch's
+> newest commit is still the plan itself, and no branch holds `docs/research/` or the brief. Every figure below that comes from the prompt's
 > "Resolved conflicts" list is used as given. Anything that needs a report's exact content (report 08's
 > core schema, report 02's archetype JSON, report 05's blueprint weights, report 09's time budget,
 > report 10's question wording, report 11's consent text) is cited as "report NN" and listed under
@@ -54,8 +57,9 @@ personalization planning prompt (resolved decisions copied into the decision log
      (`plan-streak.ts`).
    - Writes go browser → Supabase RPC `merge_study_progress` (student token), and MCP →
      `mcp_record_answer`. No backend Python touches scheduling.
-   - Putting FSRS in `py-fsrs` (as locked) means every answer write must pass through the backend.
-     That is decision **Q9**.
+   - Putting FSRS in `py-fsrs` (as first locked) would have sent every answer write through the
+     backend. **Q9 resolved:** ts-fsrs, extracted with the existing schedulers into one shared package
+     used by the web app, the MCP server and the Assistant, so there is a single copy.
 4. **Onboarding already has the right skeleton.**
    - The day-one walkthrough (`web/lib/walkthrough.js`) runs: New → About you (level, school, 10 major
      chips) during the build → 3 multiple-choice questions → "Your first review is tomorrow".
@@ -209,10 +213,10 @@ Files to touch: `web/lib/walkthrough.js`, `web/components/{Walkthrough,AboutYou,
 - Acceptance criteria:
   - `experiment_assignments(user_id, experiment, arm, stratum, assigned_at)` exists. Assignment
     happens at the first `/onboarding` read.
-  - Arms are stratified 50/50 by sign-in method and Canvas yes/no, with a 10–20% term-long holdout on
-    the old flow (Q14 sets the exact share).
-  - The ship rule is written into the plan before launch: P(B > A) ≥ 0.90 and expected loss < 1 point
-    on recall activation.
+  - 80% of signups get onboarding v2; a 20% holdout keeps the old flow for the whole term. Assignment
+    is a deterministic hash of the user id, balanced within sign-in method and Canvas yes/no.
+  - The primary metric is recall activation (0.4). With ~37 signups a month the results are
+    directional: the report shows both rates with intervals and makes no ship/no-ship call.
 - Verification command: `py:test`. Production read: arm counts per day.
 - Files likely touched: migration `20261106120000_experiments.sql`, `backend/services/experiments.py`,
   `backend/routers/learning.py`, `web/lib/onboarding.js`.
@@ -324,7 +328,7 @@ Verified when:
 - Learn, Flashcards, Quiz, Study now, MCP `record_answer` and the Assistant read the same `item_memory`;
 - `flashcard_progress` still works (expand/contract).
 
-Files to touch: the FSRS module (Q9 decides its language), migration `item_memory`,
+Files to touch: the shared scheduler package `packages/scheduler/` (ts-fsrs), migration `item_memory`,
 `web/lib/{learnEngine,spacedReview,retainEngine,studyQueue,studyAnswer}.mjs`, `web/lib/progressSave.js`,
 `supabase` RPCs, `web/lib/mcp/writeTools.mjs`, the Assistant's `exam-prep.ts`.
 
@@ -332,13 +336,17 @@ Files to touch: the FSRS module (Q9 decides its language), migration `item_memor
 - Acceptance criteria:
   - `review(state, grade, now, desired_retention)` returns the next state and due date.
     `retrievability(state, at)` is pure.
-  - It uses FSRS-6 default weights and is swappable to FSRS-7.
+  - It uses ts-fsrs pinned to an exact release at least 2 weeks old at pickup, configured explicitly
+    for **FSRS-6 with its default weights** (the 21 FSRS-6 parameters passed in, not left to the
+    library default). FSRS-7 is not used.
+  - The package also holds today's Leitner, Learn fade and Retain rules (moved, not copied), so the
+    web app, the MCP server and the Assistant import one copy.
   - Golden tests match the library's reference outputs.
-- Verification command: `py:test` or `web:test` (per Q9).
-- Files likely touched: `backend/services/memory/fsrs.py` (py-fsrs), or `web/lib/memory/fsrs.mjs`
-  (ts-fsrs); pin per Q2.
+- Verification command: `web:test` plus the package's own `node --test`.
+- Files likely touched: `packages/scheduler/{package.json,index.mjs,fsrs.mjs}`, `web/package.json`
+  (workspace dependency), `web/lib/{learnEngine,spacedReview,retainEngine}.mjs` (re-export shims).
 - Test seams: golden-vector test.
-- Blocked by: Q2, Q9
+- Blocked by: the Phase 2 distribution question (Not yet specified)
 
 #### Step 2.2: Grade mapping and ladder rules as pure functions (Size: S)
 - Acceptance criteria:
@@ -699,6 +707,9 @@ All of it is deterministic, with no LLM in the engine.
 - Test seams: provenance tests.
 - Blocked by: 7.2
 
+LSAT is the next path after NCLEX-RN. It is planned, not built: no licence is bought until the NCLEX
+path has real usage (owner's call, from the 0.4 admin metrics).
+
 #### Step 7.4: Trademark renames and footer (Size: S; can ship any time after approval)
 - Acceptance criteria:
   - Every NCLEX surface reads "NCLEX®-style practice".
@@ -714,12 +725,15 @@ All of it is deterministic, with no LLM in the engine.
 
 ## Copy audit (no changes yet; proposed wording)
 
+Every cap is read from `LIMITS["pro"]` in `backend/services/entitlements.py` (guide 100, tutor 1000,
+light 500 AI reading actions, visual 200, lecture_minute 1500). Q6: these ship now, before any A/B.
+
 | File:line | Today | Proposed |
 | --- | --- | --- |
 | `web/lib/plans.js:29` | "Unlimited study guides from the app and the Chrome extension" | "Up to 100 study guides a month, from the app and the Chrome extension" |
 | `web/lib/plans.js:30` | "Unlimited Cordia Tutor" | "Up to 1,000 Cordia Tutor messages a month" |
 | `web/lib/plans.js:12` | "Ask Cordia Tutor as much as you need" | "Ask Cordia Tutor up to 1,000 times a month" |
-| `web/lib/plans.js:20` | "Read photos, scans and diagrams without limits" | "Read up to 500 photos, scans and diagrams a month" |
+| `web/lib/plans.js:20` | "Read photos, scans and diagrams without limits" | "Up to 500 AI reading actions a month for photos, scans and diagrams" (`light` = 500; visuals are a separate cap of 200, already correct at `plans.js:19`) |
 | `web/lib/plans.js:33` | "Guides that adapt to how you learn, every time you study" | "Spaced review that brings back what you're about to forget" (true today; revisit after Phase 2) |
 | `web/pages/index.js:16` | "Learns how you study best" | "Brings back what you're about to forget" |
 | `web/pages/index.js:14` | "Shows the grade you need on your next assignment" | Keep (it is a calculation from Canvas grades), but add "from your Canvas grades" |
@@ -770,7 +784,18 @@ and ships with an RLS test.
 
 | Decision | Chosen option | Why |
 | --- | --- | --- |
-| Order | Instrumentation → Onboarding v2 → FSRS → Plans → Layouts → Editing → Outcome loop → Exam paths (Q1) | Activation is the problem (37/77 never made a guide); measure first |
+| Order | Instrumentation → Onboarding v2 → FSRS → Plans → Layouts → Editing → Outcome loop → Exam paths (Q1: yes) | Activation is the problem (37/77 never made a guide); measure first |
+| FSRS location (Q9) | ts-fsrs in one shared package used by the web app, MCP server and Assistant | Owner: a single copy; answers keep going through the Supabase RPCs |
+| FSRS version (Q2) | Exact ts-fsrs pin ≥2 weeks old; FSRS-6 with default weights set explicitly; not FSRS-7 | Owner |
+| Existing progress (Q3) | Seed an estimated start state from the Leitner box / Learn level | Owner: yes |
+| Majors (Q4) | Curated ~100 with CIP codes, plus Undeclared and Other (free text) | Owner: yes |
+| Recall check (Q5) | 3 items in onboarding only; Check yourself elsewhere stays 5 | Owner: yes |
+| Copy (Q6) | Ship the audit now; caps come from `entitlements.py` | Owner |
+| Next exam path (Q7) | LSAT planned next; no licence until NCLEX has real usage | Owner |
+| Legal wording (Q8) | Consent and SMS opt-in text held for owner/lawyer approval | Owner: yes |
+| Experiment (Q14) | 80% onboarding v2, 20% term-long holdout; primary metric recall activation; directional only | Owner |
+| Assistant scope (Q16) | `cordiaai/cordiaassistant` added for SMS, fade and streak steps | Owner: yes |
+| Clean-ups (Q17) | Schema snapshot + header fixes; widen step check; drop VARK from Tutor prompts; `MEMORY_V2` flag | Owner: yes |
 | Phase 0 scope | Build on `learning_events`/`decision_events`/`policy_versions`; add `n_options`, `decision_outcomes`, metrics, backfill | Owner instruction; tables are live with rows |
 | First try of the day | `NOT learning_events.same_day` (server-computed) | Already correct; no duplicate column |
 | Learning styles | No style routing. Keep only "How do you like things explained first?" (which Explain view opens first, stored in `learner_settings.first_view_pref`), always followed by retrieval. Remove copy claiming style matching helps | Resolved conflict |
@@ -803,10 +828,12 @@ and ships with an RLS test.
   step's pickup. Until the files are in `docs/research/` on GitHub, steps 0.2 (rapid-guess threshold),
   0.3 (decision_outcomes fields), 1.3/1.7 (question wording), 1.8/6.1 (consent text), 3.2–3.4 (BKT
   parameters, horizon rules), 4.1 (archetype JSON) and 7.3 (blueprint weights) cannot start.
-- **Phase 1:** with ~37 signups a month, a 50/50 split minus a 10–20% holdout gives ~15 accounts per
-  arm a month. Reaching the fixed ship rule may take a full term. Q14 decides whether to accept that or
-  run sequential cohorts.
-- **Phase 2:** where FSRS runs (Q9) decides the shape of 2.3/2.4.
+- **Phase 1:** resolved by Q14 (80/20, directional).
+- **Phase 2:** how the Assistant (a separate repo) gets the shared scheduler package. Recommendation: a
+  private package `@cordiaai/scheduler` published to GitHub Packages from `packages/scheduler/`, with
+  the Assistant pinning an exact version. The alternative is a git dependency on a tag, which npm
+  can't do for a subfolder without a separate repo. Asked in the second gate; Phase 0 and 1 don't
+  depend on it.
 - **Phase 4:** which report-02 widgets have no Cordia component. This is listed at 4.1 pickup, once the
   JSON is readable.
 - **Phase 6:** whether Canvas returns `score_statistics` for students at USA South (some schools hide
@@ -839,11 +866,11 @@ and ships with an RLS test.
 
 | Phase | Status |
 | --- | --- |
-| 0 Instrumentation | Waiting for approval |
-| 1 Onboarding v2 | Waiting for approval |
-| 2 Unified memory (FSRS) | Waiting for approval |
-| 3 Study plans | Waiting for approval |
-| 4 Archetypes and layouts | Waiting for approval |
-| 5 Editing and polish | Waiting for approval |
-| 6 Outcome loop | Waiting for approval |
-| 7 Exam paths | Waiting for approval |
+| 0 Instrumentation | In progress (0.3 waits for report 08) |
+| 1 Onboarding v2 | Approved, not started |
+| 2 Unified memory (FSRS) | Approved, not started |
+| 3 Study plans | Approved, not started |
+| 4 Archetypes and layouts | Approved, not started |
+| 5 Editing and polish | Approved, not started |
+| 6 Outcome loop | Approved, not started |
+| 7 Exam paths | Approved, not started |
