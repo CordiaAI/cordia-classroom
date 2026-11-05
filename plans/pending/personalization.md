@@ -963,8 +963,8 @@ Second gate: G1–G3 answered Nov 5 (see the decision log). Still open:
 
 | Phase | Status |
 | --- | --- |
-| 0 Instrumentation | Done in PR CordiaAI/cordia-classroom#197 (merged). 0.6 ✅ live: longest session since Oct 31 is 25 min, none over 3 h (17 day-long rows from before the fix remain). 0.1 ✅ `supabase/schema/` snapshot; constraints and three hand-applied migrations confirmed by queries 6–7. Owner: apply migrations `20261105120000`, `20261105130000` (and `20261026130000_feedback_attachments`, never applied), then `fly deploy`. |
-| 1 Onboarding v2 | Approved, not started |
+| 0 Instrumentation | ✅ Done (PR CordiaAI/cordia-classroom#197 merged; migrations applied and backend deployed by the owner Nov 5). Schema baseline in `supabase/schema/`. Live checks of screenshots, `n_options` and the daily job: owner runs `supabase/checks/phase0_live.sql`. |
+| 1 Onboarding v2 | In progress |
 | 2 Unified memory (FSRS) | Approved, not started |
 | 3 Study plans | Approved, not started |
 | 4 Archetypes and layouts | Approved, not started |

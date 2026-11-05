@@ -1,8 +1,10 @@
 -- Live schema snapshot of the public tables, read 2026-11-05 from production by the owner
--- (supabase/checks/phase0_readonly.sql, queries 2-4). Reference only: never run this file.
+-- (supabase/checks/phase0_readonly.sql: columns from query 2, constraints from query 6, policies
+-- from query 4). Reference only: never run this file.
 -- It is the baseline for the core tables that have no create statement in supabase/migrations
 -- (user_profiles, study_guides, study_sessions, quiz_attempts, user_streaks, folders, smart_notes).
--- Constraints: the editor returned the first 100 rows only; the rest are added from query 6.
+-- The columns were read just before three migrations were applied the same day; their columns are
+-- marked below: feedback.attachments, learning_events.n_options and the decision_outcomes table.
 -- Tables with row-level security and no policy listed are service-role only.
 
 create table public.app_admins (
@@ -18,7 +20,12 @@ create table public.assignment_plans (
   effort_minutes integer not null,
   effort_basis text,
   created_at timestamp with time zone not null default now(),
-  updated_at timestamp with time zone not null default now()
+  updated_at timestamp with time zone not null default now(),
+  constraint assignment_plans_effort_basis_check CHECK ((char_length(effort_basis) <= 300)),
+  constraint assignment_plans_effort_minutes_check CHECK (((effort_minutes >= 5) AND (effort_minutes <= 6000))),
+  constraint assignment_plans_item_key_check CHECK (((char_length(item_key) >= 1) AND (char_length(item_key) <= 200))),
+  constraint assignment_plans_pkey PRIMARY KEY (user_id, item_key),
+  constraint assignment_plans_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 
 create table public.assignment_steps (
@@ -30,7 +37,15 @@ create table public.assignment_steps (
   minutes integer not null,
   due_at timestamp with time zone,
   done boolean not null default false,
-  done_at timestamp with time zone
+  done_at timestamp with time zone,
+  constraint assignment_steps_item_key_check CHECK (((char_length(item_key) >= 1) AND (char_length(item_key) <= 200))),
+  constraint assignment_steps_minutes_check CHECK (((minutes >= 5) AND (minutes <= 3000))),
+  constraint assignment_steps_pkey PRIMARY KEY (id),
+  constraint assignment_steps_position_check CHECK ((("position" >= 0) AND ("position" <= 20))),
+  constraint assignment_steps_title_check CHECK (((char_length(title) >= 1) AND (char_length(title) <= 200))),
+  constraint assignment_steps_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  constraint assignment_steps_user_id_item_key_fkey FOREIGN KEY (user_id, item_key) REFERENCES assignment_plans(user_id, item_key) ON DELETE CASCADE,
+  constraint assignment_steps_user_id_item_key_position_key UNIQUE (user_id, item_key, "position")
 );
 
 create table public.assistant_link_codes (
@@ -58,7 +73,10 @@ create table public.canvas_activity (
   user_id uuid not null,
   endpoint text not null,
   status integer,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  constraint canvas_activity_endpoint_check CHECK ((char_length(endpoint) <= 60)),
+  constraint canvas_activity_pkey PRIMARY KEY (id),
+  constraint canvas_activity_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Users read own canvas activity" on public.canvas_activity for select to authenticated
   using (user_id = auth.uid());
@@ -72,7 +90,13 @@ create table public.canvas_announcements (
   posted_at timestamp with time zone,
   summary text,
   changes text not null default 'none'::text,
-  read_at timestamp with time zone
+  read_at timestamp with time zone,
+  constraint canvas_announcements_changes_check CHECK ((changes = ANY (ARRAY['none'::text, 'deadline'::text, 'new_work'::text]))),
+  constraint canvas_announcements_message_check CHECK ((char_length(message) <= 20000)),
+  constraint canvas_announcements_pkey PRIMARY KEY (user_id, canvas_announcement_id),
+  constraint canvas_announcements_summary_check CHECK ((char_length(summary) <= 600)),
+  constraint canvas_announcements_title_check CHECK ((char_length(title) <= 500)),
+  constraint canvas_announcements_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 
 create table public.canvas_assignments (
@@ -91,7 +115,11 @@ create table public.canvas_assignments (
   score numeric,
   is_exam boolean not null default false,
   canvas_updated_at timestamp with time zone,
-  first_seen_at timestamp with time zone not null default now()
+  first_seen_at timestamp with time zone not null default now(),
+  constraint canvas_assignments_description_check CHECK ((char_length(description) <= 20000)),
+  constraint canvas_assignments_html_url_check CHECK ((char_length(html_url) <= 1000)),
+  constraint canvas_assignments_pkey PRIMARY KEY (user_id, canvas_assignment_id),
+  constraint canvas_assignments_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Users read own canvas assignments" on public.canvas_assignments for select to authenticated
   using (user_id = auth.uid());
@@ -114,7 +142,11 @@ create table public.canvas_connections (
   sync_paused boolean not null default false,
   last_synced_at timestamp with time zone,
   expiry_reminded_at timestamp with time zone,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  constraint canvas_connections_pkey PRIMARY KEY (user_id),
+  constraint canvas_connections_school_id_fkey FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE SET NULL,
+  constraint canvas_connections_status_check CHECK ((status = ANY (ARRAY['connected'::text, 'needs_reconnect'::text]))),
+  constraint canvas_connections_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Users read own canvas connection" on public.canvas_connections for select to authenticated
   using (user_id = auth.uid());
@@ -131,7 +163,13 @@ create table public.canvas_courses (
   topic_summary text not null default ''::text,
   current_score numeric,
   current_grade text,
-  grade_checked_at timestamp with time zone
+  grade_checked_at timestamp with time zone,
+  constraint canvas_courses_class_id_fkey FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL,
+  constraint canvas_courses_current_grade_check CHECK ((char_length(current_grade) <= 10)),
+  constraint canvas_courses_pkey PRIMARY KEY (user_id, canvas_course_id),
+  constraint canvas_courses_school_id_fkey FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE SET NULL,
+  constraint canvas_courses_topic_summary_check CHECK ((char_length(topic_summary) <= 600)),
+  constraint canvas_courses_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Users read own canvas courses" on public.canvas_courses for select to authenticated
   using (user_id = auth.uid());
@@ -156,7 +194,11 @@ create table public.canvas_tokens (
   iv bytea not null,
   last4 text not null,
   expires_at date,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  constraint canvas_tokens_iv_check CHECK ((octet_length(iv) = 12)),
+  constraint canvas_tokens_last4_check CHECK ((char_length(last4) = 4)),
+  constraint canvas_tokens_pkey PRIMARY KEY (user_id),
+  constraint canvas_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 
 create table public.class_memberships (
@@ -166,7 +208,8 @@ create table public.class_memberships (
   created_at timestamp with time zone not null default now(),
   constraint class_memberships_class_term_id_fkey FOREIGN KEY (class_term_id) REFERENCES class_terms(id) ON DELETE CASCADE,
   constraint class_memberships_pkey PRIMARY KEY (user_id, class_term_id),
-  constraint class_memberships_source_check CHECK ((source = ANY (ARRAY['canvas'::text, 'calendar'::text, 'manual'::text])))
+  constraint class_memberships_source_check CHECK ((source = ANY (ARRAY['canvas'::text, 'calendar'::text, 'manual'::text]))),
+  constraint class_memberships_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Users read own memberships" on public.class_memberships for select to authenticated
   using (user_id = auth.uid());
@@ -181,13 +224,23 @@ create table public.class_merge_proposals (
   status text not null default 'pending'::text,
   created_at timestamp with time zone not null default now(),
   reviewed_by uuid,
-  reviewed_at timestamp with time zone
+  reviewed_at timestamp with time zone,
+  constraint class_merge_proposals_confidence_check CHECK (((confidence >= (0)::numeric) AND (confidence <= (1)::numeric))),
+  constraint class_merge_proposals_from_class_id_fkey FOREIGN KEY (from_class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  constraint class_merge_proposals_into_class_id_fkey FOREIGN KEY (into_class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  constraint class_merge_proposals_pkey PRIMARY KEY (id),
+  constraint class_merge_proposals_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES auth.users(id) ON DELETE SET NULL,
+  constraint class_merge_proposals_school_id_fkey FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
+  constraint class_merge_proposals_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])))
 );
 
 create table public.class_share_defaults (
   user_id uuid not null,
   class_id uuid not null,
-  share boolean not null
+  share boolean not null,
+  constraint class_share_defaults_class_id_fkey FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  constraint class_share_defaults_pkey PRIMARY KEY (user_id, class_id),
+  constraint class_share_defaults_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Users read own share defaults" on public.class_share_defaults for select to authenticated
   using (user_id = auth.uid());
@@ -228,7 +281,16 @@ create table public.connector_links (
   container_id text,
   synced_hash text,
   removed_by_student boolean not null default false,
-  updated_at timestamp with time zone not null default now()
+  updated_at timestamp with time zone not null default now(),
+  constraint connector_links_connector_check CHECK ((char_length(connector) <= 40)),
+  constraint connector_links_container_id_check CHECK ((char_length(container_id) <= 300)),
+  constraint connector_links_cordia_id_check CHECK ((char_length(cordia_id) <= 200)),
+  constraint connector_links_external_id_check CHECK ((char_length(external_id) <= 300)),
+  constraint connector_links_kind_check CHECK ((kind = ANY (ARRAY['task'::text, 'subtask'::text, 'event'::text, 'page'::text, 'file'::text]))),
+  constraint connector_links_pkey PRIMARY KEY (user_id, connector, kind, cordia_id),
+  constraint connector_links_synced_hash_check CHECK ((char_length(synced_hash) <= 64)),
+  constraint connector_links_user_id_connector_external_id_key UNIQUE (user_id, connector, external_id),
+  constraint connector_links_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 
 create table public.connector_settings (
@@ -241,7 +303,12 @@ create table public.connector_settings (
   last_synced_at timestamp with time zone,
   last_error text,
   needs_reconnect boolean not null default false,
-  stats jsonb not null default '{}'::jsonb
+  stats jsonb not null default '{}'::jsonb,
+  constraint connector_settings_connector_check CHECK ((char_length(connector) <= 40)),
+  constraint connector_settings_container_id_check CHECK ((char_length(container_id) <= 300)),
+  constraint connector_settings_last_error_check CHECK ((char_length(last_error) <= 300)),
+  constraint connector_settings_pkey PRIMARY KEY (user_id, connector),
+  constraint connector_settings_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 
 create table public.copyright_takedowns (
@@ -253,7 +320,14 @@ create table public.copyright_takedowns (
   location text not null default ''::text,
   status text not null default 'received'::text,
   created_at timestamp with time zone not null default now(),
-  actioned_at timestamp with time zone
+  actioned_at timestamp with time zone,
+  constraint copyright_takedowns_claimant_email_check CHECK (((char_length(claimant_email) >= 3) AND (char_length(claimant_email) <= 320))),
+  constraint copyright_takedowns_claimant_name_check CHECK (((char_length(claimant_name) >= 1) AND (char_length(claimant_name) <= 200))),
+  constraint copyright_takedowns_location_check CHECK ((char_length(location) <= 2000)),
+  constraint copyright_takedowns_pkey PRIMARY KEY (id),
+  constraint copyright_takedowns_set_id_fkey FOREIGN KEY (set_id) REFERENCES shared_sets(id) ON DELETE SET NULL,
+  constraint copyright_takedowns_status_check CHECK ((status = ANY (ARRAY['received'::text, 'actioned'::text, 'rejected'::text]))),
+  constraint copyright_takedowns_work_description_check CHECK (((char_length(work_description) >= 1) AND (char_length(work_description) <= 4000)))
 );
 
 create table public.deadline_changes (
@@ -270,14 +344,28 @@ create table public.deadline_changes (
   new_due timestamp with time zone,
   status text not null default 'pending'::text,
   decided_at timestamp with time zone,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  constraint deadline_changes_item_key_check CHECK ((char_length(item_key) <= 200)),
+  constraint deadline_changes_kind_check CHECK ((kind = ANY (ARRAY['moved'::text, 'extension'::text, 'cancelled'::text]))),
+  constraint deadline_changes_pkey PRIMARY KEY (id),
+  constraint deadline_changes_sender_check CHECK ((char_length(sender) <= 300)),
+  constraint deadline_changes_source_check CHECK ((source = ANY (ARRAY['gmail'::text, 'outlook'::text, 'canvas_announcement'::text, 'slack'::text]))),
+  constraint deadline_changes_source_id_check CHECK (((char_length(source_id) >= 1) AND (char_length(source_id) <= 300))),
+  constraint deadline_changes_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'dismissed'::text]))),
+  constraint deadline_changes_summary_check CHECK ((char_length(summary) <= 600)),
+  constraint deadline_changes_title_check CHECK ((char_length(title) <= 300)),
+  constraint deadline_changes_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  constraint deadline_changes_user_id_source_source_id_item_key_key UNIQUE (user_id, source, source_id, item_key)
 );
 
 create table public.deadline_marks (
   user_id uuid not null,
   item_key text not null,
   done boolean not null,
-  updated_at timestamp with time zone not null default now()
+  updated_at timestamp with time zone not null default now(),
+  constraint deadline_marks_item_key_check CHECK (((char_length(item_key) >= 1) AND (char_length(item_key) <= 200))),
+  constraint deadline_marks_pkey PRIMARY KEY (user_id, item_key),
+  constraint deadline_marks_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 
 create table public.decision_events (
@@ -297,7 +385,33 @@ create table public.decision_events (
   seed bigint not null,
   context jsonb not null,
   fsrs_before jsonb,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  constraint decision_events_pkey PRIMARY KEY (id),
+  constraint decision_events_policy_version_id_fkey FOREIGN KEY (policy_version_id) REFERENCES policy_versions(id),
+  constraint decision_events_propensity_check CHECK (((propensity > (0)::double precision) AND (propensity <= (1)::double precision))),
+  constraint decision_events_source_check CHECK ((source = ANY (ARRAY['policy'::text, 'explore'::text, 'student'::text, 'rule'::text]))),
+  constraint decision_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+);
+
+create table public.decision_outcomes ( -- 20261105130000
+  id bigint not null default nextval('decision_outcomes_id_seq'::regclass),
+  decision_id uuid not null,
+  user_id uuid not null,
+  outcome_type text not null,
+  value real not null,
+  p_pred real,
+  residual real,
+  learning_event_id bigint,
+  observed_at timestamp with time zone not null,
+  created_at timestamp with time zone not null default now(),
+  constraint decision_outcomes_decision_id_fkey FOREIGN KEY (decision_id) REFERENCES decision_events(id) ON DELETE CASCADE,
+  constraint decision_outcomes_decision_id_outcome_type_key UNIQUE (decision_id, outcome_type),
+  constraint decision_outcomes_learning_event_id_fkey FOREIGN KEY (learning_event_id) REFERENCES learning_events(id) ON DELETE SET NULL,
+  constraint decision_outcomes_outcome_type_check CHECK ((outcome_type = ANY (ARRAY['delayed_recall'::text, 'returned_within_48h'::text, 'sms_converted_2h'::text]))),
+  constraint decision_outcomes_p_pred_check CHECK (((p_pred >= (0)::double precision) AND (p_pred <= (1)::double precision))),
+  constraint decision_outcomes_pkey PRIMARY KEY (id),
+  constraint decision_outcomes_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  constraint decision_outcomes_value_check CHECK (((value >= (0)::double precision) AND (value <= (1)::double precision)))
 );
 
 create table public.feedback (
@@ -313,6 +427,7 @@ create table public.feedback (
   question_id text,
   client_request_id uuid,
   reviewed_by uuid,
+  attachments jsonb not null default '[]'::jsonb  -- 20261026130000,
   constraint feedback_app_version_length_check CHECK (((app_version IS NULL) OR (char_length(app_version) <= 100))),
   constraint feedback_category_check CHECK ((category = ANY (ARRAY['bug'::text, 'suggestion'::text, 'incorrect_content'::text, 'account_payment'::text, 'other'::text]))),
   constraint feedback_guide_id_length_check CHECK (((guide_id IS NULL) OR (char_length(guide_id) <= 100))),
@@ -376,7 +491,13 @@ create table public.generation_jobs (
   started_at timestamp with time zone,
   finished_at timestamp with time zone,
   seen_at timestamp with time zone,
-  source_hash text
+  source_hash text,
+  constraint generation_jobs_folder_id_fkey FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE SET NULL,
+  constraint generation_jobs_pkey PRIMARY KEY (id),
+  constraint generation_jobs_progress_check CHECK (((progress IS NULL) OR ((progress >= (0)::double precision) AND (progress <= (1)::double precision)))),
+  constraint generation_jobs_status_check CHECK ((status = ANY (ARRAY['queued'::text, 'running'::text, 'done'::text, 'failed'::text]))),
+  constraint generation_jobs_study_set_id_fkey FOREIGN KEY (study_set_id) REFERENCES study_guides(id) ON DELETE SET NULL,
+  constraint generation_jobs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Students read their own jobs" on public.generation_jobs for select to authenticated,mcp_client
   using (auth.uid() = user_id);
@@ -391,14 +512,26 @@ create table public.guide_visuals (
   alt text not null default ''::text,
   theme text not null default 'light'::text,
   created_at timestamp with time zone not null default now(),
-  width smallint
+  width smallint,
+  constraint guide_visuals_alt_check CHECK ((char_length(alt) <= 500)),
+  constraint guide_visuals_anchor_check CHECK ((char_length(anchor) <= 600)),
+  constraint guide_visuals_guide_id_fkey FOREIGN KEY (guide_id) REFERENCES study_guides(id) ON DELETE CASCADE,
+  constraint guide_visuals_pkey PRIMARY KEY (id),
+  constraint guide_visuals_section_check CHECK ((char_length(section) <= 500)),
+  constraint guide_visuals_theme_check CHECK ((theme = ANY (ARRAY['light'::text, 'dark'::text]))),
+  constraint guide_visuals_url_check CHECK ((char_length(url) <= 1000)),
+  constraint guide_visuals_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  constraint guide_visuals_width_check CHECK (((width >= 30) AND (width <= 100)))
 );
 
 create table public.instructor_blocks (
   id uuid not null default gen_random_uuid(),
   class_id uuid not null,
   email text not null,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  constraint instructor_blocks_class_id_email_key UNIQUE (class_id, email),
+  constraint instructor_blocks_class_id_fkey FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  constraint instructor_blocks_pkey PRIMARY KEY (id)
 );
 
 create table public.learner_settings (
@@ -408,7 +541,9 @@ create table public.learner_settings (
   use_speed boolean not null default true,
   first_view_pref text,
   study_preference text,
-  updated_at timestamp with time zone not null default now()
+  updated_at timestamp with time zone not null default now(),
+  constraint learner_settings_pkey PRIMARY KEY (user_id),
+  constraint learner_settings_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Students read their own learner settings" on public.learner_settings for select to authenticated
   using (auth.uid() = user_id);
@@ -436,7 +571,15 @@ create table public.learning_events (
   s_before real,
   d_before real,
   r_before real,
-  occurred_at timestamp with time zone not null default now()
+  occurred_at timestamp with time zone not null default now(),
+  n_options smallint  -- 20261105120000,
+  constraint learning_events_arm_check CHECK ((arm = ANY (ARRAY['fsrs'::text, 'holdout'::text]))),
+  constraint learning_events_confidence_check CHECK ((confidence = ANY (ARRAY['sure'::text, 'think_so'::text, 'guess'::text]))),
+  constraint learning_events_decision_id_fkey FOREIGN KEY (decision_id) REFERENCES decision_events(id),
+  constraint learning_events_format_check CHECK ((format = ANY (ARRAY['choice'::text, 'typed'::text, 'written'::text, 'flashcard'::text, 'fill_bank'::text, 'fill_free'::text, 'pairs'::text, 'practice'::text]))),
+  constraint learning_events_n_options_check CHECK (((n_options IS NULL) OR ((n_options >= 2) AND (n_options <= 50)))),
+  constraint learning_events_pkey PRIMARY KEY (id),
+  constraint learning_events_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Connected apps log the student's answers" on public.learning_events for insert to mcp_client
   with check ((auth.uid() = user_id) AND (mode = 'mcp'::text) AND (decision_id IS NULL));
@@ -502,13 +645,18 @@ create table public.mcp_answer_receipts (
   user_id uuid not null,
   idempotency_key text not null,
   result jsonb not null default '{}'::jsonb,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  constraint mcp_answer_receipts_idempotency_key_check CHECK (((length(idempotency_key) >= 1) AND (length(idempotency_key) <= 200))),
+  constraint mcp_answer_receipts_pkey PRIMARY KEY (user_id, idempotency_key),
+  constraint mcp_answer_receipts_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 
 create table public.mcp_connection_activity (
   user_id uuid not null,
   client_id uuid not null,
-  last_used_at timestamp with time zone not null default now()
+  last_used_at timestamp with time zone not null default now(),
+  constraint mcp_connection_activity_pkey PRIMARY KEY (user_id, client_id),
+  constraint mcp_connection_activity_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Users read own connected-app activity" on public.mcp_connection_activity for select to authenticated
   using (auth.uid() = user_id);
@@ -517,7 +665,10 @@ create table public.mcp_rate_counters (
   user_id uuid not null,
   bucket text not null,
   window_start timestamp with time zone not null,
-  calls integer not null default 0
+  calls integer not null default 0,
+  constraint mcp_rate_counters_bucket_check CHECK ((bucket = ANY (ARRAY['read'::text, 'write'::text]))),
+  constraint mcp_rate_counters_pkey PRIMARY KEY (user_id, bucket, window_start),
+  constraint mcp_rate_counters_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 
 create table public.mcp_tool_calls (
@@ -528,7 +679,13 @@ create table public.mcp_tool_calls (
   status text not null,
   error_code text,
   latency_ms integer,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  constraint mcp_tool_calls_error_code_check CHECK (((error_code IS NULL) OR (error_code ~ '^[a-z_]{1,64}$'::text))),
+  constraint mcp_tool_calls_latency_ms_check CHECK (((latency_ms IS NULL) OR (latency_ms >= 0))),
+  constraint mcp_tool_calls_pkey PRIMARY KEY (id),
+  constraint mcp_tool_calls_status_check CHECK ((status = ANY (ARRAY['ok'::text, 'error'::text, 'rate_limited'::text]))),
+  constraint mcp_tool_calls_tool_name_check CHECK ((tool_name ~ '^[a-z_]{1,64}$'::text)),
+  constraint mcp_tool_calls_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Admins read connected-app calls" on public.mcp_tool_calls for select to authenticated
   using (EXISTS ( SELECT 1
@@ -580,7 +737,10 @@ create table public.policy_versions (
   epsilon numeric not null,
   params jsonb not null,
   code_sha text not null,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  constraint policy_versions_decision_type_check CHECK ((decision_type = ANY (ARRAY['format'::text, 'explain_view'::text, 'round_size'::text, 'session_length'::text, 'sms'::text]))),
+  constraint policy_versions_epsilon_check CHECK ((epsilon <= 0.10)),
+  constraint policy_versions_pkey PRIMARY KEY (id)
 );
 
 create table public.quiz_attempts (
@@ -608,7 +768,11 @@ create table public.retain_misses (
   user_id uuid not null,
   guide_id uuid not null,
   items jsonb not null default '[]'::jsonb,
-  updated_at timestamp with time zone not null default now()
+  updated_at timestamp with time zone not null default now(),
+  constraint retain_misses_guide_id_fkey FOREIGN KEY (guide_id) REFERENCES study_guides(id) ON DELETE CASCADE,
+  constraint retain_misses_items_shape CHECK (((jsonb_typeof(items) = 'array'::text) AND (jsonb_array_length(items) <= 50) AND (pg_column_size(items) <= 200000))),
+  constraint retain_misses_pkey PRIMARY KEY (user_id, guide_id),
+  constraint retain_misses_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Connected apps read the student's retain misses" on public.retain_misses for select to mcp_client
   using (auth.uid() = user_id);
@@ -638,7 +802,13 @@ create table public.shared_set_reports (
   reporter_id uuid not null,
   reason text not null,
   status text not null default 'open'::text,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  constraint shared_set_reports_pkey PRIMARY KEY (id),
+  constraint shared_set_reports_reason_check CHECK ((reason = ANY (ARRAY['wrong'::text, 'copied_exam'::text, 'copyright'::text, 'inappropriate'::text]))),
+  constraint shared_set_reports_reporter_id_fkey FOREIGN KEY (reporter_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  constraint shared_set_reports_set_id_fkey FOREIGN KEY (set_id) REFERENCES shared_sets(id) ON DELETE CASCADE,
+  constraint shared_set_reports_set_id_reporter_id_key UNIQUE (set_id, reporter_id),
+  constraint shared_set_reports_status_check CHECK ((status = ANY (ARRAY['open'::text, 'dismissed'::text, 'upheld'::text])))
 );
 create policy "Users read own reports" on public.shared_set_reports for select to authenticated
   using (reporter_id = auth.uid());
@@ -647,7 +817,11 @@ create table public.shared_set_studiers (
   set_id uuid not null,
   user_id uuid not null,
   accuracy numeric,
-  last_studied_at timestamp with time zone not null default now()
+  last_studied_at timestamp with time zone not null default now(),
+  constraint shared_set_studiers_accuracy_check CHECK (((accuracy >= (0)::numeric) AND (accuracy <= (100)::numeric))),
+  constraint shared_set_studiers_pkey PRIMARY KEY (set_id, user_id),
+  constraint shared_set_studiers_set_id_fkey FOREIGN KEY (set_id) REFERENCES shared_sets(id) ON DELETE CASCADE,
+  constraint shared_set_studiers_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Users read own studier rows" on public.shared_set_studiers for select to authenticated
   using (user_id = auth.uid());
@@ -672,14 +846,25 @@ create table public.shared_sets (
   subject text,
   saves integer not null default 0,
   published_at timestamp with time zone,
-  search tsvector
+  search tsvector,
+  constraint shared_sets_class_id_fkey FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  constraint shared_sets_class_unless_public CHECK (((class_id IS NOT NULL) OR (visibility <> 'class'::text))),
+  constraint shared_sets_guide_id_fkey FOREIGN KEY (guide_id) REFERENCES study_guides(id) ON DELETE CASCADE,
+  constraint shared_sets_guide_id_key UNIQUE (guide_id),
+  constraint shared_sets_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  constraint shared_sets_pkey PRIMARY KEY (id),
+  constraint shared_sets_status_check CHECK ((status = ANY (ARRAY['visible'::text, 'held'::text, 'hidden'::text, 'taken_down'::text]))),
+  constraint shared_sets_subject_check CHECK ((char_length(subject) <= 80)),
+  constraint shared_sets_visibility_check CHECK ((visibility = ANY (ARRAY['private'::text, 'class'::text, 'public'::text])))
 );
 create policy "Owners and class members read shared sets" on public.shared_sets for select to authenticated
   using ((owner_id = auth.uid()) OR ((visibility = 'public'::text) AND (status = 'visible'::text)) OR ((visibility = 'class'::text) AND (status = 'visible'::text) AND is_class_member(class_id)));
 
 create table public.sharing_settings (
   user_id uuid not null,
-  show_first_name boolean not null default false
+  show_first_name boolean not null default false,
+  constraint sharing_settings_pkey PRIMARY KEY (user_id),
+  constraint sharing_settings_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Users read own sharing settings" on public.sharing_settings for select to authenticated
   using (user_id = auth.uid());
@@ -725,7 +910,14 @@ create table public.study_blocks (
   ends_at timestamp with time zone not null,
   status text not null default 'planned'::text,
   created_at timestamp with time zone not null default now(),
-  updated_at timestamp with time zone not null default now()
+  updated_at timestamp with time zone not null default now(),
+  constraint study_blocks_check CHECK ((ends_at > starts_at)),
+  constraint study_blocks_item_key_check CHECK (((char_length(item_key) >= 1) AND (char_length(item_key) <= 200))),
+  constraint study_blocks_kind_check CHECK ((kind = ANY (ARRAY['work'::text, 'review'::text]))),
+  constraint study_blocks_pkey PRIMARY KEY (id),
+  constraint study_blocks_status_check CHECK ((status = ANY (ARRAY['planned'::text, 'moved'::text, 'removed'::text, 'done'::text]))),
+  constraint study_blocks_step_id_fkey FOREIGN KEY (step_id) REFERENCES assignment_steps(id) ON DELETE SET NULL,
+  constraint study_blocks_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 
 create table public.study_days (
@@ -736,7 +928,14 @@ create table public.study_days (
   right_count integer not null default 0,
   total integer not null default 0,
   guides jsonb not null default '{}'::jsonb,
-  updated_at timestamp with time zone not null default now()
+  updated_at timestamp with time zone not null default now(),
+  constraint study_days_cards_check CHECK ((cards >= 0)),
+  constraint study_days_guides_shape CHECK (((jsonb_typeof(guides) = 'object'::text) AND (pg_column_size(guides) <= 50000))),
+  constraint study_days_minutes_check CHECK (((minutes >= (0)::double precision) AND (minutes <= (1440)::double precision))),
+  constraint study_days_pkey PRIMARY KEY (user_id, day),
+  constraint study_days_right_count_check CHECK ((right_count >= 0)),
+  constraint study_days_total_check CHECK ((total >= 0)),
+  constraint study_days_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 create policy "Connected apps read the student's study days" on public.study_days for select to mcp_client
   using (auth.uid() = user_id);
@@ -815,7 +1014,10 @@ create table public.tutor_chats (
   title text not null default ''::text,
   messages jsonb not null default '[]'::jsonb,
   created_at timestamp with time zone not null default now(),
-  updated_at timestamp with time zone not null default now()
+  updated_at timestamp with time zone not null default now(),
+  constraint tutor_chats_guide_id_fkey FOREIGN KEY (guide_id) REFERENCES study_guides(id) ON DELETE SET NULL,
+  constraint tutor_chats_pkey PRIMARY KEY (id),
+  constraint tutor_chats_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
 
 create table public.tutor_sessions (

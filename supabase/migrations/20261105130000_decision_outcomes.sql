@@ -1,5 +1,5 @@
 -- Personalization plan, step 0.3: what happened after each adaptive decision.
--- NOT APPLIED: waiting for the owner's OK. Run on a preview database first.
+-- APPLIED by the owner in the SQL editor on 2026-11-05 (not in Supabase's migration history)
 --
 -- Fields from docs/research/08-adaptive-algorithms.md ("Core schema"). One row per decision and
 -- outcome type, written by the backend's nightly job (services/decision_outcomes.py):

@@ -1,4 +1,4 @@
--- Drop the legacy 5-guide lifetime cap on free accounts (NOT APPLIED: waiting for the owner's OK).
+-- Drop the legacy 5-guide lifetime cap on free accounts (APPLIED by hand in the SQL editor, verified live 2026-11-05 (not in Supabase's migration history)).
 --
 -- enforce_free_guide_creation_limit (a BEFORE INSERT trigger on study_guides, created outside
 -- these migrations) counts every new guide in free_plan_usage and raises CORDIA_FREE_GUIDE_LIMIT

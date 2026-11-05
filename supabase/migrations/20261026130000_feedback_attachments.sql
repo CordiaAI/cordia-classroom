@@ -1,4 +1,4 @@
--- Screenshots on feedback (NOT APPLIED: waiting for the owner's OK).
+-- Screenshots on feedback (APPLIED by the owner in the SQL editor on 2026-11-05 (not in Supabase's migration history)).
 --
 -- The feedback dialog lets a student attach up to 3 screenshots or photos. The browser shrinks
 -- each to at most 2000px; the web server (pages/api/feedback-attachment.js, service role) checks
