@@ -252,7 +252,7 @@ export default function LearnPage() {
     const card = currentCard(round);
     results.forEach(item => logAnswer({
       guideId, question: questions[item.concept]?.question, mode: 'learn', type: card.type, credit: item.credit,
-      confidence: item.confidence, timing: item.timing, answerChars: item.answerChars, decisionId: decisions.current[card.id],
+      confidence: item.confidence, timing: item.timing, answerChars: item.answerChars, decisionId: decisions.current[card.id], nOptions: item.nOptions,
     }));
     const next = answer(levels, round, card, result.credit, { confidence: result.confidence || '', today });
     setLevels(next.levels);

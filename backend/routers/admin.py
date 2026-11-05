@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from auth_utils import get_user_id
@@ -38,6 +38,14 @@ def require_admin(authorization: str) -> tuple[str, object]:
 def admin_me(authorization: str = Header(default="")):
     require_admin(authorization)
     return {"admin": True}
+
+
+@router.get("/metrics")
+def metrics(days: int = Query(default=30, ge=1, le=180), authorization: str = Header(default="")):
+    """Recall activation and D1/D7 return for recent signups (personalization plan step 0.4)."""
+    from services.metrics import load_activation
+    _, db = require_admin(authorization)
+    return load_activation(db, days)
 
 
 @router.get("/queue")

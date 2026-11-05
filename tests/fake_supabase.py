@@ -117,6 +117,11 @@ class Query:
         self._limit = n
         return self
 
+    def range(self, start, end):
+        # PostgREST paging: rows start..end inclusive.
+        self._offset, self._limit = start, end - start + 1
+        return self
+
     # writes
     def insert(self, payload, **_kwargs):
         self.op, self.payload = "insert", payload
@@ -154,7 +159,8 @@ class Query:
                 key, desc = self._order
                 out.sort(key=lambda r: (r.get(key) is None, str(r.get(key) or "")), reverse=desc)
             total = len(out)
-            out = out[: self._limit] if self._limit else out
+            offset = getattr(self, "_offset", 0)
+            out = out[offset: offset + self._limit] if self._limit else out[offset:]
             if self.columns:
                 out = [{c: r.get(c) for c in self.columns} for r in out]
             return SimpleNamespace(data=out, count=total if getattr(self, "count", None) else None)

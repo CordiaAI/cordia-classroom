@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MAX_QUEUED, MAX_TRIES, answerTimer, confidenceFor, createQueue, formatFor, itemFingerprint, outcomeFor,
+  MAX_QUEUED, MAX_TRIES, answerTimer, confidenceFor, createQueue, formatFor, itemFingerprint, optionCount, outcomeFor,
 } from '../lib/learningEvents.mjs';
 import { FAMILIAR, NEW, fingerprint, formatDecision } from '../lib/learnEngine.mjs';
 
@@ -14,6 +14,14 @@ test('card types, results and confidence map to what the server stores', () => {
   assert.deepEqual([1, 0.5, 0].map(credit => outcomeFor(credit, 'written')), ['right', 'partly', 'wrong']);
   assert.deepEqual([1, 0].map(credit => outcomeFor(credit, 'flashcard')), ['got_it', 'again']);
   assert.deepEqual(['sure', 'think', 'guess', ''].map(confidenceFor), ['sure', 'think_so', 'guess', null]);
+});
+
+test('the choice count is kept only for formats with choices, within 2 to 50', () => {
+  assert.equal(optionCount('choice', 4), 4);
+  assert.equal(optionCount('pairs', 6), 6);
+  assert.equal(optionCount('typed', 4), null);
+  assert.equal(optionCount('flashcard', 2), null);
+  assert.deepEqual([1, 51, 2.5, undefined, null].map(count => optionCount('choice', count)), [null, null, null, null, null]);
 });
 
 test('every mode uses Learn\'s fingerprint for the idea', () => {
@@ -112,6 +120,8 @@ test('Learn\'s format decision records the candidates, what was ruled out and wh
   assert.deepEqual(fresh.eligible, ['mc', 'fill']);
   assert.equal(fresh.source, 'rule');
   assert.equal(fresh.recall, false);
+  // The rule policy states its own probabilities: the chosen format with probability 1, no seed.
+  assert.deepEqual([fresh.probs, fresh.propensity, fresh.seed], [{ mc: 1 }, 1, 0]);
 
   const recall = formatDecision(long, { l: FAMILIAR }, '2026-10-28', ['mc', 'type', 'cloze']);
   assert.equal(recall.chosen, 'written');

@@ -90,7 +90,7 @@ export default function MatchRace({ questions, guideId, onRestart, onDone }) {
     setAttempts(value => value + 1);
     logAnswer({
       guideId, question: pool.find(entry => entry.id === picked)?.q, mode: 'match', type: 'pairs', credit: picked === item.id ? 1 : 0,
-      timing: pickTimer.current?.done() || null,
+      timing: pickTimer.current?.done() || null, nOptions: answers.filter(entry => !cleared.has(entry.id)).length,
     });
     pickTimer.current = answerTimer(() => performance.now(), document.hidden); // a wrong try keeps the question picked
     if (picked === item.id) {

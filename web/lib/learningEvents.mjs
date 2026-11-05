@@ -27,6 +27,12 @@ export function outcomeFor(credit, format) {
   return 'wrong';
 }
 
+// The number of choices shown, kept only for formats that have choices (2 to 50).
+export function optionCount(format, count) {
+  if (format !== 'choice' && format !== 'pairs') return null;
+  return Number.isInteger(count) && count >= 2 && count <= 50 ? count : null;
+}
+
 const CONFIDENCE = { sure: 'sure', think: 'think_so', think_so: 'think_so', guess: 'guess' };
 
 export function confidenceFor(level) {

@@ -8,6 +8,8 @@ import { readUserValue, writeUserValue } from '../lib/userStore';
 import { isCardImage } from '../lib/cardImages';
 import { prefersReducedMotion } from '../lib/motion';
 import { useActiveClock } from '../lib/activeClock';
+import { answerTimer } from '../lib/learningEvents.mjs';
+import { logAnswer } from '../lib/learningEvents';
 
 const BEST_KEY = 'blocksBest';
 const PAD = 8; // board padding
@@ -37,6 +39,7 @@ export default function BlockGame({ guide, onResults, onDone }) {
   const played = useRef(0);
   const order = useRef(questionOrder(cards.length, dueIndices(guide.flashcard_progress, cards.length)));
   const asked = useRef(0);
+  const questionTimer = useRef(null);
   const [board, setBoard] = useState(() => Array.from({ length: SIZE }, () => Array(SIZE).fill(null)));
   const [tray, setTray] = useState([]);
   const [phase, setPhase] = useState('ask'); // ask | play | over
@@ -73,6 +76,7 @@ export default function BlockGame({ guide, onResults, onDone }) {
     const index = order.current[asked.current % order.current.length];
     asked.current += 1;
     setQuestion({ index, ...choicesFor(cards, index) });
+    questionTimer.current = typeof document === 'undefined' ? null : answerTimer(() => performance.now(), document.hidden);
     setPicked(null);
     setPhase('ask');
   }, [cards]);
@@ -98,6 +102,9 @@ export default function BlockGame({ guide, onResults, onDone }) {
     if (picked !== null) return;
     const right = option === question.answer;
     setPicked(option);
+    // Each card's question is logged like any other flashcard answer (with its choice count).
+    logAnswer({ guideId: guide.id, question: cards[question.index]?.front, mode: 'flashcards', type: 'mc', credit: right ? 1 : 0,
+      timing: questionTimer.current?.done() || null, nOptions: question.options?.length });
     const nextStreak = right ? streak + 1 : 0;
     setStreak(nextStreak);
     if (right) setKnown(list => (list.includes(question.index) ? list : [...list, question.index]));

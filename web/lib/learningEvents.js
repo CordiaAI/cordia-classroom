@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { getToken, tryRefreshToken } from './api';
 import { readUserValue, writeUserValue } from './userStore';
-import { answerTimer, confidenceFor, createQueue, formatFor, itemFingerprint, outcomeFor } from './learningEvents.mjs';
+import { answerTimer, confidenceFor, createQueue, formatFor, itemFingerprint, optionCount, outcomeFor } from './learningEvents.mjs';
 
 // Sends what students answer to POST /learning-events (see lib/learningEvents.mjs). Every call
 // here is fire-and-forget: nothing on a study screen waits for it or shows its errors.
@@ -110,8 +110,9 @@ export function noteView(guideId, questionText, view) {
 }
 
 // One answer. type: the card type (mc, fill, written, self, matching, flashcard, practice).
-// credit: 1, 0.5 or 0. timing: from useAnswerTiming().done().
-export function logAnswer({ guideId, question, mode, type, credit, confidence = '', timing = null, answerChars = null, decisionId = null }) {
+// credit: 1, 0.5 or 0. timing: from useAnswerTiming().done(). nOptions: how many choices were
+// shown (multiple choice and matching only).
+export function logAnswer({ guideId, question, mode, type, credit, confidence = '', timing = null, answerChars = null, decisionId = null, nOptions = null }) {
   quietly(() => {
     const format = formatFor(type);
     const print = itemFingerprint(question);
@@ -128,6 +129,7 @@ export function logAnswer({ guideId, question, mode, type, credit, confidence = 
       submit_ms: timing?.submit_ms ?? null,
       hidden_ms: timing?.hidden_ms || 0,
       answer_chars: Number.isFinite(answerChars) ? answerChars : null,
+      n_options: optionCount(format, nOptions),
       view_shown: takeView(`${guideId}:${print}`),
       occurred_at: new Date().toISOString(),
     });
@@ -159,10 +161,11 @@ export function logFormatDecision({ guideId, question, decision, context = {} })
       candidates: map(decision.candidates),
       mask_reasons: Object.fromEntries(Object.entries(decision.mask).map(([type, reason]) => [formatFor(type), reason])),
       eligible: map(decision.eligible),
-      probs: { [chosen]: 1 },
+      // From the policy that made the choice (rules: probability 1, no seed), never assumed here.
+      probs: Object.fromEntries(Object.entries(decision.probs || { [decision.chosen]: 1 }).map(([type, p]) => [formatFor(type), p]).filter(([type]) => type)),
       chosen,
-      propensity: 1,
-      seed: 0, // no randomness in phase 1
+      propensity: decision.propensity ?? 1,
+      seed: decision.seed ?? 0,
       context: { ...context, recall: decision.recall, local_hour: new Date().getHours(), device: device() },
     });
     schedule();

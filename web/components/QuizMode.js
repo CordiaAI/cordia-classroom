@@ -25,7 +25,7 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart, 
     const shown = currentCard(session);
     results.forEach(item => logAnswer({
       guideId, question: questions[item.concept]?.question, mode, type: shown?.type, credit: item.credit,
-      confidence: item.confidence, timing: item.timing, answerChars: item.answerChars,
+      confidence: item.confidence, timing: item.timing, answerChars: item.answerChars, nOptions: item.nOptions,
     }));
     setSession(current => recordResults(current, currentCard(current), results));
     setAnswered(true);

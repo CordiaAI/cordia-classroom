@@ -109,6 +109,35 @@ class WriteBatchTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             self.assertFalse(le.learning_events_enabled())
 
+    def test_choice_count_is_kept_and_left_out_when_no_answer_has_one(self):
+        le.write_batch(self.db, USER, [], [event(format="choice", n_options=4), event(format="typed")])
+        self.assertEqual([row["n_options"] for row in self.db.rows("learning_events")], [4, None])
+        # A batch without choices (a connected app's) doesn't name the column at all.
+        rows = le.event_rows(USER, [event()], [], 0, datetime.now(timezone.utc))
+        self.assertNotIn("n_options", rows[0])
+
+    def test_logging_keeps_working_before_the_n_options_migration(self):
+        db = self.db
+        real = db.table
+
+        class NoColumnYet:
+            def table(self, name):
+                query = real(name)
+                if name != "learning_events":
+                    return query
+                insert = query.insert
+
+                def guarded(payload, **kwargs):
+                    if any("n_options" in row for row in payload):
+                        raise RuntimeError("{'code': 'PGRST204', 'message': \"Could not find the 'n_options' column of 'learning_events'\"}")
+                    return insert(payload, **kwargs)
+                query.insert = guarded
+                return query
+        result = le.write_batch(NoColumnYet(), USER, [], [event(format="choice", n_options=3)])
+        self.assertEqual(result["events"], 1)
+        [row] = db.rows("learning_events")
+        self.assertNotIn("n_options", row)
+
     def test_missing_tables_are_skipped_quietly(self):
         class Missing:
             def table(self, _name):

@@ -145,7 +145,10 @@ export function formatDecision(question, entry, today = dayKey(), types = DEFAUL
   });
   delete mask[type];
   const eligible = CARD_TYPES.filter(option => !mask[option]);
-  return { candidates: [...CARD_TYPES], eligible, mask, chosen: type, recall: asked.recall, source: eligible.length === 1 ? 'student' : 'rule' };
+  // The rules are deterministic, so the chosen format has probability 1 and no random seed is used.
+  // A policy that explores would return its real probabilities here; the log copies them.
+  return { candidates: [...CARD_TYPES], eligible, mask, chosen: type, recall: asked.recall, source: eligible.length === 1 ? 'student' : 'rule',
+    probs: { [type]: 1 }, propensity: 1, seed: 0 };
 }
 
 export function askType(question, entry, today = dayKey(), types = DEFAULT_TYPES) {

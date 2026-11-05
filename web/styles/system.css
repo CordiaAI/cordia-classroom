@@ -312,17 +312,18 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
   position: fixed; left: 50%; bottom: 24px; z-index: 250; transform: translateX(-50%);
   display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 4px 6px 4px 20px;
   border-radius:var(--r-pill); background: var(--ink); color: var(--canvas);
-  font:600 15px/1.15 var(--font-sans); box-shadow: var(--shadow);
+  font:600 15px/1.3 var(--font-sans); box-shadow: var(--shadow); box-sizing: border-box;
 }
-.c-toast .c-btn--quiet { color: inherit; height: 44px; }
+.c-toast .c-btn--quiet { color: inherit; height: 44px; flex: 0 0 auto; }
 [data-theme='dark'] .c-toast { background: var(--surface-card); color: var(--ink); }
 [data-theme='dark'] .c-toast .c-btn--quiet { color: var(--olive-ink); }
 @media (max-width: 767px) { .c-toast { bottom: calc(var(--tabbar-h) + 84px); } }
 
 .c-tip {
   position: fixed; z-index: 180;
-  display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 6px 0 16px;
-  border-radius:var(--r-pill);
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 6px 0 16px;
+  max-width: calc(100vw - 24px); box-sizing: border-box;
+  border-radius:22px;
   background: var(--glass); border: 1px solid var(--glass-edge);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
   backdrop-filter: blur(24px) saturate(160%);
@@ -465,8 +466,8 @@ body:has(.about) .c-fab { display: none; }
 .create-dropbox .lucide { color: var(--olive-ink); }
 .create-batch-dialog { display: grid; gap: 16px; width: min(480px, 100%); }
 .create-choice-actions, .confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.guide-jobs .guide-job { border-radius:var(--r-pill); background: var(--glass); border-color: var(--glass-edge); backdrop-filter: blur(24px) saturate(160%); font:600 13px/1.15 var(--font-sans); }
-.guide-jobs { top: calc(var(--bar-h) + 12px) !important; }
+.guide-jobs .guide-job { border-radius:var(--r-card); background: var(--glass); border-color: var(--glass-edge); backdrop-filter: blur(24px) saturate(160%); font:600 13px/1.35 var(--font-sans); }
+@media (min-width: 721px) { .guide-jobs { top: calc(var(--bar-h) + 12px) !important; } }
 .guide-job-open { background: var(--olive) !important; border-radius:var(--r-pill) !important; font:600 13px/1 var(--font-sans) !important; height: 32px; padding: 0 14px !important; }
 .explain-preference { display: grid; gap: 10px; }
 .explain-preference label { font:600 17px/1.5 var(--font-sans); color: var(--ink); }

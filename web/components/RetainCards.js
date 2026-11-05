@@ -143,7 +143,7 @@ export function McCard({ card, question, guideId, onResult, onNext, askSure = tr
     setConfidence(level);
     const right = option === answer;
     if (!right) askTutorAboutMiss(guideId, question, option, options);
-    onResult([{ concept: card.concepts[0], credit: right ? 1 : 0, response: option, timing: timing.done(), ...(level ? { confidence: level } : {}) }]);
+    onResult([{ concept: card.concepts[0], credit: right ? 1 : 0, response: option, timing: timing.done(), nOptions: options.length, ...(level ? { confidence: level } : {}) }]);
   }
 
   function choose(option) {
@@ -351,7 +351,7 @@ export function MatchingCard({ card, questions, guideId, onResult, onNext }) {
     const time = timing.done(); // one time for the whole set of pairs
     const results = rows.map(row => {
       const right = normalize(placed[row.index]) === normalize(row.answer);
-      return { concept: row.index, credit: right ? 1 : 0, response: placed[row.index] || '', timing: time };
+      return { concept: row.index, credit: right ? 1 : 0, response: placed[row.index] || '', timing: time, nOptions: bank.length };
     });
     const miss = rows.find((row, i) => results[i].credit !== 1);
     if (miss) askTutorAboutMiss(guideId, miss.question, placed[miss.index] || '(no match)', bank);
