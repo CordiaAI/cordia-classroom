@@ -27,6 +27,7 @@ import { designCover } from '../lib/classCover';
 import { useListView } from '../lib/listView';
 import ViewToggle from '../components/ViewToggle';
 import useScrollerTabs from '../lib/useScrollerTabs';
+import { ClassSetList, SavedGuides, SectionTabs, VisibilityNote } from '../components/LibrarySections';
 
 const SORTS = [
   { key: 'recent', label: 'Newest' },
@@ -69,6 +70,8 @@ export default function LibraryPage() {
   const asked = String(router.query.tab || router.query.filter || 'all');
   const filter = FILTERS.some(item => item.key === asked) ? asked : TAB_ALIASES[asked] || 'all';
   const filtersRef = useScrollerTabs(filter);
+  // Mine · Saved · Class sets. Mine is everything you made, as before.
+  const section = ['saved', 'class'].includes(String(router.query.section)) ? String(router.query.section) : 'mine';
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [folders, setFolders] = useState([]);
@@ -174,6 +177,10 @@ export default function LibraryPage() {
     setLectures(Array.isArray(lectureData?.lectures) ? lectureData.lectures : []);
     setSharedClasses(Array.isArray(classData?.classes) ? classData.classes : []);
     setLoading(false);
+  }
+
+  function setSection(key) {
+    router.replace(key === 'mine' ? '/library' : `/library?section=${key}`, undefined, { shallow: true });
   }
 
   function setFilter(key) {
@@ -445,6 +452,15 @@ export default function LibraryPage() {
         </div>
       </header>
 
+      <SectionTabs section={section} onChange={setSection} />
+      {section !== 'mine' && (
+        <div id={`lsec-panel-${section}`} role="tabpanel" aria-labelledby={`lsec-${section}`}>
+          {section === 'saved' ? <SavedGuides onToast={setToast} /> : <ClassSetList classes={sharedClasses} />}
+        </div>
+      )}
+      {section === 'mine' && (
+      <div id="lsec-panel-mine" role="tabpanel" aria-labelledby="lsec-mine" className="c-stack lib-mine">
+      <VisibilityNote />
       {loadError && <div className="lib-error" role="alert"><span>{loadError}</span><button type="button" className="c-btn c-btn--secondary" onClick={loadData}>Retry</button></div>}
 
       <div className="lib-tools">
@@ -498,6 +514,9 @@ export default function LibraryPage() {
           {(unfiled.length > 0 || (!narrowed && view === 'rows')) && group({ id: 'none', name: 'Unfiled', list: unfiled })}
           {narrowed && !items.length && <p className="c-meta lib-empty-group">{query.trim() ? '0 results' : 'Nothing here yet.'}</p>}
         </div>
+      )}
+
+      </div>
       )}
 
       {pending && (

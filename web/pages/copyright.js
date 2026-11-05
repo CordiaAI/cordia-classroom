@@ -1,12 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import PublicPage from '../components/PublicPage';
 import { publicFetch } from '../lib/publicApi';
 
 const CONTACT = 'support@cordiaai.io';
 
-// Takedown requests. A named set is hidden at once, pending review.
+// Takedown requests. A named guide or set is held at once (no one else sees it) until we review it.
+// "Report it" on a guide page links here with ?link= filled in.
 export default function Copyright() {
+  const router = useRouter();
   const [form, setForm] = useState({ name: '', email: '', work: '', location: '', statement: false });
+  useEffect(() => {
+    const link = typeof router.query.link === 'string' ? router.query.link.slice(0, 2000) : '';
+    if (link) setForm(current => (current.location ? current : { ...current, location: link }));
+  }, [router.query.link]);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
@@ -36,7 +43,7 @@ export default function Copyright() {
               <label className="cr-field"><span>Name</span><input className="c-input" value={form.name} onChange={set('name')} autoComplete="name" /></label>
               <label className="cr-field"><span>Email</span><input className="c-input" type="email" value={form.email} onChange={set('email')} autoComplete="email" /></label>
               <label className="cr-field"><span>Your work</span><textarea className="c-input" rows={3} value={form.work} onChange={set('work')} /></label>
-              <label className="cr-field"><span>Link to the set</span><input className="c-input" value={form.location} onChange={set('location')} inputMode="url" /></label>
+              <label className="cr-field"><span>Link to the guide</span><input className="c-input" value={form.location} onChange={set('location')} inputMode="url" /></label>
               <label className="cr-check">
                 <input type="checkbox" checked={form.statement} onChange={set('statement')} />
                 <span>I own this work or act for its owner, and I believe in good faith this use isn't authorized.</span>
@@ -49,11 +56,11 @@ export default function Copyright() {
         </div>
         <div className="cr-card cr-policy">
           <h2>How we handle copyright</h2>
-          <p>We respect copyright and respond to notices under the U.S. Digital Millennium Copyright Act (DMCA). A set named in a notice is hidden right away while we review it.</p>
+          <p>We respect copyright and respond to notices under the U.S. Digital Millennium Copyright Act (DMCA). A guide or set named in a notice is hidden from everyone but its owner right away while we review it.</p>
           <h3>Sending a notice</h3>
-          <p>Use the form above or email us. Include: your signature (typing your full name counts), the work you own, a link to the shared set, your contact details, a statement that you believe in good faith the use isn't authorized, and a statement, under penalty of perjury, that your notice is accurate and you own the work or may act for its owner.</p>
+          <p>Use the form above or email us. Include: your signature (typing your full name counts), the work you own, a link to the shared guide, your contact details, a statement that you believe in good faith the use isn't authorized, and a statement, under penalty of perjury, that your notice is accurate and you own the work or may act for its owner.</p>
           <h3>Counter-notice</h3>
-          <p>If your set was removed by mistake, email us with your name and contact details, the set, a statement under penalty of perjury that it was removed by mistake or misidentification, and your consent to the jurisdiction of a U.S. federal court. We may restore it after 10 business days unless the claimant tells us they have filed a lawsuit.</p>
+          <p>If your guide was removed by mistake, email us with your name and contact details, the guide, a statement under penalty of perjury that it was removed by mistake or misidentification, and your consent to the jurisdiction of a U.S. federal court. We may restore it after 10 business days unless the claimant tells us they have filed a lawsuit.</p>
           <h3>Repeat infringers</h3>
           <p>We remove sharing access, and may close the accounts, of people who repeatedly share material that infringes copyright.</p>
           <h3>Designated agent</h3>

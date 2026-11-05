@@ -176,7 +176,7 @@ class SharingFlowTests(unittest.TestCase):
             with self.assertRaises(HTTPException):
                 public_forms.block_course(public_forms.BlockRequest(school_id=self.school_id, course_code="FILM 201"), "")
 
-    def test_takedown_hides_set_immediately(self):
+    def test_takedown_holds_set_immediately(self):
         mgt = self.add("owner")
         guide_id = "10000000-0000-4000-8000-000000000001"
         with self.s.as_user("owner"):
@@ -185,7 +185,10 @@ class SharingFlowTests(unittest.TestCase):
         set_id = self.db.rows("shared_sets")[0]["id"]
         with patch.object(public_forms, "get_supabase", return_value=self.db):
             public_forms.takedown(public_forms.TakedownRequest(name="Pub", email="legal@pub.com", work="Chapter 3", location=f"https://classroom.cordiaai.io/class/x?set={set_id}", statement=True))
-        self.assertEqual(self.db.rows("shared_sets")[0]["status"], "taken_down")
+        # Held for review (the owner's choice for Stage 3), so classmates stop seeing it at once.
+        self.assertEqual(self.db.rows("shared_sets")[0]["status"], "held")
+        self.assertEqual(self.db.rows("shared_sets")[0]["hold_reason"], "Copyright report")
+        self.assertEqual(self.db.rows("copyright_takedowns")[0]["guide_id"], guide_id)
 
 
 

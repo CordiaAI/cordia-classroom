@@ -28,7 +28,9 @@ export default function App({ Component, pageProps }) {
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => { setSignedIn(Boolean(getToken())); }, [router.pathname]);
   const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password', '/instructors', '/copyright', '/mission', '/install-extension', '/privacy', '/terms', '/honor-code', '/connect/claude', '/oauth/consent'].includes(router.pathname)
-    && !(router.pathname === '/pricing' && signedIn);
+    && !(router.pathname === '/pricing' && signedIn)
+    // A shared guide: signed-out visitors get the public frame, students the app.
+    || (router.pathname === '/sets/[id]' && !signedIn);
 
   // Authentication pages stay light; workspace routes honor the saved preference.
   useEffect(() => { applyTheme(router.pathname); }, [router.pathname]);

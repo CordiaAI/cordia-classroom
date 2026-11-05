@@ -54,6 +54,27 @@ def _cluster_for(db, class_id: str, set_id: Optional[str], signature: set) -> Op
     return None
 
 
+def _anonymous(db, guide: dict) -> bool:
+    if "attribution" in guide:
+        return guide.get("attribution") == "anonymous"
+    try:
+        row = (db.table("study_guides").select("attribution").eq("id", guide["id"]).limit(1).execute().data or [None])[0]
+    except Exception:  # before the Stage 3 migration
+        return False
+    return bool(row and row.get("attribution") == "anonymous")
+
+
+def refresh_owner_names(db, user_id: str) -> None:
+    """Re-stamp the name on every set this person shared; anonymous guides stay unnamed."""
+    db.table("shared_sets").update({"owner_name": owner_name(db, user_id)}).eq("owner_id", user_id).execute()
+    try:
+        hidden = [g["id"] for g in db.table("study_guides").select("id").eq("user_id", user_id).eq("attribution", "anonymous").execute().data or []]
+    except Exception:  # before the Stage 3 migration
+        return
+    if hidden:
+        db.table("shared_sets").update({"owner_name": None}).eq("owner_id", user_id).in_("guide_id", hidden).execute()
+
+
 def upsert_share(db, user_id: str, guide: dict, class_id: str, visibility: str) -> dict:
     """Create or update the snapshot for a guide and set its visibility."""
     existing = (db.table("shared_sets").select("*").eq("guide_id", guide["id"]).limit(1).execute().data or [None])[0]
@@ -64,7 +85,8 @@ def upsert_share(db, user_id: str, guide: dict, class_id: str, visibility: str) 
     row = {
         "guide_id": guide["id"], "owner_id": user_id, "class_id": class_id, "visibility": visibility,
         "title": title, "study_guide": text, "flashcards": cards, "card_count": len(cards),
-        "owner_name": owner_name(db, user_id), "updated_at": _now(),
+        # An anonymous guide never names its author, not even by first name.
+        "owner_name": None if _anonymous(db, guide) else owner_name(db, user_id), "updated_at": _now(),
     }
     if existing:
         changed = any(existing.get(k) != row[k] for k in ("title", "study_guide", "flashcards"))
@@ -86,7 +108,19 @@ def upsert_share(db, user_id: str, guide: dict, class_id: str, visibility: str) 
     if saved.get("id") and not saved.get("cluster_id"):
         db.table("shared_sets").update({"cluster_id": saved["id"]}).eq("id", saved["id"]).execute()
         saved["cluster_id"] = saved["id"]
+    sync_guide_visibility(db, user_id, guide["id"], visibility)
     return saved
+
+
+def sync_guide_visibility(db, user_id: str, guide_id: str, share_visibility: str) -> None:
+    """Keep the guide's own visibility in step with the old class-sharing switches: sharing with
+    the class makes a private guide class-only, and unsharing makes a class-only guide private.
+    Public and link guides are left alone (they're set from the visibility chip)."""
+    try:
+        query = db.table("study_guides").update({"visibility": "classroom" if share_visibility == "class" else "private"})
+        query.eq("id", guide_id).eq("user_id", user_id).eq("visibility", "private" if share_visibility == "class" else "classroom").execute()
+    except Exception as exc:  # before the Stage 3 migration
+        logger.warning(f"Guide visibility sync skipped: {type(exc).__name__}")
 
 
 def on_guide_changed(db, user_id: str, guide_id: str) -> None:

@@ -3,6 +3,7 @@ Guides router for CordiaClassroom.
 Handles CRUD operations for saved study guides.
 """
 
+import logging
 import re
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field, field_validator
@@ -16,6 +17,7 @@ from ids import is_uuid, require_uuid
 
 
 router = APIRouter(prefix="/guides", tags=["guides"])
+logger = logging.getLogger(__name__)
 
 
 class SaveGuideRequest(BaseModel):
@@ -30,6 +32,8 @@ class SaveGuideRequest(BaseModel):
     source_title: Optional[str] = Field(default=None, max_length=500)
     source_id: Optional[str] = Field(default=None, max_length=500)
     keep_title: bool = False  # The student typed the title: save it as typed.
+    # The web's "make my new guides public" default. Only applied once the Honor Code is accepted.
+    share_default: bool = False
 
     model_config = {"str_max_length": 5_000_000}
 
@@ -170,9 +174,31 @@ def create_guide(user_id: str, request: SaveGuideRequest, extra: Optional[dict] 
     ).execute()
 
     if result.data:
-        start_quiz_warmup(result.data[0], user_id)
-        return result.data[0]
+        row = result.data[0]
+        if request.share_default:
+            row = _publish_new(supabase, user_id, row)
+        start_quiz_warmup(row, user_id)
+        return row
     raise HTTPException(status_code=500, detail="Failed to save guide")
+
+
+def _publish_new(db, user_id: str, row: dict) -> dict:
+    """New guides from the generator default to public + named, but only for someone who has
+    accepted the Honor Code and only outside a class whose instructor turned sharing off.
+    Everything else (notes, imports, the assistant, the extension) starts private."""
+    try:
+        from services import guide_review as review
+        if not review.honor_code_accepted(db, user_id):
+            return row
+        klass = review.course(db, row)
+        if klass and klass.get("sharing_blocked"):
+            return row
+        update = {"visibility": "public", "attribution": "named"}
+        db.table("study_guides").update(update).eq("id", row["id"]).eq("user_id", user_id).execute()
+        return review.rescreen(db, {**row, **update})
+    except Exception as exc:  # before the Stage 3 migration: the guide simply stays private
+        logger.warning(f"Default sharing skipped: {type(exc).__name__}")
+        return row
 
 
 @router.post("")
@@ -191,6 +217,7 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
     # This converts the Pydantic model to a dict, excluding unset values
     update_data = request.model_dump(exclude_unset=True)
     update_data.pop("keep_title", None)
+    update_data.pop("share_default", None)
     require_own_folder(supabase, user_id, update_data.get("folder_id"))
 
     # 2. Perform the update in Supabase
@@ -205,8 +232,30 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
 
     if {"title", "study_guide", "flashcards"} & set(update_data):
         on_guide_changed(supabase, user_id, guide_id)
-    return {"guide": result.data[0]}
-    
+    guide = result.data[0]
+    if {"title", "notes", "study_guide", "flashcards"} & set(update_data):
+        guide = {**guide, **(_new_version(supabase, user_id, guide_id) or {})}
+    return {"guide": guide}
+
+
+def _new_version(db, user_id: str, guide_id: str) -> Optional[dict]:
+    """An edit makes a new version (saves pin the one they saw) and re-runs the leak check on a
+    shared guide. Returns the columns that changed."""
+    try:
+        from services.guide_review import rescreen
+        guide = (db.table("study_guides").select("id,title,study_guide,flashcards,visibility,version,review_status,hold_reason")
+                 .eq("id", guide_id).eq("user_id", user_id).limit(1).execute().data or [None])[0]
+        if not guide:
+            return None
+        version = int(guide.get("version") or 1) + 1
+        db.table("study_guides").update({"version": version}).eq("id", guide_id).eq("user_id", user_id).execute()
+        checked = rescreen(db, {**guide, "version": version})
+        return {key: checked.get(key) for key in ("version", "review_status", "hold_reason")}
+    except Exception as exc:  # before the Stage 3 migration
+        logger.warning(f"Guide version bump skipped: {type(exc).__name__}")
+        return None
+
+
 # Smaller column sets for screens that don't show the guide text (default: every column).
 GUIDE_FIELDS = {
     "meta": "id,title,folder_id,flashcard_progress,source_type,created_at",
@@ -287,6 +336,7 @@ def rename_guide(guide_id: str, request: RenameGuideRequest, authorization: str 
         .execute()
 
     on_guide_changed(supabase, user_id, guide_id)
+    _new_version(supabase, user_id, guide_id)
     return {"title": request.title}
 
 

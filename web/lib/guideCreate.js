@@ -117,6 +117,9 @@ export async function generateAndSave({ source, requestId, title, keepTitle = fa
       source_type: sourceType,
       source_title: sourceTitle,
       source_id: externalSourceId || null,
+      // New guides are public + named once the student has accepted the Honor Code (the server
+      // checks); until then they stay private.
+      share_default: true,
       ...(folderId ? { folder_id: folderId } : {}),
     }),
   });

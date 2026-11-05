@@ -61,6 +61,20 @@ export default function Admin() {
             )) : <p className="c-meta">Empty</p>}
           </section>
 
+          <section className="c-card adm-card" aria-labelledby="adm-guides">
+            <h2 id="adm-guides" className="c-section-title">Guides</h2>
+            {(queue.guides || []).length ? queue.guides.map(item => (
+              <div key={item.id} className="adm-row">
+                <span className="adm-main">
+                  <a href={`/sets/${item.id}`} target="_blank" rel="noopener noreferrer"><strong>{item.title || 'Untitled'}</strong></a>
+                  <span className="c-meta">{[item.visibility, item.review_status, item.hold_reason].filter(Boolean).join(' · ')}</span>
+                </span>
+                <button type="button" className="c-btn c-btn--secondary" onClick={() => act(`/admin/guides/${item.id}`, { status: 'ok' })}>Release</button>
+                <button type="button" className="c-btn c-btn--quiet adm-danger" onClick={() => act(`/admin/guides/${item.id}`, { status: 'hidden' })}>Hide</button>
+              </div>
+            )) : <p className="c-meta">Empty</p>}
+          </section>
+
           <section className="c-card adm-card" aria-labelledby="adm-merges">
             <h2 id="adm-merges" className="c-section-title">Merges</h2>
             {queue.merges.length ? queue.merges.map(item => (
@@ -77,8 +91,8 @@ export default function Admin() {
             {queue.takedowns.length ? queue.takedowns.map(item => (
               <div key={item.id} className="adm-row">
                 <span className="adm-main"><strong>{item.claimant_name} · {item.claimant_email}</strong><span className="c-meta">{item.work_description} · {item.location}</span></span>
-                <button type="button" className="c-btn c-btn--secondary" onClick={() => act(`/admin/takedowns/${item.id}`, { action: 'actioned' })}>Keep down</button>
-                <button type="button" className="c-btn c-btn--quiet" onClick={() => act(`/admin/takedowns/${item.id}`, { action: 'rejected' })}>Reject</button>
+                <button type="button" className="c-btn c-btn--secondary" onClick={() => act(`/admin/takedowns/${item.id}`, { action: 'actioned' })}>Remove</button>
+                <button type="button" className="c-btn c-btn--quiet" onClick={() => act(`/admin/takedowns/${item.id}`, { action: 'rejected' })}>Restore</button>
               </div>
             )) : <p className="c-meta">Empty</p>}
           </section>
