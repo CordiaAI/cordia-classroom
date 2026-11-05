@@ -15,7 +15,8 @@ export const NAPKIN_BASE = 'https://api.napkin.ai';
 // Built-in "Pastel Field" (Casual): soft sage and orange fills, close to Cordia's palette, until
 // NAPKIN_STYLE_ID picks another (https://api.napkin.ai/docs/styles).
 export const DEFAULT_STYLE_ID = 'CDGQ6XB1DGPQ6VV6EGPQ4CG';
-export const LIMITS = { free: 10, pro: 200 };
+// Fallback only: /billing/status sends each tier's real limit (backend/services/entitlements.py).
+export const LIMITS = { free: 10, pro: 10, weapon: 200 };
 // Checked every second, so a finished drawing is picked up quickly.
 export const POLL_MS = 1000;
 export const BUDGET_MS = 20000;
@@ -109,7 +110,9 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
     const userId = data?.user_id || userIdFromToken(authorization);
     if (!userId) return null;
     const plan = data?.plan === 'free' || !data?.plan ? 'free' : 'pro';
-    return { userId, plan, unlimited: Boolean(data?.unlimited) };
+    const tier = LIMITS[data?.tier] !== undefined ? data.tier : (plan === 'free' ? 'free' : 'weapon');
+    const limit = Number(data?.features?.visual?.limit) || LIMITS[tier];
+    return { userId, plan, tier, limit, unlimited: Boolean(data?.unlimited) };
   }
 
   async function used(userId) {
@@ -120,7 +123,7 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
   }
 
   async function usage(who) {
-    const limit = LIMITS[who.plan];
+    const limit = who.limit;
     const count = await used(who.userId);
     return { plan: who.plan, limit, used: count, left: who.unlimited ? limit : Math.max(0, limit - count) };
   }
@@ -224,7 +227,7 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
     const resumed = resume ? readTicket(resume, who.userId, key) : null;
     if (resume && !resumed) return { httpStatus: 400, body: { detail: 'That drawing request expired. Try again.' } };
     if (!resumed && !who.unlimited && counts.left <= 0) {
-      return { httpStatus: 402, body: { detail: { code: 'limit_reached', feature: 'visual', plan: who.plan === 'pro' ? 'classroom_plus' : 'free', used: counts.used, limit: counts.limit, message: who.plan === 'pro' ? 'Limit reached' : "You've used this month's visuals." } } };
+      return { httpStatus: 402, body: { detail: { code: 'limit_reached', feature: 'visual', plan: who.plan === 'pro' ? 'classroom_plus' : 'free', tier: who.tier, used: counts.used, limit: counts.limit, message: who.plan === 'pro' ? 'Limit reached' : "You've used this month's visuals." } } };
     }
 
     const deadline = now() + BUDGET_MS;
@@ -277,7 +280,7 @@ export function createVisualService({ env = process.env, fetch: fetchImpl = glob
   async function usageFor(authorization) {
     const who = await account(authorization);
     if (!who) return { httpStatus: 401, body: { detail: 'Sign in again.' } };
-    if (!enabled) return { httpStatus: 200, body: { enabled: false, missing, plan: who.plan, limit: LIMITS[who.plan], left: LIMITS[who.plan] } };
+    if (!enabled) return { httpStatus: 200, body: { enabled: false, missing, plan: who.plan, limit: who.limit, left: who.limit } };
     return { httpStatus: 200, body: { enabled: true, ...(await usage(who)) } };
   }
 

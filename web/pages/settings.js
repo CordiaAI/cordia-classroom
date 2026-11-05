@@ -6,7 +6,7 @@ import { useRequireAuth } from '../lib/auth';
 import Link from 'next/link';
 import { apiErrorMessage, apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName, openUpgrade } from '../lib/api';
 import { EXTENSION_STORE_URL } from '../lib/extension';
-import { FEATURE_COPY, FREE_SUMMARY, METERED, PRICES, PRO_BENEFITS, PRO_LIMITS, resetLabel } from '../lib/plans';
+import { FEATURE_COPY, FREE_SUMMARY, METERED, TIERS, TIER_ORDER, isPaid, resetLabel, tierName } from '../lib/plans';
 import LearningStylePicker from '../components/LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
 import TutorSettings from '../components/TutorSettings';
@@ -62,7 +62,6 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [upgrading, setUpgrading] = useState(false);
   const [managing, setManaging] = useState(false);
-  const [billingInterval, setBillingInterval] = useState('monthly');
   const [message, setMessage] = useState('');
 
   // Theme state
@@ -96,7 +95,7 @@ export default function SettingsPage() {
       setActiveSection('plan');
       const sessionId = typeof router.query.session_id === 'string' ? router.query.session_id : '';
       if (sessionId) {
-        setMessage('Confirming your CordiaClassroom Pro subscription...');
+        setMessage('Confirming your CordiaClassroom subscription...');
         confirmCheckout(sessionId);
       } else {
         setMessage('Checkout returned without a confirmation reference. Checking your plan...');
@@ -114,10 +113,9 @@ export default function SettingsPage() {
       method: 'POST',
       body: JSON.stringify({ session_id: sessionId }),
     });
-    if (data?.plan === 'classroom_plus') {
+    if (isPaid(data)) {
       setStatus(data);
-      if (PRICES[data.billing_interval]) setBillingInterval(data.billing_interval);
-      setMessage('CordiaClassroom Pro is active.');
+      setMessage(`${tierName(data.tier)} is active.`);
       router.replace('/settings?section=subscription', undefined, { shallow: true });
     } else {
       setMessage(apiErrorMessage(data?.detail, 'We could not confirm this Checkout session. Please contact support.'));
@@ -129,18 +127,15 @@ export default function SettingsPage() {
   async function loadStatus() {
     setLoading(true);
     const data = await apiFetch('/billing/status');
-    if (data) {
-      setStatus(data);
-      if (PRICES[data.billing_interval]) setBillingInterval(data.billing_interval);
-    }
+    if (data) setStatus(data);
     setLoading(false);
   }
 
-  async function handleUpgrade() {
+  async function handleUpgrade(tier) {
     setUpgrading(true);
     const data = await apiFetch('/billing/create-checkout-session', {
       method: 'POST',
-      body: JSON.stringify({ interval: billingInterval }),
+      body: JSON.stringify({ tier }),
     });
     if (data?.url) {
       window.location.href = data.url;
@@ -148,6 +143,24 @@ export default function SettingsPage() {
       setMessage(apiErrorMessage(data?.detail, 'Failed to start checkout. Please try again.'));
       setUpgrading(false);
     }
+  }
+
+  // A paid student moves between Pro and Academic Weapon on the same subscription.
+  async function handleSwitch(tier) {
+    const upgrade = TIER_ORDER.indexOf(tier) > TIER_ORDER.indexOf(status?.tier);
+    const note = upgrade
+      ? `Switch to ${tierName(tier)}? You pay the difference for the rest of this month now.`
+      : `Switch to ${tierName(tier)}? Your lower limits start now, and the unused part of this month comes off your next bill.`;
+    if (!window.confirm(note)) return;
+    setUpgrading(true);
+    const data = await apiFetch('/billing/change-plan', { method: 'POST', body: JSON.stringify({ tier }) });
+    if (data?.tier === tier) {
+      setStatus(data);
+      setMessage(`You're on ${tierName(tier)} now.`);
+    } else {
+      setMessage(apiErrorMessage(data?.detail, 'Your plan could not be changed. Please try again.'));
+    }
+    setUpgrading(false);
   }
 
   async function handleManageBilling() {
@@ -181,16 +194,17 @@ export default function SettingsPage() {
 
   if (!ready) return null;
 
-  const isPlus = status?.plan === 'classroom_plus';
+  const isPlus = isPaid(status);
   const onTrial = Boolean(status?.on_trial);
-  const selected = PRICES[billingInterval] || PRICES.monthly;
+  const paidNow = isPlus && !onTrial;
+  const currentTier = paidNow ? status.tier : 'free';
 
   async function handleStartTrial() {
     setUpgrading(true);
     const data = await apiFetch('/billing/start-trial', { method: 'POST' });
-    if (data?.plan === 'classroom_plus') {
+    if (isPaid(data)) {
       setStatus(data);
-      setMessage('Your 7-day Pro trial has started. No card needed, and it ends on its own.');
+      setMessage('Your 7-day Academic Weapon trial has started. No card needed, and it ends on its own.');
     } else {
       setMessage(apiErrorMessage(data?.detail, 'The trial could not start. Please try again.'));
     }
@@ -247,7 +261,7 @@ export default function SettingsPage() {
               <>
                 <div className="c-card billing-current-plan">
                   <div className="plan-badge" data-plan={isPlus ? 'plus' : 'free'}>
-                    {onTrial ? 'Pro trial' : isPlus ? 'Pro' : 'Free'}
+                    {onTrial ? 'Academic Weapon trial' : tierName(currentTier)}
                   </div>
                   <div className="plan-usage">
                     {METERED.map(feature => {
@@ -257,7 +271,7 @@ export default function SettingsPage() {
                       return (
                         <div key={feature} className="plan-usage-row">
                           <span className="plan-usage-label">{FEATURE_COPY[feature].label}</span>
-                          <span className="c-meta">{item.used} / {item.limit}{!isPlus && PRO_LIMITS[feature] ? ` · Pro ${PRO_LIMITS[feature].toLocaleString()} a month` : ''}</span>
+                          <span className="c-meta">{item.used} / {item.limit}</span>
                           <div className="c-bar"><span style={{ width: pct + '%', background: pct >= 100 ? 'var(--error)' : undefined }} /></div>
                         </div>
                       );
@@ -281,49 +295,42 @@ export default function SettingsPage() {
                     {!isPlus && <span className="plan-current-label">Current</span>}
                   </div>
 
-                  <div className={'c-card plan-card plan-card-pro' + (isPlus ? ' plan-card-current' : '')}>
-                    <h2 className="c-section-title">Pro</h2>
-                    {(!isPlus || onTrial) && (
-                      <div className="c-seg billing-toggle" role="group" aria-label="Billing interval">
-                        {Object.entries(PRICES).map(([key, option]) => (
-                          <button key={key} type="button" className={billingInterval === key ? 'is-active' : ''} aria-pressed={billingInterval === key} onClick={() => setBillingInterval(key)}>
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <div className="plan-price">
-                      {selected.price}
-                      <span>/{selected.per}</span>
-                    </div>
-                    {selected.note && <span className="c-meta">{selected.note}</span>}
-                    <ul className="plan-features">
-                      {PRO_BENEFITS.map(item => <li key={item}><Check size={18} strokeWidth={2} aria-hidden="true" />{item}</li>)}
-                    </ul>
-                    {isPlus && !onTrial ? (
-                      <div className="plan-actions">
-                        <span className="plan-current-label">Current</span>
-                        <button type="button" className="c-btn c-btn--secondary" onClick={handleManageBilling} disabled={managing}>
-                          <CreditCard size={20} strokeWidth={1.75} aria-hidden="true" />{managing ? 'Opening…' : 'Manage'}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="plan-actions">
-                        {status?.trial_available ? (
-                          <>
-                            <button type="button" className="c-btn c-btn--primary" onClick={() => openUpgrade()} disabled={upgrading}>Start trial</button>
-                            <button type="button" className="c-btn c-btn--secondary" onClick={handleUpgrade} disabled={upgrading}>
-                              {upgrading ? 'Opening…' : 'Subscribe'}
+                  {Object.entries(TIERS).map(([key, tier]) => {
+                    const current = currentTier === key;
+                    return (
+                      <div key={key} className={'c-card plan-card plan-card-pro' + (current ? ' plan-card-current' : '')}>
+                        <h2 className="c-section-title">{tier.name}</h2>
+                        <div className="plan-price">{tier.price}<span>/{tier.per}</span></div>
+                        <span className="c-meta">{tier.pitch}</span>
+                        <ul className="plan-features">
+                          {tier.benefits.map(item => <li key={item}><Check size={18} strokeWidth={2} aria-hidden="true" />{item}</li>)}
+                        </ul>
+                        <div className="plan-actions">
+                          {current ? (
+                            <>
+                              <span className="plan-current-label">Current</span>
+                              <button type="button" className="c-btn c-btn--secondary" onClick={handleManageBilling} disabled={managing}>
+                                <CreditCard size={20} strokeWidth={1.75} aria-hidden="true" />{managing ? 'Opening…' : 'Manage'}
+                              </button>
+                            </>
+                          ) : paidNow ? (
+                            <button type="button" className="c-btn c-btn--secondary" onClick={() => handleSwitch(key)} disabled={upgrading}>
+                              {upgrading ? 'Switching…' : `Switch to ${tier.name}`}
                             </button>
-                          </>
-                        ) : (
-                          <button type="button" className="c-btn c-btn--primary" onClick={handleUpgrade} disabled={upgrading}>
-                            {upgrading ? 'Opening…' : onTrial ? 'Subscribe' : 'Choose Pro'}
-                          </button>
-                        )}
+                          ) : (
+                            <>
+                              {key === 'weapon' && status?.trial_available && (
+                                <button type="button" className="c-btn c-btn--primary" onClick={() => openUpgrade({ tier_choice: 'weapon' })} disabled={upgrading}>Start free trial</button>
+                              )}
+                              <button type="button" className={key === 'weapon' && status?.trial_available ? 'c-btn c-btn--secondary' : 'c-btn c-btn--primary'} onClick={() => handleUpgrade(key)} disabled={upgrading}>
+                                {upgrading ? 'Opening…' : `Choose ${tier.name}`}
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -442,12 +449,12 @@ export default function SettingsPage() {
         .plan-usage-row .c-bar { grid-column: 1 / -1; }
         .plan-usage-label { text-transform: capitalize; font-weight:600; }
         .plan-warning { color: var(--error); font-weight:600; }
-        .billing-plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+        .billing-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+        @media (max-width: 1100px) and (min-width: 768px) { .billing-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         .plan-card { display: grid; gap: 12px; align-content: start; min-width: 0; padding: 24px; }
         .plan-card-current { box-shadow: 0 0 0 2px var(--olive); }
         .plan-price { font:600 28px/1 var(--font-sans); }
         .plan-price span { font-size: 15px; font-weight:500; }
-        .billing-toggle { justify-self: start; }
         .plan-features { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
         .plan-features li { display: flex; gap: 8px; align-items: flex-start; }
         .plan-features :global(.lucide) { color: var(--olive-ink); margin-top: 2px; }

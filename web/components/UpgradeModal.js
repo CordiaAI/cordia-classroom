@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, getToken, LIMIT_EVENT, UPGRADE_EVENT } from '../lib/api';
-import { FEATURE_COPY, FREE_SUMMARY, PRICES, PRO_BENEFITS, PRO_NAME, resetLabel } from '../lib/plans';
+import { FEATURE_COPY, FREE_SUMMARY, TIERS, isPaid, resetLabel, tierName } from '../lib/plans';
 
 // One upgrade window for the whole app. It opens when:
 //   - any API call returns 402 limit_reached (lib/api.js fires LIMIT_EVENT)
 //   - any button calls openUpgrade()                (UPGRADE_EVENT)
 //   - a 7-day trial has ended and the student hasn't been asked yet (on load)
 // It also confirms a Checkout that returned to a page other than Settings.
+// Free and trial students choose Pro or Academic Weapon; a Pro student can move up to
+// Academic Weapon on the subscription they already have (/billing/change-plan).
+// Features only Academic Weapon raises, so their upgrade window starts on it.
+const WEAPON_FEATURES = new Set(['visual']);
 // "You've used all 1 practice sets this month." reads oddly; say it the way a person would.
 function limitMessage(message = '') {
   return message.replace(/You've used all 1 ([A-Za-z ]+?)(?:zes|s) this month\./, (match, label) => `You've used your free ${match.includes('zes') ? `${label}z` : label}.`);
@@ -19,20 +23,25 @@ export default function UpgradeModal() {
   const [mode, setMode] = useState('limit'); // limit | upgrade | trial_ended
   const [limit, setLimit] = useState(null);
   const [status, setStatus] = useState(null);
-  const [interval, setPlanInterval] = useState('monthly');
+  const [tier, setTier] = useState('pro');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
 
   const loadStatus = useCallback(async () => {
     const data = await apiFetch('/billing/status');
-    if (data?.plan) setStatus(data);
+    if (data?.plan) {
+      setStatus(data);
+      // A Pro student can only move up, so their window always offers Academic Weapon.
+      if (data.tier === 'pro' && !data.on_trial) setTier('weapon');
+    }
     return data;
   }, []);
 
   const show = useCallback((nextMode, detail) => {
     setMode(nextMode);
     setLimit(detail || null);
+    setTier(detail?.upgrade_tier || detail?.tier_choice || (WEAPON_FEATURES.has(detail?.feature) ? 'weapon' : 'pro'));
     setError('');
     setOpen(true);
     loadStatus();
@@ -40,7 +49,7 @@ export default function UpgradeModal() {
 
   useEffect(() => {
     const onLimit = event => show('limit', event.detail);
-    const onUpgrade = event => show(event.detail?.feature ? 'limit' : 'upgrade', event.detail?.feature ? event.detail : null);
+    const onUpgrade = event => show(event.detail?.feature ? 'limit' : 'upgrade', event.detail || null);
     window.addEventListener(LIMIT_EVENT, onLimit);
     window.addEventListener(UPGRADE_EVENT, onUpgrade);
     return () => {
@@ -74,7 +83,7 @@ export default function UpgradeModal() {
     }
     apiFetch('/billing/confirm-checkout', { method: 'POST', body: JSON.stringify({ session_id: sessionId }) })
       .then(data => {
-        setToast(data?.plan === 'classroom_plus' ? `${PRO_NAME} is active. Try that again.` : 'We are still confirming your payment. Refresh in a minute.');
+        setToast(isPaid(data) ? `${tierName(data.tier)} is active. Try that again.` : 'We are still confirming your payment. Refresh in a minute.');
         if (data?.plan) setStatus(data);
         clean();
       });
@@ -90,7 +99,7 @@ export default function UpgradeModal() {
     setError('');
     const data = await apiFetch('/billing/create-checkout-session', {
       method: 'POST',
-      body: JSON.stringify({ interval, return_path: router.asPath.split('?')[0] }),
+      body: JSON.stringify({ tier, return_path: router.asPath.split('?')[0] }),
     });
     if (data?.url) {
       if (mode === 'trial_ended') apiFetch('/billing/trial-prompt-seen', { method: 'POST' });
@@ -101,14 +110,28 @@ export default function UpgradeModal() {
     setBusy('');
   }
 
+  async function switchTier() {
+    setBusy('switch');
+    setError('');
+    const data = await apiFetch('/billing/change-plan', { method: 'POST', body: JSON.stringify({ tier }) });
+    if (data?.tier === tier) {
+      setStatus(data);
+      setOpen(false);
+      setToast(`You're on ${tierName(tier)} now. Try that again.`);
+    } else {
+      setError(apiErrorMessage(data?.detail, 'Your plan could not be changed. Please try again.'));
+    }
+    setBusy('');
+  }
+
   async function startTrial() {
     setBusy('trial');
     setError('');
     const data = await apiFetch('/billing/start-trial', { method: 'POST' });
-    if (data?.plan === 'classroom_plus') {
+    if (isPaid(data)) {
       setStatus(data);
       setOpen(false);
-      setToast(`Your 7-day ${PRO_NAME} trial has started. No card needed. It ends on its own.`);
+      setToast('Your 7-day Academic Weapon trial has started. No card needed. It ends on its own.');
     } else {
       setError(apiErrorMessage(data?.detail, 'The trial could not start. Please try again.'));
     }
@@ -116,29 +139,36 @@ export default function UpgradeModal() {
   }
 
   const copy = limit?.feature ? FEATURE_COPY[limit.feature] : null;
-  const isPro = status?.plan === 'classroom_plus';
+  const isPro = isPaid(status);
   const onTrial = Boolean(status?.on_trial);
+  const paidNow = isPro && !onTrial;
+  const atTop = paidNow && status?.tier === 'weapon';
+  const canSwitch = paidNow && status?.tier === 'pro';
   const canTrial = Boolean(status?.trial_available) && mode !== 'trial_ended';
-  const price = PRICES[interval];
+  const chosen = TIERS[tier];
   const trialEnds = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     .toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
-  let title = `Upgrade to ${PRO_NAME}`;
-  let body = 'Get more out of every class.';
+  let title = canSwitch ? 'Upgrade to Academic Weapon' : 'Upgrade CordiaClassroom';
+  let body = canSwitch ? 'Everything in Pro, plus higher limits on the expensive tools.' : 'Get more out of every class.';
+  const resets = resetLabel(limit?.resets_at);
   if (mode === 'trial_ended') {
-    title = 'Your Pro trial has ended';
-    body = 'You are back on the free plan. Nothing was charged. Want to keep Pro?';
+    title = 'Your Academic Weapon trial has ended';
+    body = 'You are back on the free plan. Nothing was charged. Want to keep going?';
   } else if (mode === 'limit' && isPro && limit?.plan === 'free') {
     // The limit was hit under the free plan, but the status check just found (or
-    // reconnected) the student's Pro subscription.
-    title = `Your ${PRO_NAME} plan is active`;
+    // reconnected) the student's subscription.
+    title = `Your ${tierName(status?.tier)} plan is active`;
     body = 'We found your subscription and connected it to this account. Close this and try that again.';
+  } else if (mode === 'limit' && atTop) {
+    title = copy?.title || "You've reached this month's limit";
+    body = `You've reached this month's fair-use limit for ${copy?.label || 'this feature'}. It resets ${resets}.`;
+  } else if (mode === 'limit' && canSwitch) {
+    title = copy?.title || "You've reached this month's Pro limit";
+    body = `${limitMessage(limit?.message)} Academic Weapon raises it now, or it resets ${resets}.`.trim();
   } else if (mode === 'limit') {
     title = copy?.title || "You've reached a free limit";
-    const resets = resetLabel(limit?.resets_at);
-    body = isPro && !onTrial
-      ? `You've reached this month's fair-use limit for ${copy?.label || 'this feature'}. It resets ${resets}.`
-      : `${limitMessage(limit?.message)}${resets ? ` Your free plan resets ${resets}.` : ''}`.trim();
+    body = `${limitMessage(limit?.message)}${resets ? ` Your free plan resets ${resets}.` : ''}`.trim();
   }
 
   return (
@@ -152,32 +182,49 @@ export default function UpgradeModal() {
             <button className="upgrade-close" aria-label="Close" onClick={close}>×</button>
             <h3 id="upgrade-title">{title}</h3>
             <p className="upgrade-body">{body}</p>
-            {copy?.pro && !(isPro && !onTrial) && <p className="upgrade-highlight">With Pro: {copy.pro}.</p>}
+            {copy?.pro && !atTop && <p className="upgrade-highlight">{copy.pro}.</p>}
 
-            {!(isPro && !onTrial) && (
+            {canSwitch && (
               <>
                 <ul className="upgrade-benefits">
-                  {PRO_BENEFITS.map(item => <li key={item}>{item}</li>)}
+                  {TIERS.weapon.benefits.map(item => <li key={item}>{item}</li>)}
                 </ul>
-                <div className="upgrade-intervals" role="radiogroup" aria-label="Billing">
-                  {Object.entries(PRICES).map(([key, option]) => (
+                {error && <div className="upgrade-error">{error}</div>}
+                <div className="upgrade-actions">
+                  <button className="btn-upgrade" onClick={switchTier} disabled={Boolean(busy)}>
+                    {busy === 'switch' ? 'Switching...' : `Switch to Academic Weapon · ${TIERS.weapon.price}/${TIERS.weapon.per}`}
+                  </button>
+                  <button className="upgrade-later" onClick={close}>Not now</button>
+                </div>
+                <p className="upgrade-fineprint">You pay only the difference for the rest of this month, on the card you already use.</p>
+              </>
+            )}
+
+            {!paidNow && (
+              <>
+                <div className="upgrade-tiers" role="radiogroup" aria-label="Plan">
+                  {Object.entries(TIERS).map(([key, option]) => (
                     <button
                       key={key}
                       role="radio"
-                      aria-checked={interval === key}
-                      className={interval === key ? 'active' : ''}
-                      onClick={() => setPlanInterval(key)}
+                      aria-checked={tier === key}
+                      className={tier === key ? 'active' : ''}
+                      onClick={() => setTier(key)}
                     >
-                      <strong>{option.price}</strong> / {option.per}
-                      {option.note && <span>{option.note}</span>}
+                      <strong>{option.name}</strong>
+                      <span>{option.price} / {option.per}</span>
                     </button>
                   ))}
                 </div>
+                <p className="upgrade-pitch">{chosen.pitch}</p>
+                <ul className="upgrade-benefits">
+                  {chosen.benefits.map(item => <li key={item}>{item}</li>)}
+                </ul>
                 {error && <div className="upgrade-error">{error}</div>}
                 {canTrial && (
                   <p className="upgrade-highlight">
-                    Your free 7-day Pro trial ends on <strong>{trialEnds}</strong>. It will <strong>not</strong> start a paid
-                    subscription. When it ends you go back to the Free plan and lose Pro features. No card needed.
+                    Try Academic Weapon free for 7 days. It ends on <strong>{trialEnds}</strong> and will <strong>not</strong> start a paid
+                    subscription: you go back to Free. No card needed.
                   </p>
                 )}
                 <div className="upgrade-actions">
@@ -187,7 +234,7 @@ export default function UpgradeModal() {
                     </button>
                   )}
                   <button className={canTrial ? 'btn-outline' : 'btn-upgrade'} onClick={checkout} disabled={Boolean(busy)}>
-                    {busy === 'checkout' ? 'Opening secure checkout...' : `${canTrial ? 'Or subscribe now' : 'Get Pro'} · ${price.price}/${price.per}`}
+                    {busy === 'checkout' ? 'Opening secure checkout...' : `${canTrial ? 'Or subscribe now' : `Get ${chosen.name}`} · ${chosen.price}/${chosen.per}`}
                   </button>
                   <button className="upgrade-later" onClick={close}>Not now</button>
                 </div>
@@ -213,10 +260,11 @@ export default function UpgradeModal() {
         .upgrade-highlight { margin: 0 0 12px; font-weight:600; }
         .upgrade-benefits { margin: 0 0 16px; padding-left: 18px; }
         .upgrade-benefits li { margin: 4px 0; }
-        .upgrade-intervals { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
-        .upgrade-intervals button { border: 1.5px solid var(--line); background: transparent; border-radius:12px; padding: 10px; cursor: pointer; color: inherit; text-align: left; }
-        .upgrade-intervals button.active { border-color: var(--olive-ink); box-shadow: 0 0 0 2px color-mix(in srgb, var(--olive-ink) 25%, transparent); }
-        .upgrade-intervals span { display: block; font-size: 13px; color: var(--olive-ink); margin-top: 2px; }
+        .upgrade-tiers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .upgrade-tiers button { border: 1.5px solid var(--line); background: transparent; border-radius:12px; padding: 10px; cursor: pointer; color: inherit; text-align: left; }
+        .upgrade-tiers button.active { border-color: var(--olive-ink); box-shadow: 0 0 0 2px color-mix(in srgb, var(--olive-ink) 25%, transparent); }
+        .upgrade-tiers span { display: block; font-size: 13px; color: var(--olive-ink); margin-top: 2px; }
+        .upgrade-pitch { margin: 0 0 8px; color: var(--muted); }
         .upgrade-actions { display: flex; flex-direction: column; gap: 8px; }
         .upgrade-actions .btn-upgrade { width: 100%; padding: 12px; border: none; border-radius:12px; background: var(--olive); color: var(--on-olive); font-weight:600; cursor: pointer; }
         .upgrade-actions .btn-outline { width: 100%; padding: 11px; }

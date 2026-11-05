@@ -1,9 +1,12 @@
-"""Stripe billing for CordiaClassroom Pro.
+"""Stripe billing for CordiaClassroom.
 
-Plans:  Pro Monthly $9.99 (lookup key classroom_pro_monthly)
-        Pro Semester $29 / 4 months (lookup key classroom_pro_semester)
-Trial:  7 days, no card, one per account. Created server-side and set to cancel
-        itself at trial end, so it can never turn into a charge on its own.
+Tiers:  Classroom Pro $4.99/month (lookup key classroom_pro_499_monthly)
+        Academic Weapon $9.99/month (lookup key classroom_aw_monthly)
+        Older prices (classroom_pro_monthly, classroom_pro_semester) still map to a tier so
+        existing subscriptions keep working.
+Trial:  7 days of Academic Weapon, no card, one per account. Created server-side and set to
+        cancel itself at trial end, so it can never turn into a charge on its own.
+Switch: a paid student changes tier on the same subscription (/billing/change-plan).
 Promo:  Codes live only in the Stripe dashboard and are entered at Checkout
         (allow_promotion_codes). Never write a code into this repository.
 
@@ -28,25 +31,37 @@ from auth_utils import get_user_id
 from database import get_supabase
 from services.entitlements import (
     ACTIVE_STATUSES,
+    PAID_TIERS,
     PRO,
+    STORED_PLAN,
+    TIERS,
     TRIAL_DAYS,
+    TRIAL_TIER,
     entitlement,
     plan_for,
     subscription_row,
+    tier_for,
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/billing", tags=["billing"])
 
-Interval = Literal["monthly", "semester"]
-LOOKUP_KEYS = {"monthly": "classroom_pro_monthly", "semester": "classroom_pro_semester"}
-PRICE_ENV = {"monthly": "STRIPE_PRO_MONTHLY_PRICE_ID", "semester": "STRIPE_PRO_SEMESTER_PRICE_ID"}
+Tier = Literal["pro", "weapon"]
+LOOKUP_KEYS = {"pro": "classroom_pro_499_monthly", "weapon": "classroom_aw_monthly"}
+PRICE_ENV = {"pro": "STRIPE_PRO_PRICE_ID", "weapon": "STRIPE_WEAPON_PRICE_ID"}
+# Prices from the single $9.99 plan. Nobody can buy them any more; a subscription on one
+# keeps every feature it paid for.
+LEGACY_LOOKUP_KEYS = {"classroom_pro_monthly": "weapon", "classroom_pro_semester": "weapon"}
 _price_cache: dict = {}
 
 
 class CheckoutRequest(BaseModel):
-    interval: Interval = "monthly"
+    tier: Tier = "pro"
     return_path: Optional[str] = Field(default=None, max_length=300)
+
+
+class ChangePlanRequest(BaseModel):
+    tier: Tier
 
 
 class ConfirmCheckoutRequest(BaseModel):
@@ -94,25 +109,34 @@ def _plain(value) -> dict:
     return dict(value)
 
 
-def _price_id(interval: str) -> str:
+def _price_id(tier: str) -> str:
     """Env override first, otherwise resolve the Stripe lookup key once and cache it."""
-    configured = os.getenv(PRICE_ENV[interval])
+    configured = os.getenv(PRICE_ENV[tier])
     if configured:
         return configured
-    if interval not in _price_cache:
-        prices = _stripe().Price.list(lookup_keys=[LOOKUP_KEYS[interval]], active=True, limit=1)
+    if tier not in _price_cache:
+        prices = _stripe().Price.list(lookup_keys=[LOOKUP_KEYS[tier]], active=True, limit=1)
         if not prices.data:
             raise HTTPException(status_code=503, detail="Billing not configured")
-        _price_cache[interval] = prices.data[0].id
-    return _price_cache[interval]
+        _price_cache[tier] = prices.data[0].id
+    return _price_cache[tier]
 
 
-def _interval_of(price: dict) -> Optional[str]:
-    """Which Pro plan a Stripe price is, matched exactly by lookup key or configured id."""
-    for name, key in LOOKUP_KEYS.items():
-        if price.get("lookup_key") == key or (price.get("id") and price.get("id") == os.getenv(PRICE_ENV[name])):
-            return name
-    return None
+def _tier_of(price: dict) -> Optional[str]:
+    """Which paid tier a Stripe price is, matched exactly by lookup key or configured id."""
+    key = price.get("lookup_key")
+    for tier, lookup_key in LOOKUP_KEYS.items():
+        if key == lookup_key or (price.get("id") and price.get("id") == os.getenv(PRICE_ENV[tier])):
+            return tier
+    return LEGACY_LOOKUP_KEYS.get(key)
+
+
+def _subscription_tier(subscription: dict) -> Optional[str]:
+    """The tier a subscription pays for: its price first, then the tier written into its metadata."""
+    items = (subscription.get("items") or {}).get("data") or []
+    tier = _tier_of((items[0] if items else {}).get("price") or {})
+    metadata_tier = (subscription.get("metadata") or {}).get("tier")
+    return tier or (metadata_tier if metadata_tier in PAID_TIERS else None)
 
 
 def _iso(ts) -> Optional[str]:
@@ -157,23 +181,24 @@ _last_sync: dict = {}
 
 def _pro_product_ids() -> set:
     ids = set()
-    for interval in LOOKUP_KEYS:
+    for tier in LOOKUP_KEYS:
         try:
-            product = _stripe().Price.retrieve(_price_id(interval)).product
+            product = _stripe().Price.retrieve(_price_id(tier)).product
             ids.add(product if isinstance(product, str) else product.id)
-        except stripe.StripeError:
-            logger.warning("Could not resolve the %s Pro product", interval, exc_info=True)
+        except (stripe.StripeError, HTTPException):
+            logger.warning("Could not resolve the %s product", tier, exc_info=True)
     return ids
 
 
 def _is_pro_subscription(subscription: dict, pro_products: set) -> bool:
+    """Whether a subscription is for Classroom at all (any paid tier)."""
     if (subscription.get("metadata") or {}).get("product") == PRO:
         return True
     for item in (subscription.get("items") or {}).get("data") or []:
         price = item.get("price") or {}
         product = price.get("product")
         product = product if isinstance(product, str) else (product or {}).get("id")
-        if _interval_of(price) or product in pro_products:
+        if _tier_of(price) or product in pro_products:
             return True
     return False
 
@@ -226,14 +251,19 @@ def _upsert_from_subscription(subscription: dict, user_id: str) -> None:
     items = (subscription.get("items") or {}).get("data") or []
     item = items[0] if items else {}
     is_trial = (subscription.get("metadata") or {}).get("kind") == "trial"
+    tier = TRIAL_TIER if is_trial else _subscription_tier(subscription)
+    if tier is None:
+        # A Classroom subscription on a price this code doesn't know: never guess a cheaper tier.
+        logger.error("Subscription %s has no known Classroom price; treating it as Academic Weapon", subscription.get("id"))
+        tier = "weapon"
     row = {
         "user_id": user_id,
         "source": "stripe",
-        "plan": PRO,
+        "plan": STORED_PLAN[tier],
         "status": subscription.get("status"),
         "stripe_customer_id": subscription.get("customer"),
         "stripe_subscription_id": subscription.get("id"),
-        "billing_interval": None if is_trial else _interval_of(item.get("price") or {}),
+        "billing_interval": None if is_trial else "monthly",
         "current_period_start": _iso(subscription.get("current_period_start") or item.get("current_period_start")),
         "current_period_end": _iso(subscription.get("current_period_end") or item.get("current_period_end")),
         "cancel_at_period_end": bool(subscription.get("cancel_at_period_end")) and not is_trial,
@@ -331,14 +361,15 @@ def create_checkout_session(body: CheckoutRequest, authorization: str = Header(d
         row = subscription_row(user_id)
     on_trial = bool(row and row.get("status") == "trialing" and row.get("pro_trial_started_at"))
     if plan_for(row) == "pro" and not on_trial:
-        raise HTTPException(status_code=409, detail="Pro is already active on this account. Refresh the page.")
+        # A paid student switches tier on the subscription they have, never with a second one.
+        raise HTTPException(status_code=409, detail="You already have a paid plan. Change it from Settings > Subscription.")
 
     return_path = _safe_path(body.return_path, "/settings?section=subscription")
     sep = "&" if "?" in return_path else "?"
-    metadata = {"user_id": user_id, "product": PRO, "interval": body.interval}
+    metadata = {"user_id": user_id, "product": PRO, "tier": body.tier}
     params = {
         "mode": "subscription",
-        "line_items": [{"price": _price_id(body.interval), "quantity": 1}],
+        "line_items": [{"price": _price_id(body.tier), "quantity": 1}],
         "success_url": f"{_frontend()}{return_path}{sep}billing=success&session_id={{CHECKOUT_SESSION_ID}}",
         "cancel_url": f"{_frontend()}{return_path}{sep}billing=cancelled",
         "client_reference_id": user_id,
@@ -352,9 +383,54 @@ def create_checkout_session(body: CheckoutRequest, authorization: str = Header(d
     return {"url": _stripe().checkout.Session.create(**params).url}
 
 
+@router.post("/change-plan")
+def change_plan(body: ChangePlanRequest, authorization: str = Header(default="")):
+    """Move a paid subscription between Classroom Pro and Academic Weapon.
+
+    Upgrading charges the prorated difference now and only takes effect once that payment
+    succeeds. Downgrading credits the unused part of the month to the next invoice.
+    """
+    user_id = get_user_id(authorization)
+    row = subscription_row(user_id) or {}
+    current = tier_for(row)
+    subscription_id = row.get("stripe_subscription_id")
+    on_trial = row.get("status") == "trialing" and row.get("pro_trial_started_at")
+    if current == "free" or on_trial or not subscription_id:
+        raise HTTPException(status_code=409, detail="Choose a plan at checkout first.")
+    if current == body.tier:
+        return entitlement(user_id)
+
+    api = _stripe()
+    subscription = _plain(api.Subscription.retrieve(subscription_id))
+    items = (subscription.get("items") or {}).get("data") or []
+    if not items:
+        raise HTTPException(status_code=409, detail="This subscription can't be changed here. Email support@cordiaai.io.")
+    upgrade = TIERS.index(body.tier) > TIERS.index(current)
+    try:
+        updated = api.Subscription.modify(
+            subscription_id,
+            items=[{"id": items[0]["id"], "price": _price_id(body.tier)}],
+            proration_behavior="always_invoice" if upgrade else "create_prorations",
+            # A declined card leaves the student on their current tier instead of half-switched.
+            payment_behavior="pending_if_incomplete",
+            cancel_at_period_end=False,
+            metadata={**(subscription.get("metadata") or {}), "user_id": user_id, "product": PRO, "tier": body.tier},
+        )
+    except stripe.error.CardError as exc:
+        raise HTTPException(status_code=402, detail=exc.user_message or "Your card was declined, so your plan didn't change.")
+    except stripe.StripeError as exc:
+        logger.error("Plan change failed for user %s: %s", user_id[:8], exc)
+        raise HTTPException(status_code=502, detail="Your plan couldn't be changed right now. Please try again in a minute.")
+    updated = _plain(updated)
+    if updated.get("pending_update"):
+        raise HTTPException(status_code=402, detail="The payment for the upgrade didn't go through, so your plan didn't change. Update your card and try again.")
+    _upsert_from_subscription(updated, user_id)
+    return entitlement(user_id)
+
+
 @router.post("/start-trial")
 def start_trial(authorization: str = Header(default="")):
-    """7-day Pro trial, no card. It cancels itself at the end; it never bills."""
+    """7-day Academic Weapon trial, no card. It cancels itself at the end; it never bills."""
     user_id = get_user_id(authorization)
     row = subscription_row(user_id)
     if plan_for(row) != "pro" and sync_pro_from_stripe(user_id, force=True):
@@ -368,11 +444,11 @@ def start_trial(authorization: str = Header(default="")):
         customer_id = _ensure_customer(user_id, _user_email(user_id))
         subscription = _stripe().Subscription.create(
             customer=customer_id,
-            items=[{"price": _price_id("monthly")}],
+            items=[{"price": _price_id(TRIAL_TIER)}],
             trial_period_days=TRIAL_DAYS,
             cancel_at_period_end=True,
             trial_settings={"end_behavior": {"missing_payment_method": "cancel"}},
-            metadata={"user_id": user_id, "product": PRO, "kind": "trial"},
+            metadata={"user_id": user_id, "product": PRO, "kind": "trial", "tier": TRIAL_TIER},
         )
     except stripe.StripeError as e:
         logger.error(f"Trial could not start for user {user_id[:8]}: {e}")
