@@ -395,21 +395,6 @@ function SettingsTab({ room, onToast, onSaved, onGone }) {
   );
 }
 
-// This device's memory for the Study tab: guides left out of the round, and a test date kept here
-// while the server can't save one yet (before migration 20261116120000).
-const studyKey = id => 'cordia.classroom-study.' + id;
-function readStudyPrefs(id) {
-  try {
-    const saved = JSON.parse(window.localStorage.getItem(studyKey(id)) || '{}');
-    return { left: Array.isArray(saved.left) ? saved.left : [], date: typeof saved.date === 'string' ? saved.date : '' };
-  } catch {
-    return { left: [], date: '' };
-  }
-}
-function writeStudyPrefs(id, prefs) {
-  try { window.localStorage.setItem(studyKey(id), JSON.stringify(prefs)); } catch { /* private window: not remembered */ }
-}
-
 function localToday() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -425,31 +410,26 @@ function whenText(date) {
 }
 
 // Study the classroom: pick its guides, then one mixed round across them (session.js). Each guide
-// also has its own Learn. The test date is yours, or the nearest milestone.
+// also has its own Learn. The test date is yours (saved on the server once migration 20261116120000
+// runs; until then it lasts this visit), or the nearest milestone. Nothing here is kept on the device.
 function StudyTab({ room, onToast }) {
   const [data, setData] = useState(null);
   const [left, setLeft] = useState([]);
   const [ownDate, setOwnDate] = useState('');
   useEffect(() => {
-    const prefs = readStudyPrefs(room.id);
-    setLeft(prefs.left);
     classroomStudy(room.id).then(result => {
       setData(result && Array.isArray(result.guides) ? result : { guides: [], skipped: 0 });
-      setOwnDate(result?.test_date || prefs.date || '');
+      setOwnDate(result?.test_date || '');
     });
   }, [room.id]);
 
   function toggle(guideId, on) {
-    const next = on ? left.filter(item => item !== guideId) : [...left, guideId];
-    setLeft(next);
-    writeStudyPrefs(room.id, { ...readStudyPrefs(room.id), left: next });
+    setLeft(current => (on ? current.filter(item => item !== guideId) : [...current, guideId]));
   }
 
   async function saveDate(value) {
     setOwnDate(value);
     const result = await setTestDate(room.id, value);
-    // Saved on the server, or (before the update that adds it) kept on this device.
-    writeStudyPrefs(room.id, { ...readStudyPrefs(room.id), date: result?.detail ? value : '' });
     onToast(result?.detail || (value ? 'Test date saved' : 'Test date cleared'));
   }
 

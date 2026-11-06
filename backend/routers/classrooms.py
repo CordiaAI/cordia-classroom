@@ -369,7 +369,7 @@ def my_settings(classroom_id: str, body: MySettings, authorization: str = Header
         try:
             db.table("classroom_members").update(change).eq("classroom_id", room["id"]).eq("user_id", user_id).execute()
         except Exception:  # before migration 20261116120000 (study_test_date)
-            raise HTTPException(status_code=503, detail="Saving a test date needs an update on our side. It's kept on this device for now.")
+            raise HTTPException(status_code=503, detail="Saving a test date needs an update on our side. It's used for this visit only.")
     return {key.replace("study_", ""): value for key, value in change.items()}
 
 
