@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ImagePlus, X } from 'lucide-react';
+import { Check, ImagePlus, Monitor, X } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
 import { apiFetch } from '../lib/api';
@@ -27,6 +27,63 @@ function currentPageContext(router) {
   };
 }
 
+// Background layers split at top-level commas (gradients have commas inside them).
+function backgroundLayers(value) {
+  const layers = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    if (value[i] === '(') depth += 1;
+    else if (value[i] === ')') depth -= 1;
+    else if (value[i] === ',' && depth === 0) { layers.push(value.slice(start, i).trim()); start = i + 1; }
+  }
+  layers.push(value.slice(start).trim());
+  return layers.filter(Boolean);
+}
+
+// The glass grain is an inline SVG texture that comes out solid black in a captured picture, so
+// it's left off the page while the picture is taken (it's under the panel's scrim) and put back.
+function hideGrain() {
+  const changed = [];
+  for (const el of [document.documentElement, document.body, ...document.body.querySelectorAll('*')]) {
+    if (el.closest('[data-feedback-skip]')) continue;
+    const image = getComputedStyle(el).backgroundImage;
+    if (!image || !image.includes('url("data:image/svg')) continue;
+    changed.push([el, el.style.getPropertyValue('background-image'), el.style.getPropertyPriority('background-image')]);
+    // Important, so it wins over the glass styles that are themselves !important.
+    el.style.setProperty('background-image', backgroundLayers(image).filter(layer => !layer.startsWith('url(')).join(', ') || 'none', 'important');
+  }
+  return () => changed.forEach(([el, value, priority]) => {
+    if (value) el.style.setProperty('background-image', value, priority);
+    else el.style.removeProperty('background-image');
+  });
+}
+
+// A picture of the page behind the panel, as it is on screen. The feedback panel is left out
+// (it carries data-feedback-skip). Gives up after 10 seconds.
+async function capturePage() {
+  const { toBlob } = await import('html-to-image');
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const restore = hideGrain();
+  try {
+    const capture = toBlob(document.body, {
+      width,
+      height,
+      pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+      backgroundColor: getComputedStyle(document.body).backgroundColor,
+      style: { transform: `translate(${-window.scrollX}px, ${-window.scrollY}px)`, transformOrigin: 'top left' },
+      filter: node => !(node instanceof HTMLElement && node.dataset.feedbackSkip !== undefined),
+    });
+    const timeout = new Promise((_, reject) => window.setTimeout(() => reject(new Error('timeout')), 10000));
+    const blob = await Promise.race([capture, timeout]);
+    if (!blob) throw new Error('empty');
+    return new File([blob], 'page.png', { type: 'image/png' });
+  } finally {
+    restore();
+  }
+}
+
 // initialCategory / initialMessage: a starting point (e.g. reporting a profile), still editable.
 export default function FeedbackModal({ onClose, initialCategory = 'bug', initialMessage = '' }) {
   const router = useRouter();
@@ -42,6 +99,20 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
   const [shots, setShots] = useState([]);
   const [shotError, setShotError] = useState('');
   const fileRef = useRef(null);
+  const [capturing, setCapturing] = useState(false);
+
+  async function addPageCapture() {
+    if (capturing || shots.length >= MAX_SHOTS) return;
+    setCapturing(true);
+    setShotError('');
+    try {
+      await addShots([await capturePage()]);
+    } catch {
+      setShotError("This page couldn't be captured. Add a screenshot instead.");
+    } finally {
+      setCapturing(false);
+    }
+  }
 
   async function addShots(files) {
     const images = [...files].filter(file => file?.type?.startsWith('image/')).slice(0, MAX_SHOTS - shots.length);
@@ -143,7 +214,7 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
 
   return (
     <BodyPortal>
-    <div className="feedback-overlay" onMouseDown={event => {
+    <div className="feedback-overlay" data-feedback-skip="" onMouseDown={event => {
       if (event.target === event.currentTarget) onClose();
     }}>
       <section
@@ -199,18 +270,23 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
                 </div>
               ))}
               {shots.length < MAX_SHOTS && (
-                <button type="button" className="c-btn c-btn--secondary c-btn--sm feedback-add-shot" onClick={() => fileRef.current?.click()}>
-                  <ImagePlus size={16} strokeWidth={1.75} aria-hidden="true" />Add screenshot
-                </button>
+                <>
+                  <button type="button" className="c-btn c-btn--secondary c-btn--sm feedback-add-shot" onClick={addPageCapture} disabled={capturing} aria-busy={capturing}>
+                    <Monitor size={16} strokeWidth={1.75} aria-hidden="true" />{capturing ? 'Capturing…' : 'Capture this page'}
+                  </button>
+                  <button type="button" className="c-btn c-btn--secondary c-btn--sm feedback-add-shot" onClick={() => fileRef.current?.click()}>
+                    <ImagePlus size={16} strokeWidth={1.75} aria-hidden="true" />Add screenshot
+                  </button>
+                </>
               )}
               <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={event => { addShots(event.target.files || []); event.target.value = ''; }} />
             </div>
-            <p className="feedback-context">Paste or drop a screenshot here too. The page you're on is included; query details and private tokens are not.</p>
+            <p className="feedback-context">Capture this page attaches a picture of the screen behind this panel, without the panel. You can also paste or drop a screenshot. The page's address is included; query details and private tokens are not.</p>
             {shotError && <p className="feedback-error" role="alert">{shotError}</p>}
             {error && <p className="feedback-error" role="alert">{error}</p>}
             <div className="feedback-actions">
               <button type="button" className="feedback-cancel" onClick={onClose}>Cancel</button>
-              <button type="submit" className="c-btn c-btn--primary feedback-submit" disabled={submitting || !message.trim() || shots.some(shot => shot.status === 'uploading')}>
+              <button type="submit" className="c-btn c-btn--primary feedback-submit" disabled={submitting || capturing || !message.trim() || shots.some(shot => shot.status === 'uploading')}>
                 {submitting ? 'Sending…' : 'Send feedback'}
               </button>
             </div>
