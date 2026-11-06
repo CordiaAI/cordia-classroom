@@ -3,6 +3,7 @@ import CordiaLoader, { LoadingArea, Reveal, useLoadGate } from '../../components
 import { useRouter } from 'next/router';
 import { apiFetch, openUpgrade } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
+import { LEARN_LADDER_V2 } from '../../lib/featureFlags';
 import useSessionTracker from '../../lib/useSessionTracker';
 import { PRO_TYPES, TYPE_LABELS } from '../../lib/retainEngine.mjs';
 import { ArrowLeft, Lock, ListChecks, PenLine, Play, RefreshCw, Repeat, TextCursorInput, Shuffle as PairsIcon, Timer } from 'lucide-react';
@@ -22,6 +23,14 @@ const MODES = {
 };
 const STORAGE_KEY = 'retainTypes';
 const listTypes = types => types.map(type => MODES[type]?.label || type).join(' and ');
+
+// Learn's Final check in the last days before a test (LEARN_LADDER_V2) links ?types=mc,fill etc. so
+// the quiz leans to the test's format; used for this visit only, never saved over the student's picks.
+function linkedTypes(query) {
+  if (!LEARN_LADDER_V2 || typeof query !== 'string') return null;
+  const picked = [...new Set(query.split(',').filter(type => TYPE_LABELS[type] && type !== 'matching'))];
+  return picked.length ? picked : null;
+}
 
 function rememberedTypes() {
   try {
@@ -54,7 +63,7 @@ export default function QuizPage() {
 
   useEffect(() => {
     if (!ready || !guideId) return;
-    setTypes(rememberedTypes());
+    setTypes(linkedTypes(router.query.types) || rememberedTypes());
     // Title, past scores and plan arrive together, so the page appears once, whole.
     const safe = promise => promise.catch(() => null);
     Promise.all([safe(apiFetch(`/quiz/${guideId}/history`)), safe(apiFetch(`/guides/${guideId}`)), safe(apiFetch('/billing/status'))]).then(async ([past, guide, billing]) => {
@@ -80,6 +89,11 @@ export default function QuizPage() {
 
   // A remembered Pro type the account can no longer use is turned off rather than failing on Start.
   useEffect(() => {
+    // A linked Final check without Fill in the blank left uses Written instead, as Learn does.
+    if (proLocked && linkedTypes(router.query.types)) {
+      setTypes(current => [...new Set(current.map(type => (type === 'fill' ? 'written' : type)).filter(type => !PRO_TYPES.includes(type)))]);
+      return;
+    }
     if (proLocked) setTypes(current => (current.some(type => !PRO_TYPES.includes(type)) ? current.filter(type => !PRO_TYPES.includes(type)) : ['mc']));
   }, [proLocked]);
 

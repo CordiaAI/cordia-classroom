@@ -32,8 +32,11 @@ export async function saveStudyResults(guideId, before, { known = [], missed = [
 }
 
 // Learn's levels after a round or a test-date change: only the ideas that changed since `saved`.
+// body.test_format (LEARN_LADDER_V2) rides along; the database merge keeps it once migration
+// 20261111130000 runs, and Learn re-saves it on its own until then.
 export async function saveLearnLevels(guideId, saved, body) {
-  const merged = await merge(guideId, null, { levels: changedLevels(saved, body.levels), test_date: body.test_date ?? null });
+  const learn = { levels: changedLevels(saved, body.levels), test_date: body.test_date ?? null, ...(body.test_format ? { test_format: body.test_format } : {}) };
+  const merged = await merge(guideId, null, learn);
   if (merged) return merged;
   await apiFetch(`/guides/${guideId}/learn-progress`, { method: 'PATCH', body: JSON.stringify(body) });
   return null;
