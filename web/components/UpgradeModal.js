@@ -149,7 +149,7 @@ export default function UpgradeModal() {
   const trialEnds = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     .toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
-  let title = canSwitch ? 'Upgrade to Academic Weapon' : 'Upgrade CordiaClassroom';
+  let title = canSwitch ? 'Upgrade to Academic Weapon' : 'Upgrade Cordia Classroom';
   let body = canSwitch ? 'Everything in Pro, plus higher limits on the expensive tools.' : 'Get more out of every class.';
   const resets = resetLabel(limit?.resets_at);
   if (mode === 'trial_ended') {

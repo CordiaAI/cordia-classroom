@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { Check, X } from 'lucide-react';
 import AcademicInfinityMark from '../../components/AcademicInfinityMark';
+import BrandName from '../../components/BrandName';
 import { clearAuth, getToken, getUserEmail, tryRefreshToken } from '../../lib/api';
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '../../lib/supabase';
 import { PRIVACY_PATH, SUPPORT_EMAIL } from '../../lib/mcp/config.mjs';
@@ -81,7 +82,7 @@ export default function OAuthConsent() {
       <section className="consent" aria-labelledby="consent-title" aria-busy={state.step === 'loading'}>
         <div className="consent-brand" aria-hidden="true">
           <AcademicInfinityMark className="consent-mark" title="" />
-          <span>cordia</span>
+          <BrandName />
         </div>
 
         {state.step === 'loading' && <h1 id="consent-title" className="consent-title">Checking the request…</h1>}

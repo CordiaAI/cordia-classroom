@@ -63,7 +63,7 @@ export default function Pricing() {
 
   if (signedIn) return <div className="c-page">{plans}</div>;
   return (
-    <PublicPage title="Pricing — CordiaClassroom" description="CordiaClassroom Free, Pro and Academic Weapon plans." path="/pricing">
+    <PublicPage title="Pricing — Cordia Classroom" description="Cordia Classroom Free, Pro and Academic Weapon plans." path="/pricing">
       {plans}
     </PublicPage>
   );

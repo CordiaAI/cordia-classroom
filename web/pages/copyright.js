@@ -64,7 +64,7 @@ export default function Copyright() {
           <h3>Repeat infringers</h3>
           <p>We remove sharing access, and may close the accounts, of people who repeatedly share material that infringes copyright.</p>
           <h3>Designated agent</h3>
-          <p>Copyright Agent, CordiaClassroom · <a href={`mailto:${CONTACT}`}>{CONTACT}</a></p>
+          <p>Copyright Agent, Cordia Classroom · <a href={`mailto:${CONTACT}`}>{CONTACT}</a></p>
         </div>
       </section>
       <style jsx global>{`

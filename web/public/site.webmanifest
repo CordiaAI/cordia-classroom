@@ -1,6 +1,6 @@
 {
-  "name": "CordiaClassroom",
-  "short_name": "Classroom",
+  "name": "Cordia Classroom",
+  "short_name": "Cordia",
   "description": "Focused study guides, notes, flashcards, and practice from your course material.",
   "start_url": "/dashboard",
   "display": "standalone",
@@ -10,12 +10,6 @@
     {
       "src": "/cordia-classroom-icon.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon128.png",
-      "sizes": "128x128",
       "type": "image/png",
       "purpose": "any"
     }

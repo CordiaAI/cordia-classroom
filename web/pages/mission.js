@@ -5,16 +5,16 @@ export default function MissionPage() {
   const features = [
     {
       title: 'Instant Extraction',
-      description: 'Open your course material, click the CordiaClassroom icon, and use the Tutor side panel to capture the page or find related material. Cordia keeps the source attached to what it creates.',
+      description: 'Open your course material, click the Cordia Classroom icon, and use the Tutor side panel to capture the page or find related material. Cordia keeps the source attached to what it creates.',
     },
     {
       title: 'NCLEX Question Generation',
       subtitle: 'For nursing students',
-      description: 'CordiaClassroom turns the material you are learning into NCLEX-style questions, so nursing students can practice in the same format as their exams in a couple of clicks.',
+      description: 'Cordia Classroom turns the material you are learning into NCLEX-style questions, so nursing students can practice in the same format as their exams in a couple of clicks.',
     },
     {
       title: 'Only Your Class Material, Never the Web',
-      description: 'When you ask a general AI chatbot for a study guide, its questions and answers often come from somewhere other than your class. CordiaClassroom never searches the web: it uses only the material you captured, so everything you study comes from your own classes.',
+      description: 'When you ask a general AI chatbot for a study guide, its questions and answers often come from somewhere other than your class. Cordia Classroom never searches the web: it uses only the material you captured, so everything you study comes from your own classes.',
     },
     {
       title: 'One Cordia Tutor',
@@ -22,7 +22,7 @@ export default function MissionPage() {
     },
     {
       title: 'The Cost',
-      description: 'Start free with 3 study guides, 10 tutor prompts and 5 Explain views each month. CordiaClassroom Pro is $9.99 a month or $29 a semester. Try Pro free for 7 days with no card; the trial never turns into a charge on its own.',
+      description: 'Start free with 3 study guides, 10 tutor prompts and 5 Explain views each month. Cordia Classroom Pro is $9.99 a month or $29 a semester. Try Pro free for 7 days with no card; the trial never turns into a charge on its own.',
     },
     {
       title: 'Users Are "Cofounders"',
@@ -35,7 +35,7 @@ export default function MissionPage() {
     <div className="fade-in mission-page" style={{ width: 'min(var(--page-max), 100%)', margin: '0 auto' }}>
       <h1 style={{ marginBottom: 4 }}>Features</h1>
       <p style={{ color: 'var(--text-muted)', fontSize: 15, marginBottom: 28, lineHeight: 1.5 }}>
-        CordiaClassroom was built by a college student, for college students. Our mission is to make studying smarter, faster, and more accessible for every student — regardless of major or learning style.
+        Cordia Classroom was built by a college student, for college students. Our mission is to make studying smarter, faster, and more accessible for every student — regardless of major or learning style.
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

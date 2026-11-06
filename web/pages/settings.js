@@ -95,7 +95,7 @@ export default function SettingsPage() {
       setActiveSection('plan');
       const sessionId = typeof router.query.session_id === 'string' ? router.query.session_id : '';
       if (sessionId) {
-        setMessage('Confirming your CordiaClassroom subscription...');
+        setMessage('Confirming your Cordia Classroom subscription...');
         confirmCheckout(sessionId);
       } else {
         setMessage('Checkout returned without a confirmation reference. Checking your plan...');

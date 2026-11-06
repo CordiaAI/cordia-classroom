@@ -19,8 +19,8 @@ export default function PrivacyPolicy() {
         </p>
 
         <p style={{ marginBottom: '32px' }}>
-          CordiaClassroom ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy
-          explains how we collect, use, disclose, and safeguard your information when you use the CordiaClassroom
+          Cordia Classroom ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy
+          explains how we collect, use, disclose, and safeguard your information when you use the Cordia Classroom
           Chrome extension and web platform (collectively, the "Service"). Please read this policy carefully.
           By using the Service, you agree to the practices described herein.
         </p>
@@ -30,7 +30,7 @@ export default function PrivacyPolicy() {
           <p>When you create an account, we collect your email address and a hashed password, or your Google sign-in, or your phone number if you sign in with a texted code. We do not store plaintext passwords. Your phone number is used only to sign you in; sign-in codes are sent by our authentication provider's SMS service, and we do not send marketing texts.</p>
 
           <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>b. Page Content</strong></p>
-          <p>When you ask the Chrome side panel to capture a page, bounded visible study content is transmitted to our servers for AI processing. The most recent normalized capture, page title, and source URL are stored in your private Tutor session so the same Tutor can continue in CordiaClassroom. A capture may also be retained as study material when you choose to save it.</p>
+          <p>When you ask the Chrome side panel to capture a page, bounded visible study content is transmitted to our servers for AI processing. The most recent normalized capture, page title, and source URL are stored in your private Tutor session so the same Tutor can continue in Cordia Classroom. A capture may also be retained as study material when you choose to save it.</p>
           <p>If you connect a Canvas calendar feed, its private feed link is stored with your Classroom account so deadlines can reconnect automatically. It is used only by authenticated Classroom calendar routes, is never returned to the browser after saving, and is deleted when you disconnect the calendar.</p>
 
           <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>c. Generated Study Materials</strong></p>
@@ -94,22 +94,22 @@ export default function PrivacyPolicy() {
         </Section>
 
         <Section title="5. Chrome Extension — Data Practices">
-          <p>The CordiaClassroom Chrome extension:</p>
+          <p>The Cordia Classroom Chrome extension:</p>
           <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
             <li>Reads page content <strong style={{ color: 'var(--text-primary)' }}>only</strong> when you start a capture or explicitly ask the Tutor to capture the current page</li>
             <li>Sends a presence signal while the side panel is open so Classroom can show whether browser capture is available; that signal does not include the current URL or page title</li>
             <li>Does not monitor or collect your browsing history. The title, source URL, and bounded page context are sent only for the page you choose to capture</li>
             <li>Does not transmit browser cookies, passwords, form credentials, or unrestricted browser history</li>
             <li>Stores your authentication token locally using Chrome's storage API so you remain logged in between sessions</li>
-            <li>Sends extension data only to the <strong style={{ color: 'var(--text-primary)' }}>CordiaClassroom API</strong>; the service providers listed above may process that data to provide the requested feature</li>
+            <li>Sends extension data only to the <strong style={{ color: 'var(--text-primary)' }}>Cordia Classroom API</strong>; the service providers listed above may process that data to provide the requested feature</li>
           </ul>
         </Section>
 
         <Section id="connected-ai-apps" title="6. Connected AI Apps (Claude and Others)">
           {/* REVIEW: owner to review this section before it goes live. */}
           <p>
-            You can connect CordiaClassroom to an AI app that supports the Model Context Protocol, such as Claude. Nothing is
-            shared until you approve the connection on CordiaClassroom's consent page, which names the app and lists what it
+            You can connect Cordia Classroom to an AI app that supports the Model Context Protocol, such as Claude. Nothing is
+            shared until you approve the connection on Cordia Classroom's consent page, which names the app and lists what it
             will be able to do.
           </p>
           <p style={{ marginTop: '12px' }}><strong style={{ color: 'var(--text-primary)' }}>What a connected app can access.</strong> Your
@@ -120,12 +120,12 @@ export default function PrivacyPolicy() {
             Canvas or another learning management system (assignments, due dates, grades, announcements, rosters), your other
             connected accounts, your texting assistant, your payment details, or anyone else's account. It cannot delete anything
             or change your account, plan or settings.</p>
-          <p style={{ marginTop: '12px' }}><strong style={{ color: 'var(--text-primary)' }}>Your conversations.</strong> CordiaClassroom
+          <p style={{ marginTop: '12px' }}><strong style={{ color: 'var(--text-primary)' }}>Your conversations.</strong> Cordia Classroom
             does not store your conversations with the AI app. Our server receives only the requests the app sends to it (for
             example, a search or an answer to record) and keeps only what you ask it to save, like any other study material in
             your account. When you ask for a study set from text or a link, that text or link is kept until the set is made and
             deleted within a day after. What the AI app itself does with your conversation and with the material it reads from
-            CordiaClassroom is governed by that app's own privacy policy.</p>
+            Cordia Classroom is governed by that app's own privacy policy.</p>
           <p style={{ marginTop: '12px' }}><strong style={{ color: 'var(--text-primary)' }}>Records we keep.</strong> For each request
             from a connected app we record which tool was used, whether it worked, an error code if it didn't, how long it took,
             which app sent it and when. We never record what you asked or what was returned. Only our administrators can see
@@ -138,7 +138,7 @@ export default function PrivacyPolicy() {
 
         <Section title="7. Cookies and Local Storage">
           <p>
-            The CordiaClassroom web platform uses browser local storage to maintain your authenticated session and
+            The Cordia Classroom web platform uses browser local storage to maintain your authenticated session and
             to remember preferences such as your theme and drafts. We do not use third-party tracking cookies or
             advertising cookies. No cross-site tracking is performed.
           </p>
@@ -198,7 +198,7 @@ export default function PrivacyPolicy() {
             please contact us at:
           </p>
           <p style={{ marginTop: '12px' }}>
-            <strong style={{ color: 'var(--text-primary)' }}>CordiaClassroom</strong><br />
+            <strong style={{ color: 'var(--text-primary)' }}>Cordia Classroom</strong><br />
             Email: <a href="mailto:jude@cordiaai.io" style={{ color: 'var(--accent)' }}>jude@cordiaai.io</a><br />
             Website: <a href="https://classroom.cordiaai.io" style={{ color: 'var(--accent)' }}>https://classroom.cordiaai.io</a>
           </p>

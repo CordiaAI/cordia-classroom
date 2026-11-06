@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import AcademicInfinityMark from './AcademicInfinityMark';
+import BrandName from './BrandName';
 import { getToken } from '../lib/api';
 
 const SITE = 'https://classroom.cordiaai.io';
@@ -22,7 +23,7 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
       </Head>
       <div className={'public' + (backdrop ? ' public--photo' : '')} style={backdrop ? { '--public-photo': `url('${backdrop}')` } : { '--public-backdrop': "url('/classroom-clouds.webp')" }}>
         <header className="public-nav">
-          <Link href="/" className="public-brand" aria-label="Cordia Classroom home"><AcademicInfinityMark className="public-mark" title="" /><span>cordia</span></Link>
+          <Link href="/" className="public-brand" aria-label="Cordia Classroom home"><AcademicInfinityMark className="public-mark" title="" /><span><BrandName /></span></Link>
           <nav aria-label="Public">
             <Link href="/mission">Features</Link>
             <Link href="/pricing">Pricing</Link>
