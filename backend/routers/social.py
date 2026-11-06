@@ -14,6 +14,7 @@ from auth_utils import get_user_id
 from database import get_supabase
 from ids import require_uuid
 from rate_limit import ai_rate_limit
+from services import minors
 from services import social_graph as graph
 from services.blocks import hidden_from, is_blocked
 
@@ -79,6 +80,8 @@ def follow(target_id: str, authorization: str = Header(default="")):
     existing = graph.follow_row(db, user_id, target["id"])
     if existing:
         return {"status": existing["status"]}
+    if minors.is_minor(db, target["id"]) and not graph.are_friends(db, user_id, target["id"]):
+        raise HTTPException(status_code=403, detail="Only friends can follow this account.")
     graph.spend(db, user_id, "follow")
     status = "pending" if (target.get("allow_follows") or "everyone") == "approval" else "active"
     db.table("follows").insert({"follower_id": user_id, "followee_id": target["id"], "status": status, "created_at": graph.now().isoformat()}).execute()

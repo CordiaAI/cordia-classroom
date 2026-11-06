@@ -165,3 +165,37 @@ test("the knowledge map takes the stronger of a card's flashcard box and Learn l
   assert.equal(cardLevel(progress, 3, { 3: 2 }), 'known');
   assert.equal(cardLevel(progress, 4, {}), 'new');
 });
+
+// A folder or classroom round (Stage 6): its guides take turns, and the round stays capped.
+const plain = (id, count) => ({ id, title: 'Guide ' + id, flashcards: Array.from({ length: count }, (_, n) => ({ front: `${id} question ${n}?`, back: `${id} answer ${n}` })), flashcard_progress: {} });
+
+test('a folder or classroom round deals its guides in turn', () => {
+  const guides = [plain('a', 3), plain('b', 1), plain('c', 2)];
+  const mixed = buildStudyQueue(guides, {}, { today: TODAY, interleave: true }).items.map(item => item.guideId);
+  assert.deepEqual(mixed, ['a', 'b', 'c', 'a', 'c', 'a']);
+  const daily = buildStudyQueue(guides, {}, { today: TODAY }).items.map(item => item.guideId);
+  assert.deepEqual(daily, ['a', 'a', 'a', 'b', 'c', 'c'], 'Daily review keeps its order');
+});
+
+test('thirty guides still make a round of thirty cards, one from each', () => {
+  const guides = Array.from({ length: 30 }, (_, n) => plain('g' + n, 17));
+  const started = Date.now();
+  const { items, cardTotal } = buildStudyQueue(guides, {}, { today: TODAY, interleave: true });
+  assert.equal(cardTotal, 510);
+  assert.equal(items.length, 30);
+  assert.equal(new Set(items.map(item => item.guideId)).size, 30);
+  assert.ok(Date.now() - started < 1000, 'builds quickly');
+});
+
+test("a miss stays with its own guide in a mixed round, and one guide's queue is unchanged", () => {
+  const guides = [plain('a', 1), plain('b', 1)];
+  const stored = { b: [miss('a question 0?', true)] };
+  const { items } = buildStudyQueue(guides, stored, { today: TODAY, interleave: true });
+  assert.deepEqual(items.map(item => [item.guideId, item.front, Boolean(item.miss)]), [
+    ['b', 'a question 0?', true], // same words as guide a's card, but guide b's miss
+    ['a', 'a question 0?', false],
+    ['b', 'b question 0?', false],
+  ]);
+  const one = [guide()];
+  assert.deepEqual(buildStudyQueue(one, {}, { today: TODAY, interleave: true }), buildStudyQueue(one, {}, { today: TODAY }));
+});

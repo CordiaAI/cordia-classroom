@@ -4,7 +4,7 @@ import { pageTitle } from '../../lib/pageTitle';
 import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, AudioLines, BookOpen, FolderInput, Hash, NotebookPen, Pencil, Plus, Trash2, UserRound } from 'lucide-react';
+import { ArrowLeft, AudioLines, BookOpen, FolderInput, Hash, NotebookPen, Pencil, Play, Plus, Trash2, UserRound } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import { listLectures } from '../../lib/lectures';
@@ -25,6 +25,7 @@ import { CLASSROOMS_ON } from '../../lib/featureFlags';
 import CourseClassrooms from '../../components/CourseClassrooms';
 import AddToClassroom from '../../components/AddToClassroom';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // Course files and Grades show for a class brought in from Canvas.
 const TABS = [['material', 'Your material'], ['files', 'Course files', 'canvas'], ['grades', 'Grades', 'canvas'], ['sets', 'Class sets'], ['deadlines', 'Deadlines']];
@@ -202,6 +203,10 @@ export default function ClassPage() {
           </div>
         </div>
         <div className="c-row">
+          {/* One mixed review round across this folder's guides (session.js), a few from each. */}
+          {items.some(item => item.kind === 'guide') && (
+            <Link href={UUID.test(folder.id) ? '/session?scope=folder&id=' + folder.id : '/library'} className="c-btn c-btn--secondary"><Play {...ICON} />Study this folder</Link>
+          )}
           <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet()}><Plus {...ICON} />New</button>
           <Menu label="Class actions" items={menu} />
         </div>
