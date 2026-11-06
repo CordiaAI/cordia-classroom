@@ -6,7 +6,8 @@ import { coverFor } from '../lib/coverDesign.mjs';
 
 // A class in Library's card view: its cover (colour and subject icons), name, and how much is in
 // it. The whole card opens the class; the menu holds the rest.
-export default function ClassCard({ folder, name, href, count, meta, titles = [], menuItems, dropProps = {}, isDrop = false }) {
+// onOpen (instead of href): a card that opens in place, like Miscellaneous (aria-expanded = open).
+export default function ClassCard({ folder, name, href, onOpen, open, count, meta, titles = [], menuItems, dropProps = {}, isDrop = false }) {
   const { title, code } = classLabel(name);
   const cover = coverFor(folder || { name }, titles);
   const body = (
@@ -22,14 +23,17 @@ export default function ClassCard({ folder, name, href, count, meta, titles = []
   );
   return (
     <article className={'c-card cc cc-card' + (isDrop ? ' is-drop' : '')} {...dropProps} aria-label={name}>
-      {href ? <Link href={href} className="cc-link">{body}</Link> : <div className="cc-link">{body}</div>}
+      {href ? <Link href={href} className="cc-link">{body}</Link>
+        : onOpen ? <button type="button" className="cc-link cc-open" onClick={onOpen} aria-expanded={Boolean(open)}>{body}</button>
+          : <div className="cc-link">{body}</div>}
       {menuItems?.length > 0 && <div className="cc-menu"><Menu label={`More for ${name}`} items={menuItems} /></div>}
       <style jsx global>{`
         /* .cc-card: the Canvas page's class list also uses .cc for its own wrapper. */
         .cc-card { position: relative; display: block; padding: 0; overflow: hidden; }
-        .cc-card.is-drop { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
+        .cc-card.is-drop { border-color: var(--state-select-edge); background: var(--state-select-fill); }
         .cc-link { display: grid; color: var(--ink); text-decoration: none; }
         .cc-link:hover { text-decoration: none; }
+        .cc-open { width: 100%; padding: 0; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
         .cc-link:focus-visible { outline: 2px solid var(--olive); outline-offset: -2px; border-radius: inherit; }
         .cc-cover { position: relative; display: block; aspect-ratio: 16 / 9; }
         .cc-body { display: grid; gap: 4px; padding: 14px 16px 16px; min-width: 0; }

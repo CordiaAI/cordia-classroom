@@ -3,7 +3,7 @@ import { Check, ImagePlus, X } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
 import { apiFetch } from '../lib/api';
-import { uploadFeedbackImage } from '../lib/cardImages';
+import { discardFeedbackImage, uploadFeedbackImage } from '../lib/cardImages';
 
 const MAX_SHOTS = 3;
 
@@ -42,6 +42,16 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
   const [shots, setShots] = useState([]);
   const [shotError, setShotError] = useState('');
   const fileRef = useRef(null);
+  // Uploads must never outlive the draft (feedback 13: three uploaded, one attached, two left in
+  // storage). Removed shots, ones removed mid-upload, and every shot of a draft closed unsent are
+  // deleted from storage.
+  const removedRef = useRef(new Set());
+  const shotsRef = useRef(shots);
+  shotsRef.current = shots;
+  const sentRef = useRef(false);
+  useEffect(() => () => {
+    if (!sentRef.current) shotsRef.current.forEach(shot => discardFeedbackImage(shot.path));
+  }, []);
 
   async function addShots(files) {
     const images = [...files].filter(file => file?.type?.startsWith('image/')).slice(0, MAX_SHOTS - shots.length);
@@ -53,6 +63,7 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
       const id = added[index].id;
       try {
         const path = await uploadFeedbackImage(file);
+        if (removedRef.current.has(id)) { discardFeedbackImage(path); return; }
         setShots(current => current.map(shot => (shot.id === id ? { ...shot, path, status: 'ready' } : shot)));
       } catch (caught) {
         setShots(current => current.filter(shot => shot.id !== id));
@@ -64,7 +75,8 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
   function removeShot(id) {
     setShots(current => {
       const gone = current.find(shot => shot.id === id);
-      if (gone) URL.revokeObjectURL(gone.preview);
+      removedRef.current.add(id);
+      if (gone) { URL.revokeObjectURL(gone.preview); discardFeedbackImage(gone.path); }
       return current.filter(shot => shot.id !== id);
     });
   }
@@ -132,6 +144,7 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
     });
 
     if (data?.submitted) {
+      sentRef.current = true;
       setSubmitted(true);
       window.setTimeout(onClose, 1500);
     } else {

@@ -62,7 +62,10 @@ test('Library: one list grouped by class, kind filters (no Notes: notes live in 
   assert.match(library, /\{ key: 'recent', label: 'Newest' \}/);
   for (const label of ['All', 'Guides', 'Lectures', 'Flashcards', 'Starred']) assert.match(library, new RegExp(`label: '${label}'`));
   assert.doesNotMatch(library, /label: 'Notes'/);
-  assert.match(library, /name: 'Unfiled'/);
+  assert.match(library, /const MISC = 'Miscellaneous'/);
+  assert.match(library, /name: MISC, list: unfiled/);
+  assert.match(library, /<ClassCard name={MISC}/);
+  assert.doesNotMatch(library, /Unfiled'/);
   assert.match(library, /href=\{'\/folder\/' \+ folder\.id\} className="lib-group-name/);
   assert.match(library, /path: '\/smart_notes\/' \+ item\.id/);
   assert.match(undo, /item\.path \|\| '\/guides\/' \+ item\.id/);

@@ -77,5 +77,27 @@ export function createImageStore({ env = process.env, fetch: fetchImpl = fetch, 
     return { status: 200, body: { url: `${supabaseUrl}/storage/v1/object/public/${store.bucket}/${path}` } };
   }
 
-  return { upload };
+  // { path } -> 200 once a private upload the student removed (or never sent) is deleted from storage.
+  // Only their own paths, and never one already attached to sent feedback (feedback 13).
+  async function remove(authorization, body) {
+    if (store.isPublic) return { status: 405, body: { detail: 'Not supported' } };
+    if (!supabaseUrl || !serviceKey) return NOT_SET_UP;
+    const userId = (await who(authorization)).toLowerCase();
+    if (!/^[0-9a-f-]{36}$/.test(userId)) return { status: 401, body: { detail: 'Sign in again.' } };
+    const path = String(body?.path || '');
+    if (!new RegExp(`^${userId}/[0-9a-f-]{36}\\.(?:jpg|png|webp|gif)$`).test(path)) return { status: 400, body: { detail: 'Unknown file' } };
+    const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+    const used = await fetchImpl(`${supabaseUrl}/rest/v1/feedback?select=id&limit=1&attachments=cs.${encodeURIComponent(JSON.stringify([path]))}`, { headers }).catch(() => null);
+    if (!used?.ok) return { status: 503, body: { detail: 'Try again.' } };
+    if ((await used.json().catch(() => [])).length) return { status: 409, body: { detail: 'Already sent with feedback' } };
+    const gone = await fetchImpl(`${supabaseUrl}/storage/v1/object/${store.bucket}`, {
+      method: 'DELETE',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefixes: [path] }),
+    }).catch(() => null);
+    if (!gone?.ok) return { status: 502, body: { detail: 'Try again.' } };
+    return { status: 200, body: { deleted: path } };
+  }
+
+  return { upload, remove };
 }
