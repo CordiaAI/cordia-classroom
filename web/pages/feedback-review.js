@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import { safeHref } from '../lib/formatters';
@@ -18,7 +19,11 @@ function displayDate(value) {
 }
 
 export default function FeedbackReviewPage() {
+  const router = useRouter();
   const { ready } = useRequireAuth();
+  // Only accounts on the server's reviewer list see this page; everyone else goes to the Dashboard.
+  // The feedback itself is also refused by the server (403) for anyone not on the list.
+  const [allowed, setAllowed] = useState(false);
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [category, setCategory] = useState('');
@@ -46,8 +51,19 @@ export default function FeedbackReviewPage() {
   }, [category, status]);
 
   useEffect(() => {
-    if (ready) loadFeedback();
-  }, [ready, loadFeedback]);
+    if (!ready) return undefined;
+    let alive = true;
+    apiFetch('/feedback/reviewer-status').then(result => {
+      if (!alive) return;
+      if (result?.reviewer) setAllowed(true);
+      else router.replace('/dashboard');
+    });
+    return () => { alive = false; };
+  }, [ready]);
+
+  useEffect(() => {
+    if (allowed) loadFeedback();
+  }, [allowed, loadFeedback]);
 
   async function updateStatus(item, nextStatus) {
     const previousStatus = item.status;
@@ -64,7 +80,7 @@ export default function FeedbackReviewPage() {
 
   const selected = items.find(item => item.id === selectedId) || null;
 
-  if (!ready) return null;
+  if (!ready || !allowed) return null;
 
   return (
     <div className="feedback-review-page">
