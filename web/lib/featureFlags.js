@@ -3,6 +3,11 @@
 //   NEXT_PUBLIC_GAMES=1             the Games tab on guides (/play: Blocks)
 //   NEXT_PUBLIC_EXTRA_CONNECTORS=1  Google Sheets, GitHub, Slack and Dropbox in Connectors (and the
 //                                   GitHub repo link on assignments). Their backend routes stay on.
+//   NEXT_PUBLIC_LEARN_LADDER_V2=1   Learn's format ladder (lib/learnLadder.mjs): Fill in the blank and
+//                                   Written tiles, recall to master, longer retry gaps in Learn and
+//                                   Quiz, "What's the test like?", final-days practice. Pair it with
+//                                   LEARN_LADDER_V2=true on the backend (Fly) for saved blanks.
 export const GAMES_ON = process.env.NEXT_PUBLIC_GAMES === '1';
 export const EXTRA_CONNECTORS_ON = process.env.NEXT_PUBLIC_EXTRA_CONNECTORS === '1';
 export const EXTRA_CONNECTORS = ['gsheets', 'github', 'slack', 'dropbox'];
+export const LEARN_LADDER_V2 = process.env.NEXT_PUBLIC_LEARN_LADDER_V2 === '1';

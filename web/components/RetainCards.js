@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../lib/api';
 import { BookOpen, Check, Lightbulb, MessageCircle, X } from 'lucide-react';
 import { dismissTip, requestTip } from '../lib/tips';
@@ -6,6 +6,11 @@ import { walkthroughEvent } from '../lib/walkthrough';
 import { noteView, useAnswerTiming } from '../lib/learningEvents';
 import { choiceText, conceptAnswer, fillVerdict, normalize, shuffled } from '../lib/retainEngine.mjs';
 import { makeCloze } from '../lib/learnEngine.mjs';
+
+// Learn's format ladder (LEARN_LADDER_V2) wraps a round in <QuietLimits.Provider value>: a plan limit
+// reached mid-round falls back quietly (Written becomes a self-check) instead of opening the upgrade
+// dialog. Everywhere else the default (false) keeps today's behaviour.
+export const QuietLimits = createContext(false);
 
 // A wrong answer of any type opens the Tutor's "why was I wrong" help.
 // The context for "why was I wrong", sent when the student taps Ask why.
@@ -64,13 +69,14 @@ export function RememberButton({ onRemember }) {
 // screen (POST /quiz/{id}/remember). Each one uses a light AI reading; "Another one" asks for a
 // different angle. Logged as the view shown, so the next answer says whether a hook came before it.
 export function MemoryHook({ guideId, concept, question }) {
+  const quietLimit = useContext(QuietLimits);
   const [hook, setHook] = useState(null); // null: working; '': failed
   const [round, setRound] = useState(0);
   const previous = useRef('');
   useEffect(() => {
     let active = true;
     setHook(null);
-    apiFetch(`/quiz/${guideId}/remember`, { method: 'POST', body: JSON.stringify({ concept, previous: previous.current || null }) })
+    apiFetch(`/quiz/${guideId}/remember`, { method: 'POST', quietLimit, body: JSON.stringify({ concept, previous: previous.current || null }) })
       .then(data => {
         if (!active) return;
         if (data?.hook) {
@@ -145,11 +151,12 @@ export function ConfidencePrompt({ onPick }) {
 // Under a missed question: why the right answer is right, why the choice wasn't, and where the
 // guide covers it. The two sentences come from the server (POST /quiz/{id}/why).
 export function MissFeedback({ guideId, card, question, chosen, sure }) {
+  const quietLimit = useContext(QuietLimits);
   const [why, setWhy] = useState(null);
   useEffect(() => {
     let active = true;
     noteView(guideId, question.question, 'explain');
-    apiFetch(`/quiz/${guideId}/why`, { method: 'POST', body: JSON.stringify({ concept: card.concepts[0], chosen: String(chosen).slice(0, 4000) }) })
+    apiFetch(`/quiz/${guideId}/why`, { method: 'POST', quietLimit, body: JSON.stringify({ concept: card.concepts[0], chosen: String(chosen).slice(0, 4000) }) })
       .then(data => { if (active) setWhy(data?.why_right ? data : {}); });
     return () => { active = false; };
   }, [guideId, card.id]);
@@ -356,8 +363,9 @@ export function FillCard({ card, question, guideId, onResult, onNext, askSure = 
 
 // Fill the blank: the answer with its key word missing (learnEngine.makeCloze); the student types
 // the word. An answer too short to blank is asked whole.
-export function ClozeCard({ card, question, guideId, onResult, onNext, askSure = true }) {
-  const cloze = useMemo(() => makeCloze(conceptAnswer(question)), [question]);
+export function ClozeCard({ card, question, guideId, onResult, onNext, askSure = true, blank = null }) {
+  // blank: { before, missing, after } picked when the guide was built (learnLadder.blankFor).
+  const cloze = useMemo(() => blank || makeCloze(conceptAnswer(question)), [question, blank]);
   const [value, setValue] = useState('');
   const [asking, setAsking] = useState(false);
   const [explained, setExplained] = useState(false);
@@ -388,8 +396,8 @@ export function ClozeCard({ card, question, guideId, onResult, onNext, askSure =
           value={value}
           onChange={event => setValue(event.target.value)}
           onKeyDown={timing.key}
-          placeholder="The missing word"
-          aria-label="The missing word"
+          placeholder={cloze.missing.includes(' ') ? 'The missing words' : 'The missing word'}
+          aria-label={cloze.missing.includes(' ') ? 'The missing words' : 'The missing word'}
           readOnly={typed.verdict !== null || asking}
           autoFocus
           autoComplete="off"
@@ -495,6 +503,7 @@ export function MatchingCard({ card, questions, guideId, onResult, onNext }) {
 const VERDICTS = { 1: ['right', 'Right'], 0.5: ['partial', 'Partly right'], 0: ['wrong', 'Not quite'] };
 
 export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitch }) {
+  const quietLimit = useContext(QuietLimits);
   const concept = card.concepts[0];
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -511,9 +520,15 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
     setError('');
     const data = await apiFetch(`/quiz/${guideId}/grade`, {
       method: 'POST',
+      quietLimit,
       body: JSON.stringify({ concept, answer: value.trim() }),
     });
     setBusy(false);
+    // Out of AI checks inside a ladder round: straight to the self-check, no dialog.
+    if (quietLimit && data?.limit_reached && onSwitch) {
+      onSwitch('self');
+      return;
+    }
     if (typeof data?.credit !== 'number') {
       setError(data?.detail || 'Cordia could not check this answer right now.');
       return;
