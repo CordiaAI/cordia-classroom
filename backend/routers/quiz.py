@@ -18,7 +18,7 @@ from services.llm_calls import chat
 from services.models import current_user_id
 from auth_utils import get_user_id
 from ids import require_uuid
-from services import retain
+from services import print_items, retain
 from services import blanks
 from services.choice_shapes import conform, is_value, repair, shape
 from services.distractor_check import keep_valid
@@ -69,6 +69,10 @@ class WrittenAnswer(BaseModel):
 class MissRequest(BaseModel):
     concept: int = Field(..., ge=0, le=100)
     chosen: str = Field(..., min_length=1, max_length=4000)
+
+
+class PrintRequest(BaseModel):
+    fill: bool = False  # write the fill-in sentences now if they aren't cached (one AI quiz)
 
 
 class RememberRequest(BaseModel):
@@ -585,6 +589,75 @@ def refresh_choices(guide_id: str, authorization: str = Header(default="")):
         _save_quiz(supabase, guide_id, user_id, updated)
     record(user_id, "light")
     return {"changed": changed, "flagged": len(flagged), "questions": updated}
+
+
+def _print_fill(client, pairs: list) -> Optional[list]:
+    """Checked fill-in items written by Haiku from the guide's Q/A, or None when the call fails."""
+    indexes = print_items.fill_candidates(pairs)
+    if not indexes:
+        return []
+    try:
+        response = chat(client, "print_fill",
+                        messages=[{"role": "system", "content": "Write fill-in-the-blank test sentences. Return valid JSON only."},
+                                  {"role": "user", "content": print_items.fill_prompt(pairs, indexes)}],
+                        temperature=0.3, response_format={"type": "json_object"})
+        generated = json.loads(response.choices[0].message.content or "{}").get("items", [])
+    except Exception:
+        logger.warning("Fill-in sentences unavailable", exc_info=True)
+        return None
+    return print_items.fill_items(pairs, indexes, generated)
+
+
+@router.post("/{guide_id}/print-items", dependencies=[Depends(ai_rate_limit())])
+def printable_items(guide_id: str, body: PrintRequest, authorization: str = Header(default="")):
+    """Everything a printable quiz can use, per type, from the guide's own questions and answers.
+    Multiple choice comes from the saved quiz (built first if the guide has none yet); matching and
+    short answer are picked without AI; fill-in sentences are written by Haiku only when asked for
+    and not cached yet, which counts as one AI quiz. Matching, short answer and fill-in are cached
+    on the guide, so reprinting or changing the format reuses them."""
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+    row = _guide_columns(supabase, guide_id, user_id, "title, folder_id, study_guide, print_items")
+    pairs = _parse_qa_pairs(row.get("study_guide") or "")
+    if len(pairs) < 2:
+        raise HTTPException(status_code=400, detail="This guide needs questions and answers before it can be printed.")
+    mc, flagged = print_items.multiple_choice(_load_quiz(supabase, guide_id, user_id)[0], pairs)
+    cache = print_items.cached(row.get("print_items"), pairs)
+    items = {"v": print_items.VERSION, "source": print_items.source_hash(pairs),
+             "matching": print_items.matching(pairs), "short": print_items.short_answer(pairs)}
+    if "fill" in cache:
+        items["fill"] = cache["fill"]
+    fill_locked = False
+    if body.fill and "fill" not in items:
+        if remaining(user_id, "ai_quiz") <= 0:
+            fill_locked = True
+        else:
+            require(user_id, "ai_quiz")
+            fill = _print_fill(get_openai_client(), pairs)
+            if fill is not None:
+                items["fill"] = fill
+                record(user_id, "ai_quiz")
+    if items != cache:
+        try:
+            supabase.table("study_guides").update({"print_items": items}).eq("id", guide_id).eq("user_id", user_id).execute()
+        except Exception:
+            logger.warning("Could not cache print items for guide %s", guide_id, exc_info=True)
+    class_name = ""
+    if row.get("folder_id"):
+        folder = supabase.table("folders").select("name").eq("id", row["folder_id"]).eq("user_id", user_id).execute().data or []
+        class_name = (folder[0].get("name") if folder else "") or ""
+    return {
+        "title": row.get("title") or "",
+        "class_name": class_name,
+        "mc": mc,
+        "mc_flagged": flagged,
+        "matching": items["matching"],
+        "short": items["short"],
+        "fill": items.get("fill"),
+        "fill_possible": len(print_items.fill_candidates(pairs)),
+        "fill_locked": fill_locked,
+    }
 
 
 @router.post("/{guide_id}/grade", dependencies=[Depends(ai_rate_limit(max_calls=30))])
