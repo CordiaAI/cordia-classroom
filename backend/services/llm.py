@@ -542,7 +542,7 @@ CRUDE_HUMOR_RULE = (
 
 
 # Tricks that clear the bar ("Penny's sweet 16": specific, vivid, funny, built on the exact names and
-# numbers) next to ones that don't, from different subjects.
+# numbers) next to ones that don't, from different subjects. Each starts from the question's cue.
 MEMORY_EXAMPLES = (
     "Q: Normal adult potassium range? A: 3.5-5.0 mEq/L. Bad: \"Potassium is 3.5-5.0, so remember that.\" "
     "Good: \"When you see potassium, think K for kitchen: 3.5 bananas on the counter, 5 in the bowl, so K+ "
@@ -571,7 +571,8 @@ def memory_hook(question: str, answer: str, style: str = "link", interests=(), p
     response = chat(get_openai_client(), "retain_remember",
         messages=[
             {"role": "system", "content": (
-                "Write one memory trick for a question a student just missed, for any subject, "
+                "Write one memory trick for a question a student just missed, for any subject. It must "
+                "start from the question's cue and lead to the answer (\"When you see X, think Y\"), "
                 "in one or two sentences under 40 words, written to them as \"you\". Build it on the "
                 "exact names, words and numbers in the answer, using whichever fits best: a vivid image, "
                 "a link to something they already know, an acronym or first letters, a number shape or "

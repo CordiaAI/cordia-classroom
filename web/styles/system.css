@@ -691,6 +691,7 @@ body:has(.about) .c-fab { display: none; }
 .retain-hook { display: grid; gap: 8px; margin-top: 14px; padding: 14px 16px; border-radius: var(--r-input); background: var(--olive-tint); color: var(--ink); font: 500 15px/1.5 var(--font-sans); animation: c-slide-in 280ms cubic-bezier(.2, .8, .2, 1); }
 .retain-hook p { margin: 0; }
 .retain-hook-title { display: inline-flex; align-items: center; gap: 6px; color: var(--olive-ink); font: 600 13px/1 var(--font-sans); }
+.retain-hook-cue { color: var(--muted); font: 500 13px/1.4 var(--font-sans); }
 .retain-hook-link { justify-self: start; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 var(--space-3); border-radius: 999px; background: var(--surface-raised); color: var(--olive-ink); font: 600 13px/1.2 var(--font-sans); text-decoration: none; overflow-wrap: anywhere; }
 .retain-hook-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .retain-hook-again { justify-self: start; padding: 0; border: 0; background: none; color: var(--olive-ink); font: 600 14px/1.4 var(--font-sans); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }

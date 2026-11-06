@@ -102,6 +102,7 @@ export function MemoryHook({ guideId, concept, question }) {
   return (
     <div className="retain-hook" role="status">
       <span className="retain-hook-title"><Lightbulb size={18} strokeWidth={1.75} aria-hidden="true" />Help me remember</span>
+      {question?.question && <p className="retain-hook-cue">{question.question}</p>}
       {hook === null && <p className="c-meta">Thinking of a way to remember it…</p>}
       {hook && <p>{hook}</p>}
       {hook && linked && (linkedHref(linked)

@@ -87,6 +87,7 @@ class GroundedTrickTests(unittest.TestCase):
     def test_the_prompt_asks_for_the_cue_techniques_and_examples(self):
         _, chat = self.call('{"hook": "When you see ATO, think Otis Allan Glazebrook.", "linked": null}', self.CONTEXT)
         system, user = (m["content"] for m in chat.call_args.kwargs["messages"])
+        self.assertIn("When you see X, think Y", system)
         for technique in ("vivid image", "acronym", "number shape", "tiny story"):
             self.assertIn(technique, system)
         self.assertIn(llm.MEMORY_EXAMPLES, system)
