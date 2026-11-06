@@ -233,7 +233,9 @@ export async function authorizedFetch(path, options = {}) {
 
 // Returns the response JSON, or null when the request failed. With `reportFailure`, a failed
 // request returns { detail, failed: 'timeout' | 'network' } instead, so the caller can say which.
-export async function apiFetch(path, { reportFailure = false, ...options } = {}) {
+// quietLimit: a plan limit (402) returns its error to the caller without opening the upgrade dialog
+// (Learn's format ladder falls back quietly instead of interrupting a round).
+export async function apiFetch(path, { reportFailure = false, quietLimit = false, ...options } = {}) {
   if (typeof window === 'undefined' || !getToken()) return null;
   try {
     let resp = await fetchWithTimeout(API + path, {
@@ -257,7 +259,8 @@ export async function apiFetch(path, { reportFailure = false, ...options } = {})
     }
 
     const data = await responseJson(resp);
-    announceLimit(resp, data);
+    if (!quietLimit) announceLimit(resp, data);
+    else if (resp.status === 402 && data && typeof data === 'object') data.limit_reached = true;
     return data;
   } catch (e) {
     console.error('API fetch error:', path, e);

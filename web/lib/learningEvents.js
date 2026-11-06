@@ -112,7 +112,9 @@ export function noteView(guideId, questionText, view) {
 // One answer. type: the card type (mc, fill, written, self, matching, flashcard, practice).
 // credit: 1, 0.5 or 0. timing: from useAnswerTiming().done(). nOptions: how many choices were
 // shown (multiple choice and matching only).
-export function logAnswer({ guideId, question, mode, type, credit, confidence = '', timing = null, answerChars = null, decisionId = null, nOptions = null }) {
+// detail: the format ladder's owner-only study fields (LEARN_LADDER_V2), never shown to students:
+// { first_try, gap, level_before, level_after, test_format, days_to_test, fallback, practice }.
+export function logAnswer({ guideId, question, mode, type, credit, confidence = '', timing = null, answerChars = null, decisionId = null, nOptions = null, detail = null }) {
   quietly(() => {
     const format = formatFor(type);
     const print = itemFingerprint(question);
@@ -132,6 +134,7 @@ export function logAnswer({ guideId, question, mode, type, credit, confidence = 
       n_options: optionCount(format, nOptions),
       view_shown: takeView(`${guideId}:${print}`),
       occurred_at: new Date().toISOString(),
+      ...(detail ? { detail } : {}),
     });
     schedule();
   });

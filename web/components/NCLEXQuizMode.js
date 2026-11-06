@@ -4,12 +4,14 @@ import { loadFolders } from '../lib/folders';
 import { logAnswer } from '../lib/learningEvents';
 import { answerTimer } from '../lib/learningEvents.mjs';
 
-export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+// resume: progress saved by onProgress ({ currentIndex, answers, answered }) to pick up again after
+// a refresh; a question already answered then moves on. onProgress gets null once the set is sent.
+export default function NCLEXQuizMode({ questions, guideId, onComplete, resume = null, onProgress }) {
+  const [currentIndex, setCurrentIndex] = useState(() => (resume ? resume.currentIndex + (resume.answered ? 1 : 0) : 0));
   const [selected, setSelected] = useState(null);       // MCQ: selected index (int)
   const [sataSelected, setSataSelected] = useState([]); // SATA: array of selected indices
   const [answered, setAnswered] = useState(false);
-  const [answers, setAnswers] = useState([]);
+  const [answers, setAnswers] = useState(() => resume?.answers || []);
   const [done, setDone] = useState(false);
   const [score, setScore] = useState(null);
   const [showSave, setShowSave] = useState(false);
@@ -19,6 +21,10 @@ export default function NCLEXQuizMode({ questions, guideId, onComplete }) {
   const [saveStatus, setSaveStatus] = useState(''); // '' | 'saving' | 'saved' | 'error'
 
   const q = questions[currentIndex];
+  // The last answer sends the set straight away, so from then on there's nothing to resume.
+  useEffect(() => {
+    onProgress?.(done || (answered && currentIndex === questions.length - 1) ? null : { currentIndex, answers, answered });
+  }, [currentIndex, answers, answered, done]);
   const isSata = q.type === 'sata';
   // Each question is timed from when it shows to the answer (select-all: to Submit).
   const timer = useRef(null);

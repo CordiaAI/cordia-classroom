@@ -105,6 +105,19 @@ class FormatDecision(_Item):
     context: dict = Field(default_factory=dict, max_length=12)
 
 
+class LadderDetail(BaseModel):
+    """LEARN_LADDER_V2: the owner's study of the format ladder. Stored in learning_events.detail
+    (migration 20261111120000, NOT APPLIED until the owner runs it); never shown to students."""
+    first_try: bool
+    gap: Optional[int] = Field(default=None, ge=0, le=10000)          # questions since this idea was last asked
+    level_before: Optional[int] = Field(default=None, ge=0, le=3)
+    level_after: Optional[int] = Field(default=None, ge=0, le=3)
+    test_format: Optional[Literal["mc", "short", "essay", "mix", "unsure"]] = None
+    days_to_test: Optional[int] = Field(default=None, ge=-3650, le=3650)
+    fallback: bool = False                                            # a free plan's Written instead of Fill in the blank
+    practice: bool = False                                            # final-days practice that can't master
+
+
 class LearningEvent(_Item):
     """One answer. Raw values only; ratings and flags are derived later."""
     decision_id: Optional[str] = Field(default=None, pattern=UUID_PATTERN)
@@ -119,6 +132,7 @@ class LearningEvent(_Item):
     n_options: Optional[int] = Field(default=None, ge=2, le=50)  # choices shown (choice and matching)
     view_shown: Optional[str] = Field(default=None, max_length=40)
     occurred_at: Optional[datetime] = None
+    detail: Optional[LadderDetail] = None
 
 
 class LearningEventBatch(BaseModel):

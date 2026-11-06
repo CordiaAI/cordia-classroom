@@ -19,6 +19,8 @@ from services.models import current_user_id
 from auth_utils import get_user_id
 from ids import require_uuid
 from services import retain
+from services import blanks
+from services.choice_shapes import conform, is_value, repair, shape
 from services.entitlements import LIMITS, plan_for, record, remaining, require, subscription_row
 
 
@@ -50,6 +52,10 @@ class QuizSubmission(BaseModel):
 
 class SessionRequest(BaseModel):
     types: List[Literal["mc", "written", "fill", "matching"]] = Field(default_factory=lambda: ["mc"], max_length=4)
+    # Learn (LEARN_LADDER_V2): Fill in the blank is charged once per Learn session when the student may
+    # use it; with none left the session says so (fill_available false) instead of a 402, and Learn
+    # masters in Written. Never an upgrade dialog mid-round.
+    learn: bool = False
 
 
 class WrittenAnswer(BaseModel):
@@ -118,11 +124,14 @@ def _choices(answer: str, distractors: list) -> tuple:
 
 
 def even_choices(question: dict) -> dict:
-    """A saved question with its choices' endings matched (quizzes saved before this kept them)."""
+    """A saved question with its choices' endings matched (quizzes saved before this kept them),
+    and, when the answer is a year, date or amount, every wrong choice written the same way
+    (choice_shapes.repair; the right answer and its position never change)."""
     options = question.get("options")
     if not isinstance(options, list):
         return question
-    return {**question, "options": [choice_text(option) for option in options]}
+    shown = [choice_text(option) for option in options]
+    return {**question, "options": repair(question.get("question") or "", shown, question.get("correct_index"))}
 
 
 def _other_answers(qa_pairs: list, index: int) -> list:
@@ -155,14 +164,26 @@ def _not_longest(answer: str, chosen: list, pool: list) -> list:
     return [longer[0] if i == shortest else value for i, value in enumerate(chosen)]
 
 
+def _same_kind(answer: str, values: list) -> list:
+    kind = shape(answer).kind
+    return [value for value in values if shape(value).kind == kind]
+
+
 def _standard_questions(qa_pairs: list) -> list:
-    """Build an instant free Retain quiz from answers already in the guide."""
+    """Build an instant free Retain quiz from answers already in the guide. Wrong choices look like
+    the answer: a date gets dates in its style (made up nearby when the guide has too few), and a
+    short term gets short terms before longer answers (services/choice_shapes.py)."""
     questions = []
     for index, pair in enumerate(qa_pairs):
         answer = pair["answer"]
         candidates = _other_answers(qa_pairs, index)
-        shortlist = candidates[:min(6, len(candidates))]
-        distractors = _not_longest(answer, random.sample(shortlist, min(3, len(shortlist))), candidates)
+        if is_value(answer):
+            distractors = conform(answer, [], candidates, seed=pair["question"])
+        else:
+            same = _same_kind(answer, candidates)
+            shortlist = same[:min(6, len(same))]
+            picked = conform(answer, random.sample(shortlist, min(3, len(shortlist))), candidates, seed=pair["question"])
+            distractors = _not_longest(answer, picked, same or [c for c in candidates if not is_value(c)])
         if not distractors:
             continue
         options, correct_index = _choices(answer, distractors)
@@ -174,8 +195,14 @@ def _standard_questions(qa_pairs: list) -> list:
     return questions
 
 
-def _balanced_distractors(answer: str, generated: list, fallback: list) -> list:
-    """Prefer distinct model choices close to the correct answer's visible length."""
+def _balanced_distractors(answer: str, generated: list, fallback: list, seed: str = "") -> list:
+    """Prefer distinct model choices close to the correct answer's visible length, in the answer's
+    format: a year, date or amount only ever gets the same kind of value written the same way
+    (off-format model choices are rewritten or replaced), and text prefers text of its own kind."""
+    if is_value(answer):
+        return conform(answer, generated, fallback, seed=seed or answer)
+    generated = [str(value) for value in generated]
+    same_generated, same_fallback = _same_kind(answer, generated), _same_kind(answer, fallback)
     lower = max(1, round(len(answer) * 0.65))
     upper = max(lower, round(len(answer) * 1.35))
     seen = {answer.casefold()}
@@ -194,10 +221,12 @@ def _balanced_distractors(answer: str, generated: list, fallback: list) -> list:
             if len(accepted) == 3:
                 return
 
-    add(generated, enforce_length=True)
-    add(fallback, enforce_length=True)
-    add(sorted([*generated, *fallback], key=lambda value: abs(len(str(value)) - len(answer))))
-    return _not_longest(answer, accepted[:3], [*generated, *fallback])
+    add(same_generated, enforce_length=True)
+    add(same_fallback, enforce_length=True)
+    add(sorted([*same_generated, *same_fallback], key=lambda value: abs(len(str(value)) - len(answer))))
+    text = [value for value in [*generated, *fallback] if not is_value(value)]
+    add(sorted(text, key=lambda value: abs(len(str(value)) - len(answer))))
+    return _not_longest(answer, accepted[:3], [*same_generated, *same_fallback] or text)
 
 
 def _save_quiz(supabase, guide_id: str, user_id: str, questions: list) -> None:
@@ -271,7 +300,7 @@ Return a JSON object {{"items": [...]}} with one element per Q&A pair, in order,
 - "distractors": [wrong1, wrong2, wrong3]
 
 CRITICAL RULES — follow every one:
-1. Match the correct answer's grammatical form, specificity, and approximate visible length. Keep every distractor within ±20% of the correct answer's character count. The correct answer must NEVER stand out as the longest, most detailed, or only precisely worded option.
+1. Match the correct answer's grammatical form, specificity, format, and approximate visible length. When the answer is a date, year, number, percentage, or amount, every distractor is the same kind of value written in exactly the same format (for "July 4, 1776": "June 21, 1788", never "1788" or "the late 1700s"; for "45%": "30%", never "about half"). Keep every distractor within ±20% of the correct answer's character count. The correct answer must NEVER stand out as the longest, most detailed, or only precisely worded option.
 2. Give the three distractors different incorrect logic: use an incorrect mechanism or relationship; incorrect terminology, value, actor, direction, or sequence; and an answer missing or altering one essential factor. When appropriate, adapt an answer from another supplied question if it remains plausible for this question.
 3. Make each distractor tempting to a student with an incomplete understanding, while keeping it unambiguously false for the question. Do not create three paraphrases of the same mistake.
 4. Never use "None of the above", "All of the above", "Both A and B", or any placeholder/filler text.
@@ -311,6 +340,7 @@ Return ONLY the JSON object, no other text:"""
             correct_answer,
             generated,
             _other_answers(qa_pairs, i),
+            seed=pair["question"],
         )
         if not distractors:
             continue
@@ -343,7 +373,11 @@ def prewarm_quiz(guide_id: str, user_id: str) -> None:
     try:
         if remaining(user_id, "ai_quiz") <= LIMITS["free"]["ai_quiz"]:
             return
-        _load_quiz(get_supabase(), guide_id, user_id)
+        supabase = get_supabase()
+        _load_quiz(supabase, guide_id, user_id)
+        if blanks.learn_ladder_v2():
+            # Next to the wrong-answer options: the Fill in the blank span for each question.
+            blanks.ensure_blanks(supabase, guide_id, user_id)
     except Exception:
         # The first Learn simply builds it instead.
         logger.warning("Quiz warm-up failed for guide %s", guide_id, exc_info=True)
@@ -383,6 +417,8 @@ def start_session(guide_id: str, body: SessionRequest, authorization: str = Head
     if not saved:
         # Answers are checked against the saved questions, so a session always starts from them.
         _save_quiz(supabase, guide_id, user_id, questions)
+    if body.learn and blanks.learn_ladder_v2():
+        return _learn_session(supabase, guide_id, user_id, questions, body.types)
     cards = retain.plan_session(questions, body.types)
     uses_pro_types = any(card["type"] in retain.PRO_TYPES for card in cards)
     if uses_pro_types:
@@ -393,6 +429,25 @@ def start_session(guide_id: str, body: SessionRequest, authorization: str = Head
         "cards": cards,
         "types": sorted({card["type"] for card in cards}),
         "pro": plan_for(subscription_row(user_id)) == "pro",
+    }
+
+
+def _learn_session(supabase, guide_id: str, user_id: str, questions: list, types: list) -> dict:
+    """Learn's session: the questions, whether Fill in the blank is available (charged once here when
+    asked for, as Quiz charges its Pro types), and blanks built in the background for older guides."""
+    fill_available = False
+    if "fill" in types and remaining(user_id, "retain_types") > 0:
+        require(user_id, "retain_types")
+        record(user_id, "retain_types")
+        fill_available = True
+    building = blanks.start_blanks(supabase, guide_id, user_id, questions) if fill_available else False
+    return {
+        "questions": questions,
+        "cards": [],
+        "types": [],
+        "pro": plan_for(subscription_row(user_id)) == "pro",
+        "fill_available": fill_available,
+        "blanks_building": building,
     }
 
 

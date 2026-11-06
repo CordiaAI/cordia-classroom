@@ -236,6 +236,15 @@ async function install(context, state) {
     if ((m = path.match(/^\/quiz\/([^/]+)\/history$/))) return json({ attempts: state.populated ? [{ id: 'q1', score: 80, correct_answers: 4, total_questions: 5, completed_at: new Date().toISOString() }] : [] });
     if ((m = path.match(/^\/quiz\/([^/]+)\/session$/))) {
       const questions = Array.from({ length: 6 }, (_, i) => ({ question: `Question ${i + 1}?`, options: [`Right ${i + 1}`, `Wrong A${i}`, `Wrong B${i}`, `Wrong C${i}`], correct_index: 0 }));
+      // Learn's format ladder (LEARN_LADDER_V2): a longer answer with its saved Fill in the blank span,
+      // short answers typed whole, and whether this account has Fill in the blank this session.
+      if (body.learn) {
+        const long = 'Cells use ATP to power reactions that need energy, such as building proteins';
+        questions.push({ question: 'Why do cells need ATP?', options: [long, 'Cells store ATP as fat for winter months', 'ATP carries oxygen to every cell in the body', 'Cells make ATP only while they sleep'], correct_index: 0, blank: { span: 'power reactions' } });
+        questions.forEach(question => { if (!question.blank) question.blank = { whole: true }; });
+        const fill = (body.types || []).includes('fill') && !state.noFill;
+        return json({ questions, cards: [], types: [], pro: false, fill_available: fill, blanks_building: false });
+      }
       return json({ questions, cards: questions.map((_, i) => ({ type: 'mc', concepts: [i] })) });
     }
     if ((m = path.match(/^\/quiz\/([^/]+)\/submit$/))) return json({ score: 67 });
@@ -253,6 +262,7 @@ async function install(context, state) {
     if (path === '/lectures/notes') return json({ notes: [{ kind: 'heading', text: 'Cell energy', at_ms: 0 }, { kind: 'exam', text: 'ATP is made in mitochondria', at_ms: 20000 }], class_id: state.folders[0]?.id || '' });
     if (path === '/lectures/finish') return json({ title: 'Cell Energy and ATP', transcript: (body.segments || []).map(s => s.text).join(' ') + ' Mitochondria make ATP through respiration.\nATP stores energy.\nCells use ATP for work.' });
     if (path === '/lectures/transcribe-file') return json({ segments: [{ start_ms: 0, text: 'An uploaded lecture about the Krebs cycle and how cells make energy in plain terms.' }] });
+    if ((m = path.match(/^\/guides\/([^/]+)\/test-format$/)) && method === 'PATCH') { state.testFormat = body.test_format; return json({ test_format: body.test_format }); }
     if (path === '/billing/status') return json({ plan: 'free', features: { guide: { used: 1, limit: 3 }, tutor: { used: 2, limit: 10 }, learn_my_way: { used: 0, limit: 5 }, retain_types: { remaining: 1 } }, trial_available: true });
     if (path === '/learning-style') return json({ enabled: false, style: null });
     if (path === '/explanation-preference') return json({ text: '' });

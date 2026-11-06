@@ -64,6 +64,15 @@ class TierTests(unittest.TestCase):
         self.assertEqual(entitlements.tier_for(row(plan="academic_weapon")), "weapon")
         self.assertEqual(entitlements.tier_for(row(plan="classroom_pro", status="canceled")), "free")
 
+    def test_a_manual_grant_ends_on_its_end_date(self):
+        grant = dict(plan="classroom_pro", source="manual", stripe_subscription_id=None)
+        with patch.object(entitlements, "_now", return_value=NOW):
+            self.assertEqual(entitlements.tier_for(row(**grant, current_period_end=(NOW + timedelta(days=1)).isoformat())), "pro")
+            self.assertEqual(entitlements.tier_for(row(**grant, current_period_end=(NOW - timedelta(days=1)).isoformat())), "free")
+            self.assertEqual(entitlements.tier_for(row(**grant, current_period_end=None)), "pro")
+            # Stripe rows follow Stripe's status, never the stored period end.
+            self.assertEqual(entitlements.tier_for(row(plan="classroom_pro", current_period_end=(NOW - timedelta(days=1)).isoformat())), "pro")
+
     def test_limits_follow_the_owner_plan(self):
         pro, weapon = entitlements.LIMITS["pro"], entitlements.LIMITS["weapon"]
         self.assertEqual((pro["guide"], pro["tutor"], pro["practice"], pro["lecture_minute"]), (15, 300, 15, 150))
