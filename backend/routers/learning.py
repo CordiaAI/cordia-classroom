@@ -213,7 +213,9 @@ def get_onboarding(authorization: str = Header(default="")):
     # The onboarding experiment (step 1.1): only a student who hasn't started onboarding can join it.
     from services.experiments import onboarding_arm
     arm = onboarding_arm(get_supabase(), user_id, new_student=not rows)
-    return {"step": row.get("step") or "style", "completed": bool(row.get("completed_at")), "arm": arm}
+    # completed_at: feature steps (web/lib/featureOnboarding.mjs) show only for features added after it.
+    return {"step": row.get("step") or "style", "completed": bool(row.get("completed_at")), "arm": arm,
+            "completed_at": row.get("completed_at")}
 
 
 class FeatureSeen(BaseModel):

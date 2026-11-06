@@ -209,7 +209,7 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
             {shotError && <p className="feedback-error" role="alert">{shotError}</p>}
             {error && <p className="feedback-error" role="alert">{error}</p>}
             <div className="feedback-actions">
-              <button type="button" className="feedback-cancel" onClick={onClose}>Cancel</button>
+              <button type="button" className="c-btn c-btn--secondary feedback-cancel" onClick={onClose}>Cancel</button>
               <button type="submit" className="c-btn c-btn--primary feedback-submit" disabled={submitting || !message.trim() || shots.some(shot => shot.status === 'uploading')}>
                 {submitting ? 'Sending…' : 'Send feedback'}
               </button>
@@ -242,7 +242,8 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
         .feedback-context { margin: 9px 0 0; color: var(--muted-ink); font-size: 13px; line-height:1.5; }
         .feedback-error { margin: 13px 0 0; color: var(--error); font-size:13px; font-weight:600; line-height:1.5; }
         .feedback-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
-        .feedback-cancel { min-height: 46px; padding: 0 18px; border-radius:12px; font: inherit; font-size:13px; font-weight:600; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+        /* Cancel and Send are the app's own secondary and primary buttons, the same height. */
+        .feedback-cancel { min-height: 46px; }
         /* The app's primary button: its disabled state keeps a readable label (this one had white
            text on a white fill in dark mode). */
         .feedback-submit { min-height: 46px; }

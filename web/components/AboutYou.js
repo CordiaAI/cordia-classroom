@@ -6,7 +6,7 @@ import { walkthroughEvent } from '../lib/walkthrough';
 
 const LEVELS = [{ value: 'university', label: 'University' }, { value: 'high_school', label: 'High school' }];
 // "Help me remember" hooks after a miss use these two (backend services/onboarding_questions.py).
-const MEMORY_STYLES = [
+export const MEMORY_STYLES = [
   { value: 'funny', label: 'Make it funny' },
   { value: 'link', label: 'Link it to something I know' },
   { value: 'rhyme', label: 'A rhyme or catchy line' },
