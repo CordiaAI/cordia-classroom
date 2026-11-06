@@ -809,9 +809,9 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 }
 
 /* Rows / Cards switch (components/ViewToggle.js). */
-.c-viewtoggle { display: inline-flex; flex: none; gap: 2px; padding: 2px; border-radius: 999px; background: var(--olive-tint); }
-.c-viewtoggle .c-icon-btn[aria-pressed='true'] { background: var(--surface-raised); color: var(--ink); box-shadow: var(--shadow-card); }
-.c-viewtoggle .c-icon-btn[aria-pressed='false'] { color: var(--muted); }
+/* Icon-only segments (the list / grid switch): same control, square-ish segments, full-ink icons. */
+.c-seg--icons { flex: none; }
+.c-seg--icons button { display: inline-grid; place-items: center; width: 44px; height: 34px; padding: 0; line-height: 1; color: var(--ink); }
 
 /* A list in card view: the same rows laid out as small tiles. The first child (progress ring
    or kind icon) sits top left, a star and the ⋯ menu top right, the title and meta below, and a

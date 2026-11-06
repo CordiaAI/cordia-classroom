@@ -401,9 +401,8 @@ body { touch-action: manipulation; }
    Same recipe as the rest. !important because these components style themselves in scoped
    (styled-jsx) rules that outrank a plain class here; only fill, edge and shadow change. */
 
-/* Tiles and buttons: Learn's ways and Test yourself, the New sheet, calendar items, Past chats,
-   the list / grid toggle. */
-:is(.learn-way, .new-option, .new-make-btn, .new-sample, .calendar-item, .tutor-past-chats, .c-viewtoggle, .plan-badge) {
+/* Tiles and buttons: Learn's ways and Test yourself, the New sheet, calendar items, Past chats. */
+:is(.learn-way, .new-option, .new-make-btn, .new-sample, .calendar-item, .tutor-past-chats, .plan-badge) {
   background: var(--lg-sheen), var(--lg-fill) !important;
   border-color: var(--lg-edge) !important;
   box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
@@ -411,12 +410,10 @@ body { touch-action: manipulation; }
 :is(.learn-way, .new-option, .new-make-btn, .new-sample, .calendar-item, .tutor-past-chats):hover:not(:disabled) {
   background: var(--lg-sheen), var(--lg-fill-strong) !important;
 }
-.c-viewtoggle { box-shadow: var(--lg-highlight) !important; }
 /* The calendar stays shadowless (asked for): glass fill and rim only, and study blocks keep
    their olive left edge. */
 .calendar-item { box-shadow: var(--lg-highlight) !important; }
 .calendar-item-block { border-left-color: var(--olive) !important; }
-.c-viewtoggle .c-icon-btn[aria-pressed='true'] { background: var(--lg-sheen), var(--lg-fill-strong) !important; box-shadow: var(--lg-highlight), var(--lg-shadow) !important; }
 
 /* Tinted ones keep their tint, laid over the glass: study blocks, the sample, a chosen way. */
 :is(.calendar-item-block, .new-sample, .plan-badge[data-plan='plus']) {
