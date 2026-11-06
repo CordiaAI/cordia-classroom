@@ -29,6 +29,9 @@ function PracticeList({ practice }) {
 }
 
 const text = value => (typeof value === 'string' ? value : '');
+// Ids from the address bar become links back (Back, Open the guide): only well-formed ones count.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const uuid = value => (typeof value === 'string' && UUID.test(value) ? value : '');
 
 // Daily review: Retain misses, due flashcards and Learn ideas in one round (lib/studyQueue.js),
 // then open practice problems. With ?guideId= it is that guide's Study now; with
@@ -39,13 +42,13 @@ export default function StudySession() {
   const { ready } = useRequireAuth();
   const [queue, setQueue] = useState(null);
   const gate = useLoadGate(Boolean(queue));
-  const guideId = text(router.query.guideId);
-  const scope = ['folder', 'classroom'].includes(router.query.scope) && text(router.query.id) ? router.query.scope : '';
-  const scopeId = scope ? text(router.query.id) : '';
+  const guideId = uuid(router.query.guideId);
+  const scope = ['folder', 'classroom'].includes(router.query.scope) && uuid(router.query.id) ? router.query.scope : '';
+  const scopeId = scope ? uuid(router.query.id) : '';
 
   useEffect(() => {
     if (!ready || !router.isReady) return;
-    const guideIds = text(router.query.guides).split(',').filter(Boolean);
+    const guideIds = text(router.query.guides).split(',').map(uuid).filter(Boolean);
     const folderName = scope === 'folder'
       ? loadFolders().then(data => (data?.folders || []).find(folder => folder.id === scopeId)?.name || '').catch(() => '')
       : Promise.resolve('');
@@ -89,7 +92,9 @@ export default function StudySession() {
     await Promise.all(requests);
   }, [cards, queue]);
 
-  const backTo = scope === 'classroom' ? `/classrooms/${scopeId}?tab=study` : scope === 'folder' ? '/folder/' + scopeId : guideId ? '/guide/' + guideId : '/dashboard';
+  const backTo = scope === 'classroom' && UUID.test(scopeId) ? `/classrooms/${scopeId}?tab=study`
+    : scope === 'folder' && UUID.test(scopeId) ? '/folder/' + scopeId
+      : UUID.test(guideId) ? '/guide/' + guideId : '/dashboard';
   const roundTitle = scope === 'classroom' ? queue?.classroom?.name || 'Classroom review'
     : scope === 'folder' ? queue?.folderName || 'Folder review'
       : guideId ? queue?.guides[0]?.title || 'Study now' : 'Daily review';

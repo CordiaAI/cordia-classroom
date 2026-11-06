@@ -18,6 +18,7 @@ import {
 import { dueCards, learnIdeas } from '../../lib/studyQueue';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TABS = [
   { key: 'guides', label: 'Guides' },
   { key: 'study', label: 'Study' },
@@ -472,7 +473,7 @@ function StudyTab({ room, onToast }) {
                   <span className="crst-name">{guide.title || 'Untitled'}</span>
                 </label>
                 <span className="c-meta crst-due">{guide.due} due</span>
-                <Link href={'/learn/' + guide.id} className="c-btn c-btn--quiet c-btn--sm" aria-label={`Learn ${guide.title || 'this guide'}`}>Learn</Link>
+                <Link href={UUID.test(guide.id) ? '/learn/' + guide.id : '/library'} className="c-btn c-btn--quiet c-btn--sm" aria-label={`Learn ${guide.title || 'this guide'}`}>Learn</Link>
               </li>
             ))}
           </ul>
