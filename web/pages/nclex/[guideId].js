@@ -5,6 +5,7 @@ import { apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import { ArrowLeft } from 'lucide-react';
 import NCLEXQuizMode from '../../components/NCLEXQuizMode';
+import { clearResume, readResume, writeResume } from '../../lib/resume';
 
 export default function NCLEXPage() {
   const router = useRouter();
@@ -13,6 +14,8 @@ export default function NCLEXPage() {
   const [questions, setQuestions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // A set left mid-way (a refresh): the same questions again, at the same place, without writing new ones.
+  const [resumed, setResumed] = useState(null);
   const gate = useLoadGate(!loading);
 
   useEffect(() => {
@@ -22,6 +25,13 @@ export default function NCLEXPage() {
   async function loadNCLEX() {
     setLoading(true);
     setError('');
+    const pending = readResume('nclex', guideId);
+    if (pending?.questions?.length && pending.quiz) {
+      setQuestions(pending.questions);
+      setResumed(pending.quiz);
+      setLoading(false);
+      return;
+    }
     try {
       const data = await apiFetch('/nclex/' + guideId + '/generate');
       if (data?.questions?.length) {
@@ -60,7 +70,12 @@ export default function NCLEXPage() {
     <Reveal phase={gate}>
     <div className="c-page">
       {head}
-      <NCLEXQuizMode questions={questions} guideId={guideId} />
+      <NCLEXQuizMode
+        questions={questions}
+        guideId={guideId}
+        resume={resumed}
+        onProgress={snapshot => (snapshot ? writeResume('nclex', guideId, { questions, quiz: snapshot }) : clearResume('nclex', guideId))}
+      />
     </div>
     </Reveal>
   );

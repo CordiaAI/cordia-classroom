@@ -152,6 +152,11 @@ def tier_for(row: Optional[dict]) -> str:
         trial_ends = _ts(row.get("pro_trial_ends_at"))
         if trial_ends and trial_ends <= _now():
             return "free"
+    # A manual grant with an end date (a comped month) ends on it; one without stays on.
+    if row.get("source") == "manual" and not row.get("stripe_subscription_id"):
+        grant_ends = _ts(row.get("current_period_end"))
+        if grant_ends and grant_ends <= _now():
+            return "free"
     return tier
 
 
