@@ -79,7 +79,8 @@ def _search(db, table: str, columns: str, user_id: str, terms: list, exclude: st
 
 
 def related_material(db, user_id: str, guide_id: str, question: str, answer: str) -> list:
-    """Up to three [{kind, id, title, snippet}] from the student's other material, best first."""
+    """Up to three [{kind, id, title, snippet}] from the student's other material, best first, then up
+    to two things they shared about themselves (kind 'memory')."""
     terms = key_terms(question, answer)
     if not terms:
         return []
@@ -115,4 +116,26 @@ def related_material(db, user_id: str, guide_id: str, question: str, answer: str
     except Exception:
         logger.warning("Memory context: Tutor chats unavailable", exc_info=True)
     found.sort(key=lambda item: item["_score"], reverse=True)
-    return [{key: value for key, value in item.items() if key != "_score"} for item in found[:MAX_LINKS]]
+    picked = [{key: value for key, value in item.items() if key != "_score"} for item in found[:MAX_LINKS]]
+    return picked + _about_you(db, user_id, terms)
+
+
+_ABOUT_TITLES = {"tutor": "What you told the Tutor", "assistant": "What you told your Assistant"}
+
+
+def _about_you(db, user_id: str, terms: list) -> list:
+    """Up to two things the student shared about themselves (public.student_memory, written by the
+    Tutor and mirrored from the Assistant): ones that share a key word first, then interests and goals.
+    The trick may use one as an anchor only when it fits."""
+    try:
+        rows = (db.table("student_memory").select("id, source, category, value").eq("user_id", user_id)
+                .order("updated_at", desc=True).limit(50).execute().data or [])
+    except Exception:
+        return []  # before migration 20261121130000
+    def rank(row):
+        low = str(row.get("value") or "").lower()
+        return (sum(1 for term in terms if term in low), row.get("category") in ("interest", "goal"))
+    rows = sorted(rows, key=rank, reverse=True)
+    return [{"kind": "memory", "id": row["id"], "title": _ABOUT_TITLES.get(row.get("source"), "About you"),
+             "snippet": str(row.get("value") or "")[:_SNIPPET]}
+            for row in rows[:2] if row.get("value") and (rank(row)[0] or rank(row)[1])]

@@ -11,6 +11,7 @@ import LearningStylePicker from '../components/LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
 import TutorSettings from '../components/TutorSettings';
 import MemoryTrickSettings from '../components/MemoryTrickSettings';
+import MemorySettings from '../components/MemorySettings';
 import { Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2, UserRound } from 'lucide-react';
 import BodyPortal from '../components/BodyPortal';
 import SharingSettings from '../components/SharingSettings';
@@ -359,6 +360,7 @@ export default function SettingsPage() {
           <div className="profile-section c-stack" role="tabpanel" id="panel-tutor" aria-labelledby="tab-tutor">
             <TutorSettings />
             <MemoryTrickSettings />
+            <MemorySettings />
             {learningStyle?.enabled && (
               <div className="c-card settings-card">
                 <h2 className="c-section-title">Explain things to me with…</h2>

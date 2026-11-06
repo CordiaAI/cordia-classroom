@@ -275,6 +275,26 @@ def save_onboarding_answers(body: OnboardingAnswers, authorization: str = Header
     return {"saved": len(rows)}
 
 
+@router.get("/memories")
+def list_memories(authorization: str = Header(default="")):
+    """Settings › Tutor, "What Cordia remembers": what the Tutor and the Assistant keep about the
+    student (public.student_memory). Empty before migration 20261121130000."""
+    from services import student_memory
+    return {"memories": student_memory.list_for(get_supabase(), get_user_id(authorization))}
+
+
+@router.delete("/memories/{memory_id}")
+def forget_memory(memory_id: str, authorization: str = Header(default="")):
+    """Forget one memory, the student's own only (an Assistant one is forgotten there too)."""
+    from services import student_memory
+    require_uuid(memory_id, "memory ID")
+    user_id = get_user_id(authorization)
+    db = get_supabase()
+    if not student_memory.forget(db, user_id, memory_id):
+        raise HTTPException(status_code=404, detail="That memory is already gone.")
+    return {"memories": student_memory.list_for(db, user_id)}
+
+
 @router.get("/memory-tricks/settings")
 def memory_trick_settings(authorization: str = Header(default="")):
     """Settings › Tutor: whether to offer the 18+ confirmation, and "Crude humor in memory tricks"."""

@@ -566,7 +566,7 @@ def memory_hook(question: str, answer: str, style: str = "link", interests=(), p
     Returns {"hook"} plus {"linked": {kind, id, title}} when it built on a piece of context."""
     from services.retain import mentions_answer
     likes = ", ".join(str(item).replace("_", " ") for item in interests or ()) or "none given"
-    context = list(context or ())[:3]
+    context = list(context or ())[:5]
     material = "\n".join(f"[{i}] {item['title']}: {item['snippet']}" for i, item in enumerate(context, 1))
     response = chat(get_openai_client(), "retain_remember",
         messages=[
