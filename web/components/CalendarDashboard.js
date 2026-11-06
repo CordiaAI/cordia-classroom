@@ -20,6 +20,8 @@ export function feedLinkProblem(value) {
 }
 import { canvasStatus } from '../lib/canvas';
 import CanvasConnectSheet from './CanvasConnectSheet';
+import BodyPortal from './BodyPortal';
+import Toggle from './Toggle';
 import { deadlineCourse, deadlineTitle } from '../lib/formatters';
 
 const FEED_KEY = 'cordiaCanvasCalendarFeed';
@@ -105,6 +107,8 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
   // Canvas token connection (all classes and course files), offered when the backend has it.
   const [canvasReady, setCanvasReady] = useState(false);
   const [tokenOpen, setTokenOpen] = useState(false);
+  const [tokenConnected, setTokenConnected] = useState(false);
+  const [foundClasses, setFoundClasses] = useState(null);
   // One Connect Canvas: the access token first; the calendar link is the fallback.
   const [feedOpen, setFeedOpen] = useState(false);
   // Deadlines from the access token (not a calendar link) are managed in Settings.
@@ -159,6 +163,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     });
     if (applyCalendar(data, accountId)) {
       walkthroughEvent('calendar-connected');
+      if (Array.isArray(data.classes) && data.classes.length) setFoundClasses(data.classes);
       const feedKey = accountKey(FEED_KEY, accountId);
       if (feedKey) localStorage.removeItem(feedKey);
       setFeedUrl('');
@@ -259,7 +264,6 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
       { label: 'Paste here', icon: ClipboardPaste, shot: <CanvasFeedLink />, line: 'Copy the link ending in .ics' },
     ];
     const linkProblem = feedLinkProblem(feedUrl);
-    const sheet = tokenOpen && <CanvasConnectSheet school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''} onClose={() => setTokenOpen(false)} onConnected={data => { if (data?.connected) { setCanvasReady(false); refresh(); } }} />;
     if (canvasReady && !feedOpen) {
       connectCard = (
         <section className="c-card cal-connect cal-connect--one" aria-label="Connect Canvas">
@@ -268,7 +272,6 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
           <p className="c-meta">Your study blocks and lecture to-dos are below. Connect Canvas to add every class’s deadlines, kept in sync.</p>
           <button type="button" className="c-btn c-btn--primary" data-spot="calendar-feed" onClick={() => setTokenOpen(true)}>Connect Canvas</button>
           <button type="button" className="c-btn c-btn--quiet" onClick={() => setFeedOpen(true)}>Use a calendar link instead</button>
-          {sheet}
           <style jsx>{`
             .cal-connect--one { display: grid; justify-items: center; gap: 12px; padding: 40px 28px; text-align: center; }
             .cal-connect--one :global(.lucide) { color: var(--olive-ink); }
@@ -303,7 +306,6 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
             <KeyRound size={20} strokeWidth={1.75} aria-hidden="true" />Connect with an access token instead
           </button>
         )}
-        {sheet}
         <style jsx>{`
           .cal-connect { display: grid; gap: 24px; padding: 28px; }
           .cal-token { justify-self: start; margin: -12px 0 -8px -12px; }
@@ -455,7 +457,64 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
       </div>
     </section>
     {connectCard}
+    {/* Outside the connect card: connecting hides the card, and the sheet's next step is
+        choosing classes (feedback 10). The calendar reloads once the sheet closes. */}
+    {tokenOpen && (
+      <CanvasConnectSheet
+        school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''}
+        onClose={() => { setTokenOpen(false); if (tokenConnected) { setTokenConnected(false); refresh(); } }}
+        onConnected={data => { if (data?.connected) { setCanvasReady(false); setTokenConnected(true); } }}
+      />
+    )}
+    {foundClasses && <CalendarClassChooser classes={foundClasses} onClose={() => setFoundClasses(null)} />}
     </div>
+  );
+}
+
+// Right after a calendar link connects: the classes Cordia read from it, all kept unless the
+// student unticks one (a code it guessed wrong, or a class they don't want). Done drops the unticked.
+function CalendarClassChooser({ classes, onClose }) {
+  const [kept, setKept] = useState(() => new Set(classes.map(c => c.id)));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const toggle = id => setKept(current => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+
+  async function done() {
+    setBusy(true);
+    setError('');
+    const dropped = classes.filter(c => !kept.has(c.id));
+    const results = await Promise.all(dropped.map(c => apiFetch(`/classes/${c.id}`, { method: 'DELETE' })));
+    setBusy(false);
+    if (results.some(result => !result?.ok)) { setError('Some classes couldn’t be removed. Try again.'); return; }
+    onClose();
+  }
+
+  return (
+    <BodyPortal>
+      <div className="c-scrim" onClick={onClose}>
+        <section className="c-sheet ccc" role="dialog" aria-modal="true" aria-labelledby="ccc-title" onClick={event => event.stopPropagation()}>
+          <header className="c-sheet-head">
+            <h2 id="ccc-title" className="c-section-title">Choose classes</h2>
+          </header>
+          <p className="c-meta">Found in your calendar. Untick any you don’t take.</p>
+          <ul className="ccc-list">
+            {classes.map(c => (
+              <li key={c.id}>
+                <Toggle checked={kept.has(c.id)} disabled={busy} onChange={() => toggle(c.id)} label={c.name ? `${c.code} ${c.name}` : c.code} />
+              </li>
+            ))}
+          </ul>
+          {error && <p className="canvas-inline-error" role="alert">{error}</p>}
+          <div className="ccc-actions"><button type="button" className="c-btn c-btn--primary" onClick={done} disabled={busy}>{busy ? 'Saving…' : 'Done'}</button></div>
+          <style jsx>{`
+            .ccc { display: grid; gap: var(--space-4); }
+            .ccc p { margin: 0; }
+            .ccc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+            .ccc-actions { display: flex; justify-content: flex-end; }
+          `}</style>
+        </section>
+      </div>
+    </BodyPortal>
   );
 }
 

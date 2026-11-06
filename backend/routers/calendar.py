@@ -425,14 +425,16 @@ def connect_calendar(body: CalendarPreviewRequest, authorization: str = Header(d
         on_conflict="user_id",
     ).execute()
     try:
-        _import_classes(user_id, body.url, payload.get("items") or [])
+        # The app opens "Choose classes" with these right away, to drop any it guessed wrong.
+        payload["classes"] = _import_classes(user_id, body.url, payload.get("items") or [])
     except Exception as exc:
         logger.warning(f"Calendar classes skipped: {type(exc).__name__}")
     return payload
 
 
-def _import_classes(user_id: str, url: str, items: list[dict]) -> None:
-    """Course codes in event titles ("Essay [MGT-300-102]") or locations become class memberships."""
+def _import_classes(user_id: str, url: str, items: list[dict]) -> list[dict]:
+    """Course codes in event titles ("Essay [MGT-300-102]") or locations become class memberships.
+    Returns the classes added, [{id, code, name}]."""
     from services.class_catalog import clean_term, normalize_course_code, school_name_from_domain
     from services.class_db import add_membership, ensure_class, ensure_school
 
@@ -448,14 +450,18 @@ def _import_classes(user_id: str, url: str, items: list[dict]) -> None:
         if normalized.code:
             codes.setdefault(normalized.code, label)
     if not codes:
-        return
+        return []
     host = (urlparse(url).hostname or "").lower()
     db = get_supabase()
     school = ensure_school(db, school_name_from_domain(host), host)
+    added = []
     for raw in list(codes.values())[:20]:
         class_row = ensure_class(db, school["id"], raw)
         if class_row:
             add_membership(db, user_id, class_row, clean_term(""), "calendar")
+            added.append({"id": class_row["id"], "code": class_row.get("course_code_normalized") or raw,
+                          "name": class_row.get("display_name") or ""})
+    return added
 
 
 @router.delete("/connection")
