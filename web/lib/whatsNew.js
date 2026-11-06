@@ -6,6 +6,7 @@
 // browser instead (per account). A local copy is always kept, so nothing flickers back.
 import { useEffect, useState } from 'react';
 import { apiFetch, getUserId } from './api';
+import { readUserValue, writeUserValue } from './userStore';
 import { markUsed } from './progress';
 import { CLASSROOMS_ON, LEARN_LADDER_V2, PER_VIEWER_PROGRESS } from './featureFlags';
 import { EMPTY_SEEN, FEATURE_RELEASES, mergeSeen } from './featureReleases';
@@ -24,17 +25,13 @@ let state = { ready: false, stored: false, seen: EMPTY_SEEN, user: null };
 let loadingFor = '';
 const listeners = new Set();
 
-function key() {
-  const id = getUserId();
-  return id ? `${LOCAL}:${id}` : '';
-}
-
+// The browser copy goes through the app's per-account store (lib/userStore.js).
 function readLocal() {
-  try { return JSON.parse(localStorage.getItem(key()) || 'null') || EMPTY_SEEN; } catch { return EMPTY_SEEN; }
+  return mergeSeen(readUserValue(LOCAL, null));
 }
 
 function writeLocal(seen) {
-  try { if (key()) localStorage.setItem(key(), JSON.stringify(seen)); } catch { /* private window */ }
+  writeUserValue(LOCAL, mergeSeen(seen));
 }
 
 function publish(next) {
