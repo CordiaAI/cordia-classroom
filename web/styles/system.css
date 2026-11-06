@@ -121,6 +121,14 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
   cursor: pointer; text-decoration: none; text-align: center;
 }
 .c-seg [aria-selected='true'], .c-seg .is-active { background: var(--card); box-shadow: var(--shadow); }
+/* SegmentedControl: one glass pill slides under the chosen segment (transform, spring-like curve);
+   the segments themselves stay clear. Reduced motion: the pill jumps. */
+.c-seg.has-pill { position: relative; isolation: isolate; }
+.c-seg-pill { position: absolute; top: 0; left: 0; z-index: 0; border-radius: var(--r-pill); background: var(--seg-pill-bg); box-shadow: var(--seg-pill-shadow); pointer-events: none; will-change: transform; }
+.c-seg.is-ready .c-seg-pill { transition: transform var(--seg-dur) var(--seg-spring), width var(--seg-dur) var(--seg-spring), height var(--seg-dur) var(--seg-spring); }
+.c-seg.has-pill > :is(button, a) { position: relative; z-index: 1; }
+.c-seg.has-pill.has-pill > :is(button, a):is([aria-selected='true'], [aria-checked='true'], [aria-pressed='true'], .is-active) { background: transparent !important; box-shadow: none !important; border-color: transparent !important; }
+@media (prefers-reduced-motion: reduce) { .c-seg.is-ready .c-seg-pill { transition: none; } }
 .c-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .c-chip {
   display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px;

@@ -36,6 +36,7 @@ import { activeStep, walkthroughEvent } from '../../lib/walkthrough';
 import { requestTip } from '../../lib/tips';
 import { readUserValue, writeUserValue } from '../../lib/userStore';
 import { exportToDocs, exportToNotion } from '../../lib/studyPlans';
+import SegmentedControl from '../../components/SegmentedControl';
 
 const NURSING_TERMS = ['nursing', 'nurse', 'nclex', 'patient', 'vital signs', 'medication administration', 'care plan', 'nursing diagnosis', 'iv therapy', 'delegation', 'scope of practice', 'sbar', 'discharge planning', 'wound care', 'fall prevention', 'infection control', 'postoperative', 'preoperative', 'lab values', 'contraindications'];
 
@@ -615,10 +616,10 @@ export default function GuidePage() {
         </p>
       )}
 
-      {hasMaterial && <div className="c-seg guide-view" role="tablist" aria-label="Outline view">
+      {hasMaterial && <SegmentedControl kind="tabs" label="Outline view" className="guide-view">
         <button type="button" role="tab" aria-selected={view === 'outline'} className={view === 'outline' ? 'is-active' : ''} onClick={() => setView('outline')}>Outline</button>
         <button type="button" role="tab" aria-selected={view === 'pages'} className={view === 'pages' ? 'is-active' : ''} onClick={() => setView('pages')}>By page</button>
-      </div>}
+      </SegmentedControl>}
 
       {view === 'outline' || !hasMaterial ? (
         <section className="c-card guide-notes" aria-label="Outline" aria-busy={outlinePending}>
@@ -709,7 +710,7 @@ export default function GuidePage() {
         .guide-tabs-row .c-pills { flex: 1 1 auto; min-width: 0; max-width: 100%; }
         .guide-tabs-row .c-pills :global(.c-pill) { flex: 0 0 auto; }
         .guide-tabs-row, .guide-head { min-width: 0; max-width: 100%; }
-        .guide-view { justify-self: start; }
+        :global(.guide-view) { justify-self: start; }
         .guide-title-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing:-0.015em; text-align: left; cursor: text; border-radius:var(--r-input); }
         .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
         .guide-rename { flex: 1 1 auto; min-width: 0; }

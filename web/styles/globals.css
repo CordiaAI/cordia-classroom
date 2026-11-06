@@ -3129,8 +3129,8 @@ a.calendar-item:hover { border-color: var(--ink); }
 .study-aid-open { margin: 6px 16px 12px; padding: 6px 12px; border: 1px solid var(--accent); border-radius:999px; background: transparent; color: var(--accent); font: inherit; font-size: 13px; font-weight:600; cursor: pointer; }
 .study-aid-panel { margin: 4px 16px 16px; padding: 14px; border: 1px solid var(--border-subtle); border-radius:20px; background: var(--surface); }
 .study-aid-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 12px; }
-.study-aid-tab { padding: 6px 12px; border: 1px solid var(--border-subtle); border-radius:999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 13px; cursor: pointer; }
-.study-aid-tab.active { border-color: var(--olive); background: var(--olive); color: var(--on-olive); }
+.study-aid-seg { flex-wrap: wrap; }
+.study-aid-seg .study-aid-tab { height: 34px; padding: 0 14px; font: 600 13px/34px var(--font-sans); }
 .study-aid-close { margin-left: auto; border: 0; background: transparent; color: var(--text-muted); font-size:20px; cursor: pointer; }
 .study-aid-diagram { overflow-x: auto; margin: 8px 0 12px; }
 .study-aid-diagram svg { max-width: 100%; height: auto; }

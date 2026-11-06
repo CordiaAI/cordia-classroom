@@ -12,6 +12,7 @@ import { logAnswer } from '../lib/learningEvents';
 import { answerTimer } from '../lib/learningEvents.mjs';
 import { drawLatestSegment, drawStroke, farEnough, finishStroke } from '../lib/airDraw.mjs';
 import AirDraw from './AirDraw';
+import SegmentedControl from './SegmentedControl';
 
 // Drawing in the air with the webcam is off on the live site until it tracks well enough.
 const WEBCAM_DRAWING = false;
@@ -560,11 +561,11 @@ export default function PracticeWorkspace() {
           </div>
 
           <div className="practice-toolbar" role="toolbar" aria-label="Workspace tools">
-            <div className="c-seg" role="group" aria-label="Tool">
+            <SegmentedControl kind="group" label="Tool">
               <button type="button" className={tool === 'pen' ? 'is-active' : ''} aria-pressed={tool === 'pen'} onClick={() => setTool('pen')}><PenLine {...ICON} /> Draw</button>
               <button type="button" className={tool === 'eraser' ? 'is-active' : ''} aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')}><Eraser {...ICON} /> Erase</button>
               <button type="button" className={tool === 'type' ? 'is-active' : ''} aria-pressed={tool === 'type'} onClick={() => setTool('type')}><Type {...ICON} /> Type</button>
-            </div>
+            </SegmentedControl>
             <div className="practice-symbols">
               {SYMBOLS.map(symbol => <button type="button" className="c-icon-btn" key={symbol} onClick={() => addSymbol(symbol)} aria-label={`Add ${symbol}`}>{symbol}</button>)}
               <button type="button" className="c-icon-btn" onClick={() => addSymbol('', 'exp')} aria-label="Add exponent">xⁿ</button>
@@ -718,7 +719,7 @@ export default function PracticeWorkspace() {
         .practice-prompt { margin: 8px 0 0; font:600 20px/1.15 var(--font-sans); }
         .practice-kind { text-transform: capitalize; }
         .practice-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-        .practice-toolbar .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
+        .practice-toolbar :global(.c-seg) button { display: inline-flex; align-items: center; gap: 6px; }
         .practice-symbols { display: flex; flex-wrap: wrap; gap: 2px; }
         .practice-symbols :global(.c-icon-btn) { font:600 15px/1 var(--font-sans); }
         .practice-drawbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-basis: 100%; }

@@ -29,6 +29,7 @@ import ViewToggle from '../components/ViewToggle';
 import useScrollerTabs from '../lib/useScrollerTabs';
 import { ClassSetList, SECTIONS, SavedGuides, SectionTabs, VisibilityNote } from '../components/LibrarySections';
 import ClassroomList from '../components/ClassroomList';
+import SegmentedControl from '../components/SegmentedControl';
 
 const SORTS = [
   { key: 'recent', label: 'Newest' },
@@ -483,13 +484,13 @@ export default function LibraryPage() {
       </div>
       <div className="c-row lib-filter-row">
         {/* The same segmented tabs as Settings and a class page. */}
-        <div ref={filtersRef} className="c-seg is-scroller lib-filters" role="tablist" aria-label="Show">
+        <SegmentedControl kind="tabs" label="Show" className="lib-filters" scroller innerRef={filtersRef}>
           {FILTERS.map(item => (
             <button key={item.key} type="button" role="tab" aria-selected={filter === item.key} className={filter === item.key ? 'is-active' : ''} onClick={() => setFilter(item.key)}>
               {item.key === 'starred' && <Star size={16} strokeWidth={1.75} aria-hidden="true" />}{item.label}
             </button>
           ))}
-        </div>
+        </SegmentedControl>
         <span className="c-spacer" />
         <button type="button" className="c-btn c-btn--quiet lib-add-class" onClick={() => setAddingClass(true)}><FolderPlus size={20} strokeWidth={1.75} aria-hidden="true" />Add a class</button>
       </div>
@@ -550,9 +551,9 @@ export default function LibraryPage() {
         @media (max-width: 767px) { .library .lib-add-class-icon { display: inline-grid; } }
         .library .lib-filter-row { flex-wrap: nowrap; min-width: 0; }
         /* Seven filters: on narrow screens they scroll inside their bar, never the page. */
-        .library .lib-filters { max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; }
-        .library .lib-filters::-webkit-scrollbar { display: none; }
-        .library .lib-filters button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+        .library :global(.lib-filters) { max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+        .library :global(.lib-filters)::-webkit-scrollbar { display: none; }
+        .library :global(.lib-filters) button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
         .library .lib-group { padding: 6px; }
         .library .lib-group.is-drop { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
         .library .lib-group-head { display: flex; align-items: center; gap: 6px; min-height: 52px; padding-right: 12px; }

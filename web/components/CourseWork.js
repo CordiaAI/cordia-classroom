@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ExternalLink, ListChecks } from 'lucide-react';
 import DoneCheck from './DoneCheck';
 import { deadlineTitle, safeHref } from '../lib/formatters';
+import SegmentedControl from './SegmentedControl';
 
 // The Dashboard's course work, like Canvas's: how much is upcoming, missing and completed this
 // term (GET /calendar/coursework), each a tab with its list. Lecture to-dos join Upcoming.
@@ -61,7 +62,7 @@ export default function CourseWork({ data, extraUpcoming = [], onPlan, actions }
         {actions}
       </div>
       <div className="c-card cw-card">
-        <div className="c-seg cw-tabs" role="tablist" aria-label="Course work">
+        <SegmentedControl kind="tabs" label="Course work" className="cw-tabs">
           {TABS.map(item => (
             <button key={item.key} type="button" role="tab" aria-selected={tab === item.key} className={`cw-tab is-${item.key}`}
               title={item.key === 'missing' ? 'Canvas marked it missing, or it is past due and not turned in' : undefined}
@@ -69,7 +70,7 @@ export default function CourseWork({ data, extraUpcoming = [], onPlan, actions }
               {item.label}<span className="cw-badge">{counts[item.key]}</span>
             </button>
           ))}
-        </div>
+        </SegmentedControl>
         <div className="cw-list" role="tabpanel" aria-label={TABS.find(item => item.key === tab).label}>
           {!list.length && <p className="c-meta cw-empty">{TABS.find(item => item.key === tab).empty}</p>}
           {shown.map(item => {
@@ -108,7 +109,7 @@ export default function CourseWork({ data, extraUpcoming = [], onPlan, actions }
       </div>
       <style jsx>{`
         .cw-card { display: grid; gap: 4px; padding: 8px; }
-        .cw-tabs { justify-self: start; margin: 4px 4px 6px; }
+        :global(.cw-tabs) { justify-self: start; margin: 4px 4px 6px; }
         .cw-tab { display: inline-flex; align-items: center; gap: 8px; }
         .cw-badge { min-width: 22px; padding: 2px 7px; border-radius: var(--r-pill); background: var(--surface-raised); color: var(--muted); font: 600 12px/1.3 var(--font-sans); text-align: center; }
         .cw-tab[aria-selected='true'] .cw-badge { background: var(--olive-tint); color: var(--olive-ink); }
@@ -131,7 +132,7 @@ export default function CourseWork({ data, extraUpcoming = [], onPlan, actions }
         .cw-empty { margin: 0; padding: 18px 12px; }
         .cw-more { justify-self: start; margin: 4px 8px 6px; }
         @media (max-width: 520px) {
-          .cw-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); justify-self: stretch; min-width: 0; }
+          :global(.cw-tabs) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); justify-self: stretch; min-width: 0; }
           .cw-tab { justify-content: center; gap: 5px; min-width: 0; padding-inline: 6px; font-size: 14px; }
           .cw-badge { min-width: 0; padding: 2px 6px; }
           .cw-row { gap: 10px; padding: 10px 6px; }

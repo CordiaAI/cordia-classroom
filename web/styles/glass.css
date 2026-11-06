@@ -5,12 +5,19 @@
 /* One recipe: frosted fill + sheen + grain, a bright top rim, a hairline edge, a soft shadow. */
 :is(.c-btn--secondary, .btn-outline, .btn-gray, .c-btn--quiet, .c-icon-btn, .c-chip, .c-pill, .c-seg, .c-avatar,
   .c-searchbtn, .c-timerbtn, .c-tutor-bubble, .today-streak, .c-toast, .c-tip, .wt-resume, .guide-jobs .guide-job,
-  .quiz-mode, .quiz-option, .study-aid-tab, .tutor-select-trigger, .cset-option, .practice-guide, .lib-kind, .c-drop-hint) {
+  .quiz-mode, .quiz-option, .tutor-select-trigger, .cset-option, .practice-guide, .lib-kind, .c-drop-hint) {
   background: var(--lg-sheen), var(--lg-fill);
   border: 1px solid var(--lg-edge);
   -webkit-backdrop-filter: var(--lg-filter);
   backdrop-filter: var(--lg-filter);
   box-shadow: var(--lg-highlight), var(--lg-shadow);
+}
+
+/* Long scrolling lists and grids skip the blur on every item (feedback 14): dozens of blurred
+   panes repaint on each scroll frame. Their fill and edges stay, so they still read as glass. */
+:is(.lib-list, .item-grid, .lib-cards, .cc-grid, .c-list) :is(.c-card, .c-glass, .c-list-row, .lib-row) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 /* Pills in a scrolling row skip the blur: Chrome sometimes paints a blurred pill inside a

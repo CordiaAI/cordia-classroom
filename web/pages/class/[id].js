@@ -7,6 +7,7 @@ import { apiFetch, apiErrorMessage } from '../../lib/api';
 import { loadFolders } from '../../lib/folders';
 import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { ClassDeadlines, ClassSets } from '../../components/ClassSets';
+import SegmentedControl from '../../components/SegmentedControl';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -56,10 +57,10 @@ export default function SharedClassPage() {
       {error && <p className="cp-line" role="alert">{error}</p>}
       {info && (
         <>
-          <div className="c-seg cp-tabs" role="tablist" aria-label="Class">
+          <SegmentedControl kind="tabs" label="Class" className="cp-tabs">
             <button type="button" role="tab" aria-selected={tab === 'sets'} className={tab === 'sets' ? 'is-active' : ''} onClick={() => setTab('sets')}>Class sets</button>
             <button type="button" role="tab" aria-selected={tab === 'deadlines'} className={tab === 'deadlines' ? 'is-active' : ''} onClick={() => setTab('deadlines')}>Deadlines</button>
-          </div>
+          </SegmentedControl>
           {tab === 'sets' ? <ClassSets classId={id} onToast={setToast} initial={classData} /> : <ClassDeadlines classId={id} deadlines={deadlines} />}
         </>
       )}
@@ -68,7 +69,7 @@ export default function SharedClassPage() {
         .cp-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
         .cp-heading { min-width: 0; overflow-wrap: anywhere; }
         .cp-heading span { color: var(--muted); }
-        .cp-tabs { justify-self: start; }
+        :global(.cp-tabs) { justify-self: start; }
       `}</style>
     </div>
     </Reveal>

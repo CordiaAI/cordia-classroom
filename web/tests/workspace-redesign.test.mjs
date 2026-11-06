@@ -121,7 +121,7 @@ test('Settings: Account (with theme), Tutor (with Explain style), Plan, Connecto
   assert.doesNotMatch(settings, /key: 'study'|key: 'appearance'|key: 'learn'|<LearnCordia/);
   assert.match(settings, /study: 'tutor', appearance: 'account'/);
   assert.match(settings, /section === 'learn'\).*openHelp\(\)/);
-  assert.match(settings, /aria-label="Theme"/);
+  assert.match(settings, /<SegmentedControl kind="group" label="Theme">/);
   assert.match(settings, /<LearningStylePicker /);
 });
 
