@@ -159,7 +159,7 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
           <div className="feedback-success" role="status">
             <Check aria-hidden="true" />
             <h2>Feedback sent</h2>
-            <p>Thank you for helping improve CordiaClassroom.</p>
+            <p>Thank you for helping improve Cordia Classroom.</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} onPaste={onPaste} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); addShots(event.dataTransfer?.files || []); }}>

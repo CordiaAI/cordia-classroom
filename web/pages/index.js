@@ -37,14 +37,14 @@ export function Landing({ mode = 'signin', path = '/' }) {
 
   return (
     <PublicPage
-      title="CordiaClassroom — AI Study Guides, Notes & Flashcards"
+      title="Cordia Classroom — AI Study Guides, Notes & Flashcards"
       description="Turn lectures, textbooks, and course pages into focused study materials."
       path={path}
       backdrop="/login-learning-backdrop.webp"
     >
       <div className="landing">
         <section className="landing-hero">
-          <h1 className="landing-title">CordiaClassroom</h1>
+          <h1 className="landing-title">Cordia Classroom</h1>
           <ul className="sr-only">{FEATURES.map(feature => <li key={feature}>{feature}</li>)}</ul>
           <div className="landing-ticker" aria-hidden="true">
             <div className="landing-ticker-track">

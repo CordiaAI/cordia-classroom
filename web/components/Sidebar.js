@@ -5,6 +5,7 @@ import { CalendarDays, ChartNoAxesColumn, CircleHelp, CreditCard, Ellipsis, Fold
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
+import BrandName from './BrandName';
 import SearchModal from './SearchModal';
 import HelpSheet from './HelpSheet';
 import AccountMenu from './AccountMenu';
@@ -251,7 +252,7 @@ export default function Sidebar({ timerState, setTimerState }) {
         <div className="c-side-head">
           <Link className="c-side-brand" href="/dashboard" aria-label="Cordia Classroom, Dashboard">
             <AcademicInfinityMark className="top-navigation-mark" title="" />
-            <span className="c-side-label">cordia</span>
+            <span className="c-side-label"><BrandName /></span>
           </Link>
           <button type="button" className="c-side-toggle" onClick={toggleSide} aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={tip('Expand sidebar')} aria-expanded={!collapsed}>
             {collapsed ? <PanelLeftOpen size={20} strokeWidth={1.75} aria-hidden="true" /> : <PanelLeftClose size={20} strokeWidth={1.75} aria-hidden="true" />}
@@ -309,7 +310,7 @@ export default function Sidebar({ timerState, setTimerState }) {
       <header className="c-topbar">
         <Link className="c-brand" href="/dashboard" aria-label="Cordia Classroom, Dashboard">
           <AcademicInfinityMark className="top-navigation-mark" title="" />
-          <span>cordia</span>
+          <span><BrandName /></span>
         </Link>
 
         <nav className="c-nav" aria-label="Primary">

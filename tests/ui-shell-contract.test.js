@@ -53,8 +53,8 @@ assert.doesNotMatch(classroomStyles, /text-transform:\s*uppercase/);
 assert.doesNotMatch(documentPage, /Cormorant\+Garamond/);
 assert.match(documentPage, /cordia-classroom\.ico/);
 assert.match(documentPage, /cordia-classroom-icon\.png/);
-assert.match(appPage, /application-name" content="CordiaClassroom"/);
-assert.match(appPage, /og:site_name" content="CordiaClassroom"/);
+assert.match(appPage, /application-name" content="Cordia Classroom"/);
+assert.match(appPage, /og:site_name" content="Cordia Classroom"/);
 assert.doesNotMatch(documentPage, /autostudy/i);
 assert.doesNotMatch(nextConfig, /autostudyai\.online|cordiacode\.com/);
 

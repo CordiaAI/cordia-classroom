@@ -58,10 +58,10 @@ export default function App({ Component, pageProps }) {
           accidental zoom is prevented by 16px fields and no double-tap zoom (styles/glass.css). */}
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" key="viewport" />
       <title>{routeTitle(router.pathname)}</title>
-      <meta name="application-name" content="CordiaClassroom" />
-      <meta name="description" content="Turn course material into focused study guides, notes, flashcards, and practice with CordiaClassroom." />
-      <meta property="og:site_name" content="CordiaClassroom" />
-      <meta property="og:title" content="CordiaClassroom" />
+      <meta name="application-name" content="Cordia Classroom" />
+      <meta name="description" content="Turn course material into focused study guides, notes, flashcards, and practice with Cordia Classroom." />
+      <meta property="og:site_name" content="Cordia Classroom" />
+      <meta property="og:title" content="Cordia Classroom" />
       <meta property="og:description" content="Turn course material into focused study guides, notes, flashcards, and practice." />
       <meta property="og:image" content="https://classroom.cordiaai.io/og-image.png" key="og:image" />
       <meta property="og:image:width" content="1200" key="og:image:width" />

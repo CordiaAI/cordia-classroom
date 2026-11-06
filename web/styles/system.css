@@ -823,3 +823,13 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   .item-grid > * { min-height: 120px; padding: 12px !important; }
 }
 .item-grid > * > svg:first-child { box-sizing: content-box; width: 20px; height: 20px; padding: 8px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
+
+/* ---------- Brand name (components/BrandName.js): the wordmark image, then "classroom" ---------- */
+.c-brandname { display: inline-flex; align-items: center; gap: .32em; white-space: nowrap; line-height: 1; }
+.c-brandname-mark { display: block; height: 1.02em; width: auto; }
+.c-brandname-product { font: 500 1em/1 var(--font-sans); letter-spacing: .01em; color: var(--olive-ink); }
+[data-theme='dark'] .c-brandname-mark { filter: brightness(0) invert(1); opacity: .92; }
+.c-side-brand .c-brandname { font-size: 17px; }
+@media (max-width: 767px) {
+  .c-topbar .c-brand > span { font-size: 17px !important; padding-left: 10px !important; }
+}

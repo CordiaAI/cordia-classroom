@@ -11,7 +11,7 @@ export default function InstallExtensionPage() {
       <div className="extension-install-hero">
         <AcademicInfinityMark className="extension-install-logo" />
         <div>
-          <p className="extension-install-eyebrow">CordiaClassroom for Chrome</p>
+          <p className="extension-install-eyebrow">Cordia Classroom for Chrome</p>
           <h1>Capture course material in a few clicks.</h1>
           <p>Install the extension once, then use it on any page you want to turn into study materials.</p>
         </div>
@@ -24,7 +24,7 @@ export default function InstallExtensionPage() {
             <h2>Download it from the Chrome Web Store</h2>
             <p>Open the listing, then select <strong>Add to Chrome</strong>.</p>
             <a className="extension-install-store-link" onClick={() => walkthroughEvent('extension-opened')} href={EXTENSION_STORE_URL} target="_blank" rel="noreferrer">
-              Open CordiaClassroom in Chrome Web Store <span aria-hidden="true">↗</span>
+              Open Cordia Classroom in Chrome Web Store <span aria-hidden="true">↗</span>
             </a>
           </div>
         </li>
@@ -32,16 +32,16 @@ export default function InstallExtensionPage() {
         <li className="extension-install-step">
           <span className="extension-install-number">2</span>
           <div>
-            <h2>Pin CordiaClassroom to your browser</h2>
-            <p>Click Chrome&apos;s puzzle-piece Extensions icon, then click the pin next to CordiaClassroom. The icon will stay visible in your toolbar.</p>
-            <div className="extension-install-illustration" role="img" aria-label="Example Chrome toolbar with the CordiaClassroom extension icon circled">
+            <h2>Pin Cordia Classroom to your browser</h2>
+            <p>Click Chrome&apos;s puzzle-piece Extensions icon, then click the pin next to Cordia Classroom. The icon will stay visible in your toolbar.</p>
+            <div className="extension-install-illustration" role="img" aria-label="Example Chrome toolbar with the Cordia Classroom extension icon circled">
               <div className="extension-install-toolbar">
                 <span className="extension-install-url">canvas.yourschool.edu</span>
                 <Puzzle className="extension-install-puzzle" aria-hidden="true" />
                 <span className="extension-install-circle" aria-hidden="true"><img src="/icon128.png" alt="" /></span>
                 <span className="extension-install-more" aria-hidden="true">⋮</span>
               </div>
-              <p>Look for the circled CordiaClassroom icon.</p>
+              <p>Look for the circled Cordia Classroom icon.</p>
             </div>
           </div>
         </li>
@@ -50,7 +50,7 @@ export default function InstallExtensionPage() {
           <span className="extension-install-number">3</span>
           <div>
             <h2>Open the page you want to capture</h2>
-            <p>Go to a course page, lecture slides, textbook page, or other material. Click the CordiaClassroom icon in your toolbar and sign in if asked.</p>
+            <p>Go to a course page, lecture slides, textbook page, or other material. Click the Cordia Classroom icon in your toolbar and sign in if asked.</p>
           </div>
         </li>
 
@@ -64,7 +64,7 @@ export default function InstallExtensionPage() {
       </ol>
 
       <div className="extension-install-footer">
-        <p>Installed already? Open any course material and click the CordiaClassroom icon to begin.</p>
+        <p>Installed already? Open any course material and click the Cordia Classroom icon to begin.</p>
         <a className="btn" href={EXTENSION_STORE_URL} target="_blank" rel="noreferrer">Open Chrome Web Store</a>
       </div>
 
