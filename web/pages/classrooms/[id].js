@@ -10,6 +10,7 @@ import UserChip from '../../components/UserChip';
 import Menu from '../../components/Menu';
 import InviteDialog from '../../components/InviteDialog';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import InstructorDashboard from '../../components/InstructorDashboard';
 import {
   KIND_LABELS, ROLE_LABELS, VISIBILITY_HELP, approveMember, archiveClassroom, changeRole, classroomActivity, classroomProgress,
   classroomStudy, getClassroom, leaveClassroom, listItems, listMembers, removeItem, removeMember, reorderItems, setMilestone,
@@ -21,6 +22,7 @@ const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TABS = [
   { key: 'guides', label: 'Guides' },
+  { key: 'instructor', label: 'Instructor', staffOfInstructorClass: true },
   { key: 'study', label: 'Study' },
   { key: 'members', label: 'Members' },
   { key: 'progress', label: 'Progress' },
@@ -47,6 +49,8 @@ export default function ClassroomPage() {
   useEffect(() => {
     if (TABS.some(item => item.key === router.query.tab)) setTab(router.query.tab);
   }, [router.query.tab]);
+  // The Instructor tab: only for the staff of an instructor class.
+  const tabs = TABS.filter(item => !item.staffOfInstructorClass || (room && room.kind === 'instructor_class' && room.can?.manage));
   const [inviting, setInviting] = useState(false);
   const [toast, setToast] = useState('');
   const gate = useLoadGate(Boolean(room) || missing);
@@ -64,11 +68,11 @@ export default function ClassroomPage() {
   }, [toast]);
 
   function onTabKey(event) {
-    const index = TABS.findIndex(item => item.key === tab);
+    const index = tabs.findIndex(item => item.key === tab);
     const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
     if (!step) return;
     event.preventDefault();
-    const next = TABS[(index + step + TABS.length) % TABS.length];
+    const next = tabs[(index + step + tabs.length) % tabs.length];
     setTab(next.key);
     document.getElementById(`crtab-${next.key}`)?.focus();
   }
@@ -108,7 +112,7 @@ export default function ClassroomPage() {
         {room.description && <p className="cr-desc">{room.description}</p>}
 
         <div className="c-seg is-scroller cr-tabs" role="tablist" aria-label="Classroom" onKeyDown={onTabKey}>
-          {TABS.map(item => (
+          {tabs.map(item => (
             <button key={item.key} id={`crtab-${item.key}`} type="button" role="tab" aria-selected={tab === item.key} aria-controls={`crpanel-${item.key}`}
               tabIndex={tab === item.key ? 0 : -1} className={tab === item.key ? 'is-active' : ''} onClick={() => setTab(item.key)}>
               {item.label}{item.key === 'members' && room.pending_count ? ` (${room.pending_count} waiting)` : ''}
@@ -117,6 +121,7 @@ export default function ClassroomPage() {
         </div>
         <div id={`crpanel-${tab}`} role="tabpanel" aria-labelledby={`crtab-${tab}`} className="cr-panel">
           {tab === 'guides' && <GuidesTab room={room} onToast={setToast} />}
+          {tab === 'instructor' && tabs.some(item => item.key === 'instructor') && <InstructorDashboard room={room} onToast={setToast} />}
           {tab === 'study' && <StudyTab room={room} onToast={setToast} />}
           {tab === 'members' && <MembersTab room={room} onToast={setToast} onChanged={load} />}
           {tab === 'progress' && <ProgressTab room={room} />}

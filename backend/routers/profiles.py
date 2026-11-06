@@ -234,7 +234,7 @@ def get_profile(username: str, authorization: str = Header(default="")):
         "initials": _initials(profile),
         "is_self": is_self,
         "limited": not full,
-        "badges": ["verified_instructor"] if instructors.is_verified(db, owner) else [],
+        "badges": [{"key": "verified_instructor", "label": "Verified instructor"}] if instructors.is_verified(db, owner) else [],
         # Public folders and classrooms arrive in Stage 5.
         "guides": guide_access.profile_guides(db, viewer, owner) if full else [],
         "folders": [],

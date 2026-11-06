@@ -155,6 +155,8 @@ export default function PrivacySettings() {
               <Choice label="Who can follow you" options={FOLLOWS} value={me.allow_follows} onPick={value => save({ allow_follows: value })} />
               <p className="pv-label">Who can send you friend requests</p>
               <Choice label="Who can send you friend requests" options={FRIEND_REQUESTS} value={me.allow_friend_requests} onPick={value => save({ allow_friend_requests: value })} />
+              <Toggle label="Let classmates from my courses find me" checked={Boolean(me.find_by_classmates)} onChange={value => save({ find_by_classmates: value })} />
+              <p className="c-meta pv-help">People taking your courses this term can see you under “Classmates from Canvas” and follow you or send a friend request. Never shown if your profile is private.</p>
             </section>
 
             <section className="c-card pv-card" aria-labelledby="pv-blocked">

@@ -245,7 +245,7 @@ class Stage8(unittest.TestCase):
     def test_verified_instructors_get_a_badge(self):
         self.assertEqual(self.get("ben", "/profiles/ana").json()["badges"], [])
         self.verify("ana", C1)
-        self.assertEqual(self.get("ben", "/profiles/ana").json()["badges"], ["verified_instructor"])
+        self.assertEqual(self.get("ben", "/profiles/ana").json()["badges"], [{"key": "verified_instructor", "label": "Verified instructor"}])
         # A matching email that isn't confirmed doesn't count.
         self.confirmed.pop(ANA)
         self.assertEqual(self.get("ben", "/profiles/ana").json()["badges"], [])

@@ -19,6 +19,8 @@ test('the search panel shows at most three public sets, then See all in Discover
   assert.equal(rows[0].meta, 'A classmate');
   assert.equal(rows[1].meta, 'Studied by 2');
   assert.equal(rows[3].href, '/explore?q=osmosis');
+  assert.equal(rows[0].verified, false);
+  assert.equal(publicSetRows([{ id: 'v', title: 'By an instructor', verified: true }], 'cells')[0].verified, true, 'verified instructors get the badge');
   assert.deepEqual(publicSetRows(guides, '  '), []);
   assert.deepEqual(publicSetRows(null, 'osmosis').map(row => row.kind), ['explore']);
 });

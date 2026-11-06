@@ -10,6 +10,7 @@ import FeedbackModal from '../../components/FeedbackModal';
 import FollowButton from '../../components/FollowButton';
 import FriendButton from '../../components/FriendButton';
 import { blockUser, loadProfile } from '../../lib/profiles';
+import VerifiedBadge from '../../components/VerifiedBadge';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const TABS = [
@@ -111,7 +112,9 @@ export default function ProfilePage() {
                   <ul className="up-facts">
                     {profile.school && <li><GraduationCap size={18} strokeWidth={1.75} aria-hidden="true" />{profile.school}</li>}
                     {profile.streak > 0 && <li><Flame size={18} strokeWidth={1.75} aria-hidden="true" />{profile.streak}-day streak</li>}
-                    {(profile.badges || []).map(badge => <li key={badge.key || badge.label} className="up-badge">{badge.label}</li>)}
+                    {(profile.badges || []).map(badge => (badge.key === 'verified_instructor'
+                      ? <li key={badge.key}><VerifiedBadge label /></li>
+                      : <li key={badge.key || badge.label} className="up-badge">{badge.label}</li>))}
                   </ul>
                 )}
                 {profile.counts && (
