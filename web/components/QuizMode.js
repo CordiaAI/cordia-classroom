@@ -5,6 +5,7 @@ import { LEARN_LADDER_V2 } from '../lib/featureFlags';
 import { logAnswer } from '../lib/learningEvents';
 import { Repeat } from 'lucide-react';
 import SessionFinish from './SessionFinish';
+import { PrintQuizButton } from './PrintQuizSheet';
 import { FillCard, MatchingCard, McCard, WrittenCard } from './RetainCards';
 import { rememberRetainMisses } from '../lib/userStore';
 import { conceptAnswer } from '../lib/retainEngine.mjs';
@@ -15,10 +16,11 @@ import { walkthroughEvent } from '../lib/walkthrough';
 // mode: how the answers are logged ('quiz', or 'check' for a new guide's Check yourself).
 // resume: a session saved by onProgress ({ session, answered, startedAt }) to pick up again after a
 // refresh. onProgress gets that snapshot after every answer, and null once the quiz is finished.
-export default function QuizMode({ questions, cards, types, guideId, onRestart, onDone, doneLabel, mode = 'quiz', resume = null, onProgress }) {
+// retry: a prebuilt session ("Retry my misses", lib/submitQuiz.mjs); it isn't submitted again, onRetryDone gets it.
+export default function QuizMode({ questions, cards, types, guideId, onRestart, onDone, doneLabel, mode = 'quiz', resume = null, onProgress, retry = null, onRetryDone }) {
   // A card already answered when the page was left moves on, so it isn't counted twice.
   // LEARN_LADDER_V2: a miss comes back 6-10 questions later instead of 3.
-  const [session, setSession] = useState(() => (resume ? (resume.answered ? advance(resume.session) : resume.session) : createSession(questions, cards, types, { ladder: LEARN_LADDER_V2 })));
+  const [session, setSession] = useState(() => (resume ? (resume.answered ? advance(resume.session) : resume.session) : retry || createSession(questions, cards, types, { ladder: LEARN_LADDER_V2 })));
   const [answered, setAnswered] = useState(false);
   const [score, setScore] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -52,6 +54,7 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart, 
   }
 
   async function finish(next) {
+    if (retry) { onRetryDone?.(next); return; }
     // First-try misses come back in the guide's Study now; ones the student was sure of come first.
     const misses = firstAttempts(next).filter(item => item.credit < 1)
       .map(item => ({ question: questions[item.concept]?.question || '', answer: conceptAnswer(questions[item.concept]), ...(item.confidence === 'sure' ? { sure: true } : {}) }))
@@ -78,6 +81,7 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart, 
     }));
   }
 
+  if (!card && retry) return null;
   if (!card) {
     const finalStats = progress(session);
     const accuracy = score?.score ?? Math.round((finalStats.firstTryRight / Math.max(1, finalStats.total)) * 100);
@@ -86,6 +90,7 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart, 
       <SessionFinish guideId={guideId} cards={finalStats.total} accuracy={accuracy} minutes={(Date.now() - startedAt) / 60000} kind="quiz" onRestart={onRestart} onDone={onDone} doneSpot="quiz-done" doneLabel={doneLabel}>
         {saving && <span className="c-meta" role="status">Saving…</span>}
         {score?.error && <p className="retain-action-error" role="alert">{score.error}</p>}
+        {mode === 'quiz' && <PrintQuizButton guideId={guideId} />}
         {sureMisses > 0 && <p className="c-meta finish-sure">{sureMisses === 1 ? 'One answer you were sure of was wrong.' : `${sureMisses} answers you were sure of were wrong.`} Those come back first in Study now, so they stick.</p>}
       </SessionFinish>
     );

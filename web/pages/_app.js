@@ -68,6 +68,11 @@ export default function App({ Component, pageProps }) {
     </Head>
   );
 
+  // A printable page is only the paper: no app shell around it.
+  if (router.pathname.startsWith('/print/')) {
+    return <>{brandHead}<Component {...pageProps} /></>;
+  }
+
   if (isLoginPage) {
     return <>{brandHead}<Component {...pageProps} /><Analytics /><SpeedInsights /></>;
   }

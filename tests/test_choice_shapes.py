@@ -86,8 +86,10 @@ class QuizOptionTests(unittest.TestCase):
         for _ in range(10):
             q = next(q for q in quiz._standard_questions(self.PAIRS) if q["question"] == "What carries oxygen?")
             wrong = [o for i, o in enumerate(q["options"]) if i != q["correct_index"]]
-            self.assertGreaterEqual(len(wrong), 2)
+            self.assertGreaterEqual(len(wrong), 1)
             self.assertFalse(any(is_value(option) for option in wrong), "a term never gets a date or amount as a choice")
+            # Another question's full answer is a true statement, never a wrong choice (distractor_check).
+            self.assertNotIn("The mitochondria in each cell", wrong)
 
     def test_ai_choices_off_format_are_rewritten_or_replaced(self):
         out = quiz._balanced_distractors("1863", ["In 1861", "the late 1800s", "1870"], ["Hemoglobin", "45%"], seed="When?")

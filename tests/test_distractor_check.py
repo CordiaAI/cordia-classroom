@@ -1,10 +1,13 @@
 import os
 import sys
 import unittest
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "backend"))
 
 from services.distractor_check import conflict, keep_valid, subject_of
+from routers import quiz
 
 GUIDE = [
     ("What is program music?", "Instrumental music with a literary or pictorial association"),
@@ -49,6 +52,66 @@ class DistractorCheckTests(unittest.TestCase):
         kept, rejected = keep_valid(["Vocal music set to a sacred Latin text", "Absolute music is plain", "Dance music for the court"], question, answer, GUIDE)
         self.assertEqual(kept, ["Vocal music set to a sacred Latin text", "Dance music for the court"])
         self.assertEqual(rejected, ["Absolute music is plain"])
+
+
+class TopUpTests(unittest.TestCase):
+    PAIRS = [(q, a) for q, a in GUIDE]
+
+    def test_rejected_replacements_are_checked_again_and_short_questions_topped_up(self):
+        built = [{"question": GUIDE[0][0], "options": [GUIDE[0][1], "Vocal music set to a sacred Latin text"], "correct_index": 0}]
+        fresh = {GUIDE[0][0]: ["Absolute music is plain", "Dance music for the court", "Music for silent films"]}
+        with patch.object(quiz, "_replacement_distractors", return_value=fresh):
+            out = quiz._top_up(None, built, self.PAIRS, targets={GUIDE[0][0]})
+        options = out[0]["options"]
+        self.assertEqual(options[out[0]["correct_index"]], GUIDE[0][1])
+        self.assertNotIn("Absolute music is plain", options)
+        self.assertEqual(set(options) - {GUIDE[0][1]}, {"Vocal music set to a sacred Latin text", "Dance music for the court", "Music for silent films"})
+
+    def test_a_failed_regeneration_keeps_what_there_is(self):
+        built = [{"question": GUIDE[0][0], "options": [GUIDE[0][1], "Vocal music set to a sacred Latin text"], "correct_index": 0}]
+        with patch.object(quiz, "_replacement_distractors", return_value={}):
+            out = quiz._top_up(None, built, self.PAIRS, targets={GUIDE[0][0]})
+        self.assertEqual(out, built)
+
+
+class RefreshChoicesTests(unittest.TestCase):
+    def _run(self, saved, fresh):
+        query = MagicMock()
+        query.select.return_value = query
+        query.eq.return_value = query
+        query.update.return_value = query
+        query.execute.return_value = SimpleNamespace(data=[{"quiz_questions": saved}])
+        database = MagicMock()
+        database.table.return_value = query
+        with patch.object(quiz, "get_user_id", return_value="student-1"), \
+             patch.object(quiz, "get_supabase", return_value=database), \
+             patch.object(quiz, "get_openai_client", return_value=None), \
+             patch.object(quiz, "require"), patch.object(quiz, "record") as record, \
+             patch.object(quiz, "_replacement_distractors", return_value=fresh) as regenerate:
+            result = quiz.refresh_choices("00000000-0000-0000-0000-000000000001", "Bearer t")
+        return result, query, record, regenerate
+
+    def test_only_bad_choices_are_replaced_and_saved(self):
+        saved = [
+            {"question": GUIDE[0][0], "options": ["Absolute music is plain", GUIDE[0][1], "Dance music for the court", "Music for silent films"], "correct_index": 1},
+            {"question": GUIDE[1][0], "options": [GUIDE[1][1], "Music for dancing", "Music sung in church", "Folk songs for children"], "correct_index": 0},
+        ]
+        result, query, record, _ = self._run(saved, {GUIDE[0][0]: ["Vocal music set to a sacred Latin text"]})
+        self.assertEqual(result["changed"], 1)
+        first = result["questions"][0]
+        self.assertEqual(first["options"][first["correct_index"]], GUIDE[0][1])
+        self.assertNotIn("Absolute music is plain", first["options"])
+        self.assertEqual(result["questions"][1], saved[1])
+        query.update.assert_called_once()
+        record.assert_called_once()
+
+    def test_nothing_to_fix_changes_nothing(self):
+        saved = [{"question": GUIDE[1][0], "options": [GUIDE[1][1], "Music for dancing", "Music sung in church"], "correct_index": 0}]
+        result, query, record, regenerate = self._run(saved, {})
+        self.assertEqual(result["changed"], 0)
+        query.update.assert_not_called()
+        regenerate.assert_not_called()
+        record.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -159,7 +159,8 @@ class RetainRouteTests(unittest.TestCase):
                 {"concept": 3, "type": "written", "response": "Prices rise", "credit": 0.5, "token": token},
                 {"concept": 0, "type": "mc", "response": "Wrong one"},  # a later retry never changes the first try
             ]), "Bearer t")
-        self.assertEqual(result, {"score": 38, "total": 4, "correct": 1, "earned": 1.5})
+        self.assertEqual({key: result[key] for key in ("score", "total", "correct", "earned")}, {"score": 38, "total": 4, "correct": 1, "earned": 1.5})
+        self.assertEqual(tables["quiz_attempts"].inserted["metadata"], {"feedback": "each"})
         stored = tables["quiz_attempts"].inserted["answers"]
         self.assertEqual([a["credit"] for a in stored], [1.0, 0.0, 0.0, 0.5])
         self.assertEqual([a["is_correct"] for a in stored], [True, False, False, False])
@@ -180,6 +181,22 @@ class RetainRouteTests(unittest.TestCase):
         with patch.multiple(quiz, get_user_id=MagicMock(return_value="u1"), get_supabase=MagicMock(return_value=db)):
             with self.assertRaises(quiz.HTTPException):
                 quiz.explain_miss(GUIDE_ID, quiz.MissRequest(concept=9, chosen="x"), "Bearer t")
+
+    def test_when_i_submit_mode_is_stored_and_the_retry_kept_with_the_attempt(self):
+        db, tables = database([TERMS[0]])
+        with patch.dict(os.environ, {"RETAIN_SIGNING_KEY": "k"}), \
+             patch.object(quiz, "get_user_id", return_value="u1"), \
+             patch.object(quiz, "get_supabase", return_value=db), \
+             patch("routers.stats._update_streak"):
+            result = quiz.submit_quiz(GUIDE_ID, quiz.QuizSubmission(feedback="submit", attempts=[
+                {"concept": 0, "type": "mc", "response": "Wrong one"},
+            ]), "Bearer t")
+            self.assertEqual(result["score"], 0)
+            self.assertEqual(tables["quiz_attempts"].inserted["metadata"], {"feedback": "submit"})
+            tables["quiz_attempts"].row = {"metadata": {"feedback": "submit"}}
+            quiz.record_retry(GUIDE_ID, "00000000-0000-0000-0000-0000000000aa", quiz.RetryResult(cleared=5, of=1), "Bearer t")
+        # The retry is kept beside the first-try score, never in it.
+        self.assertEqual(tables["quiz_attempts"].updated, {"metadata": {"feedback": "submit", "retry": {"cleared": 1, "of": 1}}})
 
     def test_forged_written_credit_is_worth_nothing(self):
         db, tables = database([LONG])

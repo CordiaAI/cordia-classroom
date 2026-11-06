@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FAMILIAR, LEARNING, MASTERED, NEW } from '../lib/learnEngine.mjs';
-import { applyTest, buildTest, clock, markLocal, testResults, timeLimitSeconds } from '../lib/timedTest.mjs';
+import { applyTest, buildTest, clock, timeLimitSeconds } from '../lib/timedTest.mjs';
+import { markAll, markConcept, scoreRows } from '../lib/submitQuiz.mjs';
 
 const q = (question, answer) => ({ question, options: [answer, 'x', 'y', 'z'], correct_index: 0 });
 const term = q('What organelle makes ATP?', 'Mitochondria');
@@ -32,23 +33,24 @@ test('the clock: a minute per question by default, and the student can pick half
 });
 
 test('choices and typed answers are marked locally; written ones wait for AI', () => {
-  assert.equal(markLocal({ type: 'mc' }, term, 'Mitochondria'), 1);
-  assert.equal(markLocal({ type: 'mc' }, term, 'x'), 0);
-  assert.equal(markLocal({ type: 'fill' }, term, 'mitochondria'), 1);
-  assert.equal(markLocal({ type: 'fill' }, term, ''), 0);
-  assert.equal(markLocal({ type: 'written' }, long, 'Because of competition'), null);
-  assert.equal(markLocal({ type: 'cloze' }, long, 'compete'), 0);
-  assert.equal(markLocal({ type: 'cloze' }, long, 'sellers'), 1, 'the blank is the answer\'s longest meaningful word');
+  assert.equal(markConcept('mc', term, 'Mitochondria'), 1);
+  assert.equal(markConcept('mc', term, 'x'), 0);
+  assert.equal(markConcept('fill', term, 'mitochondria'), 1);
+  assert.equal(markConcept('fill', term, ''), 0);
+  assert.equal(markConcept('written', long, 'Because of competition'), null);
+  assert.equal(markConcept('cloze', long, 'compete'), 0);
+  assert.equal(markConcept('cloze', long, 'sellers'), 1, 'the blank is the answer\'s longest meaningful word');
 });
 
 test('score counts unanswered as missed and leaves unchecked answers out', () => {
-  const items = [0, 1, 2, 3].map(id => ({ id, concept: id, type: 'mc' }));
-  const result = testResults(items, { 0: 1, 1: 0.5, 3: null });
-  assert.equal(result.checked, 3);
+  const items = [{ id: 0, type: 'mc', concepts: [0] }, { id: 1, type: 'written', concepts: [1] }, { id: 2, type: 'mc', concepts: [2] }, { id: 3, type: 'written', concepts: [3] }];
+  const rows = markAll(items, questions, { 0: 'Mitochondria', 1: 'Prices', 3: 'A wrong' }, {}, { 1: { credit: 0.5, token: 't' }, 3: null });
+  const result = scoreRows(rows);
+  assert.equal(result.marked, 3);
   assert.equal(result.score, 50);
   assert.equal(result.right, 1);
-  assert.deepEqual(result.missed.map(item => item.id), [1, 2]);
-  assert.deepEqual(result.unchecked.map(item => item.id), [3]);
+  assert.deepEqual(result.missed.map(row => row.itemId), [1, 2]);
+  assert.deepEqual(result.unchecked.map(row => row.itemId), [3]);
 });
 
 test('missed ideas drop to Learning for Learn; the others keep their level', () => {

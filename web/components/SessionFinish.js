@@ -9,7 +9,7 @@ import Confetti from './Confetti';
 import ReviewPrompt, { reviewDue } from './ReviewPrompt';
 
 // Accuracy as a ring that fills while the number counts up.
-function ScoreRing({ value }) {
+export function ScoreRing({ value }) {
   const shown = useCountUp(value);
   const size = 112;
   const stroke = 8;
