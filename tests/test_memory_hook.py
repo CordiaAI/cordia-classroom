@@ -84,11 +84,12 @@ class GroundedTrickTests(unittest.TestCase):
         with patch.object(llm, "get_openai_client", return_value=None), patch.object(llm, "chat", chat):
             return llm.memory_hook("Who founded ATO?", "Otis Allan Glazebrook", context=context), chat
 
-    def test_the_prompt_lists_the_techniques_and_the_material(self):
+    def test_the_prompt_asks_for_the_cue_techniques_and_examples(self):
         _, chat = self.call('{"hook": "When you see ATO, think Otis Allan Glazebrook.", "linked": null}', self.CONTEXT)
         system, user = (m["content"] for m in chat.call_args.kwargs["messages"])
         for technique in ("vivid image", "acronym", "number shape", "tiny story"):
             self.assertIn(technique, system)
+        self.assertIn(llm.MEMORY_EXAMPLES, system)
         self.assertIn("[1] Week 3 lecture: Glazebrook founded ATO in Richmond.", user)
 
     def test_a_used_link_is_named_and_a_made_up_one_ignored(self):

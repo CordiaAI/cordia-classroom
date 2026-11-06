@@ -541,6 +541,23 @@ CRUDE_HUMOR_RULE = (
 )
 
 
+# Tricks that clear the bar ("Penny's sweet 16": specific, vivid, funny, built on the exact names and
+# numbers) next to ones that don't, from different subjects.
+MEMORY_EXAMPLES = (
+    "Q: Normal adult potassium range? A: 3.5-5.0 mEq/L. Bad: \"Potassium is 3.5-5.0, so remember that.\" "
+    "Good: \"When you see potassium, think K for kitchen: 3.5 bananas on the counter, 5 in the bowl, so K+ "
+    "stays between 3.5 and 5.0 mEq/L.\"\n"
+    "Q: Who painted The Persistence of Memory? A: Salvador Dali. Bad: \"Dali was a famous surrealist.\" "
+    "Good: \"When you see those melting clocks, think they drip DALI-ly: Salvador Dali.\"\n"
+    "Q: How long can a merchant's firm offer stay open without payment? A: 3 months. Bad: \"Firm offers "
+    "have a time limit of 3 months.\" Good: \"When you see 'firm offer', picture a handshake frozen "
+    "solid for one whole season: 3 months.\"\n"
+    "Q: Time complexity of binary search? A: O(log n). Bad: \"Binary search is efficient.\" Good: "
+    "\"When you see binary search, picture chopping a log in half, then half again, till one splinter "
+    "is left: O(log n).\""
+)
+
+
 def memory_hook(question: str, answer: str, style: str = "link", interests=(), previous: str = "",
                 crude: bool = False, context=()) -> dict:
     """A memory trick for a missed question ("Help me remember"): links the question's cue to the
@@ -558,13 +575,15 @@ def memory_hook(question: str, answer: str, style: str = "link", interests=(), p
                 "in one or two sentences under 40 words, written to them as \"you\". Build it on the "
                 "exact names, words and numbers in the answer, using whichever fits best: a vivid image, "
                 "a link to something they already know, an acronym or first letters, a number shape or "
-                f"rhyme, or a tiny story. Preferred style: {MEMORY_STYLES.get(style, MEMORY_STYLES['link'])}. "
+                "rhyme, or a tiny story. Make it specific, vivid and funny; a generic line that just "
+                f"restates the fact fails. Preferred style: {MEMORY_STYLES.get(style, MEMORY_STYLES['link'])}. "
                 "If the student's own material below gives a natural anchor (something they already "
                 "studied or heard), build on it and set \"linked\" to its number; otherwise null. Their "
                 "interests may give the link only when one fits. The trick must contain the answer exactly "
                 "as given and never change, round or blur it. Any comparison stated as fact must be true; "
                 "otherwise make it plainly wordplay. "
                 + (CRUDE_HUMOR_RULE if crude else "Playful is good; never mocking, crude, or about the student themselves. ")
+                + "\n\nEXAMPLES:\n" + MEMORY_EXAMPLES
                 + '\n\nReturn JSON: {"hook": "...", "linked": number or null}'
             )},
             {"role": "user", "content": (
