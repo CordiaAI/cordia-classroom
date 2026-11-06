@@ -313,7 +313,7 @@ export default function Today() {
           <h2 id="rooms-due-title" className="c-section-title">Due across your classrooms</h2>
           <div className="c-card c-list">
             {classroomDue.slice(0, 5).map(room => (
-              <Link key={room.id} href={UUID.test(room.id) ? `/classrooms/${room.id}?tab=study` : '/classrooms'} className="c-list-row today-room">
+              <Link key={room.id} href={UUID.test(room.id) ? { pathname: '/classrooms/[id]', query: { id: room.id, tab: 'study' } } : '/classrooms'} className="c-list-row today-room">
                 <span className="c-grow c-truncate">{room.name}</span>
                 <span className="c-meta">{room.due} due</span>
                 <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
