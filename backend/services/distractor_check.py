@@ -25,6 +25,7 @@ _STOP = {
     "has", "have", "had", "not", "no", "but", "his", "her", "their", "they", "he", "she", "one",
 }
 _COPULA = r"(?:is|are|was|were|means|meant|refers)"
+_ASKS = ("what is ", "what are ", "what was ", "what were ", "who is ", "who are ", "who was ", "who were ", "define ")
 _DESCRIPTION_WORDS = 3  # an answer with fewer content words is a name, term or value
 
 
@@ -49,17 +50,18 @@ def subject_of(question: str) -> Optional[str]:
     """The term a question asks about, normalized: 'What is absolute music?' -> 'absolute music',
     "What was Grieg's nationality?" -> 'grieg', 'What does tempo rubato mean?' -> 'tempo rubato'.
     None when the question has no single short subject."""
-    text = str(question or "").strip().rstrip("?").strip().replace("’", "'")
-    owner = re.search(r"((?:[A-Z][\w\-]*\s+){0,3}[A-Z][\w\-]*)'s\b", text)
+    text = " ".join(str(question or "").replace("’", "'").split()).rstrip("?").strip()
+    owner = re.search(r"((?:[A-Z][\w\-]{0,40} ){0,3}[A-Z][\w\-]{0,40})'s\b", text)
     if owner:
         return normalize(owner.group(1)) or None
-    first = re.split(r",|\s+and\s+(?:what|which|who|how|why)\b", text, maxsplit=1)[0].strip()
-    match = (re.match(r"(?i)^(?:what|who)\s+(?:is|are|was|were)\s+(.+)$", first)
-             or re.match(r"(?i)^what\s+does\s+(.+?)\s+mean$", first)
-             or re.match(r"(?i)^define\s+(.+)$", first))
-    if not match:
+    first = re.split(r",| and (?:what|which|who|how|why)\b", text, maxsplit=1)[0].strip()
+    lower = first.lower()
+    found = next((first[len(lead):] for lead in _ASKS if lower.startswith(lead)), None)
+    if found is None and lower.startswith("what does ") and lower.endswith(" mean"):
+        found = first[len("what does "):-len(" mean")]
+    if not found:
         return None
-    subject = normalize(match.group(1))
+    subject = normalize(found)
     return subject if subject and len(subject.split()) <= 5 and len(subject) >= 3 else None
 
 

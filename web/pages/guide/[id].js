@@ -7,7 +7,7 @@ import CardPhoto from '../../components/CardPhoto';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Brain, Download, ExternalLink, FolderInput, GraduationCap, Layers, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, X,
+  ArrowLeft, Brain, Download, ExternalLink, FolderInput, GraduationCap, Layers, NotebookText, PencilRuler, Pencil, Play, Printer, RefreshCw, Star, Stethoscope, SquarePen, Trash2, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -29,6 +29,7 @@ import { firstPublishStep } from '../../lib/guideVisibility.mjs';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import AddToClassroom from '../../components/AddToClassroom';
 import { CLASSROOMS_ON } from '../../lib/featureFlags';
+import PrintQuizSheet from '../../components/PrintQuizSheet';
 import { useLearningStyle } from '../../lib/learningStyle';
 import { rememberGuidePage, rememberLastGuide } from '../../lib/userStore';
 import { activeStep, walkthroughEvent } from '../../lib/walkthrough';
@@ -147,6 +148,7 @@ export default function GuidePage() {
   const [studySetError, setStudySetError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [toast, setToast] = useState('');
+  const [printing, setPrinting] = useState(false);
   // The outline before "Regenerate outline", so the toast can put it back.
   const [undoNotes, setUndoNotes] = useState(null);
   const [sharing, setSharing] = useState(null);
@@ -354,6 +356,17 @@ export default function GuidePage() {
     else setToast(apiErrorMessage(data?.detail, "Couldn't save to Drive.") + (/connect/i.test(data?.detail || '') ? ' Connect Google Drive in Settings › Connectors.' : ''));
   }
 
+  // Wrong choices that turned out to be another question's answer are replaced; the rest stay.
+  async function refreshChoices() {
+    setToastAction(null);
+    setToast('Checking answer choices…');
+    const data = await apiFetch('/quiz/' + id + '/refresh-choices', { method: 'POST', timeoutMs: 60000 });
+    if (typeof data?.changed !== 'number') setToast(apiErrorMessage(data?.detail, "Couldn't refresh the answer choices."));
+    else if (data.changed) setToast(data.changed === 1 ? 'Answer choices refreshed on 1 question' : `Answer choices refreshed on ${data.changed} questions`);
+    else if (data.flagged) setToast("Some choices need replacing, but new ones couldn't be written. Try again later.");
+    else setToast('Answer choices already check out');
+  }
+
   async function moveToClass(folderId) {
     const data = await apiFetch('/guides/' + id + '/move', { method: 'PATCH', body: JSON.stringify({ folder_id: folderId }) });
     if (data && !data.detail) {
@@ -462,6 +475,8 @@ export default function GuidePage() {
   // never the old notes first.
   const outlinePending = Boolean(String(guide.study_guide || '').trim()) && !isStudyGuideNotes(guide.notes) && notesTriedFor !== guide.id;
   const cardCount = guide.flashcards?.length || 0;
+  // Printing and refreshing answer choices both work from the guide's questions and answers.
+  const hasQuestions = pairs.length >= 2;
   // A guide with no material is the student's own notes until they make cards and a quiz from it.
   const hasMaterial = Boolean(String(guide.study_guide || '').trim());
   const sourceTitle = guide.source_title || (guide.source_url ? 'Source' : '');
@@ -528,11 +543,13 @@ export default function GuidePage() {
                 { label: 'Save a copy to Drive', onSelect: saveToDrive },
               ],
             },
+            ...(hasQuestions ? [{ label: 'Print quiz', icon: Printer, onSelect: () => setPrinting(true) }, { label: 'Refresh answer choices', icon: RefreshCw, onSelect: refreshChoices }] : []),
             { label: 'Delete', icon: Trash2, danger: true, onSelect: () => setConfirmDelete(true) },
           ]}
         />
         <Link href={'/session?guideId=' + id} className="c-btn c-btn--primary guide-study-now"><Play size={20} strokeWidth={1.75} aria-hidden="true" />Study now</Link>
       </header>
+      {printing && <PrintQuizSheet guideId={id} onClose={() => setPrinting(false)} />}
       {guide.origin === 'mcp' && <p className="c-meta guide-origin">Added from {guide.origin_client || 'a connected AI app'}</p>}
       {sharing?.update_available && (
         <button type="button" className="c-chip guide-update" onClick={pullUpdate}><RefreshCw size={16} strokeWidth={1.75} aria-hidden="true" />Update available</button>

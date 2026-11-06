@@ -5,7 +5,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './supabase';
 // Walkthrough, feature-use and Grove progress, saved per student on the server in
 // their Supabase account metadata (key "cordia"), with a local copy for speed and
 // offline use. It rides in the access token, so it stays small (no logs here).
-const EMPTY = { v: 1, at: 0, theme: null, wt: null, day1Status: null, done: [], used: [], tips: [], grove: {}, rings: {}, freeze: [], first: 0, review: null };
+const EMPTY = { v: 1, at: 0, theme: null, wt: null, day1Status: null, done: [], used: [], tips: [], grove: {}, rings: {}, freeze: [], first: 0, review: null, prefs: {} };
 const LOCAL = 'cordiaProgress';
 let state = { ...EMPTY };
 let loadedFor = '';
@@ -45,6 +45,8 @@ function merge(a, b) {
     rings: maxMap(a?.rings, b?.rings),
     freeze: union(a?.freeze, b?.freeze).slice(-12),
     first: Math.min(...[a?.first, b?.first].filter(Boolean), Date.now()),
+    // Study settings ({ feedback: { quiz, timed }, print }): each one from whichever copy changed last.
+    prefs: { ...(a?.prefs || {}), ...(b?.prefs || {}), ...(newer?.prefs || {}) },
     // The review prompt: { asked, next, rated }. Once rated on any device it never shows again.
     review: (a?.review?.rated && a.review) || (b?.review?.rated && b.review) || newer?.review || a?.review || b?.review || null,
   };
@@ -118,6 +120,17 @@ export function unmarkUsed(feature) {
 export function markUsed(feature) {
   if (!feature || state.used.includes(feature)) return;
   updateProgress(current => ({ used: [...current.used, feature] }));
+}
+
+// A study setting saved on the account (and in this browser): the "Show if I'm right" choice per
+// mode, the last printable-quiz format. Small values only: the whole state rides in the token.
+export function getPref(key, fallback) {
+  const value = state.prefs?.[key];
+  return value === undefined ? fallback : value;
+}
+
+export function setPref(key, value) {
+  updateProgress(current => ({ prefs: { ...(current.prefs || {}), [key]: value } }));
 }
 
 // Grove: minutes per guide (first 8 characters of the id keep the token small).

@@ -18,9 +18,10 @@ from services.llm_calls import chat
 from services.models import current_user_id
 from auth_utils import get_user_id
 from ids import require_uuid
-from services import retain
+from services import print_items, retain
 from services import blanks
 from services.choice_shapes import conform, is_value, repair, shape
+from services.distractor_check import keep_valid
 from services.entitlements import LIMITS, plan_for, record, remaining, require, subscription_row
 
 
@@ -48,6 +49,14 @@ class RetainAttempt(BaseModel):
 class QuizSubmission(BaseModel):
     answers: List[QuizAnswer] = Field(default_factory=list, max_length=50)
     attempts: List[RetainAttempt] = Field(default_factory=list, max_length=100)
+    # "Show if I'm right": after each question, or only when the whole quiz is submitted.
+    feedback: Literal["each", "submit"] = "each"
+
+
+class RetryResult(BaseModel):
+    """"Retry my misses" after a When-I-submit quiz: how many missed ideas were cleared."""
+    cleared: int = Field(..., ge=0, le=100)
+    of: int = Field(..., ge=0, le=100)
 
 
 class SessionRequest(BaseModel):
@@ -68,6 +77,10 @@ class WrittenAnswer(BaseModel):
 class MissRequest(BaseModel):
     concept: int = Field(..., ge=0, le=100)
     chosen: str = Field(..., min_length=1, max_length=4000)
+
+
+class PrintRequest(BaseModel):
+    fill: bool = False  # write the fill-in sentences now if they aren't cached (one AI quiz)
 
 
 class RememberRequest(BaseModel):
@@ -179,9 +192,10 @@ def _standard_questions(qa_pairs: list, rng=None) -> list:
     idea_id rides along; rng (a seeded Random) makes the same quiz every time."""
     rng = rng or random
     questions = []
+    others = _pairs(qa_pairs)
     for index, pair in enumerate(qa_pairs):
         answer = pair["answer"]
-        candidates = _other_answers(qa_pairs, index)
+        candidates = keep_valid(_other_answers(qa_pairs, index), pair["question"], answer, others)[0]
         if is_value(answer):
             distractors = conform(answer, [], candidates, seed=pair["question"])
         else:
@@ -199,6 +213,10 @@ def _standard_questions(qa_pairs: list, rng=None) -> list:
             **({"idea_id": pair["idea_id"]} if pair.get("idea_id") else {}),
         })
     return questions
+
+
+def _pairs(qa_pairs: list) -> list:
+    return [(pair["question"], pair["answer"]) for pair in qa_pairs]
 
 
 def _balanced_distractors(answer: str, generated: list, fallback: list, seed: str = "") -> list:
@@ -233,6 +251,86 @@ def _balanced_distractors(answer: str, generated: list, fallback: list, seed: st
     text = [value for value in [*generated, *fallback] if not is_value(value)]
     add(sorted(text, key=lambda value: abs(len(str(value)) - len(answer))))
     return _not_longest(answer, accepted[:3], [*same_generated, *same_fallback] or text)
+
+
+def _replacement_distractors(client, wanted: list, pairs: list) -> dict:
+    """{question: [new wrong choices]} from Haiku for the questions in `wanted` ({"question",
+    "answer", "have"}). Every choice is checked again by the caller; {} when the call fails."""
+    guide = "\n".join(f"Q: {question}\nA: {answer}" for question, answer in pairs)
+    needs = "\n".join(
+        f"{i}. Q: {item['question']}\n   Correct answer: {item['answer']}\n   Needs: {3 - len(item['have'])}"
+        + (f"\n   Already used: {' | '.join(item['have'])}" if item["have"] else "")
+        for i, item in enumerate(wanted)
+    )
+    prompt = f"""Write replacement wrong answer choices for the numbered quiz questions below.
+Return a JSON object {{"items": [{{"id": <number>, "distractors": [...]}}]}} with as many choices as each item needs.
+
+Rules:
+1. Each choice is false for its question, plausible to a student with an incomplete understanding, and matches the correct answer's form, specificity and approximate length.
+2. Never use the correct answer of any question in the guide (or a rewording of one), and never write a statement about another question's subject.
+3. Stay within the question's own topic. No "None of the above", "All of the above" or filler.
+4. Don't repeat a choice listed under "Already used".
+
+The guide's questions and answers:
+{guide}
+
+Questions that need choices:
+{needs}"""
+    try:
+        response = chat(client, "quiz_distractors_fix",
+                        messages=[{"role": "system", "content": "Write quiz answer choices. Return valid JSON only."},
+                                  {"role": "user", "content": prompt}],
+                        temperature=0.5, response_format={"type": "json_object"})
+        items = json.loads(response.choices[0].message.content or "{}").get("items", [])
+    except Exception:
+        logger.warning("Replacement distractors unavailable", exc_info=True)
+        return {}
+    out = {}
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict) or not isinstance(item.get("distractors"), list):
+            continue
+        try:
+            index = int(item.get("id"))
+        except (TypeError, ValueError):
+            continue
+        if 0 <= index < len(wanted):
+            out[wanted[index]["question"]] = [str(value).strip() for value in item["distractors"] if str(value).strip()]
+    return out
+
+
+def _top_up(client, questions: list, pairs: list, targets: Optional[set] = None) -> list:
+    """Questions left with fewer than three wrong choices once rejected ones were dropped get new
+    ones from Haiku, checked the same way (distractor_check). `pairs` is every (question, answer) in
+    the guide; `targets` limits which questions may be topped up (default: all, including guide
+    questions that had no usable choice at all). A question still without a wrong choice stays out.
+    Returns the questions in guide order."""
+    built = {question["question"]: question for question in questions}
+    wanted = []
+    for question, answer in pairs:
+        if targets is not None and question not in targets:
+            continue
+        current = built.get(question)
+        have = [] if current is None else [str(option) for i, option in enumerate(current["options"]) if i != current["correct_index"]]
+        if len(have) < 3:
+            wanted.append({"question": question, "answer": answer, "have": have})
+    if wanted:
+        fresh = _replacement_distractors(client, wanted, pairs)
+        for item in wanted:
+            question, answer, have = item["question"], item["answer"], item["have"]
+            seen = {choice_text(value).casefold() for value in [answer, *have]}
+            extra = []
+            for value in keep_valid(fresh.get(question, []), question, answer, pairs)[0]:
+                key = choice_text(value).casefold()
+                if key and key not in seen:
+                    seen.add(key)
+                    extra.append(value)
+            if not extra:
+                continue
+            options, correct_index = _choices(answer, (have + extra)[:3])
+            built[question] = {**built.get(question, {}), "question": question, "options": options, "correct_index": correct_index}
+    order = [question for question, _ in pairs]
+    return sorted((question for question in built.values() if len(question.get("options") or []) >= 2),
+                  key=lambda question: order.index(question["question"]) if question["question"] in order else len(order))
 
 
 def _save_quiz(supabase, guide_id: str, user_id: str, questions: list) -> None:
@@ -287,6 +385,7 @@ def _load_quiz(supabase, guide_id: str, user_id: str, regenerate: bool = False) 
     if not use_ai and regenerate:
         require(user_id, "ai_quiz")
     if not use_ai:
+        # Free quizzes stay AI-free: a rejected choice is dropped, not replaced.
         questions = _standard_questions(qa_pairs)
         if not questions:
             raise HTTPException(
@@ -336,16 +435,19 @@ Return ONLY the JSON object, no other text:"""
         distractors_list = []
 
     questions = []
+    others = _pairs(qa_pairs)
     for i, pair in enumerate(qa_pairs):
         correct_answer = pair["answer"]
         item = distractors_list[i] if i < len(distractors_list) and isinstance(distractors_list[i], dict) else {}
         generated = item.get("distractors", [])
         if not isinstance(generated, list):
             generated = []
+        # A wrong choice that is another question's answer, or answers another question, is dropped
+        # here and replaced below (_top_up), never shown.
         distractors = _balanced_distractors(
             correct_answer,
-            generated,
-            _other_answers(qa_pairs, i),
+            keep_valid([str(value) for value in generated], pair["question"], correct_answer, others)[0],
+            keep_valid(_other_answers(qa_pairs, i), pair["question"], correct_answer, others)[0],
             seed=pair["question"],
         )
         if not distractors:
@@ -359,6 +461,7 @@ Return ONLY the JSON object, no other text:"""
 
     if not questions:
         raise HTTPException(status_code=502, detail="Could not create balanced Retain options")
+    questions = _top_up(client, questions, others)
 
     # Never cache the fallback, so the next visit retries the AI distractors.
     if distractors_list:
@@ -500,6 +603,116 @@ def _learn_session(supabase, guide_id: str, user_id: str, questions: list, types
     }
 
 
+@router.post("/{guide_id}/refresh-choices", dependencies=[Depends(ai_rate_limit())])
+def refresh_choices(guide_id: str, authorization: str = Header(default="")):
+    """"Refresh answer choices": the saved quiz is checked again and only the wrong choices that are
+    another question's answer, or answer another question, are replaced. It runs when the student
+    asks; saved quizzes are never rewritten on their own. A question whose bad choices can't be
+    replaced keeps its old ones."""
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+    questions = _saved_questions(supabase, guide_id, user_id)
+    pairs = [(str(q.get("question") or ""), retain.concept_answer(q)) for q in questions if isinstance(q, dict)]
+    trimmed, flagged = {}, set()
+    for question in questions:
+        if not isinstance(question, dict) or not isinstance(question.get("options"), list):
+            continue
+        text, answer = str(question.get("question") or ""), retain.concept_answer(question)
+        wrong = [str(option) for i, option in enumerate(question["options"]) if i != question.get("correct_index")]
+        kept, rejected = keep_valid(wrong, text, answer, pairs)
+        if rejected:
+            flagged.add(text)
+            trimmed[text] = {**question, "options": [answer, *kept], "correct_index": 0}
+    if not flagged:
+        return {"changed": 0, "questions": questions}
+    require(user_id, "light")
+    fixed = {q["question"]: q for q in _top_up(get_openai_client(), list(trimmed.values()), pairs, targets=flagged)}
+    changed = 0
+    updated = []
+    for question in questions:
+        text = str(question.get("question") or "") if isinstance(question, dict) else ""
+        replacement = fixed.get(text) if text in flagged else None
+        if replacement and len(replacement["options"]) >= min(3, len(question["options"])):
+            updated.append({**question, "options": replacement["options"], "correct_index": replacement["correct_index"]})
+            changed += 1
+        else:
+            updated.append(question)
+    if changed:
+        _save_quiz(supabase, guide_id, user_id, updated)
+    record(user_id, "light")
+    return {"changed": changed, "flagged": len(flagged), "questions": updated}
+
+
+def _print_fill(client, pairs: list) -> Optional[list]:
+    """Checked fill-in items written by Haiku from the guide's Q/A, or None when the call fails."""
+    indexes = print_items.fill_candidates(pairs)
+    if not indexes:
+        return []
+    try:
+        response = chat(client, "print_fill",
+                        messages=[{"role": "system", "content": "Write fill-in-the-blank test sentences. Return valid JSON only."},
+                                  {"role": "user", "content": print_items.fill_prompt(pairs, indexes)}],
+                        temperature=0.3, response_format={"type": "json_object"})
+        generated = json.loads(response.choices[0].message.content or "{}").get("items", [])
+    except Exception:
+        logger.warning("Fill-in sentences unavailable", exc_info=True)
+        return None
+    return print_items.fill_items(pairs, indexes, generated)
+
+
+@router.post("/{guide_id}/print-items", dependencies=[Depends(ai_rate_limit())])
+def printable_items(guide_id: str, body: PrintRequest, authorization: str = Header(default="")):
+    """Everything a printable quiz can use, per type, from the guide's own questions and answers.
+    Multiple choice comes from the saved quiz (built first if the guide has none yet); matching and
+    short answer are picked without AI; fill-in sentences are written by Haiku only when asked for
+    and not cached yet, which counts as one AI quiz. Matching, short answer and fill-in are cached
+    on the guide, so reprinting or changing the format reuses them."""
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+    row = _guide_columns(supabase, guide_id, user_id, "title, folder_id, study_guide, print_items")
+    pairs = _parse_qa_pairs(row.get("study_guide") or "")
+    if len(pairs) < 2:
+        raise HTTPException(status_code=400, detail="This guide needs questions and answers before it can be printed.")
+    mc, flagged = print_items.multiple_choice(_load_quiz(supabase, guide_id, user_id)[0], pairs)
+    cache = print_items.cached(row.get("print_items"), pairs)
+    items = {"v": print_items.VERSION, "source": print_items.source_hash(pairs),
+             "matching": print_items.matching(pairs), "short": print_items.short_answer(pairs)}
+    if "fill" in cache:
+        items["fill"] = cache["fill"]
+    fill_locked = False
+    if body.fill and "fill" not in items:
+        if remaining(user_id, "ai_quiz") <= 0:
+            fill_locked = True
+        else:
+            require(user_id, "ai_quiz")
+            fill = _print_fill(get_openai_client(), pairs)
+            if fill is not None:
+                items["fill"] = fill
+                record(user_id, "ai_quiz")
+    if items != cache:
+        try:
+            supabase.table("study_guides").update({"print_items": items}).eq("id", guide_id).eq("user_id", user_id).execute()
+        except Exception:
+            logger.warning("Could not cache print items for guide %s", guide_id, exc_info=True)
+    class_name = ""
+    if row.get("folder_id"):
+        folder = supabase.table("folders").select("name").eq("id", row["folder_id"]).eq("user_id", user_id).execute().data or []
+        class_name = (folder[0].get("name") if folder else "") or ""
+    return {
+        "title": row.get("title") or "",
+        "class_name": class_name,
+        "mc": mc,
+        "mc_flagged": flagged,
+        "matching": items["matching"],
+        "short": items["short"],
+        "fill": items.get("fill"),
+        "fill_possible": len(print_items.fill_candidates(pairs)),
+        "fill_locked": fill_locked,
+    }
+
+
 @router.post("/{guide_id}/grade", dependencies=[Depends(ai_rate_limit(max_calls=30))])
 def grade_written(guide_id: str, body: WrittenAnswer, authorization: str = Header(default="")):
     """Mark one written answer with full, partial or no credit, signed so the score can be trusted."""
@@ -634,14 +847,16 @@ def submit_quiz(guide_id: str, submission: QuizSubmission, authorization: str = 
     earned = sum(a.get("credit", 1.0 if a["is_correct"] else 0.0) for a in answers)
     score = round((earned / total) * 100)
 
-    supabase.table("quiz_attempts").insert({
+    saved = supabase.table("quiz_attempts").insert({
         "user_id": user_id,
         "guide_id": guide_id,
         "score": score,
         "total_questions": total,
         "correct_answers": correct,
         "answers": answers,
+        "metadata": {"feedback": submission.feedback},
     }).execute()
+    attempt_id = (saved.data or [{}])[0].get("id")
 
     # Log study session
     supabase.table("study_sessions").insert({
@@ -656,7 +871,23 @@ def submit_quiz(guide_id: str, submission: QuizSubmission, authorization: str = 
     from routers.stats import _update_streak
     _update_streak(user_id)
 
-    return {"score": score, "total": total, "correct": correct, "earned": earned}
+    return {"score": score, "total": total, "correct": correct, "earned": earned, "attempt_id": attempt_id}
+
+
+@router.post("/{guide_id}/attempts/{attempt_id}/retry")
+def record_retry(guide_id: str, attempt_id: str, result: RetryResult, authorization: str = Header(default="")):
+    """Keeps the "Retry my misses" result with its attempt. The score stays first-try only."""
+    require_uuid(guide_id, "guide ID")
+    require_uuid(attempt_id, "attempt ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+    rows = (supabase.table("quiz_attempts").select("metadata").eq("id", attempt_id)
+            .eq("user_id", user_id).eq("guide_id", guide_id).execute()).data or []
+    if not rows:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+    metadata = {**(rows[0].get("metadata") or {}), "retry": {"cleared": min(result.cleared, result.of), "of": result.of}}
+    supabase.table("quiz_attempts").update({"metadata": metadata}).eq("id", attempt_id).eq("user_id", user_id).execute()
+    return {"ok": True}
 
 
 @router.get("/{guide_id}/history")

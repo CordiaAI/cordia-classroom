@@ -11,6 +11,8 @@ import { parseQAPairs } from '../../lib/formatters';
 import { clampCount, minutesFor, quizLimit, recommendedCount } from '../../lib/quizLength.mjs';
 import MatchRace from '../../components/MatchRace';
 import QuizMode from '../../components/QuizMode';
+import SubmitFlow from '../../components/SubmitFlow';
+import FeedbackChoice, { useFeedbackChoice } from '../../components/FeedbackChoice';
 import { inDayOne, walkthroughEvent } from '../../lib/walkthrough';
 import { spreadCards } from '../../lib/checkYourself';
 import { needsStudySet } from '../../lib/studySet.mjs';
@@ -65,6 +67,8 @@ export default function QuizPage() {
   const [history, setHistory] = useState([]);
   const [title, setTitle] = useState('');
   const [race, setRace] = useState(false);
+  // "Show if I'm right": after each question (default) or when the whole quiz is submitted.
+  const [feedback, setFeedback] = useFeedbackChoice('quiz');
   const [loaded, setLoaded] = useState(false);
   const [making, setMaking] = useState(false);
   // Someone else's shared guide (Stage 4): your own attempts and allowance; no owner actions.
@@ -162,7 +166,7 @@ export default function QuizPage() {
       // Short-answer types (Fill in, Pairs) the student picked that no question here could use.
       const unused = chosen.filter(type => PRO_TYPES.includes(type) && Array.isArray(data.types) && !data.types.includes(type));
       setResumed(null);
-      setSession({ ...data, cards: short ? data.cards.slice(0, 3) : data.cards, selected: chosen, unused, race: race && !short, version: Date.now() });
+      setSession({ ...data, cards: short ? data.cards.slice(0, 3) : data.cards, selected: chosen, unused, race: race && !short, version: Date.now(), feedback: short || race || check ? 'each' : feedback });
       walkthroughEvent('quiz-started');
     }
     else setError(data?.detail || 'The quiz could not start. Make sure this guide has questions and answers.');
@@ -221,6 +225,19 @@ export default function QuizPage() {
             {listTypes(session.unused)} only {session.unused.length === 1 ? 'works' : 'work'} with answers of a few words, and this guide doesn't have enough of them, so {session.unused.length === 1 ? "it isn't" : "they aren't"} used here.
           </p>
         )}
+        {session.feedback === 'submit' ? (
+          <SubmitFlow
+            key={session.version}
+            questions={session.questions}
+            cards={session.cards}
+            selected={session.selected}
+            guideId={guideId}
+            resume={resumed?.feedback === 'submit' ? resumed : null}
+            onProgress={snapshot => (snapshot ? writeResume('quiz', guideId, { page: session, quiz: snapshot }) : clearResume('quiz', guideId))}
+            onRestart={() => setSession(null)}
+            onDone={() => { walkthroughEvent('guide-open'); router.push('/guide/' + guideId); }}
+          />
+        ) : (
         <QuizMode
           key={session.version}
           questions={session.questions}
@@ -234,6 +251,7 @@ export default function QuizPage() {
           resume={resumed}
           onProgress={check ? undefined : snapshot => (snapshot ? writeResume('quiz', guideId, { page: session, quiz: snapshot }) : clearResume('quiz', guideId))}
         />
+        )}
         </>
       ) : making ? (
         <div className="quiz-check-wait"><CordiaLoader size={28} label="Making questions from your notes" /><span className="c-meta">Making questions from your notes…</span></div>
@@ -284,7 +302,8 @@ export default function QuizPage() {
                 : <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={() => changeCount(recommended)}>Use recommended ({recommended})</button>}
             </div>
           )}
-          <p className="quiz-note">{race ? <><Timer size={20} strokeWidth={1.75} aria-hidden="true" />Match questions to answers in 60 seconds</> : <><Repeat size={20} strokeWidth={1.75} aria-hidden="true" />Shuffled. Misses repeat.</>}</p>
+          {!race && <FeedbackChoice value={feedback} onChange={setFeedback} id="quiz-feedback" />}
+          <p className="quiz-note">{race ? <><Timer size={20} strokeWidth={1.75} aria-hidden="true" />Match questions to answers in 60 seconds</> : <><Repeat size={20} strokeWidth={1.75} aria-hidden="true" />{feedback === 'submit' ? 'Shuffled. Answers show when you submit; then retry your misses.' : 'Shuffled. Misses repeat.'}</>}</p>
           <button type="button" className="c-btn c-btn--primary c-btn--lg quiz-start" data-spot="quiz-start" onClick={start} disabled={starting || !types.length || !guideId}>
             {starting ? <><CordiaLoader size={20} label="Preparing" />Preparing</> : <><Play size={20} strokeWidth={1.75} aria-hidden="true" />Start</>}
           </button>

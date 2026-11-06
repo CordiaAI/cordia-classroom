@@ -63,6 +63,16 @@
   --draw-graphite: #6E7378;
   --draw-paper: #FBFCFB;
   --paper-line: rgba(43, 42, 51, 0.10);
+  /* Printable quiz (/print/quiz): white paper and olive ink, the same in both themes */
+  --print-paper: #FFFFFF;
+  --print-ink: #1D201C;
+  --print-muted: #6C7069;
+  --print-olive: #5B6A50;
+  --print-rule: #4B5743;
+  --print-line: #BFC3BA;
+  --print-edge: #DCDFD8;
+  --print-box: #F1F2EE;
+  --print-chip: #EEF0EA;
   /* Class covers in Library's card view: a soft wash and its ink, eight to rotate through */
   --cover-1: #E3EBDC; --cover-ink-1: #4A5A40;
   --cover-2: #F3E7D3; --cover-ink-2: #8A5A22;
@@ -305,3 +315,13 @@ body::before {
   color: var(--paper-ink) !important;
 }
 :is(.sn-paper, .sn-card-paper) :is(p, li, h1, h2, h3, h4, span, div, strong, em, .sn-card-preview) { color: var(--paper-ink) !important; }
+
+/* Printable quiz pages (/print/quiz, .pq-paper { page: quiz }): Letter with the site on the left of
+   the footer and "page / total" on the right. Here, not in the page, because margin boxes can't
+   read custom properties. */
+@page quiz {
+  size: Letter;
+  margin: 0.8in 0.85in 0.85in;
+  @bottom-left { content: "classroom.cordiaai.io"; font: 400 7.5pt 'Quicksand', sans-serif; color: #6C7069; vertical-align: top; padding-top: 0.28in; }
+  @bottom-right { content: counter(page) " / " counter(pages); font: 400 7.5pt 'Quicksand', sans-serif; color: #6C7069; vertical-align: top; padding-top: 0.28in; }
+}
