@@ -28,7 +28,10 @@ function className(name) {
 function Brand({ tag }) {
   return (
     <div className="pq-brand-row">
-      <span className="pq-brand"><img className="pq-mark" src="/academic-butterfly-open-book.png" alt="" /><span className="pq-word">Cordia</span><span className="pq-classroom">Classroom</span></span>
+      <span className="pq-brand" role="img" aria-label="Cordia">
+        <img className="pq-mark" src="/academic-butterfly-open-book.png" alt="" />
+        <img className="pq-word" src="/cordia-wordmark.webp" alt="" />
+      </span>
       <span className="pq-tag">{tag}</span>
     </div>
   );
@@ -233,11 +236,12 @@ export default function PrintQuizPage() {
         .pq-paper p, .pq-paper h1, .pq-paper h2, .pq-paper h3, .pq-paper ol { margin: 0; padding: 0; }
         .pq-paper ol { list-style: none; }
         .pq-new-page, .pq-key { break-before: page; }
-        .pq-brand-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 0.42in; }
-        .pq-brand { display: inline-flex; align-items: baseline; gap: 7px; }
-        .pq-mark { width: 18px; height: auto; align-self: center; }
-        .pq-word { font: 600 13pt/1 var(--font-display); color: var(--print-olive); }
-        .pq-classroom { font: 500 7.5pt/1 var(--font-sans); letter-spacing: 0.22em; text-transform: uppercase; color: var(--print-olive); }
+        .pq-brand-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 0.42in; }
+        /* The site's mark and "cordia" wordmark (the brand files as given), centred like the app header:
+           the wordmark's letters sit low in its file, so it is nudged up. */
+        .pq-brand { display: inline-flex; align-items: center; gap: 7px; }
+        .pq-mark { display: block; width: 24px; height: 21px; object-fit: contain; }
+        .pq-word { display: block; height: 14px; width: auto; transform: translateY(-1.7px); }
         .pq-tag { font: 500 7.5pt/1 var(--font-sans); letter-spacing: 0.08em; color: var(--print-muted); text-transform: uppercase; text-align: right; }
         .pq-title { display: grid; font: 400 23pt/1.15 var(--font-display); letter-spacing: -0.01em; color: var(--print-ink); }
         .pq-title em { font-style: italic; color: var(--print-olive); }

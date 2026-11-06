@@ -198,9 +198,7 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
   display: grid; place-items: center;
 }
 .c-avatar.is-active { box-shadow: 0 0 0 2px var(--olive); }
-/* What's new: a small dot while a new feature is unseen (components/Sidebar.js). */
 .c-avatar { position: relative; }
-.c-avatar-dot { position: absolute; top: -1px; right: -1px; width: 10px; height: 10px; border-radius: 50%; background: var(--olive); box-shadow: 0 0 0 2px var(--card); }
 
 .c-menu {
   position: absolute; z-index: 120; min-width: 220px; padding: 6px;

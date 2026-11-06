@@ -1,5 +1,5 @@
 // What's new: the seen state (announced, opened, dismissed) and who the student is, shared by the
-// Dashboard card, the pointer tip, Help's list and Learn Cordia. Rules live in featureReleases.js.
+// Dashboard card, the pointer tip and the Notifications panel. Rules live in featureReleases.js.
 //
 // Saved on the server in onboarding_progress.features (GET/PUT /onboarding/features). Until
 // migration 20261120120000 runs the server answers stored: false, and the lists live in this
@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch, getUserId } from './api';
 import { readUserValue, writeUserValue } from './userStore';
-import { markUsed } from './progress';
+import { getProgress, markUsed } from './progress';
 import { CLASSROOMS_ON, LEARN_LADDER_V2, PER_VIEWER_PROGRESS } from './featureFlags';
 import { EMPTY_SEEN, FEATURE_RELEASES, mergeSeen } from './featureReleases';
 
@@ -39,21 +39,31 @@ function publish(next) {
   listeners.forEach(listener => listener(state));
 }
 
+// When this account first used Cordia, for when the server can't say when it joined.
+function firstSeen() {
+  const first = getProgress().first;
+  return first ? new Date(first).toISOString() : null;
+}
+
 export async function loadWhatsNew() {
   const id = getUserId();
   if (!id || loadingFor === id) return state;
   loadingFor = id;
   const local = readLocal();
   publish({ seen: mergeSeen(state.seen, local) });
-  const data = await apiFetch('/onboarding/features').catch(() => null);
+  const response = await apiFetch('/onboarding/features').catch(() => null);
+  const data = response && !response.detail ? response : null;
+  // No answer (offline, or the server failed): show what we can from this browser, and ask again
+  // on the next page.
+  if (!data) loadingFor = '';
   const account = data?.account || {};
   const seen = mergeSeen(local, data?.stored ? data.features : null);
   writeLocal(seen);
   publish({
-    ready: Boolean(data && !data.detail),
+    ready: true,
     stored: Boolean(data?.stored),
     seen,
-    user: { createdAt: account.created_at || null, plan: account.plan || 'free', canvas: Boolean(account.canvas), nursing: Boolean(account.nursing) },
+    user: { createdAt: account.created_at || firstSeen(), plan: account.plan || 'free', canvas: Boolean(account.canvas), nursing: Boolean(account.nursing) },
   });
   return state;
 }

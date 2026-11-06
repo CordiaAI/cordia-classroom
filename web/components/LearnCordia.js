@@ -4,9 +4,6 @@ import { useProgress } from '../lib/progress';
 import { FEATURE_GROUPS, FEATURE_LIST } from '../lib/features';
 import { showMe } from '../lib/showMe';
 import { openHelp } from '../lib/help';
-import { available } from '../lib/featureReleases';
-import { useWhatsNew } from '../lib/whatsNew';
-import { openRelease, releaseIcon } from './WhatsNew';
 
 const NEXT_COUNT = 6;
 
@@ -15,19 +12,14 @@ const NEXT_COUNT = 6;
 export default function LearnCordia({ onBeforeShow, hideWhenComplete = false, compact = false }) {
   const router = useRouter();
   const progress = useProgress();
-  // New features (What's new) join the list unticked and tick when they're actually used.
-  const whatsNew = useWhatsNew();
-  const fresh = whatsNew.ready
-    ? whatsNew.releases.filter(release => available(release, whatsNew.user, whatsNew.flags))
-      .map(release => ({ id: release.id, label: release.title, icon: releaseIcon(release.icon), release }))
-    : [];
-  const all = [...fresh, ...FEATURE_LIST];
+  // New features are announced in the Notifications panel (What's new), not here.
+  const all = FEATURE_LIST;
   const done = all.filter(item => progress.used.includes(item.id)).length;
   if (hideWhenComplete && done === all.length) return null;
 
   const groups = compact
     ? [{ label: '', items: all.filter(item => !progress.used.includes(item.id)).slice(0, NEXT_COUNT) }]
-    : [...(fresh.length ? [{ label: 'New in Cordia', items: fresh }] : []), ...FEATURE_GROUPS];
+    : FEATURE_GROUPS;
 
   return (
     <section className="c-card learn" aria-labelledby="learn-title">
@@ -45,7 +37,7 @@ export default function LearnCordia({ onBeforeShow, hideWhenComplete = false, co
                 <li key={item.id} className={used ? 'is-used' : ''}>
                   <span className="learn-icon" aria-hidden="true">{used ? <Check size={18} strokeWidth={2} /> : <item.icon size={20} strokeWidth={1.75} />}</span>
                   <span className="learn-label">{item.label}</span>
-                  <button type="button" className="c-btn c-btn--quiet" onClick={async () => { onBeforeShow?.(); if (item.release) await openRelease(router, item.release); else await showMe(router, item.id); }} aria-label={`Show me ${item.label}`}>Show me</button>
+                  <button type="button" className="c-btn c-btn--quiet" onClick={async () => { onBeforeShow?.(); await showMe(router, item.id); }} aria-label={`Show me ${item.label}`}>Show me</button>
                 </li>
               );
             })}
