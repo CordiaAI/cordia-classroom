@@ -22,6 +22,7 @@ from typing import Optional
 from fastapi import HTTPException
 
 from services import classrooms
+from services import minors
 from services.blocks import is_blocked
 from services.class_db import is_member
 from services.guide_review import course
@@ -96,9 +97,12 @@ def viewable(db, viewer: Optional[str], guide_id: str) -> dict:
 
 
 def author(db, guide: dict) -> Optional[dict]:
-    """The author as shown to others: None when anonymous (nothing about them leaves the server)."""
+    """The author as shown to others: None when anonymous (nothing about them leaves the server),
+    and "A classmate" when the author is a minor (services/minors.py)."""
     if guide.get("attribution") == "anonymous":
         return None
+    if minors.is_minor(db, guide["user_id"]):
+        return dict(minors.CLASSMATE)
     card = cards(db, [guide["user_id"]]).get(guide["user_id"])
     if not card:
         return None

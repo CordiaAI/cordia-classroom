@@ -191,6 +191,9 @@ def _publish_new(db, user_id: str, row: dict) -> dict:
         from services import guide_review as review
         if not review.honor_code_accepted(db, user_id):
             return row
+        from services import minors
+        if minors.is_minor(db, user_id):  # a minor's new sets start private
+            return row
         klass = review.course(db, row)
         if klass and klass.get("sharing_blocked"):
             return row
