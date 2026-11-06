@@ -216,6 +216,33 @@ def get_onboarding(authorization: str = Header(default="")):
     return {"step": row.get("step") or "style", "completed": bool(row.get("completed_at")), "arm": arm}
 
 
+class FeatureSeen(BaseModel):
+    announced: list[str] = Field(default_factory=list, max_length=50)
+    opened: list[str] = Field(default_factory=list, max_length=50)
+    dismissed: list[str] = Field(default_factory=list, max_length=50)
+
+
+@router.get("/onboarding/features")
+def get_feature_announcements(authorization: str = Header(default="")):
+    """What's new: the features this student was shown, opened or dismissed, and who they are for
+    each feature's audience. `stored` is False before migration 20261120120000 (the web app then
+    keeps the lists in the browser)."""
+    from services import feature_announcements as announcements
+    user_id = get_user_id(authorization)
+    db = get_supabase()
+    stored, features, _ = announcements.load(db, user_id)
+    return {"stored": stored, "features": features, "account": announcements.account(db, user_id)}
+
+
+@router.put("/onboarding/features", dependencies=[Depends(ai_rate_limit(60, 60))])
+def put_feature_announcements(body: FeatureSeen, authorization: str = Header(default="")):
+    """Adds to the lists (they only grow)."""
+    from services import feature_announcements as announcements
+    user_id = get_user_id(authorization)
+    stored, features = announcements.save(get_supabase(), user_id, body.model_dump())
+    return {"stored": stored, "features": features}
+
+
 @router.post("/onboarding/answers")
 def save_onboarding_answers(body: OnboardingAnswers, authorization: str = Header(default="")):
     """Answers to onboarding and day 2-7 questions (step 1.2), each with its question's version."""

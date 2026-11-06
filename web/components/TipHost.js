@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { CalendarDays, ChartColumn, Highlighter, Keyboard, Lightbulb, MessageCircle, X } from 'lucide-react';
+import { CalendarDays, ChartColumn, Compass, Gauge, Globe, GraduationCap, Highlighter, Keyboard, Lightbulb, MessageCircle, Timer, X } from 'lucide-react';
 
-const ICONS = { CalendarDays, ChartColumn, Highlighter, Keyboard, MessageCircle };
-import { TIPS, TIP_EVENT, dismissTip, markTipShown } from '../lib/tips';
+const ICONS = { CalendarDays, ChartColumn, Compass, Gauge, Globe, GraduationCap, Highlighter, Keyboard, MessageCircle, Timer };
+import { TIPS, TIP_EVENT, dismissTip, markTipShown, tipSelector } from '../lib/tips';
+import { claimSurface, dismissFeature, markAnnounced, releaseSurface } from '../lib/whatsNew';
 
 const WAIT_MS = 4000;
 const EDGE = 12;
@@ -33,9 +34,13 @@ export default function TipHost() {
       clearInterval(timer.current);
           // The anchor can render a moment after the request (data still loading).
       timer.current = setInterval(() => {
-        const target = document.querySelector(`[data-tip="${id}"]`);
+        const target = document.querySelector(tipSelector(id));
         if (target && target.getClientRects().length) {
           clearInterval(timer.current);
+          // A What's new tip waits its turn: never at the same moment as the Dashboard card.
+          const release = TIPS[id].release;
+          if (release && !claimSurface('tip')) return;
+          if (release) markAnnounced(release);
           markTipShown(id);
           setTip({ id, text: text || TIPS[id].text, rect: target.getBoundingClientRect() });
         } else if (Date.now() - started > WAIT_MS) clearInterval(timer.current);
@@ -48,7 +53,7 @@ export default function TipHost() {
   useEffect(() => {
     if (!tip) return;
     const place = () => {
-      const target = document.querySelector(`[data-tip="${tip.id}"]`);
+      const target = document.querySelector(tipSelector(tip.id));
       if (!target) { setTip(null); return; }
       setTip(current => current && { ...current, rect: target.getBoundingClientRect() });
     };
@@ -57,18 +62,37 @@ export default function TipHost() {
     // The thing the tip points at can go away without a scroll (a button that hides once used):
     // the tip goes with it.
     const gone = setInterval(() => {
-      const target = document.querySelector(`[data-tip="${tip.id}"]`);
+      const target = document.querySelector(tipSelector(tip.id));
       if (!target || !target.getClientRects().length) setTip(null);
     }, 300);
     const leave = () => setTip(null);
     router.events.on('routeChangeStart', leave);
+    // Escape dismisses it, like the X.
+    const onKey = event => { if (event.key === 'Escape') close(false); };
+    window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('scroll', place, true);
       window.removeEventListener('resize', place);
       clearInterval(gone);
       router.events.off('routeChangeStart', leave);
+      window.removeEventListener('keydown', onKey);
     };
   }, [tip?.id, router.events]);
+
+  useEffect(() => {
+    if (!tip) releaseSurface('tip');
+  }, [tip]);
+
+  function close(useIt) {
+    if (!tip) return;
+    dismissTip(tip.id);
+    const release = TIPS[tip.id]?.release;
+    // Closing a What's new tip with X or Escape dismisses the feature for good.
+    if (release && !useIt) dismissFeature(release);
+    const target = document.querySelector(tipSelector(tip.id));
+    setTip(null);
+    if (useIt && target) target.click?.();
+  }
 
   if (!tip) return null;
   const Icon = ICONS[TIPS[tip.id].icon] || Lightbulb;
@@ -80,13 +104,6 @@ export default function TipHost() {
   const below = tip.rect.bottom + 10 + h <= vh - EDGE;
   const top = below ? tip.rect.bottom + 10 : Math.max(EDGE, Math.min(tip.rect.top - 10 - h, vh - EDGE - h));
   const style = { top, left };
-
-  function close(useIt) {
-    dismissTip(tip.id);
-    const target = document.querySelector(`[data-tip="${tip.id}"]`);
-    setTip(null);
-    if (useIt && target) target.click?.();
-  }
 
   return (
     <div ref={tipRef} className="c-tip" style={style} role="status">

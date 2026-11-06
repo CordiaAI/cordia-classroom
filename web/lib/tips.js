@@ -13,6 +13,16 @@ export const TIPS = {
 
 export const TIP_EVENT = 'cordia:tip';
 
+// What's new adds a tip per new feature at runtime (lib/whatsNew.js): its anchor is any selector,
+// and `release` names the feature, so dismissing the tip dismisses the feature too.
+export function registerTip(id, tip) {
+  if (!TIPS[id]) TIPS[id] = tip;
+}
+
+export function tipSelector(id) {
+  return TIPS[id]?.selector || `[data-tip="${id}"]`;
+}
+
 export function isTipDismissed(id) {
   return getProgress().tips.includes(id);
 }

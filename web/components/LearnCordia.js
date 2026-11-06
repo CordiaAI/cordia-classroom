@@ -4,6 +4,9 @@ import { useProgress } from '../lib/progress';
 import { FEATURE_GROUPS, FEATURE_LIST } from '../lib/features';
 import { showMe } from '../lib/showMe';
 import { openHelp } from '../lib/help';
+import { available } from '../lib/featureReleases';
+import { useWhatsNew } from '../lib/whatsNew';
+import { openRelease, releaseIcon } from './WhatsNew';
 
 const NEXT_COUNT = 6;
 
@@ -12,18 +15,25 @@ const NEXT_COUNT = 6;
 export default function LearnCordia({ onBeforeShow, hideWhenComplete = false, compact = false }) {
   const router = useRouter();
   const progress = useProgress();
-  const done = FEATURE_LIST.filter(item => progress.used.includes(item.id)).length;
-  if (hideWhenComplete && done === FEATURE_LIST.length) return null;
+  // New features (What's new) join the list unticked and tick when they're actually used.
+  const whatsNew = useWhatsNew();
+  const fresh = whatsNew.ready
+    ? whatsNew.releases.filter(release => available(release, whatsNew.user, whatsNew.flags))
+      .map(release => ({ id: release.id, label: release.title, icon: releaseIcon(release.icon), release }))
+    : [];
+  const all = [...fresh, ...FEATURE_LIST];
+  const done = all.filter(item => progress.used.includes(item.id)).length;
+  if (hideWhenComplete && done === all.length) return null;
 
   const groups = compact
-    ? [{ label: '', items: FEATURE_LIST.filter(item => !progress.used.includes(item.id)).slice(0, NEXT_COUNT) }]
-    : FEATURE_GROUPS;
+    ? [{ label: '', items: all.filter(item => !progress.used.includes(item.id)).slice(0, NEXT_COUNT) }]
+    : [...(fresh.length ? [{ label: 'New in Cordia', items: fresh }] : []), ...FEATURE_GROUPS];
 
   return (
     <section className="c-card learn" aria-labelledby="learn-title">
       <header className="c-row">
         <h2 id="learn-title" className="c-section-title">Learn Cordia</h2>
-        <span className="c-meta">{done} of {FEATURE_LIST.length}</span>
+        <span className="c-meta">{done} of {all.length}</span>
       </header>
       {groups.map(group => (
         <div key={group.label || 'next'} className="learn-group">
@@ -35,14 +45,14 @@ export default function LearnCordia({ onBeforeShow, hideWhenComplete = false, co
                 <li key={item.id} className={used ? 'is-used' : ''}>
                   <span className="learn-icon" aria-hidden="true">{used ? <Check size={18} strokeWidth={2} /> : <item.icon size={20} strokeWidth={1.75} />}</span>
                   <span className="learn-label">{item.label}</span>
-                  <button type="button" className="c-btn c-btn--quiet" onClick={async () => { onBeforeShow?.(); await showMe(router, item.id); }} aria-label={`Show me ${item.label}`}>Show me</button>
+                  <button type="button" className="c-btn c-btn--quiet" onClick={async () => { onBeforeShow?.(); if (item.release) await openRelease(router, item.release); else await showMe(router, item.id); }} aria-label={`Show me ${item.label}`}>Show me</button>
                 </li>
               );
             })}
           </ul>
         </div>
       ))}
-      {compact && <button type="button" className="c-btn c-btn--quiet learn-all" onClick={() => { onBeforeShow?.(); openHelp(); }}>See all {FEATURE_LIST.length}</button>}
+      {compact && <button type="button" className="c-btn c-btn--quiet learn-all" onClick={() => { onBeforeShow?.(); openHelp(); }}>See all {all.length}</button>}
       <style jsx>{`
         .learn { display: grid; gap: 8px; padding: 20px; }
         .learn-group { display: grid; gap: 4px; }
