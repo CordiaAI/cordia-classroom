@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Brain, CalendarClock, Check, GraduationCap, Layers, ListChecks, PenLine, Play, Repeat, Shuffle, Target, TextCursorInput, Timer } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Brain, CalendarClock, Check, GraduationCap, Layers, ListChecks, NotebookPen, PenLine, Play, Repeat, Shuffle, Target, TextCursorInput, Timer } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import { saveLearnLevels } from '../../lib/progressSave';
 import { useRequireAuth } from '../../lib/auth';
@@ -19,7 +19,11 @@ import { needsStudySet } from '../../lib/studySet.mjs';
 import { makeStudySet } from '../../lib/autoStudySet';
 import { clearResume, readResume, writeResume } from '../../lib/resume';
 import TimedTest from '../../components/TimedTest';
-import { ClozeCard, FillCard, McCard, MemoryHook, RememberButton, WrittenCard } from '../../components/RetainCards';
+import { ClozeCard, FillCard, McCard, MemoryHook, QuietLimits, RememberButton, WrittenCard } from '../../components/RetainCards';
+import { LEARN_LADDER_V2 } from '../../lib/featureFlags';
+import {
+  LADDER_TYPES, TEST_FORMATS, TEST_FORMAT_LABELS, answerLadder, blankFor, cleanTestFormat, createLadderRound, daysUntil, finalCheckTypes, ladderDecision, ladderTypes, onlyRecognition,
+} from '../../lib/learnLadder.mjs';
 import CordiaLoader, { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import Toggle from '../../components/Toggle';
 
@@ -29,6 +33,17 @@ const LEVEL_CLASS = ['is-new', 'is-learning', 'is-familiar', 'is-mastered'];
 const localKey = id => 'cordiaLearn:' + id;
 const SURE_KEY = 'cordiaLearnAskSure';
 const TYPES_KEY = 'cordiaLearnTypes';
+const RECALL_NOTE_KEY = 'cordiaLearnRecallNote';
+// The format ladder's tiles and card names (LEARN_LADDER_V2). Saved picks map across (ladderTypes).
+const LADDER_WAYS = {
+  mc: { label: 'Multiple choice', icon: ListChecks, note: 'Pick from four' },
+  fill: { label: 'Fill in the blank', icon: TextCursorInput, note: 'Type the answer or its key words' },
+  written: { label: 'Written answer', icon: NotebookPen, note: 'Explain it in your words' },
+  self: { label: 'Flashcards', icon: Layers, note: 'Flip and be honest' },
+};
+const LADDER_NAMES = { mc: 'Multiple choice', fill: 'Fill in the blank', cloze: 'Fill in the blank', written: 'Written', self: 'Flashcard' };
+const FALLBACK_LINE = 'Fill in the blank is a Pro tool. You used Written instead.';
+const RECALL_NOTE = "To master an idea you'll type or explain it. Picking an answer can only take you to Familiar.";
 // The ways to learn, like Quiz's question types.
 const WAYS = {
   mc: { label: 'Choice', icon: ListChecks, note: 'Pick from four' },
@@ -156,7 +171,15 @@ export default function LearnPage() {
   const [roundNumber, setRoundNumber] = useState(0);
   const [answered, setAnswered] = useState(false);
   const [askSure, setAskSure] = useState(true);
-  const [types, setTypes] = useState(DEFAULT_TYPES);
+  const [types, setTypes] = useState(LEARN_LADDER_V2 ? ladderTypes(null) : DEFAULT_TYPES);
+  // The format ladder (LEARN_LADDER_V2): what the test is like, whether this account can use Fill in the
+  // blank this session, misses carried into the next round, and when each idea was last asked.
+  const [testFormat, setTestFormat] = useState('unsure');
+  const [fillAvailable, setFillAvailable] = useState(true);
+  const [recallNote, setRecallNote] = useState(false);
+  const carry = useRef([]);
+  const askCount = useRef(0);
+  const lastAsked = useRef({});
   const roundStart = useRef(Date.now());
   const sessionStart = useRef(Date.now());
   // Each card's logged format decision, by card id; its answer points at it.
@@ -166,13 +189,16 @@ export default function LearnPage() {
   useEffect(() => {
     try {
       setAskSure(localStorage.getItem(SURE_KEY) !== 'off');
-      setTypes(cleanTypes(JSON.parse(localStorage.getItem(TYPES_KEY) || 'null')));
+      setRecallNote(localStorage.getItem(RECALL_NOTE_KEY) !== 'seen');
+      const savedTypes = JSON.parse(localStorage.getItem(TYPES_KEY) || 'null');
+      setTypes(LEARN_LADDER_V2 ? ladderTypes(savedTypes) : cleanTypes(savedTypes));
     } catch { /* defaults */ }
   }, []);
 
   // At least one way stays on.
   function toggleType(type) {
-    const next = types.includes(type) ? types.filter(item => item !== type) : LEARN_TYPES.filter(item => item === type || types.includes(item));
+    const order = LEARN_LADDER_V2 ? LADDER_TYPES : LEARN_TYPES;
+    const next = types.includes(type) ? types.filter(item => item !== type) : order.filter(item => item === type || types.includes(item));
     if (!next.length) return;
     setTypes(next);
     try { localStorage.setItem(TYPES_KEY, JSON.stringify(next)); } catch { /* this visit only */ }
@@ -185,7 +211,19 @@ export default function LearnPage() {
 
   async function load() {
     const safe = promise => promise.catch(() => null);
-    const startSession = () => safe(apiFetch(`/quiz/${guideId}/session`, { method: 'POST', body: JSON.stringify({ types: ['mc', 'written'] }) }));
+    // The ladder asks for Fill in the blank only when this account has it left (a Pro "retain types"
+    // feature, charged once per session); otherwise mastery uses Written. Never an upgrade dialog here.
+    let ladderTypesNow = types;
+    let canFill = true;
+    if (LEARN_LADDER_V2) {
+      try { ladderTypesNow = ladderTypes(JSON.parse(localStorage.getItem(TYPES_KEY) || 'null')); } catch { /* defaults */ }
+      const billing = await safe(apiFetch('/billing/status', { quietLimit: true }));
+      const left = billing?.features?.retain_types?.remaining;
+      canFill = Boolean(billing?.unlimited || billing?.plan === 'classroom_plus' || (typeof left === 'number' ? left > 0 : !billing));
+    }
+    const wantsFill = canFill && (ladderTypesNow.includes('fill') || onlyRecognition(ladderTypesNow));
+    const sessionBody = LEARN_LADDER_V2 ? { types: ['mc', 'written', ...(wantsFill ? ['fill'] : [])], learn: true } : { types: ['mc', 'written'] };
+    const startSession = () => safe(apiFetch(`/quiz/${guideId}/session`, { method: 'POST', quietLimit: LEARN_LADDER_V2, body: JSON.stringify(sessionBody) }));
     setError('');
     let [guideData, session] = await Promise.all([safe(apiFetch(`/guides/${guideId}`)), startSession()]);
     let guide = guideData?.guide;
@@ -198,6 +236,7 @@ export default function LearnPage() {
       session = await startSession();
     }
     const list = Array.isArray(session?.questions) ? session.questions : [];
+    if (LEARN_LADDER_V2) setFillAvailable(wantsFill && session?.fill_available !== false);
     // The account's saved progress wins; this browser's copy covers a backend that hasn't got it yet.
     const saved = guide?.flashcard_progress?.learn || readLocal(guideId) || {};
     // A round left mid-way (a refresh) resumes at the same card, with the levels it had reached,
@@ -211,13 +250,21 @@ export default function LearnPage() {
     const linked = list.length ? linkedTestDate(router.query.test, saved.test_date || '', today) : '';
     setLevels(restored);
     setTestDate(linked || saved.test_date || '');
+    let format = 'unsure';
+    if (LEARN_LADDER_V2) {
+      // A progress merge from before migration 20261111130000 can drop the format: this browser's copy puts it back.
+      const local = readLocal(guideId)?.test_format;
+      format = cleanTestFormat(saved.test_format || local);
+      setTestFormat(format);
+      if (!saved.test_format && local && format !== 'unsure') saveTestFormat(format);
+    }
     if (resumable) {
       setRound(pending.round);
       setRoundNumber(pending.roundNumber);
       setScreen('round');
       roundStart.current = Date.now();
     }
-    if (linked || resumable) save(restored, linked || saved.test_date || '', list);
+    if (linked || resumable) save(restored, linked || saved.test_date || '', list, format);
     if (!list.length) setError(session?.detail || (guide && !String(guide.notes || '').trim()
       ? 'This guide has no notes or questions to learn from yet.'
       : 'Learn needs questions and answers. Open the guide and make its study set first.'));
@@ -229,6 +276,13 @@ export default function LearnPage() {
     if (ready && guideId) load();
   }, [ready, guideId]);
   const gate = useLoadGate(questions !== null || making);
+  // Only recognition tiles on: the first mastery step explains once why it asks for recall.
+  const noteCard = screen === 'round' ? currentCard(round) : null;
+  const recallNoteNow = Boolean(LEARN_LADDER_V2 && recallNote && noteCard?.recall && !noteCard.practice && onlyRecognition(types));
+  useEffect(() => {
+    if (!recallNoteNow) return;
+    try { localStorage.setItem(RECALL_NOTE_KEY, 'seen'); } catch { /* shows again next visit */ }
+  }, [recallNoteNow]);
 
   // Keeps the round in progress after every answer, so a refresh resumes it; leaving it drops it.
   useEffect(() => {
@@ -240,12 +294,18 @@ export default function LearnPage() {
     writeResume('learn', guideId, { round: resumeAt, roundNumber, levels: saveableLevels(questions, levels), fps });
   }, [guideId, questions, screen, round, answered, levels, roundNumber]);
 
-  function save(nextLevels, nextDate = testDate, list = questions) {
-    const body = { levels: saveableLevels(list, nextLevels), test_date: nextDate || null };
+  function save(nextLevels, nextDate = testDate, list = questions, nextFormat = testFormat) {
+    const body = { levels: saveableLevels(list, nextLevels), test_date: nextDate || null, ...(LEARN_LADDER_V2 && nextDate ? { test_format: nextFormat } : {}) };
     try { localStorage.setItem(localKey(guideId), JSON.stringify(body)); } catch { /* the account copy is enough */ }
     const before = savedLevels.current;
     savedLevels.current = body.levels;
-    saveLearnLevels(guideId, before, body).catch(() => {});
+    saveLearnLevels(guideId, before, body)
+      .then(merged => { if (body.test_format && merged?.learn && merged.learn.test_format !== body.test_format) saveTestFormat(body.test_format); })
+      .catch(() => {});
+  }
+
+  function saveTestFormat(value) {
+    apiFetch(`/guides/${guideId}/test-format`, { method: 'PATCH', body: JSON.stringify({ test_format: value }) }).catch(() => {});
   }
 
   function changeDate(value) {
@@ -253,12 +313,24 @@ export default function LearnPage() {
     save(levels, value);
   }
 
+  // "What's the test like?": saved next to the test date and editable wherever the date is.
+  function changeTestFormat(value) {
+    const format = cleanTestFormat(value);
+    setTestFormat(format);
+    save(levels, testDate, questions, format);
+    saveTestFormat(format);
+  }
+
+  function ladderContext() {
+    return { types, today, fillAvailable, testFormat, testDate, questions };
+  }
+
   // Logs why this card is asked in its format, before it shows (phase 1: fixed rules, no exploration).
   function decide(card, reason = null) {
     if (!card || (decisions.current[card.id] && !reason)) return;
     const question = questions[card.concept];
     const entry = levels[card.concept];
-    const decision = formatDecision(question, entry, today, types, card.type);
+    const decision = LEARN_LADDER_V2 ? ladderDecision(question, entry, { ...ladderContext(), index: card.concept }, card.type) : formatDecision(question, entry, today, types, card.type);
     const daysToExam = testDate ? Math.round((new Date(testDate + 'T12:00:00') - new Date(today + 'T12:00:00')) / 86400000) : null;
     decisions.current[card.id] = logFormatDecision({
       guideId,
@@ -272,8 +344,9 @@ export default function LearnPage() {
   }
 
   function startRound() {
-    const next = createRound(questions, levels, today, types);
+    const next = LEARN_LADDER_V2 ? createLadderRound(questions, levels, { ...ladderContext(), carry: carry.current }) : createRound(questions, levels, today, types);
     if (!next.queue.length) return;
+    carry.current = [];
     decide(currentCard(next));
     setRound(next);
     setRoundNumber(number => number + 1);
@@ -285,17 +358,34 @@ export default function LearnPage() {
   function onResult(results) {
     const [result] = results;
     const card = currentCard(round);
+    const next = LEARN_LADDER_V2
+      ? answerLadder(levels, round, card, result.credit, { confidence: result.confidence || '', today, ctx: ladderContext() })
+      : answer(levels, round, card, result.credit, { confidence: result.confidence || '', today });
+    // The ladder's study fields for the owner (never shown to students).
+    const asked = askCount.current;
+    askCount.current += 1;
+    const detail = LEARN_LADDER_V2 ? {
+      first_try: !card.again,
+      gap: lastAsked.current[card.concept] === undefined ? null : asked - lastAsked.current[card.concept] - 1,
+      level_before: levels[card.concept]?.l ?? null,
+      level_after: next.levels[card.concept]?.l ?? null,
+      test_format: testDate ? testFormat : null,
+      days_to_test: daysUntil(testDate, today),
+      fallback: Boolean(card.fallback),
+      practice: Boolean(card.practice),
+    } : null;
+    lastAsked.current[card.concept] = asked;
     results.forEach(item => logAnswer({
       guideId, question: questions[item.concept]?.question, mode: 'learn', type: card.type, credit: item.credit,
-      confidence: item.confidence, timing: item.timing, answerChars: item.answerChars, decisionId: decisions.current[card.id], nOptions: item.nOptions,
+      confidence: item.confidence, timing: item.timing, answerChars: item.answerChars, decisionId: decisions.current[card.id], nOptions: item.nOptions, detail,
     }));
-    const next = answer(levels, round, card, result.credit, { confidence: result.confidence || '', today });
     setLevels(next.levels);
     setRound(next.round);
     setAnswered(true);
   }
 
   function onNext() {
+    if (recallNoteNow) setRecallNote(false);
     const next = advance(round);
     setAnswered(false);
     if (currentCard(next)) { decide(currentCard(next)); setRound(next); return; }
@@ -305,6 +395,7 @@ export default function LearnPage() {
 
   function finishRound(done) {
     save(levels);
+    if (LEARN_LADDER_V2) carry.current = done.carry || [];
     const results = Object.entries(done.results);
     const missed = results.filter(([, item]) => item.missed).map(([concept]) => questions[concept]);
     const cleared = results.filter(([, item]) => !item.missed).map(([concept]) => questions[concept]?.question).filter(Boolean);
@@ -354,6 +445,11 @@ export default function LearnPage() {
   const retainCard = card && { id: card.id, type: card.type, concepts: [card.concept], reask: card.again };
   const question = card && questions[card.concept];
   const roundSize = round ? new Set(round.queue.map(item => item.concept)).size : 0;
+  const wayList = LEARN_LADDER_V2 ? LADDER_TYPES : LEARN_TYPES;
+  const wayInfo = LEARN_LADDER_V2 ? LADDER_WAYS : WAYS;
+  // In the final days the Final check leans to the test's format too.
+  const finalTypes = LEARN_LADDER_V2 ? finalCheckTypes(testFormat, testDate, today) : null;
+  const finalHref = '/quiz/' + guideId + (finalTypes ? '?types=' + finalTypes.join(',') : '');
   const roundDone = round ? Object.keys(round.results).length : 0;
 
   return (
@@ -390,13 +486,21 @@ export default function LearnPage() {
               <input id="learn-test-date" type="date" className="c-input" value={testDate} min={today} onChange={event => changeDate(event.target.value)} />
             </label>
             <p className="c-meta">{plan ? whenLabel(plan) : 'Add the date and Learn paces you so everything is mastered the day before.'}</p>
+            {LEARN_LADDER_V2 && testDate && (
+              <label className="learn-date" htmlFor="learn-test-format">
+                <span>What's the test like?</span>
+                <select id="learn-test-format" className="c-select" value={testFormat} onChange={event => changeTestFormat(event.target.value)}>
+                  {TEST_FORMATS.map(format => <option key={format} value={format}>{TEST_FORMAT_LABELS[format]}</option>)}
+                </select>
+              </label>
+            )}
           </section>
 
           <section className="learn-ways" aria-labelledby="learn-ways-title">
             <h2 id="learn-ways-title" className="c-section-title">How do you want to learn?</h2>
             <div className="learn-way-grid" role="group" aria-label="Ways to learn">
-              {LEARN_TYPES.map(type => {
-                const way = WAYS[type];
+              {wayList.map(type => {
+                const way = wayInfo[type];
                 const on = types.includes(type);
                 return (
                   <button key={type} type="button" className={'learn-way' + (on ? ' is-on' : '')} aria-pressed={on} onClick={() => toggleType(type)}>
@@ -407,7 +511,9 @@ export default function LearnPage() {
                 );
               })}
             </div>
-            <p className="c-meta">{!types.some(type => type !== 'mc')
+            <p className="c-meta">{LEARN_LADDER_V2
+              ? (onlyRecognition(types) ? RECALL_NOTE : 'New ideas start with your first recognition pick; familiar ones are typed or explained to master them.')
+              : !types.some(type => type !== 'mc')
               ? 'Only Choice: an idea is mastered by choosing it right once it\'s familiar. Add Type it or Written to master by recalling, which sticks better for a test.'
               : 'New ideas start with your first pick; familiar ones are asked from memory to master them.'}</p>
           </section>
@@ -424,7 +530,7 @@ export default function LearnPage() {
               </button>
             ) : null}
             {allMastered && (
-              <Link href={'/quiz/' + guideId} className="c-btn c-btn--primary c-btn--lg"><Target {...ICON} />Final check</Link>
+              <Link href={finalHref} className="c-btn c-btn--primary c-btn--lg"><Target {...ICON} />Final check</Link>
             )}
           </div>
 
@@ -440,7 +546,7 @@ export default function LearnPage() {
           <ul className="learn-how">
             <li><GraduationCap {...ICON} /><span><strong>Rounds of {Math.min(7, tally.total)}.</strong> Recognise the answer first, then recall it from memory. Recall is what masters an idea.</span></li>
             <li><Check {...ICON} /><span><strong>Guesses don't count.</strong> {askSure ? 'A lucky guess stays in Learning, and a confident miss comes back first.' : 'Turn on "Ask how sure I am" so lucky guesses aren\'t counted as learned.'}</span></li>
-            <li><Repeat {...ICON} /><span><strong>Misses come back</strong> later in the same round, and mastered ideas return after {5} days so they stay fresh for the test.</span></li>
+            <li><Repeat {...ICON} /><span><strong>Misses come back</strong> {LEARN_LADDER_V2 ? 'a few questions later, or first in the next round,' : 'later in the same round,'} and mastered ideas return after {5} days so they stay fresh for the test.</span></li>
           </ul>
         </div>
       )}
@@ -450,14 +556,17 @@ export default function LearnPage() {
           <div className="learn-card-head">
             <span className="c-meta">Round {roundNumber} · {Math.min(roundDone + (answered ? 0 : 1), roundSize)} of {roundSize}</span>
             <span className={'learn-chip ' + LEVEL_CLASS[levels[card.concept].l]}>{LEVELS[levels[card.concept].l]}</span>
-            <span className="c-meta learn-type">{card.again ? 'Again' : TYPE_NAMES[card.type]}</span>
+            <span className="c-meta learn-type">{card.again ? 'Again' : (LEARN_LADDER_V2 ? LADDER_NAMES : TYPE_NAMES)[card.type]}</span>
           </div>
           <div className="c-bar" role="progressbar" aria-label="Round" aria-valuemin={0} aria-valuemax={round.queue.length} aria-valuenow={round.position}><span style={{ width: Math.round((round.position / round.queue.length) * 100) + '%' }} /></div>
+          {recallNoteNow && <p className="learn-recall-note" role="status">{RECALL_NOTE}</p>}
+          <QuietLimits.Provider value={LEARN_LADDER_V2}>
           {card.type === 'mc' && <McCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
           {card.type === 'fill' && <FillCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
           {card.type === 'written' && <WrittenCard key={card.id} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} onSwitch={switchToSelf} />}
-          {card.type === 'cloze' && <ClozeCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
+          {card.type === 'cloze' && <ClozeCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} blank={LEARN_LADDER_V2 && !blankFor(question)?.whole ? blankFor(question) : null} />}
           {card.type === 'self' && <FlipCard key={card.id + '-self'} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
+          </QuietLimits.Provider>
         </div>
       )}
 
@@ -480,10 +589,11 @@ export default function LearnPage() {
               ))}
             </ul>
             {plan && !plan.past && <p className="c-meta">{whenLabel(plan)}</p>}
+            {LEARN_LADDER_V2 && round.fallbackUsed && <p className="c-meta learn-fallback">{FALLBACK_LINE}</p>}
           </section>
           <div className="learn-actions">
             {allMastered && !tally.fading
-              ? <Link href={'/quiz/' + guideId} className="c-btn c-btn--primary c-btn--lg"><Target {...ICON} />Final check</Link>
+              ? <Link href={finalHref} className="c-btn c-btn--primary c-btn--lg"><Target {...ICON} />Final check</Link>
               : <button type="button" className="c-btn c-btn--primary c-btn--lg" onClick={startRound}>Next round<ArrowRight {...ICON} /></button>}
             <button type="button" className="c-btn c-btn--secondary c-btn--lg" onClick={() => setScreen('home')}>Overview</button>
           </div>
@@ -538,6 +648,9 @@ export default function LearnPage() {
         .learn-date { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font: 600 16px/1.3 var(--font-sans); }
         .learn-date span { display: inline-flex; align-items: center; gap: 8px; }
         .learn-date input { width: auto; min-width: 170px; }
+        .learn-date select { width: auto; min-width: 170px; }
+        .learn-recall-note { margin: 0; padding: 10px 14px; border-radius: var(--r-row); background: var(--olive-tint); color: var(--ink); font: 600 14px/1.45 var(--font-sans); }
+        .learn-fallback { margin: 0; }
         .learn-actions { display: flex; flex-wrap: wrap; gap: 10px; }
         .learn-test-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         a.learn-way { text-decoration: none; }

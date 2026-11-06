@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api';
-import { advance, createSession, currentCard, firstAttempts, progress, recordResults } from '../lib/retainEngine.mjs';
+import { advance, createSession, currentCard, firstAttempts, progress, recordResults, sinceLastAsked } from '../lib/retainEngine.mjs';
+import { LEARN_LADDER_V2 } from '../lib/featureFlags';
 import { logAnswer } from '../lib/learningEvents';
 import { Repeat } from 'lucide-react';
 import SessionFinish from './SessionFinish';
@@ -16,7 +17,8 @@ import { walkthroughEvent } from '../lib/walkthrough';
 // refresh. onProgress gets that snapshot after every answer, and null once the quiz is finished.
 export default function QuizMode({ questions, cards, types, guideId, onRestart, onDone, doneLabel, mode = 'quiz', resume = null, onProgress }) {
   // A card already answered when the page was left moves on, so it isn't counted twice.
-  const [session, setSession] = useState(() => (resume ? (resume.answered ? advance(resume.session) : resume.session) : createSession(questions, cards, types)));
+  // LEARN_LADDER_V2: a miss comes back 6-10 questions later instead of 3.
+  const [session, setSession] = useState(() => (resume ? (resume.answered ? advance(resume.session) : resume.session) : createSession(questions, cards, types, { ladder: LEARN_LADDER_V2 })));
   const [answered, setAnswered] = useState(false);
   const [score, setScore] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -35,6 +37,8 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart, 
     results.forEach(item => logAnswer({
       guideId, question: questions[item.concept]?.question, mode, type: shown?.type, credit: item.credit,
       confidence: item.confidence, timing: item.timing, answerChars: item.answerChars, nOptions: item.nOptions,
+      // The ladder's owner-only study fields: first try or retry, and questions since it was last asked.
+      detail: LEARN_LADDER_V2 ? { first_try: !shown?.reask, gap: sinceLastAsked(session, item.concept) } : null,
     }));
     setSession(current => recordResults(current, currentCard(current), results));
     setAnswered(true);
