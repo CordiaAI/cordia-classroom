@@ -40,20 +40,57 @@ class QuizPlanContractTests(unittest.TestCase):
         database.table.return_value = query
         return database, query
 
-    def test_free_quiz_uses_other_guide_answers_and_saves_it(self):
+    def test_free_quiz_also_gets_model_written_choices_without_using_the_allowance(self):
+        # Feedback 12: guide answers as wrong choices looked nothing like the right one.
         database, query = self._database({"study_guide": GUIDE, "quiz_questions": None})
+        response = MagicMock()
+        response.choices[0].message.content = (
+            '{"items":[{"distractors":["Alpine","Alder","Alto"]},{"distractors":["Bear","Bela","Bento"]},'
+            '{"distractors":["Gamut","Gala","Gauge"]},{"distractors":["Delft","Delia","Delve"]}]}'
+        )
+        client = MagicMock()
+        client.chat.completions.create.return_value = response
         with patch.object(quiz, "get_user_id", return_value="student-1"), \
              patch.object(quiz, "get_supabase", return_value=database), \
              patch.object(quiz, "remaining", return_value=0), \
-             patch.object(quiz, "get_openai_client") as openai:
+             patch.object(quiz, "record") as record_usage, \
+             patch.object(quiz, "get_openai_client", return_value=client):
             result = quiz._quiz_for_guide(GUIDE_ID, "Bearer token")
 
-        self.assertEqual(len(result["questions"]), 4)
         first = result["questions"][0]
-        self.assertEqual(set(first["options"]), {"Alpha", "Beta", "Gamma", "Delta"})
+        self.assertEqual(set(first["options"]), {"Alpha", "Alpine", "Alder", "Alto"})
         self.assertEqual(first["options"][first["correct_index"]], "Alpha")
         self.assertEqual(query.updated, {"quiz_questions": result["questions"]})
-        openai.assert_not_called()
+        record_usage.assert_not_called()
+
+    def test_old_quizzes_with_a_standout_answer_are_rebuilt_once(self):
+        cached = [
+            {"question": "Why did it fail?", "options": ["Its funding ran out before the second phase", "Beta", "Gamma", "Delta"], "correct_index": 0},
+            {"question": "Fine?", "options": ["Alpha", "Beta", "Gamma", "Delta"], "correct_index": 0},
+        ]
+        database, query = self._database({"study_guide": GUIDE, "quiz_questions": cached})
+        fresh = {"Why did it fail?": ["Its leaders split over the second phase", "Its partners left before the first phase", "Its plans were blocked by the regulators"]}
+        with patch.object(quiz, "get_user_id", return_value="student-1"), \
+             patch.object(quiz, "get_supabase", return_value=database), \
+             patch.object(quiz, "get_openai_client"), \
+             patch.object(quiz, "_replacement_distractors", return_value=fresh) as rebuild:
+            result = quiz._quiz_for_guide(GUIDE_ID, "Bearer token")
+        rebuilt, untouched = result["questions"]
+        self.assertEqual(rebuilt["options"][rebuilt["correct_index"]], "Its funding ran out before the second phase")
+        self.assertIn("Its leaders split over the second phase", rebuilt["options"])
+        self.assertNotIn("Beta", rebuilt["options"])
+        self.assertEqual(rebuilt["choices_v"], quiz.CHOICES_VERSION)
+        self.assertEqual(untouched, cached[1])
+        self.assertEqual(query.updated, {"quiz_questions": result["questions"]})
+        self.assertEqual([item["question"] for item in rebuild.call_args.args[1]], ["Why did it fail?"])
+        # Marked, so it is not tried again on the next visit.
+        self.assertFalse(quiz._stands_out(rebuilt))
+
+    def test_what_counts_as_standing_out(self):
+        self.assertTrue(quiz._stands_out({"options": ["1776", "Beta", "Gamma"], "correct_index": 0}))
+        self.assertTrue(quiz._stands_out({"options": ["A long and very detailed answer", "Short", "Brief"], "correct_index": 0}))
+        self.assertFalse(quiz._stands_out({"options": ["1776", "1781", "1765"], "correct_index": 0}))
+        self.assertFalse(quiz._stands_out({"options": ["Alpha", "Beta"], "correct_index": 1}))
 
     def test_free_quiz_reuses_the_saved_quiz(self):
         cached = [{"question": "Saved?", "options": ["Yes", "No"], "correct_index": 0}]
@@ -112,8 +149,10 @@ class QuizPlanContractTests(unittest.TestCase):
         self.assertEqual(query.updated, {"quiz_questions": result["questions"]})
         record_usage.assert_called_once_with("student-1", "ai_quiz", f"first:{GUIDE_ID}")
         prompt = client.chat.completions.create.call_args.kwargs["messages"][1]["content"]
+        self.assertIn("same type of thing as the correct answer", prompt)
         self.assertIn("incorrect terminology", prompt)
-        self.assertIn("missing or altering one essential factor", prompt)
+        self.assertIn("never a true statement", prompt)
+        self.assertNotIn("adapt an answer from another", prompt)
 
     def test_unusable_ai_reply_falls_back_without_caching(self):
         database, query = self._database({"study_guide": GUIDE, "quiz_questions": None})
