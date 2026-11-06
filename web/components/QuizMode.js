@@ -5,6 +5,7 @@ import { LEARN_LADDER_V2 } from '../lib/featureFlags';
 import { logAnswer } from '../lib/learningEvents';
 import { Repeat } from 'lucide-react';
 import SessionFinish from './SessionFinish';
+import { PrintQuizButton } from './PrintQuizSheet';
 import { FillCard, MatchingCard, McCard, WrittenCard } from './RetainCards';
 import { rememberRetainMisses } from '../lib/userStore';
 import { conceptAnswer } from '../lib/retainEngine.mjs';
@@ -86,6 +87,7 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart, 
       <SessionFinish guideId={guideId} cards={finalStats.total} accuracy={accuracy} minutes={(Date.now() - startedAt) / 60000} kind="quiz" onRestart={onRestart} onDone={onDone} doneSpot="quiz-done" doneLabel={doneLabel}>
         {saving && <span className="c-meta" role="status">Saving…</span>}
         {score?.error && <p className="retain-action-error" role="alert">{score.error}</p>}
+        {mode === 'quiz' && <PrintQuizButton guideId={guideId} />}
         {sureMisses > 0 && <p className="c-meta finish-sure">{sureMisses === 1 ? 'One answer you were sure of was wrong.' : `${sureMisses} answers you were sure of were wrong.`} Those come back first in Study now, so they stick.</p>}
       </SessionFinish>
     );

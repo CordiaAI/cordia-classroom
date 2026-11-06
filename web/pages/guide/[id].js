@@ -7,7 +7,7 @@ import CardPhoto from '../../components/CardPhoto';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Brain, Download, ExternalLink, FolderInput, GraduationCap, Layers, NotebookText, PencilRuler, Pencil, Play, RefreshCw, Star, Stethoscope, SquarePen, Trash2, X,
+  ArrowLeft, Brain, Download, ExternalLink, FolderInput, GraduationCap, Layers, NotebookText, PencilRuler, Pencil, Play, Printer, RefreshCw, Star, Stethoscope, SquarePen, Trash2, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -27,6 +27,7 @@ import { loadMyProfile } from '../../lib/profiles';
 import { setGuideVisibility } from '../../lib/guideSharing';
 import { firstPublishStep } from '../../lib/guideVisibility.mjs';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import PrintQuizSheet from '../../components/PrintQuizSheet';
 import { useLearningStyle } from '../../lib/learningStyle';
 import { rememberGuidePage, rememberLastGuide } from '../../lib/userStore';
 import { activeStep, walkthroughEvent } from '../../lib/walkthrough';
@@ -145,6 +146,7 @@ export default function GuidePage() {
   const [studySetError, setStudySetError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [toast, setToast] = useState('');
+  const [printing, setPrinting] = useState(false);
   // The outline before "Regenerate outline", so the toast can put it back.
   const [undoNotes, setUndoNotes] = useState(null);
   const [sharing, setSharing] = useState(null);
@@ -537,12 +539,13 @@ export default function GuidePage() {
                 { label: 'Save a copy to Drive', onSelect: saveToDrive },
               ],
             },
-            ...(hasQuestions ? [{ label: 'Refresh answer choices', icon: RefreshCw, onSelect: refreshChoices }] : []),
+            ...(hasQuestions ? [{ label: 'Print quiz', icon: Printer, onSelect: () => setPrinting(true) }, { label: 'Refresh answer choices', icon: RefreshCw, onSelect: refreshChoices }] : []),
             { label: 'Delete', icon: Trash2, danger: true, onSelect: () => setConfirmDelete(true) },
           ]}
         />
         <Link href={'/session?guideId=' + id} className="c-btn c-btn--primary guide-study-now"><Play size={20} strokeWidth={1.75} aria-hidden="true" />Study now</Link>
       </header>
+      {printing && <PrintQuizSheet guideId={id} onClose={() => setPrinting(false)} />}
       {guide.origin === 'mcp' && <p className="c-meta guide-origin">Added from {guide.origin_client || 'a connected AI app'}</p>}
       {sharing?.update_available && (
         <button type="button" className="c-chip guide-update" onClick={pullUpdate}><RefreshCw size={16} strokeWidth={1.75} aria-hidden="true" />Update available</button>

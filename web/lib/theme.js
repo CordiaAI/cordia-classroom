@@ -21,7 +21,8 @@ export function isLightOnly(pathname) {
   if (LIGHT_WHEN_SIGNED_OUT.includes(pathname)) {
     try { return !localStorage.getItem('authToken'); } catch { return true; }
   }
-  return LIGHT_ONLY.includes(pathname);
+  // Printed pages are always paper white.
+  return LIGHT_ONLY.includes(pathname) || pathname.startsWith('/print/');
 }
 
 export function applyTheme(pathname = typeof window !== 'undefined' ? window.location.pathname : '/') {
