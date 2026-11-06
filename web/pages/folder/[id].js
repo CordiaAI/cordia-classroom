@@ -21,6 +21,9 @@ import ClassGrades from '../../components/ClassGrades';
 import useScrollerTabs from '../../lib/useScrollerTabs';
 import { useListView } from '../../lib/listView';
 import ViewToggle from '../../components/ViewToggle';
+import { CLASSROOMS_ON } from '../../lib/featureFlags';
+import CourseClassrooms from '../../components/CourseClassrooms';
+import AddToClassroom from '../../components/AddToClassroom';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // Course files and Grades show for a class brought in from Canvas.
@@ -50,6 +53,7 @@ export default function ClassPage() {
   const [addingCode, setAddingCode] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [toast, setToast] = useState('');
+  const [sharing, setSharing] = useState(false);
   const [course, setCourse] = useState(null);
   const [renaming, setRenaming] = useState(null);
   const tabs = TABS.filter(([, , needs]) => !needs || course);
@@ -162,6 +166,7 @@ export default function ClassPage() {
   const upcoming = deadlines ? deadlines.filter(item => !item.done && new Date(item.due_at) >= new Date()).length : 0;
   const menu = [
     { label: 'Rename class', icon: Pencil, onSelect: () => setRenaming(folder.name) },
+    ...(CLASSROOMS_ON ? [{ label: 'Add to classroom', icon: Plus, onSelect: () => setSharing(true) }] : []),
     ...(folder.class_id ? [] : [{ label: 'Add course code', icon: Hash, onSelect: () => setAddingCode(true) }]),
     ...(folder.class_id && showName !== null ? [{ label: showName ? 'Hide my first name on shared sets' : 'Show my first name on shared sets', icon: UserRound, onSelect: toggleShowName }] : []),
     { label: 'Delete class', icon: Trash2, danger: true, onSelect: deleteClass },
@@ -240,9 +245,13 @@ export default function ClassPage() {
       ) : tab === 'files' && course ? <div className="c-card cls-files"><CourseFiles course={course} /></div>
         : tab === 'grades' && course ? <ClassGrades courseId={course.id} guides={items.filter(item => item.kind === 'guide')} onMakeGuide={() => setTab('files')} />
         : !folder.class_id ? needsCode
-        : tab === 'sets' ? <ClassSets classId={folder.class_id} onToast={setToast} initial={classData} />
+        : tab === 'sets' ? <>{CLASSROOMS_ON && <CourseClassrooms classId={folder.class_id} onToast={setToast} />}<ClassSets classId={folder.class_id} onToast={setToast} initial={classData} /></>
         : <ClassDeadlines classId={folder.class_id} deadlines={deadlines} />}
 
+      {sharing && (
+        <AddToClassroom item={{ type: 'folder', id: folder.id, title: folder.name, mine: true }}
+          onClose={() => setSharing(false)} onAdded={room => { setSharing(false); setToast(`Shared with ${room?.name || 'the classroom'}`); }} />
+      )}
       {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
       <style jsx>{`
         .cls-title-row { min-width: 0; align-items: flex-start; }

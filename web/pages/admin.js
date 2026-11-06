@@ -61,6 +61,22 @@ export default function Admin() {
             )) : <p className="c-meta">Empty</p>}
           </section>
 
+          {(queue.classrooms || []).length > 0 && (
+            <section className="c-card adm-card" aria-labelledby="adm-classrooms">
+              <h2 id="adm-classrooms" className="c-section-title">Instructor class requests</h2>
+              {queue.classrooms.map(item => (
+                <div key={item.id} className="adm-row">
+                  <span className="adm-main">
+                    <strong>{item.name}</strong>
+                    <span className="c-meta">{[item.owner?.name, item.owner?.email, item.owner?.username && `@${item.owner.username}`].filter(Boolean).join(' · ')}</span>
+                  </span>
+                  <button type="button" className="c-btn c-btn--secondary" onClick={() => act(`/admin/classrooms/${item.id}`, { approve: true })}>Approve</button>
+                  <button type="button" className="c-btn c-btn--quiet" onClick={() => act(`/admin/classrooms/${item.id}`, { approve: false })}>Decline</button>
+                </div>
+              ))}
+            </section>
+          )}
+
           <section className="c-card adm-card" aria-labelledby="adm-guides">
             <h2 id="adm-guides" className="c-section-title">Guides</h2>
             {(queue.guides || []).length ? queue.guides.map(item => (

@@ -71,7 +71,8 @@ export async function markNotificationsRead(ids) {
 }
 
 // What a notification says, in plain words (the actor's name is shown separately).
-export function notificationText(kind) {
+export function notificationText(kind, item = null) {
+  if (kind === 'classroom_invite') return `invited you to ${item?.classroom?.name ? `“${item.classroom.name}”` : 'a classroom'}`;
   return {
     follow: 'followed you',
     follow_request: 'asked to follow you',
@@ -81,6 +82,7 @@ export function notificationText(kind) {
 }
 
 export function notificationHref(item) {
+  if (item.kind === 'classroom_invite' && item.classroom?.token) return `/join/${item.classroom.token}`;
   if (item.kind === 'friend_request' || item.kind === 'follow_request') return '/friends?tab=requests';
   return item.actor?.username ? `/u/${item.actor.username}` : '/friends';
 }

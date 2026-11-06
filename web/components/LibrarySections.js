@@ -5,15 +5,17 @@ import { SectionLoader } from './CordiaLoader';
 import { loadSavedGuides, loadVisibilityReview, saveForLater } from '../lib/guideSharing';
 import { readUserValue, writeUserValue } from '../lib/userStore';
 import { savedMeta } from '../lib/guideVisibility.mjs';
+import { CLASSROOMS_ON } from '../lib/featureFlags';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 export const SECTIONS = [
   { key: 'mine', label: 'Mine' },
   { key: 'saved', label: 'Saved' },
+  ...(CLASSROOMS_ON ? [{ key: 'classrooms', label: 'Classrooms' }] : []),
   { key: 'class', label: 'Class sets' },
 ];
 
-// Mine · Saved · Class sets: ARIA tabs; arrow keys move between them.
+// Mine · Saved · Classrooms · Class sets: ARIA tabs; arrow keys move between them.
 export function SectionTabs({ section, onChange }) {
   function onKeyDown(event) {
     const index = SECTIONS.findIndex(item => item.key === section);
@@ -25,7 +27,7 @@ export function SectionTabs({ section, onChange }) {
     document.getElementById(`lsec-${next.key}`)?.focus();
   }
   return (
-    <div className="c-seg lib-sections" role="tablist" aria-label="Library" onKeyDown={onKeyDown}>
+    <div className={'c-seg lib-sections' + (SECTIONS.length > 3 ? ' is-scroller' : '')} role="tablist" aria-label="Library" onKeyDown={onKeyDown}>
       {SECTIONS.map(item => (
         <button key={item.key} id={`lsec-${item.key}`} type="button" role="tab" aria-selected={section === item.key}
           aria-controls={`lsec-panel-${item.key}`} tabIndex={section === item.key ? 0 : -1}

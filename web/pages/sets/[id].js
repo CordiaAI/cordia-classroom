@@ -12,7 +12,8 @@ import Menu from '../../components/Menu';
 import FeedbackModal from '../../components/FeedbackModal';
 import { VISIBILITY_LABELS, copyGuide, guideLink, loadPublicGuide, saveForLater } from '../../lib/guideSharing';
 import { outlineLine } from '../../lib/guideVisibility.mjs';
-import { PER_VIEWER_PROGRESS } from '../../lib/featureFlags';
+import { CLASSROOMS_ON, PER_VIEWER_PROGRESS } from '../../lib/featureFlags';
+import AddToClassroom from '../../components/AddToClassroom';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const VISIBILITY_ICONS = { public: Globe, link: Link2, classroom: Users, private: Lock };
@@ -29,6 +30,7 @@ export default function SetPage() {
   const [busy, setBusy] = useState('');
   const [toast, setToast] = useState('');
   const [reporting, setReporting] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => { setSignedIn(Boolean(getToken())); }, []);
 
@@ -156,9 +158,15 @@ export default function SetPage() {
                   </>
                 )}
                 <span className="sets-row-end">
-                  <button type="button" className="c-btn c-btn--secondary" disabled>
-                    <Users {...ICON} />Add to classroom<span className="sets-soon">Coming soon</span>
-                  </button>
+                  {CLASSROOMS_ON ? (
+                    (guide.is_owner || ['public', 'link'].includes(guide.visibility)) && (
+                      <button type="button" className="c-btn c-btn--secondary" onClick={() => setAdding(true)}><Users {...ICON} />Add to classroom</button>
+                    )
+                  ) : (
+                    <button type="button" className="c-btn c-btn--secondary" disabled>
+                      <Users {...ICON} />Add to classroom<span className="sets-soon">Coming soon</span>
+                    </button>
+                  )}
                   {moreItems.length > 0 && <Menu label="More" items={moreItems} />}
                 </span>
               </div>
@@ -184,6 +192,10 @@ export default function SetPage() {
         )}
       </div>
       {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
+      {adding && guide && (
+        <AddToClassroom item={{ type: 'guide', id: guide.id, title: guide.title, mine: guide.is_owner, private: guide.visibility === 'private' }}
+          onClose={() => setAdding(false)} onAdded={room => { setAdding(false); setToast(`Added to ${room?.name || 'the classroom'}`); }} />
+      )}
       {reporting && (
         <FeedbackModal initialCategory="other" initialMessage={`Report guide ${guideLink(guide.id)}: `} onClose={() => setReporting(false)} />
       )}
