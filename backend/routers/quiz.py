@@ -49,6 +49,14 @@ class RetainAttempt(BaseModel):
 class QuizSubmission(BaseModel):
     answers: List[QuizAnswer] = Field(default_factory=list, max_length=50)
     attempts: List[RetainAttempt] = Field(default_factory=list, max_length=100)
+    # "Show if I'm right": after each question, or only when the whole quiz is submitted.
+    feedback: Literal["each", "submit"] = "each"
+
+
+class RetryResult(BaseModel):
+    """"Retry my misses" after a When-I-submit quiz: how many missed ideas were cleared."""
+    cleared: int = Field(..., ge=0, le=100)
+    of: int = Field(..., ge=0, le=100)
 
 
 class SessionRequest(BaseModel):
@@ -786,14 +794,16 @@ def submit_quiz(guide_id: str, submission: QuizSubmission, authorization: str = 
     earned = sum(a.get("credit", 1.0 if a["is_correct"] else 0.0) for a in answers)
     score = round((earned / total) * 100)
 
-    supabase.table("quiz_attempts").insert({
+    saved = supabase.table("quiz_attempts").insert({
         "user_id": user_id,
         "guide_id": guide_id,
         "score": score,
         "total_questions": total,
         "correct_answers": correct,
         "answers": answers,
+        "metadata": {"feedback": submission.feedback},
     }).execute()
+    attempt_id = (saved.data or [{}])[0].get("id")
 
     # Log study session
     supabase.table("study_sessions").insert({
@@ -808,7 +818,23 @@ def submit_quiz(guide_id: str, submission: QuizSubmission, authorization: str = 
     from routers.stats import _update_streak
     _update_streak(user_id)
 
-    return {"score": score, "total": total, "correct": correct, "earned": earned}
+    return {"score": score, "total": total, "correct": correct, "earned": earned, "attempt_id": attempt_id}
+
+
+@router.post("/{guide_id}/attempts/{attempt_id}/retry")
+def record_retry(guide_id: str, attempt_id: str, result: RetryResult, authorization: str = Header(default="")):
+    """Keeps the "Retry my misses" result with its attempt. The score stays first-try only."""
+    require_uuid(guide_id, "guide ID")
+    require_uuid(attempt_id, "attempt ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+    rows = (supabase.table("quiz_attempts").select("metadata").eq("id", attempt_id)
+            .eq("user_id", user_id).eq("guide_id", guide_id).execute()).data or []
+    if not rows:
+        raise HTTPException(status_code=404, detail="Attempt not found")
+    metadata = {**(rows[0].get("metadata") or {}), "retry": {"cleared": min(result.cleared, result.of), "of": result.of}}
+    supabase.table("quiz_attempts").update({"metadata": metadata}).eq("id", attempt_id).eq("user_id", user_id).execute()
+    return {"ok": True}
 
 
 @router.get("/{guide_id}/history")
