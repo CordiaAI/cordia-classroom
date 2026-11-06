@@ -274,8 +274,9 @@ export default function PrintQuizPage() {
         .pq-fill { align-items: baseline; }
         .pq-fill .pq-text { line-height: 2.4; }
         .pq-blank { display: inline-block; width: 1.3in; margin: 0 6px; border-bottom: 1.2px solid var(--print-ink); transform: translateY(2px); }
-        .pq-line { display: block; height: 0.42in; border-bottom: 1px solid var(--print-line); }
-        .pq-short .pq-text { margin-bottom: 0.08in; }
+        .pq-line { display: block; height: 0.38in; border-bottom: 1px solid var(--print-line); }
+        .pq-short { padding-bottom: 0.24in; }
+        .pq-short .pq-text { margin-bottom: 0.1in; }
         .pq-key-title { font: 400 23pt/1.15 var(--font-display); }
         .pq-key-sub { margin: 8px 0 0.34in !important; font: 500 9.5pt/1.3 var(--font-sans); color: var(--print-muted); }
         .pq-key-part { margin-bottom: 0.26in; break-inside: avoid; }
@@ -290,7 +291,9 @@ export default function PrintQuizPage() {
         .pq-key-fill small, .pq-key-short small { font: 600 8pt/1.8 var(--font-sans); color: var(--print-muted); }
         .pq-key-note { margin-top: 0.2in !important; font: 400 8pt/1.4 var(--font-sans); color: var(--print-muted); }
         @media print {
-          html, body { background: var(--print-paper); }
+          /* The whole document is on the quiz page: anything after the paper on a default page
+             (Next's route announcer) would otherwise start a blank last page. */
+          html, body { background: var(--print-paper); page: quiz; min-height: 0; }
           .pq { min-height: 0; }
           .pq-toolbar { display: none; }
           .pq-paper { width: auto; margin: 0; padding: 0; }

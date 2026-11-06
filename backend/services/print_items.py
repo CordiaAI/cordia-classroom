@@ -32,7 +32,6 @@ _STOP = {
 _EXPLAIN = re.compile(
     r"^\s*(why|how|describe|explain|compare|contrast|discuss|in what ways?|what (role|effect|impact|characterizes|are the (musical |main |key )?(characteristics|features|effects|causes)))\b",
     re.I)
-_DEFINE = re.compile(r"^\s*what\s+(?:is|are)\s+(?:(a|an|the)\s+)?(?P<term>[^,?]+?)\s*\??\s*$", re.I)
 
 
 def source_hash(pairs: list) -> str:
@@ -134,15 +133,24 @@ def multiple_choice(quiz: list, pairs: list) -> tuple:
 
 # ---- matching ----
 
+def _defined_term(question: str) -> Optional[str]:
+    """X in a plain "What is X?" / "What are X?" question (without a/an/the), else None."""
+    text = " ".join(str(question or "").split()).rstrip("?").strip()
+    lower = text.lower()
+    lead = next((lead for lead in ("what is ", "what are ") if lower.startswith(lead)), None)
+    if not lead or "," in text or "?" in text:
+        return None
+    term = text[len(lead):]
+    article = next((word for word in ("a ", "an ", "the ") if term.lower().startswith(word)), "")
+    return term[len(article):].strip() or None
+
+
 def matching(pairs: list) -> list:
     """Term / definition pairs from short "What is X?" questions: the term is X as the question
     writes it, the definition the answer's first sentence without its "X is" / "It is" opening."""
     items, seen = [], set()
     for index, pair in enumerate(pairs):
-        found = _DEFINE.match(pair["question"])
-        if not found:
-            continue
-        term = found.group("term").strip().strip("'‘’\"")
+        term = (_defined_term(pair["question"]) or "").strip("'‘’\"")
         if not term or len(term.split()) > 4 or len(term) > 40:
             continue
         definition = _first_sentence(pair["answer"])
