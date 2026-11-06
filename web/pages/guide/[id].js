@@ -7,7 +7,7 @@ import CardPhoto from '../../components/CardPhoto';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  ArrowLeft, Brain, Download, ExternalLink, FolderInput, GraduationCap, Layers, NotebookText, PencilRuler, Pencil, Play, Printer, RefreshCw, Star, Stethoscope, SquarePen, Trash2, X,
+  ArchiveRestore, ArrowLeft, Brain, Copy, Download, ExternalLink, FolderInput, GraduationCap, Layers, NotebookText, PencilRuler, Pencil, Play, Printer, RefreshCw, Star, Stethoscope, SquarePen, Trash2, X,
 } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -36,6 +36,8 @@ import { activeStep, walkthroughEvent } from '../../lib/walkthrough';
 import { requestTip } from '../../lib/tips';
 import { readUserValue, writeUserValue } from '../../lib/userStore';
 import { exportToDocs, exportToNotion } from '../../lib/studyPlans';
+import MergeSheet from '../../components/MergeSheet';
+import { GUIDES_CHANGED, mergedInto, restoreMerged, useDuplicates } from '../../lib/duplicates';
 
 const NURSING_TERMS = ['nursing', 'nurse', 'nclex', 'patient', 'vital signs', 'medication administration', 'care plan', 'nursing diagnosis', 'iv therapy', 'delegation', 'scope of practice', 'sbar', 'discharge planning', 'wound care', 'fall prevention', 'infection control', 'postoperative', 'preoperative', 'lab values', 'contraindications'];
 
@@ -185,6 +187,32 @@ export default function GuidePage() {
   useEffect(() => {
     if (ready && id) loadGuide();
   }, [ready, id]);
+
+  // Duplicates: a line when this set looks like another one, and "Restore merged set" in the menu
+  // for sets merged into this one in the last 30 days (lib/duplicates.js).
+  const duplicates = useDuplicates();
+  const dupPair = duplicates.pairs.find(pair => pair.keep.id === id || pair.merge.id === id);
+  const dupOther = dupPair && (dupPair.keep.id === id ? dupPair.merge : dupPair.keep);
+  const [merging, setMerging] = useState(null);
+  const [merged, setMerged] = useState([]);
+  useEffect(() => {
+    if (!ready || !id) return undefined;
+    let alive = true;
+    const load = () => mergedInto(id).then(list => { if (alive) setMerged(list); });
+    load();
+    const onChange = () => { load(); loadGuide(); };
+    window.addEventListener(GUIDES_CHANGED, onChange);
+    return () => { alive = false; window.removeEventListener(GUIDES_CHANGED, onChange); };
+  }, [ready, id]);
+
+  async function restoreSet(backup) {
+    try {
+      const result = await restoreMerged(backup.id);
+      setToast(`${result.title} is back in your Library`);
+    } catch (caught) {
+      setToast(caught.message);
+    }
+  }
 
   useEffect(() => {
     if (!guide || !id) return;
@@ -544,6 +572,15 @@ export default function GuidePage() {
               ],
             },
             ...(hasQuestions ? [{ label: 'Print quiz', icon: Printer, onSelect: () => setPrinting(true) }, { label: 'Refresh answer choices', icon: RefreshCw, onSelect: refreshChoices }] : []),
+            ...(merged.length ? [{
+              label: 'Restore merged set',
+              icon: ArchiveRestore,
+              items: merged.map(backup => ({
+                key: backup.id, label: backup.title,
+                meta: backup.until ? 'until ' + new Date(backup.until).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : undefined,
+                onSelect: () => restoreSet(backup),
+              })),
+            }] : []),
             { label: 'Delete', icon: Trash2, danger: true, onSelect: () => setConfirmDelete(true) },
           ]}
         />
@@ -555,6 +592,14 @@ export default function GuidePage() {
         <button type="button" className="c-chip guide-update" onClick={pullUpdate}><RefreshCw size={16} strokeWidth={1.75} aria-hidden="true" />Update available</button>
       )}
       {!sharing?.linked && <ClassChip guideId={id} onFiled={() => loadSharing()} />}
+      {dupOther && (
+        <p className="guide-dup">
+          <Copy size={16} strokeWidth={1.75} aria-hidden="true" />
+          <span>Looks like the same material as <strong>{dupOther.title}</strong>.</span>
+          <button type="button" className="guide-dup-review" onClick={() => setMerging(dupPair)}>Review</button>
+        </p>
+      )}
+      {merging && <MergeSheet pair={merging} onClose={() => setMerging(null)} />}
       <div className="guide-meta">
         {sourceTitle && (sourceHref || sourceTitle.trim().toLowerCase() !== (guide.title || '').trim().toLowerCase()) && (
           <span className="guide-src">
@@ -695,6 +740,11 @@ export default function GuidePage() {
         .guide { gap: 16px; }
         .guide-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .guide-origin { margin: -4px 0 0 48px; font-size: 13px; }
+        .guide-dup { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0; padding: 10px 14px; border-radius: var(--r-input); background: var(--olive-tint); color: var(--ink); font: 500 15px/1.4 var(--font-sans); }
+        .guide-dup :global(svg) { color: var(--olive-ink); flex: none; }
+        .guide-dup span { min-width: 0; overflow-wrap: anywhere; }
+        .guide-dup-review { min-height: 32px; padding: 0 4px; border: 0; background: none; color: var(--olive-ink); font: 600 15px/1 var(--font-sans); cursor: pointer; }
+        .guide-dup-review:hover { text-decoration: underline; }
         .guide-title { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-wrap: anywhere; }
         .guide-title :global(.guide-rename-btn) { flex: 0 0 auto; color: var(--muted); }
         .guide-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: -8px 0 0 48px; }

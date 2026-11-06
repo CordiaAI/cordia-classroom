@@ -111,6 +111,7 @@ FEATURES = {
     "announcement_read": CallSpec(LIGHT, 300),
     "date_change_read": CallSpec(LIGHT, 500),
     "guide_title": CallSpec(LIGHT, 60),
+    "duplicate_check": CallSpec(LIGHT, 120),
     # VISION
     "page_transcription": CallSpec(VISION, 1800),
     "handwriting": CallSpec(VISION, 800),

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LoadingArea, Reveal, useLoadGate } from '../components/CordiaLoader';
+import DuplicateBanner from '../components/DuplicateBanner';
+import { GUIDES_CHANGED } from '../lib/duplicates';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
@@ -161,6 +163,13 @@ export default function LibraryPage() {
     const timer = setTimeout(() => setToast(''), 2500);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  // A merge or restore (from the banner, the bell or a set page) changes the list.
+  useEffect(() => {
+    const reload = () => loadData();
+    window.addEventListener(GUIDES_CHANGED, reload);
+    return () => window.removeEventListener(GUIDES_CHANGED, reload);
+  }, []);
 
   async function loadData() {
     setLoading(true);
@@ -462,6 +471,7 @@ export default function LibraryPage() {
       {section === 'mine' && (
       <div id="lsec-panel-mine" role="tabpanel" aria-labelledby="lsec-mine" className="c-stack lib-mine">
       <VisibilityNote />
+      <DuplicateBanner />
       {loadError && <div className="lib-error" role="alert"><span>{loadError}</span><button type="button" className="c-btn c-btn--secondary" onClick={loadData}>Retry</button></div>}
 
       <div className="lib-tools">

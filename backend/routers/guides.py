@@ -5,7 +5,7 @@ Handles CRUD operations for saved study guides.
 
 import logging
 import re
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel, Field, field_validator
 from typing import Literal, Optional
 from database import get_supabase
@@ -15,6 +15,7 @@ from routers.quiz import start_quiz_warmup
 from services import guide_versions, ideas
 from auth_utils import get_user_id
 from ids import is_uuid, require_uuid
+from rate_limit import ai_rate_limit
 
 
 router = APIRouter(prefix="/guides", tags=["guides"])
@@ -209,6 +210,107 @@ def _publish_new(db, user_id: str, row: dict) -> dict:
 def save_guide(request: SaveGuideRequest, authorization: str = Header(default="")):
     """Save a new study guide."""
     return {"guide": create_guide(get_user_id(authorization), request)}
+
+# --- Duplicate sets (services/guide_duplicates.py, services/guide_merge.py) -------------------------
+
+def _merge_error(error):
+    raise HTTPException(status_code=error.status, detail=error.detail)
+
+
+@router.get("/duplicates", dependencies=[Depends(ai_rate_limit(20, 60))])
+def duplicate_sets(authorization: str = Header(default="")):
+    """Pairs of this student's sets that look like the same material (word overlap, then an AI check)."""
+    from services import guide_duplicates
+    user_id = get_user_id(authorization)
+    try:
+        return guide_duplicates.suggestions(get_supabase(), user_id)
+    except Exception:
+        logger.warning("Duplicate suggestions failed", exc_info=True)
+        return {"available": False, "pairs": []}
+
+
+class DuplicatePair(BaseModel):
+    a: str = Field(..., max_length=64)
+    b: str = Field(..., max_length=64)
+
+
+@router.post("/duplicates/dismiss", dependencies=[Depends(ai_rate_limit(30, 60))])
+def dismiss_duplicate(body: DuplicatePair, authorization: str = Header(default="")):
+    """Not now: this pair is never suggested again."""
+    from services import guide_duplicates, guide_merge
+    require_uuid(body.a, "guide ID")
+    require_uuid(body.b, "guide ID")
+    user_id = get_user_id(authorization)
+    db = get_supabase()
+    if not guide_merge.available(db):
+        raise HTTPException(status_code=503, detail="Duplicate suggestions aren't available yet.")
+    owned = db.table("study_guides").select("id").eq("user_id", user_id).in_("id", [body.a, body.b]).execute().data or []
+    if len(owned) != 2:
+        raise HTTPException(status_code=404, detail="Set not found")
+    guide_duplicates.dismiss(db, user_id, body.a, body.b)
+    return {"dismissed": True}
+
+
+@router.get("/{guide_id}/merge-preview", dependencies=[Depends(ai_rate_limit(30, 60))])
+def merge_preview(guide_id: str, other: str = "", authorization: str = Header(default="")):
+    """What merging `other` into this set would add and move."""
+    from services import guide_merge
+    require_uuid(guide_id, "guide ID")
+    require_uuid(other, "guide ID")
+    try:
+        return guide_merge.preview(get_supabase(), get_user_id(authorization), guide_id, other)
+    except guide_merge.MergeError as error:
+        _merge_error(error)
+
+
+class MergeRequest(BaseModel):
+    other: str = Field(..., max_length=64)
+
+
+def _after_merge(db, user_id: str, keep_id: str, before: dict, keep: dict) -> None:
+    """The follow-ups of any edit of the cards or Q/A: a shared set keeps the version before the edit
+    for students on it, saved copies hear about the update, and the version goes up."""
+    if guide_versions.enabled() and (keep.get("visibility") or "private") != "private":
+        guide_versions.snapshot(db, keep_id, before)
+    on_guide_changed(db, user_id, keep_id)
+    _new_version(db, user_id, keep_id)
+
+
+@router.post("/{guide_id}/merge", dependencies=[Depends(ai_rate_limit(10, 60))])
+def merge_into(guide_id: str, body: MergeRequest, authorization: str = Header(default="")):
+    """Merge `other` into this set: its new cards, questions and notes are added, its history moves
+    here, and it's kept as a backup for 30 days (restore from this set's menu)."""
+    from services import guide_merge
+    require_uuid(guide_id, "guide ID")
+    require_uuid(body.other, "guide ID")
+    try:
+        return guide_merge.merge(get_supabase(), get_user_id(authorization), guide_id, body.other, after_write=_after_merge)
+    except guide_merge.MergeError as error:
+        _merge_error(error)
+
+
+@router.get("/{guide_id}/merged")
+def merged_into(guide_id: str, authorization: str = Header(default="")):
+    """Sets merged into this one in the last 30 days, which can still be restored."""
+    from services import guide_merge
+    require_uuid(guide_id, "guide ID")
+    try:
+        return {"merged": guide_merge.backups_for(get_supabase(), get_user_id(authorization), guide_id)}
+    except Exception:
+        logger.warning("Listing merged sets failed", exc_info=True)
+        return {"merged": []}
+
+
+@router.post("/merges/{backup_id}/restore", dependencies=[Depends(ai_rate_limit(10, 60))])
+def restore_merged(backup_id: str, authorization: str = Header(default="")):
+    """Put a merged-away set back as it was, with its history; the kept set keeps what it got."""
+    from services import guide_merge
+    require_uuid(backup_id, "merge ID")
+    try:
+        return guide_merge.restore(get_supabase(), get_user_id(authorization), backup_id)
+    except guide_merge.MergeError as error:
+        _merge_error(error)
+
 
 @router.patch("/{guide_id}")
 def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = Header(default="")):
