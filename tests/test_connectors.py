@@ -53,6 +53,24 @@ class ConnectorTests(unittest.TestCase):
             body = self.client.get("/connectors", headers=self.auth).json()
         self.assertTrue(next(c for c in body["connectors"] if c["id"] == "gcal")["connected"])
 
+    def test_reconnecting_clears_a_stale_isnt_connected_anymore(self):
+        """A sync found no Gmail account and marked it; the student has since reconnected."""
+        stale = {"gmail": {"last_error": "Gmail isn't connected anymore.", "needs_reconnect": True, "stats": {"watch_dates": True}},
+                 "canvas": {"last_error": "Canvas stopped accepting your token.", "needs_reconnect": True}}
+        with patch("services.composio.configured", return_value=True), patch("services.composio.active_accounts", return_value={"gmail": "ca_new"}), \
+                patch("services.sync_state.for_user", return_value=stale):
+            gmail = next(c for c in self.client.get("/connectors", headers=self.auth).json()["connectors"] if c["id"] == "gmail")
+        self.assertTrue(gmail["connected"])
+        self.assertFalse(gmail["health"]["needs_reconnect"])
+        self.assertIsNone(gmail["health"]["error"])
+        self.assertTrue(gmail["watch_dates"])
+        with patch("services.composio.configured", return_value=True), patch("services.composio.active_accounts", return_value={}), \
+                patch("services.sync_state.for_user", return_value=stale):
+            gmail = next(c for c in self.client.get("/connectors", headers=self.auth).json()["connectors"] if c["id"] == "gmail")
+        self.assertTrue(gmail["health"]["needs_reconnect"], "still gone: the mark stays")
+        from routers.connectors import _health
+        self.assertTrue(_health(stale["canvas"])["needs_reconnect"], "Canvas's own token check is kept")
+
     def test_list_says_where_each_app_is_used_and_switches_save(self):
         with patch("services.composio.configured", return_value=True), patch("services.composio.active_accounts", return_value={}), \
                 patch("services.connector_settings.for_user", return_value={"notion": {"tutor": False, "assistant": True}}):
