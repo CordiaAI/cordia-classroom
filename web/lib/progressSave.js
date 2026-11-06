@@ -6,6 +6,7 @@ import { apiFetch } from './api';
 import { applyResults, scheduleChanges } from './spacedReview.mjs';
 import { changedLevels } from './learnEngine.mjs';
 import { supabaseRest } from './serverCopies';
+import { saveViewerProgress } from './studyGuide';
 
 async function merge(guideId, cards, learn) {
   try {
@@ -18,11 +19,16 @@ async function merge(guideId, cards, learn) {
 
 // One round's flashcard results ({ known, missed } card indexes) and, optionally, Learn's levels
 // after it ({ levels, test_date } from learnAfterReview). Returns the progress to show next.
-export async function saveStudyResults(guideId, before, { known = [], missed = [] }, learn = null) {
+// viewer: the `viewer` of someone else's guide (lib/studyGuide.js); saves go to your own progress.
+export async function saveStudyResults(guideId, before, { known = [], missed = [] }, learn = null, viewer = null) {
   const next = known.length || missed.length ? applyResults(before, { known, missed }) : before || {};
   const cards = scheduleChanges(next, [...known, ...missed]);
   const learnChanges = learn ? { levels: changedLevels(before?.learn?.levels, learn.levels), test_date: learn.test_date ?? null } : null;
   if (!Object.keys(cards).length && !learnChanges) return next;
+  if (viewer) {
+    const saved = await saveViewerProgress(guideId, viewer, { cards: Object.keys(cards).length ? cards : null, learn: learnChanges });
+    return saved || (learn ? { ...next, learn } : next);
+  }
   const merged = await merge(guideId, Object.keys(cards).length ? cards : null, learnChanges);
   if (merged) return merged;
   // Before the merge function exists: the whole progress, as before (flashcards first, then Learn).
@@ -34,8 +40,9 @@ export async function saveStudyResults(guideId, before, { known = [], missed = [
 // Learn's levels after a round or a test-date change: only the ideas that changed since `saved`.
 // body.test_format (LEARN_LADDER_V2) rides along; the database merge keeps it once migration
 // 20261111130000 runs, and Learn re-saves it on its own until then.
-export async function saveLearnLevels(guideId, saved, body) {
+export async function saveLearnLevels(guideId, saved, body, viewer = null) {
   const learn = { levels: changedLevels(saved, body.levels), test_date: body.test_date ?? null, ...(body.test_format ? { test_format: body.test_format } : {}) };
+  if (viewer) return saveViewerProgress(guideId, viewer, { learn });
   const merged = await merge(guideId, null, learn);
   if (merged) return merged;
   await apiFetch(`/guides/${guideId}/learn-progress`, { method: 'PATCH', body: JSON.stringify(body) });

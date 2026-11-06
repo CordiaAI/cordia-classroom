@@ -217,8 +217,11 @@ class GuideFieldsTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 400)
 
     def test_flashcard_study_page_asks_for_cards_only(self):
+        # Through lib/studyGuide.js, which asks the owner's route for ?fields=cards (Stage 4).
         with open(os.path.join(ROOT, "web", "pages", "flashcards", "study.js"), encoding="utf-8") as page:
-            self.assertIn("'?fields=cards'", page.read())
+            self.assertIn("loadStudyGuide(guideId, 'cards')", page.read())
+        with open(os.path.join(ROOT, "web", "lib", "studyGuide.js"), encoding="utf-8") as helper:
+            self.assertIn("?fields=${fields}", helper.read())
 
 
 class RecordingQuery:

@@ -298,7 +298,10 @@ class GuideVisibilityTests(unittest.TestCase):
         made = self.call("post", "ben", f"/guides/{GUIDE}/copy", json={}).json()["guide_id"]
         copy = self.row(made)
         self.assertEqual((copy["user_id"], copy["forked_from_guide_id"], copy["forked_from_version"]), (BEN, GUIDE, 3))
-        self.assertEqual((copy["visibility"], copy["title"], copy["quiz_questions"]), ("private", "Supply chains", [{"q": 1}]))
+        self.assertEqual((copy["visibility"], copy["title"]), ("private", "Supply chains"))
+        # The copy keeps the original's questions, each with its idea id (Stage 4), so progress can follow them.
+        self.assertEqual([{k: v for k, v in q.items() if k != "idea_id"} for q in copy["quiz_questions"]], [{"q": 1}])
+        self.assertTrue(all(q.get("idea_id") for q in copy["quiz_questions"]))
         self.assertNotIn("flashcard_progress", copy)  # Ana's progress is hers
         self.assertNotIn("folder_id", copy)
         self.assertEqual(self.call("get", "ben", f"/guides/{GUIDE}/public").json()["guide"]["my_copy_id"], made)

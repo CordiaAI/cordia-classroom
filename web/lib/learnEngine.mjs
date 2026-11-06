@@ -33,11 +33,16 @@ export function fingerprint(question) {
 }
 
 // Saved progress -> { [index]: { l, at, sure } } for the questions as they are now.
+// A saved level belongs to the question with its fingerprint: at the same position, or (after the
+// author reorders or inserts questions) wherever that question is now.
 export function restoreLevels(questions, saved) {
   const levels = {};
+  const byPrint = {};
+  Object.values(saved || {}).forEach(entry => { if (entry?.q && !(entry.q in byPrint)) byPrint[entry.q] = entry; });
   questions.forEach((question, index) => {
-    const entry = saved?.[index];
-    levels[index] = entry && entry.q === fingerprint(question)
+    const print = fingerprint(question);
+    const entry = saved?.[index]?.q === print ? saved[index] : byPrint[print];
+    levels[index] = entry && entry.q === print
       ? { l: Math.max(NEW, Math.min(MASTERED, Number(entry.l) || 0)), at: entry.at || null, sure: Boolean(entry.sure) }
       : { l: NEW, at: null, sure: false };
   });

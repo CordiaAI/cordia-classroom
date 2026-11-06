@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Bookmark, BookmarkCheck, Copy, Flag, Globe, Link2, Lock, Play, ShieldAlert, Users, UsersRound } from 'lucide-react';
+import { ArrowLeft, Bookmark, BookmarkCheck, Brain, Copy, Flag, Globe, Layers, Link2, ListChecks, Lock, Play, ShieldAlert, Users, UsersRound } from 'lucide-react';
 import { getToken } from '../../lib/api';
 import { pageTitle } from '../../lib/pageTitle';
 import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
@@ -12,6 +12,7 @@ import Menu from '../../components/Menu';
 import FeedbackModal from '../../components/FeedbackModal';
 import { VISIBILITY_LABELS, copyGuide, guideLink, loadPublicGuide, saveForLater } from '../../lib/guideSharing';
 import { outlineLine } from '../../lib/guideVisibility.mjs';
+import { PER_VIEWER_PROGRESS } from '../../lib/featureFlags';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const VISIBILITY_ICONS = { public: Globe, link: Link2, classroom: Users, private: Lock };
@@ -132,9 +133,18 @@ export default function SetPage() {
 
             {signedIn ? (
               <div className="sets-actions">
-                <button type="button" className="c-btn c-btn--primary" disabled={Boolean(busy)} onClick={() => study(false)}>
-                  <Play {...ICON} />{busy === 'study' ? 'Opening…' : guide.is_owner ? 'Open' : 'Study'}
-                </button>
+                {PER_VIEWER_PROGRESS && !guide.is_owner ? (
+                  // Study the original with your own progress (Stage 4); a copy is only for editing.
+                  <span className="sets-study" role="group" aria-label="Study this guide">
+                    <Link href={'/learn/' + guide.id} className="c-btn c-btn--primary"><Brain {...ICON} />Learn</Link>
+                    <Link href={'/flashcards/study?guideId=' + guide.id} className="c-btn c-btn--secondary"><Layers {...ICON} />Flashcards</Link>
+                    <Link href={'/quiz/' + guide.id} className="c-btn c-btn--secondary"><ListChecks {...ICON} />Quiz</Link>
+                  </span>
+                ) : (
+                  <button type="button" className="c-btn c-btn--primary" disabled={Boolean(busy)} onClick={() => study(false)}>
+                    <Play {...ICON} />{busy === 'study' ? 'Opening…' : guide.is_owner ? 'Open' : 'Study'}
+                  </button>
+                )}
                 {!guide.is_owner && (
                   <>
                     <button type="button" className="c-btn c-btn--secondary" aria-pressed={Boolean(guide.saved)} disabled={Boolean(busy)} onClick={toggleSave}>
@@ -190,6 +200,7 @@ export default function SetPage() {
         .sets-held :global(.lucide) { color: var(--warning); flex: none; }
         .sets-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
         .sets-row-end { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+        .sets-study { display: inline-flex; flex-wrap: wrap; gap: 8px; }
         .sets-soon { margin-left: 4px; font: 500 12px/1 var(--font-sans); color: var(--muted-ink); }
         .sets-outline { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 16px; }
         .sets-outline ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
@@ -201,6 +212,7 @@ export default function SetPage() {
           .sets-card { padding: 18px; }
           .sets-actions :global(.c-btn) { flex: 1 1 auto; justify-content: center; }
           .sets-row-end { flex: 1 1 100%; margin-left: 0; }
+          .sets-study { flex: 1 1 100%; }
         }
       `}</style>
     </Reveal>
