@@ -100,7 +100,7 @@ export function retryType(question, firstType, selected) {
 // "Retry my misses": a Retain session (lib/retainEngine.mjs) holding only the first-try misses,
 // each already missed once, so each must be answered right CLEAR_AFTER more times, in a different
 // format, before it clears. Their first tries are kept as they were; the score never changes.
-export function retrySession(questions, rows, selected) {
+export function retrySession(questions, rows, selected, { ladder = false } = {}) {
   const missed = rows.filter(row => typeof row.credit === 'number' && row.credit < 1);
   const concepts = {};
   const queue = [];
@@ -116,7 +116,7 @@ export function retrySession(questions, rows, selected) {
     };
     queue.push({ type: retryType(questions[row.concept], firstType, selected), concepts: [row.concept], id: i, reask: true });
   });
-  return { questions, selected: selected || [], queue, position: 0, nextId: queue.length, concepts };
+  return { questions, selected: selected || [], queue, position: 0, nextId: queue.length, concepts, ladder: Boolean(ladder), lastAsked: {} };
 }
 
 export function retryOutcome(session) {

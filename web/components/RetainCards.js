@@ -14,7 +14,7 @@ export const QuietLimits = createContext(false);
 
 // A wrong answer of any type opens the Tutor's "why was I wrong" help.
 // The context for "why was I wrong", sent when the student taps Ask why.
-function missDetail(guideId, question, selectedAnswer, options) {
+export function missDetail(guideId, question, selectedAnswer, options) {
   return {
     guideId,
     skill: 'retain',
