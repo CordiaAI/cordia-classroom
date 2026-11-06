@@ -5,7 +5,9 @@ import { apiFetch, openUpgrade } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import useSessionTracker from '../../lib/useSessionTracker';
 import { PRO_TYPES, TYPE_LABELS } from '../../lib/retainEngine.mjs';
-import { ArrowLeft, Lock, ListChecks, PenLine, Play, RefreshCw, Repeat, TextCursorInput, Shuffle as PairsIcon, Timer } from 'lucide-react';
+import { ArrowLeft, Lock, ListChecks, Minus, PenLine, Play, Plus, RefreshCw, Repeat, TextCursorInput, Shuffle as PairsIcon, Timer } from 'lucide-react';
+import { parseQAPairs } from '../../lib/formatters';
+import { clampCount, minutesFor, quizLimit, recommendedCount } from '../../lib/quizLength.mjs';
 import MatchRace from '../../components/MatchRace';
 import QuizMode from '../../components/QuizMode';
 import { inDayOne, walkthroughEvent } from '../../lib/walkthrough';
@@ -51,6 +53,10 @@ export default function QuizPage() {
   const [race, setRace] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [making, setMaking] = useState(false);
+  // How many questions: the student picks (1 to the limit), starting at the recommendation.
+  const [available, setAvailable] = useState(0);
+  const [count, setCount] = useState(0);
+  const [countText, setCountText] = useState('');
 
   useEffect(() => {
     if (!ready || !guideId) return;
@@ -60,6 +66,12 @@ export default function QuizPage() {
     Promise.all([safe(apiFetch(`/quiz/${guideId}/history`)), safe(apiFetch(`/guides/${guideId}`)), safe(apiFetch('/billing/status'))]).then(async ([past, guide, billing]) => {
       setHistory(past?.attempts || []);
       setTitle(guide?.guide?.title || '');
+      // The saved quiz's size, or its Q/A pairs before one is built (a quiz uses at most the first 50).
+      const saved = Array.isArray(guide?.guide?.quiz_questions) ? guide.guide.quiz_questions.length : 0;
+      const pairs = saved || parseQAPairs(guide?.guide?.study_guide || '').length;
+      setAvailable(pairs);
+      setCount(recommendedCount(pairs));
+      setCountText(String(recommendedCount(pairs)));
       if (billing?.features) setPlan({ pro: billing.plan === 'classroom_plus' || billing.unlimited, left: billing.features.retain_types?.remaining ?? 0 });
       setLoaded(true);
       // Notes without questions yet (a Canvas import): the questions are made from them first.
@@ -108,7 +120,9 @@ export default function QuizPage() {
     // The day-one walkthrough runs a short 3-question multiple-choice round.
     const short = inDayOne('quiz-start');
     const chosen = short || race || check ? ['mc'] : types;
-    const data = await apiFetch(`/quiz/${guideId}/session`, { method: 'POST', body: JSON.stringify({ types: chosen }) });
+    // A chosen size asks that many questions picked at random; the order is always shuffled.
+    const sized = !short && !race && !check && count > 0 && count < quizLimit(available);
+    const data = await apiFetch(`/quiz/${guideId}/session`, { method: 'POST', body: JSON.stringify({ types: chosen, ...(sized ? { count } : {}) }) });
     setStarting(false);
     // No questions to check (a notes page, or the quiz couldn't be built): straight to reading.
     if (check && !data?.cards?.length) { router.replace('/guide/' + guideId); return; }
@@ -130,6 +144,15 @@ export default function QuizPage() {
     if (data?.questions) setSession(null);
     else setError(data?.detail || 'Could not regenerate the questions.');
   }
+
+  function changeCount(value) {
+    const next = clampCount(value, available);
+    setCount(next);
+    setCountText(String(next));
+  }
+
+  const limit = quizLimit(available);
+  const recommended = recommendedCount(available);
 
   if (gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate} label="Loading quiz" />;
   return (
@@ -197,7 +220,32 @@ export default function QuizPage() {
               );
             })}
           </div>}
-          <p className="quiz-note">{race ? <><Timer size={20} strokeWidth={1.75} aria-hidden="true" />Match questions to answers in 60 seconds</> : <><Repeat size={20} strokeWidth={1.75} aria-hidden="true" />Misses repeat</>}</p>
+          {!race && limit > 1 && (
+            <div className="quiz-count" role="group" aria-labelledby="quiz-count-label">
+              <span id="quiz-count-label" className="quiz-count-label">Questions</span>
+              <div className="quiz-count-step">
+                <button type="button" className="c-icon-btn" onClick={() => changeCount(count - 1)} disabled={count <= 1} aria-label="Fewer questions"><Minus size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+                <input
+                  className="c-input quiz-count-input"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={limit}
+                  value={countText}
+                  onChange={event => setCountText(event.target.value)}
+                  onBlur={() => changeCount(countText)}
+                  onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); changeCount(countText); } }}
+                  aria-label={`Number of questions, 1 to ${limit}`}
+                />
+                <button type="button" className="c-icon-btn" onClick={() => changeCount(count + 1)} disabled={count >= limit} aria-label="More questions"><Plus size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+              </div>
+              <span className="c-meta">of {limit}{available > limit ? ' (the most a quiz asks)' : ''} · {minutesFor(count)}</span>
+              {count === recommended
+                ? <span className="quiz-count-rec">Recommended</span>
+                : <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={() => changeCount(recommended)}>Use recommended ({recommended})</button>}
+            </div>
+          )}
+          <p className="quiz-note">{race ? <><Timer size={20} strokeWidth={1.75} aria-hidden="true" />Match questions to answers in 60 seconds</> : <><Repeat size={20} strokeWidth={1.75} aria-hidden="true" />Shuffled. Misses repeat.</>}</p>
           <button type="button" className="c-btn c-btn--primary c-btn--lg quiz-start" data-spot="quiz-start" onClick={start} disabled={starting || !types.length || !guideId}>
             {starting ? <><CordiaLoader size={20} label="Preparing" />Preparing</> : <><Play size={20} strokeWidth={1.75} aria-hidden="true" />Start</>}
           </button>
@@ -233,6 +281,12 @@ export default function QuizPage() {
         .quiz-note { display: flex; align-items: center; gap: 8px; margin: 0; font-weight:600; }
         .quiz-note :global(.lucide) { color: var(--olive-ink); }
         .quiz-start { justify-self: start; min-width: 180px; }
+        .quiz-count { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+        .quiz-count-label { font: 600 15px/1.2 var(--font-sans); color: var(--ink); }
+        .quiz-count-step { display: inline-flex; align-items: center; gap: 6px; }
+        .quiz-count-input { width: 72px; text-align: center; font-variant-numeric: tabular-nums; -moz-appearance: textfield; }
+        .quiz-count-input::-webkit-outer-spin-button, .quiz-count-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .quiz-count-rec { padding: 4px 10px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--olive-ink); font: 600 13px/1.2 var(--font-sans); }
         .quiz-past-score { font-weight:600; font-variant-numeric: tabular-nums; }
         @media (max-width: 767px) { .quiz-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } .quiz-start { width: 100%; } }
       `}</style>

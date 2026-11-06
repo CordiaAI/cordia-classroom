@@ -51,6 +51,8 @@ class QuizSubmission(BaseModel):
 
 class SessionRequest(BaseModel):
     types: List[Literal["mc", "written", "fill", "matching"]] = Field(default_factory=lambda: ["mc"], max_length=4)
+    # How many questions to ask (picked at random); none asks every question. Order is always shuffled.
+    count: Optional[int] = Field(default=None, ge=1, le=retain.MAX_QUIZ_QUESTIONS)
 
 
 class WrittenAnswer(BaseModel):
@@ -408,7 +410,9 @@ def start_session(guide_id: str, body: SessionRequest, authorization: str = Head
     if not saved:
         # Answers are checked against the saved questions, so a session always starts from them.
         _save_quiz(supabase, guide_id, user_id, questions)
-    cards = retain.plan_session(questions, body.types)
+    # A random set of the size the student chose, asked in random order. Only those questions count
+    # toward Pro types and the score (submit divides by the questions answered).
+    cards = retain.shuffled_cards(retain.plan_session(questions, body.types, retain.pick_questions(questions, body.count)))
     uses_pro_types = any(card["type"] in retain.PRO_TYPES for card in cards)
     if uses_pro_types:
         require(user_id, "retain_types")

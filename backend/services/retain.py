@@ -9,6 +9,7 @@ blank and multiple choice are checked here without AI; written answers carry a s
 from the marking endpoint so the score cannot be edited in the browser.
 """
 
+import random
 import hashlib
 import hmac
 import os
@@ -147,11 +148,15 @@ def mentions_answer(text: str, answer: str) -> bool:
     return False
 
 
-def plan_session(questions: list, selected) -> list:
-    """Cards in guide order: {"type", "concepts": [index, ...]}, one first ask per idea."""
+def plan_session(questions: list, selected, indices=None) -> list:
+    """Cards in guide order: {"type", "concepts": [index, ...]}, one first ask per idea.
+    indices: only these questions (a quiz with fewer questions than the guide has)."""
     chosen = [kind for kind in TYPES if kind in set(selected or ())] or ["mc"]
     assigned = {}
+    wanted = set(indices) if indices is not None else None
     for index, question in enumerate(questions):
+        if wanted is not None and index not in wanted:
+            continue
         shape = answer_shape(question.get("question", ""), concept_answer(question))
         assigned[index] = next((kind for kind in FIT[shape] if kind in chosen), "mc")
 
@@ -179,6 +184,29 @@ def plan_session(questions: list, selected) -> list:
     cards = [{"type": "matching", "concepts": group} for group in groups]
     cards += [{"type": kind, "concepts": [index]} for index, kind in assigned.items() if kind != "matching"]
     return sorted(cards, key=lambda card: card["concepts"][0])
+
+
+MAX_QUIZ_QUESTIONS = 50  # the most a guide's quiz holds (routers/quiz.py builds from the first 50 pairs)
+
+
+def askable(questions: list) -> list:
+    """Indexes of questions that have an answer to check."""
+    return [index for index, question in enumerate(questions) if concept_answer(question)]
+
+
+def pick_questions(questions: list, count=None, rng=None) -> list:
+    """Which questions a quiz asks: all of them, or `count` chosen at random."""
+    pool = askable(questions)
+    if not count or count >= len(pool):
+        return pool
+    return sorted((rng or random).sample(pool, count))
+
+
+def shuffled_cards(cards: list, rng=None) -> list:
+    """The session's cards in random order (a matching set stays together)."""
+    out = list(cards)
+    (rng or random).shuffle(out)
+    return out
 
 
 def _signing_key() -> bytes:
