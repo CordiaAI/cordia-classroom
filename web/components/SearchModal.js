@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
-import { ArrowRight, BookOpen, CalendarDays, Layers, Library, Mic, NotebookPen, Search, Settings, X } from 'lucide-react';
+import { ArrowRight, BookOpen, CalendarDays, Compass, Globe, Layers, Library, Mic, NotebookPen, Search, Settings, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { supabaseRest } from '../lib/serverCopies';
 import { searchRows } from '../lib/searchResults.mjs';
+import { discoverGuides, publicSetRows } from '../lib/discover';
 
 function plain(html) {
   return String(html || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
@@ -18,7 +19,8 @@ const JUMPS = [
   { key: 'j-settings', kind: 'jump', icon: Settings, title: 'Settings', href: '/settings' },
 ];
 
-// ⌘K / Ctrl K: one search over study guides, flashcards, notes and lectures.
+// ⌘K / Ctrl K: one search over study guides, flashcards, notes and lectures, then the top public
+// sets from everyone (Discover) and a link to see them all on /explore.
 export default function SearchModal({ onClose }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -27,6 +29,7 @@ export default function SearchModal({ onClose }) {
   // migration that adds it hasn't been applied yet.
   const [found, setFound] = useState(null);
   const [library, setLibrary] = useState(cache);
+  const [publicHits, setPublicHits] = useState([]);
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
@@ -44,8 +47,9 @@ export default function SearchModal({ onClose }) {
   useEffect(() => {
     clearTimeout(debounceRef.current);
     const q = query.trim();
-    if (!q) { setGuideHits([]); setFound(null); return; }
+    if (!q) { setGuideHits([]); setFound(null); setPublicHits([]); return; }
     debounceRef.current = setTimeout(async () => {
+      if (q.length >= 2) discoverGuides({ q, limit: 3 }).then(data => setPublicHits(Array.isArray(data?.guides) ? data.guides.slice(0, 3) : [])).catch(() => setPublicHits([]));
       const shared = await supabaseRest()('/rest/v1/rpc/search_my_materials', { method: 'POST', body: { search: q.slice(0, 500), max_results: 24 } }).catch(() => null);
       if (shared?.ok && Array.isArray(shared.data)) { setFound(searchRows(shared.data)); return; }
       setFound(null);
@@ -62,7 +66,8 @@ export default function SearchModal({ onClose }) {
       const notes = (library?.notes || []).slice(0, 2).map(note => ({ key: 'n' + note.id, kind: 'recent', icon: NotebookPen, title: note.title || 'Untitled', href: '/smartnotes?id=' + note.id }));
       return [...recent, ...notes, ...JUMPS];
     }
-    if (found) return found;
+    const more = publicSetRows(publicHits, query);
+    if (found) return [...found, ...more];
     const guides = guideHits.slice(0, 6).map(hit => ({ key: 'g' + hit.id, kind: 'guide', title: hit.title, href: '/guide/' + hit.id }));
     const cards = [];
     for (const guide of library?.guides || []) {
@@ -76,8 +81,8 @@ export default function SearchModal({ onClose }) {
       .filter(note => `${note.title} ${plain(note.content)}`.toLowerCase().includes(q))
       .slice(0, 6)
       .map(note => ({ key: 'n' + note.id, kind: 'note', title: note.title || 'Untitled', href: '/smartnotes?id=' + note.id }));
-    return [...guides, ...cards, ...notes];
-  }, [query, guideHits, library, found]);
+    return [...guides, ...cards, ...notes, ...more];
+  }, [query, guideHits, library, found, publicHits]);
 
   useEffect(() => setActive(0), [results.length]);
 
@@ -93,8 +98,8 @@ export default function SearchModal({ onClose }) {
     if (event.key === 'Enter' && results[active]) go(results[active]);
   }
 
-  const ICON = { guide: BookOpen, card: Layers, note: NotebookPen, lecture: Mic, recent: BookOpen, jump: ArrowRight };
-  const GROUP = { guide: 'Guides', card: 'Cards', note: 'Notes', lecture: 'Lectures', recent: 'Recent', jump: 'Go to' };
+  const ICON = { guide: BookOpen, card: Layers, note: NotebookPen, lecture: Mic, recent: BookOpen, jump: ArrowRight, public: Globe, explore: Compass };
+  const GROUP = { guide: 'Guides', card: 'Cards', note: 'Notes', lecture: 'Lectures', recent: 'Recent', jump: 'Go to', public: 'Public sets', explore: '' };
 
   return (
     <BodyPortal>
@@ -115,7 +120,7 @@ export default function SearchModal({ onClose }) {
             const groupStart = index === 0 || results[index - 1].kind !== result.kind;
             return (
               <li key={result.key} role="option" aria-selected={index === active}>
-                {groupStart && <div className="c-meta c-search-group">{GROUP[result.kind]}</div>}
+                {groupStart && GROUP[result.kind] && <div className="c-meta c-search-group">{GROUP[result.kind]}</div>}
                 <button type="button" className={'c-search-hit' + (index === active ? ' is-active' : '')} onClick={() => go(result)} onMouseEnter={() => setActive(index)}>
                   <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
                   <span className="c-truncate">{result.title}</span>
@@ -124,7 +129,7 @@ export default function SearchModal({ onClose }) {
               </li>
             );
           })}
-          {query.trim() && !results.length && <li className="c-meta c-search-none">No results</li>}
+          {query.trim() && !results.some(result => result.kind !== 'explore') && <li className="c-meta c-search-none">Nothing of yours matches</li>}
         </ul>
       </div>
       <style jsx>{`

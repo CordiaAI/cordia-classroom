@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 from auth_utils import get_user_id
 from database import get_supabase
 from rate_limit import ai_rate_limit
-from services import guide_access, social_graph, usernames
+from services import guide_access, minors, social_graph, usernames
 from services.blocks import is_blocked
 
 logger = logging.getLogger(__name__)
@@ -201,6 +201,9 @@ def get_profile(username: str, authorization: str = Header(default="")):
     if is_blocked(db, viewer, owner):
         raise HTTPException(status_code=404, detail="Profile not found")
     is_self = viewer == owner
+    # A minor's profile is for themselves and accepted friends only; to anyone else it isn't there.
+    if not is_self and minors.is_minor(db, owner) and not social_graph.are_friends(db, viewer, owner):
+        raise HTTPException(status_code=404, detail="Profile not found")
     visibility = profile.get("profile_visibility") or "public"
     full = is_self or visibility == "public" or (visibility == "friends" and social_graph.are_friends(db, viewer, owner))
     out = {
