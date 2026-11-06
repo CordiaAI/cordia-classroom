@@ -17,6 +17,7 @@ students who accept an update.
 
 from __future__ import annotations
 
+import hashlib
 import re
 import secrets
 from difflib import SequenceMatcher
@@ -42,6 +43,12 @@ def new_id() -> str:
     return secrets.token_hex(5)
 
 
+def stable_id(question) -> str:
+    """An idea's first id, made from its question, so a guide whose ids were never saved gets the
+    same ids on every read (no backfill needed); once saved, ids are carried through edits."""
+    return hashlib.sha1(("idea:" + normalize(question)).encode()).hexdigest()[:10]
+
+
 def valid_id(value) -> bool:
     return isinstance(value, str) and bool(ID_PATTERN.match(value))
 
@@ -54,10 +61,27 @@ def similarity(a, b) -> float:
         return 1.0
     if not na or not nb:
         return 0.0
-    words = SequenceMatcher(None, na.split(), nb.split()).ratio()
-    if len(na.split()) <= 3 and len(nb.split()) <= 3:
+    wa, wb = na.split(), _snap(na.split(), nb.split())
+    words = SequenceMatcher(None, wa, wb).ratio()
+    if len(wa) <= 3 and len(wb) <= 3:
         return max(words, SequenceMatcher(None, na, nb).ratio())
     return words
+
+
+def _snap(old_words: list, new_words: list) -> list:
+    """New words with each misspelling of an old word replaced by that word ("recieving" ->
+    "receiving"): same first letter, 4+ letters, spelled almost the same. "affect"/"effect" and
+    "increase"/"decrease" stay different words; numbers are never snapped."""
+    known = set(old_words)
+    out = []
+    for word in new_words:
+        if word in known or len(word) < 4 or word.isdigit():
+            out.append(word)
+            continue
+        near = [w for w in known if len(w) >= 4 and w[0] == word[0] and not w.isdigit()
+                and SequenceMatcher(None, w, word).ratio() >= 0.8]
+        out.append(max(near, key=lambda w: SequenceMatcher(None, w, word).ratio()) if near else word)
+    return out
 
 
 def _text_changed(old, new) -> bool:
@@ -80,6 +104,18 @@ def card_text(card) -> tuple:
     if not isinstance(card, dict):
         return "", ""
     return str(card.get("front") or ""), str(card.get("back") or "")
+
+
+def item_text(item) -> tuple:
+    """(question, answer) of a card ({front, back}), quiz question ({question, options}) or Q/A pair
+    ({question, answer})."""
+    if not isinstance(item, dict):
+        return "", ""
+    if "front" in item or "back" in item:
+        return card_text(item)
+    if isinstance(item.get("options"), list):
+        return quiz_text(item)
+    return str(item.get("question") or ""), str(item.get("answer") or "")
 
 
 def quiz_text(question) -> tuple:
@@ -132,7 +168,12 @@ class _Matcher:
             score = (_words(old_q, question) + _words(old_a, answer)) / 2
             if score > best_score:
                 best, best_score = idea_id, score
-        return self._give(best if best and best_score >= SAME_IDEA else new_id(), norm)
+        if best and best_score >= SAME_IDEA:
+            return self._give(best, norm)
+        fresh = stable_id(question)
+        if fresh in self.known or fresh in self.claimed:
+            fresh = new_id()
+        return self._give(fresh, norm)
 
     def _give(self, idea_id: str, norm: str) -> str:
         self.claimed[idea_id] = norm
@@ -147,31 +188,39 @@ def _words(a, b) -> float:
     return SequenceMatcher(None, na.split(), nb.split()).ratio() if na and nb else 0.0
 
 
+def assign_lists(old_lists, new_lists) -> list:
+    """Copies of each new list (cards, quiz questions or Q/A pairs; None stays None) with an
+    `idea_id` on every item, matched against all the old lists' items."""
+    old_items = [(item.get("idea_id"), *item_text(item)) for items in old_lists for item in (items or []) if isinstance(item, dict)]
+    matcher = _Matcher(old_items)
+    out = [[dict(item) if isinstance(item, dict) else item for item in items] if isinstance(items, list) else None for items in new_lists]
+    pending = []
+    for items in out:
+        for item in items or []:
+            if not isinstance(item, dict):
+                continue
+            question, answer = item_text(item)
+            found = matcher.exact(question, item.get("idea_id"))
+            if found:
+                item["idea_id"] = found
+            else:
+                pending.append((item, question, answer))
+    for item, question, answer in pending:
+        item["idea_id"] = matcher.take(question, answer)
+    return out
+
+
 def assign_idea_ids(old_cards, old_quiz, new_cards, new_quiz) -> tuple:
     """(cards, quiz) with an `idea_id` on every item, matched against the guide's previous items.
     Pass None for a list that isn't being written (it's returned as None)."""
-    old_items = [(c.get("idea_id"), *card_text(c)) for c in (old_cards or []) if isinstance(c, dict)]
-    old_items += [(q.get("idea_id"), *quiz_text(q)) for q in (old_quiz or []) if isinstance(q, dict)]
-    matcher = _Matcher(old_items)
-    cards = [dict(c) if isinstance(c, dict) else c for c in new_cards] if isinstance(new_cards, list) else None
-    quiz = [dict(q) if isinstance(q, dict) else q for q in new_quiz] if isinstance(new_quiz, list) else None
-    items = [(c, *card_text(c)) for c in cards or [] if isinstance(c, dict)]
-    # Questions match the cards: the card with the same question is the same idea.
-    items += [(q, *quiz_text(q)) for q in quiz or [] if isinstance(q, dict)]
-    if quiz is not None and cards is None:
-        for card in old_cards or []:
-            if isinstance(card, dict) and valid_id(card.get("idea_id")):
-                matcher.exact(card.get("front"), card["idea_id"])
-    pending = []
-    for item, question, answer in items:
-        found = matcher.exact(question, item.get("idea_id"))
-        if found:
-            item["idea_id"] = found
-        else:
-            pending.append((item, question, answer))
-    for item, question, answer in pending:
-        item["idea_id"] = matcher.take(question, answer)
+    cards, quiz = assign_lists([old_cards, old_quiz], [new_cards, new_quiz])
     return cards, quiz
+
+
+def ensure_ids(*lists) -> list:
+    """The same lists with ids on every item: saved ids are kept, an item without one takes the id
+    of the item with the same question, else its question's stable id. Same input, same ids."""
+    return assign_lists(list(lists), list(lists))
 
 
 def ideas_of(cards, quiz) -> list:

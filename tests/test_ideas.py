@@ -31,6 +31,14 @@ class RealChangeTests(unittest.TestCase):
         self.assertFalse(ideas.is_real_change(q, "The mitocondria", q, "The mitochondria"))
         self.assertFalse(ideas.is_real_change(q + " and growth", "x", q + " and its growth", "x"))
 
+    def test_a_misspelled_word_in_a_long_answer_is_a_typo_fix(self):
+        q = "What is lead time?"
+        self.assertFalse(ideas.is_real_change(q, "The wait between placing an order and receiving it",
+                                              q, "The wait between placing an order and recieving it"))
+        # Different words that look alike are still changes.
+        self.assertTrue(ideas.is_real_change(q, "Prices increase when supply falls", q, "Prices decrease when supply falls"))
+        self.assertTrue(ideas.is_real_change(q, "It can affect the result", q, "It can effect the result"))
+
     def test_rewording_is_a_change(self):
         self.assertTrue(ideas.is_real_change("What is ATP?", "An energy carrier", "What is ATP?", "A protein that stores fat"))
         self.assertTrue(ideas.is_real_change("Who founded it?", "Henry Dunant", "Who led it in 1900?", "Henry Dunant"))

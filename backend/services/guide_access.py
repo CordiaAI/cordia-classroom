@@ -58,6 +58,28 @@ def can_view(db, viewer: Optional[str], guide: Optional[dict]) -> bool:
     return False
 
 
+def unavailable_reason(db, viewer: Optional[str], guide: Optional[dict]) -> Optional[str]:
+    """Why a student can't see a guide they've been studying, in plain words (None when they can).
+    Shown only to someone with progress on it; everyone else gets the usual 404."""
+    if not guide:
+        return "The author deleted this guide."
+    if can_view(db, viewer, guide):
+        return None
+    if viewer and is_blocked(db, viewer, guide["user_id"]):
+        return "This guide isn't available to you."
+    status = guide.get("review_status") or "ok"
+    if status == "held":
+        return "This guide is being reviewed. If it's cleared, you can study it again."
+    if status == "hidden":
+        return "This guide was removed."
+    klass = course(db, guide)
+    if klass and klass.get("sharing_blocked"):
+        return "Sharing is turned off for this guide's class."
+    if (guide.get("visibility") or "private") == "private":
+        return "The author made this guide private."
+    return "This guide is only open to members of its class."
+
+
 def viewable(db, viewer: Optional[str], guide_id: str) -> dict:
     """The guide, or the same 404 whether it's missing, private, held or blocked."""
     guide = load(db, guide_id)

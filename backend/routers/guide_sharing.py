@@ -21,6 +21,8 @@ from services import guide_access as access
 from services import guide_review as review
 from services.guide_review import honor_code_accepted
 from services.sharing import upsert_share
+from services import guide_versions as versions
+from services import viewer_study
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/guides", tags=["guide sharing"])
@@ -174,6 +176,23 @@ class CopyRequest(BaseModel):
     carry_progress: bool = False
 
 
+def _studied_progress(db, user_id: str, guide_id: str, content: dict) -> Optional[dict]:
+    """What this student learned studying the original (Stage 4), moved to the version being copied
+    and laid out for the copy's cards and questions."""
+    try:
+        ctx = viewer_study.state(db, user_id, guide_id)
+    except (HTTPException, viewer_study.Unavailable):
+        return None
+    if not ctx["row"]:
+        return None
+    progress = ctx["row"].get("progress") or {}
+    if ctx["content"]["version"] < content["version"]:
+        progress = versions.merge_for_update(progress, ctx["content"], content)
+    ctx = {**ctx, "content": content, "questions": versions.owner_questions(content, guide_id)}
+    view = viewer_study.progress_view(ctx, progress)
+    return view if view["schedule"] or view["learn"]["levels"] or view["known"] or view["unknown"] else None
+
+
 @router.post("/{guide_id}/copy", dependencies=[Depends(ai_rate_limit(20, 60))])
 def copy_guide(guide_id: str, body: CopyRequest, authorization: str = Header(default="")):
     """Your own private copy to edit and study. carry_progress brings what you've learned on this
@@ -184,15 +203,20 @@ def copy_guide(guide_id: str, body: CopyRequest, authorization: str = Header(def
     full = (db.table("study_guides").select("title,notes,study_guide,flashcards,quiz_questions,flashcard_progress")
             .eq("id", guide["id"]).limit(1).execute().data or [{}])[0]
     version = guide.get("version") or 1
+    # The copy keeps the original's idea ids, so progress can follow the same ideas.
+    content = versions.live_content({**full, "id": guide["id"], "version": version})
     row = {
         "user_id": user_id, "title": full.get("title") or "Untitled", "notes": full.get("notes"), "study_guide": full.get("study_guide"),
-        "flashcards": full.get("flashcards"), "quiz_questions": full.get("quiz_questions"),
+        "flashcards": content["cards"] if full.get("flashcards") is not None else None, "quiz_questions": content["quiz"],
         "forked_from_guide_id": guide["id"], "forked_from_version": version, "visibility": "private", "attribution": "named",
     }
     if body.carry_progress:
+        progress = None
         if guide["user_id"] == user_id:
             progress = full.get("flashcard_progress")
-        else:
+        elif versions.enabled():
+            progress = _studied_progress(db, user_id, guide["id"], content)
+        if not progress and guide["user_id"] != user_id:
             earlier = (db.table("study_guides").select("flashcard_progress,created_at").eq("user_id", user_id).eq("forked_from_guide_id", guide["id"])
                        .eq("forked_from_version", version).order("created_at", desc=True).limit(1).execute().data or [])
             progress = earlier[0].get("flashcard_progress") if earlier else None

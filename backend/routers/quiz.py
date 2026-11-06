@@ -108,9 +108,10 @@ def choice_text(text) -> str:
     return value[:-1].rstrip()
 
 
-def _choices(answer: str, distractors: list) -> tuple:
+def _choices(answer: str, distractors: list, rng=None) -> tuple:
     """(options, correct_index): the answer and its distractors with matching endings, shuffled,
-    dropping a distractor that becomes the answer once the period goes."""
+    dropping a distractor that becomes the answer once the period goes. rng: a seeded Random for
+    a quiz that must come out the same every time (another student's version of a shared guide)."""
     shown = choice_text(answer)
     rest, seen = [], {shown.casefold()}
     for value in distractors:
@@ -119,7 +120,7 @@ def _choices(answer: str, distractors: list) -> tuple:
             seen.add(value.casefold())
             rest.append(value)
     options = [shown, *rest]
-    random.shuffle(options)
+    (rng or random).shuffle(options)
     return options, options.index(shown)
 
 
@@ -169,10 +170,12 @@ def _same_kind(answer: str, values: list) -> list:
     return [value for value in values if shape(value).kind == kind]
 
 
-def _standard_questions(qa_pairs: list) -> list:
+def _standard_questions(qa_pairs: list, rng=None) -> list:
     """Build an instant free Retain quiz from answers already in the guide. Wrong choices look like
     the answer: a date gets dates in its style (made up nearby when the guide has too few), and a
-    short term gets short terms before longer answers (services/choice_shapes.py)."""
+    short term gets short terms before longer answers (services/choice_shapes.py). A pair's
+    idea_id rides along; rng (a seeded Random) makes the same quiz every time."""
+    rng = rng or random
     questions = []
     for index, pair in enumerate(qa_pairs):
         answer = pair["answer"]
@@ -182,15 +185,16 @@ def _standard_questions(qa_pairs: list) -> list:
         else:
             same = _same_kind(answer, candidates)
             shortlist = same[:min(6, len(same))]
-            picked = conform(answer, random.sample(shortlist, min(3, len(shortlist))), candidates, seed=pair["question"])
+            picked = conform(answer, rng.sample(shortlist, min(3, len(shortlist))), candidates, seed=pair["question"])
             distractors = _not_longest(answer, picked, same or [c for c in candidates if not is_value(c)])
         if not distractors:
             continue
-        options, correct_index = _choices(answer, distractors)
+        options, correct_index = _choices(answer, distractors, rng)
         questions.append({
             "question": pair["question"],
             "options": options,
             "correct_index": correct_index,
+            **({"idea_id": pair["idea_id"]} if pair.get("idea_id") else {}),
         })
     return questions
 
@@ -407,18 +411,58 @@ def _saved_questions(supabase, guide_id: str, user_id: str) -> list:
     return questions
 
 
+# Someone else's guide (Stage 4): routers/study.py registers how to find the version a student is
+# on. Registered rather than imported so the guide save path (also the MCP worker's) never reaches
+# the visibility and class-membership code; with nothing registered, other people's guides are 404s.
+_viewer_lookup = None
+
+
+def set_viewer_lookup(lookup) -> None:
+    global _viewer_lookup
+    _viewer_lookup = lookup
+
+
+def _viewer_questions(supabase, guide_id: str, user_id: str) -> tuple:
+    """(questions, content) for someone else's guide the student may study: the version they're on,
+    built the same way every time and never saved to the author's guide. Otherwise the usual 404."""
+    if _viewer_lookup is None:
+        raise HTTPException(status_code=404, detail="Guide not found")
+    questions, content = _viewer_lookup(supabase, guide_id, user_id)
+    if not questions:
+        raise HTTPException(status_code=400, detail="This guide has no questions to quiz yet")
+    return questions, content
+
+
+def _questions_for(supabase, guide_id: str, user_id: str) -> tuple:
+    """(questions, is_viewer): the owner's saved quiz, or a studier's version of someone else's."""
+    try:
+        return _saved_questions(supabase, guide_id, user_id), False
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
+    return _viewer_questions(supabase, guide_id, user_id)[0], True
+
+
 @router.post("/{guide_id}/session", dependencies=[Depends(ai_rate_limit())])
 def start_session(guide_id: str, body: SessionRequest, authorization: str = Header(default="")):
     """The questions plus which format asks each idea, from the types the student turned on."""
     require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
-    questions, saved = _load_quiz(supabase, guide_id, user_id)
+    viewer = False
+    try:
+        questions, saved = _load_quiz(supabase, guide_id, user_id)
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
+        # Someone else's shared guide: the version this student is on (AI use is theirs).
+        questions, _ = _viewer_questions(supabase, guide_id, user_id)
+        saved, viewer = True, True
     if not saved:
         # Answers are checked against the saved questions, so a session always starts from them.
         _save_quiz(supabase, guide_id, user_id, questions)
     if body.learn and blanks.learn_ladder_v2():
-        return _learn_session(supabase, guide_id, user_id, questions, body.types)
+        return _learn_session(supabase, guide_id, user_id, questions, body.types, viewer=viewer)
     cards = retain.plan_session(questions, body.types)
     uses_pro_types = any(card["type"] in retain.PRO_TYPES for card in cards)
     if uses_pro_types:
@@ -432,15 +476,16 @@ def start_session(guide_id: str, body: SessionRequest, authorization: str = Head
     }
 
 
-def _learn_session(supabase, guide_id: str, user_id: str, questions: list, types: list) -> dict:
+def _learn_session(supabase, guide_id: str, user_id: str, questions: list, types: list, viewer: bool = False) -> dict:
     """Learn's session: the questions, whether Fill in the blank is available (charged once here when
-    asked for, as Quiz charges its Pro types), and blanks built in the background for older guides."""
+    asked for, as Quiz charges its Pro types), and blanks built in the background for older guides
+    (only the owner's: a studier never writes to someone else's guide)."""
     fill_available = False
     if "fill" in types and remaining(user_id, "retain_types") > 0:
         require(user_id, "retain_types")
         record(user_id, "retain_types")
         fill_available = True
-    building = blanks.start_blanks(supabase, guide_id, user_id, questions) if fill_available else False
+    building = blanks.start_blanks(supabase, guide_id, user_id, questions) if fill_available and not viewer else False
     return {
         "questions": questions,
         "cards": [],
@@ -456,11 +501,11 @@ def grade_written(guide_id: str, body: WrittenAnswer, authorization: str = Heade
     """Mark one written answer with full, partial or no credit, signed so the score can be trusted."""
     require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
-    questions = _saved_questions(get_supabase(), guide_id, user_id)
+    questions, _ = _questions_for(get_supabase(), guide_id, user_id)
     if body.concept >= len(questions):
         raise HTTPException(status_code=400, detail="Unknown question")
     question = questions[body.concept]
-    require(user_id, "light")
+    require(user_id, "light")  # the student's own allowance, also on someone else's guide
     result = grade_written_answer(question.get("question", ""), retain.concept_answer(question), body.answer.strip())
     if not result:
         raise HTTPException(status_code=502, detail="Cordia could not check this answer right now. Please try again.")
@@ -480,14 +525,22 @@ def explain_miss(guide_id: str, body: MissRequest, authorization: str = Header(d
     require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
-    questions = _saved_questions(supabase, guide_id, user_id)
+    try:
+        questions, content = _saved_questions(supabase, guide_id, user_id), None
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
+        questions, content = _viewer_questions(supabase, guide_id, user_id)
     if body.concept >= len(questions):
         raise HTTPException(status_code=400, detail="Unknown question")
     question = questions[body.concept]
     correct = retain.concept_answer(question)
     # The guide's own answer to this question, when the quiz wording matches it.
-    guide = supabase.table("study_guides").select("study_guide").eq("id", guide_id).eq("user_id", user_id).execute()
-    pairs = _parse_qa_pairs(((guide.data or [{}])[0].get("study_guide")) or "")
+    if content is not None:
+        pairs = content.get("qa") or []
+    else:
+        guide = supabase.table("study_guides").select("study_guide").eq("id", guide_id).eq("user_id", user_id).execute()
+        pairs = _parse_qa_pairs(((guide.data or [{}])[0].get("study_guide")) or "")
     passage = next((pair["answer"] for pair in pairs if pair["question"].strip() == str(question.get("question") or "").strip()), "")
     require(user_id, "light")
     result = explain_miss_briefly(question.get("question", ""), correct, body.chosen.strip(), passage)
@@ -527,7 +580,7 @@ def help_me_remember(guide_id: str, body: RememberRequest, authorization: str = 
     require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
-    questions = _saved_questions(supabase, guide_id, user_id)
+    questions, _ = _questions_for(supabase, guide_id, user_id)
     if body.concept >= len(questions):
         raise HTTPException(status_code=400, detail="Unknown question")
     question = questions[body.concept]
@@ -543,7 +596,7 @@ def help_me_remember(guide_id: str, body: RememberRequest, authorization: str = 
 
 def _checked_attempts(supabase, guide_id: str, user_id: str, attempts: list) -> list:
     """First try per idea, re-checked on the server; returns the stored answer records."""
-    questions = _saved_questions(supabase, guide_id, user_id)
+    questions, _ = _questions_for(supabase, guide_id, user_id)
     checked, seen = [], set()
     for attempt in attempts:
         if attempt.concept in seen or attempt.concept >= len(questions):

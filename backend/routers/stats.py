@@ -459,7 +459,25 @@ def activity_rows(supabase, user_id: str, attempts_limit: int = 20) -> tuple:
         .order("completed_at", desc=True).limit(attempts_limit).execute().data or []
     guides = {row["id"]: row for row in (supabase.table("study_guides").select("id, title, folder_id")
                                          .eq("user_id", user_id).limit(1000).execute().data or [])}
+    guides.update(_studied_guides(supabase, user_id, {a.get("guide_id") for a in attempts} | {s.get("guide_id") for s in sessions}, guides))
     return sessions, attempts, guides
+
+
+def _studied_guides(supabase, user_id: str, used: set, own: dict) -> dict:
+    """Other people's guides this student studied (Stage 4), by title only: the author's folders
+    never reach the student's charts."""
+    others = [gid for gid in used if gid and gid not in own]
+    if not others:
+        return {}
+    try:
+        studied = {r["guide_id"] for r in (supabase.table("guide_progress").select("guide_id").eq("user_id", user_id)
+                                           .in_("guide_id", others[:500]).execute().data or [])}
+        if not studied:
+            return {}
+        rows = supabase.table("study_guides").select("id, title").in_("id", list(studied)).execute().data or []
+    except Exception:  # before the Stage 4 migration
+        return {}
+    return {row["id"]: {"id": row["id"], "title": row.get("title"), "folder_id": None} for row in rows}
 
 
 @router.get("/week")

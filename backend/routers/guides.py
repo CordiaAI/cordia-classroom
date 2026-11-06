@@ -12,6 +12,7 @@ from database import get_supabase
 from services.llm import guide_title
 from services.sharing import on_guide_changed
 from routers.quiz import start_quiz_warmup
+from services import guide_versions, ideas
 from auth_utils import get_user_id
 from ids import is_uuid, require_uuid
 
@@ -219,6 +220,8 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
     update_data.pop("keep_title", None)
     update_data.pop("share_default", None)
     require_own_folder(supabase, user_id, update_data.get("folder_id"))
+    if {"study_guide", "flashcards"} & set(update_data):
+        update_data.update(_follow_ideas(supabase, user_id, guide_id, update_data))
 
     # 2. Perform the update in Supabase
     result = supabase.table("study_guides") \
@@ -238,6 +241,45 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
     return {"guide": guide}
 
 
+def _follow_ideas(db, user_id: str, guide_id: str, update: dict) -> dict:
+    """An edit of the cards or Q/A pairs: every item keeps its idea id (services/ideas.py), the saved
+    quiz drops questions whose idea changed (services/guide_versions.refresh_quiz), the owner's
+    progress follows each idea to its new position (changed ideas step back, removed ones are
+    archived), and a shared guide keeps the version before the edit for students on it."""
+    try:
+        old = (db.table("study_guides").select("id,title,study_guide,flashcards,quiz_questions,flashcard_progress,version,visibility")
+               .eq("id", guide_id).eq("user_id", user_id).limit(1).execute().data or [None])[0]
+    except Exception:  # before the Stage 3 migration (no version/visibility)
+        old = (db.table("study_guides").select("id,title,study_guide,flashcards,quiz_questions,flashcard_progress")
+               .eq("id", guide_id).eq("user_id", user_id).limit(1).execute().data or [None])[0]
+    if not old:
+        return {}
+    try:
+        before = guide_versions.live_content(old)
+        new_guide = {**old, **{k: v for k, v in update.items() if k in ("study_guide", "flashcards")}}
+        after = guide_versions.live_content({**new_guide, "quiz_questions": None})
+        after["cards"], after["qa"] = ideas.assign_lists([before["cards"], before["quiz"], before["qa"]], [after["cards"], after["qa"]])
+        if "study_guide" in update:
+            after["quiz"] = guide_versions.refresh_quiz(before["quiz"], after["qa"], guide_id, before["version"] + 1)
+        else:
+            after["quiz"] = before["quiz"]
+        out = {"flashcards": after["cards"]}
+        if "study_guide" in update and before["quiz"]:
+            out["quiz_questions"] = after["quiz"]
+        progress = old.get("flashcard_progress")
+        if isinstance(progress, dict) and progress:
+            out["flashcard_progress"] = guide_versions.remap_owner(
+                progress, before, after,
+                guide_versions.owner_questions(before, guide_id), guide_versions.owner_questions(after, guide_id))
+        if guide_versions.enabled() and (old.get("visibility") or "private") != "private":
+            guide_versions.snapshot(db, guide_id, before)
+        return out
+    except Exception:
+        # The edit itself still saves; progress just stays where it was, as before Stage 4.
+        logger.warning("Following ideas through an edit failed for guide %s", guide_id, exc_info=True)
+        return {}
+
+
 def _new_version(db, user_id: str, guide_id: str) -> Optional[dict]:
     """An edit makes a new version (saves pin the one they saw) and re-runs the leak check on a
     shared guide. Returns the columns that changed."""
@@ -250,6 +292,8 @@ def _new_version(db, user_id: str, guide_id: str) -> Optional[dict]:
         version = int(guide.get("version") or 1) + 1
         db.table("study_guides").update({"version": version}).eq("id", guide_id).eq("user_id", user_id).execute()
         checked = rescreen(db, {**guide, "version": version})
+        if guide_versions.enabled():
+            guide_versions.prune(db, guide_id, version)
         return {key: checked.get(key) for key in ("version", "review_status", "hold_reason")}
     except Exception as exc:  # before the Stage 3 migration
         logger.warning(f"Guide version bump skipped: {type(exc).__name__}")
