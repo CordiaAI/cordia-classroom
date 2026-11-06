@@ -5,7 +5,6 @@ import { Check, Inbox, Keyboard, Megaphone, Play, Puzzle, X } from 'lucide-react
 import { EXTENSION_STORE_URL } from '../lib/extension';
 import { setWalkthrough } from '../lib/walkthrough';
 import LearnCordia from './LearnCordia';
-import { WhatsNewList } from './WhatsNewList';
 
 export default function HelpSheet({ onClose, onFeedback, onShortcuts, canReviewFeedback }) {
   const router = useRouter();
@@ -32,7 +31,6 @@ export default function HelpSheet({ onClose, onFeedback, onShortcuts, canReviewF
           <h2 id="help-title" className="c-title">Help</h2>
           <button type="button" className="c-icon-btn" onClick={onClose} aria-label="Close help"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         </header>
-        <WhatsNewList onBeforeShow={onClose} />
         <LearnCordia onBeforeShow={onClose} />
         <div className="help-actions">
           <button type="button" className="c-btn c-btn--secondary" onClick={replayDayOne}><Play size={20} strokeWidth={1.75} aria-hidden="true" />Replay tour</button>

@@ -1,5 +1,5 @@
 // What's new (lib/featureReleases.js): who sees which feature, the Dashboard card's order, the
-// Help list, the pointer tip's page, and visits that count as use.
+// Notifications panel's list and the bell's count, the pointer tip's page, and visits that count as use.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,7 +9,7 @@ import test from 'node:test';
 const web = join(fileURLToPath(import.meta.url), '..', '..');
 const source = readFileSync(join(web, 'lib/featureReleases.js'), 'utf8');
 const lib = await import('data:text/javascript,' + encodeURIComponent(source));
-const { FEATURE_RELEASES, FOCUS_ROUTES, available, eligible, helpList, matchesAudience, nextAnnouncement, tipForPage, unseenCount, usedOnPage } = lib;
+const { FEATURE_RELEASES, FOCUS_ROUTES, available, bellCount, eligible, matchesAudience, nextAnnouncement, tipForPage, usedOnPage, whatsNewList } = lib;
 
 const TODAY = '2026-11-20';
 const release = (id, releasedAt, extra = {}) => ({ id, title: id, description: '', releasedAt, where: { route: '/x', anchor: '#x' }, audience: 'all', flag: null, ...extra });
@@ -65,14 +65,18 @@ test('the Dashboard card goes oldest first and moves on as features are dismisse
   assert.equal(nextAnnouncement(RELEASES, OLD, { ...NONE, dismissed: ['a', 'flagged', 'b'] }, flags, TODAY), null);
 });
 
-test('Help lists everything available, newest first, with a dot while unseen', () => {
-  const list = helpList(RELEASES, OLD, { ...NONE, opened: ['b'] }, {}, TODAY);
+test('Notifications lists everything available, newest first; new ones are counted until shown', () => {
+  const list = whatsNewList(RELEASES, OLD, { ...NONE, opened: ['b'] }, {}, TODAY);
   assert.deepEqual(list.map(item => item.id), ['b', 'a']);
-  assert.deepEqual(list.map(item => item.unseen), [false, true]);
-  assert.equal(unseenCount(RELEASES, OLD, { ...NONE, opened: ['b'] }, {}, TODAY), 1);
-  // Someone who joined after everything still sees the list, with no dots.
-  const newcomer = helpList(RELEASES, { ...OLD, createdAt: '2026-11-15T00:00:00Z' }, NONE, {}, TODAY);
-  assert.deepEqual(newcomer.map(item => [item.id, item.unseen]), [['b', false], ['a', false]]);
+  assert.deepEqual(list.map(item => item.isNew), [false, true]);
+  assert.equal(bellCount(RELEASES, OLD, { ...NONE, opened: ['b'] }, {}, TODAY), 1);
+  // Once shown (opening the panel, the card or a tip marks it announced), the bell stops counting it.
+  assert.equal(bellCount(RELEASES, OLD, { ...NONE, opened: ['b'], announced: ['a'] }, {}, TODAY), 0);
+  assert.equal(bellCount(RELEASES, OLD, NONE, {}, TODAY), 2);
+  assert.equal(bellCount(RELEASES, OLD, { ...NONE, dismissed: ['a', 'b'] }, {}, TODAY), 0);
+  // Someone who joined after everything still sees the list, with nothing counted.
+  const newcomer = whatsNewList(RELEASES, { ...OLD, createdAt: '2026-11-15T00:00:00Z' }, NONE, {}, TODAY);
+  assert.deepEqual(newcomer.map(item => [item.id, item.isNew]), [['b', false], ['a', false]]);
 });
 
 test('pointer tips never on focus-mode study screens; visits count as use', () => {
