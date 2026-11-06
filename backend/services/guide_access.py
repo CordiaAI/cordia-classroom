@@ -8,8 +8,9 @@ guide to someone other than its owner goes through can_view(). The rules, in ord
   - a block between owner and viewer hides it;
   - public and link guides are open to anyone, signed in or not (link guides are simply not
     listed anywhere);
-  - classroom guides are open to signed-in members of the guide's course (Stage 5 adds the
-    classrooms the guide is in);
+  - classroom guides are open to signed-in members of the guide's course;
+  - members of a classroom the guide is shared with see it too (Stage 5): a guide added directly
+    (unless since made private), or any guide in a folder added to the classroom;
   - private guides are open to no one else.
 Anonymous guides never reveal the author: public_card() leaves out their id, username and name.
 """
@@ -20,6 +21,7 @@ from typing import Optional
 
 from fastapi import HTTPException
 
+from services import classrooms
 from services.blocks import is_blocked
 from services.class_db import is_member
 from services.guide_review import course
@@ -44,7 +46,11 @@ def can_view(db, viewer: Optional[str], guide: Optional[dict]) -> bool:
     if viewer and viewer == guide.get("user_id"):
         return True
     visibility = guide.get("visibility") or "private"
-    if visibility == "private" or (guide.get("review_status") or "ok") != "ok":
+    if (guide.get("review_status") or "ok") != "ok":
+        return False
+    # A private guide can still reach a classroom through its folder (Stage 5); without classrooms
+    # on, it's closed here, before any lookups.
+    if visibility == "private" and not (viewer and classrooms.enabled() and guide.get("folder_id")):
         return False
     klass = course(db, guide)
     if klass and klass.get("sharing_blocked"):
@@ -53,9 +59,10 @@ def can_view(db, viewer: Optional[str], guide: Optional[dict]) -> bool:
         return False
     if visibility in ("public", "link"):
         return True
-    if visibility == "classroom":
-        return bool(viewer and klass and is_member(db, viewer, klass["id"]))
-    return False
+    if visibility == "classroom" and viewer and klass and is_member(db, viewer, klass["id"]):
+        return True
+    # Members of a classroom it's shared with (directly, or through a shared folder).
+    return classrooms.grants(db, viewer, guide)
 
 
 def unavailable_reason(db, viewer: Optional[str], guide: Optional[dict]) -> Optional[str]:

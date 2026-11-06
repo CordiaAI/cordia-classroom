@@ -76,7 +76,15 @@ def queue(authorization: str = Header(default="")):
             .in_("review_status", ["held", "hidden"]).order("created_at", desc=True).limit(200).execute().data or []
     except Exception:  # before the Stage 3 migration
         guides = []
+    try:
+        requests = db.table("classrooms").select("id,name,description,owner_id,class_id,created_at") \
+            .eq("instructor_request", "requested").is_("archived_at", "null").order("created_at").limit(200).execute().data or []
+        owners = {p["id"]: p for p in (db.table("user_profiles").select("id,email,username,name").in_("id", list({r["owner_id"] for r in requests})).execute().data or [])} if requests else {}
+        requests = [{**r, "owner": owners.get(r["owner_id"])} for r in requests]
+    except Exception:  # before the Stage 5 migration
+        requests = []
     return {
+        "classrooms": requests,
         "sets": [{**s, "class": classes.get(s["class_id"]), "reports": by_set.get(s["id"])} for s in sets.values()],
         "guides": guides,
         "merges": [{**m, "from": merge_classes.get(m.get("from_class_id")), "into": merge_classes.get(m.get("into_class_id"))} for m in merges],
@@ -122,6 +130,23 @@ def decide_guide(guide_id: str, body: GuideDecision, authorization: str = Header
     db.table("shared_sets").update({"status": "visible" if body.status == "ok" else "hidden", "hold_reason": None, "updated_at": _now()}) \
         .eq("guide_id", guide_id).in_("status", ["held", "hidden", "visible"]).execute()
     return {"ok": True}
+
+
+class ClassroomDecision(BaseModel):
+    approve: bool
+
+
+@router.post("/classrooms/{classroom_id}")
+def decide_classroom(classroom_id: str, body: ClassroomDecision, authorization: str = Header(default="")):
+    """An instructor-class request: approve it (it becomes an instructor class) or decline it (it
+    stays a study group)."""
+    _, db = require_admin(authorization)
+    room = (db.table("classrooms").select("id,instructor_request").eq("id", _id(classroom_id)).limit(1).execute().data or [None])[0]
+    if not room or room.get("instructor_request") != "requested":
+        raise HTTPException(status_code=404, detail="Request not found")
+    change = {"instructor_request": "approved", "kind": "instructor_class"} if body.approve else {"instructor_request": "declined"}
+    db.table("classrooms").update(change).eq("id", room["id"]).execute()
+    return {"ok": True, **change}
 
 
 class MergeDecision(BaseModel):
