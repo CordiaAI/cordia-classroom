@@ -464,9 +464,9 @@ def grade_written_answer(question: str, reference: str, student_answer: str) -> 
                 "essential points; \"partial\" if it gets some essential points but misses or "
                 "confuses others; \"wrong\" if it misses the main idea or is incorrect. "
                 "\"reasoning\" is your private check against the guide answer; the student never sees it. "
-                "\"feedback\" is shown to the student: one encouraging sentence (under 25 words) spoken to "
-                "them as \"you\", saying what they got and, if not right, what was missing, without "
-                "restating the whole answer, grading notes, or mentioning typos. "
+                "\"feedback\" is shown to the student, spoken to them as \"you\": if right, a few words "
+                "(under 10) naming what they nailed; otherwise one sentence (under 25 words) saying what "
+                "was missing. Never restate the whole answer, add grading notes, or mention typos. "
                 'Return JSON: {"reasoning": "...", "verdict": "right"|"partial"|"wrong", "feedback": "..."}'
             )},
             {"role": "user", "content": (
@@ -481,7 +481,10 @@ def grade_written_answer(question: str, reference: str, student_answer: str) -> 
     credit = {"right": 1.0, "partial": 0.5, "wrong": 0.0}.get(str(parsed.get("verdict") or "").lower())
     if credit is None:
         return {}
-    return {"credit": credit, "explanation": student_feedback(parsed.get("feedback"))}
+    note = student_feedback(parsed.get("feedback"))
+    if credit == 1.0 and len(note.split()) > 12:
+        note = ""  # a right answer gets one short line; the verdict alone beats a paragraph
+    return {"credit": credit, "explanation": note}
 
 
 def student_feedback(text) -> str:
@@ -529,34 +532,80 @@ MEMORY_STYLES = {
 }
 
 
-def memory_hook(question: str, answer: str, style: str = "link", interests=(), previous: str = "") -> dict:
-    """A short memory hook for a missed question ("Help me remember"), in the student's preferred
-    style, drawing on their interests only when that makes a clearer link. Kept only when it
-    states the answer and is written to the student; {} otherwise."""
+# Only for a confirmed adult who turned on "Crude humor in memory tricks" (services/adult_content.py).
+CRUDE_HUMOR_RULE = (
+    "This student is a confirmed adult who asked for crude humor: the hook may use crude, sexual-innuendo "
+    "or shocking puns built on the actual words and numbers in the answer (for example \"CUMberland\" to "
+    "remember Cumberland, or \"18, 6-7\" for 1867). Keep it to wordplay on the answer: no slurs, nothing "
+    "hateful, nothing involving minors, and nothing about real private people. "
+)
+
+
+# Tricks that clear the bar ("Penny's sweet 16": specific, vivid, funny, built on the exact names and
+# numbers) next to ones that don't, from different subjects. Each starts from the question's cue.
+MEMORY_EXAMPLES = (
+    "Q: Normal adult potassium range? A: 3.5-5.0 mEq/L. Bad: \"Potassium is 3.5-5.0, so remember that.\" "
+    "Good: \"When you see potassium, think K for kitchen: 3.5 bananas on the counter, 5 in the bowl, so K+ "
+    "stays between 3.5 and 5.0 mEq/L.\"\n"
+    "Q: Who painted The Persistence of Memory? A: Salvador Dali. Bad: \"Dali was a famous surrealist.\" "
+    "Good: \"When you see those melting clocks, think they drip DALI-ly: Salvador Dali.\"\n"
+    "Q: How long can a merchant's firm offer stay open without payment? A: 3 months. Bad: \"Firm offers "
+    "have a time limit of 3 months.\" Good: \"When you see 'firm offer', picture a handshake frozen "
+    "solid for one whole season: 3 months.\"\n"
+    "Q: Time complexity of binary search? A: O(log n). Bad: \"Binary search is efficient.\" Good: "
+    "\"When you see binary search, picture chopping a log in half, then half again, till one splinter "
+    "is left: O(log n).\""
+)
+
+
+def memory_hook(question: str, answer: str, style: str = "link", interests=(), previous: str = "",
+                crude: bool = False, context=()) -> dict:
+    """A memory trick for a missed question ("Help me remember"): links the question's cue to the
+    answer, in the student's preferred style, anchored in their own material when something there
+    fits. Kept only when it states the answer and is written to the student; {} otherwise.
+    Returns {"hook"} plus {"linked": {kind, id, title}} when it built on a piece of context."""
     from services.retain import mentions_answer
     likes = ", ".join(str(item).replace("_", " ") for item in interests or ()) or "none given"
+    context = list(context or ())[:5]
+    material = "\n".join(f"[{i}] {item['title']}: {item['snippet']}" for i, item in enumerate(context, 1))
     response = chat(get_openai_client(), "retain_remember",
         messages=[
             {"role": "system", "content": (
-                "Write one memory hook that helps a student remember the answer to a question they "
-                "just missed. One or two sentences, under 40 words, written to them as \"you\". "
-                f"Style: {MEMORY_STYLES.get(style, MEMORY_STYLES['link'])}. Their interests may give "
-                "the link, but only when one fits naturally; never force it. The hook must contain "
-                "the answer exactly as given and must never change, round or blur it. Any comparison "
-                "you state as fact must be true; otherwise make it plainly wordplay. Playful is good; "
-                "never mocking, crude, or about the student themselves. "
-                'Return JSON: {"hook": "..."}'
+                "Write one memory trick for a question a student just missed, for any subject. It must "
+                "start from the question's cue and lead to the answer (\"When you see X, think Y\"), "
+                "in one or two sentences under 40 words, written to them as \"you\". Build it on the "
+                "exact names, words and numbers in the answer, using whichever fits best: a vivid image, "
+                "a link to something they already know, an acronym or first letters, a number shape or "
+                "rhyme, or a tiny story. Make it specific, vivid and funny; a generic line that just "
+                f"restates the fact fails. Preferred style: {MEMORY_STYLES.get(style, MEMORY_STYLES['link'])}. "
+                "If the student's own material below gives a natural anchor (something they already "
+                "studied or heard), build on it and set \"linked\" to its number; otherwise null. Their "
+                "interests may give the link only when one fits. The trick must contain the answer exactly "
+                "as given and never change, round or blur it. Any comparison stated as fact must be true; "
+                "otherwise make it plainly wordplay. "
+                + (CRUDE_HUMOR_RULE if crude else "Playful is good; never mocking, crude, or about the student themselves. ")
+                + "\n\nEXAMPLES:\n" + MEMORY_EXAMPLES
+                + '\n\nReturn JSON: {"hook": "...", "linked": number or null}'
             )},
             {"role": "user", "content": (
                 f"QUESTION:\n{question[:1500]}\n\nANSWER:\n{answer[:1000]}\n\nINTERESTS: {likes}"
+                + (f"\n\nTHE STUDENT'S OWN MATERIAL:\n{material}" if material else "")
                 + (f"\n\nTAKE A DIFFERENT ANGLE FROM THIS ONE:\n{previous[:400]}" if previous else "")
             )},
         ],
         response_format={"type": "json_object"},
         temperature=0.8,
     )
-    hook = student_feedback(_practice_json(response.choices[0].message.content).get("hook"))
-    return {"hook": hook} if hook and mentions_answer(hook, answer) else {}
+    parsed = _practice_json(response.choices[0].message.content)
+    hook = student_feedback(parsed.get("hook"))
+    if not hook or not mentions_answer(hook, answer):
+        return {}
+    result = {"hook": hook}
+    linked = parsed.get("linked")
+    if isinstance(linked, int) and not isinstance(linked, bool) and 1 <= linked <= len(context):
+        item = context[linked - 1]
+        result["linked"] = {"kind": item["kind"], "id": item["id"], "title": item["title"]}
+    return result
 
 
 def transcribe_document_pages(page_images: list, max_pages: int = 20) -> str:

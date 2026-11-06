@@ -539,7 +539,11 @@ def chat(body: ChatRequest, request: Request, authorization: str = Header(defaul
     try:
         if skill in BROWSER_SKILLS:
             return _run_browser_skill(user_id, turn, skill, question)
-        return _finish(user_id, turn, _reply(body, user_id, question, material, class_id, skill, turn, authorization))
+        result = _finish(user_id, turn, _reply(body, user_id, question, material, class_id, skill, turn, authorization))
+        # What the student shared about themselves goes to the memory the Assistant shares (background).
+        from services.student_memory import learn_from_tutor
+        learn_from_tutor(user_id, question, body.session_id)
+        return result
     except HTTPException as error:
         if turn:
             fail_tutor_turn(user_id, turn, str(error.detail))

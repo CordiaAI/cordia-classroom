@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { assistantApi, formatPhone } from '../../lib/assistant';
 import { UsesPicker } from './AssistantUses';
+import SegmentedControl from '../SegmentedControl';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 
@@ -191,13 +192,13 @@ export function SurveyStep({ items, stage = 1, retake = false, onDone, onCancel 
           <li key={item.id}>
             <fieldset>
               <legend>{item.text}</legend>
-              <div className="c-seg asst-scale" role="radiogroup" aria-label={item.text}>
+              <SegmentedControl kind="radio" label={item.text} className="asst-scale">
                 {SCALE.map((label, index) => (
                   <button key={label} type="button" role="radio" aria-checked={answers[item.id] === index + 1} className={answers[item.id] === index + 1 ? 'is-active' : ''} onClick={() => setAnswers(current => ({ ...current, [item.id]: index + 1 }))}>
                     {label}
                   </button>
                 ))}
-              </div>
+              </SegmentedControl>
             </fieldset>
           </li>
         ))}

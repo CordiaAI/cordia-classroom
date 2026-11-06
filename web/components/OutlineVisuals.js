@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import BodyPortal from './BodyPortal';
-import { ArrowDown, ArrowUp, GripVertical, Layers, Maximize2, MessageCircle, Shapes, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, GripVertical, Layers, Maximize2, MessageCircle, Shapes, Trash2, X } from 'lucide-react';
 import { authOnlyHeaders } from '../lib/api';
 import { readUserValue, writeUserValue } from '../lib/userStore';
 import { walkthroughEvent } from '../lib/walkthrough';
@@ -162,7 +162,8 @@ function closestBlock(blocks, anchor) {
   return best;
 }
 
-// The highlight menu over the Outline: Visualize first, then Explain, Make card and Ask.
+// The highlight menu over the Outline: Visualize first, then Make card and Ask (Ask covers what
+// Explain did: both went to the Tutor).
 export function useOutlineSelection(rootRef) {
   const [selection, setSelection] = useState(null); // { text, section, top, left }
   useEffect(() => {
@@ -212,7 +213,6 @@ export function OutlineSelectMenu({ selection, onAction }) {
     <BodyPortal>
     <div className="c-menu ov-select" style={{ top: selection.top, left: selection.left }} role="menu" aria-label="Selection" onMouseDown={event => event.preventDefault()}>
       <button type="button" role="menuitem" className="ov-select-main" onClick={() => act('visualize')}><Shapes size={20} strokeWidth={1.75} aria-hidden="true" />Visualize</button>
-      <button type="button" role="menuitem" onClick={() => act('explain')}><Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain</button>
       <button type="button" role="menuitem" onClick={() => act('card')}><Layers size={20} strokeWidth={1.75} aria-hidden="true" />Make card</button>
       <button type="button" role="menuitem" onClick={() => act('ask')}><MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />Ask</button>
       <OutlineVisualStyle />

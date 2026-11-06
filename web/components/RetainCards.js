@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../lib/api';
-import { BookOpen, Check, Lightbulb, MessageCircle, X } from 'lucide-react';
+import { BookOpen, Check, CircleDot, Lightbulb, Link2, MessageCircle, X } from 'lucide-react';
 import { dismissTip, requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { noteView, useAnswerTiming } from '../lib/learningEvents';
@@ -68,9 +68,22 @@ export function RememberButton({ onRemember }) {
 // A short memory hook for the missed question, in the style the student picked on the About-you
 // screen (POST /quiz/{id}/remember). Each one uses a light AI reading; "Another one" asks for a
 // different angle. Logged as the view shown, so the next answer says whether a hook came before it.
+// Where a "Linked to" chip opens: the guide or lecture the trick built on (a Tutor chat has no page).
+function linkedHref(linked) {
+  if (linked.kind === 'lecture') return `/lecture/${linked.id}`;
+  if (linked.kind === 'guide') return `/guide/${linked.id}`;
+  return '';
+}
+
+// The picked-but-not-yet-checked choice: an icon and a word as well as the neutral tint.
+export function PickedMark() {
+  return <span className="quiz-option-mark is-picked"><CircleDot size={16} strokeWidth={2.25} aria-hidden="true" />Picked</span>;
+}
+
 export function MemoryHook({ guideId, concept, question }) {
   const quietLimit = useContext(QuietLimits);
   const [hook, setHook] = useState(null); // null: working; '': failed
+  const [linked, setLinked] = useState(null); // {kind, id, title}: the student's own material it built on
   const [round, setRound] = useState(0);
   const previous = useRef('');
   useEffect(() => {
@@ -83,6 +96,7 @@ export function MemoryHook({ guideId, concept, question }) {
           previous.current = data.hook;
           noteView(guideId, question.question, 'mnemonic');
           setHook(data.hook);
+          setLinked(data.linked?.title ? data.linked : null);
         } else {
           // Never the server's raw message ("Not Found"); the limit shows its own upgrade dialog.
           setHook('');
@@ -93,8 +107,12 @@ export function MemoryHook({ guideId, concept, question }) {
   return (
     <div className="retain-hook" role="status">
       <span className="retain-hook-title"><Lightbulb size={18} strokeWidth={1.75} aria-hidden="true" />Help me remember</span>
+      {question?.question && <p className="retain-hook-cue">{question.question}</p>}
       {hook === null && <p className="c-meta">Thinking of a way to remember it…</p>}
       {hook && <p>{hook}</p>}
+      {hook && linked && (linkedHref(linked)
+        ? <a className="retain-hook-link" href={linkedHref(linked)} target="_blank" rel="noopener noreferrer"><Link2 size={14} strokeWidth={2} aria-hidden="true" />Linked to: {linked.title}</a>
+        : <span className="retain-hook-link"><Link2 size={14} strokeWidth={2} aria-hidden="true" />Linked to: {linked.title}</span>)}
       {hook === '' && <p className="c-meta">Couldn't come up with one right now.</p>}
       {hook !== null && (
         <button type="button" className="retain-hook-again" onClick={() => setRound(value => value + 1)}>
@@ -224,7 +242,7 @@ export function McCard({ card, question, guideId, onResult, onNext, askSure = tr
 
   // Right and wrong are never colour alone: an icon and a word on the option, and a spoken status.
   function optionMark(option) {
-    if (selected === null) return null;
+    if (selected === null) return pending === option ? <PickedMark /> : null;
     if (option === answer) return <span className="quiz-option-mark is-right"><Check size={16} strokeWidth={2.25} aria-hidden="true" />Correct</span>;
     if (option === selected) return <span className="quiz-option-mark is-wrong"><X size={16} strokeWidth={2.25} aria-hidden="true" />Your answer</span>;
     return null;

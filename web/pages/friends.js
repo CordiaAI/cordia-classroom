@@ -6,6 +6,7 @@ import UserChip from '../components/UserChip';
 import {
   acceptFriend, approveFollow, declineFollow, declineFriend, loadPeople, removeFollower, removeFriend, unfollow,
 } from '../lib/social';
+import SegmentedControl from '../components/SegmentedControl';
 
 const TABS = [
   { key: 'activity', label: 'Activity' },
@@ -111,14 +112,14 @@ export default function FriendsPage() {
   return (
     <div className="c-page fr">
       <header className="c-page-head"><h1 className="c-title">Friends</h1></header>
-      <div className="c-seg is-scroller fr-tabs" role="tablist" aria-label="Friends" onKeyDown={onTabKey}>
+      <SegmentedControl kind="tabs" label="Friends" className="fr-tabs" scroller onKeyDown={onTabKey}>
         {TABS.map(item => (
           <button key={item.key} id={`ftab-${item.key}`} type="button" role="tab" aria-selected={tab === item.key} aria-controls={`fpanel-${item.key}`}
             tabIndex={tab === item.key ? 0 : -1} className={tab === item.key ? 'is-active' : ''} onClick={() => pick(item.key)}>
             {item.label}
           </button>
         ))}
-      </div>
+      </SegmentedControl>
 
       <div id={`fpanel-${tab}`} role="tabpanel" aria-labelledby={`ftab-${tab}`} className="fr-panel">
         {tab === 'activity' && <p className="c-card fr-empty">Activity from people you follow arrives soon.</p>}
@@ -157,7 +158,7 @@ export default function FriendsPage() {
       {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
       <style jsx>{`
         .fr { width: min(760px, 100%); margin: 0 auto; display: grid; gap: 16px; }
-        .fr-tabs { justify-self: start; max-width: 100%; }
+        :global(.fr-tabs) { justify-self: start; max-width: 100%; }
         .fr-panel { display: grid; gap: 20px; }
         .fr-section { display: grid; gap: 10px; }
         .fr-section h2 { margin: 0; }

@@ -73,3 +73,10 @@ export async function uploadFeedbackImage(file) {
   if (!response.ok || !data.path) throw new Error(data.detail || "The screenshot didn't upload. Try again.");
   return data.path;
 }
+
+// Deletes an uploaded feedback screenshot the student removed or never sent. Best effort: keepalive
+// lets it finish while the dialog closes.
+export function discardFeedbackImage(path) {
+  if (!path) return;
+  fetch('/api/feedback-attachment', { method: 'DELETE', headers: authHeaders(), body: JSON.stringify({ path }), keepalive: true }).catch(() => {});
+}

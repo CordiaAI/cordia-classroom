@@ -10,6 +10,7 @@ import FeedbackModal from '../../components/FeedbackModal';
 import FollowButton from '../../components/FollowButton';
 import FriendButton from '../../components/FriendButton';
 import { blockUser, loadProfile } from '../../lib/profiles';
+import SegmentedControl from '../../components/SegmentedControl';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const TABS = [
@@ -149,7 +150,7 @@ export default function ProfilePage() {
               </div>
             ) : (
               <>
-                <div className="c-seg up-tabs" role="tablist" aria-label="Profile" onKeyDown={onTabKey}>
+                <SegmentedControl kind="tabs" label="Profile" className="up-tabs" onKeyDown={onTabKey}>
                   {TABS.map(item => (
                     <button
                       key={item.key}
@@ -165,7 +166,7 @@ export default function ProfilePage() {
                       {item.label}
                     </button>
                   ))}
-                </div>
+                </SegmentedControl>
                 {TABS.filter(item => item.key === tab).map(item => (
                   <div key={item.key} id={`ppanel-${item.key}`} role="tabpanel" aria-labelledby={`ptab-${item.key}`} className="up-panel">
                     {(profile[item.key] || []).length === 0 && (
@@ -231,7 +232,7 @@ export default function ProfilePage() {
           .up-counts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 0; color: var(--muted); font: 500 15px/1.4 var(--font-sans); }
           .up-counts strong { color: var(--ink); font-weight: 600; }
           .up-follows-you { margin: 2px 0 0; }
-          .up-tabs { justify-self: start; }
+          :global(.up-tabs) { justify-self: start; }
           .up-panel { display: grid; gap: 8px; }
           .up-none { margin: 0; color: var(--muted); text-align: center; padding: 32px 16px; }
           .up-private { display: flex; align-items: center; gap: 10px; padding: 16px 20px; color: var(--muted); }

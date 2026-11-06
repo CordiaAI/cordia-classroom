@@ -5,6 +5,7 @@ import GuideJobIndicator from './GuideJobIndicator';
 import NewSheet from './NewSheet';
 import TipHost from './TipHost';
 import Walkthrough from './Walkthrough';
+import FeatureOnboarding from './FeatureOnboarding';
 import TimerEngine from './TimerEngine';
 import CanvasReminder from './CanvasReminder';
 import UsernameClaim from './UsernameClaim';
@@ -42,6 +43,7 @@ export default function Layout({ children, timerState, setTimerState }) {
       <CanvasReminder />
       <UsernameClaim />
       <Walkthrough />
+      <FeatureOnboarding />
       <TimerEngine timerState={timerState} setTimerState={setTimerState} />
       {!pageOwnsTutor && <TutorDrawer preferredGuideId={activeGuideId} preferredNoteId={activeNoteId} />}
     </div>

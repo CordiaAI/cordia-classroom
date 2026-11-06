@@ -6,6 +6,7 @@ import { setToken, scheduleProactiveRefresh } from '../lib/api';
 import { supabaseAuth } from '../lib/supabase';
 import { formatPhone, normalizePhone } from '../lib/phone.mjs';
 import { takeReturnTo } from '../lib/returnTo.mjs';
+import SegmentedControl from './SegmentedControl';
 
 export function GoogleLogo() {
   return (
@@ -180,10 +181,10 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
     <section id="classroom-sign-in" className="auth" aria-labelledby="auth-title">
       <h2 id="auth-title" className="auth-title">{title}</h2>
       {mode !== 'reset' && (
-        <div className="c-seg auth-tabs" role="tablist" aria-label="Account">
+        <SegmentedControl kind="tabs" label="Account" className="auth-tabs">
           <Tab to="signin" label="Sign in" />
           <Tab to="signup" label="Create account" />
-        </div>
+        </SegmentedControl>
       )}
 
       {mode !== 'reset' && (
@@ -282,8 +283,8 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
       <style jsx>{`
         .auth { display: grid; gap: 16px; width: min(400px, 100%); padding: 28px; border-radius:20px; background: var(--surface-card); border: 1px solid var(--hairline); box-shadow:var(--shadow-card); color: var(--ink); }
         .auth-title { margin: 0; font:600 28px/1.15 var(--font-display); letter-spacing:-0.015em; }
-        .auth-tabs { width: 100%; }
-        .auth-tabs :global(button), .auth-tabs :global(a) { flex: 1; }
+        :global(.auth-tabs) { width: 100%; }
+        :global(.auth-tabs) :global(button), :global(.auth-tabs) :global(a) { flex: 1; }
         .auth-google { display: flex; align-items: center; justify-content: center; gap: 10px; height: 48px; border: 1px solid var(--hairline); border-radius:999px; background: var(--surface-card); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; }
         .auth-google:hover:not(:disabled) { box-shadow: var(--lift-shadow); transform: var(--lift); }
         .auth-or { display: flex; align-items: center; gap: 12px; color: var(--muted); font:500 13px/1 var(--font-sans); }

@@ -100,6 +100,7 @@ FEATURES = {
     "retain_grade": CallSpec(LIGHT, 500),  # private reasoning first, then the verdict and a short note
     "retain_why": CallSpec(LIGHT, 250),
     "retain_remember": CallSpec(LIGHT, 200),
+    "tutor_memory": CallSpec(LIGHT, 300),  # durable study facts a student shared in a Tutor chat
     "practice_classify": CallSpec(LIGHT, 100),
     "quiz_distractors": CallSpec(LIGHT, 4096),
     "quiz_distractors_fix": CallSpec(LIGHT, 2048),

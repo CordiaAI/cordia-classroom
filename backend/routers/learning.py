@@ -46,6 +46,14 @@ class OnboardingUpdate(BaseModel):
     step: OnboardingStep
 
 
+class AgeConfirmation(BaseModel):
+    adult: bool
+
+
+class MemoryTrickSettings(BaseModel):
+    crude_humor: bool
+
+
 class OnboardingAnswer(BaseModel):
     question_id: str = Field(..., max_length=40)
     version: int = Field(..., ge=1, le=100)
@@ -213,7 +221,9 @@ def get_onboarding(authorization: str = Header(default="")):
     # The onboarding experiment (step 1.1): only a student who hasn't started onboarding can join it.
     from services.experiments import onboarding_arm
     arm = onboarding_arm(get_supabase(), user_id, new_student=not rows)
-    return {"step": row.get("step") or "style", "completed": bool(row.get("completed_at")), "arm": arm}
+    # completed_at: feature steps (web/lib/featureOnboarding.mjs) show only for features added after it.
+    return {"step": row.get("step") or "style", "completed": bool(row.get("completed_at")), "arm": arm,
+            "completed_at": row.get("completed_at")}
 
 
 class FeatureSeen(BaseModel):
@@ -263,6 +273,68 @@ def save_onboarding_answers(body: OnboardingAnswers, authorization: str = Header
         logger.warning("Onboarding answers not saved", exc_info=True)
         raise HTTPException(status_code=503, detail="Your answers weren't saved. Try again.")
     return {"saved": len(rows)}
+
+
+@router.get("/memories")
+def list_memories(authorization: str = Header(default="")):
+    """Settings › Tutor, "What Cordia remembers": what the Tutor and the Assistant keep about the
+    student (public.student_memory). Empty before migration 20261121130000."""
+    from services import student_memory
+    return {"memories": student_memory.list_for(get_supabase(), get_user_id(authorization))}
+
+
+@router.delete("/memories/{memory_id}")
+def forget_memory(memory_id: str, authorization: str = Header(default="")):
+    """Forget one memory, the student's own only (an Assistant one is forgotten there too)."""
+    from services import student_memory
+    require_uuid(memory_id, "memory ID")
+    user_id = get_user_id(authorization)
+    db = get_supabase()
+    if not student_memory.forget(db, user_id, memory_id):
+        raise HTTPException(status_code=404, detail="That memory is already gone.")
+    return {"memories": student_memory.list_for(db, user_id)}
+
+
+@router.get("/memory-tricks/settings")
+def memory_trick_settings(authorization: str = Header(default="")):
+    """Settings › Tutor: whether to offer the 18+ confirmation, and "Crude humor in memory tricks"."""
+    from services import adult_content
+    return adult_content.status(get_supabase(), get_user_id(authorization))
+
+
+@router.put("/age-confirmation")
+def confirm_age(body: AgeConfirmation, authorization: str = Header(default="")):
+    """The student confirms they are 18 or older (never for minor or high-school accounts), or takes
+    it back, which also turns crude humor off."""
+    from services import adult_content
+    user_id = get_user_id(authorization)
+    db = get_supabase()
+    if body.adult and not adult_content.may_confirm(adult_content._profile(db, user_id)):
+        raise HTTPException(status_code=403, detail="This setting isn't available for this account.")
+    try:
+        db.table("user_profiles").update({"adult_confirmed_at": datetime.now(timezone.utc).isoformat() if body.adult else None}).eq("id", user_id).execute()
+        if not body.adult:
+            db.table("learning_preferences").upsert({"user_id": user_id, "crude_humor": False, "updated_at": datetime.now(timezone.utc).isoformat()}).execute()
+    except Exception:
+        logger.warning("Age confirmation not saved", exc_info=True)
+        raise HTTPException(status_code=503, detail="Couldn't save that right now.")
+    return adult_content.status(db, user_id)
+
+
+@router.put("/memory-tricks/settings")
+def set_memory_trick_settings(body: MemoryTrickSettings, authorization: str = Header(default="")):
+    """Turn "Crude humor in memory tricks" on or off; only a confirmed adult can turn it on."""
+    from services import adult_content
+    user_id = get_user_id(authorization)
+    db = get_supabase()
+    if body.crude_humor and not adult_content.status(db, user_id)["adult_confirmed"]:
+        raise HTTPException(status_code=403, detail="Confirm you're 18 or older first.")
+    try:
+        db.table("learning_preferences").upsert({"user_id": user_id, "crude_humor": body.crude_humor, "updated_at": datetime.now(timezone.utc).isoformat()}).execute()
+    except Exception:
+        logger.warning("Crude humor preference not saved", exc_info=True)
+        raise HTTPException(status_code=503, detail="Couldn't save that right now.")
+    return adult_content.status(db, user_id)
 
 
 @router.get("/onboarding/checklist")

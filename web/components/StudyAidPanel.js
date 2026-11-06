@@ -4,6 +4,7 @@ import { AID_TABS, defaultAidTab } from '../lib/learningStyle';
 import { noteView } from '../lib/learningEvents';
 import MermaidDiagram from './MermaidDiagram';
 import NapkinVisual from './NapkinVisual';
+import SegmentedControl from './SegmentedControl';
 
 function normalize(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -257,7 +258,8 @@ export default function StudyAidPanel({ guideId, number, style, onClose, section
   useEffect(() => { noteView(guideId, section?.question, tab); }, [guideId, section?.question, tab]);
   return (
     <section className="study-aid-panel" aria-label="Learn it your way">
-      <div className="study-aid-tabs" role="tablist">
+      <div className="study-aid-tabs">
+      <SegmentedControl kind="tabs" label="Learn it your way" className="study-aid-seg">
         {AID_TABS.map(option => (
           <button
             key={option.id}
@@ -270,6 +272,7 @@ export default function StudyAidPanel({ guideId, number, style, onClose, section
             {option.label}
           </button>
         ))}
+      </SegmentedControl>
         <button type="button" className="study-aid-close" onClick={onClose} aria-label="Close">×</button>
       </div>
       <Aid key={`${number}-${tab}`} guideId={guideId} number={number} cache={cache} section={section} />

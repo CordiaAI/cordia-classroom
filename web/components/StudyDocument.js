@@ -6,7 +6,8 @@ import { walkthroughEvent } from '../lib/walkthrough';
 const PER_PAGE = 3;
 
 // The reading view: page list on the left, the page in the middle. Each question
-// ends with Got it / Explain; selecting text offers Explain, Make card and Ask.
+// ends with Got it / Explain (which opens Learn it your way when it's on); selecting text offers
+// Make card and Ask.
 export default function StudyDocument({ guide, page: controlledPage, onPageChange, onRead, onExplain, renderAid, readSections, onSelection }) {
   const [localPage, setLocalPage] = useState(0);
   const [selection, setSelection] = useState(null); // { text, top, left }
@@ -113,7 +114,6 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
 
       {selection && (
         <div className="c-menu reader-select" style={{ top: selection.top, left: selection.left }} role="menu" aria-label="Selection" onMouseDown={event => event.preventDefault()}>
-          <button type="button" role="menuitem" onClick={() => act('explain')}><Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain</button>
           <button type="button" role="menuitem" data-spot="make-card" onClick={() => act('card')}><Layers size={20} strokeWidth={1.75} aria-hidden="true" />Make card</button>
           <button type="button" role="menuitem" onClick={() => act('ask')}><MessageCircle size={20} strokeWidth={1.75} aria-hidden="true" />Ask</button>
         </div>

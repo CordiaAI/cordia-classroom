@@ -369,15 +369,81 @@ def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False)
     return {"questions": _load_quiz(get_supabase(), guide_id, user_id, regenerate)[0]}
 
 
+CHOICES_VERSION = 2  # questions checked (and, if needed, rebuilt) by _rebuild_standouts
+
+
+def _stands_out(question: dict) -> bool:
+    """Whether a saved question's right answer is easy to spot without knowing it: a different
+    kind of thing from the wrong ones (a year among phrases, a phrase among years), or clearly
+    the longest option. These are the quizzes built before every wrong choice came from the model."""
+    options = question.get("options") or []
+    index = question.get("correct_index")
+    if not isinstance(index, int) or not 0 <= index < len(options) or len(options) < 2:
+        return False
+    answer = str(options[index])
+    wrong = [str(option) for i, option in enumerate(options) if i != index]
+    if is_value(answer) != is_value(wrong[0]) or any(is_value(value) != is_value(wrong[0]) for value in wrong):
+        return True
+    longest = max(len(value) for value in wrong)
+    return len(answer) > longest * 1.35 and len(answer) - longest >= 8
+
+
+def _rebuild_standouts(supabase, guide_id: str, user_id: str, questions: list) -> list:
+    """Old cached quizzes, fixed lazily: questions whose answer stands out get model-written wrong
+    choices once (Haiku, checked like new ones) and are marked so it is tried only once. A question
+    the model can't fix keeps its old choices. A quiz with nothing standing out is never written."""
+    standouts = [q for q in questions if isinstance(q, dict) and q.get("choices_v") != CHOICES_VERSION and _stands_out(q)]
+    if not standouts:
+        return questions  # the usual case: nothing to fix, nothing written
+    pairs = [(q["question"], str(q["options"][q["correct_index"]])) for q in questions
+             if isinstance(q, dict) and isinstance(q.get("correct_index"), int) and 0 <= q["correct_index"] < len(q.get("options") or [])]
+    fixed = {}
+    if standouts:
+        wanted = [{"question": q["question"], "answer": str(q["options"][q["correct_index"]]), "have": []} for q in standouts]
+        try:
+            fresh = _replacement_distractors(get_openai_client(), wanted, pairs)
+        except Exception:
+            logger.warning("Choice rebuild unavailable", exc_info=True)
+            return questions  # try again next time
+        for item in wanted:
+            valid = keep_valid(fresh.get(item["question"], []), item["question"], item["answer"], pairs)[0]
+            distractors = _balanced_distractors(item["answer"], valid, [], seed=item["question"])
+            if len(distractors) >= 2:
+                options, correct_index = _choices(item["answer"], distractors)
+                fixed[item["question"]] = {"options": options, "correct_index": correct_index}
+    tried = {q["question"] for q in standouts}
+    out = [({**q, **fixed.get(q["question"], {}), "choices_v": CHOICES_VERSION} if isinstance(q, dict) and q["question"] in tried else q)
+           for q in questions]
+    try:
+        _save_quiz(supabase, guide_id, user_id, out)
+    except Exception:
+        logger.warning("Rebuilt choices not saved", exc_info=True)
+    return out
+
+
+_DISTRACTOR_PROMPT = """For each question and answer below, write exactly 3 wrong answer choices.
+Return a JSON object {{"items": [...]}} with one element per pair, in order, each {{"distractors": [wrong1, wrong2, wrong3]}}.
+
+Every wrong choice must:
+1. Be the same type of thing as the correct answer (a person for a person, a term for a term, a date for a date, a process for a process) in the same grammatical form, level of detail and format, within about 20% of its length. Dates, years, numbers, percentages and amounts get the same kind of value written the same way (for "July 4, 1776": "June 21, 1788", never "1788" or "the late 1700s"). The correct answer must never stand out as the longest, most specific or only precisely worded option.
+2. Be plausible to a student who half-knows the material: a common confusion, an incorrect mechanism or relationship, incorrect terminology, value, actor, direction or sequence, or the answer with one essential factor missing or altered. Use a different mistake for each of the three.
+3. Be unambiguously false for this question. Never a rewording of the correct answer, never another question's answer, and never a true statement.
+4. Stay in the same topic as the question. No "None of the above", "All of the above", "Both A and B" or filler.
+
+{pairs}
+
+Return ONLY the JSON object."""
+
+
 def _load_quiz(supabase, guide_id: str, user_id: str, regenerate: bool = False) -> tuple:
     """(questions, saved): the guide's Retain quiz, built on first use. saved is False only
-    when the questions are an unsaved fallback, so the next visit retries the AI distractors."""
+    when the questions are an unsaved fallback, so the next visit retries the model's choices."""
     # A quiz is generated once, then stays attached to its guide until the user regenerates it.
     # Read the small question set first; the guide text is only needed to build one.
     if not regenerate:
         cached = _guide_columns(supabase, guide_id, user_id, "quiz_questions").get("quiz_questions")
         if cached:
-            return [even_choices(q) if isinstance(q, dict) else q for q in cached], True
+            return _rebuild_standouts(supabase, guide_id, user_id, [even_choices(q) if isinstance(q, dict) else q for q in cached]), True
 
     study_guide_text = _guide_columns(supabase, guide_id, user_id, "study_guide").get("study_guide", "")
     if not study_guide_text:
@@ -389,60 +455,35 @@ def _load_quiz(supabase, guide_id: str, user_id: str, regenerate: bool = False) 
 
     qa_pairs = qa_pairs[:50]
 
-    # AI distractors are a Pro feature; free accounts get one AI quiz a month as a
-    # preview, then guide-derived options. An explicit regenerate at 0 opens the upgrade.
-    use_ai = remaining(user_id, "ai_quiz") > 0
-    if not use_ai and regenerate:
+    # Every quiz's wrong choices come from the model (Haiku, quiz_distractors), so they look like
+    # the answer (feedback 12). A paid allowance is still counted; an explicit "Refresh answer
+    # choices" at 0 remains a paid action and opens the upgrade.
+    counted = remaining(user_id, "ai_quiz") > 0
+    if regenerate and not counted:
         require(user_id, "ai_quiz")
-    if not use_ai:
-        # Free quizzes stay AI-free: a rejected choice is dropped, not replaced.
-        questions = _standard_questions(qa_pairs)
-        if not questions:
-            raise HTTPException(
-                status_code=400,
-                detail="At least two distinct study-guide answers are needed for Retain",
-            )
-        _save_quiz(supabase, guide_id, user_id, questions)
-        return questions, True
-
-    require(user_id, "ai_quiz")
-    client = get_openai_client()
-
     qa_text = "\n".join(f"Q: {p['question']}\nA: {p['answer']}" for p in qa_pairs)
 
-    prompt = f"""For each Q&A pair below, generate exactly 3 plausible but WRONG answer choices.
-Return a JSON object {{"items": [...]}} with one element per Q&A pair, in order, where each element has:
-- "distractors": [wrong1, wrong2, wrong3]
-
-CRITICAL RULES — follow every one:
-1. Match the correct answer's grammatical form, specificity, format, and approximate visible length. When the answer is a date, year, number, percentage, or amount, every distractor is the same kind of value written in exactly the same format (for "July 4, 1776": "June 21, 1788", never "1788" or "the late 1700s"; for "45%": "30%", never "about half"). Keep every distractor within ±20% of the correct answer's character count. The correct answer must NEVER stand out as the longest, most detailed, or only precisely worded option.
-2. Give the three distractors different incorrect logic: use an incorrect mechanism or relationship; incorrect terminology, value, actor, direction, or sequence; and an answer missing or altering one essential factor. When appropriate, adapt an answer from another supplied question if it remains plausible for this question.
-3. Make each distractor tempting to a student with an incomplete understanding, while keeping it unambiguously false for the question. Do not create three paraphrases of the same mistake.
-4. Never use "None of the above", "All of the above", "Both A and B", or any placeholder/filler text.
-5. Ground every distractor in the same domain/topic as the correct answer — no random facts from unrelated subjects.
-
-{qa_text}
-
-Return ONLY the JSON object, no other text:"""
-
-    response = chat(client, "quiz_distractors",
-        messages=[
-            {"role": "system", "content": "Generate quiz distractors. Return valid JSON only."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.5,
-        response_format={"type": "json_object"},
-    )
-
-    # JSON mode keeps escaping valid (e.g. LaTeX backslashes in math guides).
-    # If the AI reply is still unusable, fall back to guide-derived options instead of failing.
+    # JSON mode keeps escaping valid (e.g. LaTeX backslashes in math guides). An unusable reply
+    # falls back to guide-derived choices, unsaved, so the next visit asks the model again.
     try:
+        client = get_openai_client()
+        response = chat(client, "quiz_distractors",
+            messages=[
+                {"role": "system", "content": "Write quiz answer choices. Return valid JSON only."},
+                {"role": "user", "content": _DISTRACTOR_PROMPT.format(pairs=qa_text)},
+            ],
+            temperature=0.5,
+            response_format={"type": "json_object"},
+        )
         distractors_list = json.loads(response.choices[0].message.content or "{}").get("items", [])
-    except (json.JSONDecodeError, AttributeError):
-        logger.warning(f"Unusable distractor JSON for guide {guide_id}; using guide-derived options")
+    except Exception:
+        logger.warning(f"Distractors unavailable for guide {guide_id}; using guide-derived options", exc_info=True)
         distractors_list = []
-    if not isinstance(distractors_list, list):
-        distractors_list = []
+    if not isinstance(distractors_list, list) or not distractors_list:
+        questions = _standard_questions(qa_pairs)
+        if not questions:
+            raise HTTPException(status_code=502, detail="Could not create balanced Retain options")
+        return questions, False
 
     questions = []
     others = _pairs(qa_pairs)
@@ -453,33 +494,27 @@ Return ONLY the JSON object, no other text:"""
         if not isinstance(generated, list):
             generated = []
         # A wrong choice that is another question's answer, or answers another question, is dropped
-        # here and replaced below (_top_up), never shown.
+        # here and replaced by the model below (_top_up), never shown. No guide answers fill in.
         distractors = _balanced_distractors(
             correct_answer,
             keep_valid([str(value) for value in generated], pair["question"], correct_answer, others)[0],
-            keep_valid(_other_answers(qa_pairs, i), pair["question"], correct_answer, others)[0],
+            [],
             seed=pair["question"],
         )
         if not distractors:
             continue
         options, correct_index = _choices(correct_answer, distractors)
-        questions.append({
-            "question": pair["question"],
-            "options": options,
-            "correct_index": correct_index
-        })
+        questions.append({"question": pair["question"], "options": options, "correct_index": correct_index})
 
+    questions = [{**q, "choices_v": CHOICES_VERSION} for q in _top_up(client, questions, others)]
     if not questions:
         raise HTTPException(status_code=502, detail="Could not create balanced Retain options")
-    questions = _top_up(client, questions, others)
-
-    # Never cache the fallback, so the next visit retries the AI distractors.
-    if distractors_list:
-        _save_quiz(supabase, guide_id, user_id, questions)
+    _save_quiz(supabase, guide_id, user_id, questions)
 
     # A guide's first quiz is charged once, even if the save-time warm-up and a first Learn race.
-    record(user_id, "ai_quiz", None if regenerate else f"first:{guide_id}")
-    return questions, bool(distractors_list)
+    if counted:
+        record(user_id, "ai_quiz", None if regenerate else f"first:{guide_id}")
+    return questions, True
 
 
 def prewarm_quiz(guide_id: str, user_id: str) -> None:
@@ -812,9 +847,13 @@ def help_me_remember(guide_id: str, body: RememberRequest, authorization: str = 
         raise HTTPException(status_code=400, detail="Unknown question")
     question = questions[body.concept]
     style, interests = _memory_preferences(supabase, user_id)
+    from services.adult_content import crude_allowed
+    from services.memory_context import related_material
     require(user_id, "light")
-    result = memory_hook(question.get("question", ""), retain.concept_answer(question), style, interests,
-                         (body.previous or "").strip())
+    answer = retain.concept_answer(question)
+    context = related_material(supabase, user_id, guide_id, question.get("question", ""), answer)
+    result = memory_hook(question.get("question", ""), answer, style, interests,
+                         (body.previous or "").strip(), crude=crude_allowed(supabase, user_id), context=context)
     if not result:
         raise HTTPException(status_code=502, detail="Cordia couldn't come up with one right now. Try again.")
     record(user_id, "light")

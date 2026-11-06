@@ -24,6 +24,7 @@ import ViewToggle from '../../components/ViewToggle';
 import { CLASSROOMS_ON } from '../../lib/featureFlags';
 import CourseClassrooms from '../../components/CourseClassrooms';
 import AddToClassroom from '../../components/AddToClassroom';
+import SegmentedControl from '../../components/SegmentedControl';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
@@ -213,11 +214,11 @@ export default function ClassPage() {
       </header>
 
       <div className="cls-tabs-row">
-        <div ref={tabsRef} className="c-seg is-scroller cls-tabs" role="tablist" aria-label="Class">
+        <SegmentedControl kind="tabs" label="Class" className="cls-tabs" scroller innerRef={tabsRef}>
           {tabs.map(([key, label]) => (
             <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? 'is-active' : ''} onClick={() => setTab(key)}>{label}</button>
           ))}
-        </div>
+        </SegmentedControl>
         {tab === 'material' && items.length > 0 && <ViewToggle view={view} onChange={chooseView} />}
       </div>
 
@@ -266,8 +267,8 @@ export default function ClassPage() {
         .cls-name-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
         :global(.cls-name-input) { font: 600 28px/1.15 var(--font-display); height: 52px; width: min(640px, 70vw); }
         .cls-files { padding: 8px; }
-        .cls-tabs button { flex: 0 0 auto; white-space: nowrap; }
-        .cls-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }
+        :global(.cls-tabs) button { flex: 0 0 auto; white-space: nowrap; }
+        :global(.cls-tabs) { justify-self: start; max-width: 100%; overflow-x: auto; }
         .cls-tabs-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
         .cls-needs-code { display: grid; gap: 12px; padding: 20px; justify-items: start; }
         .cls-needs-code :global(.cls-add) { width: 100%; box-shadow: none; padding: 0; background: none; border: 0; }

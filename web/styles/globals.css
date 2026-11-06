@@ -535,9 +535,9 @@ input::placeholder { color: var(--text-muted); }
   position: relative; overflow: hidden;
 }
 .quiz-option:hover { border-color: var(--lg-edge); }
-.quiz-option.selected { border-color: var(--olive); background: var(--accent-glow); }
-.quiz-option.correct { border-color: var(--success); background: var(--success-bg); color: var(--success); }
-.quiz-option.wrong { border-color: var(--error); background: var(--error-bg); color: var(--error); }
+.quiz-option.selected { border-color: var(--state-select-edge); background: var(--state-select-fill); }
+.quiz-option.correct { border-color: var(--state-right-edge); background: var(--state-right-fill); color: var(--ink); }
+.quiz-option.wrong { border-color: var(--state-wrong-edge); background: var(--state-wrong-fill); color: var(--ink); }
 .quiz-option.missed { border-color: var(--warning); background: var(--warning-bg); color: var(--warning); }
 .quiz-option.disabled { pointer-events: none; opacity: 0.45; }
 
@@ -681,7 +681,7 @@ input::placeholder { color: var(--text-muted); }
 .retain-cloze-blank.right { background: var(--success-bg, var(--olive-tint)); color: var(--success, var(--olive-ink)); }
 .retain-cloze-blank.wrong { background: var(--error-bg); color: var(--error); }
 .retain-cloze-blank.partial { background: var(--warning-bg); color: var(--warning); }
-.retain-fill-input, .retain-written-input { width: 100%; min-width: 0; padding: 12px 14px; border: 1.5px solid var(--border-default); border-radius:12px; background: var(--bg-primary); color: var(--text-primary); font: inherit; }
+.retain-fill-input, .retain-written-input { width: 100%; min-width: 0; padding: var(--space-3) var(--space-4); border: 1.5px solid var(--border-default); border-radius:12px; background: var(--bg-primary); color: var(--text-primary); font: inherit; }
 .retain-written-input { display: block; margin-bottom: 12px; resize: none; line-height:1.5; }
 .retain-fill-input:focus, .retain-written-input:focus { outline: none; border-color: var(--olive); }
 .retain-fill-input.right { border-color: var(--success); background: var(--success-bg); }
@@ -3129,8 +3129,8 @@ a.calendar-item:hover { border-color: var(--ink); }
 .study-aid-open { margin: 6px 16px 12px; padding: 6px 12px; border: 1px solid var(--accent); border-radius:999px; background: transparent; color: var(--accent); font: inherit; font-size: 13px; font-weight:600; cursor: pointer; }
 .study-aid-panel { margin: 4px 16px 16px; padding: 14px; border: 1px solid var(--border-subtle); border-radius:20px; background: var(--surface); }
 .study-aid-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 12px; }
-.study-aid-tab { padding: 6px 12px; border: 1px solid var(--border-subtle); border-radius:999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 13px; cursor: pointer; }
-.study-aid-tab.active { border-color: var(--olive); background: var(--olive); color: var(--on-olive); }
+.study-aid-seg { flex-wrap: wrap; }
+.study-aid-seg .study-aid-tab { height: 34px; padding: 0 14px; font: 600 13px/34px var(--font-sans); }
 .study-aid-close { margin-left: auto; border: 0; background: transparent; color: var(--text-muted); font-size:20px; cursor: pointer; }
 .study-aid-diagram { overflow-x: auto; margin: 8px 0 12px; }
 .study-aid-diagram svg { max-width: 100%; height: auto; }
