@@ -351,6 +351,17 @@ export default function GuidePage() {
     else setToast(apiErrorMessage(data?.detail, "Couldn't save to Drive.") + (/connect/i.test(data?.detail || '') ? ' Connect Google Drive in Settings › Connectors.' : ''));
   }
 
+  // Wrong choices that turned out to be another question's answer are replaced; the rest stay.
+  async function refreshChoices() {
+    setToastAction(null);
+    setToast('Checking answer choices…');
+    const data = await apiFetch('/quiz/' + id + '/refresh-choices', { method: 'POST', timeoutMs: 60000 });
+    if (typeof data?.changed !== 'number') setToast(apiErrorMessage(data?.detail, "Couldn't refresh the answer choices."));
+    else if (data.changed) setToast(data.changed === 1 ? 'Answer choices refreshed on 1 question' : `Answer choices refreshed on ${data.changed} questions`);
+    else if (data.flagged) setToast("Some choices need replacing, but new ones couldn't be written. Try again later.");
+    else setToast('Answer choices already check out');
+  }
+
   async function moveToClass(folderId) {
     const data = await apiFetch('/guides/' + id + '/move', { method: 'PATCH', body: JSON.stringify({ folder_id: folderId }) });
     if (data && !data.detail) {
@@ -459,6 +470,8 @@ export default function GuidePage() {
   // never the old notes first.
   const outlinePending = Boolean(String(guide.study_guide || '').trim()) && !isStudyGuideNotes(guide.notes) && notesTriedFor !== guide.id;
   const cardCount = guide.flashcards?.length || 0;
+  // Printing and refreshing answer choices both work from the guide's questions and answers.
+  const hasQuestions = pairs.length >= 2;
   // A guide with no material is the student's own notes until they make cards and a quiz from it.
   const hasMaterial = Boolean(String(guide.study_guide || '').trim());
   const sourceTitle = guide.source_title || (guide.source_url ? 'Source' : '');
@@ -524,6 +537,7 @@ export default function GuidePage() {
                 { label: 'Save a copy to Drive', onSelect: saveToDrive },
               ],
             },
+            ...(hasQuestions ? [{ label: 'Refresh answer choices', icon: RefreshCw, onSelect: refreshChoices }] : []),
             { label: 'Delete', icon: Trash2, danger: true, onSelect: () => setConfirmDelete(true) },
           ]}
         />

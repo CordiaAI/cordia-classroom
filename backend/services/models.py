@@ -102,6 +102,8 @@ FEATURES = {
     "retain_remember": CallSpec(LIGHT, 200),
     "practice_classify": CallSpec(LIGHT, 100),
     "quiz_distractors": CallSpec(LIGHT, 4096),
+    "quiz_distractors_fix": CallSpec(LIGHT, 2048),
+    "print_fill": CallSpec(LIGHT, 4096),
     "learn_blanks": CallSpec(LIGHT, 2048),
     "study_aid": CallSpec(LIGHT, 700),
     "study_aid_check": CallSpec(LIGHT, 250),
