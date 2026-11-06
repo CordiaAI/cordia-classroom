@@ -535,9 +535,9 @@ input::placeholder { color: var(--text-muted); }
   position: relative; overflow: hidden;
 }
 .quiz-option:hover { border-color: var(--lg-edge); }
-.quiz-option.selected { border-color: var(--olive); background: var(--accent-glow); }
-.quiz-option.correct { border-color: var(--success); background: var(--success-bg); color: var(--success); }
-.quiz-option.wrong { border-color: var(--error); background: var(--error-bg); color: var(--error); }
+.quiz-option.selected { border-color: var(--state-select-edge); background: var(--state-select-fill); }
+.quiz-option.correct { border-color: var(--state-right-edge); background: var(--state-right-fill); color: var(--ink); }
+.quiz-option.wrong { border-color: var(--state-wrong-edge); background: var(--state-wrong-fill); color: var(--ink); }
 .quiz-option.missed { border-color: var(--warning); background: var(--warning-bg); color: var(--warning); }
 .quiz-option.disabled { pointer-events: none; opacity: 0.45; }
 

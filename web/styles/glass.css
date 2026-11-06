@@ -44,7 +44,6 @@
   color: var(--on-olive);
   border-color: var(--lg-edge);
 }
-.quiz-mode.is-on { background: var(--lg-sheen), var(--lg-fill-strong); box-shadow: 0 0 0 2px var(--olive), var(--lg-highlight), var(--lg-shadow); color: var(--ink); }
 .c-seg { box-shadow: var(--lg-highlight); }
 :is(.c-seg [aria-selected='true'], .c-seg .is-active) {
   background: var(--lg-sheen), var(--lg-fill-strong);
@@ -349,22 +348,35 @@ body { touch-action: manipulation; }
   .cn-chev { display: block; flex: none; color: var(--muted); }
 }
 
-/* Quiz answers: green for right, red for wrong. The glass recipe above outranks the state
-   rules in system.css (its list holds a two-class selector), and the hover edge is
-   !important, so the states are restated here, last and stronger. */
-.quiz-option.quiz-option.quiz-option.quiz-option:is(.correct, .correct-shine, .correct-glow) {
-  background: var(--lg-sheen), var(--success-bg);
-  border-color: var(--success) !important;
-  box-shadow: 0 0 0 1px var(--success), var(--lg-highlight) !important;
+/* Answer and choice states as tinted glass (feedback 9): a neutral olive fill the moment a choice
+   is pressed (pointerdown, :active) and while it is picked, green for right, red for wrong. No
+   outline rings. The glass recipe above outranks system.css, so the states are restated here,
+   last and stronger. Each state also carries an icon or word in the markup, never colour alone. */
+.quiz-option.quiz-option.quiz-option.quiz-option.selected,
+.quiz-option.quiz-option.quiz-option.quiz-option:not(.disabled):active,
+.retain-chip.retain-chip.picked,
+.race-tile.race-tile.is-picked,
+.learning-style-option.learning-style-option.selected,
+.quiz-mode.quiz-mode.is-on,
+.learn-way.learn-way.is-on,
+.upgrade-intervals.upgrade-intervals button:is(.active, [aria-checked='true']) {
+  background: var(--lg-sheen), linear-gradient(var(--state-select-fill), var(--state-select-fill)), var(--lg-fill-strong) !important;
+  border-color: var(--state-select-edge) !important;
+  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
   color: var(--ink);
 }
-.quiz-option.quiz-option.quiz-option.quiz-option:is(.wrong, .wrong-shake) {
-  background: var(--lg-sheen), var(--error-bg);
-  border-color: var(--error) !important;
-  box-shadow: 0 0 0 1px var(--error), var(--lg-highlight) !important;
+.quiz-option.quiz-option.quiz-option.quiz-option.quiz-option.quiz-option:is(.correct, .correct-shine, .correct-glow) {
+  background: var(--lg-sheen), linear-gradient(var(--state-right-fill), var(--state-right-fill)), var(--lg-fill-strong) !important;
+  border-color: var(--state-right-edge) !important;
+  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
   color: var(--ink);
 }
-.quiz-option.quiz-option.selected { border-color: var(--olive); box-shadow: 0 0 0 1px var(--olive), var(--lg-highlight); }
+.quiz-option.quiz-option.quiz-option.quiz-option.quiz-option.quiz-option:is(.wrong, .wrong-shake) {
+  background: var(--lg-sheen), linear-gradient(var(--state-wrong-fill), var(--state-wrong-fill)), var(--lg-fill-strong) !important;
+  border-color: var(--state-wrong-edge) !important;
+  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
+  color: var(--ink);
+}
 
 /* Scrollbars in rounded panels (sheets, menus, the sidebar, the Tutor): a thin rounded thumb on a
    clear track, kept clear of the rounded corners, instead of the square system bar that ran into them. */
@@ -410,7 +422,6 @@ body { touch-action: manipulation; }
 :is(.calendar-item-block, .new-sample, .plan-badge[data-plan='plus']) {
   background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--lg-sheen), var(--lg-fill) !important;
 }
-.learn-way.is-on { box-shadow: 0 0 0 2px var(--olive), var(--lg-highlight), var(--lg-shadow) !important; border-color: transparent !important; }
 
 /* Selected rows and tabs: a raised pane with the olive tint, not a flat tint. */
 :is(.c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-nav a[aria-current='page'], .c-search-hit.is-active) {
@@ -470,11 +481,6 @@ textarea:not(.c-input) {
   box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
 }
 .upgrade-later { box-shadow: var(--lg-highlight) !important; }
-.upgrade-intervals button:is(.active, [aria-checked='true']) {
-  background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--lg-sheen), var(--lg-fill-strong) !important;
-  box-shadow: 0 0 0 2px var(--olive), var(--lg-highlight), var(--lg-shadow) !important;
-  border-color: transparent !important;
-}
 :is(.btn-upgrade, .cordia-tutor-send) {
   background: var(--lg-sheen-olive), var(--olive) !important;
   border: 1px solid var(--lg-edge) !important;

@@ -655,7 +655,7 @@ export default function LearnPage() {
         .learn-way { display: grid; justify-items: center; align-content: center; gap: 6px; min-height: 112px; padding: 12px 8px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 15px/1.2 var(--font-sans); text-align: center; cursor: pointer; }
         .learn-way .lucide { color: var(--olive-ink); }
         .learn-way small { color: var(--muted); font: 500 12px/1.3 var(--font-sans); }
-        .learn-way.is-on { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
+        .learn-way.is-on { border-color: var(--state-select-edge); background: var(--state-select-fill); }
         .learn-way:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
         .learn-date { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font: 600 16px/1.3 var(--font-sans); }
         .learn-date span { display: inline-flex; align-items: center; gap: 8px; }

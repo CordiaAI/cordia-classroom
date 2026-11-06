@@ -51,6 +51,14 @@
   --error-bg: rgba(180, 35, 24, 0.08);
   --error-solid: #B42318;
   --selection: rgba(83, 97, 73, 0.30);
+  /* Answer states as tinted glass (feedback 9): neutral when picked, green right, red wrong.
+     Fills sit under the glass sheen; the edge is a soft same-hue line, never an outline ring. */
+  --state-select-fill: rgba(83, 97, 73, 0.16);
+  --state-select-edge: rgba(83, 97, 73, 0.38);
+  --state-right-fill: rgba(57, 114, 75, 0.18);
+  --state-right-edge: rgba(47, 107, 63, 0.42);
+  --state-wrong-fill: rgba(180, 35, 24, 0.12);
+  --state-wrong-edge: rgba(180, 35, 24, 0.38);
 
   /* Note paper (the editor and note cards are cream paper in both themes) */
   --paper: #FBF8F1;
@@ -238,6 +246,12 @@
   --warning-bg: rgba(242, 193, 78, 0.14);
   --error: #FF8A80;
   --error-bg: #3A2222;
+  --state-select-fill: rgba(195, 207, 182, 0.17);
+  --state-select-edge: rgba(195, 207, 182, 0.38);
+  --state-right-fill: rgba(143, 209, 160, 0.19);
+  --state-right-edge: rgba(143, 209, 160, 0.44);
+  --state-wrong-fill: rgba(255, 138, 128, 0.17);
+  --state-wrong-edge: rgba(255, 138, 128, 0.44);
   --paper: #F3EEE2;
   /* Practice board pens on the dark board */
   --draw-ink: #ECEFE8;

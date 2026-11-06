@@ -334,7 +334,7 @@ export default function QuizPage() {
         .quiz-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .quiz-mode { position: relative; display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 120px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow); }
         .quiz-mode :global(.lucide) { color: var(--olive-ink); }
-        .quiz-mode.is-on { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
+        .quiz-mode.is-on { border-color: var(--state-select-edge); background: var(--state-select-fill); }
         .quiz-mode :global(.quiz-lock) { position: absolute; top: 12px; right: 12px; color: var(--muted); }
         .quiz-note { display: flex; align-items: center; gap: 8px; margin: 0; font-weight:600; }
         .quiz-note :global(.lucide) { color: var(--olive-ink); }
