@@ -30,6 +30,7 @@ import { examReadiness, nearestExam } from '../lib/examCountdown.mjs';
 import FirstGuide from '../components/FirstGuide';
 import { WhatsNewCard } from '../components/WhatsNew';
 import ClassroomsDue from '../components/ClassroomsDue';
+import ClassmatesCard from '../components/ClassmatesCard';
 
 const SLOW = Symbol('slow');
 // A slow source holds the page (with the loader) this long, then the page shows and it fills in.
@@ -302,6 +303,8 @@ export default function Today() {
       )}
 
       <ClassroomsDue />
+
+      <ClassmatesCard />
 
       {alerts.length > 0 && (
         <section className="c-section" aria-labelledby="updates-title">

@@ -1,6 +1,6 @@
 // Classrooms (social plan, Stage 5): study groups and instructor classes. Everything goes through
 // the backend (routers/classrooms.py), which checks roles, blocks and caps. Behind CLASSROOMS_ON.
-import { apiFetch, getToken } from './api';
+import { apiFetch, authorizedFetch, getToken } from './api';
 import { anonymousFetch } from './guideSharing';
 
 const json = body => ({ body: JSON.stringify(body) });
@@ -44,6 +44,22 @@ export const classroomActivity = id => apiFetch(`/classrooms/${id}/activity`);
 export const classroomStudy = id => apiFetch(`/classrooms/${id}/study`);
 export const classroomProgress = id => apiFetch(`/classrooms/${id}/progress`);
 export const classroomsDue = () => apiFetch('/classrooms/due');
+export const instructorDashboard = id => apiFetch(`/classrooms/${id}/instructor`);
+export const classroomSuggestions = () => apiFetch('/classrooms/suggestions');
+
+// The instructor dashboard's CSV (only members who share their progress), saved as a file.
+export async function downloadInstructorCsv(id, name = 'classroom') {
+  const response = await authorizedFetch(`/classrooms/${id}/instructor.csv`);
+  if (!response.ok) throw new Error("The file couldn't be made. Try again.");
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'classroom'}-progress.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 export const setTestDate = (id, date) => apiFetch(`/classrooms/${id}/me`, { method: 'PATCH', ...json(date ? { test_date: date } : { clear_test_date: true }) });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // The address of a classroom round; only well-formed ids go in it.

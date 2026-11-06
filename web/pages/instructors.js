@@ -3,6 +3,7 @@ import { Mail, School, ShieldOff } from 'lucide-react';
 import PublicPage from '../components/PublicPage';
 import { publicFetch } from '../lib/publicApi';
 import { supabaseAuth } from '../lib/supabase';
+import { getToken } from '../lib/api';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const PENDING = 'cordiaInstructorPending';
@@ -19,6 +20,16 @@ export default function Instructors() {
   const [done, setDone] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // What the instructor's opt-outs hide now (GET /instructors/opt-outs): needs a sign-in, from the
+  // email link or the app.
+  const [report, setReport] = useState([]);
+  useEffect(() => {
+    const auth = token || getToken();
+    if (!auth) return undefined;
+    let alive = true;
+    publicFetch('/instructors/opt-outs', { token: auth }).then(result => { if (alive && result.ok) setReport(result.data?.courses || []); });
+    return () => { alive = false; };
+  }, [token, done]);
 
   // Back from the email link: the access token is in the URL fragment.
   useEffect(() => {
@@ -114,6 +125,22 @@ export default function Instructors() {
           )}
           {error && <p className="ins-error" role="alert">{error}</p>}
         </div>
+        {report.length > 0 && (
+          <section className="ins-card" aria-labelledby="ins-hides">
+            <h2 id="ins-hides" className="ins-sub">What your opt-out hides now</h2>
+            <ul className="ins-hides">
+              {report.map(course => (
+                <li key={course.class_id}>
+                  <strong>{course.code || course.name}</strong>
+                  <span>{course.hidden_from_discover} public {course.hidden_from_discover === 1 ? 'set' : 'sets'} kept out of Discover</span>
+                  <span>{course.class_sets_kept_private} class {course.class_sets_kept_private === 1 ? 'set' : 'sets'} kept private</span>
+                  <span>{course.classrooms_locked} course {course.classrooms_locked === 1 ? 'classroom' : 'classrooms'} where students can’t add guides</span>
+                </li>
+              ))}
+            </ul>
+            <p className="ins-note">You can still add guides to classrooms for your own courses.</p>
+          </section>
+        )}
       </section>
       <style jsx global>{`
         .ins { width: min(520px, 100%); margin: 0 auto; display: grid; gap: 24px; }
@@ -125,6 +152,11 @@ export default function Instructors() {
         .ins-form { display: grid; gap: 16px; }
         .ins-field { position: relative; display: grid; gap: 6px; font: 600 13px/1 var(--font-sans); }
         .ins-line { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 17px/1.4 var(--font-sans); }
+        .ins-sub { margin: 0; font: 600 18px/1.3 var(--font-sans); color: var(--ink); }
+        .ins-hides { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; }
+        .ins-hides li { display: grid; gap: 2px; color: var(--muted); font: 500 15px/1.45 var(--font-sans); }
+        .ins-hides strong { color: var(--ink); font-weight: 600; }
+        .ins-note { margin: 0; color: var(--muted); font: 500 14px/1.45 var(--font-sans); }
         .ins-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
         .ins-suggest { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin: 4px 0 0; padding: 4px; list-style: none; border-radius: 16px; background: var(--surface-raised); box-shadow: var(--shadow-float); }
         .ins-suggest button { width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none; font: 500 15px/1.3 var(--font-sans); text-align: left; cursor: pointer; color: var(--ink); }

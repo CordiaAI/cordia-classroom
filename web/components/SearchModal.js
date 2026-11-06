@@ -6,6 +6,7 @@ import { apiFetch } from '../lib/api';
 import { supabaseRest } from '../lib/serverCopies';
 import { searchRows } from '../lib/searchResults.mjs';
 import { discoverGuides, publicSetRows } from '../lib/discover';
+import VerifiedBadge from './VerifiedBadge';
 
 function plain(html) {
   return String(html || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
@@ -124,6 +125,7 @@ export default function SearchModal({ onClose }) {
                 <button type="button" className={'c-search-hit' + (index === active ? ' is-active' : '')} onClick={() => go(result)} onMouseEnter={() => setActive(index)}>
                   <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
                   <span className="c-truncate">{result.title}</span>
+                  {result.verified && <VerifiedBadge />}
                   {result.meta && <span className="c-meta c-truncate">{result.meta}</span>}
                 </button>
               </li>

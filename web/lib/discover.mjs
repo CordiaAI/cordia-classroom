@@ -27,6 +27,7 @@ export function publicSetRows(guides, query) {
     title: guide.title || 'Untitled',
     meta: guide.studied_by ? `Studied by ${guide.studied_by}` : (guide.author?.display_name || ''),
     href: '/sets/' + guide.id,
+    verified: Boolean(guide.verified),
   }));
   return [...rows, { key: 'explore', kind: 'explore', title: 'See all in Discover', href: explorePath(q) }];
 }
