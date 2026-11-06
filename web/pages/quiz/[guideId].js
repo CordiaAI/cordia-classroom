@@ -13,6 +13,8 @@ import { inDayOne, walkthroughEvent } from '../../lib/walkthrough';
 import { spreadCards } from '../../lib/checkYourself';
 import { needsStudySet } from '../../lib/studySet.mjs';
 import { makeStudySet } from '../../lib/autoStudySet';
+import { loadStudyGuide } from '../../lib/studyGuide';
+import UpdateAvailable, { GuideUnavailable } from '../../components/UpdateAvailable';
 import { clearResume, readResume, writeResume } from '../../lib/resume';
 
 // Short tile names; TYPE_LABELS stays the engine's own naming.
@@ -63,6 +65,10 @@ export default function QuizPage() {
   const [race, setRace] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [making, setMaking] = useState(false);
+  // Someone else's shared guide (Stage 4): your own attempts and allowance; no owner actions.
+  const [viewer, setViewer] = useState(null);
+  const [gone, setGone] = useState(null);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     if (!ready || !guideId) return;
@@ -74,20 +80,22 @@ export default function QuizPage() {
     }
     // Title, past scores and plan arrive together, so the page appears once, whole.
     const safe = promise => promise.catch(() => null);
-    Promise.all([safe(apiFetch(`/quiz/${guideId}/history`)), safe(apiFetch(`/guides/${guideId}`)), safe(apiFetch('/billing/status'))]).then(async ([past, guide, billing]) => {
+    Promise.all([safe(apiFetch(`/quiz/${guideId}/history`)), safe(loadStudyGuide(guideId)), safe(apiFetch('/billing/status'))]).then(async ([past, guide, billing]) => {
       setHistory(past?.attempts || []);
       setTitle(guide?.guide?.title || '');
+      setViewer(guide?.guide?.viewer || null);
+      if (guide?.unavailable) setGone(guide);
       if (billing?.features) setPlan({ pro: billing.plan === 'classroom_plus' || billing.unlimited, left: billing.features.retain_types?.remaining ?? 0 });
       setLoaded(true);
       // Notes without questions yet (a Canvas import): the questions are made from them first.
-      if (needsStudySet(guide?.guide)) {
+      if (!guide?.guide?.viewer && needsStudySet(guide?.guide)) {
         setMaking(true);
         const made = await makeStudySet(guide.guide);
         setMaking(false);
         if (made.error) setError(made.error);
       }
     });
-  }, [ready, guideId]);
+  }, [ready, guideId, reload]);
   const gate = useLoadGate(loaded);
 
   // Learn's Match opens it straight away (?mode=match).
@@ -122,7 +130,8 @@ export default function QuizPage() {
     autoStarted.current = true;
     start();
   }, [ready, guideId, check]);
-  const toGuide = () => router.push('/guide/' + guideId);
+  const guideHref = (viewer ? '/sets/' : '/guide/') + guideId;
+  const toGuide = () => router.push(guideHref);
 
   async function start() {
     setStarting(true);
@@ -158,28 +167,30 @@ export default function QuizPage() {
   }
 
   if (gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate} label="Loading quiz" />;
+  if (gone) return <GuideUnavailable title={gone.title} reason={gone.unavailable} />;
   return (
     <Reveal phase={gate}>
     <div className="c-page quiz-page">
       <header className="c-page-head">
         <div className="c-row">
-          <button type="button" className="c-icon-btn" onClick={() => router.push('/guide/' + guideId)} aria-label="Back to guide"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
+          <button type="button" className="c-icon-btn" onClick={toGuide} aria-label="Back to guide"><ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" /></button>
           <h1 className="c-title">{check ? 'Check yourself' : 'Quiz'}</h1>
         </div>
         {check ? (
           <button type="button" className="c-btn c-btn--quiet" onClick={toGuide}>Skip to reading</button>
-        ) : (
+        ) : viewer ? null : (
           <button type="button" className="c-btn c-btn--quiet" onClick={regenerate} disabled={regenerating || starting}>
             <RefreshCw size={20} strokeWidth={1.75} aria-hidden="true" />{regenerating ? 'Regenerating…' : 'Regenerate'}
           </button>
         )}
       </header>
       {title && <p className="c-section-title quiz-guide">{title}</p>}
+      {viewer && !session && <UpdateAvailable guideId={guideId} viewer={viewer} onChanged={() => setReload(n => n + 1)} />}
       {check && <p className="c-meta quiz-check-note">Five quick questions before you read. It doesn't count, and mistakes help you learn.</p>}
       {error && <div className="retain-action-error" role="alert">{error}</div>}
 
       {session?.race ? (
-        <MatchRace key={session.version} questions={session.questions} guideId={guideId} onRestart={() => setSession(null)} onDone={() => router.push('/guide/' + guideId)} />
+        <MatchRace key={session.version} questions={session.questions} guideId={guideId} onRestart={() => setSession(null)} onDone={toGuide} />
       ) : session ? (
         <>
         {session.unused?.length > 0 && (
@@ -194,7 +205,7 @@ export default function QuizPage() {
           types={session.selected}
           guideId={guideId}
           onRestart={() => (check ? start() : setSession(null))}
-          onDone={() => { walkthroughEvent('guide-open'); router.push('/guide/' + guideId); }}
+          onDone={() => { walkthroughEvent('guide-open'); toGuide(); }}
           doneLabel={check ? 'Read the guide' : undefined}
           mode={check ? 'check' : 'quiz'}
           resume={resumed}

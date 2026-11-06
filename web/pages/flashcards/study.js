@@ -9,6 +9,8 @@ import { applyResults } from '../../lib/spacedReview.mjs';
 import { saveStudyResults } from '../../lib/progressSave';
 import { needsStudySet } from '../../lib/studySet.mjs';
 import { makeStudySet } from '../../lib/autoStudySet';
+import { loadStudyGuide } from '../../lib/studyGuide';
+import UpdateAvailable, { GuideUnavailable } from '../../components/UpdateAvailable';
 
 
 export default function FlashcardStudy() {
@@ -18,14 +20,19 @@ export default function FlashcardStudy() {
   const [guide, setGuide] = useState(null);
   const [error, setError] = useState('');
   const [making, setMaking] = useState(false);
-  const gate = useLoadGate(Boolean(guide) || Boolean(error) || making);
+  const [gone, setGone] = useState(null);
+  const [reload, setReload] = useState(0);
+  const gate = useLoadGate(Boolean(guide) || Boolean(error) || Boolean(gone) || making);
+  // Someone else's shared guide (Stage 4): your own progress, and no owner actions.
+  const viewer = guide?.viewer || null;
 
   useEffect(() => {
     if (!ready || !guideId) return;
-    apiFetch('/guides/' + guideId + '?fields=cards').then(async data => {
+    loadStudyGuide(guideId, 'cards').then(async data => {
+      if (data?.unavailable) { setGone(data); return; }
       if (!data?.guide) { setError('These cards could not be loaded.'); return; }
-      // No cards yet: notes without questions (a Canvas import) get them made first.
-      if (!(data.guide.flashcards || []).length) {
+      // No cards yet: notes without questions (a Canvas import) get them made first (your own guides).
+      if (!data.guide.viewer && !(data.guide.flashcards || []).length) {
         const full = await apiFetch('/guides/' + guideId);
         if (full?.guide && needsStudySet(full.guide)) {
           setMaking(true);
@@ -38,7 +45,7 @@ export default function FlashcardStudy() {
       setGuide(data.guide);
       walkthroughEvent('cards-opened');
     });
-  }, [ready, guideId]);
+  }, [ready, guideId, reload]);
 
   const onFinish = useCallback(async ({ known, missed, seconds }) => {
     const cards = guide?.flashcards || [];
@@ -46,7 +53,9 @@ export default function FlashcardStudy() {
     const progress = applyResults(guide?.flashcard_progress, { known, missed });
     setGuide(current => ({ ...current, flashcard_progress: progress }));
     await Promise.all([
-      saveStudyResults(guideId, guide?.flashcard_progress, { known, missed }),
+      saveStudyResults(guideId, guide?.flashcard_progress, { known, missed }, null, guide?.viewer).then(saved => {
+        if (guide?.viewer && saved) setGuide(current => ({ ...current, flashcard_progress: saved }));
+      }),
       apiFetch('/stats/log-session', {
         method: 'POST',
         body: JSON.stringify({ guide_id: guideId, session_type: 'flashcard', duration_seconds: seconds, metadata: { cards_studied: cards.length, cards_correct: known.length } }),
@@ -60,8 +69,9 @@ export default function FlashcardStudy() {
     if (data && typeof data.is_bookmarked === 'boolean') setGuide(current => ({ ...current, is_bookmarked: data.is_bookmarked }));
   }
 
-  const goBack = () => router.push('/guide/' + guideId);
+  const goBack = () => router.push((viewer ? '/sets/' : '/guide/') + guideId);
 
+  if (gone) return <GuideUnavailable title={gone.title} reason={gone.unavailable} />;
   if (error) return <div className="c-empty"><p className="c-section-title" role="alert">{error}</p><button type="button" className="c-btn c-btn--secondary" onClick={() => router.push('/library?tab=cards')}>Back</button></div>;
   if (making) return (
     <div className="cards-making" role="status">
@@ -76,14 +86,16 @@ export default function FlashcardStudy() {
     <Reveal phase={gate}>
     {/* The page's heading for screen readers; the viewer shows the title in its bar. */}
     <h1 className="sr-only">Flashcards: {guide.title || 'Untitled guide'}</h1>
+    {viewer && <UpdateAvailable guideId={guideId} viewer={viewer} onChanged={() => setReload(n => n + 1)} />}
     <FlashcardViewer
+      key={viewer ? `v${viewer.version}` : 'own'}
       flashcards={guide.flashcards}
       guideId={guideId}
       logMode="flashcards"
       title={guide.title}
       starred={guide.is_bookmarked}
-      onToggleStar={toggleStar}
-      onEdit={() => router.push('/create?editGuideId=' + guideId)}
+      onToggleStar={viewer ? undefined : toggleStar}
+      onEdit={viewer ? undefined : () => router.push('/create?editGuideId=' + guideId)}
       onBack={goBack}
       onFinish={onFinish}
     />

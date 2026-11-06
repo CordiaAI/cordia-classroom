@@ -17,6 +17,8 @@ import { logAnswer, logFormatDecision, useAnswerTiming } from '../../lib/learnin
 import { applyTest } from '../../lib/timedTest.mjs';
 import { needsStudySet } from '../../lib/studySet.mjs';
 import { makeStudySet } from '../../lib/autoStudySet';
+import { loadStudyGuide } from '../../lib/studyGuide';
+import UpdateAvailable, { GuideUnavailable } from '../../components/UpdateAvailable';
 import { clearResume, readResume, writeResume } from '../../lib/resume';
 import TimedTest from '../../components/TimedTest';
 import { ClozeCard, FillCard, McCard, MemoryHook, QuietLimits, RememberButton, WrittenCard } from '../../components/RetainCards';
@@ -162,6 +164,10 @@ export default function LearnPage() {
   const [levels, setLevels] = useState({});
   // The levels the account has saved, so a save sends only the ideas that changed since.
   const savedLevels = useRef({});
+  // Someone else's shared guide (Stage 4): their version and your own progress; no owner actions.
+  const [viewer, setViewer] = useState(null);
+  const viewerRef = useRef(null); // the same, for saves made while loading
+  const [gone, setGone] = useState(null);
   const [testDate, setTestDate] = useState('');
   const [error, setError] = useState('');
   // A guide with notes but no questions yet (a Canvas import, a review set) gets them made here.
@@ -225,10 +231,13 @@ export default function LearnPage() {
     const sessionBody = LEARN_LADDER_V2 ? { types: ['mc', 'written', ...(wantsFill ? ['fill'] : [])], learn: true } : { types: ['mc', 'written'] };
     const startSession = () => safe(apiFetch(`/quiz/${guideId}/session`, { method: 'POST', quietLimit: LEARN_LADDER_V2, body: JSON.stringify(sessionBody) }));
     setError('');
-    let [guideData, session] = await Promise.all([safe(apiFetch(`/guides/${guideId}`)), startSession()]);
+    let [guideData, session] = await Promise.all([safe(loadStudyGuide(guideId)), startSession()]);
+    if (guideData?.unavailable) { setGone(guideData); setQuestions([]); return; }
     let guide = guideData?.guide;
     setTitle(guide?.title || '');
-    if (needsStudySet(guide)) {
+    setViewer(guide?.viewer || null);
+    viewerRef.current = guide?.viewer || null;
+    if (!guide?.viewer && needsStudySet(guide)) {
       setMaking(true);
       const made = await makeStudySet(guide);
       if (made.error) { setError(made.error); setQuestions([]); setMaking(false); return; }
@@ -256,7 +265,7 @@ export default function LearnPage() {
       const local = readLocal(guideId)?.test_format;
       format = cleanTestFormat(saved.test_format || local);
       setTestFormat(format);
-      if (!saved.test_format && local && format !== 'unsure') saveTestFormat(format);
+      if (!guide?.viewer && !saved.test_format && local && format !== 'unsure') saveTestFormat(format);
     }
     if (resumable) {
       setRound(pending.round);
@@ -265,7 +274,7 @@ export default function LearnPage() {
       roundStart.current = Date.now();
     }
     if (linked || resumable) save(restored, linked || saved.test_date || '', list, format);
-    if (!list.length) setError(session?.detail || (guide && !String(guide.notes || '').trim()
+    if (!list.length) setError(session?.detail || (guide?.viewer ? 'This guide has no questions to learn from yet.' : guide && !String(guide.notes || '').trim()
       ? 'This guide has no notes or questions to learn from yet.'
       : 'Learn needs questions and answers. Open the guide and make its study set first.'));
     setQuestions(list);
@@ -299,8 +308,9 @@ export default function LearnPage() {
     try { localStorage.setItem(localKey(guideId), JSON.stringify(body)); } catch { /* the account copy is enough */ }
     const before = savedLevels.current;
     savedLevels.current = body.levels;
-    saveLearnLevels(guideId, before, body)
-      .then(merged => { if (body.test_format && merged?.learn && merged.learn.test_format !== body.test_format) saveTestFormat(body.test_format); })
+    const studier = viewerRef.current;
+    saveLearnLevels(guideId, before, body, studier)
+      .then(merged => { if (!studier && body.test_format && merged?.learn && merged.learn.test_format !== body.test_format) saveTestFormat(body.test_format); })
       .catch(() => {});
   }
 
@@ -422,6 +432,7 @@ export default function LearnPage() {
   }
 
   if (gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate} label="Getting Learn ready" />;
+  if (gone) return <GuideUnavailable title={gone.title} reason={gone.unavailable} />;
   if (making || questions === null) return (
     <div className="c-page learn-page">
       <div className="learn-making" role="status">
@@ -457,14 +468,15 @@ export default function LearnPage() {
     <div className="c-page learn-page">
       <header className="c-page-head">
         <div className="c-row">
-          <button type="button" className="c-icon-btn" onClick={() => (inside ? setScreen('home') : router.push('/guide/' + guideId))} aria-label={screen === 'round' ? 'Stop this round' : screen === 'timed' ? 'Leave the test' : 'Back to guide'}><ArrowLeft {...ICON} /></button>
+          <button type="button" className="c-icon-btn" onClick={() => (inside ? setScreen('home') : router.push((viewer ? '/sets/' : '/guide/') + guideId))} aria-label={screen === 'round' ? 'Stop this round' : screen === 'timed' ? 'Leave the test' : 'Back to guide'}><ArrowLeft {...ICON} /></button>
           <h1 className="c-title">Learn</h1>
         </div>
       </header>
       {title && <p className="c-section-title learn-guide">{title}</p>}
+      {viewer && screen === 'home' && <UpdateAvailable guideId={guideId} viewer={viewer} onChanged={load} />}
       {error && (
         <div className="retain-action-error" role="alert">
-          {error} <Link href={'/guide/' + guideId}>Open the guide</Link>
+          {error} <Link href={(viewer ? '/sets/' : '/guide/') + guideId}>Open the guide</Link>
           <button type="button" className="c-btn c-btn--secondary c-btn--sm learn-retry" onClick={load}>Try again</button>
         </div>
       )}
