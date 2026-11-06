@@ -1,6 +1,6 @@
 // What's new: features released to students who joined before them. New students meet them in
-// onboarding; everyone else hears about them here, once (Dashboard card, a pointer tip where the
-// feature lives, the Help sheet's "What's new" list, and an item in Learn Cordia).
+// onboarding; everyone else hears about them here (a Dashboard card, a pointer tip where the
+// feature lives, and a "What's new" list in the Notifications panel, counted on the bell).
 //
 // Each entry:
 //   id          short and stable (it's stored per student; never reuse one)
@@ -101,16 +101,18 @@ export function nextAnnouncement(releases, user, seen, flags, today) {
     .sort((a, b) => day(a.releasedAt).localeCompare(day(b.releasedAt)) || releases.indexOf(a) - releases.indexOf(b))[0] || null;
 }
 
-// Help's "What's new": everything available, newest first, each with a dot while it's unseen.
-export function helpList(releases, user, seen, flags, today) {
+// The Notifications panel's "What's new": everything available, newest first. `isNew` marks the
+// ones still worth announcing that the student hasn't been shown yet (the bell counts these).
+export function whatsNewList(releases, user, seen, flags, today) {
   return releases
     .filter(release => available(release, user, flags, today))
     .sort((a, b) => day(b.releasedAt).localeCompare(day(a.releasedAt)) || releases.indexOf(a) - releases.indexOf(b))
-    .map(release => ({ ...release, unseen: eligible(release, user, seen, flags, today) }));
+    .map(release => ({ ...release, isNew: eligible(release, user, seen, flags, today) && !has(seen, 'announced', release.id) }));
 }
 
-export function unseenCount(releases, user, seen, flags, today) {
-  return releases.filter(release => eligible(release, user, seen, flags, today)).length;
+// How many the bell counts: eligible and not yet shown (in the panel, the card or a tip).
+export function bellCount(releases, user, seen, flags, today) {
+  return whatsNewList(releases, user, seen, flags, today).filter(release => release.isNew).length;
 }
 
 export function usedRoutes(release) {

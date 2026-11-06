@@ -5,6 +5,10 @@ import { Bell } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import { SectionLoader } from './CordiaLoader';
 import { loadNotifications, loadSocialSummary, markNotificationsRead, notificationHref, notificationText, onSocialSummary } from '../lib/social';
+import { whatsNewList } from '../lib/featureReleases';
+import { markAnnounced, useWhatsNew } from '../lib/whatsNew';
+import { openRelease } from './WhatsNew';
+import { WhatsNewList } from './WhatsNewList';
 
 const EDGE = 8;
 
@@ -17,7 +21,9 @@ function ago(iso) {
 }
 
 // The bell with the unread count. variant 'side': a sidebar item (wide screens); 'top': an icon
-// button in the phone top bar. Opening the panel shows the latest and marks them read.
+// button in the phone top bar. Opening the panel shows What's new (new features, components/
+// WhatsNewList.js) and the latest notifications, and marks both seen. The count is unread
+// notifications plus new features not shown yet.
 export default function NotificationBell({ variant = 'top', tip }) {
   const router = useRouter();
   const [unread, setUnread] = useState(0);
@@ -26,6 +32,11 @@ export default function NotificationBell({ variant = 'top', tip }) {
   const [place, setPlace] = useState(null);
   const buttonRef = useRef(null);
   const panelRef = useRef(null);
+  const whatsNew = useWhatsNew();
+  const features = whatsNew.ready ? whatsNewList(whatsNew.releases, whatsNew.user, whatsNew.seen, whatsNew.flags) : [];
+  const newFeatures = features.filter(item => item.isNew).map(item => item.id);
+  // The dots stay for this look at the panel; opening it counts as showing them.
+  const [shownNew, setShownNew] = useState([]);
 
   useEffect(() => onSocialSummary(summary => setUnread(summary?.unread_notifications || 0)), []);
   useEffect(() => { loadSocialSummary().then(summary => setUnread(summary?.unread_notifications || 0)); }, [router.pathname]);
@@ -35,6 +46,8 @@ export default function NotificationBell({ variant = 'top', tip }) {
     if (!open) return undefined;
     let active = true;
     setItems(null);
+    setShownNew(newFeatures);
+    if (newFeatures.length) markAnnounced(newFeatures);
     loadNotifications().then(data => {
       if (!active) return;
       setItems(data ? data.items : []);
@@ -57,10 +70,17 @@ export default function NotificationBell({ variant = 'top', tip }) {
     setPlace({ top: variant === 'side' ? anchor.top : anchor.bottom + 8, left: Math.min(Math.max(EDGE, left), window.innerWidth - width - EDGE), width });
   }, [open, variant]);
 
-  useEffect(() => { if (open && items) panelRef.current?.querySelector('a')?.focus(); }, [open, items]);
+  useEffect(() => { if (open && items) panelRef.current?.querySelector('a, button')?.focus(); }, [open, items]);
 
-  const label = unread ? `Notifications, ${unread} unread` : 'Notifications';
-  const badge = unread ? <span className="nb-badge" aria-hidden="true">{unread > 99 ? '99+' : unread}</span> : null;
+  async function showFeature(release) {
+    setOpen(false);
+    await openRelease(router, release);
+  }
+
+  const count = unread + newFeatures.length;
+  const label = count ? `Notifications, ${count} new` : 'Notifications';
+  const badge = count ? <span className="nb-badge" aria-hidden="true">{count > 99 ? '99+' : count}</span> : null;
+  const featureItems = features.map(item => ({ ...item, isNew: shownNew.includes(item.id) }));
 
   return (
     <>
@@ -79,8 +99,10 @@ export default function NotificationBell({ variant = 'top', tip }) {
           <div ref={panelRef} className="c-menu is-floating nb-panel" role="dialog" aria-label="Notifications"
             style={place ? { top: place.top, left: place.left, width: place.width } : { top: -9999, left: -9999 }}>
             <h2 className="c-section-title nb-title">Notifications</h2>
+            <WhatsNewList items={featureItems} onShow={showFeature} />
+            {featureItems.length > 0 && items !== null && items.length > 0 && <h3 className="nb-sub">Activity</h3>}
             {items === null && <SectionLoader height={96} label="Loading notifications" />}
-            {items && items.length === 0 && <p className="c-meta nb-empty">No notifications yet.</p>}
+            {items && items.length === 0 && !featureItems.length && <p className="c-meta nb-empty">No notifications yet.</p>}
             {items && items.length > 0 && (
               <ul className="nb-list">
                 {items.map(item => (
@@ -106,6 +128,7 @@ export default function NotificationBell({ variant = 'top', tip }) {
         .nb-panel { position: fixed; z-index: 170; display: grid; gap: 8px; padding: 12px; max-height: min(480px, calc(100vh - 96px)); overflow-y: auto; }
         .nb-title { margin: 4px 8px 0; }
         .nb-empty { margin: 8px; }
+        .nb-sub { margin: 8px 8px 2px; font: 600 13px/1.3 var(--font-sans); color: var(--muted-ink); }
         .nb-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
         .nb-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px; border-radius: var(--r-input); color: var(--ink); text-decoration: none; font: 500 15px/1.35 var(--font-sans); }
         .nb-item:hover, .nb-item:focus-visible { background: var(--lift-pane); text-decoration: none; }
