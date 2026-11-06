@@ -28,10 +28,8 @@ import { confirmedTodos, lectureCalendarItems, mergeCalendarItems } from '../lib
 import { deadlineTitle, parseQAPairs, safeHref } from '../lib/formatters';
 import { examReadiness, nearestExam } from '../lib/examCountdown.mjs';
 import FirstGuide from '../components/FirstGuide';
-import { CLASSROOMS_ON } from '../lib/featureFlags';
-import { classroomsDue } from '../lib/classrooms';
+import ClassroomsDue from '../components/ClassroomsDue';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SLOW = Symbol('slow');
 // A slow source holds the page (with the loader) this long, then the page shows and it fills in.
 const SLOW_MS = 8000;
@@ -107,9 +105,6 @@ export default function Today() {
     const calendarOrSlow = orSlow(calendarRequest);
     // Course work (upcoming / missing / completed) is part of the first view, not a card that pops in.
     const courseworkRequest = safe(apiFetch('/calendar/coursework'));
-    // What's due across your classrooms (Stage 6), your own progress on each one's guides.
-    const classroomDueRequest = CLASSROOMS_ON ? safe(classroomsDue()) : Promise.resolve(null);
-    const classroomDueOrSlow = orSlow(classroomDueRequest);
     const [foldersData, guidesData, statsData, streakData, onboardingData, insightsData, notesData, checklistData, calendarData, lectureTodos, alertsData, studyWeek, courseworkData, appsData, canvasData] = await Promise.all([
       safe(apiFetch('/folders')),
       safe(apiFetch('/guides?fields=summary&limit=500')),
@@ -128,9 +123,6 @@ export default function Today() {
       safe(canvasStatus()),
     ]);
     const usableCoursework = result => (result && result !== SLOW && !result.detail ? result : null);
-    const dueRooms = result => (Array.isArray(result?.classrooms) ? result.classrooms : []);
-    const classroomDue = await classroomDueOrSlow;
-    if (classroomDue === SLOW) classroomDueRequest.then(result => update(current => ({ ...current, classroomDue: dueRooms(result) })));
     if (courseworkData === SLOW) courseworkRequest.then(result => update(current => ({ ...current, coursework: usableCoursework(result) })));
     const failure = [foldersData, guidesData, statsData].find(item => !item || item.detail);
     const guideList = Array.isArray(guidesData?.guides) ? guidesData.guides : [];
@@ -165,7 +157,6 @@ export default function Today() {
       alerts: Array.isArray(alertsData?.alerts) ? alertsData.alerts : [],
       studyWeek: Number.isFinite(studyWeek?.minutes) ? studyWeek.minutes : null,
       coursework: usableCoursework(courseworkData),
-      classroomDue: dueRooms(classroomDue),
       apps: appsData || null,
       canvas: canvasData || null,
     };
@@ -184,7 +175,6 @@ export default function Today() {
 
   // Course work (upcoming / missing / completed this term); without a Canvas token Due soon shows.
   const coursework = data?.coursework || null;
-  const classroomDue = data?.classroomDue || [];
 
   // Feature tips, one per session, each at its moment.
   useEffect(() => {
@@ -308,20 +298,7 @@ export default function Today() {
         </section>
       )}
 
-      {classroomDue.length > 0 && (
-        <section className="c-section" aria-labelledby="rooms-due-title">
-          <h2 id="rooms-due-title" className="c-section-title">Due across your classrooms</h2>
-          <div className="c-card c-list">
-            {classroomDue.slice(0, 5).map(room => (
-              <Link key={room.id} href={UUID.test(room.id) ? { pathname: '/classrooms/[id]', query: { id: room.id, tab: 'study' } } : '/classrooms'} className="c-list-row today-room">
-                <span className="c-grow c-truncate">{room.name}</span>
-                <span className="c-meta">{room.due} due</span>
-                <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+      <ClassroomsDue />
 
       {alerts.length > 0 && (
         <section className="c-section" aria-labelledby="updates-title">
@@ -445,7 +422,6 @@ export default function Today() {
         .today-due { gap: 14px; }
         .today-due .c-meta { flex: none; white-space: nowrap; }
         .today-due-link { color: var(--ink); text-decoration: none; }
-        :global(.today-room) { color: var(--ink); text-decoration: none; }
         .today-due.is-done .today-due-link { color: var(--muted); text-decoration: line-through; }
         .today-continue-title { flex: 1 1 auto; min-width: 0; font:600 17px/1.15 var(--font-sans); }
         :global(.today-progress) { display: flex; align-items: center; gap: 20px; padding: 14px 18px; color: var(--ink); text-decoration: none; flex-wrap: wrap; }
