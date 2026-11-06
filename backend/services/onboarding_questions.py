@@ -7,8 +7,9 @@ always says which version of which question it answered. Changing a question's o
 version, never an edit in place.
 
 memory_style and interests (About-you screen) shape the "Help me remember" hooks a student gets
-after a missed question (llm.memory_hook): the kind of hook they like, and up to three interests a
-hook may draw on.
+after a missed question (llm.memory_hook): the kinds of hook they like (any number, since version 2;
+version 1 was one choice and is still accepted from older pages), and up to three interests a hook
+may draw on.
 
 Not here on purpose: anxiety and exam-nerves items (out of v1, Washington MHMDA), demographics, and
 personality "types". Answers are starting settings the student can change.
@@ -29,7 +30,7 @@ QUESTIONS: dict[str, tuple[int, str, tuple[str, ...]]] = {
     # On the reveal (G2): "Pick your study trigger: right after ___ I'll open Cordia ___."
     "study_trigger": (1, "trigger", ()),
     # About-you screen: for "Help me remember" hooks after a miss
-    "memory_style": (1, "choice", ("funny", "link", "rhyme", "picture", "letters")),
+    "memory_style": (2, "multi", ("funny", "link", "rhyme", "picture", "letters")),
     "interests": (1, "multi", ("sports", "music", "gaming", "movies_tv", "food", "outdoors", "art_design",
                                "fashion", "tech", "animals", "books", "travel")),
     # Day 2 (G2, report 10 Q2/Q5/Q8/Q15)
@@ -50,6 +51,11 @@ QUESTIONS: dict[str, tuple[int, str, tuple[str, ...]]] = {
     "plan_fit": (1, "choice", ("too_much", "about_right", "too_little")),
 }
 
+# Older versions still accepted, for a page loaded before the change: (id, version) -> kind.
+EARLIER = {("memory_style", 1): "choice"}
+# How many a "multi" question takes (default 3).
+MULTI_MAX = {"memory_style": 5}
+
 _TEXT = re.compile(r"^[^\x00-\x1f]{1,80}$")
 
 
@@ -64,7 +70,9 @@ def check(question_id: str, version: int, answer) -> dict:
         raise InvalidAnswer(f"Unknown question: {question_id}")
     expected, kind, options = spec
     if version != expected:
-        raise InvalidAnswer(f"{question_id} is at version {expected}")
+        kind = EARLIER.get((question_id, version))
+        if not kind:
+            raise InvalidAnswer(f"{question_id} is at version {expected}")
     if not isinstance(answer, dict):
         raise InvalidAnswer("Send the answer as an object")
     if answer.get("skipped") is True:
@@ -75,9 +83,10 @@ def check(question_id: str, version: int, answer) -> dict:
             raise InvalidAnswer(f"{question_id} takes one of: {', '.join(options)}")
         return {"value": value}
     if kind == "multi":
-        if not isinstance(value, list) or not 1 <= len(value) <= 3 or len(set(value)) != len(value) \
+        most = MULTI_MAX.get(question_id, 3)
+        if not isinstance(value, list) or not 1 <= len(value) <= most or len(set(value)) != len(value) \
                 or any(item not in options for item in value):
-            raise InvalidAnswer(f"{question_id} takes one to three of: {', '.join(options)}")
+            raise InvalidAnswer(f"{question_id} takes one to {most} of: {', '.join(options)}")
         return {"value": list(value)}
     if kind == "major":
         # The major's id from the curated list (step 1.3), or free text for "Other"; a second major

@@ -30,9 +30,13 @@ export default function AboutYou({ index = 1, total = 4 }) {
   const [school, setSchool] = useState('');
   const [major, setMajor] = useState('');
   const [otherMajor, setOtherMajor] = useState(false);
-  const [memoryStyle, setMemoryStyle] = useState('');
+  const [memoryStyles, setMemoryStyles] = useState([]);
   const [interests, setInterests] = useState([]);
   const [saving, setSaving] = useState(false);
+
+  function toggleStyle(value) {
+    setMemoryStyles(current => (current.includes(value) ? current.filter(item => item !== value) : [...current, value]));
+  }
 
   function toggleInterest(value) {
     setInterests(current => current.includes(value)
@@ -49,7 +53,7 @@ export default function AboutYou({ index = 1, total = 4 }) {
       body: JSON.stringify({ education_level: level, university: school.trim(), major: level === 'university' ? major.trim() : '' }),
     });
     const answers = [
-      memoryStyle && { question_id: 'memory_style', version: 1, answer: { value: memoryStyle }, source: 'onboarding' },
+      memoryStyles.length && { question_id: 'memory_style', version: 2, answer: { value: memoryStyles }, source: 'onboarding' },
       interests.length && { question_id: 'interests', version: 1, answer: { value: interests }, source: 'onboarding' },
     ].filter(Boolean);
     // Never holds up onboarding: a hook without these answers just uses the defaults.
@@ -93,9 +97,9 @@ export default function AboutYou({ index = 1, total = 4 }) {
       )}
 
       <fieldset className="about-group">
-        <legend className="c-section-title">How do you like to remember things?</legend>
+        <legend className="c-section-title">How do you like to remember things? <span className="c-meta about-hint">Pick any</span></legend>
         <div className="c-chips">
-          {MEMORY_STYLES.map(item => <button key={item.value} type="button" className="c-chip about-chip" aria-pressed={memoryStyle === item.value} onClick={() => setMemoryStyle(memoryStyle === item.value ? '' : item.value)}>{item.label}</button>)}
+          {MEMORY_STYLES.map(item => <button key={item.value} type="button" className="c-chip about-chip" aria-pressed={memoryStyles.includes(item.value)} onClick={() => toggleStyle(item.value)}>{item.label}</button>)}
         </div>
       </fieldset>
 
