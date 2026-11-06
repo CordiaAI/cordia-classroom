@@ -681,7 +681,7 @@ input::placeholder { color: var(--text-muted); }
 .retain-cloze-blank.right { background: var(--success-bg, var(--olive-tint)); color: var(--success, var(--olive-ink)); }
 .retain-cloze-blank.wrong { background: var(--error-bg); color: var(--error); }
 .retain-cloze-blank.partial { background: var(--warning-bg); color: var(--warning); }
-.retain-fill-input, .retain-written-input { width: 100%; min-width: 0; padding: 12px 14px; border: 1.5px solid var(--border-default); border-radius:12px; background: var(--bg-primary); color: var(--text-primary); font: inherit; }
+.retain-fill-input, .retain-written-input { width: 100%; min-width: 0; padding: var(--space-3) var(--space-4); border: 1.5px solid var(--border-default); border-radius:12px; background: var(--bg-primary); color: var(--text-primary); font: inherit; }
 .retain-written-input { display: block; margin-bottom: 12px; resize: none; line-height:1.5; }
 .retain-fill-input:focus, .retain-written-input:focus { outline: none; border-color: var(--olive); }
 .retain-fill-input.right { border-color: var(--success); background: var(--success-bg); }

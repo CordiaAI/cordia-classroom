@@ -20,6 +20,9 @@
   --lh-title: 1.15; --lh-body: 1.5;
   --track-title: -0.015em;
 
+  /* Spacing: a 4 px scale for gaps and padding */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+
   /* Neutrals: ink, muted (ink at 64%), and three surface levels */
   --ink: #171B18;
   --muted: rgba(23, 27, 24, 0.64);
