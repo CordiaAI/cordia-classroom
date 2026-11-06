@@ -734,6 +734,7 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   .c-side-brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; font: 600 20px/1.15 var(--font-display); white-space: nowrap; }
   .c-side-brand:hover { text-decoration: none; }
   .c-side-brand .top-navigation-mark { width: 30px; height: 26px; flex: none; }
+  .c-side-brand .c-side-label { display: inline-flex; align-items: center; align-self: stretch; } /* centre the wordmark on the mark, not on a text baseline */
   .c-side-toggle { display: grid; place-items: center; flex: none; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; }
   .c-side-toggle:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); color: var(--ink); }
   .c-side-new { width: 100%; height: 44px; min-height: 44px; margin-bottom: 6px; white-space: nowrap; }
@@ -824,10 +825,11 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 }
 .item-grid > * > svg:first-child { box-sizing: content-box; width: 20px; height: 20px; padding: 8px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
 
-/* ---------- Brand name (components/BrandName.js): the wordmark image, then "classroom" ---------- */
-.c-brandname { display: inline-flex; align-items: center; gap: .32em; white-space: nowrap; line-height: 1; }
-.c-brandname-mark { display: block; height: 1.02em; width: auto; }
-.c-brandname-product { font: 500 1em/1 var(--font-sans); letter-spacing: .01em; color: var(--olive-ink); }
+/* ---------- Brand name (components/BrandName.js): the "cordia" wordmark image ----------
+   The wordmark's letters sit low in the file (the leaf above the i fills the top), so it is nudged up to
+   centre its letters on the mark beside it. */
+.c-brandname { display: inline-flex; align-items: center; white-space: nowrap; line-height: 1; }
+.c-brandname-mark { display: block; height: 1.02em; width: auto; transform: translateY(-.12em); }
 [data-theme='dark'] .c-brandname-mark { filter: brightness(0) invert(1); opacity: .92; }
 .c-side-brand .c-brandname { font-size: 17px; }
 @media (max-width: 767px) {
