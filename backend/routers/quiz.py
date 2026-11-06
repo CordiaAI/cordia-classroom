@@ -195,7 +195,7 @@ def _standard_questions(qa_pairs: list, rng=None) -> list:
     others = _pairs(qa_pairs)
     for index, pair in enumerate(qa_pairs):
         answer = pair["answer"]
-        candidates = keep_valid(_other_answers(qa_pairs, index), pair["question"], answer, others)[0]
+        candidates = _free_candidates(qa_pairs, index, others)
         if is_value(answer):
             distractors = conform(answer, [], candidates, seed=pair["question"])
         else:
@@ -213,6 +213,16 @@ def _standard_questions(qa_pairs: list, rng=None) -> list:
             **({"idea_id": pair["idea_id"]} if pair.get("idea_id") else {}),
         })
     return questions
+
+
+def _free_candidates(qa_pairs: list, index: int, others: list) -> list:
+    """Wrong-choice candidates for a free question: the guide's other answers that pass the
+    distractor check first, then (only to reach three) the ones it rejected. A free quiz's wrong
+    choices all come from the guide's own answers, so when every answer is a description the check
+    rejects them all; topping up keeps the question instead of dropping it."""
+    pair = qa_pairs[index]
+    kept, rejected = keep_valid(_other_answers(qa_pairs, index), pair["question"], pair["answer"], others)
+    return kept if len(kept) >= 3 else kept + rejected[:3 - len(kept)]
 
 
 def _pairs(qa_pairs: list) -> list:
