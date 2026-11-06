@@ -13,6 +13,7 @@ import { inDayOne, walkthroughEvent } from '../../lib/walkthrough';
 import { spreadCards } from '../../lib/checkYourself';
 import { needsStudySet } from '../../lib/studySet.mjs';
 import { makeStudySet } from '../../lib/autoStudySet';
+import { clearResume, readResume, writeResume } from '../../lib/resume';
 
 // Short tile names; TYPE_LABELS stays the engine's own naming.
 const MODES = {
@@ -52,6 +53,8 @@ export default function QuizPage() {
   const [types, setTypes] = useState(['mc']);
   const [plan, setPlan] = useState(null);
   const [session, setSession] = useState(null);
+  // A quiz left mid-way (a refresh) that QuizMode picks up again.
+  const [resumed, setResumed] = useState(null);
   const [starting, setStarting] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState('');
@@ -64,6 +67,11 @@ export default function QuizPage() {
   useEffect(() => {
     if (!ready || !guideId) return;
     setTypes(linkedTypes(router.query.types) || rememberedTypes());
+    const pending = check ? null : readResume('quiz', guideId);
+    if (pending?.page && pending.quiz) {
+      setSession(pending.page);
+      setResumed(pending.quiz);
+    }
     // Title, past scores and plan arrive together, so the page appears once, whole.
     const safe = promise => promise.catch(() => null);
     Promise.all([safe(apiFetch(`/quiz/${guideId}/history`)), safe(apiFetch(`/guides/${guideId}`)), safe(apiFetch('/billing/status'))]).then(async ([past, guide, billing]) => {
@@ -130,6 +138,7 @@ export default function QuizPage() {
     if (data?.cards?.length) {
       // Short-answer types (Fill in, Pairs) the student picked that no question here could use.
       const unused = chosen.filter(type => PRO_TYPES.includes(type) && Array.isArray(data.types) && !data.types.includes(type));
+      setResumed(null);
       setSession({ ...data, cards: short ? data.cards.slice(0, 3) : data.cards, selected: chosen, unused, race: race && !short, version: Date.now() });
       walkthroughEvent('quiz-started');
     }
@@ -141,7 +150,10 @@ export default function QuizPage() {
     setError('');
     const data = await apiFetch(`/quiz/${guideId}/regenerate`, { method: 'POST' });
     setRegenerating(false);
-    if (data?.questions) setSession(null);
+    if (data?.questions) {
+      clearResume('quiz', guideId);
+      setSession(null);
+    }
     else setError(data?.detail || 'Could not regenerate the questions.');
   }
 
@@ -185,6 +197,8 @@ export default function QuizPage() {
           onDone={() => { walkthroughEvent('guide-open'); router.push('/guide/' + guideId); }}
           doneLabel={check ? 'Read the guide' : undefined}
           mode={check ? 'check' : 'quiz'}
+          resume={resumed}
+          onProgress={check ? undefined : snapshot => (snapshot ? writeResume('quiz', guideId, { page: session, quiz: snapshot }) : clearResume('quiz', guideId))}
         />
         </>
       ) : making ? (

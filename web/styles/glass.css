@@ -407,7 +407,7 @@ body { touch-action: manipulation; }
 .c-viewtoggle .c-icon-btn[aria-pressed='true'] { background: var(--lg-sheen), var(--lg-fill-strong) !important; box-shadow: var(--lg-highlight), var(--lg-shadow) !important; }
 
 /* Tinted ones keep their tint, laid over the glass: study blocks, the sample, a chosen way. */
-:is(.calendar-item-block, .new-sample) {
+:is(.calendar-item-block, .new-sample, .plan-badge[data-plan='plus']) {
   background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--lg-sheen), var(--lg-fill) !important;
 }
 .learn-way.is-on { box-shadow: 0 0 0 2px var(--olive), var(--lg-highlight), var(--lg-shadow) !important; border-color: transparent !important; }
