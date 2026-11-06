@@ -28,6 +28,7 @@ import { confirmedTodos, lectureCalendarItems, mergeCalendarItems } from '../lib
 import { deadlineTitle, parseQAPairs, safeHref } from '../lib/formatters';
 import { examReadiness, nearestExam } from '../lib/examCountdown.mjs';
 import FirstGuide from '../components/FirstGuide';
+import { WhatsNewCard } from '../components/WhatsNew';
 import ClassroomsDue from '../components/ClassroomsDue';
 
 const SLOW = Symbol('slow');
@@ -251,6 +252,8 @@ export default function Today() {
       <header className="c-page-head">
         <h1 className="c-title">Dashboard</h1>
       </header>
+
+      {!walking && <WhatsNewCard />}
 
       {loadError && (
         <div className="today-error" role="alert">

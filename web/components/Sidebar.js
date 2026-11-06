@@ -20,6 +20,8 @@ import { classLabel } from '../lib/classLabel';
 import { coverFor } from '../lib/coverDesign.mjs';
 import { latestFolders, loadFolders, onFoldersChanged } from '../lib/folders';
 import { HELP_EVENT } from '../lib/help';
+import { unseenCount } from '../lib/featureReleases';
+import { useWhatsNew } from '../lib/whatsNew';
 import { setThemePreference, themePreference } from '../lib/theme';
 
 // The sidebar (wide screens), top to bottom: New, Search, the main places, your classes, the
@@ -200,6 +202,10 @@ export default function Sidebar({ timerState, setTimerState }) {
     return () => { document.removeEventListener('pointerdown', onDown); window.removeEventListener('keydown', onKey); };
   }, [timerOpen]);
 
+  // What's new: a dot on Help (and on the avatar that opens it) while a new feature is unseen.
+  const whatsNew = useWhatsNew();
+  const newFeatures = whatsNew.ready ? unseenCount(whatsNew.releases, whatsNew.user, whatsNew.seen, whatsNew.flags) : 0;
+
   // The phone top bar's menu has everything; the sidebar's has Settings, Help, Send feedback,
   // the theme and Sign out (Progress is in the sidebar; Appearance, Plan and Connectors are in Settings).
   const accountItems = [
@@ -209,7 +215,7 @@ export default function Sidebar({ timerState, setTimerState }) {
     { key: 'appearance', label: 'Appearance', icon: Palette, onSelect: () => router.push('/settings?section=account') },
     { key: 'plan', label: 'Plan', icon: CreditCard, onSelect: () => router.push('/settings?section=plan') },
     { key: 'connectors', label: 'Connectors', icon: Link2, onSelect: () => router.push('/settings?section=connectors') },
-    { key: 'help', label: 'Help', icon: CircleHelp, onSelect: () => setShowHelp(true) },
+    { key: 'help', label: 'Help', icon: CircleHelp, dot: newFeatures > 0, dotLabel: "new features in What's new", onSelect: () => setShowHelp(true) },
     { key: 'feedback', label: 'Send feedback', icon: Megaphone, onSelect: () => setShowFeedback(true) },
     { key: 'signout', label: 'Sign out', icon: LogOut, separated: true, onSelect: () => signOut() },
   ];
@@ -298,8 +304,8 @@ export default function Sidebar({ timerState, setTimerState }) {
         </nav>
         <div className="c-side-foot">
           <button ref={sideAvatarRef} type="button" className={'c-side-item c-side-account' + (onProfile ? ' is-active' : '')} onClick={() => toggleMenu('side')} aria-expanded={menuOpen && menuFrom === 'side'} aria-haspopup="menu"
-            aria-label={`${displayName || 'Account'}, account menu`} title={tip(displayName || 'Account')}>
-            <span className="c-avatar c-side-avatar" aria-hidden="true">{initials || <User size={18} strokeWidth={1.75} />}</span>
+            aria-label={`${displayName || 'Account'}, account menu${newFeatures > 0 ? ", new in What's new" : ''}`} title={tip(displayName || 'Account')}>
+            <span className="c-avatar c-side-avatar" aria-hidden="true">{initials || <User size={18} strokeWidth={1.75} />}{newFeatures > 0 && <span className="c-avatar-dot" />}</span>
             <span className="c-side-label c-side-who"><strong className="c-truncate">{name || emailName || 'Account'}</strong>{email && <span className="c-truncate">{email}</span>}</span>
             <Ellipsis className="c-side-dots" size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
@@ -332,8 +338,9 @@ export default function Sidebar({ timerState, setTimerState }) {
             <Plus size={20} strokeWidth={1.75} aria-hidden="true" />New
           </button>
           <div className="c-menu-wrap">
-            <button ref={avatarRef} type="button" className={'c-avatar' + (onProfile ? ' is-active' : '')} onClick={() => toggleMenu('top')} aria-expanded={menuOpen && menuFrom === 'top'} aria-haspopup="menu" aria-label={initials ? `${initials} account menu` : 'Account menu'}>
+            <button ref={avatarRef} type="button" className={'c-avatar' + (onProfile ? ' is-active' : '')} onClick={() => toggleMenu('top')} aria-expanded={menuOpen && menuFrom === 'top'} aria-haspopup="menu" aria-label={(initials ? `${initials} account menu` : 'Account menu') + (newFeatures > 0 ? ", new in What's new" : '')}>
               {initials || <User size={20} strokeWidth={1.75} aria-hidden="true" />}
+              {newFeatures > 0 && <span className="c-avatar-dot" aria-hidden="true" />}
             </button>
             <AccountMenu open={menuOpen} onClose={closeMenu} anchorRef={menuFrom === 'side' ? sideAvatarRef : avatarRef} placement={menuFrom === 'side' ? 'above' : 'below'}
               items={menuFrom === 'side' ? sideMenuItems : accountItems} />
