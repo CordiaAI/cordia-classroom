@@ -52,13 +52,26 @@ export function learnIdeas(guide, today = dayKey()) {
     .map(({ question, concept, entry }) => ({ concept, front: question.question, back: conceptAnswer(question), level: entry.l }));
 }
 
+// Several lists dealt in turn, one item from each, so no one list fills the round.
+function dealt(lists) {
+  const out = [];
+  const longest = Math.max(0, ...lists.map(list => list.length));
+  for (let at = 0; at < longest; at += 1) for (const list of lists) if (at < list.length) out.push(list[at]);
+  return out;
+}
+
 // The round from what's loaded: misses the student was sure of, due flashcards, Learn ideas, then
 // other misses. A question found in more than one place is one item carrying each source:
-// index (flashcard), concept (Learn idea), miss (Retain miss).
-export function buildStudyQueue(guides, stored = {}, { guideId = '', today = dayKey() } = {}) {
-  const cards = [];
-  const learn = [];
+// index (flashcard), concept (Learn idea), miss (Retain miss). interleave (a folder or classroom
+// round) deals cards and ideas one guide at a time, so the 30-card cap takes from every guide.
+export function buildStudyQueue(guides, stored = {}, { guideId = '', today = dayKey(), interleave = false } = {}) {
+  const cardLists = [];
+  const learnLists = [];
   for (const guide of guides) {
+    const cards = [];
+    const learn = [];
+    cardLists.push(cards);
+    learnLists.push(learn);
     // Study now on a guide with nothing due still runs a full round of its cards.
     const due = dueCards(guide, today);
     const pool = guideId && !due.length ? (guide.flashcards || []).map((card, index) => ({ ...card, index })) : due;
@@ -69,6 +82,8 @@ export function buildStudyQueue(guides, stored = {}, { guideId = '', today = day
       learn.push({ kind: 'learn', guideId: guide.id, guideTitle: guide.title, concept: idea.concept, front: idea.front, back: idea.back });
     }
   }
+  const cards = interleave ? dealt(cardLists) : cardLists.flat();
+  const learn = interleave ? dealt(learnLists) : learnLists.flat();
   const misses = [];
   for (const [id, items] of Object.entries(stored || {})) {
     const guide = guides.find(item => item.id === id);

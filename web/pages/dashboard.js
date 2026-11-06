@@ -28,6 +28,7 @@ import { confirmedTodos, lectureCalendarItems, mergeCalendarItems } from '../lib
 import { deadlineTitle, parseQAPairs, safeHref } from '../lib/formatters';
 import { examReadiness, nearestExam } from '../lib/examCountdown.mjs';
 import FirstGuide from '../components/FirstGuide';
+import ClassroomsDue from '../components/ClassroomsDue';
 
 const SLOW = Symbol('slow');
 // A slow source holds the page (with the loader) this long, then the page shows and it fills in.
@@ -296,6 +297,8 @@ export default function Today() {
           </div>
         </section>
       )}
+
+      <ClassroomsDue />
 
       {alerts.length > 0 && (
         <section className="c-section" aria-labelledby="updates-title">

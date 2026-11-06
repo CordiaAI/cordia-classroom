@@ -39,6 +39,19 @@ export const removeItem = (id, type, itemId) => apiFetch(`/classrooms/${id}/item
 export const setMilestone = (id, type, itemId, body) => apiFetch(`/classrooms/${id}/items/${type}/${itemId}`, { method: 'PATCH', ...json(body) });
 export const reorderItems = (id, items) => apiFetch(`/classrooms/${id}/items/order`, { method: 'PUT', ...json({ items }) });
 export const classroomActivity = id => apiFetch(`/classrooms/${id}/activity`);
+// Studying the classroom (Stage 6): the round's guides with your own progress, your readiness (and
+// the group's or, for staff, sharing members'), what's due across your classrooms, your test date.
+export const classroomStudy = id => apiFetch(`/classrooms/${id}/study`);
+export const classroomProgress = id => apiFetch(`/classrooms/${id}/progress`);
+export const classroomsDue = () => apiFetch('/classrooms/due');
+export const setTestDate = (id, date) => apiFetch(`/classrooms/${id}/me`, { method: 'PATCH', ...json(date ? { test_date: date } : { clear_test_date: true }) });
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// The address of a classroom round; only well-formed ids go in it.
+export function studyRoundHref(id, guideIds = []) {
+  if (!UUID.test(id)) return '/classrooms';
+  const picked = guideIds.map(guideId => (UUID.test(guideId) ? guideId : '')).filter(Boolean);
+  return `/session?scope=classroom&id=${id}${picked.length ? '&guides=' + picked.join(',') : ''}`;
+}
 
 // The invite preview works signed out too.
 export async function previewInvite(token) {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowDown, ArrowLeft, ArrowUp, Flag, FolderOpen, UserPlus } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Flag, FolderOpen, Play, UserPlus } from 'lucide-react';
 import { useRequireAuth } from '../../lib/auth';
 import { pageTitle } from '../../lib/pageTitle';
 import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
@@ -11,12 +11,14 @@ import Menu from '../../components/Menu';
 import InviteDialog from '../../components/InviteDialog';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import {
-  KIND_LABELS, ROLE_LABELS, VISIBILITY_HELP, approveMember, archiveClassroom, changeRole, classroomActivity, getClassroom,
-  leaveClassroom, listItems, listMembers, removeItem, removeMember, reorderItems, setMilestone, setShareProgress,
-  transferOwnership, updateClassroom,
+  KIND_LABELS, ROLE_LABELS, VISIBILITY_HELP, approveMember, archiveClassroom, changeRole, classroomActivity, classroomProgress,
+  classroomStudy, getClassroom, leaveClassroom, listItems, listMembers, removeItem, removeMember, reorderItems, setMilestone,
+  setShareProgress, setTestDate, studyRoundHref, transferOwnership, updateClassroom,
 } from '../../lib/classrooms';
+import { dueCards, learnIdeas } from '../../lib/studyQueue';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TABS = [
   { key: 'guides', label: 'Guides' },
   { key: 'study', label: 'Study' },
@@ -41,6 +43,10 @@ export default function ClassroomPage() {
   const [room, setRoom] = useState(null);
   const [missing, setMissing] = useState(false);
   const [tab, setTab] = useState('guides');
+  // ?tab=study (back from a classroom round) opens that tab.
+  useEffect(() => {
+    if (TABS.some(item => item.key === router.query.tab)) setTab(router.query.tab);
+  }, [router.query.tab]);
   const [inviting, setInviting] = useState(false);
   const [toast, setToast] = useState('');
   const gate = useLoadGate(Boolean(room) || missing);
@@ -111,9 +117,9 @@ export default function ClassroomPage() {
         </div>
         <div id={`crpanel-${tab}`} role="tabpanel" aria-labelledby={`crtab-${tab}`} className="cr-panel">
           {tab === 'guides' && <GuidesTab room={room} onToast={setToast} />}
-          {tab === 'study' && <p className="c-card cr-soon">Study together: shared sessions and goals for this classroom are coming next.</p>}
+          {tab === 'study' && <StudyTab room={room} onToast={setToast} />}
           {tab === 'members' && <MembersTab room={room} onToast={setToast} onChanged={load} />}
-          {tab === 'progress' && <p className="c-card cr-soon">{room.kind === 'instructor_class' ? 'Progress from students who chose to share it will show here.' : 'Group progress is coming next.'}</p>}
+          {tab === 'progress' && <ProgressTab room={room} />}
           {tab === 'activity' && <ActivityTab room={room} />}
           {tab === 'settings' && <SettingsTab room={room} onToast={setToast} onSaved={setRoom} onGone={() => router.push('/classrooms')} />}
         </div>
@@ -244,7 +250,10 @@ function MilestoneForm({ room, item, onDone }) {
 function MembersTab({ room, onToast, onChanged }) {
   const [data, setData] = useState(null);
   const [confirm, setConfirm] = useState(null);
-  async function load() { setData(await listMembers(room.id) || { members: [], roles: [] }); }
+  async function load() {
+    const result = await listMembers(room.id);
+    setData(Array.isArray(result?.members) ? { roles: [], ...result } : { members: [], roles: [] });
+  }
   useEffect(() => { load(); }, [room.id]);
 
   async function act(run, done) {
@@ -384,5 +393,243 @@ function SettingsTab({ room, onToast, onSaved, onGone }) {
         .crs :global(.c-meta) { margin: 0; }
       `}</style>
     </>
+  );
+}
+
+function localToday() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+function daysUntil(date) {
+  const [y, m, d] = String(date).split('-').map(Number);
+  const [ty, tm, td] = localToday().split('-').map(Number);
+  return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(ty, tm - 1, td)) / 86400000);
+}
+function whenText(date) {
+  const days = daysUntil(date);
+  return days < 0 ? 'passed' : days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`;
+}
+
+// Study the classroom: pick its guides, then one mixed round across them (session.js). Each guide
+// also has its own Learn. The test date is yours (saved on the server once migration 20261116120000
+// runs; until then it lasts this visit), or the nearest milestone. Nothing here is kept on the device.
+function StudyTab({ room, onToast }) {
+  const [data, setData] = useState(null);
+  const [left, setLeft] = useState([]);
+  const [ownDate, setOwnDate] = useState('');
+  useEffect(() => {
+    classroomStudy(room.id).then(result => {
+      setData(result && Array.isArray(result.guides) ? result : { guides: [], skipped: 0 });
+      setOwnDate(result?.test_date || '');
+    });
+  }, [room.id]);
+
+  function toggle(guideId, on) {
+    setLeft(current => (on ? current.filter(item => item !== guideId) : [...current, guideId]));
+  }
+
+  async function saveDate(value) {
+    setOwnDate(value);
+    const result = await setTestDate(room.id, value);
+    onToast(result?.detail || (value ? 'Test date saved' : 'Test date cleared'));
+  }
+
+  if (data === null) return <SectionLoader label="Loading the guides" />;
+  const guides = data.guides.map(guide => ({ ...guide, due: dueCards(guide).length + learnIdeas(guide).length }));
+  const picked = guides.filter(guide => !left.includes(guide.id));
+  const due = picked.reduce((sum, guide) => sum + guide.due, 0);
+  const milestone = data.milestone;
+  const testDate = ownDate || milestone?.date || '';
+  const href = studyRoundHref(room.id, picked.length === guides.length ? [] : picked.map(guide => guide.id));
+  return (
+    <>
+      <section className="c-card crst-date">
+        <label className="crst-field">
+          <span>Test date</span>
+          <input className="c-input" type="date" value={ownDate} onChange={event => saveDate(event.target.value)} />
+        </label>
+        <p className="c-meta">
+          {testDate
+            ? `${ownDate ? 'Your date' : milestone.label || 'Next milestone'}: ${testDate}, ${whenText(testDate)}.`
+            : 'Set a date, or the classroom’s next milestone is used.'}
+          {ownDate && milestone ? ` The next milestone is ${milestone.label ? milestone.label + ' on ' : ''}${milestone.date}.` : ''}
+        </p>
+        {ownDate && <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={() => saveDate('')}>Use the milestone instead</button>}
+      </section>
+
+      {!guides.length ? (
+        <p className="c-card cr-soon">No guides to study here yet. Guides added to the classroom show up here.</p>
+      ) : (
+        <section className="c-card crst">
+          <div className="crst-head">
+            <h2 className="crst-title">Study together</h2>
+            <span className="c-meta">{due} {due === 1 ? 'card or idea' : 'cards and ideas'} due in {picked.length} {picked.length === 1 ? 'guide' : 'guides'}</span>
+          </div>
+          <ul className="crst-list">
+            {guides.map(guide => (
+              <li key={guide.id} className="crst-row">
+                <label className="crst-check">
+                  <input type="checkbox" checked={!left.includes(guide.id)} onChange={event => toggle(guide.id, event.target.checked)} />
+                  <span className="crst-name">{guide.title || 'Untitled'}</span>
+                </label>
+                <span className="c-meta crst-due">{guide.due} due</span>
+                <Link href={UUID.test(guide.id) ? '/learn/' + guide.id : '/library'} className="c-btn c-btn--quiet c-btn--sm" aria-label={`Learn ${guide.title || 'this guide'}`}>Learn</Link>
+              </li>
+            ))}
+          </ul>
+          {picked.length ? (
+            <Link href={href} className="c-btn c-btn--primary crst-start"><Play {...ICON} />Start</Link>
+          ) : (
+            <button type="button" className="c-btn c-btn--primary crst-start" disabled><Play {...ICON} />Start</button>
+          )}
+          <p className="c-meta crst-note">One round mixes due cards and Learn ideas from the guides you pick, a few from each. Your answers count toward your own progress on each guide.</p>
+        </section>
+      )}
+      {data.skipped > 0 && <p className="c-meta crst-note">{data.skipped} {data.skipped === 1 ? 'guide by someone else isn’t' : 'guides by others aren’t'} in rounds yet. Open {data.skipped === 1 ? 'it' : 'them'} from the Guides tab.</p>}
+      <style jsx>{`
+        .crst, .crst-date { display: grid; gap: 12px; padding: 16px; min-width: 0; }
+        .crst-date { justify-items: start; }
+        .crst-date :global(.c-meta), .crst-note { margin: 0; }
+        .crst-field { display: grid; gap: 6px; }
+        .crst-field > span { font: 600 14px/1.2 var(--font-sans); color: var(--ink); }
+        .crst-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+        .crst-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .crst-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+        .crst-row { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 44px; }
+        .crst-check { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; color: var(--ink); }
+        .crst-check input { width: 18px; height: 18px; accent-color: var(--olive); flex: none; }
+        .crst-name { overflow-wrap: anywhere; }
+        .crst-due { flex: none; }
+        .crst :global(.crst-start) { justify-self: start; }
+      `}</style>
+    </>
+  );
+}
+
+function Mix({ guide }) {
+  const parts = [['mastered', 'mastered'], ['familiar', 'familiar'], ['learning', 'learning'], ['new', 'new']]
+    .filter(([key]) => guide[key]).map(([key, word]) => `${guide[key]} ${word}`);
+  return <span className="c-meta">{parts.join(' · ') || 'No ideas yet'}</span>;
+}
+
+function Readiness({ value, label }) {
+  return (
+    <div className="crr">
+      <div className="crr-top"><span className="crr-label">{label}</span><b>{value}% ready</b></div>
+      <div className="c-bar" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, value))}%` }} /></div>
+      <style jsx>{`
+        .crr { display: grid; gap: 6px; min-width: 0; }
+        .crr-top { display: flex; justify-content: space-between; gap: 12px; color: var(--ink); }
+        .crr-label { overflow-wrap: anywhere; min-width: 0; }
+        .crr b { flex: none; font-weight: 600; }
+      `}</style>
+    </div>
+  );
+}
+
+// Progress: your own readiness (Learn's weights, each guide weighted by its number of ideas); in a
+// study group, what the group knows per question with no names, once enough people studied it; in
+// an instructor class, staff see members who chose to share.
+function ProgressTab({ room }) {
+  const [data, setData] = useState(null);
+  useEffect(() => { classroomProgress(room.id).then(result => setData(result?.me ? result : { failed: true })); }, [room.id]);
+  if (data === null) return <SectionLoader label="Loading progress" />;
+  if (data.failed) return <p className="c-card cr-soon">Progress couldn’t load. Try again in a moment.</p>;
+  const { me } = data;
+  return (
+    <>
+      <section className="c-card crp">
+        <h2 className="crp-title">You</h2>
+        {me.guides.length ? (
+          <>
+            <Readiness value={me.readiness} label="All guides" />
+            <ul className="crp-list">
+              {me.guides.map(guide => (
+                <li key={guide.id} className="crp-guide">
+                  <Readiness value={guide.readiness} label={guide.title} />
+                  <Mix guide={guide} />
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : <p className="c-meta">No guides here yet.</p>}
+        <p className="c-meta">Only you see this part.</p>
+      </section>
+
+      {data.group && data.group.length > 0 && (
+        <section className="c-card crp">
+          <h2 className="crp-title">The group</h2>
+          <p className="c-meta">How many people know each question, counted across everyone who studied the guide. No names are shown.</p>
+          {data.group.map(guide => (
+            <details key={guide.id} className="crp-heat">
+              <summary><span className="crp-heat-name">{guide.title}</span><span className="c-meta">{guide.studied} studied</span></summary>
+              {guide.shown ? <Heatmap guide={guide} /> : <p className="c-meta">Not enough people have studied this yet. It shows once {data.group_min} have.</p>}
+            </details>
+          ))}
+        </section>
+      )}
+
+      {room.kind === 'instructor_class' && (data.members ? (
+        <section className="c-card crp">
+          <h2 className="crp-title">Students who share their progress</h2>
+          {data.members.length ? (
+            <ul className="crp-list">
+              {data.members.map(person => (
+                <li key={person.user_id} className="crp-member">
+                  <UserChip person={person} meta={`${person.readiness}% ready`} />
+                </li>
+              ))}
+            </ul>
+          ) : <p className="c-meta">No one has shared their progress yet.</p>}
+          {data.not_sharing > 0 && <p className="c-meta">{data.not_sharing} {data.not_sharing === 1 ? 'member keeps' : 'members keep'} their progress private.</p>}
+        </section>
+      ) : (
+        <p className="c-meta crp-note">{room.me.progress_visible_to_staff ? 'Your instructor can see your progress here.' : 'Your progress here is private. You can share it with your instructor in Settings.'}</p>
+      ))}
+      <style jsx>{`
+        .crp { display: grid; gap: 12px; padding: 16px; min-width: 0; }
+        .crp-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .crp :global(.c-meta), .crp-note { margin: 0; }
+        .crp-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+        .crp-guide { display: grid; gap: 4px; }
+        .crp-heat { border-top: 1px solid var(--line); padding-top: 10px; min-width: 0; }
+        .crp-heat summary { display: flex; justify-content: space-between; gap: 12px; cursor: pointer; color: var(--ink); font-weight: 600; min-height: 32px; align-items: center; }
+        .crp-heat-name { overflow-wrap: anywhere; min-width: 0; }
+        .crp-heat summary :global(.c-meta) { flex: none; font-weight: 400; }
+        .crp-heat > :global(p) { margin-top: 8px; }
+      `}</style>
+    </>
+  );
+}
+
+// One guide's group view: a row per question, shaded by how many of those who studied it know it
+// (Familiar or Mastered) or are still learning it. A plain table, so it reads without the shading.
+function Heatmap({ guide }) {
+  const share = count => (guide.studied ? count / guide.studied : 0);
+  return (
+    <table className="crh">
+      <caption className="sr-only">{guide.title}: of {guide.studied} who studied it</caption>
+      <thead><tr><th scope="col">Question</th><th scope="col">Group knows</th><th scope="col">Still learning</th></tr></thead>
+      <tbody>
+        {guide.ideas.map((idea, index) => (
+          <tr key={index}>
+            <th scope="row">{idea.question}</th>
+            <td><span className="crh-shade is-knows" style={{ opacity: 0.12 + share(idea.knows) * 0.6 }} aria-hidden="true" /><span className="crh-n">{idea.knows}</span></td>
+            <td><span className="crh-shade is-learning" style={{ opacity: 0.12 + share(idea.learning) * 0.6 }} aria-hidden="true" /><span className="crh-n">{idea.learning}</span></td>
+          </tr>
+        ))}
+      </tbody>
+      <style jsx>{`
+        .crh { width: 100%; border-collapse: separate; border-spacing: 0 4px; margin-top: 8px; table-layout: fixed; }
+        .crh thead th { font: 600 13px/1.3 var(--font-sans); color: var(--muted-ink); text-align: left; padding: 0 8px 4px 0; }
+        .crh thead th:not(:first-child) { width: 76px; text-align: center; padding-right: 0; }
+        .crh tbody th { font: 400 14px/1.35 var(--font-sans); color: var(--ink); text-align: left; padding: 6px 8px 6px 0; overflow-wrap: anywhere; vertical-align: middle; }
+        .crh td { position: relative; text-align: center; font: 600 14px/1 var(--font-sans); color: var(--ink); padding: 10px 0; }
+        .crh-shade { position: absolute; inset: 2px 4px; border-radius: var(--r-input); }
+        .crh-shade.is-knows { background: var(--olive); }
+        .crh-shade.is-learning { background: var(--warning); }
+        .crh-n { position: relative; }
+      `}</style>
+    </table>
   );
 }
