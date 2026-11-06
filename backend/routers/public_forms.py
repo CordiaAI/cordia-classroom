@@ -128,3 +128,12 @@ def takedown(body: TakedownRequest):
     if guide_id:
         db.table("study_guides").update({"review_status": "held", "hold_reason": COPYRIGHT_HOLD}).eq("id", guide_id).neq("review_status", "hidden").execute()
     return {"ok": True, "contact": COPYRIGHT_EMAIL}
+
+
+@router.get("/instructors/opt-outs", dependencies=[Depends(ai_rate_limit(30, 60))])
+def my_opt_outs(authorization: str = Header(default="")):
+    """For a verified instructor: each course they turned sharing off for, and what that hides now
+    (public guides out of Discover, class sets kept private, classrooms where adding is locked)."""
+    from services import instructors
+    user_id = get_user_id(authorization)
+    return {"courses": instructors.opt_out_report(get_supabase(), user_id)}

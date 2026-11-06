@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 from auth_utils import get_user_id
 from database import get_supabase
 from rate_limit import ai_rate_limit
-from services import guide_access, minors, social_graph, usernames
+from services import classmates, guide_access, instructors, minors, social_graph, usernames
 from services.blocks import is_blocked
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,17 @@ def _me(db, user_id: str) -> dict:
         "show_real_name": bool(profile.get("show_real_name")),
         "can_change_username_at": next_change.isoformat() if next_change and next_change > datetime.now(timezone.utc) else None,
     })
+    try:  # its own query: the column arrives with migration 20261124120000
+        extra = _one(db.table("user_profiles").select("find_by_classmates,is_minor").eq("id", user_id).limit(1).execute()) or {}
+        out["find_by_classmates"] = classmates.findable(extra)
+        out["find_by_classmates_available"] = True
+    except Exception:
+        try:
+            minor = _one(db.table("user_profiles").select("is_minor").eq("id", user_id).limit(1).execute()) or {}
+        except Exception:
+            minor = {}
+        out["find_by_classmates"] = classmates.findable(minor)
+        out["find_by_classmates_available"] = False
     try:  # its own query, so /profiles/me keeps working before the Stage 3 migration
         accepted = _one(db.table("user_profiles").select("honor_code_accepted_at").eq("id", user_id).limit(1).execute())
         out["honor_code_accepted"] = bool(accepted and accepted.get("honor_code_accepted_at"))
@@ -149,6 +160,7 @@ class ProfileSettings(BaseModel):
     allow_friend_requests: Optional[Literal["everyone", "friends_of_friends", "nobody"]] = None
     show_school: Optional[bool] = None
     show_streak: Optional[bool] = None
+    find_by_classmates: Optional[bool] = None
 
     @field_validator("display_name")
     @classmethod
@@ -167,6 +179,7 @@ def update_my_profile(body: ProfileSettings, authorization: str = Header(default
     user_id = get_user_id(authorization)
     db = get_supabase()
     updates = body.model_dump(exclude_unset=True)
+    findable = updates.pop("find_by_classmates", None)
     if "display_name" in updates:
         updates["display_name"] = updates["display_name"] or None  # empty clears it
     if updates:
@@ -174,6 +187,14 @@ def update_my_profile(body: ProfileSettings, authorization: str = Header(default
             db.table("user_profiles").update(updates).eq("id", user_id).execute()
         else:
             db.table("user_profiles").insert({"id": user_id, **updates}).execute()
+    if findable is not None:
+        # Its own write, so the other settings still save before migration 20261124120000.
+        try:
+            if not _own_profile(db, user_id).get("exists"):
+                db.table("user_profiles").insert({"id": user_id}).execute()
+            db.table("user_profiles").update({"find_by_classmates": bool(findable)}).eq("id", user_id).execute()
+        except Exception:
+            raise HTTPException(status_code=503, detail="This setting isn't available yet.")
     return _me(db, user_id)
 
 
@@ -213,7 +234,7 @@ def get_profile(username: str, authorization: str = Header(default="")):
         "initials": _initials(profile),
         "is_self": is_self,
         "limited": not full,
-        "badges": [],
+        "badges": ["verified_instructor"] if instructors.is_verified(db, owner) else [],
         # Public folders and classrooms arrive in Stage 5.
         "guides": guide_access.profile_guides(db, viewer, owner) if full else [],
         "folders": [],

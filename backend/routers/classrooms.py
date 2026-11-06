@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator
 
 from auth_utils import get_user_id
@@ -16,6 +16,8 @@ from database import get_supabase
 from ids import require_uuid
 from rate_limit import ai_rate_limit
 from services import classroom_study as cstudy
+from services import classmates, instructors
+from services import instructor_dashboard as idash
 from services import classrooms as rooms
 from services import guide_versions as versions
 from services import viewer_study
@@ -158,6 +160,15 @@ def course_classrooms(class_id: str, authorization: str = Header(default="")):
                     "owner": owners.get(room["owner_id"]), "join_policy": room.get("join_policy"),
                     "my_status": me.get("status") if me and me.get("status") != "removed" else None})
     return {"classrooms": out}
+
+
+@router.get("/suggestions", dependencies=[Depends(ai_rate_limit(60, 60))])
+def suggestions(authorization: str = Header(default="")):
+    """From your courses this term (Canvas, the calendar or added by hand): public classrooms for those
+    courses you aren't in, and classmates who let people in their courses find them
+    (services/classmates.py has who is never suggested)."""
+    user_id = _uid(authorization)
+    return classmates.suggestions(get_supabase(), user_id)
 
 
 @router.get("/due")
@@ -612,6 +623,10 @@ def add_item(classroom_id: str, body: ItemAdd, authorization: str = Header(defau
         guide = access.load(db, item_id, access.GUIDE_COLUMNS + ",linked_set_id")
         if not guide:
             raise HTTPException(status_code=404, detail="Guide not found")
+        # A course opt-out (services/instructors.py): checked before anything is shared.
+        blocked = instructors.add_problem(db, user_id, room, guide=guide)
+        if blocked:
+            raise HTTPException(status_code=403, detail=blocked)
         if guide["user_id"] == user_id:
             from routers.guide_sharing import _is_others_copy
             if (guide.get("visibility") or "private") == "private":
@@ -621,9 +636,12 @@ def add_item(classroom_id: str, body: ItemAdd, authorization: str = Header(defau
         elif not (access.can_view(db, user_id, guide) and guide.get("visibility") in ("public", "link")):
             raise HTTPException(status_code=403, detail="You can add your own guides, or public ones.")
     else:
-        folder = (db.table("folders").select("id,user_id").eq("id", item_id).limit(1).execute().data or [None])[0]
+        folder = (db.table("folders").select("id,user_id,class_id").eq("id", item_id).limit(1).execute().data or [None])[0]
         if not folder or folder.get("user_id") != user_id:
             raise HTTPException(status_code=404, detail="Folder not found")
+        blocked = instructors.add_problem(db, user_id, room, folder=folder)
+        if blocked:
+            raise HTTPException(status_code=403, detail=blocked)
     existing = db.table("classroom_items").select("position").eq("classroom_id", room["id"]).execute().data or []
     if len(existing) >= 500:
         raise HTTPException(status_code=409, detail="This classroom has as many items as it can hold.")
@@ -765,6 +783,36 @@ def classroom_progress(classroom_id: str, authorization: str = Header(default=""
         out["members"] = [{**people[uid], "readiness": cstudy.combined(rows), "guides": rows} for uid, rows in staff_rows.items() if uid in people]
         out["not_sharing"] = len([m for m in members if not m.get("progress_visible_to_staff") and m["user_id"] != user_id])
     return out
+
+
+# Instructor dashboard (services/instructor_dashboard.py) ---------------------------------------------
+def _instructor_room(db, classroom_id: str, user_id: str) -> dict:
+    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+    if room.get("kind") != "instructor_class" or not rooms.is_staff(me):
+        raise HTTPException(status_code=403, detail="Only the staff of an instructor class see this.")
+    return room
+
+
+@router.get("/{classroom_id}/instructor", dependencies=[Depends(ai_rate_limit(60, 60))])
+def instructor_dashboard(classroom_id: str, authorization: str = Header(default="")):
+    """Class readiness per guide, the weakest ideas, upcoming milestones and the member list with each
+    member's sharing choice. Only members who share their progress with staff are counted."""
+    user_id = _uid(authorization)
+    db = get_supabase()
+    room = _instructor_room(db, classroom_id, user_id)
+    return idash.public(idash.build(db, user_id, room))
+
+
+@router.get("/{classroom_id}/instructor.csv", dependencies=[Depends(ai_rate_limit(10, 60))])
+def instructor_csv(classroom_id: str, authorization: str = Header(default="")):
+    """The sharing members' readiness per guide as CSV. Members who don't share never appear."""
+    user_id = _uid(authorization)
+    db = get_supabase()
+    room = _instructor_room(db, classroom_id, user_id)
+    text = idash.csv_text(idash.build(db, user_id, room))
+    name = "".join(ch if ch.isalnum() else "-" for ch in room["name"].lower()).strip("-")[:40] or "classroom"
+    return Response(content=text, media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}-progress.csv"', "Cache-Control": "no-store"})
 
 
 # Activity -------------------------------------------------------------------------------------------

@@ -351,11 +351,13 @@ def search_people(db, viewer: str, q: str, limit: int = 30) -> list[dict]:
               and (r.get("profile_visibility") or "public") == "public" and r.get("username")]
     people.sort(key=lambda r: (not str(r.get("username") or "").lower().startswith(term.lower()), str(r.get("username") or "")))
     shown = cards(db, [r["id"] for r in people[:limit]])
+    from services.instructors import verified_ids
+    verified = verified_ids(db, [r["id"] for r in people[:limit]])
     out = []
     for row in people[:limit]:
         card = shown.get(row["id"])
         if not card:
             continue
         out.append({"username": card.get("username"), "display_name": card["display_name"], "initials": card["initials"],
-                    "school": row.get("university") if row.get("show_school") else None})
+                    "school": row.get("university") if row.get("show_school") else None, "verified": row["id"] in verified})
     return out

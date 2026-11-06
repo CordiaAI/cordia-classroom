@@ -106,7 +106,9 @@ def author(db, guide: dict) -> Optional[dict]:
     card = cards(db, [guide["user_id"]]).get(guide["user_id"])
     if not card:
         return None
-    return {"username": card.get("username"), "display_name": card["display_name"], "initials": card["initials"]}
+    from services.instructors import verified_ids
+    return {"username": card.get("username"), "display_name": card["display_name"], "initials": card["initials"],
+            "verified": guide["user_id"] in verified_ids(db, [guide["user_id"]])}
 
 
 def question_count(guide: dict) -> int:
