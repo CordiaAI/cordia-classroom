@@ -198,8 +198,11 @@ class CalendarClassesTests(unittest.TestCase):
         db = FakeDB()
         items = [{"title": "Essay 1 [MGT-300-102-FA26]"}, {"title": "Lab [CHEM 2410.01]"}, {"title": "Club meeting"}]
         with patch.object(calendar, "get_supabase", return_value=db):
-            calendar._import_classes("u1", "https://testu.instructure.com/feeds/calendars/user_x.ics", items)
+            added = calendar._import_classes("u1", "https://testu.instructure.com/feeds/calendars/user_x.ics", items)
         self.assertEqual(sorted(r["course_code_normalized"] for r in db.rows("classes")), ["CHEM 2410", "MGT 300"])
+        # Returned so the app can open "Choose classes" with them (feedback 10).
+        self.assertEqual(sorted(c["code"] for c in added), ["CHEM 2410", "MGT 300"])
+        self.assertTrue(all(c["id"] for c in added))
         self.assertEqual({m["source"] for m in db.rows("class_memberships")}, {"calendar"})
         self.assertEqual(db.rows("schools")[0]["canvas_domain"], "testu.instructure.com")
 

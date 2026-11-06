@@ -13,7 +13,7 @@ const UNDO_LIMIT = 50;
 
 // A guide's Outline, which is also where the student's own notes live: the AI's outline (if the
 // guide has material) and anything the student types, saved to the guide's notes as they go.
-// Highlight text for Visualize, Explain, Make card or Ask; a visual appears right beside the
+// Highlight text for Visualize, Make card or Ask; a visual appears right beside the
 // highlighted line, and the one kept stays there.
 // It opens read-only; Edit shows the formatting buttons, Undo and the page's tools, and Done
 // goes back to reading. Undo steps back one saved change at a time (a regenerated outline too).

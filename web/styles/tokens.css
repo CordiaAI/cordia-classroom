@@ -20,6 +20,9 @@
   --lh-title: 1.15; --lh-body: 1.5;
   --track-title: -0.015em;
 
+  /* Spacing: a 4 px scale for gaps and padding */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+
   /* Neutrals: ink, muted (ink at 64%), and three surface levels */
   --ink: #171B18;
   --muted: rgba(23, 27, 24, 0.64);
@@ -48,6 +51,14 @@
   --error-bg: rgba(180, 35, 24, 0.08);
   --error-solid: #B42318;
   --selection: rgba(83, 97, 73, 0.30);
+  /* Answer states as tinted glass (feedback 9): neutral when picked, green right, red wrong.
+     Fills sit under the glass sheen; the edge is a soft same-hue line, never an outline ring. */
+  --state-select-fill: rgba(83, 97, 73, 0.16);
+  --state-select-edge: rgba(83, 97, 73, 0.38);
+  --state-right-fill: rgba(57, 114, 75, 0.18);
+  --state-right-edge: rgba(47, 107, 63, 0.42);
+  --state-wrong-fill: rgba(180, 35, 24, 0.12);
+  --state-wrong-edge: rgba(180, 35, 24, 0.38);
 
   /* Note paper (the editor and note cards are cream paper in both themes) */
   --paper: #FBF8F1;
@@ -106,19 +117,22 @@
 
   /* Liquid glass, matte: a frosted fill with a fine grain, the faintest top light, a soft
      rim and a low, diffuse shadow (no shine) (styles/glass.css applies it everywhere). */
-  --lg-filter: blur(34px) saturate(115%);
+  /* Liquid glass, upgraded (feedback 14): a lighter blur with more saturation reads as glass, not
+     frosted plastic; a specular top light, an inner edge stroke and a layered soft shadow. */
+  --lg-filter: blur(26px) saturate(170%) brightness(1.03);
   --lg-fill: rgba(250, 251, 249, 0.58);
   --lg-fill-strong: rgba(250, 251, 249, 0.80);
   --lg-fill-menu: rgb(250, 251, 249); /* menus sit over text: solid so it never reads through */
   --lg-fill-field: rgba(250, 251, 249, 0.62);
-  --lg-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0) 45%);
+  --lg-sheen: radial-gradient(140% 70% at 18% 0%, rgba(255, 255, 255, 0.30) 0%, rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.05) 38%, rgba(255, 255, 255, 0) 62%);
   --lg-sheen-olive: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 60%);
   --lg-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-  --lg-rim: rgba(255, 255, 255, 0.40);
-  --lg-rim-low: rgba(255, 255, 255, 0);
-  --lg-border: rgba(255, 255, 255, 0.42);
-  --lg-border-shade: rgba(23, 27, 24, 0.06);
-  --lg-depth: 0 1px 2px rgba(16, 24, 16, 0.04), 0 8px 22px -10px rgba(16, 24, 16, 0.12);
+  --lg-rim: rgba(255, 255, 255, 0.78);
+  --lg-rim-low: rgba(255, 255, 255, 0.22);
+  --lg-inner-stroke: rgba(255, 255, 255, 0.30);
+  --lg-border: rgba(255, 255, 255, 0.46);
+  --lg-border-shade: rgba(23, 27, 24, 0.07);
+  --lg-depth: 0 1px 1px rgba(16, 24, 16, 0.04), 0 6px 16px -6px rgba(16, 24, 16, 0.10), 0 18px 36px -18px rgba(16, 24, 16, 0.14);
   --lg-depth-float: 0 2px 6px rgba(16, 24, 16, 0.05), 0 18px 40px -14px rgba(16, 24, 16, 0.20);
   --lg-press: rgba(255, 255, 255, 0.30);
 
@@ -180,7 +194,12 @@
   --lg-panel: var(--lg-sheen), var(--lg-grain), var(--lg-fill-strong);
   --lg-menu: var(--lg-sheen), linear-gradient(var(--lg-fill-menu), var(--lg-fill-menu));
   --lg-edge: var(--lg-border);
-  --lg-highlight: inset 0 1px 0 var(--lg-rim), inset 0 -1px 0 var(--lg-rim-low), 0 0 0 0.5px var(--lg-border-shade);
+  --lg-highlight: inset 0 1px 0 var(--lg-rim), inset 0 -1px 0 var(--lg-rim-low), inset 0 0 0 1px var(--lg-inner-stroke), 0 0 0 0.5px var(--lg-border-shade);
+  /* The sliding pill in every tab bar and segmented switch (components/SegmentedControl.js). */
+  --seg-pill-bg: var(--lg-sheen), var(--lg-fill-strong);
+  --seg-pill-shadow: var(--lg-highlight), var(--lg-shadow);
+  --seg-spring: cubic-bezier(.32, 1.32, .52, 1);
+  --seg-dur: 420ms;
   --lg-shadow: var(--lg-depth);
   --hover-wash: var(--wash);
   --hover-edge: rgba(23, 27, 24, 0.16);
@@ -235,6 +254,12 @@
   --warning-bg: rgba(242, 193, 78, 0.14);
   --error: #FF8A80;
   --error-bg: #3A2222;
+  --state-select-fill: rgba(195, 207, 182, 0.17);
+  --state-select-edge: rgba(195, 207, 182, 0.38);
+  --state-right-fill: rgba(143, 209, 160, 0.19);
+  --state-right-edge: rgba(143, 209, 160, 0.44);
+  --state-wrong-fill: rgba(255, 138, 128, 0.17);
+  --state-wrong-edge: rgba(255, 138, 128, 0.44);
   --paper: #F3EEE2;
   /* Practice board pens on the dark board */
   --draw-ink: #ECEFE8;
@@ -256,18 +281,19 @@
   --cover-8: #37331F; --cover-ink-8: #E5D68F;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.35), 0 18px 48px rgba(0, 0, 0, 0.45);
-  --lg-filter: blur(34px) saturate(110%);
+  --lg-filter: blur(26px) saturate(150%);
   --lg-fill: rgba(48, 52, 57, 0.58);
   --lg-fill-strong: rgba(42, 46, 51, 0.84);
   --lg-fill-menu: rgb(42, 46, 51);
   --lg-fill-field: rgba(32, 35, 39, 0.60);
-  --lg-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0) 45%);
+  --lg-sheen: radial-gradient(140% 70% at 18% 0%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 38%, rgba(255, 255, 255, 0) 62%);
   --lg-sheen-olive: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 60%);
-  --lg-rim: rgba(255, 255, 255, 0.07);
-  --lg-rim-low: rgba(255, 255, 255, 0);
-  --lg-border: rgba(255, 255, 255, 0.08);
-  --lg-border-shade: rgba(0, 0, 0, 0.25);
-  --lg-depth: 0 1px 2px rgba(0, 0, 0, 0.22), 0 10px 26px -12px rgba(0, 0, 0, 0.45);
+  --lg-rim: rgba(255, 255, 255, 0.14);
+  --lg-rim-low: rgba(255, 255, 255, 0.04);
+  --lg-inner-stroke: rgba(255, 255, 255, 0.05);
+  --lg-border: rgba(255, 255, 255, 0.09);
+  --lg-border-shade: rgba(0, 0, 0, 0.28);
+  --lg-depth: 0 1px 1px rgba(0, 0, 0, 0.20), 0 6px 16px -6px rgba(0, 0, 0, 0.36), 0 20px 40px -18px rgba(0, 0, 0, 0.45);
   --lg-depth-float: 0 2px 8px rgba(0, 0, 0, 0.30), 0 22px 48px -14px rgba(0, 0, 0, 0.55);
   --lg-press: rgba(255, 255, 255, 0.06);
   --focus-ring: #CFDAC3;

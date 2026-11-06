@@ -36,6 +36,7 @@ import { activeStep, walkthroughEvent } from '../../lib/walkthrough';
 import { requestTip } from '../../lib/tips';
 import { readUserValue, writeUserValue } from '../../lib/userStore';
 import { exportToDocs, exportToNotion } from '../../lib/studyPlans';
+import SegmentedControl from '../../components/SegmentedControl';
 import MergeSheet from '../../components/MergeSheet';
 import { GUIDES_CHANGED, mergedInto, restoreMerged, useDuplicates } from '../../lib/duplicates';
 
@@ -46,6 +47,14 @@ function isNursing(guide) {
   if (guide?.domain === 'nursing') return true;
   const text = `${guide?.title || ''}\n${guide?.study_guide || ''}`.toLowerCase();
   return NURSING_TERMS.filter(term => text.includes(term)).length >= 4;
+}
+
+// Whether opening this guide should write its outline: notes not yet in outline form, from material
+// or (feedback 15) from the student's own or lecture notes once there are a few lines of them.
+function outlineDue(guide) {
+  if (isStudyGuideNotes(guide?.notes)) return false;
+  if (String(guide?.study_guide || '').trim()) return true;
+  return String(guide?.notes || '').replace(/<[^>]*>/g, ' ').replace(/[#>*\-\s]+/g, ' ').trim().length >= 40;
 }
 
 function ask(guideId, prompt, send = false) {
@@ -153,6 +162,9 @@ export default function GuidePage() {
   const [printing, setPrinting] = useState(false);
   // The outline before "Regenerate outline", so the toast can put it back.
   const [undoNotes, setUndoNotes] = useState(null);
+  // Read when a request finishes: an outline's Undo toast is not replaced by "Questions ready".
+  const undoRef = useRef(null);
+  undoRef.current = undoNotes;
   const [sharing, setSharing] = useState(null);
   const [toastAction, setToastAction] = useState(null); // { label, run } shown beside the toast
   const [firstPublish, setFirstPublish] = useState(false);
@@ -230,15 +242,23 @@ export default function GuidePage() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  // A guide without outline notes gets them written (once per visit); a loader shows meanwhile.
+  // A guide without outline notes gets them written when it opens (once per visit); a loader shows
+  // meanwhile. That includes lecture notes and guides that are only the student's notes (feedback
+  // 15): their own words are the source, and Undo puts them back.
   useEffect(() => {
-    // Only guides made from material; a guide that is the student's own notes is never rewritten.
-    if (!guide?.id || notesAsked.current === guide.id || isStudyGuideNotes(guide.notes) || !String(guide.study_guide || '').trim()) return;
+    if (!guide?.id || notesAsked.current === guide.id || !outlineDue(guide)) return;
     notesAsked.current = guide.id;
     const guideId = guide.id;
+    const before = guide.notes || '';
+    const ownNotes = !String(guide.study_guide || '').trim();
     fetch('/api/guide-notes', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ guide_id: guide.id }) })
       .then(response => (response.ok ? response.json() : null))
-      .then(data => { if (data?.notes) { setGuide(current => (current && current.id === guide.id ? { ...current, notes: data.notes } : current)); setNotesVersion(value => value + 1); } })
+      .then(data => {
+        if (!data?.notes) return;
+        setGuide(current => (current && current.id === guideId ? { ...current, notes: data.notes } : current));
+        setNotesVersion(value => value + 1);
+        if (ownNotes && data.notes !== before) { setUndoNotes(before); setToast('Outline written from your notes'); }
+      })
       .catch(() => {})
       .finally(() => setNotesTriedFor(guideId));
   }, [guide?.id]);
@@ -438,7 +458,7 @@ export default function GuidePage() {
     if (data?.notes) {
       setGuide(current => ({ ...current, notes: data.notes }));
       setNotesVersion(value => value + 1);
-      setUndoNotes(hasMaterial && before.trim() ? before : null);
+      setUndoNotes(before.trim() ? before : null);
       setToast(hasMaterial ? 'Outline regenerated' : 'Outline written');
     }
     else setToast(data?.reason === 'empty' ? 'Write a few more notes first' : "The outline wasn't written. Try again.");
@@ -463,7 +483,7 @@ export default function GuidePage() {
     setMaking('');
     if (made.guide) {
       setGuide(current => (current && current.id === made.guide.id ? { ...current, study_guide: made.guide.study_guide, flashcards: made.guide.flashcards } : current));
-      setToast(auto ? 'Questions ready' : 'Flashcards and quiz ready');
+      if (!(auto && undoRef.current !== null)) setToast(auto ? 'Questions ready' : 'Flashcards and quiz ready');
       return true;
     }
     if (auto) setStudySetError(made.error);
@@ -480,8 +500,9 @@ export default function GuidePage() {
 
   function onSelection(kind, text) {
     if (kind === 'card') { setCardDraft(text); walkthroughEvent('make-card-open'); }
-    else if (kind === 'explain') ask(id, `Explain this more simply: "${text}"`, true);
-    else ask(id, `About "${text}": `);
+    // Ask is the one way to the Tutor from a highlight (feedback 16: Explain and Ask both went there).
+    // It opens with "Explain …" filled in: Enter explains it, or the student types their own question.
+    else ask(id, `Explain "${text}" `);
   }
 
   if (loadError && !guide) return (
@@ -501,7 +522,7 @@ export default function GuidePage() {
   const notes = guideNotes(guide);
   // Notes not yet in outline form are about to be rewritten: show the loader from the first paint,
   // never the old notes first.
-  const outlinePending = Boolean(String(guide.study_guide || '').trim()) && !isStudyGuideNotes(guide.notes) && notesTriedFor !== guide.id;
+  const outlinePending = outlineDue(guide) && notesTriedFor !== guide.id;
   const cardCount = guide.flashcards?.length || 0;
   // Printing and refreshing answer choices both work from the guide's questions and answers.
   const hasQuestions = pairs.length >= 2;
@@ -660,26 +681,17 @@ export default function GuidePage() {
         </p>
       )}
 
-      {hasMaterial && <div className="c-seg guide-view" role="tablist" aria-label="Outline view">
+      {hasMaterial && <SegmentedControl kind="tabs" label="Outline view" className="guide-view">
         <button type="button" role="tab" aria-selected={view === 'outline'} className={view === 'outline' ? 'is-active' : ''} onClick={() => setView('outline')}>Outline</button>
         <button type="button" role="tab" aria-selected={view === 'pages'} className={view === 'pages' ? 'is-active' : ''} onClick={() => setView('pages')}>By page</button>
-      </div>}
+      </SegmentedControl>}
 
       {view === 'outline' || !hasMaterial ? (
         <section className="c-card guide-notes" aria-label="Outline" aria-busy={outlinePending}>
-          {!hasMaterial && !autoSet && (
-            <div className="guide-make">
-              <p className="c-meta">Your notes. Turn them into a tidy outline, or into flashcards and a quiz, whenever you're ready.</p>
-              <div className="c-row c-row--wrap">
-                <button type="button" className="c-btn c-btn--secondary c-btn--sm" disabled={Boolean(making)} onClick={tidyOutline}>{making === 'outline' ? 'Writing the outline…' : 'Make it an outline'}</button>
-                <button type="button" className="c-btn c-btn--primary c-btn--sm" disabled={Boolean(making)} onClick={makeStudySet}>{making === 'cards' ? 'Making cards and quiz…' : 'Make flashcards and quiz'}</button>
-              </div>
-            </div>
-          )}
-          {outlinePending || (making === 'outline' && hasMaterial)
+          {outlinePending || making === 'outline'
             ? <SectionLoader height={160} label="Writing the outline" />
             : <OutlineEditor guide={guide} version={notesVersion}
-                tools={hasMaterial && (
+                tools={(hasMaterial || isStudyGuideNotes(guide.notes)) && (
                   <button type="button" className="c-btn c-btn--quiet c-btn--sm" onMouseDown={event => event.preventDefault()} disabled={Boolean(making)} onClick={tidyOutline}>
                     <RefreshCw size={16} strokeWidth={1.75} aria-hidden="true" />Regenerate outline
                   </button>
@@ -759,7 +771,7 @@ export default function GuidePage() {
         .guide-tabs-row .c-pills { flex: 1 1 auto; min-width: 0; max-width: 100%; }
         .guide-tabs-row .c-pills :global(.c-pill) { flex: 0 0 auto; }
         .guide-tabs-row, .guide-head { min-width: 0; max-width: 100%; }
-        .guide-view { justify-self: start; }
+        :global(.guide-view) { justify-self: start; }
         .guide-title-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing:-0.015em; text-align: left; cursor: text; border-radius:var(--r-input); }
         .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
         .guide-rename { flex: 1 1 auto; min-width: 0; }
@@ -778,8 +790,6 @@ export default function GuidePage() {
         .guide-notes .guide-sub { margin-top: 6px; gap: 4px; list-style: circle; color: var(--muted-ink); }
         .guide-notes :global(strong) { font-weight: 600; color: var(--ink); }
         .guide-overview { margin: 0; padding-bottom: 24px; border-bottom: 1px solid var(--line); font: 400 var(--fs-20)/1.5 var(--font-sans); color: var(--ink); }
-        .guide-make { display: grid; gap: 10px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
-        .guide-make p { margin: 0; }
         .guide-outline-num { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 10px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 var(--fs-13)/1 var(--font-sans); vertical-align: 3px; }
         .guide-key { display: grid; gap: 16px; padding: 24px 28px; border-radius: 16px; background: var(--olive-tint); }
         @media (max-width: 767px) {

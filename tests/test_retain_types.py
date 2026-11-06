@@ -284,3 +284,13 @@ class StudentFeedbackTests(unittest.TestCase):
         with patch.object(llm, "get_openai_client", return_value=None), patch.object(llm, "chat", return_value=fake):
             result = llm.grade_written_answer("Who attended?", "Glazebrook, Marshall and Ross", "Glasebrook, Marshal, Ross")
         self.assertEqual(result, {"credit": 1.0, "explanation": "You got all three attendees."})
+
+    def test_a_right_answer_gets_one_short_line(self):
+        from services import llm
+        long_note = "Spot on: Alpha Gamma was completely absorbed by ATO in 1882, and you named both the event and the year correctly."
+        reply = '{"reasoning": "ok", "verdict": "right", "feedback": "%s"}' % long_note
+        fake = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=reply))])
+        with patch.object(llm, "get_openai_client", return_value=None), patch.object(llm, "chat", return_value=fake) as sent:
+            result = llm.grade_written_answer("What happened to Alpha Gamma?", "Absorbed by ATO in 1882", "absorbed by ato in 1882")
+        self.assertEqual(result, {"credit": 1.0, "explanation": ""})
+        self.assertIn("under 10", sent.call_args.kwargs["messages"][0]["content"])

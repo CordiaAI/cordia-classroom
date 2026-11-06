@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Toggle from '../Toggle';
+import SegmentedControl from '../SegmentedControl';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WINDOWS = { morning: 'Morning', midday: 'Midday', afternoon: 'Afternoon', evening: 'Evening' };
@@ -93,20 +94,20 @@ export default function AssistantSchedule({ view, catalog, save, toast }) {
         </div>
         <div className="c-field">
           <span id="per-day">Texts per day</span>
-          <div className="c-seg asst-seg" role="group" aria-labelledby="per-day">
+          <SegmentedControl kind="group" labelledBy="per-day" className="asst-seg">
             {[0, 1, 2, 3, 4].map(n => (
               <button key={n} type="button" aria-pressed={style.max_per_day === n} className={style.max_per_day === n ? 'is-active' : ''} onClick={() => save({ section: 'nudges', max_per_day: n })}>{n === 0 ? 'As needed' : `${n} a day`}</button>
             ))}
-          </div>
+          </SegmentedControl>
           <span className="c-meta">Replies and reminders you ask for never count.</span>
         </div>
         <div className="c-field">
           <span id="lead">Heads-up before events</span>
-          <div className="c-seg asst-seg" role="group" aria-labelledby="lead">
+          <SegmentedControl kind="group" labelledBy="lead" className="asst-seg">
             {catalog.lead_minutes.map(n => (
               <button key={n} type="button" aria-pressed={style.lead_minutes === n} className={style.lead_minutes === n ? 'is-active' : ''} onClick={() => save({ section: 'nudges', lead_minutes: n })}>{n === 60 ? '1 hour' : `${n} min`}</button>
             ))}
-          </div>
+          </SegmentedControl>
         </div>
         {view.goals.length > 0 && (
           <div className="c-field">

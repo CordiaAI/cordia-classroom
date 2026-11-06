@@ -6,6 +6,7 @@ import { loadSavedGuides, loadVisibilityReview, saveForLater } from '../lib/guid
 import { readUserValue, writeUserValue } from '../lib/userStore';
 import { savedMeta } from '../lib/guideVisibility.mjs';
 import { CLASSROOMS_ON } from '../lib/featureFlags';
+import SegmentedControl from './SegmentedControl';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 export const SECTIONS = [
@@ -15,19 +16,12 @@ export const SECTIONS = [
   { key: 'class', label: 'Class sets' },
 ];
 
-// Mine · Saved · Classrooms · Class sets: ARIA tabs; arrow keys move between them.
+// Mine · Saved · Classrooms · Class sets: ARIA tabs on the shared SegmentedControl (arrow keys,
+// Home and End move between them; the glass pill slides to the chosen one).
 export function SectionTabs({ section, onChange }) {
-  function onKeyDown(event) {
-    const index = SECTIONS.findIndex(item => item.key === section);
-    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-    if (!step) return;
-    event.preventDefault();
-    const next = SECTIONS[(index + step + SECTIONS.length) % SECTIONS.length];
-    onChange(next.key);
-    document.getElementById(`lsec-${next.key}`)?.focus();
-  }
   return (
-    <div className={'c-seg lib-sections' + (SECTIONS.length > 3 ? ' is-scroller' : '')} role="tablist" aria-label="Library" onKeyDown={onKeyDown}>
+    <>
+    <SegmentedControl kind="tabs" label="Library" className="lib-sections" scroller={SECTIONS.length > 3}>
       {SECTIONS.map(item => (
         <button key={item.key} id={`lsec-${item.key}`} type="button" role="tab" aria-selected={section === item.key}
           aria-controls={`lsec-panel-${item.key}`} tabIndex={section === item.key ? 0 : -1}
@@ -35,11 +29,12 @@ export function SectionTabs({ section, onChange }) {
           {item.label}
         </button>
       ))}
+    </SegmentedControl>
       <style jsx>{`
-        .lib-sections { justify-self: start; width: fit-content; max-width: 100%; }
-        .lib-sections button { white-space: nowrap; }
+        :global(.lib-sections) { justify-self: start; width: fit-content; max-width: 100%; }
+        button { white-space: nowrap; }
       `}</style>
-    </div>
+    </>
   );
 }
 

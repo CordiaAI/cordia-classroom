@@ -9,6 +9,7 @@ import AssistantPersonality from './AssistantPersonality';
 import AssistantSchedule from './AssistantSchedule';
 import AssistantData from './AssistantData';
 import AssistantUses from './AssistantUses';
+import SegmentedControl from '../SegmentedControl';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const TABS = [
@@ -105,13 +106,13 @@ export default function AssistantSettings({ onOpenPlan }) {
             </div>
           </div>
 
-          <div className="c-seg asst-tabs" role="tablist" aria-label="Assistant settings">
+          <SegmentedControl kind="tabs" label="Assistant settings" className="asst-tabs">
             {TABS.map(item => (
               <button key={item.key} type="button" role="tab" id={`asst-tab-${item.key}`} aria-selected={tab === item.key} aria-controls={`asst-panel-${item.key}`} tabIndex={tab === item.key ? 0 : -1} onClick={() => setTab(item.key)}>
                 {item.label}
               </button>
             ))}
-          </div>
+          </SegmentedControl>
 
           <div role="tabpanel" id={`asst-panel-${tab}`} aria-labelledby={`asst-tab-${tab}`}>
             {tab === 'uses' && <AssistantUses view={view} catalog={catalog} save={save} />}

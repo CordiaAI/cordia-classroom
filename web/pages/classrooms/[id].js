@@ -17,6 +17,7 @@ import {
   setShareProgress, setTestDate, studyRoundHref, transferOwnership, updateClassroom,
 } from '../../lib/classrooms';
 import { dueCards, learnIdeas } from '../../lib/studyQueue';
+import SegmentedControl from '../../components/SegmentedControl';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -111,14 +112,14 @@ export default function ClassroomPage() {
         </p>
         {room.description && <p className="cr-desc">{room.description}</p>}
 
-        <div className="c-seg is-scroller cr-tabs" role="tablist" aria-label="Classroom" onKeyDown={onTabKey}>
+        <SegmentedControl kind="tabs" label="Classroom" className="cr-tabs" scroller onKeyDown={onTabKey}>
           {tabs.map(item => (
             <button key={item.key} id={`crtab-${item.key}`} type="button" role="tab" aria-selected={tab === item.key} aria-controls={`crpanel-${item.key}`}
               tabIndex={tab === item.key ? 0 : -1} className={tab === item.key ? 'is-active' : ''} onClick={() => setTab(item.key)}>
               {item.label}{item.key === 'members' && room.pending_count ? ` (${room.pending_count} waiting)` : ''}
             </button>
           ))}
-        </div>
+        </SegmentedControl>
         <div id={`crpanel-${tab}`} role="tabpanel" aria-labelledby={`crtab-${tab}`} className="cr-panel">
           {tab === 'guides' && <GuidesTab room={room} onToast={setToast} />}
           {tab === 'instructor' && tabs.some(item => item.key === 'instructor') && <InstructorDashboard room={room} onToast={setToast} />}
@@ -138,8 +139,8 @@ export default function ClassroomPage() {
         .cr-facts, .cr-desc { margin: 0; }
         .cr-facts :global(a) { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
         .cr-desc { color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
-        .cr-tabs { justify-self: start; max-width: 100%; }
-        .cr-tabs button { white-space: nowrap; }
+        :global(.cr-tabs) { justify-self: start; max-width: 100%; }
+        :global(.cr-tabs) button { white-space: nowrap; }
         .cr-panel { display: grid; gap: 12px; }
         .cr-panel :global(.cr-soon) { margin: 0; padding: 16px; color: var(--muted-ink); }
       `}</style>

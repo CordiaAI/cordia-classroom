@@ -35,6 +35,9 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
   line-height: var(--lh-title) !important;
   text-wrap: balance;
 }
+/* Questions are read, not headlines: they fill the line and break only between words (balance cut
+   a two-line question at half the card's width). */
+:is(.reader-q, .quiz-question-text, .practice-prompt) { text-wrap: pretty; line-height: 1.3 !important; overflow-wrap: break-word; word-break: normal; }
 .c-pill, .c-seg a, .c-seg button { font-family: var(--font-sans) !important; font-size: var(--fs-15) !important; font-weight: 600 !important; letter-spacing: 0 !important; }
 :is(.reader-q, .quiz-question-text, .practice-prompt) { font-size: var(--fs-20) !important; }
 .fc-face p { font-size: var(--fs-28) !important; font-variant-numeric: tabular-nums; }

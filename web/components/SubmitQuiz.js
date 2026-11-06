@@ -4,7 +4,7 @@ import { choiceText, conceptAnswer, shuffled } from '../lib/retainEngine.mjs';
 import { makeCloze } from '../lib/learnEngine.mjs';
 import { clock } from '../lib/timedTest.mjs';
 import { isAnswered, unanswered } from '../lib/submitQuiz.mjs';
-import { CONFIDENCE } from './RetainCards';
+import { CONFIDENCE, PickedMark } from './RetainCards';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const FORMAT = { mc: 'Choose', fill: 'Type it', cloze: 'Fill the blank', written: 'Written', matching: 'Match' };
@@ -99,7 +99,7 @@ export default function SubmitQuiz({ questions, items, deadline = null, resume =
 
         {item.type === 'mc' && orders[item.id].map(option => (
           <button key={option} type="button" className={'quiz-option' + (response === option ? ' selected' : '')} aria-pressed={response === option} onClick={() => answer(option)}>
-            <span className="quiz-option-text">{option}</span>
+            <span className="quiz-option-text">{option}</span>{response === option && <PickedMark />}
           </button>
         ))}
         {item.type === 'cloze' && (() => {

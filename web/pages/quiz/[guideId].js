@@ -20,6 +20,7 @@ import { makeStudySet } from '../../lib/autoStudySet';
 import { loadStudyGuide } from '../../lib/studyGuide';
 import UpdateAvailable, { GuideUnavailable } from '../../components/UpdateAvailable';
 import { clearResume, readResume, writeResume } from '../../lib/resume';
+import SegmentedControl from '../../components/SegmentedControl';
 
 // Short tile names; TYPE_LABELS stays the engine's own naming.
 const MODES = {
@@ -259,10 +260,10 @@ export default function QuizPage() {
         <div className="quiz-check-wait"><CordiaLoader size={28} label="Getting your questions ready" /><span className="c-meta">Getting your questions ready…</span></div>
       ) : (
         <>
-          <div className="c-seg quiz-switch" role="tablist" aria-label="Mode">
+          <SegmentedControl kind="tabs" label="Mode" className="quiz-switch">
             <button type="button" role="tab" aria-selected={!race} className={!race ? 'is-active' : ''} onClick={() => setRace(false)}>Quiz</button>
             <button type="button" role="tab" aria-selected={race} className={race ? 'is-active' : ''} data-spot="match-tab" onClick={() => { setRace(true); walkthroughEvent('match-opened'); }}>Match</button>
-          </div>
+          </SegmentedControl>
           {!race && <div className="quiz-modes" role="group" aria-label="Question types">
             {Object.keys(TYPE_LABELS).map(type => {
               const mode = MODES[type];
@@ -327,14 +328,14 @@ export default function QuizPage() {
         .quiz-page { width: min(var(--page-max), 100%); margin: 0 auto; }
         .quiz-page :global(.quiz-question-card) { width: min(720px, 100%); justify-self: center; }
         .quiz-guide { margin: -12px 0 0; font-family: var(--font-sans); }
-        .quiz-switch { justify-self: start; }
+        :global(.quiz-switch) { justify-self: start; }
         .quiz-unused { margin: 0 0 12px; color: var(--muted); font: 500 var(--fs-13)/var(--lh-body) var(--font-sans); }
         .quiz-check-note { margin: -8px 0 4px; }
         .quiz-check-wait { display: grid; justify-items: center; gap: 12px; padding: 48px 0; }
         .quiz-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .quiz-mode { position: relative; display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 120px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow); }
         .quiz-mode :global(.lucide) { color: var(--olive-ink); }
-        .quiz-mode.is-on { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
+        .quiz-mode.is-on { border-color: var(--state-select-edge); background: var(--state-select-fill); }
         .quiz-mode :global(.quiz-lock) { position: absolute; top: 12px; right: 12px; color: var(--muted); }
         .quiz-note { display: flex; align-items: center; gap: 8px; margin: 0; font-weight:600; }
         .quiz-note :global(.lucide) { color: var(--olive-ink); }

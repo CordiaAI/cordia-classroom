@@ -90,12 +90,12 @@ a { color: var(--olive-ink); }
 
 /* ---------- Inputs ---------- */
 .c-input, .c-select {
-  width: 100%; height: 44px; padding: 0 14px;
+  width: 100%; height: 44px; padding: 0 var(--space-4);
   border: 1px solid var(--line); border-radius:var(--r-input);
   background: var(--card); color: var(--ink);
   font:500 15px/1.5 var(--font-sans);
 }
-textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: none; line-height:1.5; }
+textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(--space-4); resize: none; line-height:1.5; }
 .c-input::placeholder { color: var(--muted); }
 .c-field { display: grid; gap: 6px; }
 .c-field > span { font:600 15px/1.5 var(--font-sans); }
@@ -121,6 +121,14 @@ textarea.c-input { height: auto; min-height: 120px; padding: 12px 14px; resize: 
   cursor: pointer; text-decoration: none; text-align: center;
 }
 .c-seg [aria-selected='true'], .c-seg .is-active { background: var(--card); box-shadow: var(--shadow); }
+/* SegmentedControl: one glass pill slides under the chosen segment (transform, spring-like curve);
+   the segments themselves stay clear. Reduced motion: the pill jumps. */
+.c-seg.has-pill { position: relative; isolation: isolate; }
+.c-seg-pill { position: absolute; top: 0; left: 0; z-index: 0; border-radius: var(--r-pill); background: var(--seg-pill-bg); box-shadow: var(--seg-pill-shadow); pointer-events: none; will-change: transform; }
+.c-seg.is-ready .c-seg-pill { transition: transform var(--seg-dur) var(--seg-spring), width var(--seg-dur) var(--seg-spring), height var(--seg-dur) var(--seg-spring); }
+.c-seg.has-pill > :is(button, a) { position: relative; z-index: 1; }
+.c-seg.has-pill.has-pill > :is(button, a):is([aria-selected='true'], [aria-checked='true'], [aria-pressed='true'], .is-active) { background: transparent !important; box-shadow: none !important; border-color: transparent !important; }
+@media (prefers-reduced-motion: reduce) { .c-seg.is-ready .c-seg-pill { transition: none; } }
 .c-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .c-chip {
   display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px;
@@ -424,11 +432,10 @@ body:has(.about) .c-fab { display: none; }
 
 /* ---------- Older study surfaces, brought onto the system ---------- */
 .quiz-question-card, .quiz-result { padding: 24px; display: grid; gap: 14px; }
-.quiz-question-text { font:600 20px/1.15 var(--font-sans); color: var(--ink); margin-bottom: 4px; }
+.quiz-question-text { font:600 20px/1.15 var(--font-sans); color: var(--ink); margin-bottom: var(--space-3); }
 .quiz-option { display: block; width: 100%; min-height: 52px; padding: 12px 16px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); color: var(--ink); font:500 15px/1.5 var(--font-sans); text-align: left; cursor: pointer; }
-.quiz-option:hover:not(.disabled) { border-color: var(--olive); }
-.quiz-option.correct-shine, .quiz-option.correct-glow { border-color: var(--success); background: var(--success-bg); color: var(--ink); }
-.quiz-option.wrong-shake { border-color: var(--error); background: var(--error-bg); color: var(--ink); }
+.quiz-option.correct-shine, .quiz-option.correct-glow { border-color: var(--state-right-edge); background: var(--state-right-fill); color: var(--ink); }
+.quiz-option.wrong-shake { border-color: var(--state-wrong-edge); background: var(--state-wrong-fill); color: var(--ink); }
 .quiz-option.disabled { opacity: .55; }
 /* The answer's state in words and an icon, not only green and red (components/RetainCards.js McCard). */
 .quiz-option:has(.quiz-option-mark) { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -436,19 +443,20 @@ body:has(.about) .c-fab { display: none; }
 .quiz-option-mark { flex: none; display: inline-flex; align-items: center; gap: 4px; font: 700 13px/1.2 var(--font-sans); white-space: nowrap; }
 .quiz-option-mark.is-right { color: var(--success); }
 .quiz-option-mark.is-wrong { color: var(--error); }
+.quiz-option-mark.is-picked { color: var(--olive-ink); }
 .quiz-progress { display: flex; align-items: center; gap: 12px; }
 .quiz-progress .c-bar { flex: 1; }
 .quiz-repeat { display: inline-flex; align-items: center; gap: 4px; }
 .quiz-reask { display: inline-flex; align-items: center; gap: 8px; justify-self: start; height: 32px; padding: 0 12px; border-radius:var(--r-pill); background: var(--olive-tint); font:600 13px/1 var(--font-sans); }
 .quiz-next-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 8px; }
-.retain-fill-row { display: flex; gap: 8px; }
-.retain-fill-input, .retain-written-input { width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); color: var(--ink); font:500 15px/1.5 var(--font-sans); }
+.retain-fill-row { display: flex; gap: var(--space-2); }
+.retain-fill-input, .retain-written-input { width: 100%; min-height: 48px; padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); color: var(--ink); font:500 15px/1.5 var(--font-sans); }
 .retain-feedback { font-weight:600; }
 .retain-feedback.right { color: var(--success); }
 .retain-feedback.wrong { color: var(--error); }
 .retain-action-error { color: var(--error); font-weight:600; }
 .retain-chip { min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius:var(--r-pill); background: var(--card); color: var(--ink); font:600 13px/1.15 var(--font-sans); cursor: pointer; }
-.retain-chip.picked { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
+.retain-chip.picked { border-color: var(--state-select-edge); background: var(--state-select-fill); }
 .retain-slot { min-height: 44px; border-radius:var(--r-input); font:500 13px/1.5 var(--font-sans); }
 .practice-problem-panel, .practice-source-panel { padding: 20px; }
 .practice-board { border-radius:var(--r-card); border: 1px solid var(--line); background: var(--card); }
@@ -689,6 +697,9 @@ body:has(.about) .c-fab { display: none; }
 .retain-hook { display: grid; gap: 8px; margin-top: 14px; padding: 14px 16px; border-radius: var(--r-input); background: var(--olive-tint); color: var(--ink); font: 500 15px/1.5 var(--font-sans); animation: c-slide-in 280ms cubic-bezier(.2, .8, .2, 1); }
 .retain-hook p { margin: 0; }
 .retain-hook-title { display: inline-flex; align-items: center; gap: 6px; color: var(--olive-ink); font: 600 13px/1 var(--font-sans); }
+.retain-hook-cue { color: var(--muted); font: 500 13px/1.4 var(--font-sans); }
+.retain-hook-link { justify-self: start; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 var(--space-3); border-radius: 999px; background: var(--surface-raised); color: var(--olive-ink); font: 600 13px/1.2 var(--font-sans); text-decoration: none; overflow-wrap: anywhere; }
+.retain-hook-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .retain-hook-again { justify-self: start; padding: 0; border: 0; background: none; color: var(--olive-ink); font: 600 14px/1.4 var(--font-sans); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) { .retain-why, .retain-hook { animation: none; } }
 
@@ -804,9 +815,9 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 }
 
 /* Rows / Cards switch (components/ViewToggle.js). */
-.c-viewtoggle { display: inline-flex; flex: none; gap: 2px; padding: 2px; border-radius: 999px; background: var(--olive-tint); }
-.c-viewtoggle .c-icon-btn[aria-pressed='true'] { background: var(--surface-raised); color: var(--ink); box-shadow: var(--shadow-card); }
-.c-viewtoggle .c-icon-btn[aria-pressed='false'] { color: var(--muted); }
+/* Icon-only segments (the list / grid switch): same control, square-ish segments, full-ink icons. */
+.c-seg--icons { flex: none; }
+.c-seg--icons button { display: inline-grid; place-items: center; width: 44px; height: 34px; padding: 0; line-height: 1; color: var(--ink); }
 
 /* A list in card view: the same rows laid out as small tiles. The first child (progress ring
    or kind icon) sits top left, a star and the ⋯ menu top right, the title and meta below, and a

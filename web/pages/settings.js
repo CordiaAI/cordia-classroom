@@ -10,6 +10,8 @@ import { FEATURE_COPY, FREE_SUMMARY, METERED, TIERS, TIER_ORDER, isPaid, resetLa
 import LearningStylePicker from '../components/LearningStylePicker';
 import { useLearningStyle } from '../lib/learningStyle';
 import TutorSettings from '../components/TutorSettings';
+import MemoryTrickSettings from '../components/MemoryTrickSettings';
+import MemorySettings from '../components/MemorySettings';
 import { Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2, UserRound } from 'lucide-react';
 import BodyPortal from '../components/BodyPortal';
 import SharingSettings from '../components/SharingSettings';
@@ -19,6 +21,7 @@ import ConnectedApps from '../components/ConnectedApps';
 import useScrollerTabs from '../lib/useScrollerTabs';
 import { canvasStatus } from '../lib/canvas';
 import { openHelp } from '../lib/help';
+import SegmentedControl from '../components/SegmentedControl';
 
 export default function SettingsPage() {
   const { ready } = useRequireAuth();
@@ -234,7 +237,7 @@ export default function SettingsPage() {
       <div className="c-page profile-page">
         <header className="c-page-head"><h1 className="c-title">Settings</h1></header>
 
-        <div ref={tabsRef} className="c-seg is-scroller profile-tabs" role="tablist" aria-label="Settings" onKeyDown={onTabKey}>
+        <SegmentedControl kind="tabs" label="Settings" className="profile-tabs" scroller innerRef={tabsRef} onKeyDown={onTabKey}>
           {sections.map(section => (
             <button
               key={section.key}
@@ -249,7 +252,7 @@ export default function SettingsPage() {
               {section.label}
             </button>
           ))}
-        </div>
+        </SegmentedControl>
 
         {message && <div className="profile-message" role="status">{message}</div>}
 
@@ -356,6 +359,8 @@ export default function SettingsPage() {
         {activeSection === 'tutor' && (
           <div className="profile-section c-stack" role="tabpanel" id="panel-tutor" aria-labelledby="tab-tutor">
             <TutorSettings />
+            <MemoryTrickSettings />
+            <MemorySettings />
             {learningStyle?.enabled && (
               <div className="c-card settings-card">
                 <h2 className="c-section-title">Explain things to me with…</h2>
@@ -381,10 +386,10 @@ export default function SettingsPage() {
             </div>
             <div className="c-card settings-row">
               <span className="c-section-title">Theme</span>
-              <div className="c-seg" role="group" aria-label="Theme">
+              <SegmentedControl kind="group" label="Theme">
                 <button type="button" className={theme !== 'dark' ? 'is-active' : ''} aria-pressed={theme !== 'dark'} onClick={() => setAppearance('light')}><Sun size={18} strokeWidth={1.75} aria-hidden="true" /> Light</button>
                 <button type="button" className={theme === 'dark' ? 'is-active' : ''} aria-pressed={theme === 'dark'} onClick={() => setAppearance('dark')}><Moon size={18} strokeWidth={1.75} aria-hidden="true" /> Dark</button>
-              </div>
+              </SegmentedControl>
             </div>
             <div className="c-card settings-row">
               <span className="settings-row-label"><UserRound size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Profile and privacy</span></span>
@@ -432,11 +437,11 @@ export default function SettingsPage() {
         :global(.delete-confirm:not(:disabled)) { background: var(--error-solid) !important; border-color: var(--error-solid) !important; color: var(--on-error) !important; }
         :global(.settings-danger) { color: var(--error) !important; }
         .profile-page { width: min(var(--page-max), 100%); margin: 0 auto; }
-        .profile-tabs { justify-self: start; max-width: 100%; overflow-x: auto; }
+        :global(.profile-tabs) { justify-self: start; max-width: 100%; overflow-x: auto; }
         .profile-message { padding: 14px 18px; border-radius:var(--r-card); background: var(--olive-tint); font-weight:600; }
         .profile-section { animation: fadeIn 0.2s ease; }
         .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; flex-wrap: wrap; }
-        .settings-row .c-seg button { display: inline-flex; align-items: center; gap: 6px; }
+        .settings-row :global(.c-seg) button { display: inline-flex; align-items: center; gap: 6px; }
         .settings-row-label { display: inline-flex; align-items: center; gap: 10px; }
         .settings-row-label :global(.lucide) { color: var(--olive-ink); }
         .settings-note { margin: -4px 0 0; }

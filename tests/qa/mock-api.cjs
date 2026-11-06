@@ -13,7 +13,7 @@ function sampleGuide(id, title, extra = {}) {
 function createState(populated) {
   return {
     populated,
-    onboarding: populated ? { step: 'done', completed: true } : { step: 'style', completed: false },
+    onboarding: populated ? { step: 'done', completed: true, completed_at: new Date().toISOString() } : { step: 'style', completed: false },
     meta: {},
     folders: populated ? [{ id: 'f0000000-0000-4000-8000-000000000001', name: 'Biology 101' }] : [],
     guides: populated ? [

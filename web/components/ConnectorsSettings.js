@@ -208,6 +208,7 @@ export default function ConnectorsSettings() {
   const [open, setOpen] = useState(null);
   const [canvas, setCanvas] = useState(undefined);
   const [canvasConnecting, setCanvasConnecting] = useState(false);
+  const canvasSaid = useRef(false); // "Canvas connected" said once per connect sheet
   const [showClasses, setShowClasses] = useState(false);
   const [canvasRemoving, setCanvasRemoving] = useState(false);
 
@@ -563,8 +564,10 @@ export default function ConnectorsSettings() {
         <CanvasConnectSheet
           school={school()}
           initialDomain={canvas?.status?.domain || ''}
-          onClose={() => setCanvasConnecting(false)}
-          onConnected={() => { setCanvasConnecting(false); loadCanvas(); say('Canvas connected'); }}
+          onClose={() => { setCanvasConnecting(false); canvasSaid.current = false; }}
+          // Stays open: the sheet's next step is choosing classes (feedback 10). It reports each
+          // change to the chosen classes too, so the toast is said once.
+          onConnected={() => { loadCanvas(); if (!canvasSaid.current) { canvasSaid.current = true; say('Canvas connected'); } }}
         />
       )}
       {canvasRemoving && (

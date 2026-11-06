@@ -31,6 +31,7 @@ import ViewToggle from '../components/ViewToggle';
 import useScrollerTabs from '../lib/useScrollerTabs';
 import { ClassSetList, SECTIONS, SavedGuides, SectionTabs, VisibilityNote } from '../components/LibrarySections';
 import ClassroomList from '../components/ClassroomList';
+import SegmentedControl from '../components/SegmentedControl';
 
 const SORTS = [
   { key: 'recent', label: 'Newest' },
@@ -49,6 +50,8 @@ const FILTERS = [
   { key: 'starred', label: 'Starred' },
 ];
 // Notes live in guides now, so old Notes links show them all.
+// Items in no class (was "Unfiled").
+const MISC = 'Miscellaneous';
 const TAB_ALIASES = { cards: 'flashcards', classes: 'all', notes: 'all' };
 const ICONS = { guide: BookOpen, note: NotebookPen, lecture: AudioLines, practice: PencilRuler, learn: Target };
 
@@ -93,6 +96,7 @@ export default function LibraryPage() {
   const [renaming, setRenaming] = useState(null); // { id, value }
   const [dragId, setDragId] = useState(null);
   const [dropId, setDropId] = useState(null);
+  const [miscOpen, setMiscOpen] = useState(false); // card view: the Miscellaneous card's items showing
   const gate = useLoadGate(!loading || Boolean(loadError));
   const [toast, setToast] = useState('');
   const [confirm, setConfirm] = useState(null);
@@ -250,7 +254,7 @@ export default function LibraryPage() {
 
   async function moveItem(item, folderId) {
     if ((item.folderId || null) === folderId) return;
-    const label = folderId ? `Moved to ${classLabel(folders.find(folder => folder.id === folderId)?.name).title || 'class'}` : 'Moved to Unfiled';
+    const label = folderId ? `Moved to ${classLabel(folders.find(folder => folder.id === folderId)?.name).title || 'class'}` : 'Moved to Miscellaneous';
     if (item.kind === 'guide') {
       const data = await apiFetch('/guides/' + item.id + '/move', { method: 'PATCH', body: JSON.stringify({ folder_id: folderId }) });
       if (!data?.updated) return;
@@ -337,7 +341,7 @@ export default function LibraryPage() {
       label: 'Move to class',
       icon: FolderInput,
       items: [
-        { label: 'Unfiled', current: !item.folderId, onSelect: () => moveItem(item, null) },
+        { label: 'Miscellaneous', current: !item.folderId, onSelect: () => moveItem(item, null) },
         ...folders.map(folder => ({ key: folder.id, label: classLabel(folder.name).title, meta: classLabel(folder.name).code, current: item.folderId === folder.id, onSelect: () => moveItem(item, folder.id) })),
       ],
     };
@@ -490,13 +494,13 @@ export default function LibraryPage() {
       </div>
       <div className="c-row lib-filter-row">
         {/* The same segmented tabs as Settings and a class page. */}
-        <div ref={filtersRef} className="c-seg is-scroller lib-filters" role="tablist" aria-label="Show">
+        <SegmentedControl kind="tabs" label="Show" className="lib-filters" scroller innerRef={filtersRef}>
           {FILTERS.map(item => (
             <button key={item.key} type="button" role="tab" aria-selected={filter === item.key} className={filter === item.key ? 'is-active' : ''} onClick={() => setFilter(item.key)}>
               {item.key === 'starred' && <Star size={16} strokeWidth={1.75} aria-hidden="true" />}{item.label}
             </button>
           ))}
-        </div>
+        </SegmentedControl>
         <span className="c-spacer" />
         <button type="button" className="c-btn c-btn--quiet lib-add-class" onClick={() => setAddingClass(true)}><FolderPlus size={20} strokeWidth={1.75} aria-hidden="true" />Add a class</button>
       </div>
@@ -506,13 +510,18 @@ export default function LibraryPage() {
 
       {loading ? null : (
         <div className="c-stack" data-spot={filter === 'practice' ? 'practice-picker' : undefined}>
-          {view === 'cards' && !narrowed && (groups.length > 0 || looseClasses.length > 0) && (
+          {view === 'cards' && !narrowed && (groups.length > 0 || looseClasses.length > 0 || unfiled.length > 0) && (
             <div className="lib-cards">
               {groups.map(({ folder, list }) => (
                 <ClassCard key={folder.id} folder={folder} name={folder.name} href={'/folder/' + folder.id} count={list.length} titles={classTitles(folder.id)}
                   menuItems={classMenu(folder)} dropProps={dropProps(folder.id)} isDrop={dropId === folder.id} />
               ))}
               {looseClasses.map(item => <ClassCard key={item.id} name={`${item.code}${item.name ? `: ${item.name}` : ''}`} href={'/class/' + item.id} count={0} />)}
+              {/* Items in no class: a class card like the rest (feedback 13), opening its items below. */}
+              {unfiled.length > 0 && (
+                <ClassCard name={MISC} count={unfiled.length} titles={unfiled.map(item => item.title)} onOpen={() => setMiscOpen(value => !value)} open={miscOpen}
+                  dropProps={dropProps(null)} isDrop={dropId === 'none'} />
+              )}
             </div>
           )}
           {(view === 'rows' || narrowed) && groups.map(entry => group({ id: entry.folder.id, name: entry.folder.name, list: entry.list, folder: entry.folder }))}
@@ -522,7 +531,7 @@ export default function LibraryPage() {
               <span className="c-meta">Class sets</span>
             </Link>
           ))}
-          {(unfiled.length > 0 || (!narrowed && view === 'rows')) && group({ id: 'none', name: 'Unfiled', list: unfiled })}
+          {((view === 'rows' || narrowed) ? (unfiled.length > 0 || !narrowed) : (miscOpen && unfiled.length > 0)) && group({ id: 'none', name: MISC, list: unfiled })}
           {narrowed && !items.length && <p className="c-meta lib-empty-group">{query.trim() ? '0 results' : 'Nothing here yet.'}</p>}
         </div>
       )}
@@ -552,9 +561,9 @@ export default function LibraryPage() {
         @media (max-width: 767px) { .library .lib-add-class-icon { display: inline-grid; } }
         .library .lib-filter-row { flex-wrap: nowrap; min-width: 0; }
         /* Seven filters: on narrow screens they scroll inside their bar, never the page. */
-        .library .lib-filters { max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; }
-        .library .lib-filters::-webkit-scrollbar { display: none; }
-        .library .lib-filters button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+        .library :global(.lib-filters) { max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+        .library :global(.lib-filters)::-webkit-scrollbar { display: none; }
+        .library :global(.lib-filters) button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
         .library .lib-group { padding: 6px; }
         .library .lib-group.is-drop { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
         .library .lib-group-head { display: flex; align-items: center; gap: 6px; min-height: 52px; padding-right: 12px; }

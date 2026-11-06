@@ -3,7 +3,7 @@ import { Check, ImagePlus, Monitor, X } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
 import { apiFetch } from '../lib/api';
-import { uploadFeedbackImage } from '../lib/cardImages';
+import { discardFeedbackImage, uploadFeedbackImage } from '../lib/cardImages';
 
 const MAX_SHOTS = 3;
 
@@ -99,6 +99,17 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
   const [shots, setShots] = useState([]);
   const [shotError, setShotError] = useState('');
   const fileRef = useRef(null);
+  // Uploads must never outlive the draft (feedback 13: three uploaded, one attached, two left in
+  // storage). Removed shots, ones removed mid-upload, and every shot of a draft closed unsent are
+  // deleted from storage.
+  const removedRef = useRef(new Set());
+  const shotsRef = useRef(shots);
+  shotsRef.current = shots;
+  const sentRef = useRef(false);
+  useEffect(() => () => {
+    if (!sentRef.current) shotsRef.current.forEach(shot => discardFeedbackImage(shot.path));
+  }, []);
+
   const [capturing, setCapturing] = useState(false);
 
   async function addPageCapture() {
@@ -124,6 +135,7 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
       const id = added[index].id;
       try {
         const path = await uploadFeedbackImage(file);
+        if (removedRef.current.has(id)) { discardFeedbackImage(path); return; }
         setShots(current => current.map(shot => (shot.id === id ? { ...shot, path, status: 'ready' } : shot)));
       } catch (caught) {
         setShots(current => current.filter(shot => shot.id !== id));
@@ -135,7 +147,8 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
   function removeShot(id) {
     setShots(current => {
       const gone = current.find(shot => shot.id === id);
-      if (gone) URL.revokeObjectURL(gone.preview);
+      removedRef.current.add(id);
+      if (gone) { URL.revokeObjectURL(gone.preview); discardFeedbackImage(gone.path); }
       return current.filter(shot => shot.id !== id);
     });
   }
@@ -203,6 +216,7 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
     });
 
     if (data?.submitted) {
+      sentRef.current = true;
       setSubmitted(true);
       window.setTimeout(onClose, 1500);
     } else {
@@ -285,7 +299,7 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
             {shotError && <p className="feedback-error" role="alert">{shotError}</p>}
             {error && <p className="feedback-error" role="alert">{error}</p>}
             <div className="feedback-actions">
-              <button type="button" className="feedback-cancel" onClick={onClose}>Cancel</button>
+              <button type="button" className="c-btn c-btn--secondary feedback-cancel" onClick={onClose}>Cancel</button>
               <button type="submit" className="c-btn c-btn--primary feedback-submit" disabled={submitting || capturing || !message.trim() || shots.some(shot => shot.status === 'uploading')}>
                 {submitting ? 'Sending…' : 'Send feedback'}
               </button>
@@ -318,7 +332,8 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
         .feedback-context { margin: 9px 0 0; color: var(--muted-ink); font-size: 13px; line-height:1.5; }
         .feedback-error { margin: 13px 0 0; color: var(--error); font-size:13px; font-weight:600; line-height:1.5; }
         .feedback-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
-        .feedback-cancel { min-height: 46px; padding: 0 18px; border-radius:12px; font: inherit; font-size:13px; font-weight:600; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+        /* Cancel and Send are the app's own secondary and primary buttons, the same height. */
+        .feedback-cancel { min-height: 46px; }
         /* The app's primary button: its disabled state keeps a readable label (this one had white
            text on a white fill in dark mode). */
         .feedback-submit { min-height: 46px; }

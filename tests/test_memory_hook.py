@@ -73,6 +73,90 @@ class MemoryHookTests(unittest.TestCase):
         self.assertEqual(self.call("not json")[0], {})
 
 
+class GroundedTrickTests(unittest.TestCase):
+    """Feedback 6-8: tricks start from the question's cue, clear a quality bar, and may build on the
+    student's own material, which the reply names so the app can show "Linked to"."""
+
+    CONTEXT = [{"kind": "lecture", "id": "l1", "title": "Week 3 lecture", "snippet": "Glazebrook founded ATO in Richmond."}]
+
+    def call(self, text, context=()):
+        chat = MagicMock(return_value=reply(text))
+        with patch.object(llm, "get_openai_client", return_value=None), patch.object(llm, "chat", chat):
+            return llm.memory_hook("Who founded ATO?", "Otis Allan Glazebrook", context=context), chat
+
+    def test_the_prompt_asks_for_the_cue_techniques_and_examples(self):
+        _, chat = self.call('{"hook": "When you see ATO, think Otis Allan Glazebrook.", "linked": null}', self.CONTEXT)
+        system, user = (m["content"] for m in chat.call_args.kwargs["messages"])
+        self.assertIn("When you see X, think Y", system)
+        for technique in ("vivid image", "acronym", "number shape", "tiny story"):
+            self.assertIn(technique, system)
+        self.assertIn(llm.MEMORY_EXAMPLES, system)
+        self.assertIn("[1] Week 3 lecture: Glazebrook founded ATO in Richmond.", user)
+
+    def test_a_used_link_is_named_and_a_made_up_one_ignored(self):
+        hook = "When you see ATO, think of your Week 3 lecture in Richmond: Otis Allan Glazebrook."
+        result, _ = self.call('{"hook": "%s", "linked": 1}' % hook, self.CONTEXT)
+        self.assertEqual(result["linked"], {"kind": "lecture", "id": "l1", "title": "Week 3 lecture"})
+        for linked in ("2", "null", "true", '"1"'):
+            result, _ = self.call('{"hook": "%s", "linked": %s}' % (hook, linked), self.CONTEXT)
+            self.assertNotIn("linked", result)
+
+    def test_no_context_means_no_material_block(self):
+        _, chat = self.call('{"hook": "Otis Allan Glazebrook"}')
+        self.assertNotIn("OWN MATERIAL", chat.call_args.kwargs["messages"][1]["content"])
+
+
+class MemoryContextTests(unittest.TestCase):
+    def db(self, guides=(), lectures=(), chats=(), progress=(), broken=()):
+        from unittest.mock import MagicMock as M
+        rows = {"study_guides": list(guides), "lectures": list(lectures), "tutor_chats": list(chats), "guide_progress": list(progress)}
+        calls = {}
+
+        def table(name):
+            query = M()
+            for method in ("select", "eq", "neq", "in_", "order", "limit", "text_search"):
+                getattr(query, method).return_value = query
+            if name in broken:
+                query.execute.side_effect = RuntimeError("down")
+            else:
+                query.execute.return_value = SimpleNamespace(data=rows[name])
+            calls[name] = query
+            return query
+
+        db = M()
+        db.table.side_effect = table
+        return db, calls
+
+    def test_own_rows_only_and_the_current_guide_excluded(self):
+        from services import memory_context
+        db, calls = self.db(guides=[{"id": "g2", "title": "Greek life", "study_guide": "Otis Glazebrook founded ATO."}])
+        found = memory_context.related_material(db, "u1", "g1", "Who founded ATO?", "Otis Allan Glazebrook")
+        self.assertEqual(found, [{"kind": "guide", "id": "g2", "title": "Greek life", "snippet": "Otis Glazebrook founded ATO."}])
+        calls["study_guides"].eq.assert_any_call("user_id", "u1")
+        calls["study_guides"].neq.assert_called_with("id", "g1")
+        calls["lectures"].eq.assert_any_call("user_id", "u1")
+        calls["tutor_chats"].eq.assert_any_call("user_id", "u1")
+
+    def test_well_known_guides_rank_first_and_at_most_three_come_back(self):
+        from services import memory_context
+        guides = [{"id": f"g{i}", "title": f"Guide {i}", "notes": "Glazebrook founded it."} for i in range(2, 7)]
+        progress = [{"guide_id": "g5", "progress": {"a": {"l": 3, "at": "2099-01-01"}}}]
+        db, _ = self.db(guides=guides, progress=progress)
+        found = memory_context.related_material(db, "u1", "g1", "Who founded ATO?", "Otis Allan Glazebrook")
+        self.assertEqual(len(found), 3)
+        self.assertEqual(found[0]["id"], "g5")
+
+    def test_failures_and_passing_mentions_give_nothing(self):
+        from services import memory_context
+        db, _ = self.db(chats=[{"id": "c1", "title": "Chat", "messages": [{"role": "user", "content": "Glazebrook?"}]}],
+                        broken=("study_guides", "lectures"))
+        self.assertEqual(memory_context.related_material(db, "u1", "g1", "Who founded ATO?", "Otis Allan Glazebrook"), [])
+
+    def test_key_terms_skip_filler(self):
+        from services.memory_context import key_terms
+        self.assertEqual(key_terms("When was the Cumberland Road finished?", "1867"), ["cumberland", "finished", "road"])
+
+
 class RememberRouteTests(unittest.TestCase):
     def run_route(self, db, hook=None, body=None):
         make = MagicMock(return_value={"hook": hook} if hook else {})

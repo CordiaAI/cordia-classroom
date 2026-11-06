@@ -10,6 +10,7 @@ import { SectionLoader } from '../components/CordiaLoader';
 import UserChip from '../components/UserChip';
 import { FILTERS, discoverClassrooms, discoverGuides, discoverPeople, explorePath, studiedBy } from '../lib/discover';
 import { KIND_LABELS, joinMessage, requestJoin } from '../lib/classrooms';
+import SegmentedControl from '../components/SegmentedControl';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 const TABS = [
@@ -70,12 +71,12 @@ export default function Explore() {
           placeholder="Search public sets, classrooms and people" onChange={event => onType(event.target.value)} />
         {draft && <button type="button" className="c-search-clear" aria-label="Clear search" onClick={() => { setDraft(''); update({ q: '' }); }}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>}
       </form>
-      <div className="c-seg is-scroller ex-tabs" role="tablist" aria-label="Discover" onKeyDown={onTabKey}>
+      <SegmentedControl kind="tabs" label="Discover" className="ex-tabs" scroller onKeyDown={onTabKey}>
         {TABS.map(item => (
           <button key={item.key} id={`extab-${item.key}`} type="button" role="tab" aria-selected={tab === item.key} aria-controls={`expanel-${item.key}`}
             tabIndex={tab === item.key ? 0 : -1} className={tab === item.key ? 'is-active' : ''} onClick={() => update({ tab: item.key })}>{item.label}</button>
         ))}
-      </div>
+      </SegmentedControl>
       <div id={`expanel-${tab}`} role="tabpanel" aria-labelledby={`extab-${tab}`} className="ex-panel">
         {tab === 'guides' && <GuidesPanel q={q} filters={filters} onFilter={update} />}
         {tab === 'classrooms' && <ClassroomsPanel q={q} />}
@@ -85,8 +86,8 @@ export default function Explore() {
         .ex { display: grid; gap: 14px; width: min(860px, 100%); margin: 0 auto; }
         .ex-head { margin: 0; }
         .ex-search { width: 100%; }
-        .ex-tabs { justify-self: start; max-width: 100%; }
-        .ex-tabs button { white-space: nowrap; }
+        :global(.ex-tabs) { justify-self: start; max-width: 100%; }
+        :global(.ex-tabs) button { white-space: nowrap; }
         .ex-panel { display: grid; gap: 12px; min-width: 0; }
       `}</style>
     </div>

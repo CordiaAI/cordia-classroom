@@ -72,3 +72,43 @@ test('works with only the service key set, as in production (the project URL is 
   const bare = createImageStore({ env: { NEXT_PUBLIC_API_URL: 'https://api.example.com' }, fetch, kind: 'feedback' });
   assert.equal((await bare.upload(AUTH, { image: dataUrl(PNG) })).body.code, 'not_configured');
 });
+
+// Feedback 13: a screenshot taken off the draft (or a draft closed unsent) is deleted from storage.
+function feedbackWorld({ attached = false } = {}) {
+  const calls = [];
+  const fetch = async (url, init = {}) => {
+    calls.push({ url, init });
+    if (url.endsWith('/billing/status')) return new Response('{}', { status: 200 });
+    if (url.includes('/rest/v1/feedback?')) return new Response(JSON.stringify(attached ? [{ id: 'f1' }] : []), { status: 200 });
+    if (url.endsWith('/storage/v1/object/feedback-attachments')) return new Response('[]', { status: 200 });
+    throw new Error(`unexpected ${url}`);
+  };
+  const store = createImageStore({ kind: 'feedback', env: { NEXT_PUBLIC_API_URL: 'https://api.example.com', NEXT_PUBLIC_SUPABASE_URL: 'https://db.example.co', SUPABASE_SERVICE_ROLE_KEY: 'svc' }, fetch });
+  return { store, calls };
+}
+const OWN = `${USER}/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.png`;
+
+test('a removed feedback screenshot is deleted from storage', async () => {
+  const { store, calls } = feedbackWorld();
+  const result = await store.remove(AUTH, { path: OWN });
+  assert.equal(result.status, 200);
+  const del = calls.find(call => call.init.method === 'DELETE');
+  assert.deepEqual(JSON.parse(del.init.body), { prefixes: [OWN] });
+});
+
+test('only the student\'s own unsent screenshots can be deleted', async () => {
+  const other = `99999999-2222-4333-8444-555555555555/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.png`;
+  for (const path of [other, `${USER}/../x.png`, '']) {
+    const { store, calls } = feedbackWorld();
+    assert.equal((await store.remove(AUTH, { path })).status, 400);
+    assert.ok(!calls.some(call => call.init.method === 'DELETE'));
+  }
+  const { store, calls } = feedbackWorld({ attached: true });
+  assert.equal((await store.remove(AUTH, { path: OWN })).status, 409);
+  assert.ok(!calls.some(call => call.init.method === 'DELETE'));
+});
+
+test('card photos are public and are never deleted this way', async () => {
+  const { service } = world();
+  assert.equal((await service.remove(AUTH, { path: OWN })).status, 405);
+});

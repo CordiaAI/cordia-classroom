@@ -145,7 +145,7 @@ export default function MatchRace({ questions, guideId, onRestart, onDone }) {
         .race-col { display: grid; gap: 8px; align-content: start; }
         .race-tile { min-height: 64px; padding: 12px 14px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); color: var(--ink); font:500 15px/1.5 var(--font-sans); text-align: left; cursor: pointer; transition: opacity var(--dur), border-color var(--dur); }
         .race-tile.is-answer { font-family: var(--font-sans); font-size:15px; }
-        .race-tile.is-picked { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
+        .race-tile.is-picked { border-color: var(--state-select-edge); background: var(--state-select-fill); }
         .race-tile.is-cleared { opacity: .25; cursor: default; }
         .race-tile.is-wrong { border-color: var(--error); animation: race-shake 380ms cubic-bezier(.36,.07,.19,.97); }
         .race-tile.is-merging { position: relative; z-index: 1; border-color: var(--success); background: var(--success-bg); color: var(--success); pointer-events: none; }
