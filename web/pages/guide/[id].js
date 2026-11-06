@@ -472,8 +472,9 @@ export default function GuidePage() {
 
   function onSelection(kind, text) {
     if (kind === 'card') { setCardDraft(text); walkthroughEvent('make-card-open'); }
-    else if (kind === 'explain') ask(id, `Explain this more simply: "${text}"`, true);
-    else ask(id, `About "${text}": `);
+    // Ask is the one way to the Tutor from a highlight (feedback 16: Explain and Ask both went there).
+    // It opens with "Explain …" filled in: Enter explains it, or the student types their own question.
+    else ask(id, `Explain "${text}" `);
   }
 
   if (loadError && !guide) return (
