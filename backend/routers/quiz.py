@@ -19,6 +19,7 @@ from services.models import current_user_id
 from auth_utils import get_user_id
 from ids import require_uuid
 from services import retain
+from services import blanks
 from services.choice_shapes import conform, is_value, repair, shape
 from services.entitlements import LIMITS, plan_for, record, remaining, require, subscription_row
 
@@ -51,6 +52,10 @@ class QuizSubmission(BaseModel):
 
 class SessionRequest(BaseModel):
     types: List[Literal["mc", "written", "fill", "matching"]] = Field(default_factory=lambda: ["mc"], max_length=4)
+    # Learn (LEARN_LADDER_V2): Fill in the blank is charged once per Learn session when the student may
+    # use it; with none left the session says so (fill_available false) instead of a 402, and Learn
+    # masters in Written. Never an upgrade dialog mid-round.
+    learn: bool = False
 
 
 class WrittenAnswer(BaseModel):
@@ -368,7 +373,11 @@ def prewarm_quiz(guide_id: str, user_id: str) -> None:
     try:
         if remaining(user_id, "ai_quiz") <= LIMITS["free"]["ai_quiz"]:
             return
-        _load_quiz(get_supabase(), guide_id, user_id)
+        supabase = get_supabase()
+        _load_quiz(supabase, guide_id, user_id)
+        if blanks.learn_ladder_v2():
+            # Next to the wrong-answer options: the Fill in the blank span for each question.
+            blanks.ensure_blanks(supabase, guide_id, user_id)
     except Exception:
         # The first Learn simply builds it instead.
         logger.warning("Quiz warm-up failed for guide %s", guide_id, exc_info=True)
@@ -408,6 +417,8 @@ def start_session(guide_id: str, body: SessionRequest, authorization: str = Head
     if not saved:
         # Answers are checked against the saved questions, so a session always starts from them.
         _save_quiz(supabase, guide_id, user_id, questions)
+    if body.learn and blanks.learn_ladder_v2():
+        return _learn_session(supabase, guide_id, user_id, questions, body.types)
     cards = retain.plan_session(questions, body.types)
     uses_pro_types = any(card["type"] in retain.PRO_TYPES for card in cards)
     if uses_pro_types:
@@ -418,6 +429,25 @@ def start_session(guide_id: str, body: SessionRequest, authorization: str = Head
         "cards": cards,
         "types": sorted({card["type"] for card in cards}),
         "pro": plan_for(subscription_row(user_id)) == "pro",
+    }
+
+
+def _learn_session(supabase, guide_id: str, user_id: str, questions: list, types: list) -> dict:
+    """Learn's session: the questions, whether Fill in the blank is available (charged once here when
+    asked for, as Quiz charges its Pro types), and blanks built in the background for older guides."""
+    fill_available = False
+    if "fill" in types and remaining(user_id, "retain_types") > 0:
+        require(user_id, "retain_types")
+        record(user_id, "retain_types")
+        fill_available = True
+    building = blanks.start_blanks(supabase, guide_id, user_id, questions) if fill_available else False
+    return {
+        "questions": questions,
+        "cards": [],
+        "types": [],
+        "pro": plan_for(subscription_row(user_id)) == "pro",
+        "fill_available": fill_available,
+        "blanks_building": building,
     }
 
 

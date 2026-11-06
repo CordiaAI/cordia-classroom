@@ -11,6 +11,10 @@ export const TYPE_LABELS = {
 export const PRO_TYPES = ['fill', 'matching'];
 export const CLEAR_AFTER = 2;
 export const SPACING = 3;
+// LEARN_LADDER_V2: a miss comes back 6 to 10 questions later (6, then 8, then 10), or at the end
+// when fewer remain. Longer gaps make the retry a real recall rather than a repeat from memory.
+export const LADDER_SPACING = 6;
+const LADDER_SPACING_MAX = 10;
 const MAX_REASKS = 8;
 const TERM_MAX_WORDS = 5;
 
@@ -123,7 +127,7 @@ export function reaskType(question, firstType, reaskNumber, selected) {
   return cycle[reaskNumber % cycle.length] || 'mc';
 }
 
-export function createSession(questions, cards, selected) {
+export function createSession(questions, cards, selected, { ladder = false } = {}) {
   let nextId = 0;
   const concepts = {};
   cards.forEach(card => card.concepts.forEach(index => {
@@ -136,7 +140,20 @@ export function createSession(questions, cards, selected) {
     position: 0,
     nextId,
     concepts,
+    ladder: Boolean(ladder),
+    lastAsked: {},
   };
+}
+
+// How many questions came between this idea's last ask and now (null the first time).
+export function sinceLastAsked(session, concept) {
+  const last = session.lastAsked?.[concept];
+  return last === undefined ? null : session.position - last - 1;
+}
+
+function reaskGap(session, reasks) {
+  if (!session.ladder) return SPACING;
+  return Math.min(LADDER_SPACING_MAX, LADDER_SPACING + 2 * reasks);
 }
 
 export function currentCard(session) {
@@ -146,6 +163,7 @@ export function currentCard(session) {
 // results: [{ concept, credit, response, token? }] for the card just answered.
 export function recordResults(session, card, results) {
   const concepts = { ...session.concepts };
+  const lastAsked = { ...(session.lastAsked || {}) };
   const queue = [...session.queue];
   let nextId = session.nextId;
   results.forEach(result => {
@@ -162,13 +180,14 @@ export function recordResults(session, card, results) {
     if (!state.cleared && state.reasks >= MAX_REASKS) { state.cleared = true; state.gaveUp = true; } // never trap a student in a loop
     if (!state.cleared) {
       const type = reaskType(session.questions[result.concept], state.firstType, state.reasks, session.selected);
+      const at = Math.min(queue.length, session.position + 1 + reaskGap(session, state.reasks));
       state.reasks += 1;
-      const at = Math.min(queue.length, session.position + 1 + SPACING);
       queue.splice(at, 0, { type, concepts: [result.concept], id: nextId++, reask: true });
     }
     concepts[result.concept] = state;
+    lastAsked[result.concept] = session.position;
   });
-  return { ...session, concepts, queue, nextId };
+  return { ...session, concepts, queue, nextId, lastAsked };
 }
 
 export function advance(session) {

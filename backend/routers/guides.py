@@ -7,7 +7,7 @@ import logging
 import re
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Literal, Optional
 from database import get_supabase
 from services.llm import guide_title
 from services.sharing import on_guide_changed
@@ -428,6 +428,8 @@ class LearnProgressRequest(BaseModel):
     # Learn (web/lib/learnEngine.mjs): {question index: {"l": 0-3, "at": "YYYY-MM-DD", "q": fingerprint, "sure"?: true}}.
     levels: dict = {}
     test_date: Optional[str] = None
+    # LEARN_LADDER_V2: what the test is like, saved next to the date. None keeps the saved one.
+    test_format: Optional[Literal["mc", "short", "essay", "mix", "unsure"]] = None
 
     @field_validator("levels")
     @classmethod
@@ -466,9 +468,32 @@ def update_learn_progress(guide_id: str, request: LearnProgressRequest, authoriz
     if not current.data:
         raise HTTPException(status_code=404, detail="Study guide not found")
     progress = current.data[0].get("flashcard_progress") or {}
-    progress["learn"] = {"levels": request.levels, "test_date": request.test_date}
+    test_format = request.test_format or (progress.get("learn") or {}).get("test_format")
+    progress["learn"] = {"levels": request.levels, "test_date": request.test_date, **({"test_format": test_format} if test_format else {})}
     supabase.table("study_guides").update({"flashcard_progress": progress}).eq("id", guide_id).eq("user_id", user_id).execute()
     return {"updated": True}
+
+
+class TestFormatRequest(BaseModel):
+    test_format: Literal["mc", "short", "essay", "mix", "unsure"]
+
+
+@router.patch("/{guide_id}/test-format")
+def update_test_format(guide_id: str, request: TestFormatRequest, authorization: str = Header(default="")):
+    """LEARN_LADDER_V2: what the test is like (flashcard_progress.learn.test_format), changed on its own
+    so no level is touched. Learn also re-saves it if a progress merge dropped it (the database merge
+    keeps it once migration 20261111130000 runs)."""
+    require_uuid(guide_id, "guide ID")
+    user_id = get_user_id(authorization)
+    supabase = get_supabase()
+    current = supabase.table("study_guides").select("flashcard_progress").eq("id", guide_id).eq("user_id", user_id).execute()
+    if not current.data:
+        raise HTTPException(status_code=404, detail="Study guide not found")
+    progress = current.data[0].get("flashcard_progress") or {}
+    learn = progress.get("learn") if isinstance(progress.get("learn"), dict) else {}
+    progress["learn"] = {**learn, "test_format": request.test_format}
+    supabase.table("study_guides").update({"flashcard_progress": progress}).eq("id", guide_id).eq("user_id", user_id).execute()
+    return {"test_format": request.test_format}
 
 
 class MoveGuideRequest(BaseModel):

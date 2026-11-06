@@ -155,11 +155,16 @@ def event_rows(user_id: str, events: list[dict], earlier: Iterable[dict], tz_off
             "arm": DEFAULT_ARM,
             "params_version": PARAMS_VERSION,
             "occurred_at": event["occurred_at"].isoformat(),
+            "detail": event.get("detail"),
         })
     # A batch with no choice answers leaves the column out (a connected app's never have one).
     if all(row["n_options"] is None for row in rows):
         for row in rows:
             del row["n_options"]
+    # Only the ladder's answers carry detail; leave the column out otherwise.
+    if all(row["detail"] is None for row in rows):
+        for row in rows:
+            del row["detail"]
     return rows
 
 
@@ -169,14 +174,17 @@ def _missing_column(error: Exception, column: str) -> bool:
 
 
 def _insert_events(supabase, rows: list[dict]) -> None:
-    """Inserts answers. Until the n_options migration has run, retries without that column."""
-    try:
-        supabase.table("learning_events").insert(rows, returning=ReturnMethod.minimal).execute()
-    except Exception as error:
-        if not rows or "n_options" not in rows[0] or not _missing_column(error, "n_options"):
-            raise
-        supabase.table("learning_events").insert([{k: v for k, v in row.items() if k != "n_options"} for row in rows],
-                                                 returning=ReturnMethod.minimal).execute()
+    """Inserts answers. Until the n_options and detail migrations have run, retries without the
+    missing column (detail is the ladder's extra study fields; the answer itself is still logged)."""
+    for _ in range(3):
+        try:
+            supabase.table("learning_events").insert(rows, returning=ReturnMethod.minimal).execute()
+            return
+        except Exception as error:
+            missing = next((column for column in ("detail", "n_options") if rows and column in rows[0] and _missing_column(error, column)), None)
+            if not missing:
+                raise
+            rows = [{k: v for k, v in row.items() if k != missing} for row in rows]
 
 
 def write_batch(supabase, user_id: str, decisions: list[dict], events: list[dict], tz_offset: int = 0) -> dict:
