@@ -464,9 +464,9 @@ def grade_written_answer(question: str, reference: str, student_answer: str) -> 
                 "essential points; \"partial\" if it gets some essential points but misses or "
                 "confuses others; \"wrong\" if it misses the main idea or is incorrect. "
                 "\"reasoning\" is your private check against the guide answer; the student never sees it. "
-                "\"feedback\" is shown to the student: one encouraging sentence (under 25 words) spoken to "
-                "them as \"you\", saying what they got and, if not right, what was missing, without "
-                "restating the whole answer, grading notes, or mentioning typos. "
+                "\"feedback\" is shown to the student, spoken to them as \"you\": if right, a few words "
+                "(under 10) naming what they nailed; otherwise one sentence (under 25 words) saying what "
+                "was missing. Never restate the whole answer, add grading notes, or mention typos. "
                 'Return JSON: {"reasoning": "...", "verdict": "right"|"partial"|"wrong", "feedback": "..."}'
             )},
             {"role": "user", "content": (
@@ -481,7 +481,10 @@ def grade_written_answer(question: str, reference: str, student_answer: str) -> 
     credit = {"right": 1.0, "partial": 0.5, "wrong": 0.0}.get(str(parsed.get("verdict") or "").lower())
     if credit is None:
         return {}
-    return {"credit": credit, "explanation": student_feedback(parsed.get("feedback"))}
+    note = student_feedback(parsed.get("feedback"))
+    if credit == 1.0 and len(note.split()) > 12:
+        note = ""  # a right answer gets one short line; the verdict alone beats a paragraph
+    return {"credit": credit, "explanation": note}
 
 
 def student_feedback(text) -> str:
