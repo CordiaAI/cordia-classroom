@@ -13,7 +13,7 @@ from typing import Optional
 from fastapi import HTTPException
 
 DAILY_LIMITS = {"follow": 100, "friend_request": 30}
-NOTIFY_KINDS = ("follow", "follow_request", "friend_request", "friend_accepted")
+NOTIFY_KINDS = ("follow", "follow_request", "friend_request", "friend_accepted", "classroom_invite")
 PAGE = 30
 
 

@@ -114,5 +114,22 @@ class RefreshChoicesTests(unittest.TestCase):
         record.assert_not_called()
 
 
+
+
+class FreeQuizKeepsQuestionsTests(unittest.TestCase):
+    def test_a_guide_of_descriptions_still_gets_free_questions(self):
+        """Every wrong choice in a free quiz is another question's answer; when all answers are
+        descriptions the check would reject them all, so rejected ones top up to three."""
+        pairs = [
+            {"question": "What is lead time?", "answer": "The wait between placing an order and receiving it"},
+            {"question": "What is safety stock?", "answer": "Extra inventory kept to cover uncertain demand"},
+            {"question": "What is a bullwhip effect?", "answer": "Small demand changes growing larger up the supply chain"},
+            {"question": "What is a reorder point?", "answer": "The stock level that triggers a new order"},
+        ]
+        questions = quiz._standard_questions(pairs)
+        self.assertEqual(len(questions), 4)
+        self.assertTrue(all(len(q["options"]) >= 3 for q in questions))
+
+
 if __name__ == "__main__":
     unittest.main()

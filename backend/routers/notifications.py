@@ -1,5 +1,5 @@
-"""Notifications (social plan, Stage 2): follows, follow requests, friend requests and accepted
-friend requests. Written by services/social_graph.notify; read and marked here. Anything from a
+"""Notifications (social plan, Stage 2): follows, follow requests, friend requests, accepted
+friend requests, and classroom invites from friends (Stage 5). Written by services/social_graph.notify; read and marked here. Anything from a
 person either side has blocked, or who no longer has a profile, is left out."""
 
 from __future__ import annotations
@@ -35,7 +35,11 @@ def list_notifications(cursor: Optional[str] = Query(default=None, max_length=64
         actor = people.get((row.get("payload") or {}).get("actor_id"))
         if not actor or row.get("kind") not in graph.NOTIFY_KINDS:
             continue
-        items.append({"id": row["id"], "kind": row["kind"], "read": bool(row.get("read_at")), "created_at": row.get("created_at"), "actor": actor})
+        item = {"id": row["id"], "kind": row["kind"], "read": bool(row.get("read_at")), "created_at": row.get("created_at"), "actor": actor}
+        if row["kind"] == "classroom_invite":  # Stage 5: the classroom and its one-time invite
+            payload = row.get("payload") or {}
+            item["classroom"] = {"id": payload.get("classroom_id"), "name": payload.get("name"), "token": payload.get("token")}
+        items.append(item)
     shown, next_cursor = graph.page(items)
     return {"items": shown, "next_cursor": next_cursor}
 

@@ -27,7 +27,8 @@ import { designCover } from '../lib/classCover';
 import { useListView } from '../lib/listView';
 import ViewToggle from '../components/ViewToggle';
 import useScrollerTabs from '../lib/useScrollerTabs';
-import { ClassSetList, SavedGuides, SectionTabs, VisibilityNote } from '../components/LibrarySections';
+import { ClassSetList, SECTIONS, SavedGuides, SectionTabs, VisibilityNote } from '../components/LibrarySections';
+import ClassroomList from '../components/ClassroomList';
 
 const SORTS = [
   { key: 'recent', label: 'Newest' },
@@ -71,7 +72,7 @@ export default function LibraryPage() {
   const filter = FILTERS.some(item => item.key === asked) ? asked : TAB_ALIASES[asked] || 'all';
   const filtersRef = useScrollerTabs(filter);
   // Mine · Saved · Class sets. Mine is everything you made, as before.
-  const section = ['saved', 'class'].includes(String(router.query.section)) ? String(router.query.section) : 'mine';
+  const section = SECTIONS.some(item => item.key !== 'mine' && item.key === String(router.query.section)) ? String(router.query.section) : 'mine';
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [folders, setFolders] = useState([]);
@@ -455,7 +456,7 @@ export default function LibraryPage() {
       <SectionTabs section={section} onChange={setSection} />
       {section !== 'mine' && (
         <div id={`lsec-panel-${section}`} role="tabpanel" aria-labelledby={`lsec-${section}`}>
-          {section === 'saved' ? <SavedGuides onToast={setToast} /> : <ClassSetList classes={sharedClasses} />}
+          {section === 'saved' ? <SavedGuides onToast={setToast} /> : section === 'classrooms' ? <ClassroomList /> : <ClassSetList classes={sharedClasses} />}
         </div>
       )}
       {section === 'mine' && (

@@ -87,7 +87,7 @@ export default function NotificationBell({ variant = 'top', tip }) {
                   <li key={item.id}>
                     <Link href={notificationHref(item)} className={'nb-item' + (item.read ? '' : ' is-new')}>
                       <span className="nb-avatar" aria-hidden="true">{item.actor.initials}</span>
-                      <span className="nb-text"><strong>{item.actor.display_name}</strong> {notificationText(item.kind)}</span>
+                      <span className="nb-text"><strong>{item.actor.display_name}</strong> {notificationText(item.kind, item)}</span>
                       <span className="c-meta nb-time">{ago(item.created_at)}</span>
                     </Link>
                   </li>

@@ -27,6 +27,8 @@ import { loadMyProfile } from '../../lib/profiles';
 import { setGuideVisibility } from '../../lib/guideSharing';
 import { firstPublishStep } from '../../lib/guideVisibility.mjs';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import AddToClassroom from '../../components/AddToClassroom';
+import { CLASSROOMS_ON } from '../../lib/featureFlags';
 import PrintQuizSheet from '../../components/PrintQuizSheet';
 import { useLearningStyle } from '../../lib/learningStyle';
 import { rememberGuidePage, rememberLastGuide } from '../../lib/userStore';
@@ -152,6 +154,7 @@ export default function GuidePage() {
   const [sharing, setSharing] = useState(null);
   const [toastAction, setToastAction] = useState(null); // { label, run } shown beside the toast
   const [firstPublish, setFirstPublish] = useState(false);
+  const [sharingToRoom, setSharingToRoom] = useState(false);
   const prevRevealed = useRef(0);
   const { learningStyle } = useLearningStyle();
   const gate = useLoadGate(Boolean(guide) || Boolean(loadError));
@@ -520,6 +523,7 @@ export default function GuidePage() {
           label="Guide actions"
           items={[
             { label: 'Edit', icon: SquarePen, onSelect: () => router.push('/create?editGuideId=' + id) },
+            ...(CLASSROOMS_ON ? [{ label: 'Add to classroom', icon: Layers, onSelect: () => setSharingToRoom(true) }] : []),
             {
               label: guide.folder_id ? 'Move to class' : 'Add to class',
               icon: FolderInput,
@@ -658,6 +662,11 @@ export default function GuidePage() {
       )}
 
       {cardDraft !== null && <MakeCard front={cardDraft} onSave={saveCard} onClose={() => setCardDraft(null)} />}
+      {sharingToRoom && (
+        <AddToClassroom item={{ type: 'guide', id, title: guide.title, mine: true, private: (guide.visibility || 'private') === 'private' }}
+          onClose={() => setSharingToRoom(false)}
+          onAdded={room => { setSharingToRoom(false); setGuide(current => ({ ...current, visibility: current.visibility === 'private' || !current.visibility ? 'classroom' : current.visibility })); setToast(`Added to ${room?.name || 'the classroom'}`); }} />
+      )}
       {confirmDelete && <ConfirmDialog title={`Delete ${guide.title}?`} onConfirm={deleteGuide} onCancel={() => setConfirmDelete(false)} />}
       {toast && (
         <div className="c-toast" role="status">

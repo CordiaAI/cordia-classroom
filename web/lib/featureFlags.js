@@ -7,6 +7,10 @@
 //                                   Written tiles, recall to master, longer retry gaps in Learn and
 //                                   Quiz, "What's the test like?", final-days practice. Pair it with
 //                                   LEARN_LADDER_V2=true on the backend (Fly) for saved blanks.
+//   NEXT_PUBLIC_CLASSROOMS=1        Classrooms (study groups and instructor classes): Library tab,
+//                                   /classrooms, invites and /join, Add to classroom, course pages.
+//                                   Pair with CLASSROOMS=true on the backend after migration
+//                                   20261114120000_classrooms.sql.
 //   NEXT_PUBLIC_PER_VIEWER_PROGRESS=1  Study other people's shared guides (Flashcards, Learn, Quiz) with
 //                                   your own progress, and "Update available" when the author edits.
 //                                   Pair it with PER_VIEWER_PROGRESS=true on the backend after
@@ -16,3 +20,4 @@ export const EXTRA_CONNECTORS_ON = process.env.NEXT_PUBLIC_EXTRA_CONNECTORS === 
 export const EXTRA_CONNECTORS = ['gsheets', 'github', 'slack', 'dropbox'];
 export const LEARN_LADDER_V2 = process.env.NEXT_PUBLIC_LEARN_LADDER_V2 === '1';
 export const PER_VIEWER_PROGRESS = process.env.NEXT_PUBLIC_PER_VIEWER_PROGRESS === '1';
+export const CLASSROOMS_ON = process.env.NEXT_PUBLIC_CLASSROOMS === '1';

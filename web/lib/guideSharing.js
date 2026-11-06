@@ -23,7 +23,7 @@ export async function setGuideVisibility(id, changes) {
 }
 
 // Signed-out visitors read public and link guides without a token (apiFetch needs one).
-async function anonymousFetch(path) {
+export async function anonymousFetch(path) {
   try {
     return await responseJson(await fetch(API + path));
   } catch {

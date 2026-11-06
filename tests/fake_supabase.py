@@ -19,7 +19,7 @@ DEFAULTS = {
 SERIAL_TABLES = {"notifications", "social_rate_events"}
 ID_TABLES = {"schools", "classes", "class_terms", "folders", "study_guides", "shared_sets", "shared_set_reports",
              "class_merge_proposals", "copyright_takedowns", "instructor_blocks", "canvas_activity",
-             "assignment_steps", "study_blocks", "generation_jobs", "lectures"}
+             "assignment_steps", "study_blocks", "generation_jobs", "lectures", "classrooms", "classroom_invites"}
 
 
 class FakeDB:
