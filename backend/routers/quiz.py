@@ -812,9 +812,10 @@ def help_me_remember(guide_id: str, body: RememberRequest, authorization: str = 
         raise HTTPException(status_code=400, detail="Unknown question")
     question = questions[body.concept]
     style, interests = _memory_preferences(supabase, user_id)
+    from services.adult_content import crude_allowed
     require(user_id, "light")
     result = memory_hook(question.get("question", ""), retain.concept_answer(question), style, interests,
-                         (body.previous or "").strip())
+                         (body.previous or "").strip(), crude=crude_allowed(supabase, user_id))
     if not result:
         raise HTTPException(status_code=502, detail="Cordia couldn't come up with one right now. Try again.")
     record(user_id, "light")

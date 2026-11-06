@@ -529,7 +529,16 @@ MEMORY_STYLES = {
 }
 
 
-def memory_hook(question: str, answer: str, style: str = "link", interests=(), previous: str = "") -> dict:
+# Only for a confirmed adult who turned on "Crude humor in memory tricks" (services/adult_content.py).
+CRUDE_HUMOR_RULE = (
+    "This student is a confirmed adult who asked for crude humor: the hook may use crude, sexual-innuendo "
+    "or shocking puns built on the actual words and numbers in the answer (for example \"CUMberland\" to "
+    "remember Cumberland, or \"18, 6-7\" for 1867). Keep it to wordplay on the answer: no slurs, nothing "
+    "hateful, nothing involving minors, and nothing about real private people. "
+)
+
+
+def memory_hook(question: str, answer: str, style: str = "link", interests=(), previous: str = "", crude: bool = False) -> dict:
     """A short memory hook for a missed question ("Help me remember"), in the student's preferred
     style, drawing on their interests only when that makes a clearer link. Kept only when it
     states the answer and is written to the student; {} otherwise."""
@@ -543,9 +552,9 @@ def memory_hook(question: str, answer: str, style: str = "link", interests=(), p
                 f"Style: {MEMORY_STYLES.get(style, MEMORY_STYLES['link'])}. Their interests may give "
                 "the link, but only when one fits naturally; never force it. The hook must contain "
                 "the answer exactly as given and must never change, round or blur it. Any comparison "
-                "you state as fact must be true; otherwise make it plainly wordplay. Playful is good; "
-                "never mocking, crude, or about the student themselves. "
-                'Return JSON: {"hook": "..."}'
+                "you state as fact must be true; otherwise make it plainly wordplay. "
+                + (CRUDE_HUMOR_RULE if crude else "Playful is good; never mocking, crude, or about the student themselves. ")
+                + 'Return JSON: {"hook": "..."}'
             )},
             {"role": "user", "content": (
                 f"QUESTION:\n{question[:1500]}\n\nANSWER:\n{answer[:1000]}\n\nINTERESTS: {likes}"
