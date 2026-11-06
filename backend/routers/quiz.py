@@ -813,9 +813,12 @@ def help_me_remember(guide_id: str, body: RememberRequest, authorization: str = 
     question = questions[body.concept]
     style, interests = _memory_preferences(supabase, user_id)
     from services.adult_content import crude_allowed
+    from services.memory_context import related_material
     require(user_id, "light")
-    result = memory_hook(question.get("question", ""), retain.concept_answer(question), style, interests,
-                         (body.previous or "").strip(), crude=crude_allowed(supabase, user_id))
+    answer = retain.concept_answer(question)
+    context = related_material(supabase, user_id, guide_id, question.get("question", ""), answer)
+    result = memory_hook(question.get("question", ""), answer, style, interests,
+                         (body.previous or "").strip(), crude=crude_allowed(supabase, user_id), context=context)
     if not result:
         raise HTTPException(status_code=502, detail="Cordia couldn't come up with one right now. Try again.")
     record(user_id, "light")

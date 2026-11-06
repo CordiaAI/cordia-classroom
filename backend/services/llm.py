@@ -541,34 +541,51 @@ CRUDE_HUMOR_RULE = (
 )
 
 
-def memory_hook(question: str, answer: str, style: str = "link", interests=(), previous: str = "", crude: bool = False) -> dict:
-    """A short memory hook for a missed question ("Help me remember"), in the student's preferred
-    style, drawing on their interests only when that makes a clearer link. Kept only when it
-    states the answer and is written to the student; {} otherwise."""
+def memory_hook(question: str, answer: str, style: str = "link", interests=(), previous: str = "",
+                crude: bool = False, context=()) -> dict:
+    """A memory trick for a missed question ("Help me remember"): links the question's cue to the
+    answer, in the student's preferred style, anchored in their own material when something there
+    fits. Kept only when it states the answer and is written to the student; {} otherwise.
+    Returns {"hook"} plus {"linked": {kind, id, title}} when it built on a piece of context."""
     from services.retain import mentions_answer
     likes = ", ".join(str(item).replace("_", " ") for item in interests or ()) or "none given"
+    context = list(context or ())[:3]
+    material = "\n".join(f"[{i}] {item['title']}: {item['snippet']}" for i, item in enumerate(context, 1))
     response = chat(get_openai_client(), "retain_remember",
         messages=[
             {"role": "system", "content": (
-                "Write one memory hook that helps a student remember the answer to a question they "
-                "just missed. One or two sentences, under 40 words, written to them as \"you\". "
-                f"Style: {MEMORY_STYLES.get(style, MEMORY_STYLES['link'])}. Their interests may give "
-                "the link, but only when one fits naturally; never force it. The hook must contain "
-                "the answer exactly as given and must never change, round or blur it. Any comparison "
-                "you state as fact must be true; otherwise make it plainly wordplay. "
+                "Write one memory trick for a question a student just missed, for any subject, "
+                "in one or two sentences under 40 words, written to them as \"you\". Build it on the "
+                "exact names, words and numbers in the answer, using whichever fits best: a vivid image, "
+                "a link to something they already know, an acronym or first letters, a number shape or "
+                f"rhyme, or a tiny story. Preferred style: {MEMORY_STYLES.get(style, MEMORY_STYLES['link'])}. "
+                "If the student's own material below gives a natural anchor (something they already "
+                "studied or heard), build on it and set \"linked\" to its number; otherwise null. Their "
+                "interests may give the link only when one fits. The trick must contain the answer exactly "
+                "as given and never change, round or blur it. Any comparison stated as fact must be true; "
+                "otherwise make it plainly wordplay. "
                 + (CRUDE_HUMOR_RULE if crude else "Playful is good; never mocking, crude, or about the student themselves. ")
-                + 'Return JSON: {"hook": "..."}'
+                + '\n\nReturn JSON: {"hook": "...", "linked": number or null}'
             )},
             {"role": "user", "content": (
                 f"QUESTION:\n{question[:1500]}\n\nANSWER:\n{answer[:1000]}\n\nINTERESTS: {likes}"
+                + (f"\n\nTHE STUDENT'S OWN MATERIAL:\n{material}" if material else "")
                 + (f"\n\nTAKE A DIFFERENT ANGLE FROM THIS ONE:\n{previous[:400]}" if previous else "")
             )},
         ],
         response_format={"type": "json_object"},
         temperature=0.8,
     )
-    hook = student_feedback(_practice_json(response.choices[0].message.content).get("hook"))
-    return {"hook": hook} if hook and mentions_answer(hook, answer) else {}
+    parsed = _practice_json(response.choices[0].message.content)
+    hook = student_feedback(parsed.get("hook"))
+    if not hook or not mentions_answer(hook, answer):
+        return {}
+    result = {"hook": hook}
+    linked = parsed.get("linked")
+    if isinstance(linked, int) and not isinstance(linked, bool) and 1 <= linked <= len(context):
+        item = context[linked - 1]
+        result["linked"] = {"kind": item["kind"], "id": item["id"], "title": item["title"]}
+    return result
 
 
 def transcribe_document_pages(page_images: list, max_pages: int = 20) -> str:
