@@ -8,6 +8,7 @@ import { useRequireAuth } from '../lib/auth';
 import { learnAfterReview, loadStudyQueue } from '../lib/studyQueue';
 import { clearRetainMisses } from '../lib/userStore';
 import { saveStudyResults } from '../lib/progressSave';
+import { loadFolders } from '../lib/folders';
 import FlashcardViewer from '../components/FlashcardViewer';
 
 function PracticeList({ practice }) {
@@ -27,18 +28,29 @@ function PracticeList({ practice }) {
   );
 }
 
+const text = value => (typeof value === 'string' ? value : '');
+
 // Daily review: Retain misses, due flashcards and Learn ideas in one round (lib/studyQueue.js),
-// then open practice problems. With ?guideId= it is that guide's Study now.
+// then open practice problems. With ?guideId= it is that guide's Study now; with
+// ?scope=folder|classroom&id= (and, for a classroom, &guides= the picked guide ids) it is the same
+// round across that folder's or classroom's guides, dealt in turn.
 export default function StudySession() {
   const router = useRouter();
   const { ready } = useRequireAuth();
   const [queue, setQueue] = useState(null);
   const gate = useLoadGate(Boolean(queue));
+  const guideId = text(router.query.guideId);
+  const scope = ['folder', 'classroom'].includes(router.query.scope) && text(router.query.id) ? router.query.scope : '';
+  const scopeId = scope ? text(router.query.id) : '';
 
   useEffect(() => {
     if (!ready || !router.isReady) return;
-    // ?guideId= is a guide's Study now: the same round, for that guide only.
-    loadStudyQueue({ guideId: typeof router.query.guideId === 'string' ? router.query.guideId : '' }).then(setQueue);
+    const guideIds = text(router.query.guides).split(',').filter(Boolean);
+    const folderName = scope === 'folder'
+      ? loadFolders().then(data => (data?.folders || []).find(folder => folder.id === scopeId)?.name || '').catch(() => '')
+      : Promise.resolve('');
+    Promise.all([loadStudyQueue({ guideId, scope, id: scopeId, guideIds }), folderName])
+      .then(([loaded, name]) => setQueue({ ...loaded, folderName: name }));
   }, [ready, router.isReady]);
 
   const cards = queue ? queue.items : [];
@@ -67,7 +79,8 @@ export default function StudySession() {
       if (entry.cleared.length) clearRetainMisses(guideId, entry.cleared);
       // Known cards come back later, missed ones tomorrow (lib/spacedReview.mjs); Learn ideas move
       // up or back. Saved together, card by card, so answers saved meanwhile elsewhere are kept.
-      await saveStudyResults(guideId, guide?.flashcard_progress, { known: entry.known, missed: entry.unknown }, learnAfterReview(guide, entry.learn));
+      // Someone else's guide (a classroom's) saves to your own progress on it, never theirs.
+      await saveStudyResults(guideId, guide?.flashcard_progress, { known: entry.known, missed: entry.unknown }, learnAfterReview(guide, entry.learn), guide?.viewer || null);
     });
     requests.push(apiFetch('/stats/log-session', {
       method: 'POST',
@@ -76,14 +89,20 @@ export default function StudySession() {
     await Promise.all(requests);
   }, [cards, queue]);
 
+  const backTo = scope === 'classroom' ? `/classrooms/${scopeId}?tab=study` : scope === 'folder' ? '/folder/' + scopeId : guideId ? '/guide/' + guideId : '/dashboard';
+  const roundTitle = scope === 'classroom' ? queue?.classroom?.name || 'Classroom review'
+    : scope === 'folder' ? queue?.folderName || 'Folder review'
+      : guideId ? queue?.guides[0]?.title || 'Study now' : 'Daily review';
+
   if (!ready) return null;
   if (!queue || directPractice || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading your session" />;
 
 
   // Nothing to flip: say why, and offer the one next step (a bare "All done" explained nothing).
   if (!cards.length) {
-    const guide = router.query.guideId ? queue.guides[0] : null;
+    const guide = guideId ? queue.guides[0] : null;
     const title = queue.practice.length ? 'Practice' : guide ? 'Nothing to study yet' : 'All caught up';
+    const where = scope === 'classroom' ? 'in this classroom' : scope === 'folder' ? 'in this folder' : 'today';
     return (
       <div className="c-page session-empty">
         <h1 className="c-title">{title}</h1>
@@ -91,13 +110,13 @@ export default function StudySession() {
           <p className="c-meta session-empty-why">
             {guide
               ? `${guide.title || 'This guide'} has no flashcards yet. Add notes to it, then make cards from them.`
-              : 'No cards are due today. Cards come back here when they’re due for review.'}
+              : `No cards are due ${where}. Cards come back here when they’re due for review.`}
           </p>
         )}
         <PracticeList practice={queue.practice} />
         {guide
           ? <button type="button" className="c-btn c-btn--primary" onClick={() => router.push('/guide/' + guide.id)}>Open the guide</button>
-          : <button type="button" className="c-btn c-btn--secondary" onClick={() => router.push('/dashboard')}>Dashboard</button>}
+          : <button type="button" className="c-btn c-btn--secondary" onClick={() => router.push(backTo)}>{scope === 'classroom' ? 'Back to the classroom' : scope === 'folder' ? 'Back to the folder' : 'Dashboard'}</button>}
         <style jsx>{`
           .session-empty { width: min(760px, 100%); margin: 0 auto; justify-items: start; }
           .session-empty-why { margin: 0; max-width: 60ch; font-size: 16px; }
@@ -110,8 +129,8 @@ export default function StudySession() {
     <Reveal phase={gate}>
     <FlashcardViewer
       flashcards={cards}
-      title={router.query.guideId ? queue.guides[0]?.title || 'Study now' : 'Daily review'}
-      onBack={() => router.push(router.query.guideId ? '/guide/' + router.query.guideId : '/dashboard')}
+      title={roundTitle}
+      onBack={() => router.push(backTo)}
       onFinish={onFinish}
       finishExtra={<PracticeList practice={queue.practice} />}
       logMode="study_now"

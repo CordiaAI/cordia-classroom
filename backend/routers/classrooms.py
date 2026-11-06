@@ -15,7 +15,10 @@ from auth_utils import get_user_id
 from database import get_supabase
 from ids import require_uuid
 from rate_limit import ai_rate_limit
+from services import classroom_study as cstudy
 from services import classrooms as rooms
+from services import guide_versions as versions
+from services import viewer_study
 from services import guide_access as access
 from services import social_graph as graph
 from services.blocks import hidden_from, is_blocked
@@ -155,6 +158,30 @@ def course_classrooms(class_id: str, authorization: str = Header(default="")):
                     "owner": owners.get(room["owner_id"]), "join_policy": room.get("join_policy"),
                     "my_status": me.get("status") if me and me.get("status") != "removed" else None})
     return {"classrooms": out}
+
+
+@router.get("/due")
+def due_across_classrooms(authorization: str = Header(default="")):
+    """For the Dashboard: how much is due in each of your classrooms (your own progress on its
+    guides), most first. Classrooms with nothing due are left out."""
+    user_id = _uid(authorization)
+    db = get_supabase()
+    mine = db.table("classroom_members").select("classroom_id").eq("user_id", user_id).eq("status", "active").execute().data or []
+    found = db.table("classrooms").select("id,name,archived_at").in_("id", [m["classroom_id"] for m in mine]).execute().data or [] if mine else []
+    today = cstudy.today_iso()
+    out = []
+    for room in found:
+        if room.get("archived_at"):
+            continue
+        due = 0
+        for guide in cstudy.classroom_guides(db, user_id, room["id"]):
+            if guide.get("user_id") != user_id and not versions.enabled():
+                continue  # the study round leaves these out too (study_payload's `skipped`)
+            content, questions, _ = cstudy.guide_ideas(guide)
+            due += cstudy.due_count(guide, cstudy.member_ideas(db, user_id, guide, content, questions), content, questions, today)
+        if due:
+            out.append({"id": room["id"], "name": room["name"], "due": due})
+    return {"classrooms": sorted(out, key=lambda r: -r["due"])}
 
 
 @router.get("/{classroom_id}")
@@ -321,18 +348,29 @@ def transfer_ownership(classroom_id: str, body: Transfer, authorization: str = H
 
 
 class MySettings(BaseModel):
-    progress_visible_to_staff: bool
+    progress_visible_to_staff: Optional[bool] = None
+    test_date: Optional[date] = None
+    clear_test_date: bool = False
 
 
 @router.patch("/{classroom_id}/me", dependencies=WRITE)
 def my_settings(classroom_id: str, body: MySettings, authorization: str = Header(default="")):
-    """Whether this classroom's staff can see your progress (instructor classes)."""
+    """Whether this classroom's staff can see your progress (instructor classes), and your own test
+    date for studying it (Stage 6; otherwise the nearest milestone is used)."""
     user_id = _uid(authorization)
     db = get_supabase()
     room, _ = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
-    db.table("classroom_members").update({"progress_visible_to_staff": body.progress_visible_to_staff}) \
-        .eq("classroom_id", room["id"]).eq("user_id", user_id).execute()
-    return {"progress_visible_to_staff": body.progress_visible_to_staff}
+    change = {}
+    if body.progress_visible_to_staff is not None:
+        change["progress_visible_to_staff"] = body.progress_visible_to_staff
+    if body.test_date or body.clear_test_date:
+        change["study_test_date"] = body.test_date.isoformat() if body.test_date and not body.clear_test_date else None
+    if change:
+        try:
+            db.table("classroom_members").update(change).eq("classroom_id", room["id"]).eq("user_id", user_id).execute()
+        except Exception:  # before migration 20261116120000 (study_test_date)
+            raise HTTPException(status_code=503, detail="Saving a test date needs an update on our side. It's kept on this device for now.")
+    return {key.replace("study_", ""): value for key, value in change.items()}
 
 
 # Invites --------------------------------------------------------------------------------------------
@@ -654,6 +692,79 @@ def reorder_items(classroom_id: str, body: ItemOrder, authorization: str = Heade
         db.table("classroom_items").update({"position": position}).eq("classroom_id", room["id"]) \
             .eq("item_type", ref.item_type).eq("item_id", require_uuid(ref.item_id, "item ID")).execute()
     return {"ordered": len(body.items)}
+
+
+# Studying the classroom (Stage 6) -------------------------------------------------------------------
+@router.get("/{classroom_id}/study")
+def study_payload(classroom_id: str, guide_ids: str = "", authorization: str = Header(default="")):
+    """Everything a mixed review round needs across the classroom's guides (or the ones picked in
+    guide_ids): each guide's cards and questions with your own progress, as the study screens read
+    it. Someone else's guide comes as the version you're on (Stage 4); without per-viewer progress
+    switched on, only your own guides are included and `skipped` says how many weren't."""
+    user_id = _uid(authorization)
+    db = get_supabase()
+    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+    picked = {require_uuid(i, "guide ID") for i in guide_ids.split(",") if i.strip()} if guide_ids else None
+    out, skipped = [], 0
+    for guide in cstudy.classroom_guides(db, user_id, room["id"]):
+        if picked is not None and guide["id"] not in picked:
+            continue
+        if guide["user_id"] == user_id:
+            own = (db.table("study_guides").select("id,title,flashcards,quiz_questions,flashcard_progress").eq("id", guide["id"]).limit(1).execute().data or [None])[0]
+            if own:
+                out.append({**own, "viewer": None})
+            continue
+        if not versions.enabled():
+            skipped += 1
+            continue
+        try:
+            ctx = viewer_study.state(db, user_id, guide["id"])
+        except (HTTPException, viewer_study.Unavailable):
+            skipped += 1
+            continue
+        if ctx["row"] is None:
+            viewer_study.pin(db, user_id, guide["id"], ctx["current"])
+        content = ctx["content"]
+        out.append({"id": guide["id"], "title": content.get("title") or guide.get("title"), "flashcards": content["cards"],
+                    "quiz_questions": ctx["questions"], "flashcard_progress": viewer_study.progress_view(ctx),
+                    "viewer": {"version": content["version"], "current_version": ctx["current"]}})
+    today = cstudy.today_iso()
+    return {"classroom": {"id": room["id"], "name": room["name"]}, "guides": out, "skipped": skipped,
+            "test_date": me.get("study_test_date"), "milestone": cstudy.nearest_milestone(db, room["id"], today)}
+
+
+@router.get("/{classroom_id}/progress")
+def classroom_progress(classroom_id: str, authorization: str = Header(default="")):
+    """Your own readiness per guide and combined (weighted by each guide's number of ideas); in a
+    study group, anonymous "knows / still learning" counts per question where at least 3 members
+    studied the guide; in an instructor class, staff also see members who chose to share."""
+    user_id = _uid(authorization)
+    db = get_supabase()
+    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+    today = cstudy.today_iso()
+    guides = cstudy.classroom_guides(db, user_id, room["id"])
+    members = db.table("classroom_members").select("user_id,progress_visible_to_staff").eq("classroom_id", room["id"]).eq("status", "active").execute().data or []
+    member_ids = [m["user_id"] for m in members]
+    instructor_view = room.get("kind") == "instructor_class" and rooms.is_staff(me)
+    sharing = [m["user_id"] for m in members if m.get("progress_visible_to_staff") and m["user_id"] != user_id] if instructor_view else []
+    mine, group, staff_rows = [], [], {uid: [] for uid in sharing}
+    for guide in guides:
+        content, questions, ideas_list = cstudy.guide_ideas(guide)
+        my = cstudy.tally(ideas_list, cstudy.member_ideas(db, user_id, guide, content, questions), today)
+        mine.append({"id": guide["id"], "title": guide.get("title") or "Untitled", **my})
+        if room.get("kind") != "instructor_class":
+            group.append({"id": guide["id"], "title": guide.get("title") or "Untitled",
+                          **cstudy.group_view(db, guide, member_ids, content, questions, ideas_list, today)})
+        for uid in sharing:
+            staff_rows[uid].append({"id": guide["id"], **cstudy.tally(ideas_list, cstudy.member_ideas(db, uid, guide, content, questions), today)})
+    out = {"me": {"guides": mine, "readiness": cstudy.combined(mine), "test_date": me.get("study_test_date"),
+                  "milestone": cstudy.nearest_milestone(db, room["id"], today)},
+           "group": group if room.get("kind") != "instructor_class" else None, "group_min": cstudy.GROUP_MIN}
+    if instructor_view:
+        people = graph.cards(db, sharing)
+        out["members"] = [{**people[uid], "readiness": cstudy.combined(rows), "guides": rows} for uid, rows in staff_rows.items() if uid in people]
+        out["not_sharing"] = len([m for m in members if not m.get("progress_visible_to_staff") and m["user_id"] != user_id])
+    return out
 
 
 # Activity -------------------------------------------------------------------------------------------

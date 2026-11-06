@@ -4,7 +4,7 @@ import { pageTitle } from '../../lib/pageTitle';
 import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, AudioLines, BookOpen, FolderInput, Hash, NotebookPen, Pencil, Plus, Trash2, UserRound } from 'lucide-react';
+import { ArrowLeft, AudioLines, BookOpen, FolderInput, Hash, NotebookPen, Pencil, Play, Plus, Trash2, UserRound } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import { listLectures } from '../../lib/lectures';
@@ -202,6 +202,10 @@ export default function ClassPage() {
           </div>
         </div>
         <div className="c-row">
+          {/* One mixed review round across this folder's guides (session.js), a few from each. */}
+          {items.some(item => item.kind === 'guide') && (
+            <Link href={'/session?scope=folder&id=' + encodeURIComponent(folder.id)} className="c-btn c-btn--secondary"><Play {...ICON} />Study this folder</Link>
+          )}
           <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet()}><Plus {...ICON} />New</button>
           <Menu label="Class actions" items={menu} />
         </div>
