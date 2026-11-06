@@ -67,6 +67,14 @@ class MemoryHookTests(unittest.TestCase):
         self.assertIn("INTERESTS: sports", messages[1]["content"])
         self.assertIn("Old one", messages[1]["content"])
 
+    def test_several_styles_let_the_model_pick_one(self):
+        _, chat = self.call('{"hook": "Otis Allan Glazebrook glazes a brook."}', style=["funny", "letters"])
+        system = chat.call_args.kwargs["messages"][0]["content"]
+        self.assertIn("Preferred styles (use the one that suits this answer best): " + llm.MEMORY_STYLES["funny"]
+                      + "; " + llm.MEMORY_STYLES["letters"], system)
+        _, chat = self.call('{"hook": "Otis Allan Glazebrook glazes a brook."}', style=["nonsense"])
+        self.assertIn("Preferred style: " + llm.MEMORY_STYLES["link"], chat.call_args.kwargs["messages"][0]["content"])
+
     def test_hooks_without_the_answer_or_about_the_student_are_dropped(self):
         self.assertEqual(self.call('{"hook": "Picture someone glazing a brook."}')[0], {})
         self.assertEqual(self.call('{"hook": "The student should picture Otis Allan Glazebrook."}')[0], {})
@@ -177,14 +185,20 @@ class RememberRouteTests(unittest.TestCase):
         ]
         result, make, require, record = self.run_route(database(answers), hook="Glazebrook", body=quiz.RememberRequest(concept=0, previous=" Last "))
         self.assertEqual(result, {"hook": "Glazebrook"})
-        self.assertEqual(make.call_args.args, ("Who founded ATO?", "Otis Allan Glazebrook", "rhyme", ["music", "food"], "Last"))
+        self.assertEqual(make.call_args.args, ("Who founded ATO?", "Otis Allan Glazebrook", ["rhyme"], ["music", "food"], "Last"))
         require.assert_called_once_with("u1", "light")
         record.assert_called_once_with("u1", "light")
 
     def test_defaults_when_unanswered_skipped_or_unreadable(self):
         for db in (database(), database([{"question_id": "memory_style", "answer": {"skipped": True}}]), database(broken=True)):
             _, make, _, _ = self.run_route(db, hook="Glazebrook")
-            self.assertEqual(make.call_args.args[2:4], ("link", []))
+            self.assertEqual(make.call_args.args[2:4], (["link"], []))
+
+    def test_several_styles_since_version_2(self):
+        answers = [{"question_id": "memory_style", "answer": {"value": ["funny", "letters"]}},
+                   {"question_id": "memory_style", "answer": {"value": "rhyme"}}]  # older, version 1
+        _, make, _, _ = self.run_route(database(answers), hook="Glazebrook")
+        self.assertEqual(make.call_args.args[2], ["funny", "letters"])
 
     def test_no_hook_is_not_charged(self):
         result, _, require, record = self.run_route(database())

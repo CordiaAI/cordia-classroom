@@ -558,13 +558,20 @@ MEMORY_EXAMPLES = (
 )
 
 
-def memory_hook(question: str, answer: str, style: str = "link", interests=(), previous: str = "",
+def memory_hook(question: str, answer: str, style="link", interests=(), previous: str = "",
                 crude: bool = False, context=()) -> dict:
     """A memory trick for a missed question ("Help me remember"): links the question's cue to the
-    answer, in the student's preferred style, anchored in their own material when something there
-    fits. Kept only when it states the answer and is written to the student; {} otherwise.
+    answer, in one of the student's preferred styles (style: a MEMORY_STYLES key or a list of them;
+    the model picks the one that suits this answer), anchored in their own material when something
+    there fits. Kept only when it states the answer and is written to the student; {} otherwise.
     Returns {"hook"} plus {"linked": {kind, id, title}} when it built on a piece of context."""
     from services.retain import mentions_answer
+    keys = [style] if isinstance(style, str) else list(style or ())
+    picked = [MEMORY_STYLES[key] for key in keys if key in MEMORY_STYLES] or [MEMORY_STYLES["link"]]
+    if len(picked) == 1:
+        preferred = f"Preferred style: {picked[0]}. "
+    else:
+        preferred = f"Preferred styles (use the one that suits this answer best): {'; '.join(picked)}. "
     likes = ", ".join(str(item).replace("_", " ") for item in interests or ()) or "none given"
     context = list(context or ())[:5]
     material = "\n".join(f"[{i}] {item['title']}: {item['snippet']}" for i, item in enumerate(context, 1))
@@ -577,8 +584,8 @@ def memory_hook(question: str, answer: str, style: str = "link", interests=(), p
                 "exact names, words and numbers in the answer, using whichever fits best: a vivid image, "
                 "a link to something they already know, an acronym or first letters, a number shape or "
                 "rhyme, or a tiny story. Make it specific, vivid and funny; a generic line that just "
-                f"restates the fact fails. Preferred style: {MEMORY_STYLES.get(style, MEMORY_STYLES['link'])}. "
-                "If the student's own material below gives a natural anchor (something they already "
+                "restates the fact fails. " + preferred
+                + "If the student's own material below gives a natural anchor (something they already "
                 "studied or heard), build on it and set \"linked\" to its number; otherwise null. Their "
                 "interests may give the link only when one fits. The trick must contain the answer exactly "
                 "as given and never change, round or blur it. Any comparison stated as fact must be true; "

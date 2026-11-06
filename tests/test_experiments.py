@@ -81,7 +81,14 @@ class QuestionTests(unittest.TestCase):
                 check(bad[0], 1, bad[1])
 
     def test_memory_questions(self):
-        self.assertEqual(check("memory_style", 1, {"value": "funny"}), {"value": "funny"})
+        self.assertEqual(check("memory_style", 1, {"value": "funny"}), {"value": "funny"}, "version 1 still accepted")
+        self.assertEqual(check("memory_style", 2, {"value": ["funny", "rhyme", "picture", "link", "letters"]})["value"][0], "funny")
+        with self.assertRaises(InvalidAnswer):
+            check("memory_style", 2, {"value": "funny"})
+        with self.assertRaises(InvalidAnswer):
+            check("memory_style", 2, {"value": ["funny", "funny"]})
+        with self.assertRaises(InvalidAnswer):
+            check("interests", 1, {"value": ["sports", "music", "food", "art_design"]})
         self.assertEqual(check("interests", 1, {"value": ["music", "food"]}), {"value": ["music", "food"]})
         self.assertEqual(check("interests", 1, {"skipped": True}), {"skipped": True})
         for bad in ([], ["music", "food", "tech", "books"], ["music", "music"], ["knitting"], "music"):

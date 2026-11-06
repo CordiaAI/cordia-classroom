@@ -813,15 +813,16 @@ def explain_miss(guide_id: str, body: MissRequest, authorization: str = Header(d
 
 
 def _memory_preferences(supabase, user_id: str) -> tuple:
-    """The student's newest memory_style and interests answers (About-you screen), or defaults."""
-    style, interests = "link", []
+    """The student's newest memory_style and interests answers (About-you screen), or defaults.
+    memory_style is a list since version 2 and one value in version 1; either way, a list here."""
+    styles, interests = ["link"], []
     try:
         rows = (supabase.table("onboarding_answers").select("question_id, answer, answered_at")
                 .eq("user_id", user_id).in_("question_id", ["memory_style", "interests"])
                 .order("answered_at", desc=True).limit(20).execute()).data or []
     except Exception:
         logger.warning("Memory preferences unavailable", exc_info=True)
-        return style, interests
+        return styles, interests
     seen = set()
     for row in rows:
         question_id, answer = row.get("question_id"), row.get("answer") or {}
@@ -829,11 +830,11 @@ def _memory_preferences(supabase, user_id: str) -> tuple:
             continue
         seen.add(question_id)
         value = answer.get("value") if isinstance(answer, dict) else None
-        if question_id == "memory_style" and isinstance(value, str):
-            style = value
+        if question_id == "memory_style" and isinstance(value, (str, list)) and value:
+            styles = [value] if isinstance(value, str) else [str(item) for item in value]
         elif question_id == "interests" and isinstance(value, list):
             interests = [str(item) for item in value[:3]]
-    return style, interests
+    return styles, interests
 
 
 @router.post("/{guide_id}/remember", dependencies=[Depends(ai_rate_limit(max_calls=30))])
@@ -846,13 +847,13 @@ def help_me_remember(guide_id: str, body: RememberRequest, authorization: str = 
     if body.concept >= len(questions):
         raise HTTPException(status_code=400, detail="Unknown question")
     question = questions[body.concept]
-    style, interests = _memory_preferences(supabase, user_id)
+    styles, interests = _memory_preferences(supabase, user_id)
     from services.adult_content import crude_allowed
     from services.memory_context import related_material
     require(user_id, "light")
     answer = retain.concept_answer(question)
     context = related_material(supabase, user_id, guide_id, question.get("question", ""), answer)
-    result = memory_hook(question.get("question", ""), answer, style, interests,
+    result = memory_hook(question.get("question", ""), answer, styles, interests,
                          (body.previous or "").strip(), crude=crude_allowed(supabase, user_id), context=context)
     if not result:
         raise HTTPException(status_code=502, detail="Cordia couldn't come up with one right now. Try again.")
