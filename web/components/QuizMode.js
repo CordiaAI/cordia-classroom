@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api';
 import { advance, createSession, currentCard, firstAttempts, progress, recordResults } from '../lib/retainEngine.mjs';
 import { logAnswer } from '../lib/learningEvents';
@@ -12,14 +12,23 @@ import { walkthroughEvent } from '../lib/walkthrough';
 // Retain: every idea is asked once in its best-fitting format. A miss must then be answered
 // right two more times, a few questions apart, before it clears. The score is first-try only.
 // mode: how the answers are logged ('quiz', or 'check' for a new guide's Check yourself).
-export default function QuizMode({ questions, cards, types, guideId, onRestart, onDone, doneLabel, mode = 'quiz' }) {
-  const [session, setSession] = useState(() => createSession(questions, cards, types));
+// resume: a session saved by onProgress ({ session, answered, startedAt }) to pick up again after a
+// refresh. onProgress gets that snapshot after every answer, and null once the quiz is finished.
+export default function QuizMode({ questions, cards, types, guideId, onRestart, onDone, doneLabel, mode = 'quiz', resume = null, onProgress }) {
+  // A card already answered when the page was left moves on, so it isn't counted twice.
+  const [session, setSession] = useState(() => (resume ? (resume.answered ? advance(resume.session) : resume.session) : createSession(questions, cards, types)));
   const [answered, setAnswered] = useState(false);
   const [score, setScore] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [startedAt] = useState(() => Date.now());
+  const [startedAt] = useState(() => resume?.startedAt || Date.now());
   const card = currentCard(session);
   const stats = progress(session);
+
+  useEffect(() => {
+    onProgress?.(card ? { session, answered, startedAt } : null);
+  }, [session, answered]);
+  // Left on the very last answer: the score is saved now.
+  useEffect(() => { if (resume && !card) finish(session); }, []);
 
   function onResult(results) {
     const shown = currentCard(session);
@@ -35,23 +44,25 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart, 
     const next = advance(session);
     setSession(next);
     setAnswered(false);
-    if (!currentCard(next)) {
-      // First-try misses come back in the guide's Study now; ones the student was sure of come first.
-      const misses = firstAttempts(next).filter(item => item.credit < 1)
-        .map(item => ({ question: questions[item.concept]?.question || '', answer: conceptAnswer(questions[item.concept]), ...(item.confidence === 'sure' ? { sure: true } : {}) }))
-        .filter(item => item.question && item.answer)
-        .sort((a, b) => Number(Boolean(b.sure)) - Number(Boolean(a.sure)));
-      const cleared = firstAttempts(next).filter(item => item.credit === 1).map(item => questions[item.concept]?.question).filter(Boolean);
-      rememberRetainMisses(guideId, misses, { cleared });
-      walkthroughEvent('quiz-done');
-      setSaving(true);
-      const data = await apiFetch(`/quiz/${guideId}/submit`, {
-        method: 'POST',
-        body: JSON.stringify({ attempts: firstAttempts(next) }),
-      });
-      setSaving(false);
-      setScore(typeof data?.score === 'number' ? data : { error: data?.detail || 'Your score could not be saved.' });
-    }
+    if (!currentCard(next)) await finish(next);
+  }
+
+  async function finish(next) {
+    // First-try misses come back in the guide's Study now; ones the student was sure of come first.
+    const misses = firstAttempts(next).filter(item => item.credit < 1)
+      .map(item => ({ question: questions[item.concept]?.question || '', answer: conceptAnswer(questions[item.concept]), ...(item.confidence === 'sure' ? { sure: true } : {}) }))
+      .filter(item => item.question && item.answer)
+      .sort((a, b) => Number(Boolean(b.sure)) - Number(Boolean(a.sure)));
+    const cleared = firstAttempts(next).filter(item => item.credit === 1).map(item => questions[item.concept]?.question).filter(Boolean);
+    rememberRetainMisses(guideId, misses, { cleared });
+    walkthroughEvent('quiz-done');
+    setSaving(true);
+    const data = await apiFetch(`/quiz/${guideId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ attempts: firstAttempts(next) }),
+    });
+    setSaving(false);
+    setScore(typeof data?.score === 'number' ? data : { error: data?.detail || 'Your score could not be saved.' });
   }
 
   // A written answer that can't be checked right now is asked as multiple choice instead.

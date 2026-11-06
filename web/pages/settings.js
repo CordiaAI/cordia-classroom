@@ -261,7 +261,7 @@ export default function SettingsPage() {
               <>
                 <div className="c-card billing-current-plan">
                   <div className="plan-badge" data-plan={isPlus ? 'plus' : 'free'}>
-                    {onTrial ? 'Academic Weapon trial' : tierName(currentTier)}
+                    {onTrial ? `${tierName(status.tier)} trial` : tierName(currentTier)}
                   </div>
                   <div className="plan-usage">
                     {METERED.map(feature => {
@@ -309,9 +309,11 @@ export default function SettingsPage() {
                           {current ? (
                             <>
                               <span className="plan-current-label">Current</span>
-                              <button type="button" className="c-btn c-btn--secondary" onClick={handleManageBilling} disabled={managing}>
-                                <CreditCard size={20} strokeWidth={1.75} aria-hidden="true" />{managing ? 'Opening…' : 'Manage'}
-                              </button>
+                              {status?.source !== 'manual' && (
+                                <button type="button" className="c-btn c-btn--secondary" onClick={handleManageBilling} disabled={managing}>
+                                  <CreditCard size={20} strokeWidth={1.75} aria-hidden="true" />{managing ? 'Opening…' : 'Manage'}
+                                </button>
+                              )}
                             </>
                           ) : paidNow ? (
                             <button type="button" className="c-btn c-btn--secondary" onClick={() => handleSwitch(key)} disabled={upgrading}>
@@ -447,7 +449,7 @@ export default function SettingsPage() {
         .me-names strong { font:600 20px/1.15 var(--font-sans); }
         .billing-current-plan { display: grid; gap: 12px; padding: 20px; margin-bottom: 16px; }
         .plan-badge { justify-self: start; padding: 6px 14px; border-radius:var(--r-pill); background: var(--card-sunk); font-weight:600; }
-        .plan-badge[data-plan="plus"] { background: var(--olive); color: var(--on-olive); }
+        .plan-badge[data-plan="plus"] { color: var(--olive-ink); }
         .plan-usage { display: grid; gap: 10px; }
         .plan-usage-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; }
         .plan-usage-row .c-bar { grid-column: 1 / -1; }

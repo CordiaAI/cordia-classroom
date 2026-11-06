@@ -11,12 +11,13 @@ import { rememberRetainMisses } from '../../lib/userStore';
 import { conceptAnswer } from '../../lib/retainEngine.mjs';
 import {
   FAMILIAR, LEARNING, LEVELS, MASTERED,
-  DEFAULT_TYPES, LEARN_TYPES, advance, answer, cleanTypes, counts, createRound, currentCard, dayKey, formatDecision, linkedTestDate, readiness, restoreLevels, saveableLevels, testPlan,
+  DEFAULT_TYPES, LEARN_TYPES, advance, answer, cleanTypes, counts, createRound, currentCard, dayKey, fingerprint, formatDecision, linkedTestDate, readiness, restoreLevels, saveableLevels, testPlan,
 } from '../../lib/learnEngine.mjs';
 import { logAnswer, logFormatDecision, useAnswerTiming } from '../../lib/learningEvents';
 import { applyTest } from '../../lib/timedTest.mjs';
 import { needsStudySet } from '../../lib/studySet.mjs';
 import { makeStudySet } from '../../lib/autoStudySet';
+import { clearResume, readResume, writeResume } from '../../lib/resume';
 import TimedTest from '../../components/TimedTest';
 import { ClozeCard, FillCard, McCard, MemoryHook, RememberButton, WrittenCard } from '../../components/RetainCards';
 import CordiaLoader, { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
@@ -199,13 +200,24 @@ export default function LearnPage() {
     const list = Array.isArray(session?.questions) ? session.questions : [];
     // The account's saved progress wins; this browser's copy covers a backend that hasn't got it yet.
     const saved = guide?.flashcard_progress?.learn || readLocal(guideId) || {};
-    const restored = restoreLevels(list, saved.levels || {});
+    // A round left mid-way (a refresh) resumes at the same card, with the levels it had reached,
+    // as long as its questions are still the same ones.
+    const pending = list.length ? readResume('learn', guideId) : null;
+    const resumable = Boolean(pending && currentCard(pending.round)
+      && pending.round.queue.every(item => list[item.concept] && pending.fps?.[item.concept] === fingerprint(list[item.concept])));
+    const restored = restoreLevels(list, (resumable ? pending.levels : saved.levels) || {});
     savedLevels.current = guide?.flashcard_progress?.learn?.levels || {};
     // An exam's "Study now" passes its date (?test=YYYY-MM-DD) so Learn paces to it.
     const linked = list.length ? linkedTestDate(router.query.test, saved.test_date || '', today) : '';
     setLevels(restored);
     setTestDate(linked || saved.test_date || '');
-    if (linked) save(restored, linked, list);
+    if (resumable) {
+      setRound(pending.round);
+      setRoundNumber(pending.roundNumber);
+      setScreen('round');
+      roundStart.current = Date.now();
+    }
+    if (linked || resumable) save(restored, linked || saved.test_date || '', list);
     if (!list.length) setError(session?.detail || (guide && !String(guide.notes || '').trim()
       ? 'This guide has no notes or questions to learn from yet.'
       : 'Learn needs questions and answers. Open the guide and make its study set first.'));
@@ -217,6 +229,16 @@ export default function LearnPage() {
     if (ready && guideId) load();
   }, [ready, guideId]);
   const gate = useLoadGate(questions !== null || making);
+
+  // Keeps the round in progress after every answer, so a refresh resumes it; leaving it drops it.
+  useEffect(() => {
+    if (!guideId || questions === null) return;
+    if (screen !== 'round' || !currentCard(round)) { clearResume('learn', guideId); return; }
+    const resumeAt = answered ? advance(round) : round;
+    if (!currentCard(resumeAt)) return; // the round's last answer: finishing it saves the levels
+    const fps = Object.fromEntries(resumeAt.queue.map(item => [item.concept, fingerprint(questions[item.concept])]));
+    writeResume('learn', guideId, { round: resumeAt, roundNumber, levels: saveableLevels(questions, levels), fps });
+  }, [guideId, questions, screen, round, answered, levels, roundNumber]);
 
   function save(nextLevels, nextDate = testDate, list = questions) {
     const body = { levels: saveableLevels(list, nextLevels), test_date: nextDate || null };
