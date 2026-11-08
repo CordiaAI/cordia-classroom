@@ -25,6 +25,8 @@ export const PLANS = {
 };
 
 export const planByKey = key => PLANS.tiers.find(tier => tier.key === key);
+// The Free plan's monthly allowance for one feature ("guide", "tutor", …).
+export const freeAllowance = feature => PLANS.freeAllowances.find(item => item.feature === feature).limit;
 
 // "a, b and c"
 export const listText = items => (items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}` : items[0]);
@@ -34,4 +36,12 @@ export const FREE_PLAN_TEXT = (() => {
   const monthly = PLANS.freeAllowances.filter(item => item.limit > 1).map(item => `${item.limit} ${item.label}`);
   const oneTry = PLANS.freeAllowances.filter(item => item.limit === 1).map(item => item.label);
   return `${listText(monthly)} each month, plus one try each of ${listText(oneTry)}`;
+})();
+
+// One line on what Cordia costs, for pages that mention plans (use-case pages).
+export const PLAN_LINE = (() => {
+  const pro = planByKey('pro');
+  const weapon = planByKey('weapon');
+  const { trial } = PLANS;
+  return `Free includes ${freeAllowance('guide')} study guides a month. ${pro.name} is $${pro.price} a month and ${weapon.name} is $${weapon.price} a month, and new accounts can try ${trial.plan} free for ${trial.days} days with no card.`;
 })();

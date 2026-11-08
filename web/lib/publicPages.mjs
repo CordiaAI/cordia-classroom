@@ -4,6 +4,7 @@
 // unique; descriptions are 120–160 characters. `index: false` pages get noindex and stay out of
 // the sitemap.
 import { BRAND_NAME, PLANS, planByKey } from './brand.mjs';
+import { USE_CASES, useCasePath } from './useCases/index.mjs';
 
 const { trial } = PLANS;
 const price = key => `$${planByKey(key).price}`;
@@ -24,6 +25,11 @@ export const PUBLIC_PAGES = [
     topic: 'Features and Mission',
     description: 'How Cordia Classroom captures your course material, writes study guides, NCLEX-style questions and flashcards from it, and why it never searches the web.',
   },
+  // Use-case pages (lib/useCases/): one content file each, laid out by components/UseCasePage.js.
+  ...USE_CASES.map(page => ({
+    path: useCasePath(page), file: `pages/${page.slug}.js`, index: true, crumb: page.crumb,
+    topic: page.topic, description: page.description, modified: page.updated,
+  })),
   {
     path: '/install-extension', file: 'pages/install-extension.js', index: true, crumb: 'Chrome extension',
     topic: 'Chrome Extension',

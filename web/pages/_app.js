@@ -12,6 +12,7 @@ import { syncServerCopies } from '../lib/serverSync';
 import { showConnectedAppSets } from '../lib/guideJobs';
 import { routeTitle } from '../lib/pageTitle';
 import { ROBOTS_NOINDEX, isAppRoute } from '../lib/publicPages.mjs';
+import { USE_CASES, useCasePath } from '../lib/useCases/index.mjs';
 import { useState, useEffect } from 'react';
 import { installErrorReporting } from '../lib/errorReport';
 import { installAmbientMotion } from '../lib/ambientMotion';
@@ -30,6 +31,8 @@ export default function App({ Component, pageProps }) {
   useEffect(() => { setSignedIn(Boolean(getToken())); }, [router.pathname]);
   const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password', '/instructors', '/copyright', '/mission', '/install-extension', '/privacy', '/terms', '/honor-code', '/connect/claude', '/oauth/consent'].includes(router.pathname)
     && !(router.pathname === '/pricing' && signedIn)
+    // Use-case pages (lib/useCases/) are public pages.
+    || USE_CASES.some(page => useCasePath(page) === router.pathname)
     // A shared guide: signed-out visitors get the public frame, students the app.
     || (router.pathname === '/sets/[id]' && !signedIn)
     // A classroom invite: signed-out visitors see who's inviting them, then sign up.

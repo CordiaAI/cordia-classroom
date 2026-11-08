@@ -6,12 +6,14 @@ import Faq from './Faq';
 import SeoHead from './SeoHead';
 import { getToken } from '../lib/api';
 import { ENTITY_LINE } from '../lib/brand.mjs';
+import { USE_CASES, useCasePath } from '../lib/useCases/index.mjs';
 
 // Shared frame for the signed-out pages: clouds, wordmark, and three links. The head (title,
 // description, canonical, social tags, JSON-LD) comes from the page list in lib/publicPages.mjs;
 // a page with questions passes them as `faq` and gets the visible list and its FAQPage markup.
 // Pages outside that list (shared guides, invites) still pass their own title and description.
-export default function PublicPage({ path = '/', faq = null, title = '', description = '', backdrop = '', children }) {
+// `faqInPage` means the page places <Faq> itself (use-case pages put it before their call to action).
+export default function PublicPage({ path = '/', faq = null, faqInPage = false, title = '', description = '', backdrop = '', children }) {
   // Signed-in visitors get a way back into the app instead of "Sign in".
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => { setSignedIn(Boolean(getToken())); }, []);
@@ -31,7 +33,7 @@ export default function PublicPage({ path = '/', faq = null, title = '', descrip
         </header>
         <main className="public-main">
           {children}
-          {faq && <Faq items={faq} />}
+          {faq && !faqInPage && <Faq items={faq} />}
         </main>
         <footer className="public-footer">
           <p className="public-entity">{ENTITY_LINE}</p>
@@ -45,6 +47,10 @@ export default function PublicPage({ path = '/', faq = null, title = '', descrip
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
             <Link href="/honor-code">Honor code</Link>
+          </nav>
+          <nav aria-label="Use Cordia for" className="public-footer-group">
+            <span className="public-footer-label">Use Cordia for</span>
+            {USE_CASES.map(page => <Link key={page.slug} href={useCasePath(page)}>{page.footerLabel}</Link>)}
           </nav>
         </footer>
       </div>
@@ -67,6 +73,8 @@ export default function PublicPage({ path = '/', faq = null, title = '', descrip
         .public-doc { color: var(--text-secondary); }
         .public-footer { border-top: 1px solid var(--hairline); padding: 24px; }
         .public-footer nav { width: min(1120px, 100%); margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px 24px; }
+        .public-footer .public-footer-group { margin-top: 12px; }
+        .public-footer-label { color: var(--ink); font: 600 var(--fs-13)/1.5 var(--font-sans); }
         .public-entity { width: min(1120px, 100%); margin: 0 auto 12px; color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); }
         .public-footer a { color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); text-decoration: none; }
         .public-footer a:hover { color: var(--ink); text-decoration: underline; }

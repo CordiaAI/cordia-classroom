@@ -26,7 +26,7 @@ export default function SeoHead({ path, faq = null, title: ownTitle = '', descri
     );
   }
   const title = pageTitle(page);
-  const graph = path === '/' ? homeGraph() : pageGraph({ path, name: title, crumb: page.crumb });
+  const graph = path === '/' ? homeGraph() : pageGraph({ path, name: title, crumb: page.crumb, modified: page.modified });
   if (faq) graph.push(faqPage(faq, path));
   return (
     <Head>
