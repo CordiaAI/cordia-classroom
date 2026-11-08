@@ -76,6 +76,32 @@ async function sampleGuide() {
   // 5. Learn.
   await shoot('learn', `/learn/${G}`, null, { selector: 'main', maxHeight: 620 });
 
+  // One element of a page, scrolled into view (for sections below the fold and sheets).
+  async function shootElement(name, route, prepare, selector) {
+    try {
+      await page.goto(BASE + route, { waitUntil: 'networkidle', timeout: 20000 });
+    } catch { /* slow page: shoot what loaded */ }
+    await page.waitForTimeout(1200);
+    if (prepare) await prepare();
+    await page.waitForTimeout(600);
+    const file = path.join(out, `${name}.png`);
+    const element = page.locator(selector).first();
+    await element.scrollIntoViewIfNeeded();
+    await element.screenshot({ path: file });
+    shots.push(file);
+    console.log('captured', name);
+  }
+  // 6. Learn's "Test yourself": where quizzes live.
+  await shootElement('test-yourself', `/learn/${G}`, null, 'section:has(#learn-test-title)');
+  // 7. Quiz setup: question types and how many questions.
+  await shoot('quiz-setup', `/quiz/${G}`, null, { selector: 'main', maxHeight: 700 });
+  // 8. The Canvas connect sheet: the token steps (Canvas is available, nothing connected yet).
+  state.canvas = { connected: false };
+  await shootElement('canvas-connect', '/canvas', async () => {
+    const connect = page.getByRole('button', { name: /^Connect Canvas$/ }).first();
+    if (await connect.count()) await connect.click();
+  }, '[role="dialog"]');
+
   fs.writeFileSync(path.join(out, 'shots.json'), JSON.stringify(shots, null, 1));
   await browser.close();
 })();

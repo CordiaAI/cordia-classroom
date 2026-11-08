@@ -43,7 +43,8 @@ for (const label of ['Progress', 'Settings', 'Appearance', 'Plan', 'Help', 'Send
 }
 assert.match(dashboard, /notes: '\/smartnotes'/);
 assert.match(publicPage, /AcademicInfinityMark/);
-assert.match(install, /AcademicInfinityMark/);
+// /install-extension is a use-case page now: the mark comes from PublicPage's header (above).
+assert.match(install, /<UseCasePage page=\{page\} \/>/);
 const classroomStyles = read('web', 'styles', 'classroom.css');
 // Both webfonts are self-hosted with swap and a Georgia fallback (never Times).
 assert.match(tokens, /--font-sans: 'Quicksand'/);
