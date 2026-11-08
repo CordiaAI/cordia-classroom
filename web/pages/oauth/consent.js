@@ -78,7 +78,7 @@ export default function OAuthConsent() {
   const name = state.name || 'This app';
   return (
     <main className="consent-page">
-      <Head><meta name="robots" content="noindex" /></Head>
+      <Head><meta name="robots" content="noindex" key="robots" /></Head>
       <section className="consent" aria-labelledby="consent-title" aria-busy={state.step === 'loading'}>
         <div className="consent-brand" aria-hidden="true">
           <AcademicInfinityMark className="consent-mark" title="" />

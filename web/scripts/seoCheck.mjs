@@ -3,14 +3,19 @@
 //   indexable pages: 200, exactly one H1, a unique title containing "Cordia Classroom", a meta
 //   description of 120–160 characters, a canonical equal to SITE_URL + path, JSON-LD that
 //   parses, and FAQ JSON-LD text equal to the visible FAQ text;
-//   noindex pages (/login, /signup, /reset-password): 200 and a robots noindex tag.
+//   noindex pages (/login, /signup, /reset-password): 200 and a robots noindex tag;
+//   no public page sends an X-Robots-Tag header, and a sample of signed-in app routes sends
+//   "noindex, nofollow" and renders the matching robots meta tag.
 // Run from the repo root: `npm run seo:check` (or `node web/scripts/seoCheck.mjs --skip-build`
 // after `npm run build --prefix web`). Exits non-zero on any failure.
 import { spawn, spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BRAND_NAME, SITE_URL } from '../lib/brand.mjs';
-import { PUBLIC_PAGES } from '../lib/publicPages.mjs';
+import { PUBLIC_PAGES, ROBOTS_NOINDEX } from '../lib/publicPages.mjs';
+
+// Signed-in app routes that must stay out of search (any id works: the pages are static shells).
+export const APP_SAMPLES = ['/dashboard', '/library', '/guide/00000000-0000-4000-8000-000000000000', '/settings', '/learn/00000000-0000-4000-8000-000000000000'];
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..');
 const NEXT = join(WEB, 'node_modules', '.bin', 'next');
@@ -55,10 +60,11 @@ export function readPage(html) {
 }
 
 // Problems with one page, as sentences.
-export function checkPage(page, html, status) {
+export function checkPage(page, html, status, robotsHeader = null) {
   const problems = [];
   const seen = readPage(html);
   if (status !== 200) problems.push(`status ${status}`);
+  if (robotsHeader) problems.push(`X-Robots-Tag: ${robotsHeader}`);
   if (!page.index) {
     if (!/noindex/.test(seen.robots)) problems.push('no robots noindex');
     return { problems, seen };
@@ -111,7 +117,7 @@ async function main() {
     const titles = new Map();
     for (const page of PUBLIC_PAGES) {
       const response = await fetch(BASE + page.path, { redirect: 'manual' });
-      const { problems, seen, nodes = [] } = checkPage(page, await response.text(), response.status);
+      const { problems, seen, nodes = [] } = checkPage(page, await response.text(), response.status, response.headers.get('x-robots-tag'));
       for (const title of seen.titles) {
         if (titles.has(title)) problems.push(`title also used by ${titles.get(title)}`);
         titles.set(title, page.path);
@@ -120,6 +126,14 @@ async function main() {
       const types = nodes.map(node => node['@type']).join(', ');
       console.log(`${problems.length ? 'FAIL' : 'ok  '} ${page.path}${page.index ? '' : ' (noindex)'}  ${seen.titles[0] || ''}${types ? `  [${types}]` : ''}`);
       for (const problem of problems) console.log(`       - ${problem}`);
+    }
+    for (const path of APP_SAMPLES) {
+      const response = await fetch(BASE + path, { redirect: 'manual' });
+      const header = response.headers.get('x-robots-tag');
+      const meta = readPage(await response.text()).robots;
+      const ok = header === ROBOTS_NOINDEX && meta === ROBOTS_NOINDEX;
+      if (!ok) failed++;
+      console.log(`${ok ? 'ok  ' : 'FAIL'} ${path} (app)  X-Robots-Tag: ${header || 'none'}  robots meta: ${meta || 'none'}`);
     }
     for (const file of ['/robots.txt', '/sitemap.xml', '/llms.txt']) {
       const response = await fetch(BASE + file);
