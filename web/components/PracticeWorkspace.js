@@ -10,6 +10,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Download, Eraser, Eye, Flag, Hand
 import { walkthroughEvent } from '../lib/walkthrough';
 import { logAnswer } from '../lib/learningEvents';
 import { answerTimer } from '../lib/learningEvents.mjs';
+import { readableText } from '../lib/guideText.mjs';
 import { drawLatestSegment, drawStroke, farEnough, finishStroke } from '../lib/airDraw.mjs';
 import AirDraw from './AirDraw';
 import SegmentedControl from './SegmentedControl';
@@ -30,17 +31,6 @@ const PEN_COLORS = [
   { token: '--draw-teal', label: 'Teal' },
   { token: '--draw-graphite', label: 'Graphite' },
 ];
-
-function readableText(value) {
-  return String(value || '')
-    .replace(/<\/?(?:p|div|li|h[1-6]|blockquote|br)[^>]*>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .trim();
-}
 
 // Practice: /practice/{guideId} works from a guide. /practice works from a file picked in
 // Library › Practice (handed over in sessionStorage); without one it goes back to that filter.
