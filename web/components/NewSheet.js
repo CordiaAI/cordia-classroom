@@ -265,7 +265,7 @@ export default function NewSheet() {
       if (merged.length > MAX_FILES) problems.push(`Up to ${MAX_FILES} files.`);
       return merged.slice(0, MAX_FILES);
     });
-    setError(problems.join(' '));
+    setError([...new Set(problems)].join(' '));
   }
 
   async function create() {
