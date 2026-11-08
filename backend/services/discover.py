@@ -25,6 +25,7 @@ from typing import Iterable, Optional
 from services import classrooms as rooms
 from services import guide_access as access
 from services import minors
+from services.moderation import held_profile_ids
 from services.blocks import hidden_from
 from services.social_graph import cards
 
@@ -303,7 +304,8 @@ def _facets(ranked: list[dict], schools: dict, course: str) -> dict:
 
 # Classrooms and people --------------------------------------------------------------------------
 def search_classrooms(db, viewer: str, q: str = "", school: str = "", course: str = "", limit: int = 30) -> list[dict]:
-    """Public classrooms (listed on a course page) whose name matches, minus blocked owners."""
+    """Public classrooms (listed on a course page) whose name matches, minus blocked owners and
+    classrooms held for review."""
     if not rooms.enabled():
         return []
     query = db.table("classrooms").select("*").eq("visibility", "public").is_("archived_at", "null")
@@ -319,7 +321,7 @@ def search_classrooms(db, viewer: str, q: str = "", school: str = "", course: st
     if school:
         found = [r for r in found if (classes.get(r.get("class_id")) or {}).get("school_id") == school]
     hidden = hidden_from(db, viewer)
-    found = [r for r in found if r["owner_id"] not in hidden][:limit]
+    found = [r for r in found if r["owner_id"] not in hidden and (r.get("review_status") or "ok") == "ok"][:limit]
     owners = cards(db, [r["owner_id"] for r in found])
     young = minors.minor_ids(db, [r["owner_id"] for r in found])
     out = []
@@ -335,7 +337,8 @@ def search_classrooms(db, viewer: str, q: str = "", school: str = "", course: st
 
 
 def search_people(db, viewer: str, q: str, limit: int = 30) -> list[dict]:
-    """Public profiles whose username or name matches. Never minors, never blocked pairs."""
+    """Public profiles whose username or name matches. Never minors, never held profiles, never
+    blocked pairs."""
     term = _like((q or "").strip().lstrip("@")[:60]).strip()
     if len(term) < 2:
         return []
@@ -347,7 +350,9 @@ def search_people(db, viewer: str, q: str, limit: int = 30) -> list[dict]:
         return []
     hidden = hidden_from(db, viewer)
     rows = {r["id"]: r for r in by_name + by_shown}
-    people = [r for r in rows.values() if r["id"] != viewer and r["id"] not in hidden and r.get("is_minor") is not True
+    young = minors.minor_ids(db, list(rows))
+    held = held_profile_ids(db, list(rows))
+    people = [r for r in rows.values() if r["id"] != viewer and r["id"] not in hidden and r["id"] not in young and r["id"] not in held
               and (r.get("profile_visibility") or "public") == "public" and r.get("username")]
     people.sort(key=lambda r: (not str(r.get("username") or "").lower().startswith(term.lower()), str(r.get("username") or "")))
     shown = cards(db, [r["id"] for r in people[:limit]])

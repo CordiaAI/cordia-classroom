@@ -69,6 +69,38 @@ def verified_ids(db, user_ids: Iterable[str]) -> set:
     return {uid for uid in candidates if (_confirmed_email(db, uid) or "") in emails}
 
 
+def school_email_domains(school: dict) -> list[str]:
+    """The email domains of a school: its own list, else the one under its Canvas host."""
+    domains = [d.lower().lstrip("@") for d in school.get("email_domains") or [] if d]
+    host = (school.get("canvas_domain") or "").lower()
+    if not domains and host and not host.endswith(".instructure.com") and host.count(".") >= 2:
+        domains.append(host.split(".", 1)[1])  # canvas.missouri.edu -> missouri.edu
+    return domains
+
+
+def email_matches(email: str, domains: list[str]) -> bool:
+    domain = email.rsplit("@", 1)[-1].lower()
+    return any(domain == d or domain.endswith("." + d) for d in domains)
+
+
+def runs_verified_class(db, room: dict) -> bool:
+    """An instructor class a minor may join (Stage 9, strict rules): its owner is a verified
+    instructor whose confirmed email belongs to the school of the classroom's course."""
+    if not room.get("class_id") or not room.get("owner_id"):
+        return False
+    email = _confirmed_email(db, room["owner_id"])
+    if not email or not verified_class_ids(db, room["owner_id"]):
+        return False
+    try:
+        course = (db.table("classes").select("school_id").eq("id", room["class_id"]).limit(1).execute().data or [None])[0]
+        school = (db.table("schools").select("email_domains,canvas_domain").eq("id", course["school_id"]).limit(1).execute().data or [None])[0] \
+            if course and course.get("school_id") else None
+    except Exception:
+        return False
+    domains = school_email_domains(school) if school else []
+    return bool(domains) and email_matches(email, domains)
+
+
 def _blocked_classes(db, class_ids: Iterable[str]) -> dict:
     ids = [c for c in dict.fromkeys(class_ids) if c]
     if not ids:

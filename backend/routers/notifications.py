@@ -6,11 +6,11 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
-from auth_utils import get_user_id
-from database import get_supabase
+import access
+from access import Ctx
 from rate_limit import ai_rate_limit
 from services import social_graph as graph
 from services.blocks import hidden_from
@@ -19,10 +19,9 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
 @router.get("")
-def list_notifications(cursor: Optional[str] = Query(default=None, max_length=64), authorization: str = Header(default="")):
+def list_notifications(cursor: Optional[str] = Query(default=None, max_length=64), ctx: Ctx = Depends(access.own())):
     """Your notifications, newest first, with who did it."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+    user_id, db = ctx.user_id, ctx.db
     query = db.table("notifications").select("id,kind,payload,read_at,created_at").eq("user_id", user_id)
     if cursor:
         query = query.lt("created_at", cursor)
@@ -50,10 +49,9 @@ class ReadRequest(BaseModel):
 
 
 @router.post("/read", dependencies=[Depends(ai_rate_limit(60, 60))])
-def mark_read(body: ReadRequest, authorization: str = Header(default="")):
+def mark_read(body: ReadRequest, ctx: Ctx = Depends(access.own())):
     """Mark some of your notifications read, or all of them."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+    user_id, db = ctx.user_id, ctx.db
     query = db.table("notifications").update({"read_at": graph.now().isoformat()}).eq("user_id", user_id).is_("read_at", "null")
     if not body.all:
         if not body.ids:

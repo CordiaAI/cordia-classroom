@@ -218,8 +218,9 @@ def _active_rooms(db, viewer: str, classroom_ids: list) -> set:
                                          .eq("status", "active").in_("classroom_id", classroom_ids).execute().data or [])}
     if not mine:
         return set()
-    return {r["id"] for r in (db.table("classrooms").select("id,archived_at").in_("id", list(mine)).execute().data or [])
-            if not r.get("archived_at")}
+    # A classroom held for review grants nothing to its members until it's cleared.
+    return {r["id"] for r in (db.table("classrooms").select("*").in_("id", list(mine)).execute().data or [])
+            if not r.get("archived_at") and (r.get("review_status") or "ok") == "ok"}
 
 
 def grants(db, viewer: Optional[str], guide: dict) -> bool:

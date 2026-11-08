@@ -1,6 +1,8 @@
 """Classrooms (social plan, Stage 5): create and manage them, invite and join, share guides and
 folders, milestones, and the activity feed. Rules live in services/classrooms.py; every route
-re-checks role, status, blocks and caps itself (the service role bypasses RLS). Behind CLASSROOMS.
+declares its check from access.py (member, staff, owner, listed, invite...), which re-checks role,
+status, blocks, holds and the minor rules before the route runs (the service role bypasses RLS).
+Behind CLASSROOMS.
 """
 
 from __future__ import annotations
@@ -8,11 +10,11 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, field_validator
 
-from auth_utils import get_user_id
-from database import get_supabase
+import access
+from access import Ctx
 from ids import require_uuid
 from rate_limit import ai_rate_limit
 from services import classroom_study as cstudy
@@ -21,7 +23,7 @@ from services import instructor_dashboard as idash
 from services import classrooms as rooms
 from services import guide_versions as versions
 from services import viewer_study
-from services import guide_access as access
+from services import guide_access
 from services import social_graph as graph
 from services.blocks import hidden_from, is_blocked
 from services.class_db import is_member
@@ -32,18 +34,10 @@ WRITE = [Depends(ai_rate_limit(30, 60))]
 MAX_OWNED = 50
 
 
-def _uid(authorization: str) -> str:
-    rooms.require_enabled()
-    return get_user_id(authorization)
-
-
-def _optional_uid(authorization: str) -> Optional[str]:
-    if not authorization:
-        return None
-    try:
-        return get_user_id(authorization)
-    except HTTPException:
-        return None
+OWN = access.own(rooms.require_enabled)
+MEMBER = access.classroom("member")
+STAFF = access.classroom("staff")
+OWNER = access.classroom("owner")
 
 
 def _course(db, class_id: Optional[str]) -> Optional[dict]:
@@ -63,6 +57,7 @@ def _summary(db, room: dict, me: Optional[dict]) -> dict:
         "members_can_add": bool(room.get("members_can_add")), "members_can_invite": bool(room.get("members_can_invite")),
         "class": {"id": course["id"], "code": course.get("course_code_normalized")} if course else None,
         "member_count": rooms.active_count(db, room["id"]),
+        "review_status": room.get("review_status") or "ok",
         "me": {"role": me.get("role"), "status": me.get("status"), "progress_visible_to_staff": bool(me.get("progress_visible_to_staff"))} if me else None,
         "can": {"add": bool(me) and me.get("status") == "active" and rooms.may_add(room, me),
                 "invite": bool(me) and me.get("status") == "active" and rooms.may_invite(room, me),
@@ -92,11 +87,11 @@ class ClassroomCreate(BaseModel):
 
 
 @router.get("")
-def my_classrooms(can_add: bool = False, authorization: str = Header(default="")):
+def my_classrooms(can_add: bool = False, ctx: Ctx = Depends(OWN)):
     """Classrooms you're in (and ones waiting on your approval request), newest first. can_add=true
-    lists only the ones you can add guides to (the "Add to classroom" picker)."""
-    user_id = _uid(authorization)
-    db = get_supabase()
+    lists only the ones you can add guides to (the "Add to classroom" picker). One held for review
+    shows only to its staff."""
+    user_id, db = ctx.user_id, ctx.db
     mine = db.table("classroom_members").select("*").eq("user_id", user_id).in_("status", ["active", "pending"]).execute().data or []
     if not mine:
         return {"classrooms": []}
@@ -107,16 +102,17 @@ def my_classrooms(can_add: bool = False, authorization: str = Header(default="")
         me = by_id[room["id"]]
         if room.get("archived_at") or (can_add and (me.get("status") != "active" or not rooms.may_add(room, me))):
             continue
+        if access.held(room) and not rooms.is_staff(me):
+            continue
         out.append(_summary(db, room, me))
     return {"classrooms": out}
 
 
 @router.post("", dependencies=[Depends(ai_rate_limit(5, 60))])
-def create_classroom(body: ClassroomCreate, authorization: str = Header(default="")):
+def create_classroom(body: ClassroomCreate, ctx: Ctx = Depends(OWN)):
     """A new study group, or a request for an instructor class: it works as a study group until an
     admin approves it."""
-    user_id = _uid(authorization)
-    db = get_supabase()
+    user_id, db = ctx.user_id, ctx.db
     owned = db.table("classrooms").select("id").eq("owner_id", user_id).is_("archived_at", "null").execute().data or []
     if len(owned) >= MAX_OWNED:
         raise HTTPException(status_code=409, detail="You own the most classrooms you can. Archive one first.")
@@ -143,17 +139,16 @@ def create_classroom(body: ClassroomCreate, authorization: str = Header(default=
 
 
 @router.get("/for-class/{class_id}")
-def course_classrooms(class_id: str, authorization: str = Header(default="")):
-    """Public classrooms for a course (its page's "Classrooms for this course")."""
-    user_id = _uid(authorization)
-    db = get_supabase()
+def course_classrooms(class_id: str, ctx: Ctx = Depends(OWN)):
+    """Public classrooms for a course (its page's "Classrooms for this course"), minus held ones."""
+    user_id, db = ctx.user_id, ctx.db
     found = (db.table("classrooms").select("*").eq("class_id", require_uuid(class_id, "class ID")).eq("visibility", "public")
              .is_("archived_at", "null").limit(50).execute().data or [])
     hidden = hidden_from(db, user_id)
     owners = graph.cards(db, [r["owner_id"] for r in found])
     out = []
     for room in found:
-        if room["owner_id"] in hidden:
+        if room["owner_id"] in hidden or access.held(room):
             continue
         me = rooms.membership(db, room["id"], user_id)
         out.append({"id": room["id"], "name": room["name"], "kind": room.get("kind"), "member_count": rooms.active_count(db, room["id"]),
@@ -163,26 +158,24 @@ def course_classrooms(class_id: str, authorization: str = Header(default="")):
 
 
 @router.get("/suggestions", dependencies=[Depends(ai_rate_limit(60, 60))])
-def suggestions(authorization: str = Header(default="")):
+def suggestions(ctx: Ctx = Depends(OWN)):
     """From your courses this term (Canvas, the calendar or added by hand): public classrooms for those
     courses you aren't in, and classmates who let people in their courses find them
     (services/classmates.py has who is never suggested)."""
-    user_id = _uid(authorization)
-    return classmates.suggestions(get_supabase(), user_id)
+    return classmates.suggestions(ctx.db, ctx.user_id)
 
 
 @router.get("/due")
-def due_across_classrooms(authorization: str = Header(default="")):
+def due_across_classrooms(ctx: Ctx = Depends(OWN)):
     """For the Dashboard: how much is due in each of your classrooms (your own progress on its
-    guides), most first. Classrooms with nothing due are left out."""
-    user_id = _uid(authorization)
-    db = get_supabase()
+    guides), most first. Classrooms with nothing due, or held for review, are left out."""
+    user_id, db = ctx.user_id, ctx.db
     mine = db.table("classroom_members").select("classroom_id").eq("user_id", user_id).eq("status", "active").execute().data or []
-    found = db.table("classrooms").select("id,name,archived_at").in_("id", [m["classroom_id"] for m in mine]).execute().data or [] if mine else []
+    found = db.table("classrooms").select("*").in_("id", [m["classroom_id"] for m in mine]).execute().data or [] if mine else []
     today = cstudy.today_iso()
     out = []
     for room in found:
-        if room.get("archived_at"):
+        if room.get("archived_at") or access.held(room):
             continue
         due = 0
         for guide in cstudy.classroom_guides(db, user_id, room["id"]):
@@ -196,11 +189,8 @@ def due_across_classrooms(authorization: str = Header(default="")):
 
 
 @router.get("/{classroom_id}")
-def get_classroom(classroom_id: str, authorization: str = Header(default="")):
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
-    return {"classroom": _summary(db, room, me)}
+def get_classroom(ctx: Ctx = Depends(MEMBER)):
+    return {"classroom": _summary(ctx.db, ctx.room, ctx.me)}
 
 
 class ClassroomUpdate(BaseModel):
@@ -213,10 +203,8 @@ class ClassroomUpdate(BaseModel):
 
 
 @router.patch("/{classroom_id}", dependencies=WRITE)
-def update_classroom(classroom_id: str, body: ClassroomUpdate, authorization: str = Header(default="")):
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id, staff=True)
+def update_classroom(body: ClassroomUpdate, ctx: Ctx = Depends(STAFF)):
+    db, room, me = ctx.db, ctx.room, ctx.me
     changes = body.model_dump(exclude_none=True)
     if "name" in changes:
         changes["name"] = changes["name"].strip()
@@ -230,13 +218,9 @@ def update_classroom(classroom_id: str, body: ClassroomUpdate, authorization: st
 
 
 @router.post("/{classroom_id}/archive", dependencies=WRITE)
-def archive_classroom(classroom_id: str, authorization: str = Header(default="")):
+def archive_classroom(ctx: Ctx = Depends(OWNER)):
     """Close a classroom for everyone (owner only). Guides stay with their authors."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
-    if me.get("role") != "owner":
-        raise HTTPException(status_code=403, detail="Only the owner can archive a classroom.")
+    db, room = ctx.db, ctx.room
     db.table("classrooms").update({"archived_at": rooms.now().isoformat()}).eq("id", room["id"]).execute()
     db.table("classroom_invites").update({"revoked_at": rooms.now().isoformat()}).eq("classroom_id", room["id"]).is_("revoked_at", "null").execute()
     return {"archived": True}
@@ -244,12 +228,10 @@ def archive_classroom(classroom_id: str, authorization: str = Header(default="")
 
 # Members --------------------------------------------------------------------------------------------
 @router.get("/{classroom_id}/members")
-def list_members(classroom_id: str, authorization: str = Header(default="")):
+def list_members(ctx: Ctx = Depends(MEMBER)):
     """Everyone in the classroom (staff also see who's waiting). People either side has blocked
     are left out."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+    user_id, db, room, me = ctx.user_id, ctx.db, ctx.room, ctx.me
     statuses = ["active", "pending"] if rooms.is_staff(me) else ["active"]
     rows = db.table("classroom_members").select("user_id,role,status,joined_at").eq("classroom_id", room["id"]).in_("status", statuses).execute().data or []
     hidden = hidden_from(db, user_id)
@@ -277,12 +259,8 @@ class RoleChange(BaseModel):
 
 
 @router.patch("/{classroom_id}/members/{target_id}", dependencies=WRITE)
-def change_role(classroom_id: str, target_id: str, body: RoleChange, authorization: str = Header(default="")):
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
-    if me.get("role") != "owner":
-        raise HTTPException(status_code=403, detail="Only the owner can change roles.")
+def change_role(target_id: str, body: RoleChange, ctx: Ctx = Depends(OWNER)):
+    db, room = ctx.db, ctx.room
     target = _target(db, room, target_id)
     if target["role"] == "owner" or target.get("status") != "active":
         raise HTTPException(status_code=400, detail="Pick an active member who isn't the owner.")
@@ -293,10 +271,8 @@ def change_role(classroom_id: str, target_id: str, body: RoleChange, authorizati
 
 
 @router.post("/{classroom_id}/members/{target_id}/approve", dependencies=WRITE)
-def approve_member(classroom_id: str, target_id: str, authorization: str = Header(default="")):
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, _ = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id, staff=True)
+def approve_member(target_id: str, ctx: Ctx = Depends(STAFF)):
+    db, room = ctx.db, ctx.room
     target = _target(db, room, target_id)
     if target["status"] != "pending":
         return {"status": target["status"]}
@@ -309,11 +285,9 @@ def approve_member(classroom_id: str, target_id: str, authorization: str = Heade
 
 
 @router.delete("/{classroom_id}/members/{target_id}", dependencies=WRITE)
-def remove_member(classroom_id: str, target_id: str, authorization: str = Header(default="")):
+def remove_member(target_id: str, ctx: Ctx = Depends(STAFF)):
     """Remove a member, or decline someone waiting. Their own guides and folders leave with them."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id, staff=True)
+    db, room, me = ctx.db, ctx.room, ctx.me
     target = _target(db, room, target_id)
     if target["status"] == "active" and not rooms.may_remove(me, target):
         raise HTTPException(status_code=403, detail="You can't remove that member.")
@@ -323,13 +297,8 @@ def remove_member(classroom_id: str, target_id: str, authorization: str = Header
 
 
 @router.post("/{classroom_id}/leave", dependencies=WRITE)
-def leave_classroom(classroom_id: str, authorization: str = Header(default="")):
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room = rooms.load(db, require_uuid(classroom_id, "classroom ID"))
-    me = rooms.membership(db, room["id"], user_id) if room else None
-    if not room or not me or me.get("status") == "removed":
-        raise HTTPException(status_code=404, detail="Classroom not found")
+def leave_classroom(ctx: Ctx = Depends(access.classroom("leave"))):
+    user_id, db, room, me = ctx.user_id, ctx.db, ctx.room, ctx.me
     if me.get("role") == "owner":
         raise HTTPException(status_code=409, detail="Make someone else the owner before you leave.")
     db.table("classroom_members").update({"status": "removed"}).eq("classroom_id", room["id"]).eq("user_id", user_id).execute()
@@ -342,13 +311,9 @@ class Transfer(BaseModel):
 
 
 @router.post("/{classroom_id}/transfer", dependencies=WRITE)
-def transfer_ownership(classroom_id: str, body: Transfer, authorization: str = Header(default="")):
+def transfer_ownership(body: Transfer, ctx: Ctx = Depends(OWNER)):
     """Hand the classroom to another active member; you become an admin."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
-    if me.get("role") != "owner":
-        raise HTTPException(status_code=403, detail="Only the owner can do that.")
+    user_id, db, room = ctx.user_id, ctx.db, ctx.room
     target = _target(db, room, body.user_id)
     if target["user_id"] == user_id or target.get("status") != "active":
         raise HTTPException(status_code=400, detail="Pick another active member.")
@@ -365,12 +330,10 @@ class MySettings(BaseModel):
 
 
 @router.patch("/{classroom_id}/me", dependencies=WRITE)
-def my_settings(classroom_id: str, body: MySettings, authorization: str = Header(default="")):
+def my_settings(body: MySettings, ctx: Ctx = Depends(MEMBER)):
     """Whether this classroom's staff can see your progress (instructor classes), and your own test
     date for studying it (Stage 6; otherwise the nearest milestone is used)."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, _ = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+    user_id, db, room = ctx.user_id, ctx.db, ctx.room
     change = {}
     if body.progress_visible_to_staff is not None:
         change["progress_visible_to_staff"] = body.progress_visible_to_staff
@@ -398,11 +361,9 @@ def _live_invites(db, room: dict, me: dict) -> list:
 
 
 @router.get("/{classroom_id}/invites")
-def list_invites(classroom_id: str, authorization: str = Header(default="")):
+def list_invites(ctx: Ctx = Depends(MEMBER)):
     """Links and codes that still work (staff see all; members see their own)."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+    db, room, me = ctx.db, ctx.room, ctx.me
     if not rooms.may_invite(room, me):
         raise HTTPException(status_code=403, detail="Only the owner and admins can invite people here.")
     return {"invites": [_invite_out(i) for i in _live_invites(db, room, me)], "private": room.get("visibility") == "private"}
@@ -414,10 +375,8 @@ class InviteCreate(BaseModel):
 
 
 @router.post("/{classroom_id}/invites", dependencies=WRITE)
-def create_invite(classroom_id: str, body: InviteCreate, authorization: str = Header(default="")):
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+def create_invite(body: InviteCreate, ctx: Ctx = Depends(MEMBER)):
+    user_id, db, room, me = ctx.user_id, ctx.db, ctx.room, ctx.me
     if not rooms.may_invite(room, me):
         raise HTTPException(status_code=403, detail="Only the owner and admins can invite people here.")
     if room.get("visibility") == "private":
@@ -427,31 +386,20 @@ def create_invite(classroom_id: str, body: InviteCreate, authorization: str = He
     return {"invite": _invite_out(rooms.make_invite(db, room["id"], user_id, expires_days=body.expires_days, max_uses=body.max_uses))}
 
 
-def _own_invite(db, user_id: str, invite_id: str) -> tuple:
-    invite = (db.table("classroom_invites").select("*").eq("id", require_uuid(invite_id, "invite ID")).limit(1).execute().data or [None])[0]
-    if not invite:
-        raise HTTPException(status_code=404, detail="Invite not found")
-    room, me = rooms.member_of(db, invite["classroom_id"], user_id)
-    if not rooms.is_staff(me) and invite.get("created_by") != user_id:
-        raise HTTPException(status_code=403, detail="You can only change invites you made.")
-    return invite, room, me
+INVITE = access.invite()
 
 
 @router.post("/invites/{invite_id}/revoke", dependencies=WRITE)
-def revoke_invite(invite_id: str, authorization: str = Header(default="")):
-    user_id = _uid(authorization)
-    db = get_supabase()
-    invite, _, _ = _own_invite(db, user_id, invite_id)
+def revoke_invite(ctx: Ctx = Depends(INVITE)):
+    db, invite = ctx.db, ctx.invite
     db.table("classroom_invites").update({"revoked_at": rooms.now().isoformat()}).eq("id", invite["id"]).execute()
     return {"revoked": True}
 
 
 @router.post("/invites/{invite_id}/regenerate", dependencies=WRITE)
-def regenerate_invite(invite_id: str, authorization: str = Header(default="")):
+def regenerate_invite(ctx: Ctx = Depends(INVITE)):
     """A new link and code with the same limits; the old ones stop working."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    invite, room, _ = _own_invite(db, user_id, invite_id)
+    user_id, db, invite, room = ctx.user_id, ctx.db, ctx.invite, ctx.room
     db.table("classroom_invites").update({"revoked_at": rooms.now().isoformat()}).eq("id", invite["id"]).execute()
     days = None
     if invite.get("expires_at") and invite.get("created_at"):
@@ -466,12 +414,10 @@ class FriendInvite(BaseModel):
 
 
 @router.post("/{classroom_id}/invite-friends", dependencies=[Depends(ai_rate_limit(10, 60))])
-def invite_friends(classroom_id: str, body: FriendInvite, authorization: str = Header(default="")):
+def invite_friends(body: FriendInvite, ctx: Ctx = Depends(MEMBER)):
     """Invite friends by name: each gets a notification with a one-time invite. Only friends, and
     never anyone either side has blocked."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+    user_id, db, room, me = ctx.user_id, ctx.db, ctx.room, ctx.me
     if not rooms.may_invite(room, me):
         raise HTTPException(status_code=403, detail="Only the owner and admins can invite people here.")
     sent = 0
@@ -497,18 +443,16 @@ class JoinRequest(BaseModel):
 
 
 @router.post("/join", dependencies=[Depends(ai_rate_limit(20, 60))])
-def join_classroom(body: JoinRequest, authorization: str = Header(default="")):
+def join_classroom(body: JoinRequest, ctx: Ctx = Depends(OWN)):
     """Join with an invite link or code. Approval classrooms put you in line; an instructor class
-    first asks whether its staff can see your progress (409 consent_required until answered)."""
-    user_id = _uid(authorization)
-    db = get_supabase()
+    first asks whether its staff can see your progress (409 consent_required until answered).
+    The classroom comes from the body, so the route runs access.join_problem itself."""
+    user_id, db = ctx.user_id, ctx.db
     if not body.token and not body.code:
         raise HTTPException(status_code=400, detail="Enter a code or open an invite link.")
     invite = rooms.find_invite(db, token=body.token, code=body.code)
     room = rooms.load(db, invite["classroom_id"]) if invite else None
-    problem = rooms.invite_problem(invite, room, user_id)
-    if not problem and rooms.blocked_with(db, user_id, room, invite):
-        problem = "This invite isn't valid."
+    problem = access.join_problem(db, user_id, room, invite)
     if problem:
         raise HTTPException(status_code=404, detail=problem)
     result = rooms.join(db, room, user_id, body.share_progress)
@@ -522,31 +466,23 @@ class RequestJoin(BaseModel):
 
 
 @router.post("/{classroom_id}/request-join", dependencies=[Depends(ai_rate_limit(20, 60))])
-def request_join(classroom_id: str, body: RequestJoin, authorization: str = Header(default="")):
+def request_join(body: RequestJoin, ctx: Ctx = Depends(access.classroom("listed"))):
     """Join a public classroom from its course page."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room = rooms.load(db, require_uuid(classroom_id, "classroom ID"))
-    if not room or room.get("archived_at") or room.get("visibility") != "public" or rooms.blocked_with(db, user_id, room):
-        raise HTTPException(status_code=404, detail="Classroom not found")
-    return {**rooms.join(db, room, user_id, body.share_progress), "classroom_id": room["id"]}
+    return {**rooms.join(ctx.db, ctx.room, ctx.user_id, body.share_progress), "classroom_id": ctx.room["id"]}
 
 
 @join_router.get("/{token}", dependencies=[Depends(ai_rate_limit(60, 60))])
-def preview_invite(token: str, authorization: str = Header(default="")):
+def preview_invite(token: str, ctx: Ctx = Depends(access.public())):
     """What an invite leads to, for the join screen: name, size, owner. Works signed out for links
     and codes; an invite by name only shows to the person it's for."""
     rooms.require_enabled()
-    viewer = _optional_uid(authorization)
-    db = get_supabase()
+    viewer, db = ctx.user_id, ctx.db
     is_code = len(rooms.clean_code(token)) == 8 and len(token) <= 10
     invite = rooms.find_invite(db, code=token) if is_code else rooms.find_invite(db, token=token[:64])
     room = rooms.load(db, invite["classroom_id"]) if invite else None
-    problem = rooms.invite_problem(invite, room, viewer)
+    problem = access.join_problem(db, viewer, room, invite)
     if not problem and invite.get("invitee_id") and not viewer:
         problem = "Sign in to see this invite."
-    if not problem and viewer and rooms.blocked_with(db, viewer, room, invite):
-        problem = "This invite isn't valid."
     if problem:
         return {"valid": False, "reason": problem}
     owner = graph.cards(db, [room["owner_id"]]).get(room["owner_id"])
@@ -560,25 +496,23 @@ def preview_invite(token: str, authorization: str = Header(default="")):
 
 # Items ----------------------------------------------------------------------------------------------
 def _guide_card(db, guide: dict, viewer: str) -> dict:
-    return {"id": guide["id"], "title": guide.get("title") or "Untitled", "question_count": access.question_count(guide),
-            "author": access.author(db, guide), "is_mine": guide.get("user_id") == viewer}
+    return {"id": guide["id"], "title": guide.get("title") or "Untitled", "question_count": guide_access.question_count(guide),
+            "author": guide_access.author(db, guide), "is_mine": guide.get("user_id") == viewer}
 
 
 @router.get("/{classroom_id}/items")
-def list_items(classroom_id: str, authorization: str = Header(default="")):
+def list_items(ctx: Ctx = Depends(MEMBER)):
     """Guides and folders shared here, in order, with milestones. A folder lists every guide in it
     now. Guides you can't see (hidden, held, blocked, removed) are left out."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+    user_id, db, room, me = ctx.user_id, ctx.db, ctx.room, ctx.me
     items = db.table("classroom_items").select("*").eq("classroom_id", room["id"]).order("position").execute().data or []
     guide_ids = [i["item_id"] for i in items if i["item_type"] == "guide"]
     folder_ids = [i["item_id"] for i in items if i["item_type"] == "folder"]
-    guides = {g["id"]: g for g in (db.table("study_guides").select(access.GUIDE_COLUMNS).in_("id", guide_ids).execute().data or [])} if guide_ids else {}
+    guides = {g["id"]: g for g in (db.table("study_guides").select(guide_access.GUIDE_COLUMNS).in_("id", guide_ids).execute().data or [])} if guide_ids else {}
     folders = {f["id"]: f for f in (db.table("folders").select("id,user_id,name").in_("id", folder_ids).execute().data or [])} if folder_ids else {}
     in_folders = {}
     if folders:
-        for guide in db.table("study_guides").select(access.GUIDE_COLUMNS).in_("folder_id", list(folders)).execute().data or []:
+        for guide in db.table("study_guides").select(guide_access.GUIDE_COLUMNS).in_("folder_id", list(folders)).execute().data or []:
             folder = folders.get(guide.get("folder_id"))
             if folder and guide.get("user_id") == folder.get("user_id"):
                 in_folders.setdefault(folder["id"], []).append(guide)
@@ -590,12 +524,12 @@ def list_items(classroom_id: str, authorization: str = Header(default="")):
                 "added_by": adders.get(item.get("added_by")), "removable": rooms.is_staff(me) or item.get("added_by") == user_id}
         if item["item_type"] == "guide":
             guide = guides.get(item["item_id"])
-            if guide and access.can_view(db, user_id, guide):
+            if guide and guide_access.can_view(db, user_id, guide):
                 out.append({**base, "guide": _guide_card(db, guide, user_id)})
         else:
             folder = folders.get(item["item_id"])
             if folder:
-                shown = [g for g in in_folders.get(folder["id"], []) if access.can_view(db, user_id, g)]
+                shown = [g for g in in_folders.get(folder["id"], []) if guide_access.can_view(db, user_id, g)]
                 out.append({**base, "folder": {"id": folder["id"], "name": folder.get("name") or "Folder",
                                                "guides": [_guide_card(db, g, user_id) for g in sorted(shown, key=lambda g: str(g.get("title") or ""))]}})
     return {"items": out}
@@ -609,18 +543,16 @@ class ItemAdd(BaseModel):
 
 
 @router.post("/{classroom_id}/items", dependencies=WRITE)
-def add_item(classroom_id: str, body: ItemAdd, authorization: str = Header(default="")):
+def add_item(body: ItemAdd, ctx: Ctx = Depends(MEMBER)):
     """Share one of your guides or folders (or a public guide) with the classroom. Your own private
     guide becomes visible to the classroom's members (and your class, if it has one); a folder
     shares everything in it, now and later, with members only."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+    user_id, db, room, me = ctx.user_id, ctx.db, ctx.room, ctx.me
     if not rooms.may_add(room, me):
         raise HTTPException(status_code=403, detail="Only the owner and admins add guides here.")
     item_id = require_uuid(body.item_id, "item ID")
     if body.item_type == "guide":
-        guide = access.load(db, item_id, access.GUIDE_COLUMNS + ",linked_set_id")
+        guide = guide_access.load(db, item_id, guide_access.GUIDE_COLUMNS + ",linked_set_id")
         if not guide:
             raise HTTPException(status_code=404, detail="Guide not found")
         # A course opt-out (services/instructors.py): checked before anything is shared.
@@ -633,7 +565,7 @@ def add_item(classroom_id: str, body: ItemAdd, authorization: str = Header(defau
                 if _is_others_copy(db, guide):
                     raise HTTPException(status_code=400, detail="A copy of someone else's guide stays private.")
                 db.table("study_guides").update({"visibility": "classroom"}).eq("id", guide["id"]).eq("user_id", user_id).execute()
-        elif not (access.can_view(db, user_id, guide) and guide.get("visibility") in ("public", "link")):
+        elif not (guide_access.can_view(db, user_id, guide) and guide.get("visibility") in ("public", "link")):
             raise HTTPException(status_code=403, detail="You can add your own guides, or public ones.")
     else:
         folder = (db.table("folders").select("id,user_id,class_id").eq("id", item_id).limit(1).execute().data or [None])[0]
@@ -660,11 +592,9 @@ class ItemUpdate(BaseModel):
 
 
 @router.patch("/{classroom_id}/items/{item_type}/{item_id}", dependencies=WRITE)
-def set_milestone(classroom_id: str, item_type: Literal["guide", "folder"], item_id: str, body: ItemUpdate, authorization: str = Header(default="")):
+def set_milestone(item_type: Literal["guide", "folder"], item_id: str, body: ItemUpdate, ctx: Ctx = Depends(STAFF)):
     """A milestone on an item ("Unit 2 quiz", a date). Empty clears it. Staff only."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, _ = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id, staff=True)
+    user_id, db, room = ctx.user_id, ctx.db, ctx.room
     label = (body.milestone_label or "").strip() or None
     when = body.milestone_date.isoformat() if body.milestone_date else None
     updated = db.table("classroom_items").update({"milestone_label": label, "milestone_date": when}) \
@@ -677,10 +607,8 @@ def set_milestone(classroom_id: str, item_type: Literal["guide", "folder"], item
 
 
 @router.delete("/{classroom_id}/items/{item_type}/{item_id}", dependencies=WRITE)
-def remove_item(classroom_id: str, item_type: Literal["guide", "folder"], item_id: str, authorization: str = Header(default="")):
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+def remove_item(item_type: Literal["guide", "folder"], item_id: str, ctx: Ctx = Depends(MEMBER)):
+    user_id, db, room, me = ctx.user_id, ctx.db, ctx.room, ctx.me
     item = (db.table("classroom_items").select("added_by").eq("classroom_id", room["id"]).eq("item_type", item_type)
             .eq("item_id", require_uuid(item_id, "item ID")).limit(1).execute().data or [None])[0]
     if not item:
@@ -701,11 +629,9 @@ class ItemOrder(BaseModel):
 
 
 @router.put("/{classroom_id}/items/order", dependencies=WRITE)
-def reorder_items(classroom_id: str, body: ItemOrder, authorization: str = Header(default="")):
+def reorder_items(body: ItemOrder, ctx: Ctx = Depends(STAFF)):
     """The order items show in (staff). Items not listed keep their place after the listed ones."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, _ = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id, staff=True)
+    db, room = ctx.db, ctx.room
     for position, ref in enumerate(body.items, start=1):
         db.table("classroom_items").update({"position": position}).eq("classroom_id", room["id"]) \
             .eq("item_type", ref.item_type).eq("item_id", require_uuid(ref.item_id, "item ID")).execute()
@@ -714,14 +640,12 @@ def reorder_items(classroom_id: str, body: ItemOrder, authorization: str = Heade
 
 # Studying the classroom (Stage 6) -------------------------------------------------------------------
 @router.get("/{classroom_id}/study")
-def study_payload(classroom_id: str, guide_ids: str = "", authorization: str = Header(default="")):
+def study_payload(guide_ids: str = "", ctx: Ctx = Depends(MEMBER)):
     """Everything a mixed review round needs across the classroom's guides (or the ones picked in
     guide_ids): each guide's cards and questions with your own progress, as the study screens read
     it. Someone else's guide comes as the version you're on (Stage 4); without per-viewer progress
     switched on, only your own guides are included and `skipped` says how many weren't."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+    user_id, db, room, me = ctx.user_id, ctx.db, ctx.room, ctx.me
     picked = {require_uuid(i, "guide ID") for i in guide_ids.split(",") if i.strip()} if guide_ids else None
     out, skipped = [], 0
     for guide in cstudy.classroom_guides(db, user_id, room["id"]):
@@ -752,13 +676,11 @@ def study_payload(classroom_id: str, guide_ids: str = "", authorization: str = H
 
 
 @router.get("/{classroom_id}/progress")
-def classroom_progress(classroom_id: str, authorization: str = Header(default="")):
+def classroom_progress(ctx: Ctx = Depends(MEMBER)):
     """Your own readiness per guide and combined (weighted by each guide's number of ideas); in a
     study group, anonymous "knows / still learning" counts per question where at least 3 members
     studied the guide; in an instructor class, staff also see members who chose to share."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+    user_id, db, room, me = ctx.user_id, ctx.db, ctx.room, ctx.me
     today = cstudy.today_iso()
     guides = cstudy.classroom_guides(db, user_id, room["id"])
     members = db.table("classroom_members").select("user_id,progress_visible_to_staff").eq("classroom_id", room["id"]).eq("status", "active").execute().data or []
@@ -786,30 +708,21 @@ def classroom_progress(classroom_id: str, authorization: str = Header(default=""
 
 
 # Instructor dashboard (services/instructor_dashboard.py) ---------------------------------------------
-def _instructor_room(db, classroom_id: str, user_id: str) -> dict:
-    room, me = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
-    if room.get("kind") != "instructor_class" or not rooms.is_staff(me):
-        raise HTTPException(status_code=403, detail="Only the staff of an instructor class see this.")
-    return room
+INSTRUCTOR_STAFF = access.classroom("instructor_staff")
 
 
 @router.get("/{classroom_id}/instructor", dependencies=[Depends(ai_rate_limit(60, 60))])
-def instructor_dashboard(classroom_id: str, authorization: str = Header(default="")):
+def instructor_dashboard(ctx: Ctx = Depends(INSTRUCTOR_STAFF)):
     """Class readiness per guide, the weakest ideas, upcoming milestones and the member list with each
     member's sharing choice. Only members who share their progress with staff are counted."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room = _instructor_room(db, classroom_id, user_id)
-    return idash.public(idash.build(db, user_id, room))
+    return idash.public(idash.build(ctx.db, ctx.user_id, ctx.room))
 
 
 @router.get("/{classroom_id}/instructor.csv", dependencies=[Depends(ai_rate_limit(10, 60))])
-def instructor_csv(classroom_id: str, authorization: str = Header(default="")):
+def instructor_csv(ctx: Ctx = Depends(INSTRUCTOR_STAFF)):
     """The sharing members' readiness per guide as CSV. Members who don't share never appear."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room = _instructor_room(db, classroom_id, user_id)
-    text = idash.csv_text(idash.build(db, user_id, room))
+    room = ctx.room
+    text = idash.csv_text(idash.build(ctx.db, ctx.user_id, room))
     name = "".join(ch if ch.isalnum() else "-" for ch in room["name"].lower()).strip("-")[:40] or "classroom"
     return Response(content=text, media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="{name}-progress.csv"', "Cache-Control": "no-store"})
@@ -817,11 +730,9 @@ def instructor_csv(classroom_id: str, authorization: str = Header(default="")):
 
 # Activity -------------------------------------------------------------------------------------------
 @router.get("/{classroom_id}/activity")
-def activity(classroom_id: str, authorization: str = Header(default="")):
+def activity(ctx: Ctx = Depends(MEMBER)):
     """The newest 50 events: who joined, what was added, milestones set."""
-    user_id = _uid(authorization)
-    db = get_supabase()
-    room, _ = rooms.member_of(db, require_uuid(classroom_id, "classroom ID"), user_id)
+    user_id, db, room = ctx.user_id, ctx.db, ctx.room
     rows = db.table("classroom_activity").select("id,actor_id,kind,payload,created_at").eq("classroom_id", room["id"]) \
         .order("created_at", desc=True).limit(50).execute().data or []
     hidden = hidden_from(db, user_id)

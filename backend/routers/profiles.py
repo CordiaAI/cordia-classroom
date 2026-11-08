@@ -2,7 +2,9 @@
 
 Everything goes through here: user_profiles stays readable only by its owner in the database (it
 holds email and timezone), so other people's profiles are built field by field for the viewer.
-Blocked pairs get a 404 both ways, as if the profile didn't exist.
+access.profile() decides who may open a profile at all: blocked pairs, profiles held for review and
+a minor's profile for anyone but their friends are all a 404, as if the profile didn't exist. With
+the strict minor rules on (MINOR_SAFETY) a minor's profile is private whatever the setting says.
 """
 
 from __future__ import annotations
@@ -11,14 +13,13 @@ import logging
 from datetime import date, datetime, timezone
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 
-from auth_utils import get_user_id
-from database import get_supabase
+import access
+from access import Ctx
 from rate_limit import ai_rate_limit
 from services import classmates, guide_access, instructors, minors, social_graph, usernames
-from services.blocks import is_blocked
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/profiles", tags=["profiles"])
@@ -57,13 +58,15 @@ def _streak(db, user_id: str) -> int:
 def _me(db, user_id: str) -> dict:
     profile = _own_profile(db, user_id)
     next_change = usernames.next_change_at(profile) if profile.get("username") else None
+    locked = minors.strict_minor(db, user_id)
     out = {key: profile.get(key) for key in PRIVATE_FIELDS}
     out.update({
         "id": user_id,
         "name": profile.get("name") or "",
         "school": profile.get("university") or "",
         "initials": _initials(profile),
-        "profile_visibility": profile.get("profile_visibility") or "public",
+        "profile_visibility": "private" if locked else profile.get("profile_visibility") or "public",
+        "profile_locked": locked,
         "allow_follows": profile.get("allow_follows") or "everyone",
         "allow_friend_requests": profile.get("allow_friend_requests") or "everyone",
         "show_school": profile.get("show_school") is not False,
@@ -82,6 +85,11 @@ def _me(db, user_id: str) -> dict:
             minor = {}
         out["find_by_classmates"] = classmates.findable(minor)
         out["find_by_classmates_available"] = False
+    try:  # its own query: the columns arrive with migration 20261126120000
+        review = _one(db.table("user_profiles").select("review_status,hold_reason").eq("id", user_id).limit(1).execute()) or {}
+        out["review_status"] = review.get("review_status") or "ok"
+    except Exception:
+        out["review_status"] = "ok"
     try:  # its own query, so /profiles/me keeps working before the Stage 3 migration
         accepted = _one(db.table("user_profiles").select("honor_code_accepted_at").eq("id", user_id).limit(1).execute())
         out["honor_code_accepted"] = bool(accepted and accepted.get("honor_code_accepted_at"))
@@ -94,18 +102,16 @@ def _me(db, user_id: str) -> dict:
 
 
 @router.get("/me")
-def get_my_profile(authorization: str = Header(default="")):
+def get_my_profile(ctx: Ctx = Depends(access.own())):
     """Your own profile and privacy settings, plus username suggestions while you have none."""
-    user_id = get_user_id(authorization)
-    return _me(get_supabase(), user_id)
+    return _me(ctx.db, ctx.user_id)
 
 
 @router.get("/check-username", dependencies=[Depends(ai_rate_limit(60, 60))])
-def check_username(u: str = Query(default="", max_length=64), authorization: str = Header(default="")):
+def check_username(u: str = Query(default="", max_length=64), ctx: Ctx = Depends(access.own())):
     """Whether you could take this username now, and why not."""
-    user_id = get_user_id(authorization)
     name = usernames.normalize(u)
-    problem = usernames.availability(get_supabase(), name, user_id)
+    problem = usernames.availability(ctx.db, name, ctx.user_id)
     return {"username": name, "available": problem is None, "reason": problem}
 
 
@@ -114,11 +120,10 @@ class UsernameRequest(BaseModel):
 
 
 @router.post("/me/username", dependencies=[Depends(ai_rate_limit(10, 60))])
-def set_username(body: UsernameRequest, authorization: str = Header(default="")):
+def set_username(body: UsernameRequest, ctx: Ctx = Depends(access.own())):
     """Claim a username, or change it (once every 30 days after the first change). The old one
     redirects to the new one for 90 days and is held for you in that time."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+    user_id, db = ctx.user_id, ctx.db
     name = usernames.normalize(body.username)
     profile = _own_profile(db, user_id)
     current = profile.get("username")
@@ -174,11 +179,13 @@ class ProfileSettings(BaseModel):
 
 
 @router.patch("/me", dependencies=[Depends(ai_rate_limit(30, 60))])
-def update_my_profile(body: ProfileSettings, authorization: str = Header(default="")):
-    """Display name and privacy settings. Only the fields sent change."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+def update_my_profile(body: ProfileSettings, ctx: Ctx = Depends(access.own())):
+    """Display name and privacy settings. Only the fields sent change. With the strict minor rules
+    on, a minor's profile stays private."""
+    user_id, db = ctx.user_id, ctx.db
     updates = body.model_dump(exclude_unset=True)
+    if updates.get("profile_visibility") not in (None, "private") and minors.strict_minor(db, user_id):
+        raise HTTPException(status_code=403, detail="Profiles stay private for students under 18.")
     findable = updates.pop("find_by_classmates", None)
     if "display_name" in updates:
         updates["display_name"] = updates["display_name"] or None  # empty clears it
@@ -198,34 +205,16 @@ def update_my_profile(body: ProfileSettings, authorization: str = Header(default
     return _me(db, user_id)
 
 
-def _find(db, name: str) -> Optional[dict]:
-    return _one(db.table("user_profiles").select(PROFILE_COLUMNS).eq("username", name).limit(1).execute())
-
-
 @router.get("/{username}", dependencies=[Depends(ai_rate_limit(120, 60))])
-def get_profile(username: str, authorization: str = Header(default="")):
+def get_profile(ctx: Ctx = Depends(access.profile())):
     """A student's profile as this viewer may see it. A username released in the last 90 days
-    answers with where it moved ({"redirect": new}); blocked pairs and unknown names are 404."""
-    viewer = get_user_id(authorization)
-    db = get_supabase()
-    name = usernames.normalize(username)
-    if usernames.format_problem(name) not in (None, "That username is reserved."):
-        raise HTTPException(status_code=404, detail="Profile not found")
-    profile = _find(db, name)
-    if not profile:
-        holder = usernames.held_by(db, name, datetime.now(timezone.utc))
-        moved = _one(db.table("user_profiles").select("id,username").eq("id", holder).limit(1).execute()) if holder else None
-        if moved and moved.get("username") and not is_blocked(db, viewer, holder):
-            return {"redirect": moved["username"]}
-        raise HTTPException(status_code=404, detail="Profile not found")
+    answers with where it moved ({"redirect": new}); unknown, blocked or held profiles are 404."""
+    if ctx.redirect:
+        return {"redirect": ctx.redirect}
+    db, viewer, profile = ctx.db, ctx.user_id, ctx.person
     owner = profile["id"]
-    if is_blocked(db, viewer, owner):
-        raise HTTPException(status_code=404, detail="Profile not found")
     is_self = viewer == owner
-    # A minor's profile is for themselves and accepted friends only; to anyone else it isn't there.
-    if not is_self and minors.is_minor(db, owner) and not social_graph.are_friends(db, viewer, owner):
-        raise HTTPException(status_code=404, detail="Profile not found")
-    visibility = profile.get("profile_visibility") or "public"
+    visibility = "private" if minors.strict_minor(db, owner) else profile.get("profile_visibility") or "public"
     full = is_self or visibility == "public" or (visibility == "friends" and social_graph.are_friends(db, viewer, owner))
     out = {
         "id": owner,
@@ -240,11 +229,15 @@ def get_profile(username: str, authorization: str = Header(default="")):
         "folders": [],
         "classrooms": [],
     }
-    if not is_self:
+    if is_self:
+        out["review_status"] = profile.get("review_status") or "ok"
+    else:
         out["relationship"] = social_graph.relationship(db, viewer, owner)
         out["can_follow"] = True
         out["follows_need_approval"] = (profile.get("allow_follows") or "everyone") == "approval"
         friend_problem = social_graph.may_request_friend(db, viewer, profile)
+        if not friend_problem and minors.strict_minor(db, owner):
+            friend_problem = "This account doesn't take friend requests."
         out["can_friend"] = friend_problem is None or out["relationship"]["friendship"] != "none"
         out["friend_note"] = friend_problem if out["relationship"]["friendship"] == "none" else None
     if full:
@@ -256,4 +249,3 @@ def get_profile(username: str, authorization: str = Header(default="")):
         if profile.get("show_streak"):
             out["streak"] = _streak(db, owner)
     return out
-

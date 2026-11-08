@@ -1,34 +1,24 @@
-"""Public forms: instructor opt-out and copyright takedowns."""
+"""Public forms: instructor opt-out and copyright takedowns (guides, class sets and profiles)."""
 from __future__ import annotations
 
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
-from auth_utils import get_user_id
+import access
+from access import Ctx
 from database import get_supabase
 from rate_limit import ai_rate_limit
+from services import instructors, usernames
 from services.class_catalog import normalize_course_code
 from services.class_db import ensure_class
 
 router = APIRouter(tags=["public"])
 COPYRIGHT_EMAIL = "support@cordiaai.io"
-
-
-def _school_email_domains(school: dict) -> list[str]:
-    domains = [d.lower().lstrip("@") for d in school.get("email_domains") or [] if d]
-    host = (school.get("canvas_domain") or "").lower()
-    if not domains and host and not host.endswith(".instructure.com") and host.count(".") >= 2:
-        domains.append(host.split(".", 1)[1])  # canvas.missouri.edu -> missouri.edu
-    return domains
-
-
-def _email_matches(email: str, domains: list[str]) -> bool:
-    domain = email.rsplit("@", 1)[-1].lower()
-    return any(domain == d or domain.endswith("." + d) for d in domains)
 
 
 def _verified_email(user_id: str) -> str:
@@ -47,20 +37,19 @@ class BlockRequest(BaseModel):
 
 
 @router.get("/instructors/schools")
-def instructor_schools(q: str = "", _=Depends(ai_rate_limit(30, 60))):
+def instructor_schools(q: str = "", _=Depends(ai_rate_limit(30, 60)), ctx: Ctx = Depends(access.public())):
     q = re.sub(r"[%_,()]", " ", q).strip()
     if len(q) < 2:
         return {"schools": []}
-    rows = get_supabase().table("schools").select("id,name").ilike("name", f"%{q}%").limit(8).execute().data or []
+    rows = ctx.db.table("schools").select("id,name").ilike("name", f"%{q}%").limit(8).execute().data or []
     return {"schools": rows}
 
 
 @router.post("/instructors/block", dependencies=[Depends(ai_rate_limit(10, 3600))])
-def block_course(body: BlockRequest, authorization: str = Header(default="")):
+def block_course(body: BlockRequest, ctx: Ctx = Depends(access.own())):
     """An instructor with a verified school email turns sharing off for their course."""
-    user_id = get_user_id(authorization)
-    email = _verified_email(user_id)
-    db = get_supabase()
+    email = _verified_email(ctx.user_id)
+    db = ctx.db
     try:
         school_id = str(uuid.UUID(body.school_id))
     except ValueError:
@@ -68,8 +57,8 @@ def block_course(body: BlockRequest, authorization: str = Header(default="")):
     school = (db.table("schools").select("*").eq("id", school_id).limit(1).execute().data or [None])[0]
     if not school:
         raise HTTPException(status_code=404, detail="School not found")
-    domains = _school_email_domains(school)
-    if not domains or not _email_matches(email, domains):
+    domains = instructors.school_email_domains(school)
+    if not domains or not instructors.email_matches(email, domains):
         raise HTTPException(status_code=403, detail="Use your school email")
     if not normalize_course_code(body.course_code).code:
         raise HTTPException(status_code=400, detail="Use a course code like MGT 300")
@@ -90,15 +79,29 @@ class TakedownRequest(BaseModel):
 
 COPYRIGHT_HOLD = "Copyright report"
 _SET_ID = re.compile(r"set=([0-9a-fA-F-]{36})|/sets?/([0-9a-fA-F-]{36})")
+_PROFILE = re.compile(r"/u/([A-Za-z0-9_.]{1,64})(?![A-Za-z0-9_.])")
+
+
+def profile_from(location: str, db) -> Optional[str]:
+    """The user id behind a /u/<username> link (a recently released name still finds its owner)."""
+    found = _PROFILE.search(location or "")
+    if not found:
+        return None
+    name = usernames.normalize(found.group(1))
+    row = (db.table("user_profiles").select("id").eq("username", name).limit(1).execute().data or [None])[0]
+    if row:
+        return row["id"]
+    return usernames.held_by(db, name, datetime.now(timezone.utc))
 
 
 @router.post("/copyright/takedown", dependencies=[Depends(ai_rate_limit(5, 3600))])
-def takedown(body: TakedownRequest):
-    """Holds the named guide or class set at once for an admin to review (well inside the 24-hour
-    promise). The link can be a guide page (/sets/<guide id>) or an older class set link."""
+def takedown(body: TakedownRequest, ctx: Ctx = Depends(access.public())):
+    """A guide or class set named in the link (/sets/<guide id>, or an older class set link) is held
+    at once for an admin to review (well inside the 24-hour promise). A profile (/u/<username>)
+    goes to the admin queue without a hold: the form is anonymous and a whole profile is at stake."""
     if not body.statement:
         raise HTTPException(status_code=400, detail="Confirm the statement to continue")
-    db = get_supabase()
+    db = ctx.db
     set_id: Optional[str] = None
     guide_id: Optional[str] = None
     found = _SET_ID.search(body.location)
@@ -122,7 +125,13 @@ def takedown(body: TakedownRequest):
     }
     if guide_id:
         row["guide_id"] = guide_id
-    db.table("copyright_takedowns").insert(row).execute()
+    profile_id = None if (set_id or guide_id) else profile_from(body.location, db)
+    try:  # profile_id arrives with migration 20261126120000; before it, the link stays in `location`
+        db.table("copyright_takedowns").insert({**row, "profile_id": profile_id} if profile_id else row).execute()
+    except Exception:
+        if not profile_id:
+            raise
+        db.table("copyright_takedowns").insert(row).execute()
     if set_id:
         db.table("shared_sets").update({"status": "held", "hold_reason": COPYRIGHT_HOLD}).eq("id", set_id).in_("status", ["visible", "held"]).execute()
     if guide_id:
@@ -131,9 +140,7 @@ def takedown(body: TakedownRequest):
 
 
 @router.get("/instructors/opt-outs", dependencies=[Depends(ai_rate_limit(30, 60))])
-def my_opt_outs(authorization: str = Header(default="")):
+def my_opt_outs(ctx: Ctx = Depends(access.own())):
     """For a verified instructor: each course they turned sharing off for, and what that hides now
     (public guides out of Discover, class sets kept private, classrooms where adding is locked)."""
-    from services import instructors
-    user_id = get_user_id(authorization)
-    return {"courses": instructors.opt_out_report(get_supabase(), user_id)}
+    return {"courses": instructors.opt_out_report(ctx.db, ctx.user_id)}

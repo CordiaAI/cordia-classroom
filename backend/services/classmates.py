@@ -7,7 +7,7 @@ from Canvas sync, the calendar or added by hand):
 Classmates are never suggested when they:
   - are the student, a friend already, or someone they already follow
   - blocked the student or were blocked by them (either way)
-  - have a private profile, or no username yet
+  - have a private profile, no username yet, or a profile held for review
   - turned "Let classmates from my courses find me" off (user_profiles.find_by_classmates; it's on
     by default for adults and off by default for minors, so a minor shows only after opting in)
 A student marked as a minor gets classroom suggestions only, never people.
@@ -16,6 +16,7 @@ A student marked as a minor gets classroom suggestions only, never people.
 from __future__ import annotations
 
 from services import minors
+from services.moderation import held_profile_ids
 from services import social_graph as graph
 from services.blocks import hidden_from
 from services.class_catalog import term_for
@@ -64,12 +65,12 @@ def suggestions(db, user_id: str) -> dict:
     code_of = {c["class_id"]: c["code"] for c in courses.values()}
 
     # Classrooms for these courses that are listed on the course page.
-    rooms = db.table("classrooms").select("id,name,kind,class_id,owner_id,join_policy,visibility,archived_at") \
+    rooms = db.table("classrooms").select("*") \
         .in_("class_id", list(code_of)).eq("visibility", "public").execute().data or []
     mine = {m["classroom_id"]: m for m in db.table("classroom_members").select("classroom_id,status").eq("user_id", user_id).execute().data or []}
     room_rows = []
     for room in rooms:
-        if room.get("archived_at") or room["owner_id"] in hidden:
+        if room.get("archived_at") or room["owner_id"] in hidden or (room.get("review_status") or "ok") != "ok":
             continue
         status = (mine.get(room["id"]) or {}).get("status")
         if status in ("active", "pending"):
@@ -91,10 +92,16 @@ def suggestions(db, user_id: str) -> dict:
         friends = graph.friend_ids(db, user_id)
         following = {r["followee_id"] for r in db.table("follows").select("followee_id,status").eq("follower_id", user_id).execute().data or []}
         candidates = [uid for uid in shared if uid not in friends and uid not in following]
-        for profile in _profiles(db, candidates[:500]):
-            if not profile.get("username") or (profile.get("profile_visibility") or "public") == "private" or not findable(profile):
+        profiles = _profiles(db, candidates[:500])
+        young = minors.minor_ids(db, [p["id"] for p in profiles])
+        held = held_profile_ids(db, [p["id"] for p in profiles])
+        for profile in profiles:
+            minor = profile["id"] in young
+            if not profile.get("username") or (profile.get("profile_visibility") or "public") == "private" or profile["id"] in held \
+                    or not findable({**profile, "is_minor": minor}):
                 continue
-            minor = profile.get("is_minor") is True
+            if minor and minors.strict():  # the strict rules keep minors private
+                continue
             problem = graph.may_request_friend(db, user_id, profile)
             people.append({
                 "user_id": profile["id"], "username": profile["username"], "display_name": graph.shown_name(profile) or "Someone",
