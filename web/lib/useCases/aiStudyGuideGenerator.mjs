@@ -18,7 +18,7 @@ export default {
     'Then you study the guide in the same place, with Learn, Flashcards and Practice.',
   ],
   steps: [
-    'Choose New, then Upload, and add up to 5 files: PDFs, PowerPoint (.pptx), Word (.docx), images or text files.',
+    'Choose New, then Upload, and add up to 5 files: PDFs, PowerPoint (.pptx or .ppt), Word (.docx), photos or text files.',
     'Pick the class the guide belongs to, if you like, and choose Create.',
     'Cordia reads your material, finds the key ideas, writes questions and answers, and makes flashcards.',
     'Open the guide to read the outline or go through the questions page by page, then study it with Learn, Flashcards or Practice.',
@@ -34,18 +34,19 @@ export default {
   sections: [
     {
       question: 'How do I turn lecture slides into a study guide?',
-      answer: 'Upload the slide deck as a PowerPoint (.pptx) file or a PDF under New › Upload, then choose Create. Cordia reads every slide and writes the guide from what is on them.',
+      answer: 'Upload the slide deck as a PowerPoint file (.pptx or .ppt) or a PDF under New › Upload, then choose Create. Cordia reads every slide and writes the guide from what is on them.',
       paragraphs: [
-        'PowerPoint files are read slide by slide, so each slide\'s text stays together. Slides that only open on a web page, such as a Canvas page, can be captured with the Chrome extension instead.',
+        '.pptx files are read slide by slide, so each slide\'s text stays together, and older .ppt files are converted first. Slides that only open on a web page, such as a Canvas page, can be captured with the Chrome extension instead.',
       ],
     },
     {
       question: 'What files can I upload?',
-      answer: 'PDFs, PowerPoint (.pptx), Word (.docx), images (JPG, PNG, WebP or GIF) and text files, up to 5 files at once and 50 MB per file.',
+      answer: 'PDFs, PowerPoint (.pptx or .ppt), Word (.docx), photos and images (JPG, PNG, WebP, GIF, iPhone HEIC, BMP or TIFF) and text files, up to 5 files at once and 50 MB per file.',
       bullets: [
         'Scanned PDFs: a PDF with almost no selectable text (under 200 characters) is read from its page images, up to 20 pages, and counts as one AI reading action.',
-        'Photos and screenshots of notes are read the same way, one AI reading action each.',
-        'Older .doc and .ppt files: save them as .docx or .pptx first.',
+        'Photos and screenshots of notes are read the same way, one AI reading action each. iPhone photos (HEIC) upload as they are.',
+        'Text files include notes, data and code, such as .md, .csv, .json or .py files.',
+        'Older Word .doc and .rtf files: save them as .docx first.',
         'Audio: a recorded lecture goes through Record, not Upload. Record it or upload the recording there, and once the lecture is written up, choose Make study guide.',
         'Video files can\'t be uploaded yet.',
       ],
