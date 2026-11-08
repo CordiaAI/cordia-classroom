@@ -96,8 +96,7 @@ export default function PrivacyPolicy() {
         <Section title="5. Chrome Extension — Data Practices">
           <p>The Cordia Classroom Chrome extension:</p>
           <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
-            <li>Reads page content <strong style={{ color: 'var(--text-primary)' }}>only</strong> when you start a capture or explicitly ask the Tutor to capture the current page</li>
-            <li>Sends a presence signal while the side panel is open so Classroom can show whether browser capture is available; that signal does not include the current URL or page title</li>
+            <li>Reads page content <strong style={{ color: 'var(--text-primary)' }}>only</strong> when you click Make study guide, choose Make study guide from selection, or ask the Tutor a question before you have made a guide; the Cordia Classroom website can also ask it to read a Quizlet set or YouTube transcript you add there</li>
             <li>Does not monitor or collect your browsing history. The title, source URL, and bounded page context are sent only for the page you choose to capture</li>
             <li>Does not transmit browser cookies, passwords, form credentials, or unrestricted browser history</li>
             <li>Stores your authentication token locally using Chrome's storage API so you remain logged in between sessions</li>
