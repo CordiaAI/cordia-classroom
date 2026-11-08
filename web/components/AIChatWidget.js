@@ -562,7 +562,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         ]} />}
         {!session?.browser_available && ['capture', 'find_material'].includes(selectedSkillId) && (
           <p className="cordia-browser-fallback">
-            Browser unavailable. Open the Chrome side panel, choose an existing guide or SmartNote, or attach a file below.
+            Browser unavailable. Open the Chrome side panel, choose an existing guide or note, or attach a file below.
           </p>
         )}
       </header>
