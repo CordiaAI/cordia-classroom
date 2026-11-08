@@ -1,26 +1,23 @@
 import { useEffect, useState } from 'react';
-import Head from 'next/head';
 import Link from 'next/link';
 import AcademicInfinityMark from './AcademicInfinityMark';
 import BrandName from './BrandName';
+import Faq from './Faq';
+import SeoHead from './SeoHead';
 import { getToken } from '../lib/api';
+import { ENTITY_LINE } from '../lib/brand.mjs';
 
-const SITE = 'https://classroom.cordiaai.io';
-
-// Shared frame for the signed-out pages: clouds, wordmark, and three links.
-export default function PublicPage({ title, description, path = '/', backdrop = '', children }) {
+// Shared frame for the signed-out pages: clouds, wordmark, and three links. The head (title,
+// description, canonical, social tags, JSON-LD) comes from the page list in lib/publicPages.mjs;
+// a page with questions passes them as `faq` and gets the visible list and its FAQPage markup.
+// Pages outside that list (shared guides, invites) still pass their own title and description.
+export default function PublicPage({ path = '/', faq = null, title = '', description = '', backdrop = '', children }) {
   // Signed-in visitors get a way back into the app instead of "Sign in".
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => { setSignedIn(Boolean(getToken())); }, []);
   return (
     <>
-      <Head>
-        <title>{title}</title>
-        <meta name="description" content={description} />
-        <link rel="canonical" href={SITE + path} />
-        <meta property="og:url" content={SITE + path} />
-        <meta property="og:image" content={`${SITE}/og-image.png`} key="og:image" />
-      </Head>
+      <SeoHead path={path} faq={faq} title={title} description={description} />
       <div className={'public' + (backdrop ? ' public--photo' : '')} style={backdrop ? { '--public-photo': `url('${backdrop}')` } : { '--public-backdrop': "url('/classroom-clouds.webp')" }}>
         <header className="public-nav">
           <Link href="/" className="public-brand" aria-label="Cordia Classroom home"><AcademicInfinityMark className="public-mark" title="" /><span><BrandName /></span></Link>
@@ -32,10 +29,14 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
               : <Link href="/login" className="public-signin">Sign in</Link>}
           </nav>
         </header>
-        <main className="public-main">{children}</main>
+        <main className="public-main">
+          {children}
+          {faq && <Faq items={faq} />}
+        </main>
         <footer className="public-footer">
+          <p className="public-entity">{ENTITY_LINE}</p>
           <nav aria-label="Site">
-            <Link href="/mission">Features</Link>
+            <Link href="/mission">Mission</Link>
             <Link href="/pricing">Pricing</Link>
             <Link href="/instructors">For instructors</Link>
             <Link href="/install-extension">Get the Chrome extension</Link>
@@ -66,6 +67,7 @@ export default function PublicPage({ title, description, path = '/', backdrop = 
         .public-doc { color: var(--text-secondary); }
         .public-footer { border-top: 1px solid var(--hairline); padding: 24px; }
         .public-footer nav { width: min(1120px, 100%); margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px 24px; }
+        .public-entity { width: min(1120px, 100%); margin: 0 auto 12px; color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); }
         .public-footer a { color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); text-decoration: none; }
         .public-footer a:hover { color: var(--ink); text-decoration: underline; }
         @media (max-width: 600px) { .public-nav { padding: 0 12px 0 16px; } .public-nav nav a:not(.public-signin):first-child { display: none; } .public-main { padding: 32px 16px 64px; } .public-footer { padding: 20px 16px; } }
