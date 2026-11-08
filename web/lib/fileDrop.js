@@ -11,10 +11,22 @@ let nextId = 1;
 
 const UNSUPPORTED = /\.(zip|rar|7z|tar|gz|tgz|bz2|xz|dmg|iso|exe|msi|app|apk|mp4|mov|m4v|avi|mkv|webm|wmv|flv|mpeg|mpg|3gp|mp3|wav|m4a|aac|ogg|flac|wma|aiff?)$/i;
 
+// Formats /extract-file-text can't read but the student can re-save as one it can.
+const SAVE_AS = {
+  doc: 'Older Word (.doc) files can\'t be read. Save it as .docx, then upload it.',
+  ppt: 'Older PowerPoint (.ppt) files can\'t be read. Save it as .pptx, then upload it.',
+  rtf: 'RTF files can\'t be read. Save it as .docx or PDF, then upload it.',
+  heic: 'HEIC photos can\'t be read. Save it as JPG or PNG, then upload it.',
+  heif: 'HEIC photos can\'t be read. Save it as JPG or PNG, then upload it.',
+};
+
 // Formats the server cannot read yet get a clear message before any upload starts.
 export function unsupportedFileMessage(file) {
   const name = file?.name || '';
   const type = file?.type || '';
+  const extension = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+  const saveAs = SAVE_AS[extension] || (/^image\/hei[cf]$/i.test(type) ? SAVE_AS.heic : '');
+  if (saveAs) return saveAs;
   if (!UNSUPPORTED.test(name) && !/^(video|audio)\//.test(type)) return '';
   const kind = /^video\//.test(type) || /\.(mp4|mov|m4v|avi|mkv|webm|wmv|flv|mpeg|mpg|3gp)$/i.test(name) ? 'Video'
     : /^audio\//.test(type) || /\.(mp3|wav|m4a|aac|ogg|flac|wma|aiff?)$/i.test(name) ? 'Audio'

@@ -42,7 +42,9 @@ async function titleFor(source) {
 }
 
 const AUDIO_FILE = /\.(mp3|m4a|wav|webm|ogg|aac)$/i;
-const ACCEPT = '.pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.rtf,.png,.jpg,.jpeg,.webp,.heic,image/*';
+// Exactly what /extract-file-text reads (readable_text in backend/routers/materials.py). No
+// image/*: it would let a Mac pick HEIC; iPhones still offer Photos and hand over a JPEG.
+const ACCEPT = '.pdf,.docx,.pptx,.txt,.md,.csv,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff';
 
 export const NEW_OPTIONS = [
   { mode: 'upload', label: 'Upload', icon: Upload },
@@ -265,7 +267,7 @@ export default function NewSheet() {
       if (merged.length > MAX_FILES) problems.push(`Up to ${MAX_FILES} files.`);
       return merged.slice(0, MAX_FILES);
     });
-    setError(problems.join(' '));
+    setError([...new Set(problems)].join(' '));
   }
 
   async function create() {
