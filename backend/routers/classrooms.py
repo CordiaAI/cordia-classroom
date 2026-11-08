@@ -18,7 +18,7 @@ from access import Ctx
 from ids import require_uuid
 from rate_limit import ai_rate_limit
 from services import classroom_study as cstudy
-from services import classmates, instructors
+from services import classmates, group_streak, instructors
 from services import instructor_dashboard as idash
 from services import classrooms as rooms
 from services import guide_versions as versions
@@ -712,6 +712,13 @@ def classroom_progress(ctx: Ctx = Depends(MEMBER)):
         out["members"] = [{**people[uid], "readiness": cstudy.combined(rows), "guides": rows} for uid, rows in staff_rows.items() if uid in people]
         out["not_sharing"] = len([m for m in members if not m.get("progress_visible_to_staff") and m["user_id"] != user_id])
     return out
+
+
+@router.get("/{classroom_id}/streak", dependencies=[Depends(ai_rate_limit(60, 60))])
+def classroom_streak(ctx: Ctx = Depends(MEMBER)):
+    """The group streak (Stage 10): days in a row when at least half the members studied, and how
+    many have studied today. Counts only, never names."""
+    return group_streak.streak(ctx.db, ctx.room)
 
 
 # Instructor dashboard (services/instructor_dashboard.py) ---------------------------------------------

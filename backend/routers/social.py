@@ -15,7 +15,7 @@ import access
 from access import Ctx
 from ids import require_uuid
 from rate_limit import ai_rate_limit
-from services import minors
+from services import activity, leaderboard, minors
 from services import social_graph as graph
 from services.blocks import hidden_from
 
@@ -254,3 +254,18 @@ def summary(ctx: Ctx = Depends(access.own())):
     unread = db.table("notifications").select("id,payload").eq("user_id", user_id).is_("read_at", "null").limit(100).execute().data or []
     unread = [n for n in unread if (n.get("payload") or {}).get("actor_id") not in hidden]
     return {"incoming_friend_requests": len(friend_in), "incoming_follow_requests": len(follow_in), "unread_notifications": len(unread)}
+
+
+# Activity and the weekly leaderboard (Stage 10) ---------------------------------------------------
+@router.get("/activity", dependencies=[Depends(ai_rate_limit(60, 60))])
+def activity_feed(cursor: Optional[str] = Query(default=None, max_length=64), ctx: Ctx = Depends(access.own())):
+    """New public guides from people you follow, guides added to your classrooms and friends'
+    streak milestones (only from friends who show their streak), newest first. Read only."""
+    return activity.feed(ctx.db, ctx.user_id, cursor)
+
+
+@router.get("/leaderboard", dependencies=[Depends(ai_rate_limit(60, 60))])
+def weekly_leaderboard(ctx: Ctx = Depends(access.own())):
+    """This week's effort (active minutes and reviews, never scores) for you and your friends who
+    joined. Empty until you join (PATCH /profiles/me leaderboard_opt_in); never for minors."""
+    return leaderboard.board(ctx.db, ctx.user_id)

@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field, field_validator
 import access
 from access import Ctx
 from rate_limit import ai_rate_limit
-from services import classmates, guide_access, instructors, minors, social_graph, usernames
+from services import classmates, guide_access, instructors, leaderboard, minors, social_graph, usernames
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/profiles", tags=["profiles"])
@@ -85,6 +85,13 @@ def _me(db, user_id: str) -> dict:
             minor = {}
         out["find_by_classmates"] = classmates.findable(minor)
         out["find_by_classmates_available"] = False
+    out["can_join_leaderboard"] = minors.may_join_leaderboards(db, user_id)
+    try:  # its own query: the column arrives with migration 20261128120000
+        board = _one(db.table("user_profiles").select("leaderboard_opt_in").eq("id", user_id).limit(1).execute()) or {}
+        out["leaderboard_opt_in"] = bool(board.get("leaderboard_opt_in")) and out["can_join_leaderboard"]
+        out["leaderboard_available"] = True
+    except Exception:
+        out["leaderboard_opt_in"], out["leaderboard_available"] = False, False
     try:  # its own query: the columns arrive with migration 20261126120000
         review = _one(db.table("user_profiles").select("review_status,hold_reason").eq("id", user_id).limit(1).execute()) or {}
         out["review_status"] = review.get("review_status") or "ok"
@@ -166,6 +173,7 @@ class ProfileSettings(BaseModel):
     show_school: Optional[bool] = None
     show_streak: Optional[bool] = None
     find_by_classmates: Optional[bool] = None
+    leaderboard_opt_in: Optional[bool] = None
 
     @field_validator("display_name")
     @classmethod
@@ -187,6 +195,7 @@ def update_my_profile(body: ProfileSettings, ctx: Ctx = Depends(access.own())):
     if updates.get("profile_visibility") not in (None, "private") and minors.strict_minor(db, user_id):
         raise HTTPException(status_code=403, detail="Profiles stay private for students under 18.")
     findable = updates.pop("find_by_classmates", None)
+    joined = updates.pop("leaderboard_opt_in", None)
     if "display_name" in updates:
         updates["display_name"] = updates["display_name"] or None  # empty clears it
     if updates:
@@ -202,6 +211,8 @@ def update_my_profile(body: ProfileSettings, ctx: Ctx = Depends(access.own())):
             db.table("user_profiles").update({"find_by_classmates": bool(findable)}).eq("id", user_id).execute()
         except Exception:
             raise HTTPException(status_code=503, detail="This setting isn't available yet.")
+    if joined is not None:
+        leaderboard.set_joined(db, user_id, joined)  # 403 for minors, 503 before migration 20261128120000
     return _me(db, user_id)
 
 
