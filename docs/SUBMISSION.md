@@ -12,7 +12,7 @@ Fields marked **[YOU]** need something only you can provide.
 
 | Field | Value |
 |---|---|
-| Server URL | `https://classroom.cordiacode.com/mcp` |
+| Server URL | `https://classroom.cordiaai.io/mcp` |
 | Users connect to different URLs | No: one URL for everyone |
 | Transport | Streamable HTTP (stateless) |
 
@@ -43,7 +43,7 @@ The portal reads these from the server. Every tool has a `title` and all four hi
 - name and title "Cordia Classroom", version 0.4.0
 - a description
 - `websiteUrl`
-- `icons`: the Classroom logo at `https://classroom.cordiacode.com/cordia-classroom-icon.png`
+- `icons`: the Classroom logo at `https://classroom.cordiaai.io/cordia-classroom-icon.png`
 - `instructions`
 
 ## 3. Listing
@@ -53,9 +53,9 @@ The portal reads these from the server. Every tool has a `title` and all four hi
 | Server name (≤100) | Cordia Classroom |
 | One-liner (≤200) | Study from your own Cordia notes, lectures and flashcards in Claude: search what your professor taught, get quizzed, and save new cards back to your Library. |
 | Categories (1–5) | Education; Productivity **[YOU: pick from the portal's list]** |
-| Documentation URL | https://classroom.cordiacode.com/connect/claude |
-| Privacy policy URL | https://classroom.cordiacode.com/privacy (section 6, "Connected AI Apps") |
-| Support contact | jude@cordiaai.io |
+| Documentation URL | https://classroom.cordiaai.io/connect/claude |
+| Privacy policy URL | https://classroom.cordiaai.io/privacy (section 6, "Connected AI Apps") |
+| Support contact | support@cordiaai.io |
 | Icon | `web/public/cordia-classroom-icon.png` (512×512 PNG, the Classroom logo: the Cordia mark with the book) |
 | URL slug | `cordia-classroom` **[YOU: the slug is permanent once published]** |
 
@@ -98,7 +98,7 @@ The portal reads these from the server. Every tool has a `title` and all four hi
 | Field | Value |
 |---|---|
 | Company name | **[YOU]** |
-| Website | https://classroom.cordiacode.com |
+| Website | https://classroom.cordiaai.io |
 | Primary contact for review | **[YOU]** (name and email) |
 
 ## 6. Authentication
@@ -107,8 +107,8 @@ The portal reads these from the server. Every tool has a `title` and all four hi
 |---|---|
 | Authentication requirement | Required |
 | Method | OAuth 2.1 (authorization code with PKCE) through Supabase Auth's OAuth server, with dynamic client registration. Claude registers itself, so no client ID or secret goes in the portal. |
-| Authorization server | `https://xoolkofwihjasrvjpbrs.supabase.co/auth/v1`, advertised by `https://classroom.cordiacode.com/.well-known/oauth-protected-resource/mcp` |
-| Consent page | `https://classroom.cordiacode.com/oauth/consent`. It names the app, lists what it can and can't do, and refuses callbacks outside claude.ai and chatgpt.com. |
+| Authorization server | `https://xoolkofwihjasrvjpbrs.supabase.co/auth/v1`, advertised by `https://classroom.cordiaai.io/.well-known/oauth-protected-resource/mcp` |
+| Consent page | `https://classroom.cordiaai.io/oauth/consent`. It names the app, lists what it can and can't do, and refuses callbacks outside claude.ai and chatgpt.com. |
 | Callback used by Claude | `https://claude.ai/api/mcp/auth_callback` |
 
 Tokens are checked on every request:
@@ -140,7 +140,7 @@ of study history.
 
 **Instructions for reviewers:**
 1. In Claude: Settings › Connectors › Add custom connector. Paste
-   `https://classroom.cordiacode.com/mcp`, then Connect.
+   `https://classroom.cordiaai.io/mcp`, then Connect.
 2. Sign in with the test account and choose Allow on Cordia's consent page.
 3. Try:
    - "What did my professor say about the electron transport chain? Include timestamps." (search,
@@ -154,7 +154,7 @@ of study history.
    - "Add two flashcards about the Treaty of Versailles to that study set." (add_flashcards)
    - "Save a summary of this chat as a note in my History course." (save_note)
    - The prompts Study now, Quiz me and Review a lecture.
-4. To see the effect, sign in at https://classroom.cordiacode.com with the same account. Answered
+4. To see the effect, sign in at https://classroom.cordiaai.io with the same account. Answered
    cards have new review dates, and new items show "Added from Claude".
 
 Confirm in the portal that every tool was run through MCP Inspector and as a custom connector
@@ -176,7 +176,7 @@ All seven acknowledgments apply as written:
 
 | Requirement | How Cordia meets it | Where |
 |---|---|---|
-| Remote server over HTTPS | Vercel, `https://classroom.cordiacode.com/mcp` | `web/pages/api/mcp.js`, `next.config.js` |
+| Remote server over HTTPS | Vercel, `https://classroom.cordiaai.io/mcp` | `web/pages/api/mcp.js`, `next.config.js` |
 | Streamable HTTP | MCP TypeScript SDK `createMcpHandler`, stateless | `web/lib/mcp/endpoint.mjs` |
 | OAuth for user data | Supabase OAuth 2.1; RFC 9728 metadata; 401 with `WWW-Authenticate` and `resource_metadata` | `web/lib/mcp/auth.mjs`, `web/tests/mcp-auth.test.mjs` |
 | Every tool has `title` and `readOnlyHint` or `destructiveHint` | All four hints on all 12 tools, checked against a snapshot | `web/tests/mcp-hardening.test.mjs` |
@@ -187,7 +187,7 @@ All seven acknowledgments apply as written:
 | Reasonable response size | About 20,000 characters at most; long results paged with cursors | `web/lib/mcp/output.mjs` |
 | No conversation data collected | Only metadata logged (`mcp_tool_calls`, 90 days); answer text never stored | `supabase/migrations/20261102120000_mcp_write_tools.sql` |
 | No use of Claude's memory or files | The server only answers tool calls | — |
-| First-party API, matching domain | Cordia's own database and backend, on cordiacode.com | — |
+| First-party API, matching domain | Cordia's own database and backend, on cordiaai.io | — |
 | No money movement, no AI media | Study text only | — |
 | Privacy policy | Section 6 covers what's shared, conversations, records kept and revoking | `web/pages/privacy.js` |
 | Documentation | Setup, examples, tools, limits, disconnecting, support | `web/pages/connect/claude.js` |
@@ -201,7 +201,7 @@ All seven acknowledgments apply as written:
 - [ ] Each tool has run in MCP Inspector against a local stack (see `docs/mcp/SETUP.md`), or in Claude.ai.
 - [ ] The demo account is seeded and its password is ready for the portal.
 - [ ] You've reviewed the privacy policy section (it's marked for your review in the code).
-- [ ] cordiacode.com has a square favicon, so Claude shows the Cordia mark (optional).
+- [ ] cordiaai.io has a square favicon, so Claude shows the Cordia mark (optional).
 
 # Deployment checklist
 
@@ -231,7 +231,7 @@ No new secrets. No secret is ever sent to the browser or committed.
 
 ## DNS
 
-Nothing new for the connector. Optionally, give `cordiacode.com` a square favicon. Claude.ai shows
+Nothing new for the connector. Optionally, give `cordiaai.io` a square favicon. Claude.ai shows
 the apex domain's favicon on custom connectors until it supports `serverInfo.icons`.
 
 ## Seed the demo account
