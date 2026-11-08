@@ -71,6 +71,21 @@ export function guideNotes(guide) {
   return { overview: '', sections: [], keyPoints: parseQAPairs(guide?.study_guide).map(pair => pair.answer).filter(Boolean) };
 }
 
+// Guide or uploaded-file HTML as plain text that keeps its paragraph breaks (Practice reads it in
+// blocks). Tags come off until none are left, and &amp; is decoded last, so "&amp;lt;" stays the
+// text "&lt;" (the same order as htmlToText in lib/noteMeta.mjs).
+export function readableText(value) {
+  let text = String(value || '').replace(/<\/?(?:p|div|li|h[1-6]|blockquote|br)[^<>]*>/gi, '\n');
+  let previous;
+  do { previous = text; text = text.replace(/<[^<>]*>/g, ''); } while (text !== previous);
+  return text
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&')
+    .trim();
+}
+
 // "- bullet\n- bullet" text as string[].
 export function parseNotes(text) {
   if (!text) return [];

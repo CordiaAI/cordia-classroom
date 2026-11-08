@@ -114,6 +114,14 @@ test('walkthrough steps advance only on real actions', async () => {
   assert.doesNotMatch(controller, /setTimeout\(\(\) => advance/);
 });
 
+test('walkthrough routes put a guide id in the path only encoded', async () => {
+  const controller = await source('components/Walkthrough.js');
+
+  assert.match(controller, /const guideId = guide \? encodeURIComponent\(guide\.id\) : ''/);
+  assert.match(controller, /router\.push\('\/guide\/' \+ encodeURIComponent\(built\.guideId\)\)/);
+  assert.doesNotMatch(controller, /\/(guide|quiz)\/\$\{guide\.id\}|'\/guide\/' \+ built\.guideId/);
+});
+
 test('Settings: Account (with theme), Tutor (with Explain style), Plan, Connectors; old tabs still land', async () => {
   const settings = await source('pages/settings.js');
 

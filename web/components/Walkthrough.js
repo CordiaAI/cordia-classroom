@@ -76,7 +76,7 @@ export default function Walkthrough() {
   useEffect(() => {
     if (step?.id !== 'build') return;
     if (router.pathname === '/guide/[id]') advance(wtRef.current);
-    else if (built) router.push('/guide/' + built.guideId);
+    else if (built) router.push('/guide/' + encodeURIComponent(built.guideId));
   }, [step?.id, built?.guideId, router.pathname]);
 
   if (!wt || !step) return null;
@@ -86,16 +86,17 @@ export default function Walkthrough() {
   // The student wandered off the step's screen: one pill brings them back.
   if (step.where && !step.where(router.pathname)) {
     const guide = lastGuide();
+    const guideId = guide ? encodeURIComponent(guide.id) : '';
     const own = MINI[wt.id]?.route;
     const route = own && own !== 'guide' && step.where(own.split('?')[0]) ? own
-      : step.where('/guide/[id]') ? (guide ? `/guide/${guide.id}` : '/library')
+      : step.where('/guide/[id]') ? (guide ? `/guide/${guideId}` : '/library')
       : step.where('/dashboard') ? '/dashboard'
-        : step.where('/quiz/[guideId]') && guide ? `/quiz/${guide.id}`
+        : step.where('/quiz/[guideId]') && guide ? `/quiz/${guideId}`
           : step.where('/library') ? '/library'
             : step.where('/calendar') ? '/calendar'
             : step.where('/canvas') ? '/canvas'
               : step.where('/smartnotes') ? '/smartnotes'
-                : guide ? `/guide/${guide.id}` : '/dashboard';
+                : guide ? `/guide/${guideId}` : '/dashboard';
     return (
       <div className="wt-resume">
         <button type="button" className="c-btn c-btn--primary" onClick={() => router.push(route)}><Play size={20} strokeWidth={1.75} aria-hidden="true" />Resume</button>
