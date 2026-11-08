@@ -4,7 +4,7 @@ from pathlib import Path
 import os
 import sys
 import unittest
-from unittest.mock import patch
+
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import main  # noqa: E402
 import rate_limit  # noqa: E402
-from fake_supabase import FakeDB  # noqa: E402
+from fake_supabase import FakeDB, route_patches  # noqa: E402
 from services import usernames  # noqa: E402
 from services.blocks import hidden_from, is_blocked  # noqa: E402
 
@@ -59,12 +59,7 @@ class ProfileApiTests(unittest.TestCase):
             self.db.rows("user_profiles").append({"id": uid, "name": name, "email": f"{name.split()[0].lower()}@example.edu", "university": school})
         self.db.rows("user_streaks").append({"user_id": ANA, "current_streak": 6, "last_study_date": datetime.now(timezone.utc).date().isoformat()})
         self.client = TestClient(main.app)
-        self.patches = [
-            patch("routers.profiles.get_user_id", side_effect=lambda header: USERS[header]),
-            patch("routers.social.get_user_id", side_effect=lambda header: USERS[header]),
-            patch("routers.profiles.get_supabase", return_value=self.db),
-            patch("routers.social.get_supabase", return_value=self.db),
-        ]
+        self.patches = route_patches(("profiles", "social"), lambda header: USERS[header], self.db)
         for p in self.patches:
             p.start()
 

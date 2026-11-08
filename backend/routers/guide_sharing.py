@@ -1,7 +1,8 @@
 """Guide visibility, the public guide page, saving and copying (social plan, Stage 3).
 
 Registered before routers/guides.py so /guides/saved and /guides/visibility-review aren't read as
-guide ids. Every read of someone else's guide goes through services/guide_access.can_view.
+guide ids. Every route declares its check from access.py: your own guide, or one you may see
+(services/guide_access.can_view).
 """
 
 from __future__ import annotations
@@ -10,15 +11,16 @@ import logging
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from auth_utils import get_user_id
-from database import get_supabase
+import access
+from access import Ctx
 from ids import require_uuid
 from rate_limit import ai_rate_limit
-from services import guide_access as access
+from services import guide_access
 from services import guide_review as review
+from services import minors
 from services.guide_review import honor_code_accepted
 from services.sharing import upsert_share
 from services import guide_versions as versions
@@ -32,23 +34,6 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _viewer(authorization: str) -> Optional[str]:
-    """The signed-in viewer, or None for a signed-out visitor (public and link guides)."""
-    if not authorization:
-        return None
-    try:
-        return get_user_id(authorization)
-    except HTTPException:
-        return None
-
-
-def _own(db, user_id: str, guide_id: str) -> dict:
-    guide = access.load(db, require_uuid(guide_id, "guide ID"), access.GUIDE_COLUMNS + ",linked_set_id")
-    if not guide or guide.get("user_id") != user_id:
-        raise HTTPException(status_code=404, detail="Guide not found")
-    return guide
-
-
 def _is_others_copy(db, guide: dict) -> bool:
     """A copy of someone else's guide (or a saved class set) can't be shared on: it's their work."""
     if guide.get("linked_set_id"):
@@ -56,7 +41,7 @@ def _is_others_copy(db, guide: dict) -> bool:
     source_id = guide.get("forked_from_guide_id")
     if not source_id:
         return False
-    source = access.load(db, source_id, "id,user_id")
+    source = guide_access.load(db, source_id, "id,user_id")
     return bool(source and source.get("user_id") != guide.get("user_id"))
 
 
@@ -68,13 +53,14 @@ class VisibilityChange(BaseModel):
 
 
 @router.patch("/{guide_id}/visibility", dependencies=[Depends(ai_rate_limit(30, 60))])
-def set_visibility(guide_id: str, body: VisibilityChange, authorization: str = Header(default="")):
+def set_visibility(body: VisibilityChange, ctx: Ctx = Depends(access.guide("own"))):
     """Who can see your guide, and whether your name shows. Publishing (public or link) the first
-    time needs the Honor Code: without accept_honor_code it answers 409 honor_code_required."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
-    guide = _own(db, user_id, guide_id)
+    time needs the Honor Code: without accept_honor_code it answers 409 honor_code_required. With
+    the strict minor rules on, a minor's guides can't be public."""
+    user_id, db, guide = ctx.user_id, ctx.db, ctx.guide
     visibility = body.visibility or guide.get("visibility") or "private"
+    if body.visibility == "public" and minors.strict_minor(db, user_id):
+        raise HTTPException(status_code=403, detail="Guides can't be public for students under 18.")
     attribution = body.attribution or guide.get("attribution") or "named"
     klass = review.course(db, guide)
     if visibility != "private":
@@ -108,12 +94,12 @@ def set_visibility(guide_id: str, body: VisibilityChange, authorization: str = H
 
 
 @router.get("/visibility-review")
-def visibility_review(authorization: str = Header(default="")):
+def visibility_review(ctx: Ctx = Depends(access.own())):
     """How many of your guides were shared with a class before guides could go public (for the
     one-time "You can now make these public" note)."""
-    user_id = get_user_id(authorization)
+    user_id = ctx.user_id
     try:
-        rows = (get_supabase().table("study_guides").select("id").eq("user_id", user_id).eq("visibility_migrated", True)
+        rows = (ctx.db.table("study_guides").select("id").eq("user_id", user_id).eq("visibility_migrated", True)
                 .eq("visibility", "classroom").limit(200).execute().data or [])
     except Exception:  # before the Stage 3 migration
         rows = []
@@ -122,22 +108,17 @@ def visibility_review(authorization: str = Header(default="")):
 
 # The public page ----------------------------------------------------------------------------------
 @router.get("/{guide_id}/public", dependencies=[Depends(ai_rate_limit(120, 60))])
-def public_guide(guide_id: str, authorization: str = Header(default="")):
+def public_guide(ctx: Ctx = Depends(access.guide("view", signed_in=False))):
     """A guide as someone else sees it (/sets/<id>). Signed-out visitors see public and link guides.
     Private, held, opted-out or blocked guides are all the same 404."""
-    viewer = _viewer(authorization)
-    db = get_supabase()
-    guide = access.viewable(db, viewer, require_uuid(guide_id, "guide ID"))
-    return {"guide": access.public_card(db, viewer, guide)}
+    return {"guide": guide_access.public_card(ctx.db, ctx.user_id, ctx.guide)}
 
 
 # Saving -------------------------------------------------------------------------------------------
 @router.post("/{guide_id}/save", dependencies=[Depends(ai_rate_limit(60, 60))])
-def save_guide(guide_id: str, authorization: str = Header(default="")):
+def save_guide(ctx: Ctx = Depends(access.guide("view"))):
     """Keep someone else's guide in your Library (Saved), at the version you saw."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
-    guide = access.viewable(db, user_id, require_uuid(guide_id, "guide ID"))
+    user_id, db, guide = ctx.user_id, ctx.db, ctx.guide
     if guide["user_id"] == user_id:
         raise HTTPException(status_code=400, detail="It's already in your Library")
     db.table("guide_saves").upsert({"user_id": user_id, "guide_id": guide["id"], "pinned_version": guide.get("version") or 1,
@@ -146,25 +127,24 @@ def save_guide(guide_id: str, authorization: str = Header(default="")):
 
 
 @router.delete("/{guide_id}/save", dependencies=[Depends(ai_rate_limit(60, 60))])
-def unsave_guide(guide_id: str, authorization: str = Header(default="")):
-    user_id = get_user_id(authorization)
-    get_supabase().table("guide_saves").delete().eq("user_id", user_id).eq("guide_id", require_uuid(guide_id, "guide ID")).execute()
+def unsave_guide(guide_id: str, ctx: Ctx = Depends(access.own())):
+    user_id = ctx.user_id
+    ctx.db.table("guide_saves").delete().eq("user_id", user_id).eq("guide_id", require_uuid(guide_id, "guide ID")).execute()
     return {"saved": False}
 
 
 @router.get("/saved")
-def saved_guides(authorization: str = Header(default="")):
+def saved_guides(ctx: Ctx = Depends(access.own())):
     """Guides you saved, newest first. One you can no longer see (made private, held, blocked)
     shows as unavailable so you can remove it."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+    user_id, db = ctx.user_id, ctx.db
     rows = db.table("guide_saves").select("guide_id,pinned_version,created_at").eq("user_id", user_id).order("created_at", desc=True).limit(200).execute().data or []
     out = []
     for row in rows:
-        guide = access.load(db, row["guide_id"])
-        if access.can_view(db, user_id, guide):
-            out.append({"id": guide["id"], "title": guide.get("title") or "Untitled", "author": access.author(db, guide),
-                        "question_count": access.question_count(guide), "version": guide.get("version") or 1,
+        guide = guide_access.load(db, row["guide_id"])
+        if guide_access.can_view(db, user_id, guide):
+            out.append({"id": guide["id"], "title": guide.get("title") or "Untitled", "author": guide_access.author(db, guide),
+                        "question_count": guide_access.question_count(guide), "version": guide.get("version") or 1,
                         "pinned_version": row.get("pinned_version"), "saved_at": row.get("created_at"), "available": True})
         else:
             out.append({"id": row["guide_id"], "title": None, "available": False, "saved_at": row.get("created_at")})
@@ -194,12 +174,10 @@ def _studied_progress(db, user_id: str, guide_id: str, content: dict) -> Optiona
 
 
 @router.post("/{guide_id}/copy", dependencies=[Depends(ai_rate_limit(20, 60))])
-def copy_guide(guide_id: str, body: CopyRequest, authorization: str = Header(default="")):
+def copy_guide(body: CopyRequest, ctx: Ctx = Depends(access.guide("view"))):
     """Your own private copy to edit and study. carry_progress brings what you've learned on this
     guide (your earlier copy of the same version, or your own guide when it's yours)."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
-    guide = access.viewable(db, user_id, require_uuid(guide_id, "guide ID"))
+    user_id, db, guide = ctx.user_id, ctx.db, ctx.guide
     full = (db.table("study_guides").select("title,notes,study_guide,flashcards,quiz_questions,flashcard_progress")
             .eq("id", guide["id"]).limit(1).execute().data or [{}])[0]
     version = guide.get("version") or 1

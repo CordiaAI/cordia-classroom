@@ -415,28 +415,20 @@ def update_copy(guide_id: str, authorization: str = Header(default="")):
 
 
 class ReportRequest(BaseModel):
-    reason: Literal["wrong", "copied_exam", "copyright", "inappropriate"]
+    reason: Literal["wrong", "copied_exam", "copyright", "inappropriate", "harassment"]
 
 
 @router.post("/sharing/sets/{set_id}/report")
 def report_set(set_id: str, body: ReportRequest, authorization: str = Header(default="")):
-    """Three distinct reports hide a set until reviewed (a database trigger enforces it)."""
+    """Report a classmate's set: it reports the guide behind it (services/reports.py: 20 a day,
+    and three different reporters hold it until an admin decides)."""
+    from services import reports
     user_id = get_user_id(authorization)
     db = get_supabase()
     row = _readable_set(db, user_id, set_id)
     if row["owner_id"] == user_id:
         raise HTTPException(status_code=400, detail="You can't report your own set")
-    db.table("shared_set_reports").upsert({"set_id": row["id"], "reporter_id": user_id, "reason": body.reason}, on_conflict="set_id,reporter_id").execute()
-    # The database trigger does this too; repeating it here keeps the rule if the trigger is ever missing.
-    open_reports = db.table("shared_set_reports").select("reporter_id").eq("set_id", row["id"]).eq("status", "open").execute().data or []
-    if len({r["reporter_id"] for r in open_reports}) >= 3:
-        db.table("shared_sets").update({"status": "hidden"}).eq("id", row["id"]).eq("status", "visible").execute()
-        try:  # the guide's own page goes with it until an admin decides
-            db.table("study_guides").update({"review_status": "held", "hold_reason": "Reported by classmates"}) \
-                .eq("id", row.get("guide_id")).eq("review_status", "ok").execute()
-        except Exception:
-            pass
-    return {"ok": True}
+    return reports.file_set_report(db, user_id, row, body.reason)
 
 
 class StudiedRequest(BaseModel):

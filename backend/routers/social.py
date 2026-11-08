@@ -1,44 +1,33 @@
 """Social graph (social plan): blocks (Stage 1), follows and friends (Stage 2).
 
-The service role bypasses RLS, so every route here checks blocks itself, and every list leaves out
-anyone either side has blocked. Lists are the signed-in student's own; profiles show counts only.
+The service role bypasses RLS: every route declares its check from access.py (another person: they
+exist, aren't you, no block either way, not held for review; or your own lists and edges), and
+every list leaves out anyone either side has blocked. Profiles show counts only.
 """
 
 from __future__ import annotations
 
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from auth_utils import get_user_id
-from database import get_supabase
+import access
+from access import Ctx
 from ids import require_uuid
 from rate_limit import ai_rate_limit
 from services import minors
 from services import social_graph as graph
-from services.blocks import hidden_from, is_blocked
+from services.blocks import hidden_from
 
 router = APIRouter(prefix="/social", tags=["social"])
 WRITE = [Depends(ai_rate_limit(20, 60))]
 
 
-def _target(db, user_id: str, target_id: str) -> dict:
-    """The other person's profile row, or 404 (also when either has blocked the other)."""
-    target_id = require_uuid(target_id, "user ID")
-    if target_id == user_id:
-        raise HTTPException(status_code=400, detail="That's you")
-    row = (db.table("user_profiles").select("id,allow_follows,allow_friend_requests").eq("id", target_id).limit(1).execute().data or [None])[0]
-    if not row or is_blocked(db, user_id, target_id):
-        raise HTTPException(status_code=404, detail="User not found")
-    return row
-
-
 # Blocks -------------------------------------------------------------------------------------------
 @router.get("/blocks")
-def list_blocks(authorization: str = Header(default="")):
+def list_blocks(ctx: Ctx = Depends(access.own())):
     """People you blocked, newest first (for Settings › Privacy)."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+    user_id, db = ctx.user_id, ctx.db
     rows = db.table("user_blocks").select("blocked_id,created_at").eq("blocker_id", user_id).order("created_at", desc=True).limit(500).execute().data or []
     people = graph.cards(db, [row["blocked_id"] for row in rows])
     return {"blocks": [{**people.get(row["blocked_id"], {"user_id": row["blocked_id"], "username": None, "display_name": "Someone", "initials": "?"}),
@@ -46,16 +35,10 @@ def list_blocks(authorization: str = Header(default="")):
 
 
 @router.post("/blocks/{target_id}", dependencies=WRITE)
-def block_user(target_id: str, authorization: str = Header(default="")):
+def block_user(ctx: Ctx = Depends(access.person("target_id", "block"))):
     """Block someone: neither of you sees the other, follows and friendships between you end, and
     pending requests are cancelled. They aren't told."""
-    user_id = get_user_id(authorization)
-    target_id = require_uuid(target_id, "user ID")
-    if target_id == user_id:
-        raise HTTPException(status_code=400, detail="You can't block yourself")
-    db = get_supabase()
-    if not db.table("user_profiles").select("id").eq("id", target_id).limit(1).execute().data:
-        raise HTTPException(status_code=404, detail="User not found")
+    user_id, db, target_id = ctx.user_id, ctx.db, ctx.person["id"]
     db.table("user_blocks").upsert({"blocker_id": user_id, "blocked_id": target_id, "created_at": graph.now().isoformat()},
                                    on_conflict="blocker_id,blocked_id", ignore_duplicates=True).execute()
     graph.remove_between(db, user_id, target_id)
@@ -63,20 +46,18 @@ def block_user(target_id: str, authorization: str = Header(default="")):
 
 
 @router.delete("/blocks/{target_id}", dependencies=WRITE)
-def unblock_user(target_id: str, authorization: str = Header(default="")):
-    user_id = get_user_id(authorization)
+def unblock_user(target_id: str, ctx: Ctx = Depends(access.own())):
+    user_id = ctx.user_id
     target_id = require_uuid(target_id, "user ID")
-    get_supabase().table("user_blocks").delete().eq("blocker_id", user_id).eq("blocked_id", target_id).execute()
+    ctx.db.table("user_blocks").delete().eq("blocker_id", user_id).eq("blocked_id", target_id).execute()
     return {"blocked": False}
 
 
 # Follows ------------------------------------------------------------------------------------------
 @router.post("/follow/{target_id}", dependencies=WRITE)
-def follow(target_id: str, authorization: str = Header(default="")):
+def follow(ctx: Ctx = Depends(access.person("target_id"))):
     """Follow someone; it waits for their OK when they approve followers."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
-    target = _target(db, user_id, target_id)
+    user_id, db, target = ctx.user_id, ctx.db, ctx.person
     existing = graph.follow_row(db, user_id, target["id"])
     if existing:
         return {"status": existing["status"]}
@@ -90,11 +71,11 @@ def follow(target_id: str, authorization: str = Header(default="")):
 
 
 @router.delete("/follow/{target_id}", dependencies=WRITE)
-def unfollow(target_id: str, authorization: str = Header(default="")):
+def unfollow(target_id: str, ctx: Ctx = Depends(access.own())):
     """Stop following, or take back a follow request."""
-    user_id = get_user_id(authorization)
+    user_id = ctx.user_id
     target_id = require_uuid(target_id, "user ID")
-    get_supabase().table("follows").delete().eq("follower_id", user_id).eq("followee_id", target_id).execute()
+    ctx.db.table("follows").delete().eq("follower_id", user_id).eq("followee_id", target_id).execute()
     return {"status": "none"}
 
 
@@ -107,29 +88,27 @@ def _pending_follow(db, follower_id: str, user_id: str) -> dict:
 
 
 @router.post("/follow-requests/{follower_id}/approve", dependencies=WRITE)
-def approve_follow(follower_id: str, authorization: str = Header(default="")):
-    user_id = get_user_id(authorization)
-    db = get_supabase()
-    row = _pending_follow(db, follower_id, user_id)
+def approve_follow(ctx: Ctx = Depends(access.person("follower_id"))):
+    user_id, db = ctx.user_id, ctx.db
+    row = _pending_follow(db, ctx.person["id"], user_id)
     db.table("follows").update({"status": "active"}).eq("follower_id", row["follower_id"]).eq("followee_id", user_id).execute()
     return {"status": "active"}
 
 
 @router.post("/follow-requests/{follower_id}/decline", dependencies=WRITE)
-def decline_follow(follower_id: str, authorization: str = Header(default="")):
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+def decline_follow(follower_id: str, ctx: Ctx = Depends(access.own())):
+    user_id, db = ctx.user_id, ctx.db
     row = _pending_follow(db, follower_id, user_id)
     db.table("follows").delete().eq("follower_id", row["follower_id"]).eq("followee_id", user_id).execute()
     return {"status": "none"}
 
 
 @router.delete("/followers/{follower_id}", dependencies=WRITE)
-def remove_follower(follower_id: str, authorization: str = Header(default="")):
+def remove_follower(follower_id: str, ctx: Ctx = Depends(access.own())):
     """Remove someone who follows you (they aren't told)."""
-    user_id = get_user_id(authorization)
+    user_id = ctx.user_id
     follower_id = require_uuid(follower_id, "user ID")
-    get_supabase().table("follows").delete().eq("follower_id", follower_id).eq("followee_id", user_id).execute()
+    ctx.db.table("follows").delete().eq("follower_id", follower_id).eq("followee_id", user_id).execute()
     return {"removed": True}
 
 
@@ -146,12 +125,10 @@ def _befriend(db, user_id: str, other_id: str) -> None:
 
 
 @router.post("/friends/{target_id}", dependencies=WRITE)
-def request_friend(target_id: str, authorization: str = Header(default="")):
+def request_friend(ctx: Ctx = Depends(access.person("target_id"))):
     """Send a friend request (their settings decide who may). If they already asked you, this
-    accepts theirs."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
-    target = _target(db, user_id, target_id)
+    accepts theirs. With the strict minor rules on, no one can send a minor a request."""
+    user_id, db, target = ctx.user_id, ctx.db, ctx.person
     row = graph.friendship(db, user_id, target["id"])
     if row and row.get("status") == "accepted":
         return {"friendship": "friends"}
@@ -161,6 +138,8 @@ def request_friend(target_id: str, authorization: str = Header(default="")):
         _befriend(db, user_id, target["id"])
         return {"friendship": "friends"}
     problem = graph.may_request_friend(db, user_id, target)
+    if not problem and minors.strict_minor(db, target["id"]):
+        problem = "This account doesn't take friend requests."
     if problem:
         raise HTTPException(status_code=403, detail=problem)
     graph.spend(db, user_id, "friend_request")
@@ -180,32 +159,28 @@ def _incoming(db, user_id: str, requester_id: str) -> dict:
 
 
 @router.post("/friends/{requester_id}/accept", dependencies=WRITE)
-def accept_friend(requester_id: str, authorization: str = Header(default="")):
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+def accept_friend(ctx: Ctx = Depends(access.person("requester_id"))):
+    user_id, db, requester_id = ctx.user_id, ctx.db, ctx.person["id"]
     _incoming(db, user_id, requester_id)
-    if is_blocked(db, user_id, requester_id):
-        raise HTTPException(status_code=404, detail="No friend request from them")
     _befriend(db, user_id, requester_id)
     return {"friendship": "friends"}
 
 
 @router.post("/friends/{requester_id}/decline", dependencies=WRITE)
-def decline_friend(requester_id: str, authorization: str = Header(default="")):
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+def decline_friend(requester_id: str, ctx: Ctx = Depends(access.own())):
+    user_id, db = ctx.user_id, ctx.db
     row = _incoming(db, user_id, requester_id)
     db.table("friendships").delete().eq("user_a", row["user_a"]).eq("user_b", row["user_b"]).execute()
     return {"friendship": "none"}
 
 
 @router.delete("/friends/{target_id}", dependencies=WRITE)
-def remove_friend(target_id: str, authorization: str = Header(default="")):
+def remove_friend(target_id: str, ctx: Ctx = Depends(access.own())):
     """Remove a friend or take back your request. Follows stay; either of you can unfollow."""
-    user_id = get_user_id(authorization)
+    user_id = ctx.user_id
     target_id = require_uuid(target_id, "user ID")
     lo, hi = graph.pair(user_id, target_id)
-    get_supabase().table("friendships").delete().eq("user_a", lo).eq("user_b", hi).execute()
+    ctx.db.table("friendships").delete().eq("user_a", lo).eq("user_b", hi).execute()
     return {"friendship": "none"}
 
 
@@ -227,17 +202,15 @@ def _newest(query, cursor: Optional[str], key: str = "created_at"):
 
 
 @router.get("/followers")
-def list_followers(cursor: Optional[str] = Query(default=None, max_length=64), authorization: str = Header(default="")):
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+def list_followers(cursor: Optional[str] = Query(default=None, max_length=64), ctx: Ctx = Depends(access.own())):
+    user_id, db = ctx.user_id, ctx.db
     rows = _newest(db.table("follows").select("follower_id,created_at").eq("followee_id", user_id).eq("status", "active"), cursor)
     return _people(db, user_id, rows, "follower_id")
 
 
 @router.get("/following")
-def list_following(cursor: Optional[str] = Query(default=None, max_length=64), authorization: str = Header(default="")):
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+def list_following(cursor: Optional[str] = Query(default=None, max_length=64), ctx: Ctx = Depends(access.own())):
+    user_id, db = ctx.user_id, ctx.db
     rows = _newest(db.table("follows").select("followee_id,created_at,status").eq("follower_id", user_id).eq("status", "active"), cursor)
     return _people(db, user_id, rows, "followee_id")
 
@@ -251,18 +224,16 @@ def _friend_rows(db, user_id: str, status: str, cursor: Optional[str], key: str)
 
 
 @router.get("/friends")
-def list_friends(cursor: Optional[str] = Query(default=None, max_length=64), authorization: str = Header(default="")):
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+def list_friends(cursor: Optional[str] = Query(default=None, max_length=64), ctx: Ctx = Depends(access.own())):
+    user_id, db = ctx.user_id, ctx.db
     return _people(db, user_id, _friend_rows(db, user_id, "accepted", cursor, "accepted_at"), "other", "accepted_at")
 
 
 @router.get("/requests")
 def list_requests(kind: Literal["friend", "follow"] = "friend", direction: Literal["incoming", "outgoing"] = "incoming",
-                  cursor: Optional[str] = Query(default=None, max_length=64), authorization: str = Header(default="")):
+                  cursor: Optional[str] = Query(default=None, max_length=64), ctx: Ctx = Depends(access.own())):
     """Friend requests (in or out) and follow requests (to you, or yours waiting)."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+    user_id, db = ctx.user_id, ctx.db
     if kind == "follow":
         mine, other = ("followee_id", "follower_id") if direction == "incoming" else ("follower_id", "followee_id")
         rows = _newest(db.table("follows").select(f"{other},created_at").eq(mine, user_id).eq("status", "pending"), cursor)
@@ -273,10 +244,9 @@ def list_requests(kind: Literal["friend", "follow"] = "friend", direction: Liter
 
 
 @router.get("/summary")
-def summary(authorization: str = Header(default="")):
+def summary(ctx: Ctx = Depends(access.own())):
     """Counts for the badges: requests waiting on you and unread notifications."""
-    user_id = get_user_id(authorization)
-    db = get_supabase()
+    user_id, db = ctx.user_id, ctx.db
     hidden = hidden_from(db, user_id)
     friend_in = [r for r in _friend_rows(db, user_id, "pending", None, "created_at") if r["requested_by"] != user_id and r["other"] not in hidden]
     follow_in = [r for r in (db.table("follows").select("follower_id").eq("followee_id", user_id).eq("status", "pending").execute().data or [])

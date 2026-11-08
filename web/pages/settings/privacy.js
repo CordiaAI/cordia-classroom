@@ -143,8 +143,14 @@ export default function PrivacySettings() {
 
             <section className="c-card pv-card" aria-labelledby="pv-who">
               <h2 id="pv-who" className="c-section-title">Who can see your profile</h2>
-              <Choice label="Who can see your profile" options={VISIBILITY} value={visibility.value} onPick={value => save({ profile_visibility: value })} />
-              <p className="c-meta pv-help">{visibility.hint}</p>
+              {me.profile_locked ? (
+                <p className="c-meta pv-help"><strong>Private</strong> (required for students under 18). Only you see your profile; friends see your name.</p>
+              ) : (
+                <>
+                  <Choice label="Who can see your profile" options={VISIBILITY} value={visibility.value} onPick={value => save({ profile_visibility: value })} />
+                  <p className="c-meta pv-help">{visibility.hint}</p>
+                </>
+              )}
               <Toggle label="Show my school" checked={me.show_school} onChange={value => save({ show_school: value })} />
               <Toggle label="Show my study streak" checked={me.show_streak} onChange={value => save({ show_streak: value })} />
             </section>

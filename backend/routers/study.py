@@ -1,22 +1,22 @@
 """Studying someone else's guide (social plan, Stage 4): the guide as one student sees it, their
 progress, and the "Update available" flow. Registered before routers/guides.py.
 
-Every route re-checks visibility (services/viewer_study.state → guide_access.can_view) for every
-version, and never writes the author's guide row. Behind PER_VIEWER_PROGRESS; off, these are 404s.
+Every route declares access.guide("study"), which re-checks visibility (services/viewer_study.state
+→ guide_access.can_view) before it runs, and never writes the author's guide row. Behind
+PER_VIEWER_PROGRESS; off, these are 404s.
 """
 
 from __future__ import annotations
 
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from auth_utils import get_user_id
-from database import get_supabase
-from ids import require_uuid
+import access
+from access import Ctx
 from rate_limit import ai_rate_limit
-from services import guide_access as access
+from services import guide_access
 from services import guide_versions as versions
 from services import viewer_study as study
 from routers import quiz as quiz_router
@@ -40,22 +40,23 @@ def quiz_questions(db, guide_id: str, viewer: str) -> tuple:
 quiz_router.set_viewer_lookup(quiz_questions)
 
 
-def _ctx(db, viewer: str, guide_id: str, version: Optional[int] = None):
-    try:
-        return study.state(db, viewer, require_uuid(guide_id, "guide ID"), version), None
-    except study.Unavailable as gone:
-        return None, {"unavailable": gone.reason, "title": gone.title}
+STUDY = access.guide("study")
+
+
+def _studied(ctx: Ctx) -> dict:
+    """The viewer's study state, or 404 with the plain reason when they lost access."""
+    if ctx.gone:
+        raise HTTPException(status_code=404, detail=ctx.gone["unavailable"])
+    return ctx.study
 
 
 @router.get("/{guide_id}/study", dependencies=[Depends(ai_rate_limit(120, 60))])
-def study_guide(guide_id: str, authorization: str = Header(default="")):
+def study_guide(gate: Ctx = Depends(STUDY)):
     """Someone else's guide, ready to study: the cards and questions of the version you're on, your
     own progress in the usual shape, and whether the author has changed anything since."""
-    viewer = get_user_id(authorization)
-    db = get_supabase()
-    ctx, gone = _ctx(db, viewer, guide_id)
-    if gone:
-        return gone
+    if gate.gone:
+        return gate.gone
+    viewer, db, ctx = gate.user_id, gate.db, gate.study
     guide = ctx["guide"]
     if ctx["row"] is None:
         study.pin(db, viewer, guide["id"], ctx["current"])
@@ -70,7 +71,7 @@ def study_guide(guide_id: str, authorization: str = Header(default="")):
         "viewer": {
             "version": content["version"],
             "current_version": ctx["current"],
-            "author": access.author(db, guide),
+            "author": guide_access.author(db, guide),
             **status,
         },
     }}
@@ -89,16 +90,18 @@ class ProgressSave(BaseModel):
 
 
 @router.post("/{guide_id}/progress", dependencies=[Depends(ai_rate_limit(240, 60))])
-def save_progress(guide_id: str, body: ProgressSave, authorization: str = Header(default="")):
+def save_progress(body: ProgressSave, gate: Ctx = Depends(STUDY)):
     """Save the cards and ideas just answered, by position in the version studied; they're stored
     by idea, so they survive the author's edits."""
-    viewer = get_user_id(authorization)
-    db = get_supabase()
+    viewer, db = gate.user_id, gate.db
     if len(body.cards or {}) > 2000 or len((body.learn.levels if body.learn else {}) or {}) > 2000:
         raise HTTPException(status_code=400, detail="Too many answers in one save")
-    ctx, gone = _ctx(db, viewer, guide_id, body.version)
-    if gone:
-        raise HTTPException(status_code=404, detail=gone["unavailable"])
+    ctx = _studied(gate)
+    if body.version != ctx["content"]["version"]:  # answers from another version the viewer can see
+        try:
+            ctx = study.state(db, viewer, ctx["guide"]["id"], body.version)
+        except study.Unavailable as gone:
+            raise HTTPException(status_code=404, detail=gone.reason)
     content = ctx["content"]
     patch = versions.patch_from(body.cards, body.learn.levels if body.learn else None, content["cards"], ctx["questions"])
     learn_fields = body.learn.model_fields_set if body.learn else set()
@@ -116,28 +119,20 @@ def save_progress(guide_id: str, body: ProgressSave, authorization: str = Header
 
 
 @router.get("/{guide_id}/changes", dependencies=[Depends(ai_rate_limit(60, 60))])
-def guide_changes(guide_id: str, authorization: str = Header(default="")):
+def guide_changes(gate: Ctx = Depends(STUDY)):
     """What changed between the version you're on and the newest: added, changed (old and new
     text) and removed ideas. Typo fixes and outline or title edits aren't listed."""
-    viewer = get_user_id(authorization)
-    db = get_supabase()
-    ctx, gone = _ctx(db, viewer, guide_id)
-    if gone:
-        raise HTTPException(status_code=404, detail=gone["unavailable"])
+    ctx = _studied(gate)
     newest = versions.live_content(ctx["guide"])
     delta = versions.changes(ctx["content"], newest)
     return {"from": ctx["content"]["version"], "to": ctx["current"], **{key: study.plain_ideas(value) for key, value in delta.items()}}
 
 
 @router.post("/{guide_id}/accept-update", dependencies=[Depends(ai_rate_limit(30, 60))])
-def accept_update(guide_id: str, authorization: str = Header(default="")):
+def accept_update(gate: Ctx = Depends(STUDY)):
     """Move to the newest version: unchanged ideas keep their progress, changed ones step back one
     level, removed ones are archived (they come back if the author restores them)."""
-    viewer = get_user_id(authorization)
-    db = get_supabase()
-    ctx, gone = _ctx(db, viewer, guide_id)
-    if gone:
-        raise HTTPException(status_code=404, detail=gone["unavailable"])
+    viewer, db, ctx = gate.user_id, gate.db, _studied(gate)
     if ctx["row"] is None or ctx["content"]["version"] >= ctx["current"]:
         return {"version": ctx["current"]}
     newest = versions.live_content(ctx["guide"])
@@ -147,13 +142,9 @@ def accept_update(guide_id: str, authorization: str = Header(default="")):
 
 
 @router.post("/{guide_id}/stay", dependencies=[Depends(ai_rate_limit(30, 60))])
-def stay_on_version(guide_id: str, authorization: str = Header(default="")):
+def stay_on_version(gate: Ctx = Depends(STUDY)):
     """Keep studying the version you're on; the notice stays quiet until the author's next change."""
-    viewer = get_user_id(authorization)
-    db = get_supabase()
-    ctx, gone = _ctx(db, viewer, guide_id)
-    if gone:
-        raise HTTPException(status_code=404, detail=gone["unavailable"])
+    viewer, db, ctx = gate.user_id, gate.db, _studied(gate)
     if ctx["row"] is not None:
         db.table("guide_progress").update({"dismissed_version": ctx["current"]}).eq("user_id", viewer).eq("guide_id", ctx["guide"]["id"]).execute()
     return {"version": ctx["content"]["version"]}

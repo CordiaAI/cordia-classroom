@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "tests"))
 
 from fake_supabase import FakeDB  # noqa: E402
+from access import Ctx  # noqa: E402
 from routers import classes, public_forms  # noqa: E402
 from services.class_catalog import normalize_course_code, screen_share, suggest_class  # noqa: E402
 from services.sharing import on_guide_changed  # noqa: E402
@@ -26,9 +27,10 @@ class Session:
 
     def as_user(self, user_id):
         stack = ExitStack()
-        for module in (classes, public_forms):
-            stack.enter_context(patch.object(module, "get_user_id", return_value=user_id))
-            stack.enter_context(patch.object(module, "get_supabase", return_value=self.db))
+        stack.enter_context(patch.object(classes, "get_user_id", return_value=user_id))
+        stack.enter_context(patch.object(classes, "get_supabase", return_value=self.db))
+        stack.enter_context(patch.object(public_forms, "get_supabase", return_value=self.db))
+        self.ctx = Ctx(user_id, self.db)  # public_forms routes take their checked viewer from access.py
         return stack
 
 
@@ -164,7 +166,7 @@ class SharingFlowTests(unittest.TestCase):
         instructor = SimpleNamespace(email="prof@testu.edu", email_confirmed_at="2026-10-01")
         self.db.auth.admin.get_user_by_id = lambda _uid: SimpleNamespace(user=instructor)
         with self.s.as_user("prof"):
-            public_forms.block_course(public_forms.BlockRequest(school_id=self.school_id, course_code="mgt 300"), "")
+            public_forms.block_course(public_forms.BlockRequest(school_id=self.school_id, course_code="mgt 300"), self.s.ctx)
         with self.s.as_user("owner"):
             self.assertTrue(classes.class_page(mgt["id"], "")["class"]["sharing_blocked"])
             classes.file_guide(classes.FileRequest(guide_id="10000000-0000-4000-8000-000000000001", class_id=mgt["id"]), "")
@@ -174,7 +176,7 @@ class SharingFlowTests(unittest.TestCase):
         instructor.email = "someone@gmail.com"
         with self.s.as_user("prof2"):
             with self.assertRaises(HTTPException):
-                public_forms.block_course(public_forms.BlockRequest(school_id=self.school_id, course_code="FILM 201"), "")
+                public_forms.block_course(public_forms.BlockRequest(school_id=self.school_id, course_code="FILM 201"), self.s.ctx)
 
     def test_takedown_holds_set_immediately(self):
         mgt = self.add("owner")
@@ -184,7 +186,7 @@ class SharingFlowTests(unittest.TestCase):
             classes.share_default(mgt["id"], classes.ShareDefaultRequest(share=True, guide_id=guide_id), "")
         set_id = self.db.rows("shared_sets")[0]["id"]
         with patch.object(public_forms, "get_supabase", return_value=self.db):
-            public_forms.takedown(public_forms.TakedownRequest(name="Pub", email="legal@pub.com", work="Chapter 3", location=f"https://classroom.cordiaai.io/class/x?set={set_id}", statement=True))
+            public_forms.takedown(public_forms.TakedownRequest(name="Pub", email="legal@pub.com", work="Chapter 3", location=f"https://classroom.cordiaai.io/class/x?set={set_id}", statement=True), Ctx(None, self.db))
         # Held for review (the owner's choice for Stage 3), so classmates stop seeing it at once.
         self.assertEqual(self.db.rows("shared_sets")[0]["status"], "held")
         self.assertEqual(self.db.rows("shared_sets")[0]["hold_reason"], "Copyright report")

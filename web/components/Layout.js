@@ -9,6 +9,7 @@ import FeatureOnboarding from './FeatureOnboarding';
 import TimerEngine from './TimerEngine';
 import CanvasReminder from './CanvasReminder';
 import UsernameClaim from './UsernameClaim';
+import AgeGate from './AgeGate';
 import { useFileDragging } from '../lib/fileDrop';
 import { FOCUS_ROUTES } from '../lib/featureReleases';
 import { WhatsNewWatcher } from './WhatsNew';
@@ -42,6 +43,7 @@ export default function Layout({ children, timerState, setTimerState }) {
       <WhatsNewWatcher />
       <CanvasReminder />
       <UsernameClaim />
+      <AgeGate />
       <Walkthrough />
       <FeatureOnboarding />
       <TimerEngine timerState={timerState} setTimerState={setTimerState} />

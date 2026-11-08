@@ -201,3 +201,19 @@ class Query:
             self.db.tables[self.name] = [r for r in rows if not self._match(r)]
             return SimpleNamespace(data=gone)
         raise AssertionError(self.op)
+
+
+def route_patches(modules, who, db):
+    """patch() objects so route tests sign in through `who` (header -> user id) and read `db`:
+    access.py, which every social route checks through, plus routers.<m> for each module that
+    still imports get_user_id / get_supabase itself."""
+    import importlib
+    from unittest.mock import patch
+    out = [patch("access.get_user_id", side_effect=who), patch("access.get_supabase", return_value=db)]
+    for name in modules:
+        module = importlib.import_module(f"routers.{name}")
+        if hasattr(module, "get_user_id"):
+            out.append(patch(f"routers.{name}.get_user_id", side_effect=who))
+        if hasattr(module, "get_supabase"):
+            out.append(patch(f"routers.{name}.get_supabase", return_value=db))
+    return out
