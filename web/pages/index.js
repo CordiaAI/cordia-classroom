@@ -48,7 +48,8 @@ export function Landing({ mode = 'signin', path = '/' }) {
           <ul className="sr-only">{FEATURES.map(feature => <li key={feature}>{feature}</li>)}</ul>
           <div className="landing-ticker" aria-hidden="true">
             <div className="landing-ticker-track">
-              {[...FEATURES, ...FEATURES].map((feature, index) => <span key={index} className="landing-ticker-item">{feature}</span>)}
+              {FEATURES.map(feature => <span key={feature} className="landing-ticker-item">{feature}</span>)}
+              {FEATURES.map(feature => <span key={`copy-${feature}`} className="landing-ticker-item is-copy">{feature}</span>)}
             </div>
           </div>
         </section>
@@ -66,7 +67,7 @@ export function Landing({ mode = 'signin', path = '/' }) {
         .landing-ticker-item::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 10px 2px 0; border-radius: 50%; background: var(--olive); vertical-align: middle; }
         /* The list is drawn twice, so moving it by half its width loops without a jump. */
         @keyframes landing-ticker { from { transform: translateX(0); } to { transform: translateX(calc(-50% - 6px)); } }
-        @media (prefers-reduced-motion: reduce) { .landing-ticker { -webkit-mask-image: none; mask-image: none; } .landing-ticker-track { animation: none; width: auto; flex-wrap: wrap; } .landing-ticker-item:nth-child(n + ${FEATURES.length + 1}) { display: none; } }
+        @media (prefers-reduced-motion: reduce) { .landing-ticker { -webkit-mask-image: none; mask-image: none; } .landing-ticker-track { animation: none; width: auto; flex-wrap: wrap; } .landing-ticker-item { flex-shrink: 1; white-space: normal; } .is-copy { display: none; } }
         @media (max-width: 860px) { .landing { grid-template-columns: 1fr; gap: 32px; min-height: 0; } .landing-title { font-size: clamp(34px, 10vw, 44px) !important; } .landing-ticker { margin-top: 24px; } }
       `}</style>
     </PublicPage>
