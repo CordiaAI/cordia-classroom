@@ -1,3 +1,4 @@
+import { USE_CASES, useCasePath } from './useCases/index.mjs';
 import { getProgress, updateProgress } from './progress';
 
 // Theme: 'light' (default) or 'dark'. The account is the one source of truth
@@ -16,7 +17,8 @@ export function themePreference() {
 }
 
 // Public pages stay light; Pricing and the policy pages follow the account's theme when signed in.
-const LIGHT_WHEN_SIGNED_OUT = ['/pricing', '/privacy', '/terms', '/honor-code', '/mission', '/connect/claude'];
+// Use-case pages (lib/useCases/) are public reading pages too.
+export const LIGHT_WHEN_SIGNED_OUT = ['/pricing', '/privacy', '/terms', '/honor-code', '/mission', '/connect/claude', ...USE_CASES.map(useCasePath)];
 export function isLightOnly(pathname) {
   if (LIGHT_WHEN_SIGNED_OUT.includes(pathname)) {
     try { return !localStorage.getItem('authToken'); } catch { return true; }

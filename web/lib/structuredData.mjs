@@ -49,10 +49,10 @@ export function homeGraph() {
   ];
 }
 
-export function pageGraph({ path, name, crumb }) {
+export function pageGraph({ path, name, crumb, modified = '' }) {
   const url = pageUrl(path);
   return [
-    { '@type': 'WebPage', '@id': `${url}#webpage`, url, name, isPartOf: { '@id': ids.website }, about: { '@id': ids.app } },
+    { '@type': 'WebPage', '@id': `${url}#webpage`, url, name, isPartOf: { '@id': ids.website }, about: { '@id': ids.app }, ...(modified ? { dateModified: modified } : {}) },
     {
       '@type': 'BreadcrumbList',
       itemListElement: [
