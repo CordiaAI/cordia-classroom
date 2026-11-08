@@ -333,19 +333,25 @@ class GuideVisibilityTests(unittest.TestCase):
         self.assertEqual(self.call("post", "ben", f"/guides/{GUIDE}/copy", json={}).status_code, 200)
 
     # Reports and takedowns --------------------------------------------------------------------------
-    def test_takedown_holds_the_guide_until_an_admin_decides(self):
+    def test_takedown_stays_up_until_staff_hold_it_and_reject_restores(self):
         self.row()["visibility"] = "public"
         body = {"name": "Pub", "email": "legal@pub.com", "work": "Chapter 3", "statement": True,
                 "location": f"https://classroom.cordiaai.io/sets/{GUIDE}"}
         self.assertEqual(self.client.post("/copyright/takedown", json=body).status_code, 200)
-        self.assertEqual((self.row()["review_status"], self.row()["hold_reason"]), ("held", "Copyright report"))
-        self.assertEqual(self.call("get", "cat", f"/guides/{GUIDE}/public").status_code, 404)
+        # Received, not held: everyone who could see it still can.
+        self.assertEqual((self.row()["review_status"], self.row()["hold_reason"]), ("ok", None))
+        self.assertEqual(self.call("get", "cat", f"/guides/{GUIDE}/public").status_code, 200)
         takedown = self.db.rows("copyright_takedowns")[0]
         self.assertEqual(takedown["guide_id"], GUIDE)
         queue = self.call("get", "eve", "/admin/queue").json()
-        self.assertEqual([g["id"] for g in queue["guides"]], [GUIDE])
+        item = queue["takedowns"][0]
+        self.assertEqual((item["claimant_name"], item["target"]["guide_visibility"], item["owner"]["username"]), ("Pub", "public", "ana"))
+        # Staff hold it while confirming, then reject: it comes back exactly as it was.
+        self.assertEqual(self.call("post", "eve", f"/admin/takedowns/{takedown['id']}/hold", json={}).status_code, 200)
+        self.assertEqual(self.row()["review_status"], "held")
+        self.assertEqual(self.call("get", "cat", f"/guides/{GUIDE}/public").status_code, 404)
         self.call("post", "eve", f"/admin/takedowns/{takedown['id']}", json={"action": "rejected"})
-        self.assertEqual(self.row()["review_status"], "ok")
+        self.assertEqual((self.row()["review_status"], self.row()["hold_reason"]), ("ok", None))
         self.assertEqual(self.call("get", "cat", f"/guides/{GUIDE}/public").status_code, 200)
 
     def test_actioned_takedown_hides_the_guide(self):
@@ -354,7 +360,10 @@ class GuideVisibilityTests(unittest.TestCase):
                 "location": f"https://classroom.cordiaai.io/sets/{GUIDE}"}
         self.client.post("/copyright/takedown", json=body)
         takedown = self.db.rows("copyright_takedowns")[0]
-        self.call("post", "eve", f"/admin/takedowns/{takedown['id']}", json={"action": "actioned"})
+        refused = self.call("post", "eve", f"/admin/takedowns/{takedown['id']}", json={"action": "actioned"})
+        self.assertEqual(refused.status_code, 400)
+        self.assertEqual(self.row()["review_status"], "ok")
+        self.call("post", "eve", f"/admin/takedowns/{takedown['id']}", json={"action": "actioned", "reporter_confirmed": True})
         self.assertEqual(self.row()["review_status"], "hidden")
         self.assertEqual(self.call("get", "ana", f"/guides/{GUIDE}/public").json()["guide"]["review_status"], "hidden")
 

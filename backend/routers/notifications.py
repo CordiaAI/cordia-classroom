@@ -1,5 +1,6 @@
 """Notifications (social plan, Stage 2): follows, follow requests, friend requests, accepted
-friend requests, and classroom invites from friends (Stage 5). Written by services/social_graph.notify; read and marked here. Anything from a
+friend requests, classroom invites from friends (Stage 5), and copyright reports filed on your
+items (from Cordia, so no person: services/takedowns.py). Written by services/social_graph.notify; read and marked here. Anything from a
 person either side has blocked, or who no longer has a profile, is left out."""
 
 from __future__ import annotations
@@ -31,6 +32,12 @@ def list_notifications(cursor: Optional[str] = Query(default=None, max_length=64
     people = graph.cards(db, [(r.get("payload") or {}).get("actor_id") for r in rows])
     items = []
     for row in rows:
+        if row.get("kind") == "copyright_report":  # from Cordia, not a person (services/takedowns.py)
+            payload = row.get("payload") or {}
+            items.append({"id": row["id"], "kind": row["kind"], "read": bool(row.get("read_at")), "created_at": row.get("created_at"),
+                          "actor": None, "item": {"guide_id": payload.get("guide_id"), "profile": bool(payload.get("profile")),
+                                                  "title": payload.get("title") or ""}})
+            continue
         actor = people.get((row.get("payload") or {}).get("actor_id"))
         if not actor or row.get("kind") not in graph.NOTIFY_KINDS:
             continue

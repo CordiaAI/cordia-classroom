@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Bell, Copy } from 'lucide-react';
+import { Bell, Copy, ShieldAlert } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import { SectionLoader } from './CordiaLoader';
 import { loadNotifications, loadSocialSummary, markNotificationsRead, notificationHref, notificationText, onSocialSummary } from '../lib/social';
@@ -130,8 +130,17 @@ export default function NotificationBell({ variant = 'top', tip }) {
                 {items.map(item => (
                   <li key={item.id}>
                     <Link href={notificationHref(item)} className={'nb-item' + (item.read ? '' : ' is-new')}>
-                      <span className="nb-avatar" aria-hidden="true">{item.actor.initials}</span>
-                      <span className="nb-text"><strong>{item.actor.display_name}</strong> {notificationText(item.kind, item)}</span>
+                      {item.actor ? (
+                        <>
+                          <span className="nb-avatar" aria-hidden="true">{item.actor.initials}</span>
+                          <span className="nb-text"><strong>{item.actor.display_name}</strong> {notificationText(item.kind, item)}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="nb-avatar" aria-hidden="true"><ShieldAlert size={16} strokeWidth={1.75} /></span>
+                          <span className="nb-text">{notificationText(item.kind, item)}</span>
+                        </>
+                      )}
                       <span className="c-meta nb-time">{ago(item.created_at)}</span>
                     </Link>
                   </li>

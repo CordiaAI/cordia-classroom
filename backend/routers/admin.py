@@ -94,7 +94,7 @@ def queue(type: Optional[Literal["guide", "profile", "classroom"]] = None, autho
         "sets": [{**s, "class": classes.get(s["class_id"]), "reports": by_set.get(s["id"])} for s in sets.values()],
         "guides": guides,
         "merges": [{**m, "from": merge_classes.get(m.get("from_class_id")), "into": merge_classes.get(m.get("into_class_id"))} for m in merges],
-        "takedowns": db.table("copyright_takedowns").select("*").eq("status", "received").order("created_at").execute().data or [],
+        "takedowns": _takedown_queue(db),
         "policy": db.table("canvas_school_policy").select("*").order("domain").execute().data or [],
     }
 
@@ -201,27 +201,110 @@ def decide_reports(target_type: Literal["guide", "profile", "classroom"], target
     return {"ok": True}
 
 
+def _takedown_queue(db) -> list[dict]:
+    """Open copyright reports with what staff need to decide: the reporter, the work claimed, the
+    link, the item it points to (title, who can see it now, whether it's held) and its owner."""
+    rows = db.table("copyright_takedowns").select("*").eq("status", "received").order("created_at").execute().data or []
+    guide_ids = list({r["guide_id"] for r in rows if r.get("guide_id")})
+    set_ids = list({r["set_id"] for r in rows if r.get("set_id")})
+    guides, sets = {}, {}
+    if guide_ids:
+        try:
+            guides = {g["id"]: g for g in db.table("study_guides").select("id,user_id,title,visibility,review_status,hold_reason").in_("id", guide_ids).execute().data or []}
+        except Exception:  # before the Stage 3 migration
+            guides = {g["id"]: g for g in db.table("study_guides").select("id,user_id,title").in_("id", guide_ids).execute().data or []}
+    if set_ids:
+        sets = {s["id"]: s for s in db.table("shared_sets").select("id,owner_id,title,visibility,status,hold_reason").in_("id", set_ids).execute().data or []}
+
+    def owner_of(row):
+        return (guides.get(row.get("guide_id")) or {}).get("user_id") or (sets.get(row.get("set_id")) or {}).get("owner_id") or row.get("profile_id")
+    owner_ids = list({owner_of(r) for r in rows} - {None})
+    owners = {p["id"]: p for p in (db.table("user_profiles").select("*").in_("id", owner_ids).execute().data or [])} if owner_ids else {}
+    out = []
+    for row in rows:
+        guide, shared = guides.get(row.get("guide_id")), sets.get(row.get("set_id"))
+        owner = owners.get(owner_of(row))
+        profile = owner if row.get("profile_id") and not (guide or shared) else None
+        out.append({
+            **row,
+            "target": {
+                "kind": "profile" if profile else "guide" if (guide or shared) else None,
+                "title": (guide or {}).get("title") or (shared or {}).get("title") or (f"@{profile.get('username')}" if profile and profile.get("username") else ""),
+                "guide_visibility": (guide or {}).get("visibility"),
+                "guide_status": (guide or {}).get("review_status"),
+                "set_visibility": (shared or {}).get("visibility"),
+                "set_status": (shared or {}).get("status"),
+                "profile_visibility": (profile or {}).get("profile_visibility"),
+                "profile_status": (profile or {}).get("review_status"),
+                "found": bool(guide or shared or profile),
+            },
+            "owner": {key: owner.get(key) for key in ("id", "username", "name", "email")} if owner else ({"id": owner_of(row)} if owner_of(row) else None),
+        })
+    return out
+
+
+def _open_takedown(db, takedown_id: str) -> dict:
+    row = (db.table("copyright_takedowns").select("*").eq("id", _id(takedown_id)).limit(1).execute().data or [None])[0]
+    if not row:
+        raise HTTPException(status_code=404, detail="Takedown not found")
+    if row.get("status") != "received":
+        raise HTTPException(status_code=409, detail="This report was already decided")
+    return row
+
+
+NEEDS_MIGRATION = "Apply migration 20261127120000 first"
+
+
+@router.post("/takedowns/{takedown_id}/hold")
+def hold_takedown(takedown_id: str, authorization: str = Header(default="")):
+    """A temporary hold on a guide or class set while staff confirm the reporter: hidden from
+    everyone but its owner. Only an item that is visible now is held, and its state is recorded so
+    a rejection puts it back. Profiles aren't held from here."""
+    from services import takedowns
+    admin_id, db = require_admin(authorization)
+    row = _open_takedown(db, takedown_id)
+    if not (row.get("guide_id") or row.get("set_id")):
+        raise HTTPException(status_code=400, detail="Only a guide or class set can be held from here")
+    try:
+        takedowns.hold(db, row, admin_id)
+    except takedowns.NeedsMigration:
+        raise HTTPException(status_code=503, detail=NEEDS_MIGRATION)
+    return {"ok": True}
+
+
 class TakedownDecision(BaseModel):
     action: Literal["actioned", "rejected"]
+    # "Reporter confirmed by email from support@cordiaai.io": required to take something down.
+    reporter_confirmed: bool = False
 
 
 @router.post("/takedowns/{takedown_id}")
 def decide_takedown(takedown_id: str, body: TakedownDecision, authorization: str = Header(default="")):
-    _, db = require_admin(authorization)
-    row = (db.table("copyright_takedowns").select("*").eq("id", _id(takedown_id)).limit(1).execute().data or [None])[0]
-    if not row:
-        raise HTTPException(status_code=404, detail="Takedown not found")
-    # A report holds the guide and its class set; the decision either removes them or lets them back.
-    if row.get("set_id"):
-        if body.action == "rejected":
-            db.table("shared_sets").update({"status": "visible", "hold_reason": None}).eq("id", row["set_id"]).in_("status", ["held", "taken_down"]).execute()
-        else:
-            db.table("shared_sets").update({"status": "taken_down"}).eq("id", row["set_id"]).execute()
-    if row.get("guide_id"):
-        _decide_guide(db, row["guide_id"], "ok" if body.action == "rejected" else "hidden")
-    if row.get("profile_id") and body.action == "actioned":  # a profile isn't held on a takedown, only hidden here
-        db.table("user_profiles").update({"review_status": "hidden", "hold_reason": "Copyright report"}).eq("id", row["profile_id"]).execute()
-    db.table("copyright_takedowns").update({"status": body.action, "actioned_at": _now()}).eq("id", row["id"]).execute()
+    """Take down (only once a staff member confirmed the reporter by email) or reject. Rejecting puts
+    back only what this report changed; a hold for any other reason stays."""
+    from services import takedowns
+    admin_id, db = require_admin(authorization)
+    row = _open_takedown(db, takedown_id)
+    decided = {"status": body.action, "actioned_at": _now()}
+    if body.action == "actioned":
+        if not (body.reporter_confirmed or row.get("confirmed_at")):
+            raise HTTPException(status_code=400, detail="Confirm the reporter by email from support@cordiaai.io first")
+        try:
+            if not row.get("confirmed_at"):
+                db.table("copyright_takedowns").update({"confirmed_by": admin_id, "confirmed_at": _now()}).eq("id", row["id"]).execute()
+            takedowns.take_down(db, row, admin_id)
+        except takedowns.NeedsMigration:
+            raise HTTPException(status_code=503, detail=NEEDS_MIGRATION)
+        except Exception as error:
+            if "confirmed_" in str(error) or "column" in str(error):
+                raise HTTPException(status_code=503, detail=NEEDS_MIGRATION)
+            raise
+    else:
+        takedowns.restore(db, row)
+    try:
+        db.table("copyright_takedowns").update({**decided, "actioned_by": admin_id}).eq("id", row["id"]).execute()
+    except Exception:  # before migration 20261127120000 (no actioned_by)
+        db.table("copyright_takedowns").update(decided).eq("id", row["id"]).execute()
     return {"ok": True}
 
 
