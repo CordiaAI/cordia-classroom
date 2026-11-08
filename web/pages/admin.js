@@ -17,6 +17,8 @@ export default function Admin() {
   const [queue, setQueue] = useState(null);
   const [policy, setPolicy] = useState({ domain: '', school_name: '', tokens_allowed: false, source_url: '' });
   const [message, setMessage] = useState('');
+  // Takedowns: "Reporter confirmed by email from support@cordiaai.io", ticked per report.
+  const [confirmed, setConfirmed] = useState({});
   const [reportType, setReportType] = useState('');
 
   async function load() {
@@ -131,13 +133,33 @@ export default function Admin() {
 
           <section className="c-card adm-card" aria-labelledby="adm-takedowns">
             <h2 id="adm-takedowns" className="c-section-title">Takedowns</h2>
-            {queue.takedowns.length ? queue.takedowns.map(item => (
-              <div key={item.id} className="adm-row">
-                <span className="adm-main"><strong>{item.claimant_name} · {item.claimant_email}</strong><span className="c-meta">{[item.profile_id ? 'Profile (not held; Remove hides it)' : null, item.work_description, item.location].filter(Boolean).join(' · ')}</span></span>
-                <button type="button" className="c-btn c-btn--secondary" onClick={() => act(`/admin/takedowns/${item.id}`, { action: 'actioned' })}>Remove</button>
-                <button type="button" className="c-btn c-btn--quiet" onClick={() => act(`/admin/takedowns/${item.id}`, { action: 'rejected' })}>Restore</button>
-              </div>
-            )) : <p className="c-meta">Empty</p>}
+            <p className="c-meta">Nothing is held or removed until you act. Email the reporter from support@cordiaai.io to confirm before taking anything down.</p>
+            {queue.takedowns.length ? queue.takedowns.map(item => {
+              const target = item.target || {};
+              const owner = item.owner ? (item.owner.username ? `@${item.owner.username}` : item.owner.name || item.owner.email || item.owner.id) : 'unknown';
+              const seen = target.kind === 'profile'
+                ? `profile ${target.profile_visibility || 'visibility unknown'}${target.profile_status && target.profile_status !== 'ok' ? ` (${target.profile_status})` : ''}`
+                : [target.guide_visibility && `guide ${target.guide_visibility}${target.guide_status && target.guide_status !== 'ok' ? ` (${target.guide_status})` : ''}`,
+                  target.set_visibility && `class set ${target.set_visibility}${target.set_status && target.set_status !== 'visible' ? ` (${target.set_status})` : ''}`].filter(Boolean).join(' · ');
+              const ticked = Boolean(confirmed[item.id] || item.confirmed_at);
+              return (
+                <div key={item.id} className="adm-row adm-takedown">
+                  <span className="adm-main">
+                    <strong>{item.claimant_name} · {item.claimant_email}</strong>
+                    <span className="c-meta">Work claimed: {item.work_description}</span>
+                    <span className="c-meta">Link: {item.location}</span>
+                    <span className="c-meta">{target.found ? `“${target.title || 'Untitled'}” · ${seen || 'visibility unknown'} · owner ${owner}` : 'No guide, class set or profile matched this link'}{item.duplicate_count ? ` · reported ${item.duplicate_count + 1} times` : ''}{item.held_at ? ' · held while confirming' : ''}</span>
+                  </span>
+                  <label className="adm-confirm">
+                    <input type="checkbox" checked={ticked} disabled={Boolean(item.confirmed_at)} onChange={event => setConfirmed(current => ({ ...current, [item.id]: event.target.checked }))} />
+                    Reporter confirmed by email from support@cordiaai.io
+                  </label>
+                  {target.found && target.kind === 'guide' && !item.held_at && <button type="button" className="c-btn c-btn--quiet" onClick={() => act(`/admin/takedowns/${item.id}/hold`, {})}>Hold while confirming</button>}
+                  <button type="button" className="c-btn c-btn--secondary" disabled={!ticked} onClick={() => act(`/admin/takedowns/${item.id}`, { action: 'actioned', reporter_confirmed: ticked })}>Take down</button>
+                  <button type="button" className="c-btn c-btn--quiet" onClick={() => act(`/admin/takedowns/${item.id}`, { action: 'rejected' })}>Reject</button>
+                </div>
+              );
+            }) : <p className="c-meta">Empty</p>}
           </section>
 
           <section className="c-card adm-card" aria-labelledby="adm-policy">
@@ -166,6 +188,9 @@ export default function Admin() {
         .adm-main { flex: 1; display: grid; gap: 2px; min-width: 220px; }
         .adm-main strong { font: 600 15px/1.3 var(--font-sans); overflow-wrap: anywhere; }
         .adm-main .c-meta { overflow-wrap: anywhere; }
+        .adm-takedown { align-items: flex-start; padding: 12px 0; }
+        .adm-confirm { display: flex; align-items: center; gap: 8px; flex-basis: 100%; font: 500 14px/1.4 var(--font-sans); }
+        .adm-confirm input { width: 18px; height: 18px; accent-color: var(--olive); }
         .adm-danger { color: var(--error); }
         .adm-filters { margin-bottom: 4px; }
         .adm-main a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }

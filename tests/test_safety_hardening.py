@@ -341,13 +341,15 @@ class TakedownTests(Base):
         row = self.db.rows("copyright_takedowns")[0]
         self.assertEqual((row["profile_id"], row["set_id"]), (U["kim"], None))
         self.assertEqual(self.row("user_profiles", U["kim"])["review_status"], "ok")
-        self.call("post", "eve", f"/admin/takedowns/{row['id']}", json={"action": "actioned"})
+        # Taking down needs staff to have confirmed the reporter by email first.
+        self.assertEqual(self.call("post", "eve", f"/admin/takedowns/{row['id']}", json={"action": "actioned"}).status_code, 400)
+        self.call("post", "eve", f"/admin/takedowns/{row['id']}", json={"action": "actioned", "reporter_confirmed": True})
         self.assertEqual(self.row("user_profiles", U["kim"])["review_status"], "hidden")
         self.assertEqual(self.call("get", "lee", "/profiles/kim").status_code, 404)
 
-    def test_a_guide_link_is_still_held_at_once(self):
+    def test_a_guide_link_is_queued_without_a_hold(self):
         self.takedown(f"https://classroom.cordiaai.io/sets/{G_PUBLIC}")
-        self.assertEqual(self.row("study_guides", G_PUBLIC)["review_status"], "held")
+        self.assertEqual(self.row("study_guides", G_PUBLIC)["review_status"], "ok")
         self.assertIsNone(self.db.rows("copyright_takedowns")[0].get("profile_id"))
 
     def test_an_unknown_profile_is_just_recorded(self):

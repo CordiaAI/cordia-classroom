@@ -5,12 +5,12 @@ import { publicFetch } from '../lib/publicApi';
 
 const CONTACT = 'support@cordiaai.io';
 
-// Takedown requests. A named guide or set is held at once (no one else sees it) until we review it;
-// a profile (/u/<username>) goes to our review queue.
-// "Report it" on a guide page links here with ?link= filled in.
+// Takedown requests for a guide, set or profile. Staff review every report before anything is held
+// or removed, and may email the reporter from support@cordiaai.io to confirm it. "Report it" on a
+// guide page links here with ?link= filled in. `website` is a hidden field people never fill in.
 export default function Copyright() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: '', email: '', work: '', location: '', statement: false });
+  const [form, setForm] = useState({ name: '', email: '', work: '', location: '', statement: false, website: '' });
   useEffect(() => {
     const link = typeof router.query.link === 'string' ? router.query.link.slice(0, 2000) : '';
     if (link) setForm(current => (current.location ? current : { ...current, location: link }));
@@ -38,13 +38,14 @@ export default function Copyright() {
         <h1 className="cr-title">Copyright</h1>
         <div className="cr-card">
           {done ? (
-            <p className="cr-line" role="status">Received</p>
+            <p className="cr-line" role="status">Received. Our staff will review your report before taking any action, and we may email you from {CONTACT} to confirm it.</p>
           ) : (
             <form className="cr-form" onSubmit={submit}>
               <label className="cr-field"><span>Name</span><input className="c-input" value={form.name} onChange={set('name')} autoComplete="name" /></label>
               <label className="cr-field"><span>Email</span><input className="c-input" type="email" value={form.email} onChange={set('email')} autoComplete="email" /></label>
               <label className="cr-field"><span>Your work</span><textarea className="c-input" rows={3} value={form.work} onChange={set('work')} /></label>
               <label className="cr-field"><span>Link to the guide or profile</span><input className="c-input" value={form.location} onChange={set('location')} inputMode="url" /></label>
+              <label className="cr-trap" aria-hidden="true"><span>Website</span><input value={form.website} onChange={set('website')} tabIndex={-1} autoComplete="off" /></label>
               <label className="cr-check">
                 <input type="checkbox" checked={form.statement} onChange={set('statement')} />
                 <span>I own this work or act for its owner, and I believe in good faith this use isn't authorized.</span>
@@ -57,11 +58,11 @@ export default function Copyright() {
         </div>
         <div className="cr-card cr-policy">
           <h2>How we handle copyright</h2>
-          <p>We respect copyright and respond to notices under the U.S. Digital Millennium Copyright Act (DMCA). A guide or set named in a notice is hidden from everyone but its owner right away while we review it. A profile named in a notice is reviewed by a person first.</p>
+          <p>We respect copyright and respond to notices under the U.S. Digital Millennium Copyright Act (DMCA). Our staff review every report before taking any action on a guide, set or profile. We may email you from <a href={`mailto:${CONTACT}`}>{CONTACT}</a> to confirm your report before we act on it.</p>
           <h3>Sending a notice</h3>
           <p>Use the form above or email us. Include: your signature (typing your full name counts), the work you own, a link to the shared guide, your contact details, a statement that you believe in good faith the use isn't authorized, and a statement, under penalty of perjury, that your notice is accurate and you own the work or may act for its owner.</p>
           <h3>Counter-notice</h3>
-          <p>If your guide was removed by mistake, email us with your name and contact details, the guide, a statement under penalty of perjury that it was removed by mistake or misidentification, and your consent to the jurisdiction of a U.S. federal court. We may restore it after 10 business days unless the claimant tells us they have filed a lawsuit.</p>
+          <p>If your guide was removed by mistake, email <a href={`mailto:${CONTACT}`}>{CONTACT}</a> with your name and contact details, the guide, a statement under penalty of perjury that it was removed by mistake or misidentification, and your consent to the jurisdiction of a U.S. federal court. We may restore it after 10 business days unless the claimant tells us they have filed a lawsuit.</p>
           <h3>Repeat infringers</h3>
           <p>We remove sharing access, and may close the accounts, of people who repeatedly share material that infringes copyright.</p>
           <h3>Designated agent</h3>
@@ -78,6 +79,7 @@ export default function Copyright() {
         .cr-check { display: flex; gap: 10px; align-items: flex-start; font: 500 15px/1.45 var(--font-sans); cursor: pointer; }
         .cr-check input { margin-top: 3px; width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--olive); }
         .cr-line { margin: 0; font: 600 17px/1.4 var(--font-sans); }
+        .cr-trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
         .cr-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
         .cr-contact { justify-self: start; color: var(--ink); font: 600 15px/1 var(--font-sans); }
         .cr-policy { gap: 10px; font: 500 15px/1.55 var(--font-sans); }

@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field
@@ -13,7 +11,7 @@ import access
 from access import Ctx
 from database import get_supabase
 from rate_limit import ai_rate_limit
-from services import instructors, usernames
+from services import instructors
 from services.class_catalog import normalize_course_code
 from services.class_db import ensure_class
 
@@ -75,68 +73,50 @@ class TakedownRequest(BaseModel):
     work: str = Field(..., min_length=1, max_length=4000)
     location: str = Field(..., min_length=1, max_length=2000)
     statement: bool
-
-
-COPYRIGHT_HOLD = "Copyright report"
-_SET_ID = re.compile(r"set=([0-9a-fA-F-]{36})|/sets?/([0-9a-fA-F-]{36})")
-_PROFILE = re.compile(r"/u/([A-Za-z0-9_.]{1,64})(?![A-Za-z0-9_.])")
-
-
-def profile_from(location: str, db) -> Optional[str]:
-    """The user id behind a /u/<username> link (a recently released name still finds its owner)."""
-    found = _PROFILE.search(location or "")
-    if not found:
-        return None
-    name = usernames.normalize(found.group(1))
-    row = (db.table("user_profiles").select("id").eq("username", name).limit(1).execute().data or [None])[0]
-    if row:
-        return row["id"]
-    return usernames.held_by(db, name, datetime.now(timezone.utc))
+    # Hidden on the form: people never fill it in.
+    website: str = Field(default="", max_length=500)
 
 
 @router.post("/copyright/takedown", dependencies=[Depends(ai_rate_limit(5, 3600))])
 def takedown(body: TakedownRequest, ctx: Ctx = Depends(access.public())):
-    """A guide or class set named in the link (/sets/<guide id>, or an older class set link) is held
-    at once for an admin to review (well inside the 24-hour promise). A profile (/u/<username>)
-    goes to the admin queue without a hold: the form is anonymous and a whole profile is at stake."""
+    """Receives a copyright report on a guide, class set or profile for staff to review. Nothing is
+    held or removed here: staff confirm the reporter by email and decide in the admin queue
+    (routers/admin.py). One open report per item; a later one on the same item attaches to it."""
+    from services import takedowns
+    received = {"ok": True, "contact": COPYRIGHT_EMAIL}
+    if body.website.strip():
+        return received  # the hidden field was filled: same answer, nothing saved
     if not body.statement:
         raise HTTPException(status_code=400, detail="Confirm the statement to continue")
     db = ctx.db
-    set_id: Optional[str] = None
-    guide_id: Optional[str] = None
-    found = _SET_ID.search(body.location)
-    if found:
-        candidate = found.group(1) or found.group(2)
-        try:
-            candidate = str(uuid.UUID(candidate))
-        except ValueError:
-            candidate = None
-        if candidate:
-            shared = (db.table("shared_sets").select("id,guide_id").eq("id", candidate).limit(1).execute().data or [None])[0]
-            if not shared:
-                shared = (db.table("shared_sets").select("id,guide_id").eq("guide_id", candidate).limit(1).execute().data or [None])[0]
-                if shared or db.table("study_guides").select("id").eq("id", candidate).limit(1).execute().data:
-                    guide_id = candidate
-            if shared:
-                set_id, guide_id = shared["id"], guide_id or shared.get("guide_id")
+    if takedowns.received_today(db) >= takedowns.DAILY_CAP:
+        raise HTTPException(status_code=429, detail=f"We can't take more reports online today. Email {COPYRIGHT_EMAIL} instead.")
+    location = body.location.strip()
+    set_id, guide_id, profile_id = takedowns.target(db, location)
+    existing = takedowns.open_report(db, set_id, guide_id, profile_id, location)
+    if existing:
+        takedowns.attach(db, existing)
+        return received
     row = {
         "set_id": set_id, "claimant_name": body.name.strip(), "claimant_email": str(body.email),
-        "work_description": body.work.strip(), "location": body.location.strip(),
+        "work_description": body.work.strip(), "location": location, "status": "received",
     }
     if guide_id:
         row["guide_id"] = guide_id
-    profile_id = None if (set_id or guide_id) else profile_from(body.location, db)
-    try:  # profile_id arrives with migration 20261126120000; before it, the link stays in `location`
-        db.table("copyright_takedowns").insert({**row, "profile_id": profile_id} if profile_id else row).execute()
-    except Exception:
-        if not profile_id:
-            raise
-        db.table("copyright_takedowns").insert(row).execute()
-    if set_id:
-        db.table("shared_sets").update({"status": "held", "hold_reason": COPYRIGHT_HOLD}).eq("id", set_id).in_("status", ["visible", "held"]).execute()
-    if guide_id:
-        db.table("study_guides").update({"review_status": "held", "hold_reason": COPYRIGHT_HOLD}).eq("id", guide_id).neq("review_status", "hidden").execute()
-    return {"ok": True, "contact": COPYRIGHT_EMAIL}
+    try:
+        try:  # profile_id arrives with migration 20261126120000; before it, the link stays in `location`
+            db.table("copyright_takedowns").insert({**row, "profile_id": profile_id} if profile_id else row).execute()
+        except Exception as error:
+            if not profile_id or "duplicate key" in str(error) or "23505" in str(error):
+                raise
+            db.table("copyright_takedowns").insert(row).execute()
+    except Exception as error:
+        # Another report on the same item won the race (the one-open-report index): acknowledged.
+        if "duplicate key" in str(error) or "23505" in str(error):
+            return received
+        raise
+    takedowns.notify_owner(db, set_id, guide_id, profile_id)
+    return received
 
 
 @router.get("/instructors/opt-outs", dependencies=[Depends(ai_rate_limit(30, 60))])

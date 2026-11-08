@@ -72,6 +72,10 @@ export async function markNotificationsRead(ids) {
 
 // What a notification says, in plain words (the actor's name is shown separately).
 export function notificationText(kind, item = null) {
+  if (kind === 'copyright_report') {
+    const what = item?.item?.profile ? 'your profile' : item?.item?.title ? `“${item.item.title}”` : 'one of your guides';
+    return `A copyright report was filed on ${what} and is being reviewed.`;
+  }
   if (kind === 'classroom_invite') return `invited you to ${item?.classroom?.name ? `“${item.classroom.name}”` : 'a classroom'}`;
   return {
     follow: 'followed you',
@@ -82,6 +86,10 @@ export function notificationText(kind, item = null) {
 }
 
 export function notificationHref(item) {
+  if (item.kind === 'copyright_report') {
+    if (item.item?.profile) return item.item.title ? `/u/${item.item.title}` : '/settings';
+    return item.item?.guide_id ? `/guide/${item.item.guide_id}` : '/library';
+  }
   if (item.kind === 'classroom_invite' && item.classroom?.token) return `/join/${item.classroom.token}`;
   if (item.kind === 'friend_request' || item.kind === 'follow_request') return '/friends?tab=requests';
   return item.actor?.username ? `/u/${item.actor.username}` : '/friends';
