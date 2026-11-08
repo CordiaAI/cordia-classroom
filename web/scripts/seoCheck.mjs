@@ -2,7 +2,8 @@
 // page's server HTML the way a crawler sees it (no JavaScript):
 //   indexable pages: 200, exactly one H1, a unique title containing "Cordia Classroom", a meta
 //   description of 120–160 characters, a canonical equal to SITE_URL + path, JSON-LD that
-//   parses, and FAQ JSON-LD text equal to the visible FAQ text;
+//   parses, FAQ JSON-LD text equal to the visible FAQ text, and none of the banned words
+//   ("unlimited", "CordiaClassroom", "SmartNotes") in the visible text;
 //   noindex pages (/login, /signup, /reset-password): 200 and a robots noindex tag.
 // Run from the repo root: `npm run seo:check` (or `node web/scripts/seoCheck.mjs --skip-build`
 // after `npm run build --prefix web`). Exits non-zero on any failure.
@@ -36,6 +37,27 @@ export function stripTags(html) {
 }
 const texts = (html, pattern) => [...html.matchAll(pattern)].map(match => decode(stripTags(match[1])).trim());
 
+// The text a visitor sees in <body>: tag by tag, skipping what browsers don't show (scripts,
+// styles, templates, noscript).
+const HIDDEN = new Set(['script', 'style', 'template', 'noscript']);
+export function visibleText(html) {
+  const body = html.slice(Math.max(0, html.search(/<body[\s>]/i)));
+  const parts = [];
+  let hidden = 0;
+  let last = 0;
+  for (const tag of body.matchAll(/<(\/?)([A-Za-z][A-Za-z0-9-]*)\b[^>]*>/g)) {
+    if (!hidden) parts.push(body.slice(last, tag.index));
+    last = tag.index + tag[0].length;
+    if (HIDDEN.has(tag[2].toLowerCase())) hidden = Math.max(0, hidden + (tag[1] ? -1 : 1));
+  }
+  if (!hidden) parts.push(body.slice(last));
+  return decode(parts.join(' ')).replace(/\s+/g, ' ').trim();
+}
+
+// Words public pages must never show (copy rules: no open-ended limits, the brand is two words,
+// the notes feature is "Notes").
+export const BANNED = [/unlimited/i, /CordiaClassroom/, /SmartNotes?/i];
+
 // What a crawler reads from one page's HTML.
 export function readPage(html) {
   const metas = tags(html, 'meta');
@@ -59,6 +81,8 @@ export function checkPage(page, html, status) {
   const problems = [];
   const seen = readPage(html);
   if (status !== 200) problems.push(`status ${status}`);
+  const text = visibleText(html);
+  for (const word of BANNED) if (word.test(text)) problems.push(`shows ${word}`);
   if (!page.index) {
     if (!/noindex/.test(seen.robots)) problems.push('no robots noindex');
     return { problems, seen };
