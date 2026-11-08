@@ -7,6 +7,7 @@ import {
   acceptFriend, approveFollow, declineFollow, declineFriend, loadPeople, removeFollower, removeFriend, unfollow,
 } from '../lib/social';
 import SegmentedControl from '../components/SegmentedControl';
+import ActivityFeed from '../components/ActivityFeed';
 
 const TABS = [
   { key: 'activity', label: 'Activity' },
@@ -40,8 +41,8 @@ const ACTIONS = {
   'follow-out': [{ label: 'Cancel', run: unfollow }],
 };
 
-// Friends: who you're friends with, who you follow, who follows you, and requests both ways.
-// Activity from people you follow arrives in a later stage.
+// Friends: what happened lately (Activity, with the weekly friends leaderboard), who you're friends
+// with, who you follow, who follows you, and requests both ways.
 export default function FriendsPage() {
   const { ready } = useRequireAuth();
   const router = useRouter();
@@ -122,7 +123,7 @@ export default function FriendsPage() {
       </SegmentedControl>
 
       <div id={`fpanel-${tab}`} role="tabpanel" aria-labelledby={`ftab-${tab}`} className="fr-panel">
-        {tab === 'activity' && <p className="c-card fr-empty">Activity from people you follow arrives soon.</p>}
+        {tab === 'activity' && <ActivityFeed />}
         {tab !== 'activity' && loading && <SectionLoader height={160} label="Loading" />}
         {tab !== 'activity' && !loading && sections.map(section => {
           const data = lists[section.id];

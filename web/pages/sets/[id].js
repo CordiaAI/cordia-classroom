@@ -11,6 +11,7 @@ import UserChip from '../../components/UserChip';
 import Menu from '../../components/Menu';
 import FeedbackModal from '../../components/FeedbackModal';
 import ReportSheet from '../../components/ReportSheet';
+import GuideAsk from '../../components/GuideAsk';
 import { VISIBILITY_LABELS, copyGuide, guideLink, loadPublicGuide, saveForLater } from '../../lib/guideSharing';
 import { outlineLine } from '../../lib/guideVisibility.mjs';
 import { CLASSROOMS_ON, PER_VIEWER_PROGRESS } from '../../lib/featureFlags';
@@ -188,6 +189,7 @@ export default function SetPage() {
                 </ul>
               </section>
             )}
+            {signedIn && <GuideAsk guideId={guide.id} />}
             {!signedIn && <p className="c-meta sets-report">Is this your work, shared without permission? <Link href={`/copyright?link=${encodeURIComponent(guideLink(guide.id))}`}>Report it</Link>.</p>}
           </article>
         )}

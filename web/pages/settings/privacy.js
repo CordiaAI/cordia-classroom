@@ -153,6 +153,9 @@ export default function PrivacySettings() {
               )}
               <Toggle label="Show my school" checked={me.show_school} onChange={value => save({ show_school: value })} />
               <Toggle label="Show my study streak" checked={me.show_streak} onChange={value => save({ show_streak: value })} />
+              {me.can_join_leaderboard && me.leaderboard_available && (
+                <Toggle label="Show me on the weekly friends leaderboard" checked={Boolean(me.leaderboard_opt_in)} onChange={value => save({ leaderboard_opt_in: value })} />
+              )}
             </section>
 
             <section className="c-card pv-card" aria-labelledby="pv-connect">
