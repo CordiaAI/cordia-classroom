@@ -1,15 +1,19 @@
-"""Admin review queue: reports, held sets, merge proposals, takedowns, school policy."""
+"""Admin review queue: reports (guides, profiles, classrooms), held sets, merge proposals,
+takedowns, school policy."""
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
+import access
+from access import Ctx
 from auth_utils import get_user_id
 from database import get_supabase
+from services import reports as report_service
 from services.canvas_client import CanvasForbiddenRequest, normalize_domain
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -49,7 +53,8 @@ def metrics(days: int = Query(default=30, ge=1, le=180), authorization: str = He
 
 
 @router.get("/queue")
-def queue(authorization: str = Header(default="")):
+def queue(type: Optional[Literal["guide", "profile", "classroom"]] = None, authorization: str = Header(default="")):
+    """Everything waiting on an admin. `reports` groups open reports by target (type filters it)."""
     _, db = require_admin(authorization)
     reports = db.table("shared_set_reports").select("set_id,reason,created_at").eq("status", "open").execute().data or []
     by_set: dict[str, dict] = {}
@@ -84,6 +89,7 @@ def queue(authorization: str = Header(default="")):
     except Exception:  # before the Stage 5 migration
         requests = []
     return {
+        "reports": report_service.queue(db, type),
         "classrooms": requests,
         "sets": [{**s, "class": classes.get(s["class_id"]), "reports": by_set.get(s["id"])} for s in sets.values()],
         "guides": guides,
@@ -178,6 +184,23 @@ def decide_merge(proposal_id: str, body: MergeDecision, authorization: str = Hea
     return {"ok": True}
 
 
+class ReportDecision(BaseModel):
+    decision: Literal["clear", "hide"]
+
+
+@router.post("/reports/{target_type}/{target_id}")
+def decide_reports(target_type: Literal["guide", "profile", "classroom"], target_id: str, body: ReportDecision,
+                   ctx: Ctx = Depends(access.admin())):
+    """Clear the reports (the target is back for everyone) or keep it hidden from everyone but its
+    owner (and a classroom's staff)."""
+    target_id = _id(target_id)
+    try:
+        report_service.decide(ctx.db, target_type, target_id, body.decision)
+    except Exception:  # before migration 20261126120000 a profile or classroom has no review status
+        raise HTTPException(status_code=503, detail="This needs the Stage 9 database update first.")
+    return {"ok": True}
+
+
 class TakedownDecision(BaseModel):
     action: Literal["actioned", "rejected"]
 
@@ -196,6 +219,8 @@ def decide_takedown(takedown_id: str, body: TakedownDecision, authorization: str
             db.table("shared_sets").update({"status": "taken_down"}).eq("id", row["set_id"]).execute()
     if row.get("guide_id"):
         _decide_guide(db, row["guide_id"], "ok" if body.action == "rejected" else "hidden")
+    if row.get("profile_id") and body.action == "actioned":  # a profile isn't held on a takedown, only hidden here
+        db.table("user_profiles").update({"review_status": "hidden", "hold_reason": "Copyright report"}).eq("id", row["profile_id"]).execute()
     db.table("copyright_takedowns").update({"status": body.action, "actioned_at": _now()}).eq("id", row["id"]).execute()
     return {"ok": True}
 

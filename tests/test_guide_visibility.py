@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import main  # noqa: E402
 import rate_limit  # noqa: E402
-from fake_supabase import FakeDB  # noqa: E402
+from fake_supabase import FakeDB, route_patches  # noqa: E402
 from services import sharing  # noqa: E402
 
 ANA = "aaaaaaaa-0000-4000-8000-000000000001"   # the owner
@@ -64,8 +64,7 @@ class GuideVisibilityTests(unittest.TestCase):
             if name not in IDS:
                 raise HTTPException(status_code=401, detail="Sign in")
             return IDS[name]
-        self.patches = [patch(f"routers.{m}.get_user_id", side_effect=who) for m in MODULES]
-        self.patches += [patch(f"routers.{m}.get_supabase", return_value=self.db) for m in MODULES]
+        self.patches = route_patches(MODULES, who, self.db)
         self.patches += [patch("routers.quiz.start_quiz_warmup"), patch("routers.guides.start_quiz_warmup")]
         for p in self.patches:
             p.start()

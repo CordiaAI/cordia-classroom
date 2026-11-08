@@ -6,12 +6,14 @@ Handles login and session management via Supabase Auth. New accounts are created
 import time
 import logging
 from collections import defaultdict
-from fastapi import APIRouter, HTTPException, Request, Header
+from datetime import date, datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from pydantic import BaseModel, Field
 from supabase_auth.errors import AuthApiError, AuthInvalidJwtError
 from database import get_supabase, get_auth_supabase
 from auth_utils import get_user_id, reject_oauth_client_token
-from rate_limit import client_ip
+from rate_limit import ai_rate_limit, client_ip
+from services import minors
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -128,6 +130,7 @@ def get_current_user(authorization: str = Header(default="")):
             "user_id": result.user.id,
             "email": result.user.email,
             "name": _display_name(result.user),
+            "age_needed": _age_needed(result.user),
         }
 
     except (AuthApiError, AuthInvalidJwtError) as e:
@@ -219,7 +222,11 @@ def delete_account(request: DeleteAccountRequest, authorization: str = Header(de
     """Self-serve account deletion: cancels a paid plan, removes the student's data and the login."""
     if request.confirm != "DELETE":
         raise HTTPException(status_code=400, detail='Type DELETE to confirm')
-    user_id = get_user_id(authorization)
+    _erase_account(get_user_id(authorization))
+    return {"deleted": True}
+
+
+def _erase_account(user_id: str) -> None:
     supabase = get_supabase()
     from routers.billing import cancel_subscription_for_deletion
     cancel_subscription_for_deletion(user_id)
@@ -231,4 +238,51 @@ def delete_account(request: DeleteAccountRequest, authorization: str = Header(de
     _remove_card_images(supabase, user_id)
     supabase.auth.admin.delete_user(user_id)
     logger.info("Account deleted: %s", user_id)
-    return {"deleted": True}
+
+
+# Age (social plan, Stage 9) ------------------------------------------------------------------------
+def _age_needed(user) -> bool:
+    """A new account (made on or after minors.AGE_CHECK_FROM) that hasn't told us its birth month,
+    so the web asks once. False before migration 20261126120000 (nowhere to keep the answer)."""
+    try:
+        rows = get_supabase().table("user_profiles").select("birth_month").eq("id", user.id).limit(1).execute().data or []
+    except Exception:
+        return False
+    created = getattr(user, "created_at", None)
+    created = created.isoformat() if hasattr(created, "isoformat") else str(created or "")
+    return minors.age_needed({"birth_month": (rows[0] if rows else {}).get("birth_month"), "created_at": created})
+
+
+class AgeRequest(BaseModel):
+    year: int = Field(..., ge=1900, le=2100)
+    month: int = Field(..., ge=1, le=12)
+
+
+@router.post("/age", dependencies=[Depends(ai_rate_limit(5, 60))])
+def set_age(body: AgeRequest, authorization: str = Header(default="")):
+    """The birth month and year from sign-up (only those are kept; once only). Under 13 there's no
+    account: it's deleted at once and this answers 403 under_13 (there's no parental consent flow).
+    13 to 17 counts as a minor (services/minors.py)."""
+    user_id = get_user_id(authorization)
+    today = datetime.now(timezone.utc).date()
+    born = date(body.year, body.month, 1)
+    if born > today:
+        raise HTTPException(status_code=400, detail="Check the month and year.")
+    supabase = get_supabase()
+    try:
+        rows = supabase.table("user_profiles").select("id,birth_month").eq("id", user_id).limit(1).execute().data or []
+    except Exception:  # before migration 20261126120000
+        rows = None
+    if rows and rows[0].get("birth_month"):
+        raise HTTPException(status_code=409, detail="Your age is already saved.")
+    if minors.age_on(born, today) < minors.MIN_AGE:
+        _erase_account(user_id)
+        logger.info("Account under 13 removed at sign-up")
+        raise HTTPException(status_code=403, detail="under_13")
+    if rows is None:
+        raise HTTPException(status_code=503, detail="Saving your age isn't available yet.")
+    if rows:
+        supabase.table("user_profiles").update({"birth_month": born.isoformat()}).eq("id", user_id).execute()
+    else:
+        supabase.table("user_profiles").insert({"id": user_id, "birth_month": born.isoformat()}).execute()
+    return {"saved": True, "minor": minors.age_on(born, today) < minors.ADULT_AGE}

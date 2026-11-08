@@ -4,7 +4,6 @@ from pathlib import Path
 import os
 import sys
 import unittest
-from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
@@ -14,7 +13,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import main  # noqa: E402
 import rate_limit  # noqa: E402
-from fake_supabase import FakeDB  # noqa: E402
+from fake_supabase import FakeDB, route_patches  # noqa: E402
 from services import social_graph as graph  # noqa: E402
 
 ANA = "aaaaaaaa-0000-4000-8000-000000000001"
@@ -38,8 +37,7 @@ class SocialGraphTests(unittest.TestCase):
                                                    "profile_visibility": "public"})
         self.client = TestClient(main.app)
         who = lambda header: IDS[header.split(" ", 1)[1]]  # noqa: E731
-        self.patches = [patch(f"routers.{m}.get_user_id", side_effect=who) for m in ("social", "notifications", "profiles")]
-        self.patches += [patch(f"routers.{m}.get_supabase", return_value=self.db) for m in ("social", "notifications", "profiles")]
+        self.patches = route_patches(("social", "notifications", "profiles"), who, self.db)
         for p in self.patches:
             p.start()
 

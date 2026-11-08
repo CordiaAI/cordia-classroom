@@ -383,6 +383,7 @@ def create_invite(body: InviteCreate, ctx: Ctx = Depends(MEMBER)):
         raise HTTPException(status_code=400, detail="A private classroom only lets in people invited by name.")
     if len(_live_invites(db, room, me)) >= 20:
         raise HTTPException(status_code=409, detail="Turn off an old link first.")
+    rooms.check_invites_today(db, user_id)
     return {"invite": _invite_out(rooms.make_invite(db, room["id"], user_id, expires_days=body.expires_days, max_uses=body.max_uses))}
 
 
@@ -400,6 +401,7 @@ def revoke_invite(ctx: Ctx = Depends(INVITE)):
 def regenerate_invite(ctx: Ctx = Depends(INVITE)):
     """A new link and code with the same limits; the old ones stop working."""
     user_id, db, invite, room = ctx.user_id, ctx.db, ctx.invite, ctx.room
+    rooms.check_invites_today(db, user_id)
     db.table("classroom_invites").update({"revoked_at": rooms.now().isoformat()}).eq("id", invite["id"]).execute()
     days = None
     if invite.get("expires_at") and invite.get("created_at"):
@@ -420,13 +422,18 @@ def invite_friends(body: FriendInvite, ctx: Ctx = Depends(MEMBER)):
     user_id, db, room, me = ctx.user_id, ctx.db, ctx.room, ctx.me
     if not rooms.may_invite(room, me):
         raise HTTPException(status_code=403, detail="Only the owner and admins can invite people here.")
-    sent = 0
+    to_invite = []
     for friend_id in dict.fromkeys(require_uuid(i, "user ID") for i in body.user_ids):
         if friend_id == user_id or not graph.are_friends(db, user_id, friend_id) or is_blocked(db, friend_id, room["owner_id"]):
             continue
         current = rooms.membership(db, room["id"], friend_id)
         if current and current.get("status") in ("active", "pending"):
             continue
+        to_invite.append(friend_id)
+    if to_invite:
+        rooms.check_invites_today(db, user_id, len(to_invite))
+    sent = 0
+    for friend_id in to_invite:
         invite = rooms.make_invite(db, room["id"], user_id, expires_days=rooms.FRIEND_INVITE_DAYS, max_uses=1, invitee_id=friend_id)
         db.table("notifications").insert({"user_id": friend_id, "kind": "classroom_invite", "created_at": rooms.now().isoformat(),
                                           "payload": {"actor_id": user_id, "classroom_id": room["id"], "name": room["name"],

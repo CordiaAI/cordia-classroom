@@ -150,6 +150,18 @@ def make_invite(db, classroom_id: str, created_by: str, *, expires_days: Optiona
     raise HTTPException(status_code=503, detail="Couldn't make an invite. Try again.")
 
 
+DAILY_INVITES = 50
+
+
+def check_invites_today(db, user_id: str, adding: int = 1) -> None:
+    """At most 50 invites a day per person (links, codes and invites by name; rolling 24 hours,
+    counted in the database so the limit holds across restarts and machines)."""
+    since = (now() - timedelta(hours=24)).isoformat()
+    made = len(db.table("classroom_invites").select("id").eq("created_by", user_id).gte("created_at", since).execute().data or [])
+    if made + adding > DAILY_INVITES:
+        raise HTTPException(status_code=429, detail="You've reached today's limit for invites. Try again tomorrow.")
+
+
 def find_invite(db, token: Optional[str] = None, code: Optional[str] = None) -> Optional[dict]:
     try:
         query = db.table("classroom_invites").select("*")
