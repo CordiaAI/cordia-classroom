@@ -162,6 +162,17 @@ class ReportTests(Base):
         self.assertEqual(response.status_code, 503)
 
 
+class ReasonParityTests(unittest.TestCase):
+    def test_the_web_offers_the_reasons_the_server_accepts(self):
+        import re
+        text = (Path(__file__).resolve().parents[1] / "web" / "lib" / "reportReasons.mjs").read_text()
+        block = text[text.index("export const REASONS"):]
+        for target, keys in reports.REASONS.items():
+            found = re.search(target + r": \[([^\]]*)\]", block)
+            self.assertIsNotNone(found, target)
+            self.assertEqual(re.findall(r"'(\w+)'", found.group(1)), list(keys), target)
+
+
 class AdminQueueTests(Base):
     def test_queue_groups_by_target_and_filters_by_type(self):
         self.report("ben", "guide", G_PUBLIC, "wrong")

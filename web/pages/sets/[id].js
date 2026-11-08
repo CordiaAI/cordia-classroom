@@ -10,6 +10,7 @@ import PublicPage from '../../components/PublicPage';
 import UserChip from '../../components/UserChip';
 import Menu from '../../components/Menu';
 import FeedbackModal from '../../components/FeedbackModal';
+import ReportSheet from '../../components/ReportSheet';
 import { VISIBILITY_LABELS, copyGuide, guideLink, loadPublicGuide, saveForLater } from '../../lib/guideSharing';
 import { outlineLine } from '../../lib/guideVisibility.mjs';
 import { CLASSROOMS_ON, PER_VIEWER_PROGRESS } from '../../lib/featureFlags';
@@ -29,7 +30,7 @@ export default function SetPage() {
   const [result, setResult] = useState(null); // { guide } | { missing } | { error }
   const [busy, setBusy] = useState('');
   const [toast, setToast] = useState('');
-  const [reporting, setReporting] = useState(false);
+  const [reporting, setReporting] = useState(''); // '' | 'sheet' | 'feedback' (before the server's update)
   const [adding, setAdding] = useState(false);
 
   useEffect(() => { setSignedIn(Boolean(getToken())); }, []);
@@ -95,7 +96,7 @@ export default function SetPage() {
   const moreItems = guide ? [
     ...(guide.visibility !== 'private' ? [{ label: 'Copy link', icon: Link2, onSelect: share }] : []),
     ...(guide.is_owner ? [] : [
-      { label: 'Report', icon: Flag, onSelect: () => setReporting(true) },
+      { label: 'Report', icon: Flag, onSelect: () => setReporting('sheet') },
       { label: 'Copyright claim', meta: 'It uses your work', icon: ShieldAlert, onSelect: () => router.push(`/copyright?link=${encodeURIComponent(guideLink(guide.id))}`) },
     ]),
   ] : [];
@@ -196,8 +197,11 @@ export default function SetPage() {
         <AddToClassroom item={{ type: 'guide', id: guide.id, title: guide.title, mine: guide.is_owner, private: guide.visibility === 'private' }}
           onClose={() => setAdding(false)} onAdded={room => { setAdding(false); setToast(`Added to ${room?.name || 'the classroom'}`); }} />
       )}
-      {reporting && (
-        <FeedbackModal initialCategory="other" initialMessage={`Report guide ${guideLink(guide.id)}: `} onClose={() => setReporting(false)} />
+      {reporting === 'sheet' && (
+        <ReportSheet targetType="guide" targetId={guide.id} name={guide.title} onClose={() => setReporting('')} onUnavailable={() => setReporting('feedback')} />
+      )}
+      {reporting === 'feedback' && (
+        <FeedbackModal initialCategory="other" initialMessage={`Report guide ${guideLink(guide.id)}: `} onClose={() => setReporting('')} />
       )}
       <style jsx>{`
         .sets { width: min(760px, 100%); margin: 0 auto; display: grid; gap: 16px; }

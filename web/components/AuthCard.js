@@ -7,6 +7,9 @@ import { supabaseAuth } from '../lib/supabase';
 import { formatPhone, normalizePhone } from '../lib/phone.mjs';
 import { takeReturnTo } from '../lib/returnTo.mjs';
 import SegmentedControl from './SegmentedControl';
+import AgeFields from './AgeFields';
+import { MIN_AGE, ageFrom } from '../lib/age.mjs';
+import { ageBlocked, blockAge, rememberAge, sendAge } from '../lib/ageCheck';
 
 export function GoogleLogo() {
   return (
@@ -60,14 +63,20 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
   const [phone, setPhone] = useState('');
   const [sentTo, setSentTo] = useState('');
   const [code, setCode] = useState('');
+  const [birthMonth, setBirthMonth] = useState('');
+  const [birthYear, setBirthYear] = useState('');
+  const [tooYoung, setTooYoung] = useState(false);
   const signup = mode === 'signup';
+  // Under 13 gets no account (no parental consent flow); this browser remembers the answer.
+  useEffect(() => { if (ageBlocked() || router.query.age === '1') setTooYoung(true); }, [router.query.age]);
   const passed = CHECKS.map(check => check.test(password));
   // After a self-serve account deletion, say it worked.
   useEffect(() => { if (router.query.deleted === '1') setNotice('Your account and data were deleted.'); }, [router.query.deleted]);
 
-  function finishSession(session) {
+  async function finishSession(session) {
     setToken(session.access_token, session.user?.email, session.refresh_token, session.user?.user_metadata?.name);
     scheduleProactiveRefresh();
+    if (await sendAge() === 'under_13') return;
     const back = takeReturnTo();
     if (back) window.location.assign(back);
     else router.push('/dashboard');
@@ -81,8 +90,19 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
     setSubmitted(false);
   }
 
+  // The age question on Create account: checked here before any account exists, and again on the server.
+  function ageOk() {
+    if (!signup) return true;
+    const age = ageFrom(birthYear, birthMonth);
+    if (age === null) { setError('Enter the month and year you were born.'); return false; }
+    if (age < MIN_AGE) { blockAge(); setTooYoung(true); return false; }
+    rememberAge(birthYear, birthMonth);
+    return true;
+  }
+
   async function continueWithGoogle() {
     setError('');
+    if (!ageOk()) return;
     setBusy(true);
     const { error: oauthError } = await supabaseAuth().signInWithOAuth({
       provider: 'google',
@@ -146,6 +166,7 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
       setError(password.length < 8 ? 'Use 8 or more characters.' : '');
       return;
     }
+    if (!ageOk()) return;
     setBusy(true);
     try {
       if (signup) {
@@ -187,7 +208,18 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
         </SegmentedControl>
       )}
 
-      {mode !== 'reset' && (
+      {signup && tooYoung && (
+        <div className="auth-young" role="status">
+          <p><strong>You need to be 13 or older to use Cordia.</strong></p>
+          <p className="auth-fine">We don’t make accounts for anyone younger, and nothing you entered was kept.</p>
+        </div>
+      )}
+
+      {signup && !tooYoung && (
+        <AgeFields idPrefix="auth-age" month={birthMonth} year={birthYear} onMonth={setBirthMonth} onYear={setBirthYear} disabled={busy} />
+      )}
+
+      {mode !== 'reset' && !(signup && tooYoung) && (
         <>
           <button type="button" className="auth-google" onClick={continueWithGoogle} disabled={busy}>
             <GoogleLogo />Continue with Google
@@ -229,7 +261,7 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
         </form>
       )}
 
-      {!phoneStep && (
+      {!phoneStep && !(signup && tooYoung) && (
       <form className="auth-form" onSubmit={submit} noValidate>
         <div className="auth-field">
           <label htmlFor="auth-email">Email</label>
@@ -307,6 +339,8 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
         .auth-error { margin: 0; color: var(--error); font:600 15px/1.5 var(--font-sans); }
         .auth-notice { margin: 0; color: var(--olive-ink); font:600 15px/1.5 var(--font-sans); }
         .auth-fine { margin: 0; color: var(--muted); font: 500 13px/1.5 var(--font-sans); }
+        .auth-young { display: grid; gap: 6px; padding: 14px 16px; border-radius: 12px; background: var(--olive-tint); color: var(--ink); }
+        .auth-young p { margin: 0; }
         .auth-code { letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
         .auth-phone-links { display: flex; justify-content: space-between; gap: 12px; }
         .auth-submit { height: 48px; border: 0; border-radius:999px; background: var(--olive); color: var(--on-olive); font:600 15px/1 var(--font-sans); cursor: pointer; }

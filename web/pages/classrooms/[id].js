@@ -11,6 +11,8 @@ import Menu from '../../components/Menu';
 import InviteDialog from '../../components/InviteDialog';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import InstructorDashboard from '../../components/InstructorDashboard';
+import ReportSheet from '../../components/ReportSheet';
+import FeedbackModal from '../../components/FeedbackModal';
 import {
   KIND_LABELS, ROLE_LABELS, VISIBILITY_HELP, approveMember, archiveClassroom, changeRole, classroomActivity, classroomProgress,
   classroomStudy, getClassroom, leaveClassroom, listItems, listMembers, removeItem, removeMember, reorderItems, setMilestone,
@@ -53,6 +55,7 @@ export default function ClassroomPage() {
   // The Instructor tab: only for the staff of an instructor class.
   const tabs = TABS.filter(item => !item.staffOfInstructorClass || (room && room.kind === 'instructor_class' && room.can?.manage));
   const [inviting, setInviting] = useState(false);
+  const [reporting, setReporting] = useState(''); // '' | 'sheet' | 'feedback' (before the server's update)
   const [toast, setToast] = useState('');
   const gate = useLoadGate(Boolean(room) || missing);
 
@@ -102,8 +105,18 @@ export default function ClassroomPage() {
             <Link href="/classrooms" className="c-icon-btn" aria-label="Your classrooms"><ArrowLeft {...ICON} /></Link>
             <h1 className="c-title cr-title">{room.name}</h1>
           </div>
-          {room.can.invite && <button type="button" className="c-btn c-btn--primary" onClick={() => setInviting(true)}><UserPlus {...ICON} />Invite</button>}
+          <div className="c-row cr-head-actions">
+            {room.can.invite && <button type="button" className="c-btn c-btn--primary" onClick={() => setInviting(true)}><UserPlus {...ICON} />Invite</button>}
+            {!room.can.owner && <Menu label={`More for ${room.name}`} items={[{ label: 'Report classroom', icon: Flag, onSelect: () => setReporting('sheet') }]} />}
+          </div>
         </header>
+        {room.review_status && room.review_status !== 'ok' && (
+          <p className="c-card cr-review" role="status">
+            {room.review_status === 'held'
+              ? 'This classroom is being reviewed after reports from students. Until then, only its owner and staff can open it, and no one can join.'
+              : 'This classroom was hidden after a review. Only its owner and staff can open it. Write to support@cordiaai.io if you think this is a mistake.'}
+          </p>
+        )}
         <p className="c-meta cr-facts">
           {KIND_LABELS[room.kind]}{room.instructor_request === 'requested' ? ' · Instructor class requested, waiting for Cordia to check' : ''}
           {' · '}{room.member_count} {room.member_count === 1 ? 'member' : 'members'}
@@ -130,12 +143,16 @@ export default function ClassroomPage() {
           {tab === 'settings' && <SettingsTab room={room} onToast={setToast} onSaved={setRoom} onGone={() => router.push('/classrooms')} />}
         </div>
         {inviting && <InviteDialog classroom={room} onClose={() => setInviting(false)} />}
+        {reporting === 'sheet' && <ReportSheet targetType="classroom" targetId={room.id} name={room.name} onClose={() => setReporting('')} onUnavailable={() => setReporting('feedback')} />}
+        {reporting === 'feedback' && <FeedbackModal initialCategory="other" initialMessage={`Report classroom ${room.name}: `} onClose={() => setReporting('')} />}
         {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
       </div>
       <style jsx>{`
         .cr { display: grid; gap: 12px; }
         .cr-head { flex-wrap: wrap; gap: 8px; }
         .cr-title { overflow-wrap: anywhere; }
+        .cr-head-actions { gap: 8px; }
+        .cr-review { margin: 0; padding: 14px 16px; color: var(--ink); font: 500 15px/1.45 var(--font-sans); border-left: 3px solid var(--olive); }
         .cr-facts, .cr-desc { margin: 0; }
         .cr-facts :global(a) { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
         .cr-desc { color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }

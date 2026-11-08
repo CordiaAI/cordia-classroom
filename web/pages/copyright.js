@@ -5,7 +5,8 @@ import { publicFetch } from '../lib/publicApi';
 
 const CONTACT = 'support@cordiaai.io';
 
-// Takedown requests. A named guide or set is held at once (no one else sees it) until we review it.
+// Takedown requests. A named guide or set is held at once (no one else sees it) until we review it;
+// a profile (/u/<username>) goes to our review queue.
 // "Report it" on a guide page links here with ?link= filled in.
 export default function Copyright() {
   const router = useRouter();
@@ -43,7 +44,7 @@ export default function Copyright() {
               <label className="cr-field"><span>Name</span><input className="c-input" value={form.name} onChange={set('name')} autoComplete="name" /></label>
               <label className="cr-field"><span>Email</span><input className="c-input" type="email" value={form.email} onChange={set('email')} autoComplete="email" /></label>
               <label className="cr-field"><span>Your work</span><textarea className="c-input" rows={3} value={form.work} onChange={set('work')} /></label>
-              <label className="cr-field"><span>Link to the guide</span><input className="c-input" value={form.location} onChange={set('location')} inputMode="url" /></label>
+              <label className="cr-field"><span>Link to the guide or profile</span><input className="c-input" value={form.location} onChange={set('location')} inputMode="url" /></label>
               <label className="cr-check">
                 <input type="checkbox" checked={form.statement} onChange={set('statement')} />
                 <span>I own this work or act for its owner, and I believe in good faith this use isn't authorized.</span>
@@ -56,7 +57,7 @@ export default function Copyright() {
         </div>
         <div className="cr-card cr-policy">
           <h2>How we handle copyright</h2>
-          <p>We respect copyright and respond to notices under the U.S. Digital Millennium Copyright Act (DMCA). A guide or set named in a notice is hidden from everyone but its owner right away while we review it.</p>
+          <p>We respect copyright and respond to notices under the U.S. Digital Millennium Copyright Act (DMCA). A guide or set named in a notice is hidden from everyone but its owner right away while we review it. A profile named in a notice is reviewed by a person first.</p>
           <h3>Sending a notice</h3>
           <p>Use the form above or email us. Include: your signature (typing your full name counts), the work you own, a link to the shared guide, your contact details, a statement that you believe in good faith the use isn't authorized, and a statement, under penalty of perjury, that your notice is accurate and you own the work or may act for its owner.</p>
           <h3>Counter-notice</h3>

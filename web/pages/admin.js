@@ -2,16 +2,22 @@ import { useEffect, useState } from 'react';
 import { useRequireAuth } from '../lib/auth';
 import { apiFetch, apiErrorMessage } from '../lib/api';
 import Toggle from '../components/Toggle';
+import { SectionLoader } from '../components/CordiaLoader';
+import { REASON_LABELS as REASON } from '../lib/reportReasons.mjs';
 
-const REASON = { wrong: 'Wrong', copied_exam: 'Copied exam', copyright: 'Copyright', inappropriate: 'Inappropriate' };
+const TYPES = [['', 'All'], ['guide', 'Guides'], ['profile', 'Profiles'], ['classroom', 'Classrooms']];
+const TYPE_NAMES = { guide: 'Guide', profile: 'Profile', classroom: 'Classroom' };
+const STATUS = { held: 'Held', hidden: 'Hidden', ok: 'Visible' };
 
-// Review queue for admins: reports, held sets, merge proposals, takedowns, school policy.
+// Review queue for admins: reports (guides, profiles, classrooms; 3 reporters hold one at once),
+// held sets, merge proposals, takedowns, school policy.
 export default function Admin() {
   const { ready } = useRequireAuth();
   const [allowed, setAllowed] = useState(null);
   const [queue, setQueue] = useState(null);
   const [policy, setPolicy] = useState({ domain: '', school_name: '', tokens_allowed: false, source_url: '' });
   const [message, setMessage] = useState('');
+  const [reportType, setReportType] = useState('');
 
   async function load() {
     const data = await apiFetch('/admin/queue');
@@ -45,8 +51,29 @@ export default function Admin() {
     <div className="c-page adm">
       <header className="c-page-head"><h1 className="c-title">Review</h1></header>
       {message && <p className="adm-line" role="status">{message}</p>}
-      {!queue ? <div className="c-skeleton" style={{ height: 200, borderRadius: 20 }} /> : (
+      {!queue ? <SectionLoader label="Loading the review queue" /> : (
         <>
+          <section className="c-card adm-card" aria-labelledby="adm-reports">
+            <h2 id="adm-reports" className="c-section-title">Reports</h2>
+            <div className="c-chips adm-filters" role="group" aria-label="Show reports for">
+              {TYPES.map(([key, label]) => {
+                const count = (queue.reports || []).filter(item => !key || item.target_type === key).length;
+                return <button key={key || 'all'} type="button" className="c-chip" aria-pressed={reportType === key} onClick={() => setReportType(key)}>{label} ({count})</button>;
+              })}
+            </div>
+            {(queue.reports || []).filter(item => !reportType || item.target_type === reportType).map(item => (
+              <div key={`${item.target_type}:${item.target_id}`} className="adm-row">
+                <span className="adm-main">
+                  <strong>{TYPE_NAMES[item.target_type]} · {item.target?.link ? <a href={item.target.link} target="_blank" rel="noreferrer">{item.target.title}</a> : (item.target?.title || 'Gone')}</strong>
+                  <span className="c-meta">{[STATUS[item.target?.status] || item.target?.status, `${item.count} ${item.count === 1 ? 'report' : 'reports'}: ${Object.entries(item.reasons).map(([k, n]) => `${REASON[k] || k} ${n}`).join(', ')}`].filter(Boolean).join(' · ')}</span>
+                </span>
+                <button type="button" className="c-btn c-btn--secondary" onClick={() => act(`/admin/reports/${item.target_type}/${item.target_id}`, { decision: 'clear' })}>Clear</button>
+                <button type="button" className="c-btn c-btn--quiet adm-danger" onClick={() => act(`/admin/reports/${item.target_type}/${item.target_id}`, { decision: 'hide' })}>Keep hidden</button>
+              </div>
+            ))}
+            {!(queue.reports || []).some(item => !reportType || item.target_type === reportType) && <p className="c-meta">Empty</p>}
+          </section>
+
           <section className="c-card adm-card" aria-labelledby="adm-sets">
             <h2 id="adm-sets" className="c-section-title">Sets</h2>
             {queue.sets.length ? queue.sets.map(item => (
@@ -106,7 +133,7 @@ export default function Admin() {
             <h2 id="adm-takedowns" className="c-section-title">Takedowns</h2>
             {queue.takedowns.length ? queue.takedowns.map(item => (
               <div key={item.id} className="adm-row">
-                <span className="adm-main"><strong>{item.claimant_name} · {item.claimant_email}</strong><span className="c-meta">{item.work_description} · {item.location}</span></span>
+                <span className="adm-main"><strong>{item.claimant_name} · {item.claimant_email}</strong><span className="c-meta">{[item.profile_id ? 'Profile (not held; Remove hides it)' : null, item.work_description, item.location].filter(Boolean).join(' · ')}</span></span>
                 <button type="button" className="c-btn c-btn--secondary" onClick={() => act(`/admin/takedowns/${item.id}`, { action: 'actioned' })}>Remove</button>
                 <button type="button" className="c-btn c-btn--quiet" onClick={() => act(`/admin/takedowns/${item.id}`, { action: 'rejected' })}>Restore</button>
               </div>
@@ -140,6 +167,8 @@ export default function Admin() {
         .adm-main strong { font: 600 15px/1.3 var(--font-sans); overflow-wrap: anywhere; }
         .adm-main .c-meta { overflow-wrap: anywhere; }
         .adm-danger { color: var(--error); }
+        .adm-filters { margin-bottom: 4px; }
+        .adm-main a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
         .adm-line { margin: 0; font: 600 15px/1.4 var(--font-sans); }
         .adm-add { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto auto; gap: 8px; align-items: center; padding-top: 12px; border-top: 1px solid var(--line); }
         @media (max-width: 767px) { .adm-add { grid-template-columns: minmax(0, 1fr); } }

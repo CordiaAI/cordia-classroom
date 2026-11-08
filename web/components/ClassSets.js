@@ -5,9 +5,10 @@ import { apiFetch, apiErrorMessage } from '../lib/api';
 import DoneCheck from './DoneCheck';
 import { SectionLoader } from './CordiaLoader';
 import Menu from './Menu';
+import { reasonsFor } from '../lib/reportReasons.mjs';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
-const REASONS = [['wrong', 'Wrong'], ['copied_exam', 'Copied exam'], ['copyright', 'Copyright'], ['inappropriate', 'Inappropriate']];
+const REASONS = reasonsFor('guide').map(reason => [reason.key, reason.label]);
 
 function dueLabel(iso) {
   return new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });

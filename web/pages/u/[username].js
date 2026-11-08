@@ -7,6 +7,7 @@ import { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader'
 import Menu from '../../components/Menu';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import FeedbackModal from '../../components/FeedbackModal';
+import ReportSheet from '../../components/ReportSheet';
 import FollowButton from '../../components/FollowButton';
 import FriendButton from '../../components/FriendButton';
 import { blockUser, loadProfile } from '../../lib/profiles';
@@ -30,7 +31,7 @@ export default function ProfilePage() {
   const [tab, setTab] = useState('guides');
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [blocked, setBlocked] = useState(false);
-  const [reporting, setReporting] = useState(false);
+  const [reporting, setReporting] = useState(''); // '' | 'sheet' | 'feedback' (before the server's update)
   const [toast, setToast] = useState('');
 
   useEffect(() => {
@@ -102,6 +103,13 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {profile && !blocked && profile.is_self && profile.review_status && profile.review_status !== 'ok' && (
+          <p className="c-card up-review" role="status">
+            {profile.review_status === 'held'
+              ? 'Your profile is being reviewed after reports from other students. Until then, only you can see it.'
+              : 'Your profile was hidden after a review. Only you can see it. Write to support@cordiaai.io if you think this is a mistake.'}
+          </p>
+        )}
         {profile && !blocked && (
           <>
             <section className={'c-card up-head' + (profile.is_self ? ' is-self' : '')} aria-labelledby="up-name">
@@ -139,7 +147,7 @@ export default function ProfilePage() {
                     needsApproval={profile.follows_need_approval} onChange={following => relate({ following })} onError={setToast} />
                   <Menu label={`More for @${profile.username}`} items={[
                     { label: 'Block', icon: Ban, danger: true, onSelect: () => setConfirmBlock(true) },
-                    { label: 'Report', icon: Flag, onSelect: () => setReporting(true) },
+                    { label: 'Report', icon: Flag, onSelect: () => setReporting('sheet') },
                   ]} />
                   </>
                 )}
@@ -207,12 +215,16 @@ export default function ProfilePage() {
           />
         )}
         {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
-        {reporting && (
-          <FeedbackModal initialCategory="other" initialMessage={`Report @${profile.username}: `} onClose={() => setReporting(false)} />
+        {reporting === 'sheet' && (
+          <ReportSheet targetType="profile" targetId={profile.id} name={`@${profile.username}`} onClose={() => setReporting('')} onUnavailable={() => setReporting('feedback')} />
+        )}
+        {reporting === 'feedback' && (
+          <FeedbackModal initialCategory="other" initialMessage={`Report @${profile.username}: `} onClose={() => setReporting('')} />
         )}
 
         <style jsx>{`
           .up { width: min(760px, 100%); margin: 0 auto; display: grid; gap: 16px; }
+          .up-review { margin: 0; padding: 14px 16px; color: var(--ink); font: 500 15px/1.45 var(--font-sans); border-left: 3px solid var(--olive); }
           .up-top { display: flex; }
           .up-guides { list-style: none; margin: 0; padding: 6px; display: grid; }
           .up-guides li + li { border-top: 1px solid var(--line); }
