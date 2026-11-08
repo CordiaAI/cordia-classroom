@@ -47,7 +47,7 @@ Under the guide button, ask Cordia about the current page. It reads the page fir
 
 ## Free plan limits
 
-When you run out of free guides or tutor questions, an upgrade sheet explains the limit and links to CordiaClassroom Pro. Close it with **×**.
+When you run out of free guides or tutor questions, an upgrade sheet explains the limit and links to the CordiaClassroom paid plans. Close it with **×**.
 
 ## Files
 

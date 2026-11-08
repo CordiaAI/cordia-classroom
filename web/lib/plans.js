@@ -38,7 +38,7 @@ export const tierName = tier => (tier === 'free' || !tier ? 'Free' : TIERS[tier]
 
 export const FEATURE_COPY = {
   guide: { label: 'study guides', title: "You've used your study guides for this month", pro: 'Make a guide for every class, from the app or the extension' },
-  tutor: { label: 'tutor prompts', title: "You've used your tutor prompts for this month", pro: 'Ask Cordia Tutor as much as you need' },
+  tutor: { label: 'tutor prompts', title: "You've used your tutor prompts for this month", pro: '300 Cordia Tutor replies a month with Pro, 1,000 with Academic Weapon' },
   learn_my_way: { label: 'Explain views', title: "You've used your free Explain views", pro: 'See every question explained the way you learn' },
   practice: { label: 'practice sets', title: "You've used this month's practice sets", pro: 'Fresh practice problems from any guide' },
   ai_quiz: { label: 'AI quizzes', title: 'AI quizzes are a paid feature', pro: 'Smarter quizzes with tougher answer choices' },
@@ -46,7 +46,7 @@ export const FEATURE_COPY = {
   retain_types: { label: 'Pro quiz sessions', title: 'Matching and fill in the blank are paid features', pro: 'Quiz yourself with matching and fill in the blank, not just multiple choice' },
   lecture_minute: { label: 'recording minutes', title: "You've used this month's recording minutes", pro: 'Record more of your lectures every month' },
   visual: { label: 'visuals', title: "You've used this month's visuals", pro: 'Make up to 200 visuals a month with Academic Weapon' },
-  light: { label: 'AI reading actions', title: "You've reached this month's AI reading limit", pro: 'Read photos, scans and diagrams without limits' },
+  light: { label: 'AI reading actions', title: "You've reached this month's AI reading limit", pro: 'Read up to 500 photos, scans and diagrams a month' },
 };
 
 export const METERED = ['guide', 'tutor', 'learn_my_way'];

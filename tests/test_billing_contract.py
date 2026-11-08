@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -282,6 +283,38 @@ class PricingSurfaceTests(unittest.TestCase):
         self.assertIn("Academic Weapon", source)
         self.assertNotIn("$6.99", source)
         self.assertNotIn("$29", source)
+
+    # Copy outside plans.js that names prices, plans, the trial or limits.
+    COPY = ["web/pages/mission.js", "web/pages/terms.js", "web/pages/privacy.js", "web/lib/plans.js",
+            "web/components/assistant/AssistantSettings.js", "web/components/UpgradeModal.js",
+            "web/pages/settings.js", "extension/popup.html", "extension/popup.js", "extension/README.md",
+            "extension/manifest.json", "docs/SUBMISSION.md"]
+
+    def test_copy_never_promises_what_billing_does_not_sell(self):
+        for path in self.COPY:
+            # Property names (status.unlimited, plan.unlimited) are API fields, not copy.
+            source = re.sub(r"\.unlimited\b", "", (ROOT / path).read_text()).lower()
+            for phrase in ("$29", "per semester", "a semester", "/semester", "unlimited", "pro trial", "fair-use caps", "free or plus"):
+                self.assertFalse(phrase in source, f"{path} says {phrase!r}")
+
+    def test_copy_matches_the_limits_and_trial_in_code(self):
+        free, pro, weapon = (entitlements.LIMITS[t] for t in entitlements.TIERS)
+        terms = (ROOT / "web/pages/terms.js").read_text()
+        self.assertIn(f"{free['lecture_minute']} minutes of lecture recording per month", terms)
+        self.assertIn(f"one {entitlements.TRIAL_DAYS}-day Academic Weapon trial", terms)
+        self.assertEqual(entitlements.TRIAL_TIER, "weapon")
+        mission = (ROOT / "web/pages/mission.js").read_text()
+        self.assertIn("Pro is $4.99 a month and Academic Weapon is $9.99 a month", mission)
+        self.assertIn(f"Try Academic Weapon free for {entitlements.TRIAL_DAYS} days with no card", mission)
+        popup = (ROOT / "extension/popup.js").read_text()
+        self.assertIn(f"Pro gives you {pro['guide']} study guides and {pro['tutor']} Cordia Tutor replies a month; "
+                      f"Academic Weapon gives you {weapon['guide']} and {weapon['tutor']:,}.", popup)
+        self.assertIn(f"Try Academic Weapon free for {entitlements.TRIAL_DAYS} days, no card.",
+                      (ROOT / "extension/popup.html").read_text())
+        plans = (ROOT / "web/lib/plans.js").read_text()
+        self.assertIn(f"'{pro['tutor']} Cordia Tutor replies a month with Pro, {weapon['tutor']:,} with Academic Weapon'", plans)
+        self.assertEqual(pro["light"], weapon["light"])
+        self.assertIn(f"Read up to {pro['light']} photos, scans and diagrams a month", plans)
 
 
 if __name__ == "__main__":

@@ -90,7 +90,7 @@ The portal reads these from the server. Every tool has a `title` and all four hi
 
 | Field | Value |
 |---|---|
-| What users need first | A Cordia Classroom account (free or Plus) with some study material. Study sets made through Claude count against the plan's monthly limit, like sets made in the app. |
+| What users need first | A Cordia Classroom account (free or paid) with some study material. Study sets made through Claude count against the plan's monthly limit, like sets made in the app. |
 | Reads or writes | Both. Eight read-only tools and four add-only write tools. |
 
 ## 5. Company
