@@ -45,7 +45,7 @@ export default {
       bullets: [
         'Scanned PDFs: a PDF with almost no selectable text (under 200 characters) is read from its page images, up to 20 pages, and counts as one AI reading action.',
         'Photos and screenshots of notes are read the same way, one AI reading action each.',
-        'Older .doc and .ppt files: save them as .docx or .pptx first.',
+        'Older .doc and .ppt files: save them as .docx or .pptx first. Save RTF files as .docx or PDF, and HEIC photos as JPG or PNG.',
         'Audio: a recorded lecture goes through Record, not Upload. Record it or upload the recording there, and once the lecture is written up, choose Make study guide.',
         'Video files can\'t be uploaded yet.',
       ],
