@@ -4,7 +4,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BRAND_NAME, ENTITY_LINE, FREE_PLAN_TEXT, PLANS, SAME_AS, SITE_URL, SUPPORT_EMAIL } from '../lib/brand.mjs';
-import { INDEXABLE_PAGES, PUBLIC_PAGES, pageTitle } from '../lib/publicPages.mjs';
+import { INDEXABLE_PAGES, PUBLIC_PAGES, ROBOTS_NOINDEX, isAppRoute, pageTitle } from '../lib/publicPages.mjs';
+import { createRequire } from 'node:module';
 import { faqPage, graphJson, homeGraph, ids, pageGraph } from '../lib/structuredData.mjs';
 import { ANSWER_ENGINES, lastModified, llmsTxt, robotsTxt, sitemapXml } from '../scripts/crawlFiles.mjs';
 import { decode, readPage, stripTags } from '../scripts/seoCheck.mjs';
@@ -70,13 +71,13 @@ test('other pages: WebPage inside the site plus a breadcrumb; FAQ markup mirrors
   assert.doesNotMatch(graphJson([{ name: '</script>' }]), /<\/script>/);
 });
 
-test('robots.txt names the answer engines, disallows nothing and points to the sitemap', () => {
+test('robots.txt names the answer engines, disallows only /api/ and points to the sitemap', () => {
   const robots = robotsTxt();
   for (const agent of ['Googlebot', 'Bingbot', 'OAI-SearchBot', 'ChatGPT-User', 'PerplexityBot', 'ClaudeBot', 'Claude-SearchBot', 'Claude-User', 'Applebot']) {
     assert.ok(ANSWER_ENGINES.includes(agent));
     assert.match(robots, new RegExp(`^User-agent: ${agent}$`, 'm'));
   }
-  assert.doesNotMatch(robots, /Disallow/);
+  assert.deepEqual(robots.match(/^Disallow: .*$/gm), ['Disallow: /api/', 'Disallow: /api/']);
   assert.match(robots, /^Sitemap: https:\/\/classroom\.cordiaai\.io\/sitemap\.xml$/m);
 });
 
@@ -107,4 +108,25 @@ test('the SEO check reads text the way a crawler does', () => {
   assert.deepEqual(page.titles, ['T | Cordia Classroom']);
   assert.equal(page.h1, 1);
   assert.deepEqual(page.faq, { questions: ['Q & A?'], answers: ['Yes, it is.'] });
+});
+
+test('every route outside the public pages is noindex, except routes with their own rules', async () => {
+  const rules = await createRequire(import.meta.url)('../next.config.js').headers();
+  const rule = rules.find(r => r.headers.some(h => h.key === 'X-Robots-Tag'));
+  assert.deepEqual(rule.headers, [{ key: 'X-Robots-Tag', value: ROBOTS_NOINDEX }]);
+  assert.equal(ROBOTS_NOINDEX, 'noindex, nofollow');
+  const noindex = path => new RegExp(`^${rule.source}$`).test(path);
+  for (const page of PUBLIC_PAGES) {
+    assert.ok(!noindex(page.path), page.path);
+    assert.ok(!isAppRoute(page.path), page.path);
+  }
+  for (const path of ['/dashboard', '/library', '/guide/abc', '/settings', '/settings/privacy', '/learn/abc', '/assistant', '/404', '/oauth/consent', '/auth/callback']) {
+    assert.ok(noindex(path), path);
+  }
+  for (const route of ['/dashboard', '/guide/[id]', '/learn/[guideId]', '/settings', '/404', '/assistant']) assert.ok(isAppRoute(route), route);
+  // Shared guides and invites set their own noindex; profiles, Discover and the Assistant app are unchanged.
+  for (const path of ['/sets/abc', '/join/abc', '/u/someone', '/explore', '/assistant/privacy']) assert.ok(!noindex(path), path);
+  for (const route of ['/sets/[id]', '/join/[token]', '/u/[username]', '/explore']) assert.ok(!isAppRoute(route), route);
+  // Files keep serving without the header: the crawl files, images and Next's assets.
+  for (const path of ['/robots.txt', '/sitemap.xml', '/llms.txt', '/og-image.png', '/_next/static/chunks/a.js']) assert.ok(!noindex(path), path);
 });

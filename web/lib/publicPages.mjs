@@ -79,3 +79,28 @@ export const PUBLIC_PAGES = [
 export const pageTitle = page => `${page.topic} | ${BRAND_NAME}`;
 export const publicPage = path => PUBLIC_PAGES.find(page => page.path === path);
 export const INDEXABLE_PAGES = PUBLIC_PAGES.filter(page => page.index);
+
+// Everything outside PUBLIC_PAGES is the signed-in app and stays out of search: an
+// X-Robots-Tag header (next.config.js) and a robots meta tag (pages/_app.js). These keep their
+// own rules: shared guides and invites set noindex themselves, profiles and Discover are left as
+// they are for now, and /assistant/* is the separate Assistant app.
+const OWN_RULES = ['/sets/', '/join/', '/u/', '/assistant/'];
+export const ROBOTS_NOINDEX = 'noindex, nofollow';
+
+// For a Next.js route pattern ("/guide/[id]") or a path.
+export const isAppRoute = pathname => !publicPage(pathname) && pathname !== '/explore' && !OWN_RULES.some(prefix => pathname.startsWith(prefix));
+
+// The next.config.js `source` for the header: every path except the public pages, the routes
+// with their own rules, Next's assets and files with an extension (robots.txt, images, fonts).
+const escapeRegex = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export function appRouteSource() {
+  const skip = [
+    '$',
+    ...PUBLIC_PAGES.filter(page => page.path !== '/').map(page => `${escapeRegex(page.path.slice(1))}/?$`),
+    'explore/?$',
+    ...OWN_RULES.map(prefix => escapeRegex(prefix.slice(1))),
+    '_next/',
+    '.*\\.[A-Za-z0-9]+$',
+  ];
+  return `/((?!${skip.join('|')}).*)`;
+}

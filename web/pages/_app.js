@@ -11,6 +11,7 @@ import { useRouter } from 'next/router';
 import { syncServerCopies } from '../lib/serverSync';
 import { showConnectedAppSets } from '../lib/guideJobs';
 import { routeTitle } from '../lib/pageTitle';
+import { ROBOTS_NOINDEX, isAppRoute } from '../lib/publicPages.mjs';
 import { useState, useEffect } from 'react';
 import { installErrorReporting } from '../lib/errorReport';
 import { installAmbientMotion } from '../lib/ambientMotion';
@@ -58,6 +59,8 @@ export default function App({ Component, pageProps }) {
           accidental zoom is prevented by 16px fields and no double-tap zoom (styles/glass.css). */}
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" key="viewport" />
       <title>{routeTitle(router.pathname)}</title>
+      {/* Signed-in app pages stay out of search (the X-Robots-Tag header says the same). */}
+      {isAppRoute(router.pathname) && <meta name="robots" content={ROBOTS_NOINDEX} key="robots" />}
       <meta name="application-name" content="Cordia Classroom" />
       {/* Signed-in pages share this description; public pages set their own head (components/SeoHead.js). */}
       <meta name="description" content="Turn course material into focused study guides, notes, flashcards, and practice with Cordia Classroom." key="description" />
