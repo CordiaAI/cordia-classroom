@@ -50,6 +50,9 @@ const nextConfig = {
     { source: '/games/:guideId', destination: '/play/:guideId', permanent: false }];
   },
   async headers() {
+    // The signed-in app stays out of search: every route outside the public pages
+    // (lib/publicPages.mjs) is noindex. pages/_app.js adds the matching robots meta tag.
+    const { ROBOTS_NOINDEX, appRouteSource } = await import('./lib/publicPages.mjs');
     return [{
       source: '/:path*',
       headers: [
@@ -66,6 +69,9 @@ const nextConfig = {
         // Enforced since 2026-10-22; violations still log via /api/csp-report.
         { key: 'Content-Security-Policy', value: contentSecurityPolicy },
       ],
+    }, {
+      source: appRouteSource(),
+      headers: [{ key: 'X-Robots-Tag', value: ROBOTS_NOINDEX }],
     }];
   },
 };
