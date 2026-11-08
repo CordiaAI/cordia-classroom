@@ -101,7 +101,7 @@ test('llms.txt: facts only, from the brand module', () => {
 
 test('the SEO check reads text the way a crawler does', () => {
   assert.equal(stripTags('a<<b>i>b'), 'ab');
-  assert.doesNotMatch(stripTags('<<b>script>x'), /<script>/);
+  assert.equal(stripTags('<<b>script>x'), 'x');
   assert.equal(decode('A &amp;lt;b&amp;gt; &#x27;c&#39;'), "A &lt;b&gt; 'c'");
   const page = readPage('<title>T | Cordia Classroom</title><h1>One</h1><section data-faq=""><h3 class="x" data-faq-question="">Q &amp; A?</h3><p data-faq-answer="">Yes, <b>it</b> is.</p></section>');
   assert.deepEqual(page.titles, ['T | Cordia Classroom']);
