@@ -2,7 +2,7 @@ import PublicPage from '../components/PublicPage';
 
 export default function PrivacyPolicy() {
   return (
-    <PublicPage title="Privacy Policy — Cordia Classroom" description="How Cordia Classroom collects, uses and protects your data." path="/privacy">
+    <PublicPage path="/privacy">
       <div className="c-card public-doc" style={{
         maxWidth: '800px',
         margin: '0 auto',

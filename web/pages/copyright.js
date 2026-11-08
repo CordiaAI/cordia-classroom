@@ -33,7 +33,7 @@ export default function Copyright() {
   }
 
   return (
-    <PublicPage title="Copyright — Cordia Classroom" description="Report shared material that uses your work without permission." path="/copyright">
+    <PublicPage path="/copyright">
       <section className="cr">
         <h1 className="cr-title">Copyright</h1>
         <div className="cr-card">

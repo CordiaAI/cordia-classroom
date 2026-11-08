@@ -1,5 +1,12 @@
 import PublicPage from '../components/PublicPage';
 
+const MISSION_FAQ = [
+  {
+    question: 'Is Cordia Classroom related to Cordia Home School?',
+    answer: "No. Cordia Classroom (classroom.cordiaai.io) is an AI study app for college students and isn't affiliated with Cordia Home School or other companies named Cordia.",
+  },
+];
+
 export default function MissionPage() {
 
   const features = [
@@ -31,9 +38,9 @@ export default function MissionPage() {
   ];
 
   return (
-    <PublicPage title="Features — Cordia Classroom" description="How Cordia Classroom turns your own course material into study guides, quizzes and flashcards." path="/mission">
+    <PublicPage path="/mission" faq={MISSION_FAQ}>
     <div className="fade-in mission-page" style={{ width: 'min(var(--page-max), 100%)', margin: '0 auto' }}>
-      <h1 style={{ marginBottom: 4 }}>Features</h1>
+      <h1 style={{ marginBottom: 4 }}>Features and mission</h1>
       <p style={{ color: 'var(--text-muted)', fontSize: 15, marginBottom: 28, lineHeight: 1.5 }}>
         Cordia Classroom was built by a college student, for college students. Our mission is to make studying smarter, faster, and more accessible for every student — regardless of major or learning style.
       </p>
@@ -46,9 +53,9 @@ export default function MissionPage() {
             borderRadius: 'var(--radius-lg)',
             padding: '20px 24px',
           }}>
-            <h3 style={{ marginBottom: 4, color: 'var(--text-primary)' }}>
+            <h2 style={{ marginBottom: 4, color: 'var(--text-primary)' }}>
               {f.title}
-            </h3>
+            </h2>
             {f.subtitle && (
               <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>
                 {f.subtitle}

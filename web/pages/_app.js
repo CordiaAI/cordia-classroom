@@ -59,14 +59,12 @@ export default function App({ Component, pageProps }) {
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" key="viewport" />
       <title>{routeTitle(router.pathname)}</title>
       <meta name="application-name" content="Cordia Classroom" />
-      <meta name="description" content="Turn course material into focused study guides, notes, flashcards, and practice with Cordia Classroom." />
-      <meta property="og:site_name" content="Cordia Classroom" />
-      <meta property="og:title" content="Cordia Classroom" />
-      <meta property="og:description" content="Turn course material into focused study guides, notes, flashcards, and practice." />
+      {/* Signed-in pages share this description; public pages set their own head (components/SeoHead.js). */}
+      <meta name="description" content="Turn course material into focused study guides, notes, flashcards, and practice with Cordia Classroom." key="description" />
       <meta property="og:image" content="https://classroom.cordiaai.io/og-image.png" key="og:image" />
       <meta property="og:image:width" content="1200" key="og:image:width" />
       <meta property="og:image:height" content="630" key="og:image:height" />
-            <meta name="twitter:card" content="summary_large_image" key="twitter:card" />
+      <meta name="twitter:card" content="summary_large_image" key="twitter:card" />
     </Head>
   );
 

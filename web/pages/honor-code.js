@@ -2,7 +2,7 @@ import PublicPage from '../components/PublicPage';
 
 export default function HonorCode() {
   return (
-    <PublicPage title="Honor Code — Cordia Classroom" description="Using Cordia Classroom with academic integrity." path="/honor-code">
+    <PublicPage path="/honor-code">
       <div className="c-card public-doc" style={{
         maxWidth: '800px',
         margin: '0 auto',

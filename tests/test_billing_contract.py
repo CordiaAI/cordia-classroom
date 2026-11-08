@@ -1,5 +1,8 @@
+import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -273,6 +276,57 @@ class SavedTierTests(unittest.TestCase):
         trial = self._saved({"id": "sub_t", "status": "trialing", "metadata": {"kind": "trial"},
                              "items": {"data": [{"price": {"id": "price_aw"}}]}})
         self.assertEqual(trial["plan"], "academic_weapon")
+
+
+class WebPlansMatchBackendTests(unittest.TestCase):
+    """web/lib/brand.mjs PLANS (built on web/lib/plans.js) must say what the backend sells."""
+
+    @classmethod
+    def setUpClass(cls):
+        node = shutil.which("node")
+        if not node:  # CI always has node (the verify job installs it before the unit tests run)
+            raise unittest.SkipTest("node is not installed")
+        script = "import { PLANS } from './web/lib/brand.mjs'; process.stdout.write(JSON.stringify(PLANS));"
+        out = subprocess.run([node, "--no-warnings", "--input-type=module", "-e", script],
+                             cwd=ROOT, capture_output=True, text=True, check=True)
+        cls.plans = json.loads(out.stdout)
+
+    def test_free_allowances_equal_the_free_limits(self):
+        web = {item["feature"]: item["limit"] for item in self.plans["freeAllowances"]}
+        self.assertEqual(web, entitlements.LIMITS["free"])
+
+    def test_trial_matches_the_trial_the_backend_starts(self):
+        trial = self.plans["trial"]
+        self.assertEqual(trial["days"], entitlements.TRIAL_DAYS)
+        self.assertEqual(trial["tier"], entitlements.TRIAL_TIER)
+        self.assertEqual(trial["plan"], entitlements.TIER_NAMES[entitlements.TRIAL_TIER])
+        self.assertFalse(trial["cardRequired"])
+        self.assertEqual(trial["perAccount"], 1)
+        source = (ROOT / "backend" / "routers" / "billing.py").read_text()
+        self.assertIn("no card, one per account", source)
+        self.assertIn("Your free trial has already been used", source)
+
+    def test_paid_prices_and_tiers_match_billing(self):
+        tiers = {tier["key"]: tier for tier in self.plans["tiers"]}
+        self.assertEqual(list(tiers), list(entitlements.TIERS))
+        self.assertEqual(tiers["free"]["price"], "0")
+        doc = billing.__doc__
+        for key in entitlements.PAID_TIERS:
+            name = entitlements.TIER_NAMES[key]
+            self.assertIn(f"{name} ${tiers[key]['price']}/month", doc)
+            self.assertTrue(name.endswith(tiers[key]["name"]), (name, tiers[key]["name"]))
+            self.assertEqual(tiers[key]["interval"], "month")
+        self.assertEqual(self.plans["currency"], "USD")
+
+    def test_paid_benefit_lines_use_the_backend_limits(self):
+        source = (ROOT / "web" / "lib" / "plans.js").read_text()
+        pro, weapon = entitlements.LIMITS["pro"], entitlements.LIMITS["weapon"]
+        for line in (f"{pro['guide']} study guides a month", f"{pro['tutor']} Cordia Tutor replies a month",
+                     f"{pro['practice']} practice sets a month", f"{pro['lecture_minute']} minutes of lecture recording a month",
+                     f"{weapon['guide']} study guides a month", f"{weapon['tutor']:,} Cordia Tutor replies a month",
+                     f"{weapon['practice']} practice sets a month", f"{weapon['lecture_minute'] // 60} hours a month",
+                     f"{weapon['visual']} visuals a month"):
+            self.assertIn(line, source)
 
 
 class PricingSurfaceTests(unittest.TestCase):

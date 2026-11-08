@@ -80,9 +80,9 @@ export default function Instructors() {
   }
 
   return (
-    <PublicPage title="Instructors — Cordia Classroom" description="Turn off class sharing for your course." path="/instructors">
+    <PublicPage path="/instructors">
       <section className="ins">
-        <h1 className="ins-title">Instructors</h1>
+        <h1 className="ins-title">Cordia Classroom for instructors</h1>
         <div className="ins-intro">
           <p>Students in the same course can share their study sets with each other. If you’d rather they didn’t for a course you teach, turn sharing off: sets already shared become private, and no new ones can be shared. Students can still study with their own materials.</p>
           <ol className="ins-steps">

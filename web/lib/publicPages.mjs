@@ -1,0 +1,81 @@
+// Every page that works signed out: its title topic, meta description and source file. One list
+// feeds the page heads (components/SeoHead.js), the crawl files (scripts/crawlFiles.mjs) and the
+// SEO check (scripts/seoCheck.mjs). Titles render as "<topic> | Cordia Classroom" and must stay
+// unique; descriptions are 120–160 characters. `index: false` pages get noindex and stay out of
+// the sitemap.
+import { BRAND_NAME, PLANS, planByKey } from './brand.mjs';
+
+const { trial } = PLANS;
+const price = key => `$${planByKey(key).price}`;
+
+export const PUBLIC_PAGES = [
+  {
+    path: '/', file: 'pages/index.js', index: true, crumb: 'Home',
+    topic: 'AI Study App for College Students',
+    description: 'Turn your slides, PDFs, lectures and Canvas pages into study guides, flashcards and practice tests. Cordia Classroom is free to start for college students.',
+  },
+  {
+    path: '/pricing', file: 'pages/pricing.js', index: true, crumb: 'Pricing',
+    topic: 'Pricing: Free, Pro and Academic Weapon',
+    description: `Cordia Classroom is free to start. Pro costs ${price('pro')} a month and Academic Weapon ${price('weapon')} a month, with a ${trial.days}-day ${trial.plan} trial and no card needed.`,
+  },
+  {
+    path: '/mission', file: 'pages/mission.js', index: true, crumb: 'Features and mission',
+    topic: 'Features and Mission',
+    description: 'How Cordia Classroom captures your course material, writes study guides, NCLEX-style questions and flashcards from it, and why it never searches the web.',
+  },
+  {
+    path: '/install-extension', file: 'pages/install-extension.js', index: true, crumb: 'Chrome extension',
+    topic: 'Chrome Extension',
+    description: 'Install the Cordia Classroom Chrome extension, pin it to your toolbar and turn the course page you have open into a study guide in a few clicks.',
+  },
+  {
+    path: '/connect/claude', file: 'pages/connect/claude.js', index: true, crumb: 'Use with Claude',
+    topic: 'Use with Claude',
+    description: 'Connect Cordia Classroom to Claude to search your notes and lectures, get quizzed from your own flashcards and save new cards to your Library.',
+  },
+  {
+    path: '/instructors', file: 'pages/instructors.js', index: true, crumb: 'For instructors',
+    topic: 'Turn Off Class Sharing for Instructors',
+    description: 'Instructors can turn off study set sharing for a course they teach: verify your school email, enter the course code, and shared sets become private.',
+  },
+  {
+    path: '/honor-code', file: 'pages/honor-code.js', index: true, crumb: 'Honor Code',
+    topic: 'Honor Code and Academic Integrity',
+    description: 'How to use Cordia Classroom with academic integrity: it is a study aid, never for live exams or for handing in its output as your own original work.',
+  },
+  {
+    path: '/copyright', file: 'pages/copyright.js', index: true, crumb: 'Copyright',
+    topic: 'Copyright and Takedown Requests',
+    description: 'Report a shared guide, set or profile that uses your work without permission. Staff review every notice before acting, and you can send a counter-notice.',
+  },
+  {
+    path: '/privacy', file: 'pages/privacy.js', index: true, crumb: 'Privacy Policy',
+    topic: 'Privacy Policy',
+    description: 'How Cordia Classroom collects, uses, shares and protects your data, including the Chrome extension, Canvas, connected AI apps and your privacy rights.',
+  },
+  {
+    path: '/terms', file: 'pages/terms.js', index: true, crumb: 'Terms of Service',
+    topic: 'Terms of Service',
+    description: 'The terms for using Cordia Classroom: eligibility, acceptable use, class sharing, lecture recording, Canvas, AI-generated content, plans and billing.',
+  },
+  {
+    path: '/login', file: 'pages/login.js', index: false, crumb: 'Sign in',
+    topic: 'Sign In',
+    description: 'Sign in to Cordia Classroom to get back to your study guides, flashcards, lecture notes and Canvas deadlines, or send yourself a password reset link.',
+  },
+  {
+    path: '/signup', file: 'pages/signup.js', index: false, crumb: 'Create an account',
+    topic: 'Create a Free Account',
+    description: 'Create a free Cordia Classroom account and start turning your slides, PDFs, lectures and Canvas pages into study guides, flashcards and practice tests.',
+  },
+  {
+    path: '/reset-password', file: 'pages/reset-password.js', index: false, crumb: 'Reset password',
+    topic: 'Reset Your Password',
+    description: 'Choose a new password for your Cordia Classroom account. Reset links expire, so request a new one from the sign-in page if this link no longer works.',
+  },
+];
+
+export const pageTitle = page => `${page.topic} | ${BRAND_NAME}`;
+export const publicPage = path => PUBLIC_PAGES.find(page => page.path === path);
+export const INDEXABLE_PAGES = PUBLIC_PAGES.filter(page => page.index);

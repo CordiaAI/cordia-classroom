@@ -1,4 +1,4 @@
-import Head from 'next/head';
+import SeoHead from '../components/SeoHead';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { supabaseAuth } from '../lib/supabase';
@@ -62,9 +62,7 @@ export default function ResetPasswordPage() {
 
   return (
     <>
-      <Head>
-        <title>Reset Password — Cordia Classroom</title>
-      </Head>
+      <SeoHead path="/reset-password" />
       <div className="login-page">
         <h1 className="login-title">Cordia Classroom</h1>
         <div className="login-box">

@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/*.js tests/*.cjs web/tests/*.mjs",
-    "test:oauth-local": "bash tests/oauth/run_local_probe.sh"
+    "test:oauth-local": "bash tests/oauth/run_local_probe.sh",
+    "seo:check": "node web/scripts/seoCheck.mjs"
   },
   "devDependencies": {
     "playwright": "1.63.0"
