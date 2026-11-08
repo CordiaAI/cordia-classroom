@@ -39,10 +39,10 @@ function runtime(message) {
 function showUpgrade(limit = {}) {
   const pro = limit.plan === 'classroom_plus';
   const resets = limit.resets_at ? new Date(limit.resets_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
-  upgradeTitle.textContent = pro ? "You've reached this month's fair-use limit" : LIMIT_TITLES[limit.feature] || limit.message || 'Upgrade to CordiaClassroom Pro';
+  upgradeTitle.textContent = pro ? "You've reached this month's fair-use limit" : LIMIT_TITLES[limit.feature] || limit.message || 'Upgrade CordiaClassroom';
   upgradeBody.textContent = pro
     ? `${limit.message || ''}${resets ? ` It resets ${resets}.` : ''}`.trim()
-    : `Pro gives you unlimited guides from any page, unlimited Cordia Tutor, and guides that adapt to how you learn.${resets ? ` Your free plan resets ${resets}.` : ''}`;
+    : `Pro gives you 15 study guides and 300 Cordia Tutor replies a month; Academic Weapon gives you 100 and 1,000.${resets ? ` Your free plan resets ${resets}.` : ''}`;
   upgradeSheet.querySelectorAll('#upgrade-open, .upgrade-note').forEach(node => { node.hidden = pro; });
   upgradeSheet.hidden = false;
 }

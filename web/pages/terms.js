@@ -15,7 +15,7 @@ export default function TermsOfService() {
           Terms of Service
         </h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '0.9rem' }}>
-          Effective Date: March 23, 2026 &nbsp;|&nbsp; Last Updated: October 20, 2026
+          Effective Date: March 23, 2026 &nbsp;|&nbsp; Last Updated: November 8, 2026
         </p>
 
         <p style={{ marginBottom: '32px' }}>
@@ -66,8 +66,8 @@ export default function TermsOfService() {
         </Section>
 
         <Section title="6. Subscription and Billing">
-          <p>Cordia Classroom offers a free plan with 3 study guides (created in the app or with the Chrome extension, combined), 10 tutor prompts, 5 Explain views and 120 minutes of lecture recording per month, plus one free use of each Pro study tool. Cordia Classroom Pro removes these limits, subject to fair-use caps, and costs $9.99 per month or $29 per 4-month semester. New accounts may start one 7-day Pro trial without a payment method; the trial ends automatically and never converts to a paid subscription. Promotional codes apply only for the period stated and then renew at the regular price.</p>
-          <p style={{ marginTop: '12px' }}>Payments are processed by Stripe. You may manage or cancel your subscription at any time. After cancellation, Pro access continues through the current paid period. Refunds are not provided for partial billing periods.</p>
+          <p>Cordia Classroom offers a free plan with 3 study guides (created in the app or with the Chrome extension, combined), 10 tutor prompts, 5 Explain views and 30 minutes of lecture recording per month, plus one free use of each Pro study tool. Two paid plans raise these limits to the monthly caps shown on the Pricing page: Pro costs $4.99 per month and Academic Weapon costs $9.99 per month. New accounts may start one 7-day Academic Weapon trial without a payment method; the trial ends automatically and never converts to a paid subscription. Promotional codes apply only for the period stated and then renew at the regular price.</p>
+          <p style={{ marginTop: '12px' }}>Payments are processed by Stripe. You may manage or cancel your subscription at any time. After cancellation, paid-plan access continues through the current paid period. Refunds are not provided for partial billing periods.</p>
         </Section>
 
         <Section title="7. Termination">

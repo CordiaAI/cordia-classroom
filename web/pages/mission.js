@@ -22,7 +22,7 @@ export default function MissionPage() {
     },
     {
       title: 'The Cost',
-      description: 'Start free with 3 study guides, 10 tutor prompts and 5 Explain views each month. Cordia Classroom Pro is $9.99 a month or $29 a semester. Try Pro free for 7 days with no card; the trial never turns into a charge on its own.',
+      description: 'Start free with 3 study guides, 10 tutor prompts and 5 Explain views each month. Pro is $4.99 a month and Academic Weapon is $9.99 a month. Try Academic Weapon free for 7 days with no card; the trial never turns into a charge on its own.',
     },
     {
       title: 'Users Are "Cofounders"',

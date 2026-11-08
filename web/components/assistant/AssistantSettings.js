@@ -96,12 +96,12 @@ export default function AssistantSettings({ onOpenPlan }) {
                 <strong className="asst-row-title">Texting from {formatNumber(catalog.sms_number)}</strong>
                 <span className="c-meta">
                   To your number ending in {view.user.phone_last4} ·{' '}
-                  {plan.unlimited ? (plan.onTrial ? 'Unlimited during your Pro trial' : 'Unlimited with Pro') : `Free plan: ${plan.free_daily} texts a day`}
+                  {plan.unlimited ? (plan.onTrial ? 'Included in your Academic Weapon trial' : 'Included in your plan') : `Free plan: ${plan.free_daily} texts a day`}
                 </span>
               </span>
             </span>
             <div className="asst-actions">
-              {!plan.unlimited && <button type="button" className="c-btn c-btn--secondary" onClick={onOpenPlan}>{plan.trialAvailable ? 'Start Pro trial' : 'Get Pro'}</button>}
+              {!plan.unlimited && <button type="button" className="c-btn c-btn--secondary" onClick={onOpenPlan}>{plan.trialAvailable ? 'Start free trial' : 'Get Pro'}</button>}
               <a className="c-btn c-btn--primary" href={`sms:${catalog.sms_number}`}>Text {view.identity.assistant_name}</a>
             </div>
           </div>
