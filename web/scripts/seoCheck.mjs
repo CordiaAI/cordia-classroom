@@ -27,7 +27,14 @@ export const decode = text => text.replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|ap
 });
 const attrs = tag => Object.fromEntries([...tag.matchAll(/([\w:-]+)="([^"]*)"/g)].map(([, name, value]) => [name, decode(value)]));
 const tags = (html, name) => [...html.matchAll(new RegExp(`<${name}\\b[^>]*>`, 'gi'))].map(match => attrs(match[0]));
-const texts = (html, pattern) => [...html.matchAll(pattern)].map(match => decode(match[1].replace(/<[^<>]*>/g, '')).trim());
+// Tags come off until none are left (the same loop as readableText in lib/guideText.mjs).
+export function stripTags(html) {
+  let text = html;
+  let previous;
+  do { previous = text; text = text.replace(/<[^<>]*>/g, ''); } while (text !== previous);
+  return text;
+}
+const texts = (html, pattern) => [...html.matchAll(pattern)].map(match => decode(stripTags(match[1])).trim());
 
 // What a crawler reads from one page's HTML.
 export function readPage(html) {
