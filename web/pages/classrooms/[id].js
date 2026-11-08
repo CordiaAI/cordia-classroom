@@ -12,6 +12,7 @@ import InviteDialog from '../../components/InviteDialog';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import InstructorDashboard from '../../components/InstructorDashboard';
 import ReportSheet from '../../components/ReportSheet';
+import GroupStreak from '../../components/GroupStreak';
 import FeedbackModal from '../../components/FeedbackModal';
 import {
   KIND_LABELS, ROLE_LABELS, VISIBILITY_HELP, approveMember, archiveClassroom, changeRole, classroomActivity, classroomProgress,
@@ -561,6 +562,7 @@ function ProgressTab({ room }) {
   const { me } = data;
   return (
     <>
+      <GroupStreak classroomId={room.id} />
       <section className="c-card crp">
         <h2 className="crp-title">You</h2>
         {me.guides.length ? (

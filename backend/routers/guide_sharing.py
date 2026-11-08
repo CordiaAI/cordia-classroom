@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import access
 from access import Ctx
@@ -45,6 +45,14 @@ def _is_others_copy(db, guide: dict) -> bool:
     return bool(source and source.get("user_id") != guide.get("user_id"))
 
 
+def _mark_published(db, guide_id: str) -> None:
+    """The first time a guide goes public (the Activity tab's "new public guide", Stage 10)."""
+    try:
+        db.table("study_guides").update({"published_at": _now()}).eq("id", guide_id).is_("published_at", "null").execute()
+    except Exception:  # before migration 20261128120000
+        pass
+
+
 # Visibility --------------------------------------------------------------------------------------
 class VisibilityChange(BaseModel):
     visibility: Optional[Literal["private", "link", "classroom", "public"]] = None
@@ -75,6 +83,8 @@ def set_visibility(body: VisibilityChange, ctx: Ctx = Depends(access.guide("own"
             raise HTTPException(status_code=409, detail="honor_code_required")
         db.table("user_profiles").update({"honor_code_accepted_at": _now()}).eq("id", user_id).execute()
     db.table("study_guides").update({"visibility": visibility, "attribution": attribution}).eq("id", guide["id"]).eq("user_id", user_id).execute()
+    if visibility == "public" and guide.get("visibility") != "public":
+        _mark_published(db, guide["id"])
     guide = {**guide, "visibility": visibility, "attribution": attribution}
     # Classmates keep finding public and class-only guides in the course's Class sets.
     if klass:
@@ -210,3 +220,25 @@ def copy_guide(body: CopyRequest, ctx: Ctx = Depends(access.guide("view"))):
         except Exception:
             logger.warning("Quiz warmup for a copy failed", exc_info=True)
     return {"guide_id": made["id"]}
+
+
+# The Tutor on this guide (Stage 10) ---------------------------------------------------------------
+class AskRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=1000)
+    detail: Literal["short", "long"] = "short"
+
+
+@router.post("/{guide_id}/ask", dependencies=[Depends(ai_rate_limit(20, 60))])
+def ask_guide(body: AskRequest, ctx: Ctx = Depends(access.guide("view"))):
+    """Ask the Tutor about a guide you can see. It answers only from this guide (services/
+    guide_tutor.py), names the ideas it used, and says so when the guide doesn't cover it. Short
+    answers use the light model; detail "long" uses the build model. Uses your Tutor allowance."""
+    from services import guide_tutor
+    from services.entitlements import record, require
+    require(ctx.user_id, "tutor")
+    extra = (ctx.db.table("study_guides").select("quiz_questions").eq("id", ctx.guide["id"]).limit(1).execute().data or [{}])[0]
+    result = guide_tutor.ask({**ctx.guide, **extra}, body.question.strip(), body.detail)
+    if not result:
+        raise HTTPException(status_code=502, detail="The Tutor couldn't answer right now. Try again.")
+    record(ctx.user_id, "tutor")
+    return result

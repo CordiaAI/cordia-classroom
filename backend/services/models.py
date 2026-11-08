@@ -88,12 +88,14 @@ FEATURES = {
     "slideshow_summary": CallSpec(BUILD, 1500),
     "retain_explain": CallSpec(BUILD, 500),
     "outline_edit": CallSpec(BUILD, 8000),
+    "guide_tutor_long": CallSpec(BUILD, 1200),  # Stage 10: "Explain more" on someone else's guide
     # LIGHT
     "tutor_clarify": CallSpec(LIGHT, 500),
     "tutor_rich": CallSpec(LIGHT, 1400),
     "tutor_example": CallSpec(LIGHT, 300),
     "tutor_detailed": CallSpec(LIGHT, 700),
     "tutor_short": CallSpec(LIGHT, 200),
+    "guide_tutor_short": CallSpec(LIGHT, 400),  # Stage 10: a short answer from one guide only
     "tutor_action": CallSpec(LIGHT, 300),
     "tutor_visual": CallSpec(LIGHT, 600),
     "practice_grade": CallSpec(LIGHT, 300),

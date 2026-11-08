@@ -234,7 +234,7 @@ class MinorTests(Base):
         self.assertEqual(self.call("post", "ben", f"/social/friends/{U['min']}").json(), {"friendship": "outgoing"})
         self.assertEqual(self.call("post", "ben", f"/social/follow/{U['min']}").status_code, 403, "follows from friends only: always on")
         self.assertEqual(self.call("post", "min", f"/classrooms/{TEACH}/request-join", json={"share_progress": False}).status_code, 200)
-        self.assertTrue(minors.may_join_leaderboards(self.db, U["min"]))
+        self.assertFalse(minors.may_join_leaderboards(self.db, U["min"]), "never on the leaderboard: always on (Stage 10)")
 
     def test_flag_on(self):
         with self.strict():

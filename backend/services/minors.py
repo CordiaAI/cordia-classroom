@@ -12,11 +12,11 @@ Always on, enforced on the server:
   - their profile page is visible only to themselves and accepted friends (everyone else: 404);
   - their public sets name them "A classmate" on cards, in search and in Discover;
   - a new set they make starts private, even from the generator that makes others' public;
-  - only accepted friends can follow them.
+  - only accepted friends can follow them;
+  - they're never on the weekly friends leaderboard and can't join it (may_join_leaderboards).
 Strict rules, behind MINOR_SAFETY (off unless set; strict()):
   - their profile is private, whatever the setting says;
   - they can't make a guide public;
-  - they're never on a leaderboard (may_join_leaderboards);
   - no one can send them a friend request (they can still send one);
   - they can't join an instructor class unless a verified instructor at that course's school runs
     it (services/instructors.py runs_verified_class).
@@ -91,5 +91,5 @@ def strict_minor(db, user_id: str) -> bool:
 
 
 def may_join_leaderboards(db, user_id: str) -> bool:
-    """Leaderboards (Stage 10) never show a minor while the strict rules are on."""
-    return not strict_minor(db, user_id)
+    """The weekly friends leaderboard (Stage 10) is never open to a minor."""
+    return not is_minor(db, user_id)
