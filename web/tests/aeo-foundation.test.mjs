@@ -7,6 +7,7 @@ import { BRAND_NAME, ENTITY_LINE, FREE_PLAN_TEXT, PLANS, SAME_AS, SITE_URL, SUPP
 import { INDEXABLE_PAGES, PUBLIC_PAGES, pageTitle } from '../lib/publicPages.mjs';
 import { faqPage, graphJson, homeGraph, ids, pageGraph } from '../lib/structuredData.mjs';
 import { ANSWER_ENGINES, lastModified, llmsTxt, robotsTxt, sitemapXml } from '../scripts/crawlFiles.mjs';
+import { decode, readPage, stripTags } from '../scripts/seoCheck.mjs';
 
 const FORBIDDEN = [/unlimited/i, /\$29/, /per semester/i, /pro trial/i];
 
@@ -96,4 +97,14 @@ test('llms.txt: facts only, from the brand module', () => {
   assert.ok(text.includes(SUPPORT_EMAIL));
   for (const page of INDEXABLE_PAGES) assert.ok(text.includes(`(${SITE_URL}${page.path === '/' ? '/' : page.path})`), page.path);
   for (const word of FORBIDDEN) assert.doesNotMatch(text, word);
+});
+
+test('the SEO check reads text the way a crawler does', () => {
+  assert.equal(stripTags('a<<b>i>b'), 'ab');
+  assert.equal(stripTags('<<b>script>x'), 'x');
+  assert.equal(decode('A &amp;lt;b&amp;gt; &#x27;c&#39;'), "A &lt;b&gt; 'c'");
+  const page = readPage('<title>T | Cordia Classroom</title><h1>One</h1><section data-faq=""><h3 class="x" data-faq-question="">Q &amp; A?</h3><p data-faq-answer="">Yes, <b>it</b> is.</p></section>');
+  assert.deepEqual(page.titles, ['T | Cordia Classroom']);
+  assert.equal(page.h1, 1);
+  assert.deepEqual(page.faq, { questions: ['Q & A?'], answers: ['Yes, it is.'] });
 });
