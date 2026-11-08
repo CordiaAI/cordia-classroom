@@ -1,6 +1,0 @@
-# Allow all search engines to crawl the site
-User-agent: *
-Allow: /
-
-# The link to your sitemap (Update this to your live URL)
-Sitemap: https://classroom.cordiaai.io/sitemap.xml

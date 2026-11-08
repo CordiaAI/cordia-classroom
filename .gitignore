@@ -31,3 +31,8 @@ Thumbs.db
 .idea/
 qa-screenshots/
 qa-touchup/
+
+# Built by web/scripts/crawlFiles.mjs at build time
+web/public/robots.txt
+web/public/sitemap.xml
+web/public/llms.txt
