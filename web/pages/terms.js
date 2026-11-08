@@ -2,7 +2,7 @@ import PublicPage from '../components/PublicPage';
 
 export default function TermsOfService() {
   return (
-    <PublicPage title="Terms of Service — Cordia Classroom" description="The terms for using Cordia Classroom." path="/terms">
+    <PublicPage path="/terms">
       <div className="c-card public-doc" style={{
         maxWidth: '800px',
         margin: '0 auto',

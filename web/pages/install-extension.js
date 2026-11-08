@@ -6,7 +6,7 @@ import { walkthroughEvent } from '../lib/walkthrough';
 
 export default function InstallExtensionPage() {
   return (
-    <PublicPage title="Get the Chrome extension — Cordia Classroom" description="Install the Cordia Classroom extension and capture course material in a few clicks." path="/install-extension">
+    <PublicPage path="/install-extension">
     <div className="extension-install-page fade-in">
       <div className="extension-install-hero">
         <AcademicInfinityMark className="extension-install-logo" />

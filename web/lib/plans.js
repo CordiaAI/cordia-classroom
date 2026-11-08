@@ -51,10 +51,21 @@ export const FEATURE_COPY = {
 
 export const METERED = ['guide', 'tutor', 'learn_my_way'];
 
+// The Free plan's monthly allowances, the same numbers as LIMITS["free"] in entitlements.py
+// (tests/test_billing_contract.py fails if they ever differ).
+export const FREE_LIMITS = {
+  guide: 3, tutor: 10, learn_my_way: 5, practice: 1, ai_quiz: 1, nclex: 1,
+  retain_types: 1, light: 30, lecture_minute: 30, visual: 10,
+};
+
+// The free trial: TRIAL_DAYS and TRIAL_TIER in entitlements.py, started by /billing/start-trial
+// (billing.py): no card, one per account, and it ends on its own, back on Free.
+export const TRIAL = { tier: 'weapon', days: 7, cardRequired: false, perAccount: 1 };
+
 export const FREE_SUMMARY = [
-  '3 study guides a month (app + extension combined)',
-  '10 tutor prompts a month',
-  '5 Explain views a month',
+  `${FREE_LIMITS.guide} study guides a month (app + extension combined)`,
+  `${FREE_LIMITS.tutor} tutor prompts a month`,
+  `${FREE_LIMITS.learn_my_way} Explain views a month`,
   'One free try of each paid study tool',
 ];
 

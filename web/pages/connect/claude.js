@@ -38,7 +38,7 @@ const EXAMPLES = [
 
 export default function ConnectClaude() {
   return (
-    <PublicPage title="Use Cordia Classroom with Claude" description="Connect Cordia Classroom to Claude to search your notes and lectures, get quizzed from your own flashcards and save new cards to your Library." path="/connect/claude">
+    <PublicPage path="/connect/claude">
       <article className="c-card public-doc connect-doc">
         <h1>Use Cordia Classroom with Claude</h1>
         <p className="connect-lead">

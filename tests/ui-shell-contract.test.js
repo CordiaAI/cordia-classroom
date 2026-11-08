@@ -54,7 +54,10 @@ assert.doesNotMatch(documentPage, /Cormorant\+Garamond/);
 assert.match(documentPage, /cordia-classroom\.ico/);
 assert.match(documentPage, /cordia-classroom-icon\.png/);
 assert.match(appPage, /application-name" content="Cordia Classroom"/);
-assert.match(appPage, /og:site_name" content="Cordia Classroom"/);
+// Public pages name the site in their own head (components/SeoHead.js), from the brand module.
+const seoHead = read('web', 'components', 'SeoHead.js');
+assert.match(seoHead, /og:site_name" content=\{BRAND_NAME\}/);
+assert.match(read('web', 'lib', 'brand.mjs'), /export const BRAND_NAME = 'Cordia Classroom';/);
 assert.doesNotMatch(documentPage, /autostudy/i);
 assert.doesNotMatch(nextConfig, /autostudyai\.online|cordiacode\.com/);
 

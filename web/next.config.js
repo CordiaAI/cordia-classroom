@@ -28,7 +28,7 @@ const contentSecurityPolicy = [
 // Vercel project. Classroom forwards /assistant to it, so students get one site and one login.
 const assistantUrl = process.env.ASSISTANT_URL;
 
-module.exports = {
+const nextConfig = {
   reactStrictMode: true,
   async rewrites() {
     // The MCP server and its OAuth discovery document (pages/api/mcp.js, oauth-protected-resource.js).
@@ -69,3 +69,15 @@ module.exports = {
     }];
   },
 };
+
+// robots.txt, sitemap.xml and llms.txt are written into public/ before each build or dev server
+// (scripts/crawlFiles.mjs), whatever build command the host runs. The config's own fields stay
+// on the export so tests can read headers() and rewrites() directly.
+module.exports = Object.assign(async phase => {
+  const { PHASE_PRODUCTION_BUILD, PHASE_DEVELOPMENT_SERVER } = require('next/constants');
+  if (phase === PHASE_PRODUCTION_BUILD || phase === PHASE_DEVELOPMENT_SERVER) {
+    const { writeCrawlFiles } = await import('./scripts/crawlFiles.mjs');
+    writeCrawlFiles();
+  }
+  return nextConfig;
+}, nextConfig);
