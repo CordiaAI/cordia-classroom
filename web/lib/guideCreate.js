@@ -61,7 +61,7 @@ async function waitForJob(jobId, title) {
     }
     misses = 0;
     if (data.job?.status === 'done' && data.guide) return data.guide;
-    if (data.job?.status === 'failed') throw limitError(data.job.error, `CordiaClassroom could not build “${title}” from this material.`);
+    if (data.job?.status === 'failed') throw limitError(data.job.error, `Cordia Classroom could not build “${title}” from this material.`);
   }
   throw new Error('The guide is taking longer than usual. It will be in your Library when it’s ready.');
 }
@@ -100,7 +100,7 @@ export async function generateAndSave({ source, requestId, title, keepTitle = fa
   }
   if (generated.detail) throw limitError(generated.detail, 'Study guide generation failed.');
   if (!generated.study_guide || generated.study_guide.startsWith('[Error')) {
-    throw new Error(`CordiaClassroom could not build “${title}” from this material.`);
+    throw new Error(`Cordia Classroom could not build “${title}” from this material.`);
   }
 
   const saved = await apiFetch('/guides', {

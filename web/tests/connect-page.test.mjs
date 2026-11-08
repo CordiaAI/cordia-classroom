@@ -6,7 +6,8 @@ import { readFileSync } from 'node:fs';
 import { READ_TOOLS } from '../lib/mcp/readTools.mjs';
 import { WRITE_TOOLS } from '../lib/mcp/writeTools.mjs';
 import { PROMPTS } from '../lib/mcp/prompts.mjs';
-import { MCP_TOKEN_AUDIENCE } from '../lib/mcp/config.mjs';
+import { SUPPORT_EMAIL } from '../lib/mcp/config.mjs';
+import { SITE_URL } from '../lib/brand.mjs';
 
 const page = readFileSync(new URL('../pages/connect/claude.js', import.meta.url), 'utf8');
 const privacy = readFileSync(new URL('../pages/privacy.js', import.meta.url), 'utf8');
@@ -18,8 +19,11 @@ test('the connect page lists exactly the server\'s tools and prompts', () => {
 });
 
 test('the connect page gives the real server URL, the support contact and the privacy link', () => {
-  assert.ok(page.includes(`const SERVER_URL = '${MCP_TOKEN_AUDIENCE}'`));
+  // The canonical host. Tokens keep their audience (MCP_TOKEN_AUDIENCE, still the legacy host), and
+  // the endpoint checks that audience whichever host the request arrives on.
+  assert.ok(page.includes(`const SERVER_URL = '${SITE_URL}/mcp'`));
   assert.ok(page.includes('SUPPORT_EMAIL'));
+  assert.equal(SUPPORT_EMAIL, 'support@cordiaai.io');
   assert.ok(page.includes('/privacy#connected-ai-apps'));
   assert.ok(privacy.includes('id="connected-ai-apps"'));
 });

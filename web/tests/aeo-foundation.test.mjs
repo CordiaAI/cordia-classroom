@@ -3,12 +3,13 @@
 // the built pages themselves.)
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { BRAND_NAME, ENTITY_LINE, FREE_PLAN_TEXT, PLANS, SAME_AS, SITE_URL, SUPPORT_EMAIL } from '../lib/brand.mjs';
 import { INDEXABLE_PAGES, PUBLIC_PAGES, ROBOTS_NOINDEX, isAppRoute, pageTitle } from '../lib/publicPages.mjs';
 import { createRequire } from 'node:module';
 import { faqPage, graphJson, homeGraph, ids, pageGraph } from '../lib/structuredData.mjs';
 import { ANSWER_ENGINES, lastModified, llmsTxt, robotsTxt, sitemapXml } from '../scripts/crawlFiles.mjs';
-import { decode, readPage, stripTags } from '../scripts/seoCheck.mjs';
+import { BANNED, checkPage, decode, readPage, stripTags, visibleText } from '../scripts/seoCheck.mjs';
 
 const FORBIDDEN = [/unlimited/i, /\$29/, /per semester/i, /pro trial/i];
 
@@ -108,6 +109,30 @@ test('the SEO check reads text the way a crawler does', () => {
   assert.deepEqual(page.titles, ['T | Cordia Classroom']);
   assert.equal(page.h1, 1);
   assert.deepEqual(page.faq, { questions: ['Q & A?'], answers: ['Yes, it is.'] });
+});
+
+test('the SEO check reads only visible body text and flags the banned words', () => {
+  const html = '<html><head><title>CordiaClassroom</title></head><body><h1>Cordia Classroom</h1><script>var unlimited = 1;</script><style>.SmartNotes{}</style><p>Notes &amp; flashcards</p><script type="application/ld+json">{"name":"SmartNotes"}</script></body></html>';
+  assert.equal(visibleText(html), 'Cordia Classroom Notes & flashcards');
+  assert.ok(!BANNED.some(word => word.test(visibleText(html))));
+  for (const text of ['Unlimited guides', 'Open CordiaClassroom', 'Your SmartNotes', 'A SmartNote']) {
+    assert.ok(BANNED.some(word => word.test(text)), text);
+  }
+  const page = { path: '/login', index: false };
+  const { problems } = checkPage(page, '<head><meta name="robots" content="noindex"/></head><body><p>Unlimited</p></body>', 200);
+  assert.deepEqual(problems, ['shows /unlimited/i']);
+});
+
+test('user-facing text names the product "Cordia Classroom", in the app tabs and the extension', async () => {
+  const read = path => readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
+  assert.match(await read('web/lib/pageTitle.js'), /export const BRAND = 'Cordia Classroom';/);
+  const manifest = JSON.parse(await read('extension/manifest.json'));
+  assert.equal(manifest.name, 'Cordia Classroom');
+  assert.ok(manifest.description.length < 132);
+  assert.equal(manifest.commands._execute_action.description, 'Open the Cordia Classroom side panel');
+  for (const path of ['extension/popup.html', 'extension/popup.js', 'extension/background.js', 'extension/README.md', 'extension/store-listing.md', 'web/lib/guideCreate.js', 'web/components/AcademicInfinityMark.js']) {
+    assert.doesNotMatch(await read(path), /CordiaClassroom/, path);
+  }
 });
 
 test('every route outside the public pages is noindex, except routes with their own rules', async () => {

@@ -15,7 +15,9 @@ async function main() {
     const extensionId = new URL(worker.url()).host;
     const manifest = await worker.evaluate(() => chrome.runtime.getManifest());
     assert.equal(manifest.version, '2.1.5');
-    assert.equal(manifest.name, 'CordiaClassroom');
+    assert.equal(manifest.name, 'Cordia Classroom');
+    assert.ok(manifest.description.length < 132, `description is ${manifest.description.length} characters`);
+    assert.match(manifest.description, /Cordia Classroom study guide/);
     assert.equal(manifest.action.default_icon['128'], 'icon128.png');
     assert.deepEqual(manifest.host_permissions, ['<all_urls>']);
     assert.equal(manifest.optional_host_permissions, undefined);

@@ -15,7 +15,7 @@ export default function PrivacyPolicy() {
           Privacy Policy
         </h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '0.9rem' }}>
-          Effective Date: February 25, 2026 &nbsp;|&nbsp; Last Updated: November 2, 2026
+          Effective Date: February 25, 2026 &nbsp;|&nbsp; Last Updated: November 8, 2026
         </p>
 
         <p style={{ marginBottom: '32px' }}>
@@ -74,7 +74,7 @@ export default function PrivacyPolicy() {
         <Section title="3. How We Share Your Information">
           <p>We do not sell, trade, or rent your personal information to third parties. We may share data only in the following limited circumstances:</p>
           <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
-            <li><strong style={{ color: 'var(--text-primary)' }}>Service Providers:</strong> We use trusted third-party providers to operate the Service, including Supabase (database, file storage and authentication), Groq and OpenAI (AI content generation, image reading and speech-to-text), Napkin AI (diagrams and note covers, which receive the text being illustrated), Stripe (payment processing), Vercel (web hosting and anonymous analytics), and Fly.io (backend hosting). If you connect Canvas, requests go to your school's Canvas (Instructure) site using your token. These providers are contractually obligated to protect your data and may only use it to perform services on our behalf.</li>
+            <li><strong style={{ color: 'var(--text-primary)' }}>Service Providers:</strong> We use trusted third-party providers to operate the Service. Anthropic (Claude) writes study guides, questions, flashcards, notes and Tutor replies and reads images, and receives the material and questions you send for that. Groq and OpenAI transcribe recorded lectures, and are our backup for writing and image reading when Anthropic isn't in use. Napkin AI draws diagrams and note covers and receives the text being illustrated. Supabase provides our database, file storage and sign-in, including sign-in emails and texted codes. Stripe processes payments. Vercel hosts the web app and provides anonymous analytics and performance measurements. Fly.io hosts our backend. If you connect Canvas, requests go to your school's Canvas (Instructure) site using your token. If you connect an app under Settings › Connectors (such as Google Calendar, Google Drive, Notion or Dropbox), Composio handles that connection and passes the requests and data for what you turn on between Cordia and that app; Apple Calendar instead subscribes to a calendar link. These providers are contractually obligated to protect your data and may only use it to perform services on our behalf.</li>
             <li style={{ marginTop: '8px' }}><strong style={{ color: 'var(--text-primary)' }}>AI Apps You Connect:</strong> If you connect an AI app such as Claude, it receives the study material it requests for you, as described in section 6. You can disconnect it at any time.</li>
             <li style={{ marginTop: '8px' }}><strong style={{ color: 'var(--text-primary)' }}>Legal Requirements:</strong> We may disclose your information if required to do so by law, regulation, or valid legal process (e.g., a court order or subpoena).</li>
             <li style={{ marginTop: '8px' }}><strong style={{ color: 'var(--text-primary)' }}>Business Transfers:</strong> In the event of a merger, acquisition, or sale of all or a portion of our assets, your information may be transferred as part of that transaction. We will notify you of any such change via email or a prominent notice on our platform.</li>
@@ -199,7 +199,7 @@ export default function PrivacyPolicy() {
           </p>
           <p style={{ marginTop: '12px' }}>
             <strong style={{ color: 'var(--text-primary)' }}>Cordia Classroom</strong><br />
-            Email: <a href="mailto:jude@cordiaai.io" style={{ color: 'var(--accent)' }}>jude@cordiaai.io</a><br />
+            Email: <a href="mailto:support@cordiaai.io" style={{ color: 'var(--accent)' }}>support@cordiaai.io</a><br />
             Website: <a href="https://classroom.cordiaai.io" style={{ color: 'var(--accent)' }}>https://classroom.cordiaai.io</a>
           </p>
         </Section>

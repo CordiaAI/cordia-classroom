@@ -170,7 +170,7 @@ def _load_owned_material(body: ChatRequest, user_id: str) -> Material:
     if body.note_id:
         note = _owned_row("smart_notes", "id,title,folder_id,content", body.note_id, user_id, "note")
         text = html_to_text(note.get("content") or sent)
-        source = {"type": "smartnote", "id": note["id"], "title": note.get("title") or "SmartNote"}
+        source = {"type": "smartnote", "id": note["id"], "title": note.get("title") or "Untitled Notes"}
         return Material(text[:MAX_CONTENT_LENGTH], source, note=note)
     if body.context_title and sent:
         source = {"type": "browser" if body.context_url else "file", "title": body.context_title.strip() or "Attached file"}
@@ -191,7 +191,7 @@ def _finish(user_id: str, turn: Optional[dict], response: ChatResponse) -> ChatR
 def _run_browser_skill(user_id: str, turn: Optional[dict], skill: str, question: str) -> ChatResponse:
     if not turn or not public_tutor_session(turn)["browser_available"]:
         return _finish(user_id, turn, ChatResponse(
-            answer="Open the CordiaClassroom browser side panel, then try the browser request again.",
+            answer="Open the Cordia Classroom browser side panel, then try the browser request again.",
             action="browser_unavailable",
         ))
     command, answer = BROWSER_SKILLS[skill]
@@ -202,7 +202,7 @@ def _run_browser_skill(user_id: str, turn: Optional[dict], skill: str, question:
 
 def _organize(material: Material, class_id: Optional[str], authorization: str) -> ChatResponse:
     if not material.owned:
-        return ChatResponse(answer="Choose a study guide or SmartNote to organize.")
+        return ChatResponse(answer="Choose a study guide or note to organize.")
     if not class_id:
         return ChatResponse(answer="Choose the destination class before organizing this material.")
     if material.guide:
@@ -502,7 +502,7 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
                 "readable study material yet. Add content or choose another source."
             ))
         if skill != "explain":
-            return ChatResponse(answer="Choose a study guide, SmartNote, or uploaded file before asking Cordia.")
+            return ChatResponse(answer="Choose a study guide, note, or uploaded file before asking Cordia.")
         # A general chat: no material selected, answered from general knowledge.
         return _tutor_reply(body, user_id, question, material, skill, turn)
     if skill == "practice" or PRACTICE_REQUEST.search(question):

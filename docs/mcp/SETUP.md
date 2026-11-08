@@ -1,6 +1,6 @@
 # Cordia for Claude (MCP): setup
 
-The MCP server is `https://classroom.cordiacode.com/mcp`. Supabase Auth's OAuth 2.1 server signs
+The MCP server is `https://classroom.cordiaai.io/mcp`. Supabase Auth's OAuth 2.1 server signs
 students in; the MCP server only checks the tokens it issues.
 
 ## How a connection works
@@ -58,12 +58,12 @@ Vercel needs no new environment variables. The optional ones are listed in `web/
   page, `/mcp` and Settings.
 
 **Claude.ai.** Settings → Connectors → Add custom connector → URL
-`https://classroom.cordiacode.com/mcp` → Connect. Sign in to Cordia, choose Allow, and Claude
+`https://classroom.cordiaai.io/mcp` → Connect. Sign in to Cordia, choose Allow, and Claude
 shows the connector as connected. In Phase 1 the server has no tools yet.
 
 **MCP Inspector.**
 1. Run `npx @modelcontextprotocol/inspector`.
-2. Choose Streamable HTTP, URL `https://classroom.cordiacode.com/mcp`, then Connect.
+2. Choose Streamable HTTP, URL `https://classroom.cordiaai.io/mcp`, then Connect.
 3. Inspector's callback is on localhost. Production refuses it ("can't be approved"), and that is
    intended. Supabase always opens the request on the Site URL's consent page first, and a request
    opened there can't then be approved from a preview's address (Supabase answers 400 or 403), so
@@ -200,11 +200,11 @@ anything is revealed, and correctness judged by meaning.
 - Never promise Canvas or other LMS data.
 
 **Icon.** The server reports `serverInfo.icons`: the Cordia mark at
-`https://classroom.cordiacode.com/cordia-classroom-icon.png` (512×512, the Classroom logo), plus a description and website.
+`https://classroom.cordiaai.io/cordia-classroom-icon.png` (512×512, the Classroom logo), plus a description and website.
 - Clients that follow the MCP spec (2025-11-25) show this icon.
 - Claude.ai doesn't use it for custom connectors yet. It shows the favicon Google has for the
-  connector's apex domain, `cordiacode.com` (see `anthropics/claude-ai-mcp#152`).
-- To change the icon in Claude.ai, give `cordiacode.com` a square favicon, for example
+  connector's apex domain, `cordiaai.io` (see `anthropics/claude-ai-mcp#152`).
+- To change the icon in Claude.ai, give `cordiaai.io` a square favicon, for example
   `<link rel="icon" href="/favicon.png">` pointing to the same Cordia mark.
 
 ## Phase 5: hardening, docs and submission
@@ -225,7 +225,7 @@ anything is revealed, and correctness judged by meaning.
 1. **MCP Inspector against a local stack** (optional; see Phase 1 for why not production). Then:
    - Tools › List Tools shows 12; run each one.
    - Prompts › List Prompts shows 3; get each one.
-2. **Claude.ai custom connector.** Add `https://classroom.cordiacode.com/mcp`, sign in with the demo
+2. **Claude.ai custom connector.** Add `https://classroom.cordiaai.io/mcp`, sign in with the demo
    account and choose Allow.
 3. **Every tool and prompt in Claude.** Use the reviewer steps in `docs/SUBMISSION.md` (section 8),
    then check the results in the Cordia app.

@@ -176,10 +176,10 @@ def _study_chunks(raw_text: str, images: list) -> tuple:
 def _guide(user_id: str, chunks: list, has_images: bool) -> tuple:
     study_guide = generate_study_guide(chunks, has_images=has_images, learning_guidance=learning_guidance(user_id))
     if not study_guide:
-        raise HTTPException(status_code=422, detail="CordiaClassroom could not build a guide from this material.")
+        raise HTTPException(status_code=422, detail="Cordia Classroom could not build a guide from this material.")
     cards = study_guide_to_flashcards(study_guide)
     if not cards or not study_guide_is_complete(study_guide):
-        raise HTTPException(status_code=422, detail="CordiaClassroom received an incomplete guide. Please try again.")
+        raise HTTPException(status_code=422, detail="Cordia Classroom received an incomplete guide. Please try again.")
     return study_guide, cards
 
 
@@ -212,7 +212,7 @@ def build_materials(user_id: str, raw_text: str, images: list, notes: bool, stud
         # Cards come from the guide when there is one, so guide and cards can't disagree.
         cards = guide_cards if guide else generate_flashcards(chunks)
         if not cards:
-            raise HTTPException(status_code=422, detail="CordiaClassroom could not build flashcards from this material.")
+            raise HTTPException(status_code=422, detail="Cordia Classroom could not build flashcards from this material.")
     return {"notes": written, "study_guide": guide, "flashcards": cards, "empty": False}
 
 
