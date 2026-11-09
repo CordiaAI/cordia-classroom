@@ -11,7 +11,9 @@ export const AI_CRAWLERS = [
   'Google-Extended', 'Bingbot', 'Applebot',
 ];
 
-const PATTERN = new RegExp(`(?:^|[^A-Za-z0-9-])(${AI_CRAWLERS.map(name => name.replace(/-/g, '\\-')).join('|')})(?![A-Za-z0-9-])`, 'i');
+// Every regex special character escaped (backslash included), so a name is always matched literally.
+const escapeRegex = text => text.replace(/[\\^$.*+?()[\]{}|-]/g, '\\$&');
+const PATTERN = new RegExp(`(?:^|[^A-Za-z0-9-])(${AI_CRAWLERS.map(escapeRegex).join('|')})(?![A-Za-z0-9-])`, 'i');
 
 // The bot's canonical name for a user agent, or null. Case doesn't matter (Bing sends "bingbot").
 export function crawlerFrom(userAgent = '') {
