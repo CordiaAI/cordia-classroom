@@ -26,7 +26,7 @@ export default function PublicPage({ path = '/', faq = null, faqInPage = false, 
       <SeoHead path={path} faq={faq} title={title} description={description} article={article} jsonLd={jsonLd} />
       <div className={'public' + (backdrop ? ' public--photo' : '')} style={backdrop ? { '--public-photo': `url('${backdrop}')` } : { '--public-backdrop': "url('/classroom-clouds.webp')" }}>
         <header className="public-nav">
-          <Link href="/" className="public-brand" aria-label="Cordia Classroom home"><AcademicInfinityMark className="public-mark" title="" /><span><BrandName /></span></Link>
+          <Link href="/" className="public-brand" aria-label="Cordia Classroom home"><AcademicInfinityMark className="public-mark" title="Cordia Classroom" /><span><BrandName /></span></Link>
           <nav aria-label="Public">
             <Link href="/mission">Features</Link>
             <Link href="/pricing">Pricing</Link>

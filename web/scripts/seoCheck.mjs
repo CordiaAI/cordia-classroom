@@ -107,6 +107,9 @@ export function checkPage(page, html, status, robotsHeader = null) {
   // company's plan); it lists it in allowWords (lib/publicPages.mjs) and the rule skips that word.
   const allowed = (page.allowWords || []).map(word => word.toLowerCase());
   for (const word of BANNED) if (word.test(text) && !allowed.some(allow => word.test(allow))) problems.push(`shows ${word}`);
+  // Every image needs alt text: Bing's site scan reports alt="" as missing, even on a logo whose
+  // link already has an aria-label.
+  for (const image of tags(html, 'img')) if (!String(image.alt || '').trim()) problems.push(`image without alt text: ${image.src}`);
   if (!page.index) {
     if (!/noindex/.test(seen.robots)) problems.push('no robots noindex');
     return { problems, seen };
