@@ -32,8 +32,9 @@ export default function App({ Component, pageProps }) {
   useEffect(() => { setSignedIn(Boolean(getToken())); }, [router.pathname]);
   const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password', '/instructors', '/copyright', '/mission', '/install-extension', '/privacy', '/terms', '/honor-code', '/connect/claude', '/oauth/consent'].includes(router.pathname)
     && !(router.pathname === '/pricing' && signedIn)
-    // Use-case pages (lib/useCases/) are public pages.
+    // Use-case pages (lib/useCases/) and guides (lib/guides/) are public pages.
     || USE_CASES.some(page => useCasePath(page) === router.pathname)
+    || router.pathname === '/guides' || router.pathname === '/guides/[slug]'
     // A shared guide: signed-out visitors get the public frame, students the app.
     || (router.pathname === '/sets/[id]' && !signedIn)
     // A classroom invite: signed-out visitors see who's inviting them, then sign up.
@@ -63,6 +64,9 @@ export default function App({ Component, pageProps }) {
   const [timerState, setTimerState] = useState({
     mode: 'focus', minutes: 25, seconds: 0, isRunning: false
   });
+  // A dynamic route is judged by its real path: a published guide (/guides/<slug>) is a public page,
+  // a draft and every app route (/guide/<id>) are not.
+  const routePath = router.pathname.includes('[') ? router.asPath.split(/[?#]/)[0] : router.pathname;
   const brandHead = (
     <Head>
       {/* Phones: fit the screen and run edge to edge under the notch. Pinch-zoom stays on (WCAG 1.4.4);
@@ -70,7 +74,7 @@ export default function App({ Component, pageProps }) {
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" key="viewport" />
       <title>{routeTitle(router.pathname)}</title>
       {/* Signed-in app pages stay out of search (the X-Robots-Tag header says the same). */}
-      {isAppRoute(router.pathname) && <meta name="robots" content={ROBOTS_NOINDEX} key="robots" />}
+      {isAppRoute(routePath) && <meta name="robots" content={ROBOTS_NOINDEX} key="robots" />}
       <meta name="application-name" content="Cordia Classroom" />
       {/* Signed-in pages share this description; public pages set their own head (components/SeoHead.js). */}
       <meta name="description" content="Turn course material into focused study guides, notes, flashcards, and practice with Cordia Classroom." key="description" />

@@ -34,7 +34,9 @@ test('every public page has a unique, short, branded title and a 120–160 chara
     assert.ok(page.description.length >= 120 && page.description.length <= 160, `${page.path}: ${page.description.length}`);
     for (const word of FORBIDDEN) assert.doesNotMatch(page.description, word);
   }
-  assert.deepEqual(PUBLIC_PAGES.filter(page => !page.index).map(page => page.path), ['/login', '/signup', '/reset-password']);
+  // /guides stays noindex until a guide is published (lib/guides/).
+  const unpublishedGuides = PUBLIC_PAGES.find(page => page.path === '/guides')?.index ? [] : ['/guides'];
+  assert.deepEqual(PUBLIC_PAGES.filter(page => !page.index).map(page => page.path), [...unpublishedGuides, '/login', '/signup', '/reset-password']);
   assert.ok(!INDEXABLE_PAGES.some(page => ['/login', '/signup'].includes(page.path)));
 });
 

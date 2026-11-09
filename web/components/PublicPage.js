@@ -7,19 +7,21 @@ import SeoHead from './SeoHead';
 import { getToken } from '../lib/api';
 import { ENTITY_LINE } from '../lib/brand.mjs';
 import { USE_CASES, useCasePath } from '../lib/useCases/index.mjs';
+import { PUBLISHED_GUIDES } from '../lib/guides/index.mjs';
 
 // Shared frame for the signed-out pages: clouds, wordmark, and three links. The head (title,
 // description, canonical, social tags, JSON-LD) comes from the page list in lib/publicPages.mjs;
 // a page with questions passes them as `faq` and gets the visible list and its FAQPage markup.
 // Pages outside that list (shared guides, invites) still pass their own title and description.
 // `faqInPage` means the page places <Faq> itself (use-case pages put it before their call to action).
-export default function PublicPage({ path = '/', faq = null, faqInPage = false, title = '', description = '', backdrop = '', children }) {
+// `article` is a draft guide's Article markup (components/GuideArticle.js); published guides get theirs from the page list.
+export default function PublicPage({ path = '/', faq = null, faqInPage = false, title = '', description = '', article = null, backdrop = '', children }) {
   // Signed-in visitors get a way back into the app instead of "Sign in".
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => { setSignedIn(Boolean(getToken())); }, []);
   return (
     <>
-      <SeoHead path={path} faq={faq} title={title} description={description} />
+      <SeoHead path={path} faq={faq} title={title} description={description} article={article} />
       <div className={'public' + (backdrop ? ' public--photo' : '')} style={backdrop ? { '--public-photo': `url('${backdrop}')` } : { '--public-backdrop': "url('/classroom-clouds.webp')" }}>
         <header className="public-nav">
           <Link href="/" className="public-brand" aria-label="Cordia Classroom home"><AcademicInfinityMark className="public-mark" title="" /><span><BrandName /></span></Link>
@@ -42,6 +44,8 @@ export default function PublicPage({ path = '/', faq = null, faqInPage = false, 
             <Link href="/pricing">Pricing</Link>
             <Link href="/instructors">For instructors</Link>
             <Link href="/install-extension">Get the Chrome extension</Link>
+            {/* The guides index is linked once a guide is published (it stays noindex until then). */}
+            {PUBLISHED_GUIDES.length > 0 && <Link href="/guides">Guides</Link>}
             <Link href="/connect/claude">Use with Claude</Link>
             <Link href="/copyright">Copyright and takedowns</Link>
             <Link href="/privacy">Privacy</Link>
