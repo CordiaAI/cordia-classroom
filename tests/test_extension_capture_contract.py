@@ -48,7 +48,7 @@ class ExtensionCaptureContractTests(unittest.TestCase):
         for pattern in domains:
             self.assertIn(pattern, self.worker)
         self.assertEqual(self.manifest["homepage_url"], "https://classroom.cordiaai.io")
-        self.assertEqual(self.manifest["version"], "2.1.5")
+        self.assertEqual(self.manifest["version"], "2.1.6")
         bridge = (ROOT / "extension" / "asai-bridge.js").read_text() if "ROOT" in globals() else ""
         if bridge:
             # Focusing the tab must not force a token refresh (it rotates the token every time).

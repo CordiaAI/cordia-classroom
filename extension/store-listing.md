@@ -1,6 +1,6 @@
 # Chrome Web Store listing: Cordia Classroom
 
-Copy for the Chrome Web Store dashboard, matching extension version 2.1.5. The name and summary also come from
+Copy for the Chrome Web Store dashboard, matching extension version 2.1.6. The name and summary also come from
 `manifest.json`, so the store shows those values; keep both places the same. Plans and the entity line come from
 `web/lib/brand.mjs`, and what the extension reads and when comes from `content.js`, `background.js` and `popup.js`.
 
