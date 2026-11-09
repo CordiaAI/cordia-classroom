@@ -58,7 +58,7 @@ export default function PrivacyPolicy() {
           <p>When you use the Tutor on the Cordia Classroom website, your questions and its replies are saved with your account so you can pick up where you left off: your current chat (its latest 60 messages) and up to 30 earlier chats, with the oldest removed after that. Opening the Tutor starts a new chat and moves the previous one to your earlier chats. A chat keeps the name of the guide, note, file or page you asked about (and a page's web address), not its text. In the Chrome side panel, the conversation stays in the panel and is not saved to your account.</p>
           <p>When a question you send the Tutor, on the website or in the side panel, says something lasting about you as a learner, such as a goal, a course or an interest, our AI provider picks out up to three short facts and we save them. It is instructed to leave out health, relationship, contact, money and location details. You can see these facts in Settings › Tutor under "What Cordia remembers", along with any your Cordia Assistant keeps if you have linked it. Help me remember uses them, and may use short passages from your earlier Tutor chats, to make memory tricks.</p>
           <p>To answer you, the Tutor sends your question, the material you chose, your last few messages (in the side panel, the conversation shown there) and anything it reads from an app you turned on for the Tutor to our AI provider listed in section 3. Memory facts are not sent with Tutor answers. Your Tutor chats and memory are not shown to instructors, classmates or other users.</p>
-          <p>Tutor chats and memory are kept until you delete your account; they do not expire on their own. Choose Forget next to a fact to delete it (forgetting one that came from your Cordia Assistant deletes it there too). You cannot yet delete a single chat or export your chats or memory. Deleting your account deletes all of them.</p>
+          <p>Tutor chats and memory are kept until you delete them or your account; they do not expire on their own. To delete a saved chat, choose the trash icon next to it under Past chats. To delete memory, choose Forget next to a fact in Settings › Tutor, or Clear all to delete every fact (one that came from your Cordia Assistant is deleted there too). Download my data, in Settings › Account, gives you your Tutor chats and memory in one file with the rest of your study data. Deleting your account deletes all of them.</p>
         </Section>
 
         <Section title="2. How We Use Your Information">
@@ -176,8 +176,9 @@ export default function PrivacyPolicy() {
             <li>Data portability (receive a copy of your data in a structured format)</li>
           </ul>
           <p style={{ marginTop: '12px' }}>
-            You can delete your account yourself in Settings, export any study guide from its menu, and
-            disconnect Canvas or a calendar feed at any time. For anything else, contact us at the email address below.
+            You can delete your account yourself in Settings, download a copy of your data (Settings › Account › Download my data),
+            export any study guide from its menu, and disconnect Canvas or a calendar feed at any time. For anything else,
+            contact us at the email address below.
           </p>
         </Section>
 
