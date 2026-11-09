@@ -41,6 +41,15 @@ class PlannerRules(unittest.TestCase):
         self.assertGreaterEqual(sum((b - a).seconds // 60 for a, b in blocks), 240)
         self.assertTrue(all(a.astimezone(ZONE).hour == 19 for a, _ in blocks))
 
+    def test_short_slots_are_skipped_so_the_full_time_is_placed(self):
+        today = datetime(2026, 11, 2, tzinfo=ZONE)
+        slots = [(today.replace(hour=21, minute=15), today.replace(hour=22))]
+        slots += planner.free_slots([], (today + timedelta(days=1)).replace(hour=9), today + timedelta(days=6), ZONE)
+        for hour in (None, 19):
+            blocks = planner.place_blocks(120, slots, ZONE, preferred_hour=hour)
+            self.assertEqual(sum((b - a).seconds // 60 for a, b in blocks), 120)
+            self.assertNotIn(today.date(), [a.astimezone(ZONE).date() for a, _ in blocks])
+
     def _evening(self, hour, minute, minutes=120, days=6):
         """place_blocks as schedule() calls it, for a plan made at hour:minute Chicago time."""
         now = datetime(2026, 11, 9, hour, minute, tzinfo=ZONE)
