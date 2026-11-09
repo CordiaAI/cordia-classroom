@@ -127,6 +127,16 @@ test('the SEO check reads only visible body text and flags the banned words', ()
   assert.deepEqual(problems, ['shows /unlimited/i']);
 });
 
+test('the SEO check flags images without alt text, including alt=""', async () => {
+  const page = { path: '/login', index: false };
+  const html = '<head><meta name="robots" content="noindex"/></head><body><img src="/a.png" alt=""><img src="/b.png"><img src="/c.png" alt="Cordia"></body>';
+  assert.deepEqual(checkPage(page, html, 200).problems, ['image without alt text: /a.png', 'image without alt text: /b.png']);
+  // The header's logo images (on every public page) carry their own alt text.
+  const read = path => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+  assert.match(await read('components/BrandName.js'), /<img className="c-brandname-mark" src="\/cordia-wordmark.webp" alt="Cordia" \/>/);
+  assert.match(await read('components/PublicPage.js'), /<AcademicInfinityMark className="public-mark" title="Cordia Classroom" \/>/);
+});
+
 test('user-facing text names the product "Cordia Classroom", in the app tabs and the extension', async () => {
   const read = path => readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
   assert.match(await read('web/lib/pageTitle.js'), /export const BRAND = 'Cordia Classroom';/);
