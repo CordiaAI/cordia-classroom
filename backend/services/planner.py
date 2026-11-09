@@ -121,21 +121,29 @@ def place_blocks(minutes: int, slots: list[tuple[datetime, datetime]], zone: Zon
     by_day: dict[date, list[tuple[datetime, datetime]]] = {}
     for a, b in slots:
         by_day.setdefault(_local(a, zone).date(), []).append((a, b))
-    days = sorted(by_day)
-    count = min(len(days), max(1, math.ceil(minutes / MAX_BLOCK)))
+    count = min(len(by_day), max(1, math.ceil(minutes / MAX_BLOCK)))
+    size = max(MIN_BLOCK, min(MAX_BLOCK, math.ceil(minutes / count / 5) * 5))
+    # Only days with a slot that can hold a whole block: free_slots keeps anything of MIN_BLOCK,
+    # so a short evening slot would otherwise be picked and its block silently dropped.
+    days = sorted(day for day, options in by_day.items()
+                  if any(_round_up(a) + timedelta(minutes=size) <= b for a, b in options))
+    count = min(count, len(days))
+    if not count:
+        return []
     # Spread the chosen days across what's left instead of front-loading them all.
     picks = [days[round(i * (len(days) - 1) / max(1, count - 1))] if count > 1 else days[0] for i in range(count)]
-    size = max(MIN_BLOCK, min(MAX_BLOCK, math.ceil(minutes / count / 5) * 5))
     blocks = []
     for day in dict.fromkeys(picks):
         options = by_day[day]
         if preferred_hour is not None:
             options = sorted(options, key=lambda s: abs(_local(s[0], zone).hour - preferred_hour))
         for a, b in options:
+            start = _round_up(a)
             if preferred_hour is not None:
                 wanted = datetime.combine(day, time(preferred_hour), zone)
-                a = max(a, min(wanted, b - timedelta(minutes=size)))
-            start = _round_up(a)
+                moved = _round_up(max(a, min(wanted, b - timedelta(minutes=size))))
+                if moved + timedelta(minutes=size) <= b:
+                    start = moved
             if start + timedelta(minutes=size) <= b:
                 blocks.append((start, start + timedelta(minutes=size)))
                 break
