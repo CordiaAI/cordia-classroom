@@ -41,6 +41,7 @@ export default {
       paragraphs: [
         `A short guide is quizzed on everything; a longer one starts at about half its questions, ${MIN_RECOMMENDED} to ${MAX_RECOMMENDED}, and you can choose up to ${MAX_QUESTIONS}. Questions are picked at random and shuffled. Each wrong choice must be clearly false for its question, never a rewording of the right answer.`,
       ],
+      link: { href: '/best-ai-study-platforms-canvas-integration', label: 'AI study platforms compared' },
     },
     {
       question: 'What question types are there?',

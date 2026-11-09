@@ -1,0 +1,115 @@
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Article",
+      "@id": "https://classroom.cordiaai.io/best-ai-study-platforms-canvas-integration#article",
+      "headline": "Best AI Study Platforms With Canvas Integration",
+      "description": "Compare AI study platforms that work with Canvas: how each one connects, what it makes from your class materials, free tiers and prices.",
+      "datePublished": "2026-11-09",
+      "dateModified": "2026-11-09",
+      "author": {
+        "@type": "Person",
+        "name": "Jude Moore",
+        "jobTitle": "Chief Product Officer, Cordia AI"
+      },
+      "publisher": {
+        "@id": "https://classroom.cordiaai.io/#org"
+      },
+      "mainEntityOfPage": "https://classroom.cordiaai.io/best-ai-study-platforms-canvas-integration",
+      "about": [
+        "AI study platforms",
+        "Canvas integration",
+        "learning management system integration"
+      ]
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://classroom.cordiaai.io/#org",
+      "name": "Cordia Classroom",
+      "url": "https://classroom.cordiaai.io",
+      "email": "support@cordiaai.io",
+      "description": "Cordia Classroom is an AI study app for college students that turns course material (slides, PDFs, lectures and Canvas pages) into study guides, flashcards and practice tests."
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://classroom.cordiaai.io/best-ai-study-platforms-canvas-integration#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Which AI study platforms integrate with Canvas?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "StudyFetch, Gemini Notebook and Claude for Education offer Canvas integrations that your school installs, and teachers can build ChatGPT-style AI assignments in Canvas through Instructure's partnership with OpenAI. Cordia Classroom and Knowt work from the student side through a Chrome extension, without waiting for your school to install anything. We found no current Canvas integration from Quizlet."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Cordia Classroom work with Canvas?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, from the student side. The Chrome extension turns Canvas pages you have open into study guides, and Cordia can pull your deadlines from Canvas's calendar feed. Grade and announcement sync works if your school allows it."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Cordia Classroom work with Blackboard or Moodle?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, through the Chrome extension, which captures course pages and slides from Blackboard and Moodle as well as Canvas. Deadline and grade features are built for Canvas."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Cordia Classroom free?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. The free plan includes 3 study guides a month, 10 Tutor prompts and 5 Explain views. Paid plans are Pro at $4.99 a month and Academic Weapon at $9.99 a month."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Cordia Classroom accurate?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Cordia lists every testable concept in your material first, then writes one question per concept using only facts stated in that material. That keeps questions tied to your class, but you should still spot-check answers against your notes, as with any AI tool."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Cordia Classroom allowed at my school?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "It depends on your school and course policy, so check your syllabus first. Cordia's Honor Code says not to submit AI-written work as your own or use Cordia during live exams, and instructors can turn off sharing for their course."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How is Cordia Classroom different from Quizlet?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Quizlet is built around flashcard sets, including a large library made by other students. Cordia builds a study guide from your own class material, with an outline, questions and flashcards, and adds Canvas deadlines, spaced review and confidence ratings."
+          }
+        }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://classroom.cordiaai.io/best-ai-study-platforms-canvas-integration#breadcrumbs",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://classroom.cordiaai.io/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Best AI Study Platforms With Canvas Integration",
+          "item": "https://classroom.cordiaai.io/best-ai-study-platforms-canvas-integration"
+        }
+      ]
+    }
+  ]
+}

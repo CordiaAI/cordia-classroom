@@ -103,13 +103,19 @@ export function checkPage(page, html, status, robotsHeader = null) {
   if (status !== 200) problems.push(`status ${status}`);
   if (robotsHeader) problems.push(`X-Robots-Tag: ${robotsHeader}`);
   const text = visibleText(html);
-  for (const word of BANNED) if (word.test(text)) problems.push(`shows ${word}`);
+  // A page may quote a banned word about someone else (a comparison page quoting another
+  // company's plan); it lists it in allowWords (lib/publicPages.mjs) and the rule skips that word.
+  const allowed = (page.allowWords || []).map(word => word.toLowerCase());
+  for (const word of BANNED) if (word.test(text) && !allowed.some(allow => word.test(allow))) problems.push(`shows ${word}`);
   if (!page.index) {
     if (!/noindex/.test(seen.robots)) problems.push('no robots noindex');
     return { problems, seen };
   }
   if (seen.h1 !== 1) problems.push(`${seen.h1} H1s`);
-  if (seen.titles.length !== 1 || !seen.titles[0].includes(BRAND_NAME)) problems.push(`title ${JSON.stringify(seen.titles)}`);
+  // A page with its own exact title (a comparison page) must show exactly that; every other page
+  // must name the brand.
+  const titleOk = page.ownTitle ? seen.titles[0] === page.ownTitle : seen.titles[0]?.includes(BRAND_NAME);
+  if (seen.titles.length !== 1 || !titleOk) problems.push(`title ${JSON.stringify(seen.titles)}`);
   const length = seen.description?.length || 0;
   if (length < 120 || length > 160) problems.push(`description is ${length} characters`);
   const want = SITE_URL + (page.path === '/' ? '/' : page.path);

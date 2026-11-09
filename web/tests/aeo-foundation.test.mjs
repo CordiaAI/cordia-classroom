@@ -29,7 +29,9 @@ test('every public page has a unique, short, branded title and a 120–160 chara
   assert.equal(new Set(PUBLIC_PAGES.map(page => page.description)).size, PUBLIC_PAGES.length);
   for (const page of PUBLIC_PAGES) {
     const title = pageTitle(page);
-    assert.match(title, / \| Cordia Classroom$/, title);
+    // Comparison pages (lib/comparisons/) carry their brief's exact title; every other page is branded.
+    if (page.comparison) assert.equal(title, page.ownTitle);
+    else assert.match(title, / \| Cordia Classroom$/, title);
     assert.ok(title.length <= 60, `${title} is ${title.length} characters`);
     assert.ok(page.description.length >= 120 && page.description.length <= 160, `${page.path}: ${page.description.length}`);
     for (const word of FORBIDDEN) assert.doesNotMatch(page.description, word);

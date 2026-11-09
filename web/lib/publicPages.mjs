@@ -6,6 +6,7 @@
 import { BRAND_NAME, PLANS, planByKey } from './brand.mjs';
 import { USE_CASES, useCasePath } from './useCases/index.mjs';
 import { AUTHOR, PUBLISHED_GUIDES, guidePath } from './guides/index.mjs';
+import { COMPARISONS, comparisonPath } from './comparisons/index.mjs';
 
 const { trial } = PLANS;
 const price = key => `$${planByKey(key).price}`;
@@ -30,6 +31,13 @@ export const PUBLIC_PAGES = [
   ...USE_CASES.map(page => ({
     path: useCasePath(page), file: `pages/${page.slug}.js`, index: true, crumb: page.crumb,
     topic: page.topic, description: page.description, modified: page.updated,
+  })),
+  // Comparison pages (lib/comparisons/): their own exact title and Open Graph text, and JSON-LD
+  // from web/content/<slug>.jsonld.json, passed in by the page.
+  ...COMPARISONS.map(page => ({
+    path: comparisonPath(page), file: `pages/${page.slug}.js`, index: true, crumb: page.crumb,
+    topic: page.topic, ownTitle: page.title, description: page.description, modified: page.modified,
+    comparison: page, allowWords: page.allowWords,
   })),
   // Guides (lib/guides/): the index stays noindex until a guide is published, and only published
   // guides are listed here. Drafts aren't, so they get the app noindex rule and no sitemap entry.
@@ -90,7 +98,8 @@ export const PUBLIC_PAGES = [
   },
 ];
 
-export const pageTitle = page => `${page.topic} | ${BRAND_NAME}`;
+// A page with its own exact title (a comparison page) uses it; every other page is "<topic> | Cordia Classroom".
+export const pageTitle = page => page.ownTitle || `${page.topic} | ${BRAND_NAME}`;
 export const publicPage = path => PUBLIC_PAGES.find(page => page.path === path);
 export const INDEXABLE_PAGES = PUBLIC_PAGES.filter(page => page.index);
 

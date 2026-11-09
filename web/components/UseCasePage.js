@@ -58,7 +58,7 @@ export default function UseCasePage({ page }) {
             <p className="uc-answer">{section.answer}</p>
             {section.paragraphs?.map(text => <p key={text}>{text}</p>)}
             {section.bullets && <ul>{section.bullets.map(text => <li key={text}>{text}</li>)}</ul>}
-            {section.link && <p><Link href={section.link.href}>{section.link.label}</Link></p>}
+            {[].concat(section.link || []).map(link => <p key={link.href}><Link href={link.href}>{link.label}</Link></p>)}
           </section>
         ))}
 

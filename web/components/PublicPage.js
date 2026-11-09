@@ -7,6 +7,7 @@ import SeoHead from './SeoHead';
 import { getToken } from '../lib/api';
 import { ENTITY_LINE } from '../lib/brand.mjs';
 import { USE_CASES, useCasePath } from '../lib/useCases/index.mjs';
+import { COMPARISONS, comparisonPath } from '../lib/comparisons/index.mjs';
 import { PUBLISHED_GUIDES } from '../lib/guides/index.mjs';
 
 // Shared frame for the signed-out pages: clouds, wordmark, and three links. The head (title,
@@ -14,14 +15,15 @@ import { PUBLISHED_GUIDES } from '../lib/guides/index.mjs';
 // a page with questions passes them as `faq` and gets the visible list and its FAQPage markup.
 // Pages outside that list (shared guides, invites) still pass their own title and description.
 // `faqInPage` means the page places <Faq> itself (use-case pages put it before their call to action).
+// `jsonLd` is a comparison page's own JSON-LD (lib/comparisons/), read by its getStaticProps.
 // `article` is a draft guide's Article markup (components/GuideArticle.js); published guides get theirs from the page list.
-export default function PublicPage({ path = '/', faq = null, faqInPage = false, title = '', description = '', article = null, backdrop = '', children }) {
+export default function PublicPage({ path = '/', faq = null, faqInPage = false, title = '', description = '', article = null, jsonLd = null, backdrop = '', children }) {
   // Signed-in visitors get a way back into the app instead of "Sign in".
   const [signedIn, setSignedIn] = useState(false);
   useEffect(() => { setSignedIn(Boolean(getToken())); }, []);
   return (
     <>
-      <SeoHead path={path} faq={faq} title={title} description={description} article={article} />
+      <SeoHead path={path} faq={faq} title={title} description={description} article={article} jsonLd={jsonLd} />
       <div className={'public' + (backdrop ? ' public--photo' : '')} style={backdrop ? { '--public-photo': `url('${backdrop}')` } : { '--public-backdrop': "url('/classroom-clouds.webp')" }}>
         <header className="public-nav">
           <Link href="/" className="public-brand" aria-label="Cordia Classroom home"><AcademicInfinityMark className="public-mark" title="" /><span><BrandName /></span></Link>
@@ -55,6 +57,7 @@ export default function PublicPage({ path = '/', faq = null, faqInPage = false, 
           <nav aria-label="Use Cordia for" className="public-footer-group">
             <span className="public-footer-label">Use Cordia for</span>
             {USE_CASES.map(page => <Link key={page.slug} href={useCasePath(page)}>{page.footerLabel}</Link>)}
+            {COMPARISONS.map(page => <Link key={page.slug} href={comparisonPath(page)}>{page.footerLabel}</Link>)}
           </nav>
         </footer>
       </div>
