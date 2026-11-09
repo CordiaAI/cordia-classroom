@@ -410,6 +410,8 @@ body:has(.about) .c-fab { display: none; }
 .cordia-tutor-message.user { background: var(--olive); color: var(--on-olive); border-radius:var(--r-card); }
 .cordia-tutor-message.error { color: var(--error); background: var(--error-bg); border-radius:var(--r-input); padding: 10px 14px; }
 .cordia-tutor-source, .cordia-tutor-evidence, .cordia-tutor-guide-link, .cordia-tutor-speak { display: inline-flex; align-items: center; min-height: 32px; margin: 0 6px 6px 0; padding: 0 12px; border: 1px solid var(--line); border-radius:var(--r-pill); background: transparent; color: var(--olive-ink); font:600 13px/1 var(--font-sans); cursor: pointer; }
+/* A general answer (no material selected): a plain label, not a link to material. */
+.cordia-tutor-source.is-general { color: var(--muted-ink); cursor: default; }
 .tutor-welcome { display: grid; gap: 14px; padding: 8px 0; }
 .tutor-welcome h2 { margin: 0; font:600 20px/1.15 var(--font-sans); }
 .tutor-starter-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
