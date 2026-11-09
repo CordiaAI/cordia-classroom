@@ -3,6 +3,7 @@ import PublicPage from './PublicPage';
 import Faq from './Faq';
 import { PLAN_LINE } from '../lib/brand.mjs';
 import { USE_CASES, useCasePath } from '../lib/useCases/index.mjs';
+import { walkthroughEvent } from '../lib/walkthrough';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 // "2026-11-08" -> "November 8, 2026", the same on the server and in every browser.
@@ -10,11 +11,14 @@ const longDate = iso => { const [year, month, day] = iso.split('-').map(Number);
 
 // One use-case page from one content file (lib/useCases/). The order is fixed: breadcrumb, H1,
 // answer-first opening, how it works, screenshots, question sections, who it's for, the plan line,
-// FAQ, the call to action, then the last-updated date and links. The head and JSON-LD (WebPage
+// FAQ, the call to action, then the last-updated date and links. The call to action is "Make your
+// first study guide free" (signup?from=<slug>) unless the page names its own, such as the Chrome
+// Web Store for the extension page, which then keeps the signup link as a second line. The head and JSON-LD (WebPage
 // with dateModified, BreadcrumbList, FAQPage) come from PublicPage and the public pages list.
 export default function UseCasePage({ page }) {
   const path = useCasePath(page);
   const siblings = USE_CASES.filter(other => other.slug !== page.slug);
+  const signup = `/signup?from=${page.slug}`;
   return (
     <PublicPage path={path} faq={page.faq} faqInPage>
       <article className="uc">
@@ -69,8 +73,11 @@ export default function UseCasePage({ page }) {
         <Faq items={page.faq} />
 
         <p className="uc-cta">
-          <Link href={`/signup?from=${page.slug}`} className="c-btn c-btn--primary">Make your first study guide free</Link>
+          {page.cta
+            ? <a href={page.cta.href} className="c-btn c-btn--primary" target="_blank" rel="noreferrer" onClick={() => page.cta.event && walkthroughEvent(page.cta.event)}>{page.cta.label}</a>
+            : <Link href={signup} className="c-btn c-btn--primary">Make your first study guide free</Link>}
         </p>
+        {page.cta && <p className="uc-cta-more">No account yet? <Link href={signup}>Make your first study guide free</Link></p>}
 
         <footer className="uc-meta">
           <p>Last updated <time dateTime={page.updated}>{longDate(page.updated)}</time></p>
@@ -99,6 +106,7 @@ export default function UseCasePage({ page }) {
         .uc-section:has(.uc-shots) { max-width: 800px; }
         .uc-plan { margin: 40px 0 0; max-width: 46em; padding: 16px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--lg-card); color: var(--ink); font: 500 var(--fs-15)/1.6 var(--font-sans); }
         .uc-cta { margin: 40px 0 0; }
+        .uc-cta-more { margin: 12px 0 0; color: var(--text-secondary); font: 500 var(--fs-15)/1.6 var(--font-sans); }
         .uc-meta { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--hairline); color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); }
         .uc-meta p { margin: 0 0 8px; }
         .uc-meta nav { display: flex; flex-wrap: wrap; gap: 8px 20px; }

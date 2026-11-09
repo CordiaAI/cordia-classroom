@@ -73,7 +73,7 @@ export default {
       question: 'How do I study it once it\'s made?',
       answer: 'Use Learn to master each idea, Flashcards to review, and Test yourself in Learn when you want a quiz.',
       bullets: [
-        'Learn asks each idea as a choice, a typed answer, a fill-in-the-blank or a flashcard. Picking from choices takes an idea only as far as Familiar; answering from memory masters it.',
+        'Learn asks each idea as a choice, a typed answer, a fill-in-the-blank or a flashcard. With its default ways of asking, picking from choices takes an idea to Familiar and answering from memory masters it.',
         'Add a test date and Learn paces you so everything is mastered the day before.',
         `Flashcards come back on a spaced schedule: ${listText(INTERVALS.map(String))} days.`,
         'Practice makes practice problems from the guide.',

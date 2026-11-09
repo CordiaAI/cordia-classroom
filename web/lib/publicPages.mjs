@@ -31,11 +31,6 @@ export const PUBLIC_PAGES = [
     topic: page.topic, description: page.description, modified: page.updated,
   })),
   {
-    path: '/install-extension', file: 'pages/install-extension.js', index: true, crumb: 'Chrome extension',
-    topic: 'Chrome Extension',
-    description: 'Install the Cordia Classroom Chrome extension, pin it to your toolbar and turn the course page you have open into a study guide in a few clicks.',
-  },
-  {
     path: '/connect/claude', file: 'pages/connect/claude.js', index: true, crumb: 'Use with Claude',
     topic: 'Use with Claude',
     description: 'Connect Cordia Classroom to Claude to search your notes and lectures, get quizzed from your own flashcards and save new cards to your Library.',
