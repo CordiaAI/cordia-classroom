@@ -72,3 +72,12 @@ class WebTutorAnswerTests(unittest.TestCase):
         system = client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
         self.assertIn("never repeat or lightly reword your earlier answer", system)
         self.assertIn("Keep every sentence short", system)
+
+    def test_a_general_question_with_no_material_reaches_the_model(self):
+        client = MagicMock()
+        client.chat.completions.create.return_value.choices = [MagicMock(message=MagicMock(content="ok"))]
+        with patch("services.llm.get_openai_client", return_value=client):
+            answer_question("What is osmosis?", "", allow_clarification=True)
+        kwargs = client.chat.completions.create.call_args.kwargs
+        self.assertIn("No course material is selected", kwargs["messages"][0]["content"])
+        self.assertEqual(kwargs["messages"][-1]["content"], "Question: What is osmosis?")

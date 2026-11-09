@@ -156,9 +156,18 @@ class MemoryContextTests(unittest.TestCase):
 
     def test_failures_and_passing_mentions_give_nothing(self):
         from services import memory_context
-        db, _ = self.db(chats=[{"id": "c1", "title": "Chat", "messages": [{"role": "user", "content": "Glazebrook?"}]}],
+        db, _ = self.db(chats=[{"id": "c1", "title": "Chat", "messages": [{"role": "user", "text": "Glazebrook?"}]}],
                         broken=("study_guides", "lectures"))
         self.assertEqual(memory_context.related_material(db, "u1", "g1", "Who founded ATO?", "Otis Allan Glazebrook"), [])
+
+    def test_saved_tutor_chats_are_read_in_their_stored_shape(self):
+        from services import memory_context
+        messages = [{"role": "user", "text": "Who started ATO?"},  # tutor_sessions stores {"role", "text"}
+                    {"role": "ai", "text": "Otis Allan Glazebrook founded ATO in Richmond."}]
+        db, _ = self.db(chats=[{"id": "c1", "title": "Greek life chat", "messages": messages}])
+        found = memory_context.related_material(db, "u1", "g1", "Who founded ATO?", "Otis Allan Glazebrook")
+        self.assertEqual(found, [{"kind": "tutor", "id": "c1", "title": "Greek life chat",
+                                  "snippet": "Otis Allan Glazebrook founded ATO in Richmond."}])
 
     def test_key_terms_skip_filler(self):
         from services.memory_context import key_terms
