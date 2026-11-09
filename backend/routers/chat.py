@@ -37,6 +37,8 @@ MAX_CONTENT_LENGTH = 500_000
 TUTOR_CONTEXT_TOKENS = int(os.getenv("CLASSROOM_TUTOR_CONTEXT_TOKENS", "128000"))
 TUTOR_RESERVED_TOKENS = 6_000
 CONTEXT_FULL = "context_window_full"
+# The source on a general answer (no material selected), shown instead of "Based on <material>".
+GENERAL_SOURCE = {"type": "general", "title": "General knowledge, not your study material"}
 # An instruction to change the selected guide's outline: "fix the spelling of GihHub", "change X to Y",
 # "add a section on Z to my notes". Questions ("what does…", "explain…") are never edits.
 OUTLINE_EDIT_VERB = re.compile(
@@ -503,8 +505,11 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
             ))
         if skill != "explain":
             return ChatResponse(answer="Choose a study guide, note, or uploaded file before asking Cordia.")
-        # A general chat: no material selected, answered from general knowledge.
-        return _tutor_reply(body, user_id, question, material, skill, turn)
+        # A general chat: no material selected, answered from general knowledge. The source says so,
+        # so the reply is never mistaken for one based on the student's material (it is saved with it).
+        reply = _tutor_reply(body, user_id, question, material, skill, turn)
+        reply.source = GENERAL_SOURCE
+        return reply
     if skill == "practice" or PRACTICE_REQUEST.search(question):
         _check_picked_class(user_id, body)
         return _create_guide(user_id, material, class_id, "practice")

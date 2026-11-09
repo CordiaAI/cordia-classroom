@@ -622,7 +622,9 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         )}
         {messages.map((message, index) => (
           <div key={`${index}-${message.role}`} className={`cordia-tutor-message ${message.role}${message.visual?.text ? ' has-visual' : ''}`}>
-            {message.source && (
+            {message.source?.type === 'general' ? (
+              <span className="cordia-tutor-source is-general">{message.source.title}</span>
+            ) : message.source && (
               <button type="button" className="cordia-tutor-source" onClick={() => openSource(message.source)} disabled={message.source.type === 'file'}>
                 Based on {message.source.title}
               </button>

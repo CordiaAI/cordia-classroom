@@ -81,3 +81,38 @@ class WebTutorAnswerTests(unittest.TestCase):
         kwargs = client.chat.completions.create.call_args.kwargs
         self.assertIn("No course material is selected", kwargs["messages"][0]["content"])
         self.assertEqual(kwargs["messages"][-1]["content"], "Question: What is osmosis?")
+
+
+@patch("services.student_memory.learn_from_tutor")
+@patch("routers.chat.style_instruction", return_value="")
+@patch("routers.chat.learning_guidance", return_value="")
+@patch("routers.chat.record")
+@patch("routers.chat.require", return_value={"used": 0})
+@patch("routers.chat.get_user_id", return_value="student-1")
+class GeneralQuestionRouteTests(unittest.TestCase):
+    """POST /chat with no material selected, the way the web Tutor sends it (skill "explain"): the real
+    answer_question and model lookup run, only the AI client is mocked. Before tutor_general was in
+    models.FEATURES this answered 500 (KeyError in model_for)."""
+
+    def setUp(self):
+        self.client = TestClient(app)
+
+    def test_a_general_question_gets_an_answer_marked_as_not_from_the_students_material(self, *_):
+        ai = MagicMock()
+        ai.chat.completions.create.return_value.choices = [MagicMock(message=MagicMock(content="Osmosis is water moving across a membrane."))]
+        with patch("services.llm.get_openai_client", return_value=ai), patch("routers.chat.connectors.tutor_material", return_value=None):
+            response = self.client.post("/chat", headers=AUTH, json={"question": "What is osmosis?", "content": "", "skill": "explain"})
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["answer"], "Osmosis is water moving across a membrane.")
+        self.assertEqual(body["source"], chat.GENERAL_SOURCE)
+        self.assertEqual(body["source"]["type"], "general")
+        self.assertIn("No course material is selected", ai.chat.completions.create.call_args.kwargs["messages"][0]["content"])
+
+    def test_answers_from_material_keep_their_own_source(self, *_):
+        ai = MagicMock()
+        ai.chat.completions.create.return_value.choices = [MagicMock(message=MagicMock(content="Use the extended Euclidean algorithm."))]
+        with patch("services.llm.get_openai_client", return_value=ai):
+            response = self.client.post("/chat", headers=AUTH, json={**BASE, "skill": "explain"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertNotEqual((response.json().get("source") or {}).get("type"), "general")
