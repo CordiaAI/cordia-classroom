@@ -91,6 +91,7 @@ FEATURES = {
     "guide_tutor_long": CallSpec(BUILD, 1200),  # Stage 10: "Explain more" on someone else's guide
     # LIGHT
     "tutor_clarify": CallSpec(LIGHT, 500),
+    "tutor_general": CallSpec(LIGHT, 500),  # no material selected: a general-knowledge answer
     "tutor_rich": CallSpec(LIGHT, 1400),
     "tutor_example": CallSpec(LIGHT, 300),
     "tutor_detailed": CallSpec(LIGHT, 700),
