@@ -1,5 +1,6 @@
 import { apiFetch, clearAuth, getToken } from './api';
 import { AGE_BLOCK_KEY, PENDING_AGE_KEY } from './age.mjs';
+import { firstTouchForSignup } from './attribution.mjs';
 
 // Sending the sign-up age to the server (POST /auth/age; social plan, Stage 9). Under 13, the server
 // deletes the account; this browser then remembers it and signs out. Storage can be blocked
@@ -26,12 +27,17 @@ export function rememberAge(year, month) {
 }
 
 // Sends the waiting answer once there's a session. Returns 'saved' | 'under_13' | 'none' | 'failed'.
+// This is the one call every new account makes after sign-up, so it also carries the first-touch
+// attribution (lib/attribution.mjs) when this browser kept one.
 export async function sendAge(answer = null) {
   let body = answer;
   if (!body) {
     try { body = JSON.parse(read(PENDING_AGE_KEY) || 'null'); } catch { body = null; }
   }
   if (!body || !getToken()) return 'none';
+  let acquisition = null;
+  try { acquisition = firstTouchForSignup({ storage: window.localStorage }); } catch { /* storage blocked */ }
+  if (acquisition) body = { ...body, acquisition };
   const data = await apiFetch('/auth/age', { method: 'POST', reportFailure: true, body: JSON.stringify(body) });
   if (data?.detail === 'under_13') {
     blockAge();
