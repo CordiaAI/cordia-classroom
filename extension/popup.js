@@ -39,7 +39,7 @@ function runtime(message) {
 function showUpgrade(limit = {}) {
   const pro = limit.plan === 'classroom_plus';
   const resets = limit.resets_at ? new Date(limit.resets_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
-  upgradeTitle.textContent = pro ? "You've reached this month's fair-use limit" : LIMIT_TITLES[limit.feature] || limit.message || 'Upgrade CordiaClassroom';
+  upgradeTitle.textContent = pro ? "You've reached this month's fair-use limit" : LIMIT_TITLES[limit.feature] || limit.message || 'Upgrade Cordia Classroom';
   upgradeBody.textContent = pro
     ? `${limit.message || ''}${resets ? ` It resets ${resets}.` : ''}`.trim()
     : `Pro gives you 15 study guides and 300 Cordia Tutor replies a month; Academic Weapon gives you 100 and 1,000.${resets ? ` Your free plan resets ${resets}.` : ''}`;
@@ -109,7 +109,7 @@ async function initAuth() {
   connectLink.hidden = state.authenticated;
   announce(state.authenticated
     ? `Connected${auth.userEmail ? ` as ${auth.userEmail}` : ''}. Ready.`
-    : (auth?.error || 'Connect CordiaClassroom to make and save a guide.'), state.authenticated ? 'ready' : 'warning');
+    : (auth?.error || 'Connect Cordia Classroom to make and save a guide.'), state.authenticated ? 'ready' : 'warning');
   if (state.authenticated) await refreshPlan();
 }
 
@@ -280,7 +280,7 @@ async function saveStudyGuide() { // runs by itself once a guide is ready; then 
   if (!state.generated || saveButton.disabled) return;
   saveButton.disabled = true;
   saveButton.textContent = 'Saving…';
-  announce('Saving your guide to CordiaClassroom…', 'working');
+  announce('Saving your guide to Cordia Classroom…', 'working');
   const source = state.source || {};
   const response = await runtime({
     action: 'saveStudyGuide',

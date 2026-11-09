@@ -4,7 +4,7 @@ import BodyPortal from './BodyPortal';
 
 // The first time a student shares a guide beyond their class: the Honor Code in three lines, the
 // name choice, and "Make private" one tap away. `visibility` is 'public' or 'link'.
-export default function PublishSheet({ visibility, attribution = 'named', fresh = false, onPublish, onPrivate, onClose }) {
+export default function PublishSheet({ visibility, attribution = 'named', onPublish, onPrivate, onClose }) {
   const [named, setNamed] = useState(attribution !== 'anonymous');
   const [busy, setBusy] = useState(false);
   const firstRef = useRef(null);
@@ -27,7 +27,7 @@ export default function PublishSheet({ visibility, attribution = 'named', fresh 
     <BodyPortal>
       <div className="c-scrim" onClick={onClose}>
         <section className="c-sheet publish-sheet" role="dialog" aria-modal="true" aria-labelledby="publish-title" onClick={event => event.stopPropagation()}>
-          <h2 id="publish-title" className="publish-title">{isLink ? 'Share by link?' : fresh ? 'New guides are public' : 'Make it public?'}</h2>
+          <h2 id="publish-title" className="publish-title">{isLink ? 'Share by link?' : 'Make it public?'}</h2>
           <p className="publish-lead">
             {isLink ? 'Anyone with the link can see it. It isn’t listed anywhere.' : 'Anyone can find it and study from it.'}
             {' '}First, the Honor Code:

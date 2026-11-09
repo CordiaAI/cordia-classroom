@@ -113,33 +113,62 @@ def _round_up(dt: datetime, minutes: int = 15) -> datetime:
     return (dt + timedelta(minutes=extra)).replace(second=0, microsecond=0)
 
 
+def _room(options: list[tuple[datetime, datetime]]) -> int:
+    """The longest block (minutes, a multiple of 5, at most MAX_BLOCK) one of a day's slots can hold."""
+    longest = max((int((b - _round_up(a)).total_seconds() // 60) for a, b in options), default=0)
+    return min(MAX_BLOCK, max(0, longest) // 5 * 5)
+
+
+def _block(options: list[tuple[datetime, datetime]], day: date, size: int, zone: ZoneInfo,
+           preferred_hour: Optional[int]) -> Optional[tuple[datetime, datetime]]:
+    """One block of `size` minutes on `day`, near the preferred hour when there is one."""
+    length = timedelta(minutes=size)
+    if preferred_hour is not None:
+        options = sorted(options, key=lambda s: abs(_local(s[0], zone).hour - preferred_hour))
+    for a, b in options:
+        starts = [_round_up(a)]
+        if preferred_hour is not None:
+            wanted = datetime.combine(day, time(preferred_hour), zone)
+            starts.insert(0, _round_up(max(a, min(wanted, b - length))))
+        for start in starts:
+            if start + length <= b:
+                return start, start + length
+    return None
+
+
 def place_blocks(minutes: int, slots: list[tuple[datetime, datetime]], zone: ZoneInfo,
                  preferred_hour: Optional[int] = None) -> list[tuple[datetime, datetime]]:
-    """Blocks that add up to `minutes` (as near as the free time allows), one per day, spread out."""
+    """Blocks that add up to `minutes` (as near as the free time allows), one per day, spread out.
+
+    Each day's room is checked before any day is chosen, so a day with too little free time left
+    (the last half hour of tonight, say) never takes a block it can't hold: the time goes to the
+    days after it. Less than `minutes` comes back only when the free time really runs out."""
     if minutes <= 0 or not slots:
         return []
     by_day: dict[date, list[tuple[datetime, datetime]]] = {}
     for a, b in slots:
         by_day.setdefault(_local(a, zone).date(), []).append((a, b))
-    days = sorted(by_day)
+    room = {day: _room(options) for day, options in by_day.items()}
+    days = [day for day in sorted(by_day) if room[day] >= MIN_BLOCK]
+    if not days:
+        return []
     count = min(len(days), max(1, math.ceil(minutes / MAX_BLOCK)))
-    # Spread the chosen days across what's left instead of front-loading them all.
-    picks = [days[round(i * (len(days) - 1) / max(1, count - 1))] if count > 1 else days[0] for i in range(count)]
     size = max(MIN_BLOCK, min(MAX_BLOCK, math.ceil(minutes / count / 5) * 5))
-    blocks = []
-    for day in dict.fromkeys(picks):
-        options = by_day[day]
-        if preferred_hour is not None:
-            options = sorted(options, key=lambda s: abs(_local(s[0], zone).hour - preferred_hour))
-        for a, b in options:
-            if preferred_hour is not None:
-                wanted = datetime.combine(day, time(preferred_hour), zone)
-                a = max(a, min(wanted, b - timedelta(minutes=size)))
-            start = _round_up(a)
-            if start + timedelta(minutes=size) <= b:
-                blocks.append((start, start + timedelta(minutes=size)))
+    roomy = [day for day in days if room[day] >= size]
+    if len(roomy) >= count:
+        # Even blocks, spread across the days that can hold them instead of front-loading them all.
+        picks = [roomy[round(i * (len(roomy) - 1) / max(1, count - 1))] if count > 1 else roomy[0] for i in range(count)]
+        sizes = {day: size for day in picks}
+    else:
+        # Too few days hold an even block: fill the roomiest days first, each as long as it holds.
+        sizes, left = {}, minutes
+        for day in sorted(days, key=lambda d: (-room[d], d)):
+            if left <= 0:
                 break
-    return blocks
+            sizes[day] = min(room[day], max(MIN_BLOCK, math.ceil(left / 5) * 5))
+            left -= sizes[day]
+    blocks = [_block(by_day[day], day, sizes[day], zone, preferred_hour) for day in sorted(sizes)]
+    return [block for block in blocks if block]
 
 
 def exam_sessions(exam_at: datetime, now: datetime) -> list[tuple[int, int]]:

@@ -1,6 +1,6 @@
-# CordiaClassroom Chrome Extension
+# Cordia Classroom Chrome Extension
 
-A Chrome side panel that turns the page you are studying into a CordiaClassroom study guide, with Cordia Tutor beside it.
+A Chrome side panel that turns the page you are studying into a Cordia Classroom study guide, with Cordia Tutor beside it.
 
 ## Install (Developer Mode)
 
@@ -10,7 +10,7 @@ A Chrome side panel that turns the page you are studying into a CordiaClassroom 
 
 ## Open the panel
 
-- Click the CordiaClassroom toolbar icon, or
+- Click the Cordia Classroom toolbar icon, or
 - Press **Ctrl+Shift+Y** (**Command+Shift+Y** on Mac). You can change it at `chrome://extensions/shortcuts`.
 - Or select text on a page, right-click, and choose **Make study guide from selection**. The panel opens and starts a guide from that text.
 
@@ -35,7 +35,7 @@ The guide shows in the panel. Click **Save to Classroom** to keep it; the tab th
 4. A document the page links to (when the page itself has little text)
 5. The screenshot, if the page can't be read at all
 
-Documents are downloaded with your browser sign-in and read by the CordiaClassroom server.
+Documents are downloaded with your browser sign-in and read by the Cordia Classroom server.
 
 ## Cordia Tutor
 
@@ -47,14 +47,14 @@ Under the guide button, ask Cordia about the current page. It reads the page fir
 
 ## Free plan limits
 
-When you run out of free guides or tutor questions, an upgrade sheet explains the limit and links to the CordiaClassroom paid plans. Close it with **×**.
+When you run out of free guides or tutor questions, an upgrade sheet explains the limit and links to the Cordia Classroom paid plans. Close it with **×**.
 
 ## Files
 
 - `manifest.json` – extension settings (Manifest V3), shortcut, permissions
 - `popup.html`, `popup.js`, `styles.css` – the side panel (old "popup" names kept on purpose)
 - `tutor-chat.js` – Cordia Tutor chat in the panel
-- `background.js` – talks to the CordiaClassroom server, downloads documents, adds the right-click item
+- `background.js` – talks to the Cordia Classroom server, downloads documents, adds the right-click item
 - `content.js` – finds the selection, document, or page text to read
 - `asai-bridge.js` – shares your sign-in from classroom.cordiaai.io
 

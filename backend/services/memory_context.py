@@ -108,7 +108,7 @@ def related_material(db, user_id: str, guide_id: str, question: str, answer: str
         chats = (db.table("tutor_chats").select("id, title, messages").eq("user_id", user_id)
                  .order("updated_at", desc=True).limit(20).execute().data or [])
         for chat in chats:
-            said = " ".join(str(m.get("content") or "") for m in (chat.get("messages") or []) if isinstance(m, dict))
+            said = " ".join(str(m.get("text") or m.get("content") or "") for m in (chat.get("messages") or []) if isinstance(m, dict))
             hits, text = _snippet(said, terms)
             if hits >= 2:  # a passing word in a long chat is not a link
                 found.append({"kind": "tutor", "id": chat["id"], "title": chat.get("title") or "Tutor chat",

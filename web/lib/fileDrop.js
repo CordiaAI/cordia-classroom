@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { uploadTypeProblem } from './uploadTypes.mjs';
 
 // Page-wide file drag and drop. A file dropped anywhere on the page goes to one
 // upload box: the box under the pointer if there is one, otherwise the box with
@@ -9,17 +10,19 @@ let activeId = null;
 let endTimer = null;
 let nextId = 1;
 
-const UNSUPPORTED = /\.(zip|rar|7z|tar|gz|tgz|bz2|xz|dmg|iso|exe|msi|app|apk|mp4|mov|m4v|avi|mkv|webm|wmv|flv|mpeg|mpg|3gp|mp3|wav|m4a|aac|ogg|flac|wma|aiff?)$/i;
+const VIDEO = /\.(mp4|mov|m4v|avi|mkv|webm|wmv|flv|mpeg|mpg|3gp)$/i;
+const AUDIO = /\.(mp3|wav|m4a|aac|ogg|flac|wma|aiff?)$/i;
 
-// Formats the server cannot read yet get a clear message before any upload starts.
+// Files the server can't read get a clear message before any upload starts. The list of what it
+// can read is lib/uploadTypes.mjs (".ts" is TypeScript there, even when the system calls it video).
 export function unsupportedFileMessage(file) {
   const name = file?.name || '';
   const type = file?.type || '';
-  if (!UNSUPPORTED.test(name) && !/^(video|audio)\//.test(type)) return '';
-  const kind = /^video\//.test(type) || /\.(mp4|mov|m4v|avi|mkv|webm|wmv|flv|mpeg|mpg|3gp)$/i.test(name) ? 'Video'
-    : /^audio\//.test(type) || /\.(mp3|wav|m4a|aac|ogg|flac|wma|aiff?)$/i.test(name) ? 'Audio'
-      : 'This file type';
-  return kind === 'This file type' ? 'That file type is not supported yet. Try a PDF, slides, Word, image or text.' : `${kind} files are not supported yet. Try a PDF, slides, Word, image or text.`;
+  const problem = uploadTypeProblem(name);
+  if (!problem) return '';
+  if (/^video\//.test(type) || VIDEO.test(name)) return 'Video files are not supported yet. Try a PDF, slides, Word, image or text.';
+  if (/^audio\//.test(type) || AUDIO.test(name)) return 'Audio files are not supported yet. Try a PDF, slides, Word, image or text.';
+  return problem;
 }
 
 function hasFiles(event) {

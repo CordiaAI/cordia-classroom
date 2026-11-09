@@ -3,10 +3,13 @@
 // the built pages themselves.)
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { BRAND_NAME, ENTITY_LINE, FREE_PLAN_TEXT, PLANS, SAME_AS, SITE_URL, SUPPORT_EMAIL } from '../lib/brand.mjs';
-import { INDEXABLE_PAGES, PUBLIC_PAGES, pageTitle } from '../lib/publicPages.mjs';
+import { INDEXABLE_PAGES, PUBLIC_PAGES, ROBOTS_NOINDEX, isAppRoute, pageTitle } from '../lib/publicPages.mjs';
+import { createRequire } from 'node:module';
 import { faqPage, graphJson, homeGraph, ids, pageGraph } from '../lib/structuredData.mjs';
 import { ANSWER_ENGINES, lastModified, llmsTxt, robotsTxt, sitemapXml } from '../scripts/crawlFiles.mjs';
+import { BANNED, checkPage, decode, readPage, stripTags, visibleText } from '../scripts/seoCheck.mjs';
 
 const FORBIDDEN = [/unlimited/i, /\$29/, /per semester/i, /pro trial/i];
 
@@ -31,7 +34,9 @@ test('every public page has a unique, short, branded title and a 120–160 chara
     assert.ok(page.description.length >= 120 && page.description.length <= 160, `${page.path}: ${page.description.length}`);
     for (const word of FORBIDDEN) assert.doesNotMatch(page.description, word);
   }
-  assert.deepEqual(PUBLIC_PAGES.filter(page => !page.index).map(page => page.path), ['/login', '/signup', '/reset-password']);
+  // /guides stays noindex until a guide is published (lib/guides/).
+  const unpublishedGuides = PUBLIC_PAGES.find(page => page.path === '/guides')?.index ? [] : ['/guides'];
+  assert.deepEqual(PUBLIC_PAGES.filter(page => !page.index).map(page => page.path), [...unpublishedGuides, '/login', '/signup', '/reset-password']);
   assert.ok(!INDEXABLE_PAGES.some(page => ['/login', '/signup'].includes(page.path)));
 });
 
@@ -69,13 +74,13 @@ test('other pages: WebPage inside the site plus a breadcrumb; FAQ markup mirrors
   assert.doesNotMatch(graphJson([{ name: '</script>' }]), /<\/script>/);
 });
 
-test('robots.txt names the answer engines, disallows nothing and points to the sitemap', () => {
+test('robots.txt names the answer engines, disallows only /api/ and points to the sitemap', () => {
   const robots = robotsTxt();
   for (const agent of ['Googlebot', 'Bingbot', 'OAI-SearchBot', 'ChatGPT-User', 'PerplexityBot', 'ClaudeBot', 'Claude-SearchBot', 'Claude-User', 'Applebot']) {
     assert.ok(ANSWER_ENGINES.includes(agent));
     assert.match(robots, new RegExp(`^User-agent: ${agent}$`, 'm'));
   }
-  assert.doesNotMatch(robots, /Disallow/);
+  assert.deepEqual(robots.match(/^Disallow: .*$/gm), ['Disallow: /api/', 'Disallow: /api/']);
   assert.match(robots, /^Sitemap: https:\/\/classroom\.cordiaai\.io\/sitemap\.xml$/m);
 });
 
@@ -96,4 +101,59 @@ test('llms.txt: facts only, from the brand module', () => {
   assert.ok(text.includes(SUPPORT_EMAIL));
   for (const page of INDEXABLE_PAGES) assert.ok(text.includes(`(${SITE_URL}${page.path === '/' ? '/' : page.path})`), page.path);
   for (const word of FORBIDDEN) assert.doesNotMatch(text, word);
+});
+
+test('the SEO check reads text the way a crawler does', () => {
+  assert.equal(stripTags('a<<b>i>b'), 'ab');
+  assert.equal(stripTags('<<b>script>x'), 'x');
+  assert.equal(decode('A &amp;lt;b&amp;gt; &#x27;c&#39;'), "A &lt;b&gt; 'c'");
+  const page = readPage('<title>T | Cordia Classroom</title><h1>One</h1><section data-faq=""><h3 class="x" data-faq-question="">Q &amp; A?</h3><p data-faq-answer="">Yes, <b>it</b> is.</p></section>');
+  assert.deepEqual(page.titles, ['T | Cordia Classroom']);
+  assert.equal(page.h1, 1);
+  assert.deepEqual(page.faq, { questions: ['Q & A?'], answers: ['Yes, it is.'] });
+});
+
+test('the SEO check reads only visible body text and flags the banned words', () => {
+  const html = '<html><head><title>CordiaClassroom</title></head><body><h1>Cordia Classroom</h1><script>var unlimited = 1;</script><style>.SmartNotes{}</style><p>Notes &amp; flashcards</p><script type="application/ld+json">{"name":"SmartNotes"}</script></body></html>';
+  assert.equal(visibleText(html), 'Cordia Classroom Notes & flashcards');
+  assert.ok(!BANNED.some(word => word.test(visibleText(html))));
+  for (const text of ['Unlimited guides', 'Open CordiaClassroom', 'Your SmartNotes', 'A SmartNote']) {
+    assert.ok(BANNED.some(word => word.test(text)), text);
+  }
+  const page = { path: '/login', index: false };
+  const { problems } = checkPage(page, '<head><meta name="robots" content="noindex"/></head><body><p>Unlimited</p></body>', 200);
+  assert.deepEqual(problems, ['shows /unlimited/i']);
+});
+
+test('user-facing text names the product "Cordia Classroom", in the app tabs and the extension', async () => {
+  const read = path => readFile(new URL(`../../${path}`, import.meta.url), 'utf8');
+  assert.match(await read('web/lib/pageTitle.js'), /export const BRAND = 'Cordia Classroom';/);
+  const manifest = JSON.parse(await read('extension/manifest.json'));
+  assert.equal(manifest.name, 'Cordia Classroom');
+  assert.ok(manifest.description.length < 132);
+  assert.equal(manifest.commands._execute_action.description, 'Open the Cordia Classroom side panel');
+  for (const path of ['extension/popup.html', 'extension/popup.js', 'extension/background.js', 'extension/README.md', 'extension/store-listing.md', 'web/lib/guideCreate.js', 'web/components/AcademicInfinityMark.js']) {
+    assert.doesNotMatch(await read(path), /CordiaClassroom/, path);
+  }
+});
+
+test('every route outside the public pages is noindex, except routes with their own rules', async () => {
+  const rules = await createRequire(import.meta.url)('../next.config.js').headers();
+  const rule = rules.find(r => r.headers.some(h => h.key === 'X-Robots-Tag'));
+  assert.deepEqual(rule.headers, [{ key: 'X-Robots-Tag', value: ROBOTS_NOINDEX }]);
+  assert.equal(ROBOTS_NOINDEX, 'noindex, nofollow');
+  const noindex = path => new RegExp(`^${rule.source}$`).test(path);
+  for (const page of PUBLIC_PAGES) {
+    assert.ok(!noindex(page.path), page.path);
+    assert.ok(!isAppRoute(page.path), page.path);
+  }
+  for (const path of ['/dashboard', '/library', '/guide/abc', '/settings', '/settings/privacy', '/learn/abc', '/assistant', '/404', '/oauth/consent', '/auth/callback']) {
+    assert.ok(noindex(path), path);
+  }
+  for (const route of ['/dashboard', '/guide/[id]', '/learn/[guideId]', '/settings', '/404', '/assistant']) assert.ok(isAppRoute(route), route);
+  // Shared guides and invites set their own noindex; profiles, Discover and the Assistant app are unchanged.
+  for (const path of ['/sets/abc', '/join/abc', '/u/someone', '/explore', '/assistant/privacy']) assert.ok(!noindex(path), path);
+  for (const route of ['/sets/[id]', '/join/[token]', '/u/[username]', '/explore']) assert.ok(!isAppRoute(route), route);
+  // Files keep serving without the header: the crawl files, images and Next's assets.
+  for (const path of ['/robots.txt', '/sitemap.xml', '/llms.txt', '/og-image.png', '/_next/static/chunks/a.js']) assert.ok(!noindex(path), path);
 });

@@ -22,7 +22,8 @@ import { openNewSheet } from '../lib/newSheet';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { classLabel } from '../lib/classLabel';
 import { invalidateFolders, loadFolders } from '../lib/folders';
-import { PRACTICE_FILES, handOffUpload, readPracticeFile } from '../lib/practiceUpload';
+import { handOffUpload, readPracticeFile } from '../lib/practiceUpload';
+import { UPLOAD_ACCEPT } from '../lib/uploadTypes.mjs';
 import ClassCard from '../components/ClassCard';
 import ClassCoverSheet from '../components/ClassCoverSheet';
 import { designCover } from '../lib/classCover';
@@ -448,7 +449,7 @@ export default function LibraryPage() {
         ? <button type="button" className="c-btn c-btn--primary" onClick={() => router.push('/create')}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />Make cards</button>
       : filter === 'practice'
         ? <>
-            <input ref={practiceFileRef} type="file" hidden accept={PRACTICE_FILES} onChange={event => practiceFromFile(event.target.files?.[0])} />
+            <input ref={practiceFileRef} type="file" hidden accept={UPLOAD_ACCEPT} onChange={event => practiceFromFile(event.target.files?.[0])} />
             <button type="button" className="c-btn c-btn--primary" disabled={readingFile} onClick={() => practiceFileRef.current?.click()}><Upload size={20} strokeWidth={1.75} aria-hidden="true" />{readingFile ? 'Reading…' : 'Practice from a file'}</button>
           </>
         : <button type="button" className="c-btn c-btn--primary" onClick={() => openNewSheet()}><Plus size={20} strokeWidth={1.75} aria-hidden="true" />New</button>;

@@ -1,6 +1,7 @@
 // Schema.org JSON-LD for the public pages, built from lib/brand.mjs. Each page gets one @graph:
 // the home page names the site, the organization and the app (with one Offer per plan); every
-// other page is a WebPage inside the site, with a breadcrumb trail. No ratings or reviews.
+// other page is a WebPage inside the site, with a breadcrumb trail; a guide is an Article. No
+// ratings or reviews.
 import { BRAND_NAME, ENTITY_LINE, LOGO_URL, PARENT_ORG, PLANS, SAME_AS, SITE_URL, SUPPORT_EMAIL } from './brand.mjs';
 
 export const ids = { website: `${SITE_URL}/#website`, org: `${SITE_URL}/#org`, app: `${SITE_URL}/#app` };
@@ -49,15 +50,42 @@ export function homeGraph() {
   ];
 }
 
-export function pageGraph({ path, name, crumb }) {
+export function pageGraph({ path, name, crumb, modified = '' }) {
   const url = pageUrl(path);
   return [
-    { '@type': 'WebPage', '@id': `${url}#webpage`, url, name, isPartOf: { '@id': ids.website }, about: { '@id': ids.app } },
+    { '@type': 'WebPage', '@id': `${url}#webpage`, url, name, isPartOf: { '@id': ids.website }, about: { '@id': ids.app }, ...(modified ? { dateModified: modified } : {}) },
     {
       '@type': 'BreadcrumbList',
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Home', item: pageUrl('/') },
         { '@type': 'ListItem', position: 2, name: crumb, item: url },
+      ],
+    },
+  ];
+}
+
+// A guide (/guides/<slug>): an Article published by the organization, with Home › Guides › guide.
+export function articleGraph({ path, headline, description, author, published, modified, crumb }) {
+  const url = pageUrl(path);
+  return [
+    {
+      '@type': 'Article',
+      '@id': `${url}#article`,
+      headline,
+      description,
+      author: { '@type': 'Person', name: author.name, description: author.role },
+      // The organization is described in full on the home page; name and logo repeat so this page stands alone.
+      publisher: { '@type': 'Organization', '@id': ids.org, name: BRAND_NAME, url: SITE_URL, logo: LOGO_URL },
+      datePublished: published,
+      dateModified: modified,
+      mainEntityOfPage: { '@type': 'WebPage', '@id': url, url, isPartOf: { '@id': ids.website } },
+    },
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: pageUrl('/') },
+        { '@type': 'ListItem', position: 2, name: 'Guides', item: pageUrl('/guides') },
+        { '@type': 'ListItem', position: 3, name: crumb, item: url },
       ],
     },
   ];

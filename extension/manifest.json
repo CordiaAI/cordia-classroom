@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "CordiaClassroom",
-  "version": "2.1.5",
-  "description": "Capture study material and create a CordiaClassroom study guide.",
+  "name": "Cordia Classroom",
+  "version": "2.1.6",
+  "description": "Turn the page, PDF or slides you have open into a Cordia Classroom study guide, and ask Cordia Tutor about it in the side panel.",
   "homepage_url": "https://classroom.cordiaai.io",
   "minimum_chrome_version": "114",
   "permissions": ["activeTab", "scripting", "storage", "sidePanel", "contextMenus"],
@@ -26,7 +26,7 @@
         "default": "Ctrl+Shift+Y",
         "mac": "Command+Shift+Y"
       },
-      "description": "Open the CordiaClassroom side panel"
+      "description": "Open the Cordia Classroom side panel"
     }
   },
   "content_scripts": [

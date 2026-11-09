@@ -4,7 +4,7 @@ import { SUPPORT_EMAIL } from '../../lib/mcp/config.mjs';
 
 // Public docs for the Cordia connector: what it does, how to connect, what to ask, its tools, what
 // it can't reach, and how to disconnect. The tool list must match lib/mcp (tests/connect-page.test.mjs).
-const SERVER_URL = 'https://classroom.cordiacode.com/mcp';
+const SERVER_URL = 'https://classroom.cordiaai.io/mcp';
 
 export const TOOLS = [
   ['search_my_materials', 'Searches your study sets, flashcards, notes and lecture transcripts, with the lecture timestamp for each hit.'],

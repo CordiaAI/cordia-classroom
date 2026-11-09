@@ -11,6 +11,9 @@ import { useRouter } from 'next/router';
 import { syncServerCopies } from '../lib/serverSync';
 import { showConnectedAppSets } from '../lib/guideJobs';
 import { routeTitle } from '../lib/pageTitle';
+import { ROBOTS_NOINDEX, isAppRoute, publicPage } from '../lib/publicPages.mjs';
+import { recordFirstTouch } from '../lib/attribution.mjs';
+import { USE_CASES, useCasePath } from '../lib/useCases/index.mjs';
 import { useState, useEffect } from 'react';
 import { installErrorReporting } from '../lib/errorReport';
 import { installAmbientMotion } from '../lib/ambientMotion';
@@ -29,6 +32,9 @@ export default function App({ Component, pageProps }) {
   useEffect(() => { setSignedIn(Boolean(getToken())); }, [router.pathname]);
   const isLoginPage = ['/', '/login', '/signup', '/pricing', '/auth/callback', '/reset-password', '/instructors', '/copyright', '/mission', '/install-extension', '/privacy', '/terms', '/honor-code', '/connect/claude', '/oauth/consent'].includes(router.pathname)
     && !(router.pathname === '/pricing' && signedIn)
+    // Use-case pages (lib/useCases/) and guides (lib/guides/) are public pages.
+    || USE_CASES.some(page => useCasePath(page) === router.pathname)
+    || router.pathname === '/guides' || router.pathname === '/guides/[slug]'
     // A shared guide: signed-out visitors get the public frame, students the app.
     || (router.pathname === '/sets/[id]' && !signedIn)
     // A classroom invite: signed-out visitors see who's inviting them, then sign up.
@@ -37,6 +43,12 @@ export default function App({ Component, pageProps }) {
   // Authentication pages stay light; workspace routes honor the saved preference.
   useEffect(() => { applyTheme(router.pathname); }, [router.pathname]);
   useEffect(() => { installErrorReporting(); }, []);
+  // First-touch attribution (lib/attribution.mjs): a signed-out visitor's first landing on a public
+  // page, kept in this browser and sent once with sign-up. Once per page load, from the real URL.
+  useEffect(() => {
+    if (getToken() || !publicPage(window.location.pathname)) return;
+    try { recordFirstTouch({ href: window.location.href, referrer: document.referrer, storage: window.localStorage }); } catch { /* storage blocked */ }
+  }, []);
   useEffect(() => installAmbientMotion(), []);
 
   // Start proactive token refresh if already logged in; the account's saved theme wins over the cache.
@@ -52,12 +64,17 @@ export default function App({ Component, pageProps }) {
   const [timerState, setTimerState] = useState({
     mode: 'focus', minutes: 25, seconds: 0, isRunning: false
   });
+  // A dynamic route is judged by its real path: a published guide (/guides/<slug>) is a public page,
+  // a draft and every app route (/guide/<id>) are not.
+  const routePath = router.pathname.includes('[') ? router.asPath.split(/[?#]/)[0] : router.pathname;
   const brandHead = (
     <Head>
       {/* Phones: fit the screen and run edge to edge under the notch. Pinch-zoom stays on (WCAG 1.4.4);
           accidental zoom is prevented by 16px fields and no double-tap zoom (styles/glass.css). */}
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" key="viewport" />
       <title>{routeTitle(router.pathname)}</title>
+      {/* Signed-in app pages stay out of search (the X-Robots-Tag header says the same). */}
+      {isAppRoute(routePath) && <meta name="robots" content={ROBOTS_NOINDEX} key="robots" />}
       <meta name="application-name" content="Cordia Classroom" />
       {/* Signed-in pages share this description; public pages set their own head (components/SeoHead.js). */}
       <meta name="description" content="Turn course material into focused study guides, notes, flashcards, and practice with Cordia Classroom." key="description" />

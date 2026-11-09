@@ -4,6 +4,8 @@
 // unique; descriptions are 120–160 characters. `index: false` pages get noindex and stay out of
 // the sitemap.
 import { BRAND_NAME, PLANS, planByKey } from './brand.mjs';
+import { USE_CASES, useCasePath } from './useCases/index.mjs';
+import { AUTHOR, PUBLISHED_GUIDES, guidePath } from './guides/index.mjs';
 
 const { trial } = PLANS;
 const price = key => `$${planByKey(key).price}`;
@@ -24,11 +26,23 @@ export const PUBLIC_PAGES = [
     topic: 'Features and Mission',
     description: 'How Cordia Classroom captures your course material, writes study guides, NCLEX-style questions and flashcards from it, and why it never searches the web.',
   },
+  // Use-case pages (lib/useCases/): one content file each, laid out by components/UseCasePage.js.
+  ...USE_CASES.map(page => ({
+    path: useCasePath(page), file: `pages/${page.slug}.js`, index: true, crumb: page.crumb,
+    topic: page.topic, description: page.description, modified: page.updated,
+  })),
+  // Guides (lib/guides/): the index stays noindex until a guide is published, and only published
+  // guides are listed here. Drafts aren't, so they get the app noindex rule and no sitemap entry.
   {
-    path: '/install-extension', file: 'pages/install-extension.js', index: true, crumb: 'Chrome extension',
-    topic: 'Chrome Extension',
-    description: 'Install the Cordia Classroom Chrome extension, pin it to your toolbar and turn the course page you have open into a study guide in a few clicks.',
+    path: '/guides', file: 'pages/guides/index.js', index: PUBLISHED_GUIDES.length > 0, crumb: 'Guides',
+    topic: 'Study Guides and How-Tos',
+    description: 'Guides from Cordia Classroom on studying for college exams: planning backward from the test, active recall, spaced review and using AI with your own notes.',
   },
+  ...PUBLISHED_GUIDES.map(guide => ({
+    path: guidePath(guide), file: 'pages/guides/[slug].js', index: true, crumb: guide.crumb,
+    topic: guide.topic, description: guide.description, modified: guide.dateModified,
+    article: { headline: guide.title, author: AUTHOR, published: guide.datePublished },
+  })),
   {
     path: '/connect/claude', file: 'pages/connect/claude.js', index: true, crumb: 'Use with Claude',
     topic: 'Use with Claude',
@@ -79,3 +93,28 @@ export const PUBLIC_PAGES = [
 export const pageTitle = page => `${page.topic} | ${BRAND_NAME}`;
 export const publicPage = path => PUBLIC_PAGES.find(page => page.path === path);
 export const INDEXABLE_PAGES = PUBLIC_PAGES.filter(page => page.index);
+
+// Everything outside PUBLIC_PAGES is the signed-in app and stays out of search: an
+// X-Robots-Tag header (next.config.js) and a robots meta tag (pages/_app.js). These keep their
+// own rules: shared guides and invites set noindex themselves, profiles and Discover are left as
+// they are for now, and /assistant/* is the separate Assistant app.
+const OWN_RULES = ['/sets/', '/join/', '/u/', '/assistant/'];
+export const ROBOTS_NOINDEX = 'noindex, nofollow';
+
+// For a Next.js route pattern ("/guide/[id]") or a path.
+export const isAppRoute = pathname => !publicPage(pathname) && pathname !== '/explore' && !OWN_RULES.some(prefix => pathname.startsWith(prefix));
+
+// The next.config.js `source` for the header: every path except the public pages, the routes
+// with their own rules, Next's assets and files with an extension (robots.txt, images, fonts).
+const escapeRegex = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export function appRouteSource() {
+  const skip = [
+    '$',
+    ...PUBLIC_PAGES.filter(page => page.path !== '/').map(page => `${escapeRegex(page.path.slice(1))}/?$`),
+    'explore/?$',
+    ...OWN_RULES.map(prefix => escapeRegex(prefix.slice(1))),
+    '_next/',
+    '.*\\.[A-Za-z0-9]+$',
+  ];
+  return `/((?!${skip.join('|')}).*)`;
+}

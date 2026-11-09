@@ -7,6 +7,7 @@ import {
 import { apiErrorMessage, apiFetch, authHeaders } from '../lib/api';
 import { loadFolders } from '../lib/folders';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
+import { UPLOAD_ACCEPT } from '../lib/uploadTypes.mjs';
 import { dismissGuideJob, startGuideJob, useGuideJobs } from '../lib/guideJobs';
 import { newGuideHref } from '../lib/checkYourself';
 import { MAX_SOURCE_CHARS, baseName, combinedSource, extractFileText, fileKey, generateAndSave, newRequestId } from '../lib/guideCreate';
@@ -42,7 +43,6 @@ async function titleFor(source) {
 }
 
 const AUDIO_FILE = /\.(mp3|m4a|wav|webm|ogg|aac)$/i;
-const ACCEPT = '.pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.rtf,.png,.jpg,.jpeg,.webp,.heic,image/*';
 
 export const NEW_OPTIONS = [
   { mode: 'upload', label: 'Upload', icon: Upload },
@@ -265,7 +265,7 @@ export default function NewSheet() {
       if (merged.length > MAX_FILES) problems.push(`Up to ${MAX_FILES} files.`);
       return merged.slice(0, MAX_FILES);
     });
-    setError(problems.join(' '));
+    setError([...new Set(problems)].join(' '));
   }
 
   async function create() {
@@ -469,7 +469,7 @@ export default function NewSheet() {
                     {FORMATS.map(format => <span key={format.label}><format.icon size={20} strokeWidth={1.75} aria-hidden="true" />{format.label}</span>)}
                   </span>
                 </button>
-                <input ref={fileInput} type="file" multiple accept={ACCEPT} hidden onChange={event => { addFiles(event.target.files); event.target.value = ''; }} />
+                <input ref={fileInput} type="file" multiple accept={UPLOAD_ACCEPT} hidden onChange={event => { addFiles(event.target.files); event.target.value = ''; }} />
                 {files.length > 0 && (
                   <ul className="new-files">
                     {files.map(file => (

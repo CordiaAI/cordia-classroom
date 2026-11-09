@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { cssVar } from '../lib/cssVar';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch } from '../lib/api';
-import { PRACTICE_FILES, readPracticeFile, takeUpload } from '../lib/practiceUpload';
+import { readPracticeFile, takeUpload } from '../lib/practiceUpload';
+import { UPLOAD_ACCEPT } from '../lib/uploadTypes.mjs';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
 import { LoadingArea } from './CordiaLoader';
@@ -514,7 +515,7 @@ export default function PracticeWorkspace() {
           <span className="c-section-title c-truncate practice-source-name">{sourceTitle}</span>
         </div>
         <div className="c-row">
-          <input ref={fileRef} type="file" hidden accept={PRACTICE_FILES} onChange={event => useUploadedFile(event.target.files?.[0])} />
+          <input ref={fileRef} type="file" hidden accept={UPLOAD_ACCEPT} onChange={event => useUploadedFile(event.target.files?.[0])} />
           <button type="button" className="c-btn c-btn--quiet" onClick={() => fileRef.current?.click()} disabled={extracting}><Upload {...ICON} />{extracting ? 'Reading…' : 'Upload'}</button>
           <button type="button" className={'c-btn ' + (problems.length ? 'c-btn--secondary' : 'c-btn--primary')} onClick={generateProblems} disabled={loading || !sourceText}>
             {problems.length ? <RefreshCw {...ICON} /> : <Sparkles {...ICON} />}

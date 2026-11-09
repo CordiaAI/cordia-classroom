@@ -1,7 +1,7 @@
-// Every page has its own tab title ("Library — CordiaClassroom"), so tabs, history, bookmarks and
+// Every page has its own tab title ("Library — Cordia Classroom"), so tabs, history, bookmarks and
 // screen readers can tell pages apart. Pages about one thing (a guide, a lecture, a class) set
 // their own title with pageTitle(name).
-export const BRAND = 'CordiaClassroom';
+export const BRAND = 'Cordia Classroom';
 
 export const pageTitle = name => (name ? `${name} — ${BRAND}` : BRAND);
 

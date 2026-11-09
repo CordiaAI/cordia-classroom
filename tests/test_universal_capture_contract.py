@@ -128,7 +128,7 @@ class UniversalCaptureContractTests(unittest.TestCase):
             json={"content": "Cells divide through mitosis.", "notes": False, "flashcards": False},
         )
         self.assertEqual(response.status_code, 422)
-        self.assertEqual(response.json()["detail"], "CordiaClassroom received an incomplete guide. Please try again.")
+        self.assertEqual(response.json()["detail"], "Cordia Classroom received an incomplete guide. Please try again.")
         record.assert_not_called()
 
     @patch("routers.materials.learning_guidance", return_value="")
@@ -144,7 +144,7 @@ class UniversalCaptureContractTests(unittest.TestCase):
             json={"content": "Create a deployment diagram and an ER diagram.", "notes": False, "flashcards": False},
         )
         self.assertEqual(response.status_code, 422)
-        self.assertEqual(response.json()["detail"], "CordiaClassroom could not build a guide from this material.")
+        self.assertEqual(response.json()["detail"], "Cordia Classroom could not build a guide from this material.")
         record.assert_not_called()
 
     @patch("routers.materials.learning_guidance", return_value="")

@@ -65,21 +65,38 @@ async def render_pptx(request: Request, file: UploadFile = None, authorization: 
 @router.post("/extract-file-text")
 @limiter.limit("20/minute")
 def extract_file_text(request: Request, file: UploadFile = None, authorization: str = Header(default="")):
-    """Extract plain text from an uploaded PDF, DOCX, PPTX, image, or text file."""
+    """Extract plain text from an uploaded file of any type in files.UPLOAD_TYPES (PDF, Word, PowerPoint, photo or text)."""
     user_id = get_user_id(authorization)
     if file is None:
         raise HTTPException(status_code=400, detail="No file uploaded")
     return readable_text(user_id, file.filename, files.read_upload(file))
 
 
+def _ppt_text(data: bytes) -> str:
+    """An old .ppt deck read through the same LibreOffice conversion as the slide viewer (/render-pptx)."""
+    try:
+        pdf = render_pptx_to_pdf(data, ".ppt")
+    except PptxRenderTimeout:
+        raise HTTPException(status_code=504, detail="This PowerPoint file took too long to read. Save it as .pptx and try again.")
+    except PptxRenderUnavailable:
+        raise HTTPException(status_code=503, detail="Old PowerPoint files can't be read right now. Save it as .pptx and try again.")
+    except PptxRenderError:
+        raise HTTPException(status_code=422, detail="Could not read this PowerPoint file. Save it as .pptx and try again.")
+    return files.pdf_text(files.open_pdf(pdf))
+
+
 def readable_text(user_id: str, filename: str, data: bytes) -> dict:
     """{"text": …} for a file's bytes (PPTX also returns its slides). Scans and photos are read
     by vision, charged as one light action. Also used for Canvas files read server-side."""
     extension = files.extension_of(filename)
+    if extension not in files.UPLOAD_TYPES:
+        raise HTTPException(status_code=415, detail=files.unsupported_detail(extension))
 
     if extension == "pptx":
         return files.pptx_slides(data)
-    if extension == "pdf":
+    if extension == "ppt":
+        text = _ppt_text(data)
+    elif extension == "pdf":
         reader = files.open_pdf(data)
         text = files.pdf_text(reader)
         if len(text.strip()) < 200:
@@ -90,7 +107,7 @@ def readable_text(user_id: str, filename: str, data: bytes) -> dict:
                 record(user_id, "light")
     elif extension == "docx":
         text = files.docx_text(data)
-    elif extension in files.IMAGE_TYPES:
+    elif extension in files.IMAGE_TYPES or extension in files.CONVERTED_IMAGE_TYPES:
         image_url = files.image_data_url(data, extension)
         require(user_id, "light")
         text = transcribe_study_image(image_url)
@@ -176,10 +193,10 @@ def _study_chunks(raw_text: str, images: list) -> tuple:
 def _guide(user_id: str, chunks: list, has_images: bool) -> tuple:
     study_guide = generate_study_guide(chunks, has_images=has_images, learning_guidance=learning_guidance(user_id))
     if not study_guide:
-        raise HTTPException(status_code=422, detail="CordiaClassroom could not build a guide from this material.")
+        raise HTTPException(status_code=422, detail="Cordia Classroom could not build a guide from this material.")
     cards = study_guide_to_flashcards(study_guide)
     if not cards or not study_guide_is_complete(study_guide):
-        raise HTTPException(status_code=422, detail="CordiaClassroom received an incomplete guide. Please try again.")
+        raise HTTPException(status_code=422, detail="Cordia Classroom received an incomplete guide. Please try again.")
     return study_guide, cards
 
 
@@ -212,7 +229,7 @@ def build_materials(user_id: str, raw_text: str, images: list, notes: bool, stud
         # Cards come from the guide when there is one, so guide and cards can't disagree.
         cards = guide_cards if guide else generate_flashcards(chunks)
         if not cards:
-            raise HTTPException(status_code=422, detail="CordiaClassroom could not build flashcards from this material.")
+            raise HTTPException(status_code=422, detail="Cordia Classroom could not build flashcards from this material.")
     return {"notes": written, "study_guide": guide, "flashcards": cards, "empty": False}
 
 

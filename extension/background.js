@@ -23,7 +23,7 @@ const storageGet = keys => new Promise(resolve => chrome.storage.local.get(keys,
 
 async function apiFetch(path, options = {}, retry = true) {
   const auth = await storageGet(['authToken']);
-  if (!auth.authToken) throw new Error('Sign in to CordiaClassroom first.');
+  if (!auth.authToken) throw new Error('Sign in to Cordia Classroom first.');
   const headers = { Authorization: `Bearer ${auth.authToken}`, ...(options.headers || {}) };
   if (options.body && !(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
   let response = await fetch(API + path, { ...options, headers });
@@ -67,13 +67,13 @@ async function syncClassroomAuth(forceRefresh = false) {
       } catch (_) { /* Try the next Classroom tab. */ }
     }
   }
-  return { authenticated: false, error: 'Sign in to CordiaClassroom, then reopen this panel.' };
+  return { authenticated: false, error: 'Sign in to Cordia Classroom, then reopen this panel.' };
 }
 
 async function validateClassroomAuth() {
   await syncClassroomAuth(false);
   const auth = await storageGet(['authToken', 'userEmail']);
-  if (!auth.authToken) return { authenticated: false, error: 'Connect CordiaClassroom to make and save a guide.' };
+  if (!auth.authToken) return { authenticated: false, error: 'Connect Cordia Classroom to make and save a guide.' };
   try {
     const profile = await responseData(await apiFetch('/auth/me'), 'Classroom could not verify this session.');
     return { authenticated: true, userEmail: profile.email || auth.userEmail || '' };
@@ -208,7 +208,7 @@ async function saveStudyGuide(message) {
       source_title: message.title || 'Captured study material',
     }),
   }), 'The guide was generated but could not be saved.');
-  if (!saved?.guide?.id) throw new Error('CordiaClassroom did not confirm the saved guide.');
+  if (!saved?.guide?.id) throw new Error('Cordia Classroom did not confirm the saved guide.');
   // The panel saves as soon as the guide is ready and offers "Open guide"; it never navigates the student's tab.
   return { savedGuide: saved.guide, guideUrl: `https://classroom.cordiaai.io/guide/${encodeURIComponent(saved.guide.id)}` };
 }

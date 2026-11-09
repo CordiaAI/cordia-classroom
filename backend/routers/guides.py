@@ -34,7 +34,8 @@ class SaveGuideRequest(BaseModel):
     source_title: Optional[str] = Field(default=None, max_length=500)
     source_id: Optional[str] = Field(default=None, max_length=500)
     keep_title: bool = False  # The student typed the title: save it as typed.
-    # The web's "make my new guides public" default. Only applied once the Honor Code is accepted.
+    # Ignored: new guides always start private and the student shares one with its visibility
+    # chip. Still accepted so a page loaded before this change can save.
     share_default: bool = False
 
     model_config = {"str_max_length": 5_000_000}
@@ -141,7 +142,8 @@ def require_own_folder(supabase, user_id: str, folder_id: Optional[str]) -> None
 
 def create_guide(user_id: str, request: SaveGuideRequest, extra: Optional[dict] = None) -> dict:
     """Saves a new guide for the student and returns its row: POST /guides and the study-set worker
-    (services/generation_jobs.py). `extra` sets server-only columns (origin, origin_client)."""
+    (services/generation_jobs.py). `extra` sets server-only columns (origin, origin_client).
+    Every new guide starts private (the column's default); sharing is the student's choice."""
     supabase = get_supabase()
 
     data = {
@@ -177,33 +179,9 @@ def create_guide(user_id: str, request: SaveGuideRequest, extra: Optional[dict] 
 
     if result.data:
         row = result.data[0]
-        if request.share_default:
-            row = _publish_new(supabase, user_id, row)
         start_quiz_warmup(row, user_id)
         return row
     raise HTTPException(status_code=500, detail="Failed to save guide")
-
-
-def _publish_new(db, user_id: str, row: dict) -> dict:
-    """New guides from the generator default to public + named, but only for someone who has
-    accepted the Honor Code and only outside a class whose instructor turned sharing off.
-    Everything else (notes, imports, the assistant, the extension) starts private."""
-    try:
-        from services import guide_review as review
-        if not review.honor_code_accepted(db, user_id):
-            return row
-        from services import minors
-        if minors.is_minor(db, user_id):  # a minor's new sets start private
-            return row
-        klass = review.course(db, row)
-        if klass and klass.get("sharing_blocked"):
-            return row
-        update = {"visibility": "public", "attribution": "named"}
-        db.table("study_guides").update(update).eq("id", row["id"]).eq("user_id", user_id).execute()
-        return review.rescreen(db, {**row, **update})
-    except Exception as exc:  # before the Stage 3 migration: the guide simply stays private
-        logger.warning(f"Default sharing skipped: {type(exc).__name__}")
-        return row
 
 
 @router.post("")

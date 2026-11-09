@@ -94,6 +94,16 @@ test('a valid token gets an MCP session', async () => {
   assert.equal(message.result.serverInfo.name, 'Cordia Classroom');
 });
 
+test('the canonical host works with tokens that carry the legacy audience', async () => {
+  const request = new Request('https://classroom.cordiaai.io/mcp', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${await sign()}` },
+    body: JSON.stringify(initialize),
+  });
+  assert.equal((await endpoint(request)).status, 200);
+  assert.equal(protectedResourceMetadata(new Request('https://classroom.cordiaai.io/.well-known/oauth-protected-resource/mcp'), config).resource, 'https://classroom.cordiaai.io/mcp');
+});
+
 test('browser origins: allowed apps pass, others are refused before the token is read', async () => {
   const token = await sign();
   const evil = await endpoint(rpc(initialize, { authorization: `Bearer ${token}`, origin: 'https://evil.example' }));
