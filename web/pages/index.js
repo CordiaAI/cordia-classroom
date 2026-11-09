@@ -24,10 +24,14 @@ const FEATURES = [
 ];
 
 // One ticker pill: a link when the feature has a page. The ticker is hidden from screen readers
-// (the list above it carries the same links), so its links stay out of the tab order.
-const Pill = ({ feature }) => (feature.href
-  ? <Link href={feature.href} className="landing-ticker-item" tabIndex={-1}>{feature.text}</Link>
-  : <span className="landing-ticker-item">{feature.text}</span>);
+// (the list above it carries the same links), so its links stay out of the tab order. `copy` marks
+// the second pass of the loop, which reduced motion hides.
+const Pill = ({ feature, copy }) => {
+  const className = copy ? 'landing-ticker-item is-copy' : 'landing-ticker-item';
+  return feature.href
+    ? <Link href={feature.href} className={className} tabIndex={-1}>{feature.text}</Link>
+    : <span className={className}>{feature.text}</span>;
+};
 
 // Signed-out home: the headline and the sign-in card. /login and /signup reuse it.
 export function Landing({ mode = 'signin', path = '/' }) {
@@ -57,7 +61,8 @@ export function Landing({ mode = 'signin', path = '/' }) {
           <ul className="sr-only">{FEATURES.map(feature => <li key={feature.text}>{feature.href ? <Link href={feature.href}>{feature.text}</Link> : feature.text}</li>)}</ul>
           <div className="landing-ticker" aria-hidden="true">
             <div className="landing-ticker-track">
-              {[...FEATURES, ...FEATURES].map((feature, index) => <Pill key={index} feature={feature} />)}
+              {FEATURES.map(feature => <Pill key={feature.text} feature={feature} />)}
+              {FEATURES.map(feature => <Pill key={`copy-${feature.text}`} feature={feature} copy />)}
             </div>
           </div>
         </section>
@@ -76,7 +81,7 @@ export function Landing({ mode = 'signin', path = '/' }) {
         .landing-ticker :global(.landing-ticker-item)::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 10px 2px 0; border-radius: 50%; background: var(--olive); vertical-align: middle; }
         /* The list is drawn twice, so moving it by half its width loops without a jump. */
         @keyframes landing-ticker { from { transform: translateX(0); } to { transform: translateX(calc(-50% - 6px)); } }
-        @media (prefers-reduced-motion: reduce) { .landing-ticker { -webkit-mask-image: none; mask-image: none; } .landing-ticker-track { animation: none; width: auto; flex-wrap: wrap; } .landing-ticker :global(.landing-ticker-item):nth-child(n + ${FEATURES.length + 1}) { display: none; } }
+        @media (prefers-reduced-motion: reduce) { .landing-ticker { -webkit-mask-image: none; mask-image: none; } .landing-ticker-track { animation: none; width: auto; flex-wrap: wrap; } .landing-ticker :global(.landing-ticker-item) { flex-shrink: 1; white-space: normal; } .landing-ticker :global(.is-copy) { display: none; } }
         @media (max-width: 860px) { .landing { grid-template-columns: 1fr; gap: 32px; min-height: 0; } .landing-title { font-size: clamp(34px, 10vw, 44px) !important; } .landing-lede { font-size: var(--fs-15); } .landing-ticker { margin-top: 24px; } }
       `}</style>
     </PublicPage>
