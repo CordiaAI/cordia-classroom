@@ -63,13 +63,14 @@ export default function StudySession() {
     if (directPractice) router.replace('/practice/' + directPractice);
   }, [directPractice, router]);
 
-  // Each answer is saved to every record its question came from (lib/studyQueue.js).
+  // Each answer is saved to every record its question came from (lib/studyQueue.js). A card missed
+  // at least once this round counts as missed, even after a later Got it.
   const onFinish = useCallback(async ({ known, missed, seconds }) => {
     const knownSet = new Set(known);
     const missedSet = new Set(missed);
     const byGuide = new Map();
     cards.forEach((card, position) => {
-      const right = knownSet.has(position);
+      const right = knownSet.has(position) && !missedSet.has(position);
       if (!right && !missedSet.has(position)) return;
       const entry = byGuide.get(card.guideId) || { known: [], unknown: [], learn: [], cleared: [] };
       if (card.index !== undefined) (right ? entry.known : entry.unknown).push(card.index);
