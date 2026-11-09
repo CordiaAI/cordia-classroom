@@ -3,8 +3,8 @@ import { Star, X } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import { apiFetch } from '../lib/api';
 import { readActivity } from '../lib/activity';
-import { EXTENSION_STORE_URL } from '../lib/extension';
 import { getProgress, updateProgress } from '../lib/progress';
+import StoreReviewLine from './StoreReviewLine';
 
 const DAY = 86400000;
 const MIN_ACTIVE_DAYS = 4;
@@ -13,7 +13,8 @@ const MAX_ASKS = 3;
 const SNOOZE_DAYS = 14;
 
 // "Enjoying Cordia?" for students who've used it a while: asked at the end of a session that
-// went reasonably well, at most three times, two weeks apart, and never again once rated.
+// went reasonably well, at most three times, two weeks apart, and never again once rated. Any
+// answer gets the same Chrome Web Store line (StoreReviewLine), never only the high ratings.
 export function reviewDue(now = Date.now()) {
   const progress = getProgress();
   const review = progress.review || {};
@@ -39,7 +40,7 @@ function sendRating(stars, message = '') {
   });
 }
 
-export default function ReviewPrompt({ onClose }) {
+export default function ReviewPrompt({ onClose, sessionFinished = false }) {
   const [stars, setStars] = useState(0);
   const [hover, setHover] = useState(0);
   const [note, setNote] = useState('');
@@ -90,10 +91,9 @@ export default function ReviewPrompt({ onClose }) {
         ) : stars >= 4 ? (
           <>
             <h2 id="review-title" className="c-title review-title">Thank you!</h2>
-            <p className="review-sub">Would you leave a quick review on the Chrome Web Store? It helps other students find Cordia.</p>
+            <p className="review-sub">Glad it's helping you study.</p>
             <div className="review-actions">
-              <button type="button" className="c-btn c-btn--secondary" onClick={onClose}>Maybe later</button>
-              <a className="c-btn c-btn--primary" href={`${EXTENSION_STORE_URL}/reviews`} target="_blank" rel="noreferrer" onClick={() => setTimeout(onClose, 300)}>Leave a review</a>
+              <button type="button" className="c-btn c-btn--primary" onClick={onClose}>Done</button>
             </div>
           </>
         ) : sent ? (
@@ -111,6 +111,8 @@ export default function ReviewPrompt({ onClose }) {
             </div>
           </form>
         )}
+        {/* The same line after every rating, low or high (Chrome Web Store policy: no gating). */}
+        {stars > 0 && <StoreReviewLine sessionFinished={sessionFinished} />}
       </section>
       <style jsx>{`
         .review-sheet { position: relative; width: min(420px, 100%); display: grid; justify-items: center; gap: 12px; padding: 28px 24px 22px; text-align: center; }

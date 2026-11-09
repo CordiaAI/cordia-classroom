@@ -14,7 +14,7 @@ async function main() {
     if (!worker) worker = await context.waitForEvent('serviceworker');
     const extensionId = new URL(worker.url()).host;
     const manifest = await worker.evaluate(() => chrome.runtime.getManifest());
-    assert.equal(manifest.version, '2.1.5');
+    assert.equal(manifest.version, '2.1.6');
     assert.equal(manifest.name, 'Cordia Classroom');
     assert.ok(manifest.description.length < 132, `description is ${manifest.description.length} characters`);
     assert.match(manifest.description, /Cordia Classroom study guide/);

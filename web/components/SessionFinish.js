@@ -75,7 +75,7 @@ export default function SessionFinish({ guideId, guideTitle, cards, accuracy, mi
       {/* Spacing works better than it feels, so say what happens next. */}
       <p className="c-meta finish-next">{accuracy < 100 ? 'Study this guide again soon to lock in the ones you missed.' : 'All known. A quick review in a few days keeps it that way.'}</p>
       {children}
-      {asking && <ReviewPrompt onClose={() => setAsking(false)} />}
+      {asking && <ReviewPrompt sessionFinished onClose={() => setAsking(false)} />}
       <div className="c-row finish-actions">
         {onRestart && <button type="button" className="c-btn c-btn--secondary" onClick={onRestart}><RotateCcw size={20} strokeWidth={1.75} aria-hidden="true" />Restart</button>}
         <button type="button" className="c-btn c-btn--primary" data-spot={doneSpot} onClick={onDone}>{doneLabel}</button>

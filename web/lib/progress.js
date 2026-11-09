@@ -5,7 +5,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './supabase';
 // Walkthrough, feature-use and Grove progress, saved per student on the server in
 // their Supabase account metadata (key "cordia"), with a local copy for speed and
 // offline use. It rides in the access token, so it stays small (no logs here).
-const EMPTY = { v: 1, at: 0, theme: null, wt: null, day1Status: null, done: [], used: [], tips: [], grove: {}, rings: {}, freeze: [], first: 0, review: null, prefs: {} };
+const EMPTY = { v: 1, at: 0, theme: null, wt: null, day1Status: null, done: [], used: [], tips: [], grove: {}, rings: {}, freeze: [], first: 0, review: null, storeLine: 0, prefs: {} };
 const LOCAL = 'cordiaProgress';
 let state = { ...EMPTY };
 let loadedFor = '';
@@ -49,6 +49,9 @@ function merge(a, b) {
     prefs: { ...(a?.prefs || {}), ...(b?.prefs || {}), ...(newer?.prefs || {}) },
     // The review prompt: { asked, next, rated }. Once rated on any device it never shows again.
     review: (a?.review?.rated && a.review) || (b?.review?.rated && b.review) || newer?.review || a?.review || b?.review || null,
+    // When the Chrome Web Store review line was shown (components/StoreReviewLine.js). Once shown on
+    // any device, never again.
+    storeLine: Math.max(a?.storeLine || 0, b?.storeLine || 0),
   };
 }
 
