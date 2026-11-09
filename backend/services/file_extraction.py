@@ -9,8 +9,12 @@ import zipfile
 
 import docx
 from fastapi import HTTPException, UploadFile
+from PIL import Image, ImageOps, UnidentifiedImageError
+from pillow_heif import register_heif_opener
 from pptx import Presentation
 from pypdf import PdfReader
+
+register_heif_opener()  # lets Pillow open iPhone photos (HEIC/HEIF)
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 # OpenAI vision takes 20 MB per image; base64 adds a third.
@@ -20,11 +24,23 @@ MAX_PDF_PAGES = 600
 MAX_SCANNED_PAGES = 20
 MAX_TEXT_CHARS = 500_000
 
-IMAGE_TYPES = {
-    "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "gif": "image/gif",
-    "webp": "image/webp", "bmp": "image/bmp", "tiff": "image/tiff", "tif": "image/tiff",
-}
+# Images the AI models read as they are, and ones converted to JPEG first: iPhone photos and
+# BMP/TIFF scans, which the models don't accept.
+IMAGE_TYPES = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "gif": "image/gif", "webp": "image/webp"}
+CONVERTED_IMAGE_TYPES = {"heic", "heif", "bmp", "tif", "tiff"}
+MAX_CONVERTED_SIDE = 2048
+MAX_CONVERTED_PIXELS = 60_000_000  # a 48-megapixel iPhone photo fits; decoding bigger ones costs too much memory
 PLAIN_TEXT_TYPES = {"txt", "md", "csv"}
+# Other text files students study from: notes, data and code. Read as text only if they are text.
+OTHER_TEXT_TYPES = {
+    "markdown", "tsv", "json", "xml", "html", "htm", "tex", "ipynb", "py", "java", "js", "ts",
+    "c", "cpp", "h", "hpp", "cs", "go", "rb", "php", "swift", "kt", "rs", "sql", "r", "m", "sh",
+}
+# Every type an upload can be. The upload boxes accept exactly this list (web/lib/uploadTypes.mjs);
+# tests/test_upload_types.py fails if the two differ.
+UPLOAD_TYPES = frozenset({"pdf", "docx", "pptx", "ppt"} | set(IMAGE_TYPES) | CONVERTED_IMAGE_TYPES | PLAIN_TEXT_TYPES | OTHER_TEXT_TYPES)
+# Types that can't be read, with what to do instead (the upload boxes say the same before uploading).
+SAVE_AS = {"doc": ".docx", "rtf": ".docx", "odt": ".docx", "pages": "PDF", "key": "PDF", "numbers": "PDF"}
 GROUP_SHAPE = 6
 
 
@@ -35,6 +51,15 @@ def _too_large(detail: str) -> HTTPException:
 def extension_of(filename: str) -> str:
     name = (filename or "").lower()
     return name.rsplit(".", 1)[-1] if "." in name else ""
+
+
+def unsupported_detail(extension: str) -> str:
+    target = SAVE_AS.get(extension)
+    if target == "PDF":
+        return "Export this as a PDF first, then upload it."
+    if target:
+        return f"Save this as {target} first, then upload it."
+    return "That file type is not supported yet. Try a PDF, slides, Word, image or text."
 
 
 def read_upload(file: UploadFile) -> bytes:
@@ -176,7 +201,25 @@ def text_from_file(name: str, data: bytes, mime: str = "") -> str:
     raise HTTPException(status_code=415, detail="Cordia can import PDFs, Word, PowerPoint, Google Docs and text files.")
 
 
+def _jpeg(data: bytes) -> bytes:
+    """An iPhone photo or BMP/TIFF scan as an upright JPEG, at most MAX_CONVERTED_SIDE on its long side."""
+    try:
+        with Image.open(io.BytesIO(data)) as opened:
+            if opened.width * opened.height > MAX_CONVERTED_PIXELS:
+                raise _too_large("Image too large to read (max 60 megapixels)")
+            image = ImageOps.exif_transpose(opened)
+            image.thumbnail((MAX_CONVERTED_SIDE, MAX_CONVERTED_SIDE))
+            out = io.BytesIO()
+            image.convert("RGB").save(out, "JPEG", quality=85)
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, ValueError):
+        raise HTTPException(status_code=422, detail="Could not read this image. Try a JPG or PNG.")
+    return out.getvalue()
+
+
 def image_data_url(data: bytes, extension: str) -> str:
+    # Converted first: a large TIFF scan becomes a small JPEG (Pillow refuses decompression bombs).
+    if extension in CONVERTED_IMAGE_TYPES:
+        data, extension = _jpeg(data), "jpg"
     if len(data) > MAX_IMAGE_BYTES:
         raise _too_large("Image too large (max 15MB)")
     mime = IMAGE_TYPES.get(extension, "image/jpeg")

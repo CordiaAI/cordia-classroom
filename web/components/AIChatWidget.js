@@ -11,6 +11,7 @@ import TutorSelect from './TutorSelect';
 import CordiaLoader from './CordiaLoader';
 import { inlineParts, parseTutorAnswer } from '../lib/tutorFormat.mjs';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
+import { UPLOAD_ACCEPT } from '../lib/uploadTypes.mjs';
 
 // Tutor replies may include ```mermaid blocks; render them as diagrams and keep the rest as text.
 // A reply's diagram is drawn by Napkin from the reply's explanation.
@@ -686,7 +687,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
         </div>
       )}
       <div className={`cordia-tutor-input${Recognition ? ' has-mic' : ''}${attachDropActive ? ' drop-target-active' : ''}`}>
-        <input ref={fileRef} type="file" accept="*" multiple onChange={event => attachFiles(event.target.files)} hidden />
+        <input ref={fileRef} type="file" accept={UPLOAD_ACCEPT} multiple onChange={event => attachFiles(event.target.files)} hidden />
         <button type="button" className="cordia-tutor-clip" onClick={() => fileRef.current?.click()} disabled={extracting || attachments.length >= MAX_ATTACHMENTS}
           aria-label={extracting ? 'Reading file' : attachments.length >= MAX_ATTACHMENTS ? `${MAX_ATTACHMENTS} files attached` : 'Attach files'} title="Attach files">
           {extracting ? <CordiaLoader size={16} label="Reading" /> : <Paperclip size={18} strokeWidth={1.75} aria-hidden="true" />}

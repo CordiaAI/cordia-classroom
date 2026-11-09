@@ -65,21 +65,38 @@ async def render_pptx(request: Request, file: UploadFile = None, authorization: 
 @router.post("/extract-file-text")
 @limiter.limit("20/minute")
 def extract_file_text(request: Request, file: UploadFile = None, authorization: str = Header(default="")):
-    """Extract plain text from an uploaded PDF, DOCX, PPTX, image, or text file."""
+    """Extract plain text from an uploaded file of any type in files.UPLOAD_TYPES (PDF, Word, PowerPoint, photo or text)."""
     user_id = get_user_id(authorization)
     if file is None:
         raise HTTPException(status_code=400, detail="No file uploaded")
     return readable_text(user_id, file.filename, files.read_upload(file))
 
 
+def _ppt_text(data: bytes) -> str:
+    """An old .ppt deck read through the same LibreOffice conversion as the slide viewer (/render-pptx)."""
+    try:
+        pdf = render_pptx_to_pdf(data, ".ppt")
+    except PptxRenderTimeout:
+        raise HTTPException(status_code=504, detail="This PowerPoint file took too long to read. Save it as .pptx and try again.")
+    except PptxRenderUnavailable:
+        raise HTTPException(status_code=503, detail="Old PowerPoint files can't be read right now. Save it as .pptx and try again.")
+    except PptxRenderError:
+        raise HTTPException(status_code=422, detail="Could not read this PowerPoint file. Save it as .pptx and try again.")
+    return files.pdf_text(files.open_pdf(pdf))
+
+
 def readable_text(user_id: str, filename: str, data: bytes) -> dict:
     """{"text": …} for a file's bytes (PPTX also returns its slides). Scans and photos are read
     by vision, charged as one light action. Also used for Canvas files read server-side."""
     extension = files.extension_of(filename)
+    if extension not in files.UPLOAD_TYPES:
+        raise HTTPException(status_code=415, detail=files.unsupported_detail(extension))
 
     if extension == "pptx":
         return files.pptx_slides(data)
-    if extension == "pdf":
+    if extension == "ppt":
+        text = _ppt_text(data)
+    elif extension == "pdf":
         reader = files.open_pdf(data)
         text = files.pdf_text(reader)
         if len(text.strip()) < 200:
@@ -90,7 +107,7 @@ def readable_text(user_id: str, filename: str, data: bytes) -> dict:
                 record(user_id, "light")
     elif extension == "docx":
         text = files.docx_text(data)
-    elif extension in files.IMAGE_TYPES:
+    elif extension in files.IMAGE_TYPES or extension in files.CONVERTED_IMAGE_TYPES:
         image_url = files.image_data_url(data, extension)
         require(user_id, "light")
         text = transcribe_study_image(image_url)
