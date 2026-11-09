@@ -1,9 +1,10 @@
 import { Html, Head, Main, NextScript } from 'next/document';
 import { USE_CASES, useCasePath } from '../lib/useCases/index.mjs';
+import { COMPARISONS, comparisonPath } from '../lib/comparisons/index.mjs';
 
 // Public reading pages that stay light for signed-out visitors (lib/theme.js has the same rule),
 // plus every guide under /guides/.
-const LIGHT_SIGNED_OUT = ['/pricing', '/privacy', '/terms', '/honor-code', '/mission', '/instructors', '/copyright', '/guides', ...USE_CASES.map(useCasePath)];
+const LIGHT_SIGNED_OUT = ['/pricing', '/privacy', '/terms', '/honor-code', '/mission', '/instructors', '/copyright', '/guides', ...USE_CASES.map(useCasePath), ...COMPARISONS.map(comparisonPath)];
 
 export default function Document() {
   return (

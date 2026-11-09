@@ -14,6 +14,7 @@ import { routeTitle } from '../lib/pageTitle';
 import { ROBOTS_NOINDEX, isAppRoute, publicPage } from '../lib/publicPages.mjs';
 import { recordFirstTouch } from '../lib/attribution.mjs';
 import { USE_CASES, useCasePath } from '../lib/useCases/index.mjs';
+import { COMPARISONS, comparisonPath } from '../lib/comparisons/index.mjs';
 import { useState, useEffect } from 'react';
 import { installErrorReporting } from '../lib/errorReport';
 import { installAmbientMotion } from '../lib/ambientMotion';
@@ -34,6 +35,7 @@ export default function App({ Component, pageProps }) {
     && !(router.pathname === '/pricing' && signedIn)
     // Use-case pages (lib/useCases/) and guides (lib/guides/) are public pages.
     || USE_CASES.some(page => useCasePath(page) === router.pathname)
+    || COMPARISONS.some(page => comparisonPath(page) === router.pathname)
     || router.pathname === '/guides' || router.pathname === '/guides/[slug]'
     // A shared guide: signed-out visitors get the public frame, students the app.
     || (router.pathname === '/sets/[id]' && !signedIn)

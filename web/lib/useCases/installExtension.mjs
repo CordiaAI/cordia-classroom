@@ -61,7 +61,10 @@ export default {
       paragraphs: [
         'On Canvas it also leaves out the page header and navigation, and turns file links into direct downloads. Files your school shows only after you sign in are downloaded with your own browser session; your cookies aren\'t sent to Cordia.',
       ],
-      link: { href: '/canvas-study-tool', label: 'Connect Canvas to Cordia, too' },
+      link: [
+        { href: '/canvas-study-tool', label: 'Connect Canvas to Cordia, too' },
+        { href: '/best-ai-study-platforms-canvas-integration', label: 'See which AI study tools work with Canvas' },
+      ],
     },
     {
       question: 'How do I sign in?',
