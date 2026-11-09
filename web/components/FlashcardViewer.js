@@ -7,6 +7,7 @@ import { isCardImage } from '../lib/cardImages';
 import { useActiveClock } from '../lib/activeClock';
 import { logAnswer } from '../lib/learningEvents';
 import { answerTimer } from '../lib/learningEvents.mjs';
+import { againStep, gotItStep, roundResults } from '../lib/flashcardRound.mjs';
 
 const SHUFFLE_KEY = 'cordiaShuffle';
 // Swipe: past this many pixels the card is answered (right = Got it, left = Again).
@@ -33,7 +34,8 @@ export function askAboutCard(card, guideId) {
 }
 
 // One flashcard session. Missed cards go to the back of the queue until known.
-// cards: [{ front, back, image?, guideId? }]. onFinish({ known: [i], missed: [i], seconds }).
+// cards: [{ front, back, image?, guideId? }]. onFinish({ known: [i], missed: [i], seconds }): every
+// card ends the round known; missed lists the ones missed at least once, which are in known too.
 // logMode: how each Got it / Again is logged ('flashcards', 'study_now'); none logs nothing.
 export default function FlashcardViewer({
   flashcards, guideId, title, onBack, onFinish, onExit, starred, onToggleStar, onEdit, finishExtra, logMode = '',
@@ -81,11 +83,11 @@ export default function FlashcardViewer({
   useEffect(() => { if (window.matchMedia('(pointer: fine)').matches) requestTip('keys'); }, []);
   const card = flashcards[current];
 
-  const finish = useCallback((nextKnown, nextMissed) => {
+  const finish = useCallback(round => {
     const elapsed = clock.current?.seconds() || 0;
     setSeconds(elapsed);
     setDone(true);
-    onFinish?.({ known: nextKnown, missed: [...nextMissed].filter(index => !nextKnown.includes(index)), seconds: elapsed });
+    onFinish?.({ ...roundResults(round), seconds: elapsed });
   }, [onFinish]);
 
   function snapshot() {
@@ -96,24 +98,22 @@ export default function FlashcardViewer({
     if ((!flipped && !swiped) || card === undefined) return;
     logCard(1);
     setBump(value => ({ ...value, know: value.know + 1 }));
-    const nextKnown = [...known, current];
-    const nextQueue = queue.slice(1);
+    const next = gotItStep({ queue, known, missed });
     setHistory(list => [...list, snapshot()]);
-    setKnown(nextKnown);
-    setQueue(nextQueue);
+    setKnown(next.known);
+    setQueue(next.queue);
     setFlipped(false);
-    if (!nextQueue.length) finish(nextKnown, missed);
+    if (!next.queue.length) finish(next);
   }
 
   function again(swiped = false) {
     if ((!flipped && !swiped) || card === undefined) return;
     logCard(0);
     setBump(value => ({ ...value, learning: value.learning + 1 }));
-    const nextMissed = new Set(missed);
-    nextMissed.add(current);
+    const next = againStep({ queue, known, missed });
     setHistory(list => [...list, snapshot()]);
-    setMissed(nextMissed);
-    setQueue([...queue.slice(1), current]);
+    setMissed(next.missed);
+    setQueue(next.queue);
     setFlipped(false);
   }
 
