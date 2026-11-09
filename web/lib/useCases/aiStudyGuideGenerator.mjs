@@ -6,7 +6,7 @@ import { INTERVALS } from '../spacedReview.mjs';
 
 export default {
   slug: 'ai-study-guide-generator',
-  updated: '2026-11-08',
+  updated: '2026-11-09',
   crumb: 'AI study guide generator',
   // Shared head (lib/publicPages.mjs): "<topic> | Cordia Classroom", 120–160 character description.
   topic: 'AI Study Guide Generator: Slides and PDFs',
@@ -116,7 +116,7 @@ export default {
     },
     {
       question: 'Is my material shared with anyone?',
-      answer: 'Guides you make on the web are public by default once you have accepted the Honor Code, unless your account belongs to a minor or your instructor turned sharing off for the class. To make one private, open the guide, choose the chip under its title and pick Private. Notes, imports and guides made with the extension start private.',
+      answer: 'Guides you make start private, so only you can see them. To share one, open it, choose the chip under its title and pick Link, Classroom or Public. The first public or link share asks you to accept the Honor Code, and guides can\'t be shared in a class whose instructor turned sharing off.',
     },
   ],
 };
