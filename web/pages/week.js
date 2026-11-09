@@ -4,7 +4,7 @@ import { ChevronLeft, ListChecks } from 'lucide-react';
 import { useRequireAuth } from '../lib/auth';
 import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import AssignmentSheet from '../components/AssignmentSheet';
-import { acceptWeek, getAnnouncements, getWeek, minutesLabel } from '../lib/studyPlans';
+import { acceptWeek, getAnnouncements, getWeek, minutesLabel, scheduleNotice } from '../lib/studyPlans';
 import { deadlineCourse, deadlineTitle } from '../lib/formatters';
 import { walkthroughEvent } from '../lib/walkthrough';
 
@@ -45,7 +45,7 @@ export default function WeekPage() {
     setBusy(false);
     if (typeof result?.added !== 'number') { setError(result?.detail || "That didn't plan. Try again."); return; }
     walkthroughEvent('week-planned');
-    setNotice(result.added ? `Added ${result.added} study block${result.added === 1 ? '' : 's'} to your calendar.` : 'Everything picked already has study time.');
+    setNotice(scheduleNotice(result, { where: 'to your calendar', covered: 'Everything picked already has study time.' }));
     load();
   }
 

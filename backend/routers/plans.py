@@ -139,38 +139,50 @@ def _preferred_hour(user_id: str, zone) -> Optional[int]:
 
 
 def schedule(user_id: str, item: dict, zone) -> list:
-    """Study blocks for the plan's unfinished work, in free time before the deadline. Blocks the
-    student moved or removed are left alone and count as already placed."""
+    """Study blocks for the plan's unfinished work, in free time before the deadline."""
+    return schedule_with_totals(user_id, item, zone)[0]
+
+
+def schedule_with_totals(user_id: str, item: dict, zone) -> tuple[list, int]:
+    """Study blocks for the plan's unfinished work, in free time before the deadline, and the
+    minutes they were meant to cover, so a shortfall can be told to the student instead of being
+    dropped. Blocks the student moved or removed are left alone and count as already placed."""
     plan = make_plan(user_id, item)
     now = _now()
     due = google_sync._time(item["due_at"])
-    if not due or due <= now + timedelta(minutes=30):
-        return []
+    if not due:
+        return [], 0
     db = get_supabase()
     existing = db.table("study_blocks").select("*").eq("user_id", user_id).eq("item_key", item["id"]).execute().data or []
     placed = sum(int((google_sync._time(b["ends_at"]) - google_sync._time(b["starts_at"])).total_seconds() // 60)
                  for b in existing if b["status"] != "removed")
-    removed = sum(1 for b in existing if b["status"] == "removed")
+    is_exam = _is_exam(user_id, item)
+    open_steps = [s for s in plan["steps"] if not s.get("done")]
+    remaining = sum(s["minutes"] for s in open_steps) - placed
+    if not is_exam and remaining <= 0:
+        return [], 0  # Already covered (or the student removed blocks after it was).
+    if due <= now + timedelta(minutes=30):
+        # Too close to the deadline for any block: the work still needed is the shortfall.
+        return [], 0 if is_exam else remaining
     start = planner._round_up(now + timedelta(hours=1))
     busy = _busy(user_id, start, due)
     slots = planner.free_slots(busy, start, due, zone)
     hour = _preferred_hour(user_id, zone)
     rows = []
-    if _is_exam(user_id, item):
+    wanted = 0
+    if is_exam:
         # Exams: spaced review sessions, shorter as the exam gets closer; one per remaining day slot.
         taken_days = {google_sync._time(b["starts_at"]).astimezone(zone).date() for b in existing}
         for days, minutes in planner.exam_sessions(due, now):
             day = (due - timedelta(days=days)).astimezone(zone).date()
             if day in taken_days:
                 continue
+            wanted += minutes
             day_slots = [s for s in slots if s[0].astimezone(zone).date() == day]
             for a, b in planner.place_blocks(minutes, day_slots, zone, hour)[:1]:
                 rows.append({"user_id": user_id, "item_key": item["id"], "kind": "review", "starts_at": a.isoformat(), "ends_at": b.isoformat()})
     else:
-        remaining = sum(s["minutes"] for s in plan["steps"] if not s.get("done")) - placed
-        if removed and remaining <= 0:
-            return []
-        open_steps = [s for s in plan["steps"] if not s.get("done")]
+        wanted = remaining
         placed_blocks = planner.place_blocks(remaining, slots, zone, hour)
         for index, (a, b) in enumerate(placed_blocks):
             # Blocks follow the steps in order: the first blocks cover the first steps.
@@ -179,7 +191,12 @@ def schedule(user_id: str, item: dict, zone) -> list:
                          "starts_at": a.isoformat(), "ends_at": b.isoformat()})
     if rows:
         db.table("study_blocks").insert(rows).execute()
-    return rows
+    return rows, wanted
+
+
+def block_minutes(rows: list) -> int:
+    """Total minutes of study blocks."""
+    return sum(int((google_sync._time(r["ends_at"]) - google_sync._time(r["starts_at"])).total_seconds() // 60) for r in rows)
 
 
 def schedule_exams(user_id: str) -> int:
@@ -323,9 +340,11 @@ def set_step(item_key: str, step_id: str, body: StepRequest, authorization: str 
 def schedule_plan(item_key: str, body: ScheduleRequest, request: Request, authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     item = _item(user_id, _key(item_key))
-    added = schedule(user_id, item, _zone(user_id, body.time_zone))
+    added, wanted = schedule_with_totals(user_id, item, _zone(user_id, body.time_zone))
     _push(user_id)
-    return {"plan": _plan(user_id, item_key), "added": len(added)}
+    # minutes_added below minutes_requested: the free time before the deadline ran out.
+    return {"plan": _plan(user_id, item_key), "added": len(added), "minutes_added": block_minutes(added),
+            "minutes_requested": max(wanted, block_minutes(added))}
 
 
 class ReviewRequest(BaseModel):
@@ -596,9 +615,12 @@ def accept_week(body: AcceptRequest, request: Request, authorization: str = Head
     user_id = get_user_id(authorization)
     zone = _zone(user_id, body.time_zone)
     items = {i["id"]: i for i in calendar_for(user_id).get("items") or []}
-    added = 0
+    added, minutes_added, minutes_requested = 0, 0, 0
     for key in body.item_keys:
         if ITEM_KEY.fullmatch(key) and key in items:
-            added += len(schedule(user_id, items[key], zone))
+            rows, wanted = schedule_with_totals(user_id, items[key], zone)
+            added += len(rows)
+            minutes_added += block_minutes(rows)
+            minutes_requested += max(wanted, block_minutes(rows))  # Rounding up on one can't hide another's shortfall.
     _push(user_id)
-    return {"added": added}
+    return {"added": added, "minutes_added": minutes_added, "minutes_requested": minutes_requested}

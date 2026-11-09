@@ -1,5 +1,5 @@
 """Phase 1 connector sync: scheduling rules, Google Tasks/Calendar two-way sync, and kickoff plans."""
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import sys
 import unittest
@@ -18,10 +18,6 @@ ZONE = ZoneInfo("America/Chicago")
 NOW = datetime.now(timezone.utc).replace(microsecond=0)
 DUE = (NOW + timedelta(days=6)).replace(minute=0, second=0)
 ITEMS = [{"id": "canvas-1", "title": "Lab report", "due_at": DUE.isoformat(), "course": "BIO 101", "done": False, "type": "assignment"}]
-# Kickoff runs on a fixed clock: 20:10 in Chicago, when today's only free time is a 45-minute slot.
-KICKOFF_NOW = datetime(2026, 11, 3, 2, 10, tzinfo=timezone.utc)
-KICKOFF_DUE = KICKOFF_NOW + timedelta(days=6, minutes=50)
-KICKOFF_ITEMS = [dict(ITEMS[0], due_at=KICKOFF_DUE.isoformat())]
 
 
 class PlannerRules(unittest.TestCase):
@@ -53,6 +49,48 @@ class PlannerRules(unittest.TestCase):
             blocks = planner.place_blocks(120, slots, ZONE, preferred_hour=hour)
             self.assertEqual(sum((b - a).seconds // 60 for a, b in blocks), 120)
             self.assertNotIn(today.date(), [a.astimezone(ZONE).date() for a, _ in blocks])
+
+    def _evening(self, hour, minute, minutes=120, days=6):
+        """place_blocks as schedule() calls it, for a plan made at hour:minute Chicago time."""
+        now = datetime(2026, 11, 9, hour, minute, tzinfo=ZONE)
+        start = planner._round_up(now + timedelta(hours=1))
+        due = datetime.combine((now + timedelta(days=days)).date(), datetime.min.time(), ZONE).replace(hour=20)
+        slots = planner.free_slots([], start, due, ZONE)
+        return planner.place_blocks(minutes, slots, ZONE), slots
+
+    def test_a_short_evening_never_loses_a_block(self):
+        # 8:00-8:35 pm used to pick tonight's 25-59 free minutes for a 60-minute block and drop it.
+        for hour, minute in ((20, 0), (20, 10), (20, 20), (20, 30), (20, 35), (19, 40), (21, 0)):
+            with self.subTest(at=f"{hour}:{minute:02d}"):
+                blocks, slots = self._evening(hour, minute)
+                self.assertGreaterEqual(sum((b - a).seconds // 60 for a, b in blocks), 120)
+                self.assertTrue(all(any(s0 <= a and b <= s1 for s0, s1 in slots) for a, b in blocks), "inside free time")
+                days = [a.astimezone(ZONE).date() for a, _ in blocks]
+                self.assertEqual(len(days), len(set(days)), "one block a day")
+
+    def test_right_before_the_window_closes_the_time_goes_to_later_days(self):
+        for hour, minute in ((20, 50), (21, 30), (21, 50)):
+            with self.subTest(at=f"{hour}:{minute:02d}"):
+                blocks, _ = self._evening(hour, minute)
+                self.assertGreaterEqual(sum((b - a).seconds // 60 for a, b in blocks), 120)
+                self.assertTrue(all(a.astimezone(ZONE).date() > date(2026, 11, 9) for a, _ in blocks), "nothing tonight")
+
+    def test_across_midnight(self):
+        # Planned at 11:30 pm: the search starts after midnight and the first block is the next morning.
+        blocks, _ = self._evening(23, 30)
+        self.assertGreaterEqual(sum((b - a).seconds // 60 for a, b in blocks), 120)
+        self.assertTrue(all(a.astimezone(ZONE).hour >= planner.DAY_START for a, _ in blocks))
+        # A deadline just after midnight, planned at 7:40 pm: tonight's 75 minutes are all there is.
+        now = datetime(2026, 11, 9, 19, 40, tzinfo=ZONE)
+        slots = planner.free_slots([], planner._round_up(now + timedelta(hours=1)), datetime(2026, 11, 10, 0, 30, tzinfo=ZONE), ZONE)
+        blocks = planner.place_blocks(120, slots, ZONE)
+        self.assertEqual([(a.astimezone(ZONE).strftime("%H:%M"), (b - a).seconds // 60) for a, b in blocks], [("20:45", 75)])
+
+    def test_when_free_time_runs_out_every_day_is_used_as_far_as_it_holds(self):
+        day = datetime(2026, 11, 9, tzinfo=ZONE)
+        slots = [(day.replace(hour=21, minute=15), day.replace(hour=22)), (day.replace(day=10, hour=9), day.replace(day=10, hour=9, minute=40))]
+        blocks = planner.place_blocks(120, slots, ZONE)
+        self.assertEqual(sorted((b - a).seconds // 60 for a, b in blocks), [40, 45])
 
     def test_exam_sessions_get_shorter_and_skip_the_past(self):
         sessions = planner.exam_sessions(NOW + timedelta(days=4), NOW)
@@ -153,6 +191,13 @@ class GoogleSync(unittest.TestCase):
         self.assertEqual(len([c for c in self.calls if c[0] == "GOOGLECALENDAR_CREATE_EVENT"]), 2)  # Nothing recreated.
 
 
+# Kickoff runs on a fixed clock: 8:10 pm in Chicago (02:10 UTC), one of the times that used to
+# lose a block, with the deadline six days later.
+KICKOFF_NOW = datetime(2026, 11, 10, 2, 10, tzinfo=timezone.utc)
+KICKOFF_DUE = KICKOFF_NOW + timedelta(days=6) - timedelta(minutes=10)
+KICKOFF_ITEMS = [{**ITEMS[0], "due_at": KICKOFF_DUE.isoformat()}]
+
+
 class Kickoff(unittest.TestCase):
     def setUp(self):
         self.db = FakeDB()
@@ -180,17 +225,37 @@ class Kickoff(unittest.TestCase):
         self.assertEqual(plan["effort_minutes"], 120)
         self.assertEqual(len(plan["steps"]), 3)
         self.assertEqual(plan["steps"][-1]["due_at"], KICKOFF_DUE.isoformat())
-        added = plans.schedule(USER, KICKOFF_ITEMS[0], ZONE)
+        added, wanted = plans.schedule_with_totals(USER, KICKOFF_ITEMS[0], ZONE)
         self.assertTrue(added)
         self.assertTrue(all(datetime.fromisoformat(b["ends_at"]) <= KICKOFF_DUE for b in added))
-        self.assertGreaterEqual(sum((datetime.fromisoformat(b["ends_at"]) - datetime.fromisoformat(b["starts_at"])).seconds // 60 for b in added), 120)
+        self.assertEqual(wanted, 120)
+        self.assertGreaterEqual(plans.block_minutes(added), 120)
         self.assertEqual(plans.schedule(USER, KICKOFF_ITEMS[0], ZONE), [])  # Already covered: nothing doubled.
+
+    def test_a_shortfall_is_reported_not_dropped(self):
+        from routers import plans
+        # Planned at 7:10 pm, due at 12:30 am: tonight's 8:15-10 pm is the only free time, and one
+        # block (one a day) is at most 90 minutes, so 90 of the 120 needed fit.
+        item = {**KICKOFF_ITEMS[0], "due_at": (KICKOFF_NOW + timedelta(hours=4, minutes=20)).isoformat()}
+        with patch("routers.plans.plan_assignment", side_effect=RuntimeError("down")), \
+             patch("routers.plans.calendar_for", return_value={"items": [item]}), \
+             patch("routers.plans._now", return_value=KICKOFF_NOW - timedelta(hours=1)):
+            added, wanted = plans.schedule_with_totals(USER, item, ZONE)
+        self.assertEqual(wanted, 120)
+        self.assertEqual(plans.block_minutes(added), 90)  # One block a day, at most MAX_BLOCK long.
+        # Too close to the deadline for any block: the whole amount is the shortfall.
+        late = {**item, "id": "canvas-2", "due_at": (KICKOFF_NOW + timedelta(minutes=20)).isoformat()}
+        with patch("routers.plans.plan_assignment", side_effect=RuntimeError("down")):
+            added, wanted = plans.schedule_with_totals(USER, late, ZONE)
+        self.assertEqual(added, [])
+        self.assertEqual(wanted, sum(step["minutes"] for step in plans._plan(USER, "canvas-2")["steps"]))
+        self.assertGreater(wanted, 0)
 
     def test_model_steps_are_used_when_usable(self):
         from routers import plans
         made = {"effort_minutes": 150, "basis": "A 50-point lab write-up.", "steps": [{"title": "Analyze the data", "minutes": 60}, {"title": "Write it up", "minutes": 90}]}
         with patch("routers.plans.plan_assignment", return_value=made):
-            plan = plans.make_plan(USER, KICKOFF_ITEMS[0])
+            plan = plans.make_plan(USER, ITEMS[0])
         self.assertEqual([s["title"] for s in plan["steps"]], ["Analyze the data", "Write it up"])
         self.assertEqual(plan["effort_basis"], "A 50-point lab write-up.")
 
