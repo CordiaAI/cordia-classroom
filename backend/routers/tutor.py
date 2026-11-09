@@ -4,12 +4,15 @@ import re
 from typing import Optional
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
+import access
+from access import Ctx
 from auth_utils import get_user_id
 from ids import require_uuid
 from services.tutor_sessions import (
+    delete_tutor_chat,
     get_or_create_tutor_session,
     list_tutor_chats,
     public_tutor_session,
@@ -102,6 +105,15 @@ def browser_context(body: BrowserContextUpdate, authorization: str = Header(defa
 def saved_tutor_chats(authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     return {"chats": list_tutor_chats(user_id)}
+
+
+@router.delete("/chats/{chat_id}")
+def delete_saved_tutor_chat(chat_id: str, ctx: Ctx = Depends(access.own())):
+    """Delete one saved chat, the student's own only: anyone else's reads as already gone."""
+    require_uuid(chat_id, "chat ID")
+    if not delete_tutor_chat(ctx.user_id, chat_id):
+        raise HTTPException(status_code=404, detail="That chat is already gone.")
+    return {"chats": list_tutor_chats(ctx.user_id)}
 
 
 @router.post("/session/new")

@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from '../lib/api';
 import { loadFolders } from '../lib/folders';
 import NapkinVisual from './NapkinVisual';
+import ConfirmDialog from './ConfirmDialog';
 import { ArrowUp, BookOpen, Layers, ListTree, MessageCircle, MessagesSquare, Paperclip, PencilRuler, Plus, Trash2, X as CloseIcon } from 'lucide-react';
 import { lastGuide } from '../lib/userStore';
 import { walkthroughEvent } from '../lib/walkthrough';
@@ -123,6 +124,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const [chatsOpen, setChatsOpen] = useState(false);
   const [savedChats, setSavedChats] = useState(null);
   const [chatsError, setChatsError] = useState('');
+  const [deletingChat, setDeletingChat] = useState(null); // a saved chat waiting for "Delete" to be confirmed
   const [listening, setListening] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState(-1);
   const recognitionRef = useRef(null);
@@ -518,6 +520,14 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     setChatsOpen(false);
   }
 
+  // Past chats: delete one saved chat (the student's own only; the server checks).
+  async function deleteSavedChat(chat) {
+    setDeletingChat(null);
+    const done = await apiFetch(`/tutor/chats/${encodeURIComponent(chat.id)}`, { method: 'DELETE' });
+    if (Array.isArray(done?.chats)) { setSavedChats(done.chats); setChatsError(''); }
+    else setChatsError(done?.detail || `Could not delete “${chat.title || 'Tutor chat'}”.`);
+  }
+
   async function deleteFromTutor(confirm) {
     const done = await apiFetch(`/guides/${confirm.guide_id}`, { method: 'DELETE' });
     if (!done?.deleted) { setLocalError(done?.detail || `Could not delete ${confirm.title}.`); return; }
@@ -587,16 +597,27 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
           ) : (
             <ul className="tutor-chats-list">
               {savedChats.map(chat => (
-                <li key={chat.id}>
+                <li key={chat.id} className="tutor-chat-item">
                   <button type="button" className="tutor-chat-row" onClick={() => startChat({ resume: chat })} disabled={busy}>
                     <span className="tutor-chat-row-title">{chat.title || 'Tutor chat'}</span>
                     <span className="c-meta">{guides.find(item => item.id === chat.guide_id)?.title || 'General'} · {new Date(chat.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                  </button>
+                  <button type="button" className="c-icon-btn tutor-chat-delete" aria-label={`Delete “${chat.title || 'Tutor chat'}”`} onClick={() => setDeletingChat(chat)} disabled={busy}>
+                    <Trash2 size={18} strokeWidth={1.75} aria-hidden="true" />
                   </button>
                 </li>
               ))}
             </ul>
           )}
           {chatsError && <p className="cordia-tutor-message error" role="alert">{chatsError}</p>}
+          {deletingChat && (
+            <ConfirmDialog
+              title="Delete this chat?"
+              message={`“${deletingChat.title || 'Tutor chat'}” will be deleted for good. This can't be undone.`}
+              onConfirm={() => deleteSavedChat(deletingChat)}
+              onCancel={() => setDeletingChat(null)}
+            />
+          )}
         </div>
       ) : (
       <div className="cordia-tutor-messages" aria-live="polite">

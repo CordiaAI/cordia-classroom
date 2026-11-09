@@ -8,6 +8,8 @@ from fastapi import APIRouter, Header, HTTPException, Depends, Request
 from rate_limit import ai_rate_limit, limiter
 from pydantic import BaseModel, Field, field_validator
 
+import access
+from access import Ctx
 from auth_utils import get_user_id
 from ids import require_uuid
 from database import get_supabase
@@ -276,23 +278,32 @@ def save_onboarding_answers(body: OnboardingAnswers, authorization: str = Header
 
 
 @router.get("/memories")
-def list_memories(authorization: str = Header(default="")):
+def list_memories(ctx: Ctx = Depends(access.own())):
     """Settings › Tutor, "What Cordia remembers": what the Tutor and the Assistant keep about the
     student (public.student_memory). Empty before migration 20261121130000."""
     from services import student_memory
-    return {"memories": student_memory.list_for(get_supabase(), get_user_id(authorization))}
+    return {"memories": student_memory.list_for(ctx.db, ctx.user_id)}
+
+
+@router.delete("/memories")
+def forget_all_memories(ctx: Ctx = Depends(access.own())):
+    """Clear all: every memory of the student's own (Assistant ones are forgotten there too)."""
+    from services import student_memory
+    try:
+        student_memory.forget_all(ctx.db, ctx.user_id)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Your memories weren't cleared. Try again.")
+    return {"memories": student_memory.list_for(ctx.db, ctx.user_id)}
 
 
 @router.delete("/memories/{memory_id}")
-def forget_memory(memory_id: str, authorization: str = Header(default="")):
+def forget_memory(memory_id: str, ctx: Ctx = Depends(access.own())):
     """Forget one memory, the student's own only (an Assistant one is forgotten there too)."""
     from services import student_memory
     require_uuid(memory_id, "memory ID")
-    user_id = get_user_id(authorization)
-    db = get_supabase()
-    if not student_memory.forget(db, user_id, memory_id):
+    if not student_memory.forget(ctx.db, ctx.user_id, memory_id):
         raise HTTPException(status_code=404, detail="That memory is already gone.")
-    return {"memories": student_memory.list_for(db, user_id)}
+    return {"memories": student_memory.list_for(ctx.db, ctx.user_id)}
 
 
 @router.get("/memory-tricks/settings")

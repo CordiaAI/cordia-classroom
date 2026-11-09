@@ -12,7 +12,8 @@ import { useLearningStyle } from '../lib/learningStyle';
 import TutorSettings from '../components/TutorSettings';
 import MemoryTrickSettings from '../components/MemoryTrickSettings';
 import MemorySettings from '../components/MemorySettings';
-import { Check, CreditCard, LogOut, Moon, Puzzle, Sun, Trash2, UserRound } from 'lucide-react';
+import { Check, CreditCard, Download, LogOut, Moon, Puzzle, Sun, Trash2, UserRound } from 'lucide-react';
+import { downloadMyData } from '../lib/accountExport';
 import BodyPortal from '../components/BodyPortal';
 import SharingSettings from '../components/SharingSettings';
 import PhoneSettings from '../components/PhoneSettings';
@@ -53,6 +54,7 @@ export default function SettingsPage() {
   const [canvasReady, setCanvasReady] = useState(false);
   const [extensionInstalled, setExtensionInstalled] = useState(false);
   const [deleting, setDeleting] = useState(null); // null | { text, busy, error }
+  const [exporting, setExporting] = useState(''); // '' | 'busy' | 'failed'
   useEffect(() => {
     if (!ready) return;
     canvasStatus().then(data => setCanvasReady(Boolean(data)));
@@ -397,6 +399,15 @@ export default function SettingsPage() {
             </div>
             <PhoneSettings />
             <div className="c-card settings-row">
+              <span className="settings-row-label"><Download size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Download my data</span></span>
+              <button type="button" className="c-btn c-btn--secondary" disabled={exporting === 'busy'}
+                onClick={async () => { setExporting('busy'); setExporting((await downloadMyData()) ? '' : 'failed'); }}>
+                {exporting === 'busy' ? 'Preparing…' : 'Download'}
+              </button>
+              <p className="c-meta settings-export-note">Your profile, guides, notes, lectures, practice history, Tutor chats and what the Tutor remembers, as one JSON file.</p>
+              {exporting === 'failed' && <p className="retain-action-error settings-export-note" role="alert">The download didn’t start. Try again.</p>}
+            </div>
+            <div className="c-card settings-row">
               <span className="settings-row-label"><Trash2 size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Delete account</span></span>
               <button type="button" className="c-btn c-btn--secondary settings-danger" onClick={() => setDeleting({ text: '', busy: false, error: '' })}>Delete account</button>
             </div>
@@ -443,6 +454,7 @@ export default function SettingsPage() {
         .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; flex-wrap: wrap; }
         .settings-row :global(.c-seg) button { display: inline-flex; align-items: center; gap: 6px; }
         .settings-row-label { display: inline-flex; align-items: center; gap: 10px; }
+        .settings-export-note { flex-basis: 100%; margin: 0; }
         .settings-row-label :global(.lucide) { color: var(--olive-ink); }
         .settings-note { margin: -4px 0 0; }
         .settings-card { display: grid; gap: 12px; padding: 20px; }

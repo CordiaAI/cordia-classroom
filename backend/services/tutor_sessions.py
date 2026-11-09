@@ -517,6 +517,15 @@ def _chats_unavailable(error: Exception):
     raise HTTPException(status_code=503, detail="Saved chats aren't set up yet.") from error
 
 
+def delete_tutor_chat(user_id: str, chat_id: str) -> bool:
+    """Deletes one of the student's saved chats. False when it is someone else's or already gone."""
+    try:
+        gone = _chats_table().delete().eq("id", chat_id).eq("user_id", user_id).execute().data
+    except Exception as error:
+        _chats_unavailable(error)
+    return bool(gone)
+
+
 def list_tutor_chats(user_id: str) -> list:
     try:
         result = (

@@ -9,8 +9,11 @@ from collections import defaultdict
 from datetime import date, datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from supabase_auth.errors import AuthApiError, AuthInvalidJwtError
+import access
+from access import Ctx
 from database import get_supabase, get_auth_supabase
 from auth_utils import get_user_id, reject_oauth_client_token
 from rate_limit import ai_rate_limit, client_ip
@@ -225,6 +228,16 @@ def delete_account(request: DeleteAccountRequest, authorization: str = Header(de
         raise HTTPException(status_code=400, detail='Type DELETE to confirm')
     _erase_account(get_user_id(authorization))
     return {"deleted": True}
+
+
+@router.get("/account/export", dependencies=[Depends(ai_rate_limit(5, 60))])
+def export_account(ctx: Ctx = Depends(access.own())):
+    """Settings › Account, "Download my data": the student's own data as one JSON file, including
+    Tutor chats and memory (services/account_export.py)."""
+    from services import account_export
+    day = datetime.now(timezone.utc).date().isoformat()
+    return JSONResponse(account_export.build(ctx.db, ctx.user_id),
+                        headers={"Content-Disposition": f'attachment; filename="cordia-classroom-{day}.json"', "Cache-Control": "no-store"})
 
 
 def _erase_account(user_id: str) -> None:
