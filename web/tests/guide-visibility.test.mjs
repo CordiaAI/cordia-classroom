@@ -1,10 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { chipLabel, firstPublishStep, outlineLine, savedMeta } from '../lib/guideVisibility.mjs';
-
-const NOW = Date.parse('2026-11-05T12:00:00Z');
-const fresh = { created_at: '2026-11-05T11:58:00Z', study_guide: 'Q: What is lead time?\nA: The wait.', visibility: 'private' };
+import { chipLabel, outlineLine, savedMeta } from '../lib/guideVisibility.mjs';
 
 test('chip labels name the class only for classroom guides', () => {
   assert.equal(chipLabel('public', { code: 'MGT 300' }), 'Public');
@@ -21,17 +18,11 @@ test('outline preview lines are plain text', () => {
   assert.deepEqual(outlineLine('#hashtag stays'), { heading: false, text: '#hashtag stays' });
 });
 
-test('first-publish step: once, on a fresh guide with material, never on copies', () => {
-  assert.equal(firstPublishStep(fresh, { now: NOW }), 'ask');
-  assert.equal(firstPublishStep({ ...fresh, visibility: 'public' }, { now: NOW }), 'notice');
-  assert.equal(firstPublishStep({ ...fresh, visibility: 'classroom' }, { now: NOW }), null);
-  assert.equal(firstPublishStep(fresh, { now: NOW, asked: true }), null);
-  assert.equal(firstPublishStep({ ...fresh, created_at: '2026-11-04T11:58:00Z' }, { now: NOW }), null);
-  assert.equal(firstPublishStep({ ...fresh, study_guide: '  ' }, { now: NOW }), null);
-  assert.equal(firstPublishStep({ ...fresh, forked_from_guide_id: 'x' }, { now: NOW }), null);
-  assert.equal(firstPublishStep({ ...fresh, linked_set_id: 'x' }, { now: NOW }), null);
-  assert.equal(firstPublishStep({ ...fresh, origin: 'mcp' }, { now: NOW }), null);
-  assert.equal(firstPublishStep(null, { now: NOW }), null);
+test('a new guide never says it was made public or opens a publish prompt by itself', async () => {
+  const page = await readFile(new URL('../pages/guide/[id].js', import.meta.url), 'utf8');
+  assert.doesNotMatch(page, /New guides are public|PublishSheet|firstPublish/);
+  const sheet = await readFile(new URL('../components/PublishSheet.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(sheet, /New guides are public/);
 });
 
 test('saved rows never name an anonymous author and flag newer versions', () => {
@@ -47,11 +38,9 @@ test('the shared guide page stays out of search unless public', async () => {
   assert.match(page, /<meta name="robots" content="noindex"/);
 });
 
-test('new generated guides ask for the default share; other creators do not', async () => {
-  const create = await readFile(new URL('../lib/guideCreate.js', import.meta.url), 'utf8');
-  assert.match(create, /share_default: true/);
-  for (const file of ['../components/NewSheet.js', '../pages/smartnotes.js']) {
-    const source = await readFile(new URL(file, import.meta.url), 'utf8').catch(() => '');
-    assert.doesNotMatch(source, /share_default/);
+test('no creation path asks for a default share: new guides start private', async () => {
+  for (const file of ['../lib/guideCreate.js', '../components/NewSheet.js', '../pages/smartnotes.js', '../pages/create.js', '../../extension/background.js']) {
+    const source = await readFile(new URL(file, import.meta.url), 'utf8');
+    assert.doesNotMatch(source, /share_default/, file);
   }
 });

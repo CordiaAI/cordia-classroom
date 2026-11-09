@@ -256,17 +256,19 @@ class GuideVisibilityTests(unittest.TestCase):
         self.assertEqual(self.row()["version"], 3)  # title is always sent by the editor
 
     # New guides -------------------------------------------------------------------------------------
-    def test_new_guides_default_public_only_after_the_honor_code(self):
+    def test_new_guides_always_start_private(self):
+        # Every creation path saves private; the student shares a guide with the visibility chip.
+        # share_default (sent by pages loaded before this change) is accepted and ignored.
         body = {"title": "Cell biology", "keep_title": True, "notes": "Cells", "share_default": True}
         first = self.call("post", "ana", "/guides", json=body).json()["guide"]
         self.assertEqual(first.get("visibility", "private"), "private")
         self.accept_honor_code()
-        second = self.call("post", "ana", "/guides", json=body).json()["guide"]
-        self.assertEqual((second["visibility"], second["attribution"]), ("public", "named"))
-        plain = self.call("post", "ana", "/guides", json={**body, "share_default": False}).json()["guide"]
-        self.assertEqual(plain.get("visibility", "private"), "private")
-        opted_out = self.call("post", "ana", "/guides", json={**body, "folder_id": BLOCKED_FOLDER}).json()["guide"]
-        self.assertEqual(opted_out.get("visibility", "private"), "private")
+        made = [self.call("post", "ana", "/guides", json={**body, **extra}).json()["guide"]
+                for extra in ({}, {"share_default": False}, {"folder_id": BLOCKED_FOLDER})]
+        self.assertEqual([guide.get("visibility", "private") for guide in made], ["private"] * 3)
+        # Sharing is still the student's choice, from the chip.
+        shared = self.call("patch", "ana", f"/guides/{made[0]['id']}/visibility", json={"visibility": "public"})
+        self.assertEqual(shared.status_code, 200, shared.text)
 
     # Saving -----------------------------------------------------------------------------------------
     def test_save_and_saved_list(self):

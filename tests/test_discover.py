@@ -273,18 +273,18 @@ class MinorsRulesTests(DiscoverTests):
         self.assertEqual(other["author"]["username"], "ana")
 
     def test_new_sets_start_private(self):
-        from routers import guides
+        # Every new set starts private, a minor's and an adult's alike, even after the Honor Code
+        # and even when an older page still sends share_default.
         for row in self.db.rows("user_profiles"):
             row["honor_code_accepted_at"] = "2026-10-01T00:00:00+00:00"
-        self.db.rows("study_guides").append({"id": gid(20), "user_id": CAT, "title": "New", "visibility": "private", "folder_id": None})
-        self.db.rows("study_guides").append({"id": gid(21), "user_id": BEN, "title": "New", "visibility": "private", "folder_id": None,
-                                             "notes": "", "study_guide": "", "review_status": "ok"})
-        with patch("routers.guides.get_supabase", return_value=self.db):
-            guides._publish_new(self.db, CAT, dict(self.db.rows("study_guides")[-2]))
-            guides._publish_new(self.db, BEN, dict(self.db.rows("study_guides")[-1]))
-        by_id = {g["id"]: g for g in self.db.rows("study_guides")}
-        self.assertEqual(by_id[gid(20)]["visibility"], "private")
-        self.assertEqual(by_id[gid(21)]["visibility"], "public")
+        body = {"title": "New", "keep_title": True, "notes": "Cells", "share_default": True}
+        signed_in = patch("routers.guides.get_user_id", side_effect=lambda header: IDS[header.split(" ", 1)[-1]])
+        with signed_in, patch("routers.guides.get_supabase", return_value=self.db), patch("routers.guides.start_quiz_warmup"):
+            for who in ("cat", "ben"):
+                response = self.client.post("/guides", json=body, headers={"Authorization": f"Bearer {who}"})
+                self.assertEqual(response.status_code, 200, response.text)
+                made = response.json()["guide"]
+                self.assertEqual(made.get("visibility", "private"), "private", who)
 
     def test_people_search_leaves_them_out_even_for_friends(self):
         r = self.client.get("/discover/people", params={"q": "cat"}, headers={"Authorization": "Bearer ana"})
