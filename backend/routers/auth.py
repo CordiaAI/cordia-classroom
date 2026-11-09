@@ -7,13 +7,14 @@ import time
 import logging
 from collections import defaultdict
 from datetime import date, datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from pydantic import BaseModel, Field
 from supabase_auth.errors import AuthApiError, AuthInvalidJwtError
 from database import get_supabase, get_auth_supabase
 from auth_utils import get_user_id, reject_oauth_client_token
 from rate_limit import ai_rate_limit, client_ip
-from services import minors
+from services import acquisition as first_touch, minors
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -256,6 +257,9 @@ def _age_needed(user) -> bool:
 class AgeRequest(BaseModel):
     year: int = Field(..., ge=1900, le=2100)
     month: int = Field(..., ge=1, le=12)
+    # First-touch attribution from this browser. Taken as-is here and checked field by field in
+    # services/acquisition.py, so a bad value can't fail the age save; kept only when enabled.
+    acquisition: Optional[dict] = None
 
 
 @router.post("/age", dependencies=[Depends(ai_rate_limit(5, 60))])
@@ -285,4 +289,5 @@ def set_age(body: AgeRequest, authorization: str = Header(default="")):
         supabase.table("user_profiles").update({"birth_month": born.isoformat()}).eq("id", user_id).execute()
     else:
         supabase.table("user_profiles").insert({"id": user_id, "birth_month": born.isoformat()}).execute()
+    first_touch.save(supabase, user_id, body.acquisition)
     return {"saved": True, "minor": minors.age_on(born, today) < minors.ADULT_AGE}

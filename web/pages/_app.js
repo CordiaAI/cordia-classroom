@@ -11,7 +11,8 @@ import { useRouter } from 'next/router';
 import { syncServerCopies } from '../lib/serverSync';
 import { showConnectedAppSets } from '../lib/guideJobs';
 import { routeTitle } from '../lib/pageTitle';
-import { ROBOTS_NOINDEX, isAppRoute } from '../lib/publicPages.mjs';
+import { ROBOTS_NOINDEX, isAppRoute, publicPage } from '../lib/publicPages.mjs';
+import { recordFirstTouch } from '../lib/attribution.mjs';
 import { USE_CASES, useCasePath } from '../lib/useCases/index.mjs';
 import { useState, useEffect } from 'react';
 import { installErrorReporting } from '../lib/errorReport';
@@ -41,6 +42,12 @@ export default function App({ Component, pageProps }) {
   // Authentication pages stay light; workspace routes honor the saved preference.
   useEffect(() => { applyTheme(router.pathname); }, [router.pathname]);
   useEffect(() => { installErrorReporting(); }, []);
+  // First-touch attribution (lib/attribution.mjs): a signed-out visitor's first landing on a public
+  // page, kept in this browser and sent once with sign-up. Once per page load, from the real URL.
+  useEffect(() => {
+    if (getToken() || !publicPage(window.location.pathname)) return;
+    try { recordFirstTouch({ href: window.location.href, referrer: document.referrer, storage: window.localStorage }); } catch { /* storage blocked */ }
+  }, []);
   useEffect(() => installAmbientMotion(), []);
 
   // Start proactive token refresh if already logged in; the account's saved theme wins over the cache.

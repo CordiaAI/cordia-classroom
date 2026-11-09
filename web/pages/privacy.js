@@ -15,7 +15,7 @@ export default function PrivacyPolicy() {
           Privacy Policy
         </h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '0.9rem' }}>
-          Effective Date: February 25, 2026 &nbsp;|&nbsp; Last Updated: November 8, 2026
+          Effective Date: February 25, 2026 &nbsp;|&nbsp; Last Updated: November 9, 2026
         </p>
 
         <p style={{ marginBottom: '32px' }}>
@@ -37,7 +37,7 @@ export default function PrivacyPolicy() {
           <p>Study guides, notes, and flashcards you generate are stored in our database associated with your account so you can access them through the platform.</p>
 
           <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>d. Usage Data</strong></p>
-          <p>We count monthly study builds, Tutor prompts, recording minutes and other AI actions per account to enforce plan limits, and we keep a study log (minutes, cards and streaks) to show your progress. We use Vercel Web Analytics and Speed Insights, which record anonymous page views and page-load performance without cookies or cross-site tracking. When the web app hits an error, the error message, page path and code location are logged so we can fix it; your study content is not included. We do not collect your browsing history.</p>
+          <p>We count monthly study builds, Tutor prompts, recording minutes and other AI actions per account to enforce plan limits, and we keep a study log (minutes, cards and streaks) to show your progress. We use Vercel Web Analytics and Speed Insights, which record anonymous page views and page-load performance without cookies or cross-site tracking. When you first visit one of our public pages, your browser keeps a note for 30 days of the page you landed on and what referred you (the referring site, any campaign tags in the link, or the AI assistant that sent you, with no personal information), and if you create an account, that note is saved with it. When the web app hits an error, the error message, page path and code location are logged so we can fix it; your study content is not included. We do not collect your browsing history.</p>
 
           <p style={{ marginTop: '16px' }}><strong style={{ color: 'var(--text-primary)' }}>e. Lecture Recordings</strong></p>
           <p>If you record a lecture, audio from your microphone is sent in short pieces to our servers and to our speech-to-text provider to make a transcript. The transcript, the notes and to-dos made from it, and the audio pieces are stored with your account until you delete the lecture or your account. You are responsible for having permission to record (see our Terms of Service).</p>
