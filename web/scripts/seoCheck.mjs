@@ -6,19 +6,34 @@
 //   ("unlimited", "CordiaClassroom", "SmartNotes") in the visible text of any public page;
 //   noindex pages (/login, /signup, /reset-password): 200 and a robots noindex tag;
 //   no public page sends an X-Robots-Tag header, and a sample of signed-in app routes sends
-//   "noindex, nofollow" and renders the matching robots meta tag.
+//   "noindex, nofollow" and renders the matching robots meta tag;
+//   draft guides (lib/guides/) 404, /guides says "coming soon" while nothing is published, and
+//   no draft's text appears in the browser JavaScript (.next/static).
 // Run from the repo root: `npm run seo:check` (or `node web/scripts/seoCheck.mjs --skip-build`
 // after `npm run build --prefix web`). Exits non-zero on any failure.
 import { spawn, spawnSync } from 'node:child_process';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BRAND_NAME, SITE_URL } from '../lib/brand.mjs';
 import { PUBLIC_PAGES, ROBOTS_NOINDEX } from '../lib/publicPages.mjs';
+import { GUIDES, PUBLISHED_GUIDES, guidePath } from '../lib/guides/index.mjs';
+import { BODIES } from '../lib/guides/bodies.mjs';
+import { parseGuide } from '../lib/guides/markdown.mjs';
 
 // Signed-in app routes that must stay out of search (any id works: the pages are static shells).
 export const APP_SAMPLES = ['/dashboard', '/library', '/guide/00000000-0000-4000-8000-000000000000', '/settings', '/learn/00000000-0000-4000-8000-000000000000'];
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+// The first words of each draft's opening, which must never appear in the browser bundle: the
+// guide registry is imported by browser code, so a body import there would publish the draft.
+export const draftMarker = slug => parseGuide(BODIES[slug])[0].text.split(/\s+/).slice(0, 8).join(' ');
+export function draftLeaks(staticDir = join(WEB, '.next', 'static')) {
+  const files = readdirSync(staticDir, { recursive: true }).filter(name => String(name).endsWith('.js'));
+  const bundle = files.map(name => readFileSync(join(staticDir, String(name)), 'utf8')).join('\n');
+  return GUIDES.filter(guide => guide.draft).filter(guide => bundle.includes(draftMarker(guide.slug))).map(guide => guide.slug);
+}
 const NEXT = join(WEB, 'node_modules', '.bin', 'next');
 const PORT = Number(process.env.SEO_CHECK_PORT || 3123);
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -159,6 +174,21 @@ async function main() {
       if (!ok) failed++;
       console.log(`${ok ? 'ok  ' : 'FAIL'} ${path} (app)  X-Robots-Tag: ${header || 'none'}  robots meta: ${meta || 'none'}`);
     }
+    // Drafts: not built for production, so they 404; the index lists none of them.
+    for (const guide of GUIDES.filter(item => item.draft)) {
+      const response = await fetch(BASE + guidePath(guide), { redirect: 'manual' });
+      const ok = response.status === 404;
+      if (!ok) failed++;
+      console.log(`${ok ? 'ok  ' : 'FAIL'} ${guidePath(guide)} (draft)  ${response.status}`);
+    }
+    const index = await (await fetch(BASE + '/guides')).text();
+    const soon = index.includes('Guides are coming soon');
+    const indexOk = PUBLISHED_GUIDES.length ? !soon : soon;
+    if (!indexOk) failed++;
+    console.log(`${indexOk ? 'ok  ' : 'FAIL'} /guides  ${PUBLISHED_GUIDES.length} published${soon ? ', says coming soon' : ''}`);
+    const leaks = draftLeaks();
+    if (leaks.length) failed++;
+    console.log(`${leaks.length ? 'FAIL' : 'ok  '} draft text in browser JavaScript: ${leaks.length ? leaks.join(', ') : 'none'}`);
     for (const file of ['/robots.txt', '/sitemap.xml', '/llms.txt']) {
       const response = await fetch(BASE + file);
       const ok = response.status === 200 && (await response.text()).length > 0;

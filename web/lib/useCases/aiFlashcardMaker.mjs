@@ -7,7 +7,7 @@ import { FADE_DAYS, LEVELS } from '../learnEngine.mjs';
 
 export default {
   slug: 'ai-flashcard-maker',
-  updated: '2026-11-08',
+  updated: '2026-11-09',
   crumb: 'AI flashcard maker',
   topic: 'AI Flashcard Maker from Your Notes',
   description: 'Cordia Classroom makes flashcards from your own slides, PDFs and notes, brings them back on a spaced schedule, and imports your Quizlet sets.',
@@ -38,11 +38,11 @@ export default {
     },
     {
       question: 'How does spaced review work in Cordia?',
-      answer: `Cards come back after ${listText(INTERVALS.map(String))} days, a step further along that schedule each time you finish a round with them.`,
+      answer: `Cards come back after ${listText(INTERVALS.map(String))} days: a step further along that schedule each time you finish a round without missing them, and back to the start when you miss one.`,
       bullets: [
         'Flip (or Space) shows the answer.',
         'Got it (or 2, or a swipe right) counts the card as known for this round.',
-        'Again (or 1, or a swipe left) sends the card to the back of the round, so you see it again before the round ends.',
+        'Again (or 1, or a swipe left) sends the card to the back of the round, so you see it again before the round ends; when the round is over, a card you missed comes back the next day.',
         'Library shows how many cards are due, and Study now on a guide mixes due cards with Learn ideas, up to 30 cards a round.',
       ],
     },

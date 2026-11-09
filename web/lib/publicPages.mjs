@@ -5,6 +5,7 @@
 // the sitemap.
 import { BRAND_NAME, PLANS, planByKey } from './brand.mjs';
 import { USE_CASES, useCasePath } from './useCases/index.mjs';
+import { AUTHOR, PUBLISHED_GUIDES, guidePath } from './guides/index.mjs';
 
 const { trial } = PLANS;
 const price = key => `$${planByKey(key).price}`;
@@ -29,6 +30,18 @@ export const PUBLIC_PAGES = [
   ...USE_CASES.map(page => ({
     path: useCasePath(page), file: `pages/${page.slug}.js`, index: true, crumb: page.crumb,
     topic: page.topic, description: page.description, modified: page.updated,
+  })),
+  // Guides (lib/guides/): the index stays noindex until a guide is published, and only published
+  // guides are listed here. Drafts aren't, so they get the app noindex rule and no sitemap entry.
+  {
+    path: '/guides', file: 'pages/guides/index.js', index: PUBLISHED_GUIDES.length > 0, crumb: 'Guides',
+    topic: 'Study Guides and How-Tos',
+    description: 'Guides from Cordia Classroom on studying for college exams: planning backward from the test, active recall, spaced review and using AI with your own notes.',
+  },
+  ...PUBLISHED_GUIDES.map(guide => ({
+    path: guidePath(guide), file: 'pages/guides/[slug].js', index: true, crumb: guide.crumb,
+    topic: guide.topic, description: guide.description, modified: guide.dateModified,
+    article: { headline: guide.title, author: AUTHOR, published: guide.datePublished },
   })),
   {
     path: '/connect/claude', file: 'pages/connect/claude.js', index: true, crumb: 'Use with Claude',
