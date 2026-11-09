@@ -6,7 +6,7 @@ import { freeAllowance } from '../brand.mjs';
 
 export default {
   slug: 'canvas-study-tool',
-  updated: '2026-11-08',
+  updated: '2026-11-09',
   crumb: 'Canvas study tool',
   topic: 'AI Study Tool for Canvas',
   description: 'Connect Canvas to Cordia Classroom to bring in your classes, deadlines, grades and course files, and turn any course file into a study guide.',
@@ -39,6 +39,15 @@ export default {
       ],
     },
     {
+      question: 'How do I turn a Canvas page into a study guide?',
+      answer: 'Use the Cordia Classroom Chrome extension on the Canvas page itself.',
+      bullets: [
+        'Open the Canvas page, file or slides you want to study in Chrome.',
+        'Open Cordia\'s side panel: choose the Cordia Classroom icon in Chrome\'s toolbar, or press Ctrl+Shift+Y (Command+Shift+Y on a Mac).',
+        'Choose Make study guide. When it\'s ready, choose Save to Classroom.',
+      ],
+    },
+    {
       question: 'How do I connect Canvas?',
       answer: 'Make an access token in Canvas and paste it into Cordia with your Canvas address.',
       bullets: [
@@ -65,6 +74,14 @@ export default {
       paragraphs: [
         'Sync now runs it right away, at most once a minute. Module files for auto-import are checked every 6 hours. A calendar link isn\'t synced in the background: it is read each time your calendar loads.',
       ],
+    },
+    {
+      question: 'Is it the same as a school-installed Canvas integration?',
+      answer: 'No. Cordia isn\'t an LTI app or a Canvas partner, and your school doesn\'t install it: it works through your browser and your own Canvas account.',
+      paragraphs: [
+        'A school-installed integration (an LTI app) is added by your school\'s Canvas admin and appears inside your courses. Cordia reads Canvas with the access token you make or your Canvas calendar link, and its Chrome extension reads the Canvas pages you have open.',
+      ],
+      link: { href: '/best-ai-study-platforms-canvas-integration', label: 'Compare AI study platforms that work with Canvas' },
     },
     {
       question: 'What if my class isn\'t on Canvas?',

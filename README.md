@@ -1,10 +1,10 @@
-# CordiaClassroom
+# Cordia Classroom
 
 A Chrome side-panel extension and Classroom web app that share one Cordia Tutor session for capturing and learning from student-approved educational content.
 
 ## Overview
 
-CordiaClassroom captures content from learning platforms, online textbooks, PDFs, slideshows, and webpages, then turns it into organized study materials.
+Cordia Classroom captures content from learning platforms, online textbooks, PDFs, slideshows, and webpages, then turns it into organized study materials.
 
 ## Features
 
@@ -19,7 +19,7 @@ CordiaClassroom captures content from learning platforms, online textbooks, PDFs
 
 ### Slideshow Detection & Extraction
 
-CordiaClassroom automatically detects and extracts content from slideshows:
+Cordia Classroom automatically detects and extracts content from slideshows:
 
 | Platform | Detection | Extraction |
 |----------|-----------|------------|
