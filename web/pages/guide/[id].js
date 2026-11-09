@@ -22,10 +22,6 @@ import { classLabel } from '../../lib/classLabel';
 import Menu from '../../components/Menu';
 import ClassChip from '../../components/ClassChip';
 import VisibilityChip from '../../components/VisibilityChip';
-import PublishSheet from '../../components/PublishSheet';
-import { loadMyProfile } from '../../lib/profiles';
-import { setGuideVisibility } from '../../lib/guideSharing';
-import { firstPublishStep } from '../../lib/guideVisibility.mjs';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import AddToClassroom from '../../components/AddToClassroom';
 import { CLASSROOMS_ON } from '../../lib/featureFlags';
@@ -167,7 +163,6 @@ export default function GuidePage() {
   undoRef.current = undoNotes;
   const [sharing, setSharing] = useState(null);
   const [toastAction, setToastAction] = useState(null); // { label, run } shown beside the toast
-  const [firstPublish, setFirstPublish] = useState(false);
   const [sharingToRoom, setSharingToRoom] = useState(false);
   const prevRevealed = useRef(0);
   const { learningStyle } = useLearningStyle();
@@ -305,26 +300,6 @@ export default function GuidePage() {
     loadSharing();
   }
 
-  // Once per student, on a guide they just made: new guides are public (after the Honor Code), so
-  // say so with "Make private" one tap away; someone who hasn't accepted it gets the Honor Code sheet.
-  async function firstPublishCheck(loaded) {
-    const step = firstPublishStep(loaded, { asked: Boolean(readUserValue('cordiaPublishAsked', false)) });
-    if (step === 'notice') {
-      writeUserValue('cordiaPublishAsked', true);
-      setToastAction({ label: 'Make private', run: () => makePrivate() });
-      setToast('New guides are public');
-      return;
-    }
-    if (step !== 'ask') return;
-    const me = await loadMyProfile();
-    if (me && !me.honor_code_accepted) setFirstPublish(true);
-  }
-
-  async function makePrivate() {
-    const { result, error } = await setGuideVisibility(id, { visibility: 'private' });
-    if (result) { onVisibility(result); setToastAction(null); setToast('Private'); } else setToast(error);
-  }
-
   async function pullUpdate() {
     const data = await apiFetch(`/sharing/guides/${id}/update`, { method: 'POST' });
     if (data?.ok) { await loadGuide(); setSharing(current => ({ ...current, update_available: false })); setToast('Updated'); }
@@ -350,7 +325,6 @@ export default function GuidePage() {
       if (data.guide.source_type === 'canvas_module' && fileNamesOnly(data.guide.notes)) fetchCanvasFiles(data.guide.id);
       rememberLastGuide({ id: data.guide.id, title: data.guide.title, page: Number(router.query.page) > 0 ? Number(router.query.page) - 1 : 0 });
       walkthroughEvent('guide-open');
-      firstPublishCheck(data.guide);
     } else {
       setLoadError(apiErrorMessage(data?.detail, 'This study guide could not be loaded.'));
     }
@@ -731,21 +705,6 @@ export default function GuidePage() {
           {undoNotes !== null && <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={undoRegenerate}>Undo</button>}
           {toastAction && <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={toastAction.run}>{toastAction.label}</button>}
         </div>
-      )}
-      {firstPublish && (
-        <PublishSheet
-          visibility="public"
-          fresh
-          attribution={guide.attribution}
-          onClose={() => { writeUserValue('cordiaPublishAsked', true); setFirstPublish(false); }}
-          onPublish={async chosen => {
-            const { result, error } = await setGuideVisibility(id, { visibility: 'public', attribution: chosen, accept_honor_code: true });
-            writeUserValue('cordiaPublishAsked', true);
-            setFirstPublish(false);
-            if (result) { onVisibility(result); setToast(result.review_status === 'held' ? 'Held for review' : 'Public'); } else setToast(error);
-          }}
-          onPrivate={() => { writeUserValue('cordiaPublishAsked', true); setFirstPublish(false); setToast('Kept private'); }}
-        />
       )}
 
       <style jsx>{`
