@@ -1,6 +1,6 @@
-// Display copy for CordiaClassroom plans. Limits themselves come from /billing/status,
+// Display copy for Cordia Classroom plans. Limits themselves come from /billing/status,
 // so the backend (backend/services/entitlements.py) stays the only place a number is enforced.
-export const PRO_NAME = 'CordiaClassroom';
+export const PRO_NAME = 'Cordia Classroom';
 
 // Paid tiers, cheapest first. `status.tier` from /billing/status is one of 'free' | 'pro' | 'weapon'.
 export const TIERS = {
