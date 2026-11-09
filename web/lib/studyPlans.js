@@ -1,5 +1,7 @@
 import { apiFetch } from './api';
 
+export { minutesLabel, scheduleNotice } from './studyTime.mjs';
+
 // Assignment kickoff, study blocks, alerts and the weekly review (backend routers/plans.py).
 export const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const path = key => `/plans/${encodeURIComponent(key)}`;
@@ -21,14 +23,6 @@ export const getAnnouncements = () => apiFetch('/announcements');
 
 export const syncOn = connector => apiFetch(`/sync/${connector}`, { method: 'POST', body: JSON.stringify({ time_zone: timeZone() }), timeoutMs: 120000 });
 export const syncOff = connector => apiFetch(`/sync/${connector}`, { method: 'DELETE' });
-
-export function minutesLabel(minutes) {
-  const value = Math.max(0, Math.round(minutes || 0));
-  if (value < 60) return `${value} min`;
-  const hours = Math.floor(value / 60);
-  const rest = value % 60;
-  return rest ? `${hours} h ${rest} min` : `${hours} h`;
-}
 
 // "4 min ago", "2 h ago", "Oct 21".
 export function agoLabel(iso, now = Date.now()) {

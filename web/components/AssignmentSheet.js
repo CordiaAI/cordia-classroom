@@ -7,7 +7,7 @@ import DraftLink from './DraftLink';
 import RepoLink from './RepoLink';
 import { EXTRA_CONNECTORS_ON } from '../lib/featureFlags';
 import { SectionLoader } from './CordiaLoader';
-import { buildExamReview, getPlan, makePlan, minutesLabel, removePlan, schedulePlan, setStepDone } from '../lib/studyPlans';
+import { buildExamReview, getPlan, makePlan, minutesLabel, removePlan, scheduleNotice, schedulePlan, setStepDone } from '../lib/studyPlans';
 import { useRouter } from 'next/router';
 import { dayKey } from '../lib/learnEngine.mjs';
 import { deadlineTitle } from '../lib/formatters';
@@ -48,9 +48,9 @@ export default function AssignmentSheet({ item, onClose }) {
   }
 
   const breakDown = () => run('plan', () => makePlan(item.id));
-  const schedule = () => run('schedule', () => schedulePlan(item.id), result => (result.added
-    ? `Added ${result.added} study block${result.added === 1 ? '' : 's'} before it's due.`
-    : 'Your study time already covers this.'));
+  const schedule = () => run('schedule', () => schedulePlan(item.id), result => scheduleNotice(result, {
+    where: "before it's due", covered: 'Your study time already covers this.',
+  }));
   const startOver = () => run('reset', async () => ((await removePlan(item.id))?.ok ? { plan: null } : null));
   const router = useRouter();
   // Exams: gather the class's material into one review set, then learn it paced to the exam date.
