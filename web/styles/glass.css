@@ -280,6 +280,9 @@ body { touch-action: manipulation; }
 .tutor-chats-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .tutor-chat-row { display: grid; gap: 2px; width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid var(--hairline); border-radius: var(--r-input); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; transition: background var(--dur) var(--ease); }
 .tutor-chat-row:hover:not(:disabled) { background: var(--lift-pane); box-shadow: var(--lift-shadow); transform: var(--lift); }
+.tutor-chat-item { display: flex; align-items: center; gap: 6px; }
+.tutor-chat-item .tutor-chat-row { flex: 1; min-width: 0; }
+.tutor-chat-delete { flex: none; }
 .tutor-chat-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.4 var(--font-sans); }
 .tutor-chat-row .c-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tutor-chats-btn[aria-pressed='true'] { background: var(--olive-tint) !important; color: var(--olive-ink) !important; }

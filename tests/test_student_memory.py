@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "backend"))
 
 from fastapi import HTTPException
+from access import Ctx
 from routers import learning
 from services import memory_context, student_memory
 
@@ -94,19 +95,20 @@ class SharedMemoryReachesHelpMeRememberTests(unittest.TestCase):
 
 
 class MemoryRouteTests(unittest.TestCase):
+    """The routes take the access layer's Ctx (access.own()): the signed-in student and the database."""
+
     def test_forgetting_needs_a_real_id_and_an_own_row(self):
-        with patch.object(learning, "get_user_id", return_value="u1"), patch.object(learning, "get_supabase", return_value=table_db()[0]):
-            with self.assertRaises(HTTPException) as bad:
-                learning.forget_memory("../x", "Bearer t")
-            self.assertEqual(bad.exception.status_code, 400)
-            with self.assertRaises(HTTPException) as gone:
-                learning.forget_memory("00000000-0000-0000-0000-000000000001", "Bearer t")
-            self.assertEqual(gone.exception.status_code, 404)
+        ctx = Ctx("u1", table_db()[0])
+        with self.assertRaises(HTTPException) as bad:
+            learning.forget_memory("../x", ctx)
+        self.assertEqual(bad.exception.status_code, 400)
+        with self.assertRaises(HTTPException) as gone:
+            learning.forget_memory("00000000-0000-0000-0000-000000000001", ctx)
+        self.assertEqual(gone.exception.status_code, 404)
 
     def test_forgetting_is_scoped_to_the_student(self):
         db, calls = table_db({"student_memory": [{"id": "m1"}]})
-        with patch.object(learning, "get_user_id", return_value="u1"), patch.object(learning, "get_supabase", return_value=db):
-            learning.forget_memory("00000000-0000-0000-0000-000000000001", "Bearer t")
+        learning.forget_memory("00000000-0000-0000-0000-000000000001", Ctx("u1", db))
         calls["student_memory"].eq.assert_any_call("user_id", "u1")
 
 

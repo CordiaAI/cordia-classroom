@@ -109,6 +109,16 @@ def list_for(db, user_id: str, limit: int = 100) -> list:
         return []
 
 
+def forget_all(db, user_id: str) -> int:
+    """Deletes all of the student's memories (Assistant ones go in the Assistant too). How many went."""
+    try:
+        gone = db.table("student_memory").delete().eq("user_id", user_id).execute().data
+    except Exception:
+        logger.warning("Student memory not cleared", exc_info=True)
+        raise
+    return len(gone or [])
+
+
 def forget(db, user_id: str, memory_id: str) -> bool:
     """Deletes one of the student's own memories (an Assistant one goes in the Assistant too)."""
     try:
