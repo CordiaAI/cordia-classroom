@@ -18,6 +18,10 @@ ZONE = ZoneInfo("America/Chicago")
 NOW = datetime.now(timezone.utc).replace(microsecond=0)
 DUE = (NOW + timedelta(days=6)).replace(minute=0, second=0)
 ITEMS = [{"id": "canvas-1", "title": "Lab report", "due_at": DUE.isoformat(), "course": "BIO 101", "done": False, "type": "assignment"}]
+# Kickoff runs on a fixed clock: 20:10 in Chicago, when today's only free time is a 45-minute slot.
+KICKOFF_NOW = datetime(2026, 11, 3, 2, 10, tzinfo=timezone.utc)
+KICKOFF_DUE = KICKOFF_NOW + timedelta(days=6, minutes=50)
+KICKOFF_ITEMS = [dict(ITEMS[0], due_at=KICKOFF_DUE.isoformat())]
 
 
 class PlannerRules(unittest.TestCase):
@@ -40,6 +44,15 @@ class PlannerRules(unittest.TestCase):
         self.assertEqual(len(days), len(set(days)))
         self.assertGreaterEqual(sum((b - a).seconds // 60 for a, b in blocks), 240)
         self.assertTrue(all(a.astimezone(ZONE).hour == 19 for a, _ in blocks))
+
+    def test_short_slots_are_skipped_so_the_full_time_is_placed(self):
+        today = datetime(2026, 11, 2, tzinfo=ZONE)
+        slots = [(today.replace(hour=21, minute=15), today.replace(hour=22))]
+        slots += planner.free_slots([], (today + timedelta(days=1)).replace(hour=9), today + timedelta(days=6), ZONE)
+        for hour in (None, 19):
+            blocks = planner.place_blocks(120, slots, ZONE, preferred_hour=hour)
+            self.assertEqual(sum((b - a).seconds // 60 for a, b in blocks), 120)
+            self.assertNotIn(today.date(), [a.astimezone(ZONE).date() for a, _ in blocks])
 
     def test_exam_sessions_get_shorter_and_skip_the_past(self):
         sessions = planner.exam_sessions(NOW + timedelta(days=4), NOW)
@@ -149,8 +162,9 @@ class Kickoff(unittest.TestCase):
         self.patches = [
             patch("routers.plans.get_supabase", return_value=self.db),
             patch("services.sync_state.get_supabase", return_value=self.db),
-            patch("routers.plans.calendar_for", return_value={"items": ITEMS}),
+            patch("routers.plans.calendar_for", return_value={"items": KICKOFF_ITEMS}),
             patch("services.composio.configured", return_value=False),
+            patch("routers.plans._now", return_value=KICKOFF_NOW),
         ]
         for p in self.patches:
             p.start()
@@ -162,21 +176,21 @@ class Kickoff(unittest.TestCase):
     def test_plan_falls_back_when_the_model_fails_and_schedules_before_the_deadline(self):
         from routers import plans
         with patch("routers.plans.plan_assignment", side_effect=RuntimeError("down")):
-            plan = plans.make_plan(USER, ITEMS[0])
+            plan = plans.make_plan(USER, KICKOFF_ITEMS[0])
         self.assertEqual(plan["effort_minutes"], 120)
         self.assertEqual(len(plan["steps"]), 3)
-        self.assertEqual(plan["steps"][-1]["due_at"], DUE.isoformat())
-        added = plans.schedule(USER, ITEMS[0], ZONE)
+        self.assertEqual(plan["steps"][-1]["due_at"], KICKOFF_DUE.isoformat())
+        added = plans.schedule(USER, KICKOFF_ITEMS[0], ZONE)
         self.assertTrue(added)
-        self.assertTrue(all(datetime.fromisoformat(b["ends_at"]) <= DUE for b in added))
+        self.assertTrue(all(datetime.fromisoformat(b["ends_at"]) <= KICKOFF_DUE for b in added))
         self.assertGreaterEqual(sum((datetime.fromisoformat(b["ends_at"]) - datetime.fromisoformat(b["starts_at"])).seconds // 60 for b in added), 120)
-        self.assertEqual(plans.schedule(USER, ITEMS[0], ZONE), [])  # Already covered: nothing doubled.
+        self.assertEqual(plans.schedule(USER, KICKOFF_ITEMS[0], ZONE), [])  # Already covered: nothing doubled.
 
     def test_model_steps_are_used_when_usable(self):
         from routers import plans
         made = {"effort_minutes": 150, "basis": "A 50-point lab write-up.", "steps": [{"title": "Analyze the data", "minutes": 60}, {"title": "Write it up", "minutes": 90}]}
         with patch("routers.plans.plan_assignment", return_value=made):
-            plan = plans.make_plan(USER, ITEMS[0])
+            plan = plans.make_plan(USER, KICKOFF_ITEMS[0])
         self.assertEqual([s["title"] for s in plan["steps"]], ["Analyze the data", "Write it up"])
         self.assertEqual(plan["effort_basis"], "A 50-point lab write-up.")
 
