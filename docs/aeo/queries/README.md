@@ -4,11 +4,11 @@ Read-only SQL for the AI-referral funnel. Run these in the Supabase SQL editor, 
 
 ## When tracking went live
 
-First-touch attribution went live on **2026-11-09**. That's the day the `user_profiles.acquisition` migration was applied and `ACQUISITION_TRACKING=1` was set on the backend.
+First-touch attribution went live at **2026-11-09 02:56:32 UTC**. That's when the live backend's `https://autostudy-ai.fly.dev/openapi.json` first listed `acquisition` under `AgeRequest`, after the redeploy from main.
 
-The first backend deploy that day ran from code without the `acquisition` field on `POST /auth/age`. Sign-ups before the redeploy that includes it were saved without first-touch data. Use that redeploy's time as `go_live` below. You can confirm it's live when `https://autostudy-ai.fly.dev/openapi.json` lists `acquisition` under `AgeRequest`.
+Earlier the same day, the `user_profiles.acquisition` migration was applied and `ACQUISITION_TRACKING=1` was set. But the first backend deploy ran from code without the `acquisition` field on `POST /auth/age`, so sign-ups before 02:56:32 UTC were saved without first-touch data.
 
-**`ai-funnel.sql` is only meaningful from that date onward.** Earlier sign-ups have no acquisition data and show as "(not recorded)". A 30-day window that starts before go-live mixes the two, so read it as a full picture only from 2026-12-09.
+**`ai-funnel.sql` is only meaningful from go-live onward.** Earlier sign-ups have no acquisition data and show as "(not recorded)". A 30-day window that starts before go-live mixes the two, so read it as a full picture only from 2026-12-09 02:56 UTC.
 
 ## Files
 
@@ -16,10 +16,10 @@ The first backend deploy that day ran from code without the `acquisition` field 
 
 ## 48-hour check: are new sign-ups getting acquisition data?
 
-Run this 48 hours after go-live. Set `go_live` to the time of the deploy that accepts `acquisition`, in UTC.
+Run this 48 hours after go-live, from 2026-11-11 02:56 UTC. `go_live` is already set to the go-live time.
 
 ```sql
-with go_live as (select timestamptz '2026-11-09 00:00:00+00' as at),  -- set to the go-live deploy time
+with go_live as (select timestamptz '2026-11-09 02:56:32+00' as at),  -- when the live backend first accepted acquisition
 excluded as (
   select 'd8084ee2-a763-469e-8c33-ace8203a80c4'::uuid as id
   union select user_id from public.app_admins
