@@ -7,6 +7,7 @@ const KEY = 'cordiaReturnTo';
 export function safeReturnTo(value) {
   if (typeof value !== 'string') return null;
   if (/^\/assistant(\/[\w\-/]*)?(\?[\w=&%-]*)?$/.test(value)) return value;
+  if (value === '/chat') return value;
   if (/^\/oauth\/consent\?authorization_id=[\w-]{1,128}$/.test(value)) return value;
   return null;
 }

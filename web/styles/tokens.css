@@ -227,6 +227,9 @@
   --block-shade: rgba(0, 0, 0, 0.12); --block-shine: rgba(255, 255, 255, 0.28);
   /* The arrow on dropdowns (select.c-select), drawn in the muted ink. */
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235F655F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  /* Chat workspace (pages/chat.js): flat black and white, the accent only on the send button. */
+  --chat-bg: #FFFFFF; --chat-nav: #F7F7F5; --chat-soft: #F1F1EE; --chat-line: rgba(23, 27, 24, 0.10);
+  --chat-ink: #141414; --chat-muted: rgba(20, 20, 20, 0.56); --chat-solid: #141414; --chat-on-solid: #FFFFFF;
 }
 
 [data-theme='dark'] {
@@ -314,6 +317,8 @@
   --block-1: #A9C08F; --block-2: #E8A27A; --block-3: #EDC66E; --block-4: #8EAED0; --block-5: #BF9AC4;
   --block-shade: rgba(0, 0, 0, 0.22); --block-shine: rgba(255, 255, 255, 0.18);
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23B9BEB6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --chat-bg: #161616; --chat-nav: #1D1D1C; --chat-soft: #262625; --chat-line: rgba(255, 255, 255, 0.10);
+  --chat-ink: #ECECEA; --chat-muted: rgba(236, 236, 234, 0.56); --chat-solid: #ECECEA; --chat-on-solid: #141414;
 }
 
 /* Backdrop behind the app: pale clouds in light; a static, softly blurred olive and charcoal field in dark. */

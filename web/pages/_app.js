@@ -6,6 +6,7 @@ import '../styles/tokens.css';
 import '../styles/glass.css';
 import '../styles/assistant.css';
 import '../styles/motion.css';
+import '../styles/chat.css';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { syncServerCopies } from '../lib/serverSync';
@@ -87,8 +88,8 @@ export default function App({ Component, pageProps }) {
     </Head>
   );
 
-  // A printable page is only the paper: no app shell around it.
-  if (router.pathname.startsWith('/print/')) {
+  // A printable page is only the paper, and the chat workspace has its own shell: no app shell around either.
+  if (router.pathname.startsWith('/print/') || router.pathname === '/chat') {
     return <>{brandHead}<Component {...pageProps} /></>;
   }
 
