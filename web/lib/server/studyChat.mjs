@@ -3,6 +3,7 @@
 // Row Level Security decides what they see. Each tool result that has something to look at comes
 // back with a `window` the page opens beside the chat. Admin-only while it is a prototype.
 import Anthropic from '@anthropic-ai/sdk';
+import { createClient } from '@supabase/supabase-js';
 import * as z from 'zod';
 import { studentClient } from '../mcp/auth.mjs';
 import { loadCourses } from '../mcp/courses.mjs';
@@ -114,10 +115,11 @@ const STYLE_WORDS = {
 // The student behind a normal app sign-in, or null. Connected-app tokens are turned away earlier.
 export async function studentFromToken(token, config = mcpConfig()) {
   if (!token) return null;
-  const db = studentClient(config, token);
-  const { data, error } = await db.auth.getUser(token);
+  // A client built with accessToken can't call auth.getUser, so the check uses a plain one.
+  const auth = createClient(config.supabaseUrl, config.publishableKey, { auth: { persistSession: false, autoRefreshToken: false } }).auth;
+  const { data, error } = await auth.getUser(token);
   if (error || !data?.user?.id) return null;
-  return { db, userId: data.user.id, token };
+  return { db: studentClient(config, token), userId: data.user.id, token };
 }
 
 // Prototype access: Classroom admins, plus the user ids in STUDY_CHAT_USER_IDS (comma-separated).

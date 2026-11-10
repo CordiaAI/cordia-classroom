@@ -11,9 +11,15 @@ const MAX_MESSAGES = 60;
 async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  const student = await studentFromToken(token);
+  let student;
+  try {
+    student = await studentFromToken(token);
+    if (student && !(await mayUseChat(student))) return res.status(403).json({ detail: 'The chat workspace is a prototype and is not on for this account yet.' });
+  } catch (error) {
+    console.error('[study-chat] sign-in check', error?.message || error);
+    return res.status(503).json({ detail: 'Cordia could not check your sign-in. Try again.' });
+  }
   if (!student) return res.status(401).json({ detail: 'Sign in to Cordia Classroom first.' });
-  if (!(await mayUseChat(student))) return res.status(403).json({ detail: 'The chat workspace is a prototype and is not on for this account yet.' });
 
   if (req.method === 'GET') {
     try {
