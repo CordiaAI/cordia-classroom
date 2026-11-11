@@ -19,6 +19,12 @@ const INTERESTS = [
   { value: 'art_design', label: 'Art & design' }, { value: 'fashion', label: 'Fashion' }, { value: 'tech', label: 'Tech' },
   { value: 'animals', label: 'Animals' }, { value: 'books', label: 'Books' }, { value: 'travel', label: 'Travel' },
 ];
+// Required on Continue (backend services/onboarding_questions.py "heard_from").
+const HEARD_FROM = [
+  { value: 'tiktok', label: 'TikTok' }, { value: 'instagram', label: 'Instagram' }, { value: 'reddit', label: 'Reddit' },
+  { value: 'x', label: 'X' }, { value: 'linkedin', label: 'LinkedIn' }, { value: 'friend', label: 'Friend' },
+  { value: 'professor_class', label: 'Professor/class' }, { value: 'discord', label: 'Discord' }, { value: 'other', label: 'Other' },
+];
 const MAX_INTERESTS = 3;
 const MAJORS = ['Nursing', 'Biology', 'Business', 'Psychology', 'Computer science', 'Engineering', 'Law', 'Education', 'History', 'Arts'];
 
@@ -32,6 +38,7 @@ export default function AboutYou({ index = 1, total = 4 }) {
   const [otherMajor, setOtherMajor] = useState(false);
   const [memoryStyles, setMemoryStyles] = useState([]);
   const [interests, setInterests] = useState([]);
+  const [heardFrom, setHeardFrom] = useState('');
   const [saving, setSaving] = useState(false);
 
   function toggleStyle(value) {
@@ -53,6 +60,7 @@ export default function AboutYou({ index = 1, total = 4 }) {
       body: JSON.stringify({ education_level: level, university: school.trim(), major: level === 'university' ? major.trim() : '' }),
     });
     const answers = [
+      heardFrom && { question_id: 'heard_from', version: 1, answer: { value: heardFrom }, source: 'onboarding' },
       memoryStyles.length && { question_id: 'memory_style', version: 2, answer: { value: memoryStyles }, source: 'onboarding' },
       interests.length && { question_id: 'interests', version: 1, answer: { value: interests }, source: 'onboarding' },
     ].filter(Boolean);
@@ -95,6 +103,14 @@ export default function AboutYou({ index = 1, total = 4 }) {
           {otherMajor && <input className="c-input about-other" value={major} onChange={event => setMajor(event.target.value)} aria-label="Major" placeholder="Major" autoFocus />}
         </fieldset>
       )}
+
+      <label className="c-field about-group">
+        <span className="c-section-title">How did you hear about us?</span>
+        <select className="c-input" value={heardFrom} onChange={event => setHeardFrom(event.target.value)} required>
+          <option value="" disabled>Choose one</option>
+          {HEARD_FROM.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+        </select>
+      </label>
 
       <fieldset className="about-group">
         <legend className="c-section-title">How do you like to remember things? <span className="c-meta about-hint">Pick any</span></legend>

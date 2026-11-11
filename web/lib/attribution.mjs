@@ -1,8 +1,8 @@
 // First-touch attribution: where a visitor came from the first time they landed on a public page,
 // kept in this browser (localStorage, first-party only) for 30 days and sent once with sign-up
 // (lib/ageCheck.js -> POST /auth/age). It never overwrites a first touch younger than 30 days and
-// holds no personal data: a path, a referring host (never the full URL), campaign tags, Cordia's
-// own ?from= value and, when the visit came from an AI assistant, which one.
+// holds no personal data: a path, a referring host (never the full URL), campaign tags, a ?ref=
+// code, Cordia's own ?from= value and, when the visit came from an AI assistant, which one.
 
 export const FIRST_TOUCH_KEY = 'cordiaFirstTouch';
 export const FIRST_TOUCH_DAYS = 30;
@@ -35,7 +35,7 @@ export function aiEngine({ referrerHost = '', referrerPath = '', utmSource = '' 
 }
 
 // The first touch for one page load: { at, landing_path, referrer_host, utm_source, utm_medium,
-// utm_campaign, from, ai_engine }. A referrer from this same site isn't a source.
+// utm_campaign, ref, from, ai_engine }. A referrer from this same site isn't a source.
 export function firstTouchFrom({ href, referrer = '', now = Date.now() }) {
   const page = new URL(href);
   let referrerHost = null;
@@ -57,6 +57,7 @@ export function firstTouchFrom({ href, referrer = '', now = Date.now() }) {
     utm_source: utmSource,
     utm_medium: clip(query.get('utm_medium'), 100),
     utm_campaign: clip(query.get('utm_campaign'), 100),
+    ref: clip(query.get('ref'), 100),
     from: fromValue && /^[a-z0-9-]+$/.test(fromValue) ? fromValue : null,
     ai_engine: aiEngine({ referrerHost: referrerHost || '', referrerPath, utmSource: utmSource || '' }),
   };

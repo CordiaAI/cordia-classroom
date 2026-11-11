@@ -31,8 +31,8 @@ test('AI assistants are recognised from the referrer or utm_source', () => {
 });
 
 test('a first touch holds a path, a referring host, campaign tags, ?from= and the AI engine, nothing personal', () => {
-  const touch = firstTouchFrom({ href: 'https://classroom.cordiaai.io/ai-quiz-generator?utm_source=chatgpt.com&utm_campaign=fall&from=ai-quiz-generator&email=x@y.z', referrer: 'https://chatgpt.com/c/abc123', now: NOW });
-  assert.deepEqual(touch, { at: NOW, landing_path: '/ai-quiz-generator', referrer_host: 'chatgpt.com', utm_source: 'chatgpt.com', utm_medium: null, utm_campaign: 'fall', from: 'ai-quiz-generator', ai_engine: 'chatgpt' });
+  const touch = firstTouchFrom({ href: 'https://classroom.cordiaai.io/ai-quiz-generator?utm_source=chatgpt.com&utm_campaign=fall&ref=campus-ambassador&from=ai-quiz-generator&email=x@y.z', referrer: 'https://chatgpt.com/c/abc123', now: NOW });
+  assert.deepEqual(touch, { at: NOW, landing_path: '/ai-quiz-generator', referrer_host: 'chatgpt.com', utm_source: 'chatgpt.com', utm_medium: null, utm_campaign: 'fall', ref: 'campus-ambassador', from: 'ai-quiz-generator', ai_engine: 'chatgpt' });
   assert.ok(!JSON.stringify(touch).includes('x@y.z') && !JSON.stringify(touch).includes('abc123'), 'no query values or referrer paths beyond the allowlist');
   const internal = firstTouchFrom({ href: 'https://classroom.cordiaai.io/pricing', referrer: 'https://classroom.cordiaai.io/', now: NOW });
   assert.equal(internal.referrer_host, null, 'a referrer from this site is not a source');
