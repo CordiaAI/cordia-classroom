@@ -1,4 +1,4 @@
-// Draft: /guides/how-to-study-for-finals. Outside facts link to sources whose abstracts were read
+// /guides/how-to-study-for-finals. Outside facts link to sources whose abstracts were read
 // (listed in `sources`); Cordia facts match the code (lib/useCases/ has the file:line for each).
 import { AUTHOR } from './author.mjs';
 
@@ -9,9 +9,9 @@ export default {
   crumb: 'How to study for finals',
   description: 'A finals study plan that counts back from the exam date: test yourself, mix in old material, sleep, and keep the night before light. Two weeks or two days.',
   author: AUTHOR,
-  datePublished: '2026-11-09',
-  dateModified: '2026-11-09',
-  draft: true,
+  datePublished: '2026-11-11',
+  dateModified: '2026-11-11',
+  draft: false,
   sources: [
     { title: 'Roediger & Karpicke (2006), "Test-Enhanced Learning", Psychological Science 17(3)', url: 'https://doi.org/10.1111/j.1467-9280.2006.01693.x', supports: 'Testing yourself beat restudying on tests 2 days and 1 week later, even though restudying felt better.' },
     { title: 'Cepeda et al. (2006), "Distributed practice in verbal recall tasks", Psychological Bulletin 132(3)', url: 'https://doi.org/10.1037/0033-2909.132.3.354', supports: 'Spreading study out helps, and the best gap between sessions grows with how long you need to remember.' },
@@ -46,7 +46,7 @@ Start with the exam itself and work toward today.
 - **Give the weakest topics the earliest days**, so they come back again before the exam.
 - **Add one buffer day** for the topic that turns out harder than you thought.
 
-<!-- PERSONAL EXAMPLE (Jude): a time a plan fell apart because a topic took twice as long as expected, and what the buffer day saved. -->
+Every time I make a finals plan, I underestimate the one topic I think I already know. In high school it was the last unit of math. I gave it one night and it took three, because I kept hitting problem types I'd never actually practiced. I dropped the full re-read of my notes for my easiest class and used that time on the math instead. That was the right call.
 
 If you use Cordia, adding the exam as your test date in Learn does the counting for you: it shows how many ideas to master each day to be ready the day before.
 
@@ -77,7 +77,7 @@ Review earlier material every day, mixed in with the new. Spacing works because 
 
 Mixing different kinds of problems in one session helps too. In a classroom experiment, math students whose practice mixed problem types scored higher than students who practiced one type at a time, both on a test the next day and on a test 30 days later ([Rohrer, Dedrick & Stershic, 2015](https://doi.org/10.1037/edu0000001)). On an exam, the questions come mixed and you have to recognize which method each one needs; mixed practice rehearses exactly that.
 
-<!-- PERSONAL EXAMPLE (Jude): a course where mixing old and new problems exposed a method you thought you knew. -->
+For me, it was math. When I practiced one section at a time I got everything right, because I knew which method each chapter wanted. Once the problems were mixed together, I kept grabbing the method from the chapter I'd just studied instead of reading what the problem was asking. After that I stopped doing practice by chapter. I shuffle problems and decide which method to use before I start solving.
 
 ## How much sleep do I need during finals?
 
@@ -118,7 +118,7 @@ Cut the list, not the method. With two days you cannot cover everything at depth
 - **Mix topics on day two.** Do a timed mixed set in the morning and spend the afternoon on the misses.
 - **Still sleep both nights.** Two nights of normal sleep protect what you learn on both days.
 
-<!-- PERSONAL EXAMPLE (Jude): a two-day finals crunch, what got cut, and how the exam went. -->
+Honestly, I crammed. I stayed up too late rereading slides and felt ready, then walked in tired and blanked on stuff I'd "reviewed" the night before. Now the night before is just a quick look at whatever I keep missing, then sleep. The learning has to happen in the days before, not the night before.
 
 If your notes are scattered across slides and PDFs, turning them into one set of questions first saves time you would otherwise spend deciding what to study. That is what Cordia's study guides are built for, and the [guide to studying with AI in college](/guides/ai-study-help-college) walks through the whole process.
 

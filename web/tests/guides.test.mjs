@@ -43,7 +43,7 @@ test('drafts are visible only in dev and on Vercel previews', () => {
   const drafts = GUIDES.filter(guide => guide.draft);
   assert.deepEqual(visibleGuides({ NODE_ENV: 'production' }), PUBLISHED_GUIDES);
   assert.equal(visibleGuides({ VERCEL_ENV: 'preview' }).length, GUIDES.length);
-  assert.ok(drafts.length >= 4, 'the four drafts stay drafts until the owner approves them');
+  assert.deepEqual(drafts, [], 'the four guides are published (the owner added the personal examples)');
 });
 
 test('drafts stay out of the page list, sitemap and llms.txt, and get the app noindex rule', () => {
@@ -56,7 +56,13 @@ test('drafts stay out of the page list, sitemap and llms.txt, and get the app no
   const index = publicPage('/guides');
   assert.ok(index, '/guides is a public page');
   assert.equal(index.index, PUBLISHED_GUIDES.length > 0, '/guides stays noindex until a guide is published');
-  for (const guide of PUBLISHED_GUIDES) assert.equal(publicPage(guidePath(guide))?.index, true);
+  for (const guide of PUBLISHED_GUIDES) {
+    const path = guidePath(guide);
+    assert.equal(publicPage(path)?.index, true, path);
+    assert.equal(isAppRoute(path), false, `${path} must not get the app noindex rule`);
+    assert.ok(sitemapXml().includes(`/guides/${guide.slug}<`) && llmsTxt().includes(path), `${path} is missing from a crawl file`);
+  }
+  if (PUBLISHED_GUIDES.length) assert.ok(sitemapXml().includes('/guides<') && llmsTxt().includes('/guides'), '/guides is in the crawl files');
 });
 
 test('publishing a guide (flipping the flag) registers it as an Article page', async () => {
@@ -95,9 +101,8 @@ test('every guide content file has the fields and follows the article rules', ()
     const [low, high] = WORDS[guide.slug];
     const words = guideWords(body);
     assert.ok(words >= low && words <= high, `${guide.slug}: ${words} words (want ${low}–${high})`);
-    const notes = editorNotes(body);
-    assert.equal(notes.length, 3, `${guide.slug} has three personal-example spots`);
-    for (const note of notes) assert.match(note, /^PERSONAL EXAMPLE \(Jude\): /);
+    // A published guide has its personal examples filled in, so no editor notes are left.
+    if (!guide.draft) assert.deepEqual(editorNotes(body), [], `${guide.slug} still has editor notes`);
     // Every outside link in the body is listed under Sources; every site link goes to a real page.
     const sourceUrls = new Set(guide.sources.map(source => source.url));
     for (const source of guide.sources) assert.ok(source.url.startsWith('https://') && source.title && source.supports, source.url);
@@ -118,7 +123,7 @@ test('the pillar links every use-case page and every other guide', () => {
 });
 
 test('related links never point a build at a guide it does not show', () => {
-  const draft = GUIDES.find(guide => guide.draft);
+  const draft = { ...GUIDES[0], draft: true };
   const shown = relatedLinks([useCasePath(USE_CASES[0]), guidePath(draft)], []);
   assert.deepEqual(shown.map(item => item.href), [useCasePath(USE_CASES[0])]);
   assert.deepEqual(relatedLinks([guidePath(draft)], [draft]), [{ href: guidePath(draft), label: draft.title }]);

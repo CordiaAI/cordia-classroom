@@ -1,4 +1,4 @@
-// Draft: /guides/source-grounded-ai-tutoring. Outside facts link to sources whose abstracts were
+// /guides/source-grounded-ai-tutoring. Outside facts link to sources whose abstracts were
 // read (listed in `sources`). The Cordia section matches backend/routers/chat.py,
 // backend/services/llm.py (Tutor prompts), backend/services/guide_tutor.py and
 // web/components/AIChatWidget.js; the PR lists the lines.
@@ -11,9 +11,9 @@ export default {
   crumb: 'Source-grounded AI tutoring',
   description: 'Source-grounded AI tutoring answers from your own course material instead of the open web. How it works, why it cuts made-up answers, and how to check a tool.',
   author: AUTHOR,
-  datePublished: '2026-11-09',
-  dateModified: '2026-11-09',
-  draft: true,
+  datePublished: '2026-11-11',
+  dateModified: '2026-11-11',
+  draft: false,
   sources: [
     { title: 'Lewis et al. (2020), "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks", arXiv:2005.11401', url: 'https://arxiv.org/abs/2005.11401', supports: 'Defines retrieval-augmented generation; RAG models produced more specific and factual language than a model answering from its parameters alone.' },
     { title: 'Shuster et al. (2021), "Retrieval Augmentation Reduces Hallucination in Conversation", arXiv:2104.07567', url: 'https://arxiv.org/abs/2104.07567', supports: 'Retrieval in the loop substantially reduced knowledge hallucination in chatbots, by human evaluation.' },
@@ -40,7 +40,7 @@ A grounded tutor starts from a specific source. You give it the material, or it 
 | Can you check an answer? | Only against other sources you find yourself | Against the source it used |
 | What happens when the answer isn't there? | It often answers anyway | A well-built tool says so, or labels anything it adds |
 
-<!-- PERSONAL EXAMPLE (Jude): a time a general chatbot gave a confident answer that didn't match how your course defined the term. -->
+I asked a general chatbot to define a term from my business class, and it gave a perfectly good textbook answer that wasn't how my professor defined it. I only caught it because it didn't match the wording on the slides. On an exam, the professor's version is the one that gets graded. That's the whole reason Cordia's Tutor answers from your actual course materials first.
 
 ## Why does grounding reduce made-up answers?
 
@@ -62,7 +62,7 @@ Test it the way you would test a classmate who says they did the reading.
 - **Give it a wrong premise.** Ask "why does X cause Y?" when your notes say it doesn't. A grounded tool should correct you from the source rather than invent a reason.
 - **Read its documentation.** Look for plain statements about whether it searches the web, which material it reads, and how much of a long document it can take in.
 
-<!-- PERSONAL EXAMPLE (Jude): one of these checks you ran while building Cordia's Tutor, and what it caught. -->
+I threw a lot at Cordia's Tutor while building it. I asked it questions that were answered in the guide, questions that weren't in the guide at all, and trick questions with a wrong premise to see if it would just go along. The biggest catch was that when an answer wasn't in the material, it would sometimes answer from general knowledge without saying so. A student couldn't tell what came from their class and what didn't, so we fixed that.
 
 ## What are the limits of source-grounded tutoring?
 
@@ -89,7 +89,7 @@ A few more details, as the Tutor works today:
 - **With no material selected**, it answers from general knowledge, says when it is unsure or when the answer depends on how your course defines something, and suggests choosing a study guide.
 - **On a guide someone shared with you**, the Tutor answers only from that guide and says "This guide doesn't cover that." when the answer isn't there.
 
-<!-- PERSONAL EXAMPLE (Jude): why the Tutor labels extra context instead of refusing outright, from a real study session. -->
+Refusing felt like the wrong way to help a student. If you're stuck at midnight and the tool just says "that's not in your guide," you leave and go ask something that won't tell you where its answer came from. Labeling it gets you the help and still tells you clearly which part goes beyond your course material, so you know what to double-check with your class. You get the help and you know exactly what to trust.
 
 If you're deciding whether any AI study tool is safe to use with your class materials, the [guide to AI tutor safety](/guides/are-ai-tutors-safe-for-students) covers privacy, accuracy and academic integrity, with a checklist you can use on any tool.
 
