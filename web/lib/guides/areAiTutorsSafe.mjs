@@ -1,4 +1,4 @@
-// Draft: /guides/are-ai-tutors-safe-for-students. Cordia privacy statements follow
+// /guides/are-ai-tutors-safe-for-students. Cordia privacy statements follow
 // web/pages/privacy.js as merged in PR 240 (Last Updated November 8, 2026) and the code (uploads:
 // backend/routers/materials.py; sharing: backend/routers/guides.py, web/components/VisibilityChip.js);
 // the Honor Code and instructor steps follow web/pages/honor-code.js and web/pages/instructors.js.
@@ -11,9 +11,9 @@ export default {
   crumb: 'Are AI tutors safe for students?',
   description: 'What to check before you give an AI tutor your class materials: who stores and processes your files, how to verify answers, and where integrity lines are.',
   author: AUTHOR,
-  datePublished: '2026-11-09',
-  dateModified: '2026-11-09',
-  draft: true,
+  datePublished: '2026-11-11',
+  dateModified: '2026-11-11',
+  draft: false,
   sources: [
     { title: 'Cordia Classroom Privacy Policy (Last Updated November 8, 2026)', url: 'https://classroom.cordiaai.io/privacy', supports: 'What Cordia stores, which providers process it, no advertising use or sale, account deletion and backups, and the Chrome extension\'s data practices.' },
     { title: 'Cordia Classroom Honor Code', url: 'https://classroom.cordiaai.io/honor-code', supports: 'Study aid, not submitted work; no use in closed-book or proctored exams unless permitted; AI content may contain errors.' },
@@ -43,7 +43,7 @@ As an example of what those answers look like, here is how Cordia handles them, 
 
 If a tool also has a browser extension, check when it reads pages. Cordia's extension reads page content only when you click Make study guide, choose Make study guide from selection, or ask the Tutor a question before you've made a guide.
 
-<!-- PERSONAL EXAMPLE (Jude): what you learned about where uploaded files go while choosing Cordia's providers. -->
+What surprised me was how different the rules are between providers. Some keep what you send for a while, some say they don't train on it, and those details are buried in policies most people never read. That changed how we picked providers for Cordia.
 
 ## Does my school's privacy law cover a study app I choose?
 
@@ -77,7 +77,7 @@ Your institution's academic integrity policy decides the details, and individual
 - "Not use Cordia Classroom during closed-book or proctored examinations unless explicitly permitted"
 - "Verify important information with your course materials and authoritative sources"
 
-<!-- PERSONAL EXAMPLE (Jude): a moment from your own studying where the line between help and doing the work was unclear, and how you decided. -->
+When a class allows AI, I still check the syllabus for what kind of use is okay. My rule is that if the tool is helping me understand the material, quizzing me, explaining something, or organizing my notes, that's studying. If it would be doing the graded work for me, that's not what it's for. When I'm not sure, I ask the professor, and it's never been a big deal to ask.
 
 ## Can my instructor see or control how materials are shared?
 
@@ -105,5 +105,5 @@ Use this table on any tool you're considering, including Cordia. A good tool ans
 
 For most students, using an AI tutor with their own class materials is as safe as the tool's policies are clear. Pick a tool that tells you what it stores and who processes it, lets you delete your data, shows where its answers come from, and keeps your work private unless you share it. Then use it the way your course allows: to learn the material, not to replace the work you're graded on.
 
-<!-- PERSONAL EXAMPLE (Jude): the one check from the table you'd tell a friend to do first, and why. -->
+If a friend asked me, I'd tell them to check what the tool does with their files after they upload them. Does it keep them, does it train on them, can you delete them? Your notes and class materials are yours, and once they're uploaded you don't control them anymore. It takes two minutes to find out, and most people never look.
 `;

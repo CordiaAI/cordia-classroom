@@ -1,4 +1,4 @@
-// Draft: /guides/ai-study-help-college (the pillar). Outside facts link to sources whose abstracts
+// /guides/ai-study-help-college (the pillar). Outside facts link to sources whose abstracts
 // were read (listed in `sources`); Cordia facts match the code (lib/useCases/ and the PR list the
 // file and line behind each).
 import { AUTHOR } from './author.mjs';
@@ -10,9 +10,9 @@ export default {
   crumb: 'Studying with AI in college',
   description: 'How to study with AI in college: capture your material, build a guide, test yourself, review on a schedule and plan back from the exam, with the research.',
   author: AUTHOR,
-  datePublished: '2026-11-09',
-  dateModified: '2026-11-09',
-  draft: true,
+  datePublished: '2026-11-11',
+  dateModified: '2026-11-11',
+  draft: false,
   sources: [
     { title: 'Roediger & Karpicke (2006), "Test-Enhanced Learning", Psychological Science 17(3)', url: 'https://doi.org/10.1111/j.1467-9280.2006.01693.x', supports: 'The testing effect: recall tests beat restudying on delayed tests (2 days, 1 week), though restudying raised confidence.' },
     { title: 'Cepeda et al. (2006), "Distributed practice in verbal recall tasks", Psychological Bulletin 132(3)', url: 'https://doi.org/10.1037/0033-2909.132.3.354', supports: 'Meta-analysis of 839 assessments in 317 experiments: spacing helps, and the best gap grows with how long you need to remember.' },
@@ -51,7 +51,7 @@ Collect the material where it already lives:
 
 In Cordia, you can upload up to five files at once (PDFs, PowerPoint, Word, photos including iPhone HEIC, and text files, up to 50 MB each), record a lecture and make a guide from its write-up, or paste a link to a web page. If your classes are on Canvas, connecting it brings in your course files, and Make guide turns one into a study guide; see [studying with Canvas](/canvas-study-tool). For pages that only open in the browser, the [Chrome extension](/install-extension) reads the page you have open, or just the text you select.
 
-<!-- PERSONAL EXAMPLE (Jude): the messiest set of course materials you had to pull together for one exam, and where it all lived. -->
+For one of my exams, it was everywhere: slides on Canvas, PDFs the professor emailed, a couple of recordings, and my own notes in a different app. Just pulling it all into one place took me about an hour before I'd studied anything. That's a big part of why I built Cordia. Getting organized shouldn't be the first hour of studying.
 
 ## Step 2: How do I turn my material into a study guide?
 
@@ -94,7 +94,7 @@ Ways to practice recall with any tool:
 
 In Cordia, recall practice happens in **Learn**. It asks each idea as a choice, a typed answer, a fill-in-the-blank or a flashcard, and moves each idea through New, Learning, Familiar and Mastered. With the default ways of asking, new ideas start as choices and familiar ones are asked from memory, so an idea is mastered by recalling it. Quizzes live in Learn under **Test yourself**: Quiz brings each miss back three questions later until you get it right twice more, Timed test runs a mock exam on the clock, and Match pairs questions with answers against a 60-second timer. Written answers are checked by AI against your guide's answer for meaning, not exact wording. More on that in the [AI quiz generator guide](/ai-quiz-generator).
 
-<!-- PERSONAL EXAMPLE (Jude): the first time recall practice showed you that "I know this" wasn't true. -->
+I once thought I knew a definition cold because I'd read it so many times. When I had to write it out from memory, I mixed up two terms that sounded alike and couldn't explain the difference. Reading something over and over makes it feel familiar, but that's not the same as knowing it. That's why I lean so hard on recall and quizzes now.
 
 ## Step 5: How does spaced review work?
 
@@ -131,7 +131,7 @@ Then spend the remaining time on the misses only. Each wrong answer is a specifi
 
 In Cordia, Timed test in Learn's Test yourself sets 30 seconds, 1 minute or 2 minutes per question, holds the answers until you hand it in, and puts the ideas you missed back into Learning so your next rounds start with them.
 
-<!-- PERSONAL EXAMPLE (Jude): what a timed practice run revealed the week before a real exam. -->
+A timed practice run once showed me I was way too slow on the longer questions. I knew the material, but I spent so long on the first few that I'd never have finished in time. For the next few days I did timed sets on just those question types and set a rough time limit for each one. By exam day I finished with time left to check my answers.
 
 ## How do I ask an AI tutor for help without getting wrong answers?
 
