@@ -13,7 +13,7 @@ from test_safety_hardening import U, Base  # noqa: E402
 
 TOUCH = {
     "landing_path": "/ai-quiz-generator", "referrer_host": "chatgpt.com", "utm_source": "chatgpt.com",
-    "utm_medium": None, "utm_campaign": "fall", "from": "ai-quiz-generator", "ai_engine": "chatgpt",
+    "utm_medium": None, "utm_campaign": "fall", "ref": "campus-ambassador", "from": "ai-quiz-generator", "ai_engine": "chatgpt",
     "first_seen": "2026-11-09",
 }
 
@@ -31,6 +31,7 @@ class ParseTests(unittest.TestCase):
         self.assertNotIn("ip", stored)
         self.assertNotIn("landing_path", stored, "a full URL isn't a path")
         self.assertEqual(stored["from"], "ai-quiz-generator")
+        self.assertEqual(stored["ref"], "campus-ambassador")
         self.assertEqual(stored["ai_engine"], "chatgpt")
         self.assertEqual(stored["first_seen"], "2026-11-09")
         self.assertNotIn("utm_medium", stored, "empty values aren't stored")

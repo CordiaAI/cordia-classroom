@@ -1,7 +1,7 @@
 """First-touch attribution saved with sign-up (web/lib/attribution.mjs sends it with POST /auth/age).
 
 Where a new student first came from: the public page they landed on, the referring host, campaign
-tags, Cordia's own ?from= value and the AI assistant that sent them, if any. No personal data.
+tags, a ?ref= code, Cordia's own ?from= value and the AI assistant that sent them, if any. No personal data.
 
 Only the keys below are kept (anything else is dropped), each with a type and a length cap, and the
 whole object is capped again in the database. The write needs user_profiles.acquisition
@@ -37,6 +37,7 @@ class Acquisition(BaseModel):
     utm_source: Optional[str] = Field(default=None, max_length=100)
     utm_medium: Optional[str] = Field(default=None, max_length=100)
     utm_campaign: Optional[str] = Field(default=None, max_length=100)
+    ref: Optional[str] = Field(default=None, max_length=100)
     # Cordia's own ?from= value (use-case pages link to /signup?from=<slug>).
     from_: Optional[str] = Field(default=None, alias="from", max_length=64, pattern=r"^[a-z0-9-]+$")
     ai_engine: Optional[Literal[AI_ENGINES]] = None
@@ -45,14 +46,14 @@ class Acquisition(BaseModel):
     def stored(self) -> Optional[dict]:
         """The JSON to keep: set fields only, campaign tags without control characters; None if empty."""
         data = self.model_dump(by_alias=True, exclude_none=True, mode="json")
-        for key in ("utm_source", "utm_medium", "utm_campaign"):
+        for key in ("utm_source", "utm_medium", "utm_campaign", "ref"):
             if key in data:
                 data[key] = "".join(ch for ch in data[key] if ch.isprintable()) or None
         data = {key: value for key, value in data.items() if value}
         return data or None
 
 
-FIELDS = ("landing_path", "referrer_host", "utm_source", "utm_medium", "utm_campaign", "from", "ai_engine", "first_seen")
+FIELDS = ("landing_path", "referrer_host", "utm_source", "utm_medium", "utm_campaign", "ref", "from", "ai_engine", "first_seen")
 
 
 def parse(raw) -> Optional[Acquisition]:

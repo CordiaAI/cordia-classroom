@@ -29,6 +29,9 @@ QUESTIONS: dict[str, tuple[int, str, tuple[str, ...]]] = {
     "night_before": (1, "choice", ("reread", "highlight_rewrite", "quiz_flashcards", "practice_problems", "start_from_scratch")),
     # On the reveal (G2): "Pick your study trigger: right after ___ I'll open Cordia ___."
     "study_trigger": (1, "trigger", ()),
+    # About-you screen: how the student heard about Cordia (required there)
+    "heard_from": (1, "choice", ("tiktok", "instagram", "reddit", "x", "linkedin", "friend", "professor_class",
+                                 "discord", "other")),
     # About-you screen: for "Help me remember" hooks after a miss
     "memory_style": (2, "multi", ("funny", "link", "rhyme", "picture", "letters")),
     "interests": (1, "multi", ("sports", "music", "gaming", "movies_tv", "food", "outdoors", "art_design",
