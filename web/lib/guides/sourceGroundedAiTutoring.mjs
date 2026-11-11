@@ -89,7 +89,7 @@ A few more details, as the Tutor works today:
 - **With no material selected**, it answers from general knowledge, says when it is unsure or when the answer depends on how your course defines something, and suggests choosing a study guide.
 - **On a guide someone shared with you**, the Tutor answers only from that guide and says "This guide doesn't cover that." when the answer isn't there.
 
-Refusing felt like the wrong way to help a student. If you're stuck at midnight and the tool just says "that's not in your guide," you leave and go ask something that won't tell you where its answer came from. You get the help and you know exactly what to trust.
+Refusing felt like the wrong way to help a student. If you're stuck at midnight and the tool just says "that's not in your guide," you leave and go ask something that won't tell you where its answer came from. Labeling it gets you the help and still tells you clearly which part goes beyond your course material, so you know what to double-check with your class. You get the help and you know exactly what to trust.
 
 If you're deciding whether any AI study tool is safe to use with your class materials, the [guide to AI tutor safety](/guides/are-ai-tutors-safe-for-students) covers privacy, accuracy and academic integrity, with a checklist you can use on any tool.
 

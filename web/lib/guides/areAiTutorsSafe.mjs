@@ -43,7 +43,7 @@ As an example of what those answers look like, here is how Cordia handles them, 
 
 If a tool also has a browser extension, check when it reads pages. Cordia's extension reads page content only when you click Make study guide, choose Make study guide from selection, or ask the Tutor a question before you've made a guide.
 
-What surprised me was how different the rules are between providers. Some keep what you send for a while, some say they don't train on it, and those details are buried in policies most people never read. That changed how we picked providers for Cordia.
+What surprised me was how different the rules are between providers. Some keep what you send for a while, some say they don't train on it, and those details are buried in policies most people never read. That changed how we picked providers for Cordia. We went with providers whose terms only let them use what students send to provide the service for us, and that mattered more to me than small differences in price.
 
 ## Does my school's privacy law cover a study app I choose?
 
