@@ -1,6 +1,7 @@
 """A small in-memory stand-in for the supabase-py query builder, for route tests."""
 import copy
 import uuid
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 DEFAULTS = {
@@ -152,7 +153,10 @@ class Query:
             row["id"] = str(uuid.uuid4()) if self.name != "canvas_activity" else len(self.db.rows(self.name)) + 1
         if "created_at" not in row:
             self.db._clock += 1
-            row["created_at"] = f"2026-10-15T00:00:{self.db._clock % 60:02d}+00:00"
+            # Yesterday, not a fixed date: routes that keep "the last 30 days" would otherwise start
+            # dropping these rows once the calendar passes that date (it did on 2026-11-14).
+            day = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+            row["created_at"] = f"{day}T00:00:{self.db._clock % 60:02d}+00:00"
         return row
 
     def execute(self):
