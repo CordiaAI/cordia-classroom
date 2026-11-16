@@ -134,17 +134,17 @@ export function CourseFiles({ course }) {
         .cc-files-search .lucide { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
         .cc-files-search .c-input { width: 100%; height: 40px; margin: 0; padding: 0 12px 0 36px; line-height: 40px; }
         .cc-files { list-style: none; margin: 0; padding: 0 4px 4px; display: grid; grid-template-columns: minmax(0, 1fr); }
-        .cc-file { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 10px 8px; border-radius: var(--r-row); }
+        .cc-file { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 8px 8px; border-radius: var(--r-row); }
         .cc-file + .cc-file { border-top: 1px solid var(--line); }
         .cc-file-tile { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--olive-tint); color: var(--olive-ink); }
         .cc-file-text { display: grid; gap: 2px; min-width: 0; }
         .cc-file-name { font: 600 15px/1.35 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .cc-file-actions { display: flex; align-items: center; gap: 6px; }
+        .cc-file-actions { display: flex; align-items: center; gap: 8px; }
         .cc-file-guide { white-space: nowrap; }
-        .cc-none, .cc-error { margin: 0; padding: 8px 16px 14px; }
+        .cc-none, .cc-error { margin: 0; padding: 8px 16px 12px; }
         .cc-error { color: var(--error); font: 600 15px/1.4 var(--font-sans); }
         @media (max-width: 600px) {
-          .cc-file { grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; padding: 10px 4px; }
+          .cc-file { grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; padding: 8px 4px; }
           .cc-file-tile { width: 36px; height: 36px; }
           .cc-file-guide { width: 40px; padding: 0; justify-content: center; }
           .cc-file-guide-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -219,10 +219,10 @@ export default function CanvasClasses({ status, onStatus, folders: given }) {
         .cc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
         @media (max-width: 767px) { .cc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } }
         .cc-class { padding: 8px; }
-        .cc-head { display: flex; align-items: center; gap: 6px; min-height: 56px; }
+        .cc-head { display: flex; align-items: center; gap: 8px; min-height: 56px; }
         .cc-head .cc-closed { transform: rotate(-90deg); }
         .cc-head .lucide { transition: transform var(--dur) var(--ease); }
-        .cc-name { flex: 1; min-width: 0; display: grid; gap: 2px; padding: 6px 4px; border: 0; background: none; color: var(--ink); text-align: left; cursor: pointer; }
+        .cc-name { flex: 1; min-width: 0; display: grid; gap: 2px; padding: 4px 4px; border: 0; background: none; color: var(--ink); text-align: left; cursor: pointer; }
         .cc-name strong { font: 600 20px/1.15 var(--font-sans); }
       `}</style>
     </div>

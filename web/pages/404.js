@@ -19,7 +19,7 @@ export default function NotFound() {
       </div>
       <style jsx>{`
         .not-found { min-height: 50vh; align-content: center; }
-        .not-found-code { margin: 0; font: 600 15px/1 var(--font-sans); letter-spacing: 0.08em; }
+        .not-found-code { margin: 0; font: 600 15px/1 var(--font-sans); }
         .not-found-why { margin: 0; font-size: 16px; }
         .not-found-actions { justify-content: center; }
       `}</style>

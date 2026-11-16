@@ -25,7 +25,7 @@ export default function ConfirmDialog({ title, message, confirmLabel = 'Delete',
         .confirm-message { margin: 0; }
         .confirm-row { display: flex; justify-content: flex-end; gap: 8px; }
         .confirm-danger { background: var(--error-solid); border-color: var(--error-solid); }
-        .confirm-danger:hover:not(:disabled) { background: var(--error-solid); filter: brightness(.9); }
+        @media (hover: hover) { .confirm-danger:hover:not(:disabled) { background: var(--error-solid); filter: brightness(.9); } }
       `}</style>
     </div>
     </BodyPortal>

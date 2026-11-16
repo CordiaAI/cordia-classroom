@@ -146,13 +146,13 @@ export default function SearchModal({ onClose }) {
         .search-input::placeholder { color: var(--muted); }
         .search-input::-webkit-search-cancel-button { display: none; }
         .search-close { flex: none; display: grid; place-items: center; min-width: 44px; height: 44px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; }
-        .search-close:hover { color: var(--ink); }
+        @media (hover: hover) { .search-close:hover { color: var(--ink); } }
         .search-close:focus-visible { outline: 2px solid var(--olive); outline-offset: -4px; }
-        .search-esc { font:600 12px/1 var(--font-sans); padding: 6px 8px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--muted); }
+        .search-esc { font:600 13px/1 var(--font-sans); padding: 4px 8px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--muted); }
         .search-close :global(.search-x) { display: none; }
         .search-list { list-style: none; margin: 0; padding: 0 8px; max-height: 60vh; overflow: auto; }
         .search-list:not(:empty) { border-top: 1px solid var(--line); padding: 8px; }
-        .c-search-group { padding: 10px 12px 4px; }
+        .c-search-group { padding: 8px 12px 4px; }
         .c-search-hit { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius:var(--r-input); background: transparent; color: var(--ink); font:600 15px/1.5 var(--font-sans); text-align: left; cursor: pointer; }
         .c-search-hit.is-active { background: var(--olive-tint); }
         .c-search-hit :global(.c-meta) { margin-left: auto; max-width: 40%; }

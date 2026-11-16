@@ -56,8 +56,8 @@ export default function CanvasCourseList({ courses = [], onChange }) {
       <style jsx global>{`
         .ccl { list-style: none; margin: 0; padding: 0; display: grid; }
         .ccl-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 16px; min-height: 60px; border-bottom: 1px solid var(--line); }
-        .ccl-auto { flex: 1 0 100%; padding-bottom: 6px; }
-        .ccl-auto .c-toggle { width: 100%; justify-content: space-between; font: 500 14px/1.3 var(--font-sans); color: var(--muted); }
+        .ccl-auto { flex: 1 0 100%; padding-bottom: 4px; }
+        .ccl-auto .c-toggle { width: 100%; justify-content: space-between; font:500 13px/1.3 var(--font-sans); color: var(--muted); }
         .ccl-row:last-child { border-bottom: 0; }
         .ccl-name { display: grid; gap: 2px; min-width: 0; }
         .ccl-name strong { font: 600 15px/1.3 var(--font-sans); }

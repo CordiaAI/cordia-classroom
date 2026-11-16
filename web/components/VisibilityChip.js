@@ -91,9 +91,9 @@ export default function VisibilityChip({ guide, course, copy = false, onChange, 
       )}
       <style jsx>{`
         .vis { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .vis-label { display: inline-flex; align-items: center; gap: 6px; font: 600 13px/1 var(--font-sans); white-space: nowrap; }
+        .vis-label { display: inline-flex; align-items: center; gap: 8px; font: 600 13px/1 var(--font-sans); white-space: nowrap; }
         .vis :global(.c-menu-wrap > .c-icon-btn) { width: auto; height: 32px; padding: 0 12px; border-radius: var(--r-pill); border: 1px solid var(--line); }
-        .vis-held, .vis-static { display: inline-flex; align-items: center; gap: 6px; height: 32px; font: 600 13px/1 var(--font-sans); }
+        .vis-held, .vis-static { display: inline-flex; align-items: center; gap: 8px; height: 32px; font: 600 13px/1 var(--font-sans); }
         .vis-held { color: var(--warning); }
       `}</style>
     </span>

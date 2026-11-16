@@ -52,7 +52,7 @@ export function SocialButtonStyle() {
     <style jsx global>{`
       .sb-menu { display: inline-flex; }
       .sb-menu .c-icon-btn { width: auto; min-width: 0; height: 44px; padding: 0 16px; border-radius: var(--r-pill); }
-      .sb-label { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); font: 600 15px/1 var(--font-sans); white-space: nowrap; }
+      .sb-label { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font: 600 15px/1 var(--font-sans); white-space: nowrap; }
     `}</style>
   );
 }

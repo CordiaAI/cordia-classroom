@@ -143,7 +143,7 @@ export default function AccountMenu({ open, onClose, anchorRef, items, placement
         .acct-bubble.is-separated { margin-top: ${SIGN_OUT_EXTRA}px; }
         /* A count on an item (Friends: requests waiting on you). */
         .acct-dot { width: 8px; height: 8px; margin-left: auto; border-radius: 50%; background: var(--olive); flex: none; }
-        .acct-badge { display: grid; place-items: center; min-width: 22px; height: 22px; margin-left: auto; padding: 0 7px; border-radius: 999px; background: var(--olive); color: var(--on-olive); font: 600 13px/1 var(--font-sans); }
+        .acct-badge { display: grid; place-items: center; min-width: 22px; height: 22px; margin-left: auto; padding: 0 8px; border-radius: 999px; background: var(--olive); color: var(--on-olive); font: 600 13px/1 var(--font-sans); }
         .acct-bubble:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
         .acct-bubble:active { transform: scale(.98); }
         @media (hover: hover) {

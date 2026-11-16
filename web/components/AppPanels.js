@@ -9,17 +9,17 @@ import {
 
 const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true };
 const PANEL_CSS = css`
-  .ap { display: grid; gap: 10px; width: 100%; padding-top: 12px; border-top: 1px solid var(--hairline); text-align: left; }
+  .ap { display: grid; gap: 12px; width: 100%; padding-top: 12px; border-top: 1px solid var(--hairline); text-align: left; }
   .ap-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
   .ap .c-meta { margin: 0; }
   .ap :global(.c-toggle) { justify-content: space-between; width: 100%; }
   .ap-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .ap-list { list-style: none; margin: 0; padding: 0; display: grid; }
-  .ap-row { display: flex; align-items: center; gap: 10px; min-height: 44px; min-width: 0; }
+  .ap-row { display: flex; align-items: center; gap: 12px; min-height: 44px; min-width: 0; }
   .ap-results { max-height: 220px; overflow: auto; }
-  .ap-form { display: grid; gap: 10px; }
-  .ap-field { display: grid; gap: 6px; }
-  .ap-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ap-form { display: grid; gap: 12px; }
+  .ap-field { display: grid; gap: 8px; }
+  .ap-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 520px) { .ap-two { grid-template-columns: 1fr; } }
 `;
 

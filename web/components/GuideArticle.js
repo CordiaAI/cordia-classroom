@@ -77,7 +77,7 @@ export default function GuideArticle({ guide, blocks, author, path, related }) {
       </article>
       <style jsx>{`
         .ga { width: min(var(--page-max), 100%); margin: 0 auto; color: var(--ink); }
-        .ga-draft { margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--lg-card); color: var(--ink); font: 600 var(--fs-13)/1.5 var(--font-sans); }
+        .ga-draft { margin: 0 0 16px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--lg-card); color: var(--ink); font: 600 var(--fs-13)/1.5 var(--font-sans); }
         .ga-crumbs ol { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); }
         .ga-crumbs li + li::before { content: '›'; margin-right: 8px; color: var(--muted); }
         .ga-crumbs :global(a) { color: var(--muted); }
@@ -85,9 +85,9 @@ export default function GuideArticle({ guide, blocks, author, path, related }) {
         .ga-byline { margin: 16px 0 0; color: var(--text-secondary); font: 500 var(--fs-15)/1.5 var(--font-sans); }
         .ga-author { color: var(--ink); font-weight: 600; }
         .ga-updated { margin: 4px 0 0; color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); }
-        .ga-lede { max-width: 42em; margin-top: 24px; }
+        .ga-lede { max-width: 36em; margin-top: 24px; }
         .ga-lede :global(p) { margin: 0 0 12px; color: var(--ink); font: 500 var(--fs-17)/1.55 var(--font-sans); }
-        .ga-body, .ga-sources, .ga-related { max-width: 46em; }
+        .ga-body, .ga-sources, .ga-related { max-width: 38em; }
         .ga-body :global(h2), .ga-sources h2, .ga-related h2 { margin: 40px 0 0; }
         .ga-body :global(p), .ga-body :global(li), .ga-sources li, .ga-related li { color: var(--text-secondary); font: 500 var(--fs-15)/1.6 var(--font-sans); }
         .ga-body :global(p) { margin: 12px 0 0; }
@@ -95,7 +95,7 @@ export default function GuideArticle({ guide, blocks, author, path, related }) {
         .ga-body :global(strong) { color: var(--ink); }
         .ga-body :global(.ga-table-wrap) { margin-top: 16px; overflow-x: auto; }
         .ga-body :global(table) { width: 100%; border-collapse: collapse; font: 500 var(--fs-15)/1.5 var(--font-sans); }
-        .ga-body :global(th), .ga-body :global(td) { padding: 10px 12px; border-bottom: 1px solid var(--hairline); text-align: left; vertical-align: top; color: var(--text-secondary); }
+        .ga-body :global(th), .ga-body :global(td) { padding: 8px 12px; border-bottom: 1px solid var(--hairline); text-align: left; vertical-align: top; color: var(--text-secondary); }
         .ga-body :global(thead th) { color: var(--ink); font-weight: 600; border-bottom: 1px solid var(--line); }
         .ga-body :global(tbody th) { color: var(--ink); font-weight: 600; white-space: nowrap; }
         .ga-sources { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--hairline); }

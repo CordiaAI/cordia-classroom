@@ -100,10 +100,10 @@ export default function SettingsPage() {
       setActiveSection('plan');
       const sessionId = typeof router.query.session_id === 'string' ? router.query.session_id : '';
       if (sessionId) {
-        setMessage('Confirming your Cordia Classroom subscription...');
+        setMessage('Confirming your Cordia Classroom subscription…');
         confirmCheckout(sessionId);
       } else {
-        setMessage('Checkout returned without a confirmation reference. Checking your plan...');
+        setMessage('Checkout returned without a confirmation reference. Checking your plan…');
         loadStatus();
       }
     } else {
@@ -449,11 +449,11 @@ export default function SettingsPage() {
         :global(.settings-danger) { color: var(--error) !important; }
         .profile-page { width: min(var(--page-max), 100%); margin: 0 auto; }
         :global(.profile-tabs) { justify-self: start; max-width: 100%; overflow-x: auto; }
-        .profile-message { padding: 14px 18px; border-radius:var(--r-card); background: var(--olive-tint); font-weight:600; }
+        .profile-message { padding: 12px 16px; border-radius:var(--r-card); background: var(--olive-tint); font-weight:600; }
         .profile-section { animation: fadeIn 0.2s ease; }
         .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; flex-wrap: wrap; }
-        .settings-row :global(.c-seg) button { display: inline-flex; align-items: center; gap: 6px; }
-        .settings-row-label { display: inline-flex; align-items: center; gap: 10px; }
+        .settings-row :global(.c-seg) button { display: inline-flex; align-items: center; gap: 8px; }
+        .settings-row-label { display: inline-flex; align-items: center; gap: 12px; }
         .settings-export-note { flex-basis: 100%; margin: 0; }
         .settings-row-label :global(.lucide) { color: var(--olive-ink); }
         .settings-note { margin: -4px 0 0; }
@@ -465,10 +465,10 @@ export default function SettingsPage() {
         .me-names > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .me-names strong { font:600 20px/1.15 var(--font-sans); }
         .billing-current-plan { display: grid; gap: 12px; padding: 20px; margin-bottom: 16px; }
-        .plan-badge { justify-self: start; padding: 6px 14px; border-radius:var(--r-pill); background: var(--card-sunk); font-weight:600; }
+        .plan-badge { justify-self: start; padding: 4px 12px; border-radius:var(--r-pill); background: var(--card-sunk); font-weight:600; }
         .plan-badge[data-plan="plus"] { color: var(--olive-ink); }
-        .plan-usage { display: grid; gap: 10px; }
-        .plan-usage-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; }
+        .plan-usage { display: grid; gap: 12px; }
+        .plan-usage-row { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; }
         .plan-usage-row .c-bar { grid-column: 1 / -1; }
         .plan-usage-label { text-transform: capitalize; font-weight:600; }
         .plan-warning { color: var(--error); font-weight:600; }

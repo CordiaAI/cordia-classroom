@@ -161,11 +161,11 @@ export default function FriendsPage() {
         .fr { width: min(760px, 100%); margin: 0 auto; display: grid; gap: 16px; }
         :global(.fr-tabs) { justify-self: start; max-width: 100%; }
         .fr-panel { display: grid; gap: 20px; }
-        .fr-section { display: grid; gap: 10px; }
+        .fr-section { display: grid; gap: 12px; }
         .fr-section h2 { margin: 0; }
         .fr-empty { margin: 0; padding: 24px 20px; color: var(--muted); text-align: center; }
-        .fr-list { display: grid; margin: 0; padding: 6px 0; list-style: none; }
-        .fr-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; min-width: 0; }
+        .fr-list { display: grid; margin: 0; padding: 4px 0; list-style: none; }
+        .fr-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; min-width: 0; }
         .fr-list li + li { border-top: 1px solid var(--hairline); }
         .fr-actions { display: flex; gap: 8px; flex: none; margin-left: auto; }
         .fr-more { justify-self: start; }

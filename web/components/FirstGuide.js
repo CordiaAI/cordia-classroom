@@ -74,9 +74,9 @@ export default function FirstGuide({ canvas, coursework, onDismiss }) {
       )}
       {error && <p className="first-guide-error" role="alert">{error}</p>}
       <style jsx>{`
-        .first-guide { display: grid; gap: 12px; padding: 18px 20px; }
+        .first-guide { display: grid; gap: 12px; padding: 16px 20px; }
         .first-guide p { margin: 0; }
-        .first-guide-head { display: flex; align-items: center; gap: 10px; }
+        .first-guide-head { display: flex; align-items: center; gap: 12px; }
         .first-guide-head :global(.lucide) { color: var(--olive-ink); }
         .first-guide-head h2 { flex: 1; margin: 0; }
         .first-guide-classes { display: flex; flex-wrap: wrap; gap: 8px; }

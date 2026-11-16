@@ -116,12 +116,12 @@ export default function QuizletImport({ initialUrl = '', onImport, onCancel }) {
         )}
       </div>
       <style jsx>{`
-        .quizlet-sheet { width: min(560px, 100%); display: grid; gap: 14px; }
-        .quizlet-form { display: grid; gap: 10px; }
-        .quizlet-label { font: 600 14px/1.3 var(--font-sans); color: var(--ink); }
+        .quizlet-sheet { width: min(560px, 100%); display: grid; gap: 16px; }
+        .quizlet-form { display: grid; gap: 12px; }
+        .quizlet-label { font:600 15px/1.3 var(--font-sans); color: var(--ink); }
         .quizlet-url { position: relative; display: flex; align-items: center; }
         .quizlet-url :global(svg) { position: absolute; left: 14px; color: var(--muted); pointer-events: none; }
-        .quizlet-url :global(input) { width: 100%; padding-left: 42px; }
+        .quizlet-url :global(input) { width: 100%; padding-left: 40px; }
         .quizlet-note, .quizlet-steps { margin: 0; }
         .quizlet-steps { padding-left: 20px; display: grid; gap: 2px; }
         .quizlet-text { min-height: 180px; font-family: var(--font-mono, monospace); font-size: 13px; tab-size: 4; }

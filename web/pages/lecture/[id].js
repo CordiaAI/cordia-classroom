@@ -353,8 +353,8 @@ export default function LecturePage() {
         /* The class reads as a small chip on the meta line, not a form field. */
         .lecture-class { position: relative; display: inline-flex; align-items: center; min-width: 0; max-width: min(100%, 320px); }
         .lecture-class :global(.lucide) { position: absolute; left: 12px; color: var(--muted); pointer-events: none; }
-        .lecture-class select.c-select.c-select { width: auto; max-width: 100%; height: 34px; padding: 0 34px 0 34px; border-radius: 999px; font: 600 14px/1.3 var(--font-sans); color: var(--ink); background: var(--select-chevron) no-repeat right 12px center / 14px 14px, var(--lg-sheen), var(--lg-fill-field); box-shadow: var(--lg-highlight); cursor: pointer; }
-        .lecture-class select.c-select.c-select:hover { border-color: var(--olive); }
+        .lecture-class select.c-select.c-select { width: auto; max-width: 100%; height: 34px; padding: 0 32px 0 32px; border-radius: 999px; font:600 15px/1.3 var(--font-sans); color: var(--ink); background: var(--select-chevron) no-repeat right 12px center / 14px 14px, var(--lg-sheen), var(--lg-fill-field); box-shadow: var(--lg-highlight); cursor: pointer; }
+        @media (hover: hover) { .lecture-class select.c-select.c-select:hover { border-color: var(--olive); } }
         .lecture-notes-empty { display: grid; justify-items: start; gap: 12px; }
         .lecture-notes-empty .c-meta { margin: 0; }
         .lecture-notes-writing { display: grid; justify-items: center; gap: 4px; padding-bottom: 16px; }
@@ -379,8 +379,8 @@ export default function LecturePage() {
         /* The page title is the only h1: the outline's headings start at h2. */
         .lecture-outline-md :global(h2) { margin: 0 0 12px; font: 600 var(--fs-20)/var(--lh-title) var(--font-sans); }
         .lecture-outline-md :global(h3) { margin: 24px 0 8px; font: 600 var(--fs-17)/var(--lh-title) var(--font-sans); color: var(--olive-ink); }
-        .lecture-outline-md :global(h4), .lecture-outline-md :global(h5) { margin: 16px 0 6px; font: 600 var(--fs-15)/var(--lh-title) var(--font-sans); }
-        .lecture-outline-md :global(ul), .lecture-outline-md :global(ol) { margin: 4px 0 8px; padding-left: 22px; }
+        .lecture-outline-md :global(h4), .lecture-outline-md :global(h5) { margin: 16px 0 4px; font: 600 var(--fs-15)/var(--lh-title) var(--font-sans); }
+        .lecture-outline-md :global(ul), .lecture-outline-md :global(ol) { margin: 4px 0 8px; padding-left: 20px; }
         .lecture-outline-md :global(li > ul) { list-style: circle; }
         .lecture-outline-heading { margin: 0; font: 600 var(--fs-17)/var(--lh-title) var(--font-sans); color: var(--ink); }
         .lecture-terms { margin: 0; display: grid; gap: 12px; }

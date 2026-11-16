@@ -85,7 +85,7 @@ export default function Pricing() {
         .pricing-price { margin: 0; font:600 40px/1 var(--font-sans); }
         .pricing-price span { font-size: 15px; font-weight:500; }
         .pricing-alt { margin: -8px 0 0; color: var(--muted); font:500 13px/1.4 var(--font-sans); }
-        .pricing-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+        .pricing-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
         .pricing-card li { display: flex; gap: 8px; align-items: flex-start; font:500 15px/1.5 var(--font-sans); }
         .pricing-card li :global(.lucide) { color: var(--olive-ink); margin-top: 2px; flex: 0 0 auto; }
         .pricing-card :global(.pricing-btn) { margin-top: auto; display: inline-flex; align-items: center; justify-content: center; height: 44px; border: 0; border-radius:999px; background: var(--olive); color: var(--on-olive); font:600 15px/1 var(--font-sans); text-decoration: none; cursor: pointer; }

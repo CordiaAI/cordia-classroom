@@ -14,9 +14,9 @@ function Bar({ value, label }) {
   return (
     <div className="idb-bar">
       <div className="idb-bar-top"><span className="idb-bar-label">{label}</span><b>{value === null ? 'No data' : `${value}% ready`}</b></div>
-      <div className="c-bar" aria-hidden="true"><span style={{ width: `${Math.max(0, Math.min(100, value || 0))}%` }} /></div>
+      <div className="c-bar" aria-hidden="true"><span style={{ '--v': `${Math.max(0, Math.min(100, value || 0))}%` }} /></div>
       <style jsx>{`
-        .idb-bar { display: grid; gap: 6px; min-width: 0; }
+        .idb-bar { display: grid; gap: 8px; min-width: 0; }
         .idb-bar-top { display: flex; justify-content: space-between; gap: 12px; color: var(--ink); }
         .idb-bar-label { overflow-wrap: anywhere; min-width: 0; }
         .idb-bar b { flex: none; font-weight: 600; }
@@ -128,15 +128,15 @@ export default function InstructorDashboard({ room, onToast }) {
         .idb-mile-main { min-width: 0; overflow-wrap: anywhere; }
         .idb-mile-when { flex: none; }
         .idb-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .idb-table thead th { font: 600 13px/1.3 var(--font-sans); color: var(--muted-ink); text-align: left; padding: 0 8px 6px 0; }
+        .idb-table thead th { font: 600 13px/1.3 var(--font-sans); color: var(--muted-ink); text-align: left; padding: 0 8px 4px 0; }
         .idb-table thead th:not(:first-child) { width: 72px; text-align: center; padding-right: 0; }
-        .idb-table tbody th { display: grid; gap: 2px; text-align: left; font: 400 14px/1.35 var(--font-sans); color: var(--ink); padding: 8px 8px 8px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
-        .idb-table td { text-align: center; font: 600 14px/1 var(--font-sans); color: var(--ink); border-top: 1px solid var(--line); }
+        .idb-table tbody th { display: grid; gap: 2px; text-align: left; font:400 13px/1.35 var(--font-sans); color: var(--ink); padding: 8px 8px 8px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+        .idb-table td { text-align: center; font:600 15px/1 var(--font-sans); color: var(--ink); border-top: 1px solid var(--line); }
         .idb-member { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-width: 0; }
         .idb-share { flex: none; font: 500 13px/1.3 var(--font-sans); color: var(--muted-ink); }
         .idb-share.is-on { color: var(--olive-ink); }
         @media (max-width: 520px) {
-          .idb-table thead th:not(:first-child) { width: 52px; font-size: 12px; }
+          .idb-table thead th:not(:first-child) { width: 52px; font-size: 13px; }
         }
       `}</style>
     </div>

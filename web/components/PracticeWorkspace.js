@@ -710,7 +710,7 @@ export default function PracticeWorkspace() {
         .practice-prompt { margin: 8px 0 0; font:600 20px/1.15 var(--font-sans); }
         .practice-kind { text-transform: capitalize; }
         .practice-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-        .practice-toolbar :global(.c-seg) button { display: inline-flex; align-items: center; gap: 6px; }
+        .practice-toolbar :global(.c-seg) button { display: inline-flex; align-items: center; gap: 8px; }
         .practice-symbols { display: flex; flex-wrap: wrap; gap: 2px; }
         .practice-symbols :global(.c-icon-btn) { font:600 15px/1 var(--font-sans); }
         .practice-drawbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-basis: 100%; }
@@ -723,7 +723,7 @@ export default function PracticeWorkspace() {
         .practice-evaluation { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
         /* The answer sits on the card itself, in a rounded box like the board above it. */
         .practice-answer-inline { background: transparent; }
-        .practice-answer-inline textarea { min-height: 96px; padding: 14px 16px; border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--surface-card); }
+        .practice-answer-inline textarea { min-height: 96px; padding: 12px 16px; border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--surface-card); }
         .practice-answer-inline button[type='submit'] { justify-self: end; min-width: 160px; }
       `}</style>
     </div>

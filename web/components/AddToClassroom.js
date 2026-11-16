@@ -88,16 +88,16 @@ export default function AddToClassroom({ item, onClose, onAdded }) {
         </section>
       </div>
       <style jsx global>{`
-        .atc { width: min(460px, 100%); display: grid; gap: 14px; max-height: min(90vh, 720px); overflow-y: auto; }
+        .atc { width: min(460px, 100%); display: grid; gap: 16px; max-height: min(90vh, 720px); overflow-y: auto; }
         .atc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-        .atc-title { margin: 0; font: 500 26px/1.15 var(--font-display); color: var(--ink); }
+        .atc-title { margin: 0; font:500 28px/1.15 var(--font-display); color: var(--ink); }
         .atc-what { margin: 0; overflow-wrap: anywhere; }
         .atc-rooms { margin: 0; padding: 0; border: 0; display: grid; gap: 8px; min-width: 0; }
-        .atc-label { font: 600 14px/1.2 var(--font-sans); color: var(--ink); padding: 0; margin: 0 0 4px; }
-        .atc-room { display: flex; gap: 10px; align-items: center; color: var(--ink); cursor: pointer; overflow-wrap: anywhere; }
+        .atc-label { font:600 15px/1.2 var(--font-sans); color: var(--ink); padding: 0; margin: 0 0 4px; }
+        .atc-room { display: flex; gap: 12px; align-items: center; color: var(--ink); cursor: pointer; overflow-wrap: anywhere; }
         .atc-room input { width: 18px; height: 18px; accent-color: var(--olive); flex: none; }
         .atc-milestone { display: grid; gap: 8px; }
-        .atc-note { margin: 0; padding: 10px 14px; border-radius: var(--r-row); background: var(--olive-tint); color: var(--ink); }
+        .atc-note { margin: 0; padding: 8px 12px; border-radius: var(--r-row); background: var(--olive-tint); color: var(--ink); }
         .atc-error { margin: 0; color: var(--text-error); }
       `}</style>
     </BodyPortal>

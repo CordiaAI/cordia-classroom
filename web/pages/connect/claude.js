@@ -73,23 +73,23 @@ export default function ConnectClaude() {
           and Claude uses them when you ask.
         </p>
 
-        <h2>What Claude can&apos;t see or do</h2>
+        <h2>What Claude can’t see or do</h2>
         <ul>
           <li>Your Canvas or other LMS data: assignments, due dates, grades, announcements or rosters. Courses named by Canvas show as “Course 1”, “Course 2”.</li>
           <li>Your connected accounts (Google, Microsoft, Slack, Notion, Dropbox and others) or your texting assistant.</li>
-          <li>Anything in another student&apos;s account.</li>
+          <li>Anything in another student’s account.</li>
           <li>Delete anything, or change your account, plan or settings.</li>
         </ul>
 
         <h2>Disconnect</h2>
         <p>
           In Cordia, open <Link href="/settings?section=connectors">Settings › Connectors</Link> and choose <strong>Disconnect</strong> next to Claude under Connected AI apps.
-          Claude loses access at once. You can also remove the connector in Claude&apos;s settings.
+          Claude loses access at once. You can also remove the connector in Claude’s settings.
         </p>
 
         <h2>Privacy</h2>
         <p>
-          Cordia doesn&apos;t store your conversations with Claude. It keeps only what you ask it to save, plus a short record of each request
+          Cordia doesn’t store your conversations with Claude. It keeps only what you ask it to save, plus a short record of each request
           (which tool, whether it worked, how long it took) for 90 days. Read the details in our <Link href="/privacy#connected-ai-apps">Privacy Policy</Link>.
         </p>
 
@@ -97,16 +97,15 @@ export default function ConnectClaude() {
         <p>Questions or problems: <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.</p>
       </article>
       <style jsx>{`
-        .connect-doc { max-width: 800px; margin: 0 auto; padding: 40px clamp(20px, 5vw, 48px); line-height: 1.7; color: var(--text-secondary); }
+        .connect-doc { max-width: 680px; margin: 0 auto; padding: 40px clamp(20px, 5vw, 48px); line-height: 1.6; color: var(--text-secondary); }
         .connect-doc h1 { margin: 0 0 12px; color: var(--text-primary); font-size: 2rem; }
-        .connect-doc h2 { margin: 36px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border-default); color: var(--accent); font-size: 1.15rem; }
-        .connect-lead { font-size: 1.05rem; color: var(--text-primary); }
-        .connect-doc ol, .connect-doc ul { padding-left: 22px; }
-        .connect-doc li { margin: 6px 0; }
-        .connect-doc code { padding: 1px 6px; border-radius: 6px; background: var(--surface-raised); font-size: 0.9em; overflow-wrap: anywhere; }
+        .connect-doc h2 { margin: 36px 0 12px; color: var(--accent); font-size: 1.15rem; }
+        .connect-lead { font-size: var(--fs-17); color: var(--text-primary); }
+        .connect-doc ol, .connect-doc ul { padding-left: 20px; }
+        .connect-doc li { margin: 4px 0; }
+        .connect-doc code { padding: 1px 4px; border-radius: 6px; background: var(--surface-raised); font-size: var(--fs-13); overflow-wrap: anywhere; }
         .connect-doc .connect-url { display: block; width: fit-content; max-width: 100%; margin-top: 4px; }
-        .connect-examples li { font-style: italic; }
-        .connect-list { display: grid; gap: 10px; margin: 12px 0; }
+        .connect-list { display: grid; gap: 12px; margin: 12px 0; }
         .connect-list div { display: grid; gap: 2px; }
         .connect-list dt { color: var(--text-primary); font-weight: 600; }
         .connect-list dd { margin: 0; }

@@ -555,7 +555,7 @@ export default function LibraryPage() {
 
       <style jsx global>{`
         .library > *, .library .c-page-head, .lib-head-actions { min-width: 0; max-width: 100%; }
-        .library .lib-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
+        .library .lib-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 16px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
         .library .lib-tools { display: flex; align-items: center; gap: 8px; }
         .library .lib-add-class-icon { display: none; }
         .library .lib-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
@@ -564,17 +564,17 @@ export default function LibraryPage() {
         /* Seven filters: on narrow screens they scroll inside their bar, never the page. */
         .library :global(.lib-filters) { max-width: 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; }
         .library :global(.lib-filters)::-webkit-scrollbar { display: none; }
-        .library :global(.lib-filters) button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-        .library .lib-group { padding: 6px; }
+        .library :global(.lib-filters) button { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+        .library .lib-group { padding: 4px; }
         .library .lib-group.is-drop { border-color: var(--olive); box-shadow: 0 0 0 2px var(--olive); }
-        .library .lib-group-head { display: flex; align-items: center; gap: 6px; min-height: 52px; padding-right: 12px; }
+        .library .lib-group-head { display: flex; align-items: center; gap: 8px; min-height: 52px; padding-right: 12px; }
         .library .lib-group-toggle .lucide { transition: transform var(--dur) var(--ease); }
         .library .lib-group-toggle .is-closed { transform: rotate(-90deg); }
         .library .lib-group-name { min-width: 0; color: var(--ink); font:600 20px/1.15 var(--font-sans); text-decoration: none; }
-        .library a.lib-group-name:hover { text-decoration: underline; }
+        @media (hover: hover) { .library a.lib-group-name:hover { text-decoration: underline; } }
         .library .lib-group-count { flex: none; display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: 999px; background: var(--olive-tint); color: var(--olive-ink); font: 600 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
         .library .lib-group-count.is-empty { background: transparent; color: var(--muted); font-weight: 500; }
-        .library .lib-loose { display: flex; align-items: center; gap: 12px; padding: 16px 18px; text-decoration: none; }
+        .library .lib-loose { display: flex; align-items: center; gap: 12px; padding: 16px 16px; text-decoration: none; }
         .library .lib-list { list-style: none; margin: 0; padding: 0; }
         .library .lib-list { display: grid; gap: 2px; }
         /* Rows are soft rounded tiles: a gentle tint on hover, no lines, edges, shadow or underline. */
@@ -582,12 +582,12 @@ export default function LibraryPage() {
         .library .lib-list .lib-row:hover, .library .lib-list .lib-row:focus-within:has(:focus-visible) { border-color: transparent !important; border-radius: var(--r-input); box-shadow: var(--lift-shadow) !important; background: var(--lift-pane); transform: var(--lift); }
         .library .lib-row.is-dragging { opacity: .5; }
         .library .lib-kind { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 auto; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
-        .library .lib-row-link { display: flex; align-items: baseline; gap: 12px; flex: 1; min-width: 0; color: var(--ink); text-decoration: none; padding: 10px 0; }
-        .library .lib-row-link:hover { text-decoration: none; }
+        .library .lib-row-link { display: flex; align-items: baseline; gap: 12px; flex: 1; min-width: 0; color: var(--ink); text-decoration: none; padding: 8px 0; }
+        @media (hover: hover) { .library .lib-row-link:hover { text-decoration: none; } }
         .library .lib-row-title { font:600 17px/1.15 var(--font-sans); min-width: 0; }
         .library .lib-rename { flex: 1; min-width: 0; }
         .library .lib-star.is-on { color: var(--olive-ink); }
-        .library .lib-empty-group { padding: 8px 16px 14px; margin: 0; }
+        .library .lib-empty-group { padding: 8px 16px 12px; margin: 0; }
         @media (max-width: 767px) {
           /* Phones: the title takes the row's width and wraps to two lines instead of pushing the buttons off-screen. */
           .library .lib-row-link { flex-direction: column; align-items: stretch; gap: 2px; }

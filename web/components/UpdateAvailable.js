@@ -102,7 +102,7 @@ function ChangesDialog({ guideId, viewer, busy, onAccept, onStay, onClose }) {
       </div>
       <style jsx global>{`
         .changes-sheet { width: min(560px, 100%); max-height: min(80vh, 720px); overflow-y: auto; display: grid; gap: 16px; }
-        .changes-title { margin: 0; font: 500 26px/1.15 var(--font-display); color: var(--ink); }
+        .changes-title { margin: 0; font:500 28px/1.15 var(--font-display); color: var(--ink); }
         .changes-list { display: grid; gap: 16px; }
         .changes-group h3 { margin: 0 0 8px; font: 600 var(--fs-13)/1.2 var(--font-sans); color: var(--muted-ink); }
         .changes-group ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
@@ -152,7 +152,7 @@ export function GuideUnavailable({ title, reason }) {
       <Link href="/library" className="c-btn c-btn--secondary">Back to Library</Link>
       <style jsx>{`
         .gone { max-width: 560px; margin: 48px auto; padding: 24px; display: grid; gap: 12px; justify-items: start; }
-        .gone-title { margin: 0; font: 500 30px/1.15 var(--font-display); color: var(--ink); overflow-wrap: anywhere; }
+        .gone-title { margin: 0; font:500 28px/1.15 var(--font-display); color: var(--ink); overflow-wrap: anywhere; }
         .gone-reason { margin: 0; color: var(--ink); }
         .gone p { margin: 0; }
       `}</style>

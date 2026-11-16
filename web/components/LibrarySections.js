@@ -83,12 +83,12 @@ export function SavedGuides({ onToast }) {
         </li>
       ))}
       <style jsx>{`
-        .lsec-list { list-style: none; margin: 0; padding: 6px; display: grid; }
-        .lsec-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 6px 6px 6px 10px; border-radius: var(--r-row); min-width: 0; }
+        .lsec-list { list-style: none; margin: 0; padding: 4px; display: grid; }
+        .lsec-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 4px 4px 4px 8px; border-radius: var(--r-row); min-width: 0; }
         .lsec-row + .lsec-row { border-top: 1px solid var(--line); }
         .lsec-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
         .lsec-row :global(.lsec-main) { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; color: var(--ink); text-decoration: none; }
-        .lsec-row :global(a.lsec-main:hover strong) { text-decoration: underline; text-underline-offset: 3px; }
+        @media (hover: hover) { .lsec-row :global(a.lsec-main:hover strong) { text-decoration: underline; text-underline-offset: 3px; } }
         .lsec-row :global(.lsec-main strong) { font: 600 15px/1.3 var(--font-sans); }
       `}</style>
     </ul>
@@ -118,12 +118,12 @@ export function ClassSetList({ classes }) {
         </li>
       ))}
       <style jsx>{`
-        .lsec-list { list-style: none; margin: 0; padding: 6px; display: grid; }
-        .lsec-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 6px 10px; border-radius: var(--r-row); min-width: 0; }
+        .lsec-list { list-style: none; margin: 0; padding: 4px; display: grid; }
+        .lsec-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 4px 8px; border-radius: var(--r-row); min-width: 0; }
         .lsec-row + .lsec-row { border-top: 1px solid var(--line); }
         .lsec-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
         .lsec-row :global(.lsec-main) { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; color: var(--ink); text-decoration: none; }
-        .lsec-row :global(a.lsec-main:hover strong) { text-decoration: underline; text-underline-offset: 3px; }
+        @media (hover: hover) { .lsec-row :global(a.lsec-main:hover strong) { text-decoration: underline; text-underline-offset: 3px; } }
         .lsec-row :global(.lsec-main strong) { font: 600 15px/1.3 var(--font-sans); }
       `}</style>
     </ul>
@@ -151,9 +151,9 @@ export function VisibilityNote() {
       </p>
       <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={dismiss}>Got it</button>
       <style jsx>{`
-        .lsec-note { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; border-radius: var(--r-row); background: var(--olive-tint); color: var(--ink); }
+        .lsec-note { display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: var(--r-row); background: var(--olive-tint); color: var(--ink); }
         .lsec-note :global(.lucide) { flex: none; color: var(--olive-ink); }
-        .lsec-note p { flex: 1 1 auto; margin: 0; font: 600 14px/1.45 var(--font-sans); }
+        .lsec-note p { flex: 1 1 auto; margin: 0; font:600 15px/1.45 var(--font-sans); }
       `}</style>
     </div>
   );

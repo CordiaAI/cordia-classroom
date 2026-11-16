@@ -224,35 +224,35 @@ export default function ProfilePage() {
 
         <style jsx>{`
           .up { width: min(760px, 100%); margin: 0 auto; display: grid; gap: 16px; }
-          .up-review { margin: 0; padding: 14px 16px; color: var(--ink); font: 500 15px/1.45 var(--font-sans); border-left: 3px solid var(--olive); }
+          .up-review { margin: 0; padding: 12px 16px; color: var(--ink); font: 500 15px/1.45 var(--font-sans); border-left: 3px solid var(--olive); }
           .up-top { display: flex; }
-          .up-guides { list-style: none; margin: 0; padding: 6px; display: grid; }
+          .up-guides { list-style: none; margin: 0; padding: 4px; display: grid; }
           .up-guides li + li { border-top: 1px solid var(--line); }
-          .up :global(.up-guide) { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 6px 10px; color: var(--ink); text-decoration: none; min-width: 0; }
-          .up :global(.up-guide:hover strong) { text-decoration: underline; text-underline-offset: 3px; }
+          .up :global(.up-guide) { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 4px 8px; color: var(--ink); text-decoration: none; min-width: 0; }
+          @media (hover: hover) { .up :global(.up-guide:hover strong) { text-decoration: underline; text-underline-offset: 3px; } }
           .up-guide-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
           .up-guide-text { display: grid; gap: 2px; min-width: 0; }
           .up-guide-text strong { font: 600 15px/1.3 var(--font-sans); }
           .up-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 20px; }
-          .up-avatar { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 26px/1 var(--font-sans); }
+          .up-avatar { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font:600 28px/1 var(--font-sans); }
           .up-who { display: grid; gap: 4px; min-width: 0; }
           .up-name { margin: 0; overflow-wrap: anywhere; }
           .up-handle { margin: 0; color: var(--muted); font: 600 15px/1.4 var(--font-sans); overflow-wrap: anywhere; }
           .up-handle span { font-weight: 500; }
-          .up-facts { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0 0; padding: 0; list-style: none; color: var(--ink); font: 500 15px/1.4 var(--font-sans); }
-          .up-facts li { display: inline-flex; align-items: center; gap: 6px; }
+          .up-facts { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 4px 0 0; padding: 0; list-style: none; color: var(--ink); font: 500 15px/1.4 var(--font-sans); }
+          .up-facts li { display: inline-flex; align-items: center; gap: 8px; }
           .up-facts :global(svg) { color: var(--olive-ink); }
-          .up-badge { padding: 2px 10px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--olive-ink); font-weight: 600; }
+          .up-badge { padding: 2px 8px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--olive-ink); font-weight: 600; }
           .up-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
-          .up-counts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 0; color: var(--muted); font: 500 15px/1.4 var(--font-sans); }
+          .up-counts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 4px 0 0; color: var(--muted); font: 500 15px/1.4 var(--font-sans); }
           .up-counts strong { color: var(--ink); font-weight: 600; }
           .up-follows-you { margin: 2px 0 0; }
           :global(.up-tabs) { justify-self: start; }
           .up-panel { display: grid; gap: 8px; }
           .up-none { margin: 0; color: var(--muted); text-align: center; padding: 32px 16px; }
-          .up-private { display: flex; align-items: center; gap: 10px; padding: 16px 20px; color: var(--muted); }
+          .up-private { display: flex; align-items: center; gap: 12px; padding: 16px 20px; color: var(--muted); }
           .up-private p { margin: 0; }
-          .up-empty { display: grid; gap: 10px; justify-items: start; padding: 20px; }
+          .up-empty { display: grid; gap: 12px; justify-items: start; padding: 20px; }
           .up-empty h1, .up-empty p { margin: 0; }
           @media (max-width: 767px) {
             .up-head { gap: 12px; padding: 16px; }

@@ -70,18 +70,18 @@ export default function ReportSheet({ targetType, targetId, name, onClose, onUna
             </form>
           )}
           <style jsx>{`
-            .rs { width: min(480px, 100%); display: grid; gap: 14px; }
+            .rs { width: min(480px, 100%); display: grid; gap: 16px; }
             .rs-title { margin: 0; }
             .rs-form { display: grid; gap: 12px; }
             .rs-lead, .rs-note { margin: 0; overflow-wrap: anywhere; }
             .rs-reasons { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
-            .rs-legend { margin-bottom: 6px; padding: 0; font: 600 13px/1.3 var(--font-sans); color: var(--muted-ink); }
-            .rs-option { display: flex; gap: 12px; align-items: center; min-height: 44px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-input); cursor: pointer; color: var(--ink); font: 500 15px/1.35 var(--font-sans); }
+            .rs-legend { margin-bottom: 4px; padding: 0; font: 600 13px/1.3 var(--font-sans); color: var(--muted-ink); }
+            .rs-option { display: flex; gap: 12px; align-items: center; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r-input); cursor: pointer; color: var(--ink); font: 500 15px/1.35 var(--font-sans); }
             .rs-option.is-on { border-color: var(--olive); background: var(--olive-tint); color: var(--olive-ink); font-weight: 600; }
             .rs-option input { margin: 0; accent-color: var(--olive); flex: none; }
-            .rs-error { margin: 0; color: var(--error); font: 600 14px/1.4 var(--font-sans); }
+            .rs-error { margin: 0; color: var(--error); font:600 15px/1.4 var(--font-sans); }
             .rs-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-            .rs-done { display: grid; gap: 10px; justify-items: start; }
+            .rs-done { display: grid; gap: 12px; justify-items: start; }
             .rs-done p { margin: 0; overflow-wrap: anywhere; }
             .rs-done-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
             .rs-done .rs-actions { justify-self: stretch; }

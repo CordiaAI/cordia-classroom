@@ -90,7 +90,7 @@ export default function ReviewPrompt({ onClose, sessionFinished = false }) {
           </>
         ) : stars >= 4 ? (
           <>
-            <h2 id="review-title" className="c-title review-title">Thank you!</h2>
+            <h2 id="review-title" className="c-title review-title">Thank you</h2>
             <p className="review-sub">Glad it's helping you study.</p>
             <div className="review-actions">
               <button type="button" className="c-btn c-btn--primary" onClick={onClose}>Done</button>
@@ -115,15 +115,15 @@ export default function ReviewPrompt({ onClose, sessionFinished = false }) {
         {stars > 0 && <StoreReviewLine sessionFinished={sessionFinished} />}
       </section>
       <style jsx>{`
-        .review-sheet { position: relative; width: min(420px, 100%); display: grid; justify-items: center; gap: 12px; padding: 28px 24px 22px; text-align: center; }
+        .review-sheet { position: relative; width: min(420px, 100%); display: grid; justify-items: center; gap: 12px; padding: 28px 24px 20px; text-align: center; }
         .review-close { position: absolute; top: 12px; right: 12px; }
         .review-title { margin: 0; }
         .review-sub { margin: 0; max-width: 34ch; }
-        .review-stars { display: flex; gap: 4px; margin: 6px 0; }
+        .review-stars { display: flex; gap: 4px; margin: 4px 0; }
         .review-star { display: grid; place-items: center; width: 52px; height: 52px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; transition: transform 140ms ease, color 140ms ease; }
         .review-star.is-on { color: var(--flame); transform: scale(1.08); }
         .review-star.is-on :global(svg) { fill: currentColor; }
-        .review-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
+        .review-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
         .review-form { display: grid; gap: 12px; width: 100%; }
         .review-form :global(textarea) { min-height: 110px; }
         @media (prefers-reduced-motion: reduce) { .review-star { transition: none; } }

@@ -76,9 +76,9 @@ export default function ConnectedApps() {
         />
       )}
       <style jsx>{`
-        .ca { display: grid; gap: 14px; padding: 20px 24px; }
-        .ca-head { display: grid; gap: 6px; }
-        .ca-title { display: inline-flex; align-items: center; gap: 10px; }
+        .ca { display: grid; gap: 16px; padding: 20px 24px; }
+        .ca-head { display: grid; gap: 8px; }
+        .ca-title { display: inline-flex; align-items: center; gap: 12px; }
         .ca-title h2 { margin: 0; }
         .ca-title :global(.lucide) { color: var(--olive-ink); }
         .ca-head .c-meta { margin: 0; }

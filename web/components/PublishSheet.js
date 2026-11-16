@@ -55,8 +55,8 @@ export default function PublishSheet({ visibility, attribution = 'named', onPubl
         .publish-sheet { width: min(420px, 100%); display: grid; gap: 16px; }
         .publish-title { margin: 0; font: 500 28px/1.15 var(--font-display); color: var(--ink); }
         .publish-lead { margin: 0; color: var(--muted-ink); }
-        .publish-rules { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--ink); }
-        .publish-name { display: inline-flex; align-items: center; gap: 8px; font: 600 14px/1.2 var(--font-sans); color: var(--ink); cursor: pointer; }
+        .publish-rules { margin: 0; padding-left: 20px; display: grid; gap: 8px; color: var(--ink); }
+        .publish-name { display: inline-flex; align-items: center; gap: 8px; font:600 15px/1.2 var(--font-sans); color: var(--ink); cursor: pointer; }
         .publish-name input { width: 18px; height: 18px; accent-color: var(--olive); }
         .publish-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .publish-honor { justify-self: center; font: 600 13px/1 var(--font-sans); color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }

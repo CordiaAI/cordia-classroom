@@ -189,7 +189,7 @@ export default function Admin() {
         .adm-main strong { font: 600 15px/1.3 var(--font-sans); overflow-wrap: anywhere; }
         .adm-main .c-meta { overflow-wrap: anywhere; }
         .adm-takedown { align-items: flex-start; padding: 12px 0; }
-        .adm-confirm { display: flex; align-items: center; gap: 8px; flex-basis: 100%; font: 500 14px/1.4 var(--font-sans); }
+        .adm-confirm { display: flex; align-items: center; gap: 8px; flex-basis: 100%; font:500 13px/1.4 var(--font-sans); }
         .adm-confirm input { width: 18px; height: 18px; accent-color: var(--olive); }
         .adm-danger { color: var(--error); }
         .adm-filters { margin-bottom: 4px; }

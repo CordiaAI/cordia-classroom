@@ -58,7 +58,7 @@ export default function CourseClassrooms({ classId, onToast }) {
       </ul>
       {creating && <NewClassroomSheet classId={classId} onClose={() => setCreating(false)} onMade={room => router.push('/classrooms/' + room.id)} />}
       <style jsx>{`
-        .ccr { display: grid; gap: 10px; padding: 16px; }
+        .ccr { display: grid; gap: 12px; padding: 16px; }
         .ccr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .ccr-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
         .ccr :global(p) { margin: 0; }

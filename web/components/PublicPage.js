@@ -68,23 +68,23 @@ export default function PublicPage({ path = '/', faq = null, faqInPage = false, 
         .public--photo .public-nav { background: var(--glass-shell, var(--surface-card)); }
         .public--photo .auth, .public--photo .c-card { -webkit-backdrop-filter: blur(20px) saturate(140%); backdrop-filter: blur(20px) saturate(140%); }
         .public-nav { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; padding: 0 24px; background: var(--surface-card); border-bottom: 1px solid var(--hairline); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); }
-        .public-brand { display: inline-flex; align-items: center; gap: 14px; color: var(--ink); text-decoration: none; }
-        .public-brand > span { display: inline-flex; align-items: center; height: 28px; padding-left: 14px; border-left: 1px solid var(--line); font: 400 22px/1 var(--font-sans); letter-spacing: 0.02em; }
-        .public-brand:hover { text-decoration: none; }
+        .public-brand { display: inline-flex; align-items: center; gap: 16px; color: var(--ink); text-decoration: none; }
+        .public-brand > span { display: inline-flex; align-items: center; height: 28px; padding-left: 12px; border-left: 1px solid var(--line); font: 400 22px/1 var(--font-sans); letter-spacing: 0.02em; }
+        @media (hover: hover) { .public-brand:hover { text-decoration: none; } }
         .public-mark { width: 30px; height: 26px; object-fit: contain; }
         .public-nav nav { display: flex; align-items: center; gap: 4px; }
-        .public-nav nav a { display: inline-flex; align-items: center; height: 40px; padding: 0 14px; border-radius:999px; color: var(--ink); font:600 var(--fs-15)/1 var(--font-sans); text-decoration: none; }
-        .public-nav nav a:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); text-decoration: none; }
+        .public-nav nav a { display: inline-flex; align-items: center; justify-content: center; height: var(--hit); min-width: var(--hit); padding: 0 12px; border-radius:999px; color: var(--ink); font:600 var(--fs-15)/1 var(--font-sans); text-decoration: none; }
+        @media (hover: hover) { .public-nav nav a:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); text-decoration: none; } }
         .public-nav nav a.public-signin { background: var(--olive); color: var(--on-olive); }
         .public-main { width: min(1120px, 100%); margin: 0 auto; padding: 48px 24px 80px; }
         .public-doc { color: var(--text-secondary); }
         .public-footer { border-top: 1px solid var(--hairline); padding: 24px; }
-        .public-footer nav { width: min(1120px, 100%); margin: 0 auto; display: flex; flex-wrap: wrap; gap: 8px 24px; }
+        .public-footer nav { width: min(1120px, 100%); margin: 0 auto; display: flex; flex-wrap: wrap; gap: 24px 24px; }
         .public-footer .public-footer-group { margin-top: 12px; }
         .public-footer-label { color: var(--ink); font: 600 var(--fs-13)/1.5 var(--font-sans); }
         .public-entity { width: min(1120px, 100%); margin: 0 auto 12px; color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); }
         .public-footer a { color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); text-decoration: none; }
-        .public-footer a:hover { color: var(--ink); text-decoration: underline; }
+        @media (hover: hover) { .public-footer a:hover { color: var(--ink); text-decoration: underline; } }
         @media (max-width: 600px) { .public-nav { padding: 0 12px 0 16px; } .public-nav nav a:not(.public-signin):first-child { display: none; } .public-main { padding: 32px 16px 64px; } .public-footer { padding: 20px 16px; } }
       `}</style>
     </>

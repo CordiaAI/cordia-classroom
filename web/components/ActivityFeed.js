@@ -50,11 +50,11 @@ export default function ActivityFeed() {
         {feed?.next_cursor && <button type="button" className="c-btn c-btn--secondary af-more" onClick={showMore} disabled={more} aria-busy={more}>{more ? 'Loading…' : 'Show more'}</button>}
       </section>
       <style jsx>{`
-        .af { display: grid; gap: 10px; }
+        .af { display: grid; gap: 12px; }
         .af h2 { margin: 0; }
         .af-empty { margin: 0; padding: 24px 20px; color: var(--muted); text-align: center; }
-        .af-list { display: grid; margin: 0; padding: 6px 0; list-style: none; }
-        .af-item { display: grid; gap: 6px; padding: 12px 16px; min-width: 0; }
+        .af-list { display: grid; margin: 0; padding: 4px 0; list-style: none; }
+        .af-item { display: grid; gap: 8px; padding: 12px 16px; min-width: 0; }
         .af-item + .af-item { border-top: 1px solid var(--hairline); }
         .af-text { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 0 52px; color: var(--ink); font: 500 15px/1.45 var(--font-sans); overflow-wrap: anywhere; }
         .af-text :global(svg) { color: var(--olive-ink); flex: none; }

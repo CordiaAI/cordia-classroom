@@ -33,7 +33,7 @@ export default function MissionPage() {
     },
     {
       title: 'Users are "cofounders"',
-      description: 'Got a new recommendation or said something along the lines of "I wish it would do this?" Send feedback! Our goal is to get your recommendation ASAP! This is a college study platform made for the people.',
+      description: 'Got a new recommendation or said something along the lines of "I wish it would do this?" Send feedback. Our goal is to get your recommendation ASAP. This is a college study platform made for the people.',
     },
   ];
 
@@ -67,7 +67,7 @@ export default function MissionPage() {
           </div>
         ))}
       </div>
-      <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 15, marginTop: 24, fontStyle: 'italic' }}>
+      <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 15, marginTop: 24 }}>
         Founder - Jackson Laughlin
       </p>
     </div>

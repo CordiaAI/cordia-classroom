@@ -264,7 +264,7 @@ export default function ClassPage() {
         .cls-title { display: grid; gap: 2px; min-width: 0; }
         .cls-title :global(.c-title) { overflow-wrap: anywhere; }
         .cls-name-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; cursor: text; }
-        .cls-name-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
+        @media (hover: hover) { .cls-name-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; } }
         :global(.cls-name-input) { font: 600 28px/1.15 var(--font-display); height: 52px; width: min(640px, 70vw); }
         .cls-files { padding: 8px; }
         :global(.cls-tabs) button { flex: 0 0 auto; white-space: nowrap; }

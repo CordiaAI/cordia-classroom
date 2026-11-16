@@ -77,6 +77,8 @@ export default function ComparisonArticle({ page, path, parts, jsonLd }) {
         .cmp-crumbs :global(a) { color: var(--muted); }
         .cmp-title { margin: 0; max-width: 22em; }
         .cmp-body { max-width: 52em; }
+        /* Tables use the full column; running text stays near 70 characters a line. */
+        .cmp-body :global(p), .cmp-body :global(li) { max-width: 38em; }
         .cmp-body :global(h2) { margin: 40px 0 0; }
         .cmp-body :global(h3) { margin: 24px 0 0; }
         .cmp-body :global(p), .cmp-body :global(li) { color: var(--text-secondary); font: 500 var(--fs-15)/1.6 var(--font-sans); }
@@ -88,7 +90,7 @@ export default function ComparisonArticle({ page, path, parts, jsonLd }) {
         .cmp-body :global(.cmp-shot) { display: block; width: 100%; height: auto; margin-top: 12px; border: 1px solid var(--hairline); border-radius: 12px; }
         .cmp-body :global(.cmp-table-wrap) { margin-top: 16px; overflow-x: auto; }
         .cmp-body :global(table) { width: 100%; border-collapse: collapse; font: 500 var(--fs-13)/1.5 var(--font-sans); }
-        .cmp-body :global(th), .cmp-body :global(td) { padding: 10px 12px; border-bottom: 1px solid var(--hairline); text-align: left; vertical-align: top; color: var(--text-secondary); }
+        .cmp-body :global(th), .cmp-body :global(td) { padding: 8px 12px; border-bottom: 1px solid var(--hairline); text-align: left; vertical-align: top; color: var(--text-secondary); }
         .cmp-body :global(thead th) { color: var(--ink); font-weight: 600; border-bottom: 1px solid var(--line); }
         .cmp-body :global(tbody th) { color: var(--ink); font-weight: 600; white-space: nowrap; }
         .cmp-body :global(.faq) { margin-top: 40px; }

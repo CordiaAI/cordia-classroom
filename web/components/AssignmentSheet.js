@@ -154,7 +154,7 @@ export default function AssignmentSheet({ item, onClose }) {
         .as-sheet .c-sheet-head { margin-bottom: 0; align-items: flex-start; }
         .as-head { display: grid; gap: 4px; min-width: 0; }
         .as-head .c-section-title, .as-head .c-meta { margin: 0; }
-        .as-warn { margin: 0; padding: 10px 14px; border-radius: var(--r-row, 16px); background: var(--error-bg); color: var(--error); font-weight: 600; }
+        .as-warn { margin: 0; padding: 8px 12px; border-radius: var(--r-row, 16px); background: var(--error-bg); color: var(--error); font-weight: 600; }
         .as-empty { display: grid; justify-items: start; gap: 12px; }
         .as-empty .c-meta { margin: 0; }
         .as-effort { display: grid; gap: 2px; margin: 0; }
@@ -163,9 +163,9 @@ export default function AssignmentSheet({ item, onClose }) {
         .as-step .c-grow { display: grid; gap: 2px; }
         .as-step-title { font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
         .as-step.is-done .as-step-title { color: var(--muted); text-decoration: line-through; }
-        .as-subtitle { margin: 0 0 4px; font: 600 14px/1.4 var(--font-sans); color: var(--muted); }
-        .as-blocks ul, .as-rubric ol { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
-        .as-rubric ol { margin-top: 8px; gap: 10px; }
+        .as-subtitle { margin: 0 0 4px; font:600 15px/1.4 var(--font-sans); color: var(--muted); }
+        .as-blocks ul, .as-rubric ol { margin: 0; padding-left: 16px; display: grid; gap: 4px; }
+        .as-rubric ol { margin-top: 8px; gap: 12px; }
         .as-rubric p { margin: 2px 0 0; }
         .as-actions { display: flex; flex-wrap: wrap; gap: 8px; }
         .as-sheet :global(.as-tutor) { justify-self: start; }

@@ -170,30 +170,30 @@ export default function SubmitQuiz({ questions, items, deadline = null, resume =
 
       <style jsx global>{`
         .sq { display: grid; gap: 16px; width: min(720px, 100%); justify-self: center; }
-        .sq-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+        .sq-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
         .sq-format { margin-left: auto; }
         .sq-flag.is-on { color: var(--warning); }
-        .sq-match { display: grid; gap: 10px; margin: 0 0 8px; padding: 0; list-style: none; }
-        .sq-match li { display: grid; gap: 6px; }
+        .sq-match { display: grid; gap: 12px; margin: 0 0 8px; padding: 0; list-style: none; }
+        .sq-match li { display: grid; gap: 8px; }
         .sq-match span { font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
         .sq-sure .is-on { background: var(--olive-tint); border-color: var(--olive); color: var(--olive-ink); }
-        .sq-saved { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 0; color: var(--muted); font: 500 var(--fs-13)/1.4 var(--font-sans); }
+        .sq-saved { display: inline-flex; align-items: center; gap: 8px; margin: 4px 0 0; color: var(--muted); font: 500 var(--fs-13)/1.4 var(--font-sans); }
         .sq-saved.is-saved { color: var(--success); }
         .sq-nav { justify-content: space-between; }
         .sq-panel { display: grid; gap: 12px; padding: 16px; }
         .sq-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-        .sq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
-        .sq-cell { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 100%; height: 40px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font: 600 14px/1 var(--font-sans); font-variant-numeric: tabular-nums; cursor: pointer; }
+        .sq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+        .sq-cell { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 100%; height: 40px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; cursor: pointer; }
         .sq-cell.is-answered { background: var(--olive-tint); border-color: transparent; color: var(--olive-ink); }
         .sq-cell.is-flagged { box-shadow: inset 0 0 0 2px var(--warning); }
         .sq-cell.is-flagged .lucide { color: var(--warning); }
         .sq-cell.is-current { outline: 2px solid var(--olive); outline-offset: 2px; }
-        .sq-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; padding: 0; list-style: none; color: var(--muted); font: 500 var(--fs-13)/1.3 var(--font-sans); }
-        .sq-legend li { display: inline-flex; align-items: center; gap: 6px; }
+        .sq-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 0; list-style: none; color: var(--muted); font: 500 var(--fs-13)/1.3 var(--font-sans); }
+        .sq-legend li { display: inline-flex; align-items: center; gap: 8px; }
         .sq-dot { width: 12px; height: 12px; border-radius: 4px; border: 1px solid var(--line); background: var(--card); }
         .sq-dot.is-answered { background: var(--olive-tint); border-color: transparent; }
         .sq-dot.is-flagged { box-shadow: inset 0 0 0 2px var(--warning); }
-        .sq-confirm { display: grid; gap: 10px; padding: 12px 14px; border-radius: var(--r-row, 14px); background: var(--warning-bg); }
+        .sq-confirm { display: grid; gap: 12px; padding: 12px 12px; border-radius: var(--r-row, 14px); background: var(--warning-bg); }
         .sq-confirm p { margin: 0; color: var(--ink); font: 500 15px/1.45 var(--font-sans); }
       `}</style>
     </div>

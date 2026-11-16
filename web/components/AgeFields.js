@@ -22,8 +22,8 @@ export default function AgeFields({ month, year, onMonth, onYear, idPrefix = 'ag
         </label>
       </div>
       <style jsx>{`
-        .age-fields { display: grid; gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
-        .age-legend { padding: 0; margin-bottom: 6px; font: 600 13px/1.15 var(--font-sans); color: var(--ink); }
+        .age-fields { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+        .age-legend { padding: 0; margin-bottom: 4px; font: 600 13px/1.15 var(--font-sans); color: var(--ink); }
         .age-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 8px; }
         .age-field { display: grid; gap: 4px; min-width: 0; }
         .age-field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

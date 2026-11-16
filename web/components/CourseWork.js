@@ -109,33 +109,33 @@ export default function CourseWork({ data, extraUpcoming = [], onPlan, actions }
       </div>
       <style jsx>{`
         .cw-card { display: grid; gap: 4px; padding: 8px; }
-        :global(.cw-tabs) { justify-self: start; margin: 4px 4px 6px; }
+        :global(.cw-tabs) { justify-self: start; margin: 4px 4px 4px; }
         .cw-tab { display: inline-flex; align-items: center; gap: 8px; }
-        .cw-badge { min-width: 22px; padding: 2px 7px; border-radius: var(--r-pill); background: var(--surface-raised); color: var(--muted); font: 600 12px/1.3 var(--font-sans); text-align: center; }
+        .cw-badge { min-width: 22px; padding: 2px 8px; border-radius: var(--r-pill); background: var(--surface-raised); color: var(--muted); font:600 13px/1.3 var(--font-sans); text-align: center; }
         .cw-tab[aria-selected='true'] .cw-badge { background: var(--olive-tint); color: var(--olive-ink); }
         .cw-tab.is-missing .cw-badge { background: var(--error-bg); color: var(--error); }
         .cw-list { display: grid; }
-        .cw-row { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: var(--r-input); }
+        .cw-row { display: flex; align-items: center; gap: 16px; padding: 8px 12px; border-radius: var(--r-input); }
         .cw-row + .cw-row { border-top: 1px solid var(--border-subtle); }
-        .cw-row:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); }
+        @media (hover: hover) { .cw-row:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); } }
         .cw-date { display: grid; flex: none; place-items: center; width: 46px; height: 46px; border-radius: 12px; background: var(--olive-tint); color: var(--olive-ink); }
-        .cw-date small { font: 600 11px/1 var(--font-sans); text-transform: uppercase; letter-spacing: 0.04em; }
-        .cw-date strong { font: 600 18px/1 var(--font-sans); }
+        .cw-date small { font:600 13px/1 var(--font-sans); text-transform: uppercase; letter-spacing: 0.08em; }
+        .cw-date strong { font:600 17px/1 var(--font-sans); }
         .cw-date.is-late { background: var(--error-bg); color: var(--error); }
         .cw-main { display: grid; flex: 1; gap: 3px; min-width: 0; }
-        .cw-title { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; color: var(--ink); font: 600 15px/1.35 var(--font-sans); text-decoration: none; }
-        .cw-title:hover { text-decoration: underline; }
+        .cw-title { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; color: var(--ink); font: 600 15px/1.35 var(--font-sans); text-decoration: none; }
+        @media (hover: hover) { .cw-title:hover { text-decoration: underline; } }
         .cw-title :global(.lucide) { flex: none; color: var(--muted); opacity: 0; transition: opacity var(--dur) var(--ease); }
         .cw-row:hover .cw-title :global(.lucide), .cw-title:focus-visible :global(.lucide) { opacity: 1; }
         .cw-row.is-done .cw-title { color: var(--muted); text-decoration: line-through; }
-        .cw-late { flex: none; padding: 3px 9px; border-radius: var(--r-pill); background: var(--error-bg); color: var(--error); font: 600 12px/1.3 var(--font-sans); white-space: nowrap; }
-        .cw-empty { margin: 0; padding: 18px 12px; }
-        .cw-more { justify-self: start; margin: 4px 8px 6px; }
+        .cw-late { flex: none; padding: 3px 8px; border-radius: var(--r-pill); background: var(--error-bg); color: var(--error); font:600 13px/1.3 var(--font-sans); white-space: nowrap; }
+        .cw-empty { margin: 0; padding: 16px 12px; }
+        .cw-more { justify-self: start; margin: 4px 8px 4px; }
         @media (max-width: 520px) {
           :global(.cw-tabs) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); justify-self: stretch; min-width: 0; }
-          .cw-tab { justify-content: center; gap: 5px; min-width: 0; padding-inline: 6px; font-size: 14px; }
-          .cw-badge { min-width: 0; padding: 2px 6px; }
-          .cw-row { gap: 10px; padding: 10px 6px; }
+          .cw-tab { justify-content: center; gap: 4px; min-width: 0; padding-inline: 4px; font-size: 13px; }
+          .cw-badge { min-width: 0; padding: 2px 4px; }
+          .cw-row { gap: 12px; padding: 8px 4px; }
           .cw-date { width: 40px; height: 40px; }
           .cw-late { display: none; }
         }

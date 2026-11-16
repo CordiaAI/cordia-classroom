@@ -100,7 +100,7 @@ export default function QuizMode({ questions, cards, types, guideId, onRestart, 
   return (
     <div className="c-card quiz-question-card">
       <div className="quiz-progress">
-        <div className="c-bar" role="progressbar" aria-label="Cleared" aria-valuemin={0} aria-valuemax={stats.total} aria-valuenow={stats.cleared}><span style={{ width: Math.round((stats.cleared / Math.max(1, stats.total)) * 100) + '%' }} /></div>
+        <div className="c-bar" role="progressbar" aria-label="Cleared" aria-valuemin={0} aria-valuemax={stats.total} aria-valuenow={stats.cleared}><span style={{ '--v': Math.round((stats.cleared / Math.max(1, stats.total)) * 100) + '%' }} /></div>
         <span className="c-meta">{stats.cleared} / {stats.total}</span>
         {stats.toClear > 0 && <span className="c-meta quiz-repeat"><Repeat size={16} strokeWidth={1.75} aria-hidden="true" />{stats.toClear}</span>}
       </div>

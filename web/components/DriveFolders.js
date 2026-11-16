@@ -138,7 +138,7 @@ export default function DriveFolders({ app = 'drive' }) {
       {notice && <p className="cn-notice" role="status">{notice}</p>}
       {error && <p className="cn-error" role="alert">{error}</p>}
       <style jsx>{`
-        .df { display: grid; gap: 10px; width: 100%; padding-top: 12px; border-top: 1px solid var(--hairline); text-align: left; }
+        .df { display: grid; gap: 12px; width: 100%; padding-top: 12px; border-top: 1px solid var(--hairline); text-align: left; }
         .df-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
         .df .c-meta { margin: 0; }
         .df-list { list-style: none; margin: 0; padding: 0; display: grid; }

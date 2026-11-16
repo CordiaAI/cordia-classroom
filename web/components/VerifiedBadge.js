@@ -9,7 +9,7 @@ export default function VerifiedBadge({ label = false }) {
       {label ? <span>Verified instructor</span> : <span className="sr-only">Verified instructor</span>}
       <style jsx>{`
         .vb { display: inline-flex; align-items: center; gap: 4px; flex: none; color: var(--olive-ink); vertical-align: middle; }
-        .vb.has-label { padding: 2px 10px 2px 8px; border-radius: var(--r-pill); background: var(--olive-tint); font: 600 13px/1.4 var(--font-sans); }
+        .vb.has-label { padding: 2px 8px 2px 8px; border-radius: var(--r-pill); background: var(--olive-tint); font: 600 13px/1.4 var(--font-sans); }
       `}</style>
     </span>
   );
