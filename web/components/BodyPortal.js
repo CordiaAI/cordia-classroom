@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react';
+import { useInsertionEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 // Sheets, dialogs and menus render at the end of <body>. Inside the glass top bar or a glass card,
@@ -22,19 +22,21 @@ function leave(box, node) {
 }
 
 export default function BodyPortal({ children }) {
-  const [box, setBox] = useState(null);
-  useLayoutEffect(() => {
-    const node = document.createElement('div');
-    node.className = 'c-portal';
-    document.body.appendChild(node);
+  // The box exists from the first render and is in <body> before any layout effect runs, so
+  // what's inside can measure and take focus as soon as it mounts.
+  const [box] = useState(() => (typeof document === 'undefined' ? null : Object.assign(document.createElement('div'), { className: 'c-portal' })));
+  const removal = useRef(null);
+  useInsertionEffect(() => {
+    if (!box) return undefined;
+    clearTimeout(removal.current);
+    document.body.appendChild(box);
     const watcher = new MutationObserver(records => {
-      for (const record of records) record.removedNodes.forEach(removed => leave(node, removed));
+      for (const record of records) record.removedNodes.forEach(removed => leave(box, removed));
     });
-    watcher.observe(node, { childList: true });
-    setBox(node);
+    watcher.observe(box, { childList: true });
     // The box outlives the portal by one exit, so an overlay closed by unmounting the whole
     // portal still gets its exit.
-    return () => setTimeout(() => { watcher.disconnect(); node.remove(); }, EXIT_MS + 50);
-  }, []);
+    return () => { removal.current = setTimeout(() => { watcher.disconnect(); box.remove(); }, EXIT_MS + 50); };
+  }, [box]);
   return box ? createPortal(children, box) : null;
 }

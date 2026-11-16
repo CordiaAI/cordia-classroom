@@ -258,7 +258,7 @@
   --success-bg: rgba(143, 209, 160, 0.14);
   --warning: #F2C14E;
   --warning-bg: rgba(242, 193, 78, 0.14);
-  --error: #FF8A80;
+  --error: #FFB0A8; /* 4.5:1 or better over the lightest part of the dark backdrop (was 4.0) */
   --error-bg: #3A2222;
   --state-select-fill: rgba(195, 207, 182, 0.17);
   --state-select-edge: rgba(195, 207, 182, 0.38);
