@@ -326,6 +326,9 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
   /* On a phone it is a bottom sheet: it slides up from the edge it lives on. */
   .c-scrim { animation-duration: 280ms; }
   .c-sheet { animation: c-sheet-up 280ms var(--ease); }
+  /* It leaves by the edge it came from: 200ms, the scrim fading on the same clock. */
+  .c-scrim.is-leaving { animation-duration: 200ms; }
+  .c-scrim.is-leaving .c-sheet { animation: c-sheet-down 200ms var(--ease-exit) forwards; }
   .c-sheet { width: 100%; max-height: 92vh; border-radius:var(--r-card) var(--r-card) 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); }
 }
 @keyframes c-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -334,6 +337,17 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
 @keyframes c-dialog-in { from { opacity: 0; scale: 0.97; } }
 @keyframes c-sheet-up { from { translate: 0 100%; } }
 @keyframes c-menu-in { from { opacity: 0; scale: 0.95; translate: 0 -4px; } }
+/* Leaving (components/BodyPortal.js keeps a closed overlay for one exit): the way it came, about
+   30% faster, on the exit curve. Nothing in it can be clicked or focused. */
+.c-portal { display: contents; }
+.is-leaving { pointer-events: none; }
+.c-scrim.is-leaving { animation: c-fade-out var(--dur-exit) var(--ease-exit) forwards; }
+.c-scrim.is-leaving .c-sheet { animation: c-dialog-out var(--dur-exit) var(--ease-exit) forwards; }
+.c-menu.is-leaving { animation: c-menu-out 120ms var(--ease-exit) forwards; }
+@keyframes c-fade-out { to { opacity: 0; } }
+@keyframes c-dialog-out { to { scale: 0.97; } }
+@keyframes c-sheet-down { to { translate: 0 100%; } }
+@keyframes c-menu-out { to { opacity: 0; scale: 0.95; translate: 0 -4px; } }
 
 /* Toast + tip */
 .c-toast {

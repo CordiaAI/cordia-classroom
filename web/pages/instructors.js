@@ -123,7 +123,7 @@ export default function Instructors() {
               <button type="submit" className="c-btn c-btn--primary" disabled={busy || !school || !email.trim()}>Verify email</button>
             </form>
           )}
-          {error && <p className="ins-error" role="alert">{error}</p>}
+          <p className="ins-error" role="alert">{error}</p>
         </div>
         {report.length > 0 && (
           <section className="ins-card" aria-labelledby="ins-hides">
@@ -157,7 +157,7 @@ export default function Instructors() {
         .ins-hides li { display: grid; gap: 2px; color: var(--muted); font: 500 15px/1.45 var(--font-sans); }
         .ins-hides strong { color: var(--ink); font-weight: 600; }
         .ins-note { margin: 0; color: var(--muted); font:500 13px/1.45 var(--font-sans); }
-        .ins-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+        .ins-error { margin: 0; min-height: 20px; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
         .ins-suggest { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin: 4px 0 0; padding: 4px; list-style: none; border-radius: 16px; background: var(--surface-raised); box-shadow: var(--shadow-float); }
         .ins-suggest button { width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none; font: 500 15px/1.3 var(--font-sans); text-align: left; cursor: pointer; color: var(--ink); }
         @media (hover: hover) { .ins-suggest button:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); } }

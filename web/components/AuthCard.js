@@ -303,8 +303,8 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
         )}
 
         {mode === 'signin' && <button type="button" className="auth-link auth-forgot" onClick={() => switchMode('reset')}>Forgot password?</button>}
-        {error && <p className="auth-error" role="alert">{error}</p>}
-        {notice && <p className="auth-notice" role="status">{notice}</p>}
+        {/* One line is always reserved for the message, so the card never jumps when it appears. */}
+        <p className={notice && !error ? 'auth-notice auth-line' : 'auth-error auth-line'} role={error ? 'alert' : 'status'}>{error || notice}</p>
         <button type="submit" className="auth-submit" disabled={busy}>
           {busy ? 'One moment…' : mode === 'reset' ? 'Send link' : signup ? 'Create account' : 'Sign in'}
         </button>
@@ -336,6 +336,7 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
         .auth-checks li.is-bad { color: var(--error); }
         .auth-link { justify-self: start; height: 32px; padding: 0; border: 0; background: none; color: var(--olive-ink); font:600 13px/1 var(--font-sans); cursor: pointer; }
         .auth-forgot { justify-self: end; margin-top: -4px; }
+        .auth-line { min-height: 24px; }
         .auth-error { margin: 0; color: var(--error); font:600 15px/1.5 var(--font-sans); }
         .auth-notice { margin: 0; color: var(--olive-ink); font:600 15px/1.5 var(--font-sans); }
         .auth-fine { margin: 0; color: var(--muted); font: 500 13px/1.5 var(--font-sans); }
