@@ -131,6 +131,13 @@
   --glass-shadow-edge: inset 0 1px 0 rgba(255, 255, 255, 0.72), inset 0 -1px 0 rgba(23, 27, 24, 0.04), 0 0 0 0.5px rgba(23, 27, 24, 0.08);
   --glass-shadow-depth: 0 2px 6px rgba(16, 24, 16, 0.05), 0 24px 56px -20px rgba(34, 48, 30, 0.30);
   --glass-shadow: var(--glass-shadow-edge), var(--glass-shadow-depth);
+  /* A floating pane on hover (the Tutor bubble): the same edge over a deeper drop. */
+  --glass-shadow-lift: var(--glass-shadow-edge), 0 4px 12px rgba(16, 24, 16, 0.08), 0 30px 64px -18px rgba(34, 48, 30, 0.40);
+  /* Solid glass: what every pane, control and field fills with when the device asks for less
+     transparency or can't frost (end of this file). Opaque, so nothing behind shows through. */
+  --glass-solid: #F7F9F6;
+  --glass-inner-solid: #FAFBF9;            /* --glass-inner laid over --glass-solid */
+  --seg-track-solid: #EBEDEA;              /* --seg-track laid over --glass-solid */
   --glass-grain-opacity: 0.06;
   /* The 180px grain tile: grey noise, laid over a pane at --glass-grain-opacity. */
   --glass-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='.33 .33 .33 0 0  .33 .33 .33 0 0  .33 .33 .33 0 0  0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
@@ -248,8 +255,14 @@
      chosen segment is selected glass. */
   --seg-pill-bg: var(--selected-glass);
   --seg-pill-shadow: var(--selected-glass-shadow);
-  --seg-spring: cubic-bezier(.32, 1.32, .52, 1);
-  --seg-dur: 420ms;
+  /* The track is sunken (ink at 5% with a small inset shadow), so the pill reads as the raised one. */
+  --seg-track: rgba(23, 27, 24, 0.05);
+  --seg-track-shadow: inset 0 1px 2px rgba(23, 27, 24, 0.06), inset 0 0 0 0.5px rgba(23, 27, 24, 0.05);
+  /* Hover on an unchosen segment: a faint wash in the track, never brighter than the chosen pill. */
+  --seg-hover: rgba(23, 27, 24, 0.045);
+  /* The pill moves like every other state change (DESIGN-SPEC 6.1): 180ms, no overshoot. */
+  --seg-ease: var(--ease);
+  --seg-dur: var(--dur);
   --lg-shadow: var(--lg-depth);
   --hover-wash: var(--wash);
   --hover-edge: rgba(23, 27, 24, 0.16);
@@ -340,6 +353,13 @@
   --glass-blur: blur(36px) saturate(115%);
   --glass-shadow-edge: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.35);
   --glass-shadow-depth: 0 2px 8px rgba(0, 0, 0, 0.30), 0 24px 56px -20px rgba(0, 0, 0, 0.55);
+  --glass-shadow-lift: var(--glass-shadow-edge), 0 4px 12px rgba(0, 0, 0, 0.36), 0 30px 64px -18px rgba(0, 0, 0, 0.66);
+  --glass-solid: #25282E;                  /* raised surface laid over the dark canvas, opaque */
+  --glass-inner-solid: #303339;            /* --glass-inner laid over --glass-solid */
+  --seg-track-solid: #1D1F24;              /* --seg-track laid over --glass-solid */
+  --seg-track: rgba(0, 0, 0, 0.22);
+  --seg-track-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.30), inset 0 0 0 0.5px rgba(0, 0, 0, 0.25);
+  --seg-hover: rgba(255, 255, 255, 0.04);
   --glass-grain-opacity: 0.05;
   --glass-inner: rgba(255, 255, 255, 0.05);
   --glass-inner-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 0.5px rgba(0, 0, 0, 0.30);
@@ -391,15 +411,23 @@
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23B9BEB6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
-/* Without a frost (older browsers) or when the device asks for less transparency, panes turn
-   solid raised glass; the rim stays (DESIGN-SPEC 2.3). */
+/* Without a frost (older browsers) or when the device asks for less transparency, glass turns
+   solid: panes, raised panes, controls, selected glass and fields all fill with the opaque
+   --glass-solid, so the backdrop never shows through; the rim stays (DESIGN-SPEC 2.3). */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root, [data-theme='dark'] { --glass-fill: var(--surface-raised); --glass-fill-strong: var(--surface-raised); --glass-control: var(--surface-raised); }
+  :root, [data-theme='dark'] {
+    --glass-fill: var(--glass-solid); --glass-fill-strong: var(--glass-solid); --glass-control: var(--glass-solid);
+    --surface-raised: var(--glass-solid); --lg-fill-field: var(--glass-solid);
+    --glass-inner: var(--glass-inner-solid); --seg-track: var(--seg-track-solid);
+    --selected-glass: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--glass-solid);
+  }
 }
 @media (prefers-reduced-transparency: reduce) {
   :root, [data-theme='dark'] {
-    --glass-fill: var(--surface-raised); --glass-fill-strong: var(--surface-raised); --glass-control: var(--surface-raised);
-    --selected-glass: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--surface-raised);
+    --glass-fill: var(--glass-solid); --glass-fill-strong: var(--glass-solid); --glass-control: var(--glass-solid);
+    --surface-raised: var(--glass-solid); --lg-fill-field: var(--glass-solid);
+    --glass-inner: var(--glass-inner-solid); --seg-track: var(--seg-track-solid);
+    --selected-glass: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--glass-solid);
     --glass-blur: none;
   }
 }

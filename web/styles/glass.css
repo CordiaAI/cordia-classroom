@@ -81,7 +81,7 @@
 /* ---------- Glass controls ----------
    Secondary buttons, chips' kin, pills, the segmented track, avatars and pickers: the brighter
    control glass with a hairline ring. On a pane they don't frost again (below). */
-:is(.c-btn--secondary, .btn-outline, .btn-gray, .c-pill, .c-seg, .c-avatar, .c-searchbtn, .c-timerbtn, .today-streak,
+:is(.c-btn--secondary, .btn-outline, .btn-gray, .c-pill, .c-avatar, .c-searchbtn, .c-timerbtn, .today-streak,
   .wt-resume, .guide-jobs .guide-job, .quiz-mode, .quiz-option, .tutor-select-trigger, .cset-option, .practice-guide,
   .lib-kind, .c-drop-hint) {
   background: var(--glass-control);
@@ -89,6 +89,15 @@
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   box-shadow: var(--glass-control-shadow);
+}
+/* The segmented track is sunken into the surface (ink at 5%, a small inset shadow) and never
+   frosts; the chosen segment's pill of selected glass is the raised part (system.css). */
+.c-seg.c-seg {
+  background: var(--seg-track);
+  border-color: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--seg-track-shadow);
 }
 /* Chips sit on glass: --glass-inner with the white top line (DESIGN-SPEC 4.2). */
 .c-chip.c-chip {
@@ -209,7 +218,7 @@ select.c-select.c-select {
   transition: transform var(--dur) var(--ease);
 }
 .c-tutor-bubble .lucide { color: var(--olive-ink); flex: 0 0 auto; }
-@media (hover: hover) { .c-tutor-bubble:hover { transform: var(--lift); } }
+@media (hover: hover) { .c-tutor-bubble:hover { transform: var(--lift); box-shadow: var(--glass-shadow-lift) !important; } }
 .c-tutor-bubble:active { transform: var(--press); }
 @media (max-width: 767px) {
   .c-tutor-bubble { right: 12px; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px); width: 48px; height: 48px; min-width: 48px; padding: 0; justify-content: center; }
@@ -567,6 +576,8 @@ textarea:not(.c-input) {
   background: var(--olive-glass-sheen), var(--olive-glass-press) !important;
   transform: var(--press);
 }
+/* Tiles settle too; same weight as their hover lift and later, so press wins while hovered. */
+:is(.learn-way, .new-option, .new-make-btn, .new-sample, .tutor-past-chats):not(:disabled):active { transform: var(--press); }
 
 /* Less motion (DESIGN-SPEC 6.1): nothing lifts or scales. --lift and --press are already off
    (tokens.css); this catches the older hovers and presses that set their own transform. */

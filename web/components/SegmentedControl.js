@@ -9,8 +9,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 //         'radio' -> role="radiogroup" (children role="radio"): the same keys
 //         'group' -> role="group" (toggle buttons with aria-pressed): arrows move focus only
 //
-// The pill moves with a transform (no layout work) on a spring-like curve; with reduced motion it
-// jumps. Keys: Left/Right (Up/Down too), Home, End. Only the chosen segment is in the tab order.
+// The pill moves with a transform over 180ms on the shared ease (DESIGN-SPEC 6.1, no overshoot); a
+// change made from the keyboard shows on the next frame, and with reduced motion it jumps.
+// Keys: Left/Right (Up/Down too), Home, End. Only the chosen segment is in the tab order.
 const CHOSEN = "[aria-selected='true'], [aria-checked='true'], [aria-pressed='true'], .is-active";
 const ROLES = { tabs: 'tablist', radio: 'radiogroup', group: 'group' };
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
@@ -19,6 +20,7 @@ export default function SegmentedControl({ kind = 'tabs', label, labelledBy, cla
   const ref = useRef(null);
   const [pill, setPill] = useState(null); // { x, y, w, h } of the chosen segment, null when none
   const [ready, setReady] = useState(false); // no slide on the first placement
+  const [keyed, setKeyed] = useState(false); // the last change came from the keyboard: no slide
 
   const setRefs = useCallback(node => {
     ref.current = node;
@@ -75,20 +77,27 @@ export default function SegmentedControl({ kind = 'tabs', label, labelledBy, cla
     else if (event.key === 'End') next = all[all.length - 1];
     if (!next) return;
     event.preventDefault();
+    setKeyed(true);
     next.focus();
     next.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
     if (kind !== 'group') next.click();
   }
 
-  const { onKeyDown: _ignored, ...attrs } = rest;
+  function onPointerDown(event) {
+    rest.onPointerDown?.(event);
+    if (keyed) setKeyed(false);
+  }
+
+  const { onKeyDown: _ignored, onPointerDown: _ignoredPointer, ...attrs } = rest;
   return (
     <div
       ref={setRefs}
       role={ROLES[kind] || 'group'}
       aria-label={labelledBy ? undefined : label}
       aria-labelledby={labelledBy}
-      className={['c-seg', 'has-pill', scroller ? 'is-scroller' : '', ready ? 'is-ready' : '', className].filter(Boolean).join(' ')}
+      className={['c-seg', 'has-pill', scroller ? 'is-scroller' : '', ready ? 'is-ready' : '', keyed ? 'is-keyed' : '', className].filter(Boolean).join(' ')}
       onKeyDown={onKeyDown}
+      onPointerDown={onPointerDown}
       {...attrs}
     >
       {pill && (

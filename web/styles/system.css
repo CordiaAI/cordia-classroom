@@ -121,11 +121,16 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
   cursor: pointer; text-decoration: none; text-align: center;
 }
 .c-seg [aria-selected='true'], .c-seg .is-active { background: var(--card); box-shadow: var(--shadow); }
-/* SegmentedControl: one glass pill slides under the chosen segment (transform, spring-like curve);
-   the segments themselves stay clear. Reduced motion: the pill jumps. */
+/* SegmentedControl: one pill of selected glass slides under the chosen segment, raised over the
+   sunken track; the segments themselves stay clear. The slide is a state change (DESIGN-SPEC 6.1):
+   180ms on --ease with no overshoot. Its width eases on the same curve and clock as the transform,
+   so the pill never lags behind its own move between segments of different widths. A change made
+   from the keyboard (.is-keyed, set by SegmentedControl.js) shows on the next frame, and with
+   reduced motion the pill jumps. */
 .c-seg.has-pill { position: relative; isolation: isolate; }
 .c-seg-pill { position: absolute; top: 0; left: 0; z-index: 0; border-radius: var(--r-pill); background: var(--seg-pill-bg); box-shadow: var(--seg-pill-shadow); pointer-events: none; will-change: transform; }
-.c-seg.is-ready .c-seg-pill { transition: transform var(--seg-dur) var(--seg-spring), width var(--seg-dur) var(--seg-spring), height var(--seg-dur) var(--seg-spring); }
+.c-seg.is-ready .c-seg-pill { transition: transform var(--seg-dur) var(--seg-ease), width var(--seg-dur) var(--seg-ease), height var(--seg-dur) var(--seg-ease); }
+.c-seg.is-ready.is-keyed .c-seg-pill { transition: none; }
 .c-seg.has-pill > :is(button, a) { position: relative; z-index: 1; }
 .c-seg.has-pill.has-pill > :is(button, a):is([aria-selected='true'], [aria-checked='true'], [aria-pressed='true'], .is-active) { background: transparent !important; box-shadow: none !important; border-color: transparent !important; }
 @media (prefers-reduced-motion: reduce) { .c-seg.is-ready .c-seg-pill { transition: none; } }
@@ -582,20 +587,30 @@ body:has(.about) .c-fab { display: none; }
   cursor: pointer;
   transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
+/* Rows that show the inner pane on hover change their background with the shadow, on one clock. */
 :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .lib-row, .sn-card, a.calendar-item, div.c-list-row:has(> a[href])) {
   cursor: pointer;
-  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
 }
+/* Segments have no surface of their own: hover washes the track and never lifts. */
+.c-seg > :is(button, a):not(:disabled) { transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease), transform var(--dur) var(--ease); }
 .c-icon-btn:not(:disabled) { cursor: pointer; transition: background-color var(--dur) var(--ease), transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
 
 @media (hover: hover) {
-  :is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar):not(:disabled):not(.is-current):hover {
+  :is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar):not(:disabled):not(.is-current):hover {
     box-shadow: var(--lift-shadow) !important;
     transform: var(--lift);
     text-decoration: none;
   }
-  /* Quiet buttons have no surface of their own: the inner pane, no rise. */
-  .c-btn.c-btn--quiet:not(:disabled):hover { box-shadow: var(--glass-inner-shadow) !important; transform: none; }
+  /* Segments sit in a sunken track with no surface of their own: a faint wash, no rise, so the
+     chosen pill stays the one raised, brightest thing in the control. */
+  .c-seg.c-seg > :is(button, a):not(:disabled):not([aria-selected='true'], [aria-checked='true'], [aria-pressed='true'], .is-active):hover {
+    background: var(--seg-hover);
+    text-decoration: none;
+  }
+  /* Quiet buttons have no surface of their own: the inner pane, no rise. It outranks the lift
+     above (0,5,0 over 0,4,1) and steps aside while pressed, so press (below) still settles it. */
+  .c-btn.c-btn--quiet:not(:disabled):not(:active):hover { box-shadow: var(--glass-inner-shadow) !important; transform: none; }
   /* Cards, tiles and rows that open something: lift 2px with the deeper float shadow. */
   :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .lib-row, .sn-card, a.calendar-item, div.c-list-row:has(> a[href])):hover {
     transform: var(--lift-card);
@@ -633,7 +648,7 @@ body:has(.about) .c-fab { display: none; }
 }
 
 /* Keyboard focus: the same lift as hover; the ring is the rule above. */
-:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a):not(:disabled):focus-visible {
+:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a):not(:disabled):focus-visible {
   box-shadow: var(--lift-shadow) !important;
   transform: var(--lift);
 }
@@ -644,8 +659,11 @@ body:has(.about) .c-fab { display: none; }
 }
 .c-icon-btn:not(:disabled):focus-visible { background: var(--lift-pane); }
 
-/* Press: buttons and chips settle to --press (0.97). */
-:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a, .c-icon-btn):not(:disabled):active { transform: var(--press); }
+/* Press: buttons and chips settle to --press (0.97). A pressed control is hovered too, so press
+   has to outrank the hover lift above (0,4,1): the second selector matches its weight and comes
+   later, and the quiet-button hover (0,4,0) loses to both. */
+:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a, .c-icon-btn):not(:disabled):active,
+:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a, .c-icon-btn):not(:disabled):not(.is-current):active { transform: var(--press); }
 /* Wide surfaces (cards, rows) keep their lift on press and don't scale: 2% of a wide card is a jump. */
 :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .sn-card, a.calendar-item):active { transform: var(--lift-card); }
 .c-list > :is(a.c-list-row, button.c-list-row):is(:active, :focus-visible), .c-list > div.c-list-row:has(> a[href]):focus-within { transform: none; }
