@@ -203,7 +203,7 @@ export default function CreateGuidePage() {
           <div className="create-window-head">
             <h2 className="c-section-title create-window-title">Cards</h2>
             {!isEdit && (
-              <div className="c-row">
+              <div className="c-row c-row--wrap">
                 <button type="button" className="c-btn c-btn--quiet create-import" onClick={() => setQuizletOpen(true)}><Download size={18} strokeWidth={1.75} aria-hidden="true" />Import from Quizlet</button>
                 <button type="button" className="c-btn c-btn--quiet" onClick={() => openNewSheet('upload')}><Upload size={18} strokeWidth={1.75} aria-hidden="true" />Make from a file</button>
               </div>

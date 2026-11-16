@@ -54,7 +54,13 @@ export default function SharedClassPage() {
         <Link href="/library" className="c-icon-btn" aria-label="Back to Library"><ArrowLeft {...ICON} /></Link>
         <h1 className="c-title cp-heading">{info ? <>{info.code}{info.name && <span> {info.name}</span>}</> : error ? 'Class' : ''}</h1>
       </header>
-      {error && <p className="cp-line" role="alert">{error}</p>}
+      {error && (
+        <div className="c-card cp-missing" role="alert">
+          <h2 className="c-section-title">{error}</h2>
+          <p className="c-meta">The link may be old, or you may have left this class.</p>
+          <Link href="/library" className="c-btn c-btn--secondary">Go to Library</Link>
+        </div>
+      )}
       {info && (
         <>
           <SegmentedControl kind="tabs" label="Class" className="cp-tabs">
@@ -70,6 +76,8 @@ export default function SharedClassPage() {
         .cp-heading { min-width: 0; overflow-wrap: anywhere; }
         .cp-heading span { color: var(--muted); }
         :global(.cp-tabs) { justify-self: start; }
+        .cp-missing { display: grid; justify-items: start; gap: 12px; max-width: 520px; }
+        .cp-missing :is(h2, p) { margin: 0; }
       `}</style>
     </div>
     </Reveal>

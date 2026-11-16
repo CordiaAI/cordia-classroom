@@ -20,13 +20,13 @@ body::before {
   100% { transform: scale(1.025); }
 }
 .quiz-option.quiz-option.quiz-option.quiz-option.correct-shine {
-  animation: c-pop 360ms cubic-bezier(.2, .8, .2, 1) forwards, c-ring-out 700ms ease-out;
+  animation: c-pop 360ms cubic-bezier(.2, .8, .2, 1) forwards, c-ring-out 700ms var(--ease);
 }
-.quiz-option.quiz-option.quiz-option.quiz-option.correct-glow { animation: c-reveal 500ms 350ms both, quiz-glow-pulse 1.6s 850ms ease-in-out infinite; }
+.quiz-option.quiz-option.quiz-option.quiz-option.correct-glow { animation: c-reveal 500ms 350ms both, quiz-glow-pulse 1.6s 850ms ease-in-out 2; }
 @keyframes c-reveal { from { transform: scale(0.97); opacity: 0.6; } to { transform: none; opacity: 1; } }
-.quiz-option.correct { animation: c-pop 360ms cubic-bezier(.2, .8, .2, 1), c-ring-out 700ms ease-out; }
+.quiz-option.correct { animation: c-pop 360ms cubic-bezier(.2, .8, .2, 1), c-ring-out 700ms var(--ease); }
 .quiz-option.wrong { animation: quiz-shake 0.5s cubic-bezier(.36, .07, .19, .97); }
-.retain-fill-input.right { animation: c-ring-out 700ms ease-out; }
+.retain-fill-input.right { animation: c-ring-out 700ms var(--ease); }
 .retain-fill-input.wrong { animation: quiz-shake 0.5s cubic-bezier(.36, .07, .19, .97); }
 .retain-feedback { animation: c-slide-in 280ms cubic-bezier(.2, .8, .2, 1); }
 @keyframes c-slide-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

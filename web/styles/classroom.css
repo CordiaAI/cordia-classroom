@@ -27,7 +27,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .top-navigation-links { position: relative; width: max-content; max-width: 100%; justify-self: center; gap: 8px; padding: 0 0 10px; margin-bottom: -10px; }
 .top-navigation-links button { position: relative; padding: 18px 16px; border-radius:0; background: transparent; font-size:15px; font-weight:500; color: var(--text-secondary); }
 .top-navigation-links button.active { background: transparent; color: var(--ink); font-weight:600; }
-.top-navigation-links button:hover { background: transparent; color: var(--olive); }
+@media (hover: hover) { .top-navigation-links button:hover { background: transparent; color: var(--olive); } }
 .navigation-indicator { position: absolute; bottom: 8px; left: 0; height: 3px; border-radius:999px; background: var(--olive); transition: transform var(--motion-smooth), width var(--motion-smooth); pointer-events: none; }
 .top-navigation-actions { display: flex; align-items: center; gap: 10px; }
 .feedback-header-button { border: 0; background: transparent; color: var(--text-secondary); padding: 9px; font: inherit; font-size: 13px; cursor: pointer; }
@@ -57,7 +57,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 :is(.modal, .sn-modal, .feedback-modal, .upgrade-dialog, .oauth-callback-card, .class-guide-popover, .profile-menu, .context-menu) { background: var(--surface-raised); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow-lg); }
 :is(.dashboard-class-rail, .study-rail-card, .continue-card, .compact-calendar, .settings-section, .create-window, .practice-source-panel, .practice-main, .guide-reader-window, .tutor-drawer) { backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
 .btn, .overview-primary, .create-submit-btn, .sn-save-btn, .sn-open-btn { border: 1px solid var(--accent-strong); border-radius:12px; background: var(--accent-strong); color: var(--on-olive); box-shadow: var(--shadow-sm); font-weight:600; }
-.btn:hover:not(:disabled), .overview-primary:hover:not(:disabled) { box-shadow: var(--shadow-md); }
+@media (hover: hover) { .btn:hover:not(:disabled), .overview-primary:hover:not(:disabled) { box-shadow: var(--shadow-md); } }
 .btn-outline, .btn-gray, .overview-secondary { border-color: var(--line); border-radius:12px; background: var(--surface); color: var(--ink); box-shadow: none; }
 .dashboard-workspace-grid { grid-template-columns: 190px minmax(0, 1fr) 230px; gap: 26px; }
 .dashboard-workspace-grid.without-classes { grid-template-columns: minmax(0, 1fr) 230px; }
@@ -113,7 +113,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .tutor-drawer { width: var(--tutor-width); border: 1px solid var(--glass-edge); border-radius:20px; padding-top: 14px; }
 .tutor-resize-handle { left: 0; right: auto; }
 .tutor-resize-handle::after { content: ''; position: absolute; top: 50%; left: 3px; width: 4px; height: 40px; margin-top: -20px; border-radius: var(--r-pill); background: var(--hover-edge); }
-.tutor-resize-handle:hover::after { background: var(--olive); }
+@media (hover: hover) { .tutor-resize-handle:hover::after { background: var(--olive); } }
 .tutor-expand { position: absolute; top: 13px; right: 48px; z-index: 2; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--bg-hover); color: var(--ink); }
 .tutor-close { position: absolute; top: 13px; right: 12px; z-index: 2; width: 28px; height: 28px; border: 0; border-radius:50%; background: var(--bg-hover); color: var(--ink); font-size:20px; cursor: pointer; }
 .tutor-brand-mark { width: 25px; height: 23px; object-fit: contain; }
@@ -176,7 +176,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .login-page .login-input-row { background: var(--reading-surface); border-color: var(--line); }
 .login-input-row:focus-within { box-shadow: 0 0 0 3px var(--accent-glow); }
 .login-cta-btn { background: var(--accent-strong) !important; min-height: 50px; border-radius:12px; }
-.login-cta-btn:hover { box-shadow: var(--lift-shadow); transform: var(--lift); }
+@media (hover: hover) { .login-cta-btn:hover { box-shadow: var(--lift-shadow); transform: var(--lift); } }
 .login-oauth-button { background: var(--reading-surface); border-color: var(--line); box-shadow: none; font-size: 13px; border-radius:12px; }
 .login-form-wrap { max-width: none; }
 .login-brand-name, .login-form-title, .login-brand-tagline, .login-editorial-title { color: var(--ink); }
@@ -273,10 +273,10 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .study-scene-intro h1 span { color: var(--olive); }
 .study-scene-intro > p { max-width: 340px; color: var(--text-secondary); line-height:1.5; font-size:15px; margin-bottom: 30px; }
 .scene-continue { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 52px; padding: 14px 24px; border: 1px solid var(--glass-edge); background: var(--accent-strong); color: var(--on-olive); border-radius:20px; font:600 13px var(--font-sans); box-shadow: var(--shadow-md); cursor: pointer; transition: transform var(--motion-fast), box-shadow var(--motion-fast); }
-.scene-continue:hover { box-shadow: var(--shadow-lg); }
+@media (hover: hover) { .scene-continue:hover { box-shadow: var(--shadow-lg); } }
 .scene-tools { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-top: 28px; }
 .scene-tools button { display: grid; justify-items: center; gap: 16px; min-height: 80px; padding: 14px 5px; color: var(--ink); border: 1px solid var(--glass-edge); border-radius:12px; background: var(--surface); backdrop-filter: blur(16px); box-shadow: var(--shadow-sm); cursor: pointer; font:500 13px var(--font-sans); transition: transform var(--motion-fast), box-shadow var(--motion-fast); }
-.scene-tools button:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+@media (hover: hover) { .scene-tools button:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); } }
 .study-scene-reader { min-width: 0; }
 .study-document-window, .study-scene-tutor, .study-scene-course { border: 1px solid var(--glass-edge); background: var(--glass-shell); border-radius:20px; box-shadow:var(--shadow-card); backdrop-filter: blur(26px); -webkit-backdrop-filter: blur(26px); }
 .study-document-window { height: 100%; display: flex; flex-direction: column; padding: 12px; min-width: 0; overflow: hidden; }
@@ -328,7 +328,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .tutor-starter-actions { display: grid; gap: 12px; margin-top: 28px; }
 .tutor-starter-actions button { display: flex; align-items: center; gap: 13px; text-align: left; padding: 16px 13px; min-height: 67px; color: var(--ink); background: var(--surface); border: 1px solid var(--glass-edge); border-radius:12px; font:500 13px/1.5 var(--font-sans); cursor: pointer; box-shadow: var(--shadow-sm); transition: transform var(--motion-fast), box-shadow var(--motion-fast); }
 .tutor-starter-actions button > svg { flex: 0 0 20px; }
-.tutor-starter-actions button:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+@media (hover: hover) { .tutor-starter-actions button:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); } }
 .study-scene-course { grid-column: 2; display: flex; gap: 15px; align-items: center; padding: 16px 24px; border-radius:20px; }
 .study-scene-course > div:first-of-type { display: grid; gap: 4px; }
 .study-scene-course strong { font-size: 13px; font-weight:500; }
@@ -413,7 +413,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .reference-workspace-window .study-library-tabs { margin-top: 30px; }
 .classroom-class-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 18px; }
 .classroom-class-tile, .classroom-add-class { display: flex; flex-direction: column; padding: 0 0 18px; overflow: hidden; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius:12px; text-align: left; cursor: pointer; min-width: 0; transition: transform var(--motion-fast), box-shadow var(--motion-fast); }
-.classroom-class-tile:hover, .classroom-add-class:hover { box-shadow: var(--shadow-md); }
+@media (hover: hover) { .classroom-class-tile:hover, .classroom-add-class:hover { box-shadow: var(--shadow-md); } }
 .class-tile-cover { display: flex; width: 100%; height: 110px; align-items: center; justify-content: center; background:var(--wash); }
 .class-tile-cover > span { font:500 40px var(--font-display); color: var(--olive-ink); }
 .classroom-class-tile strong { font-size:13px; font-weight:600; margin: 18px 16px 6px; }
@@ -485,7 +485,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .tutor-select-option > span { overflow-wrap: anywhere; }
 .tutor-select-option small { font:600 13px/1.5 var(--font-sans); color: var(--text-secondary); }
 .tutor-select-option[aria-selected='true'] { background: var(--accent-glow); border-color: var(--olive); }
-.tutor-select-option:hover:not([aria-selected='true']) { background: var(--lift-pane); box-shadow: var(--lift-shadow); }
+@media (hover: hover) { .tutor-select-option:hover:not([aria-selected='true']) { background: var(--lift-pane); box-shadow: var(--lift-shadow); } }
 .tutor-select-option:focus-visible { outline-offset: -3px; }
 .tutor-select-option:disabled { opacity: .5; cursor: default; }
 .tutor-select-option .tutor-select-check { position: absolute; top: 12px; right: 10px; }
@@ -526,8 +526,8 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98)
 .setup-wizard-footer { padding-top: 24px; margin-top: 28px; border-top: 1px solid var(--line); }
 .setup-wizard-dots span { background: var(--line); transition: width var(--dur) var(--ease), background var(--dur) var(--ease); }
 .setup-wizard-dots span.done { background: var(--muted-ink); }
-.setup-wizard[data-phase='in'] { animation: setup-glass-in 260ms ease-out both; }
-.setup-wizard[data-phase='out'] { animation: setup-glass-out 260ms ease-in both; }
+.setup-wizard[data-phase='in'] { animation: setup-glass-in var(--dur-enter) var(--ease) both; }
+.setup-wizard[data-phase='out'] { animation: setup-glass-out var(--dur-exit) var(--ease-exit) both; }
 @keyframes setup-glass-in { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: none; } }
 @keyframes setup-glass-out { to { opacity: 0; transform: translateY(-8px) scale(.99); } }
 .guided-tour-callout { border: 1px solid var(--glass-edge); background: var(--surface); backdrop-filter: blur(26px); box-shadow: var(--shadow-lg); }

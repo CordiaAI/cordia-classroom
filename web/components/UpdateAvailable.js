@@ -104,7 +104,7 @@ function ChangesDialog({ guideId, viewer, busy, onAccept, onStay, onClose }) {
         .changes-sheet { width: min(560px, 100%); max-height: min(80vh, 720px); overflow-y: auto; display: grid; gap: 16px; }
         .changes-title { margin: 0; font: 500 26px/1.15 var(--font-display); color: var(--ink); }
         .changes-list { display: grid; gap: 16px; }
-        .changes-group h3 { margin: 0 0 8px; font: 600 14px/1.2 var(--font-sans); color: var(--muted-ink); text-transform: uppercase; letter-spacing: 0.04em; }
+        .changes-group h3 { margin: 0 0 8px; font: 600 var(--fs-13)/1.2 var(--font-sans); color: var(--muted-ink); }
         .changes-group ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
         .changes-group li { padding: 12px; border-radius: var(--r-row); background: var(--card-sunk); overflow-wrap: anywhere; }
         .changes-q { margin: 0 0 4px; font: 600 15px/1.35 var(--font-sans); color: var(--ink); }

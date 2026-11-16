@@ -14,7 +14,7 @@ export default function PrivacyPolicy() {
         <h1 style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>
           Privacy Policy
         </h1>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '0.9rem' }}>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: 'var(--fs-13)' }}>
           Effective Date: February 25, 2026 &nbsp;|&nbsp; Last Updated: November 9, 2026
         </p>
 
@@ -227,7 +227,7 @@ function Section({ id, title, children }) {
       }}>
         {title}
       </h2>
-      <div style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+      <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-15)' }}>
         {children}
       </div>
     </div>

@@ -86,6 +86,12 @@ export default function AppSetup({ canvasConnected = false, apps, canvas: canvas
         .setup-text .c-meta { margin: 0; }
         .is-on .setup-text strong { color: var(--muted); }
         .setup-list :global(.c-btn) { flex: none; }
+        /* Phones: the button drops under the text, so the text keeps the row's full width. */
+        @media (max-width: 480px) {
+          .setup-list li { flex-wrap: wrap; row-gap: 8px; padding: 12px 0; }
+          .setup-text { flex-basis: calc(100% - 36px); }
+          .setup-list :global(.c-btn) { margin-left: 36px; }
+        }
       `}</style>
     </section>
   );

@@ -35,7 +35,7 @@
 
 /* Quiet buttons and icon buttons stay lighter so rows of them don't feel heavy. */
 :is(.c-btn--quiet, .c-icon-btn) { box-shadow: var(--lg-highlight); }
-.c-btn--quiet:hover:not(:disabled) { background: var(--lift-pane); }
+@media (hover: hover) { .c-btn--quiet:hover:not(:disabled) { background: var(--lift-pane); } }
 
 /* Primary actions: olive glass with the same rim and sheen. */
 :is(.c-btn--primary, .btn, .btn-green, .c-tab-new-dot) {
@@ -102,7 +102,7 @@ select.c-select.c-select {
 .c-toast:has(> button, > a) { padding-right: 6px; gap: 4px; }
 /* Undo reads as the toast's action, not a second button stacked on it. */
 .c-toast > .c-btn--quiet { background: transparent !important; border-color: transparent !important; box-shadow: none !important; color: var(--olive-ink); font-weight: 600; }
-.c-toast > .c-btn--quiet:hover { background: var(--lift-pane) !important; }
+@media (hover: hover) { .c-toast > .c-btn--quiet:hover { background: var(--lift-pane) !important; } }
 @keyframes c-toast-in { from { opacity: 0; transform: translate(-50%, 12px) scale(.98); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (min-width: 768px) {
   :root:has(.app-shell:not(.is-focus) .c-side) .c-toast { left: calc(50% + (var(--side-w) + var(--side-gap)) / 2); max-width: min(560px, calc(100vw - var(--side-w) - var(--side-gap) - 48px)); }
@@ -118,8 +118,8 @@ select.c-select.c-select {
   transition: transform var(--dur) var(--ease);
 }
 .c-tutor-bubble .lucide { color: var(--olive-ink); flex: 0 0 auto; }
-.c-tutor-bubble:hover { transform: translateY(-1px); }
-.c-tutor-bubble:active { transform: scale(.97); }
+@media (hover: hover) { .c-tutor-bubble:hover { transform: translateY(-1px); } }
+.c-tutor-bubble:active { transform: scale(.98); }
 @media (max-width: 767px) {
   .c-tutor-bubble { right: 12px; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px); width: 48px; height: 48px; min-width: 48px; padding: 0; justify-content: center; }
   .c-tutor-bubble-label { display: none; }
@@ -279,7 +279,7 @@ body { touch-action: manipulation; }
 .tutor-chats-title { margin: 8px 0 0; font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
 .tutor-chats-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .tutor-chat-row { display: grid; gap: 2px; width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid var(--hairline); border-radius: var(--r-input); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; transition: background var(--dur) var(--ease); }
-.tutor-chat-row:hover:not(:disabled) { background: var(--lift-pane); box-shadow: var(--lift-shadow); transform: var(--lift); }
+@media (hover: hover) { .tutor-chat-row:hover:not(:disabled) { background: var(--lift-pane); box-shadow: var(--lift-shadow); transform: var(--lift); } }
 .tutor-chat-item { display: flex; align-items: center; gap: 6px; }
 .tutor-chat-item .tutor-chat-row { flex: 1; min-width: 0; }
 .tutor-chat-delete { flex: none; }
@@ -294,7 +294,7 @@ body { touch-action: manipulation; }
 .cn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 14px; margin: 8px 0 0; padding: 0; list-style: none; }
 .cn-grid li { display: grid; }
 .cn-tile { position: relative; display: grid; justify-items: center; align-content: start; gap: 12px; padding: 24px 14px 18px; border: 1px solid var(--lg-edge); border-radius: var(--r-card); background: var(--lg-sheen), var(--lg-fill); box-shadow: var(--lg-highlight), var(--lg-shadow); color: var(--ink); text-align: center; font: inherit; cursor: pointer; transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
-.cn-tile:hover { box-shadow: var(--lg-highlight), var(--shadow-float); }
+@media (hover: hover) { .cn-tile:hover { box-shadow: var(--lg-highlight), var(--shadow-float); } }
 .cn-tile.is-soon { opacity: .62; }
 .cn-tile-text { display: grid; gap: 2px; min-width: 0; }
 .cn-name { font: 600 15px/1.3 var(--font-sans); color: var(--ink); }
@@ -350,7 +350,7 @@ body { touch-action: manipulation; }
   .cn-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .cn-grid li + li { border-top: 1px solid var(--hairline); }
   .cn-tile { display: flex; align-items: center; gap: 12px; padding: 10px 0; text-align: left; border: 0; border-radius: 0; background: none; box-shadow: none; }
-  .cn-tile:hover { transform: none; box-shadow: none; }
+  @media (hover: hover) { .cn-tile:hover { transform: none; box-shadow: none; } }
   .cn-tile .cn-icon { width: 42px; height: 42px; border-radius: 12px; }
   .cn-tile .cn-icon svg { width: 22px; height: 22px; }
   .cn-tile-text { flex: 1 1 auto; }
@@ -398,8 +398,8 @@ body { touch-action: manipulation; }
 :is(.c-sheet, .c-menu, .tutor-drawer) *::-webkit-scrollbar-track { background: transparent; margin: 18px 0; }
 :is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-thumb,
 :is(.c-sheet, .c-menu, .tutor-drawer) *::-webkit-scrollbar-thumb { background: var(--scroll-thumb); background-clip: padding-box; border: 4px solid transparent; border-radius: 999px; min-height: 40px; }
-:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-thumb:hover,
-:is(.c-sheet, .c-menu, .tutor-drawer) *::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: padding-box; }
+@media (hover: hover) { :is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-thumb:hover,
+:is(.c-sheet, .c-menu, .tutor-drawer) *::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: padding-box; } }
 :is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-corner { background: transparent; }
 /* Firefox has no track margin; a thin bar in the same colors. */
 @supports (-moz-appearance: none) {
@@ -417,9 +417,9 @@ body { touch-action: manipulation; }
   border-color: var(--lg-edge) !important;
   box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
 }
-:is(.learn-way, .new-option, .new-make-btn, .new-sample, .calendar-item, .tutor-past-chats):hover:not(:disabled) {
+@media (hover: hover) { :is(.learn-way, .new-option, .new-make-btn, .new-sample, .calendar-item, .tutor-past-chats):hover:not(:disabled) {
   background: var(--lg-sheen), var(--lg-fill-strong) !important;
-}
+} }
 /* The calendar stays shadowless (asked for): glass fill and rim only, and study blocks keep
    their olive left edge. */
 .calendar-item { box-shadow: var(--lg-highlight) !important; }
@@ -460,6 +460,9 @@ body { touch-action: manipulation; }
   box-shadow: var(--lg-highlight) !important;
   color: var(--muted) !important;
 }
+/* A waiting primary button keeps a hint of olive, so it never reads as one more empty field
+   under the fields of a form (Instructors, Join, Reset password). */
+.c-btn--primary:disabled { background: var(--lg-sheen), var(--olive-tint) !important; color: var(--olive-ink) !important; }
 
 /* Panels: flashcard faces, the practice board and its toolbar, Create's settings. Card faces
    flip in 3D, where a backdrop blur breaks the flip, so they keep fill, sheen and rim only. */
@@ -493,4 +496,4 @@ textarea:not(.c-input) {
   border: 1px solid var(--lg-edge) !important;
   box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow) !important;
 }
-:is(.btn-upgrade, .cordia-tutor-send):hover:not(:disabled) { background: var(--lg-sheen-olive), var(--olive) !important; box-shadow: var(--lift-shadow) !important; transform: var(--lift); }
+@media (hover: hover) { :is(.btn-upgrade, .cordia-tutor-send):hover:not(:disabled) { background: var(--lg-sheen-olive), var(--olive) !important; box-shadow: var(--lift-shadow) !important; transform: var(--lift); } }

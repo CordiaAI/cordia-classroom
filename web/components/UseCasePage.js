@@ -96,7 +96,14 @@ export default function UseCasePage({ page }) {
         .uc-lede { max-width: 42em; margin-top: 16px; }
         .uc-lede p { margin: 0 0 8px; color: var(--text-secondary); font: 500 var(--fs-17)/1.55 var(--font-sans); }
         .uc-section { margin-top: 40px; max-width: 46em; }
+        /* A question sits 8px above its answer, and paragraphs and links 8px apart: closer to each
+           other than the 40px between sections, so each question reads as one group. */
+        .uc-section h2 { margin: 0 0 8px; }
+        .uc-section p { margin: 0 0 8px; }
+        .uc-section > :last-child { margin-bottom: 0; }
         .uc-section p, .uc-section li { color: var(--text-secondary); font: 500 var(--fs-15)/1.6 var(--font-sans); }
+        /* The questions at the end share the text's right edge. */
+        .uc :global(.faq) { max-width: 46em; margin-inline: 0; }
         .uc-section ul, .uc-steps { display: grid; gap: 8px; margin: 12px 0 0; padding-left: 20px; }
         .uc-answer { color: var(--ink) !important; font-weight: 600 !important; }
         .uc-shots { display: grid; gap: 20px; margin-top: 16px; }
