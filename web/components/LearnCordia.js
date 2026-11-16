@@ -35,7 +35,7 @@ export default function LearnCordia({ onBeforeShow, hideWhenComplete = false, co
               const used = progress.used.includes(item.id);
               return (
                 <li key={item.id} className={used ? 'is-used' : ''}>
-                  <span className="learn-icon" aria-hidden="true">{used ? <Check size={18} strokeWidth={2} /> : <item.icon size={20} strokeWidth={1.75} />}</span>
+                  <span className="learn-icon" aria-hidden="true">{used ? <Check size={18} strokeWidth={1.75} /> : <item.icon size={20} strokeWidth={1.75} />}</span>
                   <span className="learn-label">{item.label}</span>
                   <button type="button" className="c-btn c-btn--quiet" onClick={async () => { onBeforeShow?.(); await showMe(router, item.id); }} aria-label={`Show me ${item.label}`}>Show me</button>
                 </li>

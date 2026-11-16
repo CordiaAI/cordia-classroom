@@ -39,11 +39,11 @@ export default function ShortcutsSheet({ onClose }) {
       <style jsx>{`
         .keys-sheet { width: min(560px, 100%); }
         .keys-group { margin-top: 16px; }
-        dl { margin: 8px 0 0; display: grid; gap: 6px; }
+        dl { margin: 8px 0 0; display: grid; gap: 8px; }
         dl div { display: flex; align-items: center; gap: 12px; }
         dt { flex: 0 0 150px; }
         dd { margin: 0; }
-        kbd { font: 600 13px/1 var(--font-sans); background: var(--olive-tint); border-radius: var(--r-pill); padding: 5px 8px; }
+        kbd { font: 600 13px/1 var(--font-sans); background: var(--olive-tint); border-radius: var(--r-pill); padding: 4px 8px; }
       `}</style>
     </BodyPortal>
   );

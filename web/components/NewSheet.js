@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
-import {
-  ArrowLeft, Brain, Check, ClipboardPaste, FileImage, FileText, Layers, Link as LinkIcon, Mic, Minimize2, NotebookPen, PencilRuler, Presentation, Sparkles, Upload, X,
-} from 'lucide-react';
+import { ArrowLeft, Brain, Check, ClipboardPaste, FileImage, FileText, Layers, Link as LinkIcon, Mic, Minimize2, NotebookPen, PencilRuler, Presentation, Upload, X, BookOpen } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../lib/api';
 import { loadFolders } from '../lib/folders';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
@@ -83,7 +81,7 @@ function MakeOptions({ onGo, onNote, busy }) {
         .new-make-title { margin: 0; font-weight: 600; }
         .new-make-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
         .new-make-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur); }
-        .new-make-btn:hover { border-color: var(--olive); }
+        @media (hover: hover) { .new-make-btn:hover { border-color: var(--olive); } }
         .new-make-btn:disabled { opacity: .6; cursor: default; }
         .new-make-btn :global(.lucide) { color: var(--olive-ink); }
         @media (max-width: 520px) { .new-make-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -104,16 +102,16 @@ export function NewOptions({ onPick, onSample }) {
       ))}
       {onSample && (
         <button type="button" className="new-sample" onClick={onSample}>
-          <Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Try a sample
+          <BookOpen size={20} strokeWidth={1.75} aria-hidden="true" />Try a sample
         </button>
       )}
       <style jsx>{`
         .new-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-        .new-option { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 128px; padding: 16px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 17px/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur), transform var(--dur); }
-        .new-option:hover { border-color: var(--olive); }
+        .new-option { display: grid; justify-items: center; align-content: center; gap: 12px; min-height: 128px; padding: 16px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 17px/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur), transform var(--dur); }
+        @media (hover: hover) { .new-option:hover { border-color: var(--olive); } }
         .new-option:active { transform: scale(.98); }
         .new-option :global(.lucide) { color: var(--olive-ink); }
-        .new-sample { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; border: 1px dashed var(--olive); border-radius:var(--r-card); background: var(--olive-tint); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; }
+        .new-sample { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; border: 1px solid var(--olive); border-radius:var(--r-card); background: var(--olive-tint); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; }
       `}</style>
     </div>
   );
@@ -527,13 +525,13 @@ export default function NewSheet() {
         .new-panel { display: grid; gap: 16px; }
         .new-drop { display: grid; justify-items: center; gap: 12px; width: 100%; padding: 32px 16px; border: 2px dashed var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); cursor: pointer; font:600 17px/1.15 var(--font-sans); }
         .new-drop.is-over { border-color: var(--olive); background: var(--olive-tint); }
-        .new-drop:hover { box-shadow: var(--lift-shadow); transform: var(--lift); }
+        @media (hover: hover) { .new-drop:hover { box-shadow: var(--lift-shadow); transform: var(--lift); } }
         .new-drop :global(.lucide) { color: var(--olive-ink); }
         .new-formats { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font:600 13px/1 var(--font-sans); color: var(--muted); }
-        .new-formats > span { display: inline-flex; align-items: center; gap: 6px; }
+        .new-formats > span { display: inline-flex; align-items: center; gap: 8px; }
         .new-formats :global(.lucide) { color: var(--muted); }
         .new-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-        .new-files li { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 4px 4px 4px 12px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); }
+        .new-files li { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 4px 4px 4px 12px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); }
         .new-files li :global(.c-icon-btn) { flex: none; width: 36px; height: 36px; min-width: 0; min-height: 0; }
         .new-files li span { flex: 1; min-width: 0; }
         .new-text { min-height: 200px; }

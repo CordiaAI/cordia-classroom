@@ -613,6 +613,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
           {deletingChat && (
             <ConfirmDialog
               title="Delete this chat?"
+              confirmLabel="Delete chat"
               message={`“${deletingChat.title || 'Tutor chat'}” will be deleted for good. This can't be undone.`}
               onConfirm={() => deleteSavedChat(deletingChat)}
               onCancel={() => setDeletingChat(null)}

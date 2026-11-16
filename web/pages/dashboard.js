@@ -310,7 +310,6 @@ export default function Today() {
         <section className="c-section" aria-labelledby="updates-title">
           <div className="c-row today-updates-head">
             <h2 id="updates-title" className="c-section-title">Class updates</h2>
-            <span className="c-meta">Changes and new work from your classes and apps</span>
           </div>
           <div className="c-card c-list">
             {alerts.slice(0, 4).map(raw => (raw.kind === 'slack_post' ? raw : { ...raw, title: deadlineTitle(raw) })).map(alert => (
@@ -406,7 +405,7 @@ export default function Today() {
       {firstWeek && (dayOneFinished(progress) || !progress.wt) ? <LearnCordia hideWhenComplete compact /> : null}
 
       <style jsx>{`
-        .today-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 18px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
+        .today-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 12px 16px; border-radius:var(--r-card); background: var(--error-bg); color: var(--error); font-weight:600; }
         .today-none { margin: 0; }
         .today-alert { gap: 12px; }
         .today-alert .c-grow { display: grid; gap: 2px; min-width: 0; }
@@ -423,25 +422,25 @@ export default function Today() {
           .today-alert :global(.c-icon-btn) { order: 1; }
           .today-alert :global(.c-btn) { order: 2; }
         }
-        .today-continue { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; padding: 14px 18px; }
+        .today-continue { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; padding: 12px 16px; }
         :global(.today-continue-main) { display: flex; flex: 1 1 260px; align-items: center; gap: 16px; min-width: 0; color: var(--ink); text-decoration: none; }
-        :global(.today-continue-main:hover) { text-decoration: none; }
-        .today-continue:hover, :global(.today-progress:hover) { text-decoration: none; border-color: var(--olive); }
+        @media (hover: hover) { :global(.today-continue-main:hover) { text-decoration: none; } }
+        @media (hover: hover) { .today-continue:hover, :global(.today-progress:hover) { text-decoration: none; border-color: var(--olive); } }
         .today-continue-study { display: flex; gap: 8px; }
-        .today-exam { display: flex; align-items: center; gap: 16px; padding: 14px 18px; }
+        .today-exam { display: flex; align-items: center; gap: 16px; padding: 12px 16px; }
         .today-exam-days { display: grid; justify-items: center; min-width: 64px; }
         .today-exam-days strong { font: 600 28px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink); }
         .today-exam-text { display: grid; gap: 2px; flex: 1 1 auto; min-width: 0; }
-        .today-due { gap: 14px; }
+        .today-due { gap: 16px; }
         .today-due .c-meta { flex: none; white-space: nowrap; }
         .today-due-link { color: var(--ink); text-decoration: none; }
         .today-due.is-done .today-due-link { color: var(--muted); text-decoration: line-through; }
         .today-continue-title { flex: 1 1 auto; min-width: 0; font:600 17px/1.15 var(--font-sans); }
-        :global(.today-progress) { display: flex; align-items: center; gap: 20px; padding: 14px 18px; color: var(--ink); text-decoration: none; flex-wrap: wrap; }
-        .today-stat { display: inline-flex; align-items: center; gap: 6px; font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        :global(.today-progress) { display: flex; align-items: center; gap: 20px; padding: 12px 16px; color: var(--ink); text-decoration: none; flex-wrap: wrap; }
+        .today-stat { display: inline-flex; align-items: center; gap: 8px; font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .today-stat :global(.today-freeze) { color: var(--olive-ink); }
         @media (max-width: 767px) {
-              :global(.today-progress) { gap: 14px; }
+              :global(.today-progress) { gap: 16px; }
           .today-progress-more { display: none; }
           .today-continue-study { flex: 1 1 100%; }
           .today-continue-study :global(.c-btn) { flex: 1; justify-content: center; }

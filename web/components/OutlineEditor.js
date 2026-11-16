@@ -307,8 +307,8 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
         .oe-page :global(h2::before) { content: counter(oe-section); flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 13px/1 var(--font-sans); user-select: none; }
         .oe-page { counter-reset: oe-section; }
         .oe-page :global(.oe-overview) { margin: 0; padding-bottom: 20px; border-bottom: 1px solid var(--line); font: 400 var(--fs-20, 20px)/1.5 var(--font-sans); color: var(--ink); }
-        .oe-page :global(ul) { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
-        .oe-page :global(ul ul) { margin-top: 6px; gap: 4px; list-style: circle; color: var(--muted-ink); }
+        .oe-page :global(ul) { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+        .oe-page :global(ul ul) { margin-top: 4px; gap: 4px; list-style: circle; color: var(--muted-ink); }
         .oe-page :global(p), .oe-page :global(div) { margin: 0; }
         .oe-page :global(strong) { font-weight: 600; color: var(--ink); }
         @media (max-width: 1099px) {

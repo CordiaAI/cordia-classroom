@@ -245,17 +245,17 @@ export default function KnowledgeMap({ guides }) {
         .kmap-stage { position: relative; min-width: 0; }
         .kmap-stage canvas { display: block; width: 100%; cursor: grab; touch-action: pan-y; }
         .kmap-stage canvas:active { cursor: grabbing; }
-        .kmap-tip { position: absolute; transform: translate(-50%, calc(-100% - 12px)); display: grid; gap: 2px; padding: 8px 10px; border-radius: var(--r-input); background: var(--surface-raised, var(--card)); box-shadow: var(--shadow-float, var(--shadow)); font: 500 var(--fs-13)/1.3 var(--font-sans); white-space: nowrap; pointer-events: none; }
+        .kmap-tip { position: absolute; transform: translate(-50%, calc(-100% - 12px)); display: grid; gap: 2px; padding: 8px 8px; border-radius: var(--r-input); background: var(--surface-raised, var(--card)); box-shadow: var(--shadow-float, var(--shadow)); font: 500 var(--fs-13)/1.3 var(--font-sans); white-space: nowrap; pointer-events: none; }
         .kmap-tip strong { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
-        .kmap-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 18px; font: 500 var(--fs-13)/1 var(--font-sans); color: var(--muted); }
-        .kmap-legend li { display: inline-flex; align-items: center; gap: 6px; }
+        .kmap-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; font: 500 var(--fs-13)/1 var(--font-sans); color: var(--muted); }
+        .kmap-legend li { display: inline-flex; align-items: center; gap: 8px; }
         .kmap-legend strong { color: var(--ink); font-variant-numeric: tabular-nums; }
         .kmap-legend i { width: 10px; height: 10px; border-radius: 50%; }
         .is-new { background: var(--muted); }
         .is-learning { background: var(--warning); }
         .is-known { background: var(--olive-ink); }
         .is-mastered { background: var(--success); box-shadow: 0 0 0 3px var(--success-bg); }
-        .kmap-list ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+        .kmap-list ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
         .kmap-list li { display: flex; justify-content: space-between; gap: 12px; min-width: 0; }
         .kmap-list a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
         .kmap-list summary { cursor: pointer; }

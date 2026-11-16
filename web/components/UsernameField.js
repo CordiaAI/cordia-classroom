@@ -51,12 +51,12 @@ export default function UsernameField({ id = 'username', value, onChange, onStat
           aria-invalid={status.state === 'bad'}
           autoFocus={autoFocus}
         />
-        {status.state === 'ok' && <Check size={18} strokeWidth={2} aria-hidden="true" className="uname-ok" />}
+        {status.state === 'ok' && <Check size={18} strokeWidth={1.75} aria-hidden="true" className="uname-ok" />}
       </div>
       <p id={`${id}-status`} className={'uname-status' + (status.state === 'bad' ? ' is-bad' : '')} aria-live="polite">{status.text || '3 to 24 letters, numbers, _ or .'}</p>
       <style jsx>{`
-        .uname { display: grid; gap: 6px; }
-        .uname-box { display: flex; align-items: center; gap: 2px; height: 48px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--r-input); background: var(--card); }
+        .uname { display: grid; gap: 8px; }
+        .uname-box { display: flex; align-items: center; gap: 2px; height: 48px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-input); background: var(--card); }
         .uname-box:focus-within { border-color: var(--olive); outline: 2px solid var(--focus-ring); outline-offset: 2px; }
         .uname-input, .uname-input:focus { border: 0; box-shadow: none; background: transparent; padding: 0; }
         .uname-input:focus-visible { outline: none !important; }

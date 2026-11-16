@@ -119,9 +119,9 @@ export default function AboutYou({ index = 1, total = 4 }) {
       <style jsx>{`
         .about { display: grid; gap: 24px; width: min(560px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; }
         .about-head { display: flex; align-items: center; justify-content: space-between; }
-        .about-group { display: grid; gap: 10px; margin: 0; padding: 0; border: 0; }
-        .about-group legend { margin-bottom: 10px; }
-        .about-group :global(.about-chip) { height: 44px; padding: 0 18px; font-size: 15px; }
+        .about-group { display: grid; gap: 12px; margin: 0; padding: 0; border: 0; }
+        .about-group legend { margin-bottom: 8px; }
+        .about-group :global(.about-chip) { height: 44px; padding: 0 16px; font-size: 15px; }
         /* Picked reads like the guide's Outline / By page switch: the choice is a raised white pane,
            the rest sit flat in the sheet with muted text. */
         .about-group :global(.about-chip[aria-pressed='false']) {
@@ -133,7 +133,7 @@ export default function AboutYou({ index = 1, total = 4 }) {
           box-shadow: var(--lg-highlight), var(--shadow) !important; color: var(--ink) !important; font-weight: 600 !important;
         }
         .about-group :global(.about-chip:disabled) { opacity: 0.45; cursor: default; }
-        .about-hint { margin-left: 6px; font-weight: 400; }
+        .about-hint { margin-left: 4px; font-weight: 400; }
         .about-other { margin-top: 4px; }
         .about-next { justify-self: start; min-width: 180px; }
         @media (max-width: 767px) { .about-next { width: 100%; } }

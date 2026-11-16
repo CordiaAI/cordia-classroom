@@ -80,7 +80,7 @@ function EachRun({ items, questions, guideId, deadline, onFinish }) {
         <span className={'tt-clock' + (left <= 60 ? ' is-low' : '')} role="timer" aria-label={`${clock(left)} left`}><Clock {...ICON} />{clock(left)}</span>
         <span className="c-meta learn-type">{FORMAT[type]}</span>
       </div>
-      <div className="c-bar" role="progressbar" aria-label="Test" aria-valuemin={0} aria-valuemax={items.length} aria-valuenow={position}><span style={{ width: Math.round((position / items.length) * 100) + '%' }} /></div>
+      <div className="c-bar" role="progressbar" aria-label="Test" aria-valuemin={0} aria-valuemax={items.length} aria-valuenow={position}><span style={{ '--v': Math.round((position / items.length) * 100) + '%' }} /></div>
       {type === 'mc' && <McCard key={card.id} {...props} />}
       {type === 'fill' && <FillCard key={card.id} {...props} />}
       {type === 'cloze' && <ClozeCard key={card.id} {...props} />}
@@ -201,11 +201,11 @@ function TestStyle() {
   return (
     <style jsx global>{`
       .tt h2 { margin: 0; }
-      .tt-pace { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+      .tt-pace { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
       .tt-pace-btn { min-height: 76px; }
       .tt-total { display: flex; align-items: center; gap: 8px; margin: 0; font: 600 16px/1.3 var(--font-sans); font-variant-numeric: tabular-nums; }
       .tt-total .lucide, .tt-clock .lucide { color: var(--olive-ink); }
-      .tt-clock { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: var(--r-pill); background: var(--surface-raised); font: 600 14px/1.3 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink); }
+      .tt-clock { display: inline-flex; align-items: center; gap: 8px; padding: 3px 8px; border-radius: var(--r-pill); background: var(--surface-raised); font:600 15px/1.3 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink); }
       .tt-clock.is-low { background: var(--warning-bg); color: var(--warning); }
       .tt-clock.is-low .lucide { color: var(--warning); }
       .tt-wait { display: grid; justify-items: center; gap: 12px; padding: 48px 0; }

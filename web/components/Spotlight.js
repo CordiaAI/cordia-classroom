@@ -123,9 +123,9 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
       <style jsx>{`
         .spot { position: fixed; inset: 0; z-index: 400; pointer-events: none; }
         .spot-dim { position: fixed; background: var(--spot-dim); pointer-events: auto; }
-        .spot-ring { position: fixed; border-radius:12px; box-shadow: 0 0 0 2px var(--olive), 0 0 0 8px var(--olive-tint), 0 0 32px 8px var(--olive-tint); pointer-events: none; transition: top var(--dur) var(--ease), left var(--dur) var(--ease), width var(--dur) var(--ease), height var(--dur) var(--ease); }
+        .spot-ring { position: fixed; border-radius:12px; box-shadow: 0 0 0 2px var(--olive), 0 0 0 8px var(--olive-tint); pointer-events: none; }
         .spot-label {
-          position: fixed; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 16px; max-width: calc(100vw - 32px); box-sizing: border-box;
+          position: fixed; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px; max-width: calc(100vw - 32px); box-sizing: border-box;
           border-radius:22px; pointer-events: auto;
           background: var(--glass); border: 1px solid var(--glass-edge);
           -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
@@ -142,7 +142,7 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
         .spot :global(.spot-dots i) { width: 6px; height: 6px; border-radius:999px; background: var(--line); }
         .spot :global(.spot-dots i.is-done) { background: var(--olive); opacity: .5; }
         .spot :global(.spot-dots i.is-now) { background: var(--olive); width: 16px; }
-        .spot :global(.spot-dots .c-meta) { margin-left: 6px; }
+        .spot :global(.spot-dots .c-meta) { margin-left: 4px; }
         .spot-skip {
           position: fixed; top: calc(var(--bar-h, 64px) + 12px); right: 12px; height: 44px; padding: 0 20px; pointer-events: auto;
           border-radius:999px; border: 1px solid var(--glass-edge);

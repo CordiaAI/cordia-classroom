@@ -32,7 +32,13 @@ export function isLightOnly(pathname) {
 export function applyTheme(pathname = typeof window !== 'undefined' ? window.location.pathname : '/') {
   if (typeof document === 'undefined') return;
   const next = isLightOnly(pathname) ? 'light' : themePreference();
-  if (document.documentElement.getAttribute('data-theme') !== next) document.documentElement.setAttribute('data-theme', next);
+  const root = document.documentElement;
+  if (root.getAttribute('data-theme') === next) return;
+  // Transitions are off for the frame the theme changes, so every colour switches together
+  // instead of each one fading at its own speed (the rule is in styles/system.css).
+  root.classList.add('theme-switching');
+  root.setAttribute('data-theme', next);
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('theme-switching')));
 }
 
 function cache(preference) {

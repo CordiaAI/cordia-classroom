@@ -23,9 +23,9 @@ export default function CoverArt({ color = 0, icons = [], className = '' }) {
         .ca-i1 { left: 50%; top: 52%; width: 38cqh; height: 38cqh; }
         .ca-i2 { left: 21%; top: 30%; width: 19cqh; height: 19cqh; opacity: .8; }
         .ca-i3 { left: 79%; top: 72%; width: 17cqh; height: 17cqh; opacity: .8; }
-        a:hover .ca-i1 { transform: translate(-50%, -50%) scale(1.06); }
-        a:hover .ca-i2 { transform: translate(-50%, -50%) rotate(-6deg) scale(1.06); }
-        a:hover .ca-i3 { transform: translate(-50%, -50%) rotate(6deg) scale(1.06); }
+        @media (hover: hover) { a:hover .ca-i1 { transform: translate(-50%, -50%) scale(1.06); } }
+        @media (hover: hover) { a:hover .ca-i2 { transform: translate(-50%, -50%) rotate(-6deg) scale(1.06); } }
+        @media (hover: hover) { a:hover .ca-i3 { transform: translate(-50%, -50%) rotate(6deg) scale(1.06); } }
         @media (prefers-reduced-motion: reduce) { .ca-i { transition: none; } }
       `}</style>
     </span>

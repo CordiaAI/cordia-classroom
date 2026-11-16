@@ -135,7 +135,7 @@ function ClassStyles() {
         .cp-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-variant-numeric: tabular-nums; }
         .cp-versions { font: 600 13px/1 var(--font-sans); white-space: nowrap; }
         .cp-row .c-menu-wrap:has(.cp-versions) > .c-icon-btn { width: auto; padding: 0 12px; border-radius: 999px; }
-        .cp-deadline { gap: 14px; }
+        .cp-deadline { gap: 16px; }
         .cp-deadline.is-done .cp-title { color: var(--muted); text-decoration: line-through; }
         .cp-due { font-variant-numeric: tabular-nums; padding-right: 16px; white-space: nowrap; }
         @media (max-width: 767px) { .cp-list { padding-left: 16px; } .cp-row { flex-wrap: wrap; padding: 12px 0; } .cp-main { flex-basis: 100%; } .cp-deadline { flex-wrap: nowrap; } .cp-deadline .cp-main { flex-basis: auto; } }

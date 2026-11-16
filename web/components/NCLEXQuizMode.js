@@ -174,16 +174,16 @@ export default function NCLEXQuizMode({ questions, guideId, onComplete, resume =
             marginTop: 16, padding: 16, background: 'var(--bg-secondary)',
             border: '1px solid var(--border-default)', borderRadius: 10
           }}>
-            <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
               Title
             </label>
             <input
               type="text"
               value={saveTitle}
               onChange={e => setSaveTitle(e.target.value)}
-              style={{ marginBottom: 10, width: '100%' }}
+              style={{ marginBottom: 8, width: '100%' }}
             />
-            <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
               Save to Class (optional)
             </label>
             <select
@@ -202,7 +202,7 @@ export default function NCLEXQuizMode({ questions, guideId, onComplete, resume =
             </select>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn" onClick={saveAsGuide} disabled={saveStatus === 'saving' || !saveTitle.trim()}>
-                {saveStatus === 'saving' ? 'Saving...' : 'Save'}
+                {saveStatus === 'saving' ? 'Saving…' : 'Save'}
               </button>
               <button className="btn-outline" onClick={() => setShowSave(false)}>Cancel</button>
             </div>

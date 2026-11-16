@@ -32,14 +32,14 @@ export default function DuplicateBanner({ onMerged }) {
       )}
       {open && <MergeSheet pair={open} onClose={() => setOpen(null)} onMerged={onMerged} />}
       <style jsx>{`
-        .dup-banner { position: relative; display: flex; gap: 14px; align-items: flex-start; padding: 16px 48px 16px 16px; min-width: 0; }
+        .dup-banner { position: relative; display: flex; gap: 16px; align-items: flex-start; padding: 16px 48px 16px 16px; min-width: 0; }
         .dup-icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
         .dup-main { display: grid; gap: 4px; min-width: 0; }
         .dup-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
         .dup-sets { margin: 0; color: var(--muted-ink); overflow-wrap: anywhere; }
         .dup-sets strong { color: var(--ink); font-weight: 600; }
         .dup-more { margin: 0; }
-        .dup-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+        .dup-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
         .dup-banner :global(.dup-close) { position: absolute; top: 8px; right: 8px; }
       `}</style>
     </>

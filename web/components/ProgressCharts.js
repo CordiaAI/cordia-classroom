@@ -250,16 +250,16 @@ export function StudyHours({ hours = [] }) {
 // Global: the marks are spread over several components. Drawn with tokens only (tokens.css).
 export const CHART_CSS = css.global`
   .pc-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-  .pc-tile { display: grid; gap: 6px; align-content: start; padding: 18px 20px; }
+  .pc-tile { display: grid; gap: 8px; align-content: start; padding: 16px 20px; }
   .pc-tile strong { font: 600 28px/1.1 var(--font-sans); color: var(--ink); }
   .pc-tile .c-meta { margin: 0; }
   .pc-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-  .pc-card { position: relative; display: grid; gap: 14px; align-content: start; padding: 20px; min-width: 0; }
+  .pc-card { position: relative; display: grid; gap: 16px; align-content: start; padding: 20px; min-width: 0; }
   .pc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .pc-head .c-section-title, .pc-head .c-meta, .pc-empty { margin: 0; }
-  .pc-plot-wrap { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
+  .pc-plot-wrap { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; }
   .pc-plot-wrap.pc-hours { grid-template-columns: minmax(0, 1fr); }
-  .pc-axis-y { display: flex; flex-direction: column; justify-content: space-between; height: 160px; color: var(--muted); font: 500 12px/1 var(--font-sans); text-align: right; font-variant-numeric: tabular-nums; }
+  .pc-axis-y { display: flex; flex-direction: column; justify-content: space-between; height: 160px; color: var(--muted); font:500 13px/1 var(--font-sans); text-align: right; font-variant-numeric: tabular-nums; }
   .pc-axis-y span { transform: translateY(-50%); }
   .pc-axis-y span:last-child { transform: translateY(50%); }
   .pc-plot { position: relative; display: grid; grid-template-rows: 160px auto; gap: 8px; min-width: 0; }
@@ -272,8 +272,8 @@ export const CHART_CSS = css.global`
   .pc-bar { display: block; width: 100%; max-width: 24px; min-height: 0; border-radius: 4px 4px 0 0; background: var(--chart-mark); transition: opacity var(--dur) var(--ease); }
   .pc-col:hover .pc-bar, .pc-col:focus-visible .pc-bar { opacity: .8; }
   .pc-hours .pc-col:not(.is-peak) .pc-bar { background: var(--chart-mark-soft); }
-  .pc-peak { position: absolute; font: 600 12px/1 var(--font-sans); color: var(--ink); white-space: nowrap; pointer-events: none; }
-  .pc-axis-x { display: flex; gap: 2px; color: var(--muted); font: 500 12px/1 var(--font-sans); }
+  .pc-peak { position: absolute; font:600 13px/1 var(--font-sans); color: var(--ink); white-space: nowrap; pointer-events: none; }
+  .pc-axis-x { display: flex; gap: 2px; color: var(--muted); font:500 13px/1 var(--font-sans); }
   .pc-axis-x span { flex: 1 1 0; min-width: 0; overflow: visible; white-space: nowrap; }
   .pc-axis-x span:last-child { text-align: right; }
   .pc-axis-ends { justify-content: space-between; }
@@ -282,19 +282,19 @@ export const CHART_CSS = css.global`
   .pc-line-area svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
   .pc-line { fill: none; stroke: var(--chart-mark); stroke-width: 2px; stroke-linejoin: round; stroke-linecap: round; }
   .pc-wash { fill: var(--chart-mark); opacity: .1; }
-  .pc-dot { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--chart-mark); box-shadow: 0 0 0 2px var(--chart-surface); outline: none; cursor: default; }
+  .pc-dot { position: absolute; width: 10px; height: 10px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--chart-mark); box-shadow: 0 0 0 2px var(--chart-surface); outline: none; cursor: default; }
   .pc-dot::before { content: ''; position: absolute; inset: -8px; border-radius: 50%; }
   .pc-dot:focus-visible { box-shadow: 0 0 0 2px var(--chart-surface), 0 0 0 4px var(--olive); }
-  .pc-dot-label { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); font: 600 12px/1 var(--font-sans); color: var(--ink); white-space: nowrap; }
-  .pc-bars { position: relative; list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-  .pc-bars li { display: grid; grid-template-columns: minmax(88px, 34%) minmax(0, 1fr) auto; align-items: center; gap: 10px; outline: none; border-radius: 6px; }
+  .pc-dot-label { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); font:600 13px/1 var(--font-sans); color: var(--ink); white-space: nowrap; }
+  .pc-bars { position: relative; list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .pc-bars li { display: grid; grid-template-columns: minmax(88px, 34%) minmax(0, 1fr) auto; align-items: center; gap: 12px; outline: none; border-radius: 6px; }
   .pc-bars li:focus-visible { box-shadow: 0 0 0 2px var(--olive); }
-  .pc-bar-label { font: 500 14px/1.3 var(--font-sans); color: var(--ink); }
+  .pc-bar-label { font:500 13px/1.3 var(--font-sans); color: var(--ink); }
   .pc-bar-label a { color: inherit; }
   .pc-bar-track { display: block; height: 14px; }
   .pc-hbar { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--chart-mark); }
   .pc-bar-value { font: 500 13px/1 var(--font-sans); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .pc-tip { position: absolute; z-index: 5; transform: translate(-50%, -100%); padding: 6px 10px; border-radius: 10px; background: var(--lg-menu); border: 1px solid var(--lg-edge); box-shadow: var(--lg-highlight), var(--lg-depth-float); color: var(--ink); font: 600 13px/1.3 var(--font-sans); white-space: nowrap; pointer-events: none; }
+  .pc-tip { position: absolute; z-index: 5; transform: translate(-50%, -100%); padding: 4px 8px; border-radius: 10px; background: var(--lg-menu); border: 1px solid var(--lg-edge); box-shadow: var(--lg-highlight), var(--lg-depth-float); color: var(--ink); font: 600 13px/1.3 var(--font-sans); white-space: nowrap; pointer-events: none; }
   @media (max-width: 900px) { .pc-row { grid-template-columns: minmax(0, 1fr); } .pc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 520px) { .pc-tile strong { font-size: 22px; } .pc-axis-x span { font-size: 11px; } }
+  @media (max-width: 520px) { .pc-tile strong { font-size: var(--fs-20); } }
 `;

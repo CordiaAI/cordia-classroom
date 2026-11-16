@@ -61,13 +61,13 @@ export default function JoinCard({ preview, signedIn }) {
       <style jsx>{`
         .jc { width: min(520px, 100%); margin: 32px auto; padding: 24px; display: grid; gap: 12px; justify-items: start; }
         .jc :global(.jc-icon) { color: var(--olive-ink); }
-        .jc-title { margin: 0; font: 500 32px/1.15 var(--font-display); color: var(--ink); overflow-wrap: anywhere; }
+        .jc-title { margin: 0; font:500 28px/1.15 var(--font-display); color: var(--ink); overflow-wrap: anywhere; }
         .jc-facts, .jc-desc, .jc p { margin: 0; }
         .jc-desc { color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
         .jc-actions { display: flex; flex-wrap: wrap; gap: 8px; }
         .jc-consent { margin: 0; padding: 0; border: 0; display: grid; gap: 8px; min-width: 0; }
         .jc-consent legend { font: 600 15px/1.35 var(--font-sans); color: var(--ink); margin-bottom: 4px; padding: 0; }
-        .jc-consent label { display: flex; gap: 10px; align-items: center; color: var(--ink); cursor: pointer; }
+        .jc-consent label { display: flex; gap: 12px; align-items: center; color: var(--ink); cursor: pointer; }
         .jc-consent input { width: 18px; height: 18px; accent-color: var(--olive); }
       `}</style>
     </section>

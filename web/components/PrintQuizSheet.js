@@ -85,9 +85,9 @@ export default function PrintQuizSheet({ guideId, onClose }) {
                     <li key={type} className={'pqs-type' + (on ? '' : ' is-off')}>
                       <Toggle checked={on} onChange={value => setFormat(current => toggleType(current, type, value))} label={TYPE_NAMES[type]} disabled={on && onCount === 1} />
                       <div className="pqs-stepper" role="group" aria-label={`${TYPE_NAMES[type]} count`}>
-                        <button type="button" className="c-icon-btn" onClick={() => setFormat(current => setCount(current, type, count - 1))} disabled={!on || count <= 1} aria-label={`Fewer ${TYPE_NAMES[type].toLowerCase()}`}><Minus size={16} strokeWidth={2} aria-hidden="true" /></button>
+                        <button type="button" className="c-icon-btn" onClick={() => setFormat(current => setCount(current, type, count - 1))} disabled={!on || count <= 1} aria-label={`Fewer ${TYPE_NAMES[type].toLowerCase()}`}><Minus size={16} strokeWidth={1.75} aria-hidden="true" /></button>
                         <span className="pqs-count" aria-live="polite">{count}</span>
-                        <button type="button" className="c-icon-btn" onClick={() => setFormat(current => setCount(current, type, count + 1))} disabled={!on || count >= MAX_COUNT} aria-label={`More ${TYPE_NAMES[type].toLowerCase()}`}><Plus size={16} strokeWidth={2} aria-hidden="true" /></button>
+                        <button type="button" className="c-icon-btn" onClick={() => setFormat(current => setCount(current, type, count + 1))} disabled={!on || count >= MAX_COUNT} aria-label={`More ${TYPE_NAMES[type].toLowerCase()}`}><Plus size={16} strokeWidth={1.75} aria-hidden="true" /></button>
                       </div>
                     </li>
                   );
@@ -116,11 +116,11 @@ export default function PrintQuizSheet({ guideId, onClose }) {
         </section>
       </div>
       <style jsx global>{`
-        .pqs { width: min(520px, 100%); display: grid; gap: 14px; max-height: calc(100vh - 48px); overflow-y: auto; }
+        .pqs { width: min(520px, 100%); display: grid; gap: 16px; max-height: calc(100vh - 48px); overflow-y: auto; }
         .pqs-title { margin: 0; font: 500 28px/1.15 var(--font-display); color: var(--ink); }
         .pqs-presets { display: flex; flex-wrap: wrap; gap: 8px; }
         .pqs-chip.is-on { background: var(--olive-tint); border-color: var(--olive); color: var(--olive-ink); }
-        .pqs-types { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+        .pqs-types { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
         .pqs-type { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--hairline); }
         .pqs-type .c-toggle { flex: 1; }
         .pqs-type.is-off .pqs-count { color: var(--muted); }
@@ -128,7 +128,7 @@ export default function PrintQuizSheet({ guideId, onClose }) {
         .pqs-count { min-width: 28px; text-align: center; font: 600 16px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink); }
         .pqs-total { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
         .pqs-note { margin: 0; color: var(--muted); font: 500 var(--fs-13)/1.45 var(--font-sans); }
-        .pqs-options { display: grid; gap: 10px; padding-top: 4px; }
+        .pqs-options { display: grid; gap: 12px; padding-top: 4px; }
         .pqs-actions { display: flex; flex-wrap: wrap; gap: 8px; }
       `}</style>
     </BodyPortal>

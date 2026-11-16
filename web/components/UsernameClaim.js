@@ -80,7 +80,7 @@ export default function UsernameClaim() {
             <button type="submit" className="c-btn c-btn--primary" disabled={!status.ok || saving}>{saving ? 'Saving…' : 'Save'}</button>
           </div>
           <style jsx>{`
-            .claim { display: grid; gap: 14px; width: min(480px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; }
+            .claim { display: grid; gap: 16px; width: min(480px, 100%); max-height: calc(100vh - 48px); overflow-y: auto; }
             .claim-lead { margin: 0; color: var(--ink); }
             .claim-link { font-weight: 600; overflow-wrap: anywhere; }
             .claim-suggest { display: grid; gap: 8px; }

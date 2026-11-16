@@ -698,7 +698,7 @@ export default function GuidePage() {
           onClose={() => setSharingToRoom(false)}
           onAdded={room => { setSharingToRoom(false); setGuide(current => ({ ...current, visibility: current.visibility === 'private' || !current.visibility ? 'classroom' : current.visibility })); setToast(`Added to ${room?.name || 'the classroom'}`); }} />
       )}
-      {confirmDelete && <ConfirmDialog title={`Delete ${guide.title}?`} onConfirm={deleteGuide} onCancel={() => setConfirmDelete(false)} />}
+      {confirmDelete && <ConfirmDialog title={`Delete ${guide.title}?`} confirmLabel="Delete guide" onConfirm={deleteGuide} onCancel={() => setConfirmDelete(false)} />}
       {toast && (
         <div className="c-toast" role="status">
           <span>{toast}</span>
@@ -711,18 +711,18 @@ export default function GuidePage() {
         .guide { gap: 16px; }
         .guide-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .guide-origin { margin: -4px 0 0 48px; font-size: 13px; }
-        .guide-dup { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0; padding: 10px 14px; border-radius: var(--r-input); background: var(--olive-tint); color: var(--ink); font: 500 15px/1.4 var(--font-sans); }
+        .guide-dup { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 8px; margin: 0; padding: 8px 12px; border-radius: var(--r-input); background: var(--olive-tint); color: var(--ink); font: 500 15px/1.4 var(--font-sans); }
         .guide-dup :global(svg) { color: var(--olive-ink); flex: none; }
         .guide-dup span { min-width: 0; overflow-wrap: anywhere; }
         .guide-dup-review { min-height: 32px; padding: 0 4px; border: 0; background: none; color: var(--olive-ink); font: 600 15px/1 var(--font-sans); cursor: pointer; }
-        .guide-dup-review:hover { text-decoration: underline; }
+        @media (hover: hover) { .guide-dup-review:hover { text-decoration: underline; } }
         .guide-title { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-wrap: anywhere; }
         .guide-title :global(.guide-rename-btn) { flex: 0 0 auto; color: var(--muted); }
         .guide-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: -8px 0 0 48px; }
-        .guide-nclex { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; border-radius: var(--r-row); background: var(--olive-tint); font: 600 15px/1.4 var(--font-sans); }
+        .guide-nclex { display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: var(--r-row); background: var(--olive-tint); font: 600 15px/1.4 var(--font-sans); }
         .guide-nclex :global(.lucide) { color: var(--olive-ink); flex: 0 0 auto; }
         .guide-making { margin: -4px 0 0; }
-        .guide-auto-set { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
+        .guide-auto-set { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
         .guide-auto-set.is-error { color: var(--error); }
         .guide-tabs-row :global(.c-pill.is-making) { opacity: 1; color: var(--ink); }
         .guide-tabs-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -732,12 +732,12 @@ export default function GuidePage() {
         .guide-tabs-row, .guide-head { min-width: 0; max-width: 100%; }
         :global(.guide-view) { justify-self: start; }
         .guide-title-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing:-0.015em; text-align: left; cursor: text; border-radius:var(--r-input); }
-        .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
+        @media (hover: hover) { .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; } }
         .guide-rename { flex: 1 1 auto; min-width: 0; }
         .guide-title-input { font:600 28px/1.15 var(--font-display); height: 52px; }
         .guide-head :global(.guide-starred) { color: var(--olive-ink); }
         .guide-src { font:600 13px/1.5 var(--font-sans); }
-        .guide-src a { display: inline-flex; align-items: center; gap: 6px; }
+        .guide-src a { display: inline-flex; align-items: center; gap: 8px; }
         .guide-notes { display: grid; gap: 16px; padding: 32px 40px; }
         .guide-notes :global(.c-section-title) { margin: 0; }
         .guide-notes { gap: 32px; }
@@ -746,14 +746,14 @@ export default function GuidePage() {
         .guide-outline-section.has-visual { grid-template-columns: minmax(0, 1fr) minmax(320px, 48%); gap: 28px; align-items: start; }
         @media (max-width: 1099px) { .guide-outline-section.has-visual { grid-template-columns: minmax(0, 1fr); } }
         .guide-notes ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
-        .guide-notes .guide-sub { margin-top: 6px; gap: 4px; list-style: circle; color: var(--muted-ink); }
+        .guide-notes .guide-sub { margin-top: 4px; gap: 4px; list-style: circle; color: var(--muted-ink); }
         .guide-notes :global(strong) { font-weight: 600; color: var(--ink); }
         .guide-overview { margin: 0; padding-bottom: 24px; border-bottom: 1px solid var(--line); font: 400 var(--fs-20)/1.5 var(--font-sans); color: var(--ink); }
-        .guide-outline-num { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 10px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 var(--fs-13)/1 var(--font-sans); vertical-align: 3px; }
+        .guide-outline-num { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 8px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 var(--fs-13)/1 var(--font-sans); vertical-align: 3px; }
         .guide-key { display: grid; gap: 16px; padding: 24px 28px; border-radius: 16px; background: var(--olive-tint); }
         @media (max-width: 767px) {
           .guide-meta { margin-left: 0; }
-          .guide-notes { padding: 24px 18px; }
+          .guide-notes { padding: 24px 16px; }
           .guide-head :global(.guide-study-now) { order: 5; width: 100%; justify-content: center; }
           /* Phones: back and the actions share the top row; the title gets its own full-width row below. */
           .guide-head > :first-child { margin-right: auto; }

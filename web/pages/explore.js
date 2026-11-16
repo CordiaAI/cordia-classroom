@@ -83,7 +83,7 @@ export default function Explore() {
         {tab === 'people' && <PeoplePanel q={q} />}
       </div>
       <style jsx>{`
-        .ex { display: grid; gap: 14px; width: min(860px, 100%); margin: 0 auto; }
+        .ex { display: grid; gap: 16px; width: min(860px, 100%); margin: 0 auto; }
         .ex-head { margin: 0; }
         .ex-search { width: 100%; }
         :global(.ex-tabs) { justify-self: start; max-width: 100%; }
@@ -190,13 +190,13 @@ function GuidesPanel({ q, filters, onFilter }) {
       )}
       <style jsx>{`
         .exg-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; align-items: center; }
-        .exg-check { display: flex; align-items: center; gap: 10px; min-height: 44px; color: var(--ink); cursor: pointer; }
+        .exg-check { display: flex; align-items: center; gap: 12px; min-height: 44px; color: var(--ink); cursor: pointer; }
         .exg-check input { width: 18px; height: 18px; accent-color: var(--olive); flex: none; }
         .exg-empty { margin: 0; padding: 16px; color: var(--muted-ink); }
-        .exg-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+        .exg-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
         .exg-card { display: grid; gap: 8px; padding: 16px; min-width: 0; }
         .exg-card :global(.exg-title) { font: 600 17px/1.3 var(--font-sans); color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
-        .exg-card :global(.exg-title:hover) { text-decoration: underline; text-underline-offset: 3px; }
+        @media (hover: hover) { .exg-card :global(.exg-title:hover) { text-decoration: underline; text-underline-offset: 3px; } }
         .exg-outline { margin: 0; color: var(--muted-ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .exg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
         .exg-badge { display: inline-flex; align-items: center; gap: 4px; font: 600 13px/1.3 var(--font-sans); color: var(--olive-ink); }
@@ -251,8 +251,8 @@ function ClassroomsPanel({ q }) {
       <style jsx>{`
         .exc-empty { margin: 0; padding: 16px; color: var(--muted-ink); }
         .exc-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
-        .exc-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; min-width: 0; }
-        .exc-main { display: grid; gap: 6px; min-width: 0; }
+        .exc-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; min-width: 0; }
+        .exc-main { display: grid; gap: 8px; min-width: 0; }
         .exc-name { font: 600 16px/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
       `}</style>
     </>
@@ -275,7 +275,7 @@ function PeoplePanel({ q }) {
     <ul className="c-card exp-list" aria-label="People">
       {list.map(person => <li key={person.username}><UserChip person={person} meta={person.school || ''} /></li>)}
       <style jsx>{`
-        .exp-list { margin: 0; padding: 12px 16px; list-style: none; display: grid; gap: 10px; }
+        .exp-list { margin: 0; padding: 12px 16px; list-style: none; display: grid; gap: 12px; }
         .exp-empty { margin: 0; padding: 16px; color: var(--muted-ink); }
       `}</style>
     </ul>

@@ -252,7 +252,7 @@ export default function FlashcardViewer({
         <>
           <div className="fc-progress">
             <span className="fc-count is-learning" title="Still learning"><span className="fc-count-label">Still learning</span><strong key={'l' + bump.learning} className={bump.learning ? 'is-bumped' : ''} aria-label={`Still learning: ${learning}`}>{learning}</strong></span>
-            <div className="c-bar" role="progressbar" aria-label="Progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={known.length}><span style={{ width: `${(known.length / total) * 100}%` }} /></div>
+            <div className="c-bar" role="progressbar" aria-label="Progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={known.length}><span style={{ '--v': `${(known.length / total) * 100}%` }} /></div>
             <span className="c-meta">{position} / {total}</span>
             <span className="fc-count is-know" title="Know"><strong key={'k' + bump.know} className={bump.know ? 'is-bumped' : ''} aria-label={`Know: ${known.length}`}>{known.length}</strong><span className="fc-count-label">Know</span></span>
           </div>
@@ -305,26 +305,26 @@ export default function FlashcardViewer({
       <style jsx>{`
         .fc { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; width: min(760px, 100%); margin: 0 auto; min-width: 0; }
         .fc > * { min-width: 0; }
-        .fc-bar { position: sticky; top: calc(var(--bar-h) + 12px); z-index: 20; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius:var(--r-pill); }
+        .fc-bar { position: sticky; top: calc(var(--bar-h) + 12px); z-index: 20; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius:var(--r-pill); }
         .fc-name { flex: 1; min-width: 0; padding: 0 8px; font:600 17px/1.15 var(--font-sans); }
         .fc-bar :global(.is-starred) { color: var(--olive-ink); }
         .fc-progress { display: flex; align-items: center; gap: 12px; }
         .fc-progress .c-bar { flex: 1; }
         .fc-count { display: inline-flex; align-items: center; gap: 8px; font: 500 var(--fs-13)/1 var(--font-sans); color: var(--muted); }
-        .fc-count strong { min-width: 36px; height: 28px; padding: 0 10px; display: inline-grid; place-items: center; border-radius: var(--r-pill); font: 700 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .fc-count strong { min-width: 36px; height: 28px; padding: 0 8px; display: inline-grid; place-items: center; border-radius: var(--r-pill); font: 600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .fc-count.is-learning strong { color: var(--warning); background: var(--warning-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning) 35%, transparent); }
         .fc-count.is-know strong { color: var(--success); background: var(--success-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 35%, transparent); }
         .fc-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; text-align: left; }
         .fc-deck { position: relative; display: grid; }
         .fc-deck > * { grid-area: 1 / 1; }
-        .fc-top { position: relative; z-index: 1; animation: fc-in 180ms ease-out backwards; touch-action: pan-y; }
+        .fc-top { position: relative; z-index: 1; animation: fc-in var(--dur-pop) var(--ease) backwards; touch-action: pan-y; }
         @keyframes fc-in { from { opacity: 0; } }
         .fc-card { position: relative; min-height: 340px; perspective: 1400px; cursor: grab; border-radius:var(--r-card); user-select: none; -webkit-user-select: none; }
         .fc-card:active { cursor: grabbing; }
         /* A light sheen sweeps across the card as it turns. */
         .fc-face::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(115deg, transparent 38%, var(--sheen) 50%, transparent 62%) no-repeat; background-size: 260% 100%; background-position: 130% 0; transition: background-position 700ms var(--ease); }
         .is-flipped .fc-face::after { background-position: -40% 0; }
-        .fc-lean { position: absolute; top: 18px; z-index: 2; padding: 6px 12px; border-radius: var(--r-pill); font: 700 14px/1 var(--font-sans); letter-spacing: 0.02em; pointer-events: none; transition: opacity 120ms linear; }
+        .fc-lean { position: absolute; top: 18px; z-index: 2; padding: 4px 12px; border-radius: var(--r-pill); font:600 15px/1 var(--font-sans); letter-spacing: 0.02em; pointer-events: none; transition: opacity 120ms linear; }
         .fc-lean.is-know { right: 18px; color: var(--success); background: var(--success-bg); box-shadow: inset 0 0 0 2px var(--success); }
         .fc-lean.is-learning { left: 18px; color: var(--warning); background: var(--warning-bg); box-shadow: inset 0 0 0 2px var(--warning); }
         .fc-swipe-hint { margin: 4px 0 -8px; text-align: center; }
@@ -340,7 +340,7 @@ export default function FlashcardViewer({
         .fc-actions { display: flex; justify-content: center; gap: 12px; }
         .fc-actions :global(.c-btn) { min-width: 150px; }
         @media (max-width: 767px) {
-          .fc-ask { padding: 0 10px; }
+          .fc-ask { padding: 0 8px; }
           .fc-ask-label { display: none; }
           .fc-card { min-height: 300px; }
           .fc-actions :global(.c-btn) { flex: 1; min-width: 0; }
@@ -374,14 +374,14 @@ function ResultList({ tone, label, cards }) {
       ) : <p className="c-meta">None</p>}
       <style jsx>{`
         .fc-result { padding: 12px 16px; min-width: 0; }
-        summary { display: flex; align-items: center; gap: 10px; cursor: pointer; font: 600 15px/1.2 var(--font-sans); list-style: none; }
+        summary { display: flex; align-items: center; gap: 12px; cursor: pointer; font: 600 15px/1.2 var(--font-sans); list-style: none; }
         summary::-webkit-details-marker { display: none; }
-        summary strong { min-width: 32px; height: 26px; padding: 0 8px; display: inline-grid; place-items: center; border-radius: var(--r-pill); font: 700 14px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        summary strong { min-width: 32px; height: 26px; padding: 0 8px; display: inline-grid; place-items: center; border-radius: var(--r-pill); font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .is-learning summary strong { color: var(--warning); background: var(--warning-bg); }
         .is-know summary strong { color: var(--success); background: var(--success-bg); }
-        ul { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; max-height: 280px; overflow: auto; }
+        ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; max-height: 280px; overflow: auto; }
         li { display: grid; gap: 2px; padding-top: 8px; border-top: 1px solid var(--hairline); min-width: 0; overflow-wrap: anywhere; }
-        .fc-result-front { font: 600 14px/1.3 var(--font-sans); color: var(--ink); }
+        .fc-result-front { font:600 15px/1.3 var(--font-sans); color: var(--ink); }
         p { margin: 8px 0 0; }
       `}</style>
     </details>

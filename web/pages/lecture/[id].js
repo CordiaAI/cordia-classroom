@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { pageTitle } from '../../lib/pageTitle';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowLeft, BookOpen, CalendarCheck, CalendarPlus, Check, Folder, Merge, MessageCircle, NotebookPen, Pencil, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarCheck, CalendarPlus, Check, Folder, Merge, MessageCircle, NotebookPen, Pencil, Trash2, X } from 'lucide-react';
 import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
 import Menu from '../../components/Menu';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -200,7 +200,7 @@ export default function LecturePage() {
         <button type="button" className="c-btn c-btn--secondary" onClick={askTutor}><MessageCircle {...ICON} />Ask</button>
         {lecture.guide_id
           ? <Link className="c-btn c-btn--primary" href={'/guide/' + lecture.guide_id}><BookOpen {...ICON} />Study guide</Link>
-          : <button type="button" className="c-btn c-btn--primary" onClick={makeGuide} disabled={making}><Sparkles {...ICON} />{making ? 'Building…' : 'Make study guide'}</button>}
+          : <button type="button" className="c-btn c-btn--primary" onClick={makeGuide} disabled={making}><NotebookPen {...ICON} />{making ? 'Building…' : 'Make study guide'}</button>}
       </div>
 
       {String(analysis.my_notes || '').trim() && (
@@ -220,7 +220,7 @@ export default function LecturePage() {
       <section className="c-card lecture-card" aria-labelledby="lecture-notes">
         <div className="lecture-item-head">
           <h2 id="lecture-notes" className="c-section-title">Notes</h2>
-          {analysis.analyzed && !analysis.outline_md && notes !== 'writing' && <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={() => writeNotes({ rewrite: true })}><Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />Make full outline</button>}
+          {analysis.analyzed && !analysis.outline_md && notes !== 'writing' && <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={() => writeNotes({ rewrite: true })}><NotebookPen size={16} strokeWidth={1.75} aria-hidden="true" />Make full outline</button>}
           {analysis.note_id && <Link className="c-btn c-btn--quiet c-btn--sm" href={'/smartnotes?id=' + analysis.note_id}><NotebookPen size={16} strokeWidth={1.75} aria-hidden="true" />Open in Notes</Link>}
         </div>
         {notes === 'writing' && analysis.analyzed ? <SectionLoader height={96} label="Writing the outline" /> : analysis.outline_md ? (
@@ -242,7 +242,7 @@ export default function LecturePage() {
         ) : (
           <div className="lecture-notes-empty">
             <p className="c-meta">{notes === 'unavailable' ? "AI notes aren't set up on this site yet. The full transcript is below." : analysis.analyzed ? 'There was too little in this lecture to outline. The full transcript is below.' : "Couldn't write notes yet. The full transcript is below."}</p>
-            {notes === 'failed' && <button type="button" className="c-btn c-btn--secondary" onClick={writeNotes}><Sparkles {...ICON} />Try again</button>}
+            {notes === 'failed' && <button type="button" className="c-btn c-btn--secondary" onClick={writeNotes}><NotebookPen {...ICON} />Try again</button>}
           </div>
         )}
       </section>
@@ -341,7 +341,7 @@ export default function LecturePage() {
       </section>
 
       {merging && <MergeLectures lecture={lecture} folders={folders} onCancel={() => setMerging(false)} onMerged={merged => { setMerging(false); router.push('/lecture/' + merged.id); }} />}
-      {confirmDelete && <ConfirmDialog title={`Delete ${lecture.title}?`} onConfirm={remove} onCancel={() => setConfirmDelete(false)} />}
+      {confirmDelete && <ConfirmDialog title={`Delete ${lecture.title}?`} confirmLabel="Delete lecture" onConfirm={remove} onCancel={() => setConfirmDelete(false)} />}
       {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
 
       <style jsx>{`
@@ -353,8 +353,8 @@ export default function LecturePage() {
         /* The class reads as a small chip on the meta line, not a form field. */
         .lecture-class { position: relative; display: inline-flex; align-items: center; min-width: 0; max-width: min(100%, 320px); }
         .lecture-class :global(.lucide) { position: absolute; left: 12px; color: var(--muted); pointer-events: none; }
-        .lecture-class select.c-select.c-select { width: auto; max-width: 100%; height: 34px; padding: 0 34px 0 34px; border-radius: 999px; font: 600 14px/1.3 var(--font-sans); color: var(--ink); background: var(--select-chevron) no-repeat right 12px center / 14px 14px, var(--lg-sheen), var(--lg-fill-field); box-shadow: var(--lg-highlight); cursor: pointer; }
-        .lecture-class select.c-select.c-select:hover { border-color: var(--olive); }
+        .lecture-class select.c-select.c-select { width: auto; max-width: 100%; height: 34px; padding: 0 32px 0 32px; border-radius: 999px; font:600 15px/1.3 var(--font-sans); color: var(--ink); background: var(--select-chevron) no-repeat right 12px center / 14px 14px, var(--lg-sheen), var(--lg-fill-field); box-shadow: var(--lg-highlight); cursor: pointer; }
+        @media (hover: hover) { .lecture-class select.c-select.c-select:hover { border-color: var(--olive); } }
         .lecture-notes-empty { display: grid; justify-items: start; gap: 12px; }
         .lecture-notes-empty .c-meta { margin: 0; }
         .lecture-notes-writing { display: grid; justify-items: center; gap: 4px; padding-bottom: 16px; }
@@ -379,8 +379,8 @@ export default function LecturePage() {
         /* The page title is the only h1: the outline's headings start at h2. */
         .lecture-outline-md :global(h2) { margin: 0 0 12px; font: 600 var(--fs-20)/var(--lh-title) var(--font-sans); }
         .lecture-outline-md :global(h3) { margin: 24px 0 8px; font: 600 var(--fs-17)/var(--lh-title) var(--font-sans); color: var(--olive-ink); }
-        .lecture-outline-md :global(h4), .lecture-outline-md :global(h5) { margin: 16px 0 6px; font: 600 var(--fs-15)/var(--lh-title) var(--font-sans); }
-        .lecture-outline-md :global(ul), .lecture-outline-md :global(ol) { margin: 4px 0 8px; padding-left: 22px; }
+        .lecture-outline-md :global(h4), .lecture-outline-md :global(h5) { margin: 16px 0 4px; font: 600 var(--fs-15)/var(--lh-title) var(--font-sans); }
+        .lecture-outline-md :global(ul), .lecture-outline-md :global(ol) { margin: 4px 0 8px; padding-left: 20px; }
         .lecture-outline-md :global(li > ul) { list-style: circle; }
         .lecture-outline-heading { margin: 0; font: 600 var(--fs-17)/var(--lh-title) var(--font-sans); color: var(--ink); }
         .lecture-terms { margin: 0; display: grid; gap: 12px; }

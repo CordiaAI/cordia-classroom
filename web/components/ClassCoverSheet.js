@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RotateCcw, Sparkles, X } from 'lucide-react';
+import { RotateCcw, X, Palette } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import CoverArt, { COVER_ICON_COMPONENTS } from './CoverArt';
 import { COVER_COLORS, COVER_ICONS, coverFor } from '../lib/coverDesign.mjs';
@@ -59,7 +59,7 @@ export default function ClassCoverSheet({ folder, titles = [], onClose, onSaved 
           </div>
           <div className="cover-icons-head">
             <span className="c-meta">Icons: pick up to 3. The first is the big one.</span>
-            <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={suggest} disabled={Boolean(busy)}><Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />{busy === 'pick' ? 'Picking…' : 'Pick for me'}</button>
+            <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={suggest} disabled={Boolean(busy)}><Palette size={16} strokeWidth={1.75} aria-hidden="true" />{busy === 'pick' ? 'Picking…' : 'Pick for me'}</button>
           </div>
           <div className="cover-grid" role="group" aria-label="Icons">
             {COVER_ICONS.map(name => {
@@ -83,18 +83,18 @@ export default function ClassCoverSheet({ folder, titles = [], onClose, onSaved 
         </section>
       </div>
       <style jsx global>{`
-        .cover-sheet { width: min(560px, 100%); display: grid; gap: 14px; }
+        .cover-sheet { width: min(560px, 100%); display: grid; gap: 16px; }
         .cover-preview { position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-row); overflow: hidden; border: 1px solid var(--hairline); }
         .cover-row { display: flex; flex-wrap: wrap; gap: 8px; }
         .cover-swatch { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--hairline); background: var(--sw); cursor: pointer; box-shadow: inset 0 0 0 9px var(--sw), inset 0 0 0 30px var(--sw-ink); }
         .cover-swatch.is-on { outline: 2px solid var(--olive); outline-offset: 2px; }
         .cover-icons-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-        .cover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; max-height: 220px; overflow-y: auto; padding: 2px; }
+        .cover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 8px; max-height: 220px; overflow-y: auto; padding: 2px; }
         .cover-icon { position: relative; display: grid; place-items: center; height: 44px; border: 1px solid transparent; border-radius: 12px; background: transparent; color: var(--muted); cursor: pointer; }
-        .cover-icon:hover { background: var(--lift-pane); box-shadow: var(--lift-shadow); color: var(--ink); }
+        @media (hover: hover) { .cover-icon:hover { background: var(--lift-pane); box-shadow: var(--lift-shadow); color: var(--ink); } }
         .cover-icon.is-on { background: var(--lg-fill-strong, var(--surface-raised)); border-color: var(--olive); color: var(--olive-ink); }
-        .cover-icon-n { position: absolute; top: 2px; right: 4px; font: 700 10px/1 var(--font-sans); color: var(--olive-ink); }
-        .cover-error { margin: 0; color: var(--error); font: 600 14px/1.4 var(--font-sans); }
+        .cover-icon-n { position: absolute; top: 2px; right: 4px; font:600 13px/1 var(--font-sans); color: var(--olive-ink); }
+        .cover-error { margin: 0; color: var(--error); font:600 15px/1.4 var(--font-sans); }
         .cover-actions { gap: 8px; }
       `}</style>
     </BodyPortal>

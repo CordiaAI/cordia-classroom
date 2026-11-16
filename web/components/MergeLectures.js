@@ -62,7 +62,7 @@ export default function MergeLectures({ lecture, folders = [], onMerged, onCance
               return (
                 <li key={item.id}>
                   <button type="button" className={'merge-row' + (on ? ' is-on' : '')} aria-pressed={on} onClick={() => toggle(item.id)} disabled={busy}>
-                    <span className="merge-check" aria-hidden="true">{on && <Check size={14} strokeWidth={2.5} />}</span>
+                    <span className="merge-check" aria-hidden="true">{on && <Check size={14} strokeWidth={1.75} />}</span>
                     <span className="merge-main">
                       <span className="merge-title">{item.title}</span>
                       <span className="c-meta">{[folderName(item.folder_id), dateLabel(item.lecture_date), item.duration_ms > 60000 ? `${Math.round(item.duration_ms / 60000)} min` : ''].filter(Boolean).join(' · ')}</span>
@@ -82,10 +82,10 @@ export default function MergeLectures({ lecture, folders = [], onMerged, onCance
         </div>
       </div>
       <style jsx>{`
-        .merge-sheet { width: min(520px, 100%); display: grid; gap: 14px; max-height: min(640px, 90vh); }
+        .merge-sheet { width: min(520px, 100%); display: grid; gap: 16px; max-height: min(640px, 90vh); }
         .merge-note { margin: 0; }
-        .merge-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; overflow: auto; min-height: 0; }
-        .merge-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-input); background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+        .merge-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; overflow: auto; min-height: 0; }
+        .merge-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r-input); background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
         .merge-row.is-on { border-color: var(--olive); background: var(--olive-tint); }
         .merge-check { flex: none; width: 20px; height: 20px; display: grid; place-items: center; border: 1.5px solid var(--line); border-radius: 6px; color: var(--on-olive); }
         .is-on .merge-check { background: var(--olive); border-color: var(--olive); }

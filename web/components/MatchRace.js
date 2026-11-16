@@ -25,7 +25,7 @@ function TimerRing({ left }) {
         .race-ring-fill { stroke: var(--olive); transition: stroke-dashoffset 1s linear, stroke 300ms ease; }
         .is-low .race-ring-fill { stroke: var(--warning); }
         .is-urgent .race-ring-fill { stroke: var(--error); }
-        .is-urgent { color: var(--error); animation: race-tick 1s ease-in-out infinite; }
+        .is-urgent { color: var(--error); animation: race-tick 1s var(--ease-move) infinite; }
         @keyframes race-tick { 50% { transform: scale(1.08); } }
         @media (prefers-reduced-motion: reduce) { .race-ring-fill { transition: none; } .is-urgent { animation: none; } }
       `}</style>
@@ -122,7 +122,7 @@ export default function MatchRace({ questions, guideId, onRestart, onDone }) {
     <section className="race" aria-label="Match">
       <div className="race-bar">
         <TimerRing left={left} />
-        <div className="c-bar race-progress"><span style={{ width: `${(left / SECONDS) * 100}%` }} /></div>
+        <div className="c-bar race-progress"><span style={{ '--v': `${(left / SECONDS) * 100}%` }} /></div>
         <span className="c-meta">{matched}</span>
       </div>
       <div className="race-grid">
@@ -143,11 +143,11 @@ export default function MatchRace({ questions, guideId, onRestart, onDone }) {
         .race-progress { flex: 1; }
         .race-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .race-col { display: grid; gap: 8px; align-content: start; }
-        .race-tile { min-height: 64px; padding: 12px 14px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); color: var(--ink); font:500 15px/1.5 var(--font-sans); text-align: left; cursor: pointer; transition: opacity var(--dur), border-color var(--dur); }
+        .race-tile { min-height: 64px; padding: 12px 12px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); color: var(--ink); font:500 15px/1.5 var(--font-sans); text-align: left; cursor: pointer; transition: opacity var(--dur), border-color var(--dur); }
         .race-tile.is-answer { font-family: var(--font-sans); font-size:15px; }
         .race-tile.is-picked { border-color: var(--state-select-edge); background: var(--state-select-fill); }
         .race-tile.is-cleared { opacity: .25; cursor: default; }
-        .race-tile.is-wrong { border-color: var(--error); animation: race-shake 380ms cubic-bezier(.36,.07,.19,.97); }
+        .race-tile.is-wrong { border-color: var(--error); animation: race-shake 360ms linear; }
         .race-tile.is-merging { position: relative; z-index: 1; border-color: var(--success); background: var(--success-bg); color: var(--success); pointer-events: none; }
         .race-tile.is-merging.is-q { animation: race-merge-q ${MERGE_MS}ms var(--ease) forwards; }
         .race-tile.is-merging.is-a { animation: race-merge-a ${MERGE_MS}ms var(--ease) forwards; }

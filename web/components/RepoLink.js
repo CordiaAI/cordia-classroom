@@ -120,11 +120,11 @@ export default function RepoLink({ item, repo: initial }) {
       {error && <p className="cn-error" role="alert">{error}{/Connect GitHub/.test(error) && <> <Link href="/settings?section=connectors&open=github">Connect it</Link></>}</p>}
       <style jsx>{`
         .rl { display: grid; gap: 8px; }
-        .rl-title { margin: 0; font: 600 14px/1.4 var(--font-sans); color: var(--muted); }
+        .rl-title { margin: 0; font:600 15px/1.4 var(--font-sans); color: var(--muted); }
         .rl .c-meta { margin: 0; }
-        .rl-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .rl-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
         .rl-name { flex: 1 1 auto; min-width: 0; color: var(--ink); font: 600 15px/1.4 var(--font-sans); }
-        .rl-last { font-style: italic; }
+        .rl-last { color: var(--muted); }
         .rl :global(.rl-review), .rl .rl-link, .rl .rl-cancel { justify-self: start; }
         .rl-results { max-height: 220px; overflow: auto; }
       `}</style>

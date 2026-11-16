@@ -17,24 +17,28 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
   main h1:not(.sr-only), .public-main h1, .public-main h2, .public-main h3, .extension-install-step h2, .mission-page h2, .mission-page h3) {
   font-family: var(--font-display) !important;
   font-weight: 600 !important;
-  letter-spacing: var(--track-title) !important;
+  letter-spacing: 0 !important;
   line-height: var(--lh-title) !important;
   text-wrap: balance;
 }
 /* Page titles 40, section titles 20, card titles 17, questions 20, card faces and big numbers 28. */
-:is(.c-title, .pricing-title, .guide-title-btn, .guide-title-input, main h1:not(.sr-only), .public-main h1) { font-size: var(--fs-40) !important; }
-:is(.c-sheet .c-title, .c-sheet h2.c-title) { font-size: var(--fs-28) !important; }
+:is(.c-title, .pricing-title, .guide-title-btn, .guide-title-input, main h1:not(.sr-only), .public-main h1) { font-size: var(--fs-40) !important; letter-spacing: var(--track-title) !important; }
+:is(.c-sheet .c-title, .c-sheet h2.c-title) { font-size: var(--fs-28) !important; letter-spacing: var(--track-title) !important; }
 :is(.c-section-title, .public-main h2, .mission-page h2) { font-size: var(--fs-20) !important; }
-:is(.today-continue-title, .lib-row-title, .folder-row-title, .sn-card-title, .recap-class, .me-names strong, .extension-install-step h2, .public-main h3, .mission-page h3,
-  .today .c-list-row > .c-grow, .calendar-item strong) { font-family: var(--font-sans) !important; font-weight: 600 !important; font-size: var(--fs-17) !important; letter-spacing: -0.01em; line-height: var(--lh-title); }
+:is(.today-continue-title, .lib-row-title, .folder-row-title, .sn-card-title, .me-names strong, .extension-install-step h2, .public-main h3, .mission-page h3,
+  .today .c-list-row > .c-grow, .calendar-item strong) { font-family: var(--font-sans) !important; font-weight: 600 !important; font-size: var(--fs-17) !important; letter-spacing: 0; line-height: var(--lh-title); }
 /* Section titles, questions and card faces: Quicksand 600. */
 :is(.c-section-title, .reader-q, .quiz-question-text, .practice-prompt, .fc-face p, .today-counts strong) {
   font-family: var(--font-sans) !important;
   font-weight: 600 !important;
-  letter-spacing: -0.01em !important;
+  letter-spacing: 0 !important;
   line-height: var(--lh-title) !important;
   text-wrap: balance;
 }
+/* Figures and card faces set at 28px or more take the title tracking. */
+:is(.fc-face p, .pricing-price, .learn-ready-num, .pc-tile strong, .recap-stats strong:not(.recap-class)) { letter-spacing: var(--track-title) !important; }
+.pricing-price span { letter-spacing: 0; }
+@media (max-width: 520px) { .pc-tile.pc-tile.pc-tile strong { letter-spacing: 0 !important; } }
 /* Questions are read, not headlines: they fill the line and break only between words (balance cut
    a two-line question at half the card's width). */
 :is(.reader-q, .quiz-question-text, .practice-prompt) { text-wrap: pretty; line-height: 1.3 !important; overflow-wrap: break-word; word-break: normal; }
@@ -42,8 +46,8 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 :is(.reader-q, .quiz-question-text, .practice-prompt) { font-size: var(--fs-20) !important; }
 .fc-face p { font-size: var(--fs-28) !important; font-variant-numeric: tabular-nums; }
 /* Wordmark: light geometric lowercase, set off from the mark by a hairline. */
-.c-brand { gap: 14px; }
-.c-brand > span { display: inline-flex; align-items: center; height: 28px; padding-left: 14px; border-left: 1px solid var(--line); font: 400 22px/1 var(--font-sans) !important; letter-spacing: 0.02em; color: var(--ink); }
+.c-brand { gap: 16px; }
+.c-brand > span { display: inline-flex; align-items: center; height: 28px; padding-left: 12px; border-left: 1px solid var(--line); font: 400 22px/1 var(--font-sans) !important; letter-spacing: 0.02em; color: var(--ink); }
 /* Reading text is body text: Quicksand 17 at 1.55, at 500 so its thin strokes stay legible. */
 .c-study, .reader-a, .reader-prose, .reader-notes { font: 500 var(--fs-17)/1.55 var(--font-sans) !important; letter-spacing: 0; }
 .c-meta { font: 500 var(--fs-13)/var(--lh-body) var(--font-sans); color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -67,7 +71,7 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 .calendar-kind-exam, .calendar-kind-quiz, .calendar-kind-project {
   background: var(--surface-card) !important; border: 1px solid var(--hairline) !important; color: var(--muted) !important; border-radius: var(--r-input) !important;
 }
-.calendar-kind { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.calendar-kind { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .calendar-kind-exam::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--olive-ink); flex: 0 0 auto; }
 
 /* ---------- Surfaces ---------- */

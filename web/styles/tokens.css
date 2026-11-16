@@ -18,7 +18,8 @@
   --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
   --fs-13: 13px; --fs-15: 15px; --fs-17: 17px; --fs-20: 20px; --fs-28: 28px; --fs-40: 40px;
   --lh-title: 1.15; --lh-body: 1.5;
-  --track-title: -0.015em;
+  /* Tracking by size: none under 28px, -0.01em from 28px, -0.022em from 48px. */
+  --track-title: -0.01em; --track-display: -0.022em;
 
   /* Spacing: a 4 px scale for gaps and padding */
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
@@ -98,17 +99,21 @@
   --shadow-card: 0 1px 2px rgba(16, 24, 16, 0.04), 0 8px 24px rgba(16, 24, 16, 0.06);
   --shadow-float: 0 2px 8px rgba(16, 24, 16, 0.06), 0 18px 48px rgba(16, 24, 16, 0.14);
   /* Keyboard focus ring (system.css): 3:1 or better against every surface in this theme. */
-  --focus-ring: #536149;
+  --focus-ring: #171B18; /* neutral ink, not the brand olive */
 
   /* Radii */
   --r-input: 12px; --r-row: 16px; --r-card: 20px; --r-panel: 28px; --r-pill: 999px;
 
   /* Motion */
-  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);       /* arriving, and hover/press: fast start, soft landing */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);       /* arriving, and hover/press: fast start, soft landing */
   --ease-exit: cubic-bezier(0.55, 0, 1, 0.45);  /* leaving: gets out of the way */
-  --dur: 180ms;                                 /* hover, press, colour */
-  --dur-enter: 260ms;                           /* a sheet, toast or panel arriving */
-  --dur-exit: 200ms;                            /* the same thing leaving: a quarter shorter */
+  --ease-move: cubic-bezier(0.77, 0, 0.175, 1); /* moving or resizing while on screen */
+  --dur: 150ms;                                 /* hover, press, colour */
+  --dur-pop: 160ms;                             /* a menu or popover arriving */
+  --dur-enter: 240ms;                           /* a sheet, toast or panel arriving */
+  --dur-exit: 170ms;                            /* the same thing leaving: about 30% shorter */
+  --dur-move: 250ms;                            /* a progress fill or a row moving in place */
+  --press: 0.96;                                /* buttons, chips and icon buttons under a press */
 
   /* Layout */
   --bar-h: 64px;
@@ -126,7 +131,7 @@
   --lg-fill: rgba(250, 251, 249, 0.58);
   --lg-fill-strong: rgba(250, 251, 249, 0.80);
   --lg-fill-menu: rgb(250, 251, 249); /* menus sit over text: solid so it never reads through */
-  --lg-fill-field: rgba(250, 251, 249, 0.62);
+  --lg-fill-field: rgba(255, 255, 255, 0.92); /* a field is the brightest surface; resting buttons sit a tone down */
   --lg-sheen: radial-gradient(140% 70% at 18% 0%, rgba(255, 255, 255, 0.30) 0%, rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.05) 38%, rgba(255, 255, 255, 0) 62%);
   --lg-sheen-olive: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 60%);
   --lg-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
@@ -201,8 +206,6 @@
   /* The sliding pill in every tab bar and segmented switch (components/SegmentedControl.js). */
   --seg-pill-bg: var(--lg-sheen), var(--lg-fill-strong);
   --seg-pill-shadow: var(--lg-highlight), var(--lg-shadow);
-  --seg-spring: cubic-bezier(.32, 1.32, .52, 1);
-  --seg-dur: 420ms;
   --lg-shadow: var(--lg-depth);
   --hover-wash: var(--wash);
   --hover-edge: rgba(23, 27, 24, 0.16);
@@ -255,7 +258,7 @@
   --success-bg: rgba(143, 209, 160, 0.14);
   --warning: #F2C14E;
   --warning-bg: rgba(242, 193, 78, 0.14);
-  --error: #FF8A80;
+  --error: #FFB0A8; /* 4.5:1 or better over the lightest part of the dark backdrop (was 4.0) */
   --error-bg: #3A2222;
   --state-select-fill: rgba(195, 207, 182, 0.17);
   --state-select-edge: rgba(195, 207, 182, 0.38);
@@ -288,7 +291,7 @@
   --lg-fill: rgba(48, 52, 57, 0.58);
   --lg-fill-strong: rgba(42, 46, 51, 0.84);
   --lg-fill-menu: rgb(42, 46, 51);
-  --lg-fill-field: rgba(32, 35, 39, 0.60);
+  --lg-fill-field: rgba(58, 62, 68, 0.80); /* lighter than a resting button: on dark, the field is the raised surface */
   --lg-sheen: radial-gradient(140% 70% at 18% 0%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 38%, rgba(255, 255, 255, 0) 62%);
   --lg-sheen-olive: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 60%);
   --lg-rim: rgba(255, 255, 255, 0.14);
@@ -299,7 +302,7 @@
   --lg-depth: 0 1px 1px rgba(0, 0, 0, 0.20), 0 6px 16px -6px rgba(0, 0, 0, 0.36), 0 20px 40px -18px rgba(0, 0, 0, 0.45);
   --lg-depth-float: 0 2px 8px rgba(0, 0, 0, 0.30), 0 22px 48px -14px rgba(0, 0, 0, 0.55);
   --lg-press: rgba(255, 255, 255, 0.06);
-  --focus-ring: #CFDAC3;
+  --focus-ring: #ECECEA;
   --shot-frame: #2F3238; --shot-edge: rgba(255, 255, 255, 0.16); --shot-chrome: #24272C; --shot-line: rgba(255, 255, 255, 0.22);
   --shot-soft: #3A3E45; --shot-nav: #1E2A33; --shot-text: #FFFFFF; --shot-link: #8CC4FF; --shot-mark: #C3CFB6;
   --scroll-thumb: rgba(255, 255, 255, 0.18); --scroll-thumb-hover: rgba(255, 255, 255, 0.30);

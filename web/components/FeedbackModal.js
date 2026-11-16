@@ -280,7 +280,7 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
                 <div key={shot.id} className={'feedback-shot' + (shot.status === 'uploading' ? ' is-uploading' : '')}>
                   {/* A local preview of the file being attached (blob: URL), never a remote address. */}
                   <img src={shot.preview} alt="Attached screenshot" />
-                  <button type="button" className="feedback-shot-remove" onClick={() => removeShot(shot.id)} aria-label="Remove screenshot"><X size={14} strokeWidth={2} aria-hidden="true" /></button>
+                  <button type="button" className="feedback-shot-remove" onClick={() => removeShot(shot.id)} aria-label="Remove screenshot"><X size={14} strokeWidth={1.75} aria-hidden="true" /></button>
                 </div>
               ))}
               {shots.length < MAX_SHOTS && (
@@ -310,28 +310,28 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
 
       <style jsx>{`
         .feedback-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: var(--scrim); }
-        .feedback-modal { width: min(540px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; padding: 30px; border: 1px solid var(--line); border-radius:20px; background: var(--lg-panel); -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); border-color: var(--lg-edge); color: var(--ink); box-shadow: var(--lg-highlight), var(--lg-shadow); }
+        .feedback-modal { width: min(540px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; padding: 28px; border: 1px solid var(--line); border-radius:20px; background: var(--lg-panel); -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); border-color: var(--lg-edge); color: var(--ink); box-shadow: var(--lg-highlight), var(--lg-shadow); }
         .feedback-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
         .feedback-kicker { margin: 0 0 8px; color: var(--olive); font-size: 13px; font-weight:600; letter-spacing:0; }
-        h2 { margin: 0; color: var(--ink); font-size: max(13px, clamp(1.65rem, 4vw, 2.15rem)); line-height:1.15; letter-spacing:-0.015em; }
-        .feedback-heading p:last-child { margin: 9px 0 0; color: var(--text-secondary); font-size:15px; }
+        h2 { margin: 0; color: var(--ink); font-size: max(13px, clamp(1.65rem, 4vw, 2.15rem)); line-height:1.15; letter-spacing: 0; }
+        .feedback-heading p:last-child { margin: 8px 0 0; color: var(--text-secondary); font-size:15px; }
         .feedback-close { width: 38px; height: 38px; flex: 0 0 auto; border: 1px solid var(--line); border-radius:50%; background: var(--surface); color: var(--ink); font: inherit; font-size:20px; line-height:1; cursor: pointer; }
         label { display: block; margin-bottom: 8px; color: var(--ink); font-size: 13px; font-weight:600; }
         textarea { width: 100%; border: 1px solid var(--line); border-radius:12px; background: var(--surface); color: var(--ink); font: inherit; }
         /* The dropdown is the app's own (c-select): its chevron sits 14px in from the edge. */
         .feedback-select { width: 100%; min-height: 48px; margin-bottom: 20px; }
-        textarea { padding: 14px; resize: none; line-height:1.5; }
+        textarea { padding: 12px; resize: none; line-height:1.5; }
         .feedback-select:focus-visible, textarea:focus, button:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
-        .feedback-shots { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+        .feedback-shots { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
         .feedback-shot { position: relative; width: 72px; height: 72px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
         .feedback-shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .feedback-shot.is-uploading img { opacity: .45; }
         .feedback-shot-remove { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--lg-menu); color: var(--ink); cursor: pointer; }
         .feedback-message-label { display: flex; align-items: center; justify-content: space-between; }
         .feedback-message-label span { color: var(--muted-ink); font-size: 13px; }
-        .feedback-context { margin: 9px 0 0; color: var(--muted-ink); font-size: 13px; line-height:1.5; }
-        .feedback-error { margin: 13px 0 0; color: var(--error); font-size:13px; font-weight:600; line-height:1.5; }
-        .feedback-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+        .feedback-context { margin: 8px 0 0; color: var(--muted-ink); font-size: 13px; line-height:1.5; }
+        .feedback-error { margin: 12px 0 0; color: var(--error); font-size:13px; font-weight:600; line-height:1.5; }
+        .feedback-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
         /* Cancel and Send are the app's own secondary and primary buttons, the same height. */
         .feedback-cancel { min-height: 46px; }
         /* The app's primary button: its disabled state keeps a readable label (this one had white
@@ -340,10 +340,10 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
         .feedback-success { display: grid; justify-items: center; padding: 24px 8px; text-align: center; }
         .feedback-success span { width: 50px; height: 50px; display: grid; place-items: center; border-radius:50%; background: var(--accent-glow); color: var(--olive); font-size:20px; font-weight:600; }
         .feedback-success h2 { margin-top: 16px; }
-        .feedback-success p { margin: 9px 0 0; color: var(--text-secondary); }
+        .feedback-success p { margin: 8px 0 0; color: var(--text-secondary); }
         @media (max-width: 560px) {
           .feedback-overlay { align-items: end; padding: 0; }
-          .feedback-modal { max-height: 92vh; padding: 24px 19px max(24px, env(safe-area-inset-bottom)); border-radius:20px 20px 0 0; }
+          .feedback-modal { max-height: 92vh; padding: 24px 20px max(24px, env(safe-area-inset-bottom)); border-radius:20px 20px 0 0; }
           .feedback-actions { display: grid; grid-template-columns: 1fr 1fr; }
         }
         @media (prefers-reduced-motion: reduce) { .feedback-overlay, .feedback-modal { animation: none; transition: none; } }

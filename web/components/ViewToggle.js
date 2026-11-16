@@ -5,8 +5,8 @@ import SegmentedControl from './SegmentedControl';
 export default function ViewToggle({ view, onChange }) {
   return (
     <SegmentedControl kind="group" label="View" className="c-seg--icons">
-      <button type="button" className={view === 'rows' ? 'is-active' : ''} aria-pressed={view === 'rows'} aria-label="Rows" title="Rows" onClick={() => onChange('rows')}><List size={18} strokeWidth={2} aria-hidden="true" /></button>
-      <button type="button" className={view === 'cards' ? 'is-active' : ''} aria-pressed={view === 'cards'} aria-label="Cards" title="Cards" onClick={() => onChange('cards')}><LayoutGrid size={18} strokeWidth={2} aria-hidden="true" /></button>
+      <button type="button" className={view === 'rows' ? 'is-active' : ''} aria-pressed={view === 'rows'} aria-label="Rows" title="Rows" onClick={() => onChange('rows')}><List size={18} strokeWidth={1.75} aria-hidden="true" /></button>
+      <button type="button" className={view === 'cards' ? 'is-active' : ''} aria-pressed={view === 'cards'} aria-label="Cards" title="Cards" onClick={() => onChange('cards')}><LayoutGrid size={18} strokeWidth={1.75} aria-hidden="true" /></button>
     </SegmentedControl>
   );
 }

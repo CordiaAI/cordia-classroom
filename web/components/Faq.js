@@ -21,7 +21,7 @@ export default function Faq({ items, title = 'Frequently asked questions', level
         .faq-list { display: grid; gap: 12px; }
         .faq-item { padding: 20px 24px; border: 1px solid var(--line); border-radius: 20px; background: var(--lg-card); }
         .faq-item :global(.faq-question) { margin: 0; font: 600 var(--fs-17)/1.35 var(--font-sans); color: var(--ink); }
-        .faq-answer { margin: 8px 0 0; color: var(--text-secondary); font: 500 var(--fs-15)/1.55 var(--font-sans); }
+        .faq-answer { max-width: 38em; margin: 8px 0 0; color: var(--text-secondary); font: 500 var(--fs-15)/1.55 var(--font-sans); }
       `}</style>
     </section>
   );

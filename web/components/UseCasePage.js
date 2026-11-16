@@ -63,7 +63,7 @@ export default function UseCasePage({ page }) {
         ))}
 
         <section className="uc-section" aria-labelledby="uc-who">
-          <h2 id="uc-who">Who it&apos;s for</h2>
+          <h2 id="uc-who">Who it’s for</h2>
           <p>For example:</p>
           <ul>{page.scenarios.map(text => <li key={text}>{text}</li>)}</ul>
         </section>
@@ -93,9 +93,9 @@ export default function UseCasePage({ page }) {
         .uc-crumbs li + li::before { content: '›'; margin-right: 8px; color: var(--muted); }
         .uc-crumbs :global(a) { color: var(--muted); }
         .uc-title { margin: 0; max-width: 22em; }
-        .uc-lede { max-width: 42em; margin-top: 16px; }
+        .uc-lede { max-width: 36em; margin-top: 16px; }
         .uc-lede p { margin: 0 0 8px; color: var(--text-secondary); font: 500 var(--fs-17)/1.55 var(--font-sans); }
-        .uc-section { margin-top: 40px; max-width: 46em; }
+        .uc-section { margin-top: 40px; max-width: 38em; }
         /* A question sits 8px above its answer, and paragraphs and links 8px apart: closer to each
            other than the 40px between sections, so each question reads as one group. */
         .uc-section h2 { margin: 0 0 8px; }
@@ -103,7 +103,7 @@ export default function UseCasePage({ page }) {
         .uc-section > :last-child { margin-bottom: 0; }
         .uc-section p, .uc-section li { color: var(--text-secondary); font: 500 var(--fs-15)/1.6 var(--font-sans); }
         /* The questions at the end share the text's right edge. */
-        .uc :global(.faq) { max-width: 46em; margin-inline: 0; }
+        .uc :global(.faq) { max-width: 38em; margin-inline: 0; }
         .uc-section ul, .uc-steps { display: grid; gap: 8px; margin: 12px 0 0; padding-left: 20px; }
         .uc-answer { color: var(--ink) !important; font-weight: 600 !important; }
         .uc-shots { display: grid; gap: 20px; margin-top: 16px; }
@@ -111,7 +111,7 @@ export default function UseCasePage({ page }) {
         .uc-shot img { display: block; width: 100%; max-width: 800px; height: auto; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-card); }
         .uc-shot figcaption, .uc-note { margin-top: 8px; color: var(--muted) !important; font: 500 var(--fs-13)/1.5 var(--font-sans) !important; }
         .uc-section:has(.uc-shots) { max-width: 800px; }
-        .uc-plan { margin: 40px 0 0; max-width: 46em; padding: 16px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--lg-card); color: var(--ink); font: 500 var(--fs-15)/1.6 var(--font-sans); }
+        .uc-plan { margin: 40px 0 0; max-width: 38em; padding: 16px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--lg-card); color: var(--ink); font: 500 var(--fs-15)/1.6 var(--font-sans); }
         .uc-cta { margin: 40px 0 0; }
         .uc-cta-more { margin: 12px 0 0; color: var(--text-secondary); font: 500 var(--fs-15)/1.6 var(--font-sans); }
         .uc-meta { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--hairline); color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); }

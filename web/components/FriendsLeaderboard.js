@@ -58,21 +58,21 @@ export default function FriendsLeaderboard() {
       )}
       {error && <p className="lb-error" role="alert">{error}</p>}
       <style jsx>{`
-        .lb { display: grid; gap: 10px; padding: 16px; }
+        .lb { display: grid; gap: 12px; padding: 16px; }
         .lb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .lb-title { display: flex; align-items: center; gap: 8px; margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
         .lb-title :global(svg) { color: var(--olive-ink); }
-        .lb-join { display: grid; gap: 10px; justify-items: start; }
+        .lb-join { display: grid; gap: 12px; justify-items: start; }
         .lb-join p, .lb-lone, .lb-foot { margin: 0; }
         .lb-list { display: grid; margin: 0; padding: 0; list-style: none; }
-        .lb-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; min-width: 0; }
+        .lb-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; min-width: 0; }
         .lb-row + .lb-row { border-top: 1px solid var(--hairline); }
         .lb-row.is-me .lb-rank { background: var(--olive-tint); color: var(--olive-ink); }
-        .lb-rank { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 50%; color: var(--ink); font: 600 14px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .lb-rank { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 50%; color: var(--ink); font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .lb-who { flex: 1; min-width: 0; }
         .lb-numbers { display: grid; justify-items: end; gap: 2px; flex: none; text-align: right; }
-        .lb-numbers strong { font: 600 18px/1 var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
-        .lb-error { margin: 0; color: var(--error); font: 600 14px/1.4 var(--font-sans); }
+        .lb-numbers strong { font:600 17px/1 var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+        .lb-error { margin: 0; color: var(--error); font:600 15px/1.4 var(--font-sans); }
       `}</style>
     </section>
   );

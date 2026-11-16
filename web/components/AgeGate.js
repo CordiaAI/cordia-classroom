@@ -50,9 +50,9 @@ export default function AgeGate() {
           {error && <p className="ag-error" role="alert">{error}</p>}
           <button type="submit" className="c-btn c-btn--primary ag-save" disabled={busy || !month || !year} aria-busy={busy}>{busy ? 'Saving…' : 'Continue'}</button>
           <style jsx>{`
-            .ag { width: min(420px, 100%); display: grid; gap: 14px; }
+            .ag { width: min(420px, 100%); display: grid; gap: 16px; }
             .ag-title, .ag-lead { margin: 0; }
-            .ag-error { margin: 0; color: var(--error); font: 600 14px/1.4 var(--font-sans); }
+            .ag-error { margin: 0; color: var(--error); font:600 15px/1.4 var(--font-sans); }
             .ag-save { justify-self: end; }
           `}</style>
         </form>

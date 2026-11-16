@@ -23,7 +23,7 @@
 .asst-danger { color: var(--error) !important; }
 .asst-phone, .asst-code, .asst-name { max-width: 320px; }
 .asst-code { letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
-.asst-textarea { min-height: 120px; padding: 12px 14px; resize: none; font: 500 var(--fs-15)/1.5 var(--font-sans); }
+.asst-textarea { min-height: 120px; padding: 12px 12px; resize: none; font: 500 var(--fs-15)/1.5 var(--font-sans); }
 .asst-start { justify-self: start; }
 
 .asst-checks { display: grid; gap: 12px; }
@@ -56,14 +56,14 @@
 
 /* Style sliders beside a sample text. */
 .asst-split { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: 16px; align-items: start; }
-.asst-slider { display: grid; gap: 6px; }
+.asst-slider { display: grid; gap: 8px; }
 .asst-slider-head { display: flex; align-items: center; justify-content: space-between; min-height: 36px; }
 .asst-slider-label { font: 600 var(--fs-15)/1.4 var(--font-sans); color: var(--ink); }
 .asst-slider input[type='range'] { width: 100%; height: 28px; accent-color: var(--olive); cursor: pointer; }
 .asst-slider-ends { display: flex; justify-content: space-between; }
 .asst-preview { position: sticky; top: 88px; align-content: start; }
 .asst-bubble {
-  justify-self: start; max-width: 92%; margin: 0; padding: 10px 14px; border-radius: 18px 18px 18px 6px;
+  justify-self: start; max-width: 92%; margin: 0; padding: 8px 12px; border-radius: 18px 18px 18px 6px;
   background: var(--surface-raised); border: 1px solid var(--hairline); color: var(--ink);
   font: 500 var(--fs-15)/1.5 var(--font-sans); white-space: pre-wrap;
 }

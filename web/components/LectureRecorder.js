@@ -582,7 +582,7 @@ function RecorderStyle() {
       .rec-level span { display: block; height: 100%; background: var(--olive-ink); transform-origin: left center; transition: transform 80ms linear; }
       .rec-class { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
       .rec-class .c-field { flex: 1 1 200px; }
-      .rec-mine { display: grid; gap: 6px; }
+      .rec-mine { display: grid; gap: 8px; }
       .rec-mine span { font: 600 var(--fs-15)/1.3 var(--font-sans); color: var(--ink); }
       .rec-mine textarea { min-height: 120px; resize: vertical; }
       .rec-transcript { max-height: 220px; overflow: auto; padding: 16px 20px; border: 1px solid var(--hairline); border-radius: var(--r-row); background: var(--surface-card); }

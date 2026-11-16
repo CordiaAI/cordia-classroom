@@ -4,14 +4,14 @@ export default function TermsOfService() {
   return (
     <PublicPage path="/terms">
       <div className="c-card public-doc" style={{
-        maxWidth: '800px',
+        maxWidth: '680px',
         margin: '0 auto',
         padding: '40px clamp(20px, 5vw, 48px)',
         fontFamily: 'var(--font-sans)',
         color: 'var(--text-secondary)',
-        lineHeight: '1.8',
+        lineHeight: '1.6',
       }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
           Terms of Service
         </h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: 'var(--fs-13)' }}>

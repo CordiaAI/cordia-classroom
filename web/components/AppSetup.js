@@ -59,7 +59,7 @@ export default function AppSetup({ canvasConnected = false, apps, canvas: canvas
       <ul className="setup-list">
         {rows.map(row => (
           <li key={row.id} className={row.on ? 'is-on' : ''}>
-            <span className="setup-mark" aria-hidden="true">{row.on ? <Check size={16} strokeWidth={2.25} /> : null}</span>
+            <span className="setup-mark" aria-hidden="true">{row.on ? <Check size={16} strokeWidth={1.75} /> : null}</span>
             <span className="c-grow setup-text">
               <strong>{row.name}</strong>
               <span className="c-meta">{row.gets}</span>

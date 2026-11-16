@@ -62,7 +62,7 @@ export default function MergeSheet({ pair, onClose, onMerged }) {
           </header>
           {done ? (
             <div className="ms-done" role="status">
-              <span className="ms-done-icon" aria-hidden="true"><Check size={22} strokeWidth={2} /></span>
+              <span className="ms-done-icon" aria-hidden="true"><Check size={22} strokeWidth={1.75} /></span>
               <p><strong>{done.mergedTitle}</strong> is now part of <strong>{done.keptTitle}</strong>.</p>
               <p className="c-meta">Changed your mind? Restore it from {done.keptTitle}&rsquo;s ⋯ menu for 30 days.</p>
               <div className="ms-actions">
@@ -113,21 +113,21 @@ export default function MergeSheet({ pair, onClose, onMerged }) {
             </>
           )}
           <style jsx>{`
-            .ms { width: min(560px, 100%); display: grid; gap: 14px; }
+            .ms { width: min(560px, 100%); display: grid; gap: 16px; }
             .ms-title { margin: 0; }
             .ms-lead { margin: 0; }
             .ms-pick { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
-            .ms-legend { margin-bottom: 6px; padding: 0; font: 600 13px/1.3 var(--font-sans); color: var(--muted-ink); }
-            .ms-option { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-input); cursor: pointer; min-width: 0; }
+            .ms-legend { margin-bottom: 4px; padding: 0; font: 600 13px/1.3 var(--font-sans); color: var(--muted-ink); }
+            .ms-option { display: flex; gap: 12px; align-items: flex-start; padding: 12px 12px; border: 1px solid var(--line); border-radius: var(--r-input); cursor: pointer; min-width: 0; }
             .ms-option.is-on { border-color: var(--olive); background: var(--olive-tint); }
             .ms-option input { margin-top: 3px; accent-color: var(--olive); flex: none; }
             .ms-option-main { display: grid; gap: 2px; min-width: 0; }
             .ms-option-title { font: 600 16px/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
             .ms-what { display: grid; gap: 8px; margin: 0; padding-left: 20px; color: var(--ink); font: 500 15px/1.45 var(--font-sans); }
             .ms-what li { overflow-wrap: anywhere; }
-            .ms-error { margin: 0; color: var(--error); font: 600 14px/1.4 var(--font-sans); }
+            .ms-error { margin: 0; color: var(--error); font:600 15px/1.4 var(--font-sans); }
             .ms-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-            .ms-done { display: grid; gap: 10px; justify-items: start; }
+            .ms-done { display: grid; gap: 12px; justify-items: start; }
             .ms-done p { margin: 0; overflow-wrap: anywhere; }
             .ms-done-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
             .ms-done .ms-actions { justify-self: stretch; }

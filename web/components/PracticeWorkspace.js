@@ -7,7 +7,7 @@ import { UPLOAD_ACCEPT } from '../lib/uploadTypes.mjs';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
 import { LoadingArea } from './CordiaLoader';
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, Eraser, Eye, Flag, Hand, MessageCircle, PenLine, RefreshCw, Sparkles, Trash2, Type, Undo2, Upload, Video, VideoOff, Wand2 } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, Eraser, Eye, Flag, Hand, MessageCircle, PenLine, RefreshCw, Trash2, Type, Undo2, Upload, Video, VideoOff, Wand2 } from 'lucide-react';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { logAnswer } from '../lib/learningEvents';
 import { answerTimer } from '../lib/learningEvents.mjs';
@@ -518,7 +518,7 @@ export default function PracticeWorkspace() {
           <input ref={fileRef} type="file" hidden accept={UPLOAD_ACCEPT} onChange={event => useUploadedFile(event.target.files?.[0])} />
           <button type="button" className="c-btn c-btn--quiet" onClick={() => fileRef.current?.click()} disabled={extracting}><Upload {...ICON} />{extracting ? 'Reading…' : 'Upload'}</button>
           <button type="button" className={'c-btn ' + (problems.length ? 'c-btn--secondary' : 'c-btn--primary')} onClick={generateProblems} disabled={loading || !sourceText}>
-            {problems.length ? <RefreshCw {...ICON} /> : <Sparkles {...ICON} />}
+            {problems.length ? <RefreshCw {...ICON} /> : <PenLine {...ICON} />}
             {loading ? 'Creating…' : problems.length ? 'Regenerate' : 'Generate'}
           </button>
         </div>
@@ -710,7 +710,7 @@ export default function PracticeWorkspace() {
         .practice-prompt { margin: 8px 0 0; font:600 20px/1.15 var(--font-sans); }
         .practice-kind { text-transform: capitalize; }
         .practice-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-        .practice-toolbar :global(.c-seg) button { display: inline-flex; align-items: center; gap: 6px; }
+        .practice-toolbar :global(.c-seg) button { display: inline-flex; align-items: center; gap: 8px; }
         .practice-symbols { display: flex; flex-wrap: wrap; gap: 2px; }
         .practice-symbols :global(.c-icon-btn) { font:600 15px/1 var(--font-sans); }
         .practice-drawbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-basis: 100%; }
@@ -723,7 +723,7 @@ export default function PracticeWorkspace() {
         .practice-evaluation { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
         /* The answer sits on the card itself, in a rounded box like the board above it. */
         .practice-answer-inline { background: transparent; }
-        .practice-answer-inline textarea { min-height: 96px; padding: 14px 16px; border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--surface-card); }
+        .practice-answer-inline textarea { min-height: 96px; padding: 12px 16px; border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--surface-card); }
         .practice-answer-inline button[type='submit'] { justify-self: end; min-width: 160px; }
       `}</style>
     </div>

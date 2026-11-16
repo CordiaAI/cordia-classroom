@@ -22,9 +22,9 @@ export default function Guides() {
       </div>
       <style jsx>{`
         .guides { width: min(var(--page-max), 100%); margin: 0 auto; color: var(--ink); }
-        .guides-lede { max-width: 42em; margin: 16px 0 0; color: var(--text-secondary); font: 500 var(--fs-17)/1.55 var(--font-sans); }
+        .guides-lede { max-width: 36em; margin: 16px 0 0; color: var(--text-secondary); font: 500 var(--fs-17)/1.55 var(--font-sans); }
         .guides-soon { margin: 32px 0 0; color: var(--muted); font: 500 var(--fs-15)/1.6 var(--font-sans); }
-        .guides-list { display: grid; gap: 24px; max-width: 46em; margin: 32px 0 0; padding: 0; list-style: none; }
+        .guides-list { display: grid; gap: 24px; max-width: 38em; margin: 32px 0 0; padding: 0; list-style: none; }
         .guides-list :global(.guides-link) { color: var(--ink); font: 600 var(--fs-17)/1.4 var(--font-sans); }
         .guides-list p { margin: 4px 0 0; color: var(--text-secondary); font: 500 var(--fs-15)/1.6 var(--font-sans); }
       `}</style>

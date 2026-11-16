@@ -83,8 +83,8 @@ export default function PhoneSettings() {
       {error && <p className="settings-phone-error" role="alert">{error}</p>}
       {notice && <p className="settings-phone-notice" role="status">{notice}</p>}
       <style jsx>{`
-        .settings-phone { display: grid; gap: 10px; padding: 16px 20px; }
-        .settings-phone-label { display: inline-flex; align-items: center; gap: 10px; }
+        .settings-phone { display: grid; gap: 12px; padding: 16px 20px; }
+        .settings-phone-label { display: inline-flex; align-items: center; gap: 12px; }
         .settings-phone-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .settings-phone .c-meta, .settings-phone-error, .settings-phone-notice { margin: 0; }
         .settings-phone-form { display: flex; flex-wrap: wrap; gap: 8px; }
