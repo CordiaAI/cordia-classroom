@@ -8,7 +8,7 @@ Pull request: not opened yet
 | Task | State | Attempt | Builder agent ID | Last gate verdict | Merged commit |
 | --- | --- | --- | --- | --- | --- |
 | T0 Setup | merged | 1 | director (no builder: no product code) | `scripts/redesign-gate.sh` exit 0 (no pages in scope) | e6152b4 |
-| T1 Glass v2 | fixing | 2 | attempt 1: ab399dfab03b18aa1; attempt 2: fresh builder (see log) | NOT FINISHED (gatekeeper ad284c202f58ad154): 3 Medium | |
+| T1 Glass v2 | fixing | 3 | attempt 1: ab399dfab03b18aa1; attempt 2: a6664897672a34b9c; attempt 3: fresh builder | NOT FINISHED (gatekeeper a4aba7028285cdc1f): 3 new Medium | |
 | T2 App shell and sidebar | waiting | 0 | | | |
 | T3 Chat home | waiting | 0 | | | |
 | T4 Composer and tool chips | waiting | 0 | | | |
@@ -25,6 +25,8 @@ States: waiting, building, checking, fixing, merged, blocked.
 
 Newest first. One entry per hand-off, check, verdict, fix request, merge or block.
 
+- 2026-11-16 T1 attempt 3: fix list sent to a fresh builder (builders cannot be resumed from this session).
+- 2026-11-16 T1 attempt 2 verdict: NOT FINISHED. The three Medium findings from attempt 1 are fixed and confirmed by the second gatekeeper (press 0.97 while hovered, opaque fills under reduced transparency, pill at 180ms with instant keyboard changes). Director's check: diff narrow, hard rules held, gate exit 0. New Medium findings, none a repeat: (1) light theme, the chosen segment cannot be told from the sunken track: pill rgb(223,225,221) vs track rgb(225,226,226), 1.011:1, and all labels are the same ink (introduced by attempt 2's track change); (2) dark theme, the sidebar ⌘K keycap `.c-side-kbd` (`system.css:783`) measures 4.26 to 4.37:1; (3) sidebar hover changes colour on `.c-side-toggle`, `.c-side-add`, `.c-side-all`, `.c-side-empty` (`system.css:770, 796, 802, 804`, `color: var(--ink)`). Low findings for later tasks: Search rise on ⌘K and + button at 26px (T2), menus with no exit motion, theme-swap fades, raw "Server error" copy, mask colour token misuse in `glass.css:340-342` (T11), Dashboard's olive "Update" (T2/T8), Tutor bubble overlap at 390px (T9).
 - 2026-11-16 T1 attempt 2: fix list sent. The director's session has no SendMessage tool, so the first builder could not be resumed; a fresh builder got the full task card plus the numbered failures.
 - 2026-11-16 T1 attempt 1 verdict: NOT FINISHED. Director's check: criteria 1 to 7 pass in code, hard rules held, gate exit 0 (after one re-run for the Next.js notice). Gatekeeper Medium findings: (1) with a mouse, press does not scale glass buttons, pills, chips or segments to 0.97, because the hover rule at `web/styles/system.css:592` outranks the press rule at `:648`; (2) under `prefers-reduced-transparency` panes use `--surface-raised` at 86% opacity, so they are not solid (`tokens.css:397-404`); (3) the segmented-control pill moves on a 420ms overshoot spring and animates width (`--seg-spring` / `--seg-dur`, `tokens.css:251-252`), predates T1. Low findings left for later tasks: account-menu bubble easing (T2), toast border (T10), two olive New buttons on Library (T2/T8), Tutor bubble over the last row at 390px (T9).
 - 2026-11-16 T1 handed to a builder on `redesign/T1-glass-v2`, attempt 1.
