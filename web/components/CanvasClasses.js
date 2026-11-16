@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, ChevronDown, Download, FileImage, FileSpreadsheet, FileText, FileVideo, Presentation, Search, Settings2, Sparkles } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, Download, FileImage, FileSpreadsheet, FileText, FileVideo, Presentation, Search, Settings2, BookOpen } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authorizedFetch } from '../lib/api';
 import { openNewSheet } from '../lib/newSheet';
 import { SectionLoader } from './CordiaLoader';
@@ -118,7 +118,7 @@ export function CourseFiles({ course }) {
                 </span>
                 <span className="cc-file-actions">
                   {label !== 'Video' && <button type="button" className="c-btn c-btn--secondary c-btn--sm cc-file-guide" onClick={() => act(file, 'guide')} disabled={Boolean(busy)} aria-label={`Make a guide from ${file.name}`}>
-                    <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" /><span className="cc-file-guide-label">{busy === `guide:${file.id}` ? 'Getting it…' : 'Make guide'}</span>
+                    <BookOpen size={16} strokeWidth={1.75} aria-hidden="true" /><span className="cc-file-guide-label">{busy === `guide:${file.id}` ? 'Getting it…' : 'Make guide'}</span>
                   </button>}
                   <button type="button" className="c-icon-btn" onClick={() => act(file, 'download')} disabled={Boolean(busy)} aria-label={`Download ${file.name}`}><Download {...ICON} /></button>
                 </span>

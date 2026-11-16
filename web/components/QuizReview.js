@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, MessageCircle, Minus, Sparkles, X } from 'lucide-react';
+import { Check, MessageCircle, Minus, X, Lightbulb } from 'lucide-react';
 import { expected } from '../lib/submitQuiz.mjs';
 import { MissFeedback, missDetail } from './RetainCards';
 
@@ -44,7 +44,7 @@ function Row({ row, number, question, guideId, onSelfCheck }) {
           <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={() => window.dispatchEvent(new CustomEvent('cordia:tutor-prompt', {
             detail: { ...missDetail(guideId, question, row.response || '(no answer)', question.options || []), send: true },
           }))}><MessageCircle size={16} strokeWidth={1.75} aria-hidden="true" />Ask why</button>
-          {!explained && <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={() => setExplained(true)}><Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />Explain</button>}
+          {!explained && <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={() => setExplained(true)}><Lightbulb size={16} strokeWidth={1.75} aria-hidden="true" />Explain</button>}
         </div>
       )}
       {explained && <MissFeedback guideId={guideId} card={{ id: `review-${row.itemId}-${row.concept}`, concepts: [row.concept] }} question={question} chosen={row.response || '(no answer)'} sure={row.confidence === 'sure'} />}

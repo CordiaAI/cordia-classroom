@@ -291,7 +291,7 @@
   --lg-fill: rgba(48, 52, 57, 0.58);
   --lg-fill-strong: rgba(42, 46, 51, 0.84);
   --lg-fill-menu: rgb(42, 46, 51);
-  --lg-fill-field: rgba(32, 35, 39, 0.60);
+  --lg-fill-field: rgba(58, 62, 68, 0.80); /* lighter than a resting button: on dark, the field is the raised surface */
   --lg-sheen: radial-gradient(140% 70% at 18% 0%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 38%, rgba(255, 255, 255, 0) 62%);
   --lg-sheen-olive: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 60%);
   --lg-rim: rgba(255, 255, 255, 0.14);

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { Compass, Gauge, Globe, GraduationCap, Sparkles, Timer, X } from 'lucide-react';
+import { Compass, Gauge, Globe, GraduationCap, Timer, X, Megaphone } from 'lucide-react';
 import { getProgress } from '../lib/progress';
 import { isTipDismissed, registerTip, requestTip } from '../lib/tips';
 import { showMe } from '../lib/showMe';
@@ -12,7 +12,7 @@ import {
 } from '../lib/whatsNew';
 
 export const RELEASE_ICONS = { Compass, Gauge, Globe, GraduationCap, Timer };
-export const releaseIcon = name => RELEASE_ICONS[name] || Sparkles;
+export const releaseIcon = name => RELEASE_ICONS[name] || Megaphone;
 
 // "Show me": the feature's walkthrough when it has one, else its page.
 export async function openRelease(router, release) {

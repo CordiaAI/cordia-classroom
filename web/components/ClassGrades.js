@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BookOpen, Check, ExternalLink, Sparkles } from 'lucide-react';
+import { BookOpen, Check, ExternalLink } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { SectionLoader } from './CordiaLoader';
 import { safeHref } from '../lib/formatters';
@@ -135,7 +135,7 @@ export default function ClassGrades({ courseId, guides = [], onMakeGuide }) {
                   ? <span className="c-chip cg-done"><Check {...ICON} />Turned in</span>
                   : guide
                   ? <Link href={'/guide/' + guide.id} className="c-btn c-btn--secondary c-btn--sm"><BookOpen {...ICON} />Study {guide.title.length > 24 ? 'guide' : guide.title}</Link>
-                  : onMakeGuide && <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={onMakeGuide}><Sparkles {...ICON} />Make a guide</button>}
+                  : onMakeGuide && <button type="button" className="c-btn c-btn--secondary c-btn--sm" onClick={onMakeGuide}><BookOpen {...ICON} />Make a guide</button>}
               </li>
             );
           })}

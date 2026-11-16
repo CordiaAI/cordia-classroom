@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Layers, MessageCircle, Sparkles } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Layers, MessageCircle, Lightbulb } from 'lucide-react';
 import { parseQAPairs, parseNotes } from '../lib/formatters';
 import { walkthroughEvent } from '../lib/walkthrough';
 
@@ -89,7 +89,7 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
                   )}
                   {onExplain && (
                     <button type="button" className="c-btn c-btn--quiet" data-spot={offset === 0 ? 'explain' : undefined} onClick={() => { walkthroughEvent('explain'); onExplain(index); }}>
-                      <Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Explain
+                      <Lightbulb size={20} strokeWidth={1.75} aria-hidden="true" />Explain
                     </button>
                   )}
                 </div>

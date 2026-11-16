@@ -1,6 +1,7 @@
 import {
+  Lightbulb,
   BookText, Brain, CalendarCheck, CalendarDays, ChartColumn, FileText, FolderSync, MailCheck, Layers, Link2, MessageCircle, MessageSquareText, Mic, NotebookPen, PencilRuler,
-  Plug, Puzzle, Shapes, Shuffle, Sparkles, SquarePlus, Timer, Upload,
+  Plug, Puzzle, Shapes, Shuffle, SquarePlus, Timer, Upload,
 } from 'lucide-react';
 
 // Every feature, grouped the way Learn Cordia shows them. Ids match MINI walkthroughs.
@@ -14,7 +15,7 @@ export const FEATURE_GROUPS = [
     { id: 'extension', label: 'Extension', icon: Puzzle },
   ] },
   { label: 'Study', items: [
-    { id: 'explain', label: 'Explain', icon: Sparkles },
+    { id: 'explain', label: 'Explain', icon: Lightbulb },
     { id: 'ask', label: 'Tutor', icon: MessageCircle },
     { id: 'quiz', label: 'Quiz', icon: Brain },
     { id: 'match', label: 'Match', icon: Shuffle },

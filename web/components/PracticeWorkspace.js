@@ -7,7 +7,7 @@ import { UPLOAD_ACCEPT } from '../lib/uploadTypes.mjs';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
 import { LoadingArea } from './CordiaLoader';
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, Eraser, Eye, Flag, Hand, MessageCircle, PenLine, RefreshCw, Sparkles, Trash2, Type, Undo2, Upload, Video, VideoOff, Wand2 } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, Eraser, Eye, Flag, Hand, MessageCircle, PenLine, RefreshCw, Trash2, Type, Undo2, Upload, Video, VideoOff, Wand2 } from 'lucide-react';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { logAnswer } from '../lib/learningEvents';
 import { answerTimer } from '../lib/learningEvents.mjs';
@@ -518,7 +518,7 @@ export default function PracticeWorkspace() {
           <input ref={fileRef} type="file" hidden accept={UPLOAD_ACCEPT} onChange={event => useUploadedFile(event.target.files?.[0])} />
           <button type="button" className="c-btn c-btn--quiet" onClick={() => fileRef.current?.click()} disabled={extracting}><Upload {...ICON} />{extracting ? 'Reading…' : 'Upload'}</button>
           <button type="button" className={'c-btn ' + (problems.length ? 'c-btn--secondary' : 'c-btn--primary')} onClick={generateProblems} disabled={loading || !sourceText}>
-            {problems.length ? <RefreshCw {...ICON} /> : <Sparkles {...ICON} />}
+            {problems.length ? <RefreshCw {...ICON} /> : <PenLine {...ICON} />}
             {loading ? 'Creating…' : problems.length ? 'Regenerate' : 'Generate'}
           </button>
         </div>

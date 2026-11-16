@@ -421,7 +421,7 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(var(
 .classroom-class-tile small { font-size: 13px; color: var(--text-muted); margin: 0 16px 16px; }
 .class-tile-progress { display: block; height: 4px; border-radius:12px; background: var(--line); margin: auto 16px 0; }
 .class-tile-progress > span { display: block; height: 100%; background: var(--olive); border-radius:inherit; }
-.classroom-add-class { justify-content: center; align-items: center; text-align: center; padding: 24px; border-style: dashed; background: transparent; gap: 12px; }
+.classroom-add-class { justify-content: center; align-items: center; text-align: center; padding: 24px; border-style: solid; background: transparent; gap: 12px; }
 .classroom-add-class > span { font:500 28px var(--font-display); }
 .classroom-add-class strong { font-size: 13px; font-weight:600; }
 .classroom-add-class small { font-size: 13px; color: var(--text-muted); line-height:1.5; }

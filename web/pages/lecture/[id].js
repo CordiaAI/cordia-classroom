@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { pageTitle } from '../../lib/pageTitle';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowLeft, BookOpen, CalendarCheck, CalendarPlus, Check, Folder, Merge, MessageCircle, NotebookPen, Pencil, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarCheck, CalendarPlus, Check, Folder, Merge, MessageCircle, NotebookPen, Pencil, Trash2, X } from 'lucide-react';
 import { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
 import Menu from '../../components/Menu';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -200,7 +200,7 @@ export default function LecturePage() {
         <button type="button" className="c-btn c-btn--secondary" onClick={askTutor}><MessageCircle {...ICON} />Ask</button>
         {lecture.guide_id
           ? <Link className="c-btn c-btn--primary" href={'/guide/' + lecture.guide_id}><BookOpen {...ICON} />Study guide</Link>
-          : <button type="button" className="c-btn c-btn--primary" onClick={makeGuide} disabled={making}><Sparkles {...ICON} />{making ? 'Building…' : 'Make study guide'}</button>}
+          : <button type="button" className="c-btn c-btn--primary" onClick={makeGuide} disabled={making}><NotebookPen {...ICON} />{making ? 'Building…' : 'Make study guide'}</button>}
       </div>
 
       {String(analysis.my_notes || '').trim() && (
@@ -220,7 +220,7 @@ export default function LecturePage() {
       <section className="c-card lecture-card" aria-labelledby="lecture-notes">
         <div className="lecture-item-head">
           <h2 id="lecture-notes" className="c-section-title">Notes</h2>
-          {analysis.analyzed && !analysis.outline_md && notes !== 'writing' && <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={() => writeNotes({ rewrite: true })}><Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />Make full outline</button>}
+          {analysis.analyzed && !analysis.outline_md && notes !== 'writing' && <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={() => writeNotes({ rewrite: true })}><NotebookPen size={16} strokeWidth={1.75} aria-hidden="true" />Make full outline</button>}
           {analysis.note_id && <Link className="c-btn c-btn--quiet c-btn--sm" href={'/smartnotes?id=' + analysis.note_id}><NotebookPen size={16} strokeWidth={1.75} aria-hidden="true" />Open in Notes</Link>}
         </div>
         {notes === 'writing' && analysis.analyzed ? <SectionLoader height={96} label="Writing the outline" /> : analysis.outline_md ? (
@@ -242,7 +242,7 @@ export default function LecturePage() {
         ) : (
           <div className="lecture-notes-empty">
             <p className="c-meta">{notes === 'unavailable' ? "AI notes aren't set up on this site yet. The full transcript is below." : analysis.analyzed ? 'There was too little in this lecture to outline. The full transcript is below.' : "Couldn't write notes yet. The full transcript is below."}</p>
-            {notes === 'failed' && <button type="button" className="c-btn c-btn--secondary" onClick={writeNotes}><Sparkles {...ICON} />Try again</button>}
+            {notes === 'failed' && <button type="button" className="c-btn c-btn--secondary" onClick={writeNotes}><NotebookPen {...ICON} />Try again</button>}
           </div>
         )}
       </section>

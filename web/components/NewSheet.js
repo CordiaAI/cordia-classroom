@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
-import {
-  ArrowLeft, Brain, Check, ClipboardPaste, FileImage, FileText, Layers, Link as LinkIcon, Mic, Minimize2, NotebookPen, PencilRuler, Presentation, Sparkles, Upload, X,
-} from 'lucide-react';
+import { ArrowLeft, Brain, Check, ClipboardPaste, FileImage, FileText, Layers, Link as LinkIcon, Mic, Minimize2, NotebookPen, PencilRuler, Presentation, Upload, X, BookOpen } from 'lucide-react';
 import { apiErrorMessage, apiFetch, authHeaders } from '../lib/api';
 import { loadFolders } from '../lib/folders';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
@@ -104,7 +102,7 @@ export function NewOptions({ onPick, onSample }) {
       ))}
       {onSample && (
         <button type="button" className="new-sample" onClick={onSample}>
-          <Sparkles size={20} strokeWidth={1.75} aria-hidden="true" />Try a sample
+          <BookOpen size={20} strokeWidth={1.75} aria-hidden="true" />Try a sample
         </button>
       )}
       <style jsx>{`
@@ -113,7 +111,7 @@ export function NewOptions({ onPick, onSample }) {
         @media (hover: hover) { .new-option:hover { border-color: var(--olive); } }
         .new-option:active { transform: scale(.98); }
         .new-option :global(.lucide) { color: var(--olive-ink); }
-        .new-sample { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; border: 1px dashed var(--olive); border-radius:var(--r-card); background: var(--olive-tint); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; }
+        .new-sample { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; border: 1px solid var(--olive); border-radius:var(--r-card); background: var(--olive-tint); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; }
       `}</style>
     </div>
   );

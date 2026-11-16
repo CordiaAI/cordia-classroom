@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RotateCcw, Sparkles, X } from 'lucide-react';
+import { RotateCcw, X, Palette } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import CoverArt, { COVER_ICON_COMPONENTS } from './CoverArt';
 import { COVER_COLORS, COVER_ICONS, coverFor } from '../lib/coverDesign.mjs';
@@ -59,7 +59,7 @@ export default function ClassCoverSheet({ folder, titles = [], onClose, onSaved 
           </div>
           <div className="cover-icons-head">
             <span className="c-meta">Icons: pick up to 3. The first is the big one.</span>
-            <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={suggest} disabled={Boolean(busy)}><Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />{busy === 'pick' ? 'Picking…' : 'Pick for me'}</button>
+            <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={suggest} disabled={Boolean(busy)}><Palette size={16} strokeWidth={1.75} aria-hidden="true" />{busy === 'pick' ? 'Picking…' : 'Pick for me'}</button>
           </div>
           <div className="cover-grid" role="group" aria-label="Icons">
             {COVER_ICONS.map(name => {

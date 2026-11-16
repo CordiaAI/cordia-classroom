@@ -1347,7 +1347,7 @@ input::placeholder { color: var(--text-muted); }
 .sn-index-empty {
   padding: 48px; text-align: center;
   color: var(--text-muted); font-size:15px;
-  border: 1px dashed var(--border-subtle); border-radius:12px;
+  border: 1px solid var(--border-subtle); border-radius:12px;
 }
 
 /* Grid — 4 columns, responsive */
@@ -1563,7 +1563,7 @@ input::placeholder { color: var(--text-muted); }
 /* Add card button */
 .create-add-card {
   width: 100%; padding: 12px; border-radius:12px;
-  border: 2px dashed var(--border-default);
+  border: 2px solid var(--border-default);
   background: transparent; color: var(--accent);
   font-family: var(--font-sans); font-size:13px; font-weight:600;
   cursor: pointer; transition: border-color var(--dur), background var(--dur);
@@ -1680,7 +1680,7 @@ input::placeholder { color: var(--text-muted); }
 .draggable-guide.dragging {
   opacity: 0.4;
   transform: scale(0.98);
-  border-style: dashed;
+  border-style: solid;
 }
 .drag-handle {
   color: var(--text-muted);
@@ -2639,7 +2639,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--olive); box-shad
 .class-guide-popover-list button small { flex: 0 0 auto; color: var(--muted-ink); font-size: 13px; }
 .class-guide-popover-list p { padding: 16px 8px; color: var(--muted-ink); font-size: 13px; line-height:1.5; text-align: center; }
 .class-guide-view-all { justify-content: center; margin-top: 8px; padding-block: 8px; color: var(--olive); font-size: 13px; font-weight:600; }
-.class-rail-empty { width: 100%; padding: 16px 12px; border: 1px dashed var(--line); border-radius:12px; background: transparent; color: var(--muted-ink); font: inherit; font-size: 13px; cursor: pointer; }
+.class-rail-empty { width: 100%; padding: 16px 12px; border: 1px solid var(--line); border-radius:12px; background: transparent; color: var(--muted-ink); font: inherit; font-size: 13px; cursor: pointer; }
 
 .dashboard-center-column { min-width: 0; padding: 2px 0 40px; }
 .dashboard-desktop-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
@@ -2811,7 +2811,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--olive); box-shad
 .dashboard-unclassified-guides { display: grid; gap: 12px; }
 .dashboard-unclassified-guides .guide-row { min-height: 78px; margin: 0; padding: 16px 20px !important; }
 .guide-row-type { flex: 0 0 auto; padding: 4px 8px; border-radius:999px; background: var(--sand); color: var(--olive); font-size: 13px; font-weight:600; letter-spacing:0; }
-.dashboard-guides-empty { display: flex; flex-direction: column; gap: 8px; padding: 36px 24px; border: 1px dashed var(--line); border-radius:20px; color: var(--muted-ink); text-align: center; }
+.dashboard-guides-empty { display: flex; flex-direction: column; gap: 8px; padding: 36px 24px; border: 1px solid var(--line); border-radius:20px; color: var(--muted-ink); text-align: center; }
 .dashboard-guides-empty strong { color: var(--ink); font-size:20px; letter-spacing:0; }
 .dashboard-guides-empty span { font-size: 13px; }
 
@@ -3058,7 +3058,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--olive); box-shad
   justify-content: space-between;
   gap: 16px;
   padding: 16px 16px;
-  border: 1px dashed var(--line);
+  border: 1px solid var(--line);
   border-radius:12px;
   background: var(--canvas);
   color: var(--ink);

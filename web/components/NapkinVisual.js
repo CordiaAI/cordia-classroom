@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, RefreshCw, Sparkles } from 'lucide-react';
+import { Download, RefreshCw, Shapes } from 'lucide-react';
 import { authOnlyHeaders, openUpgrade } from '../lib/api';
 import CordiaLoader from './CordiaLoader';
 import { currentTheme } from './MermaidDiagram';
@@ -235,7 +235,7 @@ export default function NapkinVisual({ text, context = '', fallback, auto = fals
       {state.phase === 'limit' && state.pro && <p className="nv-error" role="alert">Limit reached</p>}
       {!disabled && state.phase !== 'limit' && !(auto && state.phase === 'idle') && (
         <div className="nv-bar">
-          <button type="button" className="c-btn c-btn--sm c-btn--secondary" onClick={() => make()} disabled={!text}><Sparkles aria-hidden="true" />{state.phase === 'fallback' ? 'Try again' : 'Make visual'}</button>
+          <button type="button" className="c-btn c-btn--sm c-btn--secondary" onClick={() => make()} disabled={!text}><Shapes aria-hidden="true" />{state.phase === 'fallback' ? 'Try again' : 'Make visual'}</button>
           {left && <span className="c-meta">{left}</span>}
         </div>
       )}
