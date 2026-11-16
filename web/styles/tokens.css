@@ -252,8 +252,9 @@
   --lg-edge: var(--lg-border);
   --lg-highlight: var(--glass-shadow-edge);
   /* The sliding pill in every tab bar and segmented switch (components/SegmentedControl.js): the
-     chosen segment is selected glass. */
-  --seg-pill-bg: var(--selected-glass);
+     chosen segment is selected glass with the pane sheen on top, so it catches the light above
+     the sunken track (as in the mockups). */
+  --seg-pill-bg: var(--glass-sheen), var(--selected-glass);
   --seg-pill-shadow: var(--selected-glass-shadow);
   /* The track is sunken (ink at 5% with a small inset shadow), so the pill reads as the raised one. */
   --seg-track: rgba(23, 27, 24, 0.05);
