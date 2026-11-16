@@ -78,7 +78,8 @@ export default function Pricing() {
       <style jsx>{`
         .pricing-title { margin: 0 0 32px; font:600 40px/1.15 var(--font-display); color: var(--ink); }
         .pricing-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; max-width: 1180px; }
-        .pricing-card { display: grid; gap: 16px; align-content: start; padding: 28px; border-radius:20px; color: var(--ink); background: var(--lg-card); border: 1px solid var(--lg-edge); -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); box-shadow: var(--lg-highlight), var(--lg-shadow); }
+        /* A column, so the three plan buttons share one baseline however long each list is. */
+        .pricing-card { display: flex; flex-direction: column; gap: 16px; padding: 28px; border-radius:20px; color: var(--ink); background: var(--lg-card); border: 1px solid var(--lg-edge); -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); box-shadow: var(--lg-highlight), var(--lg-shadow); }
         .pricing-card.is-pro { box-shadow: 0 0 0 2px var(--olive), var(--lg-highlight), var(--lg-shadow); }
         .pricing-card h2 { margin: 0; font:600 17px/1.15 var(--font-sans); color: var(--ink); }
         .pricing-price { margin: 0; font:600 40px/1 var(--font-sans); }
@@ -87,7 +88,7 @@ export default function Pricing() {
         .pricing-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
         .pricing-card li { display: flex; gap: 8px; align-items: flex-start; font:500 15px/1.5 var(--font-sans); }
         .pricing-card li :global(.lucide) { color: var(--olive-ink); margin-top: 2px; flex: 0 0 auto; }
-        .pricing-card :global(.pricing-btn) { display: inline-flex; align-items: center; justify-content: center; height: 44px; border: 0; border-radius:999px; background: var(--olive); color: var(--on-olive); font:600 15px/1 var(--font-sans); text-decoration: none; cursor: pointer; }
+        .pricing-card :global(.pricing-btn) { margin-top: auto; display: inline-flex; align-items: center; justify-content: center; height: 44px; border: 0; border-radius:999px; background: var(--olive); color: var(--on-olive); font:600 15px/1 var(--font-sans); text-decoration: none; cursor: pointer; }
         .pricing-card :global(.pricing-btn.is-secondary) { background: var(--glass); color: var(--ink); border: 1px solid var(--line); }
         .pricing-card :global(.pricing-btn.is-current) { background: transparent; color: var(--ink); border: 1px solid var(--line); cursor: default; }
         @media (max-width: 960px) { .pricing-grid { grid-template-columns: 1fr; max-width: 520px; } }

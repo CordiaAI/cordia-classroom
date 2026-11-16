@@ -14,7 +14,7 @@ export default function TermsOfService() {
         <h1 style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>
           Terms of Service
         </h1>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: '0.9rem' }}>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '40px', fontSize: 'var(--fs-13)' }}>
           Effective Date: March 23, 2026 &nbsp;|&nbsp; Last Updated: November 8, 2026
         </p>
 
@@ -95,8 +95,8 @@ export default function TermsOfService() {
         </Section>
 
         <div style={{ marginTop: '40px', paddingTop: '20px', borderTop: '1px solid var(--border-subtle)' }}>
-          <a href="/privacy" style={{ color: 'var(--accent)', marginRight: '16px', fontSize: '0.9rem' }}>Privacy Policy</a>
-          <a href="/honor-code" style={{ color: 'var(--accent)', fontSize: '0.9rem' }}>Honor Code</a>
+          <a href="/privacy" style={{ color: 'var(--accent)', marginRight: '16px', fontSize: 'var(--fs-13)' }}>Privacy Policy</a>
+          <a href="/honor-code" style={{ color: 'var(--accent)', fontSize: 'var(--fs-13)' }}>Honor Code</a>
         </div>
       </div>
     </PublicPage>

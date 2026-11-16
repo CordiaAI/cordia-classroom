@@ -104,8 +104,11 @@
   --r-input: 12px; --r-row: 16px; --r-card: 20px; --r-panel: 28px; --r-pill: 999px;
 
   /* Motion */
-  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --dur: 180ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);       /* arriving, and hover/press: fast start, soft landing */
+  --ease-exit: cubic-bezier(0.55, 0, 1, 0.45);  /* leaving: gets out of the way */
+  --dur: 180ms;                                 /* hover, press, colour */
+  --dur-enter: 260ms;                           /* a sheet, toast or panel arriving */
+  --dur-exit: 200ms;                            /* the same thing leaving: a quarter shorter */
 
   /* Layout */
   --bar-h: 64px;

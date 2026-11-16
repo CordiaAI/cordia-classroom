@@ -83,7 +83,7 @@
 /* Lists inside a card are flat; the card is the glass. */
 .asst-flat-list { grid-template-columns: minmax(0, 1fr); padding: 0; background: none; box-shadow: none; border: 0; }
 /* These rows don't open anything, so they don't hover like rows that do. */
-.asst-flat-list .c-list-row:hover { background: none; }
+@media (hover: hover) { .asst-flat-list .c-list-row:hover { background: none; } }
 .asst-app + .asst-app { border-top: 1px solid var(--hairline); }
 .asst-app .c-list-row { border-top: 0; padding-left: 0; padding-right: 0; }
 .asst-calendars { display: grid; gap: 4px; padding: 0 0 12px 32px; }

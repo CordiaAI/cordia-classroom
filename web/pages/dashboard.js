@@ -416,6 +416,13 @@ export default function Today() {
         .today-alert-title { font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
         .today-alert.is-grade_drop .today-alert-title, .today-alert.is-missing .today-alert-title { color: var(--error); }
         .today-alert.is-date_change .today-alert-title { font-variant-numeric: tabular-nums; }
+        /* Phones: the text and its dismiss share the first line; the action drops under the text. */
+        @media (max-width: 480px) {
+          .today-alert { flex-wrap: wrap; row-gap: 8px; }
+          .today-alert .c-grow { flex-basis: calc(100% - 56px); }
+          .today-alert :global(.c-icon-btn) { order: 1; }
+          .today-alert :global(.c-btn) { order: 2; }
+        }
         .today-continue { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; padding: 14px 18px; }
         :global(.today-continue-main) { display: flex; flex: 1 1 260px; align-items: center; gap: 16px; min-width: 0; color: var(--ink); text-decoration: none; }
         :global(.today-continue-main:hover) { text-decoration: none; }

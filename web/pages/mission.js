@@ -11,16 +11,16 @@ export default function MissionPage() {
 
   const features = [
     {
-      title: 'Instant Extraction',
+      title: 'Instant extraction',
       description: 'Open your course material, click the Cordia Classroom icon, and use the Tutor side panel to capture the page or find related material. Cordia keeps the source attached to what it creates.',
     },
     {
-      title: 'NCLEX Question Generation',
+      title: 'NCLEX question generation',
       subtitle: 'For nursing students',
       description: 'Cordia Classroom turns the material you are learning into NCLEX-style questions, so nursing students can practice in the same format as their exams in a couple of clicks.',
     },
     {
-      title: 'Only Your Class Material, Never the Web',
+      title: 'Only your class material, never the web',
       description: 'When you ask a general AI chatbot for a study guide, its questions and answers often come from somewhere other than your class. Cordia Classroom never searches the web: it uses only the material you captured, so everything you study comes from your own classes.',
     },
     {
@@ -28,11 +28,11 @@ export default function MissionPage() {
       description: 'The Classroom Tutor and Chrome side panel share the same conversation, selected class, source material, learning guidance, and active skill so work can continue across both interfaces.',
     },
     {
-      title: 'The Cost',
+      title: 'The cost',
       description: 'Start free with 3 study guides, 10 tutor prompts and 5 Explain views each month. Pro is $4.99 a month and Academic Weapon is $9.99 a month. Try Academic Weapon free for 7 days with no card; the trial never turns into a charge on its own.',
     },
     {
-      title: 'Users Are "Cofounders"',
+      title: 'Users are "cofounders"',
       description: 'Got a new recommendation or said something along the lines of "I wish it would do this?" Send feedback! Our goal is to get your recommendation ASAP! This is a college study platform made for the people.',
     },
   ];

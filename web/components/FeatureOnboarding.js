@@ -92,7 +92,7 @@ export default function FeatureOnboarding() {
         /* Sits above the Tutor bubble (glass.css: 56px tall, 24px up; 48px on phones), so it never covers Save. */
         .fo { position: fixed; z-index: 60; right: max(var(--space-4), env(safe-area-inset-right, 0px)); bottom: calc(24px + 56px + var(--space-3) + env(safe-area-inset-bottom, 0px)); max-height: calc(100dvh - 24px - 56px - 2 * var(--space-3)); overflow-y: auto; width: min(400px, calc(100vw - 2 * var(--space-4))); display: grid; gap: var(--space-3); padding: var(--space-5); }
         .fo-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-        .fo-kicker { color: var(--olive-ink); font: 700 var(--fs-13)/1 var(--font-sans); letter-spacing: .04em; text-transform: uppercase; }
+        .fo-kicker { color: var(--olive-ink); font: 600 var(--fs-13)/1 var(--font-sans); }
         .fo-title { margin: 0; font: 500 var(--fs-20)/1.25 var(--font-display); color: var(--ink); }
         .fo :global(.fo-body) { margin: 0; color: var(--muted); font: 500 var(--fs-15)/1.45 var(--font-sans); }
         .fo :global(.fo-choices) { display: flex; flex-wrap: wrap; gap: var(--space-2); }

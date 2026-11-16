@@ -646,7 +646,7 @@ export default function LearnPage() {
         .learn-flip.is-flipped .learn-flip-inner { transform: rotateY(180deg); }
         .learn-flip-face { grid-area: 1 / 1; display: grid; align-content: center; justify-items: center; gap: 14px; padding: 28px 24px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
         .learn-flip-back { transform: rotateY(180deg); background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--card); }
-        .learn-flip-face small { color: var(--muted); font: 600 12px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; }
+        .learn-flip-face small { color: var(--muted); font: 600 var(--fs-13)/1 var(--font-sans); }
         .learn-flip-text { max-width: 36ch; color: var(--ink); font: 500 22px/1.4 var(--font-sans); }
         .learn-flip:not(:disabled):hover .learn-flip-face { border-color: var(--olive); }
         .learn-flip-marks { align-items: center; }
