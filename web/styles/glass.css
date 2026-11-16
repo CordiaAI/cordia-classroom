@@ -160,7 +160,10 @@
   .c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-chip[aria-pressed='true'], .c-search-hit.is-active,
   .c-nav .c-nav-btn[aria-pressed='true'], .tutor-chats-btn[aria-pressed='true'],
   .c-icon-btn:is([aria-pressed='true'], .is-on)) :is(svg.lucide, .lucide) { color: var(--olive-ink) !important; }
-.c-seg.c-seg > :is(button, a):is([aria-selected='true'], [aria-checked='true'], .is-active) { color: var(--ink) !important; }
+/* Segment labels: muted until chosen, ink on the chosen pill (mockup 3-class-page.html:53-54), for
+   tabs, radios and toggle groups alike. */
+.c-seg.c-seg > :is(button, a) { color: var(--muted); }
+.c-seg.c-seg > :is(button, a):is([aria-selected='true'], [aria-checked='true'], [aria-pressed='true'], .is-active) { color: var(--ink) !important; }
 
 /* Fields: a slightly clearer pane, set into the surface. */
 :is(.c-input, .c-select, .c-search .c-input, textarea.c-input) {

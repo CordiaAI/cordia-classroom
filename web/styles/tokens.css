@@ -137,7 +137,7 @@
      transparency or can't frost (end of this file). Opaque, so nothing behind shows through. */
   --glass-solid: #F7F9F6;
   --glass-inner-solid: #FAFBF9;            /* --glass-inner laid over --glass-solid */
-  --seg-track-solid: #EBEDEA;              /* --seg-track laid over --glass-solid */
+  --seg-track-solid: #E8E9E8;              /* --seg-track laid over --glass-solid */
   --glass-grain-opacity: 0.06;
   /* The 180px grain tile: grey noise, laid over a pane at --glass-grain-opacity. */
   --glass-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='.33 .33 .33 0 0  .33 .33 .33 0 0  .33 .33 .33 0 0  0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
@@ -252,15 +252,24 @@
   --lg-edge: var(--lg-border);
   --lg-highlight: var(--glass-shadow-edge);
   /* The sliding pill in every tab bar and segmented switch (components/SegmentedControl.js): the
-     chosen segment is selected glass with the pane sheen on top, so it catches the light above
-     the sunken track (as in the mockups). */
-  --seg-pill-bg: var(--glass-sheen), var(--selected-glass);
-  --seg-pill-shadow: var(--selected-glass-shadow);
-  /* The track is sunken (ink at 5% with a small inset shadow), so the pill reads as the raised one. */
-  --seg-track: rgba(23, 27, 24, 0.05);
-  --seg-track-shadow: inset 0 1px 2px rgba(23, 27, 24, 0.06), inset 0 0 0 0.5px rgba(23, 27, 24, 0.05);
-  /* Hover on an unchosen segment: a faint wash in the track, never brighter than the chosen pill. */
-  --seg-hover: rgba(23, 27, 24, 0.045);
+     chosen segment is selected glass raised off the sunken track, as in the mockups: a near-white
+     base (brighter than --selected-glass's, which landed on the track's own tone over the clouds),
+     a faint olive tint, the pane sheen on top, and the olive ring pressed chips wear. */
+  --seg-pill-base: rgba(255, 255, 255, 0.97);
+  --seg-pill-base-solid: #FFFFFF;          /* --seg-pill-base when glass turns solid */
+  --seg-pill-tint: rgba(83, 97, 73, 0.03);
+  --seg-pill-bg: var(--glass-sheen), linear-gradient(var(--seg-pill-tint), var(--seg-pill-tint)), var(--seg-pill-base);
+  --seg-pill-shadow: var(--selected-glass-shadow), var(--selected-glass-ring);
+  /* The track is sunken: ink at 8% with a small inset shadow, over a light base so it keeps one
+     tone whether it sits on a card or straight on the clouds (muted labels stay 4.5:1 on it, and
+     the near-white pill stands clear of it). */
+  --seg-track-ink: rgba(23, 27, 24, 0.08);
+  --seg-track-base: rgba(255, 255, 255, 0.40);
+  --seg-track: linear-gradient(var(--seg-track-ink), var(--seg-track-ink)), var(--seg-track-base);
+  --seg-track-shadow: inset 0 1px 2px rgba(23, 27, 24, 0.07), inset 0 0 0 0.5px rgba(23, 27, 24, 0.06);
+  /* Hover on an unchosen segment: a light wash in the track (labels only gain contrast), never as
+     bright as the chosen pill. */
+  --seg-hover: rgba(255, 255, 255, 0.24);
   /* The pill moves like every other state change (DESIGN-SPEC 6.1): 180ms, no overshoot. */
   --seg-ease: var(--ease);
   --seg-dur: var(--dur);
@@ -297,7 +306,7 @@
 [data-theme='dark'] {
   color-scheme: dark;
   --ink: #ECECEA;                          /* 12.2:1 on the dark card; pure white glared */
-  --muted: rgba(255, 255, 255, 0.70);      /* 4.5:1 or better on dark glass over the clouds */
+  --muted: rgba(255, 255, 255, 0.75);      /* 4.5:1 or better on dark glass over the clouds, under the sheen and a hover pane too */
   --canvas: #1A1D20;
   --surface-card: rgba(39, 42, 48, 0.55);
   --surface-raised: rgba(39, 42, 48, 0.86);
@@ -361,6 +370,9 @@
   --seg-track: rgba(0, 0, 0, 0.22);
   --seg-track-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.30), inset 0 0 0 0.5px rgba(0, 0, 0, 0.25);
   --seg-hover: rgba(255, 255, 255, 0.04);
+  --seg-pill-base: rgba(60, 64, 71, 0.92);
+  --seg-pill-base-solid: #3A3E45;
+  --seg-pill-tint: rgba(195, 207, 182, 0.10);
   --glass-grain-opacity: 0.05;
   --glass-inner: rgba(255, 255, 255, 0.05);
   --glass-inner-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 0.5px rgba(0, 0, 0, 0.30);
@@ -419,7 +431,7 @@
   :root, [data-theme='dark'] {
     --glass-fill: var(--glass-solid); --glass-fill-strong: var(--glass-solid); --glass-control: var(--glass-solid);
     --surface-raised: var(--glass-solid); --lg-fill-field: var(--glass-solid);
-    --glass-inner: var(--glass-inner-solid); --seg-track: var(--seg-track-solid);
+    --glass-inner: var(--glass-inner-solid); --seg-track: var(--seg-track-solid); --seg-pill-base: var(--seg-pill-base-solid);
     --selected-glass: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--glass-solid);
   }
 }
@@ -427,7 +439,7 @@
   :root, [data-theme='dark'] {
     --glass-fill: var(--glass-solid); --glass-fill-strong: var(--glass-solid); --glass-control: var(--glass-solid);
     --surface-raised: var(--glass-solid); --lg-fill-field: var(--glass-solid);
-    --glass-inner: var(--glass-inner-solid); --seg-track: var(--seg-track-solid);
+    --glass-inner: var(--glass-inner-solid); --seg-track: var(--seg-track-solid); --seg-pill-base: var(--seg-pill-base-solid);
     --selected-glass: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--glass-solid);
     --glass-blur: none;
   }
