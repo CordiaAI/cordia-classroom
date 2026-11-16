@@ -153,6 +153,9 @@
   --olive-glass-press: var(--olive-press);
   /* The rim's mask: only the 1px padding ring of the ::after layer shows (alpha only, no colour). */
   --glass-rim-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  /* Panes that scroll their own content (sheets, menus) can't keep a ::after rim in place, so their
+     1px border carries it: the rim's stops on the top, right, bottom and left edges. */
+  --glass-rim-border: rgba(255, 255, 255, 0.80) rgba(255, 255, 255, 0.30) rgba(255, 255, 255, 0.42) rgba(255, 255, 255, 0.72);
   --glass-rim-mask-webkit: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
 
   /* The backdrop (DESIGN-SPEC 2.1): the cloud photo, blurred a little, under a white light from
@@ -350,6 +353,7 @@
   --selected-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.35), 0 4px 12px -6px rgba(0, 0, 0, 0.45);
   --selected-glass-ring: 0 0 0 0.5px rgba(195, 207, 182, 0.35);
   --olive-glass-press: #73846A;            /* darker than olive, dark label still 4.5:1 */
+  --glass-rim-border: rgba(255, 255, 255, 0.22) rgba(255, 255, 255, 0.06) rgba(255, 255, 255, 0.12) rgba(255, 255, 255, 0.18);
   --backdrop-sky-opacity: 0.18;
   --backdrop-wash: none;
   --backdrop-field:

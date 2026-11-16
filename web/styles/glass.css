@@ -53,10 +53,16 @@
   -webkit-mask: var(--glass-rim-mask-webkit); -webkit-mask-composite: xor;
   mask: var(--glass-rim-mask);
 }
+/* Panes that scroll their own content: an absolute layer would scroll away with it, so the rim is
+   the pane's own 1px border and the grain a background layer (neither moves when it scrolls). */
+:is(.c-sheet, .c-menu, .c-search-results, .tutor-select-options, .sn-notes-dropdown, .account-menu-panel) { border-color: var(--glass-rim-border) !important; }
+:is(.c-sheet, .c-menu, .c-search-results, .tutor-select-options, .sn-notes-dropdown, .account-menu-panel)::before,
+:is(.c-sheet, .c-menu, .c-search-results, .tutor-select-options, .sn-notes-dropdown, .account-menu-panel)::after { content: none; }
 /* Raised panes: sheets, the Tutor, the phone bars (page text scrolls under them) and floating things. */
 :is(.c-topbar, .c-tabbar, .c-sheet, .tutor-drawer, .c-toast, .c-tip, .c-tutor-bubble, .upgrade-dialog, .feedback-modal) {
   background: var(--glass-sheen), var(--glass-fill-strong) !important;
 }
+.c-sheet { background: var(--glass-sheen), var(--lg-grain), var(--glass-fill-strong) !important; }
 /* Menus and popovers float over text, so their fill stays solid; they keep their own frost and rim. */
 :is(.c-menu, .c-search-results, .tutor-select-options, .sn-notes-dropdown, .account-menu-panel) {
   background: var(--lg-menu) !important;
