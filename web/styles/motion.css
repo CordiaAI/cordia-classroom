@@ -1,13 +1,6 @@
 /* Motion shared across the app. Every effect here stops for people who ask their device for
    less motion (the block at the end), and none of it changes layout. */
 
-/* Backdrop drift: lib/ambientMotion.js sets --bg-x / --bg-y from the mouse or phone tilt. */
-body::before {
-  transform: translate3d(var(--bg-x, 0px), var(--bg-y, 0px), 0) scale(1.04);
-  transition: transform 900ms cubic-bezier(.2, .8, .2, 1);
-  will-change: transform;
-}
-
 /* Quiz answers: a right answer pops and sends out a green ring; a wrong one shakes (globals.css)
    and the right one then pulses in. */
 @keyframes c-ring-out {
@@ -61,7 +54,6 @@ body::before {
 @keyframes c-flicker-blaze { 0%, 100% { transform: scale(1.32) rotate(0); } 30% { transform: scale(1.4, 1.26) rotate(-4deg); } 60% { transform: scale(1.28, 1.4) rotate(3deg); } }
 
 @media (prefers-reduced-motion: reduce) {
-  body::before { transform: none; transition: none; }
   .quiz-option.quiz-option.quiz-option.quiz-option.correct-shine,
   .quiz-option.quiz-option.quiz-option.quiz-option.correct-glow,
   .quiz-option.correct, .quiz-option.wrong, .retain-fill-input.right, .retain-fill-input.wrong, .retain-feedback,

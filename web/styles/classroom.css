@@ -5,7 +5,7 @@ body { position: relative; isolation: isolate; background: transparent; font-fam
 h1, h2, h3, .login-form-title, .section-header h2, .editorial-page-title { font-family: var(--font-display); font-weight:500; letter-spacing:-0.015em; }
 button, input, textarea, select { font-family: var(--font-sans); }
 button:not(:disabled), a { -webkit-tap-highlight-color: transparent; }
-button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(.98); transition-duration: 90ms; }
+button:not(:disabled):active, .btn:not(:disabled):active { transform: var(--press); transition-duration: 90ms; }
 :where(button, a, input, textarea, select, [role='button']):focus-visible { outline: 2px solid var(--olive); outline-offset: 4px; }
 .workspace-skip-link { position: fixed; top: 10px; left: 20px; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; z-index: 200; background: var(--surface-raised); border-radius:12px; }
 .workspace-skip-link:focus { width: auto; height: auto; padding: 12px 20px; clip-path: none; }

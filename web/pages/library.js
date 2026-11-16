@@ -579,7 +579,9 @@ export default function LibraryPage() {
         .library .lib-list { display: grid; gap: 2px; }
         /* Rows are soft rounded tiles: a gentle tint on hover, no lines, edges, shadow or underline. */
         .library .lib-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 4px 12px; border: 0; border-radius: var(--r-row, 16px); }
-        .library .lib-list .lib-row:hover, .library .lib-list .lib-row:focus-within:has(:focus-visible) { border-color: transparent !important; border-radius: var(--r-input); box-shadow: var(--lift-shadow) !important; background: var(--lift-pane); transform: var(--lift); }
+        /* Rows on glass show the inner pane and stay put (DESIGN-SPEC 6.1). */
+        @media (hover: hover) { .library .lib-list .lib-row:hover { border-color: transparent !important; border-radius: var(--r-input); box-shadow: var(--glass-inner-shadow) !important; background: var(--lift-pane); transform: none !important; } }
+        .library .lib-list .lib-row:focus-within:has(:focus-visible) { border-color: transparent !important; border-radius: var(--r-input); box-shadow: var(--glass-inner-shadow) !important; background: var(--lift-pane); transform: none !important; }
         .library .lib-row.is-dragging { opacity: .5; }
         .library .lib-kind { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 auto; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
         .library .lib-row-link { display: flex; align-items: baseline; gap: 12px; flex: 1; min-width: 0; color: var(--ink); text-decoration: none; padding: 10px 0; }

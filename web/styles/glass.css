@@ -1,17 +1,98 @@
-/* Liquid glass, matte, on everything that isn't the backdrop: cards, panels, menus,
-   buttons, chips, tabs, fields and the floating controls. Loaded last; colors come only
-   from tokens.css (--lg-*). Sizes, spacing and positions never change here. */
+/* Glass v2 (docs/redesign/DESIGN-SPEC.md section 2) on everything that isn't the backdrop:
+   panes (cards, the sidebar, sheets, the Tutor, menus), glass controls, olive primary buttons and
+   selected items. Loaded last; every value comes from tokens.css. Sizes, spacing and positions
+   never change here. */
 
-/* One recipe: frosted fill + sheen + grain, a bright top rim, a hairline edge, a soft shadow. */
-:is(.c-btn--secondary, .btn-outline, .btn-gray, .c-btn--quiet, .c-icon-btn, .c-chip, .c-pill, .c-seg, .c-avatar,
-  .c-searchbtn, .c-timerbtn, .c-tutor-bubble, .today-streak, .c-toast, .c-tip, .wt-resume, .guide-jobs .guide-job,
-  .quiz-mode, .quiz-option, .tutor-select-trigger, .cset-option, .practice-guide, .lib-kind, .c-drop-hint) {
-  background: var(--lg-sheen), var(--lg-fill);
-  border: 1px solid var(--lg-edge);
-  -webkit-backdrop-filter: var(--lg-filter);
-  backdrop-filter: var(--lg-filter);
-  box-shadow: var(--lg-highlight), var(--lg-shadow);
+/* ---------- Panes ----------
+   1. sheen over fill (resting panes --glass-fill; sheets, bars and floating panes --glass-fill-strong)
+   2. the frost, 3. the layered shadow,
+   4. ::before: the grain tile under the content (the pane isolates, the layer sits at z-index -1),
+   5. ::after: the 1px rim, masked to the edge. The rim is the edge now, so the pane's 1px border
+      turns clear (its width stays, so nothing moves). */
+:is(.c-card, .c-glass, .c-side, .c-topbar, .c-tabbar, .c-sheet, .tutor-drawer, .c-toast, .c-tip, .c-tutor-bubble,
+  .card, .folder-card, .stat-card, .dashboard-class-rail, .study-rail-card, .canvas-dashboard, .compact-calendar,
+  .continue-card, .recent-material, .overview-snapshot, .settings-section, .create-window, .create-card,
+  .practice-source-panel, .practice-main, .practice-problem-panel, .quiz-card, .quiz-question-card, .nclex-card,
+  .completion-card, .guide-reader-window, .sn-viewer-wrap, .sn-diagram-wrap, .extension-install-hero,
+  .extension-install-step, .extension-install-footer, .upgrade-dialog, .feedback-modal, .practice-toolbar,
+  .create-split-settings, .c-menu, .c-search-results, .tutor-select-options, .sn-notes-dropdown, .account-menu-panel) {
+  isolation: isolate;
+  background: var(--glass-sheen), var(--glass-fill) !important;
+  border-color: transparent !important;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow) !important;
 }
+/* The grain and rim layers need a positioned pane; :where() keeps any position a pane already has. */
+:where(.c-card, .c-glass, .card, .folder-card, .stat-card, .dashboard-class-rail, .study-rail-card, .canvas-dashboard,
+  .compact-calendar, .continue-card, .recent-material, .overview-snapshot, .settings-section, .create-window,
+  .create-card, .practice-source-panel, .practice-main, .practice-problem-panel, .quiz-card, .quiz-question-card,
+  .nclex-card, .completion-card, .guide-reader-window, .sn-viewer-wrap, .sn-diagram-wrap, .extension-install-hero,
+  .extension-install-step, .extension-install-footer, .c-sheet, .c-tip, .upgrade-dialog, .feedback-modal,
+  .create-split-settings, .c-search-results, .sn-notes-dropdown, .account-menu-panel) { position: relative; }
+:is(.c-card, .c-glass, .c-side, .c-topbar, .c-tabbar, .c-sheet, .tutor-drawer, .c-toast, .c-tip, .c-tutor-bubble,
+  .card, .folder-card, .stat-card, .dashboard-class-rail, .study-rail-card, .canvas-dashboard, .compact-calendar,
+  .continue-card, .recent-material, .overview-snapshot, .settings-section, .create-window, .create-card,
+  .practice-source-panel, .practice-main, .practice-problem-panel, .quiz-card, .quiz-question-card, .nclex-card,
+  .completion-card, .guide-reader-window, .sn-viewer-wrap, .sn-diagram-wrap, .extension-install-hero,
+  .extension-install-step, .extension-install-footer, .upgrade-dialog, .feedback-modal, .practice-toolbar,
+  .create-split-settings, .c-menu, .c-search-results, .tutor-select-options, .sn-notes-dropdown, .account-menu-panel)::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  background: var(--glass-grain) repeat; background-size: 180px 180px; opacity: var(--glass-grain-opacity);
+}
+:is(.c-card, .c-glass, .c-side, .c-topbar, .c-tabbar, .c-sheet, .tutor-drawer, .c-toast, .c-tip, .c-tutor-bubble,
+  .card, .folder-card, .stat-card, .dashboard-class-rail, .study-rail-card, .canvas-dashboard, .compact-calendar,
+  .continue-card, .recent-material, .overview-snapshot, .settings-section, .create-window, .create-card,
+  .practice-source-panel, .practice-main, .practice-problem-panel, .quiz-card, .quiz-question-card, .nclex-card,
+  .completion-card, .guide-reader-window, .sn-viewer-wrap, .sn-diagram-wrap, .extension-install-hero,
+  .extension-install-step, .extension-install-footer, .upgrade-dialog, .feedback-modal, .practice-toolbar,
+  .create-split-settings, .c-menu, .c-search-results, .tutor-select-options, .sn-notes-dropdown, .account-menu-panel,
+  .fc-face, .learn-flip-face)::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: var(--glass-rim);
+  -webkit-mask: var(--glass-rim-mask-webkit); -webkit-mask-composite: xor;
+  mask: var(--glass-rim-mask);
+}
+/* Raised panes: sheets, the Tutor, the phone bars (page text scrolls under them) and floating things. */
+:is(.c-topbar, .c-tabbar, .c-sheet, .tutor-drawer, .c-toast, .c-tip, .c-tutor-bubble, .upgrade-dialog, .feedback-modal) {
+  background: var(--glass-sheen), var(--glass-fill-strong) !important;
+}
+/* Menus and popovers float over text, so their fill stays solid; they keep their own frost and rim. */
+:is(.c-menu, .c-search-results, .tutor-select-options, .sn-notes-dropdown, .account-menu-panel) {
+  background: var(--lg-menu) !important;
+  box-shadow: var(--glass-shadow-edge), var(--lg-depth-float) !important;
+}
+/* Nest glass once at most, and one frost per spot: a pane on a pane is --glass-inner with no blur,
+   grain or depth of its own. */
+:is(.c-card, .c-glass, .c-side, .c-sheet, .tutor-drawer, .card) :is(.c-card, .c-glass, .card, .folder-card, .stat-card, .settings-section, .create-card, .quiz-card, .quiz-question-card, .completion-card) {
+  background: var(--glass-inner) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--glass-inner-shadow) !important;
+}
+:is(.c-card, .c-glass, .c-side, .c-sheet, .tutor-drawer, .card) :is(.c-card, .c-glass, .card, .folder-card, .stat-card, .settings-section, .create-card, .quiz-card, .quiz-question-card, .completion-card)::before { content: none; }
+
+/* ---------- Glass controls ----------
+   Secondary buttons, chips' kin, pills, the segmented track, avatars and pickers: the brighter
+   control glass with a hairline ring. On a pane they don't frost again (below). */
+:is(.c-btn--secondary, .btn-outline, .btn-gray, .c-pill, .c-seg, .c-avatar, .c-searchbtn, .c-timerbtn, .today-streak,
+  .wt-resume, .guide-jobs .guide-job, .quiz-mode, .quiz-option, .tutor-select-trigger, .cset-option, .practice-guide,
+  .lib-kind, .c-drop-hint) {
+  background: var(--glass-control);
+  border-color: transparent;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-control-shadow);
+}
+/* Chips sit on glass: --glass-inner with the white top line (DESIGN-SPEC 4.2). */
+.c-chip.c-chip {
+  background: var(--glass-inner) !important;
+  border-color: transparent !important;
+  box-shadow: var(--glass-inner-shadow) !important;
+}
+/* Quiet buttons and icon buttons have no surface until hover. */
+:is(.c-btn--quiet, .c-icon-btn) { box-shadow: none; }
+.c-icon-btn--glass { background: var(--glass-control); border-color: transparent; box-shadow: var(--glass-control-shadow); }
 
 /* Long scrolling lists and grids skip the blur on every item (feedback 14): dozens of blurred
    panes repaint on each scroll frame. Their fill and edges stay, so they still read as glass. */
@@ -33,34 +114,38 @@
   backdrop-filter: none;
 }
 
-/* Quiet buttons and icon buttons stay lighter so rows of them don't feel heavy. */
-:is(.c-btn--quiet, .c-icon-btn) { box-shadow: var(--lg-highlight); }
 @media (hover: hover) { .c-btn--quiet:hover:not(:disabled) { background: var(--lift-pane); } }
 
-/* Primary actions: olive glass with the same rim and sheen. */
-:is(.c-btn--primary, .btn, .btn-green, .c-tab-new-dot) {
-  background: var(--lg-sheen-olive), var(--olive);
-  border: 1px solid var(--lg-edge);
-  box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow);
-}
-/* Hover keeps the olive: the lift and deeper shadow come from the hover system in system.css. */
-
-/* Selected states: olive glass for pills and chips; a raised clear pane for segment tabs. */
-:is(.c-pill[aria-current='page'], .c-pill[aria-selected='true'], .quiz-mode.is-on) {
-  background: var(--lg-sheen-olive), var(--olive);
+/* ---------- Primary buttons: olive glass (DESIGN-SPEC 2.4) ----------
+   The olive sheen over olive, the olive glass shadow and the label colour. Hover adds the 4px olive
+   halo and rises 1px; press darkens and settles to 0.97 (section 6.1). */
+:is(.c-btn--primary, .btn, .btn-green, .btn-upgrade, .cordia-tutor-send, .c-tab-new-dot,
+  .pricing-btn:not(.is-secondary):not(.is-current)):not(:disabled) {
+  background: var(--olive-glass-sheen), var(--olive) !important;
+  border-color: transparent !important;
+  box-shadow: var(--olive-glass-shadow) !important;
   color: var(--on-olive);
-  border-color: var(--lg-edge);
 }
-.c-seg { box-shadow: var(--lg-highlight); }
-:is(.c-seg [aria-selected='true'], .c-seg .is-active) {
-  background: var(--lg-sheen), var(--lg-fill-strong);
-  box-shadow: var(--lg-highlight), var(--lg-shadow);
+
+/* ---------- Selected items: selected glass ----------
+   The current place in the sidebar and nav, a pressed chip or toggle, the chosen pill or search hit:
+   olive tint over raised glass, ink text, an olive icon. The chosen segment is the sliding pill
+   (--seg-pill-bg). */
+:is(.c-side .c-side-item[aria-current='page'], .c-nav a[aria-current='page'], .c-tabbar a[aria-current='page'],
+  .c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-chip[aria-pressed='true'], .c-search-hit.is-active,
+  .c-nav .c-nav-btn[aria-pressed='true'], .tutor-chats-btn[aria-pressed='true'],
+  .c-icon-btn:is([aria-pressed='true'], .is-on):not(:disabled)) {
+  background: var(--selected-glass) !important;
+  border-color: transparent !important;
+  box-shadow: var(--selected-glass-shadow) !important;
+  color: var(--ink) !important;
 }
-/* The active place in the nav reads as a pane of glass, not a flat fill. */
-:is(.c-nav a[aria-current='page'], .c-tabbar a[aria-current='page']) {
-  background: var(--lg-sheen), var(--lg-fill-strong);
-  box-shadow: var(--lg-highlight), var(--lg-shadow);
-}
+.c-chip.c-chip[aria-pressed='true'] { box-shadow: var(--selected-glass-shadow), var(--selected-glass-ring) !important; }
+:is(.c-side .c-side-item[aria-current='page'], .c-nav a[aria-current='page'], .c-tabbar a[aria-current='page'],
+  .c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-chip[aria-pressed='true'], .c-search-hit.is-active,
+  .c-nav .c-nav-btn[aria-pressed='true'], .tutor-chats-btn[aria-pressed='true'],
+  .c-icon-btn:is([aria-pressed='true'], .is-on)) :is(svg.lucide, .lucide) { color: var(--olive-ink) !important; }
+.c-seg.c-seg > :is(button, a):is([aria-selected='true'], [aria-checked='true'], .is-active) { color: var(--ink) !important; }
 
 /* Fields: a slightly clearer pane, set into the surface. */
 :is(.c-input, .c-select, .c-search .c-input, textarea.c-input) {
@@ -79,8 +164,8 @@ select.c-select.c-select {
   text-overflow: ellipsis;
 }
 
-/* Floating things get the deeper shadow. */
-:is(.c-tutor-bubble, .c-toast, .c-tip, .wt-resume, .c-drop-hint, .c-timer-pop .focus-card, .c-menu, .c-sheet) { box-shadow: var(--lg-highlight), var(--lg-depth-float) !important; }
+/* Floating controls get the deeper shadow (floating panes carry the glass shadow above). */
+:is(.wt-resume, .c-drop-hint, .c-timer-pop .focus-card) { box-shadow: var(--glass-shadow-edge), var(--lg-depth-float) !important; }
 /* The toast is light glass now, so its text is ink (it was light text for the old dark toast). */
 .c-toast { color: var(--ink); }
 .c-toast .c-btn--quiet { color: var(--olive-ink); }
@@ -118,8 +203,8 @@ select.c-select.c-select {
   transition: transform var(--dur) var(--ease);
 }
 .c-tutor-bubble .lucide { color: var(--olive-ink); flex: 0 0 auto; }
-@media (hover: hover) { .c-tutor-bubble:hover { transform: translateY(-1px); } }
-.c-tutor-bubble:active { transform: scale(.98); }
+@media (hover: hover) { .c-tutor-bubble:hover { transform: var(--lift); } }
+.c-tutor-bubble:active { transform: var(--press); }
 @media (max-width: 767px) {
   .c-tutor-bubble { right: 12px; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px); width: 48px; height: 48px; min-width: 48px; padding: 0; justify-content: center; }
   .c-tutor-bubble-label { display: none; }
@@ -139,42 +224,27 @@ select.c-select.c-select {
 }
 .c-tab-new-dot { display: grid; place-items: center; width: 36px; height: 28px; border-radius: var(--r-pill); color: var(--on-olive); }
 
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :is(.c-btn--secondary, .c-btn--quiet, .c-icon-btn, .c-chip, .c-pill, .c-seg, .c-avatar, .c-searchbtn, .c-timerbtn, .c-tutor-bubble, .c-input, .c-select, .c-side, .c-menu.ov-select, .c-menu.reader-select) { background: var(--card) !important; }
-}
+/* Without a frost, or when the device asks for less transparency, the glass tokens turn solid
+   (tokens.css); fields follow, and nothing frosts. Rims stay. */
 @media (prefers-reduced-transparency: reduce) {
-  :is(.c-card, .c-btn--secondary, .c-btn--quiet, .c-icon-btn, .c-chip, .c-pill, .c-seg, .c-tutor-bubble, .c-input, .c-select, .c-sheet, .c-menu, .c-side) { background: var(--surface-raised) !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  :is(.c-input, .c-select, textarea) { background: var(--surface-raised) !important; }
   select.c-select.c-select { background: var(--select-chevron) no-repeat right 14px center / 16px 16px, var(--surface-raised) !important; }
+  * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 }
 
-/* The sidebar: a floating pane of frosted glass, like the cards, with the deeper float shadow. */
+/* The sidebar is a resting pane (above); its items keep a clear 1px edge so the current one,
+   in selected glass, doesn't shift. */
 @media (min-width: 768px) {
-  .c-side {
-    background: var(--lg-sheen), var(--lg-grain), var(--lg-fill);
-    border-color: var(--lg-edge);
-    -webkit-backdrop-filter: var(--lg-filter);
-    backdrop-filter: var(--lg-filter);
-    box-shadow: var(--lg-highlight), var(--lg-depth-float);
-  }
-  /* Where you are: a raised pane with the olive tint and olive icon, the same as selected pills.
-     Only the current page wears it; hover is the plain wash in system.css. */
   .c-side .c-side-item { border: 1px solid transparent; }
-  .c-side .c-side-item[aria-current='page'] {
-    background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--lg-sheen), var(--lg-fill-strong);
-    border-color: var(--lg-edge);
-    box-shadow: var(--lg-highlight), var(--lg-shadow);
-    color: var(--ink);
-  }
-  .c-side .c-side-item[aria-current='page'] .lucide { color: var(--olive-ink); }
 }
 
 /* The highlight menu over notes: frosted glass rather than a solid menu (the text under it
    blurs away, so it still reads). */
 .c-menu:is(.ov-select, .reader-select) {
-  background: var(--lg-sheen), var(--lg-grain), var(--lg-fill-strong) !important;
-  -webkit-backdrop-filter: var(--lg-filter);
-  backdrop-filter: var(--lg-filter);
-  box-shadow: var(--lg-highlight), var(--lg-depth-float) !important;
+  background: var(--glass-sheen), var(--glass-fill-strong) !important;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow) !important;
 }
 
 /* A glass card is its own stacking context, so an open menu inside one would slide under
@@ -213,10 +283,6 @@ main .sn-paper h1, .sn-paper h1 { font-size: var(--fs-20) !important; font-weigh
 .sn-paper h2 { font-size: var(--fs-17) !important; }
 .sn-paper :is(h3, h4) { font-size: var(--fs-15) !important; }
 
-/* An icon button that is switched on (shuffle, star, camera) reads like a switch that is on:
-   olive glass with a white icon, unmistakable at a glance in both themes. */
-:is(.c-icon-btn[aria-pressed='true'], .c-icon-btn.is-on):not(:disabled) { background: var(--lg-sheen-olive), var(--olive) !important; border-color: var(--lg-edge); color: var(--on-olive); box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow); }
-:is(.c-icon-btn[aria-pressed='true'], .c-icon-btn.is-on) svg.lucide { color: var(--on-olive) !important; }
 
 /* Phones never zoom: no double-tap zoom, and fields are 16px so iOS doesn't zoom in on focus. */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -278,14 +344,13 @@ body { touch-action: manipulation; }
 .tutor-chats-new .c-meta { margin: 0; }
 .tutor-chats-title { margin: 8px 0 0; font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
 .tutor-chats-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.tutor-chat-row { display: grid; gap: 2px; width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid var(--hairline); border-radius: var(--r-input); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; transition: background var(--dur) var(--ease); }
-@media (hover: hover) { .tutor-chat-row:hover:not(:disabled) { background: var(--lift-pane); box-shadow: var(--lift-shadow); transform: var(--lift); } }
+.tutor-chat-row { display: grid; gap: 2px; width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid var(--hairline); border-radius: var(--r-input); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+@media (hover: hover) { .tutor-chat-row:hover:not(:disabled) { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); } }
 .tutor-chat-item { display: flex; align-items: center; gap: 6px; }
 .tutor-chat-item .tutor-chat-row { flex: 1; min-width: 0; }
 .tutor-chat-delete { flex: none; }
 .tutor-chat-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.4 var(--font-sans); }
 .tutor-chat-row .c-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tutor-chats-btn[aria-pressed='true'] { background: var(--olive-tint) !important; color: var(--olive-ink) !important; }
 
 /* Settings › Connectors: tiles with brand marks, like Cordia Assistant's Connections.
    Phones show one list with a line on what each app does. */
@@ -413,69 +478,58 @@ body { touch-action: manipulation; }
 
 /* Tiles and buttons: Learn's ways and Test yourself, the New sheet, calendar items, Past chats. */
 :is(.learn-way, .new-option, .new-make-btn, .new-sample, .calendar-item, .tutor-past-chats, .plan-badge) {
-  background: var(--lg-sheen), var(--lg-fill) !important;
-  border-color: var(--lg-edge) !important;
-  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
+  background: var(--glass-control) !important;
+  border-color: transparent !important;
+  box-shadow: var(--glass-control-shadow) !important;
 }
-@media (hover: hover) { :is(.learn-way, .new-option, .new-make-btn, .new-sample, .calendar-item, .tutor-past-chats):hover:not(:disabled) {
-  background: var(--lg-sheen), var(--lg-fill-strong) !important;
-} }
-/* The calendar stays shadowless (asked for): glass fill and rim only, and study blocks keep
+/* The calendar stays shadowless (asked for): glass fill and edge only, and study blocks keep
    their olive left edge. */
-.calendar-item { box-shadow: var(--lg-highlight) !important; }
+.calendar-item { box-shadow: var(--glass-shadow-edge) !important; }
 .calendar-item-block { border-left-color: var(--olive) !important; }
 
 /* Tinted ones keep their tint, laid over the glass: study blocks, the sample, a chosen way. */
 :is(.calendar-item-block, .new-sample, .plan-badge[data-plan='plus']) {
-  background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--lg-sheen), var(--lg-fill) !important;
+  background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--glass-control) !important;
 }
 
-/* Selected rows and tabs: a raised pane with the olive tint, not a flat tint. */
-:is(.c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-nav a[aria-current='page'], .c-search-hit.is-active) {
-  background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--lg-sheen), var(--lg-fill-strong) !important;
-  border-color: var(--lg-edge) !important;
-  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
-}
-.c-seg [aria-checked='true'] {
-  background: var(--lg-sheen), var(--lg-fill-strong) !important;
-  border-color: var(--hairline) !important;
-  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
-}
-
-/* Primary actions everywhere, including Pricing's. A disabled button is a quiet pane of glass,
-   not a flat grey block. */
-.pricing-btn:not(.is-secondary):not(.is-current) {
-  background: var(--lg-sheen-olive), var(--olive) !important;
-  border: 1px solid var(--lg-edge) !important;
-  box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow) !important;
-}
-:is(.pricing-btn.is-secondary, .pricing-btn.is-current) {
-  background: var(--lg-sheen), var(--lg-fill) !important;
-  border-color: var(--lg-edge) !important;
-  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
+/* Secondary choices and a disabled button are quiet glass, not a flat grey block. */
+:is(.pricing-btn.is-secondary, .pricing-btn.is-current, .upgrade-intervals button, .feedback-cancel, .feedback-close, .upgrade-later) {
+  background: var(--glass-control) !important;
+  border-color: transparent !important;
+  box-shadow: var(--glass-control-shadow) !important;
 }
 :is(.c-btn, .btn, .btn-outline):disabled {
-  background: var(--lg-sheen), var(--lg-fill) !important;
-  border-color: var(--lg-edge) !important;
-  box-shadow: var(--lg-highlight) !important;
+  background: var(--glass-control) !important;
+  border-color: transparent !important;
+  box-shadow: var(--glass-shadow-edge) !important;
   color: var(--muted) !important;
 }
 /* A waiting primary button keeps a hint of olive, so it never reads as one more empty field
    under the fields of a form (Instructors, Join, Reset password). */
-.c-btn--primary:disabled { background: var(--lg-sheen), var(--olive-tint) !important; color: var(--olive-ink) !important; }
+.c-btn--primary:disabled { background: var(--glass-sheen), var(--olive-tint) !important; color: var(--olive-ink) !important; }
 
-/* Panels: flashcard faces, the practice board and its toolbar, Create's settings. Card faces
-   flip in 3D, where a backdrop blur breaks the flip, so they keep fill, sheen and rim only. */
-:is(.fc-face, .learn-flip-face, .practice-board, .practice-toolbar, .create-split-settings) {
+/* Card faces flip in 3D, where a backdrop blur breaks the flip: raised fill, sheen, shadow and the
+   rim (on ::before; ::after is the flashcard's own sweep), no frost. */
+:is(.fc-face, .learn-flip-face) {
+  background: var(--glass-sheen), var(--glass-fill-strong) !important;
+  border-color: transparent !important;
+  box-shadow: var(--glass-shadow) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:where(.learn-flip-face) { position: relative; }
+:is(.fc-face, .learn-flip-face)::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: var(--glass-rim);
+  -webkit-mask: var(--glass-rim-mask-webkit); -webkit-mask-composite: xor;
+  mask: var(--glass-rim-mask);
+}
+.learn-flip-back { background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--glass-sheen), var(--glass-fill-strong) !important; }
+.practice-board {
   background: var(--lg-card) !important;
   border-color: var(--lg-edge) !important;
-  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
+  box-shadow: var(--glass-shadow) !important;
 }
-:is(.practice-toolbar, .create-split-settings) {
-  -webkit-backdrop-filter: var(--lg-filter);
-  backdrop-filter: var(--lg-filter);
-}
-.learn-flip-back { background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--lg-card) !important; }
 
 /* Every text box is a field pane, whether or not it uses .c-input. */
 textarea:not(.c-input) {
@@ -484,16 +538,41 @@ textarea:not(.c-input) {
   box-shadow: inset 0 1px 2px var(--lg-border-shade), inset 0 -1px 0 var(--lg-rim-low) !important;
 }
 
-/* Dialogs: Upgrade's plan options and buttons, Feedback's Cancel and close, the Tutor's Send. */
-:is(.upgrade-intervals button, .feedback-cancel, .feedback-close, .upgrade-later) {
-  background: var(--lg-sheen), var(--lg-fill) !important;
-  border: 1px solid var(--lg-edge) !important;
-  box-shadow: var(--lg-highlight), var(--lg-shadow) !important;
+/* ---------- Hover and press (DESIGN-SPEC 6.1) ----------
+   The shared rules are in system.css; these cover what this file styles. Tiles rise 1px with the
+   deeper control shadow; olive buttons rise with their 4px halo and press darker. Nothing changes
+   colour on hover. */
+:is(.learn-way, .new-option, .new-make-btn, .new-sample, .tutor-past-chats, .cordia-tutor-send, .c-tutor-bubble):not(:disabled) {
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-.upgrade-later { box-shadow: var(--lg-highlight) !important; }
-:is(.btn-upgrade, .cordia-tutor-send) {
-  background: var(--lg-sheen-olive), var(--olive) !important;
-  border: 1px solid var(--lg-edge) !important;
-  box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-shadow) !important;
+@media (hover: hover) {
+  :is(.learn-way, .new-option, .new-make-btn, .new-sample, .tutor-past-chats):hover:not(:disabled) {
+    box-shadow: var(--glass-control-shadow-hover) !important;
+    transform: var(--lift);
+  }
+  :is(.c-btn--primary, .btn, .btn-green, .btn-upgrade, .cordia-tutor-send,
+    .pricing-btn:not(.is-secondary):not(.is-current)):not(:disabled):hover {
+    box-shadow: var(--olive-glass-shadow-hover) !important;
+    transform: var(--lift);
+  }
 }
-@media (hover: hover) { :is(.btn-upgrade, .cordia-tutor-send):hover:not(:disabled) { background: var(--lg-sheen-olive), var(--olive) !important; box-shadow: var(--lift-shadow) !important; transform: var(--lift); } }
+:is(.c-btn--primary, .btn, .btn-green, .btn-upgrade, .cordia-tutor-send,
+  .pricing-btn:not(.is-secondary):not(.is-current)):not(:disabled):active {
+  background: var(--olive-glass-sheen), var(--olive-glass-press) !important;
+  transform: var(--press);
+}
+
+/* Less motion (DESIGN-SPEC 6.1): nothing lifts or scales. --lift and --press are already off
+   (tokens.css); this catches the older hovers and presses that set their own transform. */
+@media (prefers-reduced-motion: reduce) {
+  :is(.btn, .btn-outline, .btn-gray, .btn-green, .btn-upgrade, .login-cta-btn, .login-oauth-button, .c-btn, .c-icon-btn, .c-pill, .c-chip,
+    .c-seg button, .c-seg a, .c-avatar, .c-nav a, .c-nav .c-nav-btn, .c-side-item, .c-menu [role='menuitem'], .c-card, .c-list-row, .lib-row,
+    .sn-card, .calendar-item, .item-grid > *, .fc-hub-card, .fc-btn, .fc-btn-know, .fc-btn-again, .quiz-option, .quiz-explanation-btn,
+    .sn-save-btn, .sn-open-btn, .cordia-tutor-attach, .cordia-tutor-evidence, .cordia-tutor-send, .tutor-dock-toggle, .account-avatar,
+    .account-menu-panel > button, .acct-bubble, .scene-tools button, .tutor-starter-actions button, .learning-style-option,
+    .workspace-shortcuts button, .rail-create, .overview-secondary, .cn-tile, .c-tutor-bubble, .new-option, .new-make-btn, .new-sample,
+    .new-drop, .learn-way, .tutor-past-chats, .tutor-chat-row, .asst-option, .class-add-trigger, .card-photo-add, .auth-google,
+    .rec-start, .pricing-btn, .upgrade-intervals button, .upgrade-later, .study-aid-tab, .tutor-select-trigger):is(:hover, :active, :focus-visible, :focus-within) {
+    transform: none !important;
+  }
+}
