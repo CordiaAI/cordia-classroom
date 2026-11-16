@@ -291,7 +291,7 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
                   const state = passed[index] ? 'ok' : submitted ? 'bad' : 'todo';
                   return (
                     <li key={check.label} className={`is-${state}`}>
-                      {state === 'bad' ? <X size={16} strokeWidth={2} aria-hidden="true" /> : <Check size={16} strokeWidth={2} aria-hidden="true" />}
+                      {state === 'bad' ? <X size={16} strokeWidth={1.75} aria-hidden="true" /> : <Check size={16} strokeWidth={1.75} aria-hidden="true" />}
                       <span>{check.label}</span>
                       <span className="sr-only">{passed[index] ? 'done' : 'missing'}</span>
                     </li>
@@ -324,7 +324,7 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
         .auth-form { display: grid; gap: 16px; }
         .auth-field { display: grid; gap: 8px; }
         .auth-field label { font:600 13px/1.15 var(--font-sans); color: var(--ink); }
-        .auth-input { width: 100%; height: 48px; padding: 0 12px; border: 1px solid var(--hairline); border-radius:12px; background: var(--surface-card); color: var(--ink); font:500 15px/1 var(--font-sans); outline: none; box-shadow: none; }
+        .auth-input { width: 100%; height: 48px; padding: 0 12px; border: 1px solid var(--hairline); border-radius:12px; background: var(--lg-fill-field); color: var(--ink); font:500 15px/1 var(--font-sans); outline: none; box-shadow: none; }
         .auth-input:focus-visible, .auth-input:focus { outline: 2px solid var(--olive); outline-offset: 0; border-color: transparent; border-radius:12px; box-shadow: none; }
         .auth-password { position: relative; }
         .auth-password .auth-input { padding-right: 52px; }

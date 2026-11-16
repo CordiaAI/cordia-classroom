@@ -13,7 +13,8 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: scale(var(
 .main-content { width: auto; max-width: none; margin: 0 0 0 calc(var(--workspace-rail-width) + 36px); padding: 36px 28px 60px; background: transparent; }
 /* "backwards", not "both": a transform kept after the animation makes the page the containing
    block for position: fixed, so toasts and overlays inside a page landed mid-page. */
-.workspace-route { min-width: 0; animation: window-reveal 300ms cubic-bezier(.2,.8,.2,1) backwards; }
+/* No entrance: a page that is already there when it paints stays still. */
+.workspace-route { min-width: 0; }
 /* No fade: while a parent is see-through, Chrome paints every frosted pane inside it as a flat
    block until the fade ends. The page slides in instead. */
 @keyframes window-reveal { from { transform: translateY(12px); } to { transform: none; } }

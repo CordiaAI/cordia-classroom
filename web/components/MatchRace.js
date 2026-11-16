@@ -25,7 +25,7 @@ function TimerRing({ left }) {
         .race-ring-fill { stroke: var(--olive); transition: stroke-dashoffset 1s linear, stroke 300ms ease; }
         .is-low .race-ring-fill { stroke: var(--warning); }
         .is-urgent .race-ring-fill { stroke: var(--error); }
-        .is-urgent { color: var(--error); animation: race-tick 1s ease-in-out infinite; }
+        .is-urgent { color: var(--error); animation: race-tick 1s var(--ease-move) infinite; }
         @keyframes race-tick { 50% { transform: scale(1.08); } }
         @media (prefers-reduced-motion: reduce) { .race-ring-fill { transition: none; } .is-urgent { animation: none; } }
       `}</style>
@@ -147,7 +147,7 @@ export default function MatchRace({ questions, guideId, onRestart, onDone }) {
         .race-tile.is-answer { font-family: var(--font-sans); font-size:15px; }
         .race-tile.is-picked { border-color: var(--state-select-edge); background: var(--state-select-fill); }
         .race-tile.is-cleared { opacity: .25; cursor: default; }
-        .race-tile.is-wrong { border-color: var(--error); animation: race-shake 380ms cubic-bezier(.36,.07,.19,.97); }
+        .race-tile.is-wrong { border-color: var(--error); animation: race-shake 360ms linear; }
         .race-tile.is-merging { position: relative; z-index: 1; border-color: var(--success); background: var(--success-bg); color: var(--success); pointer-events: none; }
         .race-tile.is-merging.is-q { animation: race-merge-q ${MERGE_MS}ms var(--ease) forwards; }
         .race-tile.is-merging.is-a { animation: race-merge-a ${MERGE_MS}ms var(--ease) forwards; }

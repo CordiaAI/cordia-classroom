@@ -25,7 +25,7 @@ export default function CardPhoto({ value, onChange, label = 'Add photo', onErro
       {value && isCardImage(value) ? (
         <span className="card-photo">
           <img src={value} alt="" />
-          <button type="button" className="card-photo-remove" onClick={() => onChange('')} aria-label={`Remove photo (${label.replace(/^Add photo/i, '').trim() || 'card'})`}><X size={14} strokeWidth={2} aria-hidden="true" /></button>
+          <button type="button" className="card-photo-remove" onClick={() => onChange('')} aria-label={`Remove photo (${label.replace(/^Add photo/i, '').trim() || 'card'})`}><X size={14} strokeWidth={1.75} aria-hidden="true" /></button>
         </span>
       ) : (
         <button type="button" className="card-photo-add" onClick={() => inputRef.current?.click()} disabled={busy} aria-label={label} title={label}>

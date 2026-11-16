@@ -45,7 +45,7 @@ export default function ReportSheet({ targetType, targetId, name, onClose, onUna
           </header>
           {done ? (
             <div className="rs-done" role="status">
-              <span className="rs-done-icon" aria-hidden="true"><Check size={22} strokeWidth={2} /></span>
+              <span className="rs-done-icon" aria-hidden="true"><Check size={22} strokeWidth={1.75} /></span>
               <p>We’ll review {name ? <strong>{name}</strong> : `this ${what}`}. It isn’t told who reported it.</p>
               <div className="rs-actions"><button type="button" className="c-btn c-btn--primary" onClick={onClose}>Done</button></div>
             </div>

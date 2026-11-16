@@ -310,7 +310,6 @@ export default function Today() {
         <section className="c-section" aria-labelledby="updates-title">
           <div className="c-row today-updates-head">
             <h2 id="updates-title" className="c-section-title">Class updates</h2>
-            <span className="c-meta">Changes and new work from your classes and apps</span>
           </div>
           <div className="c-card c-list">
             {alerts.slice(0, 4).map(raw => (raw.kind === 'slack_post' ? raw : { ...raw, title: deadlineTitle(raw) })).map(alert => (

@@ -551,7 +551,7 @@ export default function LibraryPage() {
         <ClassCoverSheet folder={coverFor} titles={classTitles(coverFor.id)} onClose={() => setCoverFor(null)}
           onSaved={folder => { setFolders(current => current.map(item => (item.id === folder.id ? { ...item, ...folder } : item))); setCoverFor(null); setToast('Cover saved'); }} />
       )}
-      {confirm && <ConfirmDialog title={confirm.title} confirmLabel="Delete" onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
+      {confirm && <ConfirmDialog title={confirm.title} confirmLabel="Delete class" onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
 
       <style jsx global>{`
         .library > *, .library .c-page-head, .lib-head-actions { min-width: 0; max-width: 100%; }

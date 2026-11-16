@@ -24,7 +24,7 @@ function Row({ row, number, question, guideId, onSelfCheck }) {
       <div className="rv-top">
         <span className="rv-num">{number}</span>
         <span className="rv-q">{question.question}</span>
-        <span className={'rv-mark is-' + tone}>{tone !== 'unchecked' && <Icon size={16} strokeWidth={2.25} aria-hidden="true" />}{label}</span>
+        <span className={'rv-mark is-' + tone}>{tone !== 'unchecked' && <Icon size={16} strokeWidth={1.75} aria-hidden="true" />}{label}</span>
       </div>
       <dl className="rv-answers">
         <div><dt>Your answer</dt><dd>{row.response || 'Not answered'}{row.confidence && <span className="rv-sure">{SURE[row.confidence]}</span>}</dd></div>

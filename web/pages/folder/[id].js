@@ -185,7 +185,7 @@ export default function ClassPage() {
   return (
     <Reveal phase={gate}>
     <div className="c-page cls-page">
-      {confirm && <ConfirmDialog title={confirm.title} confirmLabel="Delete" onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
+      {confirm && <ConfirmDialog title={confirm.title} confirmLabel="Delete class" onConfirm={confirm.onConfirm} onCancel={() => setConfirm(null)} />}
       <header className="c-page-head">
         <div className="c-row cls-title-row">
           <Link href="/library" className="c-icon-btn" aria-label="Library"><ArrowLeft {...ICON} /></Link>

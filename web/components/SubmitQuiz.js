@@ -123,7 +123,7 @@ export default function SubmitQuiz({ questions, items, deadline = null, resume =
             ))}
           </div>
         )}
-        <p className={'sq-saved' + (answered ? ' is-saved' : '')} role="status">{answered ? <><Check size={16} strokeWidth={2} aria-hidden="true" />Answer saved</> : 'Not answered yet'}</p>
+        <p className={'sq-saved' + (answered ? ' is-saved' : '')} role="status">{answered ? <><Check size={16} strokeWidth={1.75} aria-hidden="true" />Answer saved</> : 'Not answered yet'}</p>
 
         <div className="quiz-next-row sq-nav">
           <button type="button" className="c-btn c-btn--secondary" onClick={() => go(position - 1)} disabled={position === 0}><ArrowLeft {...ICON} />Previous</button>
@@ -146,7 +146,7 @@ export default function SubmitQuiz({ questions, items, deadline = null, resume =
               <li key={entry.id}>
                 <button type="button" className={'sq-cell' + (done ? ' is-answered' : '') + (marked ? ' is-flagged' : '') + (index === position ? ' is-current' : '')}
                   aria-current={index === position ? 'step' : undefined} aria-label={`Question ${index + 1}, ${done ? 'answered' : 'not answered'}${marked ? ', flagged' : ''}`} onClick={() => go(index)}>
-                  {index + 1}{marked && <Flag size={10} strokeWidth={2.25} aria-hidden="true" fill="currentColor" />}
+                  {index + 1}{marked && <Flag size={10} strokeWidth={1.75} aria-hidden="true" fill="currentColor" />}
                 </button>
               </li>
             );

@@ -85,9 +85,9 @@ export default function PrintQuizSheet({ guideId, onClose }) {
                     <li key={type} className={'pqs-type' + (on ? '' : ' is-off')}>
                       <Toggle checked={on} onChange={value => setFormat(current => toggleType(current, type, value))} label={TYPE_NAMES[type]} disabled={on && onCount === 1} />
                       <div className="pqs-stepper" role="group" aria-label={`${TYPE_NAMES[type]} count`}>
-                        <button type="button" className="c-icon-btn" onClick={() => setFormat(current => setCount(current, type, count - 1))} disabled={!on || count <= 1} aria-label={`Fewer ${TYPE_NAMES[type].toLowerCase()}`}><Minus size={16} strokeWidth={2} aria-hidden="true" /></button>
+                        <button type="button" className="c-icon-btn" onClick={() => setFormat(current => setCount(current, type, count - 1))} disabled={!on || count <= 1} aria-label={`Fewer ${TYPE_NAMES[type].toLowerCase()}`}><Minus size={16} strokeWidth={1.75} aria-hidden="true" /></button>
                         <span className="pqs-count" aria-live="polite">{count}</span>
-                        <button type="button" className="c-icon-btn" onClick={() => setFormat(current => setCount(current, type, count + 1))} disabled={!on || count >= MAX_COUNT} aria-label={`More ${TYPE_NAMES[type].toLowerCase()}`}><Plus size={16} strokeWidth={2} aria-hidden="true" /></button>
+                        <button type="button" className="c-icon-btn" onClick={() => setFormat(current => setCount(current, type, count + 1))} disabled={!on || count >= MAX_COUNT} aria-label={`More ${TYPE_NAMES[type].toLowerCase()}`}><Plus size={16} strokeWidth={1.75} aria-hidden="true" /></button>
                       </div>
                     </li>
                   );

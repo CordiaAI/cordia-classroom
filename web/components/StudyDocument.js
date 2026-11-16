@@ -77,7 +77,7 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
           const read = readSections?.has(index);
           return (
             <section className="reader-block" key={pair.index}>
-              <h2 className="reader-q"><span className={'reader-num' + (read ? ' is-read' : '')} aria-label={read ? `${index + 1}, done` : undefined}>{read ? <Check size={14} strokeWidth={2.5} aria-hidden="true" /> : index + 1}</span>{pair.question}</h2>
+              <h2 className="reader-q"><span className={'reader-num' + (read ? ' is-read' : '')} aria-label={read ? `${index + 1}, done` : undefined}>{read ? <Check size={14} strokeWidth={1.75} aria-hidden="true" /> : index + 1}</span>{pair.question}</h2>
               <p className="c-study reader-a" data-spot={offset === 0 ? 'reader-text' : undefined} data-tip={offset === 0 ? 'highlight' : undefined}>{pair.answer}</p>
               {pair.image && <img className="reader-img" src={pair.image} alt="" />}
               {(onRead || onExplain) && (

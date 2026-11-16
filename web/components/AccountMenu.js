@@ -137,7 +137,7 @@ export default function AccountMenu({ open, onClose, anchorRef, items, placement
           color: var(--ink); font: 500 15px/1 var(--font-sans); white-space: nowrap; cursor: pointer;
           /* No background transition: the fill is gradient layers, which can't animate, so a transition
              to a plain color left the bubble see-through (a grey flash) for a moment on hover. */
-          transition: border-color 160ms ease-out, transform 160ms ease-out, box-shadow 160ms ease-out;
+          transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
         }
         .acct-bubble .lucide { flex: 0 0 auto; width: 20px; height: 20px; color: var(--ink); }
         .acct-bubble.is-separated { margin-top: ${SIGN_OUT_EXTRA}px; }
@@ -155,7 +155,7 @@ export default function AccountMenu({ open, onClose, anchorRef, items, placement
           }
           .acct-bubbles.is-open .acct-bubble:active { transform: translateY(-1px) scale(.98); }
         }
-        .acct-bubbles.is-opening .acct-bubble { animation: acct-fold-out 260ms ease-out var(--open-delay) both; }
+        .acct-bubbles.is-opening .acct-bubble { animation: acct-fold-out var(--dur-enter) var(--ease) var(--open-delay) both; }
         .acct-bubbles.is-closing .acct-bubble { animation: acct-fold-in 200ms ease-in var(--close-delay) both; }
         @keyframes acct-fold-out {
           0% { transform: translateY(var(--from)) scale(.9); opacity: 0; }
@@ -167,7 +167,7 @@ export default function AccountMenu({ open, onClose, anchorRef, items, placement
           to { transform: translateY(var(--from)) scale(.9); opacity: 0; }
         }
         @media (prefers-reduced-motion: reduce) {
-          .acct-bubbles.is-opening .acct-bubble { animation: acct-fade-in 150ms ease-out both; }
+          .acct-bubbles.is-opening .acct-bubble { animation: acct-fade-in var(--dur) var(--ease) both; }
           .acct-bubbles.is-closing .acct-bubble { animation: acct-fade-out 150ms ease-in both; }
           .acct-bubble:hover, .acct-bubble:active { transform: none !important; }
         }

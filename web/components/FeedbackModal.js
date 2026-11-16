@@ -280,7 +280,7 @@ export default function FeedbackModal({ onClose, initialCategory = 'bug', initia
                 <div key={shot.id} className={'feedback-shot' + (shot.status === 'uploading' ? ' is-uploading' : '')}>
                   {/* A local preview of the file being attached (blob: URL), never a remote address. */}
                   <img src={shot.preview} alt="Attached screenshot" />
-                  <button type="button" className="feedback-shot-remove" onClick={() => removeShot(shot.id)} aria-label="Remove screenshot"><X size={14} strokeWidth={2} aria-hidden="true" /></button>
+                  <button type="button" className="feedback-shot-remove" onClick={() => removeShot(shot.id)} aria-label="Remove screenshot"><X size={14} strokeWidth={1.75} aria-hidden="true" /></button>
                 </div>
               ))}
               {shots.length < MAX_SHOTS && (

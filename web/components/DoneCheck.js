@@ -21,7 +21,7 @@ export default function DoneCheck({ id, title, done, onChange, save = setDeadlin
 
   return (
     <button type="button" role="checkbox" aria-checked={checked} aria-label={`${checked ? 'Mark not done' : 'Mark done'}: ${title}`} className={'done-check' + (checked ? ' is-done' : '')} onClick={toggle}>
-      {checked && <Check size={16} strokeWidth={2.25} aria-hidden="true" />}
+      {checked && <Check size={16} strokeWidth={1.75} aria-hidden="true" />}
       <style jsx>{`
         .done-check { flex: 0 0 auto; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 2px solid var(--muted); border-radius: 8px; background: transparent; color: var(--on-olive); cursor: pointer; transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease); }
         @media (hover: hover) { .done-check:hover { border-color: var(--olive); } }

@@ -271,7 +271,7 @@ export default function Sidebar({ timerState, setTimerState }) {
             <div className="c-side-heading-row">
               <h2 id="c-side-classes" className="c-side-heading">Classes</h2>
               <Link className="c-side-add" href="/library?add=class" aria-label="Add a class">
-                <Plus size={16} strokeWidth={2} aria-hidden="true" />
+                <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
               </Link>
             </div>
             {classes && classes.length > 0 && (
@@ -349,7 +349,7 @@ export default function Sidebar({ timerState, setTimerState }) {
           </Link>
         ))}
         <button type="button" className="c-tab-new" data-spot="new" onClick={() => openNewSheet()} aria-label="New">
-          <span className="c-tab-new-dot"><Plus size={22} strokeWidth={2} aria-hidden="true" /></span>
+          <span className="c-tab-new-dot"><Plus size={22} strokeWidth={1.75} aria-hidden="true" /></span>
           New
         </button>
         {tabItems.slice(2).map(item => (

@@ -53,7 +53,7 @@ function GradeRing({ letter, score }) {
         .cg-ring { position: relative; flex: none; width: ${RING.size}px; height: ${RING.size}px; display: grid; place-items: center; }
         .cg-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
         .cg-ring-track { stroke: var(--hairline); }
-        .cg-ring-fill { stroke: var(--olive-ink); transition: stroke-dashoffset 700ms cubic-bezier(.2, .8, .2, 1); animation: cg-fill 900ms cubic-bezier(.2, .8, .2, 1) both; }
+        .cg-ring-fill { stroke: var(--olive-ink); transition: stroke-dashoffset 700ms var(--ease); animation: cg-fill 900ms var(--ease) both; }
         @keyframes cg-fill { from { stroke-dashoffset: var(--ring-full); } }
         .cg-ring > span { font:600 28px/1 var(--font-sans); letter-spacing: 0; color: var(--ink); }
         .is-a .cg-ring-fill { stroke: var(--success); }

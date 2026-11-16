@@ -60,7 +60,7 @@ export default function Pricing() {
         <section className="pricing-card" aria-labelledby="plan-free">
           <h2 id="plan-free">Free</h2>
           <p className="pricing-price">$0<span>/month</span></p>
-          <ul>{FREE_SUMMARY.map(item => <li key={item}><Check size={18} strokeWidth={2} aria-hidden="true" />{item}</li>)}</ul>
+          <ul>{FREE_SUMMARY.map(item => <li key={item}><Check size={18} strokeWidth={1.75} aria-hidden="true" />{item}</li>)}</ul>
           {signedIn ? (currentTier === 'free' ? current : null) : <Link href="/signup" className="pricing-btn is-secondary">Start free</Link>}
         </section>
         {Object.entries(TIERS).map(([key, tier]) => (
@@ -68,7 +68,7 @@ export default function Pricing() {
             <h2 id={`plan-${key}`}>{tier.name}</h2>
             <p className="pricing-price">{tier.price}<span>/{tier.per}</span></p>
             <p className="pricing-alt">{tier.pitch}</p>
-            <ul>{tier.benefits.map(item => <li key={item}><Check size={18} strokeWidth={2} aria-hidden="true" />{item}</li>)}</ul>
+            <ul>{tier.benefits.map(item => <li key={item}><Check size={18} strokeWidth={1.75} aria-hidden="true" />{item}</li>)}</ul>
             {signedIn
               ? (currentTier === key ? current : <button type="button" className="pricing-btn" onClick={() => openUpgrade({ tier_choice: key })}>Get {tier.name}</button>)
               : <Link href="/signup" className="pricing-btn">Get {tier.name}</Link>}

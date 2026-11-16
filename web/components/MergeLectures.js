@@ -62,7 +62,7 @@ export default function MergeLectures({ lecture, folders = [], onMerged, onCance
               return (
                 <li key={item.id}>
                   <button type="button" className={'merge-row' + (on ? ' is-on' : '')} aria-pressed={on} onClick={() => toggle(item.id)} disabled={busy}>
-                    <span className="merge-check" aria-hidden="true">{on && <Check size={14} strokeWidth={2.5} />}</span>
+                    <span className="merge-check" aria-hidden="true">{on && <Check size={14} strokeWidth={1.75} />}</span>
                     <span className="merge-main">
                       <span className="merge-title">{item.title}</span>
                       <span className="c-meta">{[folderName(item.folder_id), dateLabel(item.lecture_date), item.duration_ms > 60000 ? `${Math.round(item.duration_ms / 60000)} min` : ''].filter(Boolean).join(' · ')}</span>

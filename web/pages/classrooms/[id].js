@@ -295,9 +295,9 @@ function MembersTab({ room, onToast, onChanged }) {
     const items = [];
     if (data.roles.length && member.role !== 'owner') {
       data.roles.filter(role => role !== member.role).forEach(role => items.push({ label: `Make ${ROLE_LABELS[role].toLowerCase()}`, onSelect: () => act(() => changeRole(room.id, member.user_id, role), 'Role changed') }));
-      items.push({ label: 'Make owner', onSelect: () => setConfirm({ title: `Make ${member.display_name} the owner?`, body: 'You’ll become an admin. Only the owner can change roles or archive the classroom.', run: () => act(() => transferOwnership(room.id, member.user_id), 'Ownership handed over') }) });
+      items.push({ label: 'Make owner', onSelect: () => setConfirm({ label: 'Make owner', title: `Make ${member.display_name} the owner?`, body: 'You’ll become an admin. Only the owner can change roles or archive the classroom.', run: () => act(() => transferOwnership(room.id, member.user_id), 'Ownership handed over') }) });
     }
-    if (member.removable) items.push({ label: 'Remove from classroom', danger: true, onSelect: () => setConfirm({ title: `Remove ${member.display_name}?`, body: 'Their own guides and folders leave the classroom with them.', run: () => act(() => removeMember(room.id, member.user_id), 'Removed') }) });
+    if (member.removable) items.push({ label: 'Remove from classroom', danger: true, onSelect: () => setConfirm({ label: 'Remove member', title: `Remove ${member.display_name}?`, body: 'Their own guides and folders leave the classroom with them.', run: () => act(() => removeMember(room.id, member.user_id), 'Removed') }) });
     return (
       <li key={member.user_id} className="crmb-row">
         <UserChip person={member} meta={ROLE_LABELS[member.role] + (member.is_me ? ' · You' : '')} />
@@ -322,7 +322,7 @@ function MembersTab({ room, onToast, onChanged }) {
         <h2 className="crmb-title">{active.length} {active.length === 1 ? 'member' : 'members'}</h2>
         <ul className="crmb-list">{active.map(row)}</ul>
       </section>
-      {confirm && <ConfirmDialog title={confirm.title} message={confirm.body} confirmLabel="Yes" onCancel={() => setConfirm(null)} onConfirm={async () => { const next = confirm; setConfirm(null); await next.run(); }} />}
+      {confirm && <ConfirmDialog title={confirm.title} message={confirm.body} confirmLabel={confirm.label} onCancel={() => setConfirm(null)} onConfirm={async () => { const next = confirm; setConfirm(null); await next.run(); }} />}
       <style jsx>{`
         .crmb { display: grid; gap: 8px; padding: 16px; }
         .crmb-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
@@ -400,13 +400,13 @@ function SettingsTab({ room, onToast, onSaved, onGone }) {
         {room.can.owner ? (
           <>
             <p className="c-meta">To leave, make someone else the owner first (Members tab).</p>
-            <button type="button" className="c-btn c-btn--danger" onClick={() => setConfirm({ title: 'Archive this classroom?', body: 'It closes for everyone and its invites stop working. Guides stay with their authors.', run: async () => { const data = await archiveClassroom(room.id); if (data?.archived) onGone(); else onToast(data?.detail || "Couldn't archive it."); } })}>Archive classroom</button>
+            <button type="button" className="c-btn c-btn--danger" onClick={() => setConfirm({ label: 'Archive classroom', title: 'Archive this classroom?', body: 'It closes for everyone and its invites stop working. Guides stay with their authors.', run: async () => { const data = await archiveClassroom(room.id); if (data?.archived) onGone(); else onToast(data?.detail || "Couldn't archive it."); } })}>Archive classroom</button>
           </>
         ) : (
-          <button type="button" className="c-btn c-btn--secondary" onClick={() => setConfirm({ title: 'Leave this classroom?', body: 'Guides and folders you added leave with you. You can join again with an invite.', run: async () => { const data = await leaveClassroom(room.id); if (data?.status === 'removed') onGone(); else onToast(data?.detail || "Couldn't leave."); } })}>Leave classroom</button>
+          <button type="button" className="c-btn c-btn--secondary" onClick={() => setConfirm({ label: 'Leave classroom', title: 'Leave this classroom?', body: 'Guides and folders you added leave with you. You can join again with an invite.', run: async () => { const data = await leaveClassroom(room.id); if (data?.status === 'removed') onGone(); else onToast(data?.detail || "Couldn't leave."); } })}>Leave classroom</button>
         )}
       </section>
-      {confirm && <ConfirmDialog title={confirm.title} message={confirm.body} confirmLabel="Yes" onCancel={() => setConfirm(null)} onConfirm={async () => { const next = confirm; setConfirm(null); await next.run(); }} />}
+      {confirm && <ConfirmDialog title={confirm.title} message={confirm.body} confirmLabel={confirm.label} onCancel={() => setConfirm(null)} onConfirm={async () => { const next = confirm; setConfirm(null); await next.run(); }} />}
       <style jsx>{`
         .crs { display: grid; gap: 12px; padding: 16px; justify-items: start; }
         .crs-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }

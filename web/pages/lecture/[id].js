@@ -341,7 +341,7 @@ export default function LecturePage() {
       </section>
 
       {merging && <MergeLectures lecture={lecture} folders={folders} onCancel={() => setMerging(false)} onMerged={merged => { setMerging(false); router.push('/lecture/' + merged.id); }} />}
-      {confirmDelete && <ConfirmDialog title={`Delete ${lecture.title}?`} onConfirm={remove} onCancel={() => setConfirmDelete(false)} />}
+      {confirmDelete && <ConfirmDialog title={`Delete ${lecture.title}?`} confirmLabel="Delete lecture" onConfirm={remove} onCancel={() => setConfirmDelete(false)} />}
       {toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
 
       <style jsx>{`

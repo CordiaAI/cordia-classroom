@@ -62,7 +62,7 @@ export default function MergeSheet({ pair, onClose, onMerged }) {
           </header>
           {done ? (
             <div className="ms-done" role="status">
-              <span className="ms-done-icon" aria-hidden="true"><Check size={22} strokeWidth={2} /></span>
+              <span className="ms-done-icon" aria-hidden="true"><Check size={22} strokeWidth={1.75} /></span>
               <p><strong>{done.mergedTitle}</strong> is now part of <strong>{done.keptTitle}</strong>.</p>
               <p className="c-meta">Changed your mind? Restore it from {done.keptTitle}&rsquo;s ⋯ menu for 30 days.</p>
               <div className="ms-actions">

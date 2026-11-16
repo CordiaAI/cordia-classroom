@@ -295,7 +295,7 @@ export default function SettingsPage() {
                     <h2 className="c-section-title">Free</h2>
                     <div className="plan-price">$0 <span>/month</span></div>
                     <ul className="plan-features">
-                      {FREE_SUMMARY.map(item => <li key={item}><Check size={18} strokeWidth={2} aria-hidden="true" />{item}</li>)}
+                      {FREE_SUMMARY.map(item => <li key={item}><Check size={18} strokeWidth={1.75} aria-hidden="true" />{item}</li>)}
                     </ul>
                     {!isPlus && <span className="plan-current-label">Current</span>}
                   </div>
@@ -308,7 +308,7 @@ export default function SettingsPage() {
                         <div className="plan-price">{tier.price}<span>/{tier.per}</span></div>
                         <span className="c-meta">{tier.pitch}</span>
                         <ul className="plan-features">
-                          {tier.benefits.map(item => <li key={item}><Check size={18} strokeWidth={2} aria-hidden="true" />{item}</li>)}
+                          {tier.benefits.map(item => <li key={item}><Check size={18} strokeWidth={1.75} aria-hidden="true" />{item}</li>)}
                         </ul>
                         <div className="plan-actions">
                           {current ? (

@@ -77,7 +77,7 @@ function linkedHref(linked) {
 
 // The picked-but-not-yet-checked choice: an icon and a word as well as the neutral tint.
 export function PickedMark() {
-  return <span className="quiz-option-mark is-picked"><CircleDot size={16} strokeWidth={2.25} aria-hidden="true" />Picked</span>;
+  return <span className="quiz-option-mark is-picked"><CircleDot size={16} strokeWidth={1.75} aria-hidden="true" />Picked</span>;
 }
 
 export function MemoryHook({ guideId, concept, question }) {
@@ -111,8 +111,8 @@ export function MemoryHook({ guideId, concept, question }) {
       {hook === null && <p className="c-meta">Thinking of a way to remember it…</p>}
       {hook && <p>{hook}</p>}
       {hook && linked && (linkedHref(linked)
-        ? <a className="retain-hook-link" href={linkedHref(linked)} target="_blank" rel="noopener noreferrer"><Link2 size={14} strokeWidth={2} aria-hidden="true" />Linked to: {linked.title}</a>
-        : <span className="retain-hook-link"><Link2 size={14} strokeWidth={2} aria-hidden="true" />Linked to: {linked.title}</span>)}
+        ? <a className="retain-hook-link" href={linkedHref(linked)} target="_blank" rel="noopener noreferrer"><Link2 size={14} strokeWidth={1.75} aria-hidden="true" />Linked to: {linked.title}</a>
+        : <span className="retain-hook-link"><Link2 size={14} strokeWidth={1.75} aria-hidden="true" />Linked to: {linked.title}</span>)}
       {hook === '' && <p className="c-meta">Couldn't come up with one right now.</p>}
       {hook !== null && (
         <button type="button" className="retain-hook-again" onClick={() => setRound(value => value + 1)}>
@@ -243,8 +243,8 @@ export function McCard({ card, question, guideId, onResult, onNext, askSure = tr
   // Right and wrong are never colour alone: an icon and a word on the option, and a spoken status.
   function optionMark(option) {
     if (selected === null) return pending === option ? <PickedMark /> : null;
-    if (option === answer) return <span className="quiz-option-mark is-right"><Check size={16} strokeWidth={2.25} aria-hidden="true" />Correct</span>;
-    if (option === selected) return <span className="quiz-option-mark is-wrong"><X size={16} strokeWidth={2.25} aria-hidden="true" />Your answer</span>;
+    if (option === answer) return <span className="quiz-option-mark is-right"><Check size={16} strokeWidth={1.75} aria-hidden="true" />Correct</span>;
+    if (option === selected) return <span className="quiz-option-mark is-wrong"><X size={16} strokeWidth={1.75} aria-hidden="true" />Your answer</span>;
     return null;
   }
   const status = selected === null ? '' : selected === answer ? 'Correct' : `Not quite. The answer is: ${answer}`;

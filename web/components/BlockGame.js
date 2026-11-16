@@ -304,8 +304,8 @@ export default function BlockGame({ guide, onResults, onDone }) {
                 const state = picked === null ? '' : option === question.answer ? ' is-right' : option === picked ? ' is-wrong' : ' is-dim';
                 return (
                   <button key={option} type="button" className={'bg-option' + state} onClick={event => { keyboard.current = event.detail === 0; answer(option); }} disabled={picked !== null}>
-                    {picked !== null && option === question.answer && <Check size={18} strokeWidth={2} aria-hidden="true" />}
-                    {picked === option && option !== question.answer && <X size={18} strokeWidth={2} aria-hidden="true" />}
+                    {picked !== null && option === question.answer && <Check size={18} strokeWidth={1.75} aria-hidden="true" />}
+                    {picked === option && option !== question.answer && <X size={18} strokeWidth={1.75} aria-hidden="true" />}
                     <span>{option}</span>
                   </button>
                 );

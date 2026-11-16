@@ -698,7 +698,7 @@ export default function GuidePage() {
           onClose={() => setSharingToRoom(false)}
           onAdded={room => { setSharingToRoom(false); setGuide(current => ({ ...current, visibility: current.visibility === 'private' || !current.visibility ? 'classroom' : current.visibility })); setToast(`Added to ${room?.name || 'the classroom'}`); }} />
       )}
-      {confirmDelete && <ConfirmDialog title={`Delete ${guide.title}?`} onConfirm={deleteGuide} onCancel={() => setConfirmDelete(false)} />}
+      {confirmDelete && <ConfirmDialog title={`Delete ${guide.title}?`} confirmLabel="Delete guide" onConfirm={deleteGuide} onCancel={() => setConfirmDelete(false)} />}
       {toast && (
         <div className="c-toast" role="status">
           <span>{toast}</span>

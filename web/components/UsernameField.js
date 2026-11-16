@@ -51,7 +51,7 @@ export default function UsernameField({ id = 'username', value, onChange, onStat
           aria-invalid={status.state === 'bad'}
           autoFocus={autoFocus}
         />
-        {status.state === 'ok' && <Check size={18} strokeWidth={2} aria-hidden="true" className="uname-ok" />}
+        {status.state === 'ok' && <Check size={18} strokeWidth={1.75} aria-hidden="true" className="uname-ok" />}
       </div>
       <p id={`${id}-status`} className={'uname-status' + (status.state === 'bad' ? ' is-bad' : '')} aria-live="polite">{status.text || '3 to 24 letters, numbers, _ or .'}</p>
       <style jsx>{`

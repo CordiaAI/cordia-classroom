@@ -317,7 +317,7 @@ export default function FlashcardViewer({
         .fc-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; text-align: left; }
         .fc-deck { position: relative; display: grid; }
         .fc-deck > * { grid-area: 1 / 1; }
-        .fc-top { position: relative; z-index: 1; animation: fc-in 180ms ease-out backwards; touch-action: pan-y; }
+        .fc-top { position: relative; z-index: 1; animation: fc-in var(--dur-pop) var(--ease) backwards; touch-action: pan-y; }
         @keyframes fc-in { from { opacity: 0; } }
         .fc-card { position: relative; min-height: 340px; perspective: 1400px; cursor: grab; border-radius:var(--r-card); user-select: none; -webkit-user-select: none; }
         .fc-card:active { cursor: grabbing; }
