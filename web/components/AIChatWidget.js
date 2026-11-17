@@ -13,6 +13,7 @@ import CordiaLoader from './CordiaLoader';
 import { inlineParts, parseTutorAnswer } from '../lib/tutorFormat.mjs';
 import { unsupportedFileMessage, useFileDropZone } from '../lib/fileDrop';
 import { UPLOAD_ACCEPT } from '../lib/uploadTypes.mjs';
+import { loadSavedChats, reportTutorSession, tutorChatsChanged } from '../lib/tutorChats';
 
 // Tutor replies may include ```mermaid blocks; render them as diagrams and keep the rest as text.
 // A reply's diagram is drawn by Napkin from the reply's explanation.
@@ -93,7 +94,8 @@ const SKILL_PROGRESS = {
 };
 
 // freshOnMount: the full Tutor page opens on a new chat; the side panel starts one each time it opens.
-export default function AIChatWidget({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '', freshOnMount = false, assignment = null, initialPrompt = '' }) {
+// resumeChatId: the full Tutor page opens that saved chat instead (the sidebar's Recent chats).
+export default function AIChatWidget({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '', freshOnMount = false, resumeChatId = '', assignment = null, initialPrompt = '' }) {
   // An assignment being worked on: its instructions and rubric go with every question until cleared.
   const [working, setWorking] = useState(assignment);
   useEffect(() => { setWorking(assignment); }, [assignment?.key]);
@@ -121,6 +123,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   const [localError, setLocalError] = useState('');
   // Set when the Tutor opens: the next session load starts a new chat (the last one is saved).
   const [freshPending, setFreshPending] = useState(false);
+  const [resumePending, setResumePending] = useState('');
   const [chatsOpen, setChatsOpen] = useState(false);
   const [savedChats, setSavedChats] = useState(null);
   const [chatsError, setChatsError] = useState('');
@@ -480,16 +483,41 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   useEffect(() => {
     const readMode = () => setSavedMode(tutorMode());
     readMode();
-    if (freshOnMount && sessionStorage.getItem('cordiaTutorKeep') !== '1') setFreshPending(true);
+    if (!resumeChatId && freshOnMount && sessionStorage.getItem('cordiaTutorKeep') !== '1') setFreshPending(true);
     sessionStorage.removeItem('cordiaTutorKeep');
     const onVisibility = event => { if (event.detail?.open) setFreshPending(true); };
+    // The sidebar's New chat, pressed while the full Tutor page is already open.
+    const onNew = () => { if (freshOnMount) setFreshPending(true); };
     window.addEventListener('cordia:tutor-visibility', onVisibility);
+    window.addEventListener('cordia:tutor-new', onNew);
     window.addEventListener('cordia:tutor-mode', readMode);
     return () => {
       window.removeEventListener('cordia:tutor-visibility', onVisibility);
+      window.removeEventListener('cordia:tutor-new', onNew);
       window.removeEventListener('cordia:tutor-mode', readMode);
     };
   }, []);
+
+  useEffect(() => { if (resumeChatId) setResumePending(resumeChatId); }, [resumeChatId]);
+
+  // The sidebar's Recent chats: report this conversation as it changes.
+  useEffect(() => { reportTutorSession(session?.messages); }, [session?.messages]);
+
+  // Opened from Recent chats (/tutor?chat=<id>): move that saved chat back into the conversation,
+  // the same as Past chats does, then drop the id from the address.
+  useEffect(() => {
+    if (!resumePending || !session?.id) return;
+    let live = true;
+    loadSavedChats().then(chats => {
+      if (!live) return;
+      const chat = chats.find(item => String(item.id) === resumePending);
+      setResumePending('');
+      const done = () => router.replace('/tutor', undefined, { shallow: true });
+      if (chat) startChat({ resume: chat, opening: true }).finally(done);
+      else { setLocalError('That chat is no longer saved.'); done(); }
+    });
+    return () => { live = false; };
+  }, [resumePending, session?.id]);
 
   // Each time the Tutor opens it is on a new chat. The one before is saved under Past chats;
   // nothing is started while a reply is still being worked on, or when the chat is already empty.
@@ -513,6 +541,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
     if (!next?.id) { setChatsError(next?.detail || 'Could not start a new chat.'); return; }
     const guide = resume ? resume.guide_id : guideId;
     setSession(next);
+    tutorChatsChanged();
     setContextKey(guide && guides.some(item => item.id === guide) ? `guide:${guide}` : 'none');
     setSkillOverride('');
     setRetainContext(null);
@@ -524,7 +553,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   async function deleteSavedChat(chat) {
     setDeletingChat(null);
     const done = await apiFetch(`/tutor/chats/${encodeURIComponent(chat.id)}`, { method: 'DELETE' });
-    if (Array.isArray(done?.chats)) { setSavedChats(done.chats); setChatsError(''); }
+    if (Array.isArray(done?.chats)) { setSavedChats(done.chats); setChatsError(''); tutorChatsChanged(); }
     else setChatsError(done?.detail || `Could not delete “${chat.title || 'Tutor chat'}”.`);
   }
 

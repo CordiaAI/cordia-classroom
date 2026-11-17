@@ -1,6 +1,7 @@
 // The Dashboard's exam countdown: the nearest exam in the next two weeks that has a Learn guide,
 // and how ready the student is for it (Learn's own readiness).
 import { counts, dayKey, readiness, restoreLevels } from './learnEngine.mjs';
+import { parseQAPairs } from './guideText.mjs';
 
 export const COUNTDOWN_DAYS = 14;
 const DAY = 86400000;
@@ -35,4 +36,23 @@ export function nearestExam(guides, exams, today = dayKey()) {
 export function examReadiness(questions, learn, today = dayKey()) {
   const list = Array.isArray(questions) ? questions : [];
   return readiness(counts(list, restoreLevels(list, learn?.levels || {}), today));
+}
+
+// Learn's questions for a guide (the saved quiz), or its own questions before Learn first opens.
+export function learnQuestions(guide) {
+  if (Array.isArray(guide?.quiz_questions) && guide.quiz_questions.length) return guide.quiz_questions;
+  return parseQAPairs(guide?.study_guide).map(pair => ({ question: pair.question, options: [pair.answer], correct_index: 0 }));
+}
+
+// The sidebar's readiness rings (DESIGN-SPEC 3.3): for each class, the nearest exam in the next two
+// weeks that has a review set among that class's guides (nearestExam above). Returns
+// { [classId]: { guideId, title, date, daysLeft } } for the classes that have one.
+export function classExams(classIds, guides, exams, today = dayKey()) {
+  const found = {};
+  (classIds || []).forEach(id => {
+    const own = (guides || []).filter(guide => String(guide?.folder_id || '') === String(id));
+    const exam = own.length ? nearestExam(own, exams, today) : null;
+    if (exam) found[id] = exam;
+  });
+  return found;
 }

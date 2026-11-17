@@ -25,8 +25,8 @@ import { LoadGate, SectionLoader } from '../components/CordiaLoader';
 import { useCachedPage } from '../lib/pageCache';
 import { readCalendarCache, rememberCalendar } from '../lib/calendarCache';
 import { confirmedTodos, lectureCalendarItems, mergeCalendarItems } from '../lib/lectures';
-import { deadlineTitle, parseQAPairs, safeHref } from '../lib/formatters';
-import { examReadiness, nearestExam } from '../lib/examCountdown.mjs';
+import { deadlineTitle, safeHref } from '../lib/formatters';
+import { examReadiness, learnQuestions, nearestExam } from '../lib/examCountdown.mjs';
 import FirstGuide from '../components/FirstGuide';
 import { WhatsNewCard } from '../components/WhatsNew';
 import ClassroomsDue from '../components/ClassroomsDue';
@@ -37,12 +37,6 @@ const SLOW = Symbol('slow');
 const SLOW_MS = 8000;
 
 const FIRST_GUIDE_KEY = 'cordiaFirstGuideDismissed';
-
-// Learn's questions for a guide (the saved quiz), or its own questions before Learn first opens.
-function learnQuestions(guide) {
-  if (Array.isArray(guide?.quiz_questions) && guide.quiz_questions.length) return guide.quiz_questions;
-  return parseQAPairs(guide?.study_guide).map(pair => ({ question: pair.question, options: [pair.answer], correct_index: 0 }));
-}
 
 const LEGACY_VIEWS = { guides: '/library', classes: '/library', calendar: '/calendar', notes: '/smartnotes' };
 
@@ -329,7 +323,7 @@ export default function Today() {
                   <Link className="c-btn c-btn--secondary c-btn--sm" href={`/tutor?assignment=${encodeURIComponent(alert.item_key)}&title=${encodeURIComponent(alert.title || '')}&ask=${encodeURIComponent('Read my code against the instructions and help me pick the next thing to build.')}`}>Get unstuck</Link>
                 )}
                 {alert.kind === 'date_change' && (
-                  <button type="button" className="c-btn c-btn--primary c-btn--sm" disabled={Boolean(reviewing)} onClick={() => accept(alert)}>
+                  <button type="button" className="c-btn c-btn--secondary c-btn--sm" disabled={Boolean(reviewing)} onClick={() => accept(alert)}>
                     {reviewing === alert.id ? 'Updating…' : alert.change === 'cancelled' ? 'Remove it' : 'Update'}
                   </button>
                 )}
