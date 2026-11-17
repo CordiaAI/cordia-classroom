@@ -36,6 +36,10 @@ DEFAULT_LIMIT = 30
 MAX_LIMIT = 100
 LEGACY_FETCH = 200
 DELETED_KEEP_DAYS = 30
+PURGE_BATCH = 100
+PURGE_MAX_BATCHES = 100      # per run: 10,000 chats; anything left goes tomorrow
+PURGE_HOUR_UTC = 9           # the daily job runs on the first worker pass at or after this hour (UTC)
+PURGE_RETRY = timedelta(hours=1)
 CONFLICT_DETAIL = "Tutor conversation changed. Refresh and try again."
 SUMMARY = "id,guide_id,class_id,title,renamed,live,created_at,updated_at"
 LEGACY_SUMMARY = "id,guide_id,title,created_at,updated_at"
@@ -558,10 +562,83 @@ def start_chat(user_id: str, session_id=None, guide_id=None, class_id=None, resu
 
 
 # Removing deleted chats for good -------------------------------------------------------------------
+def _cutoff(now=None) -> datetime:
+    return (now or datetime.now(timezone.utc)) - timedelta(days=DELETED_KEEP_DAYS)
+
+
+def _expired(query, cutoff: datetime):
+    """The one filter for what may be removed for good, used by the daily job and by the purge on a
+    student's next chat so they cannot drift: deleted, deleted before the cutoff, and not live.
+    A chat that is not deleted (deleted_at null) can never match."""
+    return query.not_.is_("deleted_at", "null").lt("deleted_at", cutoff.isoformat()).eq("live", False)
+
+
+def _purge_batches(cutoff: datetime, user_id=None):
+    """Remove expired chats in batches of PURGE_BATCH (all students, or one); yields how many each batch removed."""
+    for _ in range(PURGE_MAX_BATCHES):
+        pick = _expired(_chats().select("id"), cutoff)
+        if user_id:
+            pick = pick.eq("user_id", user_id)
+        ids = [row["id"] for row in pick.order("deleted_at").limit(PURGE_BATCH).execute().data or []]
+        if not ids:
+            return
+        remove = _expired(_chats().delete(), cutoff)  # the same filter again: only rows still expired go
+        if user_id:
+            remove = remove.eq("user_id", user_id)
+        gone = remove.in_("id", ids).execute().data or []
+        yield len(gone)
+        if len(ids) < PURGE_BATCH or not gone:
+            return
+
+
 def _purge_deleted(user_id: str) -> None:
-    """Deleted chats stay for DELETED_KEEP_DAYS (so Undo still works), then go for good."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=DELETED_KEEP_DAYS)).isoformat()
+    """Deleted chats stay for DELETED_KEEP_DAYS (so Undo still works), then go for good. This is the
+    student's own purge, run when they next start a chat; purge_expired_chats does it for everyone daily."""
     try:
-        _chats().delete().eq("user_id", user_id).lt("deleted_at", cutoff).execute()
+        for _ in _purge_batches(_cutoff(), user_id):
+            pass
     except Exception:
         logger.warning("Saved chats: purge failed", exc_info=True)
+
+
+def _purge_all(now=None):
+    """(rows removed, finished without an error). Before the migration (no deleted_at column) it removes
+    nothing and says so once. Any other database error is logged and not raised."""
+    removed = 0
+    try:
+        for count in _purge_batches(_cutoff(now)):
+            removed += count
+    except Exception as error:
+        if is_missing_schema(error):
+            logger.info("Saved chats purge skipped: the saved-chats migration has not been applied yet")
+            return removed, True
+        logger.warning("Saved chats purge failed after removing %d chats", removed, exc_info=True)
+        return removed, False
+    if removed:
+        logger.info("Saved chats purge removed %d deleted chats", removed)  # a count only, never what was in them
+    return removed, True
+
+
+def purge_expired_chats(now=None) -> int:
+    """Permanently delete, for every student, the chats deleted more than DELETED_KEEP_DAYS ago. Safe to
+    run twice or on two machines at once. Never raises. Returns how many chats it removed."""
+    return _purge_all(now)[0]
+
+
+_last_purge_day = None
+_purge_retry_at = None
+
+
+def run_purge_if_due(now=None) -> int:
+    """Once a day, from the sync worker's loop (services/sync_worker.py), on its first pass at or after
+    PURGE_HOUR_UTC. A run that hit a database error is tried again an hour later, not every minute."""
+    global _last_purge_day, _purge_retry_at
+    now = now or datetime.now(timezone.utc)
+    if now.hour < PURGE_HOUR_UTC or _last_purge_day == now.date() or (_purge_retry_at and now < _purge_retry_at):
+        return 0
+    removed, finished = _purge_all(now)
+    if finished:
+        _last_purge_day, _purge_retry_at = now.date(), None
+    else:
+        _purge_retry_at = now + PURGE_RETRY
+    return removed

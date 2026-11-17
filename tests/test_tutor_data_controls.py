@@ -166,8 +166,11 @@ class TutorDataControlsTests(unittest.TestCase):
         self.assertEqual(gone["deleted_at"], "2026-11-10T08:30:00+00:00")
         self.assertEqual(gone["purge_on"], "2026-12-10T08:30:00+00:00")  # 30 days later
         self.assertEqual(gone["messages"], [{"role": "user", "text": "Where does the Krebs cycle happen?"}])
-        self.assertIn("30 days", data["deleted_chats_note"])
-        self.assertIn("deleted", data["deleted_chats_note"])
+        note = data["deleted_chats_note"]
+        self.assertIn("30 days", note)
+        self.assertIn("permanently deleted", note)  # the daily clean-up removes it on its purge date ...
+        self.assertIn("within a day of that date", note)  # ... or at the next run, which is at most a day later
+        self.assertNotIn("on or after", note)
         self.assertEqual(account_export.DELETED_KEEP_DAYS, 30)
 
     def test_the_purge_date_follows_the_purge_period_the_purge_uses(self):

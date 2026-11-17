@@ -42,8 +42,9 @@ SECTIONS = (
 # database without it is read exactly as before.
 DELETED_CHATS_NOTE = (
     "A Tutor chat with \"deleted\": true was deleted by the student and is kept only so the deletion can be undone. "
-    "\"deleted_at\" is when it was deleted; \"purge_on\" is the date on or after which it is removed for good "
-    f"({DELETED_KEEP_DAYS} days after deletion). Chats without these fields are not deleted."
+    "\"deleted_at\" is when it was deleted; \"purge_on\" is the date it is permanently deleted "
+    f"({DELETED_KEEP_DAYS} days after deletion). A clean-up that runs once a day removes it, so the chat is gone "
+    "within a day of that date. Chats without these fields are not deleted."
 )
 
 

@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 from fake_supabase import FakeDB, Query, route_patches  # noqa: E402
 import main  # noqa: E402
 import rate_limit  # noqa: E402
-from services import saved_chats, tutor_sessions  # noqa: E402
+from services import saved_chats, sync_worker, tutor_sessions  # noqa: E402
 
 ANA = "11111111-1111-4111-8111-111111111111"
 BEN = "22222222-2222-4222-8222-222222222222"
@@ -888,6 +888,177 @@ class MissingSchemaMatcherTests(unittest.TestCase):
     def test_a_missing_table_still_counts(self):
         self.assertTrue(tutor_sessions.is_missing_saved_chats_schema(
             APIError({"code": "PGRST205", "message": "Could not find the table 'public.tutor_chats' in the schema cache"})))
+
+
+def ago(days):
+    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+
+class PurgeJobTests(SavedChatsBase):
+    """The daily purge in the sync worker: every student's deleted chats past DELETED_KEEP_DAYS go for good."""
+    db_class = ConstraintDB
+
+    def setUp(self):
+        super().setUp()
+        saved_chats._last_purge_day, saved_chats._purge_retry_at = None, None
+        self.id = lambda n: f"a0000000-0000-4000-8000-0000000001{n:02d}"
+        self.db.rows("tutor_chats").extend([
+            chat_row(self.id(1), ANA, "Cell respiration, deleted 31 days ago", "2026-09-01T10:00:00+00:00", deleted_at=ago(31)),
+            chat_row(self.id(2), ANA, "Organic chemistry, deleted 29 days ago", "2026-09-01T10:00:00+00:00", deleted_at=ago(29)),
+            chat_row(self.id(3), ANA, "Never deleted, last used years ago", "2020-01-01T10:00:00+00:00"),
+            chat_row(self.id(4), BEN, "Torts, deleted 31 days ago", "2026-09-01T10:00:00+00:00", deleted_at=ago(31)),
+            chat_row(self.id(5), BEN, "Contracts, deleted 29 days ago", "2026-09-01T10:00:00+00:00", deleted_at=ago(29)),
+            chat_row(self.id(6), BEN, "Evidence, never deleted", "2020-01-01T10:00:00+00:00"),
+        ])
+        # A live chat that somehow has an old deleted_at (the database check now refuses it; this row got in anyway).
+        self.db.rows("tutor_chats").append(chat_row(self.id(7), ANA, "Live", "2026-11-14T10:00:00+00:00", live=True, messages=[], deleted_at=ago(45)))
+
+    def ids(self):
+        return sorted(r["id"] for r in self.db.rows("tutor_chats"))
+
+    def test_a_chat_deleted_31_days_ago_is_removed_and_29_days_ago_is_kept_for_every_student(self):
+        self.assertEqual(saved_chats.purge_expired_chats(), 2)
+        self.assertEqual(self.ids(), [self.id(n) for n in (2, 3, 5, 6, 7)])
+
+    def test_a_chat_that_is_not_deleted_and_a_live_chat_are_never_removed_however_old(self):
+        saved_chats.purge_expired_chats()
+        self.assertIn(self.id(3), self.ids())  # deleted_at null
+        self.assertIn(self.id(6), self.ids())
+        self.assertIn(self.id(7), self.ids())  # live, even with an old deleted_at
+
+    def test_the_students_own_purge_only_touches_their_rows(self):
+        saved_chats._purge_deleted(ANA)
+        self.assertEqual(self.ids(), [self.id(n) for n in (2, 3, 4, 5, 6, 7)])  # Ben's old chat is still there
+        saved_chats._purge_deleted(BEN)
+        self.assertNotIn(self.id(4), self.ids())
+
+    def test_running_it_twice_removes_nothing_the_second_time(self):
+        self.assertEqual(saved_chats.purge_expired_chats(), 2)
+        self.assertEqual(saved_chats.purge_expired_chats(), 0)
+
+    def test_two_workers_at_once_do_not_clash(self):
+        """The other machine's whole run happens between this run's pick and its delete."""
+        other = []
+        self.db.before("tutor_chats", "delete", lambda: other.append(saved_chats.purge_expired_chats()))
+        self.assertEqual(saved_chats.purge_expired_chats(), 0)  # its rows were already gone
+        self.assertEqual(other, [2])
+        self.assertEqual(self.ids(), [self.id(n) for n in (2, 3, 5, 6, 7)])
+
+    def test_it_deletes_in_bounded_batches(self):
+        for n in range(10, 15):
+            self.db.rows("tutor_chats").append(chat_row(self.id(n), ANA, f"Old {n}", "2026-09-01T10:00:00+00:00", deleted_at=ago(40)))
+        with patch.object(saved_chats, "PURGE_BATCH", 3):
+            self.assertEqual(list(saved_chats._purge_batches(saved_chats._cutoff())), [3, 3, 1])
+        with patch.object(saved_chats, "PURGE_BATCH", 2), patch.object(saved_chats, "PURGE_MAX_BATCHES", 2):
+            self.assertEqual(saved_chats.purge_expired_chats(), 0)  # nothing left: the first run took them all
+        self.assertEqual(self.ids(), [self.id(n) for n in (2, 3, 5, 6, 7)])
+
+    def test_one_run_is_capped_and_the_rest_goes_next_time(self):
+        for n in range(10, 15):
+            self.db.rows("tutor_chats").append(chat_row(self.id(n), ANA, f"Old {n}", "2026-09-01T10:00:00+00:00", deleted_at=ago(40)))
+        with patch.object(saved_chats, "PURGE_BATCH", 2), patch.object(saved_chats, "PURGE_MAX_BATCHES", 2):
+            self.assertEqual(saved_chats.purge_expired_chats(), 4)  # two batches of two
+            self.assertEqual(saved_chats.purge_expired_chats(), 3)  # the other three
+            self.assertEqual(saved_chats.purge_expired_chats(), 0)
+        self.assertEqual(self.ids(), [self.id(n) for n in (2, 3, 5, 6, 7)])
+
+    def test_the_job_and_the_students_purge_use_the_same_filter_and_the_same_cutoff(self):
+        with patch.object(saved_chats, "_expired", wraps=saved_chats._expired) as spy:
+            saved_chats._purge_deleted(ANA)
+            saved_chats.purge_expired_chats()
+        cutoffs = [call.args[1] for call in spy.call_args_list]
+        self.assertGreaterEqual(len(cutoffs), 4)  # a pick and a delete, in each of the two runs
+        self.assertEqual((cutoffs[0], cutoffs[2]), (cutoffs[1], cutoffs[3]))  # one cutoff per run, for the pick and the delete
+        for cutoff in cutoffs:
+            expected = datetime.now(timezone.utc) - timedelta(days=saved_chats.DELETED_KEEP_DAYS)
+            self.assertLess(abs((cutoff - expected).total_seconds()), 5)
+
+    def test_the_cutoff_is_utc_and_comes_from_the_one_constant(self):
+        now = datetime(2026, 12, 20, 9, 0, tzinfo=timezone.utc)
+        self.assertEqual(saved_chats._cutoff(now), datetime(2026, 11, 20, 9, 0, tzinfo=timezone.utc))
+        self.assertEqual(saved_chats._cutoff().utcoffset(), timedelta(0))
+        with patch.object(saved_chats, "DELETED_KEEP_DAYS", 7):
+            self.assertEqual(saved_chats._cutoff(now), datetime(2026, 12, 13, 9, 0, tzinfo=timezone.utc))
+            self.assertEqual(saved_chats.purge_expired_chats(), 4)  # deleted 29 and 31 days ago are both past 7 days
+        self.assertEqual(self.ids(), [self.id(n) for n in (3, 6, 7)])  # never deleted, and live: kept whatever the period
+
+    def test_the_log_says_how_many_and_nothing_about_the_chats(self):
+        with self.assertLogs("services.saved_chats", "INFO") as logs:
+            saved_chats.purge_expired_chats()
+        text = " ".join(logs.output)
+        self.assertIn("removed 2 deleted chats", text)
+        for word in ("respiration", "Torts", "Cell", self.id(1), ANA, BEN):
+            self.assertNotIn(word, text)
+
+    def test_a_database_error_is_logged_and_does_not_raise(self):
+        with patch.object(saved_chats, "_chats", side_effect=RuntimeError("connection reset by peer")), \
+                self.assertLogs("services.saved_chats", "WARNING") as logs:
+            self.assertEqual(saved_chats.purge_expired_chats(), 0)
+        self.assertIn("purge failed", logs.output[0])
+
+    def test_after_an_error_it_tries_again_in_an_hour_not_every_minute(self):
+        calls = []
+        morning = datetime(2026, 11, 20, 9, 5, tzinfo=timezone.utc)
+        results = iter([(0, False), (3, True), (0, True)])
+        with patch.object(saved_chats, "_purge_all", side_effect=lambda now: calls.append(now) or next(results)):
+            saved_chats.run_purge_if_due(morning)
+            saved_chats.run_purge_if_due(morning + timedelta(minutes=1))   # too soon
+            saved_chats.run_purge_if_due(morning + timedelta(minutes=59))  # too soon
+            self.assertEqual(saved_chats.run_purge_if_due(morning + timedelta(hours=1)), 3)
+            saved_chats.run_purge_if_due(morning + timedelta(hours=2))     # done for today
+        self.assertEqual(len(calls), 2)
+
+    def test_it_runs_once_a_day_on_the_first_pass_after_its_hour(self):
+        calls = []
+        with patch.object(saved_chats, "_purge_all", side_effect=lambda now: calls.append(now) or (0, True)):
+            for when in (datetime(2026, 11, 20, 3, 0), datetime(2026, 11, 20, 8, 59), datetime(2026, 11, 20, 9, 0),
+                         datetime(2026, 11, 20, 9, 1), datetime(2026, 11, 20, 23, 59), datetime(2026, 11, 21, 8, 0),
+                         datetime(2026, 11, 21, 9, 30)):
+                saved_chats.run_purge_if_due(when.replace(tzinfo=timezone.utc))
+        self.assertEqual([c.strftime("%d %H:%M") for c in calls], ["20 09:00", "21 09:30"])
+
+
+class PurgeBeforeTheMigrationTests(SavedChatsBase):
+    db_class = LegacyDB
+
+    def test_nothing_happens_and_it_says_so_once_without_an_error(self):
+        saved_chats._last_purge_day, saved_chats._purge_retry_at = None, None
+        self.db.rows("tutor_chats").append({"id": RATES, "user_id": ANA, "title": "Related rates", "messages": [], "updated_at": "2020-01-01T00:00:00+00:00"})
+        before = copy.deepcopy(self.db.rows("tutor_chats"))
+        with self.assertLogs("services.saved_chats", "INFO") as logs:
+            self.assertEqual(saved_chats.purge_expired_chats(), 0)
+        self.assertEqual(len(logs.records), 1)
+        self.assertEqual(logs.records[0].levelname, "INFO")
+        self.assertEqual(self.db.rows("tutor_chats"), before)
+        with self.assertLogs("services.saved_chats", "INFO") as logs:  # through the daily entry point: once, then not again that day
+            saved_chats.run_purge_if_due(datetime(2026, 11, 20, 9, 0, tzinfo=timezone.utc))
+            saved_chats.run_purge_if_due(datetime(2026, 11, 20, 9, 1, tzinfo=timezone.utc))
+        self.assertEqual(len(logs.records), 1)
+
+
+class WorkerLoopTests(unittest.TestCase):
+    """The purge is one more job in the existing sync worker's loop; a failure in it does not stop the others."""
+
+    class Stop(Exception):
+        pass
+
+    def test_the_worker_runs_the_purge_every_pass_and_survives_it_failing(self):
+        sleeps = []
+        def sleep(seconds):
+            sleeps.append(seconds)
+            if len(sleeps) == 2:
+                raise self.Stop
+        with patch.object(sync_worker, "tick"), patch.object(sync_worker, "send_reminders") as reminders, \
+             patch("services.decision_outcomes.run_if_due") as outcomes, \
+             patch.object(saved_chats, "run_purge_if_due", side_effect=[RuntimeError("database is down"), 0]) as purge, \
+             patch.object(sync_worker.time, "sleep", side_effect=sleep), self.assertLogs("services.sync_worker", "ERROR"):
+            with self.assertRaises(self.Stop):
+                sync_worker._loop()
+        self.assertEqual((purge.call_count, outcomes.call_count, reminders.call_count), (2, 2, 2))
+        self.assertEqual(sleeps, [sync_worker.REMINDER_SECONDS] * 2)
+
+    def test_the_worker_docstring_names_the_job(self):
+        self.assertIn("saved_chats.run_purge_if_due", sync_worker.__doc__)
 
 
 if __name__ == "__main__":
