@@ -19,6 +19,11 @@ test('the control slides a transform-based pill, handles keys, and respects redu
   for (const key of ['ArrowRight', 'ArrowLeft', 'Home', 'End']) assert.match(source, new RegExp(key));
   assert.match(source, /tabs: 'tablist', radio: 'radiogroup'/);
   assert.match(css, /prefers-reduced-motion: reduce\) \{ \.c-seg\.is-ready \.c-seg-pill \{ transition: none; \}/);
-  assert.match(tokens, /--seg-spring: cubic-bezier\(/);
+  // DESIGN-SPEC 6.1: a state change is 180ms on the shared ease, and a keyboard change has no transition.
+  assert.match(tokens, /--seg-ease: var\(--ease\);/);
+  assert.match(tokens, /--seg-dur: var\(--dur\);/);
+  assert.doesNotMatch(tokens, /--seg-spring/);
+  assert.match(css, /\.c-seg\.is-ready\.is-keyed \.c-seg-pill \{ transition: none; \}/);
+  assert.match(source, /setKeyed\(true\)/);
   assert.match(tokens, /--lg-inner-stroke:/);
 });

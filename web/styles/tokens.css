@@ -118,24 +118,77 @@
   --streak-width: 220px;
   --workspace-rail-width: 190px;
 
-  /* Liquid glass, matte: a frosted fill with a fine grain, the faintest top light, a soft
-     rim and a low, diffuse shadow (no shine) (styles/glass.css applies it everywhere). */
-  /* Liquid glass, upgraded (feedback 14): a lighter blur with more saturation reads as glass, not
-     frosted plastic; a specular top light, an inner edge stroke and a layered soft shadow. */
-  --lg-filter: blur(26px) saturate(170%) brightness(1.03);
-  --lg-fill: rgba(250, 251, 249, 0.58);
-  --lg-fill-strong: rgba(250, 251, 249, 0.80);
+  /* Glass v2 (docs/redesign/DESIGN-SPEC.md section 2). A pane is: sheen over fill, a 36px frost,
+     the layered shadow, a grain layer under its content and a 1px rim that catches the light at
+     the top left (styles/glass.css draws it). Anything on glass uses --glass-inner, never a second
+     frost. Values are the spec's table; the control, inner and selected shadows come from the
+     mockups in docs/redesign/screens/. */
+  --glass-fill: rgba(248, 250, 247, 0.46);              /* resting panes: sidebar, cards */
+  --glass-fill-strong: rgba(250, 251, 249, 0.74);       /* sheets, the Tutor, raised panes */
+  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0) 42%);
+  --glass-rim: linear-gradient(155deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.22) 30%, rgba(255, 255, 255, 0) 58%, rgba(255, 255, 255, 0.42));
+  --glass-blur: blur(36px) saturate(140%);
+  --glass-shadow-edge: inset 0 1px 0 rgba(255, 255, 255, 0.72), inset 0 -1px 0 rgba(23, 27, 24, 0.04), 0 0 0 0.5px rgba(23, 27, 24, 0.08);
+  --glass-shadow-depth: 0 2px 6px rgba(16, 24, 16, 0.05), 0 24px 56px -20px rgba(34, 48, 30, 0.30);
+  --glass-shadow: var(--glass-shadow-edge), var(--glass-shadow-depth);
+  /* A floating pane on hover (the Tutor bubble): the same edge over a deeper drop. */
+  --glass-shadow-lift: var(--glass-shadow-edge), 0 4px 12px rgba(16, 24, 16, 0.08), 0 30px 64px -18px rgba(34, 48, 30, 0.40);
+  /* Solid glass: what every pane, control and field fills with when the device asks for less
+     transparency or can't frost (end of this file). Opaque, so nothing behind shows through. */
+  --glass-solid: #F7F9F6;
+  --glass-inner-solid: #FAFBF9;            /* --glass-inner laid over --glass-solid */
+  --seg-track-solid: #E8E9E8;              /* --seg-track laid over --glass-solid */
+  --glass-grain-opacity: 0.06;
+  /* The 180px grain tile: grey noise, laid over a pane at --glass-grain-opacity. */
+  --glass-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='.33 .33 .33 0 0  .33 .33 .33 0 0  .33 .33 .33 0 0  0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  --glass-inner: rgba(255, 255, 255, 0.38);             /* things on glass: tile icons, hover pane */
+  --glass-inner-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.70), 0 0 0 0.5px rgba(23, 27, 24, 0.08);
+  /* Glass buttons and other controls: a brighter sheen, a hairline ring and a small drop; hover
+     rises with the deeper shadow. */
+  --glass-control: linear-gradient(180deg, rgba(255, 255, 255, 0.50), rgba(255, 255, 255, 0) 60%), rgba(250, 251, 249, 0.56);
+  --glass-control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.80), 0 0 0 0.5px rgba(23, 27, 24, 0.11), 0 1px 2px rgba(16, 24, 16, 0.06);
+  --glass-control-shadow-hover: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 0 0 0.5px rgba(23, 27, 24, 0.12), 0 10px 24px -12px rgba(34, 48, 30, 0.38);
+  /* Primary buttons: olive glass. */
+  --olive-glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 55%);
+  --olive-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), inset 0 -1px 0 rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(38, 48, 32, 0.40), 0 8px 20px -8px rgba(61, 73, 55, 0.65);
+  --olive-glass-shadow-hover: var(--olive-glass-shadow), 0 0 0 4px rgba(83, 97, 73, 0.14), 0 12px 26px -8px rgba(61, 73, 55, 0.70);
+  /* Selected items (the current place, a pressed chip, the chosen segment): olive tint over raised glass. */
+  --selected-glass: linear-gradient(rgba(83, 97, 73, 0.13), rgba(83, 97, 73, 0.13)), rgba(250, 251, 249, 0.74);
+  --selected-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 0 0 0.5px rgba(23, 27, 24, 0.07), 0 4px 12px -6px rgba(34, 48, 30, 0.25);
+  --selected-glass-ring: 0 0 0 0.5px rgba(83, 97, 73, 0.35);
+  /* Press darkens primary buttons to olive-press (dark mode below keeps its dark label at 4.5:1). */
+  --olive-glass-press: var(--olive-press);
+  /* The rim's mask: only the 1px padding ring of the ::after layer shows (alpha only, no colour). */
+  --glass-rim-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  /* Panes that scroll their own content (sheets, menus) can't keep a ::after rim in place, so their
+     1px border carries it: the rim's stops on the top, right, bottom and left edges. */
+  --glass-rim-border: rgba(255, 255, 255, 0.80) rgba(255, 255, 255, 0.30) rgba(255, 255, 255, 0.42) rgba(255, 255, 255, 0.72);
+  --glass-rim-mask-webkit: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+
+  /* The backdrop (DESIGN-SPEC 2.1): the cloud photo, blurred a little, under a white light from
+     the top left and a faint olive tint from the bottom right. Dark lays the clouds at 18% over
+     the olive and charcoal field. */
+  --backdrop-sky: url('/classroom-clouds.webp');
+  --backdrop-sky-opacity: 0.92;
+  --backdrop-sky-filter: blur(4px) saturate(110%);
+  --backdrop-wash: radial-gradient(900px 620px at 6% -10%, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0) 64%), radial-gradient(1100px 760px at 104% 112%, rgba(122, 140, 107, 0.20), rgba(122, 140, 107, 0) 62%);
+  --backdrop-field: none;
+
+  /* Older glass names, kept so every screen resolves to the v2 values above. */
+  --lg-filter: var(--glass-blur);
+  --lg-fill: var(--glass-fill);
+  --lg-fill-strong: var(--glass-fill-strong);
   --lg-fill-menu: rgb(250, 251, 249); /* menus sit over text: solid so it never reads through */
   --lg-fill-field: rgba(250, 251, 249, 0.62);
-  --lg-sheen: radial-gradient(140% 70% at 18% 0%, rgba(255, 255, 255, 0.30) 0%, rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.05) 38%, rgba(255, 255, 255, 0) 62%);
-  --lg-sheen-olive: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 60%);
+  --lg-sheen: var(--glass-sheen);
+  --lg-sheen-olive: var(--olive-glass-sheen);
   --lg-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-  --lg-rim: rgba(255, 255, 255, 0.78);
+  --lg-rim: rgba(255, 255, 255, 0.72);
   --lg-rim-low: rgba(255, 255, 255, 0.22);
   --lg-inner-stroke: rgba(255, 255, 255, 0.30);
   --lg-border: rgba(255, 255, 255, 0.46);
   --lg-border-shade: rgba(23, 27, 24, 0.07);
-  --lg-depth: 0 1px 1px rgba(16, 24, 16, 0.04), 0 6px 16px -6px rgba(16, 24, 16, 0.10), 0 18px 36px -18px rgba(16, 24, 16, 0.14);
+  --lg-depth: var(--glass-shadow-depth);
   --lg-depth-float: 0 2px 6px rgba(16, 24, 16, 0.05), 0 18px 40px -14px rgba(16, 24, 16, 0.20);
   --lg-press: rgba(255, 255, 255, 0.30);
 
@@ -197,26 +250,44 @@
   --lg-panel: var(--lg-sheen), var(--lg-grain), var(--lg-fill-strong);
   --lg-menu: var(--lg-sheen), linear-gradient(var(--lg-fill-menu), var(--lg-fill-menu));
   --lg-edge: var(--lg-border);
-  --lg-highlight: inset 0 1px 0 var(--lg-rim), inset 0 -1px 0 var(--lg-rim-low), inset 0 0 0 1px var(--lg-inner-stroke), 0 0 0 0.5px var(--lg-border-shade);
-  /* The sliding pill in every tab bar and segmented switch (components/SegmentedControl.js). */
-  --seg-pill-bg: var(--lg-sheen), var(--lg-fill-strong);
-  --seg-pill-shadow: var(--lg-highlight), var(--lg-shadow);
-  --seg-spring: cubic-bezier(.32, 1.32, .52, 1);
-  --seg-dur: 420ms;
+  --lg-highlight: var(--glass-shadow-edge);
+  /* The sliding pill in every tab bar and segmented switch (components/SegmentedControl.js): the
+     chosen segment is selected glass raised off the sunken track, as in the mockups: a near-white
+     base (brighter than --selected-glass's, which landed on the track's own tone over the clouds),
+     a faint olive tint, the pane sheen on top, and the olive ring pressed chips wear. */
+  --seg-pill-base: rgba(255, 255, 255, 0.97);
+  --seg-pill-base-solid: #FFFFFF;          /* --seg-pill-base when glass turns solid */
+  --seg-pill-tint: rgba(83, 97, 73, 0.03);
+  --seg-pill-bg: var(--glass-sheen), linear-gradient(var(--seg-pill-tint), var(--seg-pill-tint)), var(--seg-pill-base);
+  --seg-pill-shadow: var(--selected-glass-shadow), var(--selected-glass-ring);
+  /* The track is sunken: ink at 8% with a small inset shadow, over a light base so it keeps one
+     tone whether it sits on a card or straight on the clouds (muted labels stay 4.5:1 on it, and
+     the near-white pill stands clear of it). */
+  --seg-track-ink: rgba(23, 27, 24, 0.08);
+  --seg-track-base: rgba(255, 255, 255, 0.40);
+  --seg-track: linear-gradient(var(--seg-track-ink), var(--seg-track-ink)), var(--seg-track-base);
+  --seg-track-shadow: inset 0 1px 2px rgba(23, 27, 24, 0.07), inset 0 0 0 0.5px rgba(23, 27, 24, 0.06);
+  /* Hover on an unchosen segment: a light wash in the track (labels only gain contrast), never as
+     bright as the chosen pill. */
+  --seg-hover: rgba(255, 255, 255, 0.24);
+  /* The pill moves like every other state change (DESIGN-SPEC 6.1): 180ms, no overshoot. */
+  --seg-ease: var(--ease);
+  --seg-dur: var(--dur);
   --lg-shadow: var(--lg-depth);
   --hover-wash: var(--wash);
   --hover-edge: rgba(23, 27, 24, 0.16);
   --hover-shadow: var(--shadow-float);
   --hover-light: #FFFFFF;
-  /* Hover: things lift and keep their glass; nothing changes colour. Controls rise 1px with a deeper
-     shadow, cards 2px; things with no surface of their own (menu items, rows, nav links) show a
-     clear raised pane of glass. */
+  /* Hover (DESIGN-SPEC 6.1): nothing changes colour. Glass buttons and chips rise 1px with a deeper
+     shadow, cards 2px, and press settles to 0.97; things with no surface of their own (menu items,
+     rows, nav links) show --glass-inner. All of it stops under reduced motion (end of this file). */
   --lift: translateY(-1px);
   --lift-card: translateY(-2px);
-  --lift-pane: var(--lg-sheen), var(--lg-fill-strong);
-  --lift-shadow: var(--lg-highlight), var(--lg-depth-float);
-  --lift-shadow-card: var(--lg-highlight), var(--hover-shadow);
-  --primary-glow: 0 0 0 4px rgba(83, 97, 73, 0.16), 0 8px 22px rgba(83, 97, 73, 0.28);
+  --press: scale(0.97);
+  --lift-pane: var(--glass-inner);
+  --lift-shadow: var(--glass-control-shadow-hover);
+  --lift-shadow-card: var(--glass-shadow-edge), var(--hover-shadow);
+  --primary-glow: 0 0 0 4px rgba(83, 97, 73, 0.14), 0 12px 26px -8px rgba(61, 73, 55, 0.70);
   --public-backdrop: var(--canvas);
   --login-backdrop: none;
   /* Motion: card sheen, streak flame, celebration colours. */
@@ -235,7 +306,7 @@
 [data-theme='dark'] {
   color-scheme: dark;
   --ink: #ECECEA;                          /* 12.2:1 on the dark card; pure white glared */
-  --muted: rgba(255, 255, 255, 0.64);
+  --muted: rgba(255, 255, 255, 0.75);      /* 4.5:1 or better on dark glass over the clouds, under the sheen and a hover pane too */
   --canvas: #1A1D20;
   --surface-card: rgba(39, 42, 48, 0.55);
   --surface-raised: rgba(39, 42, 48, 0.86);
@@ -255,7 +326,7 @@
   --success-bg: rgba(143, 209, 160, 0.14);
   --warning: #F2C14E;
   --warning-bg: rgba(242, 193, 78, 0.14);
-  --error: #FF8A80;
+  --error: #FFB4AB;                        /* 4.5:1 or better on dark glass over the clouds (was #FF8A80) */
   --error-bg: #3A2222;
   --state-select-fill: rgba(195, 207, 182, 0.17);
   --state-select-edge: rgba(195, 207, 182, 0.38);
@@ -284,19 +355,53 @@
   --cover-8: #37331F; --cover-ink-8: #E5D68F;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.30), 0 8px 24px rgba(0, 0, 0, 0.28);
   --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.35), 0 18px 48px rgba(0, 0, 0, 0.45);
-  --lg-filter: blur(26px) saturate(150%);
-  --lg-fill: rgba(48, 52, 57, 0.58);
-  --lg-fill-strong: rgba(42, 46, 51, 0.84);
+  /* Glass v2, dark (DESIGN-SPEC 2.2). */
+  --glass-fill: rgba(42, 46, 51, 0.52);
+  --glass-fill-strong: rgba(42, 46, 51, 0.82);
+  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 42%);
+  --glass-rim: linear-gradient(155deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.06) 30%, rgba(255, 255, 255, 0) 58%, rgba(255, 255, 255, 0.12));
+  --glass-blur: blur(36px) saturate(115%);
+  --glass-shadow-edge: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.35);
+  --glass-shadow-depth: 0 2px 8px rgba(0, 0, 0, 0.30), 0 24px 56px -20px rgba(0, 0, 0, 0.55);
+  --glass-shadow-lift: var(--glass-shadow-edge), 0 4px 12px rgba(0, 0, 0, 0.36), 0 30px 64px -18px rgba(0, 0, 0, 0.66);
+  --glass-solid: #25282E;                  /* raised surface laid over the dark canvas, opaque */
+  --glass-inner-solid: #303339;            /* --glass-inner laid over --glass-solid */
+  --seg-track-solid: #1D1F24;              /* --seg-track laid over --glass-solid */
+  --seg-track: rgba(0, 0, 0, 0.22);
+  --seg-track-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.30), inset 0 0 0 0.5px rgba(0, 0, 0, 0.25);
+  --seg-hover: rgba(255, 255, 255, 0.04);
+  --seg-pill-base: rgba(60, 64, 71, 0.92);
+  --seg-pill-base-solid: #3A3E45;
+  --seg-pill-tint: rgba(195, 207, 182, 0.10);
+  --glass-grain-opacity: 0.05;
+  --glass-inner: rgba(255, 255, 255, 0.05);
+  --glass-inner-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 0.5px rgba(0, 0, 0, 0.30);
+  --glass-control: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 60%), rgba(52, 56, 62, 0.62);
+  --glass-control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.40), 0 1px 2px rgba(0, 0, 0, 0.30);
+  --glass-control-shadow-hover: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 0 0 0.5px rgba(0, 0, 0, 0.45), 0 10px 24px -12px rgba(0, 0, 0, 0.60);
+  --olive-glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 55%);
+  --olive-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 0 0 0.5px rgba(0, 0, 0, 0.4), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
+  --olive-glass-shadow-hover: var(--olive-glass-shadow), 0 0 0 4px rgba(195, 207, 182, 0.14), 0 12px 26px -8px rgba(0, 0, 0, 0.65);
+  --selected-glass: linear-gradient(rgba(195, 207, 182, 0.12), rgba(195, 207, 182, 0.12)), rgba(42, 46, 51, 0.84);
+  --selected-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.35), 0 4px 12px -6px rgba(0, 0, 0, 0.45);
+  --selected-glass-ring: 0 0 0 0.5px rgba(195, 207, 182, 0.35);
+  --olive-glass-press: #73846A;            /* darker than olive, dark label still 4.5:1 */
+  --glass-rim-border: rgba(255, 255, 255, 0.22) rgba(255, 255, 255, 0.06) rgba(255, 255, 255, 0.12) rgba(255, 255, 255, 0.18);
+  --backdrop-sky-opacity: 0.18;
+  --backdrop-wash: none;
+  --backdrop-field:
+    radial-gradient(55% 48% at 16% 20%, #2B3327 0%, #2B3327 35%, transparent 75%),
+    radial-gradient(44% 40% at 84% 28%, #1E2125 0%, #1E2125 40%, transparent 78%),
+    radial-gradient(58% 50% at 66% 84%, #2B3327 0%, #2B3327 35%, transparent 75%),
+    radial-gradient(40% 34% at 10% 88%, #1E2125 0%, transparent 72%),
+    #1A1D20;
   --lg-fill-menu: rgb(42, 46, 51);
   --lg-fill-field: rgba(32, 35, 39, 0.60);
-  --lg-sheen: radial-gradient(140% 70% at 18% 0%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 55%), linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 38%, rgba(255, 255, 255, 0) 62%);
-  --lg-sheen-olive: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 60%);
-  --lg-rim: rgba(255, 255, 255, 0.14);
+  --lg-rim: rgba(255, 255, 255, 0.08);
   --lg-rim-low: rgba(255, 255, 255, 0.04);
   --lg-inner-stroke: rgba(255, 255, 255, 0.05);
   --lg-border: rgba(255, 255, 255, 0.09);
   --lg-border-shade: rgba(0, 0, 0, 0.28);
-  --lg-depth: 0 1px 1px rgba(0, 0, 0, 0.20), 0 6px 16px -6px rgba(0, 0, 0, 0.36), 0 20px 40px -18px rgba(0, 0, 0, 0.45);
   --lg-depth-float: 0 2px 8px rgba(0, 0, 0, 0.30), 0 22px 48px -14px rgba(0, 0, 0, 0.55);
   --lg-press: rgba(255, 255, 255, 0.06);
   --focus-ring: #CFDAC3;
@@ -307,7 +412,7 @@
   --heat-0: rgba(255, 255, 255, 0.06);
   --heat-1: rgba(195, 207, 182, 0.30); --heat-2: rgba(195, 207, 182, 0.50); --heat-3: rgba(195, 207, 182, 0.75); --heat-4: #C3CFB6;
   --hover-edge: rgba(255, 255, 255, 0.18);
-  --primary-glow: 0 0 0 4px rgba(195, 207, 182, 0.14), 0 8px 22px rgba(83, 97, 73, 0.5);
+  --primary-glow: 0 0 0 4px rgba(195, 207, 182, 0.14), 0 12px 26px -8px rgba(0, 0, 0, 0.65);
   /* Olive used as text must be the light olive on dark surfaces. */
   --accent: var(--olive-ink);
   --accent-secondary: var(--olive-ink);
@@ -319,24 +424,46 @@
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23B9BEB6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
-/* Backdrop behind the app: pale clouds in light; a static, softly blurred olive and charcoal field in dark. */
+/* Without a frost (older browsers) or when the device asks for less transparency, glass turns
+   solid: panes, raised panes, controls, selected glass and fields all fill with the opaque
+   --glass-solid, so the backdrop never shows through; the rim stays (DESIGN-SPEC 2.3). */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root, [data-theme='dark'] {
+    --glass-fill: var(--glass-solid); --glass-fill-strong: var(--glass-solid); --glass-control: var(--glass-solid);
+    --surface-raised: var(--glass-solid); --lg-fill-field: var(--glass-solid);
+    --glass-inner: var(--glass-inner-solid); --seg-track: var(--seg-track-solid); --seg-pill-base: var(--seg-pill-base-solid);
+    --selected-glass: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--glass-solid);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root, [data-theme='dark'] {
+    --glass-fill: var(--glass-solid); --glass-fill-strong: var(--glass-solid); --glass-control: var(--glass-solid);
+    --surface-raised: var(--glass-solid); --lg-fill-field: var(--glass-solid);
+    --glass-inner: var(--glass-inner-solid); --seg-track: var(--seg-track-solid); --seg-pill-base: var(--seg-pill-base-solid);
+    --selected-glass: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--glass-solid);
+    --glass-blur: none;
+  }
+}
+/* Less motion: nothing lifts or scales. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --lift: none; --lift-card: none; --press: none; }
+}
+
+/* Backdrop behind the app (DESIGN-SPEC 2.1), three fixed layers that never move or take input:
+   the dark field (dark only), the cloud photo, and the light washes over it. */
 html { background: var(--canvas); }
+body { background: transparent; }
+body::before, body::after, [data-theme='dark']::before {
+  content: ''; position: fixed; z-index: -1; pointer-events: none; user-select: none;
+}
 body::before {
-  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background: linear-gradient(rgba(242, 248, 250, 0.12), rgba(238, 245, 248, 0.26)), url('/classroom-clouds.webp') center / cover;
-  filter: blur(14px); opacity: 0.35;
+  inset: -48px; /* past every edge, so the blur never shows one */
+  background: var(--backdrop-sky) center / cover no-repeat;
+  opacity: var(--backdrop-sky-opacity);
+  filter: var(--backdrop-sky-filter);
 }
-[data-theme='dark'] body::before {
-  opacity: 1;
-  inset: -120px;
-  background:
-    radial-gradient(55% 48% at 16% 20%, #2B3327 0%, #2B3327 35%, transparent 75%),
-    radial-gradient(44% 40% at 84% 28%, #1E2125 0%, #1E2125 40%, transparent 78%),
-    radial-gradient(58% 50% at 66% 84%, #2B3327 0%, #2B3327 35%, transparent 75%),
-    radial-gradient(40% 34% at 10% 88%, #1E2125 0%, transparent 72%),
-    #1A1D20;
-  filter: blur(80px);
-}
+body::after { inset: 0; background: var(--backdrop-wash); }
+[data-theme='dark']::before { inset: -120px; background: var(--backdrop-field); filter: blur(80px); }
 
 /* Note paper (cream in both themes): its text always uses the paper ink. */
 .sn-paper, .sn-card-paper {
