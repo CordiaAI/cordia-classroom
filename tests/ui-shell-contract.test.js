@@ -30,7 +30,8 @@ for (const token of ['--canvas: #EDF2F4', '--ink: #171B18', '--muted: rgba(23, 2
   assert.ok(tokens.includes(token), `missing design token ${token}`);
 }
 assert.match(system, /prefers-reduced-motion/);
-assert.match(tokens, /--lg-filter: blur\(26px\) saturate\(170%\) brightness\(1\.03\)/);
+// Glass v2 (docs/redesign/DESIGN-SPEC.md 2.2): the 36px frost.
+assert.match(tokens, /--glass-blur: blur\(36px\) saturate\(140%\);/);
 // The sidebar: four places, then classes and the Assistant, each
 // a real route; the phone tab bar keeps Dashboard, Library, New, Calendar, Assistant. The Tutor is a bubble.
 const nav = sidebar.split('const navItems = [')[1].split('];')[0];

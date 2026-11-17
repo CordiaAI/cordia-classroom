@@ -12,7 +12,8 @@ const login = read('web', 'pages', 'index.js');
 const api = read('web', 'lib', 'api.js');
 const styles = read('web', 'styles', 'globals.css');
 const calendarDashboard = read('web', 'components', 'CalendarDashboard.js');
-const tutor = read('web', 'components', 'AIChatWidget.js');
+// The Tutor panel, the conversation it shares with the chat home, and the client they both use.
+const tutor = [read('web', 'components', 'AIChatWidget.js'), read('web', 'components', 'TutorMessages.js'), read('web', 'lib', 'useTutorChat.js')].join('\n');
 const tutorDrawer = read('web', 'components', 'TutorDrawer.js');
 const retain = read('web', 'components', 'RetainCards.js');
 const flashcards = read('web', 'components', 'FlashcardViewer.js');

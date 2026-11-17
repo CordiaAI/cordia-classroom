@@ -36,3 +36,4 @@ qa-touchup/
 web/public/robots.txt
 web/public/sitemap.xml
 web/public/llms.txt
+.claude/settings.local.json

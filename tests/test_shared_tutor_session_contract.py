@@ -231,7 +231,9 @@ class SharedTutorSessionContractTests(unittest.TestCase):
         manifest = json.loads((ROOT / "extension" / "manifest.json").read_text(encoding="utf-8"))
         worker = (ROOT / "extension" / "background.js").read_text(encoding="utf-8")
         panel = (ROOT / "extension" / "popup.js").read_text(encoding="utf-8")
-        web_tutor = (ROOT / "web" / "components" / "AIChatWidget.js").read_text(encoding="utf-8")
+        # The Tutor's logic lives in web/lib/useTutorChat.js; the widget keeps only its markup.
+        web_tutor = (ROOT / "web" / "lib" / "useTutorChat.js").read_text(encoding="utf-8")
+        web_widget = (ROOT / "web" / "components" / "AIChatWidget.js").read_text(encoding="utf-8")
 
         self.assertEqual(manifest["side_panel"]["default_path"], "popup.html")
         self.assertIn("sidePanel", manifest["permissions"])
@@ -242,7 +244,8 @@ class SharedTutorSessionContractTests(unittest.TestCase):
         self.assertNotIn("tutorSession", panel)
         self.assertIn("apiFetch('/tutor/session')", web_tutor)
         self.assertIn("session_id: session.id", web_tutor)
-        self.assertIn('<TutorSelect label="Destination class"', web_tutor)
+        self.assertIn("session_id: current.id", web_tutor)
+        self.assertIn('<TutorSelect label="Destination class"', web_widget)
         tutor_select = (ROOT / "web" / "components" / "TutorSelect.js").read_text(encoding="utf-8")
         self.assertIn("aria-label={label}", tutor_select)
         self.assertIn("needsTargetClass ? targetClassId", web_tutor)
@@ -314,7 +317,8 @@ class SharedTutorSessionContractTests(unittest.TestCase):
         self.assertNotIn("secret-value", update.browser_content)
 
     def test_web_tutor_loads_browser_content_only_when_capture_exists(self):
-        widget = (ROOT / "web" / "components" / "AIChatWidget.js").read_text(encoding="utf-8")
+        # The Tutor's logic lives in web/lib/useTutorChat.js.
+        widget = (ROOT / "web" / "lib" / "useTutorChat.js").read_text(encoding="utf-8")
         self.assertIn("browser_content_available", widget)
         self.assertIn("/tutor/session/browser-content", widget)
         self.assertIn("material?.kind === 'browser'", widget)

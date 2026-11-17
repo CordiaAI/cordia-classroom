@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cordia: chat with Practice open</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&amp;family=Newsreader:opsz,wght@6..72,600&amp;family=Quicksand:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+.cc{--ink:#171B18;--muted:rgba(23,27,24,0.64);--olive:#536149;--olive-press:#3D4937;--hair:rgba(23,27,24,0.08);--dur:180ms;--ease:cubic-bezier(.2,.8,.2,1);position:relative;isolation:isolate;box-sizing:border-box;min-height:900px;display:flex;flex-wrap:wrap;align-items:stretch;gap:12px;padding:12px;background:#E3EAEC;color:var(--ink);font-family:'Quicksand',system-ui,-apple-system,'Segoe UI',sans-serif;font-weight:500;font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased;overflow:hidden}
+.cc *,.cc *::before,.cc *::after{box-sizing:border-box}
+.sky{position:absolute;inset:-48px;z-index:-2;background:url(/_blob/7a832a369bd73343daf8db44e8295675) center/cover no-repeat;filter:blur(4px) saturate(110%);opacity:.92;pointer-events:none;user-select:none}
+.light{position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(900px 620px at 6% -10%,rgba(255,255,255,.62),rgba(255,255,255,0) 64%),radial-gradient(1100px 760px at 104% 112%,rgba(122,140,107,.20),rgba(122,140,107,0) 62%)}
+.g{position:relative;isolation:isolate;background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,0) 42%),rgba(248,250,247,.46);-webkit-backdrop-filter:blur(36px) saturate(140%);backdrop-filter:blur(36px) saturate(140%);box-shadow:inset 0 1px 0 rgba(255,255,255,.72),inset 0 -1px 0 rgba(23,27,24,.04),0 0 0 .5px rgba(23,27,24,.08),0 2px 6px rgba(16,24,16,.05),0 24px 56px -20px rgba(34,48,30,.30)}
+.g::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:url(/_blob/432c346470a698e478ecf5226af959c9) repeat;background-size:180px 180px;opacity:.06;pointer-events:none}
+.g::after{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;background:linear-gradient(155deg,rgba(255,255,255,.95),rgba(255,255,255,.22) 30%,rgba(255,255,255,0) 58%,rgba(255,255,255,.42));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);pointer-events:none}
+.g-strong{background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,0) 42%),rgba(250,251,249,.74)}
+.pane{background:rgba(255,255,255,.38);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 0 0 .5px rgba(23,27,24,.08)}
+.field{background:rgba(250,251,249,.66);box-shadow:inset 0 1px 2px rgba(23,27,24,.07),0 0 0 .5px rgba(23,27,24,.09);border:0;border-radius:12px;color:var(--ink);font:500 17px/1.5 'Quicksand',sans-serif}
+.ic{flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.title{margin:0;font-family:'Newsreader',Georgia,serif;font-weight:600;font-size:40px;line-height:1.12;letter-spacing:-.015em;text-wrap:balance}
+.sheet-title{margin:0;font-family:'Newsreader',Georgia,serif;font-weight:600;font-size:28px;line-height:1.15;letter-spacing:-.015em}
+.sec-title{margin:0;font-size:20px;font-weight:600;line-height:1.2;letter-spacing:-.01em}
+.row-title{font-size:17px;font-weight:600;line-height:1.3}
+.meta{font-size:13px;color:var(--muted);font-weight:500}
+.num{font-variant-numeric:tabular-nums}
+.side-h{margin:0;padding:0 12px 6px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:999px;border:0;font:600 15px/1 'Quicksand',sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap;transition:transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease),background-color var(--dur) var(--ease)}
+.btn .ic{width:18px;height:18px}
+.btn-glass{background:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,0) 60%),rgba(250,251,249,.56);box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 0 0 .5px rgba(23,27,24,.11),0 1px 2px rgba(16,24,16,.06)}
+.btn-quiet{background:transparent;color:var(--ink)}
+.btn-olive{color:#FFFFFF;background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,0) 55%),#536149;box-shadow:inset 0 1px 0 rgba(255,255,255,.30),inset 0 -1px 0 rgba(0,0,0,.18),0 0 0 .5px rgba(38,48,32,.40),0 8px 20px -8px rgba(61,73,55,.65)}
+.btn-olive:active{background-color:#3D4937}
+.icbtn{display:inline-grid;place-items:center;width:40px;height:40px;flex:none;border:0;border-radius:999px;background:transparent;color:var(--muted);cursor:pointer;transition:background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease)}
+.nav{display:flex;align-items:center;gap:12px;width:100%;height:38px;padding:0 12px;border:0;border-radius:12px;background:transparent;color:var(--ink);font:600 15px/1 'Quicksand',sans-serif;text-decoration:none;text-align:left;cursor:pointer;transition:background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease)}
+.nav .ic{color:var(--muted)}
+.nav.cur{background:linear-gradient(rgba(83,97,73,.13),rgba(83,97,73,.13)),rgba(250,251,249,.74);box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 0 0 .5px rgba(23,27,24,.07),0 4px 12px -6px rgba(34,48,30,.25)}
+.nav.cur .ic{color:#536149}
+.nav-sm{height:36px;font-size:14px}
+.kbd{margin-left:auto;padding:3px 7px;border-radius:999px;font-size:12px;font-weight:600;color:var(--muted);box-shadow:0 0 0 1px var(--hair)}
+.chip{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px 0 11px;border-radius:999px;border:0;background:rgba(255,255,255,.36);box-shadow:inset 0 1px 0 rgba(255,255,255,.65),0 0 0 .5px rgba(23,27,24,.10);font:600 15px/1 'Quicksand',sans-serif;color:var(--ink);cursor:pointer;transition:background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.chip .ic{width:18px;height:18px;color:var(--muted)}
+.chip.on{background:linear-gradient(rgba(83,97,73,.15),rgba(83,97,73,.15)),rgba(250,251,249,.82);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 0 0 .5px rgba(83,97,73,.35)}
+.chip.on .ic{color:#536149}
+.row{display:flex;align-items:center;gap:16px;padding:14px 20px;border-radius:16px;transition:background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease)}
+.dot{width:10px;height:10px;border-radius:999px;flex:none}
+.seg{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:rgba(23,27,24,.05);box-shadow:inset 0 1px 2px rgba(23,27,24,.06)}
+.seg .s{height:34px;padding:0 14px;border:0;border-radius:999px;background:transparent;font:600 15px/1 'Quicksand',sans-serif;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.seg .s.on{color:var(--ink);background:linear-gradient(180deg,rgba(255,255,255,.6),rgba(255,255,255,0) 60%),rgba(250,251,249,.86);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 0 0 .5px rgba(23,27,24,.08),0 2px 6px -2px rgba(34,48,30,.18)}
+.rail{flex:0 0 64px;border-radius:24px;padding:10px 0;display:flex;flex-direction:column;align-items:center;gap:6px}
+.rail-btn{position:relative;width:44px;height:44px;border-radius:999px;border:0;display:grid;place-items:center;color:var(--muted);background:transparent;cursor:pointer;transition:background-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),color var(--dur) var(--ease)}
+.rail-btn .ic{width:20px;height:20px}
+.rail-btn.cur{color:#536149;background:linear-gradient(rgba(83,97,73,.13),rgba(83,97,73,.13)),rgba(250,251,249,.74);box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 0 0 .5px rgba(23,27,24,.07),0 4px 12px -6px rgba(34,48,30,.25)}
+.tip{position:absolute;right:calc(100% + 14px);top:50%;width:232px;padding:12px 14px;border-radius:16px;text-align:left;display:flex;flex-direction:column;gap:3px;background:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,0) 50%),rgb(250,251,249);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 0 0 .5px rgba(23,27,24,.10),0 2px 6px rgba(16,24,16,.06),0 18px 40px -14px rgba(34,48,30,.30);opacity:0;transform:translate(6px,-50%);pointer-events:none;transition:opacity 150ms var(--ease),transform 150ms var(--ease);z-index:20}
+.tip b{font-size:15px;font-weight:600;color:var(--ink)}
+.tip span{font-size:13px;line-height:1.4;color:var(--muted);font-weight:500}
+.rail-btn:focus-visible .tip,.tip.show{opacity:1;transform:translate(0,-50%)}
+.cc :focus-visible{outline:2px solid #536149;outline-offset:2px}
+.cc textarea:focus-visible,.cc input:focus-visible{outline:none}
+.compose:focus-within{box-shadow:inset 0 1px 0 rgba(255,255,255,.72),0 0 0 2px #536149,0 24px 56px -20px rgba(34,48,30,.30)}
+@media (hover:hover){
+.btn-glass:hover{transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 0 0 .5px rgba(23,27,24,.12),0 10px 24px -12px rgba(34,48,30,.38)}
+.btn-olive:hover{transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.30),inset 0 -1px 0 rgba(0,0,0,.18),0 0 0 .5px rgba(38,48,32,.40),0 0 0 4px rgba(83,97,73,.14),0 12px 26px -8px rgba(61,73,55,.7)}
+.btn-quiet:hover,.icbtn:hover,.nav:not(.cur):hover,.row:hover{background:rgba(255,255,255,.40);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 0 0 .5px rgba(23,27,24,.07)}
+.rail-btn:not(.cur):hover{background:rgba(255,255,255,.45);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 0 0 .5px rgba(23,27,24,.07);color:var(--ink)}
+.rail-btn:hover .tip{opacity:1;transform:translate(0,-50%)}
+.chip:not(.on):hover{background:rgba(255,255,255,.6);transform:translateY(-1px)}
+}
+.btn:active,.chip:active,.icbtn:active{transform:scale(.97)}
+@media (prefers-reduced-motion:reduce){.cc *{transition:none !important}.tip{transform:translate(0,-50%)}.btn:hover,.btn:active,.chip:hover,.chip:active,.icbtn:active{transform:none}}
+@media (prefers-reduced-transparency:reduce){.g,.g-strong{-webkit-backdrop-filter:none;backdrop-filter:none;background:#F7F9F6}}
+</style>
+</helmet>
+<div class="cc">
+<div class="sky" aria-hidden="true"></div>
+<div class="light" aria-hidden="true"></div>
+<nav class="g" aria-label="Main" style="flex:0 1 264px;min-width:240px;border-radius:24px;padding:14px 12px 12px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:center;gap:10px;padding:2px 4px 0 8px">
+<img src="/_blob/49f6aac2cf8ce9964dcc19d9b98892a6" width="30" height="26" alt="" style="display:block">
+<span style="font-family:'Newsreader',Georgia,serif;font-weight:600;font-size:20px;letter-spacing:-.01em">cordia</span>
+<button class="icbtn" type="button" aria-label="Collapse sidebar" style="margin-left:auto;width:36px;height:36px"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z M9 3v18"></path></svg></button>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<a class="btn btn-olive" href="Main.dc.html" style="height:44px;width:100%"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M18.375 2.625a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4Z"></path></svg>New chat</a>
+<button class="nav" type="button" style="margin-top:4px"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M21 21l-4.34-4.34 M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z"></path></svg><span>Search</span><span class="kbd">⌘K</span></button>
+</div>
+<div style="display:flex;flex-direction:column;gap:2px">
+<div style="display:flex;align-items:center;justify-content:space-between;padding-right:4px"><h2 class="side-h" style="padding-bottom:0">Classes</h2><button class="icbtn" type="button" aria-label="Add a class" style="width:32px;height:32px"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="width:16px;height:16px"><path d="M5 12h14 M12 5v14"></path></svg></button></div>
+<a class="nav nav-sm" href="Class.dc.html" title="Calculus I"><span class="dot" style="background:#4A5A40;margin:0 5px"></span><span>MA 125</span><span class="num meta" style="margin-left:auto;display:inline-flex;align-items:center;gap:6px">77%<svg width="16" height="16" viewBox="0 0 16 16" role="img" aria-label="77% ready for the next exam" style="flex:none;display:block"><circle cx="8.0" cy="8.0" r="6.88" fill="none" stroke="rgba(23,27,24,0.12)" stroke-width="2.25"></circle><circle cx="8.0" cy="8.0" r="6.88" fill="none" stroke="#536149" stroke-width="2.25" stroke-linecap="round" stroke-dasharray="33.26 43.20" transform="rotate(-90 8.0 8.0)"></circle></svg></span></a><a class="nav nav-sm" href="Class.dc.html" title="Professional Experience"><span class="dot" style="background:#8A5A22;margin:0 5px"></span><span>BUS 101</span></a><a class="nav nav-sm" href="Class.dc.html" title="Intro to Computing"><span class="dot" style="background:#355E86;margin:0 5px"></span><span>CIS 115</span><span class="num meta" style="margin-left:auto;display:inline-flex;align-items:center;gap:6px">52%<svg width="16" height="16" viewBox="0 0 16 16" role="img" aria-label="52% ready for the next exam" style="flex:none;display:block"><circle cx="8.0" cy="8.0" r="6.88" fill="none" stroke="rgba(23,27,24,0.12)" stroke-width="2.25"></circle><circle cx="8.0" cy="8.0" r="6.88" fill="none" stroke="#536149" stroke-width="2.25" stroke-linecap="round" stroke-dasharray="22.46 43.20" transform="rotate(-90 8.0 8.0)"></circle></svg></span></a><a class="nav nav-sm" href="Class.dc.html" title="Composition I"><span class="dot" style="background:#8E3E62;margin:0 5px"></span><span>EH 101</span></a>
+</div>
+<div style="display:flex;flex-direction:column;gap:2px;min-height:0">
+<h2 class="side-h">Recent chats</h2>
+<a class="nav nav-sm cur" href="Chat.dc.html" aria-current="page" style="font-weight:500"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Calculus exam prep</span></a><a class="nav nav-sm" href="Chat.dc.html" style="font-weight:500"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Career portfolio outline</span></a><a class="nav nav-sm" href="Chat.dc.html" style="font-weight:500"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Why the chain rule works</span></a><a class="nav nav-sm" href="Chat.dc.html" style="font-weight:500"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Thesis for the EH 101 essay</span></a><a class="nav nav-sm" href="Chat.dc.html" style="font-weight:500"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">CIS 115 loops, explained</span></a><a class="nav nav-sm" href="Chat.dc.html" style="font-weight:500"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Related rates practice</span></a>
+</div>
+<div style="margin-top:auto;display:flex;align-items:center;gap:12px;padding:10px 4px 0 6px;box-shadow:0 -1px 0 var(--hair)">
+<span style="width:36px;height:36px;border-radius:999px;display:grid;place-items:center;font-size:13px;font-weight:700;color:#536149;background:linear-gradient(rgba(83,97,73,.14),rgba(83,97,73,.14)),rgba(250,251,249,.8);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 0 0 .5px rgba(23,27,24,.08)">JM</span>
+<span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:14px;font-weight:600">Jude Moore</span><span style="font-size:12px;color:var(--muted)">Pro · South Alabama</span></span>
+<button class="icbtn" type="button" aria-label="Account menu" style="margin-left:auto;width:36px;height:36px"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z M19 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z M5 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"></path></svg></button>
+</div>
+</nav>
+<main style="flex:999 1 760px;min-width:0;display:flex;flex-wrap:wrap;gap:12px;align-items:stretch"><section aria-label="Conversation" style="flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;gap:8px;height:52px;padding:0 8px">
+<h1 style="margin:0;font-size:17px;font-weight:600">Calculus exam prep</h1>
+<span class="btn btn-quiet" style="height:32px;padding:0 10px;font-size:13px;gap:6px;cursor:default"><span class="dot" style="background:#4A5A40"></span>MA 125</span>
+<button class="icbtn" type="button" aria-label="Chat options" style="margin-left:auto"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z M19 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z M5 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"></path></svg></button>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;padding:4px 8px 0">
+<div class="g g-strong" style="align-self:flex-end;max-width:78%;border-radius:20px 20px 6px 20px;padding:12px 16px;font-size:17px;line-height:1.5">Can I start my math practice for Thursday’s exam?</div>
+<div style="display:flex;gap:12px;align-items:flex-start">
+<span class="g" style="width:32px;height:32px;border-radius:999px;display:grid;place-items:center;flex:none"><img src="/_blob/49f6aac2cf8ce9964dcc19d9b98892a6" width="20" height="17" alt="" style="display:block"></span>
+<div style="display:flex;flex-direction:column;gap:14px;min-width:0;font-size:17px;line-height:1.55">
+<p style="margin:0">Yes. Exam 3 covers 3.9 through 4.4 in your MA 125 guides. I made 10 problems from them and put related rates first, since you missed 3 of 5 of those in Learn yesterday.</p>
+<a href="#" class="g" style="display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:16px;color:var(--ink);text-decoration:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 0 0 1.5px rgba(83,97,73,.45),0 10px 24px -14px rgba(34,48,30,.35)">
+<span style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;color:#536149;background:linear-gradient(rgba(83,97,73,.14),rgba(83,97,73,.14)),rgba(250,251,249,.8)"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M13 21h8 M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z M15 5l4 4"></path></svg></span>
+<span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span class="row-title">Practice · Exam 3 review</span><span class="meta num">10 problems · open beside this chat · 1 of 10 done</span></span>
+</a>
+<p style="margin:0">Work on the board. When you check an answer I’ll grade it, and if it’s off I’ll show where.</p>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<button class="chip" type="button"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5 M9 18h6 M10 22h4"></path></svg>Give me a hint</button>
+<button class="chip" type="button"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z M22 10v6 M6 12.5V16a6 3 0 0 0 12 0v-3.5"></path></svg>Switch to Learn</button>
+</div>
+</div>
+</div>
+</div>
+<div class="g g-strong compose" style="border-radius:28px;padding:12px 12px 10px;display:flex;flex-direction:column;gap:6px">
+
+<label class="sr" for="ask">Message the Tutor</label>
+<textarea id="ask" placeholder="Reply, or ask for a hint" style="width:100%;height:52px;resize:none;border:0;background:transparent;padding:10px 8px 4px;font:500 17px/1.5 'Quicksand',sans-serif;color:var(--ink)"></textarea>
+<div style="display:flex;align-items:center;gap:4px">
+<button class="icbtn" type="button" aria-label="Add files or a link"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M16 6l-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"></path></svg></button>
+<button class="icbtn" type="button" aria-label="Talk to the Tutor"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M12 19v3 M19 10v2a7 7 0 0 1-14 0v-2 M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path></svg></button>
+<button class="btn btn-quiet" type="button" style="height:34px;padding:0 12px;font-size:14px;gap:6px"><span class="dot" style="background:#4A5A40"></span>MA 125<svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="width:16px;height:16px"><path d="M6 9l6 6 6-6"></path></svg></button>
+<span style="margin-left:auto"></span>
+<button class="icbtn" type="button" aria-label="Send" style="background:rgba(23,27,24,.07);color:var(--muted)"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px"><path d="M5 12l7-7 7 7 M12 19V5"></path></svg></button>
+</div>
+</div>
+</section><section aria-label="Practice" class="g g-strong" style="flex:1 1 520px;min-width:0;border-radius:28px;padding:16px 20px 20px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;align-items:center;gap:12px">
+<span style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;color:#536149;background:linear-gradient(rgba(83,97,73,.14),rgba(83,97,73,.14)),rgba(250,251,249,.8)"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M13 21h8 M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z M15 5l4 4"></path></svg></span>
+<div style="display:flex;flex-direction:column;gap:2px;min-width:0"><h2 class="sec-title">Practice</h2><span class="meta">Exam 3 review · MA 125</span></div>
+<span class="meta num" style="margin-left:auto">Problem 2 of 10</span>
+<button class="icbtn" type="button" aria-label="Open full screen"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px"><path d="M15 3h6v6 M9 21H3v-6 M21 3l-7 7 M3 21l7-7"></path></svg></button>
+<button class="icbtn" type="button" aria-label="Close practice"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px"><path d="M18 6 6 18 M6 6l12 12"></path></svg></button>
+</div>
+<div style="display:flex;gap:4px" aria-hidden="true">
+<span style="flex:1;height:4px;border-radius:999px;background:#536149"></span><span style="flex:1;height:4px;border-radius:999px;background:rgba(83,97,73,.45)"></span><span style="flex:8;height:4px;border-radius:999px;background:rgba(23,27,24,.08)"></span>
+</div>
+<p style="margin:0;font-size:17px;line-height:1.55;max-width:62ch">A spherical balloon is being inflated so its volume grows at 100 cm³ per second. How fast is the radius growing when the radius is 5 cm?</p>
+<div style="position:relative;flex:1;min-height:300px;border-radius:16px;background:#FBFCFB;box-shadow:inset 0 0 0 .5px rgba(23,27,24,.10),inset 0 1px 3px rgba(23,27,24,.05);overflow:hidden">
+<svg width="100%" height="100%" viewBox="0 0 560 300" preserveAspectRatio="xMinYMin meet" role="img" aria-label="Handwritten work: V equals four thirds pi r cubed; dV/dt equals 4 pi r squared times dr/dt; 100 equals 4 pi times 25 times dr/dt; dr/dt equals 1 over pi" style="position:absolute;inset:0">
+<g style="font-family:'Caveat',cursive;font-weight:500" fill="#2B2A33">
+<text x="28" y="56" font-size="34">V = ⁴⁄₃ π r³</text>
+<text x="28" y="116" font-size="34">dV/dt = 4π r² · dr/dt</text>
+<text x="28" y="176" font-size="34">100 = 4π (25) · dr/dt</text>
+<text x="28" y="236" font-size="34" fill="#2F5FA8">dr/dt = 1/π</text>
+</g>
+<path d="M300 106 q 30 -18 58 -2" fill="none" stroke="#536149" stroke-width="2.4" stroke-linecap="round"></path>
+<text x="368" y="100" font-size="24" fill="#536149" style="font-family:'Caveat',cursive">chain rule</text>
+<path d="M22 248 q 90 10 170 -2" fill="none" stroke="#2F5FA8" stroke-width="2.4" stroke-linecap="round"></path>
+</svg>
+<div class="g" style="position:absolute;left:12px;bottom:12px;display:flex;align-items:center;gap:2px;padding:4px;border-radius:999px">
+<button class="icbtn" type="button" aria-label="Draw" aria-pressed="true" style="color:#FFFFFF;background:#536149"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path></svg></button>
+<button class="icbtn" type="button" aria-label="Erase"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px"><path d="M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21 M5.082 11.09l8.828 8.828"></path></svg></button>
+<button class="icbtn" type="button" aria-label="Type"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px"><path d="M12 4v16 M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2 M9 20h6"></path></svg></button>
+<span style="width:1px;height:20px;background:var(--hair);margin:0 4px"></span>
+<button class="icbtn" type="button" aria-label="Pen color: ink" style="width:32px;height:32px"><span style="width:16px;height:16px;border-radius:999px;background:#2B2A33"></span></button>
+<button class="icbtn" type="button" aria-label="Pen color: olive" style="width:32px;height:32px"><span style="width:16px;height:16px;border-radius:999px;background:#536149"></span></button>
+<button class="icbtn" type="button" aria-label="Pen color: blue" style="width:32px;height:32px"><span style="width:16px;height:16px;border-radius:999px;background:#2F5FA8;box-shadow:0 0 0 2px #FBFCFB,0 0 0 3.5px #2F5FA8"></span></button>
+<span style="width:1px;height:20px;background:var(--hair);margin:0 4px"></span>
+<button class="icbtn" type="button" aria-label="Undo"><svg class="ic" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="width:18px;height:18px"><path d="M9 14 4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path></svg></button>
+</div>
+<button class="btn btn-glass" type="button" style="position:absolute;right:12px;bottom:12px;height:40px"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M15 4V2 M15 16v-2 M8 9h2 M20 9h2 M17.8 11.8 19 13 M17.8 6.2 19 5 M3 21l9-9 M12.2 6.2 11 5"></path></svg>Tidy</button>
+</div>
+<div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px">
+<div style="flex:1 1 220px;display:flex;flex-direction:column;gap:6px">
+<label for="ans" class="meta" style="font-weight:600">Your answer</label>
+<input id="ans" class="field num" value="1/π cm per second" style="height:44px;padding:0 14px;font-size:16px">
+</div>
+<button class="btn btn-quiet" type="button" style="height:44px">Ask why</button>
+<button class="btn btn-olive" type="button" style="height:44px;padding:0 20px"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M20 6 9 17l-5-5"></path></svg>Check answer</button>
+</div>
+</section></main>
+<aside class="g rail" aria-label="Tools"><button class="rail-btn" type="button" aria-label="Make guide"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z M14 2v4a2 2 0 0 0 2 2h4 M12 12v6 M9 15h6"></path></svg><span class="tip" role="tooltip"><b>Make guide</b><span>Turn slides, PDFs, links or a lecture into a study guide.</span></span></button><button class="rail-btn" type="button" aria-label="Learn"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z M22 10v6 M6 12.5V16a6 3 0 0 0 12 0v-3.5"></path></svg><span class="tip" role="tooltip"><b>Learn</b><span>Master every idea before the test, one round at a time.</span></span></button><button class="rail-btn" type="button" aria-label="Flashcards"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12 M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"></path></svg><span class="tip" role="tooltip"><b>Flashcards</b><span>Review cards when they’re due, so they stick.</span></span></button><button class="rail-btn" type="button" aria-label="Quiz"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M13 5h8 M13 12h8 M13 19h8 M3 17l2 2 4-4 M3 7l2 2 4-4"></path></svg><span class="tip" role="tooltip"><b>Quiz</b><span>Test yourself. Misses come back until you get them right.</span></span></button><button class="rail-btn cur" type="button" aria-label="Practice" aria-current="page"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M13 21h8 M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z M15 5l4 4"></path></svg><span class="tip" role="tooltip"><b>Practice</b><span>Work problems on a drawing board and get each one graded.</span></span></button><button class="rail-btn" type="button" aria-label="Library"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M12 7v14 M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg><span class="tip" role="tooltip"><b>Library</b><span>Every guide, note and lecture, sorted by class.</span></span></button><button class="rail-btn" type="button" aria-label="Calendar"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M8 2v4 M16 2v4 M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M3 10h18"></path></svg><span class="tip" role="tooltip"><b>Calendar</b><span>Canvas deadlines and your study blocks in one week.</span></span></button><button class="rail-btn" type="button" aria-label="Plan my week"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M8 2v4 M16 2v4 M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M3 10h18 M9 16l2 2 4-4"></path></svg><span class="tip" role="tooltip"><b>Plan my week</b><span>Fit what’s due into the free time you have.</span></span></button><button class="rail-btn" type="button" aria-label="Progress"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M3 3v16a2 2 0 0 0 2 2h16 M7 15l4-4 3 3 5-6"></path></svg><span class="tip" role="tooltip"><b>Progress</b><span>Your streak, study time and what you know.</span></span></button><span style="flex:1"></span><button class="rail-btn" type="button" aria-label="More tools"><svg class="ic" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="width:20px;height:20px"><path d="M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z M19 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z M5 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"></path></svg><span class="tip" role="tooltip"><b>More tools</b><span>Record a lecture, NCLEX practice, Study now, Dashboard and the Assistant.</span></span></button></aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

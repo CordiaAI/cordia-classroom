@@ -37,9 +37,9 @@ function ratio(a, b) {
 }
 
 const lightCanvas = rgb(token(LIGHT, '--canvas'));
-const lightCard = over(rgb(token(LIGHT, '--lg-fill')), lightCanvas);
+const lightCard = over(rgb(token(LIGHT, '--glass-fill')), lightCanvas);
 const darkCanvas = rgb(token(DARK, '--canvas'));
-const darkCard = over(rgb(token(DARK, '--lg-fill')), darkCanvas);
+const darkCard = over(rgb(token(DARK, '--glass-fill')), darkCanvas);
 
 test('the keyboard focus ring is 3:1 or better on the canvas and on cards, in both themes', () => {
   for (const [block, canvas, card] of [[LIGHT, lightCanvas, lightCard], [DARK, darkCanvas, darkCard]]) {

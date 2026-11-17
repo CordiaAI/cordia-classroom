@@ -41,10 +41,10 @@ a { color: var(--olive-ink); }
 @media (hover: hover) { .c-btn:hover, .btn:hover { text-decoration: none; } }
 .c-btn:disabled, .btn:disabled, .btn-outline:disabled { opacity: 1; background: var(--card-sunk); border-color: var(--line); color: var(--muted); box-shadow: none; cursor: default; }
 .c-btn--primary, .btn, .btn-green { background: var(--olive); color: var(--on-olive); border-color: var(--olive); box-shadow: none; }
-.c-btn--primary:active:not(:disabled), .btn:active:not(:disabled) { transform: scale(.98); }
+.c-btn--primary:active:not(:disabled), .btn:active:not(:disabled) { transform: var(--press); }
 .c-btn--secondary, .btn-outline, .btn-gray {
   background: var(--glass); color: var(--ink); border-color: var(--glass-edge);
-  backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: var(--glass-blur);
   box-shadow: inset 0 1px 0 var(--glass-edge);
 }
 .c-btn--quiet { background: transparent; color: var(--olive-ink); border-color: transparent; padding: 0 12px; }
@@ -69,7 +69,7 @@ a { color: var(--olive-ink); }
 }
 .c-icon-btn:disabled { opacity: .4; cursor: default; }
 .c-icon-btn[aria-pressed='true'], .c-icon-btn.is-on { color: var(--olive-ink); }
-.c-icon-btn--glass { background: var(--glass); border-color: var(--glass-edge); backdrop-filter: blur(24px) saturate(160%); box-shadow: inset 0 1px 0 var(--glass-edge); }
+.c-icon-btn--glass { background: var(--glass); border-color: var(--glass-edge); backdrop-filter: var(--glass-blur); box-shadow: inset 0 1px 0 var(--glass-edge); }
 
 /* ---------- Surfaces ---------- */
 .c-card {
@@ -79,8 +79,8 @@ a { color: var(--olive-ink); }
 }
 .c-glass {
   background: var(--glass);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-edge);
   box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow);
 }
@@ -117,15 +117,20 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
 }
 .c-seg button, .c-seg a {
   height: 38px; padding: 0 18px; border: 0; border-radius:var(--r-pill);
-  background: transparent; color: var(--ink); font:600 15px/38px var(--font-sans);
+  background: transparent; color: var(--muted); font:600 15px/38px var(--font-sans);
   cursor: pointer; text-decoration: none; text-align: center;
 }
 .c-seg [aria-selected='true'], .c-seg .is-active { background: var(--card); box-shadow: var(--shadow); }
-/* SegmentedControl: one glass pill slides under the chosen segment (transform, spring-like curve);
-   the segments themselves stay clear. Reduced motion: the pill jumps. */
+/* SegmentedControl: one pill of selected glass slides under the chosen segment, raised over the
+   sunken track; the segments themselves stay clear. The slide is a state change (DESIGN-SPEC 6.1):
+   180ms on --ease with no overshoot. Its width eases on the same curve and clock as the transform,
+   so the pill never lags behind its own move between segments of different widths. A change made
+   from the keyboard (.is-keyed, set by SegmentedControl.js) shows on the next frame, and with
+   reduced motion the pill jumps. */
 .c-seg.has-pill { position: relative; isolation: isolate; }
 .c-seg-pill { position: absolute; top: 0; left: 0; z-index: 0; border-radius: var(--r-pill); background: var(--seg-pill-bg); box-shadow: var(--seg-pill-shadow); pointer-events: none; will-change: transform; }
-.c-seg.is-ready .c-seg-pill { transition: transform var(--seg-dur) var(--seg-spring), width var(--seg-dur) var(--seg-spring), height var(--seg-dur) var(--seg-spring); }
+.c-seg.is-ready .c-seg-pill { transition: transform var(--seg-dur) var(--seg-ease), width var(--seg-dur) var(--seg-ease), height var(--seg-dur) var(--seg-ease); }
+.c-seg.is-ready.is-keyed .c-seg-pill { transition: none; }
 .c-seg.has-pill > :is(button, a) { position: relative; z-index: 1; }
 .c-seg.has-pill.has-pill > :is(button, a):is([aria-selected='true'], [aria-checked='true'], [aria-pressed='true'], .is-active) { background: transparent !important; box-shadow: none !important; border-color: transparent !important; }
 @media (prefers-reduced-motion: reduce) { .c-seg.is-ready .c-seg-pill { transition: none; } }
@@ -169,8 +174,8 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
   display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
   height: var(--bar-h); padding: 0 20px;
   background: var(--glass);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   border-bottom: 1px solid var(--glass-edge);
   box-shadow: inset 0 1px 0 var(--glass-edge), 0 1px 0 var(--line);
 }
@@ -191,7 +196,7 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
   font:600 15px/1 var(--font-sans);
 }
 .c-nav .c-nav-btn[aria-pressed='true'] { background: var(--olive-tint); }
-@media (hover: hover) { .c-nav .c-nav-btn:hover { background: var(--lift-pane); box-shadow: var(--lift-shadow); transform: var(--lift); } }
+@media (hover: hover) { .c-nav .c-nav-btn:hover { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); } }
 .c-timerbtn { height: 40px; min-width: 40px; padding: 0 10px; gap: 6px; justify-content: center; }
 .c-timerbtn:not(.is-running) { width: 40px; padding: 0; }
 .c-timerbtn.is-running { color: var(--olive-ink); }
@@ -212,16 +217,18 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
   position: absolute; z-index: 120; min-width: 220px; padding: 6px;
   border-radius:var(--r-card);
   background: var(--glass); border: 1px solid var(--glass-edge);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow);
 }
 .c-menu [role='menuitem'], .c-menu > button, .c-menu > a {
   display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 14px;
   border: 0; border-radius:var(--r-input); background: transparent; color: var(--ink);
   font:600 15px/1 var(--font-sans); text-align: left; text-decoration: none; cursor: pointer;
+  transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-.c-menu [role='menuitem']:hover, .c-menu [role='menuitem']:focus-visible { background: var(--lift-pane); box-shadow: var(--lift-shadow); transform: var(--lift); text-decoration: none; }
+.c-menu [role='menuitem']:focus-visible { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); text-decoration: none; transition: none; } /* arrow keys: next frame (DESIGN-SPEC 6.1) */
+@media (hover: hover) { .c-menu [role='menuitem']:hover { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); text-decoration: none; } }
 .c-menu [role='menuitem'].is-danger { color: var(--error); }
 .c-menu hr { margin: 6px 8px; border: 0; border-top: 1px solid var(--line); }
 .c-menu-wrap { position: relative; }
@@ -250,8 +257,8 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
     height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
     padding: 6px 4px env(safe-area-inset-bottom);
     background: var(--glass);
-    -webkit-backdrop-filter: blur(24px) saturate(160%);
-    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
     border-top: 1px solid var(--glass-edge);
     box-shadow: inset 0 1px 0 var(--glass-edge);
   }
@@ -295,8 +302,8 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
   display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto;
   height: 44px; padding: 0 18px; border-radius:var(--r-pill);
   background: var(--glass); border: 1px solid var(--glass-edge);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   box-shadow: inset 0 1px 0 var(--glass-edge);
   color: var(--ink); font:600 15px/1 var(--font-sans); text-decoration: none; cursor: pointer;
 }
@@ -310,8 +317,8 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
   width: min(640px, 100%); max-height: calc(100vh - 32px); overflow: auto;
   padding: 24px; border-radius:var(--r-card);
   background: var(--glass); border: 1px solid var(--glass-edge);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow);
   animation: c-rise 220ms var(--ease);
 }
@@ -342,8 +349,8 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
   max-width: calc(100vw - 24px); box-sizing: border-box;
   border-radius:22px;
   background: var(--glass); border: 1px solid var(--glass-edge);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow);
   color: var(--ink); font:600 15px/1 var(--font-sans);
   animation: c-rise 240ms var(--ease);
@@ -485,7 +492,7 @@ body:has(.about) .c-fab { display: none; }
 .create-dropbox .lucide { color: var(--olive-ink); }
 .create-batch-dialog { display: grid; gap: 16px; width: min(480px, 100%); }
 .create-choice-actions, .confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.guide-jobs .guide-job { border-radius:var(--r-card); background: var(--glass); border-color: var(--glass-edge); backdrop-filter: blur(24px) saturate(160%); font:600 13px/1.35 var(--font-sans); }
+.guide-jobs .guide-job { border-radius:var(--r-card); background: var(--glass); border-color: var(--glass-edge); backdrop-filter: var(--glass-blur); font:600 13px/1.35 var(--font-sans); }
 @media (min-width: 721px) { .guide-jobs { top: calc(var(--bar-h) + 12px) !important; } }
 .guide-job-open { background: var(--olive) !important; border-radius:var(--r-pill) !important; font:600 13px/1 var(--font-sans) !important; height: 32px; padding: 0 14px !important; }
 .explain-preference { display: grid; gap: 10px; }
@@ -568,56 +575,65 @@ body:has(.about) .c-fab { display: none; }
 /* Note cards and the note page are cream paper in both themes, so their text stays paper ink. */
 
 /* ---------- Hover, focus and press (one system for every control) ----------
-   Hover lifts: a control rises 1px with the glass rim and a deeper shadow, a card 2px, and its
-   colour never changes (no tint, no wash, no darker olive). Things with no surface of their own
-   (nav links, menu items, rows in a list) show a clear raised pane of glass. The glass layer sets
+   DESIGN-SPEC 6.1. Hover: a glass control rises 1px with a deeper shadow, a card 2px, and its
+   colour never changes (no tint, no wash, no darker olive); olive buttons add their halo
+   (glass.css). Things with no surface of their own (nav links, menu items, rows in a list, icon and
+   quiet buttons) show --glass-inner with its white top line and stay put. The glass layer sets
    card border, background and shadow with !important, so these rules use it too. Hover only
-   where a mouse can hover; keyboard focus gets the same lift plus the olive ring. */
+   where a mouse can hover; keyboard focus gets the same lift plus the olive ring. Press settles
+   to --press (0.97). --lift and --press are off under reduced motion (tokens.css). */
 
 :is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a):not(:disabled) {
   cursor: pointer;
   transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
+/* Rows that show the inner pane on hover change their background with the shadow, on one clock. */
 :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .lib-row, .sn-card, a.calendar-item, div.c-list-row:has(> a[href])) {
   cursor: pointer;
-  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
 }
-.c-icon-btn:not(:disabled) { cursor: pointer; transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+/* Segments have no surface of their own: hover washes the track and never lifts. */
+.c-seg > :is(button, a):not(:disabled) { transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease), transform var(--dur) var(--ease); }
+.c-icon-btn:not(:disabled) { cursor: pointer; transition: background-color var(--dur) var(--ease), transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
 
 @media (hover: hover) {
-  :is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar):not(:disabled):not(.is-current):hover {
-    border-color: var(--lg-edge) !important;
+  :is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar):not(:disabled):not(.is-current):hover {
     box-shadow: var(--lift-shadow) !important;
     transform: var(--lift);
     text-decoration: none;
   }
-  /* Olive buttons keep their olive and their own rim: only the shadow deepens. */
-  :is(.c-btn--primary, .btn, .btn-green, .btn-upgrade, .pricing-btn:not(.is-secondary):not(.is-current)):not(:disabled):hover {
-    box-shadow: inset 0 1px 0 var(--lg-rim-low), var(--lg-depth-float) !important;
+  /* Segments sit in a sunken track with no surface of their own: a faint wash, no rise, so the
+     chosen pill stays the one raised, brightest thing in the control. */
+  .c-seg.c-seg > :is(button, a):not(:disabled):not([aria-selected='true'], [aria-checked='true'], [aria-pressed='true'], .is-active):hover {
+    background: var(--seg-hover);
+    text-decoration: none;
   }
+  /* Quiet buttons have no surface of their own: the inner pane, no rise. Both outrank the lift
+     above (0,5,0 over 0,4,1). The pane's edge holds while pressed too; only the no-rise steps
+     aside then, so press (below) still settles it to 0.97. */
+  .c-btn.c-btn--quiet.c-btn--quiet:not(:disabled):hover { box-shadow: var(--glass-inner-shadow) !important; }
+  .c-btn.c-btn--quiet:not(:disabled):not(:active):hover { transform: none; }
   /* Cards, tiles and rows that open something: lift 2px with the deeper float shadow. */
   :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .lib-row, .sn-card, a.calendar-item, div.c-list-row:has(> a[href])):hover {
     transform: var(--lift-card);
-    border-color: var(--lg-edge) !important;
     box-shadow: var(--lift-shadow-card) !important;
     text-decoration: none;
   }
-  /* Icon buttons are glass already: they lift and keep their fill. Nav links get the clear pane. */
-  .c-icon-btn:not(:disabled):hover { box-shadow: var(--lift-shadow); transform: var(--lift); }
+  /* Icon buttons and nav links show the inner pane and stay put. */
+  .c-icon-btn:not(:disabled):not([aria-pressed='true']):not(.is-on):hover { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); }
   .c-nav a:not([aria-current='page']):hover {
     background: var(--lift-pane);
-    box-shadow: var(--lift-shadow);
-    transform: var(--lift);
+    box-shadow: var(--glass-inner-shadow);
     text-decoration: none;
   }
-  /* Rows inside a list card rise as a rounded pane of their own, so the lift never draws a square
-     block over the card's rounded corners. */
+  /* Rows inside a list card show a rounded pane of their own, so it never draws a square block
+     over the card's rounded corners. */
   .c-list > :is(a.c-list-row, button.c-list-row, div.c-list-row:has(> a[href])):hover {
-    transform: var(--lift);
     border-color: transparent !important;
     border-radius: var(--r-input);
     background: var(--lift-pane) !important;
-    box-shadow: var(--lift-shadow) !important;
+    box-shadow: var(--glass-inner-shadow) !important;
+    transform: none;
   }
 }
 /* The end rows of a list card follow its rounded corners. */
@@ -628,28 +644,33 @@ body:has(.about) .c-fab { display: none; }
    surface in both themes). !important so no component's own outline, or outline: none, can hide it.
    Two fields draw their box on a wrapper, which takes the ring instead: the Tutor's message box
    (glass.css) and the search bar (SearchModal). */
-:focus-visible:not(.cordia-tutor-input textarea, .search-input) {
+:focus-visible:not(.cordia-tutor-input textarea, .search-input, .composer-box) {
   outline: 2px solid var(--focus-ring) !important;
   outline-offset: 2px !important;
 }
 
-/* Keyboard focus: the same lift as hover; the ring is the rule above. */
-:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a):not(:disabled):focus-visible {
-  border-color: var(--lg-edge) !important;
+/* Keyboard focus: the same lift as hover; the ring is the rule above. A keyboard change shows on
+   the next frame (DESIGN-SPEC 6.1), so the lift doesn't ease in; pointer hover keeps its 180ms. */
+:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a):not(:disabled):focus-visible {
   box-shadow: var(--lift-shadow) !important;
   transform: var(--lift);
+  transition: none;
 }
 :is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .sn-card, a.calendar-item):focus-visible,
 :is(.lib-row, div.c-list-row:has(> a[href])):focus-within:has(:focus-visible) {
   transform: var(--lift-card);
-  border-color: var(--lg-edge) !important;
   box-shadow: var(--lift-shadow-card) !important;
 }
-.c-icon-btn:not(:disabled):focus-visible { box-shadow: var(--lift-shadow); transform: var(--lift); }
+.c-icon-btn:not(:disabled):focus-visible { background: var(--lift-pane); }
 
-/* Press: settle back down with a small squeeze (cards keep their lift). */
-:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a, .c-icon-btn):not(:disabled):active { transform: scale(.98); }
-:is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .sn-card, a.calendar-item):active { transform: var(--lift-card) scale(.98); }
+/* Press: buttons and chips settle to --press (0.97). A pressed control is hovered too, so press
+   has to outrank the hover lift above (0,4,1): the second selector matches its weight and comes
+   later; the quiet button's no-rise steps aside while pressed. */
+:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a, .c-icon-btn):not(:disabled):active,
+:is(.c-btn, .btn, .btn-outline, .btn-gray, .btn-green, .c-pill, .c-chip, .c-seg button, .c-seg a, .pricing-btn, .upgrade-intervals button, .upgrade-later, .btn-upgrade, .study-aid-tab, .tutor-select-trigger, .quiz-option, .c-avatar, .c-nav a, .c-icon-btn):not(:disabled):not(.is-current):active { transform: var(--press); }
+/* Wide surfaces (cards, rows) keep their lift on press and don't scale: 2% of a wide card is a jump. */
+:is(a.c-card, button.c-card, a.c-list-row, button.c-list-row, .sn-card, a.calendar-item):active { transform: var(--lift-card); }
+.c-list > :is(a.c-list-row, button.c-list-row):is(:active, :focus-visible), .c-list > div.c-list-row:has(> a[href]):focus-within { transform: none; }
 
 /* Reduced motion: no lift or squeeze; the shadow and pane still show. */
 @media (prefers-reduced-motion: reduce) {
@@ -719,107 +740,214 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 @keyframes rec-pulse { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .rec-pill-dot { animation: none; } }
 
-/* ---------- Sidebar (wide screens) ----------
-   Replaces the top bar from 768px up: a rounded glass panel floating 12px in from the edges. New,
-   Search, Dashboard · Library · Calendar · Progress, your classes, Assistant, then one
-   divider and the account row (its ⋯ menu has Settings, Help, Send feedback and the theme). Folds to
-   icons (72px) with the toggle, remembered per device; between 768 and 1099px it's always folded so
-   the page keeps its width. Phones keep the top bar and tab bar.
-   One item is current (aria-current): a raised olive-tinted pane. Hover lifts a clear pane of glass
-   (no tint, no shadow), so it never reads as selected. */
-:root { --side-w: 248px; --side-gap: 12px; }
-:root[data-side='collapsed'] { --side-w: 72px; }
-.c-side { display: none; }
-@media (min-width: 768px) {
-  :root:has(.app-shell) { --bar-h: 0px; }
-  .app-shell .c-topbar { display: none; }
-  .app-shell { padding-left: calc(var(--side-w) + var(--side-gap)); transition: padding-left 200ms var(--ease); }
-  .app-shell.is-focus { padding-left: 0; }
-  .app-shell.is-focus .c-side { display: none; }
-  .c-side {
-    position: fixed; top: var(--side-gap); bottom: var(--side-gap); left: var(--side-gap); z-index: 95; width: var(--side-w);
-    display: flex; flex-direction: column; gap: 2px; padding: 14px 12px 12px;
-    overflow: hidden;
-    border: 1px solid var(--glass-edge);
-    border-radius: 24px; /* Fill, blur and shadow: the liquid glass recipe in glass.css. */
-    transition: width 200ms var(--ease);
+/* ---------- App shell: the sidebar and the tool rail (wide screens) ----------
+   DESIGN-SPEC 3.1, 3.2, 3.4. From 768px up two panes of glass float 12px in from the edges: the
+   sidebar on the left (264px; folded, 72px of icons) and the tool rail on the right (64px). The page
+   fills the space between them. The sidebar folds with its toggle, remembered on this device
+   (_document sets data-side before paint); from 768 to 1099px it is always folded and the rail never
+   folds. On short windows only the sidebar's middle and the rail's tools scroll: the brand row, New
+   chat, Search, the account row and More tools stay put. Phones keep the top bar and tab bar. */
+:root { --side-gap: 12px; --rail-w: 0px; }
+/* The new shell's widths; today's navigation (the switch off: styles/legacy-shell.css) sets its own. */
+:root[data-shell='new'] { --side-w: 264px; --rail-w: 64px; }
+:root[data-shell='new'][data-side='collapsed'] { --side-w: 72px; }
+@media (min-width: 768px) and (max-width: 1099px) { :root[data-shell='new'], :root[data-shell='new'][data-side] { --side-w: 72px; } }
+@media (min-width: 768px) { :root[data-shell='new']:has(.app-shell) { --bar-h: 0px; } }
+.c-side, .c-rail { display: none; }
+/* Everything below applies only while the new shell's switch is on (lib/newShell.mjs sets
+   data-shell on <html> before the first paint). :where() keeps each rule's own weight. */
+:where(:root[data-shell='new']) {
+  @media (min-width: 768px) {
+    .app-shell .c-topbar { display: none; }
+    /* Folding is instant: the page and the pane change width on the next frame, so nothing animates
+       a layout property and no text reflows mid-move. */
+    .app-shell { padding-left: calc(var(--side-w) + var(--side-gap)); padding-right: calc(var(--rail-w) + var(--side-gap)); }
+    .app-shell.is-focus { padding-left: 0; padding-right: 0; }
+    .app-shell.is-focus :is(.c-side, .c-rail) { display: none; }
+
+    /* The sidebar: brand row, New chat and Search, the scrolling middle, the account row; 14px apart. */
+    .c-side {
+      position: fixed; top: var(--side-gap); bottom: var(--side-gap); left: var(--side-gap); z-index: 95; width: var(--side-w);
+      display: flex; flex-direction: column; gap: 14px; padding: 14px 12px 12px; overflow: hidden;
+      border: 1px solid transparent; border-radius: 24px; /* fill, frost, grain and rim: glass.css */
+    }
+    .c-side-head { flex: none; display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 0 0 8px; }
+    .c-side-brand { display: inline-flex; align-items: center; gap: 10px; min-width: 0; color: var(--ink); text-decoration: none; white-space: nowrap; }
+    @media (hover: hover) { .c-side-brand:hover { text-decoration: none; } }
+    .c-side-brand .top-navigation-mark { width: 30px; height: 26px; flex: none; }
+    .c-side-brand .c-side-label { display: inline-flex; align-items: center; align-self: stretch; } /* the wordmark sits centred on the mark */
+    .c-side-head-tools { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+    /* Icon buttons in the sidebar (the bell, the fold toggle): 36px, muted; hover shows the inner pane. */
+    .c-side-icon {
+      position: relative; display: grid; place-items: center; flex: none; width: 36px; height: 36px; padding: 0;
+      border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer;
+      transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+    }
+    .c-side-icon[aria-expanded='true']:not(.c-side-toggle) { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
+
+    .c-side-top { flex: none; display: flex; flex-direction: column; gap: 4px; }
+    .c-side-new { width: 100%; height: 44px; min-height: 44px; gap: 8px; white-space: nowrap; }
+    .c-side-item {
+      position: relative; display: flex; align-items: center; gap: 12px; width: 100%; height: 36px; padding: 0 12px;
+      border: 1px solid transparent; border-radius: var(--r-input); background: transparent; color: var(--ink);
+      font: 600 15px/1.3 var(--font-sans); text-align: left; text-decoration: none; white-space: nowrap; cursor: pointer;
+      transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+    }
+    .c-side-item .lucide { flex: none; }
+    .c-side-search { height: 38px; margin-top: 4px; }
+    /* The ⌘K keycap: 12px/600 muted on a 1px hairline ring, no fill. */
+    .c-side-kbd { margin-left: auto; padding: 4px 7px; border-radius: var(--r-pill); background: transparent; box-shadow: 0 0 0 1px var(--hairline); color: var(--muted); font: 600 12px/1 var(--font-sans); }
+    /* Line height above 1, so the ellipsis clip never cuts off descenders (y, g, p). */
+    .c-side-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; padding-block: 1px; }
+
+    /* The middle: Classes, then Recent chats filling the rest and scrolling inside it. When even that
+       doesn't fit (a short window), the whole middle scrolls. */
+    .c-side-nav {
+      flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 14px;
+      /* 4px of padding keeps the first item's focus ring inside the scroll box. */
+      margin: 0 -12px; padding: 4px 12px; overflow: hidden auto; overscroll-behavior: contain;
+    }
+    .c-side-section { flex: none; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .c-side-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 32px; margin: 0; padding: 0 4px 0 12px; }
+    /* The sidebar's headings are the one place in caps (DESIGN-SPEC 5). */
+    .c-side-heading { margin: 0; color: var(--muted); font: 700 13px/1 var(--font-sans); letter-spacing: 0.06em; text-transform: uppercase; }
+    .c-side-add {
+      position: relative; display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: var(--r-pill);
+      color: var(--muted); text-decoration: none; transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+    }
+    .c-side-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .c-side-class { font-size: 14px; }
+    /* The class's colour dot takes an icon's 20px slot. */
+    .c-side-dot { flex: none; width: 10px; height: 10px; margin: 0 5px; border-radius: 50%; background: var(--dot, var(--olive)); box-shadow: inset 0 0 0 1px var(--hairline); }
+    /* Readiness (DESIGN-SPEC 3.3): the % in tabular 13px muted, then a 16px ring. */
+    .c-side-ready { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--muted); font: 500 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+    .c-side-ready .c-ring svg { display: block; }
+    .c-side-ready .c-ring-track { stroke: var(--ring-track); }
+    .c-side-all { display: flex; align-items: center; height: 32px; padding: 0 12px 0 44px; border-radius: var(--r-input); color: var(--muted); font: 600 13px/1.3 var(--font-sans); text-decoration: none; transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+    .c-side-empty { margin: 0; padding: 4px 12px; color: var(--muted); font: 500 13px/1.4 var(--font-sans); white-space: normal; }
+    .c-side-chats { flex: 1 1 0; min-height: 148px; }
+    .c-side-chat-list { flex: 1 1 0; min-height: 0; margin: 0 -12px; padding: 0 12px 4px; overflow: hidden auto; overscroll-behavior: contain; }
+    .c-side-chat { flex: none; font: 500 14px/1.3 var(--font-sans); }
+    .c-side-chats-icon { display: none; }
+
+    /* The account row, under the one hairline: a 36px avatar (initials in olive on selected glass),
+       the name, the plan and school, and ⋯ (its menu: components/AccountMenu.js). */
+    .c-side-foot { flex: none; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); }
+    .c-side-account { height: 52px; padding: 0 6px; gap: 12px; }
+    .c-side-account[aria-expanded='true'] { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
+    .c-side .c-side-avatar { flex: none; width: 36px; height: 36px; border: 0; background: var(--selected-glass); box-shadow: var(--selected-glass-shadow); color: var(--olive-ink); font: 700 13px/1 var(--font-sans); }
+    .c-side-who { display: grid; gap: 2px; min-width: 0; flex: 1 1 auto; }
+    .c-side-who strong { font: 600 14px/1.25 var(--font-sans); color: var(--ink); }
+    .c-side-who span { color: var(--muted); font: 500 12px/1.25 var(--font-sans); }
+    .c-side-dots { flex: none; margin-left: auto; color: var(--muted); }
+
+    /* Hover (DESIGN-SPEC 3.2, 6.1): the inner pane with its white top line; no colour or weight change. */
+    @media (hover: hover) {
+      :is(.c-side-item:not([aria-current='page']), .c-side-icon, .c-side-add, .c-side-all):hover {
+        background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); text-decoration: none;
+      }
+    }
+
+    /* The tool rail (DESIGN-SPEC 3.4): 44px round buttons 6px apart, More tools alone at the bottom. */
+    .c-rail {
+      position: fixed; top: var(--side-gap); bottom: var(--side-gap); right: var(--side-gap); z-index: 95; width: var(--rail-w);
+      display: flex; flex-direction: column; align-items: center; padding: 10px 0;
+      border: 1px solid transparent; border-radius: 24px; /* glass.css */
+    }
+    .c-rail-tools {
+      flex: 0 1 auto; min-height: 0; width: 100%; margin: 0; padding: 2px 0; list-style: none;
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      overflow: hidden auto; overscroll-behavior: contain; scrollbar-width: none;
+    }
+    .c-rail-tools::-webkit-scrollbar { display: none; }
+    .c-rail-tools li { display: grid; }
+    .c-rail-btn {
+      display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0;
+      border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; text-decoration: none;
+      transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease), transform var(--dur) var(--ease);
+    }
+    .c-rail-more { margin-top: auto; }
+    /* Hover: the inner pane, and the icon turns ink (DESIGN-SPEC 3.4 names this one change). */
+    @media (hover: hover) {
+      .c-rail-btn:not([aria-current='page']):hover { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); color: var(--ink); }
+    }
+    .c-rail-btn[aria-expanded='true'] { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); color: var(--ink); }
+    .c-rail-btn[aria-current='page'] { background: var(--selected-glass); box-shadow: var(--selected-glass-shadow); color: var(--olive-ink); }
+    .c-rail-btn:active { transform: var(--press); }
+
+    /* Things that sat in the bottom-right corner move left of the rail. */
+    .app-shell:not(.is-focus) .c-tutor-bubble { right: calc(var(--rail-w) + var(--side-gap) * 2); }
+    .app-shell:not(.is-focus) .tutor-drawer-shell { right: calc(var(--rail-w) + var(--side-gap) * 2); }
+    .app-shell:not(.is-focus) .guide-jobs { right: calc(var(--rail-w) + var(--side-gap) * 2 + 8px); }
   }
-  .c-side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 4px 0 8px; margin-bottom: 8px; }
-  .c-side-brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; font: 600 20px/1.15 var(--font-display); white-space: nowrap; }
-  @media (hover: hover) { .c-side-brand:hover { text-decoration: none; } }
-  .c-side-brand .top-navigation-mark { width: 30px; height: 26px; flex: none; }
-  .c-side-brand .c-side-label { display: inline-flex; align-items: center; align-self: stretch; } /* centre the wordmark on the mark, not on a text baseline */
-  .c-side-toggle { display: grid; place-items: center; flex: none; width: 36px; height: 36px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; }
-  @media (hover: hover) { .c-side-toggle:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); color: var(--ink); } }
-  .c-side-new { width: 100%; height: 44px; min-height: 44px; margin-bottom: 6px; white-space: nowrap; }
-  .c-side-item {
-    position: relative; display: flex; align-items: center; gap: 12px; width: 100%; height: 40px; padding: 0 12px;
-    border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink);
-    font: 600 15px/1.3 var(--font-sans); text-align: left; text-decoration: none; white-space: nowrap; cursor: pointer;
+
+  /* Folded: 72px of icons, centred. Each keeps its name as a tooltip and an accessible name; class
+     dots stay, Recent chats becomes one icon with a menu, the + stays for adding a class. */
+  @media (min-width: 768px) {
+    &[data-side='collapsed'] .c-side :is(.c-side-label, .c-side-kbd, .c-side-heading, .c-side-all, .c-side-dots, .c-side-ready, .c-side-chats, .c-side-empty) { display: none; }
+    &[data-side='collapsed'] .c-side .c-side-head { flex-direction: column; padding: 0; gap: 6px; }
+    &[data-side='collapsed'] .c-side .c-side-head-tools { flex-direction: column; margin-left: 0; gap: 6px; }
+    &[data-side='collapsed'] .c-side :is(.c-side-item, .c-side-new) { justify-content: center; padding: 0; }
+    &[data-side='collapsed'] .c-side .c-side-heading-row { justify-content: center; padding: 0; }
+    &[data-side='collapsed'] .c-side .c-side-chats-icon { display: flex; flex: none; height: 40px; }
+    &[data-side='collapsed'] .c-side .c-side-account { height: 48px; }
   }
-  .c-side-item .lucide { flex: none; }
-  .c-side-item { transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
-  /* The sidebar is already glass, so its hover pane uses the lighter fill: subtler than the current item. */
-  @media (hover: hover) { .c-side-item:hover { background: var(--lg-sheen), var(--lg-fill); box-shadow: var(--lg-highlight); transform: var(--lift); text-decoration: none; } }
-  /* Line height above 1, so the ellipsis clip never cuts off descenders (y, g, p). */
-  .c-side-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; padding-block: 1px; }
-  .c-side-kbd { margin-left: auto; padding: 4px 7px; border-radius: var(--r-pill); background: var(--hairline); color: var(--muted); font: 600 12px/1 var(--font-sans); }
-  /* The middle scrolls on short screens; New and Search stay on top and the account at the bottom. */
-  .c-side-nav {
-    flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1px;
-    /* 4px of top padding keeps the first item's focus ring inside the scroll box. */
-    margin: 0 -12px; padding: 4px 12px 8px; overflow: hidden auto; overscroll-behavior: contain;
+  @media (min-width: 768px) and (max-width: 1099px) {
+    .c-side :is(.c-side-label, .c-side-kbd, .c-side-heading, .c-side-all, .c-side-dots, .c-side-ready, .c-side-chats, .c-side-empty, .c-side-toggle) { display: none; }
+    .c-side .c-side-head { flex-direction: column; padding: 0; gap: 6px; }
+    .c-side .c-side-head-tools { flex-direction: column; margin-left: 0; gap: 6px; }
+    .c-side :is(.c-side-item, .c-side-new) { justify-content: center; padding: 0; }
+    .c-side .c-side-heading-row { justify-content: center; padding: 0; }
+    .c-side .c-side-chats-icon { display: flex; flex: none; height: 40px; }
+    .c-side .c-side-account { height: 48px; }
   }
-  .c-side-nav .c-side-item { height: 38px; }
-  /* Classes: a label with its + (add a class), then up to five classes as colour dot + course code. */
-  .c-side-section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; margin: 12px 0 6px; }
-  .c-side-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 28px; padding: 0 4px 0 12px; }
-  .c-side-heading { margin: 0; color: var(--muted); font: 600 13px/1.6 var(--font-sans); }
-  .c-side-add { display: grid; place-items: center; width: 26px; height: 26px; border-radius: var(--r-pill); color: var(--muted); text-decoration: none; }
-  @media (hover: hover) { .c-side-add:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); color: var(--ink); text-decoration: none; } }
-  .c-side-classes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; }
-  .c-side-class { font-size: 14px; }
-  /* The dot takes the icon's 20px slot, so codes line up with the labels above. */
-  .c-side-dot { flex: none; width: 10px; height: 10px; margin: 0 5px; border-radius: 50%; background: var(--dot, var(--olive)); box-shadow: inset 0 0 0 1px var(--hairline); }
-  .c-side-all { display: flex; align-items: center; height: 30px; padding: 0 12px 0 44px; border-radius: var(--r-input); color: var(--muted); font: 600 13px/1.3 var(--font-sans); text-decoration: none; }
-  @media (hover: hover) { .c-side-all:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); color: var(--ink); text-decoration: none; } }
-  .c-side-empty { color: var(--muted); font-size: 14px; }
-  @media (hover: hover) { .c-side-empty:hover { color: var(--ink); } }
-  /* The one divider, then the account row. */
-  .c-side-foot { flex: none; display: grid; gap: 2px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
-  .c-side-head, .c-side-new, .c-side > .c-side-item { flex: none; }
-  .c-side-account { height: 56px; padding: 0 8px; }
-  .c-side-account[aria-expanded='true'] { background: var(--lift-pane); box-shadow: var(--lg-highlight); }
-  .c-side-account.is-active .c-side-avatar { box-shadow: 0 0 0 2px var(--olive); }
-  .c-side-avatar { flex: none; width: 36px; height: 36px; }
-  .c-side-who { display: grid; gap: 3px; min-width: 0; flex: 1 1 auto; }
-  .c-side-who strong { font: 600 var(--fs-15)/1.2 var(--font-sans); }
-  .c-side-who span { color: var(--muted); font: 500 var(--fs-13)/1.2 var(--font-sans); }
-  .c-side-dots { flex: none; margin-left: auto; color: var(--muted); }
-  /* Folded: icons only, centered; each keeps its name as a tooltip and accessible label. Class
-     dots stay, with the course code as the tooltip. */
-  .c-side.is-collapsed { padding-inline: 12px; }
-  .c-side.is-collapsed :is(.c-side-label, .c-side-kbd, .c-side-heading-row, .c-side-all, .c-side-dots) { display: none; }
-  .c-side.is-collapsed .c-side-head { flex-direction: column; padding: 0; gap: 8px; }
-  .c-side.is-collapsed :is(.c-side-item, .c-side-new) { justify-content: center; padding: 0; }
-  .c-side.is-collapsed .c-side-section { margin-top: 8px; padding-top: 8px; }
-  .c-side.is-collapsed .c-side-account { height: 48px; }
 }
-@media (min-width: 768px) and (max-width: 1099px) {
-  :root { --side-w: 72px; }
-  .c-side :is(.c-side-label, .c-side-kbd, .c-side-toggle, .c-side-heading-row, .c-side-all, .c-side-dots) { display: none; }
-  .c-side .c-side-head { justify-content: center; padding: 0; }
-  .c-side :is(.c-side-item, .c-side-new) { justify-content: center; padding: 0; }
-  .c-side .c-side-section { margin-top: 8px; padding-top: 8px; }
+
+/* Popovers for the rail (name and one line) and the folded sidebar (the name): solid menu glass,
+   never in the way of a click. Enter: a 150ms fade from 6px out; exit: a 100ms fade; from the
+   keyboard, at once (DESIGN-SPEC 6.1, 6.2). components/ShellTips.js places them. */
+.c-shell-tip {
+  position: fixed; top: -9999px; left: -9999px; z-index: 170; box-sizing: border-box;
+  display: grid; gap: 3px; width: 232px; padding: 12px 14px; text-align: left; pointer-events: none;
+  border: 1px solid; border-color: var(--glass-rim-border); border-radius: 16px;
+  background: var(--glass-sheen), var(--lg-fill-menu); box-shadow: var(--glass-shadow-edge), var(--shadow-float);
+  opacity: 0; visibility: hidden; transform: translate(6px, -50%);
+  transition: opacity 100ms var(--ease-exit), visibility 0s linear 100ms, transform 0s linear 100ms;
 }
+.c-shell-tip.is-right { transform: translate(-6px, -50%); }
+.c-shell-tip.is-shown {
+  opacity: 1; visibility: visible; transform: translate(0, -50%);
+  transition: opacity 150ms var(--ease), transform 150ms var(--ease), visibility 0s;
+}
+.c-shell-tip.is-instant { transition: none; }
+.c-shell-tip b { color: var(--ink); font: 600 15px/1.3 var(--font-sans); }
+.c-shell-tip span { color: var(--muted); font: 500 13px/1.4 var(--font-sans); }
+.c-shell-tip.is-name { width: max-content; max-width: 260px; padding: 9px 14px; }
+
+/* Menus beside the shell (More tools, the folded Recent chats): components/ShellMenu.js. */
+.c-shell-menu { position: fixed; z-index: 400; width: 300px; box-sizing: border-box; max-width: calc(100vw - 32px); max-height: calc(100vh - 24px); overflow-y: auto; }
+.c-shell-menu.is-open { animation: c-shell-in-left 150ms var(--ease) both; }
+.c-shell-menu.is-right.is-open { animation-name: c-shell-in-right; }
+.c-shell-menu.is-instant.is-open { animation: none; }
+.c-shell-menu.is-closing { animation: c-fade-out 100ms var(--ease-exit) both; pointer-events: none; }
+.c-shell-menu [role='menuitem'] .c-menu-label, .c-shell-menu .c-menu-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-shell-menu [role='menuitem'] .lucide { color: var(--muted); }
+.c-shell-menu [role='menuitem'][aria-current='page'] { background: var(--selected-glass); box-shadow: var(--selected-glass-shadow); }
+.c-shell-menu [role='menuitem'][aria-current='page'] .lucide { color: var(--olive-ink); }
+@keyframes c-shell-in-left { from { opacity: 0; transform: translateX(6px); } to { opacity: 1; transform: none; } }
+@keyframes c-shell-in-right { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+@keyframes c-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
 @media (prefers-reduced-motion: reduce) {
-  .c-side, .app-shell { transition: none; }
+  .c-shell-tip, .c-shell-tip.is-right { transform: translate(0, -50%); }
+  .c-shell-menu.is-open, .c-shell-menu.is-right.is-open { animation-name: c-fade; }
 }
 
 /* Rows / Cards switch (components/ViewToggle.js). */
-/* Icon-only segments (the list / grid switch): same control, square-ish segments, full-ink icons. */
+/* Icon-only segments (the list / grid switch): same control, square-ish segments; icons are muted
+   until chosen, like every segment label (glass.css). */
 .c-seg--icons { flex: none; }
-.c-seg--icons button { display: inline-grid; place-items: center; width: 44px; height: 34px; padding: 0; line-height: 1; color: var(--ink); }
+.c-seg--icons button { display: inline-grid; place-items: center; width: 44px; height: 34px; padding: 0; line-height: 1; }
 
 /* A list in card view: the same rows laid out as small tiles. The first child (progress ring
    or kind icon) sits top left, a star and the ⋯ menu top right, the title and meta below, and a
@@ -851,6 +979,127 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 }
 
 /* Small buttons keep their size and get a 40px tap area (the same idea as .done-check). */
-:is(.c-side-add, .create-card-remove) { position: relative; }
-.c-side-add::before { content: ''; position: absolute; inset: -7px; }
+.create-card-remove { position: relative; }
+.c-side-add::before { content: ''; position: absolute; inset: -4px; }
 .create-card-remove::before { content: ''; position: absolute; inset: -4px; }
+
+/* ---------- Chat home and composer (DESIGN-SPEC 4.1, 4.2, 4.3; pages/home.js, components/Composer.js) ----------
+   The home fills the space between the sidebar and the rail, 12px from each, and never scrolls:
+   the headline, composer and suggestions sit a little above the middle in a 760px column. After the
+   first message only the conversation scrolls, with the composer at the bottom. */
+@media (min-width: 768px) {
+  :root[data-shell='new'] .app-shell:has(.chat-home) .main-content { padding: 0 var(--side-gap) !important; }
+  :root[data-shell='new'] .app-shell:has(.chat-home) .workspace-route { max-width: none; }
+  :root[data-shell='new'] .chat-home { height: 100dvh; min-height: 0; padding: var(--side-gap) 0; }
+}
+.chat-home { box-sizing: border-box; display: flex; flex-direction: column; min-height: calc(100dvh - 160px); }
+.chat-home-top { flex: none; display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 8px; min-width: 0; }
+.chat-home-date { margin-left: auto; color: var(--muted); font: 500 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chat-home-top h1.chat-home-title { min-width: 0; margin: 0 0 0 4px; color: var(--ink); font: 600 17px/1.3 var(--font-sans) !important; letter-spacing: 0 !important; }
+.chat-home-chip { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: var(--r-pill); background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); color: var(--ink); font: 600 13px/1 var(--font-sans); }
+.chat-home-stage { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 20px; padding: 0 24px 72px; }
+.chat-home-hero, .chat-home-composer, .chat-home-pills { box-sizing: border-box; width: 100%; max-width: 760px; margin-inline: auto; }
+.chat-home-hero { display: grid; gap: 8px; padding: 0 8px; }
+.chat-home-hero h1.chat-home-headline { margin: 0; color: var(--ink); font-size: 40px !important; line-height: 1.12 !important; }
+.chat-home-line { margin: 0; color: var(--muted); font: 500 17px/1.5 var(--font-sans); font-variant-numeric: tabular-nums; }
+.chat-home-pills { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 4px; }
+.chat-home-pill {
+  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 11px; border: 0; border-radius: var(--r-pill);
+  background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); color: var(--ink); font: 600 15px/1 var(--font-sans);
+  text-decoration: none; white-space: nowrap; cursor: pointer; transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.chat-home-pill .lucide { flex: none; color: var(--muted); }
+@media (hover: hover) { .chat-home-pill:hover { transform: var(--lift); box-shadow: var(--glass-inner-shadow), var(--lift-shadow); text-decoration: none; } }
+.chat-home-pill:active { transform: var(--press); }
+.chat-home-note { flex: none; margin: 0 0 4px; padding: 0 16px; text-align: center; color: var(--muted); font: 500 13px/1.4 var(--font-sans); }
+
+/* The chat: the conversation scrolls in a 760px column; the composer sits under it. */
+.chat-home.is-chat .chat-home-stage { justify-content: flex-end; gap: 12px; padding: 0 0 8px; }
+.chat-home.is-chat .chat-home-composer { padding: 0 24px; max-width: calc(760px + 48px); }
+.chat-home .chat-home-thread { flex: 1 1 auto; min-height: 0; display: block; overflow-y: auto; padding: 8px 24px 16px; overscroll-behavior: contain; animation: c-chat-in 180ms var(--ease) both; }
+@keyframes c-chat-in { from { opacity: 0; } to { opacity: 1; } }
+.chat-home-column { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.chat-home-thread .cordia-tutor-message { position: relative; max-width: none; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--ink); font: 500 17px/1.55 var(--font-sans); }
+.chat-home-thread .cordia-tutor-message:is(.ai, .tutor-thinking) { align-self: stretch; padding-left: 44px; min-height: 32px; }
+.chat-home-thread .cordia-tutor-message.tutor-thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 15px; }
+.chat-home-thread .cordia-tutor-message.user {
+  align-self: flex-end; max-width: 78%; padding: 12px 16px; border-radius: 20px 20px 6px 20px;
+  background: var(--glass-sheen), var(--glass-fill-strong) !important; box-shadow: var(--glass-shadow); color: var(--ink) !important;
+}
+.chat-home-thread .cordia-tutor-message.error { align-self: stretch; padding: 10px 14px; border-radius: var(--r-input); background: var(--error-bg); color: var(--error); font-size: 15px; }
+.cordia-tutor-avatar { position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
+.cordia-tutor-avatar svg, .cordia-tutor-avatar img { width: 22px; height: auto; }
+
+/* The composer: strong glass, 28px corners; focus rings the whole composer, not the box. */
+.composer {
+  position: relative; isolation: isolate; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px;
+  padding: 12px 12px 10px; border-radius: 28px; background: var(--glass-sheen), var(--glass-fill-strong);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-shadow);
+}
+.composer::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background: var(--glass-grain) repeat; background-size: 180px 180px; opacity: var(--glass-grain-opacity); }
+.composer::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; background: var(--glass-rim); -webkit-mask: var(--glass-rim-mask-webkit); -webkit-mask-composite: xor; mask: var(--glass-rim-mask); }
+.composer:has(.composer-box:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.composer.is-drop { outline: 2px dashed var(--focus-ring); outline-offset: 2px; }
+.composer .composer-box {
+  display: block; box-sizing: border-box; width: 100%; margin: 0; padding: 10px 8px 4px; resize: none; overflow-y: hidden;
+  /* Borderless (DESIGN-SPEC 4.2): the shared field glass (glass.css) stays off this box. */
+  border: 0 !important; border-radius: 0; background: transparent !important; box-shadow: none !important; color: var(--ink); font: 500 17px/1.5 var(--font-sans);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.composer .composer-box:focus, .composer .composer-box:focus-visible { outline: none; box-shadow: none; }
+.composer .composer-box::placeholder { color: var(--muted); opacity: 1; }
+.composer-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.composer-spacer { flex: 1 1 auto; }
+.composer-icon {
+  position: relative; display: inline-grid; place-items: center; flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: var(--r-pill);
+  background: transparent; color: var(--muted); cursor: pointer; transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.composer-icon:disabled { cursor: default; opacity: .5; }
+.composer-icon.is-on { background: var(--selected-glass); box-shadow: var(--selected-glass-shadow); color: var(--olive-ink); }
+@media (hover: hover) { .composer-icon:not(:disabled):not(.is-on):hover { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); } }
+.composer-send {
+  display: inline-grid; place-items: center; flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: var(--r-pill);
+  background-color: var(--send-quiet); background-image: none; color: var(--muted); cursor: default;
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.composer-send.is-ready { background-color: var(--olive); background-image: var(--olive-glass-sheen); box-shadow: var(--olive-glass-shadow); color: var(--on-olive); cursor: pointer; }
+@media (hover: hover) { .composer-send.is-ready:hover { transform: var(--lift); box-shadow: var(--olive-glass-shadow-hover); } }
+.composer-send.is-ready:active { transform: var(--press); background-color: var(--olive-press); }
+.composer-send:not(.is-ready):active { transform: none; }
+.composer-files { list-style: none; margin: 0; padding: 0 4px; display: flex; flex-wrap: wrap; gap: 6px; }
+.composer-files li { display: inline-flex; align-items: center; gap: 8px; max-width: 260px; height: 36px; padding: 0 4px 0 12px; border-radius: var(--r-pill); background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); color: var(--ink); font: 600 14px/1 var(--font-sans); }
+.composer-files li .lucide { flex: none; color: var(--muted); }
+.composer-file-remove { display: grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; transition: background-color var(--dur) var(--ease); }
+@media (hover: hover) { .composer-file-remove:hover { background: var(--glass-inner); } }
+.composer-note { margin: 0 8px 2px; color: var(--muted); font: 500 13px/1.4 var(--font-sans); }
+.composer-note.is-error { color: var(--error); }
+
+/* The class picker (components/ClassPicker.js): a quiet button with the class's dot and code. */
+.c-class-picker {
+  display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; border: 0; border-radius: var(--r-pill);
+  background: transparent; color: var(--ink); font: 600 15px/1 var(--font-sans); white-space: nowrap; cursor: pointer;
+  transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.c-class-picker.is-sm { height: 34px; padding: 0 10px; font-size: 14px; }
+.c-class-picker .lucide { flex: none; color: var(--muted); }
+.c-class-picker[aria-expanded='true'] { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
+@media (hover: hover) { .c-class-picker:hover { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); } }
+.c-class-dot { flex: none; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--dot, transparent); box-shadow: inset 0 0 0 1px var(--hairline); }
+.c-menu [role='menuitem'] > .c-class-dot { margin: 0 5px; }
+.c-class-dot.is-none { box-shadow: none; }
+/* Small controls keep their look and get a 40px target (DESIGN-SPEC 6.1; the same idea as .c-side-add). */
+.c-class-picker.is-sm, .composer-file-remove { position: relative; }
+.c-class-picker.is-sm::after, .composer-file-remove::after { content: ''; position: absolute; top: 50%; left: 50%; width: max(100%, 40px); height: max(100%, 40px); translate: -50% -50%; }
+
+@media (max-width: 767px) {
+  .chat-home-stage { padding: 0 0 24px; }
+  .chat-home-hero h1.chat-home-headline { font-size: 30px !important; }
+  .chat-home-date { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-home .chat-home-thread { animation: none; }
+  .chat-home-pill:hover, .chat-home-pill:active, .composer-send.is-ready:hover, .composer-send.is-ready:active { transform: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .composer { background: var(--surface-raised); }
+}

@@ -51,6 +51,12 @@ async function install(context, state) {
     if (url.includes('/token')) return route.fulfill({ status: 400, json: { error: 'invalid_grant', error_description: 'Invalid login credentials' } });
     return route.fulfill({ json: {} });
   });
+  // The new shell's switch (web/pages/api/new-shell.js) checks the token with the real Classroom
+  // API on the server, which this mock can't answer. In development the page already knows (the
+  // shell is on unless CORDIA_NEW_SHELL=off). Set state.newShell to true or false to answer it here.
+  await context.route(/\/api\/new-shell$/, route => (typeof state.newShell === 'boolean'
+    ? route.fulfill({ json: { newShell: state.newShell }, headers: { 'Cache-Control': 'private, no-store' } })
+    : route.fallback()));
   await context.route(/localhost:8000\//, async route => {
     const req = route.request();
     const url = new URL(req.url());

@@ -1,6 +1,7 @@
 import '../styles/globals.css';
 import '../styles/classroom.css';
 import '../styles/system.css';
+import '../styles/legacy-shell.css';
 import '../styles/refine.css';
 import '../styles/tokens.css';
 import '../styles/glass.css';
@@ -17,7 +18,6 @@ import { USE_CASES, useCasePath } from '../lib/useCases/index.mjs';
 import { COMPARISONS, comparisonPath } from '../lib/comparisons/index.mjs';
 import { useState, useEffect } from 'react';
 import { installErrorReporting } from '../lib/errorReport';
-import { installAmbientMotion } from '../lib/ambientMotion';
 import Layout from '../components/Layout';
 import UpgradeModal from '../components/UpgradeModal';
 import { scheduleProactiveRefresh, getToken } from '../lib/api';
@@ -51,7 +51,6 @@ export default function App({ Component, pageProps }) {
     if (getToken() || !publicPage(window.location.pathname)) return;
     try { recordFirstTouch({ href: window.location.href, referrer: document.referrer, storage: window.localStorage }); } catch { /* storage blocked */ }
   }, []);
-  useEffect(() => installAmbientMotion(), []);
 
   // Start proactive token refresh if already logged in; the account's saved theme wins over the cache.
   useEffect(() => {

@@ -7,8 +7,8 @@ const SIGN_OUT_EXTRA = 8;
 
 // The account menu: one glass bubble per item, folding out from under the avatar.
 // Open: bubbles start stacked behind the first one and slide down in order (40 ms stagger,
-// 260 ms each, ~3 px overshoot). Close: last bubble first, back up behind the one above
-// (30 ms stagger, 200 ms, ease-in). Rendered on <body> so the top bar's blur can't make
+// 260 ms each). Close: last bubble first, back up behind the one above (30 ms stagger, 200 ms).
+// Every move uses the everyday curve (DESIGN-SPEC 6.1, --ease), with no overshoot. Rendered on <body> so the top bar's blur can't make
 // the bubbles see-through.
 // items: [{ key, label, icon, onSelect, separated }]
 export default function AccountMenu({ open, onClose, anchorRef, items, placement = 'below' }) {
@@ -135,40 +135,36 @@ export default function AccountMenu({ open, onClose, anchorRef, items, placement
           -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter);
           box-shadow: var(--lg-highlight), var(--lg-shadow);
           color: var(--ink); font: 500 15px/1 var(--font-sans); white-space: nowrap; cursor: pointer;
-          /* No background transition: the fill is gradient layers, which can't animate, so a transition
-             to a plain color left the bubble see-through (a grey flash) for a moment on hover. */
-          transition: border-color 160ms ease-out, transform 160ms ease-out, box-shadow 160ms ease-out;
+          /* Hover rises with a deeper shadow and never changes the fill (DESIGN-SPEC 6.1). */
+          transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
         }
         .acct-bubble .lucide { flex: 0 0 auto; width: 20px; height: 20px; color: var(--ink); }
         .acct-bubble.is-separated { margin-top: ${SIGN_OUT_EXTRA}px; }
         /* A count on an item (Friends: requests waiting on you). */
         .acct-dot { width: 8px; height: 8px; margin-left: auto; border-radius: 50%; background: var(--olive); flex: none; }
         .acct-badge { display: grid; place-items: center; min-width: 22px; height: 22px; margin-left: auto; padding: 0 7px; border-radius: 999px; background: var(--olive); color: var(--on-olive); font: 600 13px/1 var(--font-sans); }
-        .acct-bubble:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
-        .acct-bubble:active { transform: scale(.98); }
+        .acct-bubble:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
         @media (hover: hover) {
-          .acct-bubbles.is-open .acct-bubble:hover, .acct-bubbles.is-open .acct-bubble:focus-visible {
-            --acct-hover: color-mix(in srgb, var(--lg-fill-menu), var(--hover-light) 6%);
-            background: var(--lg-sheen), linear-gradient(var(--acct-hover), var(--acct-hover));
-            border-color: var(--hover-edge);
-            transform: translateY(-1px);
+          .acct-bubbles.is-open .acct-bubble:hover {
+            box-shadow: var(--lg-highlight), var(--glass-control-shadow-hover);
+            transform: var(--lift);
           }
-          .acct-bubbles.is-open .acct-bubble:active { transform: translateY(-1px) scale(.98); }
         }
-        .acct-bubbles.is-opening .acct-bubble { animation: acct-fold-out 260ms ease-out var(--open-delay) both; }
-        .acct-bubbles.is-closing .acct-bubble { animation: acct-fold-in 200ms ease-in var(--close-delay) both; }
+        .acct-bubbles.is-open .acct-bubble:focus-visible { box-shadow: var(--lg-highlight), var(--glass-control-shadow-hover); transition: none; }
+        .acct-bubbles.is-open .acct-bubble:active { transform: var(--press); }
+        .acct-bubbles.is-opening .acct-bubble { animation: acct-fold-out 260ms var(--ease) var(--open-delay) both; }
+        .acct-bubbles.is-closing .acct-bubble { animation: acct-fold-in 200ms var(--ease) var(--close-delay) both; }
         @keyframes acct-fold-out {
-          0% { transform: translateY(var(--from)) scale(.9); opacity: 0; }
-          72% { transform: translateY(3px) scale(1); opacity: 1; }
-          100% { transform: none; opacity: 1; }
+          from { transform: translateY(var(--from)) scale(.9); opacity: 0; }
+          to { transform: none; opacity: 1; }
         }
         @keyframes acct-fold-in {
           from { transform: none; opacity: 1; }
           to { transform: translateY(var(--from)) scale(.9); opacity: 0; }
         }
         @media (prefers-reduced-motion: reduce) {
-          .acct-bubbles.is-opening .acct-bubble { animation: acct-fade-in 150ms ease-out both; }
-          .acct-bubbles.is-closing .acct-bubble { animation: acct-fade-out 150ms ease-in both; }
+          .acct-bubbles.is-opening .acct-bubble { animation: acct-fade-in 150ms var(--ease) both; }
+          .acct-bubbles.is-closing .acct-bubble { animation: acct-fade-out 150ms var(--ease) both; }
           .acct-bubble:hover, .acct-bubble:active { transform: none !important; }
         }
         @keyframes acct-fade-in { from { opacity: 0; } to { opacity: 1; } }

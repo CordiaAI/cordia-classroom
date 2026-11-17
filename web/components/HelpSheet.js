@@ -5,6 +5,7 @@ import { Check, Inbox, Keyboard, Megaphone, Play, Puzzle, X } from 'lucide-react
 import { EXTENSION_STORE_URL } from '../lib/extension';
 import { setWalkthrough } from '../lib/walkthrough';
 import LearnCordia from './LearnCordia';
+import { homeRoute } from '../lib/useNewShell';
 
 export default function HelpSheet({ onClose, onFeedback, onShortcuts, canReviewFeedback }) {
   const router = useRouter();
@@ -19,7 +20,9 @@ export default function HelpSheet({ onClose, onFeedback, onShortcuts, canReviewF
 
   async function replayDayOne() {
     onClose();
-    if (router.pathname !== '/dashboard') await router.push('/dashboard');
+    // Day one starts where students land: the chat home with the new shell, the Dashboard without.
+    const start = homeRoute();
+    if (router.pathname !== start) await router.push(start);
     setWalkthrough({ id: 'day1', step: 0, sub: 0, status: 'active' });
   }
 
