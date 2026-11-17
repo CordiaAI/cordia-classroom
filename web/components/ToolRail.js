@@ -30,6 +30,13 @@ export default function ToolRail() {
     if (refocus) moreRef.current?.focus({ preventScroll: true });
   }, []);
 
+  // Make guide opens the New sheet; on the chat home, files already in the composer go with it
+  // (pages/home.js takes the event and builds from them through the New sheet).
+  function makeGuide() {
+    const event = new CustomEvent('cordia:make-guide', { cancelable: true });
+    if (window.dispatchEvent(event)) openNewSheet();
+  }
+
   const MORE_ACTIONS = {
     new: () => openNewSheet(),
     record: () => { walkthroughEvent('record-opened'); openNewSheet('record'); },
@@ -55,7 +62,7 @@ export default function ToolRail() {
           return (
             <li key={tool.key}>
               {tool.key === 'make' ? (
-                <button type="button" {...common} data-spot="new" onClick={() => openNewSheet()}>
+                <button type="button" {...common} data-spot="new" onClick={makeGuide}>
                   <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
                 </button>
               ) : (
