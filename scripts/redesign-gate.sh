@@ -14,7 +14,9 @@ step() { printf '\n== %s\n' "$1"; }
 hash_of() { shasum "$@" 2>/dev/null | shasum | cut -d' ' -f1; }
 
 # Keep the gate's own files out of git without touching .gitignore.
-grep -qxF '.gate-venv/' .git/info/exclude 2>/dev/null || echo '.gate-venv/' >> .git/info/exclude
+# In a git worktree .git is a file, so ask git where the shared exclude file lives.
+EXCLUDE="$(git rev-parse --git-common-dir)/info/exclude"
+grep -qxF '.gate-venv/' "$EXCLUDE" 2>/dev/null || echo '.gate-venv/' >> "$EXCLUDE"
 
 step "Node version (CI uses 22)"
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
