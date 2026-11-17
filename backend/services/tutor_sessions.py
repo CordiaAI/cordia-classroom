@@ -1,5 +1,6 @@
 """Shared Cordia Tutor session state for the web app and browser side panel."""
 
+import re
 from datetime import datetime, timezone
 from hashlib import sha256
 from uuid import uuid4
@@ -527,6 +528,7 @@ def delete_tutor_chat(user_id: str, chat_id: str) -> bool:
 
 
 SAVED_CHAT_COLUMNS = ("live", "deleted_at", "class_id", "renamed")
+_SAVED_CHAT_COLUMN = re.compile(r"\b(?:" + "|".join(SAVED_CHAT_COLUMNS) + r")\b")  # whole names: "delivery" is not "live"
 
 
 def is_missing_saved_chats_schema(error: Exception) -> bool:
@@ -534,7 +536,7 @@ def is_missing_saved_chats_schema(error: Exception) -> bool:
     text = str(error)
     if not any(mark in text for mark in ("PGRST204", "PGRST205", "42703", "42P01", "does not exist", "Could not find")):
         return False
-    return "tutor_chats" in text or any(column in text for column in SAVED_CHAT_COLUMNS)
+    return "tutor_chats" in text or bool(_SAVED_CHAT_COLUMN.search(text))
 
 
 def list_tutor_chats(user_id: str) -> list:

@@ -7,7 +7,9 @@ and deleted_at to it. public.tutor_sessions is unchanged: it is still the one li
 web app shares, and the Chrome extension never touches it (it sends its own history to POST /chat).
   * The live chat is the tutor_chats row with live = true (one per student). While it is live its
     messages are read from tutor_sessions; the row takes a copy when the conversation moves on.
-  * Every other chat is a row with live = false; deleted ones have deleted_at set.
+  * Every other chat is a row with live = false; deleted ones have deleted_at set. A chat is never both:
+    the migration has a database check (live and deleted_at) so a racing write fails instead of making
+    that state, and every write below also filters on it and checks that it changed a row.
   * A conversation that began before this existed (messages in tutor_sessions, no live row) gets
     its live row the first time it is listed or opened, so it has a stable id and is listed once.
 
@@ -34,6 +36,7 @@ DEFAULT_LIMIT = 30
 MAX_LIMIT = 100
 LEGACY_FETCH = 200
 DELETED_KEEP_DAYS = 30
+CONFLICT_DETAIL = "Tutor conversation changed. Refresh and try again."
 SUMMARY = "id,guide_id,class_id,title,renamed,live,created_at,updated_at"
 LEGACY_SUMMARY = "id,guide_id,title,created_at,updated_at"
 NOT_AVAILABLE = {"detail": "Saved chats aren't set up yet.", "code": "chats_not_available"}
@@ -45,6 +48,17 @@ class NotAvailable(Exception):
 
 def _db():
     return get_supabase()
+
+
+def _conflict() -> HTTPException:
+    return HTTPException(status_code=409, detail=CONFLICT_DETAIL)
+
+
+def _is_conflict(error: Exception) -> bool:
+    """A database rule stopped a racing write: the one-live-chat index (23505) or the live-and-deleted check (23514)."""
+    code = str(getattr(error, "code", "") or "")
+    text = str(error)
+    return code in {"23505", "23514"} or any(mark in text for mark in ("23505", "23514", "duplicate key value", "violates check constraint"))
 
 
 def _chats():
@@ -76,16 +90,24 @@ def _session(user_id: str):
 
 
 def _guide_classes(user_id: str, guide_ids) -> dict:
-    """{guide_id: class_id} for the student's guides that sit in a class."""
+    """{guide_id: class_id} for the student's own guides that sit in one of the student's own classes.
+    A guide row can carry a folder id that is not the student's, so each class is checked against folders."""
     ids = sorted({g for g in guide_ids if g})
     if not ids:
         return {}
     try:
         rows = _db().table("study_guides").select("id,folder_id").eq("user_id", user_id).in_("id", ids).execute().data or []
+        in_class = {row["id"]: row["folder_id"] for row in rows if row.get("folder_id")}
+        if not in_class:
+            return {}
+        mine = {
+            row["id"] for row in
+            _db().table("folders").select("id").eq("user_id", user_id).in_("id", sorted(set(in_class.values()))).execute().data or []
+        }
     except Exception:
         logger.warning("Saved chats: guide classes unavailable", exc_info=True)
         return {}
-    return {row["id"]: row["folder_id"] for row in rows if row.get("folder_id")}
+    return {guide: folder for guide, folder in in_class.items() if folder in mine}
 
 
 def _guide_class(user_id: str, guide_id):
@@ -102,12 +124,17 @@ def _virtual(user_id: str, session: dict) -> dict:
     }
 
 
+def _live_now(user_id: str):
+    found = _chats().select("*").eq("user_id", user_id).eq("live", True).is_("deleted_at", "null").limit(1).execute().data
+    return found[0] if found else None
+
+
 def _live_row(user_id: str, session):
-    """The live chat's row. A conversation with no row yet (it began before saved chats) gets one.
-    Raises the database error when the migration has not run."""
-    found = _chats().select("*").eq("user_id", user_id).eq("live", True).limit(1).execute().data
+    """The live chat's row (never a deleted one). A conversation with no row yet (it began before saved
+    chats) gets one. Raises the database error when the migration has not run."""
+    found = _live_now(user_id)
     if found:
-        return found[0]
+        return found
     if not session or not (session.get("messages") or []):
         return None
     stamp = session.get("updated_at") or _now()
@@ -120,10 +147,14 @@ def _live_row(user_id: str, session):
     except Exception as error:
         if is_missing_schema(error):
             raise
-        found = _chats().select("*").eq("user_id", user_id).eq("live", True).limit(1).execute().data  # made by a parallel request
-        if not found:
-            raise
-        return found[0]
+        found = _live_now(user_id)  # made by a parallel request
+        if found:
+            return found
+        if _is_conflict(error):
+            return None  # that one went away again: the caller treats it as a race
+        raise
+    if not made:
+        raise _conflict()
     return made[0]
 
 
@@ -290,6 +321,9 @@ def _busy(session: dict) -> bool:
 
 
 def _reset_session(user_id: str, session: dict, messages: list, guide_id, stamp: str):
+    """Replace the Tutor's conversation, only if nobody moved it on since `session` was read. This is the
+    claim every change of the live chat makes first: of two overlapping requests only one gets past it,
+    and the other changes nothing."""
     version = session.get("conversation_version") or 0
     return (
         _db().table("tutor_sessions")
@@ -299,6 +333,52 @@ def _reset_session(user_id: str, session: dict, messages: list, guide_id, stamp:
         })
         .eq("id", session["id"]).eq("user_id", user_id).eq("conversation_version", version).execute().data
     )
+
+
+def _restore_session(user_id: str, before: dict, claimed: dict) -> bool:
+    """A request that had already reset the Tutor could not finish: put the conversation back. True when
+    that worked. It only applies if nobody moved the session on again since the reset."""
+    try:
+        version = claimed.get("conversation_version") or 0
+        done = _db().table("tutor_sessions").update({
+            "messages": list(before.get("messages") or []), "active_guide_id": before.get("active_guide_id"),
+            "conversation_version": version + 1, "updated_at": before.get("updated_at") or _now(),
+        }).eq("id", before["id"]).eq("user_id", user_id).eq("conversation_version", version).execute().data
+        return bool(done)
+    except Exception:
+        logger.error("Saved chats: could not put the Tutor conversation back", exc_info=True)
+        return False
+
+
+def _save_copy(user_id: str, row, session: dict) -> None:
+    """The conversation cannot go into its own chat row (it was deleted or went elsewhere meanwhile): keep it
+    as a saved chat of its own, so a conversation the student was in is never lost."""
+    row = row or {}
+    fields = _archive_fields(row, session)
+    _chats().insert({
+        "user_id": user_id, "guide_id": session.get("active_guide_id"), "class_id": row.get("class_id"),
+        "created_at": row.get("created_at") or fields["updated_at"], **fields,
+    }).execute()
+
+
+def _reopen(user_id: str, before: dict) -> None:
+    """Make the chat a request had saved the live chat again (as it was). If something else is live by now,
+    or the chat was deleted meanwhile, it stays saved: the conversation is in the Tutor session either way."""
+    try:
+        _chats().update({
+            "live": True, "messages": before.get("messages") or [], "title": before.get("title") or "",
+            "updated_at": before.get("updated_at"),
+        }).eq("id", before["id"]).eq("user_id", user_id).eq("live", False).is_("deleted_at", "null").execute()
+    except Exception:
+        logger.warning("Saved chats: could not make the chat live again", exc_info=True)
+
+
+def _gone_or_conflict(user_id: str, chat_id: str) -> HTTPException:
+    """A guarded write changed no row: the chat is gone or deleted (404), or it changed under us (409)."""
+    rows = _chats().select("id,deleted_at").eq("id", chat_id).eq("user_id", user_id).limit(1).execute().data
+    if not rows or rows[0].get("deleted_at"):
+        return HTTPException(status_code=404, detail="That chat is already gone.")
+    return _conflict()
 
 
 def delete_chat(user_id: str, chat_id: str) -> dict:
@@ -311,21 +391,33 @@ def delete_chat(user_id: str, chat_id: str) -> dict:
         raise NotAvailable
     changes = {"deleted_at": _now()}
     live = bool(row.get("live"))
+    claimed = None
     if live:
         if _busy(session):
             raise HTTPException(status_code=409, detail="Wait for Cordia Tutor to finish before deleting this chat")
+        claimed = _reset_session(user_id, session, [], None, _now())
+        if not claimed:
+            raise _conflict()  # the conversation moved on first (another tab): nothing was changed
         changes.update(_archive_fields(row, session))
+    def undo():  # the Tutor was already cleared: put the conversation back, or keep it as a chat of its own
+        if claimed and not _restore_session(user_id, session, claimed[0]) and (session.get("messages") or []):
+            _save_copy(user_id, row, session)
+
     try:
-        done = _chats().update(changes).eq("id", row["id"]).eq("user_id", user_id).is_("deleted_at", "null").execute().data
+        # A chat that was read as live is only deleted while it is still live, one that was not only while it is not,
+        # and never one that is already deleted: no chat is ever both live and deleted.
+        done = (_chats().update(changes).eq("id", row["id"]).eq("user_id", user_id).eq("live", live)
+                .is_("deleted_at", "null").execute().data)
     except Exception as error:
+        undo()
         if is_missing_schema(error):
             raise NotAvailable from error
+        if _is_conflict(error):
+            raise _conflict() from error
         raise
     if not done:
-        raise HTTPException(status_code=404, detail="That chat is already gone.")
-    if live and not _reset_session(user_id, session, [], None, _now()):
-        _chats().update({"deleted_at": None, "live": True}).eq("id", row["id"]).eq("user_id", user_id).execute()
-        raise HTTPException(status_code=409, detail="Tutor conversation changed. Refresh and try again.")
+        undo()
+        raise _gone_or_conflict(user_id, row["id"])
     return {"chat": {**_summary(done[0]), "deleted_at": changes["deleted_at"]}, "editable": True}
 
 
@@ -350,10 +442,45 @@ def restore_chat(user_id: str, chat_id: str) -> dict:
 
 
 # Starting and opening ------------------------------------------------------------------------------
+def _fresh_live(user_id: str, fields: dict, stamp: str, reuse):
+    """The live chat for a new, empty conversation: the empty one already there, else a new row.
+    Returns (row, settled) where settled means a parallel request's empty live chat was used instead."""
+    if reuse:
+        done = (_chats().update(fields).eq("id", reuse["id"]).eq("user_id", user_id).eq("live", True)
+                .is_("deleted_at", "null").execute().data)
+        if done:
+            return done[0], False
+    for _ in range(2):
+        try:
+            made = _chats().insert({"user_id": user_id, **fields, "title": "", "messages": [], "live": True,
+                                    "created_at": stamp, "updated_at": stamp}).execute().data
+        except Exception as error:
+            if not _is_conflict(error):
+                raise
+            # The one-live-chat index says another request made a live chat first. This request already holds
+            # the Tutor's (now empty) conversation, so that chat is the one to use.
+            found = _live_now(user_id)
+            if found:
+                done = (_chats().update(fields).eq("id", found["id"]).eq("user_id", user_id).eq("live", True)
+                        .is_("deleted_at", "null").execute().data)
+                if done:
+                    return done[0], True
+            continue
+        if made:
+            return made[0], False
+        raise _conflict()
+    raise _conflict()
+
+
 def start_chat(user_id: str, session_id=None, guide_id=None, class_id=None, resume_id=None):
     """Start a new chat (about a guide, in a class, or general), or open a saved one, as the Tutor's
     current conversation. The conversation it replaces is saved as a chat. Returns
-    (chat summary, the Tutor session row); the chat's id is the one for the URL, so navigate to it."""
+    (chat summary, the Tutor session row); the chat's id is the one for the URL, so navigate to it.
+
+    The Tutor session is reset first, with its version check: of two overlapping requests only one gets
+    past it and the other changes nothing (409). Everything after that is a guarded write on the chat
+    rows; if one of them cannot be done, the session is put back and the request answers 409, so the
+    student's conversation is never lost, saved twice, or filed under a deleted chat."""
     session = sessions.get_or_create_tutor_session(user_id)
     if session_id and session_id != session["id"]:
         raise HTTPException(status_code=404, detail="Tutor session not found")
@@ -368,6 +495,8 @@ def start_chat(user_id: str, session_id=None, guide_id=None, class_id=None, resu
     except Exception as error:
         if not is_missing_schema(error):
             raise
+        if resume_id and resume_id == session["id"]:
+            return _summary(_virtual(user_id, session), session), session  # the live conversation: already open
         row = sessions.start_tutor_chat(user_id, session["id"], guide_id, resume_id)
         return _summary(_virtual(user_id, row), row), row
 
@@ -380,41 +509,55 @@ def start_chat(user_id: str, session_id=None, guide_id=None, class_id=None, resu
             return _summary(resumed, session), session  # already the current conversation
 
     current = list(session.get("messages") or [])
-    if current:
-        if not live:  # _live_row gives every conversation with messages a row, so this is a race
-            raise HTTPException(status_code=409, detail="Tutor conversation changed. Refresh and try again.")
-        _chats().update(_archive_fields(live, session)).eq("id", live["id"]).eq("user_id", user_id).execute()
+    if current and not live:  # _live_row gives every conversation with messages a row, so this is a race
+        raise _conflict()
     reuse = live if (live and not current and not resumed) else None
-    if live and not current and resumed:
-        _chats().delete().eq("id", live["id"]).eq("user_id", user_id).execute()  # an empty chat nobody wrote in
-
-    stamp = _now()
     if resumed:
-        target = _chats().update({"live": True}).eq("id", resumed["id"]).eq("user_id", user_id).execute().data[0]
-        messages, guide, stamp = list(resumed.get("messages") or []), resumed.get("guide_id"), resumed.get("updated_at") or stamp
+        messages, guide, stamp, fields = list(resumed.get("messages") or []), resumed.get("guide_id"), resumed.get("updated_at") or _now(), None
     else:
-        messages, guide = [], guide_id
+        messages, guide, stamp = [], guide_id, _now()
         fields = {"guide_id": guide_id, "class_id": class_id or _guide_class(user_id, guide_id)}
-        if reuse:
-            target = _chats().update(fields).eq("id", reuse["id"]).eq("user_id", user_id).execute().data[0]
-        else:
-            target = _chats().insert({"user_id": user_id, **fields, "title": "", "messages": [], "live": True,
-                                      "created_at": stamp, "updated_at": stamp}).execute().data[0]
 
-    updated = _reset_session(user_id, session, messages, guide, stamp)
-    if not updated:
-        # Someone else moved the conversation on first: put everything back as it was.
-        if resumed:
-            _chats().update({"live": False}).eq("id", resumed["id"]).eq("user_id", user_id).execute()
-        elif not reuse:
-            _chats().delete().eq("id", target["id"]).eq("user_id", user_id).execute()
+    claimed = _reset_session(user_id, session, messages, guide, stamp)
+    if not claimed:
+        raise _conflict()  # another request moved the conversation on first: nothing was changed
+    archived = False
+    settled = False
+    try:
         if current:
-            _chats().update({"live": True}).eq("id", live["id"]).eq("user_id", user_id).execute()
-        raise HTTPException(status_code=409, detail="Tutor conversation changed. Refresh and try again.")
+            saved = (_chats().update(_archive_fields(live, session)).eq("id", live["id"]).eq("user_id", user_id)
+                     .eq("live", True).is_("deleted_at", "null").execute().data)
+            if saved:
+                archived = True
+            else:  # the live chat was deleted or went elsewhere while this ran
+                _save_copy(user_id, live, session)
+        elif live and resumed:
+            _chats().delete().eq("id", live["id"]).eq("user_id", user_id).eq("live", True).is_("deleted_at", "null").execute()  # an empty chat nobody wrote in
+        if resumed:
+            made = (_chats().update({"live": True}).eq("id", resumed["id"]).eq("user_id", user_id).eq("live", False)
+                    .is_("deleted_at", "null").execute().data)
+            if not made:  # deleted (or opened elsewhere) since it was read
+                raise _gone_or_conflict(user_id, resumed["id"])
+            target = made[0]
+        else:
+            target, settled = _fresh_live(user_id, fields, stamp, reuse)
+    except Exception as error:
+        if _restore_session(user_id, session, claimed[0]) and archived:
+            _reopen(user_id, live)  # the conversation is the live one again; if it could not be put back it stays saved
+        if not isinstance(error, HTTPException) and _is_conflict(error):
+            raise _conflict() from error
+        raise
+    current_session = claimed[0]
+    if settled:
+        try:
+            current_session = sessions._owned_session(user_id, session["id"])
+        except Exception:
+            logger.warning("Saved chats: could not re-read the Tutor session", exc_info=True)
     _purge_deleted(user_id)
-    return _summary({**target, "live": True}, updated[0]), updated[0]
+    return _summary({**target, "live": True}, current_session), current_session
 
 
+# Removing deleted chats for good -------------------------------------------------------------------
 def _purge_deleted(user_id: str) -> None:
     """Deleted chats stay for DELETED_KEEP_DAYS (so Undo still works), then go for good."""
     cutoff = (datetime.now(timezone.utc) - timedelta(days=DELETED_KEEP_DAYS)).isoformat()
