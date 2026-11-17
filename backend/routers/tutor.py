@@ -11,12 +11,12 @@ import access
 from access import Ctx
 from auth_utils import get_user_id
 from ids import require_uuid
+from services.saved_chats import start_chat
 from services.tutor_sessions import (
     delete_tutor_chat,
     get_or_create_tutor_session,
     list_tutor_chats,
     public_tutor_session,
-    start_tutor_chat,
     update_browser_context,
     tutor_browser_content,
 )
@@ -123,4 +123,5 @@ def new_tutor_chat(body: NewTutorChat, authorization: str = Header(default="")):
     for value, name in ((body.session_id, "session ID"), (body.guide_id, "guide ID"), (body.resume_id, "chat ID")):
         if value:
             require_uuid(value, name)
-    return public_tutor_session(start_tutor_chat(user_id, body.session_id, body.guide_id, body.resume_id))
+    # services/saved_chats keeps the saved chat's id, title and class once its migration has run.
+    return public_tutor_session(start_chat(user_id, body.session_id, body.guide_id, None, body.resume_id)[1])

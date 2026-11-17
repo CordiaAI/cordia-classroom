@@ -105,9 +105,16 @@ def related_material(db, user_id: str, guide_id: str, question: str, answer: str
     except Exception:
         logger.warning("Memory context: lectures unavailable", exc_info=True)
     try:
-        chats = (db.table("tutor_chats").select("id, title, messages").eq("user_id", user_id)
-                 .order("updated_at", desc=True).limit(20).execute().data or [])
+        def saved(columns):
+            return (db.table("tutor_chats").select(columns).eq("user_id", user_id)
+                    .order("updated_at", desc=True).limit(20).execute().data or [])
+        try:
+            chats = saved("id, title, messages, deleted_at")
+        except Exception:  # before migration 20261130120000 there is no deleted_at
+            chats = saved("id, title, messages")
         for chat in chats:
+            if chat.get("deleted_at"):  # a deleted chat is not material
+                continue
             said = " ".join(str(m.get("text") or m.get("content") or "") for m in (chat.get("messages") or []) if isinstance(m, dict))
             hits, text = _snippet(said, terms)
             if hits >= 2:  # a passing word in a long chat is not a link

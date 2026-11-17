@@ -526,16 +526,32 @@ def delete_tutor_chat(user_id: str, chat_id: str) -> bool:
     return bool(gone)
 
 
+SAVED_CHAT_COLUMNS = ("live", "deleted_at", "class_id", "renamed")
+
+
+def is_missing_saved_chats_schema(error: Exception) -> bool:
+    """The database error says tutor_chats lacks a column that migration 20261130120000 adds (or the table is missing)."""
+    text = str(error)
+    if not any(mark in text for mark in ("PGRST204", "PGRST205", "42703", "42P01", "does not exist", "Could not find")):
+        return False
+    return "tutor_chats" in text or any(column in text for column in SAVED_CHAT_COLUMNS)
+
+
 def list_tutor_chats(user_id: str) -> list:
+    """The past chats the Tutor panel lists. Once the saved-chats migration has run, the live chat and
+    deleted chats are left out; before it, every row is a past chat."""
+    def newest(after_migration: bool):
+        query = _chats_table().select("id,guide_id,title,updated_at").eq("user_id", user_id)
+        if after_migration:
+            query = query.neq("live", True).is_("deleted_at", "null")
+        return query.order("updated_at", desc=True).limit(MAX_SAVED_CHATS)
     try:
-        result = (
-            _chats_table()
-            .select("id,guide_id,title,updated_at")
-            .eq("user_id", user_id)
-            .order("updated_at", desc=True)
-            .limit(MAX_SAVED_CHATS)
-            .execute()
-        )
+        try:
+            result = newest(True).execute()
+        except Exception as error:
+            if not is_missing_saved_chats_schema(error):
+                raise
+            result = newest(False).execute()
     except Exception as error:
         _chats_unavailable(error)
     return result.data or []
