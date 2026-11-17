@@ -18,7 +18,10 @@ export function useShellTips() {
 
   const show = useCallback((key, element, instant) => {
     clearTimeout(timer.current);
-    setTip({ key, rect: element.getBoundingClientRect(), instant });
+    const rect = element.getBoundingClientRect();
+    // 14px from the pane's edge (the rail or the sidebar), centred on the control.
+    const pane = element.closest('.c-rail, .c-side')?.getBoundingClientRect() || rect;
+    setTip({ key, rect: { top: rect.top, height: rect.height, left: pane.left, right: pane.right }, instant });
   }, []);
   const hide = useCallback(() => {
     clearTimeout(timer.current);
@@ -64,6 +67,9 @@ export function useShellTips() {
 // repeats the control's own name, so it's hidden from them.
 export function ShellTipLayer({ tip, items, side = 'left', describes = false }) {
   const places = useRef({});
+  // After hydration: the server renders no portal, so the first client render mustn't either.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   if (tip?.rect) {
     const { rect } = tip;
     places.current[tip.key] = side === 'left'
@@ -71,7 +77,7 @@ export function ShellTipLayer({ tip, items, side = 'left', describes = false }) 
       : { top: rect.top + rect.height / 2, left: rect.right + GAP };
   }
   const shown = describes ? items : items.filter(item => places.current[item.key]);
-  if (!shown.length) return null;
+  if (!mounted || !shown.length) return null;
   return (
     <BodyPortal>
       {shown.map(item => {

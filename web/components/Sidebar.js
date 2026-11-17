@@ -251,7 +251,7 @@ export default function Sidebar() {
   ];
   const themeItem = { key: 'theme', label: dark ? 'Light theme' : 'Dark theme', icon: dark ? Sun : Moon, onSelect: () => setThemePreference(dark ? 'light' : 'dark') };
   const sideMenuItems = [
-    ...accountItems.filter(item => ['profile', 'plan', 'friends', 'help', 'feedback'].includes(item.key))
+    ...['profile', 'plan', 'friends', 'help', 'feedback'].map(key => accountItems.find(item => item.key === key))
       .map(item => (item.key === 'plan' && plan === 'Free' ? { ...item, label: 'Upgrade' } : item)),
     themeItem,
     ...accountItems.filter(item => item.key === 'signout'),
@@ -374,7 +374,7 @@ export default function Sidebar() {
           </div>
           {/* Folded, the chats open from one icon, in a menu beside the sidebar. */}
           <button ref={chatsRef} type="button" className="c-side-item c-side-chats-icon" aria-label="Recent chats" aria-haspopup="menu" aria-expanded={chatsOpen}
-            aria-current={current.startsWith('chat:') ? 'page' : undefined} {...tipFor('chats')} onClick={() => { hide(); setChatsOpen(open => !open); }}>
+            aria-current={folded && current.startsWith('chat:') ? 'page' : undefined} {...tipFor('chats')} onClick={() => { hide(); setChatsOpen(open => !open); }}>
             <MessagesSquare size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </nav>

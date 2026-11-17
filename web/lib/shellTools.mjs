@@ -19,12 +19,12 @@ export const MORE_TOOL = { key: 'more', label: 'More tools', icon: 'Ellipsis', l
 // More tools: every other tool in the feature map (docs/redesign/PLAN.md) that lives under
 // "Rail › More tools". NCLEX shows only when the student has nursing material.
 export const MORE_TOOLS = [
-  { key: 'new', label: 'New', icon: 'Plus', meta: 'Upload, paste, a link, record or a sample' },
-  { key: 'write', label: 'Write cards', icon: 'PenLine', meta: 'Write your own cards or import a set', href: '/create' },
-  { key: 'record', label: 'Record lecture', icon: 'Mic', meta: 'Notes write themselves as the class goes' },
-  { key: 'nclex', label: 'NCLEX', icon: 'Stethoscope', meta: 'Nursing questions in the NCLEX style', nursing: true },
-  { key: 'study', label: 'Study now', icon: 'Zap', meta: 'Today’s due cards from every guide', href: '/session' },
-  { key: 'dashboard', label: 'Dashboard', icon: 'House', meta: 'Continue, class updates and course work', href: '/dashboard' },
+  { key: 'new', label: 'New', icon: 'Plus', meta: 'Upload, paste, a link or a recording' },
+  { key: 'write', label: 'Write cards', icon: 'PenLine', meta: 'Your own cards, or import a set', href: '/create' },
+  { key: 'record', label: 'Record lecture', icon: 'Mic', meta: 'Notes write themselves in class' },
+  { key: 'nclex', label: 'NCLEX', icon: 'Stethoscope', meta: 'Nursing questions, NCLEX style', nursing: true },
+  { key: 'study', label: 'Study now', icon: 'Zap', meta: 'Due cards from every guide', href: '/session' },
+  { key: 'dashboard', label: 'Dashboard', icon: 'House', meta: 'Class updates and course work', href: '/dashboard' },
   { key: 'assistant', label: 'Assistant', icon: 'MessageCircle', meta: 'Cordia Assistant settings', href: '/assistant' },
 ];
 

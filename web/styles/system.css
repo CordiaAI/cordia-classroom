@@ -749,7 +749,9 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 @media (min-width: 768px) {
   :root:has(.app-shell) { --bar-h: 0px; }
   .app-shell .c-topbar { display: none; }
-  .app-shell { padding-left: calc(var(--side-w) + var(--side-gap)); padding-right: calc(var(--rail-w) + var(--side-gap)); transition: padding-left var(--dur) var(--ease); }
+  /* Folding is instant: the page and the pane change width on the next frame, so nothing animates
+     a layout property and no text reflows mid-move. */
+  .app-shell { padding-left: calc(var(--side-w) + var(--side-gap)); padding-right: calc(var(--rail-w) + var(--side-gap)); }
   .app-shell.is-focus { padding-left: 0; padding-right: 0; }
   .app-shell.is-focus :is(.c-side, .c-rail) { display: none; }
 
@@ -758,7 +760,6 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
     position: fixed; top: var(--side-gap); bottom: var(--side-gap); left: var(--side-gap); z-index: 95; width: var(--side-w);
     display: flex; flex-direction: column; gap: 14px; padding: 14px 12px 12px; overflow: hidden;
     border: 1px solid transparent; border-radius: 24px; /* fill, frost, grain and rim: glass.css */
-    transition: width var(--dur) var(--ease);
   }
   .c-side-head { flex: none; display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 0 0 8px; }
   .c-side-brand { display: inline-flex; align-items: center; gap: 10px; min-width: 0; color: var(--ink); text-decoration: none; white-space: nowrap; }
@@ -914,12 +915,12 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 .c-shell-tip.is-name { width: max-content; max-width: 260px; padding: 9px 14px; }
 
 /* Menus beside the shell (More tools, the folded Recent chats): components/ShellMenu.js. */
-.c-shell-menu { position: fixed; z-index: 400; width: 300px; max-width: calc(100vw - 32px); max-height: calc(100vh - 24px); overflow-y: auto; }
+.c-shell-menu { position: fixed; z-index: 400; width: 300px; box-sizing: border-box; max-width: calc(100vw - 32px); max-height: calc(100vh - 24px); overflow-y: auto; }
 .c-shell-menu.is-open { animation: c-shell-in-left 150ms var(--ease) both; }
 .c-shell-menu.is-right.is-open { animation-name: c-shell-in-right; }
 .c-shell-menu.is-instant.is-open { animation: none; }
 .c-shell-menu.is-closing { animation: c-fade-out 100ms var(--ease-exit) both; pointer-events: none; }
-.c-shell-menu [role='menuitem'] .c-menu-label { white-space: nowrap; }
+.c-shell-menu [role='menuitem'] .c-menu-label, .c-shell-menu .c-menu-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .c-shell-menu [role='menuitem'] .lucide { color: var(--muted); }
 .c-shell-menu [role='menuitem'][aria-current='page'] { background: var(--selected-glass); box-shadow: var(--selected-glass-shadow); }
 .c-shell-menu [role='menuitem'][aria-current='page'] .lucide { color: var(--olive-ink); }
@@ -928,7 +929,6 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 @keyframes c-fade-out { from { opacity: 1; } to { opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .c-side, .app-shell { transition: none; }
   .c-shell-tip, .c-shell-tip.is-right { transform: translate(0, -50%); }
   .c-shell-menu.is-open, .c-shell-menu.is-right.is-open { animation-name: c-fade; }
 }
