@@ -12,9 +12,10 @@ Set by `applySettings`. Default values set no attribute.
 | --- | --- | --- |
 | `data-accent` | `ocean` `indigo` `clay` `rose` `plum` `graphite` `teal` `custom` | olive (Cordia) |
 | `data-bg` | `dusk` `paper` `meadow` | clouds |
-| `data-font` | `clean` `bookish` `friendly` `readable` | cordia (Newsreader + Quicksand) |
+| `data-font` | `clean` `bookish` `friendly` `readable` `paper` | cordia (Newsreader + Quicksand) |
 | `data-size` | `small` (0.9) `large` (1.125) `larger` (1.25) | default (1) |
 | `data-glass` | `clearer` `solid` `frosted` | auto: frosted, or solid when the device asks for reduced transparency |
+| `data-look` | `paper-clay` | none: Cordia |
 | `data-theme` | `light` `dark` | set from Appearance (already how light/dark worked) |
 
 `data-glass="frosted"` is set only when the student asks for it, so it beats the device's reduced
@@ -27,20 +28,22 @@ theme code.
 
 Swatches for the sheet, which never change with the student's picks: `--swatch-accent-<id>` (the light
 fill of each of the eight accents) and `--swatch-bg-<clouds|dusk|paper|meadow>` (tile art, light and dark).
-Font previews: `--font-<pair>-display` and `--font-<pair>-ui` for the five pairs.
+Font previews: `--font-<pair>-display` and `--font-<pair>-ui` for the five pairs (and the sixth, `paper`, see below).
 
 ## Modules (`web/lib/`)
 
 `themeSettings.mjs` (pure, no DOM unless you pass a root)
 - Lists: `ACCENTS`, `BACKGROUNDS` (no `photo`), `FONTS`, `SIZES`, `SIZE_SCALE`, `APPEARANCES`
   (`light` `dark` `system`), `GLASS_LEVELS` (`auto` `frosted` `clearer` `solid`), `PRESETS`
-  (`{ id, label, accent, bg }`: cordia, ocean, clay, plum, rose, graphite).
-- Settings shape: `{ accent, customAccent: '#RRGGBB' | null, bg, font, size, appearance, glass }`.
-  `DEFAULT_SETTINGS` is `olive / null / clouds / cordia / default / system / auto`.
-- `validateSettings(raw)` returns a complete valid object from anything (object, JSON string, junk).
+  (`{ id, label, accent, bg }`: cordia, ocean, clay, plum, rose, graphite; and `paper-clay`, which also carries
+  `look`, `font` and `glass`).
+- Settings shape: `{ accent, customAccent: '#RRGGBB' | null, bg, font, size, appearance, glass, look }`.
+  `DEFAULT_SETTINGS` is `olive / null / clouds / cordia / default / system / auto / none`.
+- `validateSettings(raw)` returns a complete valid object from anything (object, JSON string, junk). While a look
+  is on it forces `glass: 'solid'`, and it accepts the look's accent (`LOOK_ACCENT`, `paperclay`) only with that look.
   Unknown values fall back to the default, unknown keys are dropped, it never throws.
 - `isDefaultSettings(s)`, `resolveTheme(s)` returns a preset id or `'custom'`, `applyPreset(s, id)` sets the
-  preset's accent and background and keeps the rest.
+  preset's accent and background and keeps the rest (a look preset also sets its look, font pair and glass).
 - `withCustomAccent(s, hex)` returns `{ settings, adjusted, derived }`. Show "Adjusted so text stays
   readable" when `adjusted` is true. For a bad hex it returns the settings unchanged and `derived.ok === false`.
 - `attributesFor(s)`, `resolveAppearance(appearance, deviceIsDark)`, `customAccentVariables(s)`, `bootCache(s)`.
@@ -79,6 +82,102 @@ before (signed-out visitors on Pricing, policy and guide pages; `/`, `/login`, `
 `/print/*` in `theme.js`): they get no attributes and light, and moving to one from the app clears the look.
 Signed-in students on Pricing and the policy pages see their own look, as they already saw dark.
 
+## Paper & Clay (the seventh preset, a full look)
+
+The owner's values, word for word, are in DESIGN-SPEC 3.5; the source design's `project/tokens.json` agreed with
+every one of them (read on 2026-11-17; nothing in it was needed beyond them, see "Derived" below).
+
+**The attribute.** `<html data-look="paper-clay">`. Accent, background, font and glass attributes each switch one
+thing; this look switches the whole surface system (fills, text levels, hairlines, corners, shadows, backdrop)
+as well, so it needs one attribute of its own that no single other setting can express. The look carries its
+own accent, plain-paper backdrop and font pair as defaults: they apply while no `data-accent`, `data-bg` or
+`data-font` is set over them. So `data-look="paper-clay"` on its own, set by hand, is the whole look in light and
+dark. The engine writes only `data-look` and `data-glass="solid"` for the preset; when the student then picks
+something the look would otherwise treat as "unset" it writes it out (`data-accent="olive"`, `data-bg="clouds"`,
+`data-font="cordia"`), and any other pick is written as usual and wins. `paperclay` (the accent) and `paper` (the
+font pair) are valid settings values but write no attribute while the look is on.
+
+**What it sets** (`styles/tokens.css`, the block before "Less motion"; light `:root[data-look]`, dark
+`[data-theme='dark'][data-look]`, with a test that the two set exactly the same tokens): ink, body
+(`--text-secondary`), muted, hairline; `--surface-card/-raised` and every glass fill (raised, #FFFFFF / #30302E);
+`--glass-inner` (hover) and `--lg-press` (pressed); `--lg-border` (control edge); selected rows, the segmented track
+and pill; `--olive-tint` and `--wash` (neutral: washes are never accent); the clay accent seeds (`--ca-l-*`,
+`--ca-d-*`); the corners `--r-input 8`, `--r-row 12`, `--r-card 16`, `--r-panel 20`; no blur, sheen or grain
+(`--glass-blur`, `--glass-sheen`, `--glass-grain`, `--glass-grain-opacity`); the rim becomes the 1px hairline
+(`--glass-rim`, `--glass-rim-border`); and borders before shadows (`--glass-shadow-depth`, `--glass-shadow-edge`,
+`--shadow-card`, `--olive-glass-shadow` are all zero, so a resting pane, card, button or chip has no drop shadow;
+menus and popovers keep `--lg-depth-float`, which is the source design's menu shadow). The backdrop (canvas,
+`--backdrop-sky/-wash/-field` all none) is a separate rule that applies unless a Clouds, Dusk or Meadow
+`data-bg` is set. The accent is the primary fill (`--olive`: send, New, primary buttons, checked controls,
+progress) and clay-coloured text (`--olive-ink`: active labels, badges, links, icons on the current item).
+
+**New tokens, none read until a look sets them** (so the default look is unchanged; proved with the
+resolve-every-token method below): `--text-disabled`, `--line-strong` (button edges, hover), `--control-edge`
+(inputs, checkboxes, switches), `--surface-sidebar`, `--shadow-composer`, `--font-reply`, the font pair
+`--font-paper-display/-ui/-mono`, and the tile tokens `--swatch-look-paper-clay`, `-edge`, `-dot`, `-ink`, `-font`
+and `--swatch-accent-paperclay`.
+
+**Fonts.** Source Serif 4, Instrument Sans and JetBrains Mono, Latin variable woff2 from the official
+`@fontsource-variable` packages (SIL OFL; licences next to them), `public/fonts/source-serif-4-latin.woff2`,
+`instrument-sans-latin.woff2` (400 to 700), `jetbrains-mono-latin.woff2`. They are `@font-face` rules that
+only fetch when a rendered element uses the family: on the default look none of the three is requested (checked).
+`FONT_FILES.paper` preloads the serif and the sans before first paint. No italic file: emphasis in a reply is the
+browser's slanted serif. `--font-reply` is the UI font, and the one rule that reads it,
+`.cordia-tutor-message.ai` in `system.css`, was changed to `font-family: var(--font-reply)`. The look sets it to
+the display font, so Tutor replies are serif (and follow the display font if the student changes the pair).
+
+**The tile (for the sheet).** A 92px-wide tile like the other themes, background `--swatch-look-paper-clay` with a
+1px `--swatch-look-paper-clay-edge` border and 12px corners; an 8px round dot of `--swatch-look-paper-clay-dot`
+at the bottom right; "Aa" in `--swatch-look-paper-clay-ink`, `font-family: var(--swatch-look-paper-clay-font)`, 600,
+centred. Name under it: "Paper & Clay".
+
+**Derived, not given by the owner** (the source design had no values for these): the pressed shade of the accent
+in light is the owner's "accent hover" `#9C4A27`, and in dark `#E38A6B` (lighter than the fill, as the owner gave it;
+Cordia's own dark press is darker); the accent's shadow edge `112, 50, 24` and wash `217, 119, 87` (not drawn while
+shadows are off); `--line-strong` at 0.20 of the hairline colour (the source design's `line-strong`); the scrim
+(`rgba(20,20,19,.40)` light, `rgba(0,0,0,.65)` dark, the source's overlay); the menu and popover shadow (the source's
+`shadow-lg`) and the composer's (`shadow-composer`); the hover wash and the selected row (the owner's hover
+colour); the neutral `--olive-tint`. The contrast of the given pairs is checked in `accent-contrast.test.mjs`.
+
+**What the sheet builder must do.**
+1. Show Paper & Clay as the seventh tile from `PRESETS` using `resolveTheme` and the tile tokens above.
+2. While `settings.look !== 'none'`, Glass is Solid and cannot change (`validateSettings` forces it): show the row
+   disabled and set to Solid, with a hint such as "Paper & Clay is always solid".
+3. Do not list `paper` in the font tiles (`FONTS` stays five); it appears selected nowhere, so a student who
+   changed the font cannot get it back except by picking the preset again. If you want a sixth tile, add it.
+4. The Accent row's selected dot while Paper & Clay is current: its accent is not one of the eight (`accent` is
+   `paperclay`), so none is selected; the tile row shows "Paper & Clay" selected. Picking any dot or background
+   changes `accent`/`bg` and the theme reads "Custom" with the look still on. Picking another theme tile
+   (`applyPreset`) leaves the look, puts Glass back to Auto and the font pair back to Cordia if it was still `paper`.
+5. Custom accents under the look work as before (the same maths; its surfaces are opaque and lighter or darker than
+   the worst glass the maths already assumes).
+6. Reset to Cordia (`DEFAULT_SETTINGS`) leaves the look.
+
+**Components that do not follow tokens** (not restyled in this task; they keep Cordia's value under the look):
+- Corners hard-coded as `border-radius: Npx` instead of `--r-*`: 312 declarations. Most are 12px (about 137) and 20px
+  (about 64) in `styles/globals.css` (30 at 20/24/28), `styles/classroom.css` (20) and styled-jsx; named cases: the
+  sidebar `.c-side` and the toast `.c-toast` (24px), `FeedbackModal.js`, `UpgradeModal.js`, `AuthCard.js`,
+  `pages/pricing.js`, `pages/oauth/consent.js`, `CalendarDashboard.js` (20px). They stay as they are; the 182
+  places that use `--r-*` (the shared `.c-*` components) follow the look.
+- The sidebar has no fill of its own: `.c-side` shares `--glass-fill` with cards, so it is raised white under the
+  look, not the sidebar paper `#F5F4ED`. `--surface-sidebar` holds the right value; the fix is one line in
+  `glass.css` (`.c-side { background: var(--glass-sheen), var(--surface-sidebar) !important; }`), best made where the
+  sidebar is rebuilt (T2).
+- Control edges: inputs get `--lg-edge` (so the control edge, 3:1) through `--lg-border`, but that token is also the
+  edge of the toast, tiles, pricing card and a few menus, which therefore get the control edge too. Checkboxes and
+  switches use whatever border their own component has. A `--control-edge` hook in `.c-input`, checkbox and switch
+  rules would let `--lg-border` go back to the hairline.
+- The composer does not exist in this branch. When it is built, give it `box-shadow: var(--shadow-composer)`;
+  anything that uses `--glass-shadow` is flat under the look. Sheets, dialogs, the toast and the Tutor bubble are
+  panes, so they are flat with a hairline too (the source design floats dialogs and toasts with `shadow-lg`; that
+  needs a floating-pane token they do not have yet). The Tutor bubble keeps a shadow on hover.
+- Code: `.practice-code` (`globals.css:736`) and `globals.css:1115` name their own monospace; only
+  `.tutor-work` and the Quizlet import use `--font-mono`, so JetBrains Mono reaches those two.
+- Progress rings and bars, stars and a few badges read `--olive` or `--olive-ink` directly, so the accent shows
+  there as well as on primary actions (nothing at token level can tell a ring from a button).
+- `.pricing-card`, the print pages and the note paper keep their own paper (public pages never get the look; note
+  paper is cream in both themes by design).
+
 ## Decisions worth a look
 
 - **Match device is the default** (DESIGN-SPEC 3.5). Before, a student who never chose had light. Now a
@@ -106,7 +205,7 @@ Signed-in students on Pricing and the policy pages see their own look, as they a
    so run it once at the end, over the merged branch. I did not run it.
 2. Small is 0.9 (11.7px for 13px text), under the brand's 13px minimum, as the spec states. Floor `--fs-13`
    if that matters.
-3. **Fonts**: Inter, Fraunces, Source Sans 3, Nunito and Atkinson Hyperlegible are Latin-subset woff2 files
+3. **Fonts**: Inter, Fraunces, Source Sans 3, Nunito, Atkinson Hyperlegible and the Paper & Clay trio (Source Serif 4, Instrument Sans, JetBrains Mono) are Latin-subset woff2 files
    from the official `@fontsource` packages (SIL OFL; licences next to them in `public/fonts/`). Other
    scripts fall back to the system font. Fraunces is the standard axes only (no optical size). The Cordia
    pair's two files are still preloaded for everyone by `_document.js`, which is wasted for a student on
@@ -127,5 +226,7 @@ Signed-in students on Pricing and the policy pages see their own look, as they a
 ## Tests
 
 `web/tests/accent-contrast.test.mjs` (every accent, 4 backgrounds, light and dark, 3 glass levels, read from
-`tokens.css`; 15 hard colours through the custom-accent maths) and `web/tests/theme-settings.test.mjs`
-(validation, defaults leave no attribute, presets, applying, the first-paint script run in a sandbox).
+`tokens.css`; 15 hard colours through the custom-accent maths; and Paper & Clay's own pairs on its canvas, sidebar
+and raised surfaces in both modes, with the weaker pairs measured and asserted as known numbers) and `web/tests/theme-settings.test.mjs`
+(validation, defaults leave no attribute, presets, applying, Paper & Clay's preset, Custom detection, forced Solid, the
+font pair and the first-paint script run in a sandbox).

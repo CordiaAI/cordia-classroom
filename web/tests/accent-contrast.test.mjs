@@ -1,14 +1,15 @@
 // Make it yours, contrast (DESIGN-SPEC 3.5): every accent against every built-in background, in
-// light and dark, on every glass level, read straight from styles/tokens.css; and the custom-accent
-// adjustment on hard colours. 4.5:1 for accent text and icons on glass and for the label on the
-// accent; 3:1 for the dark-mode fill as an edge and for the focus ring.
+// light and dark, on every glass level, read straight from styles/tokens.css; the custom-accent
+// adjustment on hard colours; and the Paper & Clay look's own pairs on its own surfaces. 4.5:1 for accent
+// text and icons on glass and for the label on the accent; 3:1 for the dark-mode fill as an edge and for
+// the focus ring.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ACCENTS, BACKGROUNDS, PRESETS, GLASS_LEVELS } from '../lib/themeSettings.mjs';
+import { ACCENTS, BACKGROUNDS, PRESETS, GLASS_LEVELS, LOOK_ACCENT } from '../lib/themeSettings.mjs';
 import { SURFACES, accentVariables, contrast, deriveAccent, luminance, over, parseHex, toHex } from '../lib/accentMath.mjs';
 
 const web = join(fileURLToPath(import.meta.url), '..', '..');
@@ -121,14 +122,15 @@ function seedsFor(accent) {
   };
 }
 
-test('there are eight accents and six presets, and every preset is an accent on a background', () => {
+test('there are eight accents and seven presets, and every preset is an accent on a background', () => {
   assert.equal(ACCENTS.length, 8);
-  assert.equal(PRESETS.length, 6);
+  assert.equal(PRESETS.length, 7);
   assert.equal(BACKGROUNDS.length, 4);
   for (const preset of PRESETS) {
-    assert.ok(ACCENTS.includes(preset.accent) && BACKGROUNDS.includes(preset.bg), preset.id);
+    // Paper & Clay's accent is its own (not one of the eight swatches).
+    assert.ok((ACCENTS.includes(preset.accent) || preset.accent === LOOK_ACCENT) && BACKGROUNDS.includes(preset.bg), preset.id);
   }
-  assert.deepEqual(PRESETS.map(p => p.id), ['cordia', 'ocean', 'clay', 'plum', 'rose', 'graphite']);
+  assert.deepEqual(PRESETS.map(p => p.id), ['cordia', 'ocean', 'clay', 'plum', 'rose', 'graphite', 'paper-clay']);
 });
 
 for (const accent of ACCENTS) {
@@ -218,4 +220,125 @@ test('deriving never throws and says when the input is not a colour', () => {
 test('luminance and contrast agree with the published values', () => {
   assert.ok(Math.abs(contrast([0, 0, 0], [255, 255, 255]) - 21) < 1e-9);
   assert.ok(Math.abs(contrast([119, 119, 119], [255, 255, 255]) - 4.48) < 0.01);
+});
+
+// ---------- Paper & Clay (the full look, DESIGN-SPEC 3.5) ----------
+// Its surfaces are opaque paper, so its pairs are read straight from the tokens: no glass maths.
+
+const LOOK_LIGHT = block(":root[data-look='paper-clay']");
+const LOOK_DARK = block("[data-theme='dark'][data-look='paper-clay']");
+const LOOK_SEEDS = block(":root[data-look='paper-clay']:not([data-accent])");
+const LOOK_CANVAS = { light: block(":root[data-look='paper-clay']:not([data-bg='clouds'], [data-bg='dusk'], [data-bg='meadow'])"), dark: block("[data-theme='dark'][data-look='paper-clay']:not([data-bg='clouds'], [data-bg='dusk'], [data-bg='meadow'])") };
+const opaque = (text, name) => { const value = rgba(token(text, name)); assert.equal(value[3], 1, `${name} must be opaque`); return value.slice(0, 3); };
+
+function paperClay(mode) {
+  const look = mode === 'light' ? LOOK_LIGHT : LOOK_DARK;
+  const seed = suffix => triple(LOOK_SEEDS, `--ca-${mode === 'light' ? 'l' : 'd'}-${suffix}`);
+  return {
+    surfaces: { canvas: opaque(LOOK_CANVAS[mode], '--canvas'), sidebar: opaque(look, '--surface-sidebar'), raised: opaque(look, '--surface-raised') },
+    others: { hover: opaque(look, '--glass-inner'), pressed: opaque(look, '--lg-press') },
+    text: { ink: opaque(look, '--ink'), body: opaque(look, '--text-secondary'), muted: opaque(look, '--muted'), clay: seed('ink') },
+    disabled: opaque(look, '--text-disabled'),
+    edge: opaque(look, '--control-edge'),
+    fill: seed('fill'), hover: seed(mode === 'light' ? 'press' : 'glass-press'), on: seed('on'),
+  };
+}
+
+test('Paper & Clay: the owner\'s values are the ones in tokens.css', () => {
+  const light = paperClay('light');
+  const dark = paperClay('dark');
+  const hex = list => toHex(list);
+  assert.deepEqual([hex(light.surfaces.canvas), hex(light.surfaces.sidebar), hex(light.surfaces.raised), hex(light.others.hover), hex(light.others.pressed)], ['#FAF9F5', '#F5F4ED', '#FFFFFF', '#F0EEE6', '#E8E6DC']);
+  assert.deepEqual([hex(light.text.ink), hex(light.text.body), hex(light.text.muted), hex(light.disabled), hex(light.text.clay), hex(light.edge)], ['#141413', '#3D3D3A', '#6B6A64', '#9C9A92', '#A24A29', '#8F8C82']);
+  assert.deepEqual([hex(light.fill), hex(light.hover), hex(light.on)], ['#AE5630', '#9C4A27', '#FFFFFF']);
+  assert.deepEqual([hex(dark.surfaces.canvas), hex(dark.surfaces.sidebar), hex(dark.surfaces.raised), hex(dark.others.hover), hex(dark.others.pressed)], ['#262624', '#1F1E1D', '#30302E', '#3A3936', '#45443F']);
+  assert.deepEqual([hex(dark.text.ink), hex(dark.text.body), hex(dark.text.muted), hex(dark.disabled), hex(dark.text.clay), hex(dark.edge)], ['#FAF9F5', '#C2C0B6', '#A6A39A', '#85837B', '#E8916F', '#8A877E']);
+  assert.deepEqual([hex(dark.fill), hex(dark.hover), hex(dark.on)], ['#D97757', '#E38A6B', '#1A1918']);
+  assert.deepEqual(rgba(token(LOOK_LIGHT, '--hairline')), [31, 30, 29, 0.10]);
+  assert.deepEqual(rgba(token(LOOK_DARK, '--hairline')), [250, 249, 245, 0.12]);
+});
+
+for (const mode of ['light', 'dark']) {
+  test(`Paper & Clay ${mode}: text, body, muted and clay text read 4.5:1 on the canvas, the sidebar and raised surfaces`, () => {
+    const look = paperClay(mode);
+    for (const [surfaceName, surface] of Object.entries(look.surfaces)) {
+      for (const [textName, color] of Object.entries(look.text)) {
+        assert.ok(contrast(color, surface) >= 4.5, `${mode} ${textName} ${toHex(color)} on ${surfaceName} ${toHex(surface)} is ${contrast(color, surface).toFixed(2)}`);
+      }
+    }
+  });
+
+  test(`Paper & Clay ${mode}: the label on the accent reads 4.5:1 on the fill and on its hover shade`, () => {
+    const look = paperClay(mode);
+    assert.ok(contrast(look.on, look.fill) >= 4.5, `label on fill ${contrast(look.on, look.fill).toFixed(2)}`);
+    assert.ok(contrast(look.on, look.hover) >= 4.5, `label on hover ${contrast(look.on, look.hover).toFixed(2)}`);
+  });
+
+  test(`Paper & Clay ${mode}: control borders hold 3:1 on the canvas, the sidebar and raised surfaces`, () => {
+    const look = paperClay(mode);
+    for (const [surfaceName, surface] of Object.entries(look.surfaces)) assert.ok(contrast(look.edge, surface) >= 3, `${mode} control border on ${surfaceName} ${contrast(look.edge, surface).toFixed(2)}`);
+  });
+}
+
+// What falls short, written down rather than hidden: pairs the spec does not require (or, for muted text
+// on a pressed fill and a control border on hover or pressed, that the source design itself calls out).
+// The measured number is asserted, so a colour change shows up here. Disabled text is meant to fail 4.5:1.
+const KNOWN = {
+  'light disabled on canvas': 2.68, 'light disabled on sidebar': 2.56, 'light disabled on raised': 2.82,
+  'dark disabled on canvas': 3.99, 'dark disabled on sidebar': 4.38, 'dark disabled on raised': 3.48,
+  'light disabled on hover': 2.43, 'light disabled on pressed': 2.25, 'dark disabled on hover': 3.04, 'dark disabled on pressed': 2.57,
+  'light control border on hover': 2.90, 'light control border on pressed': 2.69,
+  'dark control border on pressed': 2.72,
+  'light muted on pressed': 4.34, 'dark muted on pressed': 3.87, 'dark clay on pressed': 4.05,
+};
+test('Paper & Clay: disabled text and the weaker pairs are measured and reported', t => {
+  const found = {};
+  for (const mode of ['light', 'dark']) {
+    const look = paperClay(mode);
+    for (const [name, surface] of Object.entries({ ...look.surfaces, ...look.others })) {
+      const checks = { disabled: [look.disabled, 4.5], 'control border': [look.edge, 3], muted: [look.text.muted, 4.5], clay: [look.text.clay, 4.5] };
+      for (const [what, [color, need]] of Object.entries(checks)) {
+        const ratio = contrast(color, surface);
+        if (ratio < need) found[`${mode} ${what} on ${name}`] = Number(ratio.toFixed(2));
+      }
+    }
+  }
+  t.diagnostic(`below their floor: ${JSON.stringify(found)}`);
+  assert.deepEqual(Object.keys(found).sort(), Object.keys(KNOWN).sort(), 'a pair crossed its floor, one way or the other');
+  for (const [name, ratio] of Object.entries(KNOWN)) assert.ok(Math.abs(found[name] - ratio) <= 0.011, `${name}: ${found[name]} not ${ratio}`);
+});
+
+test('Paper & Clay: the light and dark looks set the same tokens, with no photo, no grain, no frost and no resting shadow', () => {
+  const names = text => [...text.matchAll(/(--[a-z0-9-]+)\s*:/g)].map(match => match[1]).sort();
+  assert.deepEqual(names(LOOK_DARK), names(LOOK_LIGHT), 'every token the light look sets, the dark look sets too (it is less specific otherwise)');
+  for (const text of [LOOK_LIGHT, LOOK_DARK]) {
+    assert.equal(token(text, '--glass-blur'), 'none');
+    assert.equal(token(text, '--glass-sheen'), 'none');
+    assert.equal(token(text, '--glass-grain'), 'none');
+    assert.equal(token(text, '--glass-grain-opacity'), '0');
+    assert.equal(token(text, '--shadow-card'), '0 0 0 0 rgba(0, 0, 0, 0)', 'a resting card has no drop shadow');
+    assert.equal(token(text, '--glass-shadow-depth'), '0 0 0 0 rgba(0, 0, 0, 0)', 'a resting pane has no drop shadow');
+    assert.notEqual(token(text, '--lg-depth-float'), '0 0 0 0 rgba(0, 0, 0, 0)', 'menus and popovers keep theirs');
+    assert.match(token(text, '--shadow-composer'), /rgba/, 'the composer keeps its shadow');
+    for (const name of ['--surface-card', '--surface-raised', '--glass-fill', '--glass-fill-strong', '--glass-solid', '--lg-fill-menu', '--lg-fill-field', '--glass-control']) opaque(text, name);
+    assert.deepEqual(['--r-input', '--r-row', '--r-card', '--r-panel'].map(name => token(text, name)), ['8px', '12px', '16px', '20px']);
+    assert.equal(token(text, '--font-reply'), 'var(--font-display)');
+  }
+  for (const text of Object.values(LOOK_CANVAS)) for (const name of ['--backdrop-sky', '--backdrop-wash', '--backdrop-field']) assert.equal(token(text, name), 'none');
+});
+
+test('Paper & Clay: the sixth font pair, its three files and their licences are in the repo', () => {
+  assert.match(token(css, '--font-paper-display'), /^'Source Serif 4'/);
+  assert.match(token(css, '--font-paper-ui'), /^'Instrument Sans'/);
+  assert.match(token(css, '--font-paper-mono'), /^'JetBrains Mono'/);
+  for (const name of ['source-serif-4', 'instrument-sans', 'jetbrains-mono']) {
+    assert.ok(readFileSync(join(web, 'public', 'fonts', `${name}-latin.woff2`)).length > 10000, name);
+    assert.match(readFileSync(join(web, 'public', 'fonts', `${name}-LICENSE.txt`), 'utf8'), /SIL OPEN FONT LICENSE/);
+  }
+});
+
+test('the tile tokens for the theme sheet exist in light and dark, and nothing in the product says Claude', () => {
+  for (const name of ['--swatch-look-paper-clay', '--swatch-look-paper-clay-edge', '--swatch-look-paper-clay-dot', '--swatch-look-paper-clay-ink', '--swatch-look-paper-clay-font', '--swatch-accent-paperclay']) assert.ok(token(LIGHT, name), name);
+  assert.notEqual(token(DARK, '--swatch-look-paper-clay'), token(LIGHT, '--swatch-look-paper-clay'));
+  assert.ok(!/claude/i.test(css.replace(/\/\*[\s\S]*?\*\//g, '')), 'no token or selector names the assistant brand');
 });

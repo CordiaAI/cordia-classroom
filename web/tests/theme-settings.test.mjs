@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {
-  ACCENTS, APPEARANCES, ATTRIBUTE_NAMES, BACKGROUNDS, DEFAULT_SETTINGS, FONTS, FONT_FILES, GLASS_LEVELS, PRESETS, SIZES, SIZE_SCALE,
+  ACCENTS, APPEARANCES, ATTRIBUTE_NAMES, BACKGROUNDS, DEFAULT_SETTINGS, FONTS, FONT_FILES, GLASS_LEVELS, LOOKS, LOOK_ACCENT, LOOK_FONT, PRESETS, SIZES, SIZE_SCALE,
   applyPreset, applySettings, attributesFor, bootCache, customAccentVariables, isDefaultSettings, resolveAppearance, resolveTheme,
   validateSettings, withCustomAccent,
 } from '../lib/themeSettings.mjs';
@@ -34,7 +34,10 @@ test('the lists are the ones the spec names', () => {
   assert.deepEqual(APPEARANCES, ['light', 'dark', 'system']);
   assert.equal(DEFAULT_SETTINGS.appearance, 'system');
   assert.ok(!BACKGROUNDS.includes('photo'), 'Your photo stays out until a private bucket is approved');
-  assert.deepEqual(Object.keys(FONT_FILES).sort(), ['bookish', 'clean', 'friendly', 'readable']);
+  assert.deepEqual(Object.keys(FONT_FILES).sort(), ['bookish', 'clean', 'friendly', 'paper', 'readable']);
+  assert.deepEqual(FONTS, ['cordia', 'clean', 'bookish', 'friendly', 'readable'], 'the sheet still shows five pairs; the sixth is Paper & Clay\'s own');
+  assert.deepEqual(LOOKS, ['none', 'paper-clay']);
+  assert.ok(!ACCENTS.includes(LOOK_ACCENT), 'Paper & Clay\'s accent is not one of the eight swatches');
 });
 
 test('validation falls back to the defaults on anything bad and never throws', () => {
@@ -65,7 +68,7 @@ test('every valid value survives validation', () => {
 });
 
 test('the defaults put no data attribute and no variable on <html>', () => {
-  assert.deepEqual(Object.values(attributesFor(DEFAULT_SETTINGS)), [null, null, null, null, null]);
+  assert.deepEqual(Object.values(attributesFor(DEFAULT_SETTINGS)), [null, null, null, null, null, null]);
   assert.deepEqual(customAccentVariables(DEFAULT_SETTINGS), {});
   assert.deepEqual(bootCache(DEFAULT_SETTINGS).a, {});
   assert.deepEqual(bootCache(DEFAULT_SETTINGS).f, []);
@@ -82,7 +85,7 @@ test('the defaults put no data attribute and no variable on <html>', () => {
 
 test('every setting becomes its attribute, and olive, clouds, Cordia, default size and auto glass become none', () => {
   const all = { accent: 'rose', bg: 'dusk', font: 'bookish', size: 'larger', glass: 'clearer', appearance: 'dark' };
-  assert.deepEqual(attributesFor(all), { 'data-accent': 'rose', 'data-bg': 'dusk', 'data-font': 'bookish', 'data-size': 'larger', 'data-glass': 'clearer' });
+  assert.deepEqual(attributesFor(all), { 'data-accent': 'rose', 'data-bg': 'dusk', 'data-font': 'bookish', 'data-size': 'larger', 'data-glass': 'clearer', 'data-look': null });
   assert.equal(attributesFor({ glass: 'frosted' })['data-glass'], 'frosted', 'frosted asked for explicitly stays on, so it beats the device\'s reduced transparency');
   assert.equal(attributesFor({ glass: 'auto' })['data-glass'], null);
   const root = fakeRoot();
@@ -106,11 +109,12 @@ test('appearance: Light and Dark are fixed, Match device follows the device', ()
   assert.equal(applySettings({ appearance: 'light' }, { root, deviceIsDark: true }).theme, 'light');
 });
 
-test('presets: six, each an accent on a background; the resolver names the preset or Custom', () => {
+test('presets: seven, six an accent on a background and Paper & Clay a full look; the resolver names the preset or Custom', () => {
   assert.deepEqual(PRESETS.map(p => [p.id, p.accent, p.bg]), [
     ['cordia', 'olive', 'clouds'], ['ocean', 'ocean', 'clouds'], ['clay', 'clay', 'paper'],
-    ['plum', 'plum', 'dusk'], ['rose', 'rose', 'dusk'], ['graphite', 'graphite', 'paper'],
+    ['plum', 'plum', 'dusk'], ['rose', 'rose', 'dusk'], ['graphite', 'graphite', 'paper'], ['paper-clay', 'paperclay', 'paper'],
   ]);
+  assert.equal(PRESETS.find(p => p.id === 'paper-clay').label, 'Paper & Clay');
   assert.equal(resolveTheme(DEFAULT_SETTINGS), 'cordia');
   for (const preset of PRESETS) assert.equal(resolveTheme(applyPreset(DEFAULT_SETTINGS, preset.id)), preset.id);
   assert.equal(resolveTheme({ accent: 'ocean', bg: 'dusk' }), 'custom', 'changing the background marks it Custom');
@@ -224,4 +228,117 @@ test('first paint: a damaged cache is ignored, never thrown, and never sets odd 
   assert.deepEqual([...root.attributes.keys()].sort(), ['data-accent', 'data-side', 'data-theme']);
   assert.deepEqual([...root.styleMap.keys()], ['--ca-l-fill']);
   assert.deepEqual(links.map(l => l.href), ['/fonts/inter-latin.woff2']);
+});
+
+// ---------- Paper & Clay ----------
+
+const paperClay = () => applyPreset(DEFAULT_SETTINGS, 'paper-clay');
+
+test('Paper & Clay: picking it sets the look, its accent, the paper background, its font pair and Solid glass', () => {
+  const picked = paperClay();
+  assert.deepEqual(picked, { ...DEFAULT_SETTINGS, look: 'paper-clay', accent: LOOK_ACCENT, bg: 'paper', font: LOOK_FONT, glass: 'solid' });
+  assert.equal(resolveTheme(picked), 'paper-clay');
+  assert.equal(resolveTheme(applyPreset(DEFAULT_SETTINGS, 'clay')), 'clay', 'the Clay preset (accent and background only) is still its own');
+  // It keeps what the student chose elsewhere.
+  const kept = applyPreset({ size: 'large', appearance: 'dark', font: 'clean', glass: 'frosted' }, 'paper-clay');
+  assert.deepEqual([kept.size, kept.appearance, kept.font, kept.glass], ['large', 'dark', LOOK_FONT, 'solid']);
+});
+
+test('Paper & Clay: it writes only its own attribute (the look supplies its accent, paper and fonts) and Solid glass', () => {
+  assert.deepEqual(attributesFor(paperClay()), { 'data-accent': null, 'data-bg': null, 'data-font': null, 'data-size': null, 'data-glass': 'solid', 'data-look': 'paper-clay' });
+  const root = fakeRoot();
+  const applied = applySettings({ ...paperClay(), appearance: 'dark' }, { root });
+  assert.deepEqual(lookAttributes(root).sort(), ['data-glass', 'data-look']);
+  assert.equal(root.getAttribute('data-look'), 'paper-clay');
+  assert.equal(root.getAttribute('data-glass'), 'solid');
+  assert.equal(applied.theme, 'dark');
+  assert.equal(root.styleMap.size, 0, 'no runtime variables: its colours are all tokens');
+  applySettings(DEFAULT_SETTINGS, { root });
+  assert.deepEqual(lookAttributes(root), [], 'back to Cordia removes the look');
+});
+
+test('Paper & Clay: changing its accent or background makes the theme Custom, and a font change does not', () => {
+  const picked = paperClay();
+  assert.equal(resolveTheme({ ...picked, font: 'clean' }), 'paper-clay');
+  assert.equal(resolveTheme({ ...picked, font: 'cordia' }), 'paper-clay');
+  assert.equal(resolveTheme({ ...picked, size: 'larger', appearance: 'dark' }), 'paper-clay');
+  assert.equal(resolveTheme({ ...picked, accent: 'ocean' }), 'custom');
+  assert.equal(resolveTheme({ ...picked, accent: 'olive' }), 'custom');
+  assert.equal(resolveTheme({ ...picked, bg: 'dusk' }), 'custom');
+  assert.equal(resolveTheme({ ...picked, bg: 'clouds' }), 'custom');
+  assert.equal(resolveTheme(withCustomAccent(picked, '#2F5F86').settings), 'custom');
+  assert.equal(resolveTheme({ ...picked, accent: 'clay' }), 'custom', 'the Clay swatch on the paper look is not the Clay preset');
+});
+
+test('Paper & Clay: what the student picks over the look is written out so it shows', () => {
+  const picked = paperClay();
+  const asked = attributesFor({ ...picked, accent: 'olive', bg: 'clouds', font: 'cordia' });
+  assert.deepEqual([asked['data-accent'], asked['data-bg'], asked['data-font']], ['olive', 'clouds', 'cordia'], 'Olive, Clouds and Cordia are normally "no attribute", which under the look would mean its own');
+  const other = attributesFor({ ...picked, accent: 'plum', bg: 'dusk', font: 'friendly' });
+  assert.deepEqual([other['data-accent'], other['data-bg'], other['data-font']], ['plum', 'dusk', 'friendly']);
+  assert.equal(attributesFor({ ...DEFAULT_SETTINGS, bg: 'clouds' })['data-bg'], null, 'without the look Clouds is still no attribute');
+});
+
+test('Paper & Clay: Solid glass is forced while the look is on, and the look is the only thing that can hold it', () => {
+  for (const glass of GLASS_LEVELS) assert.equal(validateSettings({ ...paperClay(), glass }).glass, 'solid', glass);
+  assert.equal(validateSettings({ glass: 'clearer' }).glass, 'clearer', 'other looks keep their choice');
+  assert.equal(validateSettings({ accent: LOOK_ACCENT }).accent, 'olive', 'its accent is not valid on glass');
+  assert.equal(validateSettings({ look: 'paper-clay', accent: LOOK_ACCENT }).accent, LOOK_ACCENT);
+  assert.equal(validateSettings({ look: 'sepia' }).look, 'none');
+  assert.equal(validateSettings({ font: LOOK_FONT }).font, LOOK_FONT, 'the pair is just a pair: valid anywhere');
+});
+
+test('Paper & Clay: leaving it puts back the glass it forced and, if the student kept its own pair, the default pair', () => {
+  const left = applyPreset(paperClay(), 'ocean');
+  assert.deepEqual([left.look, left.glass, left.font, left.accent, left.bg], ['none', 'auto', 'cordia', 'ocean', 'clouds']);
+  const keptFont = applyPreset({ ...paperClay(), font: 'bookish', size: 'large' }, 'plum');
+  assert.deepEqual([keptFont.font, keptFont.size, keptFont.glass], ['bookish', 'large', 'auto']);
+  const plain = applyPreset({ glass: 'clearer', font: 'friendly' }, 'plum');
+  assert.deepEqual([plain.glass, plain.font], ['clearer', 'friendly'], 'a preset that follows another plain preset touches neither');
+});
+
+test('Paper & Clay: validation accepts it, survives hostile values and never throws', () => {
+  assert.deepEqual(validateSettings(JSON.stringify(paperClay())), paperClay());
+  for (const hostile of [{ look: {} }, { look: ['paper-clay'] }, { look: null, accent: LOOK_ACCENT }, { look: 'paper-clay', accent: ['paperclay'], bg: 5, font: {} }, '{"look":"paper-clay","accent":"paperclay"', { look: 'paper-clay', accent: 'custom', customAccent: 'nope' }]) {
+    assert.doesNotThrow(() => validateSettings(hostile));
+    const clean = validateSettings(hostile);
+    assert.deepEqual(Object.keys(clean).sort(), Object.keys(DEFAULT_SETTINGS).sort());
+    assert.ok(LOOKS.includes(clean.look));
+  }
+});
+
+test('Paper & Clay: public pages stay the Cordia default whatever the student picked', () => {
+  const root = fakeRoot();
+  const applied = applySettings({ ...paperClay(), appearance: 'dark' }, { root, publicPage: true });
+  assert.deepEqual(lookAttributes(root), []);
+  assert.equal(root.getAttribute('data-theme'), 'light');
+  assert.equal(applied.settings.look, 'none');
+  applySettings({ ...paperClay(), appearance: 'dark' }, { root });
+  assert.equal(root.getAttribute('data-look'), 'paper-clay');
+  applySettings({ ...paperClay(), appearance: 'dark' }, { root, publicPage: true });
+  assert.equal(root.getAttribute('data-look'), null, 'moving to a public page clears the look');
+});
+
+test('Paper & Clay: its font files are cached for preloading, serif and sans only', () => {
+  assert.deepEqual(bootCache(paperClay()).f, FONT_FILES.paper);
+  assert.deepEqual(FONT_FILES.paper, ['/fonts/source-serif-4-latin.woff2', '/fonts/instrument-sans-latin.woff2']);
+  assert.deepEqual(bootCache(paperClay()).a, { 'data-glass': 'solid', 'data-look': 'paper-clay' });
+  assert.deepEqual(bootCache({ ...paperClay(), font: 'clean' }).f, FONT_FILES.clean);
+});
+
+test('first paint: Paper & Clay is on <html> before anything draws, with its fonts preloaded and no flash of the default', () => {
+  const settings = { ...paperClay(), appearance: 'dark' };
+  const { root, links } = boot({ storage: { [LOOK_KEY]: cached(settings) } });
+  assert.equal(root.getAttribute('data-theme'), 'dark');
+  assert.equal(root.getAttribute('data-look'), 'paper-clay');
+  assert.equal(root.getAttribute('data-glass'), 'solid');
+  assert.equal(root.getAttribute('data-accent'), null, 'the look supplies its own accent');
+  assert.deepEqual(links.map(l => l.href), FONT_FILES.paper);
+  assert.ok(links.every(l => l.rel === 'preload' && l.as === 'font' && l.crossOrigin === 'anonymous'));
+  // With the student's own picks over it.
+  const over = boot({ storage: { [LOOK_KEY]: cached({ ...paperClay(), accent: 'plum', bg: 'dusk', font: 'clean' }) } }).root;
+  assert.deepEqual(['data-look', 'data-accent', 'data-bg', 'data-font'].map(name => over.getAttribute(name)), ['paper-clay', 'plum', 'dusk', 'clean']);
+  // Public pages and signed-out visitors never see it.
+  for (const path of ['/', '/login', '/pricing', '/guides/anything']) assert.deepEqual(lookAttributes(boot({ path, storage: { [LOOK_KEY]: cached(settings) } }).root), [], path);
+  assert.equal(boot({ path: '/pricing', storage: { [LOOK_KEY]: cached(settings), authToken: 'x' } }).root.getAttribute('data-look'), 'paper-clay', 'signed in, Pricing is part of the app');
 });
