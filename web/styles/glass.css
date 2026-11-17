@@ -156,6 +156,9 @@
   color: var(--ink) !important;
 }
 .c-chip.c-chip[aria-pressed='true'] { box-shadow: var(--selected-glass-shadow), var(--selected-glass-ring) !important; }
+/* The current view pill sits among glass controls; its own token keeps it apart from them in dark
+   (tokens.css --pill-current-bg). */
+.c-pill.c-pill:is([aria-current='page'], [aria-selected='true']) { background: var(--pill-current-bg) !important; box-shadow: var(--pill-current-shadow) !important; }
 :is(.c-side .c-side-item[aria-current='page'], .c-nav a[aria-current='page'], .c-tabbar a[aria-current='page'],
   .c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-chip[aria-pressed='true'], .c-search-hit.is-active,
   .c-nav .c-nav-btn[aria-pressed='true'], .tutor-chats-btn[aria-pressed='true'],
