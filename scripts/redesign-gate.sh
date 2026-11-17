@@ -24,7 +24,9 @@ echo "node $(node --version)"
 step "Raw colour values outside tokens.css in files this branch changed"
 BASE="$(git merge-base HEAD origin/main)"
 CHANGED="$(git diff --name-only --diff-filter=AM "$BASE" -- web | grep -E '\.(js|jsx|ts|tsx|css)$' | grep -v 'tokens\.css$' || true)"
-if [ -n "$CHANGED" ] && echo "$CHANGED" | xargs grep -nE '#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(' ; then
+# One exception: the browser's <meta name="theme-color"> cannot read a CSS variable, and its value
+# is the same on main. Every other raw colour in a changed file fails.
+if [ -n "$CHANGED" ] && echo "$CHANGED" | xargs grep -nE '#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(' | grep -v '<meta name="theme-color"' ; then
   echo "FAIL: colour values found outside tokens.css. Move them into tokens.css as tokens."
   exit 1
 fi
