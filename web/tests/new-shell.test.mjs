@@ -1,92 +1,138 @@
-// The new shell's switch (lib/newShell.mjs): who gets the sidebar, tool rail, chat home and
-// composer, how the setting reaches the browser, and that Layout renders both paths.
+// The new shell's switch (lib/newShell.mjs, lib/server/newShell.mjs): who gets the sidebar, tool
+// rail, chat home and composer; that only the server reads the list and the browser gets only a
+// boolean; and that Layout renders both paths. Sample ids and emails are made up.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-import { HOME_ROUTE, OFF, builtSetting, readIdentity, shellBootScript, shellHash, shellOnFor, shellSetting } from '../lib/newShell.mjs';
+import { HOME_ROUTE, SHELL_CACHE, cachedShell, rememberShell, safeDefault, shellBootScript, shellOn } from '../lib/newShell.mjs';
+import { pageDefault, shellMode } from '../lib/server/newShell.mjs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-const STUDENT = { email: 'maya.okafor@southalabama.edu', id: '6f1d2c3b-9a8e-4d7c-b6a5-0e1f2a3b4c5d' };
-const OTHER = { email: 'devon.reyes@southalabama.edu', id: '0a9b8c7d-6e5f-4a3b-9c2d-1e0f9a8b7c6d' };
+const STUDENT = { email: 'sample.student@example.edu', id: '6f1d2c3b-9a8e-4d7c-b6a5-0e1f2a3b4c5d' };
+const OTHER = { email: 'another.student@example.edu', id: '0a9b8c7d-6e5f-4a3b-9c2d-1e0f9a8b7c6d' };
 
 test('unset is off for everyone in production', () => {
-  assert.deepEqual(shellSetting({ value: '' }), OFF);
-  assert.deepEqual(shellSetting({ value: undefined, vercelEnv: 'production' }), OFF);
-  assert.equal(shellOnFor(shellSetting({}), [STUDENT.email, STUDENT.id]), false);
+  assert.equal(shellMode({ value: '' }).mode, 'off');
+  assert.equal(shellMode({ value: undefined, vercelEnv: 'production' }).mode, 'off');
+  assert.equal(shellMode({ value: ' , ' }).mode, 'off');
 });
 
-test('all turns it on for every account', () => {
-  const setting = shellSetting({ value: 'all', vercelEnv: 'production' });
-  assert.equal(setting.all, true);
-  assert.equal(shellOnFor(setting, [OTHER.email]), true);
-  assert.equal(shellOnFor(shellSetting({ value: ' ALL ' }), []), true);
+test('all turns it on for every signed-in account', () => {
+  assert.equal(shellMode({ value: 'all', vercelEnv: 'production' }).mode, 'on');
+  assert.equal(shellMode({ value: ' ALL ' }).mode, 'on');
 });
 
-test('an allowlist turns it on for the accounts on it, by email or user id, and no one else', () => {
-  const byEmail = shellSetting({ value: ` ${STUDENT.email.toUpperCase()} , someone.else@usouthal.edu`, vercelEnv: 'production' });
-  assert.equal(byEmail.all, false);
-  assert.equal(shellOnFor(byEmail, [STUDENT.email, STUDENT.id]), true);
-  assert.equal(shellOnFor(byEmail, [OTHER.email, OTHER.id]), false);
-  const byId = shellSetting({ value: STUDENT.id });
-  assert.equal(shellOnFor(byId, ['', STUDENT.id]), true);
-  assert.equal(shellOnFor(byId, [OTHER.id]), false);
-  assert.equal(shellOnFor(byId, []), false);
+test('a list names accounts by Supabase user id (emails work too), lowercased for the server only', () => {
+  const list = shellMode({ value: ` ${STUDENT.id.toUpperCase()} , ${OTHER.email.toUpperCase()}`, vercelEnv: 'production' });
+  assert.deepEqual(list, { mode: 'list', entries: [STUDENT.id, OTHER.email] });
 });
 
-test('the list reaches the browser as hashes, never as written', () => {
-  const setting = shellSetting({ value: `${STUDENT.email},${STUDENT.id}` });
-  const json = JSON.stringify(setting);
-  assert.ok(!json.includes('maya') && !json.includes(STUDENT.id));
-  assert.equal(setting.keys.length, 2);
-  assert.equal(shellHash(' Maya.Okafor@SouthAlabama.edu '), shellHash(STUDENT.email));
-  assert.notEqual(shellHash(STUDENT.email), shellHash(OTHER.email));
-});
-
-test('preview deployments and local development are on for everyone; off turns it off anywhere', () => {
-  assert.equal(shellSetting({ vercelEnv: 'preview' }).all, true);
-  assert.equal(shellSetting({ development: true }).all, true);
-  assert.equal(shellSetting({ value: STUDENT.email, vercelEnv: 'preview' }).all, true);
-  assert.deepEqual(shellSetting({ value: 'off', vercelEnv: 'preview' }), OFF);
-  assert.deepEqual(shellSetting({ value: 'off', development: true }), OFF);
-  assert.equal(shellSetting({ vercelEnv: 'production' }).all, false);
-});
-
-test('the built setting round-trips, and anything malformed is off', () => {
-  const setting = shellSetting({ value: STUDENT.email });
-  assert.deepEqual(builtSetting(JSON.stringify(setting)), setting);
-  assert.deepEqual(builtSetting(''), OFF);
-  assert.deepEqual(builtSetting('{not json'), OFF);
+test('development and preview deployments are on for everyone; off turns it off anywhere', () => {
+  assert.equal(shellMode({ vercelEnv: 'preview' }).mode, 'on');
+  assert.equal(shellMode({ development: true }).mode, 'on');
+  assert.equal(shellMode({ value: STUDENT.id, vercelEnv: 'preview' }).mode, 'on');
+  assert.equal(shellMode({ value: 'off', vercelEnv: 'preview' }).mode, 'off');
+  assert.equal(shellMode({ value: 'off', development: true }).mode, 'off');
+  assert.equal(shellMode({ vercelEnv: 'production' }).mode, 'off');
   assert.equal(HOME_ROUTE, '/home');
 });
 
-const storage = values => ({ getItem: key => (key in values ? values[key] : null) });
+test('the page knows the answer from the environment only where it needs no account', () => {
+  // next dev renders every page on request: exact, off included.
+  assert.deepEqual(pageDefault({ NODE_ENV: 'development' }), { fixed: true });
+  assert.deepEqual(pageDefault({ NODE_ENV: 'development', CORDIA_NEW_SHELL: STUDENT.id }), { fixed: true });
+  assert.deepEqual(pageDefault({ NODE_ENV: 'development', CORDIA_NEW_SHELL: 'off' }), { fixed: false });
+  // A production build never reads the variable for the page: a preview build guesses on (the
+  // server confirms after load), anything else asks the server.
+  const watched = new Proxy({ NODE_ENV: 'production', VERCEL_ENV: 'preview', CORDIA_NEW_SHELL: STUDENT.id }, {
+    get(target, key) { if (key === 'CORDIA_NEW_SHELL') throw new Error('read at build'); return target[key]; },
+  });
+  assert.deepEqual(pageDefault(watched), { guess: true });
+  assert.deepEqual(pageDefault({ NODE_ENV: 'production', VERCEL_ENV: 'production', CORDIA_NEW_SHELL: 'all' }), {});
+  assert.deepEqual(pageDefault({ NODE_ENV: 'production' }), {});
+  // Only two booleans ever reach the page.
+  assert.deepEqual(safeDefault({ fixed: true, entries: [STUDENT.id] }), { fixed: true });
+  assert.deepEqual(safeDefault({ guess: 'yes' }), {});
+});
+
+const storage = values => ({ getItem: key => (key in values ? values[key] : null), setItem: (key, value) => { values[key] = String(value); } });
 const token = payload => `header.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.signature`;
 const atob = value => Buffer.from(value, 'base64').toString('binary');
+const saved = (user, on) => JSON.stringify({ user, on });
 
-test('the signed-in account is read from the cache and from the access token', () => {
-  assert.deepEqual(readIdentity(storage({ userEmail: STUDENT.email, userId: STUDENT.id }), atob), [STUDENT.email, STUDENT.id]);
-  const fresh = readIdentity(storage({ authToken: token({ sub: STUDENT.id, email: STUDENT.email }) }), atob);
-  assert.ok(fresh.includes(STUDENT.email) && fresh.includes(STUDENT.id));
-  assert.deepEqual(readIdentity(storage({ authToken: 'not-a-jwt' }), atob), []);
+test('the device keeps one boolean per account and ignores another account\'s answer', () => {
+  const values = {};
+  rememberShell(storage(values), STUDENT.id, true);
+  assert.deepEqual(Object.keys(values), [SHELL_CACHE]);
+  assert.deepEqual(JSON.parse(values[SHELL_CACHE]), { user: STUDENT.id, on: true });
+  assert.equal(cachedShell(storage(values), STUDENT.id), true);
+  assert.equal(cachedShell(storage(values), OTHER.id), null);
+  assert.equal(cachedShell(storage(values), ''), null);
+  assert.equal(cachedShell(storage({ [SHELL_CACHE]: '{broken' }), STUDENT.id), null);
+});
+
+test('the page default wins when fixed; then the account\'s answer; then a preview guess', () => {
+  assert.equal(shellOn({ fixed: false }, true), false);
+  assert.equal(shellOn({ fixed: true }, false), true);
+  assert.equal(shellOn({}, true), true);
+  assert.equal(shellOn({ guess: true }, false), false);
+  assert.equal(shellOn({ guess: true }, null), true);
+  assert.equal(shellOn({}, null), false);
 });
 
 // Runs the script pages/_document.js puts in <head>, as the browser would before first paint.
-function boot(setting, values) {
+function boot(pageDefaultValue, values) {
   const attributes = {};
-  const context = { localStorage: storage(values), atob, document: { documentElement: { setAttribute: (name, value) => { attributes[name] = value; } } } };
-  vm.runInNewContext(shellBootScript(setting), context);
-  return attributes['data-shell'];
+  const window = {};
+  const context = { window, localStorage: storage(values), atob, document: { documentElement: { setAttribute: (name, value) => { attributes[name] = value; } } } };
+  vm.runInNewContext(shellBootScript(pageDefaultValue), context);
+  return { shell: attributes['data-shell'], window };
 }
 
-test('the boot script marks <html> before first paint for the right accounts only', () => {
-  const list = shellSetting({ value: STUDENT.email });
-  assert.equal(boot(list, { userEmail: STUDENT.email }), 'new');
-  assert.equal(boot(list, { authToken: token({ sub: 'x', email: STUDENT.email }) }), 'new');
-  assert.equal(boot(list, { userEmail: OTHER.email }), undefined);
-  assert.equal(boot(list, {}), undefined);
-  assert.equal(boot(shellSetting({ value: 'all' }), {}), 'new');
-  assert.equal(boot(OFF, { userEmail: STUDENT.email }), undefined);
+test('the boot script uses only the cached boolean, for the signed-in account only', () => {
+  assert.equal(boot({}, { userId: STUDENT.id, [SHELL_CACHE]: saved(STUDENT.id, true) }).shell, 'new');
+  // Freshly signed in: the id comes from the access token.
+  assert.equal(boot({}, { authToken: token({ sub: STUDENT.id }), [SHELL_CACHE]: saved(STUDENT.id, true) }).shell, 'new');
+  // Another account's answer on a shared device is ignored.
+  assert.equal(boot({}, { userId: OTHER.id, [SHELL_CACHE]: saved(STUDENT.id, true) }).shell, undefined);
+  assert.equal(boot({}, { userId: STUDENT.id, [SHELL_CACHE]: saved(STUDENT.id, false) }).shell, undefined);
+  // No answer yet: today's navigation.
+  assert.equal(boot({}, { userId: STUDENT.id }).shell, undefined);
+  assert.equal(boot({}, {}).shell, undefined);
+  // Development and preview need no account; off in development wins over any cached answer.
+  assert.equal(boot({ fixed: true }, {}).shell, 'new');
+  assert.equal(boot({ fixed: false }, { userId: STUDENT.id, [SHELL_CACHE]: saved(STUDENT.id, true) }).shell, undefined);
+  assert.equal(boot({ guess: true }, {}).shell, 'new');
+  assert.equal(boot({ guess: true }, { userId: STUDENT.id, [SHELL_CACHE]: saved(STUDENT.id, false) }).shell, undefined);
+  assert.deepEqual({ ...boot({ guess: true }, {}).window.__cordiaShell }, { guess: true });
+});
+
+test('the boot script carries no ids, emails, hashes or list, whatever it is given', () => {
+  const script = shellBootScript({ fixed: true, entries: [STUDENT.id, STUDENT.email], keys: ['abc'] });
+  assert.ok(!script.includes(STUDENT.id) && !script.includes(STUDENT.email) && !script.includes('abc'));
+  assert.doesNotMatch(script, /imul|NEW_SHELL/);
+});
+
+// Files that run in the browser (or set what the browser gets) never see the list.
+const CLIENT_FILES = ['lib/newShell.mjs', 'lib/useNewShell.js', 'lib/api.js', 'pages/home.js', 'pages/index.js', 'components/AuthCard.js', 'pages/auth/callback.js', 'components/Layout.js', 'next.config.js'];
+
+// Code only: lib/newShell.mjs's opening comment names the variable for the owner (it never ships).
+const code = source => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+test('no client module or next.config.js reads the switch\'s variable or hashes an identity', () => {
+  for (const file of CLIENT_FILES) {
+    const source = code(read(file));
+    assert.doesNotMatch(source, /CORDIA_NEW_SHELL|NEXT_PUBLIC_NEW_SHELL/, file);
+    assert.doesNotMatch(source, /shellHash|Math\.imul|cyrb53|readIdentity/, file);
+  }
+  assert.doesNotMatch(read('next.config.js'), /newShell/);
+  // The page gets its default from server code only.
+  assert.match(read('pages/_document.js'), /shellBootScript\(pageDefault\(\)\)/);
+  assert.match(read('pages/_document.js'), /from '\.\.\/lib\/server\/newShell\.mjs'/);
+  // Sign-out clears the device's answer.
+  assert.match(read('lib/api.js'), /export function clearAuth\(\) \{[\s\S]*?localStorage\.removeItem\('cordiaShell'\);[\s\S]*?\n\}/);
+  assert.equal(SHELL_CACHE, 'cordiaShell');
 });
 
 test('Layout renders the new shell or today\'s navigation, and only the new shell has the rail', () => {
@@ -104,12 +150,16 @@ test('Layout renders the new shell or today\'s navigation, and only the new shel
   // Its wide-screen styles apply only with the switch off; the new shell's only with it on.
   assert.match(read('styles/legacy-shell.css'), /:where\(:root:not\(\[data-shell='new'\]\)\) \{/);
   assert.match(read('styles/system.css'), /:where\(:root\[data-shell='new'\]\) \{/);
-  assert.match(read('pages/_document.js'), /shellBootScript\(builtSetting\(process\.env\.NEXT_PUBLIC_NEW_SHELL\)\)/);
 });
 
-test('signed-in students land on the home only with the switch on and a wide window', () => {
+test('signed-in students land on the home only with the switch on and a wide window, asked first', () => {
   const runtime = read('lib/useNewShell.js');
   assert.match(runtime, /return shellFlag\(\) && window\.matchMedia\(WIDE_QUERY\)\.matches;/);
   assert.match(runtime, /shellActive\(\) \? HOME_ROUTE : '\/dashboard'/);
-  for (const page of ['pages/index.js', 'components/AuthCard.js', 'pages/auth/callback.js']) assert.match(read(page), /homeRoute\(\)/, page);
+  assert.match(runtime, /export async function landingRoute\(\) \{\n  await Promise\.race\(\[refreshShell\(\)/);
+  // Only a verified answer is kept, for the account that asked.
+  assert.match(runtime, /typeof body\?\.newShell === 'boolean' && getUserId\(\) === userId/);
+  for (const page of ['pages/index.js', 'components/AuthCard.js', 'pages/auth/callback.js']) assert.match(read(page), /landingRoute\(\)/, page);
+  // The home asks before sending an account without an answer to the Dashboard.
+  assert.match(read('pages/home.js'), /if \(shellFlag\(\)\) decide\(true\);\n    else refreshShell\(\)\.then\(decide\);/);
 });

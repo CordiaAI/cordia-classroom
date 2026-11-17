@@ -85,9 +85,5 @@ module.exports = Object.assign(async phase => {
     const { writeCrawlFiles } = await import('./scripts/crawlFiles.mjs');
     writeCrawlFiles();
   }
-  // The new app shell's switch (lib/newShell.mjs): CORDIA_NEW_SHELL as hashes, on in development
-  // and on Vercel preview deployments.
-  const { shellSetting } = await import('./lib/newShell.mjs');
-  const shell = shellSetting({ value: process.env.CORDIA_NEW_SHELL, vercelEnv: process.env.VERCEL_ENV, development: phase === PHASE_DEVELOPMENT_SERVER });
-  return { ...nextConfig, env: { ...nextConfig.env, NEXT_PUBLIC_NEW_SHELL: JSON.stringify(shell) } };
+  return nextConfig;
 }, nextConfig);

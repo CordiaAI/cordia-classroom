@@ -1,87 +1,74 @@
 // The new app shell (docs/redesign: the sidebar and tool rail, the chat home as the signed-in
-// landing route, the composer) sits behind one switch. Pure, so it can be tested in Node
-// (web/tests/new-shell.test.mjs); lib/useNewShell.js reads it in the browser and
+// landing route, the composer) sits behind one switch, decided on the server. Pure, so it can be
+// tested in Node (web/tests/new-shell.test.mjs); lib/useNewShell.js uses it in the browser and
 // pages/_document.js applies it before the first paint.
 //
-// The owner sets CORDIA_NEW_SHELL in Vercel (read at build time, so a change needs a redeploy):
+// The owner sets CORDIA_NEW_SHELL in Vercel (Project, Settings, Environment Variables, Production):
 //   unset               off for everyone in production
-//   all                 on for every account
-//   a, b, c             on for these accounts: emails or user ids, comma-separated
+//   all                 on for every signed-in account
+//   id, id, id          on for these accounts: Supabase user ids (Authentication, Users, "UID"),
+//                       comma-separated. Emails work too, but ids are preferred.
 //   off                 off everywhere, even in development and on preview deployments
 // Local development (`next dev`) and Vercel preview deployments are on for everyone unless the
 // value is `off`, so a pull request's preview link shows the new shell without any setup.
-// Emails and ids never reach the browser as written: next.config.js turns the list into hashes.
+// Vercel applies a changed environment variable only to new deployments: redeploy after changing it.
+//
+// Only the server reads the variable (lib/server/newShell.mjs, at request time). The browser asks
+// GET /api/new-shell with its access token and gets back { newShell: true | false } and nothing else.
+// It keeps that answer on the device, paired with the signed-in account's user id (already in the
+// browser: lib/api.js), so the boot script can apply it before the first paint; a different account
+// on the same device never uses it, sign-out clears it, and every page load asks again in the
+// background so turning the switch off takes effect on the next visit. With no answer yet, the page
+// shows today's navigation until the server answers.
 // Whatever the switch says, phones (under 768px) keep today's layout and navigation.
 
 export const HOME_ROUTE = '/home';
 export const WIDE_QUERY = '(min-width: 768px)';
-export const OFF = Object.freeze({ all: false, keys: [] });
+export const SHELL_ENDPOINT = '/api/new-shell';
+// localStorage: { user: <the signed-in account's user id>, on: true | false }.
+export const SHELL_CACHE = 'cordiaShell';
 
-// A short, stable hash (cyrb53) of an email or user id. It runs in the boot script in
-// pages/_document.js as written here (Function.prototype.toString), so it stays plain ES5.
-export function shellHash(value) {
-  var str = String(value == null ? '' : value).trim().toLowerCase();
-  var h1 = 0xdeadbeef;
-  var h2 = 0x41c6ce57;
-  for (var i = 0; i < str.length; i++) {
-    var ch = str.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
+// The server's last answer for this account on this device: true, false, or null (none yet, or it
+// belongs to another account).
+export function cachedShell(storage, userId) {
+  if (!userId) return null;
+  try {
+    const saved = JSON.parse(storage.getItem(SHELL_CACHE) || 'null');
+    return saved && saved.user === String(userId) && typeof saved.on === 'boolean' ? saved.on : null;
+  } catch {
+    return null;
   }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
-// The setting the browser gets, from the build's environment: { all, keys } (keys are hashes).
-export function shellSetting({ value = '', vercelEnv = '', development = false } = {}) {
-  const raw = String(value || '').trim();
-  if (/^(off|none)$/i.test(raw)) return OFF;
-  if (/^all$/i.test(raw) || development || vercelEnv === 'preview') return { all: true, keys: [] };
-  const keys = [...new Set(raw.split(',').map(item => item.trim()).filter(Boolean).map(shellHash))];
-  return { all: false, keys };
+export function rememberShell(storage, userId, on) {
+  if (!userId || typeof on !== 'boolean') return;
+  try { storage.setItem(SHELL_CACHE, JSON.stringify({ user: String(userId), on })); } catch { /* storage blocked */ }
 }
 
-// The setting this build was made with (next.config.js puts it in NEXT_PUBLIC_NEW_SHELL).
-export function builtSetting(json = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_NEW_SHELL : '') {
-  try {
-    const parsed = JSON.parse(json || 'null');
-    if (parsed && typeof parsed === 'object') return { all: parsed.all === true, keys: Array.isArray(parsed.keys) ? parsed.keys.map(String) : [] };
-  } catch { /* a malformed value is off */ }
-  return OFF;
+// Is the shell on, from what the page knows now? pageDefault comes from the server's environment
+// (lib/server/newShell.mjs pageDefault): { fixed } settles it for everyone; otherwise the account's
+// cached answer; otherwise { guess } (a preview deployment), else off.
+export function shellOn(pageDefault, cached) {
+  if (pageDefault && typeof pageDefault.fixed === 'boolean') return pageDefault.fixed;
+  if (typeof cached === 'boolean') return cached;
+  return Boolean(pageDefault && pageDefault.guess === true);
 }
 
-// Is the switch on for this account? ids: the signed-in account's email and user id (any may be empty).
-export function shellOnFor(setting, ids = []) {
-  if (!setting) return false;
-  if (setting.all) return true;
-  if (!setting.keys?.length) return false;
-  return ids.some(id => id && setting.keys.includes(shellHash(id)));
-}
-
-// The signed-in account as this browser knows it: the cached email and id (lib/api.js), and the
-// same two from the access token, so a fresh sign-in counts before /auth/me answers.
-export function readIdentity(storage, decode = typeof atob === 'function' ? atob : null) {
-  const ids = [];
-  try {
-    ids.push(storage.getItem('userEmail'), storage.getItem('userId'));
-    const token = storage.getItem('authToken');
-    if (token && decode) {
-      const payload = JSON.parse(decode(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-      ids.push(payload.email, payload.sub);
-    }
-  } catch { /* storage blocked or a token that isn't a JWT */ }
-  return ids.filter(Boolean).map(String);
+// Only the two booleans pass into the page, whatever is handed in.
+export function safeDefault(pageDefault) {
+  if (pageDefault && typeof pageDefault.fixed === 'boolean') return { fixed: pageDefault.fixed };
+  return pageDefault && pageDefault.guess === true ? { guess: true } : {};
 }
 
 // The script pages/_document.js runs before the first paint: data-shell="new" on <html> when the
-// switch is on for whoever is signed in, so the stylesheet lays the page out for the right shell
-// and neither shell ever flashes before the other.
-export function shellBootScript(setting = OFF) {
-  const safe = { all: setting.all === true, keys: (setting.keys || []).map(String) };
-  return '(function(){try{var s=' + JSON.stringify(safe) + ';var on=s.all;if(!on&&s.keys.length){var h=' + shellHash.toString()
-    + ';var ids=[localStorage.getItem("userEmail"),localStorage.getItem("userId")];var t=localStorage.getItem("authToken");'
-    + 'if(t){try{var p=JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));ids.push(p.email,p.sub);}catch(e){}}'
-    + 'for(var i=0;i<ids.length;i++){if(ids[i]&&s.keys.indexOf(h(ids[i]))>-1){on=true;break;}}}'
-    + 'if(on)document.documentElement.setAttribute("data-shell","new");}catch(e){}})();';
+// shell is on (shellOn above, with the cached answer for the signed-in account), so the stylesheet
+// lays the page out for the right shell and neither shell flashes before the other. It also leaves
+// the page's default in window.__cordiaShell for lib/useNewShell.js. Plain ES5.
+export function shellBootScript(pageDefault) {
+  return '(function(){var d=' + JSON.stringify(safeDefault(pageDefault)) + ';window.__cordiaShell=d;try{var on=d.fixed;'
+    + 'if(typeof on!=="boolean"){var s=localStorage,u=s.getItem("userId"),c=null;'
+    + 'if(!u){var t=s.getItem("authToken");if(t){try{var e=t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/");while(e.length%4)e+="=";u=JSON.parse(atob(e)).sub;}catch(x){}}}'
+    + 'if(u){try{var v=JSON.parse(s.getItem("' + SHELL_CACHE + '")||"null");if(v&&v.user===String(u)&&typeof v.on==="boolean")c=v.on;}catch(x){}}'
+    + 'on=c===null?d.guess===true:c;}'
+    + 'if(on)document.documentElement.setAttribute("data-shell","new");}catch(x){}})();';
 }
