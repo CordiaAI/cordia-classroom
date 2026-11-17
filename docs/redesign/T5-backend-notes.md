@@ -88,7 +88,28 @@ Errors: 400 bad id, 401 signed out, 404 not yours / gone / deleted (also a class
 - A deleted live chat becomes a saved, deleted chat and the Tutor is empty. Undo returns it as saved, not live.
 - Starting a chat while the current one is empty reuses the empty live chat (its guide and class are replaced).
 - The 30-saved-chat cap in `start_tutor_chat` (the pre-migration path) still deletes the oldest chats beyond 30.
-  After the migration the new path does not prune; only deleted chats are purged (30 days). The owner may want
-  a retention rule for saved chats.
-- `account_export` still exports every row (including deleted ones); `memory_context` now skips deleted chats.
+  After the migration the new path does not prune; only deleted chats are purged (30 days). See the owner's
+  decisions below.
+- `account_export` still exports every row, including deleted ones, which now carry a deleted marker (below);
+  `memory_context` skips deleted chats.
 - `tests/qa/mock-api.cjs` has no `/chats` routes; the UI task adds them.
+
+## Owner decisions (Jude)
+
+1. **No trim to the newest 30 saved chats after the migration.** Approved. Already how the code works:
+   `saved_chats.start_chat` never prunes saved chats (`list_chats` shows 30 per page by default, up to 100, and
+   deletes nothing). Only the pre-migration path, `tutor_sessions.start_tutor_chat` (`MAX_SAVED_CHATS`), trims, and
+   it stops being used once the migration is applied.
+2. **Deleted chats are purged 30 days after deletion.** Approved. Already how the code works. The 30 is one named
+   constant, `DELETED_KEEP_DAYS` in `backend/services/saved_chats.py`; the purge (`_purge_deleted`) and the account
+   export both read it. The purge runs when the student next starts a chat, so a chat can outlive its purge date
+   until then; the export says "on or after".
+3. **The account export keeps deleted chats while they exist, but marks them.** In `tutor_chats`, a chat with
+   `deleted_at` set gets `"deleted": true`, `"deleted_at"` (when it was deleted) and `"purge_on"` (`deleted_at` plus
+   `DELETED_KEEP_DAYS`). Chats that are not deleted get none of these fields, so they export exactly as before.
+   When the export holds a deleted chat it also carries a top-level `"deleted_chats_note"` in plain words. Before the
+   migration (no `deleted_at` column) the export reads the old columns and works as it did, detected with
+   `saved_chats.is_missing_schema`. Code: `backend/services/account_export.py`; tests: `tests/test_tutor_data_controls.py`.
+
+**For the pull request description:** it must say that the privacy policy needs a sentence saying deleted chats are
+purged 30 days after deletion (and that the data export includes them, marked deleted, until then).
