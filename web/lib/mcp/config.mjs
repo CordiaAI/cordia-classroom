@@ -27,6 +27,9 @@ export const MCP_INSTRUCTIONS = [
 // origins may call /mcp. Hostnames only. Preview and local builds also allow localhost, for MCP
 // Inspector; production never does.
 const DEFAULT_APP_HOSTS = ['claude.ai', 'chatgpt.com'];
+// Gemini's custom MCP connectors send students back through Google's OAuth redirect host. It is
+// only a redirect target, never a browser origin that calls /mcp, so it isn't a CORS default.
+export const DEFAULT_REDIRECT_HOSTS = [...DEFAULT_APP_HOSTS, 'oauth-redirect.googleusercontent.com'];
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
 
 export function listOf(value) {
@@ -37,9 +40,9 @@ export function isProductionDeploy(vercelEnv, nodeEnv) {
   return vercelEnv === 'production' || (!vercelEnv && nodeEnv === 'production');
 }
 
-export function connectedAppHosts(configured, { production }) {
+export function connectedAppHosts(configured, { production, defaults = DEFAULT_APP_HOSTS }) {
   const hosts = listOf(configured);
-  return [...(hosts.length ? hosts : DEFAULT_APP_HOSTS), ...(production ? [] : LOCAL_HOSTS)];
+  return [...(hosts.length ? hosts : defaults), ...(production ? [] : LOCAL_HOSTS)];
 }
 
 export function mcpConfig(env = process.env) {
