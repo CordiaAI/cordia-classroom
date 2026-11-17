@@ -1,7 +1,7 @@
 // Supabase Auth's OAuth 2.1 server, from the student's side: the consent page approves or denies
 // a connected app's request, and Settings lists and disconnects apps. The app keeps its own
 // session (lib/api.js), so these call Supabase Auth's endpoints with that access token.
-import { connectedAppHosts, isProductionDeploy } from './mcp/config.mjs';
+import { DEFAULT_REDIRECT_HOSTS, connectedAppHosts, isProductionDeploy } from './mcp/config.mjs';
 import { restClient } from './supabaseRest.mjs';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -9,7 +9,7 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 // Hosts a connected app may send the student back to. NEXT_PUBLIC_* values are passed in by the
 // page, because Next only inlines them where they're written out in full.
 export function redirectHosts({ configured, vercelEnv, nodeEnv }) {
-  return connectedAppHosts(configured, { production: isProductionDeploy(vercelEnv, nodeEnv) });
+  return connectedAppHosts(configured, { production: isProductionDeploy(vercelEnv, nodeEnv), defaults: DEFAULT_REDIRECT_HOSTS });
 }
 
 export function redirectHostOf(uri) {
