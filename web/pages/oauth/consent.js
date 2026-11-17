@@ -8,6 +8,7 @@ import { clearAuth, getToken, getUserEmail, tryRefreshToken } from '../../lib/ap
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '../../lib/supabase';
 import { PRIVACY_PATH, SUPPORT_EMAIL } from '../../lib/mcp/config.mjs';
 import { clientName, oauthApi, redirectAllowed, redirectHostOf, redirectHosts } from '../../lib/oauthConsent.mjs';
+import { sessionExpired } from '../../lib/supabaseRest.mjs';
 
 const HOSTS = redirectHosts({
   configured: process.env.NEXT_PUBLIC_OAUTH_REDIRECT_HOSTS,
@@ -45,7 +46,7 @@ export default function OAuthConsent() {
       return;
     }
     api.authorization(authorizationId).then(({ ok, status, data }) => {
-      if (status === 401) return signIn(authorizationId);
+      if (sessionExpired({ status, data })) return signIn(authorizationId);
       if (!ok || !data) {
         setState({ step: 'error', message: status === 404 || status === 400
           ? 'This request has expired or was already used. Go back to the app and connect again.'
@@ -69,7 +70,7 @@ export default function OAuthConsent() {
     if (busy || state.step !== 'ask') return;
     setBusy(action);
     const { ok, status, data } = await api.decide(state.authorizationId, action).catch(() => ({ ok: false }));
-    if (status === 401) return signIn(state.authorizationId);
+    if (sessionExpired({ status, data })) return signIn(state.authorizationId);
     if (ok && data?.redirect_url) return goBack(data.redirect_url);
     setBusy('');
     setState({ step: 'error', message: 'That didn’t go through. Go back to the app and connect again.' });
