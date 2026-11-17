@@ -76,9 +76,10 @@ export function railCurrent(pathname) {
   return '';
 }
 
-// The one sidebar item for this page, or '': 'new' (a new Tutor chat), 'chat:live' (the Tutor's
+// The one sidebar item for this page, or '': 'new' (the chat home, or a new Tutor chat), 'chat:live' (the Tutor's
 // open conversation), 'class:<id>' (a class listed in the sidebar), 'account' (Settings, Billing).
 export function sidebarCurrent(pathname, query = {}, { classIds = [], liveChat = false } = {}) {
+  if (pathname === '/home') return 'new';
   if (pathname === '/tutor') return liveChat ? 'chat:live' : 'new';
   if (pathname === '/folder/[id]' && classIds.includes(String(one(query.id) || ''))) return 'class:' + one(query.id);
   if (pathname === '/settings' || pathname.startsWith('/settings/') || pathname === '/billing') return 'account';

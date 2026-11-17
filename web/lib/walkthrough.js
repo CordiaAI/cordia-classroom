@@ -13,7 +13,9 @@ const onToday = path => path === '/dashboard';
 // taught by one-time tips where it is used (lib/tips.js) and "Show me" in Learn Cordia.
 export const DAY_ONE = [
   [
-    { id: 'new', target: '[data-spot="new"]', label: 'What are you studying?', on: 'new-opened' },
+    // In the new shell (lib/newShell.mjs) the walkthrough starts on the chat home, whose headline
+    // already asks; the spot is the rail's Make guide, which opens the same New sheet.
+    { id: 'new', target: '[data-spot="new"]', label: 'What are you studying?', shellLabel: 'Make your first study guide', on: 'new-opened' },
     { id: 'new-pick', target: '[data-spot="new-options"]', label: 'Upload, paste, a link, or a sample', on: 'guide-building' },
   ],
   // While the guide builds, the profile questions fill the wait (Walkthrough shows them).
@@ -33,7 +35,7 @@ export const DAY_ONE = [
 // Short walkthroughs for each feature, started from Learn Cordia (Today's first week, and Help).
 export const MINI = {
   add: { label: 'Add material', route: '/dashboard', steps: [
-    { target: '[data-spot="new"]', label: 'Tap New', on: 'new-opened' },
+    { target: '[data-spot="new"]', label: 'Tap New', shellLabel: 'Tap Make guide', on: 'new-opened' },
     { target: '[data-spot="new-options"]', label: 'Pick one', on: 'guide-building' },
   ] },
   explain: { label: 'Explain', route: 'guide', steps: [
@@ -67,7 +69,7 @@ export const MINI = {
   ] },
   // Notes live in a guide's Outline: New › Note makes a page to type in.
   notes: { label: 'Notes', route: '/dashboard', steps: [
-    { target: '[data-spot="new"]', label: 'Tap New', on: 'new-opened' },
+    { target: '[data-spot="new"]', label: 'Tap New', shellLabel: 'Tap Make guide', on: 'new-opened' },
     { target: '[data-spot="new-note"]', label: 'Tap Note', on: 'note-created' },
     { target: '[data-spot="note-new"]', label: 'Press Edit, then type your notes', where: onGuide, on: 'note-written', finishable: true },
   ] },

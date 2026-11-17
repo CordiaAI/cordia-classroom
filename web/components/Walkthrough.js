@@ -9,6 +9,7 @@ import { useProgress } from '../lib/progress';
 import { DAY_ONE, MINI, WT_EVENT, activeStep, endWalkthrough, setWalkthrough } from '../lib/walkthrough';
 import { saveOnboardingStep } from '../lib/onboarding';
 import { lastGuide } from '../lib/userStore';
+import { homeRoute, useNewShell } from '../lib/useNewShell';
 
 const OPTIONAL_WAIT_MS = 1500;
 
@@ -32,6 +33,8 @@ export default function Walkthrough() {
   const wtRef = useRef(wt);
   wtRef.current = wt;
   const [coarse, setCoarse] = useState(false);
+  // The new shell names its controls differently (Make guide in the rail, not New).
+  const newShell = useNewShell();
 
   useEffect(() => {
     setCoarse(window.matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && window.innerWidth < 768));
@@ -81,7 +84,7 @@ export default function Walkthrough() {
 
   if (!wt || !step) return null;
   if (step.screen === 'about') return <AboutYou index={step.index} total={step.total} />;
-  if (step.screen === 'first-review') return <FirstReview onDone={() => { finish('done'); router.push('/dashboard'); }} />;
+  if (step.screen === 'first-review') return <FirstReview onDone={() => { finish('done'); router.push(homeRoute()); }} />;
 
   // The student wandered off the step's screen: one pill brings them back.
   if (step.where && !step.where(router.pathname)) {
@@ -96,7 +99,7 @@ export default function Walkthrough() {
             : step.where('/calendar') ? '/calendar'
             : step.where('/canvas') ? '/canvas'
               : step.where('/smartnotes') ? '/smartnotes'
-                : guide ? `/guide/${guideId}` : '/dashboard';
+                : guide ? `/guide/${guideId}` : homeRoute();
     return (
       <div className="wt-resume">
         <button type="button" className="c-btn c-btn--primary" onClick={() => router.push(route)}><Play size={20} strokeWidth={1.75} aria-hidden="true" />Resume</button>
@@ -109,7 +112,7 @@ export default function Walkthrough() {
     );
   }
 
-  const label = step.label === 'flip' ? (coarse ? 'Tap to flip' : 'Press Space') : step.label;
+  const label = step.label === 'flip' ? (coarse ? 'Tap to flip' : 'Press Space') : (newShell && step.shellLabel) || step.label;
   return (
     <Spotlight
       key={`${wt.id}:${wt.step}:${wt.sub || 0}`}

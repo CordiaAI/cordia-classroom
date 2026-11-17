@@ -642,7 +642,7 @@ body:has(.about) .c-fab { display: none; }
    surface in both themes). !important so no component's own outline, or outline: none, can hide it.
    Two fields draw their box on a wrapper, which takes the ring instead: the Tutor's message box
    (glass.css) and the search bar (SearchModal). */
-:focus-visible:not(.cordia-tutor-input textarea, .search-input) {
+:focus-visible:not(.cordia-tutor-input textarea, .search-input, .composer-box) {
   outline: 2px solid var(--focus-ring) !important;
   outline-offset: 2px !important;
 }
@@ -979,3 +979,119 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 .c-side-add::before { content: ''; position: absolute; inset: -4px; }
 .create-card-remove::before { content: ''; position: absolute; inset: -4px; }
 
+/* ---------- Chat home and composer (DESIGN-SPEC 4.1, 4.2, 4.3; pages/home.js, components/Composer.js) ----------
+   The home fills the space between the sidebar and the rail, 12px from each, and never scrolls:
+   the headline, composer and suggestions sit a little above the middle in a 760px column. After the
+   first message only the conversation scrolls, with the composer at the bottom. */
+@media (min-width: 768px) {
+  :root[data-shell='new'] .app-shell:has(.chat-home) .main-content { padding: 0 var(--side-gap) !important; }
+  :root[data-shell='new'] .app-shell:has(.chat-home) .workspace-route { max-width: none; }
+  :root[data-shell='new'] .chat-home { height: 100dvh; min-height: 0; padding: var(--side-gap) 0; }
+}
+.chat-home { box-sizing: border-box; display: flex; flex-direction: column; min-height: calc(100dvh - 160px); }
+.chat-home-top { flex: none; display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 8px; min-width: 0; }
+.chat-home-date { margin-left: auto; color: var(--muted); font: 500 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chat-home-top h1.chat-home-title { min-width: 0; margin: 0 0 0 4px; color: var(--ink); font: 600 17px/1.3 var(--font-sans) !important; letter-spacing: 0 !important; }
+.chat-home-chip { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: var(--r-pill); background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); color: var(--ink); font: 600 13px/1 var(--font-sans); }
+.chat-home-stage { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 20px; padding: 0 24px 72px; }
+.chat-home-hero, .chat-home-composer, .chat-home-pills { box-sizing: border-box; width: 100%; max-width: 760px; margin-inline: auto; }
+.chat-home-hero { display: grid; gap: 8px; padding: 0 8px; }
+.chat-home-hero h1.chat-home-headline { margin: 0; color: var(--ink); font-size: 40px !important; line-height: 1.12 !important; }
+.chat-home-line { margin: 0; color: var(--muted); font: 500 17px/1.5 var(--font-sans); font-variant-numeric: tabular-nums; }
+.chat-home-pills { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 4px; }
+.chat-home-pill {
+  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 11px; border: 0; border-radius: var(--r-pill);
+  background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); color: var(--ink); font: 600 15px/1 var(--font-sans);
+  text-decoration: none; white-space: nowrap; cursor: pointer; transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.chat-home-pill .lucide { flex: none; color: var(--muted); }
+@media (hover: hover) { .chat-home-pill:hover { transform: var(--lift); box-shadow: var(--glass-inner-shadow), var(--lift-shadow); text-decoration: none; } }
+.chat-home-pill:active { transform: var(--press); }
+.chat-home-note { flex: none; margin: 0 0 4px; padding: 0 16px; text-align: center; color: var(--muted); font: 500 13px/1.4 var(--font-sans); }
+
+/* The chat: the conversation scrolls in a 760px column; the composer sits under it. */
+.chat-home.is-chat .chat-home-stage { justify-content: flex-end; gap: 12px; padding: 0 0 8px; }
+.chat-home.is-chat .chat-home-composer { padding: 0 24px; max-width: calc(760px + 48px); }
+.chat-home .chat-home-thread { flex: 1 1 auto; min-height: 0; display: block; overflow-y: auto; padding: 8px 24px 16px; overscroll-behavior: contain; animation: c-chat-in 180ms var(--ease) both; }
+@keyframes c-chat-in { from { opacity: 0; } to { opacity: 1; } }
+.chat-home-column { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.chat-home-thread .cordia-tutor-message { position: relative; max-width: none; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--ink); font: 500 17px/1.55 var(--font-sans); }
+.chat-home-thread .cordia-tutor-message:is(.ai, .tutor-thinking) { align-self: stretch; padding-left: 44px; min-height: 32px; }
+.chat-home-thread .cordia-tutor-message.tutor-thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 15px; }
+.chat-home-thread .cordia-tutor-message.user {
+  align-self: flex-end; max-width: 78%; padding: 12px 16px; border-radius: 20px 20px 6px 20px;
+  background: var(--glass-sheen), var(--glass-fill-strong) !important; box-shadow: var(--glass-shadow); color: var(--ink) !important;
+}
+.chat-home-thread .cordia-tutor-message.error { align-self: stretch; padding: 10px 14px; border-radius: var(--r-input); background: var(--error-bg); color: var(--error); font-size: 15px; }
+.cordia-tutor-avatar { position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
+.cordia-tutor-avatar svg, .cordia-tutor-avatar img { width: 22px; height: auto; }
+
+/* The composer: strong glass, 28px corners; focus rings the whole composer, not the box. */
+.composer {
+  position: relative; isolation: isolate; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px;
+  padding: 12px 12px 10px; border-radius: 28px; background: var(--glass-sheen), var(--glass-fill-strong);
+  -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-shadow);
+}
+.composer::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background: var(--glass-grain) repeat; background-size: 180px 180px; opacity: var(--glass-grain-opacity); }
+.composer::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; background: var(--glass-rim); -webkit-mask: var(--glass-rim-mask-webkit); -webkit-mask-composite: xor; mask: var(--glass-rim-mask); }
+.composer:has(.composer-box:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.composer.is-drop { outline: 2px dashed var(--focus-ring); outline-offset: 2px; }
+.composer .composer-box {
+  display: block; box-sizing: border-box; width: 100%; margin: 0; padding: 10px 8px 4px; resize: none; overflow-y: hidden;
+  /* Borderless (DESIGN-SPEC 4.2): the shared field glass (glass.css) stays off this box. */
+  border: 0 !important; border-radius: 0; background: transparent !important; box-shadow: none !important; color: var(--ink); font: 500 17px/1.5 var(--font-sans);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.composer .composer-box:focus, .composer .composer-box:focus-visible { outline: none; box-shadow: none; }
+.composer .composer-box::placeholder { color: var(--muted); opacity: 1; }
+.composer-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.composer-spacer { flex: 1 1 auto; }
+.composer-icon {
+  position: relative; display: inline-grid; place-items: center; flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: var(--r-pill);
+  background: transparent; color: var(--muted); cursor: pointer; transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.composer-icon:disabled { cursor: default; opacity: .5; }
+.composer-icon.is-on { background: var(--selected-glass); box-shadow: var(--selected-glass-shadow); color: var(--olive-ink); }
+@media (hover: hover) { .composer-icon:not(:disabled):not(.is-on):hover { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); } }
+.composer-send {
+  display: inline-grid; place-items: center; flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: var(--r-pill);
+  background-color: var(--send-quiet); background-image: none; color: var(--muted); cursor: default;
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.composer-send.is-ready { background-color: var(--olive); background-image: var(--olive-glass-sheen); box-shadow: var(--olive-glass-shadow); color: var(--on-olive); cursor: pointer; }
+@media (hover: hover) { .composer-send.is-ready:hover { transform: var(--lift); box-shadow: var(--olive-glass-shadow-hover); } }
+.composer-send.is-ready:active { transform: var(--press); background-color: var(--olive-press); }
+.composer-send:not(.is-ready):active { transform: none; }
+.composer-files { list-style: none; margin: 0; padding: 0 4px; display: flex; flex-wrap: wrap; gap: 6px; }
+.composer-files li { display: inline-flex; align-items: center; gap: 8px; max-width: 260px; height: 36px; padding: 0 4px 0 12px; border-radius: var(--r-pill); background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); color: var(--ink); font: 600 14px/1 var(--font-sans); }
+.composer-files li .lucide { flex: none; color: var(--muted); }
+.composer-file-remove { display: grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; transition: background-color var(--dur) var(--ease); }
+@media (hover: hover) { .composer-file-remove:hover { background: var(--glass-inner); } }
+.composer-note { margin: 0 8px 2px; color: var(--muted); font: 500 13px/1.4 var(--font-sans); }
+.composer-note.is-error { color: var(--error); }
+
+/* The class picker (components/ClassPicker.js): a quiet button with the class's dot and code. */
+.c-class-picker {
+  display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; border: 0; border-radius: var(--r-pill);
+  background: transparent; color: var(--ink); font: 600 15px/1 var(--font-sans); white-space: nowrap; cursor: pointer;
+  transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.c-class-picker.is-sm { height: 34px; padding: 0 10px; font-size: 14px; }
+.c-class-picker .lucide { flex: none; color: var(--muted); }
+.c-class-picker[aria-expanded='true'] { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
+@media (hover: hover) { .c-class-picker:hover { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); } }
+.c-class-dot { flex: none; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--dot, transparent); box-shadow: inset 0 0 0 1px var(--hairline); }
+.c-menu [role='menuitem'] > .c-class-dot { margin: 0 5px; }
+
+@media (max-width: 767px) {
+  .chat-home-stage { padding: 0 0 24px; }
+  .chat-home-hero h1.chat-home-headline { font-size: 30px !important; }
+  .chat-home-date { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-home .chat-home-thread { animation: none; }
+  .chat-home-pill:hover, .chat-home-pill:active, .composer-send.is-ready:hover, .composer-send.is-ready:active { transform: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .composer { background: var(--surface-raised); }
+}

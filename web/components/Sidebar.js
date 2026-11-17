@@ -26,6 +26,7 @@ import { tierName } from '../lib/plans';
 import { loadClassReadiness } from '../lib/classReadiness';
 import { liveMessages, loadSavedChats, onTutorChats } from '../lib/tutorChats';
 import { MAX_CLASSES, recentChats, sidebarCurrent } from '../lib/shellTools.mjs';
+import { HOME_ROUTE } from '../lib/newShell.mjs';
 
 // Phones (under 768px) keep the top bar and tab bar until the phone layout (T9). The top bar's
 // links and its account menu cover the places; the tab bar keeps its five.
@@ -273,9 +274,9 @@ export default function Sidebar() {
   const onProfile = ['/settings', '/billing'].includes(router.pathname);
   const planLine = [plan, school].filter(Boolean).join(' · ') || email;
 
-  // New chat opens the Tutor on a new chat; on the Tutor page itself it starts one there.
+  // New chat opens the chat home; on the home (or the Tutor page) it starts a new chat there.
   function newChat(event) {
-    if (router.pathname === '/tutor' && !router.query.chat) {
+    if (router.pathname === HOME_ROUTE || (router.pathname === '/tutor' && !router.query.chat)) {
       event.preventDefault();
       window.dispatchEvent(new Event('cordia:tutor-new'));
     }
@@ -301,7 +302,7 @@ export default function Sidebar() {
       <a className="workspace-skip-link" href="#classroom-main">Skip to content</a>
       <aside className={'c-side' + (collapsed ? ' is-collapsed' : '')} aria-label="Sidebar">
         <div className="c-side-head">
-          <Link className="c-side-brand" href="/dashboard" aria-label="Cordia Classroom, Dashboard">
+          <Link className="c-side-brand" href={HOME_ROUTE} aria-label="Cordia Classroom, home">
             <AcademicInfinityMark className="top-navigation-mark" title="" />
             <span className="c-side-label"><BrandName /></span>
           </Link>
@@ -314,7 +315,7 @@ export default function Sidebar() {
         </div>
 
         <div className="c-side-top">
-          <Link href="/tutor" className="c-btn c-btn--primary c-side-new" aria-label="New chat" aria-current={current === 'new' ? 'page' : undefined} onClick={newChat} {...tipFor('new')}>
+          <Link href={HOME_ROUTE} className="c-btn c-btn--primary c-side-new" aria-label="New chat" aria-current={current === 'new' ? 'page' : undefined} onClick={newChat} {...tipFor('new')}>
             <SquarePen size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-side-label">New chat</span>
           </Link>
           <button type="button" className="c-side-item c-side-search" onClick={() => setSearch({ instant: false })} aria-label={`Search (${shortcut})`} aria-keyshortcuts={shortcut === '⌘K' ? 'Meta+K' : 'Control+K'} {...tipFor('search')}>
