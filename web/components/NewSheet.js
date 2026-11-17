@@ -173,6 +173,9 @@ export default function NewSheet() {
   recordingRef.current = recording;
   // The name an opened-with text comes with (an imported Doc), used instead of a made-up one.
   const pasteTitleRef = useRef('');
+  // Opened to build straight away (the composer's "make a guide"): Create runs once the files,
+  // link or text are in, through the same steps as pressing it.
+  const [autoCreate, setAutoCreate] = useState(false);
 
   useEffect(() => {
     function onOpen(event) {
@@ -185,11 +188,20 @@ export default function NewSheet() {
       setError('');
       if (event.detail?.files?.length) addFiles(event.detail.files);
       if (event.detail?.text) { setText(event.detail.text); pasteTitleRef.current = event.detail.title || ''; }
+      if (event.detail?.url) setUrl(event.detail.url);
+      if (event.detail?.folderId) setFolderId(event.detail.folderId);
+      setAutoCreate(Boolean(event.detail?.create));
       walkthroughEvent('new-opened');
     }
     window.addEventListener(NEW_SHEET_EVENT, onOpen);
     return () => window.removeEventListener(NEW_SHEET_EVENT, onOpen);
   }, []);
+
+  useEffect(() => {
+    if (!autoCreate || !open || status !== 'idle') return;
+    setAutoCreate(false);
+    if (mode === 'upload' ? files.length > 0 : mode === 'link' ? /^https?:\/\/\S+\.\S+/.test(url.trim()) : text.trim().length >= 10) create();
+  }, [autoCreate, open, status, mode, files, url, text]);
 
   // The sheet closes when a recording ends (it becomes a lecture), so the pill never outlives it.
   useEffect(() => { if (!open) setMinimized(false); }, [open]);

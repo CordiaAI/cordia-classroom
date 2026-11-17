@@ -37,7 +37,7 @@ test('every material file picker offers exactly the server types', async () => {
     }
   }
   const material = pickers.filter(picker => !(picker.path in OTHER_PICKERS));
-  assert.deepEqual(material.map(picker => picker.path).sort(), ['components/AIChatWidget.js', 'components/NewSheet.js', 'components/PracticeWorkspace.js', 'pages/library.js']);
+  assert.deepEqual(material.map(picker => picker.path).sort(), ['components/AIChatWidget.js', 'components/Composer.js', 'components/NewSheet.js', 'components/PracticeWorkspace.js', 'pages/library.js']);
   for (const picker of material) assert.equal(picker.accept, '{UPLOAD_ACCEPT}', `${picker.path} must use UPLOAD_ACCEPT`);
   for (const picker of pickers.filter(item => item.path in OTHER_PICKERS)) assert.equal(picker.accept, OTHER_PICKERS[picker.path], picker.path);
 });

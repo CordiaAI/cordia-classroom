@@ -22,7 +22,8 @@ const JUMPS = [
 
 // ⌘K / Ctrl K: one search over study guides, flashcards, notes and lectures, then the top public
 // sets from everyone (Discover) and a link to see them all on /explore.
-export default function SearchModal({ onClose }) {
+// instant: opened from the keyboard, so it shows on the next frame with no fade or rise (DESIGN-SPEC 6.1).
+export default function SearchModal({ onClose, instant = false }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [guideHits, setGuideHits] = useState([]);
@@ -104,7 +105,7 @@ export default function SearchModal({ onClose }) {
 
   return (
     <BodyPortal>
-    <div className="c-scrim c-search-scrim" onClick={onClose}>
+    <div className={'c-scrim c-search-scrim' + (instant ? ' is-instant' : '')} onClick={onClose}>
       <div className="c-sheet c-search-sheet" role="dialog" aria-modal="true" aria-label="Search" onClick={event => event.stopPropagation()}>
         <div className="search-bar">
           <Search size={20} strokeWidth={1.75} aria-hidden="true" />
@@ -146,8 +147,9 @@ export default function SearchModal({ onClose }) {
         .search-input::placeholder { color: var(--muted); }
         .search-input::-webkit-search-cancel-button { display: none; }
         .search-close { flex: none; display: grid; place-items: center; min-width: 44px; height: 44px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; }
-        .search-close:hover { color: var(--ink); }
-        .search-close:focus-visible { outline: 2px solid var(--olive); outline-offset: -4px; }
+        @media (hover: hover) { .search-close:hover { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); } }
+        .search-close:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -4px; }
+        .c-search-scrim.is-instant, .c-search-scrim.is-instant .c-search-sheet { animation: none; }
         .search-esc { font:600 12px/1 var(--font-sans); padding: 6px 8px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--muted); }
         .search-close :global(.search-x) { display: none; }
         .search-list { list-style: none; margin: 0; padding: 0 8px; max-height: 60vh; overflow: auto; }

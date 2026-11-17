@@ -5,11 +5,12 @@ import BodyPortal from './BodyPortal';
 const GAP = 6;
 const EDGE = 8;
 
-// A ⋯ button with a small glass menu. items: [{ label, meta, icon, onSelect, danger, items }]
+// A ⋯ button with a small glass menu. items: [{ label, meta, icon, onSelect, danger, items, current }]
+// trigger and triggerClassName: a different button face (the composer's class picker).
 // An item with `items` opens a second level (e.g. Move to class), with a way back.
 // The menu renders at the end of <body>, placed under its button (above it when there's no room
 // below), so a list row or card never covers it.
-export default function Menu({ label = 'More', items, align = 'right', trigger }) {
+export default function Menu({ label = 'More', items, align = 'right', trigger, triggerClassName = 'c-icon-btn' }) {
   const [open, setOpen] = useState(false);
   const [sub, setSub] = useState(null);
   const [place, setPlace] = useState(null); // { top, left }
@@ -71,7 +72,7 @@ export default function Menu({ label = 'More', items, align = 'right', trigger }
 
   return (
     <div className="c-menu-wrap" ref={rootRef} onClick={event => event.stopPropagation()}>
-      <button ref={buttonRef} type="button" className="c-icon-btn" aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} onClick={() => (open ? close(false) : setOpen(true))}>
+      <button ref={buttonRef} type="button" className={triggerClassName} aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} onClick={() => (open ? close(false) : setOpen(true))}>
         {trigger || <Ellipsis size={20} strokeWidth={1.75} aria-hidden="true" />}
       </button>
       {open && (
