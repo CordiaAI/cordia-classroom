@@ -260,6 +260,13 @@
   --seg-pill-tint: rgba(83, 97, 73, 0.03);
   --seg-pill-bg: var(--glass-sheen), linear-gradient(var(--seg-pill-tint), var(--seg-pill-tint)), var(--seg-pill-base);
   --seg-pill-shadow: var(--selected-glass-shadow), var(--selected-glass-ring);
+  /* The current view pill (.c-pill[aria-current], the guide's Outline / Learn / Flashcards row): its
+     neighbours are glass controls, not a sunken track. In light, selected glass stands clear of
+     them; dark overrides it (below). The base is drawn only in dark; light keeps selected glass's. */
+  --pill-current-base: rgba(250, 251, 249, 0.74);
+  --pill-current-base-solid: #F7F8F6;
+  --pill-current-bg: var(--selected-glass);
+  --pill-current-shadow: var(--selected-glass-shadow);
   /* The track is sunken: ink at 8% with a small inset shadow, over a light base so it keeps one
      tone whether it sits on a card or straight on the clouds (muted labels stay 4.5:1 on it, and
      the near-white pill stands clear of it). */
@@ -373,6 +380,13 @@
   --seg-pill-base: rgba(60, 64, 71, 0.92);
   --seg-pill-base-solid: #3A3E45;
   --seg-pill-tint: rgba(195, 207, 182, 0.10);
+  /* Dark selected glass lands on the glass controls' own tone over the backdrop, so the current
+     view pill takes the chosen segment's treatment instead: a brighter base, the faint olive tint,
+     the sheen and the olive ring. */
+  --pill-current-base: rgba(72, 77, 84, 0.94);
+  --pill-current-base-solid: #484D54;      /* --pill-current-base when glass turns solid */
+  --pill-current-bg: var(--glass-sheen), linear-gradient(var(--seg-pill-tint), var(--seg-pill-tint)), var(--pill-current-base);
+  --pill-current-shadow: var(--selected-glass-shadow), var(--selected-glass-ring);
   --glass-grain-opacity: 0.05;
   --glass-inner: rgba(255, 255, 255, 0.05);
   --glass-inner-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 0.5px rgba(0, 0, 0, 0.30);
@@ -432,6 +446,7 @@
     --glass-fill: var(--glass-solid); --glass-fill-strong: var(--glass-solid); --glass-control: var(--glass-solid);
     --surface-raised: var(--glass-solid); --lg-fill-field: var(--glass-solid);
     --glass-inner: var(--glass-inner-solid); --seg-track: var(--seg-track-solid); --seg-pill-base: var(--seg-pill-base-solid);
+    --pill-current-base: var(--pill-current-base-solid);
     --selected-glass: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--glass-solid);
   }
 }
@@ -440,6 +455,7 @@
     --glass-fill: var(--glass-solid); --glass-fill-strong: var(--glass-solid); --glass-control: var(--glass-solid);
     --surface-raised: var(--glass-solid); --lg-fill-field: var(--glass-solid);
     --glass-inner: var(--glass-inner-solid); --seg-track: var(--seg-track-solid); --seg-pill-base: var(--seg-pill-base-solid);
+    --pill-current-base: var(--pill-current-base-solid);
     --selected-glass: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--glass-solid);
     --glass-blur: none;
   }
