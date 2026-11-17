@@ -28,6 +28,12 @@
   --font-friendly-ui: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-readable-display: 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-readable-ui: 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* The sixth pair, which only the Paper & Clay look selects by default (<html data-font="paper">). */
+  --font-paper-display: 'Source Serif 4', 'Iowan Old Style', Georgia, serif;
+  --font-paper-ui: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-paper-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Tutor reply text (.cordia-tutor-message.ai, system.css). The UI font unless a look says otherwise. */
+  --font-reply: var(--font-sans);
   /* Text size (<html data-size>, end of this file): --text-scale is 1 unless the student chose
      another size, and the type scale follows it. */
   --text-scale: 1;
@@ -51,6 +57,15 @@
   --scrim: rgba(23, 27, 24, 0.28);
   --scrim-strong: rgba(15, 18, 16, 0.38); /* search: dims the page more than a sheet does */
   --spot-dim: rgba(23, 27, 24, 0.4);         /* onboarding spotlight dims the app to 40% */
+  /* Levels the Paper & Clay look needs that Cordia's glass never named. Nothing reads them until a
+     look sets them (docs/redesign/T10-engine-notes.md): disabled text, the stronger hairline (hover
+     and button edges), the edge of an input, checkbox or switch, the composer's own shadow, and the
+     sidebar's fill (it is a pane like any other until the look gives it its own paper tone). */
+  --text-disabled: rgba(23, 27, 24, 0.38);
+  --line-strong: rgba(23, 27, 24, 0.16);
+  --control-edge: rgba(23, 27, 24, 0.34);
+  --surface-sidebar: var(--glass-fill);
+  --shadow-composer: var(--glass-shadow);
 
   /* Accent and states. The accent is olive unless <html data-accent> says otherwise (end of this
      file). Everything that is olive today is built from these tokens: the fill and its text, press
@@ -203,6 +218,17 @@
   --swatch-bg-dusk: linear-gradient(170deg, #C9C3DA 0%, #E9DCE0 55%, #F1E3D3 100%);
   --swatch-bg-paper: #F3F1EA;
   --swatch-bg-meadow: linear-gradient(170deg, #D6E3DA, #EDF1EA 55%, #DCE5D6);
+  /* The Paper & Clay theme tile (the sheet draws it from these): a paper swatch with a small clay dot
+     and a serif "Aa". Recipe: tile background --swatch-look-paper-clay with a 1px --swatch-look-paper-clay-edge
+     border; an 8px round dot of --swatch-look-paper-clay-dot at the bottom right; "Aa" in
+     --swatch-look-paper-clay-ink, font-family --swatch-look-paper-clay-font, 600, centred. The paperclay
+     accent's own fill is --swatch-accent-paperclay (not one of the eight accent dots). */
+  --swatch-look-paper-clay: #FAF9F5;
+  --swatch-look-paper-clay-edge: rgba(31, 30, 29, 0.14);
+  --swatch-look-paper-clay-dot: #D97757;
+  --swatch-look-paper-clay-ink: #141413;
+  --swatch-look-paper-clay-font: var(--font-paper-display);
+  --swatch-accent-paperclay: #AE5630;
 
   /* Older glass names, kept so every screen resolves to the v2 values above. */
   --lg-filter: var(--glass-blur);
@@ -352,6 +378,9 @@
   --photo-veil: rgba(26, 29, 32, 0.80);
   --scrim: rgba(0, 0, 0, 0.45);
   --scrim-strong: rgba(0, 0, 0, 0.55); /* search: dims the page more than a sheet does */
+  --text-disabled: rgba(255, 255, 255, 0.40);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --control-edge: rgba(255, 255, 255, 0.38);
   /* Lighter olive so filled buttons and their edges stand out from the dark glass (3.96:1 on the
      card, was 2.17), with a dark label on it (5.05:1). Olive as text stays --olive-ink. */
   --olive: #7A8C6B;
@@ -437,6 +466,9 @@
   --swatch-bg-dusk: linear-gradient(170deg, #2E2A3D 0%, #2A2530 55%, #2F2927 100%);
   --swatch-bg-paper: #1E1D1A;
   --swatch-bg-meadow: linear-gradient(170deg, #25332B, #1F2A23 55%, #28332A);
+  --swatch-look-paper-clay: #262624;
+  --swatch-look-paper-clay-edge: rgba(250, 249, 245, 0.16);
+  --swatch-look-paper-clay-ink: #FAF9F5;
   --backdrop-wash: none;
   --backdrop-field:
     radial-gradient(55% 48% at 16% 20%, #2B3327 0%, #2B3327 35%, transparent 75%),
@@ -507,7 +539,9 @@ html[data-size='small'] { font-size: 90%; --text-scale: 0.9; }
 html[data-size='large'] { font-size: 112.5%; --text-scale: 1.125; }
 html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
 
-/* ---- Font pair: <html data-font="clean|bookish|friendly|readable">. The pair's files load only when
+/* ---- Font pair: <html data-font="clean|bookish|friendly|readable|paper">. The sixth, paper (Source Serif 4,
+   Instrument Sans, JetBrains Mono), is the Paper & Clay look's own: it is that look's pair unless a data-font
+   is set over it, and the only pair that also sets the code font. The pair's files load only when
    a page uses them. Each file covers Latin; other scripts fall back to the system font. Atkinson
    Hyperlegible has regular and bold only, so the 500 and 600 weights land on 400 and 700. ---- */
 @font-face { font-family: Inter; src: url('/fonts/inter-latin.woff2') format('woff2'); font-style: normal; font-weight: 100 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
@@ -519,7 +553,11 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
 :root[data-font='clean'] { --font-sans: var(--font-clean-ui); --font-display: var(--font-clean-display); }
 :root[data-font='bookish'] { --font-sans: var(--font-bookish-ui); --font-display: var(--font-bookish-display); }
 :root[data-font='friendly'] { --font-sans: var(--font-friendly-ui); --font-display: var(--font-friendly-display); }
+@font-face { font-family: 'Source Serif 4'; src: url('/fonts/source-serif-4-latin.woff2') format('woff2'); font-style: normal; font-weight: 200 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Instrument Sans'; src: url('/fonts/instrument-sans-latin.woff2') format('woff2'); font-style: normal; font-weight: 400 700; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'JetBrains Mono'; src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2'); font-style: normal; font-weight: 100 800; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 :root[data-font='readable'] { --font-sans: var(--font-readable-ui); --font-display: var(--font-readable-display); }
+:root[data-font='paper'], :root[data-look='paper-clay']:not([data-font]) { --font-sans: var(--font-paper-ui); --font-display: var(--font-paper-display); --font-mono: var(--font-paper-mono); }
 
 /* ---- Accent: <html data-accent="ocean|indigo|clay|rose|plum|graphite|teal|custom">. Olive is the
    default and needs no attribute. Each accent is a set of seeds (channels, R, G, B): --ca-l-* for
@@ -557,7 +595,9 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
 }
 /* An accent without its seeds (a custom accent whose variables are missing) is just olive: the
    olive tokens fall back to the file's own values through these var() fallbacks. */
-:root[data-accent] {
+/* The Paper & Clay look is an accent of its own (its seeds are set with the look, below), so the same
+   mapping runs for it when no accent was picked over it. */
+:root:is([data-accent], [data-look='paper-clay']) {
   --accent-rgb: var(--ca-l-fill, 83, 97, 73);
   --accent-deep-rgb: var(--ca-l-press, 61, 73, 55);
   --accent-edge-rgb: var(--ca-l-edge, 38, 48, 32);
@@ -568,7 +608,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
   --on-olive: rgb(var(--ca-l-on, 255, 255, 255));
   --focus-ring: rgb(var(--ca-l-ink, 83, 97, 73));
 }
-[data-theme='dark'][data-accent] {
+[data-theme='dark']:is([data-accent], [data-look='paper-clay']) {
   --accent-tint-rgb: var(--ca-d-tint, 195, 207, 182);
   --olive: rgb(var(--ca-d-fill, 122, 140, 107));
   --olive-ink: rgb(var(--ca-d-ink, 207, 218, 195));
@@ -643,6 +683,117 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
     --glass-blur: none;
   }
 }
+/* ---- Look: <html data-look="paper-clay">, the Paper & Clay full-look preset (DESIGN-SPEC 3.5). Unlike
+   the accent, background, font and glass attributes it switches the whole surface system at once, so it
+   has its own attribute: plain paper surfaces (no photo, no grain, no frost), hairline borders before
+   shadows, the paper text, the 8 / 12-16 / 20 corners and the serif Tutor replies. It only overrides
+   tokens that exist above, so no component has theme code.
+   The look carries its own accent and font pair as defaults: they apply while no <html data-accent> or
+   data-font is set over them (the engine, lib/themeSettings.mjs, writes one whenever the student picks
+   another). Every token set in the light block is
+   set again in the dark block (a test holds the two lists equal), because [data-theme='dark'] alone
+   is less specific than the look's selector. Placed after the glass fallbacks so the look wins them.
+   The accent shows as the primary fill (the send button, New chat, checked controls, progress) and as
+   clay-coloured text (--olive-ink) for active labels and links; washes and selected rows are neutral. ---- */
+:root[data-look='paper-clay']:not([data-accent]) {  /* the clay accent: #AE5630 on paper, #D97757 on dark (not one of the eight swatches) */
+  --ca-l-fill: 174, 86, 48; --ca-l-press: 156, 74, 39; --ca-l-ink: 162, 74, 41; --ca-l-on: 255, 255, 255; --ca-l-edge: 112, 50, 24; --ca-l-wash: 217, 119, 87;
+  --ca-d-fill: 217, 119, 87; --ca-d-ink: 232, 145, 111; --ca-d-on: 26, 25, 24; --ca-d-glass-press: 227, 138, 107; --ca-d-tint: 232, 145, 111;
+}
+:root[data-look='paper-clay'] {
+  --ink: #141413; --text-secondary: #3D3D3A; --muted: #6B6A64; --text-disabled: #9C9A92;
+  --hairline: rgba(31, 30, 29, 0.10); --line-strong: rgba(31, 30, 29, 0.20); --control-edge: #8F8C82;
+  --scrim: rgba(20, 20, 19, 0.40);
+  --wash: rgba(31, 30, 29, 0.04);
+  --olive-tint: rgba(31, 30, 29, 0.06);
+  /* Surfaces: canvas (below), sidebar, raised (composer, cards, menus), hover and pressed. */
+  --surface-card: #FFFFFF; --surface-raised: #FFFFFF; --surface-sidebar: #F5F4ED;
+  --glass-fill: #FFFFFF; --glass-fill-strong: #FFFFFF; --glass-solid: #FFFFFF; --glass-control: #FFFFFF;
+  --lg-fill-menu: #FFFFFF; --lg-fill-field: #FFFFFF;
+  --glass-inner: #F0EEE6; --glass-inner-solid: #F0EEE6; --lg-press: #E8E6DC;
+  --seg-track: #F0EEE6; --seg-track-solid: #F0EEE6; --seg-track-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  --seg-hover: rgba(255, 255, 255, 0.60);
+  --seg-pill-base: #FFFFFF; --seg-pill-base-solid: #FFFFFF; --seg-pill-tint: rgba(0, 0, 0, 0);
+  --pill-current-base: #FFFFFF; --pill-current-base-solid: #FFFFFF;
+  --selected-glass: linear-gradient(#F0EEE6, #F0EEE6);
+  --selected-glass-shadow: 0 0 0 1px var(--hairline); --selected-glass-ring: 0 0 0 0 rgba(0, 0, 0, 0);
+  /* Solid, flat glass: no frost, no sheen, no grain. The rim becomes the 1px hairline border. */
+  --glass-blur: none;
+  --glass-sheen: none; --olive-glass-sheen: none;
+  --glass-grain: none; --lg-grain: none; --glass-grain-opacity: 0;
+  --glass-rim: var(--hairline);
+  --glass-rim-border: var(--hairline) var(--hairline) var(--hairline) var(--hairline);
+  --lg-rim: var(--hairline); --lg-rim-low: rgba(0, 0, 0, 0); --lg-inner-stroke: rgba(0, 0, 0, 0);
+  --lg-border: var(--control-edge); --lg-border-shade: rgba(0, 0, 0, 0);
+  /* Borders before shadows: resting panes, cards and controls have no drop shadow. Only what floats
+     (menus, popovers and the composer) keeps one. */
+  --glass-shadow-edge: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-shadow-depth: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-inner-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-control-shadow: 0 0 0 1px var(--line-strong);
+  --glass-control-shadow-hover: 0 0 0 1px var(--control-edge);
+  --olive-glass-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  --olive-glass-shadow-hover: var(--olive-glass-shadow), 0 0 0 3px rgba(var(--accent-rgb), 0.16);
+  --primary-glow: 0 0 0 3px rgba(var(--accent-rgb), 0.16);
+  --shadow-card: 0 0 0 0 rgba(0, 0, 0, 0);
+  --hover-edge: var(--line-strong); --hover-shadow: 0 0 0 1px var(--line-strong);
+  --shadow-float: 0 8px 28px rgba(20, 20, 19, 0.12), 0 2px 6px rgba(20, 20, 19, 0.06);
+  --lg-depth-float: 0 8px 28px rgba(20, 20, 19, 0.12), 0 2px 6px rgba(20, 20, 19, 0.06);
+  --glass-shadow-lift: var(--glass-shadow-edge), var(--lg-depth-float);
+  --shadow-composer: 0 4px 20px rgba(20, 20, 19, 0.06), 0 0 0 0.5px rgba(31, 30, 29, 0.15);
+  /* Corners: controls 8, cards 12 to 16, the composer and panels 20; chips stay pills. */
+  --r-input: 8px; --r-row: 12px; --r-card: 16px; --r-panel: 20px;
+  /* Tutor replies speak in the display font (the serif); everything else stays in the UI font. */
+  --font-reply: var(--font-display);
+}
+[data-theme='dark'][data-look='paper-clay'] {
+  --ink: #FAF9F5; --text-secondary: #C2C0B6; --muted: #A6A39A; --text-disabled: #85837B;
+  --hairline: rgba(250, 249, 245, 0.12); --line-strong: rgba(250, 249, 245, 0.20); --control-edge: #8A877E;
+  --scrim: rgba(0, 0, 0, 0.65);
+  --wash: rgba(250, 249, 245, 0.05);
+  --olive-tint: rgba(250, 249, 245, 0.08);
+  --surface-card: #30302E; --surface-raised: #30302E; --surface-sidebar: #1F1E1D;
+  --glass-fill: #30302E; --glass-fill-strong: #30302E; --glass-solid: #30302E; --glass-control: #30302E;
+  --lg-fill-menu: #30302E; --lg-fill-field: #30302E;
+  --glass-inner: #3A3936; --glass-inner-solid: #3A3936; --lg-press: #45443F;
+  --seg-track: #262624; --seg-track-solid: #262624; --seg-track-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  --seg-hover: rgba(250, 249, 245, 0.06);
+  --seg-pill-base: #45443F; --seg-pill-base-solid: #45443F; --seg-pill-tint: rgba(0, 0, 0, 0);
+  --pill-current-base: #45443F; --pill-current-base-solid: #45443F;
+  --selected-glass: linear-gradient(#3A3936, #3A3936);
+  --selected-glass-shadow: 0 0 0 1px var(--hairline); --selected-glass-ring: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-blur: none;
+  --glass-sheen: none; --olive-glass-sheen: none;
+  --glass-grain: none; --lg-grain: none; --glass-grain-opacity: 0;
+  --glass-rim: var(--hairline);
+  --glass-rim-border: var(--hairline) var(--hairline) var(--hairline) var(--hairline);
+  --lg-rim: var(--hairline); --lg-rim-low: rgba(0, 0, 0, 0); --lg-inner-stroke: rgba(0, 0, 0, 0);
+  --lg-border: var(--control-edge); --lg-border-shade: rgba(0, 0, 0, 0);
+  --glass-shadow-edge: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-shadow-depth: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-inner-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-control-shadow: 0 0 0 1px var(--line-strong);
+  --glass-control-shadow-hover: 0 0 0 1px var(--control-edge);
+  --olive-glass-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  --olive-glass-shadow-hover: var(--olive-glass-shadow), 0 0 0 3px rgba(var(--accent-tint-rgb), 0.18);
+  --primary-glow: 0 0 0 3px rgba(var(--accent-tint-rgb), 0.18);
+  --shadow-card: 0 0 0 0 rgba(0, 0, 0, 0);
+  --hover-edge: var(--line-strong); --hover-shadow: 0 0 0 1px var(--line-strong);
+  --shadow-float: 0 8px 28px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --lg-depth-float: 0 8px 28px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --glass-shadow-lift: var(--glass-shadow-edge), var(--lg-depth-float);
+  --shadow-composer: 0 4px 20px rgba(0, 0, 0, 0.25), 0 0 0 0.5px rgba(250, 249, 245, 0.15);
+  --r-input: 8px; --r-row: 12px; --r-card: 16px; --r-panel: 20px;
+  --font-reply: var(--font-display);
+}
+/* The look's backdrop is plain paper: no photo, no washes, no dark field. A background the student then
+   picks (the engine writes data-bg for Clouds, Dusk and Meadow while the look is on) brings its own back. */
+:root[data-look='paper-clay']:not([data-bg='clouds'], [data-bg='dusk'], [data-bg='meadow']) {
+  --canvas: #FAF9F5; --backdrop-sky: none; --backdrop-wash: none; --backdrop-field: none;
+}
+[data-theme='dark'][data-look='paper-clay']:not([data-bg='clouds'], [data-bg='dusk'], [data-bg='meadow']) {
+  --canvas: #262624; --backdrop-sky: none; --backdrop-wash: none; --backdrop-field: none;
+}
+
 /* Less motion: nothing lifts or scales. */
 @media (prefers-reduced-motion: reduce) {
   :root { --lift: none; --lift-card: none; --press: none; }

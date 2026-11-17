@@ -9,13 +9,24 @@ export const BACKGROUNDS = ['clouds', 'dusk', 'paper', 'meadow'];
 // "Your photo" needs a private storage bucket Jude has to approve, so it is not a valid choice yet.
 export const PHOTO_BACKGROUND_ENABLED = false;
 export const FONTS = ['cordia', 'clean', 'bookish', 'friendly', 'readable'];
+// The Paper & Clay look's own pair (Source Serif 4, Instrument Sans, JetBrains Mono). It is not one of the
+// sheet's five tiles: only that preset selects it by default, and it is a valid value wherever it is saved.
+export const LOOK_FONT = 'paper';
+// Looks switch more than one setting (DESIGN-SPEC 3.5): 'none' is Cordia; 'paper-clay' is Paper & Clay.
+// <html data-look> carries it (styles/tokens.css) because no single accent, background, font or glass
+// attribute can express a look that sets all of them and the surface system besides.
+export const LOOKS = ['none', 'paper-clay'];
+// Paper & Clay's own clay accent (its seeds are set with the look in styles/tokens.css, and it writes no
+// data-accent). It is not one of the eight swatches and is a valid accent only while that look is on.
+export const LOOK_ACCENT = 'paperclay';
 export const SIZES = ['small', 'default', 'large', 'larger'];
 export const SIZE_SCALE = { small: 0.9, default: 1, large: 1.125, larger: 1.25 };
 export const APPEARANCES = ['light', 'dark', 'system'];
 // 'auto' follows the device: frosted, or solid when it asks for less transparency.
 export const GLASS_LEVELS = ['auto', 'frosted', 'clearer', 'solid'];
 
-// Each preset is an accent plus a background (DESIGN-SPEC 3.5). Cordia is the default.
+// Each preset is an accent plus a background (DESIGN-SPEC 3.5); the seventh, Paper & Clay, is a full look: it
+// also sets the look, the font pair and Solid glass. Cordia is the default.
 export const PRESETS = [
   { id: 'cordia', label: 'Cordia', accent: 'olive', bg: 'clouds' },
   { id: 'ocean', label: 'Ocean', accent: 'ocean', bg: 'clouds' },
@@ -23,6 +34,7 @@ export const PRESETS = [
   { id: 'plum', label: 'Plum', accent: 'plum', bg: 'dusk' },
   { id: 'rose', label: 'Rose', accent: 'rose', bg: 'dusk' },
   { id: 'graphite', label: 'Graphite', accent: 'graphite', bg: 'paper' },
+  { id: 'paper-clay', label: 'Paper & Clay', accent: LOOK_ACCENT, bg: 'paper', look: 'paper-clay', font: LOOK_FONT, glass: 'solid' },
 ];
 
 // Which font files a pair needs (preloaded before first paint so a saved pair doesn't flash the
@@ -32,6 +44,7 @@ export const FONT_FILES = {
   bookish: ['/fonts/fraunces-latin.woff2', '/fonts/source-sans-3-latin.woff2'],
   friendly: ['/fonts/nunito-latin.woff2'],
   readable: ['/fonts/atkinson-hyperlegible-latin-400.woff2', '/fonts/atkinson-hyperlegible-latin-700.woff2'],
+  paper: ['/fonts/source-serif-4-latin.woff2', '/fonts/instrument-sans-latin.woff2'], // JetBrains Mono is only for code: fetched when a page shows some
 };
 
 export const DEFAULT_SETTINGS = Object.freeze({
@@ -42,6 +55,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   size: 'default',
   appearance: 'system',
   glass: 'auto',
+  look: 'none',
 });
 
 // The attribute each setting writes on <html>, and the value that means "default, no attribute".
@@ -51,6 +65,7 @@ const ATTRIBUTES = [
   ['font', 'data-font', 'cordia'],
   ['size', 'data-size', 'default'],
   ['glass', 'data-glass', 'auto'],
+  ['look', 'data-look', 'none'],
 ];
 export const ATTRIBUTE_NAMES = ATTRIBUTES.map(([, attribute]) => attribute);
 
@@ -64,11 +79,14 @@ export function validateSettings(raw) {
     const input = source && typeof source === 'object' && !Array.isArray(source) ? source : {};
     const settings = { ...DEFAULT_SETTINGS };
     settings.bg = pick(input.bg, BACKGROUNDS, DEFAULT_SETTINGS.bg);
-    settings.font = pick(input.font, FONTS, DEFAULT_SETTINGS.font);
+    settings.look = pick(input.look, LOOKS, DEFAULT_SETTINGS.look);
+    settings.font = pick(input.font, [...FONTS, LOOK_FONT], DEFAULT_SETTINGS.font);
     settings.size = pick(input.size, SIZES, DEFAULT_SETTINGS.size);
     settings.appearance = pick(input.appearance, APPEARANCES, DEFAULT_SETTINGS.appearance);
     settings.glass = pick(input.glass, GLASS_LEVELS, DEFAULT_SETTINGS.glass);
-    if (input.accent === 'custom') {
+    if (input.accent === LOOK_ACCENT) {
+      if (settings.look === 'paper-clay') settings.accent = LOOK_ACCENT; // anywhere else it would sit on glass it was not made for
+    } else if (input.accent === 'custom') {
       const rgb = parseHex(input.customAccent);
       if (rgb && deriveAccent(toHex(rgb)).ok) {
         settings.accent = 'custom';
@@ -77,6 +95,7 @@ export function validateSettings(raw) {
     } else {
       settings.accent = pick(input.accent, ACCENTS, DEFAULT_SETTINGS.accent);
     }
+    if (settings.look !== 'none') settings.glass = 'solid'; // a look is flat paper: Solid is not a choice while it is on
     return settings;
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -89,19 +108,31 @@ export function isDefaultSettings(settings) {
   return Object.keys(DEFAULT_SETTINGS).every(key => clean[key] === DEFAULT_SETTINGS[key]);
 }
 
-// "Cordia", "Ocean" ... or 'custom' when the accent and background are no preset's.
+// "Cordia", "Ocean" ... "Paper & Clay", or 'custom' when the accent and background are no preset's (a preset
+// that is a look also needs that look on). The font and glass never decide it: the student may change the
+// font after picking Paper & Clay, and glass is not theirs to change while a look is on.
 export function resolveTheme(settings) {
   const clean = validateSettings(settings);
-  const match = PRESETS.find(preset => preset.accent === clean.accent && preset.bg === clean.bg);
+  const match = PRESETS.find(preset => preset.accent === clean.accent && preset.bg === clean.bg && (preset.look || 'none') === clean.look);
   return match ? match.id : 'custom';
 }
 
-// Picking a preset sets its accent and background; the other settings stay as they are.
+// Picking a preset sets its accent and background; the other settings stay as they are. A full look also
+// sets the look, its font pair and Solid glass; leaving a look puts back the glass it forced and, if the
+// student kept the look's own font pair, the default pair.
 export function applyPreset(settings, presetId) {
   const clean = validateSettings(settings);
   const preset = PRESETS.find(item => item.id === presetId);
   if (!preset) return clean;
-  return { ...clean, accent: preset.accent, customAccent: null, bg: preset.bg };
+  const next = { ...clean, accent: preset.accent, customAccent: null, bg: preset.bg, look: preset.look || 'none' };
+  if (preset.look) {
+    next.font = preset.font;
+    next.glass = preset.glass;
+  } else if (clean.look !== 'none') {
+    if (next.font === LOOK_FONT) next.font = DEFAULT_SETTINGS.font;
+    next.glass = DEFAULT_SETTINGS.glass;
+  }
+  return validateSettings(next);
 }
 
 // Picking a custom colour: the settings with that accent, plus what the sheet needs to show:
@@ -118,6 +149,14 @@ export function attributesFor(settings) {
   const clean = validateSettings(settings);
   const out = {};
   for (const [key, attribute, fallback] of ATTRIBUTES) out[attribute] = clean[key] === fallback ? null : clean[key];
+  // A look supplies its own accent, background and font pair when those attributes are absent, so while it
+  // is on: its own values write nothing, and a student's pick of what would otherwise be the default
+  // (Olive, Clouds, the Cordia pair) is written out so it shows over the look.
+  if (clean.look === 'paper-clay') {
+    if (clean.accent === LOOK_ACCENT) out['data-accent'] = null; else if (clean.accent === 'olive') out['data-accent'] = 'olive';
+    if (clean.bg === 'paper') out['data-bg'] = null; else if (clean.bg === 'clouds') out['data-bg'] = 'clouds';
+    if (clean.font === LOOK_FONT) out['data-font'] = null; else if (clean.font === 'cordia') out['data-font'] = 'cordia';
+  }
   return out;
 }
 
