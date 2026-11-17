@@ -28,21 +28,6 @@ export const SHELL_ENDPOINT = '/api/new-shell';
 // localStorage: { user: <the signed-in account's user id>, on: true | false }.
 export const SHELL_CACHE = 'cordiaShell';
 
-// The signed-in account's user id as this browser knows it (lib/api.js getUserId: the cached id,
-// else the access token's subject), or ''.
-export function storedUserId(storage, decode = typeof atob === 'function' ? atob : null) {
-  try {
-    const cached = storage.getItem('userId');
-    if (cached) return String(cached);
-    const token = storage.getItem('authToken');
-    if (!token || !decode) return '';
-    const encoded = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    return String(JSON.parse(decode(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '='))).sub || '');
-  } catch {
-    return '';
-  }
-}
-
 // The server's last answer for this account on this device: true, false, or null (none yet, or it
 // belongs to another account).
 export function cachedShell(storage, userId) {

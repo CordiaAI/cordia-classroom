@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-import { HOME_ROUTE, SHELL_CACHE, cachedShell, rememberShell, safeDefault, shellBootScript, shellOn, storedUserId } from '../lib/newShell.mjs';
+import { HOME_ROUTE, SHELL_CACHE, cachedShell, rememberShell, safeDefault, shellBootScript, shellOn } from '../lib/newShell.mjs';
 import { pageDefault, shellMode } from '../lib/server/newShell.mjs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -70,9 +70,6 @@ test('the device keeps one boolean per account and ignores another account\'s an
   assert.equal(cachedShell(storage(values), OTHER.id), null);
   assert.equal(cachedShell(storage(values), ''), null);
   assert.equal(cachedShell(storage({ [SHELL_CACHE]: '{broken' }), STUDENT.id), null);
-  assert.equal(storedUserId(storage({ userId: STUDENT.id }), atob), STUDENT.id);
-  assert.equal(storedUserId(storage({ authToken: token({ sub: STUDENT.id }) }), atob), STUDENT.id);
-  assert.equal(storedUserId(storage({ authToken: 'not-a-jwt' }), atob), '');
 });
 
 test('the page default wins when fixed; then the account\'s answer; then a preview guess', () => {
