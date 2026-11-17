@@ -124,6 +124,7 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   // Set when the Tutor opens: the next session load starts a new chat (the last one is saved).
   const [freshPending, setFreshPending] = useState(false);
   const [resumePending, setResumePending] = useState('');
+  const keepRef = useRef(null); // opened to keep the current chat (the panel's expand, Recent chats)
   const [chatsOpen, setChatsOpen] = useState(false);
   const [savedChats, setSavedChats] = useState(null);
   const [chatsError, setChatsError] = useState('');
@@ -483,8 +484,12 @@ export default function AIChatWidget({ guides: providedGuides = null, preferredG
   useEffect(() => {
     const readMode = () => setSavedMode(tutorMode());
     readMode();
-    if (!resumeChatId && freshOnMount && sessionStorage.getItem('cordiaTutorKeep') !== '1') setFreshPending(true);
-    sessionStorage.removeItem('cordiaTutorKeep');
+    // Read once per mount (React's development double effects mustn't read it twice).
+    if (keepRef.current === null) {
+      keepRef.current = sessionStorage.getItem('cordiaTutorKeep') === '1';
+      sessionStorage.removeItem('cordiaTutorKeep');
+    }
+    if (!resumeChatId && freshOnMount && !keepRef.current) setFreshPending(true);
     const onVisibility = event => { if (event.detail?.open) setFreshPending(true); };
     // The sidebar's New chat, pressed while the full Tutor page is already open.
     const onNew = () => { if (freshOnMount) setFreshPending(true); };

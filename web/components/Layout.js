@@ -1,5 +1,6 @@
 import { useRouter } from 'next/router';
 import Sidebar from './Sidebar';
+import ToolRail from './ToolRail';
 import TutorDrawer from './TutorDrawer';
 import GuideJobIndicator from './GuideJobIndicator';
 import NewSheet from './NewSheet';
@@ -36,6 +37,7 @@ export default function Layout({ children, timerState, setTimerState }) {
           {children}
         </div>
       </main>
+      <ToolRail />
       {dragging && <div className="c-drop-hint" role="status">Drop to upload</div>}
       <GuideJobIndicator />
       <NewSheet />

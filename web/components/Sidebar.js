@@ -13,7 +13,6 @@ import ShortcutsSheet from './ShortcutsSheet';
 import TutorBubble from './TutorBubble';
 import NotificationBell from './NotificationBell';
 import ProgressRing from './ProgressRing';
-import ToolRail from './ToolRail';
 import ShellMenu from './ShellMenu';
 import { ShellTipLayer, useShellTips } from './ShellTips';
 import { loadSocialSummary, onSocialSummary } from '../lib/social';
@@ -73,7 +72,7 @@ function isMac() {
 // The sidebar (DESIGN-SPEC 3.2), from 768px up: the mark and "cordia" with the bell and the fold
 // toggle; New chat and Search; Classes (up to five, with a readiness ring when an exam is coming);
 // Recent chats, which fill the rest and scroll; the account row. No tools: those are in the rail
-// (components/ToolRail.js). Folded, it is 72px of icons, each with a tooltip and a name.
+// (components/ToolRail.js, after the page in Layout so the keyboard reaches the page first). Folded, it is 72px of icons, each with a tooltip and a name.
 export default function Sidebar() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -392,7 +391,6 @@ export default function Sidebar() {
       <ShellMenu open={chatsOpen && folded} onClose={closeChats} anchorRef={chatsRef} side="right" label="Recent chats"
         items={chats.slice(0, 12).map(chat => ({ key: chat.key, label: chat.title, href: chat.href, current: current === chat.key, onSelect: () => openChat(chat) }))} />
 
-      <ToolRail />
 
       {/* Phones: brand, search and account on top; the tab bar below. */}
       <header className="c-topbar">
