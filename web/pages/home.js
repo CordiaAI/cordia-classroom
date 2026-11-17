@@ -7,7 +7,7 @@ import { useCachedPage } from '../lib/pageCache';
 import { loadHome } from '../lib/homeData';
 import { homeHeadline, homeSuggestions } from '../lib/homeText.mjs';
 import { useTutorChat } from '../lib/useTutorChat';
-import { shellFlag } from '../lib/useNewShell';
+import { refreshShell, shellFlag } from '../lib/useNewShell';
 import { latestFolders, loadFolders, onFoldersChanged } from '../lib/folders';
 import { useProgress } from '../lib/progress';
 import { loadOnboarding, saveOnboardingStep } from '../lib/onboarding';
@@ -38,11 +38,18 @@ export default function ChatHome() {
   const progress = useProgress();
   const [allowed, setAllowed] = useState(null);
   // With the switch off, students land on the Dashboard as before.
+  // With no answer on this device yet, the server is asked first (lib/useNewShell.js).
   useEffect(() => {
     if (!ready) return;
-    const on = shellFlag();
-    setAllowed(on);
-    if (!on) router.replace('/dashboard');
+    let live = true;
+    const decide = on => {
+      if (!live) return;
+      setAllowed(on);
+      if (!on) router.replace('/dashboard');
+    };
+    if (shellFlag()) decide(true);
+    else refreshShell().then(decide);
+    return () => { live = false; };
   }, [ready]);
 
   const [classId, setClassId] = useState('');

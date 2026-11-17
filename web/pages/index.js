@@ -6,7 +6,7 @@ import { rememberReturnTo, takeReturnTo } from '../lib/returnTo.mjs';
 import PublicPage from '../components/PublicPage';
 import AuthCard from '../components/AuthCard';
 import { ENTITY_LINE } from '../lib/brand.mjs';
-import { homeRoute } from '../lib/useNewShell';
+import { landingRoute } from '../lib/useNewShell';
 
 // What Classroom does. They slide right to left under the title; the ones with a use-case page
 // (lib/useCases/) link to it.
@@ -42,7 +42,7 @@ export function Landing({ mode = 'signin', path = '/' }) {
     if (!getToken()) return;
     if (!back) {
       // The chat home with the new shell on (lib/newShell.mjs), the Dashboard otherwise.
-      router.push(homeRoute());
+      landingRoute().then(route => router.push(route));
       return;
     }
     // The Assistant sends students here when their token has expired: renew it and go back,

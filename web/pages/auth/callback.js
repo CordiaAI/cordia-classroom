@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { setToken, scheduleProactiveRefresh } from '../../lib/api';
 import { authMessage } from '../../components/AuthCard';
 import { takeReturnTo } from '../../lib/returnTo.mjs';
-import { homeRoute } from '../../lib/useNewShell';
+import { landingRoute } from '../../lib/useNewShell';
 
 function tokenEmail(token) {
   try {
@@ -39,7 +39,7 @@ export default function OAuthCallback() {
 
     const back = takeReturnTo();
     if (back) window.location.assign(back);
-    else router.replace(homeRoute());
+    else landingRoute().then(route => router.replace(route));
   }, [router]);
 
   return (
