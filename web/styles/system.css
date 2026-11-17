@@ -1082,6 +1082,10 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 @media (hover: hover) { .c-class-picker:hover { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); } }
 .c-class-dot { flex: none; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--dot, transparent); box-shadow: inset 0 0 0 1px var(--hairline); }
 .c-menu [role='menuitem'] > .c-class-dot { margin: 0 5px; }
+.c-class-dot.is-none { box-shadow: none; }
+/* Small controls keep their look and get a 40px target (DESIGN-SPEC 6.1; the same idea as .c-side-add). */
+.c-class-picker.is-sm, .composer-file-remove { position: relative; }
+.c-class-picker.is-sm::after, .composer-file-remove::after { content: ''; position: absolute; top: 50%; left: 50%; width: max(100%, 40px); height: max(100%, 40px); translate: -50% -50%; }
 
 @media (max-width: 767px) {
   .chat-home-stage { padding: 0 0 24px; }

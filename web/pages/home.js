@@ -21,7 +21,8 @@ import TutorMessages from '../components/TutorMessages';
 import AssignmentSheet from '../components/AssignmentSheet';
 
 const PILL_ICONS = { learn: GraduationCap, cards: Layers, plan: CalendarCheck };
-const MOVE = { duration: 240, easing: 'cubic-bezier(.2, .8, .2, 1)' };
+// Home to chat: the composer moves in place to the bottom (an on-screen move: ease-in-out).
+const MOVE = { duration: 280, easing: 'cubic-bezier(0.77, 0, 0.175, 1)' };
 const safe = promise => promise.catch(() => null);
 
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -88,7 +89,7 @@ export default function ChatHome() {
 
   const chatting = tutor.sentHere && tutor.messages.length > 0;
 
-  // Home to chat: the composer slides from where it was to the bottom (240ms, the everyday curve);
+  // Home to chat: the composer slides from where it was to the bottom (MOVE);
   // the conversation fades in. Reduced motion: it is simply there.
   const composerRef = useRef(null);
   const lastTop = useRef(null);

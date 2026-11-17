@@ -7,7 +7,8 @@ import Menu from './Menu';
 export default function ClassPicker({ classes = [], value = '', onChange, size = 'md' }) {
   const picked = classes.find(item => String(item.id) === String(value)) || null;
   const dot = tone => function ClassDot() {
-    return <span className="c-class-dot" style={{ '--dot': tone ? `var(--cover-ink-${tone})` : 'transparent' }} aria-hidden="true" />;
+    // "All classes" keeps the dot's slot, so every label starts on one line, but draws nothing.
+    return <span className={'c-class-dot' + (tone ? '' : ' is-none')} style={tone ? { '--dot': `var(--cover-ink-${tone})` } : undefined} aria-hidden="true" />;
   };
   const items = [
     { key: 'all', label: 'All classes', icon: dot(0), current: !picked, onSelect: () => onChange('') },
