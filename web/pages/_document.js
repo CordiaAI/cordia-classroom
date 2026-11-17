@@ -1,6 +1,7 @@
 import { Html, Head, Main, NextScript } from 'next/document';
 import { USE_CASES, useCasePath } from '../lib/useCases/index.mjs';
 import { COMPARISONS, comparisonPath } from '../lib/comparisons/index.mjs';
+import { builtSetting, shellBootScript } from '../lib/newShell.mjs';
 
 // Public reading pages that stay light for signed-out visitors (lib/theme.js has the same rule),
 // plus every guide under /guides/.
@@ -18,6 +19,8 @@ export default function Document() {
         <meta name="theme-color" content="#39432f" />
         {/* Set the saved theme before first paint so the nav never flashes the wrong colors. */}
         <script dangerouslySetInnerHTML={{ __html: "(function(){try{var p=location.pathname;var light=['/','/login','/signup','/reset-password'].indexOf(p)>-1||((" + JSON.stringify(LIGHT_SIGNED_OUT) + ".indexOf(p)>-1||p.indexOf('/guides/')===0)&&!localStorage.getItem('authToken'));document.documentElement.setAttribute('data-theme',!light&&localStorage.getItem('theme')==='dark'?'dark':'light');document.documentElement.setAttribute('data-side',localStorage.getItem('cordiaSide')==='collapsed'?'collapsed':'open');}catch(e){}})();" }} />
+        {/* The new app shell's switch (lib/newShell.mjs), before first paint so neither shell flashes. */}
+        <script dangerouslySetInnerHTML={{ __html: shellBootScript(builtSetting(process.env.NEXT_PUBLIC_NEW_SHELL)) }} />
       </Head>
       <body>
         <Main />
