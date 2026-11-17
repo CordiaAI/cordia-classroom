@@ -96,7 +96,7 @@ test('the shell wiring: the sidebar has no tools, the rail is mounted, popovers 
   const sidebar = read('components/Sidebar.js');
   const rail = read('components/ToolRail.js');
   const tips = read('components/ShellTips.js');
-  assert.match(read('components/Layout.js'), /<\/main>\s*<ToolRail \/>/);
+  assert.match(read('components/Layout.js'), /<\/main>\s*\{shell && <ToolRail \/>\}/);
   assert.doesNotMatch(sidebar, /<ToolRail/);
   assert.match(sidebar, /aria-label="New chat"/);
   assert.match(sidebar, /readiness for the next exam|ready for the next exam/);
