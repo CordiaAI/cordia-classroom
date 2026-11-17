@@ -38,7 +38,8 @@ Font previews: `--font-<pair>-display` and `--font-<pair>-ui` for the five pairs
   (`{ id, label, accent, bg }`: cordia, ocean, clay, plum, rose, graphite; and `paper-clay`, which also carries
   `look`, `font` and `glass`).
 - Settings shape: `{ accent, customAccent: '#RRGGBB' | null, bg, font, size, appearance, glass, look }`.
-  `DEFAULT_SETTINGS` is `olive / null / clouds / cordia / default / system / auto / none`.
+  `DEFAULT_SETTINGS` is `olive / null / clouds / cordia / default / light / auto / none`: **light**, not Match device,
+  because "no saved choice" means an existing account. See "Appearance: existing accounts stay on Light" below.
 - `validateSettings(raw)` returns a complete valid object from anything (object, JSON string, junk). While a look
   is on it forces `glass: 'solid'`, and it accepts the look's accent (`LOOK_ACCENT`, `paperclay`) only with that look.
   Unknown values fall back to the default, unknown keys are dropped, it never throws.
@@ -77,7 +78,8 @@ written when the appearance is Light or Dark, for older tabs.
 
 The script in `_document.js` reads `cordiaLook`, sets `data-theme` and the attributes and variables, and adds
 `<link rel="preload">` for the saved font pair's files, so nothing flashes the default. With no saved look it
-falls back to the old `theme` key, then to Match device. Public pages use the same list that kept them light
+falls back to the old `theme` key, then to **Light** (it cannot know the account yet; a new account's Match device
+is written into the cache as soon as the account loads, see below). Public pages use the same list that kept them light
 before (signed-out visitors on Pricing, policy and guide pages; `/`, `/login`, `/signup`, `/reset-password`;
 `/print/*` in `theme.js`): they get no attributes and light, and moving to one from the app clears the look.
 Signed-in students on Pricing and the policy pages see their own look, as they already saw dark.
@@ -178,12 +180,53 @@ colour); the neutral `--olive-tint`. The contrast of the given pairs is checked 
 - `.pricing-card`, the print pages and the note paper keep their own paper (public pages never get the look; note
   paper is cream in both themes by design).
 
+## Appearance: existing accounts stay on Light
+
+**The rule (the owner's decision, Jude):** "For appearance, existing accounts with no saved choice stay on Light;
+only accounts created after T10 ships default to Match device." DESIGN-SPEC 3.5's "Match device (the default)"
+therefore applies to new accounts only. Anyone who has saved Light, Dark or Match device gets what they saved.
+Signed-out and public pages are unchanged (always Cordia default, light).
+
+**The mechanism (no database change).** One cut-off compared with the account's creation time:
+
+- `NEW_ACCOUNT_CUTOFF` in `web/lib/themeSettings.mjs`: an ISO date-time. An account created **on or after** it is
+  new (default Match device); one created before it, **or whose creation time is not known**, defaults to Light.
+  `isNewAccount`, `defaultAppearance(createdAt)`, `defaultSettingsFor(createdAt)` and `accountSettings(raw, createdAt)`
+  are the pure helpers (tested); `DEFAULT_SETTINGS.appearance` is `light`, so every fallback elsewhere (junk values,
+  a missing value, no account) is Light.
+- The creation time is Supabase's own `created_at`, which `progress.js` already receives from `GET /auth/v1/user`
+  when the account loads. It is kept on the device as `localStorage.cordiaAccount` (`{ id, created }`, ignored for
+  any other account) and read with `accountCreatedAt()`. It is not part of `progress`, so it is never written back
+  and does not ride in the token.
+- `theme.js`: `lookSettings()` fills a missing appearance from the account's default. `syncThemeFromAccount()`,
+  once the account is known and there is no saved look or saved light/dark, writes the default into the device cache
+  (`cordiaLook`), so every later first paint already has it. Until the creation time is known it changes nothing.
+- First paint (`themeBoot.mjs`): with no cache and no old `theme` key it is **Light**. A cached Match device follows
+  the device. So an existing student on a new browser never flashes dark; a new account's first paint on a new
+  browser is Light and turns to Match device when the account has loaded (the one unavoidable change), and is right
+  from the start after that.
+- Why this over writing the default into a new account's saved look at sign-up: sign-up has several routes (email,
+  SMS, OAuth, the extension) and some give no session to save with, so "no saved choice" would sometimes still mean
+  a new account; this one rule needs no sign-up change, writes nothing, and when it cannot tell it says Light.
+
+**Where the cut-off is set, and what the owner must do.** `NEW_ACCOUNT_CUTOFF` in `web/lib/themeSettings.mjs` is the
+only place. It ships as a **placeholder, `2099-01-01T00:00:00Z`, so nobody counts as new** and everyone with no saved
+choice stays on Light. **The owner sets it to the moment T10 ships** (UTC, for example `2026-12-01T00:00:00Z`) in the
+release commit. Set it too early and accounts made between that moment and the release get Match device; set it too
+late and accounts made after the release stay on Light until it is corrected. It never moves an existing account.
+
+**Pull request description must carry this line:** "Existing accounts with no saved appearance stay on Light; only
+accounts created after this ships default to Match device."
+
+**For the sheet builder.** Reset to Cordia must save `defaultLook()` (exported by `theme.js`), not `DEFAULT_SETTINGS`:
+the first keeps Light for an existing account, the second is the legacy default and is only the right answer for
+everything except appearance. Build the sheet's next settings from `lookSettings()` (as you must anyway) and Match
+device shows selected for a new account with no saved choice, Light for an existing one.
+
 ## Decisions worth a look
 
-- **Match device is the default** (DESIGN-SPEC 3.5). Before, a student who never chose had light. Now a
-  student with a dark device and no saved choice gets dark. Anyone who chose Light or Dark before keeps it.
-  To keep the old behaviour, change `DEFAULT_SETTINGS.appearance` to `'light'` and the `'system'` fallbacks in
-  `themeBoot.mjs`.
+- **Match device is the default for new accounts only** (DESIGN-SPEC 3.5, the owner's decision above). Light for
+  every existing account that never chose.
 - **Eight accents.** The mockup's second and third dots are almost the same blue (#2F5F86 and #355E86), so the
   eighth is Indigo (#4A55A2). Clay (#865122, mockup #8A5426) and Teal (#2A685B, mockup #2E6B5E) are a shade
   darker than the mockup so they reach 4.5:1 on the most see-through glass.

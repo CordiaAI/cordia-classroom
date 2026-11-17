@@ -1,7 +1,7 @@
 import { USE_CASES, useCasePath } from './useCases/index.mjs';
 import { COMPARISONS, comparisonPath } from './comparisons/index.mjs';
-import { getProgress, updateProgress } from './progress';
-import { applySettings, bootCache, resolveAppearance, validateSettings } from './themeSettings.mjs';
+import { accountCreatedAt, getProgress, updateProgress } from './progress';
+import { accountSettings, applySettings, bootCache, defaultAppearance, defaultSettingsFor, resolveAppearance } from './themeSettings.mjs';
 import { LOOK_KEY } from './themeBoot.mjs';
 
 // The look: light/dark and every "Make it yours" setting (lib/themeSettings.mjs). The account is the
@@ -31,11 +31,19 @@ function legacyTheme() {
 }
 
 // The saved look as a complete, valid settings object. Before the first look is saved, the old
-// light/dark choice carries over; with neither, appearance is Match device.
+// light/dark choice carries over; with neither, appearance is the account's default: Match device for an
+// account created after T10 shipped, Light for every other one, and for one not yet known
+// (NEW_ACCOUNT_CUTOFF in themeSettings.mjs).
 export function lookSettings() {
   const cached = readCache()?.s;
   const base = cached && typeof cached === 'object' ? cached : {};
-  return validateSettings(base.appearance ? base : { ...base, appearance: legacyTheme() || undefined });
+  return accountSettings(base.appearance ? base : { ...base, appearance: legacyTheme() || undefined }, accountCreatedAt());
+}
+
+// The default look for this account, for Reset to Cordia: saving DEFAULT_SETTINGS instead would move an
+// existing student to Match device.
+export function defaultLook() {
+  return defaultSettingsFor(accountCreatedAt());
 }
 
 // 'light' or 'dark', as drawn right now (Match device resolved).
@@ -79,7 +87,7 @@ function cache(settings) {
 // Saves a look (any shape; it is validated) on this device and on the account, and applies it.
 // The account save is the same quiet, delayed one progress uses; if it fails the device copy stays.
 export function saveLook(next) {
-  const settings = validateSettings(next);
+  const settings = accountSettings(next, accountCreatedAt());
   cache(settings);
   const explicit = settings.appearance === 'system' ? null : settings.appearance;
   if (explicit) { try { localStorage.setItem(KEY, explicit); } catch { /* storage blocked */ } }
@@ -94,17 +102,20 @@ export function setThemePreference(preference) {
 }
 
 // After the account loads, its saved look replaces the cache (an account with only the old
-// light/dark choice carries that over).
+// light/dark choice carries that over). An account with no saved choice gets its own default, which is cached
+// on this device so first paint has it from then on: Match device for a new account, Light for an existing one.
+// Until the account's creation time is known nothing changes, so a student is never moved on a guess.
 export function syncThemeFromAccount() {
   const progress = getProgress();
+  const created = accountCreatedAt();
   if (progress.look) {
-    const saved = validateSettings(progress.look);
+    const saved = accountSettings(progress.look, created);
     if (JSON.stringify(saved) !== JSON.stringify(lookSettings())) { cache(saved); applyTheme(lastPath); }
     return;
   }
-  const saved = progress.theme;
-  if ((saved === 'light' || saved === 'dark') && !readCache()?.s?.appearance && saved !== themePreference()) {
-    cache({ ...lookSettings(), appearance: saved });
-    applyTheme(lastPath);
-  }
+  const explicit = progress.theme === 'light' || progress.theme === 'dark' ? progress.theme : null;
+  const appearance = explicit || (created ? defaultAppearance(created) : null);
+  if (!appearance || readCache()?.s?.appearance === appearance) return;
+  cache({ ...lookSettings(), appearance });
+  applyTheme(lastPath);
 }

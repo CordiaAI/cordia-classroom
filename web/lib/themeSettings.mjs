@@ -47,13 +47,24 @@ export const FONT_FILES = {
   paper: ['/fonts/source-serif-4-latin.woff2', '/fonts/instrument-sans-latin.woff2'], // JetBrains Mono is only for code: fetched when a page shows some
 };
 
+// Appearance and the two kinds of account (the owner's decision for DESIGN-SPEC 3.5): an account that existed
+// before T10 shipped and never saved an appearance stays on Light, exactly as it always was; only an account
+// created after T10 ships defaults to Match device. The account's creation time (Supabase's own `created_at`)
+// is compared with this one cut-off. Accounts created before it, or whose creation time is not known, get Light.
+// PLACEHOLDER: the owner sets this to the moment T10 ships (an ISO date-time, UTC, e.g. '2026-12-01T00:00:00Z')
+// and it is the only place it is set. Until then it is far in the future, so nobody counts as new and everyone
+// without a saved choice has Light: unset is the safe way round.
+export const NEW_ACCOUNT_CUTOFF = '2099-01-01T00:00:00Z';
+export const NEW_ACCOUNT_APPEARANCE = 'system';
+export const LEGACY_APPEARANCE = 'light';
+
 export const DEFAULT_SETTINGS = Object.freeze({
   accent: 'olive',
   customAccent: null, // '#RRGGBB', only while accent is 'custom'
   bg: 'clouds',
   font: 'cordia',
   size: 'default',
-  appearance: 'system',
+  appearance: LEGACY_APPEARANCE, // what no saved choice means for an existing account; defaultAppearance() decides for a new one
   glass: 'auto',
   look: 'none',
 });
@@ -100,6 +111,43 @@ export function validateSettings(raw) {
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
+}
+
+// True when `createdAt` (an ISO date-time or a time in ms) is on or after the cut-off. Anything that is not a
+// readable time, a missing one included, is not new: when in doubt, Light.
+export function isNewAccount(createdAt, cutoff = NEW_ACCOUNT_CUTOFF) {
+  const at = typeof createdAt === 'string' ? Date.parse(createdAt) : typeof createdAt === 'number' ? createdAt : NaN;
+  const from = Date.parse(cutoff);
+  return Number.isFinite(at) && at > 0 && Number.isFinite(from) && at >= from;
+}
+
+// The appearance of an account that has never saved one: Match device for a new account, Light otherwise.
+export function defaultAppearance(createdAt, cutoff = NEW_ACCOUNT_CUTOFF) {
+  return isNewAccount(createdAt, cutoff) ? NEW_ACCOUNT_APPEARANCE : LEGACY_APPEARANCE;
+}
+
+// The default look for this account (what Reset to Cordia must save, rather than DEFAULT_SETTINGS, so it
+// never moves an existing student to Match device).
+export function defaultSettingsFor(createdAt, cutoff = NEW_ACCOUNT_CUTOFF) {
+  return { ...DEFAULT_SETTINGS, appearance: defaultAppearance(createdAt, cutoff) };
+}
+
+// True when a saved settings value (object or JSON string) carries a valid appearance of its own.
+export function hasSavedAppearance(raw) {
+  try {
+    const source = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Boolean(source && typeof source === 'object' && APPEARANCES.includes(source.appearance));
+  } catch {
+    return false;
+  }
+}
+
+// validateSettings for a signed-in account: a saved appearance (Light, Dark or Match device) is kept as it is;
+// with none saved, the account's own default applies (see NEW_ACCOUNT_CUTOFF).
+export function accountSettings(raw, createdAt, cutoff = NEW_ACCOUNT_CUTOFF) {
+  const settings = validateSettings(raw);
+  if (!hasSavedAppearance(raw)) settings.appearance = defaultAppearance(createdAt, cutoff);
+  return settings;
 }
 
 // True when every setting is the default (appearance included).
@@ -160,11 +208,11 @@ export function attributesFor(settings) {
   return out;
 }
 
-// 'light' or 'dark'. Match device follows the device.
+// 'light' or 'dark'. Only Match device follows the device; anything unrecognised is Light.
 export function resolveAppearance(appearance, deviceIsDark = false) {
   if (appearance === 'dark') return 'dark';
-  if (appearance === 'light') return 'light';
-  return deviceIsDark ? 'dark' : 'light';
+  if (appearance === 'system') return deviceIsDark ? 'dark' : 'light';
+  return 'light';
 }
 
 // The runtime variables a custom accent writes ({} for any other accent).

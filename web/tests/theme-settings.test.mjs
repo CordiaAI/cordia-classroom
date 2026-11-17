@@ -3,8 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {
-  ACCENTS, APPEARANCES, ATTRIBUTE_NAMES, BACKGROUNDS, DEFAULT_SETTINGS, FONTS, FONT_FILES, GLASS_LEVELS, LOOKS, LOOK_ACCENT, LOOK_FONT, PRESETS, SIZES, SIZE_SCALE,
-  applyPreset, applySettings, attributesFor, bootCache, customAccentVariables, isDefaultSettings, resolveAppearance, resolveTheme,
+  ACCENTS, APPEARANCES, ATTRIBUTE_NAMES, BACKGROUNDS, DEFAULT_SETTINGS, FONTS, FONT_FILES, GLASS_LEVELS, LOOKS, LOOK_ACCENT, LOOK_FONT, NEW_ACCOUNT_CUTOFF, PRESETS, SIZES, SIZE_SCALE,
+  accountSettings, applyPreset, applySettings, attributesFor, bootCache, customAccentVariables, defaultAppearance, defaultSettingsFor, hasSavedAppearance, isDefaultSettings, isNewAccount, resolveAppearance, resolveTheme,
   validateSettings, withCustomAccent,
 } from '../lib/themeSettings.mjs';
 import { ACCENT_VARIABLES } from '../lib/accentMath.mjs';
@@ -32,7 +32,7 @@ test('the lists are the ones the spec names', () => {
   assert.deepEqual(SIZES, ['small', 'default', 'large', 'larger']);
   assert.deepEqual(SIZE_SCALE, { small: 0.9, default: 1, large: 1.125, larger: 1.25 });
   assert.deepEqual(APPEARANCES, ['light', 'dark', 'system']);
-  assert.equal(DEFAULT_SETTINGS.appearance, 'system');
+  assert.equal(DEFAULT_SETTINGS.appearance, 'light', 'no saved choice means Light; only a new account defaults to Match device (see the account tests)');
   assert.ok(!BACKGROUNDS.includes('photo'), 'Your photo stays out until a private bucket is approved');
   assert.deepEqual(Object.keys(FONT_FILES).sort(), ['bookish', 'clean', 'friendly', 'paper', 'readable']);
   assert.deepEqual(FONTS, ['cordia', 'clean', 'bookish', 'friendly', 'readable'], 'the sheet still shows five pairs; the sixth is Paper & Clay\'s own');
@@ -102,7 +102,8 @@ test('appearance: Light and Dark are fixed, Match device follows the device', ()
   assert.equal(resolveAppearance('dark', false), 'dark');
   assert.equal(resolveAppearance('system', true), 'dark');
   assert.equal(resolveAppearance('system', false), 'light');
-  assert.equal(resolveAppearance(undefined, true), 'dark');
+  assert.equal(resolveAppearance(undefined, true), 'light', 'only Match device follows the device');
+  assert.equal(resolveAppearance('sepia', true), 'light');
   const root = fakeRoot();
   assert.equal(applySettings({ appearance: 'system' }, { root, deviceIsDark: true }).theme, 'dark');
   assert.equal(root.getAttribute('data-theme'), 'dark');
@@ -194,9 +195,14 @@ test('first paint: a saved look is on <html> before anything draws, custom accen
   assert.ok(links.every(l => l.rel === 'preload' && l.as === 'font' && l.crossOrigin === 'anonymous'));
 });
 
-test('first paint: Match device follows the device, and is the default with nothing saved', () => {
-  assert.equal(boot({ deviceDark: true }).root.getAttribute('data-theme'), 'dark');
+test('first paint: a saved Match device follows the device; with nothing cached it is Light, on a dark device too', () => {
+  assert.equal(boot({ deviceDark: true, storage: { [LOOK_KEY]: cached({ appearance: 'system' }) } }).root.getAttribute('data-theme'), 'dark');
+  assert.equal(boot({ deviceDark: false, storage: { [LOOK_KEY]: cached({ appearance: 'system' }) } }).root.getAttribute('data-theme'), 'light');
+  assert.equal(boot({ deviceDark: true }).root.getAttribute('data-theme'), 'light', 'an existing account on a new browser must not flash dark');
   assert.equal(boot({ deviceDark: false }).root.getAttribute('data-theme'), 'light');
+  assert.equal(boot({ deviceDark: true, storage: { [LOOK_KEY]: '{not json' } }).root.getAttribute('data-theme'), 'light');
+  assert.equal(boot({ deviceDark: true, storage: { [LOOK_KEY]: JSON.stringify({ ap: 'sepia' }) } }).root.getAttribute('data-theme'), 'light', 'an unreadable appearance is Light');
+  assert.equal(boot({ deviceDark: true, path: '/pricing', storage: { authToken: 'x' } }).root.getAttribute('data-theme'), 'light', 'signed in, nothing cached: Light');
   assert.equal(boot({ deviceDark: true, storage: { [LOOK_KEY]: cached({ appearance: 'light' }) } }).root.getAttribute('data-theme'), 'light');
   assert.equal(boot({ deviceDark: true, hasMatchMedia: false }).root.getAttribute('data-theme'), 'light', 'a browser without matchMedia stays light');
   assert.deepEqual(lookAttributes(boot().root), [], 'nothing saved: no attributes');
@@ -228,6 +234,105 @@ test('first paint: a damaged cache is ignored, never thrown, and never sets odd 
   assert.deepEqual([...root.attributes.keys()].sort(), ['data-accent', 'data-side', 'data-theme']);
   assert.deepEqual([...root.styleMap.keys()], ['--ca-l-fill']);
   assert.deepEqual(links.map(l => l.href), ['/fonts/inter-latin.woff2']);
+});
+
+// ---------- Appearance: existing accounts stay on Light, new accounts default to Match device ----------
+
+// A cut-off in the past of "today", so the tests do not depend on the owner's placeholder.
+const CUTOFF = '2026-12-01T00:00:00Z';
+const BEFORE = '2026-11-30T23:59:59Z';
+const AFTER = '2026-12-01T00:00:00Z';
+const resolved = (raw, createdAt, deviceIsDark) => resolveAppearance(accountSettings(raw, createdAt, CUTOFF).appearance, deviceIsDark);
+
+test('an existing account with no saved choice is Light on every device, a dark one included', () => {
+  for (const created of [BEFORE, '2020-01-01T00:00:00Z']) {
+    for (const raw of [undefined, null, {}, { accent: 'ocean' }, { appearance: 'sepia' }, '{not json']) {
+      assert.equal(resolved(raw, created, true), 'light', `${created} ${JSON.stringify(raw)} dark device`);
+      assert.equal(resolved(raw, created, false), 'light');
+    }
+  }
+  assert.equal(defaultAppearance(BEFORE, CUTOFF), 'light');
+});
+
+test('a new account with no saved choice is Match device: dark on a dark device, light on a light one', () => {
+  for (const raw of [undefined, null, {}, { accent: 'ocean' }, { appearance: 'sepia' }]) {
+    assert.equal(accountSettings(raw, AFTER, CUTOFF).appearance, 'system');
+    assert.equal(resolved(raw, AFTER, true), 'dark', JSON.stringify(raw));
+    assert.equal(resolved(raw, AFTER, false), 'light', JSON.stringify(raw));
+  }
+  assert.equal(resolved({}, '2031-05-05T10:00:00.000Z', true), 'dark');
+  assert.equal(resolved({}, Date.parse(AFTER), true), 'dark', 'a time in ms works too');
+  assert.equal(defaultAppearance(AFTER, CUTOFF), 'system');
+  assert.equal(accountSettings({ accent: 'ocean' }, AFTER, CUTOFF).accent, 'ocean', 'only appearance is account-dependent');
+});
+
+test('an unknown or unreadable creation time is Light: when in doubt, Light', () => {
+  for (const created of [undefined, null, '', 'not a date', 0, NaN, {}, [], true]) {
+    assert.equal(isNewAccount(created, CUTOFF), false, String(created));
+    assert.equal(resolved({}, created, true), 'light', String(created));
+  }
+  assert.equal(isNewAccount(AFTER, 'garbage'), false, 'a broken cut-off makes nobody new');
+  assert.equal(isNewAccount(AFTER, undefined), false, 'the placeholder cut-off is far ahead, so nobody is new until the owner sets it');
+});
+
+test('the cut-off is on or after: the exact moment counts as new, a second before does not', () => {
+  assert.equal(isNewAccount(AFTER, CUTOFF), true);
+  assert.equal(isNewAccount(BEFORE, CUTOFF), false);
+  assert.equal(isNewAccount('2026-12-01T00:00:00.001Z', CUTOFF), true);
+  assert.equal(isNewAccount('2026-11-30T23:59:59.999Z', CUTOFF), false);
+});
+
+test('the placeholder cut-off is one readable date-time, far ahead, so releasing without setting it leaves everyone on Light', () => {
+  assert.ok(Number.isFinite(Date.parse(NEW_ACCOUNT_CUTOFF)));
+  assert.ok(Date.parse(NEW_ACCOUNT_CUTOFF) > Date.parse('2090-01-01T00:00:00Z'));
+  assert.equal(defaultAppearance(new Date().toISOString()), 'light');
+  assert.equal(accountSettings({}, new Date().toISOString()).appearance, 'light');
+});
+
+test('a saved Light, Dark or Match device always wins, for both kinds of account', () => {
+  for (const created of [BEFORE, AFTER, undefined]) {
+    for (const deviceDark of [true, false]) {
+      assert.equal(resolved({ appearance: 'light' }, created, deviceDark), 'light', `light ${created} ${deviceDark}`);
+      assert.equal(resolved({ appearance: 'dark' }, created, deviceDark), 'dark', `dark ${created} ${deviceDark}`);
+      assert.equal(resolved({ appearance: 'system' }, created, deviceDark), deviceDark ? 'dark' : 'light', `system ${created} ${deviceDark}`);
+    }
+  }
+  assert.equal(accountSettings(JSON.stringify({ appearance: 'dark' }), BEFORE, CUTOFF).appearance, 'dark', 'a saved JSON string works too');
+  assert.equal(hasSavedAppearance({ appearance: 'light' }) && hasSavedAppearance({ appearance: 'dark' }) && hasSavedAppearance({ appearance: 'system' }), true);
+  assert.equal(hasSavedAppearance({}) || hasSavedAppearance(null) || hasSavedAppearance('{bad') || hasSavedAppearance({ appearance: 'sepia' }), false);
+});
+
+test('Reset to Cordia uses the account default: Light for an existing account, Match device for a new one', () => {
+  assert.equal(defaultSettingsFor(BEFORE, CUTOFF).appearance, 'light');
+  assert.equal(defaultSettingsFor(undefined, CUTOFF).appearance, 'light');
+  assert.equal(defaultSettingsFor(AFTER, CUTOFF).appearance, 'system');
+  assert.deepEqual({ ...defaultSettingsFor(AFTER, CUTOFF), appearance: 'light' }, DEFAULT_SETTINGS);
+});
+
+test('an existing account with no saved settings computes exactly the tokens it always did', () => {
+  const before = fakeRoot();
+  applySettings(DEFAULT_SETTINGS, { root: before, deviceIsDark: true });
+  const root = fakeRoot();
+  const applied = applySettings(accountSettings({}, BEFORE, CUTOFF), { root, deviceIsDark: true });
+  assert.equal(applied.theme, 'light');
+  assert.equal(root.getAttribute('data-theme'), 'light');
+  assert.deepEqual(lookAttributes(root), [], 'no attribute but the theme');
+  assert.equal(root.styleMap.size, 0);
+  assert.deepEqual([...root.attributes], [...before.attributes]);
+});
+
+test('signed-out and public pages are unchanged: Light and the Cordia default, for any account and any device', () => {
+  for (const created of [BEFORE, AFTER, undefined]) {
+    const root = fakeRoot();
+    const applied = applySettings(accountSettings({ appearance: 'system', accent: 'plum' }, created, CUTOFF), { root, deviceIsDark: true, publicPage: true });
+    assert.equal(applied.theme, 'light');
+    assert.equal(root.getAttribute('data-theme'), 'light');
+    assert.deepEqual(lookAttributes(root), []);
+  }
+  for (const path of ['/', '/login', '/signup', '/reset-password', '/pricing', '/privacy', '/guides/x']) {
+    assert.equal(boot({ path, deviceDark: true }).root.getAttribute('data-theme'), 'light', path);
+    assert.equal(boot({ path, deviceDark: true, storage: { [LOOK_KEY]: cached({ appearance: 'system', accent: 'plum' }) } }).root.getAttribute('data-theme'), 'light', `${path} with Match device cached`);
+  }
 });
 
 // ---------- Paper & Clay ----------

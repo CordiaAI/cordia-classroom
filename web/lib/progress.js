@@ -7,6 +7,11 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './supabase';
 // offline use. It rides in the access token, so it stays small (no logs here).
 const EMPTY = { v: 1, at: 0, theme: null, look: null, wt: null, day1Status: null, done: [], used: [], tips: [], grove: {}, rings: {}, freeze: [], first: 0, review: null, storeLine: 0, prefs: {} };
 const LOCAL = 'cordiaProgress';
+// When this account was created: Supabase's own `created_at`, read with the account below and kept on this device
+// ({ id, created }, for the signed-in account only) so the look can tell an existing account from a new one before
+// the network answers (lib/theme.js, lib/themeSettings.mjs NEW_ACCOUNT_CUTOFF). Not part of `state`: it is not ours to
+// write and it must not ride in the token.
+const ACCOUNT = 'cordiaAccount';
 let state = { ...EMPTY };
 let loadedFor = '';
 let saveTimer = null;
@@ -77,6 +82,19 @@ export function getProgress() {
   return state;
 }
 
+// The signed-in account's creation time as an ISO string, or '' when it is not known yet (never loaded on this
+// device, or another account's copy). Unknown is treated as an existing account.
+export function accountCreatedAt() {
+  const id = getUserId();
+  if (!id) return '';
+  try {
+    const saved = JSON.parse(localStorage.getItem(ACCOUNT) || 'null');
+    return saved?.id === id && typeof saved.created === 'string' ? saved.created : '';
+  } catch {
+    return '';
+  }
+}
+
 export async function loadProgress() {
   const key = localKey();
   if (!key || loadedFor === key) return state;
@@ -87,11 +105,18 @@ export async function loadProgress() {
   publish();
   const user = await remote('GET');
   const server = user?.user_metadata?.cordia;
+  const id = getUserId();
+  let created = false;
+  if (id && typeof user?.created_at === 'string' && user.created_at && (!user.id || user.id === id) && accountCreatedAt() !== user.created_at) {
+    try { localStorage.setItem(ACCOUNT, JSON.stringify({ id, created: user.created_at })); created = true; } catch {}
+  }
   if (server) {
     state = merge(state, server);
     try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
-    publish();
+  } else if (created) {
+    state = { ...state }; // a new object, so the look re-reads the account it now knows
   }
+  if (server || created) publish();
   if (!state.first) updateProgress(current => ({ ...current, first: Date.now() }));
   return state;
 }

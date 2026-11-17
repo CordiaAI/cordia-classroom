@@ -60,7 +60,7 @@ export default function App({ Component, pageProps }) {
   useEffect(() => { if (getToken()) { syncServerCopies(); showConnectedAppSets(); } }, [router.pathname]);
   // The account's saved look (light/dark and Make it yours) replaces the local cache as soon as the account loads.
   const progress = useProgress();
-  useEffect(() => { if (progress.look || progress.theme) syncThemeFromAccount(); }, [progress.look, progress.theme]);
+  useEffect(() => { syncThemeFromAccount(); }, [progress]);
   const [timerState, setTimerState] = useState({
     mode: 'focus', minutes: 25, seconds: 0, isRunning: false
   });

@@ -12,8 +12,10 @@ export function bootScript(lightSignedOut) {
     + 'var d=document.documentElement,ls=localStorage,p=location.pathname;'
     + "var light=['/','/login','/signup','/reset-password'].indexOf(p)>-1||((" + JSON.stringify(lightSignedOut) + ".indexOf(p)>-1||p.indexOf('/guides/')===0)&&!ls.getItem('authToken'));"
     + "var c=null;try{c=JSON.parse(ls.getItem('" + LOOK_KEY + "')||'null')}catch(e){}"
-    // Appearance: the saved look, else the old light/dark choice, else Match device.
-    + "var ap=c&&c.ap;if(ap!=='light'&&ap!=='dark'&&ap!=='system'){var t=ls.getItem('theme');ap=t==='dark'||t==='light'?t:'system'}"
+    // Appearance: the saved look, else the old light/dark choice, else Light. An account that is new (lib/theme.js)
+    // gets Match device written into the cache as soon as the account is known, so only then does this follow
+    // the device: with no cache and no account yet, an existing student never flashes dark.
+    + "var ap=c&&c.ap;if(ap!=='light'&&ap!=='dark'&&ap!=='system'){var t=ls.getItem('theme');ap=t==='dark'||t==='light'?t:'light'}"
     + "var dark=!light&&(ap==='dark'||(ap==='system'&&!!window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches));"
     + "d.setAttribute('data-theme',dark?'dark':'light');"
     + 'if(!light&&c){'
