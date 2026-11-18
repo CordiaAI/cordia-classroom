@@ -808,3 +808,7 @@ def weak_title(raw: str) -> bool:
     words = re.findall(r"[A-Za-z][A-Za-z'’]+", _LABEL_WORDS.sub(" ", title))
     subject = [w for w in words if len(w) >= 3 and not (w.isupper() and len(w) <= 4)]
     return len(subject) < 2 or len(subject) < len(title.split()) / 3
+
+
+def shown_questions(questions):  # placeholder until the display layer lands (test-first)
+    return questions
