@@ -81,7 +81,7 @@ export default function Heatmap({ serverWeek = [], serverDays = [] }) {
         .heat { display: grid; gap: 12px; padding: 20px; }
         .heat-hint { margin: 0; }
         .heat-scroll { overflow-x: auto; padding: 2px; }
-        .heat-months { display: grid; grid-auto-flow: column; grid-auto-columns: 12px; gap: 3px; width: max-content; height: 16px; color: var(--muted); font: 500 12px/1 var(--font-sans); }
+        .heat-months { display: grid; grid-auto-flow: column; grid-auto-columns: 12px; gap: 3px; width: max-content; height: 16px; color: var(--muted); font: 500 0.75rem/1 var(--font-sans); }
         .heat-months span { white-space: nowrap; }
         .heat-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 12px); grid-auto-columns: 12px; gap: 3px; width: max-content; }
         /* One olive ramp, light to dark by minutes (tokens.css --heat-0..4, both themes). */

@@ -56,7 +56,7 @@ export default function ActivityFeed() {
         .af-list { display: grid; margin: 0; padding: 6px 0; list-style: none; }
         .af-item { display: grid; gap: 6px; padding: 12px 16px; min-width: 0; }
         .af-item + .af-item { border-top: 1px solid var(--hairline); }
-        .af-text { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 0 52px; color: var(--ink); font: 500 15px/1.45 var(--font-sans); overflow-wrap: anywhere; }
+        .af-text { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 0 52px; color: var(--ink); font: 500 0.9375rem/1.45 var(--font-sans); overflow-wrap: anywhere; }
         .af-text :global(svg) { color: var(--olive-ink); flex: none; }
         .af-text :global(.af-link) { color: var(--ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
         .af-more { justify-self: start; }

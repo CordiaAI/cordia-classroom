@@ -56,7 +56,7 @@ export default function CanvasConnectButton({ card = false, className = 'c-btn c
       <style jsx>{`
         .canvas-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border-radius: var(--r-card); flex-wrap: wrap; }
         .canvas-card-text { display: grid; gap: 2px; min-width: 0; }
-        .canvas-card-text strong { font: 600 17px/1.3 var(--font-sans); }
+        .canvas-card-text strong { font: 600 1.0625rem/1.3 var(--font-sans); }
         @media (max-width: 767px) { .canvas-card :global(button) { width: 100%; justify-content: center; } }
       `}</style>
     </>

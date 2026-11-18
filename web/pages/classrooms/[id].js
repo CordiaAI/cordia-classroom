@@ -153,7 +153,7 @@ export default function ClassroomPage() {
         .cr-head { flex-wrap: wrap; gap: 8px; }
         .cr-title { overflow-wrap: anywhere; }
         .cr-head-actions { gap: 8px; }
-        .cr-review { margin: 0; padding: 14px 16px; color: var(--ink); font: 500 15px/1.45 var(--font-sans); border-left: 3px solid var(--olive); }
+        .cr-review { margin: 0; padding: 14px 16px; color: var(--ink); font: 500 0.9375rem/1.45 var(--font-sans); border-left: 3px solid var(--olive); }
         .cr-facts, .cr-desc { margin: 0; }
         .cr-facts :global(a) { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
         .cr-desc { color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -242,8 +242,8 @@ function GuidesTab({ room, onToast }) {
         .cr-items { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
         .cr-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; min-width: 0; }
         .cr-item-main { display: grid; gap: 4px; flex: 1; min-width: 0; }
-        .cr-item-main :global(.cr-item-title) { display: inline-flex; align-items: center; gap: 8px; font: 600 16px/1.3 var(--font-sans); color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
-        .cr-milestone { display: inline-flex; align-items: center; gap: 6px; font: 600 13px/1.3 var(--font-sans); color: var(--olive-ink); }
+        .cr-item-main :global(.cr-item-title) { display: inline-flex; align-items: center; gap: 8px; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+        .cr-milestone { display: inline-flex; align-items: center; gap: 6px; font: 600 0.8125rem/1.3 var(--font-sans); color: var(--olive-ink); }
         .cr-folder { margin: 4px 0 0; padding-left: 20px; display: grid; gap: 4px; }
         .cr-folder :global(a) { color: var(--ink); overflow-wrap: anywhere; }
         .cr-item-actions { display: inline-flex; gap: 4px; flex: none; }
@@ -325,7 +325,7 @@ function MembersTab({ room, onToast, onChanged }) {
       {confirm && <ConfirmDialog title={confirm.title} message={confirm.body} confirmLabel="Yes" onCancel={() => setConfirm(null)} onConfirm={async () => { const next = confirm; setConfirm(null); await next.run(); }} />}
       <style jsx>{`
         .crmb { display: grid; gap: 8px; padding: 16px; }
-        .crmb-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .crmb-title { margin: 0; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); }
         .crmb-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
         .crmb-list :global(.crmb-row) { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
         .crmb-list :global(.crmb-actions) { display: inline-flex; gap: 6px; flex: none; }
@@ -409,9 +409,9 @@ function SettingsTab({ room, onToast, onSaved, onGone }) {
       {confirm && <ConfirmDialog title={confirm.title} message={confirm.body} confirmLabel="Yes" onCancel={() => setConfirm(null)} onConfirm={async () => { const next = confirm; setConfirm(null); await next.run(); }} />}
       <style jsx>{`
         .crs { display: grid; gap: 12px; padding: 16px; justify-items: start; }
-        .crs-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .crs-title { margin: 0; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); }
         .crs-field { display: grid; gap: 6px; width: 100%; margin: 0; padding: 0; border: 0; min-width: 0; }
-        .crs-field > span, .crs-field legend { font: 600 14px/1.2 var(--font-sans); color: var(--ink); padding: 0; margin-bottom: 4px; }
+        .crs-field > span, .crs-field legend { font: 600 0.875rem/1.2 var(--font-sans); color: var(--ink); padding: 0; margin-bottom: 4px; }
         .crs-check { display: flex; gap: 10px; align-items: flex-start; color: var(--ink); cursor: pointer; }
         .crs-check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--olive); flex: none; }
         .crs :global(.c-meta) { margin: 0; }
@@ -515,9 +515,9 @@ function StudyTab({ room, onToast }) {
         .crst-date { justify-items: start; }
         .crst-date :global(.c-meta), .crst-note { margin: 0; }
         .crst-field { display: grid; gap: 6px; }
-        .crst-field > span { font: 600 14px/1.2 var(--font-sans); color: var(--ink); }
+        .crst-field > span { font: 600 0.875rem/1.2 var(--font-sans); color: var(--ink); }
         .crst-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
-        .crst-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .crst-title { margin: 0; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); }
         .crst-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
         .crst-row { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 44px; }
         .crst-check { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; color: var(--ink); }
@@ -613,7 +613,7 @@ function ProgressTab({ room }) {
       ))}
       <style jsx>{`
         .crp { display: grid; gap: 12px; padding: 16px; min-width: 0; }
-        .crp-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .crp-title { margin: 0; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); }
         .crp :global(.c-meta), .crp-note { margin: 0; }
         .crp-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
         .crp-guide { display: grid; gap: 4px; }
@@ -646,10 +646,10 @@ function Heatmap({ guide }) {
       </tbody>
       <style jsx>{`
         .crh { width: 100%; border-collapse: separate; border-spacing: 0 4px; margin-top: 8px; table-layout: fixed; }
-        .crh thead th { font: 600 13px/1.3 var(--font-sans); color: var(--muted-ink); text-align: left; padding: 0 8px 4px 0; }
+        .crh thead th { font: 600 0.8125rem/1.3 var(--font-sans); color: var(--muted-ink); text-align: left; padding: 0 8px 4px 0; }
         .crh thead th:not(:first-child) { width: 76px; text-align: center; padding-right: 0; }
-        .crh tbody th { font: 400 14px/1.35 var(--font-sans); color: var(--ink); text-align: left; padding: 6px 8px 6px 0; overflow-wrap: anywhere; vertical-align: middle; }
-        .crh td { position: relative; text-align: center; font: 600 14px/1 var(--font-sans); color: var(--ink); padding: 10px 0; }
+        .crh tbody th { font: 400 0.875rem/1.35 var(--font-sans); color: var(--ink); text-align: left; padding: 6px 8px 6px 0; overflow-wrap: anywhere; vertical-align: middle; }
+        .crh td { position: relative; text-align: center; font: 600 0.875rem/1 var(--font-sans); color: var(--ink); padding: 10px 0; }
         .crh-shade { position: absolute; inset: 2px 4px; border-radius: var(--r-input); }
         .crh-shade.is-knows { background: var(--meter); }
         .crh-shade.is-learning { background: var(--warning); }

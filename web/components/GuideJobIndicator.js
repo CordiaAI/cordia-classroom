@@ -53,13 +53,13 @@ export default function GuideJobIndicator() {
       ))}
       <style jsx>{`
         .guide-jobs { position: fixed; top: 86px; right: 20px; z-index: 95; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; justify-items: end; width: max-content; max-width: min(380px, calc(100vw - 32px)); }
-        .guide-job { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; box-sizing: border-box; padding: 8px 10px 8px 14px; border: 1px solid var(--line); border-radius:12px; background: var(--surface); box-shadow:var(--shadow-card); color: var(--ink); font-size: 13px; font-weight:600; }
+        .guide-job { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; box-sizing: border-box; padding: 8px 10px 8px 14px; border: 1px solid var(--line); border-radius:12px; background: var(--surface); box-shadow:var(--shadow-card); color: var(--ink); font-size: 0.8125rem; font-weight:600; }
         .guide-job span { flex: 1 1 auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
         .guide-job-running :global(.cordia-loader) { gap: 0; flex: 0 0 auto; }
         .guide-job-running :global(.cordia-loader svg) { filter: none; }
         .guide-job-error span { color: var(--error); }
-        .guide-job-open { flex: 0 0 auto; padding: 5px 11px; border: 0; border-radius:999px; background: var(--olive); color: var(--on-olive); font: inherit; font-size: 13px; cursor: pointer; }
-        .guide-job-dismiss { flex: 0 0 auto; display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 50%; background: none; color: var(--muted-ink); font-size:17px; line-height:1; cursor: pointer; }
+        .guide-job-open { flex: 0 0 auto; padding: 5px 11px; border: 0; border-radius:999px; background: var(--olive); color: var(--on-olive); font: inherit; font-size: 0.8125rem; cursor: pointer; }
+        .guide-job-dismiss { flex: 0 0 auto; display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 50%; background: none; color: var(--muted-ink); font-size:1.0625rem; line-height:1; cursor: pointer; }
         .guide-job-dismiss:hover { background: var(--lift-pane); color: var(--ink); }
         @media (max-width: 720px) { .guide-jobs { top: auto; bottom: calc(var(--tabbar-h, 0px) + 80px); left: 16px; right: 16px; width: auto; max-width: none; } }
       `}</style>

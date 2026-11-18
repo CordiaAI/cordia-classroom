@@ -26,9 +26,9 @@ export default function ShareSheet({ classId, code, guideId, onDone }) {
         <Link href="/honor-code" className="share-honor" target="_blank">Honor code</Link>
         <style jsx global>{`
           .share-sheet { width: min(400px, 100%); display: grid; gap: 20px; justify-items: center; text-align: center; }
-          .share-title { margin: 0; font: 500 28px/1.15 var(--font-display); }
+          .share-title { margin: 0; font: 500 1.75rem/1.15 var(--font-display); }
           .share-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
-          .share-honor { font: 600 13px/1 var(--font-sans); color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+          .share-honor { font: 600 0.8125rem/1 var(--font-sans); color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
         `}</style>
       </section>
     </div>

@@ -19,7 +19,7 @@ function TimerRing({ left }) {
       </svg>
       <span aria-hidden="true">{left}</span>
       <style jsx>{`
-        .race-ring { position: relative; width: ${RING.size}px; height: ${RING.size}px; display: inline-grid; place-items: center; font: 600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .race-ring { position: relative; width: ${RING.size}px; height: ${RING.size}px; display: inline-grid; place-items: center; font: 600 0.9375rem/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .race-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
         .race-ring-track { stroke: var(--hairline); }
         .race-ring-fill { stroke: var(--meter); transition: stroke-dashoffset 1s linear, stroke 300ms ease; }
@@ -143,8 +143,8 @@ export default function MatchRace({ questions, guideId, onRestart, onDone }) {
         .race-progress { flex: 1; }
         .race-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .race-col { display: grid; gap: 8px; align-content: start; }
-        .race-tile { min-height: 64px; padding: 12px 14px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); color: var(--ink); font:500 15px/1.5 var(--font-sans); text-align: left; cursor: pointer; transition: opacity var(--dur), border-color var(--dur); }
-        .race-tile.is-answer { font-family: var(--font-sans); font-size:15px; }
+        .race-tile { min-height: 64px; padding: 12px 14px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); color: var(--ink); font:500 0.9375rem/1.5 var(--font-sans); text-align: left; cursor: pointer; transition: opacity var(--dur), border-color var(--dur); }
+        .race-tile.is-answer { font-family: var(--font-sans); font-size:0.9375rem; }
         .race-tile.is-picked { border-color: var(--state-select-edge); background: var(--state-select-fill); }
         .race-tile.is-cleared { opacity: .25; cursor: default; }
         .race-tile.is-wrong { border-color: var(--error); animation: race-shake 380ms cubic-bezier(.36,.07,.19,.97); }
@@ -155,7 +155,7 @@ export default function MatchRace({ questions, guideId, onRestart, onDone }) {
         @keyframes race-merge-a { 40% { transform: translateX(-14%) scale(1.03); } 100% { transform: translateX(-28%) scale(0.85); opacity: 0.2; } }
         @keyframes race-shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
         @media (prefers-reduced-motion: reduce) { .race-tile.is-merging, .race-tile.is-wrong { animation: none; } }
-        @media (max-width: 767px) { .race-tile { min-height: 56px; font-size: 13px; } .race-tile.is-answer { font-size: 15px; } }
+        @media (max-width: 767px) { .race-tile { min-height: 56px; font-size: 0.8125rem; } .race-tile.is-answer { font-size: 0.9375rem; } }
       `}</style>
     </section>
   );

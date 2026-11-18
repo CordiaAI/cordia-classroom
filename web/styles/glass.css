@@ -246,7 +246,7 @@ select.c-select.c-select {
 .c-tab-new {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   border: 0; background: none; color: var(--ink); cursor: pointer;
-  font: 600 13px/1 var(--font-sans);
+  font: 600 0.8125rem/1 var(--font-sans);
 }
 .c-tab-new-dot { display: grid; place-items: center; width: 36px; height: 28px; border-radius: var(--r-pill); color: var(--on-olive); }
 
@@ -368,14 +368,14 @@ body { touch-action: manipulation; }
 .tutor-chats-new .c-btn { justify-content: flex-start; min-width: 0; }
 .tutor-chats-new .c-btn > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tutor-chats-new .c-meta { margin: 0; }
-.tutor-chats-title { margin: 8px 0 0; font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
+.tutor-chats-title { margin: 8px 0 0; font: 600 0.9375rem/1.4 var(--font-sans); color: var(--ink); }
 .tutor-chats-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .tutor-chat-row { display: grid; gap: 2px; width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid var(--hairline); border-radius: var(--r-input); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
 @media (hover: hover) { .tutor-chat-row:hover:not(:disabled) { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); } }
 .tutor-chat-item { display: flex; align-items: center; gap: 6px; }
 .tutor-chat-item .tutor-chat-row { flex: 1; min-width: 0; }
 .tutor-chat-delete { flex: none; }
-.tutor-chat-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 15px/1.4 var(--font-sans); }
+.tutor-chat-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 0.9375rem/1.4 var(--font-sans); }
 .tutor-chat-row .c-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Settings › Connectors: tiles with brand marks, like Cordia Assistant's Connections.
@@ -388,9 +388,9 @@ body { touch-action: manipulation; }
 @media (hover: hover) { .cn-tile:hover { box-shadow: var(--lg-highlight), var(--shadow-float); } }
 .cn-tile.is-soon { opacity: .62; }
 .cn-tile-text { display: grid; gap: 2px; min-width: 0; }
-.cn-name { font: 600 15px/1.3 var(--font-sans); color: var(--ink); }
+.cn-name { font: 600 0.9375rem/1.3 var(--font-sans); color: var(--ink); }
 .cn-tag, .cn-chev { display: none; }
-.cn-badge { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--r-pill); border: 1px solid var(--hairline); color: var(--muted); font: 600 13px/1 var(--font-sans); }
+.cn-badge { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--r-pill); border: 1px solid var(--hairline); color: var(--muted); font: 600 0.8125rem/1 var(--font-sans); }
 .cn-badge.is-on { border-color: transparent; background: var(--success-bg); color: var(--success); }
 .cn-badge.is-warn { border-color: transparent; background: var(--warning-bg); color: var(--warning); }
 .cn-detail.is-canvas { max-height: 90svh; overflow-y: auto; }
@@ -403,13 +403,13 @@ body { touch-action: manipulation; }
 .cn-detail { position: relative; width: min(440px, 100%); display: grid; justify-items: center; gap: 12px; padding-top: 32px; text-align: center; max-height: 90svh; overflow-y: auto; }
 /* "Try it": the things to do with an app, each with a link to where it happens. */
 .cn-try { display: grid; gap: 8px; width: 100%; padding-top: 12px; border-top: 1px solid var(--hairline); text-align: left; }
-.cn-try-title { margin: 0; font: 600 var(--fs-15, 15px)/1.4 var(--font-sans); color: var(--muted); }
+.cn-try-title { margin: 0; font: 600 var(--fs-15, 0.9375rem)/1.4 var(--font-sans); color: var(--muted); }
 .cn-try ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.cn-try li { display: grid; gap: 6px; justify-items: start; color: var(--ink); font: 500 15px/1.5 var(--font-sans); }
+.cn-try li { display: grid; gap: 6px; justify-items: start; color: var(--ink); font: 500 0.9375rem/1.5 var(--font-sans); }
 .cn-try li::before { content: none; }
 .cn-detail .c-section-title { margin: 0; }
 .cn-close { position: absolute; top: 12px; right: 12px; }
-.cn-detail-text { margin: 0; color: var(--ink); font: 500 15px/1.55 var(--font-sans); }
+.cn-detail-text { margin: 0; color: var(--ink); font: 500 0.9375rem/1.55 var(--font-sans); }
 .cn-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
 .cn-health { margin: 0; }
 .cn-health.is-error { color: var(--error); }
@@ -420,13 +420,13 @@ body { touch-action: manipulation; }
 .cn-target .c-meta { margin: 0; }
 .cn-feed { display: grid; gap: 8px; width: 100%; text-align: left; }
 .cn-assistant { display: grid; justify-items: start; gap: 8px; width: 100%; padding-top: 12px; border-top: 1px solid var(--hairline); text-align: left; }
-.cn-group-title { margin: 20px 0 0; font: 600 var(--fs-15, 15px)/1.4 var(--font-sans); color: var(--muted); }
+.cn-group-title { margin: 20px 0 0; font: 600 var(--fs-15, 0.9375rem)/1.4 var(--font-sans); color: var(--muted); }
 .cn-icon .lucide { width: 28px; height: 28px; }
 .cn-feed .c-meta { margin: 0; }
 .cn-feed-row { display: flex; gap: 8px; }
 .cn-feed-row .c-input { flex: 1 1 auto; min-width: 0; }
-.cn-notice { margin: 0; color: var(--olive-ink); font: 600 15px/1.4 var(--font-sans); }
-.cn-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+.cn-notice { margin: 0; color: var(--olive-ink); font: 600 0.9375rem/1.4 var(--font-sans); }
+.cn-error { margin: 0; color: var(--error); font: 600 0.9375rem/1.4 var(--font-sans); }
 .cn-sheet { width: min(560px, 100%); display: grid; gap: 14px; max-height: min(640px, 90svh); overflow: hidden; grid-template-rows: auto auto minmax(0, 1fr) auto auto; }
 .cn-sheet .c-sheet-head { margin-bottom: 0; }
 .cn-search { display: flex; align-items: center; gap: 10px; color: var(--muted); }
@@ -434,7 +434,7 @@ body { touch-action: manipulation; }
 .cn-results { overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--hairline); border-radius: var(--r-row); }
 .cn-result { width: 100%; border-left: 0; border-right: 0; border-bottom: 0; background: transparent; text-align: left; font: inherit; cursor: pointer; }
 .cn-result .c-grow { display: grid; gap: 2px; }
-.cn-row-title { font: 600 17px/1.35 var(--font-sans); color: var(--ink); }
+.cn-row-title { font: 600 1.0625rem/1.35 var(--font-sans); color: var(--ink); }
 .cn-sheet > .c-meta { margin: 0; }
 @media (max-width: 560px) {
   .cn-card { padding: 20px 16px; }
@@ -445,7 +445,7 @@ body { touch-action: manipulation; }
   .cn-tile .cn-icon { width: 42px; height: 42px; border-radius: 12px; }
   .cn-tile .cn-icon svg { width: 22px; height: 22px; }
   .cn-tile-text { flex: 1 1 auto; }
-  .cn-tag { display: block; overflow: hidden; color: var(--muted); font: 500 13px/1.35 var(--font-sans); white-space: nowrap; text-overflow: ellipsis; }
+  .cn-tag { display: block; overflow: hidden; color: var(--muted); font: 500 0.8125rem/1.35 var(--font-sans); white-space: nowrap; text-overflow: ellipsis; }
   .cn-chev { display: block; flex: none; color: var(--muted); }
 }
 

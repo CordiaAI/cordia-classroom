@@ -186,15 +186,15 @@ export default function Admin() {
         .adm-card h2 { margin: 0 0 8px; }
         .adm-row { display: flex; align-items: center; gap: 8px; min-height: 64px; border-top: 1px solid var(--line); flex-wrap: wrap; }
         .adm-main { flex: 1; display: grid; gap: 2px; min-width: 220px; }
-        .adm-main strong { font: 600 15px/1.3 var(--font-sans); overflow-wrap: anywhere; }
+        .adm-main strong { font: 600 0.9375rem/1.3 var(--font-sans); overflow-wrap: anywhere; }
         .adm-main .c-meta { overflow-wrap: anywhere; }
         .adm-takedown { align-items: flex-start; padding: 12px 0; }
-        .adm-confirm { display: flex; align-items: center; gap: 8px; flex-basis: 100%; font: 500 14px/1.4 var(--font-sans); }
+        .adm-confirm { display: flex; align-items: center; gap: 8px; flex-basis: 100%; font: 500 0.875rem/1.4 var(--font-sans); }
         .adm-confirm input { width: 18px; height: 18px; accent-color: var(--olive); }
         .adm-danger { color: var(--error); }
         .adm-filters { margin-bottom: 4px; }
         .adm-main a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
-        .adm-line { margin: 0; font: 600 15px/1.4 var(--font-sans); }
+        .adm-line { margin: 0; font: 600 0.9375rem/1.4 var(--font-sans); }
         .adm-add { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto auto; gap: 8px; align-items: center; padding-top: 12px; border-top: 1px solid var(--line); }
         @media (max-width: 767px) { .adm-add { grid-template-columns: minmax(0, 1fr); } }
       `}</style>

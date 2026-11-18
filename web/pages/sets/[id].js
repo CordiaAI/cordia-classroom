@@ -212,18 +212,18 @@ export default function SetPage() {
         .sets-card { display: grid; gap: 16px; padding: 24px; min-width: 0; }
         .sets-title { margin: 0; font-family: var(--font-display); overflow-wrap: anywhere; }
         .sets-who { min-width: 0; }
-        .sets-facts { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; font: 600 14px/1.3 var(--font-sans); color: var(--muted-ink); }
+        .sets-facts { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; font: 600 0.875rem/1.3 var(--font-sans); color: var(--muted-ink); }
         .sets-facts span { display: inline-flex; align-items: center; gap: 6px; }
-        .sets-held { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 14px; border-radius: var(--r-row); background: var(--warning-bg); color: var(--ink); font: 600 14px/1.4 var(--font-sans); }
+        .sets-held { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 14px; border-radius: var(--r-row); background: var(--warning-bg); color: var(--ink); font: 600 0.875rem/1.4 var(--font-sans); }
         .sets-held :global(.lucide) { color: var(--warning); flex: none; }
         .sets-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
         .sets-row-end { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
         .sets-study { display: inline-flex; flex-wrap: wrap; gap: 8px; }
-        .sets-soon { margin-left: 4px; font: 500 12px/1 var(--font-sans); color: var(--muted-ink); }
+        .sets-soon { margin-left: 4px; font: 500 0.75rem/1 var(--font-sans); color: var(--muted-ink); }
         .sets-outline { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 16px; }
         .sets-outline ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
         .sets-outline li { color: var(--ink); overflow-wrap: anywhere; }
-        .sets-outline li.is-heading { font: 600 16px/1.4 var(--font-sans); margin-top: 6px; }
+        .sets-outline li.is-heading { font: 600 1rem/1.4 var(--font-sans); margin-top: 6px; }
         .sets-report { margin: 0; }
         .sets-report :global(a) { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
         @media (max-width: 560px) {

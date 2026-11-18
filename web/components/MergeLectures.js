@@ -90,7 +90,7 @@ export default function MergeLectures({ lecture, folders = [], onMerged, onCance
         .merge-check { flex: none; width: 20px; height: 20px; display: grid; place-items: center; border: 1.5px solid var(--toggle-edge); border-radius: 6px; color: var(--on-olive); }
         .is-on .merge-check { background: var(--olive); border-color: var(--olive); }
         .merge-main { display: grid; gap: 2px; min-width: 0; }
-        .merge-title { font: 600 15px/1.3 var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .merge-title { font: 600 0.9375rem/1.3 var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .merge-error { margin: 0; color: var(--error); font-weight: 600; }
         .merge-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
       `}</style>

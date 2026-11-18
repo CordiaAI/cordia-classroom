@@ -163,23 +163,23 @@ export default function NotificationBell({ variant = 'top', buttonProps = {}, ti
       <style jsx global>{`
         .nb-icon { position: relative; display: inline-flex; }
         .nb-top { position: relative; }
-        .nb-badge { position: absolute; top: -6px; right: -8px; display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--meter); color: var(--on-meter); font: 700 11px/1 var(--font-sans); }
+        .nb-badge { position: absolute; top: -6px; right: -8px; display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--meter); color: var(--on-meter); font: 700 0.6875rem/1 var(--font-sans); }
         .nb-top .nb-badge { top: 2px; right: 2px; }
         .nb-panel { position: fixed; z-index: 170; display: grid; gap: 8px; padding: 12px; max-height: min(480px, calc(100vh - 96px)); overflow-y: auto; }
         .nb-title { margin: 4px 8px 0; }
         .nb-empty { margin: 8px; }
-        .nb-dup { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px; border-radius: var(--r-input); color: var(--ink); font: 500 15px/1.35 var(--font-sans); }
-        .nb-review { min-height: 32px; padding: 0 2px; border: 0; background: none; color: var(--olive-ink); font: 600 14px/1 var(--font-sans); cursor: pointer; }
+        .nb-dup { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px; border-radius: var(--r-input); color: var(--ink); font: 500 0.9375rem/1.35 var(--font-sans); }
+        .nb-review { min-height: 32px; padding: 0 2px; border: 0; background: none; color: var(--olive-ink); font: 600 0.875rem/1 var(--font-sans); cursor: pointer; }
         .nb-review:hover { text-decoration: underline; }
-        .nb-sub { margin: 8px 8px 2px; font: 600 13px/1.3 var(--font-sans); color: var(--muted-ink); }
+        .nb-sub { margin: 8px 8px 2px; font: 600 0.8125rem/1.3 var(--font-sans); color: var(--muted-ink); }
         .nb-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
-        .nb-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px; border-radius: var(--r-input); color: var(--ink); text-decoration: none; font: 500 15px/1.35 var(--font-sans); }
+        .nb-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px; border-radius: var(--r-input); color: var(--ink); text-decoration: none; font: 500 0.9375rem/1.35 var(--font-sans); }
         .nb-item:hover, .nb-item:focus-visible { background: var(--lift-pane); text-decoration: none; }
         .nb-item.is-new .nb-text strong::after { content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--meter); vertical-align: middle; }
-        .nb-avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 13px/1 var(--font-sans); }
+        .nb-avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 0.8125rem/1 var(--font-sans); }
         .nb-text { overflow-wrap: anywhere; }
         .nb-time { white-space: nowrap; }
-        .nb-all { justify-self: start; margin: 4px 8px; color: var(--olive-ink); font: 600 15px/1 var(--font-sans); }
+        .nb-all { justify-self: start; margin: 4px 8px; color: var(--olive-ink); font: 600 0.9375rem/1 var(--font-sans); }
       `}</style>
     </>
   );

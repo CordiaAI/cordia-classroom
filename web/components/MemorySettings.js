@@ -76,7 +76,7 @@ export default function MemorySettings() {
         .mem-row { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
         .mem-row :global(.lucide) { flex: none; color: var(--olive-ink); }
         .mem-text { flex: 1; min-width: 0; display: grid; gap: 2px; overflow-wrap: anywhere; }
-        .mem-from { font-size: 12px; }
+        .mem-from { font-size: 0.75rem; }
         .mem-clear { justify-self: start; }
       `}</style>
     </div>

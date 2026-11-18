@@ -115,3 +115,10 @@ test('components a look must reach: sidebar fill, control edges, composer and fl
   const globals = await source('styles/globals.css');
   assert.doesNotMatch(globals, /Courier New|SFMono-Regular, Consolas/);
 });
+
+test('Larger text scales every text size: no font size or line height left in px (fields keep 16px so iOS never zooms)', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const report = execFileSync(process.execPath, [new URL('../scripts/px-to-rem.mjs', import.meta.url).pathname], { encoding: 'utf8' });
+  assert.match(report, /^0 declarations to convert/m, report);
+  assert.match(await source('styles/glass.css'), /font-size: 16px !important/);
+});

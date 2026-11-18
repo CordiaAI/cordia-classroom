@@ -147,7 +147,7 @@ export default function SearchModal({ onClose, instant = false }) {
         .c-search-scrim { place-items: start center; padding-top: 14vh; background: var(--scrim-strong); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
         .c-search-sheet { width: min(640px, 100%); padding: 0; overflow: hidden; background: var(--lg-menu, var(--card)) !important; }
         .search-bar { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0 12px 0 20px; color: var(--muted); }
-        .search-input { flex: 1; min-width: 0; height: 60px; padding: 0; border: 0; background: transparent; color: var(--ink); font:500 17px/1.4 var(--font-sans); outline: none; box-shadow: none; -webkit-appearance: none; appearance: none; }
+        .search-input { flex: 1; min-width: 0; height: 60px; padding: 0; border: 0; background: transparent; color: var(--ink); font:500 1.0625rem/1.4 var(--font-sans); outline: none; box-shadow: none; -webkit-appearance: none; appearance: none; }
         .search-input:focus, .search-input:focus-visible { outline: none; box-shadow: none; }
         /* The bar is the field's box, flush with the panel's top edge, so its focus ring sits just inside it. */
         .search-bar:has(.search-input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: inherit; }
@@ -157,12 +157,12 @@ export default function SearchModal({ onClose, instant = false }) {
         @media (hover: hover) { .search-close:hover { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); } }
         .search-close:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -4px; }
         .c-search-scrim.is-instant, .c-search-scrim.is-instant .c-search-sheet { animation: none; }
-        .search-esc { font:600 12px/1 var(--font-sans); padding: 6px 8px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--muted); }
+        .search-esc { font:600 0.75rem/1 var(--font-sans); padding: 6px 8px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--muted); }
         .search-close :global(.search-x) { display: none; }
         .search-list { list-style: none; margin: 0; padding: 0 8px; max-height: 60vh; overflow: auto; }
         .search-list:not(:empty) { border-top: 1px solid var(--line); padding: 8px; }
         .c-search-group { padding: 10px 12px 4px; }
-        .c-search-hit { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius:var(--r-input); background: transparent; color: var(--ink); font:600 15px/1.5 var(--font-sans); text-align: left; cursor: pointer; }
+        .c-search-hit { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius:var(--r-input); background: transparent; color: var(--ink); font:600 0.9375rem/1.5 var(--font-sans); text-align: left; cursor: pointer; }
         .c-search-hit.is-active { background: var(--olive-tint); }
         .c-search-hit :global(.c-meta) { margin-left: auto; max-width: 40%; }
         .c-search-none { padding: 16px 12px; }

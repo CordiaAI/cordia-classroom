@@ -55,7 +55,7 @@ function GradeRing({ letter, score }) {
         .cg-ring-track { stroke: var(--hairline); }
         .cg-ring-fill { stroke: var(--meter-ink); transition: stroke-dashoffset 700ms cubic-bezier(.2, .8, .2, 1); animation: cg-fill 900ms cubic-bezier(.2, .8, .2, 1) both; }
         @keyframes cg-fill { from { stroke-dashoffset: var(--ring-full); } }
-        .cg-ring > span { font: 700 26px/1 var(--font-sans); letter-spacing: -0.01em; color: var(--ink); }
+        .cg-ring > span { font: 700 1.625rem/1 var(--font-sans); letter-spacing: -0.01em; color: var(--ink); }
         .is-a .cg-ring-fill { stroke: var(--success); }
         .is-c .cg-ring-fill { stroke: var(--warning); }
         .is-low .cg-ring-fill { stroke: var(--error); }
@@ -152,19 +152,19 @@ export default function ClassGrades({ courseId, guides = [], onMakeGuide }) {
         .cg-now { display: flex; align-items: center; gap: 20px; padding: 20px 24px; }
         .cg-score { display: grid; gap: 2px; }
         .cg-score strong { font: 600 var(--fs-28)/1.1 var(--font-sans); font-variant-numeric: tabular-nums; }
-        .cg-none { margin: 0; font: 600 17px/1.4 var(--font-sans); }
+        .cg-none { margin: 0; font: 600 1.0625rem/1.4 var(--font-sans); }
         .cg-list { list-style: none; margin: 0; padding: 4px 20px; display: grid; }
         .cg-row { display: flex; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line); }
         .cg-row:last-child { border-bottom: 0; }
         .cg-main { flex: 1; min-width: 0; display: grid; gap: 4px; }
-        .cg-name { font: 600 17px/1.3 var(--font-sans); overflow-wrap: anywhere; }
+        .cg-name { font: 600 1.0625rem/1.3 var(--font-sans); overflow-wrap: anywhere; }
         a.cg-name { color: var(--ink); text-decoration: none; }
         a.cg-name:hover { text-decoration: underline; text-underline-offset: 3px; }
         a.cg-name :global(.lucide) { margin-left: 6px; vertical-align: -2px; color: var(--muted); }
-        .cg-goal { font: 500 15px/1.4 var(--font-sans); color: var(--ink); }
+        .cg-goal { font: 500 0.9375rem/1.4 var(--font-sans); color: var(--ink); }
         .cg-goal.is-up { color: var(--olive-ink); font-weight: 600; }
         .cg-note, .cg-error { margin: 0; }
-        .cg-error { color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+        .cg-error { color: var(--error); font: 600 0.9375rem/1.4 var(--font-sans); }
         @media (max-width: 767px) { .cg-row { flex-wrap: wrap; } .cg-row :global(.c-btn) { width: 100%; justify-content: center; } }
       `}</style>
     </div>

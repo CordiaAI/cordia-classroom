@@ -448,12 +448,12 @@ export default function SettingsPage() {
         .settings-row-label :global(.lucide) { color: var(--olive-ink); }
         .settings-note { margin: -4px 0 0; }
         .settings-card { display: grid; gap: 12px; padding: 20px; }
-        .settings-links { display: flex; gap: 20px; font:600 13px/1 var(--font-sans); }
+        .settings-links { display: flex; gap: 20px; font:600 0.8125rem/1 var(--font-sans); }
         .me-card { display: flex; align-items: center; gap: 16px; padding: 20px; }
-        .me-avatar { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius:50%; background: var(--olive); color: var(--on-olive); font:600 20px/1 var(--font-sans); }
+        .me-avatar { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius:50%; background: var(--olive); color: var(--on-olive); font:600 1.25rem/1 var(--font-sans); }
         .me-names { display: grid; gap: 2px; flex: 1; min-width: 0; }
         .me-names > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .me-names strong { font:600 20px/1.15 var(--font-sans); }
+        .me-names strong { font:600 1.25rem/1.15 var(--font-sans); }
         .billing-current-plan { display: grid; gap: 12px; padding: 20px; margin-bottom: 16px; }
         .plan-badge { justify-self: start; padding: 6px 14px; border-radius:var(--r-pill); background: var(--card-sunk); font-weight:600; }
         .plan-badge[data-plan="plus"] { color: var(--meter-ink); }
@@ -466,8 +466,8 @@ export default function SettingsPage() {
         @media (max-width: 1100px) and (min-width: 768px) { .billing-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         .plan-card { display: grid; gap: 12px; align-content: start; min-width: 0; padding: 24px; }
         .plan-card-current { box-shadow: 0 0 0 2px var(--olive); }
-        .plan-price { font:600 28px/1 var(--font-sans); }
-        .plan-price span { font-size: 15px; font-weight:500; }
+        .plan-price { font:600 1.75rem/1 var(--font-sans); }
+        .plan-price span { font-size: 0.9375rem; font-weight:500; }
         .plan-features { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
         .plan-features li { display: flex; gap: 8px; align-items: flex-start; }
         .plan-features :global(.lucide) { color: var(--olive-ink); margin-top: 2px; }
