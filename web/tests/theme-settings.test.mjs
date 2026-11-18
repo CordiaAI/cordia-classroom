@@ -10,6 +10,9 @@ import {
 import { ACCENT_VARIABLES } from '../lib/accentMath.mjs';
 import { LOOK_KEY, bootScript } from '../lib/themeBoot.mjs';
 
+// The one shared cache the app kept before each account had its own (lib/theme.js carries it over once).
+const OLD_KEY = LOOK_KEY;
+
 // A stand-in for <html>: attributes and inline custom properties.
 function fakeRoot() {
   const attributes = new Map();
@@ -164,14 +167,22 @@ test('the font a pair needs is cached for preloading, and the default pair needs
 // ---------- First paint ----------
 
 const PUBLIC_LIST = ['/privacy'];
-function boot({ path = '/library', storage = {}, deviceDark = false, hasMatchMedia = true } = {}) {
+function boot({ path = '/library', storage = {}, deviceDark = false, hasMatchMedia = true, raw = false } = {}) {
   const root = fakeRoot();
   const links = [];
+  // `storage[LOOK_KEY]` is the signed-in account's cache: it is kept under that account's own key (cordiaLook:<id>),
+  // and the account is 'account-me' unless the test names one. Any other key is stored as given, and with `raw` all are.
   const store = { ...storage };
+  if (!raw && LOOK_KEY in store) {
+    const me = store.userId || 'account-me';
+    store.userId = me;
+    store[`${LOOK_KEY}:${me}`] = store[LOOK_KEY];
+    delete store[LOOK_KEY];
+  }
   const sandbox = {
     document: { documentElement: root, head: { appendChild: link => links.push(link) }, createElement: () => ({}) },
     location: { pathname: path },
-    localStorage: { getItem: key => (key in store ? store[key] : null) },
+    localStorage: { getItem: key => (key in store ? store[key] : null), get length() { return Object.keys(store).length; }, key: index => Object.keys(store)[index] ?? null },
     window: hasMatchMedia ? { matchMedia: () => ({ matches: deviceDark }) } : {},
     matchMedia: () => ({ matches: deviceDark }),
   };
@@ -216,7 +227,7 @@ test('first paint: the old light/dark choice still decides until a look is saved
 
 test('first paint: public pages are the Cordia default in light', () => {
   const dark = { [LOOK_KEY]: cached({ accent: 'plum', bg: 'dusk', appearance: 'dark', size: 'larger' }), theme: 'dark' };
-  for (const path of ['/', '/login', '/signup', '/reset-password', '/pricing', '/privacy', '/guides/anything']) {
+  for (const path of ['/', '/login', '/signup', '/reset-password', '/privacy', '/guides/anything']) {
     const { root } = boot({ path, storage: dark });
     assert.equal(root.getAttribute('data-theme'), 'light', path);
     assert.deepEqual(lookAttributes(root), [], path);
@@ -228,21 +239,50 @@ test('first paint: public pages are the Cordia default in light', () => {
   // Pricing is the Cordia default in light for everyone, signed in too (the director's call on criterion 9).
   const pricing = boot({ path: '/pricing', storage: { ...dark, authToken: 'x', [LOOK_KEY]: cached({ look: 'paper-clay', accent: 'paperclay', font: 'paper', glass: 'solid', appearance: 'dark', size: 'larger' }) } });
   assert.equal(pricing.root.getAttribute('data-theme'), 'light');
-  assert.deepEqual(lookAttributes(pricing.root), []);
+  // ...but the student's text size is for reading, so it stays (and nothing else of the look does).
+  assert.deepEqual(lookAttributes(pricing.root), ['data-size']);
+  assert.equal(pricing.root.getAttribute('data-size'), 'larger');
   assert.equal(pricing.links.length, 0, 'no look fonts preloaded');
+  assert.equal(pricing.root.styleMap.size, 0);
+  // Other public pages drop it as before, and with the default size there is nothing to keep.
+  assert.deepEqual(lookAttributes(boot({ path: '/login', storage: { authToken: 'x', [LOOK_KEY]: cached({ size: 'larger' }) } }).root), []);
+  assert.deepEqual(lookAttributes(boot({ path: '/pricing', storage: { authToken: 'x', [LOOK_KEY]: cached({ accent: 'plum' }) } }).root), []);
+  assert.deepEqual(lookAttributes(boot({ path: '/pricing', storage: { [LOOK_KEY]: cached({ size: 'large' }) } }).root), ['data-size'], 'signed in by its user id alone');
 });
 
 test("first paint: on a shared browser, the previous account's look never paints for the next one", () => {
-  const theirs = JSON.stringify({ ...bootCache({ ...paperClay(), appearance: 'dark', size: 'larger' }), u: 'account-a' });
-  const next = boot({ deviceDark: true, storage: { [LOOK_KEY]: theirs, theme: 'dark', userId: 'account-b', authToken: 'x' } });
+  const theirs = cached({ ...paperClay(), appearance: 'dark', size: 'larger' });
+  // Each account has its own key: B finds none, and A's look (and the shared light/dark key) is not B's.
+  const next = boot({ deviceDark: true, storage: { 'cordiaLook:account-a': theirs, theme: 'dark', userId: 'account-b', authToken: 'x' } });
   assert.equal(next.root.getAttribute('data-theme'), 'light');
   assert.deepEqual(lookAttributes(next.root), []);
   assert.equal(next.links.length, 0);
-  // The same account, or a cache from before the stamp, still paints its own look.
-  const own = boot({ storage: { [LOOK_KEY]: theirs, userId: 'account-a', authToken: 'x' } }).root;
+  // A's own key still paints A's look.
+  const own = boot({ storage: { 'cordiaLook:account-a': theirs, userId: 'account-a', authToken: 'x' } }).root;
   assert.equal(own.getAttribute('data-theme'), 'dark');
   assert.equal(own.getAttribute('data-look'), 'paper-clay');
-  assert.equal(boot({ storage: { [LOOK_KEY]: cached({ appearance: 'dark' }), userId: 'account-b' } }).root.getAttribute('data-theme'), 'dark', 'unstamped cache');
+  // With both on the device, each account paints its own.
+  const both = { 'cordiaLook:account-a': theirs, 'cordiaLook:account-b': cached({ appearance: 'light', accent: 'plum' }), authToken: 'x' };
+  assert.equal(boot({ storage: { ...both, userId: 'account-b' } }).root.getAttribute('data-accent'), 'plum');
+  assert.equal(boot({ storage: { ...both, userId: 'account-b' } }).root.getAttribute('data-theme'), 'light');
+  assert.equal(boot({ storage: { ...both, userId: 'account-a' } }).root.getAttribute('data-look'), 'paper-clay');
+  // Nobody signed in: nothing is read.
+  assert.deepEqual(lookAttributes(boot({ storage: { 'cordiaLook:account-a': theirs } }).root), []);
+});
+
+test('first paint: the one shared cache from before the keys is read once, for an account with none of its own', () => {
+  const old = cached({ ...paperClay(), appearance: 'dark' });
+  // Unstamped, or stamped with this account: carried over. Stamped with another account: not this one's.
+  assert.equal(boot({ storage: { [OLD_KEY]: old, userId: 'account-b', authToken: 'x' }, raw: true }).root.getAttribute('data-look'), 'paper-clay');
+  const stampedA = JSON.stringify({ ...JSON.parse(old), u: 'account-a' });
+  assert.equal(boot({ storage: { [OLD_KEY]: stampedA, userId: 'account-a', authToken: 'x' }, raw: true }).root.getAttribute('data-look'), 'paper-clay');
+  const foreign = boot({ deviceDark: true, storage: { [OLD_KEY]: stampedA, theme: 'dark', userId: 'account-b', authToken: 'x' }, raw: true });
+  assert.equal(foreign.root.getAttribute('data-theme'), 'light');
+  assert.deepEqual(lookAttributes(foreign.root), []);
+  // Once the account has its own key, the old one is not read.
+  const both = boot({ storage: { [OLD_KEY]: old, 'cordiaLook:account-b': cached({ accent: 'plum' }), userId: 'account-b', authToken: 'x' }, raw: true }).root;
+  assert.equal(both.getAttribute('data-look'), null);
+  assert.equal(both.getAttribute('data-accent'), 'plum');
 });
 
 test('first paint: a damaged cache is ignored, never thrown, and never sets odd attributes', () => {
@@ -446,6 +486,18 @@ test('Paper & Clay: public pages stay the Cordia default whatever the student pi
   assert.equal(root.getAttribute('data-look'), 'paper-clay');
   applySettings({ ...paperClay(), appearance: 'dark' }, { root, publicPage: true });
   assert.equal(root.getAttribute('data-look'), null, 'moving to a public page clears the look');
+});
+
+test('a public page can keep the student\'s text size: nothing else of the look', () => {
+  const root = fakeRoot();
+  const settings = { ...paperClay(), appearance: 'dark', size: 'larger', accent: 'plum' };
+  const applied = applySettings(settings, { root, publicPage: true, keepSize: true });
+  assert.deepEqual(lookAttributes(root), ['data-size']);
+  assert.equal(root.getAttribute('data-size'), 'larger');
+  assert.equal(root.getAttribute('data-theme'), 'light');
+  assert.deepEqual({ ...applied.settings, size: DEFAULT_SETTINGS.size }, { ...DEFAULT_SETTINGS, appearance: 'light' });
+  applySettings(settings, { root, publicPage: true });
+  assert.equal(root.getAttribute('data-size'), null, 'without keepSize a public page is plain default');
 });
 
 test('Paper & Clay: its font files are cached for preloading, serif and sans only', () => {

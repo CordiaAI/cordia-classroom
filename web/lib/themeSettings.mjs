@@ -232,9 +232,10 @@ export function bootCache(settings) {
 // Puts a look on <html>: sets or removes the data attributes, writes (or clears) the custom accent's
 // variables, and sets data-theme from the appearance. `publicPage` pages are always the Cordia
 // default in light, whatever was saved. Returns what it applied.
-export function applySettings(settings, { root, deviceIsDark = false, publicPage = false } = {}) {
+export function applySettings(settings, { root, deviceIsDark = false, publicPage = false, keepSize = false } = {}) {
   const target = root || (typeof document !== 'undefined' ? document.documentElement : null);
-  const clean = publicPage ? { ...DEFAULT_SETTINGS, appearance: 'light' } : validateSettings(settings);
+  // A public page keeps the student's text size when it is asked to (`keepSize`): that is for reading, not looks.
+  const clean = publicPage ? { ...DEFAULT_SETTINGS, appearance: 'light', ...(keepSize ? { size: validateSettings(settings).size } : {}) } : validateSettings(settings);
   const attributes = attributesFor(clean);
   const variables = customAccentVariables(clean);
   const theme = resolveAppearance(clean.appearance, deviceIsDark);

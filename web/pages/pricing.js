@@ -79,7 +79,7 @@ export default function Pricing() {
         .pricing-title { margin: 0 0 32px; font:600 2.5rem/1.15 var(--font-display); color: var(--ink); }
         .pricing-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; max-width: 1180px; }
         /* A column, so the three plan buttons share one baseline however long each list is. */
-        .pricing-card { display: flex; flex-direction: column; gap: 16px; padding: 28px; border-radius:20px; color: var(--ink); background: var(--lg-card); border: 1px solid var(--lg-edge); -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); box-shadow: var(--lg-highlight), var(--lg-shadow); }
+        .pricing-card { container-type: inline-size; display: flex; flex-direction: column; gap: 16px; padding: 28px; border-radius:20px; color: var(--ink); background: var(--lg-card); border: 1px solid var(--lg-edge); -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); box-shadow: var(--lg-highlight), var(--lg-shadow); }
         .pricing-card.is-pro { box-shadow: 0 0 0 2px var(--olive), var(--lg-highlight), var(--lg-shadow); }
         .pricing-card h2 { margin: 0; font:600 1.0625rem/1.15 var(--font-sans); color: var(--ink); }
         .pricing-price { margin: 0; font:600 2.5rem/1 var(--font-sans); }
@@ -91,6 +91,9 @@ export default function Pricing() {
         .pricing-card :global(.pricing-btn) { margin-top: auto; display: inline-flex; align-items: center; justify-content: center; height: auto; min-height: 44px; padding: 10px 20px; border: 0; border-radius:999px; background: var(--olive); color: var(--on-olive); font:600 0.9375rem/1.25 var(--font-sans); line-height: 1.25 !important; text-align: center; text-decoration: none; cursor: pointer; }
         .pricing-card :global(.pricing-btn.is-secondary) { background: var(--glass); color: var(--ink); border: 1px solid var(--line); }
         .pricing-card :global(.pricing-btn.is-current) { background: transparent; color: var(--ink); border: 1px solid var(--line); cursor: default; }
+        /* In a narrow card (a wide window at a large text setting) "Get Academic Weapon" can take two lines while the
+           others take one: every plan button keeps two lines' height, so the three stay even. */
+        @container (max-width: 13.5rem) { .pricing-card :global(.pricing-btn) { min-height: calc(2.5em + 20px); } }
         @media (max-width: 960px) { .pricing-grid { grid-template-columns: 1fr; max-width: 520px; } }
       `}</style>
     </>

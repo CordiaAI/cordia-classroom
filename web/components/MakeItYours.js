@@ -83,11 +83,15 @@ export default function MakeItYoursHost() {
         </BodyPortal>
       )}
       <style jsx global>{`
-        /* Reset happens in the sheet, so its Undo toast is born over it: it sits at the top, centred on the window
-           like the sheet, and the sheet makes room under it, so it never covers the footer (Reset, Done) or the
-           title. It keeps that place for its six seconds, even if the sheet closes first. */
-        .c-toast.miy-toast { top: calc(16px + env(safe-area-inset-top)); bottom: auto !important; left: 50% !important; width: max-content; }
-        :root:has(.miy-toast) .miy-scrim { --miy-toast-room: calc(78px + env(safe-area-inset-top)); }
+        /* Reset happens in the sheet, so its Undo toast is born over it. Nothing moves when it comes or goes: on a
+           desktop window the sheet always leaves the toast's room clear under it (the scrim below), so the toast
+           keeps its usual place at the bottom of the window; on a phone, where the sheet is the whole window, it sits
+           just above the sheet's footer, so it never covers Reset, Done or the title. It keeps that place for its six
+           seconds, even if the sheet closes first. */
+        :root { --miy-foot-h: 70px; }
+        @media (max-width: 767px) {
+          .c-toast.miy-toast { bottom: calc(var(--miy-foot-h) + env(safe-area-inset-bottom) + var(--toast-gap)) !important; }
+        }
       `}</style>
     </>
   );
@@ -241,12 +245,13 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
                       </button>
                     ))}
                     <span className="miy-custom-slot">
-                      <button className={'miy-dot miy-custom' + (customChosen ? ' is-chosen' : '')} data-opens-picker="" title="Custom colour"
+                      <button className={'miy-dot miy-custom' + (customChosen ? ' is-chosen' : '')} data-opens-picker="" title="Custom colour" aria-describedby="miy-custom-hint"
                         aria-label={customChosen ? `Custom colour, ${settings.customAccent}` : 'Custom colour'} {...radioProps(customChosen, openPicker)}>
                         <span className="miy-dot-fill" style={customChosen ? { background: settings.customAccent } : undefined} aria-hidden="true">
                           {!customChosen && <Pipette size={16} strokeWidth={2} />}
                         </span>
                       </button>
+                      <span id="miy-custom-hint" className="sr-only">Opens a colour picker</span>
                       <input ref={pickerRef} type="color" className="miy-picker" tabIndex={-1} aria-hidden="true"
                         value={(pickerValue || '').toLowerCase()} onChange={onCustom} />
                     </span>
@@ -318,15 +323,16 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
       <style jsx global>{`
         /* DESIGN-SPEC 3.5 and 4.6: an 880px sheet of solid menu glass, 28px corners, over a 22% ink scrim with a
            3px blur; a full-height sheet on phones. Every value is a token. */
+        /* The sheet sits centred; its row under it is never shorter than the toast's room, so on a short window the
+           sheet stops short of it, and on a tall one it is centred exactly. */
         .miy-scrim {
-          --miy-toast-room: 0px;
-          position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: calc(16px + var(--miy-toast-room)) 16px 16px;
+          position: fixed; inset: 0; z-index: 200; display: grid; grid-template-rows: minmax(0, 1fr) auto minmax(calc(var(--toast-room) - 16px), 1fr); justify-items: center; padding: 16px;
           background: var(--scrim-sheet); -webkit-backdrop-filter: var(--scrim-sheet-blur); backdrop-filter: var(--scrim-sheet-blur);
           animation: miy-fade ${OPEN_MS}ms var(--ease) both;
         }
         .miy-scrim.is-closing { animation: miy-fade-out ${CLOSE_MS}ms var(--ease-exit) both; pointer-events: none; }
         .miy-sheet {
-          position: relative; display: flex; flex-direction: column; width: min(880px, 100%); max-height: calc(100dvh - 32px - var(--miy-toast-room));
+          position: relative; display: flex; flex-direction: column; grid-row: 2; width: min(880px, 100%); max-height: calc(100dvh - 16px - var(--toast-room));
           border-radius: var(--r-panel); border: 1px solid; border-color: var(--glass-rim-border);
           background: var(--lg-menu); color: var(--ink);
           box-shadow: var(--glass-shadow-edge), var(--lg-depth-float);
@@ -419,8 +425,8 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
 
         /* Phones: a full-height sheet; labels above their controls; every target at least 44px. */
         @media (max-width: 767px) {
-          .miy-scrim { padding: 0; place-items: stretch; }
-          .miy-sheet { position: fixed; inset: var(--miy-toast-room) 0 0; width: auto; height: auto; max-height: none; border-radius: 0; border-width: 0; }
+          .miy-scrim { padding: 0; display: block; }
+          .miy-sheet { position: fixed; inset: 0; width: auto; height: auto; max-height: none; border-radius: 0; border-width: 0; }
           @keyframes miy-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
           @keyframes miy-sink { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(24px); } }
           .miy-head { padding: calc(16px + env(safe-area-inset-top)) 16px 8px; }
@@ -429,13 +435,13 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
           .miy-body { padding: 4px 16px 0; }
           .miy-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
           .miy-label { padding-top: 0; }
-          .miy-themes { grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+          .miy-themes { grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; }
           .miy-small { width: calc((100% - 20px) / 3); min-width: 92px; }
           /* Nine 44px choices are wider than a phone: five and four, not eight and a lone custom colour. */
           .miy-dots { display: grid; grid-template-columns: repeat(5, 44px); }
           .miy-seg { max-width: 100%; }
           .miy-seg > button { min-height: 44px; }
-          .miy-foot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+          .miy-foot { box-sizing: border-box; min-height: calc(var(--miy-foot-h) + env(safe-area-inset-bottom)); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
         }
         /* Less motion: the sheet and its scrim appear and go with no movement and no fade. */
         @media (prefers-reduced-motion: reduce) {

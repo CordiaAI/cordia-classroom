@@ -42,8 +42,10 @@ async function browser({ users = {}, store = new Map() } = {}) {
     getItem: key => (store.has(key) ? store.get(key) : null),
     setItem: (key, value) => store.set(key, String(value)),
     removeItem: key => store.delete(key),
+    get length() { return store.size; },
+    key: index => [...store.keys()][index] ?? null,
   };
-  globalThis.window = { matchMedia: () => ({ matches: false, addEventListener() {} }), location: { pathname: '/library' } };
+  globalThis.window = { matchMedia: () => ({ matches: false, addEventListener() {} }), location: { pathname: '/library', origin: 'http://localhost' }, postMessage() {} };
   globalThis.document = { documentElement: root };
   globalThis.requestAnimationFrame = callback => callback();
   const api = {
@@ -57,9 +59,11 @@ async function browser({ users = {}, store = new Map() } = {}) {
     const user = users[id];
     return { ok: Boolean(user), json: async () => ({ id, created_at: user?.created, user_metadata: user?.meta || {} }) };
   };
+  const phone = { formatPhone: value => String(value || '') };
   const react = { useEffect() {}, useState: initial => [initial, () => {}] };
   const supabase = { SUPABASE_URL: 'https://example.invalid', SUPABASE_PUBLISHABLE_KEY: 'publishable' };
   const progress = await load('progress.js', { react, './api': api, './supabase': supabase });
+  const apiModule = await load('api.js', { './phone.mjs': phone, './themeBoot.mjs': bootModule });
   const theme = await load('theme.js', {
     './useCases/index.mjs': { USE_CASES: [], useCasePath: page => `/${page.slug}` },
     './comparisons/index.mjs': { COMPARISONS: [], comparisonPath: page => `/${page.slug}` },
@@ -70,9 +74,11 @@ async function browser({ users = {}, store = new Map() } = {}) {
   });
   theme.applyTheme('/library'); // the page the student is on (the default path is a public one)
   return {
-    store, root, progress, theme, calls,
-    signIn: id => localStorage.setItem('authToken', token(id)),
-    cachedLook: () => JSON.parse(localStorage.getItem(bootModule.LOOK_KEY) || 'null')?.s,
+    store, root, progress, theme, calls, apiModule,
+    // Signing in puts the token and the user id where api.js setToken does.
+    signIn: id => { localStorage.setItem('authToken', token(id)); localStorage.setItem('userId', id); },
+    // This device's cache of an account's look (by default the signed-in one's).
+    cachedLook: (id = api.getUserId()) => JSON.parse(localStorage.getItem(bootModule.lookKeyFor(id)) || 'null')?.s,
   };
 }
 
@@ -123,22 +129,30 @@ test('account switch: B, with no saved look, gets the defaults, not A\'s Paper &
   assert.equal(b.cachedLook().look, 'paper-clay');
   assert.equal(b.cachedLook().appearance, 'dark');
 
-  // B signs in on the same browser. Before B's copy is read the cache is not written, and A's look is not B's:
-  // B is painted the Cordia default in Light (never A's dark); after B's copy is read, B has the defaults.
+  // B signs in on the same browser. A's look is under A's own key, so B finds nothing there: B is painted the Cordia
+  // default in Light (never A's dark) from the first frame, and nothing is written for B until B's own copy is read.
   b.signIn(B);
+  assert.equal(b.theme.lookSettings().appearance, 'light', 'A\'s dark is not B\'s');
+  assert.equal(b.theme.lookSettings().look, 'none');
   b.theme.syncThemeFromAccount();
-  assert.equal(b.cachedLook().look, 'paper-clay', 'the cache is not written before B\'s own copy is read');
+  assert.equal(b.cachedLook(B), undefined, 'nothing is written for B before B\'s own copy is read');
+  assert.equal(b.cachedLook(A).look, 'paper-clay', 'A\'s cache is untouched');
   b.theme.applyTheme('/library');
   assert.equal(b.root.getAttribute('data-theme'), 'light', 'A\'s dark never paints for B');
   assert.equal(b.root.getAttribute('data-look'), null);
   assert.equal(b.root.getAttribute('data-size'), null);
-  assert.equal(b.theme.lookSettings().appearance, 'light');
   await b.progress.loadProgress();
   b.theme.syncThemeFromAccount();
-  assert.deepEqual(b.cachedLook(), { ...DEFAULT_SETTINGS, appearance: 'light' });
+  assert.deepEqual(b.cachedLook(B), { ...DEFAULT_SETTINGS, appearance: 'light' });
   assert.equal(b.root.getAttribute('data-look'), null);
   assert.equal(b.root.getAttribute('data-size'), null);
   assert.equal(b.root.getAttribute('data-theme'), 'light');
+
+  // And back to A: A's own look is there on the very first frame, before anything is read.
+  b.signIn(A);
+  assert.equal(b.theme.lookSettings().look, 'paper-clay');
+  assert.equal(b.theme.lookSettings().size, 'larger');
+  assert.equal(b.theme.lookSettings().appearance, 'dark');
 });
 
 test('account switch: an old explicit dark choice still carries over as the appearance, the rest at defaults', async () => {
@@ -163,7 +177,7 @@ test('account switch: with no creation time known, B is Light (A\'s dark is not 
   assert.equal(b.progress.accountCreatedAt(), '');
   b.theme.syncThemeFromAccount();
   assert.deepEqual(b.cachedLook(), { ...DEFAULT_SETTINGS, appearance: 'light' }, 'Light until B\'s creation time is known; everything else is the default');
-  assert.equal(JSON.parse(localStorage.getItem(bootModule.LOOK_KEY)).u, B, 'the cache now names B');
+  assert.ok(b.store.has(`cordiaLook:${B}`), 'B has a cache of its own');
 });
 
 test('the same account reloading paints its own saved look, and the sync never resets a saved look', async () => {
@@ -184,4 +198,149 @@ test('the same account reloading paints its own saved look, and the sync never r
   assert.equal(JSON.stringify(again.cachedLook()), saved, 'after it, the saved look is the cache');
   assert.equal(again.root.getAttribute('data-size'), 'large');
   assert.equal(again.root.getAttribute('data-theme'), 'dark');
+});
+
+// ---------- Per-account look storage (lib/theme.js, lib/themeBoot.mjs, lib/api.js clearAuth) ----------
+
+const lookValues = store => [...store].filter(([key]) => key.startsWith('cordiaLook')).map(([key, value]) => ({ key, value: String(value) }));
+
+test('no user id is in any value the look code writes: the id is only in the key', async () => {
+  const b = await browser({ users: { [A]: { created: EXISTING }, [B]: { created: '2031-01-01T00:00:00Z' } } });
+  for (const id of [A, B]) {
+    b.signIn(id);
+    await b.progress.loadProgress();
+    b.theme.syncThemeFromAccount();
+    b.theme.saveLook({ ...DEFAULT_SETTINGS, accent: 'plum', size: 'large', appearance: id === A ? 'dark' : 'system' });
+    b.theme.syncThemeFromAccount();
+  }
+  const written = lookValues(b.store);
+  assert.deepEqual(written.map(entry => entry.key).sort(), [`cordiaLook:${A}`, `cordiaLook:${B}`].sort());
+  for (const { key, value } of written) {
+    for (const id of [A, B]) assert.equal(value.includes(id), false, `${key} holds no user id`);
+    assert.equal(Object.hasOwn(JSON.parse(value), 'u'), false, `${key} has no u field`);
+  }
+  assert.equal(b.store.has('cordiaLook'), false, 'the shared key is never written');
+  // The creation-time and progress copies keep to the same rule.
+  for (const [key, value] of b.store) if (key.startsWith('cordiaAccount')) assert.equal(String(value).includes(A), false, key);
+});
+
+test('signing out removes every look kept on this device, and the shared light/dark key with them', async () => {
+  const b = await browser({ users: { [A]: { created: EXISTING }, [B]: { created: EXISTING } } });
+  b.signIn(A);
+  await b.progress.loadProgress();
+  b.theme.saveLook({ ...DEFAULT_SETTINGS, accent: 'plum', appearance: 'dark' });
+  b.signIn(B);
+  await b.progress.loadProgress();
+  b.theme.saveLook({ ...DEFAULT_SETTINGS, size: 'large', appearance: 'light' });
+  localStorage.setItem('cordiaLook', JSON.stringify({ s: DEFAULT_SETTINGS })); // an old shared cache, too
+  assert.equal(lookValues(b.store).length, 3);
+  assert.equal(localStorage.getItem('theme'), 'light');
+  b.apiModule.clearAuth();
+  assert.deepEqual(lookValues(b.store), []);
+  assert.equal(localStorage.getItem('theme'), null);
+  assert.equal(localStorage.getItem('authToken'), null);
+  // The next account to sign in starts from the Cordia default.
+  b.signIn(A);
+  assert.equal(b.theme.lookSettings().accent, 'olive');
+  assert.equal(b.theme.lookSettings().appearance, 'light');
+});
+
+test('another account never shows the previous look at any step, and the same account gets its own back on the first frame', async () => {
+  const A_LOOK = { ...DEFAULT_SETTINGS, look: 'paper-clay', accent: 'paperclay', font: 'paper', bg: 'paper', size: 'larger', appearance: 'dark' };
+  const b = await browser({ users: { [A]: { created: EXISTING, meta: { cordia: { v: 1, at: 5, look: A_LOOK, theme: 'dark' } } }, [B]: { created: EXISTING } } });
+  const frames = [];
+  const frame = who => { b.theme.applyTheme('/library'); frames.push({ who, theme: b.root.getAttribute('data-theme'), look: b.root.getAttribute('data-look'), size: b.root.getAttribute('data-size') }); };
+  b.signIn(A);
+  await b.progress.loadProgress();
+  b.theme.syncThemeFromAccount();
+  frame('A'); // A's look, from the server
+  // B signs in (a different account on the same browser, no sign-out between): every frame is the default, to the end.
+  b.signIn(B);
+  frame('B first frame');
+  b.theme.syncThemeFromAccount();
+  frame('B before its copy is read');
+  await b.progress.loadProgress();
+  b.theme.syncThemeFromAccount();
+  frame('B after');
+  // A returns: its own look on the first frame, with nothing read yet.
+  b.signIn(A);
+  frame('A returns, first frame');
+  const byWho = Object.fromEntries(frames.map(f => [f.who, f]));
+  assert.deepEqual([byWho.A.theme, byWho.A.look, byWho.A.size], ['dark', 'paper-clay', 'larger']);
+  for (const who of ['B first frame', 'B before its copy is read', 'B after']) assert.deepEqual([byWho[who].theme, byWho[who].look, byWho[who].size], ['light', null, null], who);
+  assert.deepEqual([byWho['A returns, first frame'].theme, byWho['A returns, first frame'].look, byWho['A returns, first frame'].size], ['dark', 'paper-clay', 'larger']);
+});
+
+test('the one shared cache from before the keys is carried over once, for an account with none, then removed', async () => {
+  const OLD = { s: { ...DEFAULT_SETTINGS, accent: 'ocean', size: 'large', appearance: 'dark' }, ap: 'dark', a: { 'data-accent': 'ocean' }, v: {}, f: [] };
+  // Unstamped: this account's (as before).
+  const unstamped = await browser();
+  unstamped.signIn(A);
+  localStorage.setItem('cordiaLook', JSON.stringify(OLD));
+  assert.equal(unstamped.theme.lookSettings().accent, 'ocean');
+  assert.equal(unstamped.store.has('cordiaLook'), false, 'the old key is removed');
+  assert.equal(unstamped.cachedLook(A).accent, 'ocean');
+  assert.equal(Object.hasOwn(JSON.parse(unstamped.store.get(`cordiaLook:${A}`)), 'u'), false);
+  // Stamped with this account: carried over, the stamp dropped.
+  const own = await browser();
+  own.signIn(A);
+  localStorage.setItem('cordiaLook', JSON.stringify({ ...OLD, u: A }));
+  assert.equal(own.theme.lookSettings().size, 'large');
+  assert.equal(own.store.has('cordiaLook'), false);
+  assert.equal(own.store.get(`cordiaLook:${A}`).includes(A), false);
+  // Stamped with another account: not this one's, and gone.
+  const theirs = await browser();
+  theirs.signIn(B);
+  localStorage.setItem('cordiaLook', JSON.stringify({ ...OLD, u: A }));
+  assert.equal(theirs.theme.lookSettings().accent, 'olive');
+  assert.equal(theirs.store.has('cordiaLook'), false);
+  assert.equal(theirs.store.has(`cordiaLook:${B}`), false);
+  // With a cache of its own, the old one is left alone by the read and the account keeps its own.
+  const both = await browser();
+  both.signIn(A);
+  both.theme.saveLook({ ...DEFAULT_SETTINGS, accent: 'plum' });
+  localStorage.setItem('cordiaLook', JSON.stringify(OLD));
+  assert.equal(both.theme.lookSettings().accent, 'plum');
+});
+
+test('the old light/dark key is not trusted while another account\'s look is on this browser', async () => {
+  const b = await browser({ users: { [A]: { created: EXISTING }, [B]: { created: EXISTING } } });
+  b.signIn(A);
+  await b.progress.loadProgress();
+  b.theme.saveLook({ ...DEFAULT_SETTINGS, appearance: 'dark' }); // writes theme=dark for older tabs
+  assert.equal(localStorage.getItem('theme'), 'dark');
+  b.signIn(B);
+  assert.equal(b.theme.lookSettings().appearance, 'light', 'A\'s dark, through the shared key, is not B\'s');
+  // A device that has never held a per-account look (older than this) still honours its light/dark key.
+  const old = await browser();
+  old.signIn(A);
+  localStorage.setItem('theme', 'dark');
+  assert.equal(old.theme.lookSettings().appearance, 'dark');
+});
+
+test('"no saved look" is only believed once the server has answered: a look that is on its way is never replaced by the default', async () => {
+  const SAVED = { ...DEFAULT_SETTINGS, accent: 'ocean', size: 'large', appearance: 'dark' };
+  const b = await browser({ users: { [A]: { created: EXISTING, meta: { cordia: { v: 1, at: 5, look: SAVED, theme: 'dark' } } } } });
+  b.signIn(A);
+  const loading = b.progress.loadProgress(); // the local copy is read at once; the server has not answered
+  assert.equal(b.progress.progressLoaded(), true);
+  assert.equal(b.progress.progressRead(), false);
+  b.theme.syncThemeFromAccount();
+  assert.equal(b.cachedLook(A), undefined, 'the default look is not written while the account\'s own is on its way');
+  await loading;
+  assert.equal(b.progress.progressRead(), true);
+  b.theme.syncThemeFromAccount();
+  assert.deepEqual(b.cachedLook(A), SAVED);
+  assert.equal(b.root.getAttribute('data-size'), 'large');
+  // An account that really has none gets its default once the server has answered (here, with nothing).
+  const none = await browser({ users: { [A]: { created: EXISTING } } });
+  none.signIn(A);
+  await none.progress.loadProgress();
+  none.theme.syncThemeFromAccount();
+  assert.deepEqual(none.cachedLook(A), { ...DEFAULT_SETTINGS, appearance: 'light' });
+  // A failed read counts as answered too: the device copy is all there is.
+  const offline = await browser({ users: {} });
+  offline.signIn(A);
+  await offline.progress.loadProgress();
+  assert.equal(offline.progress.progressRead(), true);
 });

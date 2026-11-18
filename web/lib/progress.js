@@ -17,6 +17,8 @@ const ACCOUNT = 'cordiaAccount';
 const ACCOUNT_OLD = 'cordiaAccount';
 let state = { ...EMPTY };
 let loadedFor = '';
+// The account whose server copy has answered (or failed to) at least once on this page.
+let readFor = '';
 let saveTimer = null;
 const listeners = new Set();
 
@@ -117,11 +119,17 @@ function carryOverOldCopy(key) {
   return created;
 }
 
-// True once the signed-in account's own saved copy is read on this device (lib/theme.js waits for it before it
-// treats an account as having no saved look).
+// True once the signed-in account's own copy on this device is read (a look saved here is known from then on).
 export function progressLoaded() {
   const key = localKey();
   return Boolean(key) && loadedFor === key;
+}
+
+// True once the account's server copy has answered (or failed) on this page: only then can "no saved look" be
+// believed. lib/theme.js waits for it before it gives an account the default look.
+export function progressRead() {
+  const key = localKey();
+  return Boolean(key) && readFor === key;
 }
 
 export async function loadProgress() {
@@ -133,6 +141,7 @@ export async function loadProgress() {
   state = merge(EMPTY, local);
   publish();
   const user = await remote('GET');
+  readFor = key;
   const server = user?.user_metadata?.cordia;
   const id = getUserId();
   const createdKey = accountKey();
@@ -143,10 +152,10 @@ export async function loadProgress() {
   if (server) {
     state = merge(state, server);
     try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
-  } else if (created) {
-    state = { ...state }; // a new object, so the look re-reads the account it now knows
+  } else if (created || !state.look) {
+    state = { ...state }; // a new object, so the look re-reads the account it now knows (or knows has no saved look)
   }
-  if (server || created) publish();
+  if (server || created || !state.look) publish();
   if (!state.first) updateProgress(current => ({ ...current, first: Date.now() }));
   return state;
 }
