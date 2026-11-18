@@ -207,6 +207,8 @@ class NotionTextTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertLessEqual(max(depth_seen), notion_text.MAX_DEPTH)
         self.assertLessEqual(len(depth_seen), notion_text.MAX_CALLS)
+        # The deepest level's own children were left out, and the import says so.
+        self.assertTrue(response.json()["partial"])
 
         wide_calls = []
 
@@ -218,7 +220,9 @@ class NotionTextTests(unittest.TestCase):
             response = self.client.post("/connectors/notion/import", headers=self.auth, json={"id": PAGE, "title": "p"})
         self.assertEqual(response.status_code, 200, response.text)
         self.assertLessEqual(len(wide_calls), notion_text.MAX_CALLS)
-        self.assertLessEqual(len(response.json()["text"].splitlines()), notion_text.MAX_BLOCKS)
+        # The blocks, then a blank line and the line that says the rest wasn't imported.
+        self.assertLessEqual(len(response.json()["text"].splitlines()), notion_text.MAX_BLOCKS + 2)
+        self.assertTrue(response.json()["partial"])
 
     def test_no_readable_text_only_after_the_attempt_finds_none(self):
         empty = {(PAGE, None): [block("paragraph", ""), block("divider"), block("image", "", external={"url": "https://example.com/a.png"}), block("to_do", "")]}
@@ -263,6 +267,237 @@ class NotionTextTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         notes = db.rows("study_guides")[0]["notes"]
         self.assertIn("Read chapter 4 on cell division", notes)
+
+
+def child_page(title, block_id):
+    return {"object": "block", "id": block_id, "type": "child_page", "has_children": True, "child_page": {"title": title}}
+
+
+class ThreadSafePages:
+    """A fake Notion that can be slow (each call sleeps `delay` seconds) and keeps how many calls ran at once."""
+
+    def __init__(self, tree, delay=0.0, hang=()):
+        import threading
+        self.tree, self.delay, self.hang, self.lock = tree, delay, set(hang), threading.Lock()
+        self.calls, self.running, self.peak = [], 0, 0
+
+    def __call__(self, account, user, slug, arguments):
+        import time
+        with self.lock:
+            self.calls.append(arguments["block_id"])
+            self.running += 1
+            self.peak = max(self.peak, self.running)
+        try:
+            time.sleep(3.0 if arguments["block_id"] in self.hang else self.delay)
+        finally:
+            with self.lock:
+                self.running -= 1
+        return listing(*self.tree.get((arguments["block_id"], arguments.get("start_cursor")), []))
+
+
+def toggles(count, answer=lambda i: f"Answer {i}"):
+    tree = {(PAGE, None): [block("toggle", f"Question {i}", block_id=f"t{i}", children=True) for i in range(count)]}
+    for i in range(count):
+        tree[(f"t{i}", None)] = [block("paragraph", answer(i))]
+    return tree
+
+
+class NotionBudgetTests(unittest.TestCase):
+    """Review fixes: a nested page imports inside the client's wait, a cut-off page says so, and a
+    page of sub-pages names them."""
+
+    def setUp(self):
+        import os
+        os.environ.setdefault("RETAIN_SIGNING_KEY", "test-key")
+        from fastapi.testclient import TestClient
+        from main import app
+        from rate_limit import limiter
+        limiter.reset()
+        self.client = TestClient(app)
+        self.auth = {"Authorization": "Bearer t"}
+        for p in [patch("routers.connectors.get_user_id", return_value=USER), patch("services.composio.account_for", return_value="ca_mine")]:
+            p.start()
+            self.addCleanup(p.stop)
+
+    def post(self, fake):
+        with patch("services.composio.run", side_effect=fake):
+            return self.client.post("/connectors/notion/import", headers=self.auth, json={"id": PAGE, "title": "p"})
+
+    def test_forty_nested_calls_are_read_a_few_at_a_time_not_one_after_another(self):
+        import time
+        delay = 0.1
+        fake = ThreadSafePages(toggles(40), delay=delay)
+        started = time.monotonic()
+        response = self.post(fake)
+        took = time.monotonic() - started
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertFalse(response.json()["partial"])
+        self.assertEqual(len(fake.calls), 41)
+        self.assertTrue(all(f"Answer {i}\n" in response.json()["text"] + "\n" for i in range(40)))
+        # 41 calls one by one would take 4.1 s; four at a time takes about a quarter of that.
+        self.assertLess(took, 41 * delay * 0.5, took)
+        from services import notion_text
+        self.assertGreater(fake.peak, 1)
+        self.assertLessEqual(fake.peak, notion_text.PARALLEL)
+
+    def test_the_time_budget_holds_when_notion_is_slow_or_hangs(self):
+        import time
+        from services import notion_text
+        # Every call takes 0.3 s and a budget of 0.8 s only gets through a few of them; one call never returns.
+        fake = ThreadSafePages(toggles(40), delay=0.3, hang={"t5"})
+        started = time.monotonic()
+        with patch.object(notion_text, "TIME_BUDGET", 0.8):
+            response = self.post(fake)
+        took = time.monotonic() - started
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertLess(took, 1.5, took)
+        self.assertTrue(response.json()["partial"])
+        text = response.json()["text"]
+        self.assertIn("Question 0", text)
+        self.assertTrue(text.splitlines()[-1].endswith("because Notion was slow to answer."), text.splitlines()[-1])
+        self.assertLess(len(fake.calls), 41)
+
+    def test_a_first_call_that_never_answers_is_a_502_inside_the_budget(self):
+        import time
+        from services import notion_text
+        fake = ThreadSafePages({}, hang={PAGE})
+        started = time.monotonic()
+        with patch.object(notion_text, "TIME_BUDGET", 0.5):
+            response = self.post(fake)
+        self.assertEqual(response.status_code, 502, response.text)
+        self.assertLess(time.monotonic() - started, 1.2)
+
+    def test_what_kept_39_answers_before_now_keeps_all_60(self):
+        fake = ThreadSafePages(toggles(60))
+        response = self.post(fake)
+        text = response.json()["text"]
+        self.assertEqual(sum(f"Answer {i}\n" in text + "\n" for i in range(60)), 60)
+        self.assertFalse(response.json()["partial"])
+
+    def test_a_deep_outline_and_a_2000_paragraph_page_are_read_whole(self):
+        tree = {(PAGE, None): []}
+        for h in range(12):
+            tree[(PAGE, None)].append(block("heading_2", f"H{h}"))
+            for b in range(4):
+                bid = f"b{h}-{b}"
+                tree[(PAGE, None)].append(block("bulleted_list_item", f"B{h}-{b}", block_id=bid, children=True))
+                tree[(bid, None)] = [block("bulleted_list_item", f"S{h}-{b}-{s}") for s in range(2)]
+        response = self.post(ThreadSafePages(tree))
+        self.assertEqual(response.json()["text"].count("  - S"), 96)
+        self.assertFalse(response.json()["partial"])
+        pages = {(PAGE, None): listing(*[block("paragraph", f"P{i}") for i in range(100)], has_more=True, cursor="c1")}
+        for n in range(1, 20):
+            pages[(PAGE, f"c{n}")] = listing(*[block("paragraph", f"P{n * 100 + i}") for i in range(100)], has_more=n < 19, cursor=f"c{n + 1}")
+
+        def run(account, user, slug, arguments):
+            return pages[(arguments["block_id"], arguments.get("start_cursor"))]
+        response = self.post(run)
+        self.assertEqual(len(response.json()["text"].splitlines()), 2000)
+        self.assertFalse(response.json()["partial"])
+
+    def test_a_page_stopped_by_a_cap_says_so_in_the_text_and_the_response(self):
+        from services import notion_text
+        for cap, value in (("MAX_CALLS", 10), ("MAX_BLOCKS", 25), ("MAX_DEPTH", 0)):
+            with self.subTest(cap=cap), patch.object(notion_text, cap, value), self.assertLogs("services.notion_text", "WARNING") as logged:
+                response = self.post(ThreadSafePages(toggles(60)))
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertTrue(response.json()["partial"], cap)
+            lines = response.json()["text"].splitlines()
+            self.assertEqual(lines[-1], "The rest of this Notion page wasn't imported because the page is longer than Cordia reads at once.")
+            self.assertEqual(lines[-2], "")
+            self.assertIn("Question 0", response.json()["text"])
+            self.assertIn("cut short (size)", logged.output[0])
+
+    def test_a_failed_call_is_said_too(self):
+        from fastapi import HTTPException
+
+        def run(account, user, slug, arguments):
+            if arguments["block_id"] == "t3":
+                raise HTTPException(status_code=502, detail="The app didn't respond.")
+            return ThreadSafePages(toggles(6))(account, user, slug, arguments)
+        response = self.post(run)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()["partial"])
+        self.assertIn("Answer 4", response.json()["text"])
+        self.assertTrue(response.json()["text"].splitlines()[-1].startswith("Part of this Notion page couldn't be read"))
+
+    def test_the_character_limit_keeps_the_note_as_the_last_line(self):
+        from services import file_extraction
+        long_line = "x" * 900
+        tree = {(PAGE, None): [block("paragraph", f"{long_line}{i}") for i in range(80)]}
+        with patch.object(file_extraction, "MAX_TEXT_CHARS", 10_000):
+            response = self.post(ThreadSafePages(tree))
+        body = response.json()
+        self.assertTrue(body["partial"])
+        self.assertLessEqual(len(body["text"]), 10_000)
+        self.assertIn("longer than Cordia reads at once", body["text"].splitlines()[-1])
+
+    def test_a_hub_page_of_sub_pages_names_them(self):
+        tree = {(PAGE, None): [child_page(f"Lecture {i}", f"cp{i}") for i in range(1, 9)]}
+        fake = ThreadSafePages(tree)
+        response = self.post(fake)
+        self.assertEqual(response.status_code, 422, response.text)
+        detail = response.json()["detail"]
+        self.assertEqual(detail, "This page's notes are in its sub-pages: Lecture 1, Lecture 2, Lecture 3, Lecture 4, Lecture 5, Lecture 6 and 2 more. Import one of those.")
+        # Sub-pages are not read into this page: one call, for the hub itself.
+        self.assertEqual(fake.calls, [PAGE])
+
+    def test_sub_page_titles_stay_in_place_on_a_page_with_notes(self):
+        tree = {(PAGE, None): [block("heading_1", "Week 3"), block("paragraph", "Overview of the week."), child_page("Lecture 3", "cp3"),
+                               {"object": "block", "id": "db", "type": "child_database", "has_children": False, "child_database": {"title": "Flashcards"}}]}
+        response = self.post(ThreadSafePages(tree))
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["text"].splitlines(), ["# Week 3", "Overview of the week.", "Sub-page: Lecture 3", "Database: Flashcards"])
+
+    def test_one_tutor_message_makes_at_most_the_stated_number_of_notion_calls(self):
+        from routers import connectors
+        from services import notion_text
+        counts = {"search": 0, "blocks": 0}
+
+        def run(account, user, slug, arguments):
+            if slug == "NOTION_SEARCH_NOTION_PAGE":
+                counts["search"] += 1
+                return {"results": [{"id": "P-" + arguments["query"], "object": "page", "properties": {}}]}
+            counts["blocks"] += 1
+            if arguments["block_id"].startswith("P-"):
+                return listing(*[block("toggle", "", block_id=f"T{i}-{arguments['block_id']}", children=True) for i in range(60)])
+            return listing(block("divider"))
+        question = "quiz me on my notion page about cellular respiration glycolysis"
+        with patch("services.composio.configured", return_value=True), patch("services.composio.active_accounts", return_value={"notion": "ca_n"}), \
+                patch("services.connector_settings.uses", return_value={"tutor": True}), patch("services.composio.run", side_effect=run):
+            self.assertEqual(len(connectors._search_terms(question, "notion")), 3)
+            found = connectors.tutor_material(USER, question)
+        total = counts["search"] + counts["blocks"]
+        self.assertEqual(counts["search"], 1)  # the first page found is the one read
+        self.assertLessEqual(total, notion_text.TUTOR_MAX_CALLS)
+        self.assertIn("no text on it", found["problem"])
+
+        # Three searches that find nothing, then one that does: still inside the same number.
+        counts.update(search=0, blocks=0)
+
+        def late(account, user, slug, arguments):
+            if slug == "NOTION_SEARCH_NOTION_PAGE":
+                counts["search"] += 1
+                return {"results": [{"id": "P", "object": "page"}] if counts["search"] == 3 else []}
+            counts["blocks"] += 1
+            return listing(block("paragraph", "Glycolysis makes two ATP."))
+        with patch("services.composio.configured", return_value=True), patch("services.composio.active_accounts", return_value={"notion": "ca_n"}), \
+                patch("services.connector_settings.uses", return_value={"tutor": True}), patch("services.composio.run", side_effect=late):
+            found = connectors.tutor_material(USER, question)
+        self.assertIn("Glycolysis makes two ATP.", found["text"])
+        self.assertLessEqual(counts["search"] + counts["blocks"], notion_text.TUTOR_MAX_CALLS)
+
+    def test_the_tutor_names_the_sub_pages_of_a_hub(self):
+        from routers import connectors
+
+        def run(account, user, slug, arguments):
+            if slug == "NOTION_SEARCH_NOTION_PAGE":
+                return {"results": [{"id": "HUB", "object": "page", "properties": {"title": {"type": "title", "title": [{"plain_text": "Biology hub"}]}}}]}
+            return listing(child_page("Lecture 1", "a"), child_page("Lecture 2", "b"))
+        with patch("services.composio.configured", return_value=True), patch("services.composio.active_accounts", return_value={"notion": "ca_n"}), \
+                patch("services.connector_settings.uses", return_value={"tutor": True}), patch("services.composio.run", side_effect=run):
+            found = connectors.tutor_material(USER, 'Quiz me on my Notion page "Biology hub"')
+        self.assertIn("Lecture 1, Lecture 2", found["problem"])
 
 
 if __name__ == "__main__":

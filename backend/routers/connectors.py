@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import os
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -193,9 +194,10 @@ class ImportRequest(BaseModel):
     title: str = Field(default="", max_length=300)
 
 
-def _notion_text(account: str, user_id: str, page_id: str) -> str:
-    """The page's text: every text block, nested children followed (services/notion_text.py)."""
-    return notion_text.page_text(account, user_id, page_id)
+def _sub_pages_error(titles: list) -> HTTPException:
+    """A page that is only sub-pages (a course hub, a table of contents): which ones to import instead."""
+    shown = ", ".join(titles[:6]) + (f" and {len(titles) - 6} more" if len(titles) > 6 else "")
+    return HTTPException(status_code=422, detail=f"This page's notes are in its sub-pages: {shown}. Import one of those.")
 
 
 def _drive_text(account: str, user_id: str, file_id: str) -> str:
@@ -217,32 +219,41 @@ def _no_text(connector: str) -> HTTPException:
     return HTTPException(status_code=422, detail=f"That {'page' if connector == 'notion' else 'file'} has no readable text.")
 
 
-def _import_text(connector: str, user_id: str, body: ImportRequest) -> tuple[str, str]:
+def _import_text(connector: str, user_id: str, body: ImportRequest) -> tuple[str, str, bool]:
+    """(text, title, partial): partial when part of the page wasn't imported (the text says so too)."""
     if connector not in {"gdrive", "gdocs", "notion", "dropbox"}:
         raise HTTPException(status_code=404, detail="Unknown connector")
     account = composio.account_for(user_id, connector)
+    partial, notion_has_text = False, False
     if connector == "gdocs":
         data = composio.run(account, user_id, "GOOGLEDOCS_GET_DOCUMENT_PLAINTEXT", {"document_id": body.id, "include_tables": True})
         text, title = str(data.get("plain_text") or ""), data.get("title") or body.title
     elif connector == "notion":
-        text, title = _notion_text(account, user_id, body.id), body.title
+        read = notion_text.read_page(account, user_id, body.id)
+        if not read.readable:
+            if read.sub_pages:
+                raise _sub_pages_error(read.sub_pages)
+            if read.reason in {"time", "missed"}:  # the clock or a failed call stopped the read before any text: that is not "no text"
+                raise HTTPException(status_code=502, detail="Notion was slow to answer. Try again in a minute.")
+        text, partial = read.text_within(files.MAX_TEXT_CHARS)
+        title, notion_has_text = body.title, read.readable
     elif connector == "dropbox":
         from services import dropbox_sync
         text, title = dropbox_sync.file_text(account, user_id, body.id, body.title), body.title
     else:
         text, title = _drive_text(account, user_id, body.id), body.title
     # A short to-do is still text; empty pages, dividers and images are not.
-    if not (notion_text.has_text(text) if connector == "notion" else len(text.strip()) >= 10):
+    if not (notion_has_text if connector == "notion" else len(text.strip()) >= 10):
         raise _no_text(connector)
-    return text, (title or "Imported notes")[:300]
+    return text, (title or "Imported notes")[:300], partial
 
 
 @router.post("/connectors/{connector}/import")
 @limiter.limit("10/minute")
 def import_file(connector: str, body: ImportRequest, request: Request, authorization: str = Header(default="")):
     """The file's text, for the student to review on Create before making a guide."""
-    text, title = _import_text(connector, get_user_id(authorization), body)
-    return {"title": title, "text": text[:files.MAX_TEXT_CHARS]}
+    text, title, partial = _import_text(connector, get_user_id(authorization), body)
+    return {"title": title, "text": text[:files.MAX_TEXT_CHARS], "partial": partial}
 
 
 class LibraryRequest(ImportRequest):
@@ -257,13 +268,13 @@ def add_to_library(connector: str, body: LibraryRequest, request: Request, autho
     from services import library_import
     user_id = get_user_id(authorization)
     folder = _own_folder(user_id, body.folder_id)
-    text, title = _import_text(connector, user_id, body)
+    text, title, partial = _import_text(connector, user_id, body)
     names = {"gdrive": "Google Drive", "gdocs": "Google Docs", "notion": "Notion", "dropbox": "Dropbox"}
     guide = library_import.upsert_source(user_id, ref=f"{connector}:{body.id}", connector=connector, title=title, text=text,
                                          folder_id=folder["id"], source_type=connector, source_title=names[connector])
     if not guide:
         raise _no_text(connector)
-    return {"guide": {"id": guide.get("id"), "title": guide.get("title")}}
+    return {"guide": {"id": guide.get("id"), "title": guide.get("title")}, "partial": partial}
 
 
 # ---- The Tutor reads an app the student names ----
@@ -337,7 +348,11 @@ def tutor_material(user_id: str, question: str) -> Optional[dict]:
     if connector in {"gcal", "gtasks"}:
         title = "Your next 14 days" if connector == "gcal" else "Your open tasks"
         return {**found, "title": f"{name}: {title}", "text": _upcoming_from_app(account, user_id, connector)}
+    # One budget for the whole message: the searches and the page read together (notion_text.TUTOR_*).
+    deadline, searches = time.monotonic() + notion_text.TUTOR_TIME_BUDGET, 0
     for terms in _search_terms(question, connector):
+        if connector == "notion" and time.monotonic() >= deadline:
+            break
         if connector == "gdrive":
             data = composio.run(account, user_id, "GOOGLEDRIVE_FIND_FILE", {
                 "q": _drive_query(terms), "pageSize": 5, "orderBy": "modifiedTime desc", "fields": "files(id,name,mimeType)",
@@ -349,6 +364,7 @@ def tutor_material(user_id: str, question: str) -> Optional[dict]:
             })
             hits = [(f.get("id"), f.get("name")) for f in data.get("files") or data.get("documents") or []]
         else:
+            searches += 1
             data = composio.run(account, user_id, "NOTION_SEARCH_NOTION_PAGE", {"query": terms, "page_size": 5})
             hits = [(r.get("id"), _notion_title(r)) for r in data.get("results") or [] if r.get("object") != "database"]
         hits = [hit for hit in hits if hit[0]]
@@ -358,7 +374,17 @@ def tutor_material(user_id: str, question: str) -> Optional[dict]:
         if connector == "gdocs":
             text = str(composio.run(account, user_id, "GOOGLEDOCS_GET_DOCUMENT_PLAINTEXT", {"document_id": file_id, "include_tables": True}).get("plain_text") or "")
         elif connector == "notion":
-            text = _notion_text(account, user_id, file_id)
+            # The first page found is the one read: trying the next search term on an empty page would
+            # spend the whole page budget again.
+            read = notion_text.read_page(account, user_id, file_id, deadline=deadline,
+                                         max_calls=max(notion_text.TUTOR_MAX_CALLS - searches, 1))
+            if not read.readable:
+                if read.sub_pages:
+                    return {**found, "problem": f"Found {title or 'a page'} in {name}, but its notes are in its sub-pages: "
+                                                f"{', '.join(read.sub_pages[:6])}. Ask about one of those by name."}
+                return {**found, "problem": f"Found {title or 'a page'} in {name}, but "
+                                            + ("it was slow to answer. Ask again in a minute." if read.reason in {"time", "missed"} else "there's no text on it to read.")}
+            text = read.text_within(files.MAX_TEXT_CHARS)[0]
         else:
             try:
                 text = _drive_text(account, user_id, file_id)
