@@ -12,6 +12,7 @@ update public.feedback set status = 'resolved' where left(id::text, 8) in ('<id>
 | --- | --- | --- | --- | --- | --- |
 | 1 | Tutor as a study helper | F6 | Opus | f53bfc5f | Highest of the batch. Prompts stay domain-neutral; no change to which models the product calls. Backend parts need `fly deploy` by Jude. |
 | 2 | Learn question quality | F5 | Opus | ed2eb2e2, b67047f0 | Find why structure questions slipped through; fix in `text_processing.py` first, prompts second (CLAUDE.md). Test on nursing, art history, business law, literature, CS. Backend: `fly deploy` by Jude. |
+| 2b | Calendar with four views | F10 | Opus (UI), Sonnet (data and wiring) | none given | After F6 and F5. Mockups: redesign canvas https://claude.ai/artifact/T1sk4u66DGSsnWDR26swbh, boards Calendar A to D. Existing data only; a needed table gets a NOT APPLIED migration. Own pull request with a preview. |
 | 3 | Settings polish | F1 | Sonnet | 4f036165 | Includes the Notion import fixes (ordinary pages import their text). |
 | 4 | Guide page | F4 | Sonnet | 5ec17e97, 298f5965, b24fe320 | |
 | 5 | Search and the tour | F2, F7 | Opus (F2), Sonnet (F7) | ee529baf, 8844cc2f | Starts after T10 merges: T10 edits `SearchModal.js`. |
@@ -40,3 +41,11 @@ F7 Onboarding tour [8844cc2f]: the highlight cut-out uses the target's own borde
 F8 Discover [da3d2e78]: proper empty state with padding, and something useful on an empty page (popular public sets or classmates' class sets), in the shell's layout.
 
 F9 Old feedback triage: see the table. 79ab943f: practice graded "54" wrong when the answer was 54.
+
+F10 Calendar, four views (Jude, 2026-11-18), from the redesign canvas boards Calendar A to D. One segmented control: Week, Board, Month, Agenda; remember the last one on the device. Defaults: Week on wide screens, Agenda under 768px (Agenda is the only phone view until T9).
+- Week (board A): time grid 8 AM to 10 PM, a Due strip above each day, study blocks as class-tinted glass, exams as solid olive blocks, today's column tinted, an olive now line. Drag a study block to move or resize it.
+- Board (board D): seven day columns with cards in time order, planned study hours per day as a small bar, the exam card with its readiness ring, "Add study time" per day, and a "Needs a time" tray at the top. Drag a tray item onto a day to make a study block, or press Find time.
+- Month (board C): month grid with up to two deadline chips per day plus "+N more", study counts, today outlined, the selected day's timeline in a right panel. Click a day to select it.
+- Agenda (board B): Yesterday, Today, Tomorrow and later as a list with one action per row (Start for study time, Review now for an exam, Find time if nothing is planned, Planned if it is), with exam readiness, a mini month and "Needs study time" on the right.
+Shared: Plan my week in the header; the same class colours and flag icon for anything due; done items struck through and faded; the exam readiness ring from Learn's real numbers. "Needs study time" = a deadline in the next 7 days with no study block for that class before it. Find time uses the existing Plan my week logic. Moving or creating study blocks keeps the existing Google Calendar sync. Data from existing sources only (Canvas deadlines, lecture to-dos, study_blocks, assignment steps); no new tables, or a NOT APPLIED migration for Jude.
+Director's note: the canvas is a claude.ai artifact; earlier sessions could not open such links from here. When F10 starts, the director tries the built-in browser (Jude may already be signed in) and saves the four boards as images into the F10 worktree for the builders; if that fails, Jude is asked to export them.
