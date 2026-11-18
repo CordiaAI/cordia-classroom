@@ -19,7 +19,7 @@ from ids import is_uuid
 from rate_limit import limiter
 from routers.calendar import calendar_for
 from services import composio
-from services import connector_settings, google_sync, sync_state
+from services import connector_settings, google_sync, notion_text, sync_state
 from services import file_extraction as files
 
 router = APIRouter(tags=["connectors"])
@@ -194,15 +194,8 @@ class ImportRequest(BaseModel):
 
 
 def _notion_text(account: str, user_id: str, page_id: str) -> str:
-    data = composio.run(account, user_id, "NOTION_FETCH_BLOCK_CONTENTS", {"block_id": page_id, "page_size": 100})
-    lines = []
-    for block in data.get("results") or []:
-        kind = str(block.get("type"))
-        text = "".join(part.get("plain_text", "") for part in (block.get(kind) or {}).get("rich_text") or [])
-        if not text:
-            continue
-        lines.append(("# " if kind.startswith("heading") else "- " if "list_item" in kind or kind == "to_do" else "") + text)
-    return "\n".join(lines)
+    """The page's text: every text block, nested children followed (services/notion_text.py)."""
+    return notion_text.page_text(account, user_id, page_id)
 
 
 def _drive_text(account: str, user_id: str, file_id: str) -> str:
@@ -233,7 +226,8 @@ def _import_text(connector: str, user_id: str, body: ImportRequest) -> tuple[str
         text, title = dropbox_sync.file_text(account, user_id, body.id, body.title), body.title
     else:
         text, title = _drive_text(account, user_id, body.id), body.title
-    if len(text.strip()) < 10:
+    # Said only here, after the import was tried and read nothing (a short to-do is still text).
+    if not (notion_text.has_text(text) if connector == "notion" else len(text.strip()) >= 10):
         raise HTTPException(status_code=422, detail="That file has no readable text.")
     return text, (title or "Imported notes")[:300]
 
