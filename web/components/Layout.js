@@ -30,7 +30,8 @@ export default function Layout({ children, timerState, setTimerState }) {
   // and the window's width; null while the page hydrates (lib/useNewShell.js).
   const shell = useNewShell();
   // The Tutor page and the home show the Tutor full size, so the side panel stays out of the way there.
-  const pageOwnsTutor = OWNS_TUTOR.includes(router.pathname);
+  // So does a class page in the new shell: its own composer talks to the Tutor (components/ClassProject.js).
+  const pageOwnsTutor = OWNS_TUTOR.includes(router.pathname) || Boolean(shell && router.pathname === '/folder/[id]');
   const activeGuideId = router.query.guideId || (router.pathname === '/guide/[id]' ? router.query.id : '');
   const activeNoteId = router.pathname === '/smartnotes' ? router.query.id : '';
   // Remount the page when the material changes (guide A -> guide B), not on every query tweak.

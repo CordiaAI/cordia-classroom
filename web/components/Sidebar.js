@@ -446,7 +446,7 @@ export default function Sidebar() {
           </Link>
         ))}
       </nav>
-      <TutorBubble />
+      <TutorBubble ownedBy={['/folder/[id]']} />
 
       {search && <SearchModal instant={search.instant} onClose={() => setSearch(null)} />}
       {showHelp && (

@@ -5,7 +5,9 @@ import { walkthroughEvent } from '../lib/walkthrough';
 
 // The Tutor, one tap away on every page: a glass bubble in the bottom-right corner.
 // Wide screens open it beside the page; phones open the full Tutor page.
-export default function TutorBubble() {
+// ownedBy: pages that show the Tutor themselves besides the Tutor page and the home (the new shell's
+// class page, whose composer is the Tutor there: components/Sidebar.js passes it).
+export default function TutorBubble({ ownedBy = [] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
@@ -16,7 +18,7 @@ export default function TutorBubble() {
   }, []);
 
   // The Tutor page and the chat home show the Tutor themselves.
-  if (router.pathname === '/tutor' || router.pathname === '/home' || open) return null;
+  if (router.pathname === '/tutor' || router.pathname === '/home' || ownedBy.includes(router.pathname) || open) return null;
 
   function show() {
     walkthroughEvent('ask');

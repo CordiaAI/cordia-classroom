@@ -93,31 +93,37 @@ export function ClassSets({ classId, onToast, initial }) {
   );
 }
 
-// Your own Canvas deadlines for this class.
-export function ClassDeadlines({ classId, deadlines }) {
+// Your own Canvas deadlines for this class. onOpen (the class page in the new shell): each title
+// opens that deadline's assignment sheet.
+export function ClassDeadlines({ classId, deadlines, onOpen }) {
   if (!classId) return null;
   if (!deadlines) return <SectionLoader height={120} label="Loading deadlines" />;
   if (!deadlines.length) return <p className="cp-line">No deadlines</p>;
   return (
     <ul className="c-card cp-list">
       {deadlines.map((item, index) => (
-        <DeadlineRow key={item.id || index} item={item} />
+        <DeadlineRow key={item.id || index} item={item} onOpen={onOpen} />
       ))}
       <ClassStyles />
     </ul>
   );
 }
 
-function DeadlineRow({ item }) {
+function DeadlineRow({ item, onOpen }) {
   const [done, setDone] = useState(Boolean(item.done));
   const late = !done && new Date(item.due_at) < new Date();
+  const main = (
+    <>
+      <span className="cp-title c-truncate">{item.title}</span>
+      {(item.submitted || late) && <span className="c-meta">{item.submitted ? 'Turned in on Canvas' : 'Past due'}</span>}
+    </>
+  );
   return (
     <li className={'cp-row cp-deadline' + (done ? ' is-done' : '')}>
       {item.id && <DoneCheck id={item.id} title={item.title} done={done} onChange={setDone} />}
-      <span className="cp-main">
-        <span className="cp-title c-truncate">{item.title}</span>
-        {(item.submitted || late) && <span className="c-meta">{item.submitted ? 'Turned in on Canvas' : 'Past due'}</span>}
-      </span>
+      {onOpen && item.id
+        ? <button type="button" className="cp-main cp-open" onClick={() => onOpen({ ...item, done })}>{main}</button>
+        : <span className="cp-main">{main}</span>}
       <span className="c-meta cp-due">{dueLabel(item.due_at)}</span>
     </li>
   );
@@ -137,6 +143,7 @@ function ClassStyles() {
         .cp-row .c-menu-wrap:has(.cp-versions) > .c-icon-btn { width: auto; padding: 0 12px; border-radius: 999px; }
         .cp-deadline { gap: 14px; }
         .cp-deadline.is-done .cp-title { color: var(--muted); text-decoration: line-through; }
+        .cp-open { align-self: stretch; align-content: center; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
         .cp-due { font-variant-numeric: tabular-nums; padding-right: 16px; white-space: nowrap; }
         @media (max-width: 767px) { .cp-list { padding-left: 16px; } .cp-row { flex-wrap: wrap; padding: 12px 0; } .cp-main { flex-basis: 100%; } .cp-deadline { flex-wrap: nowrap; } .cp-deadline .cp-main { flex-basis: auto; } }
     `}</style>

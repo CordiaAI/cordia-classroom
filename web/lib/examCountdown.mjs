@@ -1,6 +1,6 @@
 // The Dashboard's exam countdown: the nearest exam in the next two weeks that has a Learn guide,
 // and how ready the student is for it (Learn's own readiness).
-import { counts, dayKey, readiness, restoreLevels } from './learnEngine.mjs';
+import { counts, dayKey, readiness, restoreLevels, testPlan } from './learnEngine.mjs';
 import { parseQAPairs } from './guideText.mjs';
 
 export const COUNTDOWN_DAYS = 14;
@@ -12,6 +12,11 @@ function daysUntil(date, today) {
 
 const reviewTitle = title => `${String(title || '').trim()}: review`.toLowerCase();
 
+// The review set built for an exam ("<exam>: review"), from a list of guides, or null.
+export function reviewSetFor(guides, examTitle) {
+  return (guides || []).find(guide => String(guide?.title || '').trim().toLowerCase() === reviewTitle(examTitle)) || null;
+}
+
 // guides: list summaries (flashcard_progress.learn.test_date); exams: calendar or course-work items
 // of type 'exam'. An exam's guide is its review set ("<exam>: review"); any guide with a Learn
 // test date counts too. Returns { guideId, title, date, daysLeft } or null.
@@ -21,7 +26,7 @@ export function nearestExam(guides, exams, today = dayKey()) {
   (exams || []).forEach(exam => {
     if (exam?.done || !exam?.due_at) return;
     const date = dayKey(exam.due_at);
-    const guide = (guides || []).find(item => String(item.title || '').trim().toLowerCase() === reviewTitle(exam.title));
+    const guide = reviewSetFor(guides, exam.title);
     if (guide && inRange(date)) found.push({ guideId: guide.id, title: String(exam.title).trim(), date });
   });
   (guides || []).forEach(guide => {
@@ -36,6 +41,18 @@ export function nearestExam(guides, exams, today = dayKey()) {
 export function examReadiness(questions, learn, today = dayKey()) {
   const list = Array.isArray(questions) ? questions : [];
   return readiness(counts(list, restoreLevels(list, learn?.levels || {}), today));
+}
+
+// Where a full guide stands in Learn: Learn's own tally (new, learning, familiar, mastered, of
+// total ideas) from its questions and saved levels.
+export function guideTally(guide, today = dayKey()) {
+  const questions = learnQuestions(guide);
+  return counts(questions, restoreLevels(questions, guide?.flashcard_progress?.learn?.levels || {}), today);
+}
+
+// Learn's pace to an exam date for a full guide: { daysLeft, remaining, perDay, past }, or null.
+export function examPlan(guide, date, today = dayKey()) {
+  return testPlan(guideTally(guide, today), date, today);
 }
 
 // Learn's questions for a guide (the saved quiz), or its own questions before Learn first opens.

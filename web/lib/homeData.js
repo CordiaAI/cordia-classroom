@@ -3,8 +3,8 @@ import { loadFolders } from './folders';
 import { classLabel } from './classLabel';
 import { readCalendarCache, rememberCalendar } from './calendarCache';
 import { dueCount } from './studyQueue';
-import { counts, dayKey, restoreLevels, testPlan } from './learnEngine.mjs';
-import { learnQuestions, nearestExam } from './examCountdown.mjs';
+import { dayKey } from './learnEngine.mjs';
+import { examPlan, nearestExam } from './examCountdown.mjs';
 import { deadlineTitle } from './formatters';
 
 // Everything the chat home shows (DESIGN-SPEC 4.1), loaded together so the page appears once:
@@ -36,11 +36,7 @@ export async function loadHome(today = dayKey()) {
   let className = '';
   if (exam) {
     const full = await safe(apiFetch('/guides/' + encodeURIComponent(exam.guideId)));
-    if (full?.guide) {
-      const questions = learnQuestions(full.guide);
-      const tally = counts(questions, restoreLevels(questions, full.guide.flashcard_progress?.learn?.levels || {}), today);
-      plan = testPlan(tally, exam.date, today);
-    }
+    if (full?.guide) plan = examPlan(full.guide, exam.date, today);
     const folderId = guides.find(guide => guide.id === exam.guideId)?.folder_id;
     const folder = folderId && folders.find(item => String(item.id) === String(folderId));
     if (folder) className = classLabel(folder.name).title || classLabel(folder.name).code || folder.name;
