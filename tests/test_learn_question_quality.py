@@ -1,0 +1,421 @@
+"""Learn question quality (feedback ed2eb2e2, b67047f0), on captured text from five subjects:
+
+1. No question about the source's structure ("listed for Chapter 1", "Slide 5"): slide and page
+   markers never reach the guide prompt, and a question that still points at the source is
+   rewritten (a leading or trailing "according to Slide 5") or dropped.
+2. Every multiple-choice question has exactly 4 choices of the same kind (a list for a list, a value
+   for a value) and similar length; the guide's other answers are only borrowed when they answer
+   the same kind of question (never a company for a person).
+3. "Help me remember" covers every part of a multi-part answer, retrying once when it doesn't.
+"""
+
+import json
+import os
+import sys
+import unittest
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "backend"))
+
+from routers import quiz  # noqa: E402
+from services import llm, retain  # noqa: E402
+from services.choice_shapes import fits  # noqa: E402
+from services.text_processing import (  # noqa: E402
+    chunk_text, extract_slideshow_content, format_slideshow_text, refers_to_source, standalone_question,
+    strip_structure_markers,
+)
+
+GUIDE_ID = "00000000-0000-0000-0000-000000000001"
+
+# Captured text as each source sends it: PPTX/extension slides, OCR'd PDF pages, a web page.
+SOURCES = {
+    "nursing_slides": "--- Slide 1 ---\nFluid and Electrolytes\n--- Slide 5 ---\nPotassium\n"
+                      "Normal serum potassium is 3.5-5.0 mEq/L.\nHyperkalemia causes peaked T waves.\n"
+                      "--- Slide 6 ---\nSlide 6: Sodium\nNormal serum sodium is 135-145 mEq/L.",
+    "art_history_pdf": "--- Page 1 ---\nChapter 1: The Renaissance\nPage 1 of 12\nLeonardo da Vinci painted the Mona Lisa "
+                       "using sfumato, a soft blending of tones.\n--- Page 2 ---\nPage 2 of 12\nChiaroscuro is the "
+                       "strong contrast between light and dark.\n2",
+    "business_law_web": "Business Law - Week 3\nChapter 11 bankruptcy lets a business reorganize its debts while it "
+                        "keeps operating.\nSection 2 of the Sherman Act prohibits monopolization.\nPage 3",
+    "literature_pdf": "--- Page 12 ---\nIn Chapter 9 of The Great Gatsby, only Nick and Owl Eyes attend Gatsby's "
+                      "funeral.\np. 12\nThe green light symbolizes Gatsby's hope for the future.",
+    "cs_slides": "--- Slide 3 ---\nVirtual Memory\nA page fault occurs when a program touches a page that is not in "
+                 "memory.\n--- Slide 4 ---\nBinary search runs in O(log n) time.\nSlide 4 of 20",
+}
+
+# What a model wrote from those sources: subject questions mixed with questions about the source.
+MODEL_OUTPUT = {
+    "nursing": [
+        ("What is the normal serum potassium range, according to Slide 5?", "3.5-5.0 mEq/L", "What is the normal serum potassium range?"),
+        ("What topics are covered in this lecture?", "Potassium and sodium", None),
+        ("What is shown on slide 7?", "An ECG strip", None),
+        ("What ECG change does hyperkalemia cause?", "Peaked T waves", "same"),
+        ("What is the typical presentation of hyperkalemia?", "Muscle weakness and peaked T waves", "same"),
+        ("What is a C-section?", "Surgical delivery of a baby through the abdomen", "same"),
+    ],
+    "art_history": [
+        ("Which artists are listed for Chapter 1?", "Leonardo da Vinci, Michelangelo, Raphael and Donatello", None),
+        ("On page 3, what technique is described?", "Sfumato", None),
+        ("According to the reading, what is chiaroscuro?", "The strong contrast between light and dark", "What is chiaroscuro?"),
+        ("Who painted the Mona Lisa?", "Leonardo da Vinci", "same"),
+        ("What does Figure 2 show?", "The Last Supper", None),
+        ("What is a cross-section drawing?", "A view of an object cut through", "same"),
+    ],
+    "business_law": [
+        ("What does Chapter 11 bankruptcy allow a business to do?", "Reorganize its debts while operating", "same"),
+        ("Under Section 2 of the Sherman Act, what conduct is prohibited?", "Monopolization", "same"),
+        ("What are the key terms for Chapter 3?", "Tort, contract and agency", None),
+        ("What is discussed in Section 4.2?", "Agency law", None),
+        ("Which companies are listed on the New York Stock Exchange?", "Publicly traded companies that meet its rules", "same"),
+        ("What is a listed company?", "A company whose shares trade on an exchange", "same"),
+        ("What are the requirements for filing for Chapter 7?", "Passing the means test", "same"),
+    ],
+    "literature": [
+        ("What happens in Chapter 9 of The Great Gatsby?", "Only Nick and Owl Eyes attend Gatsby's funeral", "same"),
+        ("What themes are introduced in this chapter?", "Hope and loss", None),
+        ("What does the passage on page 12 reveal about Nick?", "His loyalty", None),
+        ("What does the green light symbolize in The Great Gatsby?", "Gatsby's hope for the future", "same"),
+        ("Which characters are listed in the document?", "Nick, Gatsby, Daisy and Tom", None),
+    ],
+    "computer_science": [
+        ("What causes a page fault?", "A program touching a page that is not in memory", "same"),
+        ("What is a page table?", "A map from virtual pages to physical frames", "same"),
+        ("In Lecture 4, what is the time complexity of binary search?", "O(log n)", "What is the time complexity of binary search?"),
+        ("Which algorithms are listed in the table above?", "Binary search and merge sort", None),
+        ("What does this class inherit from in Java?", "Object", "same"),
+        ("What are the notes of a C major triad?", "C, E and G", "same"),
+    ],
+}
+
+
+def reply(text):
+    return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=text))])
+
+
+class StructureMarkerTests(unittest.TestCase):
+    """Problem 1, earliest point: markers in the captured text that invite "Slide 5" questions."""
+
+    def test_slide_chunks_carry_titles_but_no_slide_numbers(self):
+        slides = extract_slideshow_content(SOURCES["nursing_slides"])
+        for text in [format_slideshow_text(slides), *chunk_text("", slides=slides)]:
+            self.assertNotIn("<NUMBER>", text)
+            self.assertNotIn("Untitled Slide", text)
+            self.assertIn("<SLIDE>", text)
+        untitled = format_slideshow_text([{"title": "", "content": ["Mitosis splits a cell."]}])
+        self.assertNotIn("Slide", untitled.replace("<SLIDE>", "").replace("</SLIDE>", ""))
+
+    def test_page_and_slide_markers_are_stripped_from_every_source(self):
+        for name, text in SOURCES.items():
+            cleaned = strip_structure_markers(text)
+            for marker in ("--- Slide", "--- Page", "Page 1 of 12", "Page 2 of 12", "Slide 4 of 20", "Slide 6:", "p. 12"):
+                self.assertNotIn(marker, cleaned, f"{name}: {marker}")
+            self.assertNotRegex(cleaned, r"(?m)^\s*(?:Page )?\d+\s*$", name)
+        cleaned = strip_structure_markers(SOURCES["nursing_slides"])
+        self.assertIn("Sodium\nNormal serum sodium is 135-145 mEq/L.", cleaned)
+        law = strip_structure_markers(SOURCES["business_law_web"])
+        self.assertIn("Chapter 11 bankruptcy", law)
+        self.assertIn("Section 2 of the Sherman Act", law)
+
+    def test_a_line_mentioning_a_slide_is_still_content(self):
+        self.assertEqual(strip_structure_markers("Slide 3 covers torts"), "Slide 3 covers torts")
+
+    def test_the_guide_prompt_never_sees_a_marker(self):
+        chat = MagicMock(return_value=reply("Q1: What is chiaroscuro?\nA1: Strong contrast between light and dark."))
+        with patch.object(llm, "get_openai_client", return_value=None), patch.object(llm, "chat", chat):
+            for text in SOURCES.values():
+                llm.generate_study_guide(chunk_text(text))
+        for call in chat.call_args_list:
+            prompt = call.kwargs["messages"][1]["content"]
+            for marker in ("--- Slide", "--- Page", "of 12", "Slide 4 of 20", "<NUMBER>"):
+                self.assertNotIn(marker, prompt)
+
+    def test_the_stand_alone_rule_applies_to_every_question(self):
+        prompt = llm._build_study_guide_prompt("text")
+        rule = next(line for line in prompt.splitlines() if "stand alone" in line)
+        self.assertTrue(rule.startswith("• Every question must stand alone"), rule)
+        self.assertEqual(prompt.count("stand alone"), 1, "one rule, not a second copy")
+
+
+class StructureQuestionTests(unittest.TestCase):
+    """Problem 1, deterministic backstop after generation."""
+
+    def test_five_subjects(self):
+        for subject, rows in MODEL_OUTPUT.items():
+            for question, _answer, expected in rows:
+                kept = standalone_question(question)
+                if expected is None:
+                    self.assertIsNone(kept, f"{subject}: kept {question!r} as {kept!r}")
+                else:
+                    self.assertEqual(kept, question if expected == "same" else expected, subject)
+                    self.assertFalse(refers_to_source(kept), f"{subject}: {kept}")
+
+    def test_postprocessed_guides_hold_no_structure_question(self):
+        for subject, rows in MODEL_OUTPUT.items():
+            raw = "\n".join(f"Q{i}: {q}\nA{i}: {a}" for i, (q, a, _) in enumerate(rows, 1))
+            guide, next_index = llm._postprocess_study_guide(raw)
+            questions = [line.split(": ", 1)[1] for line in guide.splitlines() if line.startswith("Q")]
+            expected = [q if e == "same" else e for q, _, e in rows if e is not None]
+            self.assertEqual(questions, expected, subject)
+            self.assertEqual(next_index, len(expected) + 1, "numbering stays continuous")
+            self.assertTrue(llm.study_guide_is_complete(guide))
+
+    def test_answers_lose_a_leading_source_clause(self):
+        guide, _ = llm._postprocess_study_guide("Q1: What is sfumato?\nA1: According to the slides, a soft blending of tones.")
+        self.assertIn("A1: A soft blending of tones.", guide)
+
+    def test_quizzes_built_from_older_guides_skip_them(self):
+        text = "\n".join(f"Q{i}: {q}\nA{i}: {a}" for i, (q, a, _) in enumerate(MODEL_OUTPUT["art_history"], 1))
+        questions = [pair["question"] for pair in quiz._parse_qa_pairs(text)]
+        self.assertEqual(questions, ["What is chiaroscuro?", "Who painted the Mona Lisa?", "What is a cross-section drawing?"])
+
+    def test_saved_quizzes_drop_them_once_and_keep_the_rest(self):
+        saved = [
+            {"question": "Which artists are listed for Chapter 1?", "options": ["a b", "c d", "e f", "g h"], "correct_index": 0},
+            {"question": "Who painted the Mona Lisa?", "options": ["Leonardo da Vinci", "Raphael", "Titian", "Giotto"], "correct_index": 0, "choices_v": 2},
+        ]
+        db = FakeDb({"quiz_questions": saved})
+        questions, saved_flag = quiz._load_quiz(db, GUIDE_ID, "u1")
+        self.assertTrue(saved_flag)
+        self.assertEqual([q["question"] for q in questions], ["Who painted the Mona Lisa?"])
+        self.assertEqual(db.updates[-1]["quiz_questions"], questions, "the cleaned list is saved so answers line up")
+        db = FakeDb({"quiz_questions": saved[1:]})
+        quiz._load_quiz(db, GUIDE_ID, "u1")
+        self.assertEqual(db.updates, [], "nothing to drop, nothing written")
+
+
+class FakeDb:
+    """study_guides row reads and writes, as _load_quiz uses them."""
+
+    def __init__(self, row):
+        self.row, self.updates = row, []
+
+    def table(self, _name):
+        return FakeQuery(self)
+
+
+class FakeQuery:
+    def __init__(self, db):
+        self.db, self.update_values = db, None
+
+    def select(self, *_):
+        return self
+
+    def eq(self, *_):
+        return self
+
+    def update(self, values):
+        self.update_values = values
+        return self
+
+    def execute(self):
+        if self.update_values is not None:
+            self.db.updates.append(self.update_values)
+            self.db.row.update(self.update_values)
+            return SimpleNamespace(data=[self.db.row])
+        return SimpleNamespace(data=[dict(self.db.row)])
+
+
+# Q&A from five subjects for the choice checks (term, name, list, value and description answers).
+GUIDES = {
+    "nursing": [
+        ("What is the normal adult serum potassium range?", "3.5-5.0 mEq/L"),
+        ("What ECG change is an early sign of hyperkalemia?", "Peaked T waves"),
+        ("What electrolyte imbalance causes U waves?", "Hypokalemia"),
+        ("What are the classic signs of hypocalcemia?", "Tetany, Chvostek's sign, Trousseau's sign, and seizures"),
+        ("Who founded modern nursing?", "Florence Nightingale"),
+        ("What is the normal serum sodium range?", "135-145 mEq/L"),
+    ],
+    "art_history": [
+        ("Who painted the Mona Lisa?", "Leonardo da Vinci"),
+        ("Who sculpted David in 1504?", "Michelangelo"),
+        ("Who painted The School of Athens?", "Raphael"),
+        ("Who painted The Birth of Venus?", "Sandro Botticelli"),
+        ("What is chiaroscuro?", "The strong contrast between light and dark in a painting"),
+        ("What is sfumato?", "A soft blending of tones without hard outlines"),
+        ("In what year was the Sistine Chapel ceiling finished?", "1512"),
+    ],
+    "business_law": [
+        ("Who pioneered the moving assembly line?", "Henry Ford"),
+        ("Which automaker entered the US market in 1986?", "Hyundai"),
+        ("Who proposed scientific management?", "Frederick Taylor"),
+        ("Who described a hierarchy of needs?", "Abraham Maslow"),
+        ("Who wrote the fourteen principles of management?", "Henri Fayol"),
+        ("What are the elements of a valid contract?", "Offer, acceptance, consideration, capacity, and legality"),
+        ("What does Chapter 11 bankruptcy allow?", "A business to reorganize its debts while it keeps operating"),
+    ],
+    "literature": [
+        ("Who narrates The Great Gatsby?", "Nick Carraway"),
+        ("Who wrote Beloved?", "Toni Morrison"),
+        ("Who wrote Things Fall Apart?", "Chinua Achebe"),
+        ("Who wrote Mrs Dalloway?", "Virginia Woolf"),
+        ("What does the green light symbolize?", "Gatsby's hope for a future with Daisy"),
+        ("What are the stages of Freytag's pyramid?", "Exposition, rising action, climax, falling action, and resolution"),
+    ],
+    "computer_science": [
+        ("What is the time complexity of binary search?", "O(log n)"),
+        ("What causes a page fault?", "A program touching a page that is not in memory"),
+        ("What does a hash table map?", "Keys to values through a hash function"),
+        ("Who proposed the stored-program computer design?", "John von Neumann"),
+        ("Who invented the World Wide Web?", "Tim Berners-Lee"),
+        ("Who wrote the first published algorithm for a machine?", "Ada Lovelace"),
+        ("What are the four pillars of object-oriented programming?", "Encapsulation, abstraction, inheritance, and polymorphism"),
+    ],
+}
+
+LENGTH_RATIO = 0.5  # the shortest choice is at least half the longest (or within 6 characters)
+
+
+def visible(text):
+    return quiz.choice_text(text)
+
+
+def length_ok(answer, value):
+    a, b = len(visible(answer)), len(visible(value))
+    return min(a, b) >= LENGTH_RATIO * max(a, b) or abs(a - b) <= 6
+
+
+class ChoiceTests(unittest.TestCase):
+    """Problem 2."""
+
+    def assert_good(self, question, label):
+        options = question["options"]
+        self.assertEqual(len(options), 4, f"{label}: {question['question']} -> {options}")
+        answer = options[question["correct_index"]]
+        for option in options:
+            self.assertTrue(length_ok(answer, option), f"{label}: {answer!r} vs {option!r}")
+            self.assertTrue(option == answer or fits(answer, option), f"{label}: {answer!r} vs {option!r}")
+        self.assertEqual(len(retain.answer_parts(answer)) > 1, all(len(retain.answer_parts(o)) > 1 for o in options), label)
+
+    def test_wrong_choices_of_another_kind_or_length_are_refused(self):
+        self.assertFalse(fits("Sigmund Freud, Carl Jung, and Alfred Adler", "Hyundai"))
+        self.assertTrue(fits("Sigmund Freud, Carl Jung, and Alfred Adler", "B. F. Skinner, John Watson, and Ivan Pavlov"))
+        self.assertFalse(fits("Just-in-time inventory management", "Kanban"))
+        self.assertTrue(fits("Just-in-time inventory management", "Economic order quantity model"))
+        self.assertFalse(fits("1512", "The High Renaissance"))
+        self.assertFalse(fits("Peaked T waves", "Tetany, Chvostek's sign, Trousseau's sign, and seizures"))
+        self.assertTrue(fits("O(log n)", "O(n)"))
+
+    def test_model_choices_are_kept_only_when_they_fit(self):
+        out = quiz._balanced_distractors("Sigmund Freud, Carl Jung, and Alfred Adler",
+                                         ["Hyundai", "B. F. Skinner, John Watson, and Ivan Pavlov",
+                                          "Carl Rogers, Abraham Maslow, and Rollo May", "Behaviorism",
+                                          "Wilhelm Wundt, William James, and Edward Titchener"], [])
+        self.assertEqual(out, ["B. F. Skinner, John Watson, and Ivan Pavlov", "Carl Rogers, Abraham Maslow, and Rollo May",
+                               "Wilhelm Wundt, William James, and Edward Titchener"])
+        out = quiz._balanced_distractors("Just-in-time inventory management", ["Kanban", "Hyundai", "Total quality management"], [])
+        self.assertEqual(out, ["Total quality management"])
+
+    def test_free_choices_never_borrow_an_unrelated_answer(self):
+        for subject, pairs in GUIDES.items():
+            qa = [{"question": q, "answer": a} for q, a in pairs]
+            for question in quiz._standard_questions(qa):
+                self.assert_good(question, subject)
+        qa = [{"question": q, "answer": a} for q, a in GUIDES["business_law"]]
+        ford = next(q for q in quiz._standard_questions(qa) if q["question"].startswith("Who pioneered"))
+        self.assertNotIn("Hyundai", ford["options"])
+
+    def test_ai_quizzes_have_exactly_four_choices_or_leave_the_question_out(self):
+        for subject, pairs in GUIDES.items():
+            text = "\n".join(f"Q{i}: {q}\nA{i}: {a}" for i, (q, a) in enumerate(pairs, 1))
+            # The model's choices: one in three wrong-sized or another kind, the replacement call fails.
+            items = [{"distractors": [a + " and more besides", "Hyundai", "X"]} if i % 3 == 0 else
+                     {"distractors": [f"{a} ({k})" for k in ("i", "ii", "iii")]} for i, (_, a) in enumerate(pairs)]
+            chat = MagicMock(side_effect=[reply(json.dumps({"items": items})), RuntimeError("down")])
+            db = FakeDb({"quiz_questions": None, "study_guide": text})
+            with patch.multiple(quiz, chat=chat, get_openai_client=MagicMock(return_value=None),
+                                remaining=MagicMock(return_value=1), record=MagicMock()):
+                questions, _ = quiz._load_quiz(db, GUIDE_ID, "u1")
+            self.assertTrue(questions, subject)
+            for question in questions:
+                self.assert_good(question, subject)
+            self.assertLess(len(questions), len(pairs), f"{subject}: questions short of choices are left out")
+
+    def test_nclex_multiple_choice_has_four_options(self):
+        good = {"type": "mcq", "stem": "A client has a potassium of 6.2 mEq/L. Which ECG finding is expected?",
+                "options": ["Peaked T waves", "U waves", "ST depression", "Prolonged QT"], "correct_indices": [0], "rationale": "r"}
+        short = {**good, "options": ["Peaked T waves", "U waves", "ST depression"]}
+        slide = {**good, "stem": "According to slide 5, which ECG finding is expected?"}
+        chat = MagicMock(return_value=reply(json.dumps([good, short, slide])))
+        with patch.object(llm, "get_openai_client", return_value=None), patch.object(llm, "chat", chat):
+            out = llm.generate_nclex_questions("Q1: x\nA1: y")
+        self.assertEqual([len(q["options"]) for q in out], [4, 4])
+        self.assertEqual(out[1]["stem"], "Which ECG finding is expected?")
+
+
+class AnswerPartsTests(unittest.TestCase):
+    def test_lists_split_into_parts_and_prose_does_not(self):
+        cases = {
+            "Sigmund Freud, Carl Jung, and Alfred Adler": ["Sigmund Freud", "Carl Jung", "Alfred Adler"],
+            "Tetany, Chvostek's sign, Trousseau's sign, and seizures": ["Tetany", "Chvostek's sign", "Trousseau's sign", "seizures"],
+            "Offer; acceptance; consideration": ["Offer", "acceptance", "consideration"],
+            "Exposition, rising action, climax, falling action, and resolution": ["Exposition", "rising action", "climax", "falling action", "resolution"],
+            "Encapsulation, abstraction, inheritance, and polymorphism": ["Encapsulation", "abstraction", "inheritance", "polymorphism"],
+        }
+        for answer, parts in cases.items():
+            self.assertEqual(retain.answer_parts(answer), parts, answer)
+        for prose in ("Romeo and Juliet", "Hyperkalemia, a high potassium level, causes peaked T waves",
+                      "In 1863, Lincoln issued it", "3.5-5.0 mEq/L", "A business to reorganize its debts while it keeps operating"):
+            self.assertEqual(retain.answer_parts(prose), [prose], prose)
+
+
+class MemoryHookCoverageTests(unittest.TestCase):
+    """Problem 3."""
+
+    ANSWER = "Leonardo da Vinci, Michelangelo, Raphael, Donatello, Botticelli, Titian, Giotto, and Brunelleschi"
+    QUESTION = "Which artists defined the Italian Renaissance?"
+    TOPIC_ONLY = ("When you see Renaissance, picture the Ninja Turtles: Leonardo da Vinci, Michelangelo, Raphael "
+                  "and Donatello paint a pizza.")
+    EVERY_PART = ("When you see Renaissance, picture the Ninja Turtles Leonardo da Vinci, Michelangelo, Raphael and "
+                  "Donatello, then Botticelli's bottle, Titian's titan, Giotto's grotto and Brunelleschi's brunch.")
+
+    def call(self, *texts, question=QUESTION, answer=ANSWER):
+        chat = MagicMock(side_effect=[reply(json.dumps({"hook": text})) if isinstance(text, str) else text for text in texts])
+        with patch.object(llm, "get_openai_client", return_value=None), patch.object(llm, "chat", chat):
+            return llm.memory_hook(question, answer), chat
+
+    def test_half_a_list_passed_the_old_check(self):
+        self.assertTrue(retain.mentions_answer(self.TOPIC_ONLY, self.ANSWER), "the gap this fixes")
+        self.assertEqual(retain.missing_parts(self.TOPIC_ONLY, self.ANSWER), ["Botticelli", "Titian", "Giotto", "Brunelleschi"])
+        self.assertEqual(retain.missing_parts(self.EVERY_PART, self.ANSWER), [])
+
+    def test_a_trick_missing_parts_is_retried_once_with_them_named(self):
+        result, chat = self.call(self.TOPIC_ONLY, self.EVERY_PART)
+        self.assertEqual(result, {"hook": self.EVERY_PART})
+        self.assertEqual(chat.call_count, 2)
+        retry = chat.call_args.kwargs["messages"][1]["content"]
+        for name in ("Botticelli", "Titian", "Giotto", "Brunelleschi"):
+            self.assertIn(name, retry)
+
+    def test_still_missing_after_the_retry_gives_nothing(self):
+        result, chat = self.call(self.TOPIC_ONLY, self.TOPIC_ONLY)
+        self.assertEqual(result, {})
+        self.assertEqual(chat.call_count, 2)
+        result, chat = self.call(self.TOPIC_ONLY, RuntimeError("down"))
+        self.assertEqual(result, {}, "a failed retry is no trick, not an error")
+
+    def test_one_part_answers_make_one_call(self):
+        result, chat = self.call("When you see the smile, think of Leonardo da Vinci.", question="Who painted the Mona Lisa?",
+                                 answer="Leonardo da Vinci")
+        self.assertEqual(chat.call_count, 1)
+        self.assertTrue(result)
+
+    def test_five_subjects_lists(self):
+        for answer in ("Tetany, Chvostek's sign, Trousseau's sign, and seizures",
+                       "Offer, acceptance, consideration, capacity, and legality",
+                       "Exposition, rising action, climax, falling action, and resolution",
+                       "Encapsulation, abstraction, inheritance, and polymorphism"):
+            parts = retain.answer_parts(answer)
+            partial = "When you see this, think " + ", ".join(parts[:2]) + "."
+            self.assertTrue(retain.missing_parts(partial, answer), answer)
+            whole = "When you see this, think " + " then ".join(parts) + "."
+            self.assertEqual(retain.missing_parts(whole, answer), [], answer)
+
+    def test_the_prompt_asks_for_a_hook_per_part(self):
+        _, chat = self.call(self.EVERY_PART)
+        system = chat.call_args.kwargs["messages"][0]["content"]
+        self.assertIn("every part", system)
+
+
+if __name__ == "__main__":
+    unittest.main()
