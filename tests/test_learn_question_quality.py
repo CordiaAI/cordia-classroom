@@ -22,7 +22,7 @@ from routers import quiz  # noqa: E402
 from services import llm, retain  # noqa: E402
 from services.choice_shapes import fits, is_value  # noqa: E402
 from services.text_processing import (  # noqa: E402
-    chunk_text, extract_slideshow_content, format_slideshow_text, refers_to_source, standalone_question,
+    chunk_text, extract_slideshow_content, format_slideshow_text, refers_to_source, shown_questions, standalone_question,
     strip_structure_markers,
 )
 
@@ -110,7 +110,8 @@ class StructureMarkerTests(unittest.TestCase):
             cleaned = strip_structure_markers(text)
             for marker in ("--- Slide", "--- Page", "Page 1 of 12", "Page 2 of 12", "Slide 4 of 20", "Slide 6:", "p. 12"):
                 self.assertNotIn(marker, cleaned, f"{name}: {marker}")
-            self.assertNotRegex(cleaned, r"(?m)^\s*(?:Page )?\d+\s*$", name)
+            self.assertNotRegex(cleaned, r"(?im)^\s*(?:page|slide)\s*\d+\s*$", name)
+            # A line that is only a number stays: it is as often the fact itself ("1789", "4000").
         cleaned = strip_structure_markers(SOURCES["nursing_slides"])
         self.assertIn("Sodium\nNormal serum sodium is 135-145 mEq/L.", cleaned)
         law = strip_structure_markers(SOURCES["business_law_web"])
@@ -229,24 +230,27 @@ class StructureQuestionTests(unittest.TestCase):
         self.assertEqual([q["question"] for q in questions], [q["question"] for q in saved])
         self.assertEqual(db.updates, [], "nothing was about the source, so nothing is written")
 
-    def test_quizzes_built_from_older_guides_skip_them(self):
+    def test_quizzes_built_from_older_guides_show_only_subject_questions(self):
+        # Parsed as written (ids and positions hang on the saved wording); shown without the source.
         text = "\n".join(f"Q{i}: {q}\nA{i}: {a}" for i, (q, a, _) in enumerate(MODEL_OUTPUT["art_history"], 1))
-        questions = [pair["question"] for pair in quiz._parse_qa_pairs(text)]
-        self.assertEqual(questions, ["What is chiaroscuro?", "Who painted the Mona Lisa?", "What is a cross-section drawing?"])
+        pairs = quiz._parse_qa_pairs(text)
+        self.assertEqual([pair["question"] for pair in pairs], [q for q, _, _ in MODEL_OUTPUT["art_history"]])
+        shown = shown_questions([{"question": p["question"], "options": [p["answer"]], "correct_index": 0} for p in pairs])
+        asked = [q.get("shown", q["question"]) for q in shown if not q.get("hidden")]
+        self.assertEqual(asked, ["What is chiaroscuro?", "Who painted the Mona Lisa?", "What is a cross-section drawing?"])
 
-    def test_saved_quizzes_drop_them_once_and_keep_the_rest(self):
+    def test_saved_quizzes_hide_them_where_shown_and_are_never_rewritten(self):
         saved = [
             {"question": "Which artists are listed for Chapter 1?", "options": ["a b", "c d", "e f", "g h"], "correct_index": 0},
             {"question": "Who painted the Mona Lisa?", "options": ["Leonardo da Vinci", "Raphael", "Titian", "Giotto"], "correct_index": 0, "choices_v": 2},
         ]
-        db = FakeDb({"quiz_questions": saved})
+        db = FakeDb({"quiz_questions": [dict(q) for q in saved]})
         questions, saved_flag = quiz._load_quiz(db, GUIDE_ID, "u1")
         self.assertTrue(saved_flag)
-        self.assertEqual([q["question"] for q in questions], ["Who painted the Mona Lisa?"])
-        self.assertEqual(db.updates[-1]["quiz_questions"], questions, "the cleaned list is saved so answers line up")
-        db = FakeDb({"quiz_questions": saved[1:]})
-        quiz._load_quiz(db, GUIDE_ID, "u1")
-        self.assertEqual(db.updates, [], "nothing to drop, nothing written")
+        self.assertEqual(db.updates, [], "progress keys stay: the saved quiz is left as it is")
+        shown = shown_questions(questions)
+        self.assertEqual([q["question"] for q in shown], [q["question"] for q in saved])
+        self.assertEqual([bool(q.get("hidden")) for q in shown], [True, False])
 
 
 class FakeDb:
@@ -348,7 +352,7 @@ class ChoiceTests(unittest.TestCase):
         if four:
             self.assertEqual(len(options), 4, f"{label}: {question['question']} -> {options}")
         else:
-            self.assertGreaterEqual(len(options), 2, label)
+            self.assertGreaterEqual(len(options), 1, label)  # fewer than 3: asked typed, never left out
         answer = options[question["correct_index"]]
         for option in options:
             self.assertTrue(length_ok(answer, option), f"{label}: {answer!r} vs {option!r}")
@@ -375,9 +379,9 @@ class ChoiceTests(unittest.TestCase):
         self.assertEqual(out, ["Total quality management"])
 
     def test_free_choices_never_borrow_an_unrelated_answer(self):
-        # Guide-derived choices (shared guides, merges, edited questions, a model outage) keep every idea
-        # that has a related choice, so they may have fewer than four, but never an unrelated one; a
-        # value always gets four.
+        # Guide-derived choices (shared guides, merges, edited questions, a model outage) keep every idea,
+        # with only related choices, so they may have fewer than four (even none: then it is asked
+        # typed), but never an unrelated one; a value always gets four.
         for subject, pairs in GUIDES.items():
             qa = [{"question": q, "answer": a} for q, a in pairs]
             questions = quiz._standard_questions(qa)
@@ -389,7 +393,7 @@ class ChoiceTests(unittest.TestCase):
         ford = next(q for q in quiz._standard_questions(qa) if q["question"].startswith("Who pioneered"))
         self.assertNotIn("Hyundai", ford["options"])
 
-    def test_ai_quizzes_have_exactly_four_choices_or_leave_the_question_out(self):
+    def test_ai_quizzes_have_exactly_four_choices_or_ask_the_question_typed(self):
         for subject, pairs in GUIDES.items():
             text = "\n".join(f"Q{i}: {q}\nA{i}: {a}" for i, (q, a) in enumerate(pairs, 1))
             # The model's choices: one in three wrong-sized or another kind, the replacement call fails.
@@ -400,10 +404,15 @@ class ChoiceTests(unittest.TestCase):
             with patch.multiple(quiz, chat=chat, get_openai_client=MagicMock(return_value=None),
                                 remaining=MagicMock(return_value=1), record=MagicMock()):
                 questions, _ = quiz._load_quiz(db, GUIDE_ID, "u1")
-            self.assertTrue(questions, subject)
+            self.assertEqual(len(questions), len(pairs), f"{subject}: every idea stays")
+            typed = [question for question in questions if len(question["options"]) != 4]
             for question in questions:
-                self.assert_good(question, subject)
-            self.assertLess(len(questions), len(pairs), f"{subject}: questions short of choices are left out")
+                if question not in typed:
+                    self.assert_good(question, subject)
+            self.assertTrue(typed, f"{subject}: questions short of choices are asked typed")
+            for question in typed:
+                self.assertEqual(len(question["options"]), 1, f"{subject}: only the answer, so never multiple choice")
+                self.assertFalse(retain.can_choose(question))
 
     def test_nclex_multiple_choice_has_four_options(self):
         good = {"type": "mcq", "stem": "A client has a potassium of 6.2 mEq/L. Which ECG finding is expected?",

@@ -22,7 +22,7 @@ from services import print_items, retain
 from services import blanks
 from services.choice_shapes import conform, fits, is_value, repair, shape
 from services.distractor_check import keep_valid
-from services.text_processing import standalone_question
+from services.text_processing import shown_pairs, shown_questions
 from services.entitlements import LIMITS, plan_for, record, remaining, require, subscription_row
 
 
@@ -90,9 +90,9 @@ class RememberRequest(BaseModel):
 
 
 def _parse_qa_pairs(text: str) -> list:
-    """Parse Question 1: ... Answer 1: ... format into list of {question, answer}. Guides written
-    before questions were checked for it may still ask about the source ("Which artists are listed
-    for Chapter 1?"): those are left out, and "According to Slide 5, what is X?" asks "What is X?"."""
+    """Parse Question 1: ... Answer 1: ... format into list of {question, answer}, every pair as
+    written: idea ids, Learn levels and quiz positions are keyed by the saved wording, so a pair
+    about the source is reworded or hidden only where it is shown (text_processing.shown_questions)."""
     pairs = []
     lines = text.split('\n')
     current_q = None
@@ -101,7 +101,7 @@ def _parse_qa_pairs(text: str) -> list:
         q_match = re.match(r'^Q(\d+):\s*(.+)', line)
         a_match = re.match(r'^A(\d+):\s*(.+)', line)
         if q_match:
-            current_q = standalone_question(q_match.group(2).strip())
+            current_q = q_match.group(2).strip()
         elif a_match and current_q:
             pairs.append({"question": current_q, "answer": a_match.group(2).strip()})
             current_q = None
@@ -206,10 +206,9 @@ def _standard_questions(qa_pairs: list, rng=None) -> list:
             shortlist = same[:min(6, len(same))]
             picked = conform(answer, rng.sample(shortlist, min(3, len(shortlist))), candidates, seed=pair["question"])
             distractors = _not_longest(answer, picked, same or candidates)
-        if not distractors:
-            continue
-        # Only related, fitting choices, however few: this list also serves shared guides, merges and
-        # edited questions, whose ideas and positions must stay. AI quizzes always have four (_load_quiz).
+        # Only related, fitting choices, however few (even none): this list also serves shared guides,
+        # merges and edited questions, whose ideas and positions must stay. An idea with fewer than 3
+        # choices is asked typed (retain.can_choose), never left out. AI quizzes have four (_load_quiz).
         options, correct_index = _choices(answer, distractors, rng)
         questions.append({
             "question": pair["question"],
@@ -403,7 +402,7 @@ def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False)
     """Load or generate a Retain quiz, optionally replacing saved distractors."""
     require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
-    return {"questions": _load_quiz(get_supabase(), guide_id, user_id, regenerate)[0]}
+    return {"questions": shown_questions(_load_quiz(get_supabase(), guide_id, user_id, regenerate)[0])}
 
 
 CHOICES_VERSION = 2  # questions checked (and, if needed, rebuilt) by _rebuild_standouts
@@ -458,26 +457,6 @@ def _rebuild_standouts(supabase, guide_id: str, user_id: str, questions: list) -
     return out
 
 
-def _without_source_questions(supabase, guide_id: str, user_id: str, questions: list) -> list:
-    """A saved quiz without questions about the source rather than the subject ("Which artists are
-    listed for Chapter 1?"), and with "According to Slide 5, what is X?" asked as "What is X?". Saved
-    when anything changed, so answers are checked against the same list the session showed."""
-    out, changed = [], False
-    for question in questions:
-        if isinstance(question, dict) and isinstance(question.get("question"), str):
-            text = standalone_question(question["question"])
-            if text is None:
-                changed = True
-                continue
-            if text != question["question"]:
-                question, changed = {**question, "question": text}, True
-        out.append(question)
-    if changed:
-        logger.info("Quiz for guide %s: %s question(s) about the source removed or reworded", guide_id, len(questions) - len(out))
-        _save_quiz(supabase, guide_id, user_id, out)
-    return out
-
-
 _DISTRACTOR_PROMPT = """For each question and answer below, write exactly 3 wrong answer choices.
 Return a JSON object {{"items": [...]}} with one element per pair, in order, each {{"distractors": [wrong1, wrong2, wrong3]}}.
 
@@ -499,8 +478,6 @@ def _load_quiz(supabase, guide_id: str, user_id: str, regenerate: bool = False) 
     # Read the small question set first; the guide text is only needed to build one.
     if not regenerate:
         cached = _guide_columns(supabase, guide_id, user_id, "quiz_questions").get("quiz_questions")
-        if cached:
-            cached = _without_source_questions(supabase, guide_id, user_id, cached)
         if cached:
             return _rebuild_standouts(supabase, guide_id, user_id, [even_choices(q) if isinstance(q, dict) else q for q in cached]), True
 
@@ -561,17 +538,24 @@ def _load_quiz(supabase, guide_id: str, user_id: str, regenerate: bool = False) 
             seed=pair["question"],
         )
         if not distractors:
-            continue
+            continue  # _top_up asks for choices for it
         options, correct_index = _choices(correct_answer, distractors)
         questions.append({"question": pair["question"], "options": options, "correct_index": correct_index})
 
-    # Exactly four choices: a question still short of three fitting wrong ones after the top-up is
-    # left out of the quiz rather than shown with two or three.
-    built = _top_up(client, questions, others)
-    questions = [{**q, "choices_v": CHOICES_VERSION} for q in built if len(q["options"]) == 4]
-    if len(questions) < len(qa_pairs):
-        logger.info("Quiz for guide %s: %s of %s questions left out for want of four fitting choices",
-                    guide_id, len(qa_pairs) - len(questions), len(qa_pairs))
+    # Every idea stays, in guide order. Multiple choice always has exactly four choices: an idea still
+    # short of three fitting wrong ones after the top-up keeps only its answer, so it is asked typed
+    # (retain.can_choose), never left out and never shown with two or three.
+    built = {q["question"]: q for q in _top_up(client, questions, others)}
+    questions = []
+    for pair in qa_pairs:
+        question = built.get(pair["question"])
+        if not question or len(question["options"]) != 4:
+            question = {"question": pair["question"], "options": [choice_text(pair["answer"])], "correct_index": 0}
+        questions.append({**question, "choices_v": CHOICES_VERSION})
+    typed = sum(1 for q in questions if len(q["options"]) != 4)
+    if typed:
+        logger.info("Quiz for guide %s: %s of %s questions asked typed for want of four fitting choices",
+                    guide_id, typed, len(qa_pairs))
     if not questions:
         raise HTTPException(status_code=502, detail="Could not create balanced Retain options")
     _save_quiz(supabase, guide_id, user_id, questions)
@@ -678,6 +662,8 @@ def start_session(guide_id: str, body: SessionRequest, authorization: str = Head
         _save_quiz(supabase, guide_id, user_id, questions)
     if body.learn and blanks.learn_ladder_v2():
         return _learn_session(supabase, guide_id, user_id, questions, body.types, viewer=viewer)
+    # As the student sees them: same positions, a question about the source hidden (never asked).
+    questions = shown_questions(questions)
     # A random set of the size the student chose, asked in random order. Only those questions count
     # toward Pro types and the score (submit divides by the questions answered).
     cards = retain.shuffled_cards(retain.plan_session(questions, body.types, retain.pick_questions(questions, body.count)))
@@ -704,7 +690,7 @@ def _learn_session(supabase, guide_id: str, user_id: str, questions: list, types
         fill_available = True
     building = blanks.start_blanks(supabase, guide_id, user_id, questions) if fill_available and not viewer else False
     return {
-        "questions": questions,
+        "questions": shown_questions(questions),
         "cards": [],
         "types": [],
         "pro": plan_for(subscription_row(user_id)) == "pro",
@@ -735,7 +721,7 @@ def refresh_choices(guide_id: str, authorization: str = Header(default="")):
             flagged.add(text)
             trimmed[text] = {**question, "options": [answer, *kept], "correct_index": 0}
     if not flagged:
-        return {"changed": 0, "questions": questions}
+        return {"changed": 0, "questions": shown_questions(questions)}
     require(user_id, "light")
     fixed = {q["question"]: q for q in _top_up(get_openai_client(), list(trimmed.values()), pairs, targets=flagged)}
     changed = 0
@@ -751,7 +737,7 @@ def refresh_choices(guide_id: str, authorization: str = Header(default="")):
     if changed:
         _save_quiz(supabase, guide_id, user_id, updated)
     record(user_id, "light")
-    return {"changed": changed, "flagged": len(flagged), "questions": updated}
+    return {"changed": changed, "flagged": len(flagged), "questions": shown_questions(updated)}
 
 
 def _print_fill(client, pairs: list) -> Optional[list]:
@@ -785,10 +771,13 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
     pairs = _parse_qa_pairs(row.get("study_guide") or "")
     if len(pairs) < 2:
         raise HTTPException(status_code=400, detail="This guide needs questions and answers before it can be printed.")
-    mc, flagged = print_items.multiple_choice(_load_quiz(supabase, guide_id, user_id)[0], pairs)
+    # Printed as the student sees them (reworded, none about the source); the cache stays keyed by
+    # the saved pairs, so fill-in sentences already paid for are reused.
+    shown = shown_pairs(pairs)
+    mc, flagged = print_items.multiple_choice(shown_questions(_load_quiz(supabase, guide_id, user_id)[0]), pairs)
     cache = print_items.cached(row.get("print_items"), pairs)
     items = {"v": print_items.VERSION, "source": print_items.source_hash(pairs),
-             "matching": print_items.matching(pairs), "short": print_items.short_answer(pairs)}
+             "matching": print_items.matching(shown), "short": print_items.short_answer(shown)}
     if "fill" in cache:
         items["fill"] = cache["fill"]
     fill_locked = False

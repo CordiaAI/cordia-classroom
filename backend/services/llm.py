@@ -495,10 +495,23 @@ def grade_written_answer(question: str, reference: str, student_answer: str) -> 
     return {"credit": credit, "explanation": note}
 
 
-def student_feedback(text) -> str:
+NOTE_MAX_CHARS = 300        # a marking note, a "why" line or a one-part memory trick (under 40 words)
+HOOK_LIST_MAX_CHARS = 600   # a memory trick for a list answer (up to 70 words); also what "another one" sends back
+
+
+def student_feedback(text, limit: int = NOTE_MAX_CHARS) -> str:
     """The note a student sees under a marked answer. A note that reads like the marker's own
-    notes ("The student correctly identified...") is dropped; the verdict alone shows instead."""
-    note = str(text or "").strip()[:300]
+    notes ("The student correctly identified...") is dropped; the verdict alone shows instead. A
+    note over `limit` characters is cut at its last full sentence (or word) that fits, never mid-word."""
+    note = str(text or "").strip()
+    if len(note) > limit:
+        cut = note[:limit + 1]
+        end = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+        if end >= limit // 2:
+            note = cut[:end + 1]
+        else:
+            space = cut.rfind(" ")
+            note = cut[:space].rstrip(" ,;:") if space > 0 else note[:limit]
     if re.search(r"\bthe (student|learner|user)\b|\b(student|learner)'s\b", note, re.IGNORECASE):
         return ""
     return note
@@ -577,6 +590,7 @@ def memory_hook(question: str, answer: str, style="link", interests=(), previous
     Returns {"hook"} plus {"linked": {kind, id, title}} when it built on a piece of context."""
     from services.retain import ANSWER_MAX_CHARS, answer_parts, mentions_answer, missing_parts
     answer = str(answer or "")[:ANSWER_MAX_CHARS]  # all of it the model is shown; every check below sees the same text
+    listed = len(answer_parts(answer)) > 1
     keys = [style] if isinstance(style, str) else list(style or ())
     picked = [MEMORY_STYLES[key] for key in keys if key in MEMORY_STYLES] or [MEMORY_STYLES["link"]]
     if len(picked) == 1:
@@ -608,7 +622,7 @@ def memory_hook(question: str, answer: str, style="link", interests=(), previous
     user = (
         f"QUESTION:\n{question[:1500]}\n\nANSWER:\n{answer}\n\nINTERESTS: {likes}"
         + (f"\n\nTHE STUDENT'S OWN MATERIAL:\n{material}" if material else "")
-        + (f"\n\nTAKE A DIFFERENT ANGLE FROM THIS ONE:\n{previous[:400]}" if previous else "")
+        + (f"\n\nTAKE A DIFFERENT ANGLE FROM THIS ONE:\n{previous[:HOOK_LIST_MAX_CHARS]}" if previous else "")
     )
     client = get_openai_client()
 
@@ -619,13 +633,15 @@ def memory_hook(question: str, answer: str, style="link", interests=(), previous
             temperature=0.8,
         )
         parsed = _practice_json(response.choices[0].message.content)
-        return parsed, student_feedback(parsed.get("hook"))
+        # A list trick may run to 70 words (the prompt allows it): cut at the 40-word size, it would
+        # lose its last parts and fail the coverage check below every time.
+        return parsed, student_feedback(parsed.get("hook"), HOOK_LIST_MAX_CHARS if listed else NOTE_MAX_CHARS)
 
     def covers(hook: str) -> bool:
         return bool(hook) and mentions_answer(hook, answer) and not missing_parts(hook, answer)
 
     parsed, hook = ask(user)
-    if not covers(hook) and len(answer_parts(answer)) > 1:
+    if not covers(hook) and listed:
         # A list answer whose trick skipped parts: once more, naming the parts it left out.
         left_out = (missing_parts(hook, answer) if hook else []) or answer_parts(answer)
         try:
