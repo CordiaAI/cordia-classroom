@@ -1,4 +1,6 @@
 """The Tutor's voice guards: no slang openers, and no specific fact stated as settled without material."""
+import json
+import re
 import sys
 from pathlib import Path
 import unittest
@@ -132,6 +134,97 @@ class RouteTests(unittest.TestCase):
         body = self.ask("It was founded by three people in 1865.", {
             "question": "Who founded it?", "content": "Three people founded it in 1865.", "context_title": "Notes", "skill": "explain"})
         self.assertNotIn(UNCHECKED_NOTE, body["answer"])
+
+
+# ---- Regression guard: nothing main marks unchecked goes unmarked here ----
+
+CORPUS = ROOT / "tests" / "fixtures" / "grounding" / "review_corpus.json"
+# main's tutor_voice.py (unchanged from 95bd889 to 3122eff), used only when git can't show origin/main or
+# main (CI checks out a single commit).
+MAIN_SNAPSHOT = ROOT / "tests" / "fixtures" / "grounding" / "main_tutor_voice.py.txt"
+# Plain sentences main flagged for no specific fact, each with why. Nothing else may move from flagged to plain.
+ALLOWED = {
+    # main's count read "one by one", or a verb after a number ("one is", "2 is", "one has"), as a counted thing.
+    "Git rewrites them one by one as new commits.": "a count of nothing: 'one by one'",
+    "We got a final answer of 42, is that right?": "a count of nothing: '42, is'",
+    "Each one is processed once.": "a count of nothing: 'one is'",
+    "Two plus two is four.": "a count of nothing: arithmetic",
+    "Step 2 is the same.": "a count of nothing: a step number",
+    "The left one has more weight.": "a count of nothing: 'one has'",
+    "This one was the first draft.": "a count of nothing: 'one was'",
+    "One swells the tissues; the other dries them out.": "a count of nothing: 'one swells'",
+    "lol, that one trips everyone up.": "a count of nothing: 'one trips'",
+    "Each one limits and shapes what the artist can do.": "a count of nothing: 'one limits'",
+    # Code: keywords and code blocks name nothing in the world.
+    "It never raises an error, so it returns None when no default is given.": "None is a code keyword",
+    "It returns True if the key exists and False if not.": "True and False are code keywords",
+    "Call `print(True)` and it prints True.": "True is a code keyword",
+    "```\nclass Node:\n    def __init__(self, value):\n        self.value = value\n        self.next = None\n```": "a code block",
+    # Symbols and acronyms, not names.
+    "Low Na can cause confusion and seizures.": "Na is a chemical symbol",
+    "It breaks down acetyl CoA to release energy carriers.": "CoA is a chemical symbol",
+    "A REST API exposes resources at URLs and uses HTTP methods like GET and POST to read or change them.": "URLs is an acronym",
+    # A descriptive adjective before a common word (tutor_voice.ADJECTIVES).
+    "It comes from the Greek word for carrying over.": "Greek describes the word",
+    "The Greek word means measure.": "Greek describes the word",
+    "The injured person can sue for damages in court rather than the State bringing charges.": "the State is the prosecuting side",
+    "Could we prepare for the Baroque quiz together?": "Baroque describes the quiz",
+}
+
+
+def _load_main_tutor_voice():
+    import subprocess
+    import types
+    source = None
+    for ref in ("origin/main", "main"):
+        shown = subprocess.run(["git", "show", f"{ref}:backend/services/tutor_voice.py"], cwd=ROOT, capture_output=True, text=True)
+        if shown.returncode == 0:
+            source = shown.stdout
+            break
+    module = types.ModuleType("main_tutor_voice")
+    exec(compile(source or MAIN_SNAPSHOT.read_text(), "main_tutor_voice.py", "exec"), module.__dict__)
+    return module
+
+
+def _sentences_of(answer: str) -> list:
+    return [part for part in re.split(r"(?<=[.!?])\s+", answer) if part.strip()]
+
+
+class RegressionGuardTests(unittest.TestCase):
+    """main's grounding guard and this one on every sentence of the reviewer's scripts (rook-f6, rook-f6b,
+    rook-f6c) and the existing tests: what main flags stays flagged, except the ALLOWED plain sentences."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.main = _load_main_tutor_voice()
+        cls.corpus = json.loads(CORPUS.read_text())
+
+    def test_the_corpus_is_the_reviewers_and_the_tests(self):
+        self.assertEqual({source.split("/")[0] for _, _, source in self.corpus}, {"rook-f6", "rook-f6b", "rook-f6c", "tests"})
+        self.assertGreater(len(self.corpus), 800)
+
+    def test_nothing_main_flags_goes_unflagged_except_the_allow_list(self):
+        main, used, missed = self.main.states_specifics, set(), []
+
+        def dropped(text, question):
+            return main(text, question) and not states_specifics(text, question)
+
+        for question, answer, source in self.corpus:
+            sentences = _sentences_of(answer)
+            for unit in [answer, *(sentences if len(sentences) > 1 else [])]:
+                if not dropped(unit, question):
+                    continue
+                if unit in ALLOWED:
+                    used.add(unit)
+                elif not (unit == answer and len(sentences) > 1
+                          and all(part in ALLOWED or not dropped(part, question) for part in sentences)):
+                    missed.append((source, question, unit))  # (a whole answer main flags only for allowed sentences is fine)
+        self.assertEqual(missed, [])
+        self.assertEqual(set(ALLOWED) - used, set())  # every entry is still needed
+
+    def test_the_guard_reads_mains_rules_not_this_branchs(self):
+        self.assertFalse(hasattr(self.main, "ADJECTIVES"))
+        self.assertTrue(self.main.states_specifics("Each one is processed once.", ""))
 
 
 if __name__ == "__main__":
