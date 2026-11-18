@@ -41,6 +41,28 @@ export function useLoadGate(ready) {
   return phase;
 }
 
+// A button's working mark: shown only after 300 ms (a quick answer never flashes it) and, once shown, kept
+// at least 500 ms (a slow one never flickers). Timers, not animation delays, so it still shows when the
+// device asks for reduced motion.
+const MARK_AFTER = 300;
+const MARK_HOLD = 500;
+export function useWorkingMark(active) {
+  const [shown, setShown] = useState(false);
+  const shownAt = useRef(0);
+  useEffect(() => {
+    if (active && !shown) {
+      const timer = setTimeout(() => { shownAt.current = Date.now(); setShown(true); }, MARK_AFTER);
+      return () => clearTimeout(timer);
+    }
+    if (!active && shown) {
+      const timer = setTimeout(() => setShown(false), Math.max(0, MARK_HOLD - (Date.now() - shownAt.current)));
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [active, shown]);
+  return shown;
+}
+
 export function LoadGate({ ready, children, label = 'Loading' }) {
   const phase = useLoadGate(ready);
   if (phase === 'instant' || phase === 'shown') {

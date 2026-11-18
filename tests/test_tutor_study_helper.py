@@ -74,7 +74,7 @@ class IntentAndDateTests(unittest.TestCase):
 class PlanTextTests(unittest.TestCase):
     def test_a_plan_with_a_guide_and_date_starts_the_check_in(self):
         answer, plan = study_helper.plan_reply(today=WEDNESDAY, when=date(2026, 11, 23), guide={"id": GUIDE, "title": "Biology"}, exam=None)
-        self.assertIn("on Monday, Nov 23 (5 days away)", answer)
+        self.assertIn("on Mon, Nov 23 (5 days away)", answer)
         self.assertIn("**Final check** the day before, Sunday.", answer)
         self.assertEqual(plan["actions"], [{"kind": "checkin", "label": "Start the check-in quiz", "href": f"/learn/{GUIDE}?test=2026-11-23&checkin=1"}])
         self.assertEqual(plan["test_date"], "2026-11-23")

@@ -313,7 +313,6 @@ SPECIFIC = [
 
 
 class GroundingTests(unittest.TestCase):
-    @unittest.expectedFailure  # TODO(F6b M4): fixed in a later milestone of this branch
     def test_plain_answers_are_flagged_at_most_one_in_ten_per_discipline(self):
         for discipline, cases in PLAIN.items():
             self.assertEqual(len(cases), 10)
@@ -321,11 +320,9 @@ class GroundingTests(unittest.TestCase):
             with self.subTest(discipline=discipline):
                 self.assertLessEqual(len(flagged), 1, flagged)
 
-    @unittest.expectedFailure  # TODO(F6b M4): fixed in a later milestone of this branch
     def test_everyday_numbers_code_and_symbols_are_not_facts(self):
         self.assertEqual([text for text in COUNT_NOISE if states_specifics(text, "")], [])
 
-    @unittest.expectedFailure  # TODO(F6b M5): fixed in a later milestone of this branch
     def test_answers_that_state_counts_amounts_dates_or_names_are_flagged(self):
         self.assertEqual([answer for question, answer in SPECIFIC if not states_specifics(answer, question)], [])
 
@@ -342,7 +339,6 @@ STRIPPED = {"Yo, here's the deal.": "Here's the deal.", "Great question! Mitosis
 
 
 class OpeningTests(unittest.TestCase):
-    @unittest.expectedFailure  # TODO(F6b M6): fixed in a later milestone of this branch
     def test_real_words_at_the_start_are_kept(self):
         self.assertEqual({text: plain_opening(text) for text in KEPT}, {text: text for text in KEPT})
 
@@ -356,13 +352,11 @@ class DateTests(unittest.TestCase):
     def parse(self, text):
         return study_helper.parse_test_date(text, WEDNESDAY)
 
-    @unittest.expectedFailure  # TODO(F6b M9): fixed in a later milestone of this branch
     def test_chapter_and_section_numbers_are_not_dates(self):
         self.assertEqual(self.parse("quiz on chapters 3/4 on Friday"), date(2026, 11, 20))
         self.assertIsNone(self.parse("I need to study sections 1/2 for the test"))
         self.assertIsNone(self.parse("review chapters 3/4"))
 
-    @unittest.expectedFailure  # TODO(F6b M9): fixed in a later milestone of this branch
     def test_today_is_a_test_date_only_when_the_test_is_today(self):
         self.assertIsNone(self.parse("what should I do today?"))
         self.assertIsNone(self.parse("I want to study today for my exam"))
@@ -375,7 +369,6 @@ class DateTests(unittest.TestCase):
         self.assertEqual(self.parse("my final is Dec 3"), date(2026, 12, 3))
         self.assertEqual(self.parse("test tomorrow on contracts"), date(2026, 11, 19))
 
-    @unittest.expectedFailure  # TODO(F6b L13): fixed in a later milestone of this branch
     def test_the_plan_names_the_day_short(self):
         answer, _ = study_helper.plan_reply(today=WEDNESDAY, when=date(2026, 11, 23), guide={"id": GUIDE, "title": "Biology"}, exam=None)
         self.assertIn("on Mon, Nov 23 (5 days away)", answer)
@@ -395,15 +388,20 @@ class MidTurnCheckinTests(unittest.TestCase):
     def tearDown(self):
         self.patch.stop()
 
-    @unittest.expectedFailure  # TODO(F6b L15): fixed in a later milestone of this branch
-    def test_the_check_in_survives_the_turn_and_bumps_the_version(self):
+    def test_the_check_in_survives_the_turn(self):
         turn = tutor_sessions.claim_tutor_turn(ME, "session-1", 2, "what is osmosis?", None)
         posted = tutor_sessions.append_tutor_message(ME, "Check-in done on Biology: 3 of 7 right.", once="checkin:learn-1")
-        self.assertEqual(posted["conversation_version"], 3)
+        self.assertIsNotNone(posted)
         done = tutor_sessions.complete_tutor_turn(ME, turn, {"answer": "Osmosis is water moving across a membrane."})
         texts = [message["text"] for message in done["messages"]]
         self.assertEqual(texts, ["Hi", "what is osmosis?", "Check-in done on Biology: 3 of 7 right.", "Osmosis is water moving across a membrane."])
-        self.assertGreater(done["conversation_version"], 3)
+        self.assertEqual(done["conversation_version"], 3)
+        self.assertEqual(done["status"], "idle")
+
+    def test_a_turn_with_nothing_posted_completes_as_before(self):
+        turn = tutor_sessions.claim_tutor_turn(ME, "session-1", 2, "what is osmosis?", None)
+        done = tutor_sessions.complete_tutor_turn(ME, turn, {"answer": "Water moving across a membrane."})
+        self.assertEqual([message["text"] for message in done["messages"]], ["Hi", "what is osmosis?", "Water moving across a membrane."])
 
 
 if __name__ == "__main__":

@@ -121,7 +121,10 @@ def parse_test_date(text: str, today: date) -> Optional[date]:
         return today + timedelta(days=2)
     if re.search(r"\b(?:tomorrow|tmrw|tmr)\b", words):
         return today + timedelta(days=1)
-    if re.search(r"\b(?:today|tonight|this (?:morning|afternoon|evening))\b", words):
+    # "Today" is the test's day only when the test is today ("my exam is today", or "it's today" answering
+    # the plan's "when is the test?"), never "what should I do today?".
+    if re.search(r"\b(?:tests?|exams?|quiz(?:zes)?|midterms?|finals?)\s+(?:is\s+|'s\s+)?(?:today|tonight|this (?:morning|afternoon|evening))\b"
+                 r"|^\s*(?:it'?s\s+|it\s+is\s+)?(?:today|tonight|this (?:morning|afternoon|evening))\b", words):
         return today
     if match := re.search(r"\bin\s+(\d{1,2}|" + "|".join(SMALL_NUMBERS) + r")\s+(days?|weeks?)\b", words):
         count = int(match.group(1)) if match.group(1).isdigit() else SMALL_NUMBERS[match.group(1)]
@@ -132,11 +135,15 @@ def parse_test_date(text: str, today: date) -> Optional[date]:
         return _future(today.year, MONTHS[match.group(1)], int(match.group(2)), today)
     if match := re.search(rf"\b(\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?({MONTH_NAMES})\b", words):
         return _future(today.year, MONTHS[match.group(2)], int(match.group(1)), today)
-    if match := re.search(r"\b(\d{1,2})/(\d{1,2})\b", words):
-        return _future(today.year, int(match.group(1)), int(match.group(2)), today)
+    # Weekday and month names come before numbers like 3/4, which are often chapters or sections.
     if match := re.search(r"\b(next\s+)?(" + "|".join(WEEKDAYS) + r")\b", words):
         ahead = (WEEKDAYS.index(match.group(2)) - today.weekday()) % 7
         return today + timedelta(days=ahead or (7 if match.group(1) else 0))
+    # 12/3 is a date only right after "on", "by", "due" or the test word ("exam 12/3", "test is on 12/3"),
+    # or as the whole answer to "when is the test?".
+    if match := re.search(r"(?:\b(?:on|by|due|tests?|exams?|quiz(?:zes)?|midterms?|finals?)\s+(?:is\s+|'s\s+)?(?:on\s+)?"
+                          r"|^\s*(?:it'?s\s+|it\s+is\s+)?(?:on\s+)?)(\d{1,2})/(\d{1,2})\b", words):
+        return _future(today.year, int(match.group(1)), int(match.group(2)), today)
     return None
 
 
@@ -196,7 +203,7 @@ def _day_label(when: date, today: date) -> str:
         return "today"
     if days == 1:
         return "tomorrow"
-    label = f"{WEEKDAYS[when.weekday()].capitalize()}, {when.strftime('%b')} {when.day}"
+    label = f"{WEEKDAYS[when.weekday()][:3].capitalize()}, {when.strftime('%b')} {when.day}"  # "Mon, Nov 23"
     return f"on {label} ({days} days away)" if days > 1 else f"on {label}"
 
 

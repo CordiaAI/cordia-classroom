@@ -26,7 +26,7 @@ import { LEARN_LADDER_V2 } from '../../lib/featureFlags';
 import {
   LADDER_TYPES, TEST_FORMATS, TEST_FORMAT_LABELS, answerLadder, blankFor, cleanTestFormat, createLadderRound, daysUntil, finalCheckTypes, ladderDecision, ladderTypes, onlyRecognition,
 } from '../../lib/learnLadder.mjs';
-import CordiaLoader, { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
+import CordiaLoader, { LoadingArea, Reveal, useLoadGate, useWorkingMark } from '../../components/CordiaLoader';
 import Toggle from '../../components/Toggle';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
@@ -197,6 +197,9 @@ export default function LearnPage() {
   const [checkin, setCheckin] = useState('');
   const checkinSeen = useRef(false);
   const checkinResult = useRef(null);
+  const checkinShown = ['sending', 'sent', 'failed'].includes(checkin);
+  // "Back to the Tutor" shows its working mark after 300ms, for at least 500ms (useWorkingMark).
+  const backMarked = useWorkingMark(checkin === 'sending');
 
   useEffect(() => {
     try {
@@ -282,7 +285,9 @@ export default function LearnPage() {
     if (linked || resumable) save(restored, linked || saved.test_date || '', list, format);
     if (router.query.checkin === '1' && list.length && !guide?.viewer && !checkinSeen.current) {
       checkinSeen.current = true;
-      setCheckin(resumable ? 'running' : 'pending');
+      // A round resumed after a refresh is the check-in only if it started as one; an ordinary round left
+      // mid-way finishes as itself, and the check-in is the next round.
+      setCheckin(resumable && pending.checkin ? 'running' : 'pending');
     }
     if (!list.length) setError(session?.detail || (guide?.viewer ? 'This guide has no questions to learn from yet.' : guide && !String(guide.notes || '').trim()
       ? 'This guide has no notes or questions to learn from yet.'
@@ -315,8 +320,8 @@ export default function LearnPage() {
     const resumeAt = answered ? advance(round) : round;
     if (!currentCard(resumeAt)) return; // the round's last answer: finishing it saves the levels
     const fps = Object.fromEntries(resumeAt.queue.map(item => [item.concept, fingerprint(questions[item.concept])]));
-    writeResume('learn', guideId, { round: resumeAt, roundNumber, levels: saveableLevels(questions, levels), fps });
-  }, [guideId, questions, screen, round, answered, levels, roundNumber]);
+    writeResume('learn', guideId, { round: resumeAt, roundNumber, levels: saveableLevels(questions, levels), fps, checkin: checkin === 'running' });
+  }, [guideId, questions, screen, round, answered, levels, roundNumber, checkin]);
 
   function save(nextLevels, nextDate = testDate, list = questions, nextFormat = testFormat) {
     const body = { levels: saveableLevels(list, nextLevels), test_date: nextDate || null, ...(LEARN_LADDER_V2 && nextDate ? { test_format: nextFormat } : {}) };
@@ -372,6 +377,7 @@ export default function LearnPage() {
     const next = LEARN_LADDER_V2 ? createLadderRound(questions, levels, { ...ladderContext(), carry: carry.current }) : createRound(questions, levels, today, types);
     if (!next.queue.length) return;
     if (['sent', 'failed'].includes(checkin)) setCheckin(''); // later rounds are ordinary rounds
+    if (checkin === 'pending') setCheckin('running'); // after a resumed ordinary round, this one is the check-in
     carry.current = [];
     decide(currentCard(next));
     setRound(next);
@@ -632,7 +638,7 @@ export default function LearnPage() {
       {screen === 'checkpoint' && round && (
         <div className="learn-home">
           <section className="c-card learn-panel">
-            <h2 className="c-section-title">{checkin && checkin !== 'running' ? 'Check-in done' : `Round ${roundNumber} done`}</h2>
+            <h2 className="c-section-title">{checkinShown ? 'Check-in done' : `Round ${roundNumber} done`}</h2>
             <div className="learn-ready"><span className="learn-ready-num">{ready_}%</span><span className="c-meta">ready</span></div>
             <LadderBar tally={tally} />
             <ul className="learn-moves">
@@ -645,27 +651,28 @@ export default function LearnPage() {
             </ul>
             {plan && !plan.past && <p className="c-meta">{whenLabel(plan)}</p>}
             {LEARN_LADDER_V2 && round.fallbackUsed && <p className="c-meta learn-fallback">{FALLBACK_LINE}</p>}
+            {/* On the card, not the bare backdrop, so the line keeps its contrast. */}
+            {checkinShown && (
+              <p className={'c-meta learn-checkin-status' + (checkin === 'failed' ? ' is-failed' : '')} role="status">
+                {checkin === 'sending' ? 'Sending your score to the Tutor…'
+                  : checkin === 'sent' ? 'Your Tutor has your next steps and when to do them.'
+                  : "The Tutor didn't get your score. Your progress is saved here."}
+                {checkin === 'failed' && <button type="button" className="c-btn c-btn--quiet c-btn--sm learn-checkin-again" onClick={sendCheckin}>Send it again</button>}
+              </p>
+            )}
           </section>
-          {['sending', 'sent', 'failed'].includes(checkin) && (
-            <p className={'c-meta learn-checkin-status' + (checkin === 'failed' ? ' is-failed' : '')} role="status">
-              {checkin === 'sending' ? 'Sending your score to the Tutor…'
-                : checkin === 'sent' ? 'Your Tutor has your next steps and when to do them.'
-                : "The Tutor didn't get your score. Your progress is saved here."}
-              {checkin === 'failed' && <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={sendCheckin}>Send it again</button>}
-            </p>
-          )}
           <div className="learn-actions">
-            {['sending', 'sent', 'failed'].includes(checkin) && (
-              <button type="button" className={'c-btn c-btn--primary c-btn--lg learn-back-tutor' + (checkin === 'sending' ? ' is-busy' : '')}
+            {checkinShown && (
+              <button type="button" className={'c-btn c-btn--primary c-btn--lg learn-back-tutor' + (checkin === 'sending' ? ' is-busy' : '') + (backMarked ? ' is-marked' : '')}
                 onClick={() => { if (checkin !== 'sending') backToTutor(); }} aria-disabled={checkin === 'sending' || undefined} aria-busy={checkin === 'sending' || undefined}>
                 <span className="learn-back-face"><MessageCircle {...ICON} />Back to the Tutor</span>
-                {checkin === 'sending' && <span className="learn-back-spinner"><CordiaLoader size={22} label="Sending your score" /></span>}
+                {(checkin === 'sending' || backMarked) && <span className="learn-back-spinner"><CordiaLoader size={22} label="Sending your score" /></span>}
               </button>
             )}
             {allMastered && !tally.fading
-              ? <Link href={finalHref} className={'c-btn c-btn--lg ' + (checkin ? 'c-btn--secondary' : 'c-btn--primary')}><Target {...ICON} />Final check</Link>
-              : <button type="button" className={'c-btn c-btn--lg ' + (checkin ? 'c-btn--secondary' : 'c-btn--primary')} onClick={startRound}>Next round<ArrowRight {...ICON} /></button>}
-            <button type="button" className="c-btn c-btn--secondary c-btn--lg" onClick={() => setScreen('home')}>Overview</button>
+              ? <Link href={finalHref} className={'c-btn c-btn--lg ' + (checkinShown ? 'c-btn--secondary' : 'c-btn--primary')}><Target {...ICON} />Final check</Link>
+              : <button type="button" className={'c-btn c-btn--lg ' + (checkinShown ? 'c-btn--secondary' : 'c-btn--primary')} onClick={startRound}>{checkin === 'pending' ? 'Start the check-in quiz' : 'Next round'}<ArrowRight {...ICON} /></button>}
+            <button type="button" className={'c-btn c-btn--lg ' + (checkinShown ? 'c-btn--quiet' : 'c-btn--secondary')} onClick={() => setScreen('home')}>Overview</button>
           </div>
         </div>
       )}
@@ -721,17 +728,19 @@ export default function LearnPage() {
         .learn-date select { width: auto; min-width: 170px; }
         .learn-recall-note { margin: 0; padding: 10px 14px; border-radius: var(--r-row); background: var(--olive-tint); color: var(--ink); font: 600 0.875rem/1.45 var(--font-sans); }
         .learn-fallback { margin: 0; }
-        .learn-checkin-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; min-height: 36px; }
-        .learn-checkin-status.is-failed { justify-content: space-between; padding: 6px 6px 6px 14px; border-radius: var(--r-input); background: var(--error-bg); color: var(--error); font-weight: 600; }
+        .learn-checkin-status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) 0.625rem; margin: 0; min-height: 2.25rem; }
+        .learn-checkin-status.is-failed { justify-content: space-between; padding: 0.375rem 0.375rem 0.375rem 0.875rem; border-radius: var(--r-input); background: var(--error-bg); color: var(--error); font-weight: 600; }
+        @media (max-width: 767px), (pointer: coarse) { .learn-checkin-again { height: 2.75rem !important; min-height: 2.75rem !important; } }
         .learn-back-tutor { position: relative; }
         .learn-back-tutor.is-busy { cursor: progress; }
-        .learn-back-face { display: inline-flex; align-items: center; gap: 8px; }
-        /* The label keeps its width while the mark shows, so the row doesn't move. */
-        /* After 300ms (a quick send never flashes it), held while it sends. */
-        .learn-back-tutor.is-busy .learn-back-face { animation: learn-back-hide 0s 300ms forwards; }
-        .learn-back-spinner { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; animation: learn-back-show 150ms var(--ease) 300ms forwards; }
-        @keyframes learn-back-hide { to { visibility: hidden; } }
-        @keyframes learn-back-show { to { opacity: 1; } }
+        .learn-back-face { display: inline-flex; align-items: center; gap: var(--space-2); }
+        /* The label keeps its width while the mark shows, so the row doesn't move. is-marked comes from a
+           300ms timer (backMarked), so the mark also shows with reduced motion, just without the fade. */
+        .learn-back-tutor.is-marked .learn-back-face { visibility: hidden; }
+        .learn-back-spinner { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; }
+        .learn-back-tutor.is-marked .learn-back-spinner { opacity: 1; animation: learn-back-show 150ms var(--ease); }
+        @keyframes learn-back-show { from { opacity: 0; } to { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) { .learn-back-tutor.is-marked .learn-back-spinner { animation: none; } }
         .learn-actions { display: flex; flex-wrap: wrap; gap: 10px; }
         .learn-test-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         a.learn-way { text-decoration: none; }
