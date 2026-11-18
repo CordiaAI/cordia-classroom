@@ -1,7 +1,7 @@
 import { USE_CASES, useCasePath } from './useCases/index.mjs';
 import { COMPARISONS, comparisonPath } from './comparisons/index.mjs';
-import { accountCreatedAt, getProgress, updateProgress } from './progress';
-import { accountSettings, applySettings, bootCache, defaultAppearance, defaultSettingsFor, resolveAppearance } from './themeSettings.mjs';
+import { accountCreatedAt, getProgress, progressLoaded, updateProgress } from './progress';
+import { DEFAULT_SETTINGS, accountSettings, applySettings, bootCache, defaultAppearance, defaultSettingsFor, resolveAppearance } from './themeSettings.mjs';
 import { LOOK_KEY } from './themeBoot.mjs';
 
 // The look: light/dark and every "Make it yours" setting (lib/themeSettings.mjs). The account is the
@@ -112,9 +112,11 @@ export function setThemePreference(preference) {
 }
 
 // After the account loads, its saved look replaces the cache (an account with only the old
-// light/dark choice carries that over). An account with no saved choice gets its own default, which is cached
-// on this device so first paint has it from then on: Match device for a new account, Light for an existing one.
-// Until the account's creation time is known nothing changes, so a student is never moved on a guess.
+// light/dark choice carries that over). An account with no saved look gets its own default look, cached on this
+// device so first paint has it from then on: Light for an existing account, Match device for a new one, and every
+// other setting at its default, so the previous account's theme, accent, font, text size and glass never carry
+// over on a shared browser. Until the account's own saved copy is read nothing changes (the cache may be its
+// own), and until its creation time is known the appearance stays as it is, so a student is never moved on a guess.
 export function syncThemeFromAccount() {
   const progress = getProgress();
   const created = accountCreatedAt();
@@ -123,9 +125,11 @@ export function syncThemeFromAccount() {
     if (JSON.stringify(saved) !== JSON.stringify(lookSettings())) { cache(saved); applyTheme(lastPath); }
     return;
   }
+  if (!progressLoaded()) return;
   const explicit = progress.theme === 'light' || progress.theme === 'dark' ? progress.theme : null;
-  const appearance = explicit || (created ? defaultAppearance(created) : null);
-  if (!appearance || readCache()?.s?.appearance === appearance) return;
-  cache({ ...lookSettings(), appearance });
+  const appearance = explicit || (created ? defaultAppearance(created) : lookSettings().appearance);
+  const next = bootCache({ ...DEFAULT_SETTINGS, appearance });
+  if (JSON.stringify(readCache()?.s) === JSON.stringify(next.s)) return;
+  cache(next.s);
   applyTheme(lastPath);
 }
