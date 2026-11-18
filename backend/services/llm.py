@@ -575,7 +575,8 @@ def memory_hook(question: str, answer: str, style="link", interests=(), previous
     list answer ("Freud, Jung, and Adler") needs every part in the trick: one that leaves parts out is
     asked for again once, naming them, and dropped if it still does.
     Returns {"hook"} plus {"linked": {kind, id, title}} when it built on a piece of context."""
-    from services.retain import answer_parts, mentions_answer, missing_parts
+    from services.retain import ANSWER_MAX_CHARS, answer_parts, mentions_answer, missing_parts
+    answer = str(answer or "")[:ANSWER_MAX_CHARS]  # all of it the model is shown; every check below sees the same text
     keys = [style] if isinstance(style, str) else list(style or ())
     picked = [MEMORY_STYLES[key] for key in keys if key in MEMORY_STYLES] or [MEMORY_STYLES["link"]]
     if len(picked) == 1:
@@ -605,7 +606,7 @@ def memory_hook(question: str, answer: str, style="link", interests=(), previous
         + '\n\nReturn JSON: {"hook": "...", "linked": number or null}'
     )
     user = (
-        f"QUESTION:\n{question[:1500]}\n\nANSWER:\n{answer[:1000]}\n\nINTERESTS: {likes}"
+        f"QUESTION:\n{question[:1500]}\n\nANSWER:\n{answer}\n\nINTERESTS: {likes}"
         + (f"\n\nTHE STUDENT'S OWN MATERIAL:\n{material}" if material else "")
         + (f"\n\nTAKE A DIFFERENT ANGLE FROM THIS ONE:\n{previous[:400]}" if previous else "")
     )

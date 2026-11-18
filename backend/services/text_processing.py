@@ -362,6 +362,11 @@ def strip_structure_markers(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
+# The patterns below only ever see text from _checked_text(): whitespace runs collapsed to one space
+# and a length cap, so a space is written \s or \s? (never \s* or \s+) and no two quantifiers can
+# fight over the same run of spaces. A question saved with 20,000 spaces cannot make them backtrack.
+_CHECK_CHARS = 1000  # a long question is checked at its first and last 1000 characters (where attributions sit)
+
 # Words that name the source or a part of it, not the subject. Not "unit", "class", "course" or
 # "material": "defined in SI units", "the methods in the class", "the course of the disease".
 _SOURCE_NOUN = (r"(?:slide ?decks?|slides?|decks?|pages?|chapters?|sections?|modules?|lectures?|lessons?|"
@@ -373,51 +378,51 @@ _SOURCE_NOUN = (r"(?:slide ?decks?|slides?|decks?|pages?|chapters?|sections?|mod
 # that runs on into another word is a term ("the List interface", "a page table", "the document
 # object model", "the section 8 voucher"): it names the subject, so it is never a source reference.
 # A verb after it ("this table shows") is the source acting, so it counts as a connector.
-_BOUNDARY = (r"(?=\s*(?:[?.,;:!)]|$)|\s+(?:on|about|of|for|from|and|or|but|that|which|what|who|how|why|by|in|at|"
+_BOUNDARY = (r"(?=\s?(?:[?.,;:!)]|$)|\s(?:on|about|of|for|from|and|or|but|that|which|what|who|how|why|by|in|at|"
              r"above|below|here|earlier|before|after|says?|states?|shows?|lists?|covers?|describes?|mentions?|explains?|"
              r"includes?|discusses|contains?|gives?)\b)")
 # A numbered part ("Chapter 3", "Section 4.2", "Slide 5"); a number that runs on into a name
 # ("Chapter 11 bankruptcy", "Section 2 of the Sherman Act") is the subject, not the source.
-_NUMBERED = r"\s*#?\s*\d+(?:\.\d+)*[a-z]?(?=\s*(?:[?.,;:!)]|$|\s+(?:and|or|that|which|what|who|how|why)\b))"
-_PART = rf"(?:(?:the|this|these|each|our|today'?s)\s+)?(?:(?:first|second|third|last|next|previous|current|final)\s+)?" \
-        rf"{_SOURCE_NOUN}(?:{_NUMBERED}|(?!\s*#?\s*\d){_BOUNDARY})"
+_NUMBERED = r"\s?#?\s?\d+(?:\.\d+)*[a-z]?(?=\s?(?:[?.,;:!)]|$|\s(?:and|or|that|which|what|who|how|why)\b))"
+_PART = rf"(?:(?:the|this|these|each|our|today'?s)\s)?(?:(?:first|second|third|last|next|previous|current|final)\s)?" \
+        rf"{_SOURCE_NOUN}(?:{_NUMBERED}|(?!\s?#?\s?\d){_BOUNDARY})"
 _COVERAGE_VERB = (r"(?:listed|covered|discussed|introduced|presented|mentioned|described|named|outlined|reviewed|taught|"
                   r"shown|included|highlighted|identified|summari[sz]ed|assigned|studied|learned|featured|depicted|"
                   r"illustrated|explained|defined|displayed|pictured)")
 # What the source contains or shows: "listed for Chapter 1", "covered in this lecture", "the key
 # terms for Chapter 3". No rewrite saves these.
 _ABOUT_SOURCE = re.compile(
-    rf"\b{_COVERAGE_VERB}\s+(?:in|on|for|under|during|throughout|from|at|by)\s+{_PART}"
-    rf"|\b(?:key\s+)?(?:terms|vocabulary|concepts|topics|objectives|readings|themes|takeaways)\s+(?:for|of|in|from)"
-    rf"\s+(?:(?:the|this)\s+)?(?:chapter|section|module|lecture|lesson|week|part|reading|slide|page)s?"
-    rf"(?:{_NUMBERED}|(?!\s*#?\s*\d){_BOUNDARY})",
+    rf"\b{_COVERAGE_VERB}\s(?:in|on|for|under|during|throughout|from|at|by)\s{_PART}"
+    rf"|\b(?:key\s)?(?:terms|vocabulary|concepts|topics|objectives|readings|themes|takeaways)\s(?:for|of|in|from)"
+    rf"\s(?:(?:the|this)\s)?(?:chapter|section|module|lecture|lesson|week|part|reading|slide|page)s?"
+    rf"(?:{_NUMBERED}|(?!\s?#?\s?\d){_BOUNDARY})",
     re.I)
 _POINTS_AT_SOURCE = re.compile(
     # "Slide 5", "page 12", "p. 12", "Figure 2", "Table 3", "Example 2", "Problem 4"
-    r"\b(?:slides?|pages?|pp?\.|pg\.?|figures?|fig\.|tables?|exhibits?|examples?|problems?|exercises?)\s*#?\s*\d+"
+    r"\b(?:slides?|pages?|pp?\.|pg\.?|figures?|fig\.|tables?|exhibits?|examples?|problems?|exercises?)\s?#?\s?\d+"
     # "in Lecture 4", "for Module 2", "during Week 3" (but "week 20 of pregnancy" is a subject)
-    r"|\b(?:in|from|during|for|after|before)\s+(?:the\s+)?(?:modules?|lectures?|lessons?|weeks?)\s+\d+\b(?!\s+of\b)"
+    r"|\b(?:in|from|during|for|after|before)\s(?:the\s)?(?:modules?|lectures?|lessons?|weeks?)\s\d+\b(?!\sof\b)"
     # "this chapter", "these slides", "the table above", "the following list"
-    rf"|\b(?:this|these|the\s+(?:above|following|preceding|previous|attached|provided))\s+(?:{_SOURCE_NOUN}|course){_BOUNDARY}"
-    rf"|\bthe\s+{_SOURCE_NOUN}\s+(?:above|below)\b"
+    rf"|\b(?:this|these|the\s(?:above|following|preceding|previous|attached|provided))\s(?:{_SOURCE_NOUN}|course){_BOUNDARY}"
+    rf"|\bthe\s{_SOURCE_NOUN}\s(?:above|below)\b"
     # "the lecture says", "listed in the document", "on the slides?" (not "the document object model",
     # nor "the slide" a specimen sits on)
-    r"|\bthe\s+(?:slides|slide ?deck|lectures?|readings?|handouts?|documents?|study guide|transcripts?|videos?|"
-    r"textbook|syllabus)(?=\s*(?:[?.,;:!)]|$)|\s+(?:says?|said|states?|stated|shows?|showed|lists?|describes?|mentions?|"
+    r"|\bthe\s(?:slides|slide ?deck|lectures?|readings?|handouts?|documents?|study guide|transcripts?|videos?|"
+    r"textbook|syllabus)(?=\s?(?:[?.,;:!)]|$)|\s(?:says?|said|states?|stated|shows?|showed|lists?|describes?|mentions?|"
     r"covers?|discusses|explains?|defines?|gives?|gave|presents?|notes?|calls?|uses?|claims?|argues?|suggests?|"
     r"includes?|identifies|highlights?|refers?)\b)"
     # "on the slides", "in the lecture": not "the document in the chart", "the document for informed consent"
-    r"|\bthe\s+(?:slides|slide ?deck|lectures?|readings?|handouts?|study guide|transcripts?|videos?|"
-    r"textbook|syllabus)\s+(?:on|in|at|for|about)\b"
+    r"|\bthe\s(?:slides|slide ?deck|lectures?|readings?|handouts?|study guide|transcripts?|videos?|"
+    r"textbook|syllabus)\s(?:on|in|at|for|about)\b"
     # "listed above", "Which characters are listed?"
-    r"|\blisted\s+(?:above|below|here|earlier|previously)\b"
-    r"|\b(?:is|are|was|were)\s+(?:being\s+)?(?:listed|shown|described|mentioned|discussed|presented|introduced|"
-    r"outlined|highlighted|depicted|illustrated|featured|pictured|displayed)\s*[?.]?\s*$",
+    r"|\blisted\s(?:above|below|here|earlier|previously)\b"
+    r"|\b(?:is|are|was|were)\s(?:being\s)?(?:listed|shown|described|mentioned|discussed|presented|introduced|"
+    r"outlined|highlighted|depicted|illustrated|featured|pictured|displayed)\s?[?.]?\s?$",
     re.I)
 _ATTRIBUTION = (r"(?:according to|based on|as (?:stated|described|shown|explained|noted|defined|outlined|discussed|"
                 r"listed|seen|mentioned|presented) (?:in|on|by)|in|on|from|per|within|throughout)")
-_LEADING = re.compile(rf"^\s*{_ATTRIBUTION}\s+{_PART}(?:\s*\([^)]*\))?\s*[,:]\s*", re.I)
-_TRAILING = re.compile(rf"\s*,?\s*{_ATTRIBUTION}\s+{_PART}\s*(?=[?.!]?\s*$)", re.I)
+_LEADING = re.compile(rf"^\s?{_ATTRIBUTION}\s{_PART}(?:\s?\([^)]*\))?\s?[,:]\s?", re.I)
+_TRAILING = re.compile(rf"\s?,?\s?{_ATTRIBUTION}\s{_PART}\s?(?=[?.!]?\s?$)", re.I)
 
 
 # Every pattern above needs one of these; most questions have none, so the patterns are skipped
@@ -431,9 +436,22 @@ _SOURCE_WORDS = (
 )
 
 
+def _squash(text) -> str:
+    """The text with every run of whitespace (spaces, tabs, newlines) as one space, ends trimmed."""
+    return " ".join(str(text or "").split())
+
+
 def _may_refer(text: str) -> bool:
     lower = text.lower()
     return any(word in lower for word in _SOURCE_WORDS)
+
+
+def _windows(text: str) -> list:
+    """The parts of a squashed text the patterns run on: all of it, or for a long text its first
+    and last _CHECK_CHARS characters, so the cost of a check never depends on how long the text is."""
+    if len(text) <= 2 * _CHECK_CHARS:
+        return [text]
+    return [text[:_CHECK_CHARS], text[-_CHECK_CHARS:]]
 
 
 def refers_to_source(question: str) -> bool:
@@ -441,22 +459,32 @@ def refers_to_source(question: str) -> bool:
     names a slide, page, figure or numbered lecture, points at "this chapter" or "the lecture", or
     asks what the source lists, covers or shows. Subject terms that share these words stay clear
     ("Chapter 11 bankruptcy", "Section 2 of the Sherman Act", "a page fault", "a listed company")."""
-    text = str(question or "")
-    return _may_refer(text) and bool(_ABOUT_SOURCE.search(text) or _POINTS_AT_SOURCE.search(text))
+    text = _squash(question)
+    return _may_refer(text) and any(
+        _ABOUT_SOURCE.search(part) or _POINTS_AT_SOURCE.search(part) for part in _windows(text))
 
 
 def _sentence_case(text: str) -> str:
     return text[:1].upper() + text[1:] if text else text
 
 
+def _without_attribution(text: str) -> str:
+    """A squashed text without its leading and trailing attribution (only the ends are touched)."""
+    if len(text) <= 2 * _CHECK_CHARS:
+        return _TRAILING.sub("", _LEADING.sub("", text)).strip()
+    head, middle, tail = text[:_CHECK_CHARS], text[_CHECK_CHARS:-_CHECK_CHARS], text[-_CHECK_CHARS:]
+    return (_LEADING.sub("", head) + middle + _TRAILING.sub("", tail)).strip()
+
+
 def strip_source_attribution(text: str) -> str:
     """Without a leading or trailing "according to Slide 5" / "In this lecture,": what is left is
     about the subject. Used on questions and answers."""
     value = str(text or "").strip()
-    if not _may_refer(value):
+    squashed = _squash(value)
+    if not _may_refer(squashed):
         return value
-    stripped = _TRAILING.sub("", _LEADING.sub("", value)).strip()
-    return _sentence_case(stripped) if stripped and stripped != value else value
+    stripped = _without_attribution(squashed)
+    return _sentence_case(stripped) if stripped and stripped != squashed else value
 
 
 def standalone_question(question: str):
@@ -466,9 +494,10 @@ def standalone_question(question: str):
     text = str(question or "").strip()
     if not text:
         return None
-    if not _may_refer(text):
+    squashed = _squash(text)
+    if not _may_refer(squashed):
         return text
-    if _ABOUT_SOURCE.search(text):
+    if any(_ABOUT_SOURCE.search(part) for part in _windows(squashed)):
         return None
     rewritten = strip_source_attribution(text)
     if rewritten != text and not rewritten.endswith("?") and text.endswith("?"):

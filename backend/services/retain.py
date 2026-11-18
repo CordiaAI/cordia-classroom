@@ -15,6 +15,7 @@ import hmac
 import os
 import re
 import unicodedata
+from collections import Counter
 
 TYPES = ("mc", "written", "fill", "matching")
 PRO_TYPES = {"fill", "matching"}
@@ -117,7 +118,9 @@ def _key_words(text: str) -> list:
 def _same_word(a: str, b: str) -> bool:
     if a == b or re.sub(r"s$", "", a) == re.sub(r"s$", "", b):
         return True
-    return len(a) >= 5 and len(b) >= 5 and not re.search(r"\d", a + b) and _distance(a, b) <= max(len(a), len(b)) // 5
+    longest = max(len(a), len(b))
+    return (len(a) >= 5 and len(b) >= 5 and abs(len(a) - len(b)) <= longest // 5 and not re.search(r"\d", a + b)
+            and _distance(a, b) <= longest // 5)
 
 
 def fill_verdict(response: str, answer: str) -> str:
@@ -144,6 +147,9 @@ def fill_verdict(response: str, answer: str) -> str:
 
 
 PART_MAX_WORDS = 6
+PART_MAX_COUNT = 12     # a longer list is one answer, not parts to check
+ANSWER_MAX_CHARS = 1000  # a longer answer is one answer too: this is also all of it the model is shown
+WORD_MAX_CHARS = 40
 _SERIES_END = re.compile(r"^(?:and|or|&)\s+", re.I)
 _LAST_PAIR = re.compile(r"^(.+?)\s+(?:and|or|&)\s+(.+)$", re.I)
 
@@ -153,11 +159,18 @@ def answer_parts(answer: str) -> list:
     "Offer; acceptance; consideration"), else [answer]. A list is three or more short items split
     by semicolons, or by commas with "and"/"or" before the last one (four or more need none), so a
     sentence with commas ("Hyperkalemia, a high potassium level, causes peaked T waves") and a pair
-    or title ("Romeo and Juliet") stay one part."""
-    whole = str(answer or "").strip()
+    or title ("Romeo and Juliet") stay one part. At most PART_MAX_COUNT parts in at most
+    ANSWER_MAX_CHARS characters: anything longer is returned whole, so the work never grows with
+    what was saved in the guide."""
+    raw = str(answer or "")
+    whole = raw.strip()
+    if len(raw) > ANSWER_MAX_CHARS:
+        return [whole]
     text = " ".join(whole.split()).rstrip(".")
     semicolons = ";" in text
     items = [item.strip() for item in (text.split(";") if semicolons else text.split(",")) if item.strip()]
+    if len(items) > PART_MAX_COUNT:
+        return [whole]
     listed = semicolons and len(items) >= 3
     if not semicolons and len(items) >= 2:
         if _SERIES_END.match(items[-1]):
@@ -167,7 +180,7 @@ def answer_parts(answer: str) -> list:
             listed = True
         else:
             listed = len(items) >= 4                     # "A, B, C, D"
-    if not listed:
+    if not listed or len(items) > PART_MAX_COUNT:
         return [whole]
     items = [_SERIES_END.sub("", item).strip() for item in items]
     if any(not item or len(item.split()) > PART_MAX_WORDS for item in items):
@@ -175,21 +188,31 @@ def answer_parts(answer: str) -> list:
     return items
 
 
+def _stem(word: str) -> str:
+    return word[:-1] if word.endswith("s") else word
+
+
+def _part_words(text: str) -> list:
+    return [word[:WORD_MAX_CHARS] for word in _key_words(normalize(text))]
+
+
 def missing_parts(text: str, answer: str) -> list:
     """The parts of a list answer (answer_parts) that a piece of writing (a memory trick) leaves
     out. A part counts when one of its distinguishing words is there (a word no other part uses:
     "1", "2" and "gestational" for "Type 1 diabetes, Type 2 diabetes, gestational diabetes"; a part
     with none uses all its words), allowing plurals, possessives and small typos, so a word the
-    parts share cannot stand in for the one that was left out. [] for a one-part answer."""
+    parts share cannot stand in for the one that was left out. [] for a one-part answer.
+    Each part's words are counted once (a word used by one part only is distinguishing), so the work
+    is linear in the answer, and the answer is at most PART_MAX_COUNT parts (answer_parts)."""
     parts = answer_parts(answer)
     if len(parts) < 2:
         return []
-    words = _key_words(normalize(text))
-    keys = [_key_words(normalize(part)) for part in parts]
+    words = _part_words(str(text or "")[:ANSWER_MAX_CHARS * 3])
+    keys = [_part_words(part) for part in parts]
+    used_by = Counter(stem for group in keys for stem in {_stem(word) for word in group})
     missing = []
     for index, part in enumerate(parts):
-        others = [word for other, group in enumerate(keys) if other != index for word in group]
-        own = [word for word in keys[index] if not any(_same_word(word, other) for other in others)] or keys[index]
+        own = [word for word in keys[index] if used_by[_stem(word)] == 1] or keys[index]
         if not any(_same_word(given, word) for word in own for given in words):
             missing.append(part)
     return missing
