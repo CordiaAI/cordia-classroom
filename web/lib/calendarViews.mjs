@@ -182,6 +182,16 @@ export function buildDeadlines(items, index) {
   }).sort((a, b) => a.at - b.at);
 }
 
+// A block's own words: "Argument essay draft: Finish the draft" reads "Finish the draft" (its class
+// and deadline show beside it); "Review: Exam 3" and "Work on Quiz 10" stay as they are.
+export function blockLabel(title, deadline) {
+  const text = String(title || '').trim() || 'Study';
+  for (const name of [deadline?.rawTitle, deadline?.title].filter(Boolean)) {
+    if (text.toLowerCase().startsWith(`${name.toLowerCase()}: `) && text.length > name.length + 2) return text.slice(name.length + 2);
+  }
+  return text;
+}
+
 // Study blocks from /calendar/blocks, with the class of the deadline each one is for.
 export function buildBlocks(blocks, deadlines, index) {
   const byId = new Map((deadlines || []).map(entry => [entry.id, entry]));
@@ -193,7 +203,8 @@ export function buildBlocks(blocks, deadlines, index) {
       key: `block-${block.id}`,
       id: block.id,
       itemKey: block.item_key,
-      title: block.title || 'Study',
+      title: blockLabel(block.title, deadline),
+      fullTitle: block.title || 'Study',
       start: new Date(block.starts_at),
       end: new Date(block.ends_at),
       review: block.kind === 'review',

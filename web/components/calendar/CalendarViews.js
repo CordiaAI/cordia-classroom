@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ArrowLeft, ArrowRight, CalendarCheck, Flag } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarCheck } from 'lucide-react';
 import SegmentedControl from '../SegmentedControl';
 import AssignmentSheet from '../AssignmentSheet';
 import { addDays, monthLabel, PHONE_MAX, pickView, sameDay, span, startOfWeek, VIEW_LABELS, VIEWS, weekRangeLabel } from '../../lib/calendarViews.mjs';
@@ -146,12 +146,6 @@ export default function CalendarViews({ deadlines, blocks, needs, readiness, set
             <button type="button" className="c-btn c-btn--quiet cal-today" onClick={() => setAnchor(new Date())} aria-pressed={isNow}>Today</button>
             <button type="button" className="c-icon-btn" onClick={() => go(1)} aria-label={view === 'month' ? 'Next month' : 'Next week'}><ArrowRight {...ICON} /></button>
           </div>
-          {view === 'week' && (
-            <ul className="cal-legend" aria-label="Key">
-              <li><span className="cal-legend-swatch" aria-hidden="true" />Study time</li>
-              <li><Flag size={14} strokeWidth={1.75} aria-hidden="true" />Due</li>
-            </ul>
-          )}
         </div>
         <div className="cal-head-actions">
           {wide && (
@@ -186,16 +180,13 @@ export default function CalendarViews({ deadlines, blocks, needs, readiness, set
       <SharedStyles />
       <style jsx>{`
         .cal { display: grid; gap: 1rem; min-width: 0; }
-        .cal-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1.25rem; }
-        .cal-head-main { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; min-width: 0; }
+        .cal-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1rem; }
+        .cal-head-main { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.875rem; min-width: 0; }
         .cal-title { font-size: 2.25rem; line-height: 1.1; }
         .cal-range { margin: 0; color: var(--muted); font: 600 1.0625rem/1.3 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
         .cal-nav { display: flex; align-items: center; gap: 0.125rem; }
-        .cal-nav :global(.cal-today) { min-width: 4.5rem; color: var(--ink); font-weight: 600; }
+        .cal-nav :global(.cal-today) { padding: 0 0.75rem; color: var(--ink); font-weight: 600; }
         .cal-nav :global(.c-icon-btn) { color: var(--ink); }
-        .cal-legend { display: flex; gap: 1rem; margin: 0; padding: 0; list-style: none; color: var(--muted); font: 500 0.8125rem/1.2 var(--font-sans); }
-        .cal-legend li { display: inline-flex; align-items: center; gap: 0.375rem; white-space: nowrap; }
-        .cal-legend-swatch { width: 0.875rem; height: 0.625rem; border-radius: 0.1875rem; background: var(--glass-inner); box-shadow: inset 0 0 0 0.0625rem var(--line-strong); }
         .cal-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
         .cal-head-actions :global(.cal-switch) { flex: 0 0 auto; }
         .cal-head-actions :global(.cal-plan) { white-space: nowrap; }

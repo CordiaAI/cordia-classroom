@@ -52,6 +52,11 @@ test('course codes match the student\'s classes, with the sidebar\'s colour', ()
   assert.equal(byId('canvas-1').cls.classId, null);
   assert.equal(byId('canvas-1').cls.tone, byId('canvas-6').cls.tone);
   assert.equal(classFor('From Lecture 12', index), null);
+  // A block reads as its own step; its deadline's name stays in fullTitle.
+  const b3 = blocks.find(block => block.id === 'b3');
+  assert.equal(b3.title, 'Draft body paragraphs');
+  assert.equal(b3.fullTitle, 'Argument essay draft: Draft body paragraphs');
+  assert.equal(blocks.find(block => block.id === 'b2').title, 'Review: Exam 3');
   // Blocks take their deadline's class.
   assert.equal(blocks.find(block => block.id === 'b3').cls.key, 'EH 101');
 });
