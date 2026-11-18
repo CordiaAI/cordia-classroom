@@ -2,7 +2,8 @@
 // (docs/redesign/PLAN.md T5): A today's backend (/chats answers 404), B the new backend before its
 // migration (editable false), C the new backend with it. Run the app on the port first:
 //   npm run dev --prefix web -- -p 3108
-//   BASE=http://localhost:3108 CHROME=/path/to/chrome node tests/qa/chats-check.cjs
+//   BASE=http://localhost:3108 CHROME=/path/to/chrome node tests/qa/chats-check.cjs   (ONLY=regex runs some checks)
+// The first visit to a page in `next dev` compiles it, so the waits below are generous.
 const path = require('path');
 const { chromium } = require(path.join(__dirname, '../../node_modules/playwright'));
 const { install, createState, TOKEN, USER, otherTab } = require('./mock-api.cjs');
@@ -18,6 +19,7 @@ const expect = (condition, message) => { if (!condition) throw new Error(message
 const same = (actual, wanted, message) => expect(JSON.stringify(actual) === JSON.stringify(wanted), `${message}: got ${JSON.stringify(actual)}, wanted ${JSON.stringify(wanted)}`);
 
 async function check(name, fn) {
+  if (process.env.ONLY && !new RegExp(process.env.ONLY).test(name)) return;
   try { await fn(); results.push(true); console.log(`ok   ${name}`); }
   catch (error) { results.push(false); console.log(`FAIL ${name}\n     ${String(error.message || error).split('\n')[0].slice(0, 300)}`); }
 }
@@ -69,7 +71,8 @@ async function ready(page, url, selector = '.chat-home') { await page.goto(BASE 
       same(await current(page), ['New chat'], 'home');
       await page.fill('textarea', 'What is the product rule?');
       await page.keyboard.press('Enter');
-      await page.waitForTimeout(1600);
+      await page.waitForURL(/\/chat\//, { timeout: 30000 }).catch(() => {});
+      await page.waitForTimeout(800);
       expect(path_(page).startsWith('/chat/'), `address ${path_(page)}`);
       same(await current(page), ['What is the product rule?'], 'one current item, the chat');
       await page.reload();
@@ -92,7 +95,8 @@ async function ready(page, url, selector = '.chat-home') { await page.goto(BASE 
         expect(await page.evaluate(() => document.activeElement.getAttribute('aria-label')) === 'Chat options', 'Escape returns to the ⋯ button');
         await page.click('.chat-home-menu button');
         await page.click('[role=menuitem]:has-text("Delete")');
-        await page.waitForTimeout(600);
+        await page.waitForURL(/\/home/, { timeout: 30000 }).catch(() => {});
+        await page.waitForTimeout(400);
         expect(path_(page) === '/home', 'delete goes home');
         expect((await text(page, '.c-chat-toast')).includes('Undo'), 'toast with Undo');
         await page.click('.c-chat-toast button');
@@ -212,7 +216,8 @@ async function ready(page, url, selector = '.chat-home') { await page.goto(BASE 
     for (const [api, id, wanted] of [[undefined, SAVED, '/tutor'], ['full', SAVED, '/tutor'], ['full', 'missing-chat', '/dashboard']]) {
       const { page, context } = await session(browser, api, { width: 390, height: 844 });
       await page.goto(`${BASE}/chat/${id}`);
-      await page.waitForTimeout(2500);
+      await page.waitForURL(url => !url.pathname.startsWith('/chat/'), { timeout: 40000 }).catch(() => {});
+      await page.waitForTimeout(500);
       expect(path_(page) === wanted, `${api} ${id}: ${path_(page)}`);
       await context.close();
     }
