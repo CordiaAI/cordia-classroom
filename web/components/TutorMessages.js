@@ -2,6 +2,7 @@ import { Trash2 } from 'lucide-react';
 import NapkinVisual from './NapkinVisual';
 import CordiaLoader from './CordiaLoader';
 import AcademicInfinityMark from './AcademicInfinityMark';
+import StudyPlanActions from './StudyPlanActions';
 import { inlineParts, parseTutorAnswer } from '../lib/tutorFormat.mjs';
 import { speakableText } from '../lib/useTutorChat';
 
@@ -65,6 +66,8 @@ export default function TutorMessages({ tutor, avatar = false }) {
             <NapkinVisual text={message.visual.text} context={message.visual.title || ''} auto name={(message.visual.title || 'tutor-visual').replace(/[^a-z0-9]+/gi, '-').toLowerCase()} />
           </div>
         )}
+        {/* A study plan's buttons come straight after it: they are the next step. */}
+        {message.study_plan && <StudyPlanActions plan={message.study_plan} tutor={tutor} latest={index === messages.length - 1} />}
         {canSpeak && message.role !== 'user' && message.text && (
           <button type="button" className="cordia-tutor-speak" onClick={() => toggleSpeech(index, message.text)} aria-pressed={speakingIndex === index}>
             {speakingIndex === index ? 'Stop' : 'Listen'}

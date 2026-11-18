@@ -45,6 +45,7 @@ function combineAttachments(files) {
 }
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const localDay = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const MAX_MESSAGES = 30;
 const SKILL_PROGRESS = {
   explain: 'Explaining material…',
@@ -439,6 +440,8 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
         assignment_key: working?.key || undefined,
         mode: 'short',
         rich_text: true,
+        // The student's own day, so "tomorrow" and "Friday" in a study plan mean their days.
+        local_date: localDay(),
       }),
     });
     sendingRef.current = false;

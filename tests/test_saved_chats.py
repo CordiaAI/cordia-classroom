@@ -595,6 +595,19 @@ class AfterMigrationTests(SavedChatsBase):
             found = memory_context.related_material(self.db, ANA, GUIDE, "Who founded ATO?", "Otis Allan Glazebrook")
         self.assertEqual(sorted(item["title"] for item in found if item["kind"] == "tutor"), ["Greek life", "Who started ATO?"])
 
+    def test_twenty_newer_deleted_chats_do_not_crowd_out_a_live_one_for_the_memory_trick(self):
+        from services import memory_context
+        said = [ask("Who started ATO?"), reply("Otis Allan Glazebrook founded ATO in Richmond.")]
+        self.db.rows("tutor_chats").append(
+            chat_row("a0000000-0000-4000-8000-0000000000c0", ANA, "Greek life", "2026-11-01T10:00:00+00:00", messages=said))
+        for n in range(20):  # all newer than the live one, so the 20 newest rows are all deleted
+            self.db.rows("tutor_chats").append(
+                chat_row(f"a0000000-0000-4000-8000-0000000001{n:02d}", ANA, f"Deleted {n}", f"2026-11-14T10:{n:02d}:00+00:00",
+                         messages=said, deleted_at="2026-11-14T12:00:00+00:00"))
+        with self.assertLogs("services.memory_context", "WARNING"):  # the fake database has no full-text search
+            found = memory_context.related_material(self.db, ANA, GUIDE, "Who founded ATO?", "Otis Allan Glazebrook")
+        self.assertEqual([item["title"] for item in found if item["kind"] == "tutor"], ["Greek life"])
+
     def test_the_memory_trick_falls_back_only_when_the_column_is_missing(self):
         from services import memory_context
         said = [ask("Who started ATO?"), reply("Otis Allan Glazebrook founded ATO in Richmond.")]
@@ -603,7 +616,7 @@ class AfterMigrationTests(SavedChatsBase):
         seen = []
 
         def timeout(query):
-            if query.name == "tutor_chats" and "deleted_at" in (query.columns or []):
+            if query.name == "tutor_chats":
                 seen.append(query.columns)
                 raise db_error("57014", "canceling statement due to statement timeout")
             return real(query)
@@ -1484,6 +1497,15 @@ class BeforeMigrationTests(SavedChatsBase):
         self.assertEqual(len(self.call("GET", "/tutor/chats").json()["chats"]), 2)
         self.assertEqual(self.call("POST", "/tutor/session/new", json={"session_id": SESSION}).status_code, 200)
         self.assertEqual(self.call("DELETE", f"/tutor/chats/{RATES}").status_code, 200)
+
+    def test_the_memory_trick_still_reads_the_chats_before_the_migration(self):
+        from services import memory_context
+        said = [ask("Who started ATO?"), reply("Otis Allan Glazebrook founded ATO in Richmond.")]
+        self.db.rows("tutor_chats").append(
+            {k: v for k, v in chat_row("a0000000-0000-4000-8000-0000000000c0", ANA, "Greek life", "2026-11-14T10:00:00+00:00", messages=said).items() if k not in CHAT_COLUMNS})
+        with self.assertLogs("services.memory_context", "WARNING"):  # the fake database has no full-text search
+            found = memory_context.related_material(self.db, ANA, GUIDE, "Who founded ATO?", "Otis Allan Glazebrook")
+        self.assertEqual([item["title"] for item in found if item["kind"] == "tutor"], ["Greek life"])
 
     def test_the_extensions_chat_endpoint_is_not_touched(self):
         import routers.chat as chat_router

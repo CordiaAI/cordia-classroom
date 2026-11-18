@@ -238,7 +238,7 @@ test('first paint: a damaged cache is ignored, never thrown, and never sets odd 
 
 // ---------- Appearance: existing accounts stay on Light, new accounts default to Match device ----------
 
-// A cut-off in the past of "today", so the tests do not depend on the owner's placeholder.
+// A fixed cut-off of the tests' own, so most tests do not move if the real one is ever changed.
 const CUTOFF = '2026-12-01T00:00:00Z';
 const BEFORE = '2026-11-30T23:59:59Z';
 const AFTER = '2026-12-01T00:00:00Z';
@@ -272,7 +272,7 @@ test('an unknown or unreadable creation time is Light: when in doubt, Light', ()
     assert.equal(resolved({}, created, true), 'light', String(created));
   }
   assert.equal(isNewAccount(AFTER, 'garbage'), false, 'a broken cut-off makes nobody new');
-  assert.equal(isNewAccount(AFTER, undefined), false, 'the placeholder cut-off is far ahead, so nobody is new until the owner sets it');
+  assert.equal(isNewAccount(undefined), false, 'with the real cut-off, an unknown creation time is not new');
 });
 
 test('the cut-off is on or after: the exact moment counts as new, a second before does not', () => {
@@ -282,11 +282,17 @@ test('the cut-off is on or after: the exact moment counts as new, a second befor
   assert.equal(isNewAccount('2026-11-30T23:59:59.999Z', CUTOFF), false);
 });
 
-test('the placeholder cut-off is one readable date-time, far ahead, so releasing without setting it leaves everyone on Light', () => {
+test('the real cut-off is the moment T10 shipped: on or after is Match device, before and unknown stay Light', () => {
+  assert.equal(NEW_ACCOUNT_CUTOFF, '2026-11-18T18:55:05Z');
   assert.ok(Number.isFinite(Date.parse(NEW_ACCOUNT_CUTOFF)));
-  assert.ok(Date.parse(NEW_ACCOUNT_CUTOFF) > Date.parse('2090-01-01T00:00:00Z'));
-  assert.equal(defaultAppearance(new Date().toISOString()), 'light');
-  assert.equal(accountSettings({}, new Date().toISOString()).appearance, 'light');
+  assert.equal(defaultAppearance('2026-11-18T18:55:05Z'), 'system', 'the exact moment is new');
+  assert.equal(defaultAppearance('2026-11-18T18:55:05.001Z'), 'system');
+  assert.equal(defaultAppearance('2027-03-01T09:00:00Z'), 'system');
+  assert.equal(defaultAppearance('2026-11-18T18:55:04.999Z'), 'light', 'a moment before is Light');
+  assert.equal(defaultAppearance('2020-05-05T10:00:00Z'), 'light');
+  assert.equal(defaultAppearance(undefined), 'light');
+  assert.equal(accountSettings({}, '2026-11-19T00:00:00Z').appearance, 'system');
+  assert.equal(accountSettings({}, '2026-11-17T00:00:00Z').appearance, 'light');
 });
 
 test('a saved Light, Dark or Match device always wins, for both kinds of account', () => {

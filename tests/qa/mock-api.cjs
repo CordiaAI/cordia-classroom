@@ -378,8 +378,18 @@ async function install(context, state) {
       if (state.chatDelay) await new Promise(resolve => setTimeout(resolve, state.chatDelay));
       if (state.tutorLimit) return route.fulfill({ status: 402, json: { detail: { code: 'limit_reached', feature: 'tutor', message: "You've used all 10 Tutor questions on the Free plan this month." } } });
       if (body.session_id && body.conversation_version != null && body.conversation_version !== state.tutor.conversation_version) return route.fulfill({ status: 409, json: { detail: 'Tutor conversation changed. Refresh and try again.' } });
-      state.tutor = { ...state.tutor, messages: [...state.tutor.messages, { role: 'user', text: body.question }, { role: 'ai', text: state.tutorReply || 'Here is a **simple** explanation from your guide.' }], conversation_version: state.tutor.conversation_version + 1, updated_at: new Date().toISOString() };
-      return json({ answer: 'ok', session: state.tutor });
+      // state.chatReply(body): a reply of its own ({ answer, study_plan, link, ... }), e.g. a study plan.
+      const { answer = state.tutorReply || 'Here is a **simple** explanation from your guide.', ...extra } = state.chatReply?.(body) || {};
+      state.tutor = { ...state.tutor, messages: [...state.tutor.messages, { role: 'user', text: body.question }, { role: 'ai', text: answer, ...extra }], conversation_version: state.tutor.conversation_version + 1, updated_at: new Date().toISOString() };
+      return json({ answer, ...extra, session: state.tutor });
+    }
+    // Learn's finished check-in (backend routers/tutor.py tutor_checkin): the Tutor's next steps join the chat.
+    if (path === '/tutor/session/checkin') {
+      if (state.failCheckin) return route.fulfill({ status: 409, json: { detail: 'The Tutor was busy. Your check-in is saved in Learn; try again.' } });
+      state.checkin = body;
+      const text = `Check-in done: ${body.right} of ${body.total} right. Next: one Learn round a day, and a final check the day before.`;
+      state.tutor = { ...state.tutor, messages: [...state.tutor.messages, { role: 'ai', text, link: { href: `/learn/${body.guide_id}`, label: 'Learn' } }], conversation_version: state.tutor.conversation_version + 1 };
+      return json(state.tutor);
     }
     if ((m = path.match(/^\/quiz\/([^/]+)\/history$/))) return json({ attempts: state.populated ? [{ id: 'q1', score: 80, correct_answers: 4, total_questions: 5, completed_at: new Date().toISOString() }] : [] });
     if ((m = path.match(/^\/quiz\/([^/]+)\/session$/))) {

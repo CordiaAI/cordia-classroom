@@ -1,18 +1,23 @@
 """Shared Tutor session endpoints used by Classroom and the Chrome side panel."""
 
 import re
+from datetime import date, datetime, timezone
 from typing import Optional
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 import access
 from access import Ctx
 from auth_utils import get_user_id
+from database import get_supabase
 from ids import require_uuid
+from rate_limit import limiter
 from services.saved_chats import start_chat
+from services.study_helper import checkin_reply, learn_href
 from services.tutor_sessions import (
+    append_tutor_message,
     delete_tutor_chat,
     get_or_create_tutor_session,
     list_tutor_chats,
@@ -125,3 +130,50 @@ def new_tutor_chat(body: NewTutorChat, authorization: str = Header(default="")):
             require_uuid(value, name)
     # services/saved_chats keeps the saved chat's id, title and class once its migration has run.
     return public_tutor_session(start_chat(user_id, body.session_id, body.guide_id, None, body.resume_id)[1])
+
+
+DAY = r"^\d{4}-\d{2}-\d{2}$"
+
+
+class CheckinResult(BaseModel):
+    """A finished check-in round in Learn, sent back so the Tutor can say what to do next and when."""
+    checkin_id: str = Field(..., pattern=r"^[\w:.-]{1,80}$")
+    guide_id: str = Field(..., max_length=36)
+    right: int = Field(..., ge=0, le=500)
+    total: int = Field(..., ge=1, le=500)
+    remaining: int = Field(default=0, ge=0, le=5000)  # ideas not yet mastered after the round
+    test_date: Optional[str] = Field(default=None, pattern=DAY)
+    local_date: Optional[str] = Field(default=None, pattern=DAY)
+
+    @model_validator(mode="after")
+    def right_within_total(self):
+        if self.right > self.total:
+            raise ValueError("right cannot be more than total")
+        return self
+
+
+def _day(value: Optional[str]) -> Optional[date]:
+    try:
+        return date.fromisoformat(value) if value else None
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Use a real date (YYYY-MM-DD).")
+
+
+@router.post("/session/checkin")
+@limiter.limit("20/minute")
+def tutor_checkin(body: CheckinResult, request: Request, authorization: str = Header(default="")):
+    """Learn's check-in is done: the Tutor posts what to do next and when (from the score and the days
+    left) in the student's own conversation, once per check-in, about the student's own guide only."""
+    user_id = get_user_id(authorization)
+    require_uuid(body.guide_id, "guide ID")
+    rows = get_supabase().table("study_guides").select("id,title").eq("id", body.guide_id).eq("user_id", user_id).limit(1).execute().data
+    if not rows:
+        raise HTTPException(status_code=404, detail="Guide not found")
+    title = rows[0].get("title") or "your guide"
+    today = _day(body.local_date) or datetime.now(timezone.utc).date()
+    text = checkin_reply(title=title, right=body.right, total=body.total, remaining=body.remaining, when=_day(body.test_date), today=today)
+    link = {"href": learn_href(body.guide_id, checkin=False), "label": f"Learn for {title}"}
+    row = append_tutor_message(user_id, text, extra={"link": link}, once=f"checkin:{body.checkin_id}")
+    if not row:
+        raise HTTPException(status_code=409, detail="The Tutor was busy. Your check-in is saved in Learn; try again.")
+    return public_tutor_session(row)
