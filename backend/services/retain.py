@@ -132,6 +132,50 @@ def fill_verdict(response: str, answer: str) -> str:
     return "wrong"
 
 
+PART_MAX_WORDS = 6
+_SERIES_END = re.compile(r"^(?:and|or|&)\s+", re.I)
+_LAST_PAIR = re.compile(r"^(.+?)\s+(?:and|or|&)\s+(.+)$", re.I)
+
+
+def answer_parts(answer: str) -> list:
+    """The parts of a list answer ("Sigmund Freud, Carl Jung, and Alfred Adler" -> three names;
+    "Offer; acceptance; consideration"), else [answer]. A list is three or more short items split
+    by semicolons, or by commas with "and"/"or" before the last one (four or more need none), so a
+    sentence with commas ("Hyperkalemia, a high potassium level, causes peaked T waves") and a pair
+    or title ("Romeo and Juliet") stay one part."""
+    whole = str(answer or "").strip()
+    text = " ".join(whole.split()).rstrip(".")
+    semicolons = ";" in text
+    items = [item.strip() for item in (text.split(";") if semicolons else text.split(",")) if item.strip()]
+    listed = semicolons and len(items) >= 3
+    if not semicolons and len(items) >= 2:
+        if _SERIES_END.match(items[-1]):
+            listed = len(items) >= 3                     # "A, B, and C"
+        elif (pair := _LAST_PAIR.match(items[-1])):
+            items[-1:] = [pair.group(1), pair.group(2)]  # "A, B and C"
+            listed = True
+        else:
+            listed = len(items) >= 4                     # "A, B, C, D"
+    if not listed:
+        return [whole]
+    items = [_SERIES_END.sub("", item).strip() for item in items]
+    if any(not item or len(item.split()) > PART_MAX_WORDS for item in items):
+        return [whole]
+    return items
+
+
+def missing_parts(text: str, answer: str) -> list:
+    """The parts of a list answer (answer_parts) that a piece of writing (a memory trick) leaves
+    out: a part counts when one of its key words is there, allowing plurals, possessives and small
+    typos. [] for a one-part answer."""
+    parts = answer_parts(answer)
+    if len(parts) < 2:
+        return []
+    words = _key_words(normalize(text))
+    return [part for part in parts
+            if not any(_same_word(given, word) for word in _key_words(normalize(part)) for given in words)]
+
+
 def mentions_answer(text: str, answer: str) -> bool:
     """Whether a piece of writing (a memory hook) states the answer: every number in it, and all of
     its key words (at least half when it has more than six), allowing plurals and small typos."""
