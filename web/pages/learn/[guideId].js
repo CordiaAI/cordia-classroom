@@ -614,7 +614,7 @@ export default function LearnPage() {
           </div>
           <div className="c-bar" role="progressbar" aria-label="Round" aria-valuemin={0} aria-valuemax={round.queue.length} aria-valuenow={round.position}><span style={{ width: Math.round((round.position / round.queue.length) * 100) + '%' }} /></div>
           {recallNoteNow && <p className="learn-recall-note" role="status">{RECALL_NOTE}</p>}
-          {checkin === 'running' && <p className="learn-recall-note">Check-in quiz: answer what you can, guesses included. Your Tutor plans the rest from your score.</p>}
+          {checkin === 'running' && <p className="learn-recall-note">Check-in quiz: one short round to see where you stand. Your Tutor plans the rest from your score.</p>}
           <QuietLimits.Provider value={LEARN_LADDER_V2}>
           {card.type === 'mc' && <McCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
           {card.type === 'fill' && <FillCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
@@ -657,7 +657,7 @@ export default function LearnPage() {
           <div className="learn-actions">
             {['sending', 'sent', 'failed'].includes(checkin) && (
               <button type="button" className={'c-btn c-btn--primary c-btn--lg learn-back-tutor' + (checkin === 'sending' ? ' is-busy' : '')}
-                onClick={backToTutor} disabled={checkin === 'sending'} aria-busy={checkin === 'sending' || undefined}>
+                onClick={() => { if (checkin !== 'sending') backToTutor(); }} aria-disabled={checkin === 'sending' || undefined} aria-busy={checkin === 'sending' || undefined}>
                 <span className="learn-back-face"><MessageCircle {...ICON} />Back to the Tutor</span>
                 {checkin === 'sending' && <span className="learn-back-spinner"><CordiaLoader size={22} label="Sending your score" /></span>}
               </button>
@@ -722,12 +722,16 @@ export default function LearnPage() {
         .learn-recall-note { margin: 0; padding: 10px 14px; border-radius: var(--r-row); background: var(--olive-tint); color: var(--ink); font: 600 0.875rem/1.45 var(--font-sans); }
         .learn-fallback { margin: 0; }
         .learn-checkin-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; min-height: 36px; }
-        .learn-checkin-status.is-failed { color: var(--error); }
+        .learn-checkin-status.is-failed { justify-content: space-between; padding: 6px 6px 6px 14px; border-radius: var(--r-input); background: var(--error-bg); color: var(--error); font-weight: 600; }
         .learn-back-tutor { position: relative; }
+        .learn-back-tutor.is-busy { cursor: progress; }
         .learn-back-face { display: inline-flex; align-items: center; gap: 8px; }
         /* The label keeps its width while the mark shows, so the row doesn't move. */
-        .learn-back-tutor.is-busy .learn-back-face { visibility: hidden; }
-        .learn-back-spinner { position: absolute; inset: 0; display: grid; place-items: center; }
+        /* After 300ms (a quick send never flashes it), held while it sends. */
+        .learn-back-tutor.is-busy .learn-back-face { animation: learn-back-hide 0s 300ms forwards; }
+        .learn-back-spinner { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; animation: learn-back-show 150ms var(--ease) 300ms forwards; }
+        @keyframes learn-back-hide { to { visibility: hidden; } }
+        @keyframes learn-back-show { to { opacity: 1; } }
         .learn-actions { display: flex; flex-wrap: wrap; gap: 10px; }
         .learn-test-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         a.learn-way { text-decoration: none; }

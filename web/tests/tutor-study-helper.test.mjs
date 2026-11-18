@@ -24,8 +24,8 @@ test('the plan buttons use tokens and rem only, and keep their width while worki
     assert.doesNotMatch(source, /#[0-9a-f]{3,8}\b|rgba?\(/i);
     assert.doesNotMatch(source, /font[^;]*\d+px/);
   }
-  assert.match(actions, /\.is-busy \.plan-face \{ visibility: hidden; \}/);
-  assert.match(learn, /\.learn-back-tutor\.is-busy \.learn-back-face \{ visibility: hidden; \}/);
+  assert.match(actions, /\.is-busy \.plan-face \{ animation: plan-hide 0s 300ms forwards; \}/);
+  assert.match(learn, /\.learn-back-tutor\.is-busy \.learn-back-face \{ animation: learn-back-hide 0s 300ms forwards; \}/);
 });
 
 test('the Tutor gets the student\'s own day, so "Friday" means their Friday', () => {

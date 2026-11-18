@@ -243,6 +243,7 @@ async function install(context, state) {
     }
     // Learn's finished check-in (backend routers/tutor.py tutor_checkin): the Tutor's next steps join the chat.
     if (path === '/tutor/session/checkin') {
+      if (state.failCheckin) return route.fulfill({ status: 409, json: { detail: 'The Tutor was busy. Your check-in is saved in Learn; try again.' } });
       state.checkin = body;
       const text = `Check-in done: ${body.right} of ${body.total} right. Next: one Learn round a day, and a final check the day before.`;
       state.tutor = { ...state.tutor, messages: [...state.tutor.messages, { role: 'ai', text, link: { href: `/learn/${body.guide_id}`, label: 'Learn' } }], conversation_version: state.tutor.conversation_version + 1 };

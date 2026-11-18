@@ -50,17 +50,19 @@ export default function StudyPlanActions({ plan, tutor, latest }) {
       <div className="plan-row">
         {actions.map((action, index) => {
           const Icon = ICONS[action.kind] || Play;
-          const tone = index === 0 ? 'c-btn--primary' : 'c-btn--secondary';
+          // One olive button per view: only the latest plan's next step is primary.
+          const tone = index === 0 && latest ? 'c-btn--primary' : 'c-btn--secondary';
           const body = <><Icon {...ICON} /><span>{action.label}</span></>;
           if (action.kind === 'checkin' || action.kind === 'link') {
             return insideApp(action.href) && <Link key={action.kind + index} href={action.href} className={`c-btn c-btn--sm ${tone} plan-btn`}>{body}</Link>;
           }
           // Asking the Tutor or opening the file picker only makes sense from the latest reply.
+          // The working button keeps its look (aria-disabled, ignored clicks) so its mark stays readable; the rest disable.
           const busy = working === action.kind;
-          const off = Boolean(working) || tutor.busy || (!latest && action.kind !== 'canvas_review');
+          const off = !busy && (Boolean(working) || tutor.busy || (!latest && action.kind !== 'canvas_review'));
           return (
             <button key={action.kind + index} type="button" className={`c-btn c-btn--sm ${tone} plan-btn${busy ? ' is-busy' : ''}`}
-              onClick={() => run(action)} disabled={off} aria-busy={busy || undefined}>
+              onClick={() => { if (!working) run(action); }} disabled={off} aria-disabled={busy || undefined} aria-busy={busy || undefined}>
               <span className="plan-face">{body}</span>
               {busy && <span className="plan-spinner"><CordiaLoader size={18} label={`${action.label}: working`} /></span>}
             </button>
@@ -69,13 +71,17 @@ export default function StudyPlanActions({ plan, tutor, latest }) {
       </div>
       {problem && <p className="plan-problem" role="alert">{problem}</p>}
       <style jsx>{`
-        .plan-actions { display: grid; gap: 8px; margin-top: 10px; }
+        .plan-actions { display: grid; gap: 8px; margin: 12px 0 10px; }
         .plan-row { display: flex; flex-wrap: wrap; gap: 8px; }
+        .plan-actions :global(.plan-btn.is-busy) { cursor: progress; }
         .plan-actions :global(.plan-btn) { position: relative; padding: 0 16px; font-family: var(--font-sans); font-size: 0.875rem; }
         .plan-face { display: inline-flex; align-items: center; gap: 8px; }
-        /* The label keeps its width while the mark shows, so nothing moves while it works. */
-        .is-busy .plan-face { visibility: hidden; }
-        .plan-spinner { position: absolute; inset: 0; display: grid; place-items: center; }
+        /* Pressed: disabled at once. The mark replaces the label only after 300ms, so a quick answer never
+           flashes it, and the label keeps its width, so nothing moves while it works. */
+        .is-busy .plan-face { animation: plan-hide 0s 300ms forwards; }
+        .plan-spinner { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; animation: plan-show 150ms var(--ease) 300ms forwards; }
+        @keyframes plan-hide { to { visibility: hidden; } }
+        @keyframes plan-show { to { opacity: 1; } }
         .plan-problem { margin: 0; padding: 8px 12px; border-radius: var(--r-input); background: var(--error-bg); color: var(--error); font: 500 0.8125rem/1.45 var(--font-sans); }
       `}</style>
     </div>

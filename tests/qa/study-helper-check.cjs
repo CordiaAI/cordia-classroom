@@ -50,12 +50,12 @@ async function session(browser, scheme) {
 async function finishRound(page) {
   for (let step = 0; step < 40; step += 1) {
     if (await page.locator('text=Check-in done').count()) return;
-    const right = page.locator('.quiz-option:has-text("Right"), .quiz-option:has-text("power reactions")').first();
-    if (await right.count() && await right.isEnabled()) { await right.click(); await page.waitForTimeout(80); continue; }
-    const sure = page.locator('button:has-text("Sure")').first();
-    if (await sure.count() && await sure.isVisible()) { await sure.click(); await page.waitForTimeout(80); continue; }
     const next = page.locator('button.quiz-next').first();
-    if (await next.count() && await next.isVisible()) { await next.click(); await page.waitForTimeout(120); continue; }
+    if (await next.count() && await next.isVisible()) { await next.click(); await page.waitForTimeout(150); continue; }
+    const sure = page.locator('.retain-sure button:has-text("Sure")').first();
+    if (await sure.count() && await sure.isVisible()) { await sure.click(); await page.waitForTimeout(100); continue; }
+    const right = page.locator('button.quiz-option:has-text("Right"), button.quiz-option:has-text("power reactions")').first();
+    if (await right.count()) { await right.click(); await page.waitForTimeout(100); continue; }
     const typed = page.locator('.learn-card textarea, .learn-card input[type="text"]').first();
     if (await typed.count()) { await typed.fill('Concept explained in plain words'); await typed.press('Enter'); await page.waitForTimeout(400); continue; }
     await page.waitForTimeout(200);
@@ -84,8 +84,8 @@ async function finishRound(page) {
     });
     await check(`${scheme}: the check-in opens Learn with the date and starts a round`, async () => {
       await page.locator('.plan-actions a:has-text("Start the check-in quiz")').click();
-      await page.waitForURL(/\/learn\//, { timeout: 15000 });
-      await page.locator('text=Check-in quiz: answer what you can').waitFor({ timeout: 20000 });
+      await page.waitForURL(/\/learn\//, { timeout: 90000 }); // a dev server compiles the page first
+      await page.locator('text=Check-in quiz: one short round').waitFor({ timeout: 90000 });
       await page.waitForTimeout(300);
       await page.screenshot({ path: path.join(OUT, `learn-checkin-${scheme}.png`) });
     });
@@ -100,14 +100,68 @@ async function finishRound(page) {
     });
     await check(`${scheme}: back in the Tutor, the next steps are in the same conversation`, async () => {
       await page.locator('button:has-text("Back to the Tutor")').click();
-      await page.waitForURL(/\/tutor/, { timeout: 15000 });
-      await page.locator('text=Check-in done:').waitFor({ timeout: 15000 });
+      await page.waitForURL(/\/tutor/, { timeout: 90000 });
+      await page.locator('text=Check-in done:').waitFor({ timeout: 90000 });
       expect(await page.locator('text=I need to study for my bio test').count() > 0, 'the conversation was not kept');
       await page.waitForTimeout(400);
       await page.screenshot({ path: path.join(OUT, `tutor-next-steps-${scheme}.png`) });
     });
     await context.close();
   }
+  await check('a check-in the Tutor misses says so and can be sent again; phone width', async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: 'light' });
+    const state = createState(true);
+    state.chatReply = planReply;
+    state.failCheckin = true;
+    await install(context, state);
+    const page = await context.newPage();
+    await page.goto(BASE + '/login');
+    await page.evaluate(([token, user]) => { localStorage.setItem('authToken', token); localStorage.setItem('userId', user); localStorage.setItem('refreshToken', 'r'); localStorage.setItem('theme', 'light'); }, [TOKEN, USER]);
+    await page.goto(BASE + '/home');
+    const box = page.locator('textarea').first();
+    await box.waitFor({ timeout: 30000 });
+    await box.fill('I need to study for my bio test in 5 days');
+    await box.press('Enter');
+    await page.locator('.plan-actions').waitFor({ timeout: 15000 });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: path.join(OUT, 'home-plan-390.png') });
+    await page.goto(BASE + `/learn/${GUIDE}?test=${TEST_DATE}&checkin=1`);
+    await finishRound(page);
+    await page.locator("text=The Tutor didn't get your score").waitFor({ timeout: 10000 });
+    expect(page.url().includes('checkin=1'), 'a failed check-in should keep its place');
+    await page.screenshot({ path: path.join(OUT, 'learn-checkin-failed-390.png'), fullPage: true });
+    state.failCheckin = false;
+    await page.locator('button:has-text("Send it again")').click();
+    await page.locator('text=Your Tutor has your next steps').waitFor({ timeout: 10000 });
+    await context.close();
+  });
+  await check('a plan with no guide builds the review set from Canvas and opens its check-in', async () => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'light' });
+    const state = createState(true);
+    state.chatReply = () => ({ action: 'study_plan', answer: "Let's get you ready for Midterm in 6 days. You don't have a guide for it yet. I can gather your Canvas material for this class into a review set, then start a short check-in quiz.",
+      study_plan: { guide: null, test_date: day(6), exam: { key: 'canvas-77', title: 'Midterm' }, actions: [{ kind: 'canvas_review', label: 'Build it from Canvas', item_key: 'canvas-77' }, { kind: 'attach', label: 'Attach notes instead' }] } });
+    await install(context, state);
+    await context.route(/localhost:8000\/plans\/canvas-77\/review-set$/, async route => { await new Promise(resolve => setTimeout(resolve, 1200)); route.fulfill({ json: { guide: { id: GUIDE, title: 'Midterm: review' }, due_at: new Date().toISOString() } }); });
+    const page = await context.newPage();
+    await page.goto(BASE + '/login');
+    await page.evaluate(([token, user]) => { localStorage.setItem('authToken', token); localStorage.setItem('userId', user); localStorage.setItem('refreshToken', 'r'); localStorage.setItem('theme', 'light'); }, [TOKEN, USER]);
+    await page.goto(BASE + '/home');
+    const box = page.locator('textarea').first();
+    await box.waitFor({ timeout: 30000 });
+    await box.fill('help me prep for the midterm');
+    await box.press('Enter');
+    const build = page.locator('.plan-actions button:has-text("Build it from Canvas")');
+    await build.waitFor({ timeout: 15000 });
+    const before = await build.boundingBox();
+    await build.click();
+    await page.waitForTimeout(600);
+    const during = await build.boundingBox();
+    expect(Math.abs(before.width - during.width) < 1, 'the button changed width while working');
+    expect(await build.getAttribute('aria-disabled') === 'true', 'the button is not marked as working');
+    await page.screenshot({ path: path.join(OUT, 'home-canvas-building-light.png') });
+    await page.waitForURL(new RegExp(`/learn/${GUIDE}\\?test=${day(6)}&checkin=1`), { timeout: 90000 });
+    await context.close();
+  });
   await browser.close();
   const failed = results.filter(ok => !ok).length;
   console.log(`\n${results.length - failed} of ${results.length} passed`);
