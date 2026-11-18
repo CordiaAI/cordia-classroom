@@ -50,11 +50,10 @@ export const FONT_FILES = {
 // Appearance and the two kinds of account (the owner's decision for DESIGN-SPEC 3.5): an account that existed
 // before T10 shipped and never saved an appearance stays on Light, exactly as it always was; only an account
 // created after T10 ships defaults to Match device. The account's creation time (Supabase's own `created_at`)
-// is compared with this one cut-off. Accounts created before it, or whose creation time is not known, get Light.
-// PLACEHOLDER: the owner sets this to the moment T10 ships (an ISO date-time, UTC, e.g. '2026-12-01T00:00:00Z')
-// and it is the only place it is set. Until then it is far in the future, so nobody counts as new and everyone
-// without a saved choice has Light: unset is the safe way round.
-export const NEW_ACCOUNT_CUTOFF = '2099-01-01T00:00:00Z';
+// is compared with this one cut-off. Accounts created at or after it default to Match device; accounts created
+// before it, or whose creation time is not known, stay Light.
+// This is the moment T10 shipped (pull request 270 merged, 2026-11-18T18:55:05Z, UTC). It is the only place it is set.
+export const NEW_ACCOUNT_CUTOFF = '2026-11-18T18:55:05Z';
 export const NEW_ACCOUNT_APPEARANCE = 'system';
 export const LEGACY_APPEARANCE = 'light';
 
