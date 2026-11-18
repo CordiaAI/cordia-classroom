@@ -9,6 +9,11 @@ from datetime import date, timedelta
 from typing import Optional
 from urllib.parse import urlencode
 
+
+def _one_line(text: Optional[str]) -> str:
+    """The text with every whitespace run as one space, so no pattern ever meets a long run of spaces."""
+    return " ".join((text or "").split())
+
 # ---- Is the student asking for help with a test they sit? ----
 # The test is a noun the student sits ("my bio test", "the midterm", "an art history final"), never part of a
 # compound ("unit tests", "t-test", "test tube", "quiz question", "final answer", "the Howey test for…"):
@@ -18,24 +23,27 @@ _MONTH = (r"(?:jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec|january|februar
           r"september|october|november|december)")
 _TEST = r"(?<![-\w])(?:tests?|exams?|midterms?|quiz(?:zes)?|finals?(?:\s+(?:exams?|tests?))?)"
 TEST_WORD = re.compile(_TEST, re.IGNORECASE)
-_ENDS = (r"(?=\s*(?:$|[,.!?;:—–])|\s+(?:is|are|was|'s|on|in|at|by|due|about|covering|over|and|but|so|that|which|"
+# Linear time: every pattern here runs on whitespace-normalised text (one space between words, see _one_line),
+# and a space run is taken whole (\s++, possessive) wherever the next part starts with a word, so no two
+# neighbouring parts can trade the same characters back and forth.
+_ENDS = (r"(?=\s*+(?:$|[,.!?;:—–])|\s++(?:is|are|was|'s|on|in|at|by|due|about|covering|over|and|but|so|that|which|"
          r"i|i'm|i've|we|can|could|would|please|help|any|what|how|where|today|tonight|tomorrow|tmrw|tmr|next|this|"
-         rf"coming|soon|{_WEEKDAY}|{_MONTH}|\d+)\b)")
+         rf"coming|soon|with|together|{_WEEKDAY}|{_MONTH}|\d+)\b)")
 # What may follow the test word before its date: "exam is today", "exam's today" (straight or curly), "exam today".
-_IS = r"(?:\s+is\s+|['’]s\s+|\s+)"
+_IS = r"(?:\s++is\s++|['’]s\s++|\s++)"
 # When the test is: "tomorrow", "on Friday", "next week", "in 5 days", "Dec 3", "12/3".
 _WHEN = (rf"(?:today|tonight|tomorrow|tmrw|tmr|(?:on\s+|this\s+|next\s+)?{_WEEKDAY}|next\s+week|"
          rf"in\s+\w+\s+(?:days?|weeks?)|(?:on\s+)?{_MONTH}\.?\s+\d|(?:on\s+)?\d{{1,2}}/\d{{1,2}})\b")
 # Words naming the class between the article and the test ("my art history final", "the CS 101 quiz"), never
 # a word that makes the test the topic of something else ("a question about the final exam").
-_COURSE = r"(?:(?!(?:about|of|with|on|in|to|for|from|question|questions|answer|answers|the|a|an|my|and|or)\b)[\w&.'+-]+\s+){0,4}?"
-_OWNER = r"(?:(?:a|an|my|our|the|this|that|next|another|tomorrow's|today's)\s+)?"
+_COURSE = r"(?:(?!(?:about|of|with|on|in|to|for|from|question|questions|answer|answers|the|a|an|my|and|or)\b)[\w&.'+-]++\s++){0,4}?"
+_OWNER = r"(?:(?:a|an|my|our|the|this|that|next|another|tomorrow's|today's)\s++)?"
 STUDY_FOR_TEST = re.compile(
     # "I need to study for my bio test", "help me prep for the midterm", "get ready for my exam".
-    r"\b(?:study|studying|prep|prepping|prepare|preparing|review|reviewing|revise|revising|cram|cramming|ready)\s+"
-    rf"(?:\w+\s+){{0,2}}?for\s+{_OWNER}{_COURSE}{_TEST}{_ENDS}"
+    r"\b(?:study|studying|prep|prepping|prepare|preparing|review|reviewing|revise|revising|cram|cramming|ready)\s++"
+    rf"(?:\w++\s++){{0,2}}?for\s++{_OWNER}{_COURSE}{_TEST}{_ENDS}"
     # "I have an exam on Friday", "I've got a quiz Thursday in CS 101", "there's a test tomorrow".
-    rf"|\b(?:have|has|got|there's|there\s+is)\s+(?:a|an|my|our|another)\s+{_COURSE}{_TEST}{_ENDS}"
+    rf"|\b(?:have|has|got|there's|there\s++is)\s++(?:a|an|my|our|another)\s++{_COURSE}{_TEST}{_ENDS}"
     # "my art history final is next week", "test tomorrow on contracts", "exam on Friday".
     rf"|{_TEST}{_IS}{_WHEN}",
     re.IGNORECASE,
@@ -51,7 +59,7 @@ ASKS_FOR_HELP = re.compile(
     r"\b(?:help|what\s+(?:should|do|can)\s+i\s+(?:do|study|start)|where\s+(?:do|should)\s+i\s+(?:start|begin)|"
     r"how\s+(?:do|should|can)\s+i\s+(?:study|prep|prepare|get\s+ready|start)|plan|"
     # An offer to study together: "can we study for my biology exam?", "could you review for my final?".
-    r"(?:can|could|will|would)\s+(?:we|you)\s+(?:please\s+)?(?:study|prep|prepare|review|revise|cram|get\s+ready))\b",
+    r"(?:can|could|will|would)\s++(?:we|you)\s++(?:please\s++)?(?:study|prep|prepare|review|revise|cram|get\s++ready))\b",
     re.IGNORECASE,
 )
 # "Learn" as the product, asked for in so many words. A closed grammar the whole sentence has to match:
@@ -59,36 +67,69 @@ ASKS_FOR_HELP = re.compile(
 # chapter 4", "Learn for this". Anything it doesn't list ("how do I make a Learn set?", "make a Learn set
 # or a quiz, which is better?", "things to learn for the quiz", "don't make a Learn set yet") is a question
 # for the Tutor to answer.
-_LEAD = r"(?:(?:ok(?:ay)?|alright|great|cool|sure|yes|yeah|yep|so|and|now|then|please|thanks|hey|hi)[,!.]?\s+)*"
-_POLITE = r"(?:can|could|would|will)\s+(?:you|we)\s+(?:please\s+)?"
-_ASK = (rf"(?:please\s+|{_POLITE}|let'?s\s+|i\s+(?:want|need)\s+(?:you\s+)?to\s+|i'?d\s+like\s+(?:you\s+)?to\s+|"
-        r"go\s+ahead\s+and\s+)?")
-_SET = r"(?:(?:a|an|the|my|that|this)\s+(?:new\s+|quick\s+|short\s+)?learn(?:\s+(?:set|session|round|mode))?|learn\s+(?:set|session|round|mode))"
-_THING = (rf"(?:(?:make|create|build|generate|set\s*up|start|open|run|do|launch|begin)\s+(?:me\s+|us\s+)?{_SET}|"
-          r"(?:open|start|run|set\s*up|launch)\s+learn(?=\s+(?:for|on|from|with)\b))")
-_TAIL = (r"(?:\s+(?:for|on|from|with|about|of|out\s+of|using)\s+(?:(?!\bor\b)[^?!.;,]){1,60}?)?"
-         r"(?:,?\s+(?:now|please|for\s+me|thanks|then))*")
+# Linear time (security review): each space run is taken whole (\s++), since every part after one starts with
+# a word; the lead words are taken whole too (*+: none of them starts the request itself, and "please" works
+# from either side); the material is at most 60 characters, so it is the only part that can try more than
+# one length, and the trailers and the end anchor never give anything back. split_learn_request also
+# collapses whitespace and skips sentences longer than MAX_REQUEST_LENGTH before matching.
+_LEAD = r"(?:(?:ok(?:ay)?|alright|great|cool|sure|yes|yeah|yep|so|and|now|then|please|thanks|hey|hi)[,!.]?\s++)*+"
+_POLITE = r"(?:can|could|would|will)\s++(?:you|we)\s++(?:please\s++)?"
+_ASK = (rf"(?:please\s++|{_POLITE}|let'?s\s++|i\s++(?:want|need)\s++(?:you\s++)?to\s++|i'?d\s++like\s++(?:you\s++)?to\s++|"
+        r"go\s++ahead\s++and\s++)?")
+_SET = r"(?:(?:a|an|the|my|that|this)\s++(?:new\s++|quick\s++|short\s++)?learn(?:\s++(?:set|session|round|mode))?|learn\s++(?:set|session|round|mode))"
+_THING = (rf"(?:(?:make|create|build|generate|set\s*+up|start|open|run|do|launch|begin)\s++(?:me\s++|us\s++)?{_SET}|"
+          r"(?:open|start|run|set\s*+up|launch)\s++learn(?=\s++(?:for|on|from|with)\b))")
+# What the set is for: up to 60 characters without "or", and never "…and make flashcards": another tool
+# asked for by name in the same sentence makes it not a Learn request, so that tool gets the turn.
+_MATERIAL = r"(?:(?!\bor\b|\band\s++(?:make|create|build|generate|draw|give)\b)[^?!.;,]){1,60}?"
+_TAIL = (rf"(?:\s++(?:for|on|from|with|about|of|out\s++of|using)\s++{_MATERIAL})?"
+         r"(?:,?\s++(?:now|please|for\s++me|thanks|then))*+")
 LEARN_REQUEST = re.compile(
-    rf"^\s*{_LEAD}(?:(?:{_ASK}{_THING}|i\s+(?:want|need)\s+{_SET}|i'?d\s+like\s+{_SET}){_TAIL}"
-    r"|learn\s+for\s+(?:it|this|that)(?:,?\s+please)?)\s*[.!?]*\s*$",
+    rf"^\s*+{_LEAD}(?:(?:{_ASK}{_THING}|i\s++(?:want|need)\s++{_SET}|i'?d\s++like\s++{_SET}){_TAIL}"
+    r"|learn\s++for\s++(?:it|this|that)(?:,?\s++please)?)\s*+[.!?]*+\s*+$",
     re.IGNORECASE,
 )
-POLITE_START = re.compile(rf"^\s*{_LEAD}{_POLITE}", re.IGNORECASE)
+POLITE_START = re.compile(rf"^\s*+{_LEAD}{_POLITE}", re.IGNORECASE)
+MAX_REQUEST_LENGTH = 300  # a sentence longer than this is never a request for Learn; the Tutor answers it
+# Learn named as the product: "Learn" capitalized, "a learn set/session/round", or "open/start/make … learn".
+# Text that names it without asking for it in the grammar above is a question about Learn, for the Tutor.
+NAMES_LEARN = re.compile(r"(?<![\w-])Learn(?![\w-])|(?i:\blearn\s++(?:sets?|sessions?|rounds?|mode)\b"
+                         r"|\b(?:open|start|launch|run|set\s*+up|make|build|create|generate|begin|do)\s++"
+                         r"(?:(?:a|an|the|my|me|us|this|that|new|quick|short)\s++){0,3}learn\b)")
+# A second tool asked for after the Learn request ("…and make flashcards too"): that tool gets the turn.
+ANOTHER_TOOL = re.compile(r"\band\s++(?:also\s++)?(?:make|create|build|generate|draw|give)\b", re.IGNORECASE)
+
+
+# Someone else getting ready ("help a patient prepare for a pelvic exam", "the client studies for the
+# driving test"): the test is a topic, not one the student sits.
+OTHER_PERSON = {"patient", "patients", "client", "clients"}
+
+
+def _words_before(sentence: str, end: int) -> list:
+    """The last few words before end (a short window, so many matches can't each rescan the sentence)."""
+    window = sentence[max(0, end - 48):end].lower()
+    words = re.findall(r"[\w/-]+", window)
+    if end > 48 and words and re.match(r"[\w/-]", window) and re.match(r"[\w/-]", sentence[end - 49]):
+        words = words[1:]  # the window's first word was cut short
+    return words
 
 
 def _sits_a_test(sentence: str) -> bool:
     for match in STUDY_FOR_TEST.finditer(sentence):
         start = match.start() + TEST_WORD.search(match.group(0)).start()
-        before = re.findall(r"[\w/-]+", sentence[:start].lower())
-        if not before or before[-1].rstrip("-") not in COMPOUND_TESTS:
-            return True
+        before = _words_before(sentence, start)
+        if before and before[-1].rstrip("-") in COMPOUND_TESTS:
+            continue
+        if set(_words_before(sentence, match.start())[-3:]) & OTHER_PERSON:
+            continue
+        return True
     return False
 
 
 def asks_to_study_for_test(text: str) -> bool:
     """The student says they have a test to get ready for. A question about something else that mentions a
     test, an exam word inside a compound ("unit tests", "final answer") or a topic test ("the Howey test") is not."""
-    for sentence in re.split(r"(?<=[.?!;])\s+", (text or "").strip()):
+    for sentence in re.split(r"(?<=[.?!;]) ", _one_line(text)):
         if not _sits_a_test(sentence):
             continue
         if (ASKS_ABOUT.search(sentence) or sentence.rstrip().endswith("?")) and not ASKS_FOR_HELP.search(sentence):
@@ -102,8 +143,9 @@ def split_learn_request(text: str) -> tuple[Optional[str], str]:
     ("can you make a Learn set?"), None when the student didn't ask for Learn; rest is the other sentences.
     A bare question ("Make a Learn set?") isn't a request, and neither is one followed by a question
     ("Can you make a Learn set? Or is that only for guides?")."""
-    sentences = [sentence for sentence in re.split(r"(?<=[.?!;])\s+", (text or "").strip()) if sentence]
-    asked = [bool(LEARN_REQUEST.match(sentence)) and (not sentence.rstrip().endswith("?") or bool(POLITE_START.match(sentence)))
+    sentences = [sentence for sentence in re.split(r"(?<=[.?!;]) ", _one_line(text)) if sentence]
+    asked = [len(sentence) <= MAX_REQUEST_LENGTH and bool(LEARN_REQUEST.match(sentence))
+             and (not sentence.endswith("?") or bool(POLITE_START.match(sentence)))
              for sentence in sentences]
     if not any(asked):
         return None, text or ""
@@ -117,6 +159,12 @@ def split_learn_request(text: str) -> tuple[Optional[str], str]:
 
 def asks_for_learn(text: str) -> bool:
     return split_learn_request(text)[0] is not None
+
+
+def asks_about_learn(text: str) -> bool:
+    """Learn named but not asked for ("can a Learn set include my flashcards?", "please don't open Learn yet",
+    "make a Learn set or a quiz, which is better?"): a question the Tutor answers itself."""
+    return bool(NAMES_LEARN.search(_one_line(text))) and not asks_for_learn(text)
 
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
@@ -144,7 +192,7 @@ def _future(year: int, month: int, day: int, today: date) -> Optional[date]:
 
 def parse_test_date(text: str, today: date) -> Optional[date]:
     """The test date the student gave ("tomorrow", "on Friday", "in 5 days", "Dec 3", "12/3"), or None."""
-    words = (text or "").lower()
+    words = _one_line(text).lower()
     if match := re.search(r"\b(\d{4})-(\d{2})-(\d{2})\b", words):
         try:
             return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))

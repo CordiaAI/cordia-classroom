@@ -78,8 +78,17 @@ PAGES = {
 GUIDE_TABS = {"flashcards": "/flashcards/study?guideId={id}", "quiz": "/quiz/{id}", "practice": "/practice/{id}"}
 
 
+# "Don't…", "please don't…", "let's not…": nothing to do in the app.
+SAYS_NOT = re.compile(r"^\s*+(?:(?:ok(?:ay)?|so|and|no|please)[,!.]?\s++)*+(?:don['’]?t|do\s++not|never|let['’]?s\s++not)\b",
+                      re.IGNORECASE)
+
+
 def _asks_for_app_action(question: str) -> bool:
-    if QUESTION_START.search(question):
+    # A question ("open Learn for the art history guide?") asks about the app, not for an action in it, unless
+    # it's a polite request ("can you open my Biology class?"); neither does a "don't".
+    if QUESTION_START.search(question) or SAYS_NOT.search(question):
+        return False
+    if question.rstrip().endswith("?") and not study_helper.POLITE_START.search(question):
         return False
     return bool(APP_ALWAYS.search(question) or (APP_VERB.search(question) and APP_NOUN.search(question)))
 
@@ -380,6 +389,18 @@ STUDY_HELPER_SKILLS = {None, "explain", "plan", "retain"}
 BUILD_WINDOW = timedelta(minutes=15)
 
 
+def _about_learn(question: str) -> bool:
+    """Learn named but not asked for ("please don't open Learn for the ethics guide", "make a Learn set or a
+    quiz, which is better?"): the Tutor answers it, and the app-action planner never sees it, since it could
+    build or open something nobody asked for. Unless another tool is asked for by name after it ("make a
+    Learn set for it and make flashcards too"): that tool gets the turn."""
+    if not study_helper.asks_about_learn(question):
+        return False
+    another = study_helper.ANOTHER_TOOL.search(question)
+    rest = question[another.start():another.start() + 120] if another else ""  # the tool is named right after it
+    return not (rest and (MAKE_THING.search(rest) or VISUAL_REQUEST.search(rest)))
+
+
 def _today(body: ChatRequest) -> date:
     if body.local_date:
         try:
@@ -639,7 +660,7 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
             return _tutor_reply(body, user_id, question, Material(content=app["text"], source=source), skill, turn)
     about_material = bool(material.content.strip() and PRACTICE_REQUEST.search(question))
     if (skill in {None, "explain", "build_guide", "practice", "organize", "plan", "retain"} and not body.class_id
-            and not about_material and _asks_for_app_action(question)):
+            and not about_material and not _about_learn(question) and _asks_for_app_action(question)):
         done = _app_action(user_id, question, material, authorization)
         if done:
             return done
@@ -653,7 +674,8 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
     if skill == "organize":
         return _organize(material, body.class_id, authorization)
     # Before the empty-material check: a new notes page can be edited while still empty.
-    if material.guide and (skill == "edit_outline" or (skill in {None, "explain"} and _asks_to_edit_outline(question))):
+    if material.guide and (skill == "edit_outline" or (skill in {None, "explain"} and not _about_learn(question)
+                                                       and _asks_to_edit_outline(question))):
         edited = _edit_outline(user_id, material, question)
         if edited:
             return edited

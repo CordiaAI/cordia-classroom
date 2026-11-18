@@ -455,6 +455,17 @@ def claim_tutor_turn(
     return claimed
 
 
+def _posted_during(claimed: list, current: list) -> list:
+    """The messages posted after the ones the turn claimed, taken by position: the stored conversation is the
+    claimed one (perhaps with its oldest messages trimmed off the front) followed by what was posted, so a
+    posted message the same as an earlier one ("A" again) is kept too."""
+    for trimmed in range(len(claimed)):
+        kept = claimed[trimmed:]
+        if current[:len(kept)] == kept:
+            return current[len(kept):]
+    return [message for message in current if message not in claimed]  # not the claimed conversation at all
+
+
 def complete_tutor_turn(user_id: str, turn: dict, response: dict):
     claimed = list(turn.get("messages") or [])
     assistant_message = {"role": "ai", "text": response.get("answer") or ""}
@@ -477,7 +488,7 @@ def complete_tutor_turn(user_id: str, turn: dict, response: dict):
         )
         if not current:
             break
-        posted = [message for message in current[0].get("messages") or [] if message not in claimed]
+        posted = _posted_during(claimed, list(current[0].get("messages") or []))
         messages = [*claimed, *posted, assistant_message]
         query = (
             get_supabase().table("tutor_sessions")
