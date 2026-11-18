@@ -8,6 +8,7 @@ page; move, rename or delete a guide; make a class, notes page or guide), or a g
 import os
 import re
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Request
@@ -25,6 +26,7 @@ from services.llm import (
     answer_question, edit_outline, explain_retain_answer, generate_practice_guide, generate_study_guide, plan_app_action, write_visual_text,
     study_guide_is_complete, study_guide_to_flashcards,
 )
+from services import study_helper
 from services.text_processing import chunk_text, clean_text, html_to_text
 from services.tutor_voice import ground_general_answer, plain_opening
 from services.tutor_sessions import (
@@ -370,6 +372,150 @@ def _app_action(user_id: str, question: str, material: Material, authorization: 
     return None
 
 
+# ---- The Tutor as a study helper (services/study_helper): a test to study for gets a plan, not a lecture ----
+
+# "Make a study guide for my exam", "make flashcards to review for the test": the student asked for a thing.
+MAKE_THING = re.compile(r"\b(?:create|make|generate|build|turn)\b.*\b(?:guides?|flashcards?|practice|notes?|outline|visual|diagram)\b", re.IGNORECASE)
+STUDY_HELPER_SKILLS = {None, "explain", "plan", "retain"}
+BUILD_WINDOW = timedelta(minutes=15)
+
+
+def _today(body: ChatRequest) -> date:
+    if body.local_date:
+        try:
+            return date.fromisoformat(body.local_date)
+        except ValueError:
+            pass
+    return datetime.now(timezone.utc).date()
+
+
+def _upcoming_exams(user_id: str, today: date) -> tuple[list, bool]:
+    """The student's own exams and quizzes still ahead (from their calendar) and whether one is connected."""
+    from routers.calendar import calendar_for
+    try:
+        calendar = calendar_for(user_id) or {}
+    except Exception:  # an unreachable calendar never blocks the plan
+        return [], False
+    exams = [item for item in calendar.get("items") or []
+             if item.get("type") in {"exam", "quiz"} and not item.get("done") and str(item.get("due_at") or "")[:10] >= today.isoformat()]
+    return sorted(exams, key=lambda item: str(item.get("due_at"))), bool(calendar.get("connected"))
+
+
+def _last_plan(turn: Optional[dict]) -> Optional[dict]:
+    """The study plan in the Tutor's latest reply, so a follow-up ("it's on Friday", "make a Learn for it") continues it."""
+    for message in reversed(((turn or {}).get("messages") or [])[:-1]):
+        if message.get("role") in {"ai", "assistant"}:
+            return message.get("study_plan")
+    return None
+
+
+def _owned_guide(user_id: str, guide_id: str, columns: str = "id,title,folder_id") -> Optional[dict]:
+    try:
+        return _owned_row("study_guides", columns, guide_id, user_id, "guide")
+    except HTTPException:
+        return None
+
+
+def _saved_test_date(user_id: str, guide_id: str, today: date) -> Optional[date]:
+    """The test date already set in Learn for this guide, when it's still ahead."""
+    row = _owned_guide(user_id, guide_id, "id,flashcard_progress") or {}
+    saved = str(((row.get("flashcard_progress") or {}).get("learn") or {}).get("test_date") or "")
+    try:
+        when = date.fromisoformat(saved)
+    except ValueError:
+        return None
+    return when if when >= today else None
+
+
+def _study_plan(body: ChatRequest, user_id: str, question: str, material: Material, carried: Optional[dict] = None) -> ChatResponse:
+    """A short plan for a test with real buttons: start the check-in in Learn, or build the set first."""
+    today = _today(body)
+    when = study_helper.parse_test_date(question, today)
+    exams, connected = _upcoming_exams(user_id, today)
+    carried = carried or {}
+    exam = next((item for item in exams if item.get("id") == (carried.get("exam") or {}).get("key")), None) \
+        or study_helper.match_exam(question, exams, when)
+    # The Tutor's picker usually has something selected; it counts only when it fits the test the student named.
+    named = study_helper.topic_words(question) | study_helper.topic_words(f"{(exam or {}).get('title') or ''} {(exam or {}).get('course') or ''}")
+    fits = lambda title: not named or study_helper.shared_topics(named, title) > 0
+    guide = _owned_guide(user_id, carried["guide"]["id"]) if (carried.get("guide") or {}).get("id") else None
+    if not guide and material.guide and fits(material.title):
+        guide = material.guide
+    if not guide:
+        owned = get_supabase().table("study_guides").select("id,title,updated_at").eq("user_id", user_id) \
+            .order("updated_at", desc=True).limit(300).execute().data or []
+        guide = study_helper.match_guide(question, owned, exam)
+    if not when and exam:
+        when = date.fromisoformat(str(exam["due_at"])[:10])
+    if not when and guide:
+        when = _saved_test_date(user_id, guide["id"], today)
+    from_material = material.title if material.content.strip() and not material.guide and fits(material.title) else ""
+    answer, plan = study_helper.plan_reply(today=today, when=when, guide=guide, exam=exam,
+                                           material_title=from_material, canvas_connected=connected)
+    used = from_material or (guide and material.guide and guide["id"] == material.guide["id"])
+    return ChatResponse(answer=answer, action="study_plan", study_plan=plan, source=material.source if used else None)
+
+
+def _recent_build(user_id: str, material: Material, title: str) -> Optional[dict]:
+    """The same set built from the same material moments ago (a second tab, a double send), to open instead."""
+    since = (datetime.now(timezone.utc) - BUILD_WINDOW).isoformat()
+    query = get_supabase().table("study_guides").select("id,title,folder_id").eq("user_id", user_id).eq("title", title) \
+        .eq("source_title", material.title).gte("created_at", since)
+    if (material.source or {}).get("id"):
+        query = query.eq("source_id", material.source["id"])
+    rows = query.order("created_at", desc=True).limit(1).execute().data or []
+    return rows[0] if rows else None
+
+
+def _make_learn(body: ChatRequest, user_id: str, question: str, material: Material, class_id: Optional[str],
+                skill: Optional[str], turn: Optional[dict]) -> ChatResponse:
+    """"Make a Learn for it": build the set (the build_guide or practice skill) when there isn't one, then open Learn."""
+    today = _today(body)
+    plan = _last_plan(turn) or {}
+    when = study_helper.parse_test_date(question, today)
+    if not when and plan.get("test_date"):
+        when = date.fromisoformat(plan["test_date"])
+    guide = material.guide
+    if not guide and material.content.strip():
+        kind = "practice" if skill == "practice" or re.search(r"\bpractice\b", question, re.IGNORECASE) else "guide"
+        _check_picked_class(user_id, body)
+        guide = _recent_build(user_id, material, f"{material.title} — {GUIDE_KINDS[kind][0]}") \
+            or _create_guide(user_id, material, class_id, kind).guide
+    if not guide and (plan.get("guide") or {}).get("id"):
+        guide = _owned_guide(user_id, plan["guide"]["id"])
+    if not guide:
+        return ChatResponse(answer="Pick a guide above or attach your notes, and I'll build the Learn set from them.",
+                            study_plan={"guide": None, "test_date": when.isoformat() if when else None, "exam": plan.get("exam"),
+                                        "actions": [{"kind": "attach", "label": "Attach notes"}]})
+    title = guide.get("title") or "your guide"
+    return ChatResponse(
+        answer=f"Opening Learn for {title}. It starts with a short check-in quiz.",
+        action="navigate",
+        link={"href": study_helper.learn_href(guide["id"], when, today), "label": f"Learn for {title}"},
+        guide={"id": guide["id"], "title": title, "folder_id": guide.get("folder_id")},
+        source=material.source,
+    )
+
+
+def _study_helper(body: ChatRequest, user_id: str, question: str, material: Material, class_id: Optional[str],
+                  skill: Optional[str], turn: Optional[dict]) -> Optional[ChatResponse]:
+    """A plan or a Learn set when the student is studying for a test; None for everything else."""
+    if skill not in STUDY_HELPER_SKILLS | {"build_guide", "practice"} or body.retain_context or body.assignment_key:
+        return None
+    if study_helper.asks_for_learn(question):
+        return _make_learn(body, user_id, question, material, class_id, skill, turn)
+    if skill not in STUDY_HELPER_SKILLS or MAKE_THING.search(question) or VISUAL_REQUEST.search(question):
+        return None
+    if study_helper.asks_to_study_for_test(question):
+        return _study_plan(body, user_id, question, material)
+    # "It's on Friday": the date the last plan asked for.
+    pending = _last_plan(turn)
+    if pending and not pending.get("test_date") and len(question) <= 80 and not QUESTION_START.search(question) \
+            and study_helper.parse_test_date(question, _today(body)):
+        return _study_plan(body, user_id, question, material, carried=pending)
+    return None
+
+
 def _verified_retain_context(body: ChatRequest, content: str):
     """A missed practice question the Tutor explains must still match the guide it came from."""
     retain = body.retain_context
@@ -465,6 +611,10 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
         drawn = _visual(user_id, question, material)
         if drawn:
             return drawn
+    # "I need to study for my bio test" / "make a Learn for it": a plan with buttons, before any lecture.
+    helped = _study_helper(body, user_id, question, material, class_id, skill, turn)
+    if helped:
+        return helped
     # "What's in my Notion page on X" / "quiz me on my Google Doc": the Tutor reads that app, if it's on for the Tutor.
     if skill in {None, "explain"} and not body.class_id:
         app = connectors.tutor_material(user_id, question)
