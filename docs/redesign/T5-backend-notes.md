@@ -18,46 +18,107 @@ For the builder of the T5 screens. Backend only; nothing here is live until the 
 
 ## Data model (the migration)
 
-No new table. Four columns, one check and four indexes on `tutor_chats` (the migration is one transaction):
+No new table. One transaction (`begin; set local lock_timeout = '5s'; ... commit;`):
 
-| Column | Meaning |
+| Table.column | Meaning |
 | --- | --- |
-| `class_id` | the class (`folders.id`) the chat belongs to, null = none; `on delete set null` |
-| `renamed` | true once the student typed a title; until then the title is the first message |
-| `live` | this row is the Tutor's current conversation (at most one per student, partial unique index) |
-| `deleted_at` | soft delete; Undo clears it; deleted chats are removed for good 30 days after deletion (daily job, see below) |
+| `tutor_chats.class_id` | the class (`folders.id`) the chat belongs to, null = none; `on delete set null` |
+| `tutor_chats.renamed` | true once the student typed a title; until then the title is the first message |
+| `tutor_chats.deleted_at` | soft delete; Undo clears it; deleted chats are removed for good 30 days after deletion (daily job, see below) |
+| `tutor_sessions.live_chat_id` | **the single record of which chat is live**: the chat the session's messages belong to. Nullable, no backfill, `references tutor_chats(id) on delete set null` |
 
-The check `tutor_chats_live_not_deleted` (`not (live and deleted_at is not null)`) makes a chat that is both the
-current conversation and deleted impossible: a racing write fails with a database error and the backend answers it
-as 409. Indexes: one live chat per student; `(user_id, class_id, updated_at desc) where deleted_at is null` for the
-lists; `(class_id) where class_id is not null` so deleting a class (`on delete set null`) does not scan the table;
-`(deleted_at) where deleted_at is not null` for the purge.
+There is **no `tutor_chats.live` column** (an earlier draft had one, with a one-live-per-student index and a
+"not live and deleted" check). It was dropped instead of kept as a mirror: a mirror is a second record that can
+disagree with the session, and every bug the two reviews found came from two records disagreeing for a moment.
+With one record there is nothing to tidy and nothing to heal.
 
-`updated_at` stays the last activity; renaming or moving does not change it. While a chat is live its
-messages are read from `tutor_sessions` (the row keeps a copy only when the conversation moves on), so
-nothing is stored twice and the extension-shared session stays the single source of truth.
-RLS is on with no client policy and no client grant, the same as `tutor_chats` and `tutor_sessions`: the
-owner check is in the endpoints, and every query also filters on `user_id`.
-The migration backfills `class_id` for existing chats that are about a guide (the guide's class), only when the guide
-and the class are the chat owner's own. The backfill sits in the block that adds `class_id`, so it runs only the first
-time the file is applied: running the file again after launch changes nothing and never re-files a chat a student moved
-out of a class. The backend applies the same ownership rule (`saved_chats._guide_classes`): a guide's folder counts
-only if it is one of the student's own folders.
+Indexes: `tutor_sessions (live_chat_id) where live_chat_id is not null` (removing a chat row looks up the session that
+points at it; the purge asks which candidates a session points at); `tutor_chats (user_id, class_id, updated_at desc)
+where deleted_at is null` for the lists; `tutor_chats (class_id) where class_id is not null` so deleting a class does not
+scan the table; `tutor_chats (deleted_at) where deleted_at is not null` for the purge.
+
+`updated_at` stays the last activity; renaming or moving does not change it. While a chat is live its messages are read
+from `tutor_sessions`; its `tutor_chats` row keeps the id, title and class, and a copy of the messages that is only ever a
+snapshot of what the session already holds (written just before the conversation moves on).
+RLS is on with no client policy and no client grant, the same as before: the owner check is in the endpoints, and every
+query also filters on `user_id`. The migration backfills `class_id` for existing chats that are about a guide (the guide's
+class), only when the guide and the class are the chat owner's own, inside the block that adds `class_id`, so it runs only
+the first time the file is applied. The backend applies the same ownership rule (`saved_chats._guide_classes`).
+
+## Which chat is live: one answer everywhere
+
+"Is chat X live" means: `tutor_sessions.live_chat_id = X` **and** X exists and is not deleted. A pointer at a deleted or
+missing chat counts as "no live chat". Every reader derives it the same way: `GET /chats` and `GET /chats/{id}`
+(`saved_chats._is_live`), delete (`_snapshot`), the purge (`_pointed_at`: never removes a chat a session points at, even
+one with an old `deleted_at`), the old panel's `GET /tutor/chats` (`tutor_sessions.list_tutor_chats` leaves out the
+pointed-at chat and deleted chats). No chat can be "live and deleted" because "live" is defined as pointed at and not
+deleted.
+
+A conversation with messages and no usable chat (everything from before the migration, or a session left pointing at a
+chat that was deleted or hard-deleted) gets a chat the first time anything reads it (`_home`): an **empty** new row,
+then `live_chat_id` set by a compare-and-set that only applies while the pointer is still what was read. The messages
+stay in the session, so nothing is copied and nothing can be lost; if another request gave it a row first, this
+request's row is removed again (only its own, only while still empty and unused). A read never creates a second row for
+a conversation that has one.
+
+## The order of writes (`backend/services/saved_chats.py`)
+
+Every request that changes which chat is live (new chat, open, delete of the live chat, the old panel's
+`POST /tutor/session/new` new and resume) follows the same four steps, so a crash or another tab can at worst leave a
+**duplicate, never a gap**:
+
+1. **Read** (`_snapshot`, `_settled`): the session row once (messages, `conversation_version`, `updated_at`, `status`,
+   `run_id`, `live_chat_id`), and the row the pointer names, read *before* that session read. If the conversation has
+   messages and no usable row, `_home` gives it one first and the read is repeated.
+2. **Save** (`_save`): the session's messages are written into the live chat's row. Only `messages` and `updated_at`
+   (never `title`, `renamed` or `class_id`, so a rename or move in another tab survives); only while the row is not
+   deleted; only while the row's `updated_at` is still what was read (so a slower request never writes an older copy over
+   a newer one). An empty conversation saves nothing. *Safe on a crash:* the session is untouched. *Safe against another
+   tab:* it is only a snapshot of what the session already holds; if this request then loses the race, the live chat's
+   row simply holds an up-to-date copy.
+3. **Reset** (`_reset`), the one atomic step: one `update` of the session row with
+   `conversation_version = v and updated_at = u and status = s and run_id = r and live_chat_id = p` (all as read) that
+   writes the new messages (empty, or the opened chat's saved messages), the new `live_chat_id`, version + 1, an idle
+   status, a cleared goal and run. *Which field stops a message being dropped:* `updated_at`. `conversation_version`
+   only changes when a turn completes; a turn's claim, a failed turn (which keeps the student's message) and a reply
+   posted outside a turn (`append_tutor_message`) do not change it, but every write that touches `messages` writes
+   `updated_at`, so a message sent after the read makes the compare-and-set change no row. `status` and `run_id` also
+   refuse a turn that is in flight (a request that sees a turn in flight answers 409 before it writes anything).
+   If no row changed, another request won: the request reads again and decides again (up to 3 times), then 409.
+4. **Tidy**, only after the reset went through: the chat that was live is removed if it is empty, never renamed, not
+   saved into since it was read and the session does not point at it again (`_tidy`, `_discard`); the student's old
+   deleted chats are purged. Failures are only logged.
+
+Per route:
+
+| Request | Steps |
+| --- | --- |
+| New chat (`POST /chats`, panel `POST /tutor/session/new` without `resume_id`) | `_start_new`: read; insert an empty, not-live row of its own; save; reset to empty with `live_chat_id` = the new row; tidy. If the reset loses, the request reads again; if it gives up, it removes only its own still-empty row and answers 409. It never adopts or edits a row another request made. |
+| Open (`POST /chats/{id}/open`, panel resume) | `_start_open`: read; save; read the chat being opened (right before the reset); reset to its saved messages with `live_chat_id` = it; read it again: if another tab deleted it in between, the session (which holds exactly that chat's saved copy, checked by the same compare-and-set) is emptied and the answer is 404. |
+| Delete the live chat (`DELETE /chats/{id}`) | `delete_chat`: read; save into it; reset to empty with `live_chat_id = null`; then mark it deleted (`_mark_deleted`). A crash between the reset and the mark leaves it a saved, not-deleted chat holding the conversation; the student can delete it again. |
+| Delete another chat | `_mark_deleted`: mark it deleted, then read the session; if another tab made it live meanwhile, take the mark back and answer 409. |
+| Rename, move | one `update` of `title`/`renamed` or `class_id` on that row, not deleted; nothing else writes those columns. |
+
+There is no "put back" step anywhere: nothing ever writes old messages over a session. If a step after the save fails,
+the saved copy is the safety and the session is left as it is.
+
+The pre-migration path (`tutor_sessions.start_tutor_chat`) already saved first (insert the copy, then reset); it is
+unchanged.
 
 ## How existing history becomes chats
 
 - Saved chats keep their id, title, messages and times. After the migration they simply gain the new columns.
-- A conversation that is in `tutor_sessions` but has no live row (everything from before this) gets its
-  live row the first time `GET /chats` or `GET /chats/{id}` or a start sees it. The row has empty
-  `messages`; the session holds them. So it is listed once and nothing is copied.
-- `GET /tutor/chats` (the Tutor panel's Past chats) is unchanged in shape; after the migration it leaves out
-  the live chat and deleted chats. `POST /tutor/session/new` is unchanged in shape and now keeps the saved
-  chat's row (and so its id, title and class) when it is resumed.
+- A conversation that is in `tutor_sessions` with no pointer (everything from before this) gets an empty row and the
+  pointer the first time `GET /chats`, `GET /chats/{id}` or a change of the live chat sees it (see above).
+- `GET /tutor/chats` (the Tutor panel's Past chats) is unchanged in shape; after the migration it leaves out the live
+  chat and deleted chats, and gives a chat saved without a title its first question as the title (empty, unused chats are
+  not listed). `POST /tutor/session/new` is unchanged in shape and now keeps the saved chat's row (and so its id, title
+  and class) when it is resumed.
 
 ## Endpoints (`backend/routers/chats.py`, prefix `/chats`, signed-in student only)
 
 Chat summary: `{id, title, guide_id, class_id, live, created_at, updated_at}`.
-`editable` is false until the migration has run.
+`editable` is false until the migration has run. No existing response gained a field (`live_chat_id` is never sent).
 
 | Call | Request | Response |
 | --- | --- | --- |
@@ -71,8 +132,31 @@ Chat summary: `{id, title, guide_id, class_id, live, created_at, updated_at}`.
 
 Messages keep the stored shape (`{role: "user"|"ai", text, source?, guide?, link?, confirm?, visual?, evidence?}`).
 Errors: 400 bad id, 401 signed out, 404 not yours / gone / deleted (also a class or guide that is not yours),
-409 the Tutor is working, or the conversation moved on (also: two tabs raced, or a database rule refused a racing write);
-refresh and retry. No route answers 500 for a race, and none answers 500 before the migration.
+409 the Tutor is working, or another tab changed the conversation first. No route answers 500 for a race, and none
+answers 500 before the migration.
+
+## Stale tabs: every 404 and 409 another tab can cause
+
+| Route | Answer | When |
+| --- | --- | --- |
+| `POST /chats`, panel `POST /tutor/session/new` | 409 "Wait for Cordia Tutor to finish..." | a message is being answered (in any tab) |
+| same | 409 "Tutor conversation changed. Refresh and try again." | other tabs changed the conversation three times while this request ran |
+| same | 404 "Class not found" / "Guide not found" | the class or guide was deleted in another tab |
+| `POST /chats/{id}/open`, panel resume | 404 "Chat not found" | the chat was deleted (or removed by the old panel) in another tab before the switch |
+| same | 404 "That chat was deleted in another tab." | it was deleted in the moment of the switch; the Tutor is left empty (the previous chat was saved) |
+| same | 409 busy / 409 changed | as for `POST /chats` |
+| `DELETE /chats/{id}` | 404 "That chat is already gone." | already deleted in another tab, or an empty chat nobody used that a new chat in another tab removed |
+| same | 409 "Wait for Cordia Tutor to finish before deleting this chat" | it is the live chat and a message is being answered |
+| same | 409 changed | another tab opened this chat at the same moment (the delete is taken back), or kept changing the conversation |
+| `PATCH /chats/{id}`, `GET /chats/{id}` | 404 | deleted in another tab, or an empty unused chat removed by a new chat |
+| `POST /chats/{id}/restore` | 404 | already removed for good (purged after 30 days, or the old panel's hard delete) |
+| `POST /chat` (unchanged) | 409 "Tutor conversation changed" | the tab's `conversation_version` is older than the session's (another tab switched chats) |
+
+**What the web app should do:** on any of these, refresh the chat list (`GET /chats`) and the current chat
+(`GET /chats/{id}` or `GET /tutor/session`), and say in plain words that the chat was deleted or moved in another tab
+(or, for "busy", that the Tutor is still answering). Never show the raw error and never a blank screen: on a 404 for the
+chat in the URL, go back to the list (or the new live chat). Nothing is lost in any of these cases; the student's
+messages are in the session or in a chat they can list.
 
 ## Before the migration is applied (live database today)
 
@@ -87,6 +171,12 @@ refresh and retry. No route answers 500 for a race, and none answers 500 before 
   is the session id for the live chat, and opening a saved chat moves it into the session (its old id goes).
   Always navigate to the `chat.id` in the response. A URL made before the migration shows whatever is
   live under that session id; after it, `/chats/{session id}` still finds the live chat.
+- Detection: `tutor_sessions.is_missing_saved_chats_schema` matches the error code (`42703` from Postgres on a select or
+  filter, `PGRST204` from PostgREST on an insert or update, `PGRST205`/`42P01` for a missing table) together with one of
+  the new column names as a whole word (`deleted_at`, `class_id`, `renamed`, `live_chat_id`). Right after the migration,
+  while PostgREST's schema cache may still be the old one, a write naming a new column is refused with `PGRST204`: new
+  and open then use the old path (their first write always names a new column, so nothing of the new path was written),
+  rename, move, delete and undo answer the 503 above, and lists and reads keep working.
 
 ## What the UI builder needs to know
 
@@ -97,18 +187,15 @@ refresh and retry. No route answers 500 for a race, and none answers 500 before 
 - New endpoints answer 404 on the backend that is live now (not deployed). Fall back to `GET /tutor/chats`
   and the existing session calls when `/chats` returns no `chats` array.
 - A deleted live chat becomes a saved, deleted chat and the Tutor is empty. Undo returns it as saved, not live.
-- Starting a chat while the current one is empty reuses the empty live chat (its guide and class are replaced).
-- **Two tabs.** Every change of the live chat (new chat, open, delete of the live chat) first resets the Tutor session
-  with its version check, so of two overlapping requests only one gets through; the other answers 409 and changed
-  nothing. On a 409, refetch (`GET /chats/{id}` or `GET /tutor/session`) and show what is current. A tab that was
-  told about a chat that another tab deleted a moment later gets 404 on it; send it back to the list.
-  The student's conversation is never lost: if a step after the reset cannot be done, the session is put back,
-  or the conversation is saved as a chat of its own.
+- Starting a chat while the current one is empty and was never used (no messages, never renamed) removes that empty chat
+  and starts a new one; an empty chat the student renamed is kept.
+- **Two tabs**: see "Stale tabs" above. On a 409 or 404, refetch and show what is current.
 - The 30-saved-chat cap in `start_tutor_chat` (the pre-migration path) still deletes the oldest chats beyond 30.
   After the migration the new path does not prune; only deleted chats are purged (30 days). See the owner's
   decisions below.
 - `account_export` still exports every row, including deleted ones, which now carry a deleted marker (below);
-  `memory_context` skips deleted chats.
+  `memory_context` skips deleted chats, and falls back to the old columns only when the error says the new column is
+  missing (any other error is logged and the Tutor chats are left out of that one answer).
 - `tests/qa/mock-api.cjs` has no `/chats` routes; the UI task adds them.
 
 ## Owner decisions (Jude)
@@ -118,7 +205,7 @@ refresh and retry. No route answers 500 for a race, and none answers 500 before 
    deletes nothing). Only the pre-migration path, `tutor_sessions.start_tutor_chat` (`MAX_SAVED_CHATS`), trims, and
    it stops being used once the migration is applied.
 2. **Deleted chats are purged 30 days after deletion.** Approved. The 30 is one named constant, `DELETED_KEEP_DAYS` in
-   `backend/services/saved_chats.py`; the purge and the account export both read it. The purge now runs daily for every
+   `backend/services/saved_chats.py`; the purge and the account export both read it. The purge runs daily for every
    student (see "The daily purge"), and still also when a student starts a chat (`_purge_deleted`, their rows only),
    with one shared filter so the two cannot drift. A chat is therefore permanently deleted on its `purge_on` date or
    within a day after it.
@@ -129,23 +216,45 @@ refresh and retry. No route answers 500 for a race, and none answers 500 before 
    is permanently deleted on `purge_on`, and because the clean-up runs once a day, within a day of that date. Before the
    migration (no `deleted_at` column) the export reads the old columns and works as it did, detected with
    `saved_chats.is_missing_schema`. Code: `backend/services/account_export.py`; tests: `tests/test_tutor_data_controls.py`.
+4. **Save first, reset after** (the rule behind the third pass): if resetting the session before writing the chat rows
+   can lose any messages on a crash or deploy, that is High; the order is save first, reset after, so the worst case is
+   a duplicate, never a gap. The session row is the single record of which chat is live. No database function.
 
 **For the pull request description:** it must say that the privacy policy needs a sentence saying deleted chats are
 purged 30 days after deletion (and that the data export includes them, marked deleted, until then).
 
-## Review fixes (second pass)
+## Review history
 
-The first review of the backend failed on one High finding. What changed, and the test that proves each fix
-(all in `tests/test_saved_chats.py`; the database there is a fake that enforces the one-live-chat index and the
-live-and-deleted check, with hooks that run the other tab's whole request at an exact step of this one):
+- **First review** (H1, M1, M2): a chat could be live and deleted; overlapping starts gave 500s or saved twice; a guide's
+  folder was trusted as the chat's class. The second pass fixed these by resetting the session first, then writing the
+  chat rows, with a database check and a put-back step.
+- **Second review** (H-A, H-B, both High): resetting first opened a window in which the session already held the new
+  conversation while the old chat row was still marked live, so another tab could file a chat's messages under the wrong
+  chat (H-A, open plus delete of the live chat: the opened chat's messages ended up only inside a deleted chat and were
+  purged 31 days later), and a crash between the reset and the row write lost the conversation (H-B). The put-back could
+  also overwrite a turn another tab had started.
+- **Third pass (this one)**: the order is now save first, reset after (above), and `live_chat_id` on the session replaces
+  `tutor_chats.live`, so the session's messages and the chat they belong to are written in one row update and can never
+  disagree. The put-back is gone. Also: the save writes messages and time only (the rename that was lost), `_fresh_live`'s
+  "settle on another request's live chat" is gone (no request edits a row it did not create except the guarded save and
+  the guarded removal of an unused empty chat), the purge deletes with a count instead of returning rows and never removes
+  a chat a session points at, `memory_context` falls back only on the missing-column error, and the migration sets a
+  lock timeout. `append_tutor_message` (practice feedback posted into the Tutor) now writes only onto the conversation it
+  read (compare-and-set on `updated_at`), so it can never write an old conversation over a chat another tab opened.
 
-| Finding | Fix | Test |
-| --- | --- | --- |
-| H1: a chat could end up live and deleted (a new chat or the old panel's automatic `POST /tutor/session/new` racing a delete in another tab; open racing delete) and the student's next messages were filed under a deleted chat and purged | Database check; every write that sets or relies on `live` also filters `deleted_at is null` and checks that it changed a row; the non-live delete requires `live = false`; the session is reset first, and a step that cannot be done puts the conversation back or saves it as a chat of its own | `test_scenario_a_a_delete_in_another_tab_wins_before_a_new_chat_resets_the_tutor`, `test_scenario_a_the_delete_lands_after_the_new_chat_took_the_conversation`, `test_scenario_b_opening_a_chat_while_another_tab_deletes_it`, `test_deleting_a_saved_chat_that_became_live_meanwhile_is_refused`, `test_the_database_check_is_what_the_code_falls_back_on_and_it_answers_409_not_500`, `test_deleting_the_live_chat_when_its_row_cannot_be_written_puts_the_conversation_back`, `test_if_the_conversation_cannot_be_put_back_it_is_saved_as_a_chat_of_its_own` |
-| M1: two overlapping new-chat or open requests gave a 500, sometimes saved the conversation twice | Version-checked session reset first (one winner); unique violations answer 409 or settle on the live chat the other request made; empty `data` is checked | `test_p1_two_tabs_start_a_new_chat_at_once`, `test_p1b_the_second_tab_reads_after_the_first_saved_the_conversation_but_before_it_made_the_new_chat`, `test_a_live_chat_that_vanishes_before_it_is_reused_is_replaced_not_a_500`, `test_opening_a_chat_when_a_stray_live_chat_appears_is_a_409_and_keeps_the_conversation` |
-| M2: a guide's folder was trusted as the chat's class | Backfill and `_guide_classes` check the guide and the folder belong to the chat's owner | `test_a_guide_whose_folder_belongs_to_another_student_gives_the_chat_no_class`, `MigrationFileTests.test_the_backfill_runs_only_the_first_time_and_only_with_the_owners_guide_and_class` |
-| Migration | One transaction; backfill runs only when the file creates `class_id`; `class_id` index | `MigrationFileTests` |
-| Low | Open of the live conversation by the id `GET /chats` gave it works before the migration; the missing-schema matcher matches whole column names; second-student resume and other-student purge tests added | `test_opening_the_live_conversation_by_the_id_the_list_gave_it_returns_it`, `MissingSchemaMatcherTests`, `test_a_second_student_resumes_through_the_tutor_panels_route`, `test_the_students_own_purge_leaves_another_students_deleted_chats_alone` |
+Tests (`tests/test_saved_chats.py`; the fake database enforces the foreign key and its `on delete set null`, and can run
+another request at an exact step of this one):
+
+| What | Test |
+| --- | --- |
+| Every ordered pair of 13 actions (new via `/chats` and via the panel, open R, open T, open the live chat, delete the live chat, delete R, restore, list, get the live chat, rename, move, a full message turn), tab B's whole request before every database call of tab A's, from a normal live chat, a conversation with no row yet, and an empty live chat; invariants: no 5xx, no live-and-deleted chat, one answer to "which chat is live" in the list, a single chat and the old panel, every message reachable exactly once (or only in a chat the student deleted), no chat holding another's messages, titles/classes/renamed changed only by a rename or move, then a follow-up turn and new chat saved once | `Interleavings.test_every_pair_from_*` |
+| A turn claimed before every database call of every change and completed after it | `Interleavings.test_a_turn_in_flight_across_every_step_of_every_change` |
+| A crash, a lost answer, or two failed database calls in a row at every database call of new chat, panel new, open and delete-live; nothing lost and the next request consistent | `CrashTests.test_a_crash_or_a_lost_answer_at_any_step_never_loses_a_message`, `test_probe_1..4` |
+| H-A end to end (normal, empty and no-row live chat, both orders), through the purge 31 days later | `TwoTabTests.test_h_a_*` |
+| A turn another tab started is never overwritten (probe_after_reset [5], [6]); a message sent between the save and the reset is never dropped; an older copy never saved over a newer one | `TwoTabTests.test_a_turn_started_*`, `test_a_failed_delete_*`, `test_a_message_sent_*`, `test_a_slower_request_*` |
+| The settle hijack, the lost rename, the duplicate cases | `TwoTabTests.test_a_new_chat_never_changes_*`, `test_a_rename_in_another_tab_*`, `test_overlapping_starts_*`, `test_two_tabs_starting_*` |
+| The purge never removes the chat a session points at, even with an old `deleted_at` | `CrashTests.test_the_purge_never_removes_*`, `PurgeJobTests` |
+| Before the migration; right after it with a stale schema cache; the matcher for `live_chat_id` | `BeforeMigrationTests`, `StaleSchemaCacheTests`, `MissingSchemaMatcherTests` |
 
 ## The daily purge
 
@@ -156,10 +265,11 @@ the thread started on Fly at app start; no second worker, no new scheduler).
   or after 09:00 UTC each day (about 4 a.m. US Eastern) and not again that day, the same pattern as the nightly decision
   outcomes. After a database error it tries again an hour later, not every minute. A restart of the machine can repeat a
   run the same day; that is harmless.
-- **What it can remove.** `deleted_at is not null and deleted_at < (now in UTC - DELETED_KEEP_DAYS days) and live = false`.
-  One function (`_expired`) holds that filter and both the job and the purge on a student's next chat use it, with the one
-  constant. A row with `deleted_at` null is never touched. It first picks up to 100 ids with the filter, then deletes
-  those ids with the same filter again, at most 100 batches (10,000 chats) per run; the rest goes the next day.
+- **What it can remove.** `deleted_at is not null and deleted_at < (now in UTC - DELETED_KEEP_DAYS days)`, and no Tutor
+  session points at it (`live_chat_id`). `_purge_batches` holds that rule and both the job and the purge on a student's
+  next chat use it, with the one constant. A row with `deleted_at` null is never touched. It picks up to 100 ids with the
+  filter, leaves out any a session points at, then deletes those ids with the same filter again (asking for a count, not
+  the rows), at most 100 batches (10,000 chats) per run; the rest goes the next day.
 - **Safe.** Running it twice removes nothing the second time; two machines at once just delete overlapping batches.
   Before the migration (no `deleted_at` column) it removes nothing and logs one line; any other database error is
   logged and does not stop the worker's other jobs. The log says how many chats it removed, never titles or messages.
@@ -170,28 +280,37 @@ the thread started on Fly at app start; no second worker, no new scheduler).
   the next run, at most a day later. The export note says "permanently deleted on `purge_on` ... within a day of that
   date".
 
-## Before the owner applies the migration
+## The owner's checklist for applying the migration
 
 1. Run these read-only checks on the live database; **both should return 0**. (A non-zero result means a guide or a
-   folder is attached to another student's chat; the backfill now ignores those, but ask before applying.)
+   folder is attached to another student's chat; the backfill ignores those, but ask before applying.)
    ```sql
    select count(*) from tutor_chats c join study_guides g on g.id = c.guide_id where g.user_id is distinct from c.user_id;
    select count(*) from tutor_chats c join study_guides g on g.id = c.guide_id join folders f on f.id = g.folder_id where f.user_id is distinct from c.user_id;
    ```
-2. Deploy the backend first (`cd backend && fly deploy`), then apply the migration. The backend works before and after.
-3. **Never roll the backend back to an older release after the migration is applied.** The old code trims saved chats to
-   the newest 30 (`MAX_SAVED_CHATS`) and would delete everything beyond that, and it knows nothing of `live` or
-   `deleted_at`.
-4. The privacy policy needs the sentence about the 30-day purge (see the owner decisions above).
+2. Deploy the backend first (`cd backend && fly deploy`), check `cd backend && fly logs` for errors, and only then apply
+   the migration. The backend works before and after it.
+3. Apply the file as **one script** (paste the whole file into the SQL editor and run it once, or `psql -f`). It carries
+   its own `begin; ... commit;`; do not run parts of it. If it stops with a lock timeout (it waits at most 5 seconds for
+   `tutor_chats` and `tutor_sessions`), nothing changed: run it again at a quieter moment.
+4. After it: `GET /chats` should answer with `editable: true`; rename, move, delete and undo stop answering 503. Watch
+   `fly logs` for a minute: a `PGRST204` right after the migration (PostgREST's schema cache reloading) is handled by
+   the fallback and stops on its own; if it does not, reload the schema cache (`notify pgrst, 'reload schema';`).
+5. **Never roll the backend back to an older release after the migration is applied.** The old code trims saved chats to
+   the newest 30 (`MAX_SAVED_CHATS`) and would delete everything beyond that, and it knows nothing of `live_chat_id`
+   or `deleted_at`.
+6. The privacy policy needs the sentence about the 30-day purge (see the owner decisions above).
 
 ## Left alone on purpose (for later)
 
 - `GET /chats` has no pagination beyond 100.
-- Pre-existing: a `POST /chat` claim can land between `_busy()` and the session reset (the version check does not see a
-  turn that has started but not finished). It is not made worse; it is not fixed here.
-- The old panel's `DELETE /tutor/chats/{id}` is still a hard delete of any row, the live one included (the live row is
-  recreated from the session on the next read, so no conversation is lost).
-- The export lists the live chat's row with an empty message copy (its messages are in the Tutor session).
-- Two tabs that start a chat at the same moment can, in a very narrow window, leave one of them holding the id of a
-  chat the other just archived or deleted. Nothing is lost, saved twice or hidden; that tab gets a 404 or a 409 on its
-  next call and refetches. A transaction in the database (one function for the whole change) would close it fully.
+- The old panel's `DELETE /tutor/chats/{id}` is still a hard delete of any row (after the migration it only lists
+  chats that are not live). If it removes the live chat's row, `on delete set null` clears the pointer and the
+  conversation stays in the session; the next read gives it a chat of its own. Nothing is lost.
+- The export lists the live chat's row with the message copy it had when it was last saved (its current messages are in
+  the Tutor session, which the export also includes).
+- An abandoned turn (running for more than 3 minutes) does not block a change of the live chat, as before: the change
+  saves the student's question and resets the session, and the abandoned turn's late answer is refused (409).
+- In the few seconds after the migration while PostgREST's schema cache is stale, new and open use the old path,
+  including its 30-chat trim; no chat has been soft-deleted or pointed at yet in that window, so it behaves exactly as
+  today.
