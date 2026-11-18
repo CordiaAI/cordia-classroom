@@ -499,12 +499,19 @@ def _make_learn(body: ChatRequest, user_id: str, question: str, material: Materi
 
 def _study_helper(body: ChatRequest, user_id: str, question: str, material: Material, class_id: Optional[str],
                   skill: Optional[str], turn: Optional[dict]) -> Optional[ChatResponse]:
-    """A plan or a Learn set when the student is studying for a test; None for everything else."""
-    if skill not in STUDY_HELPER_SKILLS | {"build_guide", "practice"} or body.retain_context or body.assignment_key:
+    """A plan or a Learn set when the student is studying for a test; None for everything else.
+    Only in the web app's Tutor (a session): the plan's buttons and Learn live there. The extension side
+    panel sends no session and shows only the answer text, so it always gets its normal answer."""
+    if not turn or skill not in STUDY_HELPER_SKILLS | {"build_guide", "practice"} or body.retain_context or body.assignment_key:
+        return None
+    # Another tool asked for by name ("make flashcards…", "draw a diagram…") is that tool's, even if it
+    # also says "learn"; what's left once the Learn request itself is taken out decides.
+    rest = study_helper.LEARN_REQUEST.sub(" ", question)
+    if MAKE_THING.search(rest) or VISUAL_REQUEST.search(rest):
         return None
     if study_helper.asks_for_learn(question):
         return _make_learn(body, user_id, question, material, class_id, skill, turn)
-    if skill not in STUDY_HELPER_SKILLS or MAKE_THING.search(question) or VISUAL_REQUEST.search(question):
+    if skill not in STUDY_HELPER_SKILLS:
         return None
     if study_helper.asks_to_study_for_test(question):
         return _study_plan(body, user_id, question, material)

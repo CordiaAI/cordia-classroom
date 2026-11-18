@@ -9,23 +9,77 @@ from datetime import date, timedelta
 from typing import Optional
 from urllib.parse import urlencode
 
-# "I need to study for my bio test", "help me prep for the midterm", "I have an exam on Friday".
+# ---- Is the student asking for help with a test they sit? ----
+# The test is a noun the student sits ("my bio test", "the midterm", "an art history final"), never part of a
+# compound ("unit tests", "t-test", "test tube", "quiz question", "final answer", "the Howey test for…"):
+# the word after it has to end the phrase, and "final" counts only as that noun or before exam/test.
+_WEEKDAY = r"(?:mon|tues|wednes|thurs|fri|satur|sun)day"
+_MONTH = (r"(?:jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec|january|february|march|april|june|july|august|"
+          r"september|october|november|december)")
+_TEST = r"(?<![-\w])(?:tests?|exams?|midterms?|quiz(?:zes)?|finals?(?:\s+(?:exams?|tests?))?)"
+TEST_WORD = re.compile(_TEST, re.IGNORECASE)
+_ENDS = (r"(?=\s*(?:$|[,.!?;:—–])|\s+(?:is|are|was|'s|on|in|at|by|due|about|covering|over|and|but|so|that|which|"
+         r"i|i'm|i've|we|can|could|would|please|help|any|what|how|where|today|tonight|tomorrow|tmrw|tmr|next|this|"
+         rf"coming|soon|{_WEEKDAY}|{_MONTH}|\d+)\b)")
+# When the test is: "tomorrow", "on Friday", "next week", "in 5 days", "Dec 3", "12/3".
+_WHEN = (rf"(?:is\s+|'s\s+)?(?:today|tonight|tomorrow|tmrw|tmr|(?:on\s+|this\s+|next\s+)?{_WEEKDAY}|next\s+week|"
+         rf"in\s+\w+\s+(?:days?|weeks?)|(?:on\s+)?{_MONTH}\.?\s+\d|(?:on\s+)?\d{{1,2}}/\d{{1,2}})\b")
+# Words naming the class between the article and the test ("my art history final", "the CS 101 quiz"), never
+# a word that makes the test the topic of something else ("a question about the final exam").
+_COURSE = r"(?:(?!(?:about|of|with|on|in|to|for|from|question|questions|answer|answers|the|a|an|my|and|or)\b)[\w&.'+-]+\s+){0,4}?"
+_OWNER = r"(?:(?:a|an|my|our|the|this|that|next|another|tomorrow's|today's)\s+)?"
 STUDY_FOR_TEST = re.compile(
-    r"\b(?:study|studying|prep|prepping|prepare|preparing|review|reviewing|revise|revising|cram|cramming|ready)\b"
-    r"[^.?!]{0,60}?\b(?:tests?|exams?|midterms?|finals?|quiz(?:zes)?)\b"
-    r"|\b(?:have|got|there's)\s+(?:a|an|my|the)\s+(?:[\w-]+\s+){0,3}?(?:test|exam|midterm|final|quiz)\b",
+    # "I need to study for my bio test", "help me prep for the midterm", "get ready for my exam".
+    r"\b(?:study|studying|prep|prepping|prepare|preparing|review|reviewing|revise|revising|cram|cramming|ready)\s+"
+    rf"(?:\w+\s+){{0,2}}?for\s+{_OWNER}{_COURSE}{_TEST}{_ENDS}"
+    # "I have an exam on Friday", "I've got a quiz Thursday in CS 101", "there's a test tomorrow".
+    rf"|\b(?:have|has|got|there's|there\s+is)\s+(?:a|an|my|our|another)\s+{_COURSE}{_TEST}{_ENDS}"
+    # "my art history final is next week", "test tomorrow on contracts", "exam on Friday".
+    rf"|{_TEST}\s+{_WHEN}",
     re.IGNORECASE,
 )
-# "Make a Learn for it", "set up Learn for my exam", "build a learn set".
+# Named tests and methods that are topics, not something the student sits ("the Allen test", "unit tests").
+COMPOUND_TESTS = {"unit", "t", "z", "f", "chi", "chi-square", "allen", "howey", "romberg", "turing", "rinne", "weber",
+                  "patch", "blood", "drug", "pregnancy", "stress", "litmus", "smoke", "regression", "integration", "load",
+                  "acid", "skin", "screening", "hearing", "vision", "eye", "urine", "lab", "ab", "a/b", "beta", "alpha"}
+# A question about something ("what will be on the test?", "why was question 2 wrong?") is not a plan
+# request, unless it asks for help getting ready ("can you help me get ready?", "where do I start?").
+ASKS_ABOUT = re.compile(r"^\s*(?:what|why|how|who|when|where|which|explain|describe|define|is|are|does|do|did)\b", re.IGNORECASE)
+ASKS_FOR_HELP = re.compile(
+    r"\b(?:help|what\s+(?:should|do|can)\s+i\s+(?:do|study|start)|where\s+(?:do|should)\s+i\s+(?:start|begin)|"
+    r"how\s+(?:do|should|can)\s+i\s+(?:study|prep|prepare|get\s+ready|start)|plan)\b",
+    re.IGNORECASE,
+)
+# "Learn" as the product, not the verb: "make a Learn for it", "set up Learn for my exam", "build a learn set",
+# "start a Learn round", "Learn for this". Not "things to learn for the quiz" or "open the learn page".
 LEARN_REQUEST = re.compile(
-    r"\b(?:make|create|build|set\s*up|start|generate|open)\b[^.?!]{0,30}?"
-    r"\b(?:(?:a|an|the|my|me\s+a)\s+learn\b|learn\s+(?:set|session|round|mode|for)\b)",
+    r"\b(?:make|create|build|set\s*up|start|generate|open|run)\s+(?:me\s+)?(?:(?:a|an|the|my)\s+)?"
+    r"learn(?:\s+(?:set|session|round|mode))?(?=\s*(?:$|[,.!?;:])|\s+(?:for|on|from|with|about|now|please)\b)"
+    r"|(?:^|[.!?]\s+)learn\s+for\s+(?:it|this|that)\b"
+    r"|\b(?:a|an|the|my)\s+learn\s+(?:set|session|round)\b",
     re.IGNORECASE,
 )
+
+
+def _sits_a_test(sentence: str) -> bool:
+    for match in STUDY_FOR_TEST.finditer(sentence):
+        start = match.start() + TEST_WORD.search(match.group(0)).start()
+        before = re.findall(r"[\w/-]+", sentence[:start].lower())
+        if not before or before[-1].rstrip("-") not in COMPOUND_TESTS:
+            return True
+    return False
 
 
 def asks_to_study_for_test(text: str) -> bool:
-    return bool(STUDY_FOR_TEST.search(text or ""))
+    """The student says they have a test to get ready for. A question about something else that mentions a
+    test, an exam word inside a compound ("unit tests", "final answer") or a topic test ("the Howey test") is not."""
+    for sentence in re.split(r"(?<=[.?!;])\s+", (text or "").strip()):
+        if not _sits_a_test(sentence):
+            continue
+        if (ASKS_ABOUT.search(sentence) or sentence.rstrip().endswith("?")) and not ASKS_FOR_HELP.search(sentence):
+            continue
+        return True
+    return False
 
 
 def asks_for_learn(text: str) -> bool:
