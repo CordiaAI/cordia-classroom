@@ -326,5 +326,10 @@ def first_try_credit(question: dict, attempt: dict, user_id: str, guide_id: str)
         # right" / "I was right"). Their call, like a flashcard's Got it: it only moves their own score.
         return 1.0 if attempt.get("self_marked") and attempt.get("credit") == 1 else 0.0
     if kind == "written":
+        if not attempt.get("token"):
+            # The AI check didn't come back (grading failed, or the AI checks are used up), so the
+            # student looked at the right answer and marked their own. Their call, like a flashcard's
+            # Got it: it only moves their own score.
+            return 1.0 if attempt.get("self_marked") and attempt.get("credit") == 1 else 0.0
         return verified_credit(user_id, guide_id, attempt.get("concept"), attempt.get("credit"), attempt.get("token"))
     return 0.0

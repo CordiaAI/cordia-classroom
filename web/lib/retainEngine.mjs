@@ -26,6 +26,17 @@ export function canChoose(question) {
   return Array.isArray(question?.options) && question.options.length >= MIN_CHOICES;
 }
 
+// Why an AI check of a written answer didn't come back (the reply to POST /quiz/{id}/grade had no
+// credit). `limit`: the student's AI checks are used up, so asking again can't help. Either way the
+// card offers the model answer to check by hand (WrittenCard), so a Written question is never a dead
+// end for a free or a Pro student. Only a plain sentence is shown; a plan-limit body (detail is an object) is not.
+export function gradeFailure(data) {
+  const limit = Boolean(data?.limit_reached) || data?.detail?.code === 'limit_reached';
+  if (limit) return { limit, message: "You've used your AI checks for now." };
+  const detail = typeof data?.detail === 'string' && data.detail.trim() ? data.detail.trim() : '';
+  return { limit, message: detail || 'Cordia could not check this answer right now.' };
+}
+
 export function conceptAnswer(question) {
   const options = question?.options || [];
   const index = question?.correct_index;
