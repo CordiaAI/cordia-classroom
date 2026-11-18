@@ -21,8 +21,10 @@ TEST_WORD = re.compile(_TEST, re.IGNORECASE)
 _ENDS = (r"(?=\s*(?:$|[,.!?;:—–])|\s+(?:is|are|was|'s|on|in|at|by|due|about|covering|over|and|but|so|that|which|"
          r"i|i'm|i've|we|can|could|would|please|help|any|what|how|where|today|tonight|tomorrow|tmrw|tmr|next|this|"
          rf"coming|soon|{_WEEKDAY}|{_MONTH}|\d+)\b)")
+# What may follow the test word before its date: "exam is today", "exam's today" (straight or curly), "exam today".
+_IS = r"(?:\s+is\s+|['’]s\s+|\s+)"
 # When the test is: "tomorrow", "on Friday", "next week", "in 5 days", "Dec 3", "12/3".
-_WHEN = (rf"(?:is\s+|'s\s+)?(?:today|tonight|tomorrow|tmrw|tmr|(?:on\s+|this\s+|next\s+)?{_WEEKDAY}|next\s+week|"
+_WHEN = (rf"(?:today|tonight|tomorrow|tmrw|tmr|(?:on\s+|this\s+|next\s+)?{_WEEKDAY}|next\s+week|"
          rf"in\s+\w+\s+(?:days?|weeks?)|(?:on\s+)?{_MONTH}\.?\s+\d|(?:on\s+)?\d{{1,2}}/\d{{1,2}})\b")
 # Words naming the class between the article and the test ("my art history final", "the CS 101 quiz"), never
 # a word that makes the test the topic of something else ("a question about the final exam").
@@ -35,7 +37,7 @@ STUDY_FOR_TEST = re.compile(
     # "I have an exam on Friday", "I've got a quiz Thursday in CS 101", "there's a test tomorrow".
     rf"|\b(?:have|has|got|there's|there\s+is)\s+(?:a|an|my|our|another)\s+{_COURSE}{_TEST}{_ENDS}"
     # "my art history final is next week", "test tomorrow on contracts", "exam on Friday".
-    rf"|{_TEST}\s+{_WHEN}",
+    rf"|{_TEST}{_IS}{_WHEN}",
     re.IGNORECASE,
 )
 # Named tests and methods that are topics, not something the student sits ("the Allen test", "unit tests").
@@ -52,15 +54,26 @@ ASKS_FOR_HELP = re.compile(
     r"(?:can|could|will|would)\s+(?:we|you)\s+(?:please\s+)?(?:study|prep|prepare|review|revise|cram|get\s+ready))\b",
     re.IGNORECASE,
 )
-# "Learn" as the product, not the verb: "make a Learn for it", "set up Learn for my exam", "build a learn set",
-# "start a Learn round", "Learn for this". Not "things to learn for the quiz" or "open the learn page".
+# "Learn" as the product, asked for in so many words. A closed grammar the whole sentence has to match:
+# "make a Learn for it", "set up Learn for my exam", "can you build a learn set?", "start a Learn round on
+# chapter 4", "Learn for this". Anything it doesn't list ("how do I make a Learn set?", "make a Learn set
+# or a quiz, which is better?", "things to learn for the quiz", "don't make a Learn set yet") is a question
+# for the Tutor to answer.
+_LEAD = r"(?:(?:ok(?:ay)?|alright|great|cool|sure|yes|yeah|yep|so|and|now|then|please|thanks|hey|hi)[,!.]?\s+)*"
+_POLITE = r"(?:can|could|would|will)\s+(?:you|we)\s+(?:please\s+)?"
+_ASK = (rf"(?:please\s+|{_POLITE}|let'?s\s+|i\s+(?:want|need)\s+(?:you\s+)?to\s+|i'?d\s+like\s+(?:you\s+)?to\s+|"
+        r"go\s+ahead\s+and\s+)?")
+_SET = r"(?:(?:a|an|the|my|that|this)\s+(?:new\s+|quick\s+|short\s+)?learn(?:\s+(?:set|session|round|mode))?|learn\s+(?:set|session|round|mode))"
+_THING = (rf"(?:(?:make|create|build|generate|set\s*up|start|open|run|do|launch|begin)\s+(?:me\s+|us\s+)?{_SET}|"
+          r"(?:open|start|run|set\s*up|launch)\s+learn(?=\s+(?:for|on|from|with)\b))")
+_TAIL = (r"(?:\s+(?:for|on|from|with|about|of|out\s+of|using)\s+(?:(?!\bor\b)[^?!.;,]){1,60}?)?"
+         r"(?:,?\s+(?:now|please|for\s+me|thanks|then))*")
 LEARN_REQUEST = re.compile(
-    r"\b(?:make|create|build|set\s*up|start|generate|open|run)\s+(?:me\s+)?(?:(?:a|an|the|my)\s+)?"
-    r"learn(?:\s+(?:set|session|round|mode))?(?=\s*(?:$|[,.!?;:])|\s+(?:for|on|from|with|about|now|please)\b)"
-    r"|(?:^|[.!?]\s+)learn\s+for\s+(?:it|this|that)\b"
-    r"|\b(?:a|an|the|my)\s+learn\s+(?:set|session|round)\b",
+    rf"^\s*{_LEAD}(?:(?:{_ASK}{_THING}|i\s+(?:want|need)\s+{_SET}|i'?d\s+like\s+{_SET}){_TAIL}"
+    r"|learn\s+for\s+(?:it|this|that)(?:,?\s+please)?)\s*[.!?]*\s*$",
     re.IGNORECASE,
 )
+POLITE_START = re.compile(rf"^\s*{_LEAD}{_POLITE}", re.IGNORECASE)
 
 
 def _sits_a_test(sentence: str) -> bool:
@@ -84,18 +97,26 @@ def asks_to_study_for_test(text: str) -> bool:
     return False
 
 
-# A question about Learn ("how does a Learn session work?", "what is a Learn set?", "can you explain a Learn
-# round?") asks what it is; it doesn't ask for one to be built or opened.
-ASKS_ABOUT_LEARN = re.compile(
-    r"^\s*(?:(?:what|why|how|who|when|where|which|is|are|does|did|do\s+(?:you|we|i|they))\b|"
-    r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?)?(?:explain|describe|define|tell\s+me)\b)",
-    re.IGNORECASE,
-)
+def split_learn_request(text: str) -> tuple[Optional[str], str]:
+    """(form, rest): form is "do" for an imperative ("make a Learn for it"), "ask" for a polite question
+    ("can you make a Learn set?"), None when the student didn't ask for Learn; rest is the other sentences.
+    A bare question ("Make a Learn set?") isn't a request, and neither is one followed by a question
+    ("Can you make a Learn set? Or is that only for guides?")."""
+    sentences = [sentence for sentence in re.split(r"(?<=[.?!;])\s+", (text or "").strip()) if sentence]
+    asked = [bool(LEARN_REQUEST.match(sentence)) and (not sentence.rstrip().endswith("?") or bool(POLITE_START.match(sentence)))
+             for sentence in sentences]
+    if not any(asked):
+        return None, text or ""
+    last = max(index for index, hit in enumerate(asked) if hit)
+    if any(sentence.rstrip().endswith("?") for sentence in sentences[last + 1:]):
+        return None, text or ""
+    matched = [sentence for sentence, hit in zip(sentences, asked) if hit]
+    form = "ask" if any(POLITE_START.match(sentence) or sentence.rstrip().endswith("?") for sentence in matched) else "do"
+    return form, " ".join(sentence for sentence, hit in zip(sentences, asked) if not hit)
 
 
 def asks_for_learn(text: str) -> bool:
-    return any(LEARN_REQUEST.search(sentence) and not ASKS_ABOUT_LEARN.search(sentence)
-               for sentence in re.split(r"(?<=[.?!;])\s+", (text or "").strip()))
+    return split_learn_request(text)[0] is not None
 
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
@@ -135,7 +156,7 @@ def parse_test_date(text: str, today: date) -> Optional[date]:
         return today + timedelta(days=1)
     # "Today" is the test's day only when the test is today ("my exam is today", or "it's today" answering
     # the plan's "when is the test?"), never "what should I do today?".
-    if re.search(r"\b(?:tests?|exams?|quiz(?:zes)?|midterms?|finals?)\s+(?:is\s+|'s\s+)?(?:today|tonight|this (?:morning|afternoon|evening))\b"
+    if re.search(rf"\b(?:tests?|exams?|quiz(?:zes)?|midterms?|finals?){_IS}(?:today|tonight|this (?:morning|afternoon|evening))\b"
                  r"|^\s*(?:it'?s\s+|it\s+is\s+)?(?:today|tonight|this (?:morning|afternoon|evening))\b", words):
         return today
     if match := re.search(r"\bin\s+(\d{1,2}|" + "|".join(SMALL_NUMBERS) + r")\s+(days?|weeks?)\b", words):
@@ -153,7 +174,7 @@ def parse_test_date(text: str, today: date) -> Optional[date]:
         return today + timedelta(days=ahead or (7 if match.group(1) else 0))
     # 12/3 is a date only right after "on", "by", "due" or the test word ("exam 12/3", "test is on 12/3"),
     # or as the whole answer to "when is the test?".
-    if match := re.search(r"(?:\b(?:on|by|due|tests?|exams?|quiz(?:zes)?|midterms?|finals?)\s+(?:is\s+|'s\s+)?(?:on\s+)?"
+    if match := re.search(rf"(?:\b(?:on|by|due|tests?|exams?|quiz(?:zes)?|midterms?|finals?){_IS}(?:on\s+)?"
                           r"|^\s*(?:it'?s\s+|it\s+is\s+)?(?:on\s+)?)(\d{1,2})/(\d{1,2})\b", words):
         return _future(today.year, int(match.group(1)), int(match.group(2)), today)
     return None
@@ -229,6 +250,13 @@ def learn_href(guide_id: str, when: Optional[date] = None, today: Optional[date]
     return f"/learn/{guide_id}" + (f"?{urlencode(query)}" if query else "")
 
 
+def build_offer(material_title: str) -> tuple[str, dict]:
+    """The offer to build a Learn set from the selected material, and its button. The button's prompt is an
+    imperative, so pressing it builds; a question alone never does (routers/chat._make_learn)."""
+    return (f"I'll turn {material_title} into a Learn set first, then you can start a short check-in quiz.",
+            {"kind": "build", "label": "Build the Learn set", "prompt": "Make a Learn for it"})
+
+
 def plan_reply(*, today: date, when: Optional[date], guide: Optional[dict], exam: Optional[dict],
                material_title: str = "", canvas_connected: bool = False) -> tuple[str, dict]:
     """A short plan and its buttons: (answer, study_plan). Buttons are actions the web app knows:
@@ -258,9 +286,9 @@ def plan_reply(*, today: date, when: Optional[date], guide: Optional[dict], exam
         body = "\n".join(f"{index}. {step}" for index, step in enumerate(steps, 1))
         answer = f"{lead} Here's the plan:\n{body}"
     elif material_title:
-        answer = (f"{lead} I'll turn {material_title} into a Learn set first, then you can start a short check-in quiz."
-                  + ("" if when else " When is the test?"))
-        actions.append({"kind": "build", "label": "Build the Learn set", "prompt": "Make a Learn for it"})
+        offer, build = build_offer(material_title)
+        answer = f"{lead} {offer}" + ("" if when else " When is the test?")
+        actions.append(build)
     elif exam and str(exam.get("id") or "").startswith("canvas-"):
         answer = (f"{lead} You don't have a guide for it yet. I can gather your Canvas material for this class "
                   "into a review set, then start a short check-in quiz.")

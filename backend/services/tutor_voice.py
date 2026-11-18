@@ -11,7 +11,9 @@ import re
 # "Great question! …"), so real words that start the same way stay ("Yo-yo dieting", "Hey Jude is…",
 # "Dude ranches", "What's up with…", "Good question to ask: …", "Okay so-called experts").
 SLANG = r"yo+|ay+o*|sup|wa+s+up|what'?s\s+up|hey+(?:\s+there)?|heya|hiya|dude|bro|fam|lol|ok(?:ay)?\s+so|alright\s+so|so\s+basically"
-SLANG_OPENER = re.compile(rf"^\s*(?:(?:{SLANG})(?:[,!.]+|\s*[—–])|(?:great|good)\s+question[!.,]+)\s+", re.IGNORECASE)
+# A period after a slang word ends a sentence the word belongs to ("Fam. Medicine is…"), so slang takes a comma,
+# "!" or a dash; only "great/good question" may end with a period.
+SLANG_OPENER = re.compile(rf"^\s*(?:(?:{SLANG})(?:[,!]+|\s*[—–])|(?:great|good)\s+question[!.,]+)\s+", re.IGNORECASE)
 
 
 def plain_opening(answer: str) -> str:
@@ -31,6 +33,15 @@ NUMBER_WORD = re.compile(rf"^(?:two|three|four|five|six|seven|eight|nine|ten|ele
 MONTHS = ("january|february|march|april|may|june|july|august|september|october|november|december|"
           "jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec")
 YEAR = re.compile(r"\b(?:1[0-9]{3}|20[0-9]{2})s?\b")
+# Amounts: "$500", "£ 20", "60 percent", "sixty per cent", "3 percentage points", "40 dollars".
+_AMOUNT_WORD = (rf"one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|"
+                rf"seventeen|eighteen|nineteen|hundred|(?:{TENS})(?:-(?:one|two|three|four|five|six|seven|eight|nine))?")
+AMOUNT = re.compile(rf"[$£€¥]\s?(\d[\d,.]*)"
+                    rf"|\b(\d[\d,.]*|{_AMOUNT_WORD})\s+(?:percent|per\s+cent|percentage\s+points?)\b"
+                    rf"|\b(\d[\d,.]*)\s+(?:dollars?|euros?|pounds)\b", re.IGNORECASE)
+# A question asking who, when or how many is answered with a specific, whatever words the answer uses.
+ASKS_FOR_SPECIFIC = re.compile(r"^\s*(?:who|whom|whose|what\s+year|which\s+year|what\s+date|how\s+many|how\s+old|what\s+percent)\b",
+                               re.IGNORECASE)
 DATE = re.compile(rf"\b(?:{MONTHS})\.?\s+\d{{1,2}}(?:st|nd|rd|th)?\b|\b\d{{1,2}}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:{MONTHS})\b", re.IGNORECASE)
 # Counts about the answer's own structure ("here are three steps", "two ways to see it"), not facts.
 META_NOUNS = {"ways", "steps", "things", "tips", "examples", "points", "ideas", "parts", "questions", "options", "reasons"}
@@ -117,13 +128,15 @@ def _names(sentence: str, asked: set) -> bool:
                 and sentence[words[end].end():words[end + 1].start()] in {" ", "-"}:
             end += 1
         run = [match.group(0) for match in words[index:end + 1]]
-        named = [word for word in run if _is_name(word, asked)]
-        if index == 0:
-            named = [word for word in named if word != run[0]]  # the sentence's first word
+        # The sentence's first word is capitalized anyway: it counts only inside a longer run ("Toni Morrison",
+        # "Italian Renaissance painters"), and never when it's "The", "In" or another function word.
+        first = run[0].lower()
+        named = [word for position, word in enumerate(run) if _is_name(word, asked)
+                 and not (index == 0 and position == 0 and (first in FUNCTION_WORDS or first in DETERMINERS or len(run) == 1))]
         before = words[index - 1].group(0).lower() if index and sentence[words[index - 1].end():words[index].start()].strip() == "" else ""
         after = words[end + 1].group(0) if end + 1 < len(words) and sentence[words[end].end():words[end + 1].start()].strip() == "" else ""
         modifier = (index == 0 or before in DETERMINERS) and after[:1].islower()
-        if named and not modifier:
+        if len(named) >= 2 or (named and not modifier):
             return True
         index = end + 1
     return False
@@ -143,8 +156,13 @@ def states_specifics(answer: str, question: str = "") -> bool:
     """Whether the reply states a specific name, number, count, amount or date the student didn't give."""
     asked = {word.lower() for word in WORD.findall(question or "")}
     asked_numbers = set(re.findall(r"\d[\d,.]*", question or ""))
+    if ASKS_FOR_SPECIFIC.match(question or ""):
+        return True
     text = "\n".join(_plain_lines(answer))
     if any(year not in asked_numbers for year in YEAR.findall(text)) or DATE.search(text):
+        return True
+    amounts = [next(group for group in match.groups() if group) for match in AMOUNT.finditer(text)]
+    if any(amount.lower() not in asked and amount.rstrip(".,") not in asked_numbers for amount in amounts):
         return True
     return any(_counts(sentence, asked, asked_numbers) or _names(sentence, asked) for sentence in _sentences(answer))
 

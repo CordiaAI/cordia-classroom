@@ -299,8 +299,13 @@ export default function LearnPage() {
   useEffect(() => {
     if (ready && guideId) load();
   }, [ready, guideId]);
+  // The check-in starts by itself once: the first time the questions load, if it's waiting and the overview
+  // is showing then. Back on the overview later (after a resumed round), it waits for its button.
+  const checkinAuto = useRef(false);
   useEffect(() => {
-    if (checkin !== 'pending' || !questions?.length || screen !== 'home') return;
+    if (checkinAuto.current || !questions?.length) return;
+    checkinAuto.current = true;
+    if (checkin !== 'pending' || screen !== 'home') return;
     setCheckin('running');
     startRound();
   }, [checkin, questions, screen]);

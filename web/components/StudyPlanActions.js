@@ -68,7 +68,7 @@ export default function StudyPlanActions({ plan, tutor, latest }) {
           const off = !busy && (Boolean(working) || tutor.busy || (!latest && action.kind !== 'canvas_review'));
           return (
             <button key={action.kind + index} type="button" className={`c-btn c-btn--sm ${tone} plan-btn${busy ? ' is-busy' : ''}${showMark ? ' is-marked' : ''}`}
-              onClick={() => { if (!working) run(action); }} disabled={off} aria-disabled={busy || undefined} aria-busy={busy || undefined}>
+              onClick={() => { if (!working && !marked) run(action); }} disabled={off} aria-disabled={busy || undefined} aria-busy={busy || undefined}>
               <span className="plan-face">{body}</span>
               {(busy || showMark) && <span className="plan-spinner"><CordiaLoader size={18} label={`${action.label}: working`} /></span>}
             </button>

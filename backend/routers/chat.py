@@ -468,14 +468,21 @@ def _recent_build(user_id: str, material: Material, title: str) -> Optional[dict
 
 
 def _make_learn(body: ChatRequest, user_id: str, question: str, material: Material, class_id: Optional[str],
-                skill: Optional[str], turn: Optional[dict]) -> ChatResponse:
-    """"Make a Learn for it": build the set (the build_guide or practice skill) when there isn't one, then open Learn."""
+                skill: Optional[str], turn: Optional[dict], form: str = "do") -> ChatResponse:
+    """"Make a Learn for it": build the set (the build_guide or practice skill) when there isn't one, then open Learn.
+    A build costs a model call, so it starts only from an imperative or the build button; a polite question
+    ("can you make a Learn set from my notes?") gets the offer and the button instead."""
     today = _today(body)
     plan = _last_plan(turn) or {}
     when = study_helper.parse_test_date(question, today)
     if not when and plan.get("test_date"):
         when = date.fromisoformat(plan["test_date"])
     guide = material.guide
+    if not guide and material.content.strip() and form == "ask":
+        offer, build = study_helper.build_offer(material.title)
+        return ChatResponse(answer=offer, action="study_plan", source=material.source,
+                            study_plan={"guide": None, "test_date": when.isoformat() if when else None, "exam": plan.get("exam"),
+                                        "actions": [build]})
     if not guide and material.content.strip():
         kind = "practice" if skill == "practice" or re.search(r"\bpractice\b", question, re.IGNORECASE) else "guide"
         _check_picked_class(user_id, body)
@@ -506,11 +513,11 @@ def _study_helper(body: ChatRequest, user_id: str, question: str, material: Mate
         return None
     # Another tool asked for by name ("make flashcards…", "draw a diagram…") is that tool's, even if it
     # also says "learn"; what's left once the Learn request itself is taken out decides.
-    rest = study_helper.LEARN_REQUEST.sub(" ", question)
+    form, rest = study_helper.split_learn_request(question)
     if MAKE_THING.search(rest) or VISUAL_REQUEST.search(rest):
         return None
-    if study_helper.asks_for_learn(question):
-        return _make_learn(body, user_id, question, material, class_id, skill, turn)
+    if form:
+        return _make_learn(body, user_id, question, material, class_id, skill, turn, form)
     if skill not in STUDY_HELPER_SKILLS:
         return None
     if study_helper.asks_to_study_for_test(question):
