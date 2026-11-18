@@ -15,6 +15,7 @@ import hmac
 import os
 import re
 import unicodedata
+from bisect import bisect_left
 from collections import Counter
 
 TYPES = ("mc", "written", "fill", "matching")
@@ -199,11 +200,13 @@ def _part_words(text: str) -> list:
 def missing_parts(text: str, answer: str) -> list:
     """The parts of a list answer (answer_parts) that a piece of writing (a memory trick) leaves
     out. A part counts when one of its distinguishing words is there (a word no other part uses:
-    "1", "2" and "gestational" for "Type 1 diabetes, Type 2 diabetes, gestational diabetes"; a part
-    with none uses all its words), allowing plurals, possessives and small typos, so a word the
-    parts share cannot stand in for the one that was left out. [] for a one-part answer.
-    Each part's words are counted once (a word used by one part only is distinguishing), so the work
-    is linear in the answer, and the answer is at most PART_MAX_COUNT parts (answer_parts)."""
+    "1", "2" and "gestational" for "Type 1 diabetes, Type 2 diabetes, gestational diabetes"),
+    allowing plurals, possessives and small typos, so a word the parts share cannot stand in for the
+    one that was left out. A part with no word of its own ("right atrium" beside "left atrium" and
+    "right ventricle") counts only when all its words are there together, at most one word apart,
+    not scattered through the trick. [] for a one-part answer.
+    Each part's words are counted once and each trick word is compared once per part word, so the
+    work is linear in the trick and the answer is at most PART_MAX_COUNT parts (answer_parts)."""
     parts = answer_parts(answer)
     if len(parts) < 2:
         return []
@@ -212,10 +215,34 @@ def missing_parts(text: str, answer: str) -> list:
     used_by = Counter(stem for group in keys for stem in {_stem(word) for word in group})
     missing = []
     for index, part in enumerate(parts):
-        own = [word for word in keys[index] if used_by[_stem(word)] == 1] or keys[index]
-        if not any(_same_word(given, word) for word in own for given in words):
+        own = [word for word in keys[index] if used_by[_stem(word)] == 1]
+        if own:
+            found = any(_same_word(given, word) for word in own for given in words)
+        else:
+            found = _together(words, list(dict.fromkeys(keys[index])))
+        if not found:
             missing.append(part)
     return missing
+
+
+def _together(words: list, wanted: list) -> bool:
+    """Whether every word in `wanted` appears in `words` within a stretch of len(wanted) + 1 words."""
+    if not wanted:
+        return True
+    at = [[i for i, given in enumerate(words) if _same_word(given, word)] for word in wanted]
+    if not all(at):
+        return False
+    span = len(wanted) + 1
+    for start in at[0]:
+        if all(_near(positions, start, span) for positions in at[1:]):
+            return True
+    return False
+
+
+def _near(positions: list, position: int, span: int) -> bool:
+    """Whether a sorted list of positions holds one less than `span` from `position`."""
+    i = bisect_left(positions, position - span + 1)
+    return i < len(positions) and positions[i] < position + span
 
 
 def mentions_answer(text: str, answer: str) -> bool:
@@ -249,7 +276,7 @@ def plan_session(questions: list, selected, indices=None) -> list:
     assigned = {}
     wanted = set(indices) if indices is not None else None
     for index, question in enumerate(questions):
-        if wanted is not None and index not in wanted:
+        if (wanted is not None and index not in wanted) or (isinstance(question, dict) and question.get("hidden")):
             continue
         shape = answer_shape(question.get("question", ""), concept_answer(question))
         if can_choose(question):
@@ -290,8 +317,10 @@ MAX_QUIZ_QUESTIONS = 50  # the most a guide's quiz holds (routers/quiz.py builds
 
 
 def askable(questions: list) -> list:
-    """Indexes of questions that have an answer to check."""
-    return [index for index, question in enumerate(questions) if concept_answer(question)]
+    """Indexes of questions that have an answer to check and are not hidden (a question about the
+    source rather than the subject, text_processing.shown_questions: it keeps its place, unasked)."""
+    return [index for index, question in enumerate(questions)
+            if concept_answer(question) and not (isinstance(question, dict) and question.get("hidden"))]
 
 
 def pick_questions(questions: list, count=None, rng=None) -> list:

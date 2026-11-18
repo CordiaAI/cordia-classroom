@@ -23,7 +23,7 @@
 
 import { conceptAnswer } from './retainEngine.mjs';
 import { FAMILIAR, FADE_DAYS, LEARNING, MASTERED, NEW, ROUND_SIZE, dayKey, isFading, isTerm } from './learnEngine.mjs';
-import { canChoose } from './retainEngine.mjs';
+import { askable, canChoose } from './retainEngine.mjs';
 
 export const LADDER_TYPES = ['mc', 'fill', 'written', 'self'];
 export const LADDER_DEFAULT = ['mc', 'fill', 'written'];
@@ -169,7 +169,7 @@ export function askLadder(question, entry, ctx = {}) {
 // before the rest), then the usual order (learnEngine.pickRound): confident misses, ideas in
 // progress, new ones, then fading ones.
 export function pickLadderRound(questions, levels, today = dayKey(), carry = [], size = ROUND_SIZE) {
-  const valid = index => Boolean(conceptAnswer(questions[index]));
+  const valid = index => askable(questions[index]);
   const rank = index => {
     const entry = levels[index];
     if (entry.l === MASTERED) return isFading(entry, today) ? 4 : 99;

@@ -5,7 +5,7 @@
 // and a miss drops it back to Learning and asks it again later in the same round.
 // Mastered ideas fade after FADE_DAYS without practice and come back for a quick recall.
 
-import { canChoose, conceptAnswer } from './retainEngine.mjs';
+import { askable, canChoose, conceptAnswer } from './retainEngine.mjs';
 
 export const LEVELS = ['New', 'Learning', 'Familiar', 'Mastered'];
 export const NEW = 0;
@@ -169,7 +169,7 @@ export function askType(question, entry, today = dayKey(), types = DEFAULT_TYPES
 // Next round: ideas the student got wrong while sure come first, then ones in progress (highest
 // first, so they finish), then new ones, then mastered ones that are fading.
 export function pickRound(questions, levels, today = dayKey(), size = ROUND_SIZE) {
-  const indexes = questions.map((_, index) => index).filter(index => conceptAnswer(questions[index]));
+  const indexes = questions.map((_, index) => index).filter(index => askable(questions[index]));
   const rank = index => {
     const entry = levels[index];
     if (entry.l === MASTERED) return isFading(entry, today) ? 4 : 99;
@@ -242,7 +242,7 @@ export function advance(round) {
 export function counts(questions, levels, today = dayKey()) {
   const tally = { total: 0, new: 0, learning: 0, familiar: 0, mastered: 0, fading: 0 };
   questions.forEach((question, index) => {
-    if (!conceptAnswer(question)) return;
+    if (!askable(question)) return;
     const entry = levels[index];
     tally.total += 1;
     if (isFading(entry, today)) { tally.fading += 1; tally.familiar += 1; return; }

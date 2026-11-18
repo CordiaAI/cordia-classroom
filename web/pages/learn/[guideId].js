@@ -8,7 +8,7 @@ import { useRequireAuth } from '../../lib/auth';
 import useSessionTracker from '../../lib/useSessionTracker';
 import { recordStudy } from '../../lib/activity';
 import { rememberRetainMisses } from '../../lib/userStore';
-import { conceptAnswer } from '../../lib/retainEngine.mjs';
+import { conceptAnswer, questionText } from '../../lib/retainEngine.mjs';
 import {
   FAMILIAR, LEARNING, LEVELS, MASTERED,
   DEFAULT_TYPES, LEARN_TYPES, advance, answer, cleanTypes, counts, createRound, currentCard, dayKey, fingerprint, formatDecision, linkedTestDate, readiness, restoreLevels, saveableLevels, testPlan,
@@ -112,11 +112,11 @@ function FlipCard({ card, question, guideId, onResult, onNext }) {
   return (
     <>
       <button type="button" className={'learn-flip' + (flipped ? ' is-flipped' : '')} onClick={flip} disabled={done !== null}
-        aria-label={flipped ? `Answer: ${answerText}` : `${question.question}. Flip to see the answer`}>
+        aria-label={flipped ? `Answer: ${answerText}` : `${questionText(question)}. Flip to see the answer`}>
         <span className="learn-flip-inner">
           <span className="learn-flip-face learn-flip-front" aria-hidden={flipped}>
             <small>Question</small>
-            <span className="learn-flip-text">{question.question}</span>
+            <span className="learn-flip-text">{questionText(question)}</span>
             <span className="c-meta">Think of the answer, then flip · <kbd>Space</kbd></span>
           </span>
           <span className="learn-flip-face learn-flip-back" aria-hidden={!flipped}>
@@ -638,7 +638,7 @@ export default function LearnPage() {
             <ul className="learn-moves">
               {Object.entries(round.results).map(([concept, item]) => (
                 <li key={concept}>
-                  <span className="c-truncate">{questions[concept].question}</span>
+                  <span className="c-truncate">{questionText(questions[concept])}</span>
                   <span className={'learn-chip ' + LEVEL_CLASS[item.to]}>{item.to > item.from ? '↑ ' : item.to < item.from ? '↓ ' : ''}{LEVELS[item.to]}</span>
                 </li>
               ))}

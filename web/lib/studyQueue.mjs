@@ -15,7 +15,7 @@
 import { questionKey } from './retainMisses.mjs';
 import { dueIndices } from './spacedReview.mjs';
 import { FAMILIAR, LEARNING, answer, askCard, dayKey, isFading, restoreLevels, saveableLevels } from './learnEngine.mjs';
-import { conceptAnswer } from './retainEngine.mjs';
+import { askable, conceptAnswer, questionText } from './retainEngine.mjs';
 
 // A card is due when it is new, or its spaced-review day has come (lib/spacedReview.mjs). `today`
 // is the student's local day (the server passes the one in their time zone).
@@ -48,8 +48,8 @@ export function learnIdeas(guide, today = dayKey()) {
   const levels = restoreLevels(questions, saved);
   return questions
     .map((question, concept) => ({ question, concept, entry: levels[concept] }))
-    .filter(({ question, entry }) => conceptAnswer(question) && (entry.l === LEARNING || entry.l === FAMILIAR || isFading(entry, today)))
-    .map(({ question, concept, entry }) => ({ concept, front: question.question, back: conceptAnswer(question), level: entry.l }));
+    .filter(({ question, entry }) => askable(question) && (entry.l === LEARNING || entry.l === FAMILIAR || isFading(entry, today)))
+    .map(({ question, concept, entry }) => ({ concept, front: questionText(question), back: conceptAnswer(question), level: entry.l }));
 }
 
 // Several lists dealt in turn, one item from each, so no one list fills the round.

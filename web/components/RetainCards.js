@@ -4,7 +4,7 @@ import { BookOpen, Check, CircleDot, Lightbulb, Link2, MessageCircle, X } from '
 import { dismissTip, requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { noteView, useAnswerTiming } from '../lib/learningEvents';
-import { canChoose, choiceText, conceptAnswer, fillVerdict, gradeFailure, normalize, shuffled } from '../lib/retainEngine.mjs';
+import { canChoose, choiceText, conceptAnswer, fillVerdict, gradeFailure, normalize, questionText, shuffled } from '../lib/retainEngine.mjs';
 import { makeCloze } from '../lib/learnEngine.mjs';
 
 // Learn's format ladder (LEARN_LADDER_V2) wraps a round in <QuietLimits.Provider value>: a plan limit
@@ -107,7 +107,7 @@ export function MemoryHook({ guideId, concept, question }) {
   return (
     <div className="retain-hook" role="status">
       <span className="retain-hook-title"><Lightbulb size={18} strokeWidth={1.75} aria-hidden="true" />Help me remember</span>
-      {question?.question && <p className="retain-hook-cue">{question.question}</p>}
+      {question?.question && <p className="retain-hook-cue">{questionText(question)}</p>}
       {hook === null && <p className="c-meta">Thinking of a way to remember it…</p>}
       {hook && <p>{hook}</p>}
       {hook && linked && (linkedHref(linked)
@@ -251,7 +251,7 @@ export function McCard({ card, question, guideId, onResult, onNext, askSure = tr
 
   return (
     <>
-      <div className="quiz-question-text">{question.question}</div>
+      <div className="quiz-question-text">{questionText(question)}</div>
       {options.map(option => (
         <button key={option} type="button" className={optionClass(option)} aria-pressed={selected === null ? pending === option : option === selected} onClick={() => choose(option)}>
           <span className="quiz-option-text">{option}</span>{optionMark(option)}
@@ -352,7 +352,7 @@ export function FillCard({ card, question, guideId, onResult, onNext, askSure = 
 
   return (
     <form onSubmit={check}>
-      <div className="quiz-question-text">{question.question}</div>
+      <div className="quiz-question-text">{questionText(question)}</div>
       <div className="retain-fill-row">
         <input
           className={'retain-fill-input' + verdictClass(typed.verdict)}
@@ -402,7 +402,7 @@ export function ClozeCard({ card, question, guideId, onResult, onNext, askSure =
 
   return (
     <form onSubmit={check}>
-      <div className="quiz-question-text">{question.question}</div>
+      <div className="quiz-question-text">{questionText(question)}</div>
       <p className="retain-cloze">
         {cloze.before}
         <span className={'retain-cloze-blank' + verdictClass(typed.verdict)}>{typed.verdict === null ? <span aria-label="missing word">______</span> : cloze.missing}</span>
@@ -497,7 +497,7 @@ export function MatchingCard({ card, questions, guideId, onResult, onNext }) {
           const state = !checked ? '' : normalize(value) === normalize(row.answer) ? ' right' : ' wrong';
           return (
             <li key={row.index} className={'retain-match-row' + state}>
-              <span>{row.question.question}</span>
+              <span>{questionText(row.question)}</span>
               <button
                 type="button"
                 className={'retain-slot' + (value ? ' filled' : '') + (picked ? ' ready' : '')}
@@ -533,7 +533,10 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
   const [remembering, setRemembering] = useState(false);
   const timing = useAnswerTiming();
   const time = useRef(null);
+  const answerRef = useRef(null);
   const modelAnswer = conceptAnswer(question);
+  // The self-check opens on the model answer (read first, then judged), never on a button that gives credit.
+  useEffect(() => { if (selfCheck && !grade) answerRef.current?.focus(); }, [selfCheck, grade]);
 
   async function check(event) {
     event.preventDefault();
@@ -576,7 +579,7 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
   const [tone, label] = grade ? VERDICTS[grade.credit] : [];
   return (
     <form onSubmit={check}>
-      <div className="quiz-question-text">{question.question}</div>
+      <div className="quiz-question-text">{questionText(question)}</div>
       <textarea
         className="retain-written-input"
         value={value}
@@ -603,13 +606,13 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
       )}
       {!grade && selfCheck && (
         <>
-          <div className="retain-feedback partial" role="status">
+          <div className="retain-feedback partial" role="status" ref={answerRef} tabIndex={-1}>
             <strong>{error || 'Check this one yourself.'}</strong> Here is the answer. Compare it with yours.
             <p className="retain-guide-answer"><span>Answer</span>{modelAnswer}</p>
           </div>
           <div className="quiz-next-row">
             <button type="button" className="c-btn c-btn--secondary" onClick={() => mark(0)}>I missed it</button>
-            <button type="button" className="c-btn c-btn--primary quiz-next" onClick={() => mark(1)} autoFocus>I got it</button>
+            <button type="button" className="c-btn c-btn--primary quiz-next" onClick={() => mark(1)}>I got it</button>
           </div>
         </>
       )}

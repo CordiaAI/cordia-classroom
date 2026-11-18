@@ -75,15 +75,17 @@ export function scoreRows(rows) {
   };
 }
 
-// The attempts the server re-checks (POST /quiz/{id}/submit). Unmarked written answers stay out,
-// and so do self-checked ones: without the AI's signed grade the server can't count them.
+// The attempts the server re-checks (POST /quiz/{id}/submit). A written answer goes with the AI's
+// signed grade, or marked self_marked when the student checked it by hand against the model answer
+// (the AI check failed or was used up): the server credits that like a flashcard's Got it
+// (backend retain.first_try_credit). One that was never marked stays out.
 export function attemptsFor(rows) {
-  return rows.filter(row => typeof row.credit === 'number' && !(row.type === 'written' && !row.token)).map(row => ({
+  return rows.filter(row => typeof row.credit === 'number' && !(row.type === 'written' && !row.token && !row.selfMarked)).map(row => ({
     concept: row.concept,
     type: row.type === 'cloze' ? 'fill' : row.type,
     response: row.response,
     credit: row.credit,
-    ...(row.token ? { token: row.token } : {}),
+    ...(row.token ? { token: row.token } : row.selfMarked ? { self_marked: true } : {}),
     ...(row.confidence ? { confidence: row.confidence } : {}),
   }));
 }

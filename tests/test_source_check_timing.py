@@ -7,7 +7,9 @@
    "Help me remember" path (llm.memory_hook) in well under 50 ms.
 
 Each case runs in a child process with a hard timeout, so a regex that backtracks for minutes (or
-quadratic code) fails this test instead of freezing the suite.
+quadratic code) fails this test instead of freezing the suite. Only the call is timed (after the
+imports, which can take seconds for services.llm on a busy machine); the hard timeout covers the
+imports too, so it is generous and only there to stop a runaway.
 """
 
 import json
@@ -20,7 +22,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BACKEND = os.path.join(ROOT, "backend")
 LIMIT_MS = 50
-HARD_TIMEOUT_S = float(os.environ.get("SOURCE_CHECK_TIMEOUT", "15"))
+HARD_TIMEOUT_S = float(os.environ.get("SOURCE_CHECK_TIMEOUT", "90"))  # imports included; the limit is LIMIT_MS
 N = 20_000
 
 # Each input is a Python expression, evaluated in the child.
@@ -36,9 +38,20 @@ TEXTS = {
     "leading spaces": f'" " * {N} + "Slide 5: x"',
     "marker line, spaces": f'"page 3" + " " * {N} + "x"',
     "commas and spaces": f'"in the lecture, " * {N // 16}',
+    # F5 review: the source acting, "of" + a name, a generic remainder, stacked attributions
+    "source acting chain": f'"What does the lecturer " * {N // 24} + "say?"',
+    "of a name chain": f'"What is Problem 4 of the " * {N // 25} + "x?"',
+    "ordinal chain": f'"What is the " + "first " * {N // 6} + "step, according to the slides?"',
+    "trailing attributions": f'"What is x" + ", according to the text" * {N // 23} + "?"',
+    "leading attributions": f'"According to the slides, " * {N // 26} + "what is x?"',
+    "number lines": f'"\\n".join(["Dose (mg):", "4000"] * {N // 16})',
+    "year lines": f'"\\n".join(["1789", "Storming"] * {N // 14})',
 }
 
-CHECKS = ("refers_to_source", "standalone_question", "strip_source_attribution", "strip_structure_markers")
+CHECKS = ("refers_to_source", "standalone_question", "strip_source_attribution", "strip_structure_markers",
+          "shown_questions", "attach_values")
+CALLS = {"shown_questions": "tp.shown_questions([{{'question': text, 'options': ['a'], 'correct_index': 0}}] * 3)",
+         "attach_values": "tp.attach_values(text.split(chr(10)))"}
 
 CHILD = """\
 import json, sys, time
@@ -78,7 +91,7 @@ class SourceCheckTimingTests(unittest.TestCase):
             for check in CHECKS:
                 with self.subTest(text=label, check=check):
                     ms = timed("from services import text_processing as tp\ntext = " + expression,
-                               f"tp.{check}(text)")
+                               CALLS.get(check, "tp.{check}(text)").format(check=check))
                     self.assertLess(ms, LIMIT_MS, f"{check}({label}): {took(ms)}")
 
     def test_a_long_question_with_a_source_reference_is_still_handled(self):

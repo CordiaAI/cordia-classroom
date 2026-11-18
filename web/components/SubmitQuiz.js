@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Clock, Flag } from 'lucide-react';
-import { choiceText, conceptAnswer, shuffled } from '../lib/retainEngine.mjs';
+import { choiceText, conceptAnswer, questionText, shuffled } from '../lib/retainEngine.mjs';
 import { makeCloze } from '../lib/learnEngine.mjs';
 import { clock } from '../lib/timedTest.mjs';
 import { isAnswered, unanswered } from '../lib/submitQuiz.mjs';
@@ -84,8 +84,8 @@ export default function SubmitQuiz({ questions, items, deadline = null, resume =
             <ol className="sq-match">
               {item.concepts.map(concept => (
                 <li key={concept}>
-                  <span>{questions[concept].question}</span>
-                  <select className="c-input" value={response?.[concept] || ''} onChange={event => place(concept, event.target.value)} aria-label={`Answer for: ${questions[concept].question}`}>
+                  <span>{questionText(questions[concept])}</span>
+                  <select className="c-input" value={response?.[concept] || ''} onChange={event => place(concept, event.target.value)} aria-label={`Answer for: ${questionText(questions[concept])}`}>
                     <option value="">Choose an answer</option>
                     {orders[item.id].map(option => <option key={option} value={option}>{option}</option>)}
                   </select>
@@ -94,7 +94,7 @@ export default function SubmitQuiz({ questions, items, deadline = null, resume =
             </ol>
           </>
         ) : (
-          <div className="quiz-question-text">{question.question}</div>
+          <div className="quiz-question-text">{questionText(question)}</div>
         )}
 
         {item.type === 'mc' && orders[item.id].map(option => (

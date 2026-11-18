@@ -61,8 +61,12 @@ test('a written answer the AI could not mark is left out of the score until self
   const after = scoreRows(markAll(ITEMS.slice(0, 3), QUESTIONS, answers, {}, { 2: null }, { 2: 1 }));
   assert.equal(after.unchecked.length, 0);
   assert.equal(after.score, 67);
-  // The server only counts written answers carrying the AI's signed grade.
-  assert.equal(attemptsFor(markAll(ITEMS.slice(0, 3), QUESTIONS, answers, {}, { 2: null }, { 2: 1 })).some(item => item.concept === 2), false);
+  // A self-checked written answer is sent marked as the student's own (the server credits it like a
+  // flashcard's Got it); one never marked is not sent.
+  const sent = attemptsFor(markAll(ITEMS.slice(0, 3), QUESTIONS, answers, {}, { 2: null }, { 2: 1 })).find(item => item.concept === 2);
+  assert.equal(sent.self_marked, true);
+  assert.equal(sent.token, undefined);
+  assert.equal(attemptsFor(rows).some(item => item.concept === 2), false);
 });
 
 test('an unanswered question counts as a miss', () => {

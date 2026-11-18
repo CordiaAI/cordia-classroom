@@ -26,6 +26,20 @@ export function canChoose(question) {
   return Array.isArray(question?.options) && question.options.length >= MIN_CHOICES;
 }
 
+// A saved question is never rewritten: Learn levels, answer logs and misses are keyed by its
+// `question` text, idea ids by its wording and attempts by its position. The backend sends the
+// wording to show (`shown`) when the saved one points at the source ("According to Slide 5, what is
+// X?" shows "What is X?"), and marks one about the source itself `hidden` ("Which artists are listed
+// for Chapter 1?"): it keeps its place but is never asked (backend text_processing.shown_questions).
+export function questionText(question) {
+  return String(question?.shown || question?.question || '');
+}
+
+// Whether a question can be asked: it has an answer to check and is not hidden.
+export function askable(question) {
+  return Boolean(conceptAnswer(question)) && !question?.hidden;
+}
+
 // Why an AI check of a written answer didn't come back (the reply to POST /quiz/{id}/grade had no
 // credit). `limit`: the student's AI checks are used up, so asking again can't help. Either way the
 // card offers the model answer to check by hand (WrittenCard), so a Written question is never a dead

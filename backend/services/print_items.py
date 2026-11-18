@@ -109,12 +109,13 @@ def strip_stem(question: str, options: list) -> list:
 def multiple_choice(quiz: list, pairs: list) -> tuple:
     """(items, flagged): printable multiple-choice questions from the cached quiz. A question whose
     choices fail the distractor check is left out (flagged counts them) until the student refreshes
-    the answer choices; the saved quiz itself is never changed here."""
+    the answer choices; the saved quiz itself is never changed here. A question shown_questions
+    hid (about the source) is left out, and one it reworded is printed in its shown wording."""
     index_of = {normalize(pair["question"]): i for i, pair in enumerate(pairs)}
     others = [(str(q.get("question") or ""), concept_answer(q)) for q in quiz if isinstance(q, dict)]
     items, flagged = [], 0
     for position, question in enumerate(quiz):
-        if not isinstance(question, dict) or not isinstance(question.get("options"), list):
+        if not isinstance(question, dict) or not isinstance(question.get("options"), list) or question.get("hidden"):
             continue
         text, answer = str(question.get("question") or ""), concept_answer(question)
         options = [_plain(option) for option in question["options"]]
@@ -126,8 +127,9 @@ def multiple_choice(quiz: list, pairs: list) -> tuple:
             flagged += 1
             continue
         source = index_of.get(normalize(text), f"quiz:{position}")
-        items.append({"id": f"mc{position}", "source": source, "question": text,
-                      "options": strip_stem(text, options), "answer": correct})
+        shown = str(question.get("shown") or text)
+        items.append({"id": f"mc{position}", "source": source, "question": shown,
+                      "options": strip_stem(shown, options), "answer": correct})
     return items, flagged
 
 
