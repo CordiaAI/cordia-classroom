@@ -122,7 +122,7 @@ class MemoryContextTests(unittest.TestCase):
 
         def table(name):
             query = M()
-            for method in ("select", "eq", "neq", "in_", "order", "limit", "text_search"):
+            for method in ("select", "eq", "neq", "is_", "in_", "order", "limit", "text_search"):
                 getattr(query, method).return_value = query
             if name in broken:
                 query.execute.side_effect = RuntimeError("down")
