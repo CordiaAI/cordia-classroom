@@ -15,7 +15,8 @@
   /* Type */
   --font-sans: 'Quicksand', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: 'Newsreader', Georgia, serif;
-  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-code-block: ui-monospace, SFMono-Regular, Consolas, monospace;  /* practice code blocks, their stack before T10; the paper pair replaces it */
   --font-code-note: 'Courier New', monospace;  /* code on the note paper; a font pair with its own code font replaces it */
   /* The five font pairs (<html data-font>, end of this file): a display font for headings and a UI
      font for everything else. The sheet previews each pair from these. */
@@ -49,6 +50,7 @@
   /* Neutrals: ink, muted (ink at 64%), and three surface levels */
   --ink: #171B18;
   --muted: rgba(23, 27, 24, 0.64);
+  --muted-strong: rgba(23, 27, 24, 0.74);   /* small text straight on the bright clouds (the chat's footnote): 4.5:1 there */
   --canvas: #EDF2F4;                       /* 1 backdrop */
   --surface-card: rgba(255, 255, 252, 0.55); /* 2 glass card */
   --surface-raised: rgba(255, 255, 252, 0.86); /* 3 raised glass: nav, sheets, menus, Tutor */
@@ -401,6 +403,7 @@
 [data-theme='dark'] {
   color-scheme: dark;
   --ink: #ECECEA;                          /* 12.2:1 on the dark card; pure white glared */
+  --muted-strong: rgba(255, 255, 255, 0.82);
   --muted: rgba(255, 255, 255, 0.75);      /* 4.5:1 or better on dark glass over the clouds, under the sheen and a hover pane too */
   --canvas: #1A1D20;
   --surface-card: rgba(39, 42, 48, 0.55);
@@ -596,7 +599,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
 @font-face { font-family: 'Instrument Sans'; src: url('/fonts/instrument-sans-latin.woff2') format('woff2'); font-style: normal; font-weight: 400 700; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 @font-face { font-family: 'JetBrains Mono'; src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2'); font-style: normal; font-weight: 100 800; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 :root[data-font='readable'] { --font-sans: var(--font-readable-ui); --font-display: var(--font-readable-display); }
-:root[data-font='paper'], :root[data-look='paper-clay']:not([data-font]) { --font-sans: var(--font-paper-ui); --font-display: var(--font-paper-display); --font-mono: var(--font-paper-mono); --font-code-note: var(--font-paper-mono); }
+:root[data-font='paper'], :root[data-look='paper-clay']:not([data-font]) { --font-sans: var(--font-paper-ui); --font-display: var(--font-paper-display); --font-mono: var(--font-paper-mono); --font-code-note: var(--font-paper-mono); --font-code-block: var(--font-paper-mono); }
 
 /* ---- Accent: <html data-accent="ocean|indigo|clay|rose|plum|graphite|teal|custom">. Olive is the
    default and needs no attribute. Each accent is a set of seeds (channels, R, G, B): --ca-l-* for
@@ -668,7 +671,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
 }
 /* Dusk's violet top is darker than the clouds: in light, muted text on the page itself needs a little more ink to
    hold 4.5:1. */
-:root[data-bg='dusk']:not([data-theme='dark']) { --muted: rgba(23, 27, 24, 0.72); }
+:root[data-bg='dusk']:not([data-theme='dark']) { --muted: rgba(23, 27, 24, 0.72); --muted-strong: rgba(23, 27, 24, 0.8); }
 :root[data-bg='paper'] {
   --canvas: #F3F1EA;
   --backdrop-sky: none;
@@ -742,7 +745,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
   --ca-d-fill: 217, 119, 87; --ca-d-ink: 232, 145, 111; --ca-d-on: 26, 25, 24; --ca-d-glass-press: 227, 138, 107; --ca-d-tint: 232, 145, 111;
 }
 :root[data-look='paper-clay'] {
-  --ink: #141413; --text-secondary: #3D3D3A; --muted: #6B6A64; --text-disabled: #9C9A92;
+  --ink: #141413; --text-secondary: #3D3D3A; --muted: #6B6A64; --muted-strong: #55544E; --text-disabled: #9C9A92;
   --hairline: rgba(31, 30, 29, 0.10); --line-strong: rgba(31, 30, 29, 0.20);
   /* Control borders: the spec's #8F8C82 moved the smallest step (9 per channel, darker) that holds 3:1 on the
      hover and pressed fills too (the owner's decision A): 3.03 on pressed #E8E6DC, 3.27 on hover #F0EEE6. */
@@ -799,7 +802,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
   --r-pane: 16px;
 }
 [data-theme='dark'][data-look='paper-clay'] {
-  --ink: #FAF9F5; --text-secondary: #C2C0B6; --muted: #A6A39A; --text-disabled: #85837B;
+  --ink: #FAF9F5; --text-secondary: #C2C0B6; --muted: #A6A39A; --muted-strong: #BDBAB1; --text-disabled: #85837B;
   --hairline: rgba(250, 249, 245, 0.12); --line-strong: rgba(250, 249, 245, 0.20);
   /* Control borders: the spec's #8A877E moved the smallest step that passes (8 per channel; lighter, the passing
      direction on dark): 3.02 on pressed #45443F, 3.57 on hover #3A3936 (decision A). */

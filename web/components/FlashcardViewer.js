@@ -221,7 +221,7 @@ export default function FlashcardViewer({
         <span className="fc-name c-truncate">{title}</span>
         <button type="button" className="c-icon-btn" onClick={toggleShuffle} aria-label="Shuffle" aria-pressed={shuffleOn} title={shuffleOn ? 'Shuffle is on' : 'Shuffle is off'} disabled={done}><Shuffle size={20} strokeWidth={1.75} aria-hidden="true" /></button>
         {onToggleStar && (
-          <button type="button" className={'c-icon-btn' + (starred ? ' is-starred' : '')} onClick={onToggleStar} aria-pressed={Boolean(starred)} aria-label={starred ? 'Unstar' : 'Star'}>
+          <button type="button" className={'c-icon-btn c-star' + (starred ? ' is-starred' : '')} onClick={onToggleStar} aria-pressed={Boolean(starred)} aria-label={starred ? 'Unstar' : 'Star'}>
             <Star size={20} strokeWidth={1.75} aria-hidden="true" fill={starred ? 'currentColor' : 'none'} />
           </button>
         )}
@@ -307,7 +307,6 @@ export default function FlashcardViewer({
         .fc > * { min-width: 0; }
         .fc-bar { position: sticky; top: calc(var(--bar-h) + 12px); z-index: 20; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius:var(--r-pill); }
         .fc-name { flex: 1; min-width: 0; padding: 0 8px; font:600 1.0625rem/1.15 var(--font-sans); }
-        .fc-bar :global(.is-starred), .fc-bar :global(.is-starred svg) { color: var(--meter-ink) !important; }
         .fc-progress { display: flex; align-items: center; gap: 12px; }
         .fc-progress .c-bar { flex: 1; }
         .fc-count { display: inline-flex; align-items: center; gap: 8px; font: 500 var(--fs-13)/1 var(--font-sans); color: var(--muted); }

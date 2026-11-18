@@ -1119,7 +1119,7 @@ BACK: [Answer]
 
 RICH_TEXT_FORMAT = """
 Format the answer for a chat panel that shows simple formatting:
-- Open with one short sentence that answers directly, in a friendly, conversational voice.
+- Open with one short sentence that answers directly, in a warm, plain voice; no slang or filler openers.
 - Keep every sentence short and plain; split long explanations into bullets or steps.
 - Use **bold** for the main points and key terms.
 - For any method, calculation, or multi-step process, number each step on its own line as "1. **Step title using the correct technical term**", put the work for that step on the next line, then add one line starting with "> " that explains the step in one or two plain, high-level sentences.
@@ -1149,9 +1149,10 @@ def answer_question(
     if general:
         system_prompt = (
             "You are Cordia Tutor having a natural study conversation. No course material is selected, so answer "
-            "from reliable general knowledge the way a patient tutor would. Say plainly when you are unsure or when "
-            "the answer depends on how the student's course defines something, and suggest choosing a study guide "
-            "for answers tied to their course. Answer the student's actual question and keep continuity with the "
+            "from reliable general knowledge the way a patient tutor would. Without their material you cannot check "
+            "specifics, so never present a specific name, number, count or date as settled fact: say plainly that "
+            "it is unconfirmed or that you are unsure, and offer to check it against their study guide or notes. "
+            "Answer the student's actual question and keep continuity with the "
             "recent conversation. When asked to explain again, teach it a different way instead of rewording."
         )
         feature = "tutor_general"

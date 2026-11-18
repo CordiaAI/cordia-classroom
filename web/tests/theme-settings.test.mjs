@@ -163,7 +163,7 @@ test('the font a pair needs is cached for preloading, and the default pair needs
 
 // ---------- First paint ----------
 
-const PUBLIC_LIST = ['/pricing', '/privacy'];
+const PUBLIC_LIST = ['/privacy'];
 function boot({ path = '/library', storage = {}, deviceDark = false, hasMatchMedia = true } = {}) {
   const root = fakeRoot();
   const links = [];
@@ -221,10 +221,28 @@ test('first paint: public pages are the Cordia default in light', () => {
     assert.equal(root.getAttribute('data-theme'), 'light', path);
     assert.deepEqual(lookAttributes(root), [], path);
   }
-  // Signed in, the same page is part of the app and follows the account.
-  const signedIn = boot({ path: '/pricing', storage: { ...dark, authToken: 'x' } });
+  // Signed in, a policy page is part of the app and follows the account.
+  const signedIn = boot({ path: '/privacy', storage: { ...dark, authToken: 'x' } });
   assert.equal(signedIn.root.getAttribute('data-theme'), 'dark');
   assert.equal(signedIn.root.getAttribute('data-accent'), 'plum');
+  // Pricing is the Cordia default in light for everyone, signed in too (the director's call on criterion 9).
+  const pricing = boot({ path: '/pricing', storage: { ...dark, authToken: 'x', [LOOK_KEY]: cached({ look: 'paper-clay', accent: 'paperclay', font: 'paper', glass: 'solid', appearance: 'dark', size: 'larger' }) } });
+  assert.equal(pricing.root.getAttribute('data-theme'), 'light');
+  assert.deepEqual(lookAttributes(pricing.root), []);
+  assert.equal(pricing.links.length, 0, 'no look fonts preloaded');
+});
+
+test("first paint: on a shared browser, the previous account's look never paints for the next one", () => {
+  const theirs = JSON.stringify({ ...bootCache({ ...paperClay(), appearance: 'dark', size: 'larger' }), u: 'account-a' });
+  const next = boot({ deviceDark: true, storage: { [LOOK_KEY]: theirs, theme: 'dark', userId: 'account-b', authToken: 'x' } });
+  assert.equal(next.root.getAttribute('data-theme'), 'light');
+  assert.deepEqual(lookAttributes(next.root), []);
+  assert.equal(next.links.length, 0);
+  // The same account, or a cache from before the stamp, still paints its own look.
+  const own = boot({ storage: { [LOOK_KEY]: theirs, userId: 'account-a', authToken: 'x' } }).root;
+  assert.equal(own.getAttribute('data-theme'), 'dark');
+  assert.equal(own.getAttribute('data-look'), 'paper-clay');
+  assert.equal(boot({ storage: { [LOOK_KEY]: cached({ appearance: 'dark' }), userId: 'account-b' } }).root.getAttribute('data-theme'), 'dark', 'unstamped cache');
 });
 
 test('first paint: a damaged cache is ignored, never thrown, and never sets odd attributes', () => {
@@ -451,5 +469,6 @@ test('first paint: Paper & Clay is on <html> before anything draws, with its fon
   assert.deepEqual(['data-look', 'data-accent', 'data-bg', 'data-font'].map(name => over.getAttribute(name)), ['paper-clay', 'plum', 'dusk', 'clean']);
   // Public pages and signed-out visitors never see it.
   for (const path of ['/', '/login', '/pricing', '/guides/anything']) assert.deepEqual(lookAttributes(boot({ path, storage: { [LOOK_KEY]: cached(settings) } }).root), [], path);
-  assert.equal(boot({ path: '/pricing', storage: { [LOOK_KEY]: cached(settings), authToken: 'x' } }).root.getAttribute('data-look'), 'paper-clay', 'signed in, Pricing is part of the app');
+  assert.equal(boot({ path: '/privacy', storage: { [LOOK_KEY]: cached(settings), authToken: 'x' } }).root.getAttribute('data-look'), 'paper-clay', 'signed in, a policy page follows the account');
+  assert.deepEqual(lookAttributes(boot({ path: '/pricing', storage: { [LOOK_KEY]: cached(settings), authToken: 'x' } }).root), [], 'Pricing stays the Cordia default, signed in too');
 });

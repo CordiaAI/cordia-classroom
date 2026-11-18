@@ -350,21 +350,27 @@ def queue_browser_command(user_id: str, turn: dict, command_type: str, goal: str
     return command
 
 
-def append_tutor_message(user_id: str, text: str):
+def append_tutor_message(user_id: str, text: str, extra: dict | None = None, once: str | None = None):
     """Post a Tutor reply outside a chat turn (e.g. feedback on a missed practice answer). The write only
     applies to the conversation it read (same updated_at): a new chat or an open in another tab in between
-    is never overwritten with the old conversation; the reply is then added to the current one instead."""
+    is never overwritten with the old conversation; the reply is then added to the current one instead.
+    extra: more fields on the message (a link). once: a key posted at most once per conversation (a
+    finished check-in sent again from a second tab or a retry is not repeated)."""
     for _ in range(3):
         row = get_or_create_tutor_session(user_id)
         messages = list(row.get("messages") or [])
-        messages.append({"role": "ai", "text": text})
+        if once and any(message.get("once") == once for message in messages):
+            return row
+        messages.append({"role": "ai", "text": text, **(extra or {}), **({"once": once} if once else {})})
         query = get_supabase().table("tutor_sessions").update({
             "messages": messages[-MAX_SESSION_MESSAGES:],
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", row["id"]).eq("user_id", user_id)
         query = query.eq("updated_at", row["updated_at"]) if row.get("updated_at") else query.is_("updated_at", "null")
-        if query.execute().data:
-            return
+        written = query.execute().data
+        if written:
+            return written[0]
+    return None
 
 
 def wait_for_browser_result(user_id: str, turn: dict, answer: str):
@@ -454,7 +460,7 @@ def complete_tutor_turn(user_id: str, turn: dict, response: dict):
     assistant_message = {"role": "ai", "text": response.get("answer") or ""}
     if response.get("source"):
         assistant_message["source"] = response["source"]
-    for key in ("guide", "link", "confirm", "visual"):
+    for key in ("guide", "link", "confirm", "visual", "study_plan"):
         if response.get(key):
             assistant_message[key] = response[key]
     messages.append(assistant_message)

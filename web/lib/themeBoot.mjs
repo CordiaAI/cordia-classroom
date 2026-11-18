@@ -4,18 +4,21 @@
 // accent's variables are already in the cache. It is a string so a test can run it.
 //
 // Public pages stay the Cordia default in light whatever was saved: the same list that keeps them
-// light today decides it.
+// light today decides it. Pricing is light and default for everyone, signed in or not (lib/theme.js LIGHT_ONLY).
 export const LOOK_KEY = 'cordiaLook';
 
 export function bootScript(lightSignedOut) {
   return '(function(){try{'
     + 'var d=document.documentElement,ls=localStorage,p=location.pathname;'
-    + "var light=['/','/login','/signup','/reset-password'].indexOf(p)>-1||((" + JSON.stringify(lightSignedOut) + ".indexOf(p)>-1||p.indexOf('/guides/')===0)&&!ls.getItem('authToken'));"
+    + "var light=['/','/login','/signup','/pricing','/reset-password'].indexOf(p)>-1||((" + JSON.stringify(lightSignedOut) + ".indexOf(p)>-1||p.indexOf('/guides/')===0)&&!ls.getItem('authToken'));"
     + "var c=null;try{c=JSON.parse(ls.getItem('" + LOOK_KEY + "')||'null')}catch(e){}"
+    // Another account's cache (a shared browser): the Cordia default in Light, not the previous account's look, and
+    // not the old light/dark key either (shared too). lib/theme.js applies the same rule after first paint.
+    + "var me=ls.getItem('userId')||'',other=!!(c&&typeof c.u==='string'&&c.u&&me&&c.u!==me);if(other)c=null;"
     // Appearance: the saved look, else the old light/dark choice, else Light. An account that is new (lib/theme.js)
     // gets Match device written into the cache as soon as the account is known, so only then does this follow
     // the device: with no cache and no account yet, an existing student never flashes dark.
-    + "var ap=c&&c.ap;if(ap!=='light'&&ap!=='dark'&&ap!=='system'){var t=ls.getItem('theme');ap=t==='dark'||t==='light'?t:'light'}"
+    + "var ap=c&&c.ap;if(ap!=='light'&&ap!=='dark'&&ap!=='system'){var t=other?null:ls.getItem('theme');ap=t==='dark'||t==='light'?t:'light'}"
     + "var dark=!light&&(ap==='dark'||(ap==='system'&&!!window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches));"
     + "d.setAttribute('data-theme',dark?'dark':'light');"
     + 'if(!light&&c){'

@@ -20,7 +20,8 @@ const JUMPS = [
   { key: 'j-calendar', kind: 'jump', icon: CalendarDays, title: 'Calendar', href: '/calendar' },
   { key: 'j-settings', kind: 'jump', icon: Settings, title: 'Settings', href: '/settings' },
 ];
-// "theme", "make it yours", "dark mode", "appearance" and the like open the Make it yours sheet.
+// "theme", "make it yours", "dark mode", "appearance" and the like open the Make it yours sheet. It is listed after the
+// student's own matches (and before public sets), so a class word that is also a setting word never pushes them down.
 const MAKE_IT_YOURS = { key: 's-make-it-yours', kind: 'setting', icon: Palette, title: 'Make it yours', meta: 'Theme, colours, font, text size, light or dark', sheet: true };
 
 // ⌘K / Ctrl K: one search over study guides, flashcards, notes and lectures, then the top public
@@ -75,7 +76,7 @@ export default function SearchModal({ onClose, instant = false }) {
     }
     const more = publicSetRows(publicHits, query);
     const settings = matchesMakeItYours(q) ? [MAKE_IT_YOURS] : [];
-    if (found) return [...settings, ...found, ...more];
+    if (found) return [...found, ...settings, ...more];
     const guides = guideHits.slice(0, 6).map(hit => ({ key: 'g' + hit.id, kind: 'guide', title: hit.title, href: '/guide/' + hit.id }));
     const cards = [];
     for (const guide of library?.guides || []) {
@@ -89,7 +90,7 @@ export default function SearchModal({ onClose, instant = false }) {
       .filter(note => `${note.title} ${plain(note.content)}`.toLowerCase().includes(q))
       .slice(0, 6)
       .map(note => ({ key: 'n' + note.id, kind: 'note', title: note.title || 'Untitled', href: '/smartnotes?id=' + note.id }));
-    return [...settings, ...guides, ...cards, ...notes, ...more];
+    return [...guides, ...cards, ...notes, ...settings, ...more];
   }, [query, guideHits, library, found, publicHits]);
 
   useEffect(() => setActive(0), [results.length]);

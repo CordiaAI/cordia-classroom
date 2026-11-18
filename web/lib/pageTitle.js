@@ -6,7 +6,7 @@ export const BRAND = 'Cordia Classroom';
 export const pageTitle = name => (name ? `${name} — ${BRAND}` : BRAND);
 
 const TITLES = {
-  '/': 'Study smarter', '/login': 'Sign in', '/signup': 'Sign up', '/dashboard': 'Dashboard', '/home': 'New chat', '/library': 'Library',
+  '/': 'Study smarter', '/login': 'Sign in', '/signup': 'Sign up', '/dashboard': 'Dashboard', '/home': 'New chat', '/chat/[id]': 'Chat', '/library': 'Library',
   '/canvas': 'Canvas', '/calendar': 'Calendar', '/week': 'Your week', '/progress': 'Progress', '/assistant': 'Assistant',
   '/tutor': 'Tutor', '/settings': 'Settings', '/billing': 'Billing', '/pricing': 'Pricing', '/create': 'Write cards',
   '/flashcards/study': 'Flashcards', '/practice': 'Practice', '/session': 'Study session',
