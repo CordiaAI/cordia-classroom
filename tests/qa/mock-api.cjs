@@ -83,6 +83,11 @@ const otherTab = {
   purge(state, id) { state.chats = (state.chats || []).filter(chat => chat.id !== id); },
 };
 
+// state.startFail: starting a chat fails: 'network', or [status, detail] (409 busy, 409 changed, 404 class gone).
+function failStart(route, fail) {
+  return fail === 'network' ? route.abort('failed') : route.fulfill({ status: fail[0], json: { detail: fail[1] } });
+}
+
 function chatsRoute(state, path, method, url, body) {
   const mode = state.chatsApi;
   const notAvailable = { status: 503, json: { detail: "Saved chats aren't set up yet.", code: 'chats_not_available' } };
@@ -277,6 +282,7 @@ async function install(context, state) {
     if (path === '/tutor/chats') return json({ chats: (state.chats || []).filter(chat => !chat.deleted_at).map(({ id, guide_id, title, updated_at }) => ({ id, guide_id, title, updated_at })) });
     if (path === '/chats' || path.startsWith('/chats/')) {
       if (state.chatsDown) return route.abort('failed');
+      if (path === '/chats' && method === 'POST' && state.startFail) return failStart(route, state.startFail);
       if (!state.chatsApi) return route.fulfill({ status: 404, json: { detail: 'Not Found' } });
       if (state.chatsDelay) await new Promise(resolve => setTimeout(resolve, state.chatsDelay));
       const answer = chatsRoute(state, path, method, url, body);
@@ -362,6 +368,7 @@ async function install(context, state) {
     if (path.match(/^\/connectors\/[a-z]+\/files/)) return json({ files: [{ id: 'f1', title: 'Biology lecture 4 notes', kind: 'doc', edited: '2026-10-20' }, { id: 'f2', title: 'Syllabus', kind: 'pdf', edited: '2026-09-01' }] });
     if (path.match(/^\/connectors\/[a-z]+\/import$/)) return json({ title: 'Biology lecture 4 notes', text: 'Osmosis is the movement of water across a membrane.' });
     if (path === '/tutor/session/new') {
+      if (state.startFail) return failStart(route, state.startFail);
       if (state.tutor.status && state.tutor.status !== 'idle') return route.fulfill({ status: 409, json: { detail: 'Wait for Cordia Tutor to finish before starting a new chat' } });
       state.chats = state.chats || [];
       const resumed = body.resume_id && state.chats.find(chat => chat.id === body.resume_id && !chat.deleted_at);

@@ -505,14 +505,14 @@ function ChatScreen({ routeId, goTo, progress }) {
         ) : (
           <div className="chat-home-stage">
             {chatting ? (
-              <div className="cordia-tutor-messages chat-home-thread" aria-live="polite">
+              <div key="thread" className="cordia-tutor-messages chat-home-thread" aria-live="polite">
                 <div className="chat-home-column">
                   <TutorMessages tutor={shown} avatar />
                   <div ref={tutor.endRef} />
                 </div>
               </div>
             ) : (
-              <div className="chat-home-hero">
+              <div key="hero" className="chat-home-hero">
                 <h1 className="chat-home-headline">{headline.title}</h1>
                 {headline.line && <p className="chat-home-line">{headline.line}</p>}
               </div>

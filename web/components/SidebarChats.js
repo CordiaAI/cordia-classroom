@@ -41,9 +41,12 @@ export default function SidebarChats({ chats, current, editable, classes, failed
     // One or two rows leaving is a delete; a whole other list (another account, a reload) is not.
     if (!gone.length || gone.length > 2) return undefined;
     setGhosts(current => [...current, ...gone]);
-    const timer = setTimeout(() => setGhosts(current => current.filter(row => !gone.includes(row))), EXIT_MS);
-    return () => clearTimeout(timer);
+    // Not cleared when the list changes again: each ghost leaves on its own time.
+    setTimeout(() => { if (mounted.current) setGhosts(current => current.filter(row => !gone.includes(row))); }, EXIT_MS);
+    return undefined;
   }, [chats]);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const list = chats.slice();
   [...ghosts].sort((a, b) => a.index - b.index).forEach(row => { if (!keysOf(list).has(row.chat.key)) list.splice(Math.min(row.index, list.length), 0, { ...row.chat, ghost: true }); });
