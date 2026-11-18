@@ -195,11 +195,11 @@ function GuidesPanel({ q, filters, onFilter }) {
         .exg-empty { margin: 0; padding: 16px; color: var(--muted-ink); }
         .exg-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
         .exg-card { display: grid; gap: 8px; padding: 16px; min-width: 0; }
-        .exg-card :global(.exg-title) { font: 600 17px/1.3 var(--font-sans); color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+        .exg-card :global(.exg-title) { font: 600 1.0625rem/1.3 var(--font-sans); color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
         .exg-card :global(.exg-title:hover) { text-decoration: underline; text-underline-offset: 3px; }
         .exg-outline { margin: 0; color: var(--muted-ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .exg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
-        .exg-badge { display: inline-flex; align-items: center; gap: 4px; font: 600 13px/1.3 var(--font-sans); color: var(--olive-ink); }
+        .exg-badge { display: inline-flex; align-items: center; gap: 4px; font: 600 0.8125rem/1.3 var(--font-sans); color: var(--meter-ink); }
         .exg-facts { margin: 0; overflow-wrap: anywhere; }
         .exg-similar { display: grid; gap: 4px; justify-items: start; }
         .exg-similar :global(.exg-flip) { transform: rotate(180deg); }
@@ -253,7 +253,7 @@ function ClassroomsPanel({ q }) {
         .exc-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
         .exc-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; min-width: 0; }
         .exc-main { display: grid; gap: 6px; min-width: 0; }
-        .exc-name { font: 600 16px/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+        .exc-name { font: 600 1rem/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
       `}</style>
     </>
   );

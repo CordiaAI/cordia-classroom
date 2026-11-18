@@ -407,7 +407,7 @@ export default function Today() {
         .today-updates-head { align-items: baseline; gap: 12px; flex-wrap: wrap; }
         .today-updates-head .c-section-title { margin: 0; }
         .today-updates-head .c-meta { margin: 0; }
-        .today-alert-title { font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
+        .today-alert-title { font: 600 0.9375rem/1.4 var(--font-sans); color: var(--ink); }
         .today-alert.is-grade_drop .today-alert-title, .today-alert.is-missing .today-alert-title { color: var(--error); }
         .today-alert.is-date_change .today-alert-title { font-variant-numeric: tabular-nums; }
         /* Phones: the text and its dismiss share the first line; the action drops under the text. */
@@ -424,15 +424,15 @@ export default function Today() {
         .today-continue-study { display: flex; gap: 8px; }
         .today-exam { display: flex; align-items: center; gap: 16px; padding: 14px 18px; }
         .today-exam-days { display: grid; justify-items: center; min-width: 64px; }
-        .today-exam-days strong { font: 600 28px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink); }
+        .today-exam-days strong { font: 600 1.75rem/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink); }
         .today-exam-text { display: grid; gap: 2px; flex: 1 1 auto; min-width: 0; }
         .today-due { gap: 14px; }
         .today-due .c-meta { flex: none; white-space: nowrap; }
         .today-due-link { color: var(--ink); text-decoration: none; }
         .today-due.is-done .today-due-link { color: var(--muted); text-decoration: line-through; }
-        .today-continue-title { flex: 1 1 auto; min-width: 0; font:600 17px/1.15 var(--font-sans); }
+        .today-continue-title { flex: 1 1 auto; min-width: 0; font:600 1.0625rem/1.15 var(--font-sans); }
         :global(.today-progress) { display: flex; align-items: center; gap: 20px; padding: 14px 18px; color: var(--ink); text-decoration: none; flex-wrap: wrap; }
-        .today-stat { display: inline-flex; align-items: center; gap: 6px; font:600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .today-stat { display: inline-flex; align-items: center; gap: 6px; font:600 0.9375rem/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .today-stat :global(.today-freeze) { color: var(--olive-ink); }
         @media (max-width: 767px) {
               :global(.today-progress) { gap: 14px; }

@@ -74,17 +74,17 @@ export function Landing({ mode = 'signin', path = '/' }) {
         .landing { display: grid; grid-template-columns: minmax(0, 1fr) 400px; align-items: center; gap: 48px; min-height: calc(100vh - 64px - 128px); }
         .landing-hero { min-width: 0; }
         /* Bigger than other page titles (refine.css sets every h1 to 40). */
-        .landing-title { margin: 0; font:600 64px/1.05 var(--font-display); font-size: 64px !important; letter-spacing:-0.015em; color: var(--ink); }
+        .landing-title { margin: 0; font:600 4rem/1.05 var(--font-display); font-size: 4rem !important; letter-spacing:-0.015em; color: var(--ink); }
         .landing-lede { max-width: 34em; margin: 16px 0 0; color: var(--text-secondary); font: 500 var(--fs-17)/1.5 var(--font-sans); }
         .landing-ticker { margin-top: 32px; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, var(--ink) 10%, var(--ink) 90%, transparent); mask-image: linear-gradient(90deg, transparent, var(--ink) 10%, var(--ink) 90%, transparent); }
         .landing-ticker-track { display: flex; gap: 12px; width: max-content; animation: landing-ticker 48s linear infinite; }
         .landing-ticker:hover .landing-ticker-track { animation-play-state: paused; }
-        .landing-ticker :global(.landing-ticker-item) { flex: none; padding: 10px 18px; border: 1px solid var(--glass-edge); border-radius: var(--r-pill); background: var(--surface); box-shadow: var(--lg-depth); color: var(--ink); font:600 15px/1.2 var(--font-sans); white-space: nowrap; text-decoration: none; }
+        .landing-ticker :global(.landing-ticker-item) { flex: none; padding: 10px 18px; border: 1px solid var(--glass-edge); border-radius: var(--r-pill); background: var(--surface); box-shadow: var(--lg-depth); color: var(--ink); font:600 0.9375rem/1.2 var(--font-sans); white-space: nowrap; text-decoration: none; }
         .landing-ticker :global(.landing-ticker-item)::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 10px 2px 0; border-radius: 50%; background: var(--olive); vertical-align: middle; }
         /* The list is drawn twice, so moving it by half its width loops without a jump. */
         @keyframes landing-ticker { from { transform: translateX(0); } to { transform: translateX(calc(-50% - 6px)); } }
         @media (prefers-reduced-motion: reduce) { .landing-ticker { -webkit-mask-image: none; mask-image: none; } .landing-ticker-track { animation: none; width: auto; flex-wrap: wrap; } .landing-ticker :global(.landing-ticker-item) { flex-shrink: 1; white-space: normal; } .landing-ticker :global(.is-copy) { display: none; } }
-        @media (max-width: 860px) { .landing { grid-template-columns: 1fr; gap: 32px; min-height: 0; } .landing-title { font-size: clamp(34px, 10vw, 44px) !important; } .landing-lede { font-size: var(--fs-15); } .landing-ticker { margin-top: 24px; } }
+        @media (max-width: 860px) { .landing { grid-template-columns: 1fr; gap: 32px; min-height: 0; } .landing-title { font-size: clamp(2.125rem, 10vw, 2.75rem) !important; } .landing-lede { font-size: var(--fs-15); } .landing-ticker { margin-top: 24px; } }
       `}</style>
     </PublicPage>
   );

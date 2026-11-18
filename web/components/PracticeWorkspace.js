@@ -707,12 +707,12 @@ export default function PracticeWorkspace() {
           .practice-source-name { flex: 1 1 100%; min-width: 0; max-width: 100%; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-15) !important; color: var(--muted); }
         }
         .practice-source-name { font-family: var(--font-sans); min-width: 0; }
-        .practice-prompt { margin: 8px 0 0; font:600 20px/1.15 var(--font-sans); }
+        .practice-prompt { margin: 8px 0 0; font:600 1.25rem/1.15 var(--font-sans); }
         .practice-kind { text-transform: capitalize; }
         .practice-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
         .practice-toolbar :global(.c-seg) button { display: inline-flex; align-items: center; gap: 6px; }
         .practice-symbols { display: flex; flex-wrap: wrap; gap: 2px; }
-        .practice-symbols :global(.c-icon-btn) { font:600 15px/1 var(--font-sans); }
+        .practice-symbols :global(.c-icon-btn) { font:600 0.9375rem/1 var(--font-sans); }
         .practice-drawbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex-basis: 100%; }
         .practice-swatches { display: flex; flex-wrap: wrap; gap: 4px; }
         .practice-swatch { width: 28px; height: 28px; padding: 0; border: 2px solid transparent; border-radius: var(--r-pill); background: var(--swatch); box-shadow: inset 0 0 0 2px var(--surface-raised); cursor: pointer; transition: border-color var(--dur) var(--ease); }

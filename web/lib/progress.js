@@ -5,8 +5,16 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './supabase';
 // Walkthrough, feature-use and Grove progress, saved per student on the server in
 // their Supabase account metadata (key "cordia"), with a local copy for speed and
 // offline use. It rides in the access token, so it stays small (no logs here).
-const EMPTY = { v: 1, at: 0, theme: null, wt: null, day1Status: null, done: [], used: [], tips: [], grove: {}, rings: {}, freeze: [], first: 0, review: null, storeLine: 0, prefs: {} };
+const EMPTY = { v: 1, at: 0, theme: null, look: null, wt: null, day1Status: null, done: [], used: [], tips: [], grove: {}, rings: {}, freeze: [], first: 0, review: null, storeLine: 0, prefs: {} };
 const LOCAL = 'cordiaProgress';
+// When this account was created: Supabase's own `created_at`, read with the account below and kept on this device,
+// one value per account under its own key (named like the progress copy), so the look can tell an existing account
+// from a new one before the network answers (lib/theme.js, lib/themeSettings.mjs NEW_ACCOUNT_CUTOFF). The value is
+// the creation time alone: no user id is stored in it. Not part of `state`: it is not ours to write and it must not
+// ride in the token. ACCOUNT_OLD held { id, created } in one shared slot; it is read once to carry the time over,
+// then removed.
+const ACCOUNT = 'cordiaAccount';
+const ACCOUNT_OLD = 'cordiaAccount';
 let state = { ...EMPTY };
 let loadedFor = '';
 let saveTimer = null;
@@ -15,6 +23,11 @@ const listeners = new Set();
 function localKey() {
   const id = getUserId();
   return id ? `${LOCAL}:${id}` : '';
+}
+
+function accountKey() {
+  const id = getUserId();
+  return id ? `${ACCOUNT}:${id}` : '';
 }
 
 function publish() {
@@ -37,6 +50,8 @@ function merge(a, b) {
     at: Math.max(a?.at || 0, b?.at || 0),
     wt: newer?.wt ?? null,
     theme: newer?.theme ?? a?.theme ?? b?.theme ?? null,
+    // The "Make it yours" settings (lib/themeSettings.mjs): one small object, from whichever copy changed last.
+    look: newer?.look ?? a?.look ?? b?.look ?? null,
     day1Status: a?.day1Status || b?.day1Status || null,
     done: union(a?.done, b?.done),
     used: union(a?.used, b?.used),
@@ -75,6 +90,40 @@ export function getProgress() {
   return state;
 }
 
+// The signed-in account's creation time as an ISO string, or '' when it is not known yet (never loaded on this
+// device, or another account's copy). Unknown is treated as an existing account.
+export function accountCreatedAt() {
+  const key = accountKey();
+  if (!key) return '';
+  try {
+    const saved = localStorage.getItem(key);
+    if (typeof saved === 'string' && saved) return saved;
+    return carryOverOldCopy(key);
+  } catch {
+    return '';
+  }
+}
+
+// A device that already holds the old shared copy ({ id, created }) keeps the creation time it knew for the
+// signed-in account, so a new account is not shown Light until the network answers. The old key is removed.
+function carryOverOldCopy(key) {
+  let created = '';
+  try {
+    const old = JSON.parse(localStorage.getItem(ACCOUNT_OLD) || 'null');
+    if (old && old.id === getUserId() && typeof old.created === 'string') created = old.created;
+    localStorage.removeItem(ACCOUNT_OLD);
+    if (created) localStorage.setItem(key, created);
+  } catch { /* storage blocked */ }
+  return created;
+}
+
+// True once the signed-in account's own saved copy is read on this device (lib/theme.js waits for it before it
+// treats an account as having no saved look).
+export function progressLoaded() {
+  const key = localKey();
+  return Boolean(key) && loadedFor === key;
+}
+
 export async function loadProgress() {
   const key = localKey();
   if (!key || loadedFor === key) return state;
@@ -85,11 +134,19 @@ export async function loadProgress() {
   publish();
   const user = await remote('GET');
   const server = user?.user_metadata?.cordia;
+  const id = getUserId();
+  const createdKey = accountKey();
+  let created = false;
+  if (id && createdKey && typeof user?.created_at === 'string' && user.created_at && (!user.id || user.id === id) && accountCreatedAt() !== user.created_at) {
+    try { localStorage.setItem(createdKey, user.created_at); created = true; } catch {}
+  }
   if (server) {
     state = merge(state, server);
     try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
-    publish();
+  } else if (created) {
+    state = { ...state }; // a new object, so the look re-reads the account it now knows
   }
+  if (server || created) publish();
   if (!state.first) updateProgress(current => ({ ...current, first: Date.now() }));
   return state;
 }

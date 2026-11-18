@@ -63,7 +63,7 @@ export default function StudyInsights({ compact = false, data }) {
         .insights-card { display: grid; gap: 12px; padding: 20px; align-content: start; }
         .insights-card :global(header .lucide) { color: var(--olive-ink); }
         .insight-list, .insight-tips { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-        .insights-card :global(.insight-row) { display: flex; align-items: center; gap: 10px; min-height: 36px; font:600 15px/1.5 var(--font-sans); }
+        .insights-card :global(.insight-row) { display: flex; align-items: center; gap: 10px; min-height: 36px; font:600 0.9375rem/1.5 var(--font-sans); }
         .insights-card :global(.insight-row span:nth-child(2)) { flex: 1; min-width: 0; }
         .insights-card :global(.insight-row.good .lucide) { color: var(--success); }
         .insights-card :global(.insight-row.work .lucide) { color: var(--warning); }

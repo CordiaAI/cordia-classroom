@@ -82,7 +82,7 @@ export default function CanvasPage() {
       )}
       <style jsx>{`
         .canvas-page { width: min(var(--page-max), 100%); margin: 0 auto; }
-        .canvas-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+        .canvas-error { margin: 0; color: var(--error); font: 600 0.9375rem/1.4 var(--font-sans); }
         .canvas-note { margin: 0; }
       `}</style>
     </div>

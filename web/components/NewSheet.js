@@ -82,7 +82,7 @@ function MakeOptions({ onGo, onNote, busy }) {
         .new-make { display: grid; gap: 8px; margin-top: 16px; }
         .new-make-title { margin: 0; font-weight: 600; }
         .new-make-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-        .new-make-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur); }
+        .new-make-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 0.9375rem/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur); }
         .new-make-btn:hover { border-color: var(--olive); }
         .new-make-btn:disabled { opacity: .6; cursor: default; }
         .new-make-btn :global(.lucide) { color: var(--olive-ink); }
@@ -109,11 +109,11 @@ export function NewOptions({ onPick, onSample }) {
       )}
       <style jsx>{`
         .new-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-        .new-option { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 128px; padding: 16px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 17px/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur), transform var(--dur); }
+        .new-option { display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 128px; padding: 16px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 1.0625rem/1 var(--font-sans); cursor: pointer; transition: border-color var(--dur), transform var(--dur); }
         .new-option:hover { border-color: var(--olive); }
         .new-option:active { transform: scale(.98); }
         .new-option :global(.lucide) { color: var(--olive-ink); }
-        .new-sample { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; border: 1px dashed var(--olive); border-radius:var(--r-card); background: var(--olive-tint); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; }
+        .new-sample { grid-column: 1 / -1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; border: 1px dashed var(--olive); border-radius:var(--r-card); background: var(--olive-tint); color: var(--ink); font:600 0.9375rem/1 var(--font-sans); cursor: pointer; }
       `}</style>
     </div>
   );
@@ -537,11 +537,11 @@ export default function NewSheet() {
       <style jsx>{`
         .new-sheet { width: min(560px, 100%); }
         .new-panel { display: grid; gap: 16px; }
-        .new-drop { display: grid; justify-items: center; gap: 12px; width: 100%; padding: 32px 16px; border: 2px dashed var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); cursor: pointer; font:600 17px/1.15 var(--font-sans); }
+        .new-drop { display: grid; justify-items: center; gap: 12px; width: 100%; padding: 32px 16px; border: 2px dashed var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); cursor: pointer; font:600 1.0625rem/1.15 var(--font-sans); }
         .new-drop.is-over { border-color: var(--olive); background: var(--olive-tint); }
         .new-drop:hover { box-shadow: var(--lift-shadow); transform: var(--lift); }
         .new-drop :global(.lucide) { color: var(--olive-ink); }
-        .new-formats { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font:600 13px/1 var(--font-sans); color: var(--muted); }
+        .new-formats { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; font:600 0.8125rem/1 var(--font-sans); color: var(--muted); }
         .new-formats > span { display: inline-flex; align-items: center; gap: 6px; }
         .new-formats :global(.lucide) { color: var(--muted); }
         .new-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
@@ -551,7 +551,7 @@ export default function NewSheet() {
         .new-text { min-height: 200px; }
         .new-class { max-width: 280px; }
         .new-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 20px; }
-        .new-error { margin: 16px 0 0; color: var(--error); font:600 15px/1.5 var(--font-sans); }
+        .new-error { margin: 16px 0 0; color: var(--error); font:600 0.9375rem/1.5 var(--font-sans); }
         .new-build { display: grid; gap: 16px; }
         .new-build-title { margin: 0; font: 600 var(--fs-20)/var(--lh-title) var(--font-sans); letter-spacing: var(--track-title); color: var(--ink); text-wrap: balance; }
         .new-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }

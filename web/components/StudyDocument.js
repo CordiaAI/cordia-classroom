@@ -125,17 +125,17 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
         .reader-pages { position: sticky; top: calc(var(--bar-h) + 16px); display: grid; gap: 8px; max-height: calc(100vh - var(--bar-h) - 40px); overflow: auto; padding: 2px; }
         .reader-thumb { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius:var(--r-input); background: var(--card); color: var(--ink); text-align: left; cursor: pointer; }
         .reader-thumb.is-active { border-color: var(--olive); box-shadow: 0 0 0 1px var(--olive); }
-        .reader-thumb-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font:600 13px/1.5 var(--font-sans); }
+        .reader-thumb-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font:600 0.8125rem/1.5 var(--font-sans); }
         .reader-paper { padding: 40px 48px; min-width: 0; display: grid; justify-items: center; scroll-margin-top: calc(var(--bar-h) + 16px); }
         .reader-block { width: 100%; max-width: 68ch; padding: 8px 0 28px; }
         .reader-block + .reader-block { border-top: 1px solid var(--line); padding-top: 28px; }
-        .reader-q { display: flex; gap: 12px; align-items: baseline; margin: 0 0 12px; font:600 20px/1.15 var(--font-sans); letter-spacing:0; }
+        .reader-q { display: flex; gap: 12px; align-items: baseline; margin: 0 0 12px; font:600 1.25rem/1.15 var(--font-sans); letter-spacing:0; }
         .reader-a { margin: 0; white-space: pre-wrap; }
         .reader-img { display: block; max-width: 100%; margin-top: 16px; border-radius:var(--r-input); }
         .reader-actions { display: flex; gap: 4px; margin: 16px 0 0 -12px; }
         .reader-actions :global(.is-read) { color: var(--success); }
         /* Section numbers turn into a tick, with a small pop, once the section is marked read. */
-        .reader-num { flex: none; display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--olive-ink); font: 600 13px/1 var(--font-sans); vertical-align: 3px; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
+        .reader-num { flex: none; display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 6px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--olive-ink); font: 600 0.8125rem/1 var(--font-sans); vertical-align: 3px; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
         .reader-num.is-read { background: var(--success-bg); color: var(--success); animation: reader-tick 420ms var(--ease); }
         @keyframes reader-tick { 0% { transform: scale(0.6); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
         @media (prefers-reduced-motion: reduce) { .reader-num.is-read { animation: none; } }
@@ -149,7 +149,7 @@ export default function StudyDocument({ guide, page: controlledPage, onPageChang
         }
         @media (max-width: 767px) {
           .reader-paper { padding: 24px 18px; }
-          .reader-q { font-size:20px; }
+          .reader-q { font-size:1.25rem; }
         }
       `}</style>
     </section>

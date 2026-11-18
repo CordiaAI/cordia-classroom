@@ -134,15 +134,15 @@ export default function AccountMenu({ open, onClose, anchorRef, items, placement
           background: var(--lg-menu); border: 1px solid var(--lg-edge);
           -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter);
           box-shadow: var(--lg-highlight), var(--lg-shadow);
-          color: var(--ink); font: 500 15px/1 var(--font-sans); white-space: nowrap; cursor: pointer;
+          color: var(--ink); font: 500 0.9375rem/1 var(--font-sans); white-space: nowrap; cursor: pointer;
           /* Hover rises with a deeper shadow and never changes the fill (DESIGN-SPEC 6.1). */
           transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
         }
         .acct-bubble .lucide { flex: 0 0 auto; width: 20px; height: 20px; color: var(--ink); }
         .acct-bubble.is-separated { margin-top: ${SIGN_OUT_EXTRA}px; }
         /* A count on an item (Friends: requests waiting on you). */
-        .acct-dot { width: 8px; height: 8px; margin-left: auto; border-radius: 50%; background: var(--olive); flex: none; }
-        .acct-badge { display: grid; place-items: center; min-width: 22px; height: 22px; margin-left: auto; padding: 0 7px; border-radius: 999px; background: var(--olive); color: var(--on-olive); font: 600 13px/1 var(--font-sans); }
+        .acct-dot { width: 8px; height: 8px; margin-left: auto; border-radius: 50%; background: var(--meter); flex: none; }
+        .acct-badge { display: grid; place-items: center; min-width: 22px; height: 22px; margin-left: auto; padding: 0 7px; border-radius: 999px; background: var(--meter); color: var(--on-meter); font: 600 0.8125rem/1 var(--font-sans); }
         .acct-bubble:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
         @media (hover: hover) {
           .acct-bubbles.is-open .acct-bubble:hover {

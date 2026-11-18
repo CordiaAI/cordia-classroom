@@ -130,7 +130,7 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
           background: var(--glass); border: 1px solid var(--glass-edge);
           -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
           box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow);
-          color: var(--ink); font:600 17px/1.25 var(--font-sans); overflow-wrap: anywhere;
+          color: var(--ink); font:600 1.0625rem/1.25 var(--font-sans); overflow-wrap: anywhere;
           animation: spot-in 220ms var(--ease) both;
         }
         :global(:root:not([data-theme='dark'])) .spot-label { background: var(--surface-card); }
@@ -147,13 +147,13 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
           position: fixed; top: calc(var(--bar-h, 64px) + 12px); right: 12px; height: 44px; padding: 0 20px; pointer-events: auto;
           border-radius:999px; border: 1px solid var(--glass-edge);
           background: var(--glass); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
-          color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer;
+          color: var(--ink); font:600 0.9375rem/1 var(--font-sans); cursor: pointer;
         }
         .spot-skip.is-left { right: auto; left: 12px; }
         @media (min-width: 768px) { .spot-skip { top: auto; bottom: 24px; right: 24px; } .spot-skip.is-left { left: 24px; } }
         .spot-finish { height: 36px; min-height: 36px; }
         @keyframes spot-in { from { opacity: 0; } to { opacity: 1; } }
-        @media (max-width: 767px) { .spot :global(.spot-dots i) { display: none; } .spot :global(.spot-dots .c-meta) { margin-left: 0; } .spot-label { font-size: 15px; } }
+        @media (max-width: 767px) { .spot :global(.spot-dots i) { display: none; } .spot :global(.spot-dots .c-meta) { margin-left: 0; } .spot-label { font-size: 0.9375rem; } }
         @media (prefers-reduced-motion: reduce) { .spot-ring { transition: none; } .spot-label { animation: none; } }
       `}</style>
     </div>,

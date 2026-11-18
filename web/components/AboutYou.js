@@ -121,7 +121,7 @@ export default function AboutYou({ index = 1, total = 4 }) {
         .about-head { display: flex; align-items: center; justify-content: space-between; }
         .about-group { display: grid; gap: 10px; margin: 0; padding: 0; border: 0; }
         .about-group legend { margin-bottom: 10px; }
-        .about-group :global(.about-chip) { height: 44px; padding: 0 18px; font-size: 15px; }
+        .about-group :global(.about-chip) { height: 44px; padding: 0 18px; font-size: 0.9375rem; }
         /* Picked reads like the guide's Outline / By page switch: the choice is a raised white pane,
            the rest sit flat in the sheet with muted text. */
         .about-group :global(.about-chip[aria-pressed='false']) {

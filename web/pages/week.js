@@ -131,13 +131,13 @@ export default function WeekPage() {
           .week-hint { margin: -4px 0 0; }
           .week-row, .week-news { gap: 14px; }
           .week-row .c-grow, .week-news .c-grow { display: grid; gap: 2px; min-width: 0; }
-          .week-title { font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
+          .week-title { font: 600 0.9375rem/1.4 var(--font-sans); color: var(--ink); }
           .week-pick { width: 20px; height: 20px; accent-color: var(--olive); flex: none; }
           .week-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 12px; }
           .week-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
           .week-stat { display: grid; gap: 2px; padding: 14px 18px; min-width: 0; }
-          .week-stat strong { font: 600 20px/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
-          .week-flag { margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--olive-tint); color: var(--olive-ink); font: 600 12px/1.4 var(--font-sans); }
+          .week-stat strong { font: 600 1.25rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
+          .week-flag { margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--olive-tint); color: var(--olive-ink); font: 600 0.75rem/1.4 var(--font-sans); }
         `}</style>
       </div>
     </LoadGate>

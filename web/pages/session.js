@@ -125,7 +125,7 @@ export default function StudySession() {
           : <button type="button" className="c-btn c-btn--secondary" onClick={() => router.push(backTo)}>{scope === 'classroom' ? 'Back to the classroom' : scope === 'folder' ? 'Back to the folder' : 'Dashboard'}</button>}
         <style jsx>{`
           .session-empty { width: min(760px, 100%); margin: 0 auto; justify-items: start; }
-          .session-empty-why { margin: 0; max-width: 60ch; font-size: 16px; }
+          .session-empty-why { margin: 0; max-width: 60ch; font-size: 1rem; }
         `}</style>
       </div>
     );

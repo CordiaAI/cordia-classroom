@@ -175,7 +175,7 @@ export default function SubmitQuiz({ questions, items, deadline = null, resume =
         .sq-flag.is-on { color: var(--warning); }
         .sq-match { display: grid; gap: 10px; margin: 0 0 8px; padding: 0; list-style: none; }
         .sq-match li { display: grid; gap: 6px; }
-        .sq-match span { font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
+        .sq-match span { font: 600 0.9375rem/1.4 var(--font-sans); color: var(--ink); }
         .sq-sure .is-on { background: var(--olive-tint); border-color: var(--olive); color: var(--olive-ink); }
         .sq-saved { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 0; color: var(--muted); font: 500 var(--fs-13)/1.4 var(--font-sans); }
         .sq-saved.is-saved { color: var(--success); }
@@ -183,7 +183,7 @@ export default function SubmitQuiz({ questions, items, deadline = null, resume =
         .sq-panel { display: grid; gap: 12px; padding: 16px; }
         .sq-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .sq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
-        .sq-cell { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 100%; height: 40px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font: 600 14px/1 var(--font-sans); font-variant-numeric: tabular-nums; cursor: pointer; }
+        .sq-cell { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 100%; height: 40px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font: 600 0.875rem/1 var(--font-sans); font-variant-numeric: tabular-nums; cursor: pointer; }
         .sq-cell.is-answered { background: var(--olive-tint); border-color: transparent; color: var(--olive-ink); }
         .sq-cell.is-flagged { box-shadow: inset 0 0 0 2px var(--warning); }
         .sq-cell.is-flagged .lucide { color: var(--warning); }
@@ -194,7 +194,7 @@ export default function SubmitQuiz({ questions, items, deadline = null, resume =
         .sq-dot.is-answered { background: var(--olive-tint); border-color: transparent; }
         .sq-dot.is-flagged { box-shadow: inset 0 0 0 2px var(--warning); }
         .sq-confirm { display: grid; gap: 10px; padding: 12px 14px; border-radius: var(--r-row, 14px); background: var(--warning-bg); }
-        .sq-confirm p { margin: 0; color: var(--ink); font: 500 15px/1.45 var(--font-sans); }
+        .sq-confirm p { margin: 0; color: var(--ink); font: 500 0.9375rem/1.45 var(--font-sans); }
       `}</style>
     </div>
   );

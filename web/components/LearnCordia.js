@@ -49,7 +49,7 @@ export default function LearnCordia({ onBeforeShow, hideWhenComplete = false, co
         .learn { display: grid; gap: 8px; padding: 20px; }
         .learn-group { display: grid; gap: 4px; }
         .learn-group + .learn-group { margin-top: 12px; }
-        .learn-group-title { margin: 0; font: 600 13px/1.4 var(--font-sans); letter-spacing: 0; color: var(--muted); }
+        .learn-group-title { margin: 0; font: 600 0.8125rem/1.4 var(--font-sans); letter-spacing: 0; color: var(--muted); }
         .learn-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
         .learn-list li { display: flex; align-items: center; gap: 12px; min-height: 52px; border-top: 1px solid var(--line); }
         .learn-icon { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border-radius:50%; background: var(--olive-tint); color: var(--olive-ink); }

@@ -306,12 +306,12 @@ export default function FlashcardViewer({
         .fc { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; width: min(760px, 100%); margin: 0 auto; min-width: 0; }
         .fc > * { min-width: 0; }
         .fc-bar { position: sticky; top: calc(var(--bar-h) + 12px); z-index: 20; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius:var(--r-pill); }
-        .fc-name { flex: 1; min-width: 0; padding: 0 8px; font:600 17px/1.15 var(--font-sans); }
-        .fc-bar :global(.is-starred) { color: var(--olive-ink); }
+        .fc-name { flex: 1; min-width: 0; padding: 0 8px; font:600 1.0625rem/1.15 var(--font-sans); }
+        .fc-bar :global(.is-starred), .fc-bar :global(.is-starred svg) { color: var(--meter-ink) !important; }
         .fc-progress { display: flex; align-items: center; gap: 12px; }
         .fc-progress .c-bar { flex: 1; }
         .fc-count { display: inline-flex; align-items: center; gap: 8px; font: 500 var(--fs-13)/1 var(--font-sans); color: var(--muted); }
-        .fc-count strong { min-width: 36px; height: 28px; padding: 0 10px; display: inline-grid; place-items: center; border-radius: var(--r-pill); font: 700 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .fc-count strong { min-width: 36px; height: 28px; padding: 0 10px; display: inline-grid; place-items: center; border-radius: var(--r-pill); font: 700 0.9375rem/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .fc-count.is-learning strong { color: var(--warning); background: var(--warning-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning) 35%, transparent); }
         .fc-count.is-know strong { color: var(--success); background: var(--success-bg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 35%, transparent); }
         .fc-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; text-align: left; }
@@ -324,7 +324,7 @@ export default function FlashcardViewer({
         /* A light sheen sweeps across the card as it turns. */
         .fc-face::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(115deg, transparent 38%, var(--sheen) 50%, transparent 62%) no-repeat; background-size: 260% 100%; background-position: 130% 0; transition: background-position 700ms var(--ease); }
         .is-flipped .fc-face::after { background-position: -40% 0; }
-        .fc-lean { position: absolute; top: 18px; z-index: 2; padding: 6px 12px; border-radius: var(--r-pill); font: 700 14px/1 var(--font-sans); letter-spacing: 0.02em; pointer-events: none; transition: opacity 120ms linear; }
+        .fc-lean { position: absolute; top: 18px; z-index: 2; padding: 6px 12px; border-radius: var(--r-pill); font: 700 0.875rem/1 var(--font-sans); letter-spacing: 0.02em; pointer-events: none; transition: opacity 120ms linear; }
         .fc-lean.is-know { right: 18px; color: var(--success); background: var(--success-bg); box-shadow: inset 0 0 0 2px var(--success); }
         .fc-lean.is-learning { left: 18px; color: var(--warning); background: var(--warning-bg); box-shadow: inset 0 0 0 2px var(--warning); }
         .fc-swipe-hint { margin: 4px 0 -8px; text-align: center; }
@@ -332,7 +332,7 @@ export default function FlashcardViewer({
         .fc-count strong.is-bumped { animation: fc-bump 380ms var(--ease); }
         @keyframes fc-bump { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
         .fc-face { position: absolute; inset: 0; display: grid; align-content: center; justify-items: center; gap: 12px; padding: 32px; overflow: auto; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); box-shadow: var(--shadow); backface-visibility: hidden; transition: transform var(--dur) var(--ease); text-align: center; }
-        .fc-face p { margin: 0; max-width: 34ch; font:500 20px/1.15 var(--font-sans); color: var(--ink); }
+        .fc-face p { margin: 0; max-width: 34ch; font:500 1.25rem/1.15 var(--font-sans); color: var(--ink); }
         .fc-face img { max-width: 100%; max-height: 180px; object-fit: contain; border-radius:var(--r-input); }
         .fc-back { transform: rotateY(180deg); }
         .is-flipped .fc-front { transform: rotateY(-180deg); }
@@ -374,14 +374,14 @@ function ResultList({ tone, label, cards }) {
       ) : <p className="c-meta">None</p>}
       <style jsx>{`
         .fc-result { padding: 12px 16px; min-width: 0; }
-        summary { display: flex; align-items: center; gap: 10px; cursor: pointer; font: 600 15px/1.2 var(--font-sans); list-style: none; }
+        summary { display: flex; align-items: center; gap: 10px; cursor: pointer; font: 600 0.9375rem/1.2 var(--font-sans); list-style: none; }
         summary::-webkit-details-marker { display: none; }
-        summary strong { min-width: 32px; height: 26px; padding: 0 8px; display: inline-grid; place-items: center; border-radius: var(--r-pill); font: 700 14px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        summary strong { min-width: 32px; height: 26px; padding: 0 8px; display: inline-grid; place-items: center; border-radius: var(--r-pill); font: 700 0.875rem/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .is-learning summary strong { color: var(--warning); background: var(--warning-bg); }
         .is-know summary strong { color: var(--success); background: var(--success-bg); }
         ul { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; max-height: 280px; overflow: auto; }
         li { display: grid; gap: 2px; padding-top: 8px; border-top: 1px solid var(--hairline); min-width: 0; overflow-wrap: anywhere; }
-        .fc-result-front { font: 600 14px/1.3 var(--font-sans); color: var(--ink); }
+        .fc-result-front { font: 600 0.875rem/1.3 var(--font-sans); color: var(--ink); }
         p { margin: 8px 0 0; }
       `}</style>
     </details>

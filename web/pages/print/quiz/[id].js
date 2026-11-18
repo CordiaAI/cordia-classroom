@@ -230,7 +230,7 @@ export default function PrintQuizPage() {
         html, body { background: var(--print-box); }
         body::before { display: none !important; }
         .pq { min-height: 100vh; color: var(--print-ink); }
-        .pq-toolbar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 24px; background: var(--print-paper); border-bottom: 1px solid var(--print-edge); font: 500 14px/1.4 var(--font-sans); }
+        .pq-toolbar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 24px; background: var(--print-paper); border-bottom: 1px solid var(--print-edge); font: 500 0.875rem/1.4 var(--font-sans); }
         .pq-note { flex-basis: 100%; color: var(--print-muted); }
         .pq-paper { width: 8.5in; margin: 24px auto; padding: 0.8in 0.85in 0.85in; background: var(--print-paper); box-sizing: border-box; page: quiz; }
         .pq-paper p, .pq-paper h1, .pq-paper h2, .pq-paper h3, .pq-paper ol { margin: 0; padding: 0; }

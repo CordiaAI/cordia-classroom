@@ -88,7 +88,7 @@ export default function NotionHome() {
       {error && <p className="cn-error" role="alert">{error}</p>}
       <style jsx>{`
         .nh { display: grid; gap: 10px; width: 100%; padding-top: 12px; border-top: 1px solid var(--hairline); text-align: left; }
-        .nh-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .nh-title { margin: 0; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); }
         .nh .c-meta { margin: 0; }
         .nh-actions { display: flex; flex-wrap: wrap; gap: 8px; }
         .nh .nh-start, .nh .nh-cancel { justify-self: start; }

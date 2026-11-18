@@ -93,8 +93,8 @@ export default function ClassCoverSheet({ folder, titles = [], onClose, onSaved 
         .cover-icon { position: relative; display: grid; place-items: center; height: 44px; border: 1px solid transparent; border-radius: 12px; background: transparent; color: var(--muted); cursor: pointer; }
         .cover-icon:hover { background: var(--lift-pane); box-shadow: var(--lift-shadow); color: var(--ink); }
         .cover-icon.is-on { background: var(--lg-fill-strong, var(--surface-raised)); border-color: var(--olive); color: var(--olive-ink); }
-        .cover-icon-n { position: absolute; top: 2px; right: 4px; font: 700 10px/1 var(--font-sans); color: var(--olive-ink); }
-        .cover-error { margin: 0; color: var(--error); font: 600 14px/1.4 var(--font-sans); }
+        .cover-icon-n { position: absolute; top: 2px; right: 4px; font: 700 0.625rem/1 var(--font-sans); color: var(--olive-ink); }
+        .cover-error { margin: 0; color: var(--error); font: 600 0.875rem/1.4 var(--font-sans); }
         .cover-actions { gap: 8px; }
       `}</style>
     </BodyPortal>

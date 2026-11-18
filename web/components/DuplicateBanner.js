@@ -35,7 +35,7 @@ export default function DuplicateBanner({ onMerged }) {
         .dup-banner { position: relative; display: flex; gap: 14px; align-items: flex-start; padding: 16px 48px 16px 16px; min-width: 0; }
         .dup-icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
         .dup-main { display: grid; gap: 4px; min-width: 0; }
-        .dup-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .dup-title { margin: 0; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); }
         .dup-sets { margin: 0; color: var(--muted-ink); overflow-wrap: anywhere; }
         .dup-sets strong { color: var(--ink); font-weight: 600; }
         .dup-more { margin: 0; }

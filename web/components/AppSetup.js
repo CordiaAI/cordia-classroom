@@ -82,7 +82,7 @@ export default function AppSetup({ canvasConnected = false, apps, canvas: canvas
         .setup-mark { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--line); color: var(--on-olive); }
         .is-on .setup-mark { border-color: var(--olive); background: var(--olive); }
         .setup-text { flex: 1 1 auto; display: grid; gap: 2px; min-width: 0; }
-        .setup-text strong { font: 600 15px/1.3 var(--font-sans); }
+        .setup-text strong { font: 600 0.9375rem/1.3 var(--font-sans); }
         .setup-text .c-meta { margin: 0; }
         .is-on .setup-text strong { color: var(--muted); }
         .setup-list :global(.c-btn) { flex: none; }

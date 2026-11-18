@@ -64,17 +64,17 @@ export default function QuizReview({ rows, questions, guideId, onSelfCheck }) {
         .rv-item { display: grid; gap: 8px; padding: 14px 0; border-top: 1px solid var(--border-subtle); }
         .rv-item:first-child { border-top: 0; }
         .rv-top { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: baseline; }
-        .rv-num { color: var(--olive-ink); font: 600 14px/1.4 var(--font-sans); font-variant-numeric: tabular-nums; }
-        .rv-q { color: var(--ink); font: 600 15px/1.4 var(--font-sans); }
-        .rv-mark { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: var(--r-pill); font: 600 12px/1.3 var(--font-sans); white-space: nowrap; }
+        .rv-num { color: var(--olive-ink); font: 600 0.875rem/1.4 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .rv-q { color: var(--ink); font: 600 0.9375rem/1.4 var(--font-sans); }
+        .rv-mark { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: var(--r-pill); font: 600 0.75rem/1.3 var(--font-sans); white-space: nowrap; }
         .rv-mark.is-right { background: var(--success-bg); color: var(--success); }
         .rv-mark.is-partial, .rv-mark.is-unchecked { background: var(--warning-bg); color: var(--warning); }
         .rv-mark.is-wrong { background: var(--error-bg); color: var(--error); }
         .rv-answers { display: grid; gap: 4px; margin: 0 0 0 38px; }
         .rv-answers div { display: grid; grid-template-columns: 120px 1fr; gap: 8px; }
         .rv-answers dt { color: var(--muted); font: 500 var(--fs-13)/1.5 var(--font-sans); }
-        .rv-answers dd { margin: 0; color: var(--ink); font: 500 15px/1.45 var(--font-sans); }
-        .rv-sure { margin-left: 8px; padding: 1px 8px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--olive-ink); font: 600 12px/1.4 var(--font-sans); }
+        .rv-answers dd { margin: 0; color: var(--ink); font: 500 0.9375rem/1.45 var(--font-sans); }
+        .rv-sure { margin-left: 8px; padding: 1px 8px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--olive-ink); font: 600 0.75rem/1.4 var(--font-sans); }
         .rv-self, .rv-help, .rv-item .retain-why { margin-left: 38px; }
         .rv-self { display: grid; gap: 6px; }
         .rv-self p { margin: 0; }
