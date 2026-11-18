@@ -347,7 +347,7 @@ export default function Sidebar() {
             {classes && classes.length === 0 && <p className="c-side-empty c-side-label">No classes yet</p>}
           </div>
 
-          <SidebarChats chats={chats} current={current} editable={saved.editable} classes={classes || []} failed={saved.failed} />
+          <SidebarChats chats={chats} current={current} editable={saved.editable} classes={classes || []} failed={saved.failed} loaded={saved.loaded} />
           {/* Folded, the chats open from one icon, in a menu beside the sidebar. */}
           <button ref={chatsRef} type="button" className="c-side-item c-side-chats-icon" aria-label="Recent chats" aria-haspopup="menu" aria-expanded={chatsOpen}
             aria-current={folded && current.startsWith('chat:') ? 'page' : undefined} {...tipFor('chats')} onClick={() => { hide(); setChatsOpen(open => !open); }}>

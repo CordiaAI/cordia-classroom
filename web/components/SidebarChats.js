@@ -14,8 +14,9 @@ const dot = tone => function ClassDot() {
 // Recent chats in the sidebar (DESIGN-SPEC 3.2): newest first, one line each with an ellipsis,
 // filling the rest of the sidebar and scrolling inside it. Each row's ⋯ (shown on hover and on
 // keyboard focus, once chats can be changed) offers Rename, Move to class and Delete, the same as
-// the chat's own ⋯. chats: shellTools.recentChats rows; classes: every class (Sidebar sidebarClasses).
-export default function SidebarChats({ chats, current, editable, classes, failed }) {
+// the chat's own ⋯. Until the first answer the list area stays empty (no "no chats" line that then
+// turns into a list). chats: shellTools.recentChats rows; classes: every class (Sidebar sidebarClasses).
+export default function SidebarChats({ chats, current, editable, classes, failed, loaded }) {
   const router = useRouter();
   const [renaming, setRenaming] = useState('');
   const done = useRef(false);
@@ -84,7 +85,7 @@ export default function SidebarChats({ chats, current, editable, classes, failed
         </ul>
       ) : failed ? (
         <p className="c-side-empty">Recent chats didn't load. <button type="button" className="c-side-retry" onClick={() => loadChats({ fresh: true })}>Try again</button></p>
-      ) : <p className="c-side-empty">Chats with the Tutor show up here.</p>}
+      ) : loaded ? <p className="c-side-empty">Chats with the Tutor show up here.</p> : null}
     </div>
   );
 }

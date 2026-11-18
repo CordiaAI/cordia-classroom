@@ -131,6 +131,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
   let failed = false;
   let loadedAt = 0;
   let loading = null;
+  let lastFailure = null;
   let open = null; // the chat on screen, kept in the list (and so current in the sidebar) while it is open
   let toast = null;
   let toastId = 0;
@@ -220,13 +221,18 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
         loadedAt = now();
         // Deleted here and now gone from the server's list too: nothing left to hide.
         for (const id of [...removed]) if (!chats.some(chat => chat.id === id)) removed.delete(id);
-      } else failed = true;
+      } else { failed = true; lastFailure = result; }
       emit();
       return snapshot();
     });
     return loading;
   }
-  const ready = () => (mode ? Promise.resolve() : load());
+  // Which backend this is isn't known until /chats has answered once; until then nothing else is tried
+  // (a failed first answer must not fall through to the Tutor-only calls, which change things).
+  const unready = async () => {
+    if (!mode) await load();
+    return mode ? null : lastFailure || failure('network');
+  };
 
   let soon = null;
   function refreshSoon(delay = 400) {
@@ -236,7 +242,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
 
   // A class's chats, for its page's Chats tab: { chats, editable, failed }, newest first.
   async function classChats(classId) {
-    await ready();
+    if (await unready()) return { chats: [], editable, failed: true };
     const result = await fetchList(String(classId || ''));
     if (!result.ok) return { chats: [], editable, failed: true };
     return { chats: result.chats.filter(chat => !removed.has(chat.id)), editable, failed: false };
@@ -246,7 +252,8 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
   // when live], editable, mustOpen }. mustOpen: this backend can only show a saved chat by opening it.
   async function getChat(id) {
     id = String(id || '');
-    await ready();
+    const notReady = await unready();
+    if (notReady) return notReady;
     if (mode === 'chats') {
       const data = await request(`/chats/${encodeURIComponent(id)}`);
       const result = outcome(data);
@@ -281,7 +288,8 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
 
   // A new chat from a composer. The conversation it replaces is saved. { ok, chat, session }.
   async function startChat({ session = null, guideId = null, classId = null } = {}) {
-    await ready();
+    const notReady = await unready();
+    if (notReady) return notReady;
     if (mode === 'chats') {
       const data = await request('/chats', { method: 'POST', body: JSON.stringify({ guide_id: guideId || null, class_id: classId || null, session_id: session?.id ? String(session.id) : null }) });
       const result = outcome(data);
@@ -315,7 +323,8 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
   // backend may give it a new id: callers go to the returned chat.id. { ok, chat, session }.
   async function openChat(id, { session = null } = {}) {
     id = String(id || '');
-    await ready();
+    const notReady = await unready();
+    if (notReady) return notReady;
     if (mode === 'chats') {
       const data = await request(`/chats/${encodeURIComponent(id)}/open`, { method: 'POST' });
       const result = outcome(data);

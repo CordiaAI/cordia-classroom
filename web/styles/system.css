@@ -1053,6 +1053,9 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 .cordia-tutor-avatar { position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
 .cordia-tutor-avatar svg, .cordia-tutor-avatar img { width: 22px; height: auto; }
 
+/* Undo while it is working: still focusable, but it looks and acts inert. */
+.c-chat-toast .c-btn[aria-disabled='true'] { opacity: .55; cursor: default; pointer-events: none; }
+
 /* A chat's header (4.3): the title, its class, and ⋯ at the right. Rename edits the title in place,
    in the title's own type, so nothing moves when it opens. */
 .chat-home-menu { flex: none; margin-left: auto; }
@@ -1077,6 +1080,7 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 @media (min-width: 768px) {
   :root[data-shell='new'] .app-shell:has(.chat-home) .c-chat-toast { top: calc(var(--side-gap) + 60px); bottom: auto; animation-name: c-toast-drop; }
 }
+@media (prefers-reduced-motion: reduce) { :root[data-shell='new'] .app-shell:has(.chat-home) .c-chat-toast { animation: none; } }
 @keyframes c-toast-drop { from { opacity: 0; transform: translate(-50%, -12px) scale(.98); } to { opacity: 1; transform: translate(-50%, 0); } }
 .chat-home-missing .chat-home-line { color: var(--ink); }
 

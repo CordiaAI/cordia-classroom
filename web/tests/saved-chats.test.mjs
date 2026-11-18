@@ -44,6 +44,8 @@ function backend(mode) {
     if (server.down) return { failed: 'network', detail: "Couldn't reach Classroom." };
     const [route, search = ''] = path.split('?');
     const query = new URLSearchParams(search);
+    const forced = server.fail?.[`${method} ${route.replace(/^\/chats\/[^/]+/, '/chats/:id')}`];
+    if (forced) return status(forced[0], { detail: forced[1] });
     if (route === '/guides') return ok({ guides: server.guides });
     if (route === '/tutor/session') return ok({ ...server.session });
     if (route === '/tutor/chats') return ok({ chats: visible().map(({ messages, class_id, ...row }) => row) });
@@ -108,6 +110,45 @@ function storeFor(mode) {
   const store = createChatStore({ request: server.request, onTutorChanged: () => { tutorChanges += 1; } });
   return { server, store, tutorChanges: () => tutorChanges };
 }
+
+// Every 404 and 409 another tab can cause, with the backend's own words (docs/redesign/T5-backend-notes.md, "Stale tabs").
+const STALE_TABLE = [
+  ['POST /chats', 409, 'Wait for Cordia Tutor to finish before starting a new chat', 'busy'],
+  ['POST /chats', 409, 'Tutor conversation changed. Refresh and try again.', 'moved'],
+  ['POST /chats', 404, 'Class not found', 'missing'],
+  ['POST /chats', 404, 'Guide not found', 'missing'],
+  ['POST /chats/:id/open', 404, 'Chat not found', 'gone'],
+  ['POST /chats/:id/open', 404, 'That chat was deleted in another tab.', 'gone'],
+  ['POST /chats/:id/open', 409, 'Wait for Cordia Tutor to finish before starting a new chat', 'busy'],
+  ['POST /chats/:id/open', 409, 'Tutor conversation changed. Refresh and try again.', 'moved'],
+  ['DELETE /chats/:id', 404, 'That chat is already gone.', 'gone'],
+  ['DELETE /chats/:id', 409, 'Wait for Cordia Tutor to finish before deleting this chat', 'busy'],
+  ['DELETE /chats/:id', 409, 'Tutor conversation changed. Refresh and try again.', 'moved'],
+  ['PATCH /chats/:id', 404, 'Chat not found', 'gone'],
+  ['PATCH /chats/:id', 404, 'Class not found', 'missing'],
+  ['GET /chats/:id', 404, 'Chat not found', 'gone'],
+  ['POST /chats/:id/restore', 404, 'Chat not found', 'gone'],
+  ['POST /chat', 409, 'Tutor conversation changed. Refresh and try again.', 'moved'],
+  ['POST /chat', 409, 'Cordia Tutor is already working on a request.', 'busy'],
+  ['POST /chat', 409, 'Cordia Tutor received another request first. Refresh and try again.', 'busy'],
+  ['POST /chat', 404, 'Class not found', 'missing'],
+  ['POST /chat', 404, 'Tutor session not found', 'gone'],
+  ['POST /tutor/session/new', 409, 'Wait for Cordia Tutor to finish before starting a new chat', 'busy'],
+  ['POST /tutor/session/new', 404, 'Chat not found', 'gone'],
+  ['POST /tutor/session/new', 404, 'Guide not found', 'missing'],
+];
+
+test('every 404 and 409 in the backend notes means one thing, and each has plain words and no jargon', () => {
+  for (const [route, httpStatus, detail, reason] of STALE_TABLE) {
+    assert.equal(outcome({ httpStatus, detail }), reason, `${route} ${httpStatus} ${detail}`);
+  }
+  for (const reason of ['gone', 'moved', 'busy', 'missing']) {
+    assert.match(MESSAGES[reason], /^[A-Z][^!]*\.$/, reason);
+    assert.doesNotMatch(MESSAGES[reason], /error|exception|\b(404|409)\b|undefined|null/i, reason);
+  }
+  assert.equal(MESSAGES.busy, 'The Tutor is still answering. Wait for it to finish, then try again.');
+  assert.equal(MESSAGES.missing, 'The class or material you picked was deleted in another tab. Pick another and try again.');
+});
 
 test('responses mean the same thing whatever the backend: 404 gone, 409 moved on, 503 not set up yet', () => {
   assert.equal(outcome({ httpStatus: 200 }), 'ok');
@@ -363,4 +404,99 @@ test('the wiring: one page for /home and /chat/[id], one Tutor client, one data 
   // Only the data module tells the backend's states apart.
   assert.match(read('lib/chatStore.mjs'), /mode = 'tutor'/);
   assert.doesNotMatch(read('lib/chats.js'), /mode/);
+});
+
+test('another tab: starting a chat while the Tutor is answering, or after the class was deleted, fails with plain words and the list is refreshed', async () => {
+  for (const [route, httpStatus, detail, reason] of STALE_TABLE.filter(row => row[0] === 'POST /chats')) {
+    const { server, store } = storeFor('full');
+    await store.load();
+    server.fail = { 'POST /chats': [httpStatus, detail] };
+    const before = server.calls.filter(call => call === 'GET /chats?limit=30').length;
+    const result = await store.start({ session: server.session, classId: CALC });
+    assert.equal(result.ok, false, detail);
+    assert.equal(result.reason, reason, detail);
+    assert.equal(result.message, MESSAGES[reason], detail);
+    await new Promise(resolve => setTimeout(resolve, 20));
+    assert.ok(server.calls.filter(call => call === 'GET /chats?limit=30').length > before, `${detail}: the list was fetched again`);
+  }
+  // The first backend: the same answers from the Tutor's own new-chat call.
+  const { server, store } = storeFor('tutor');
+  server.fail = { 'POST /tutor/session/new': [409, 'Wait for Cordia Tutor to finish before starting a new chat'] };
+  const result = await store.start({ session: server.session });
+  assert.equal(result.reason, 'busy');
+});
+
+test('another tab: carrying on a chat that was deleted in the moment of the switch drops it from the list', async () => {
+  for (const mode of ['full', 'tutor']) {
+    const { server, store } = storeFor(mode);
+    await store.load();
+    server.fail = { [mode === 'full' ? 'POST /chats/:id/open' : 'POST /tutor/session/new']: [404, 'That chat was deleted in another tab.'] };
+    const result = await store.openChat('c-1', { session: server.session });
+    assert.equal(result.reason, 'gone', mode);
+    assert.equal(result.message, MESSAGES.gone, mode);
+    assert.ok(!store.snapshot().chats.some(chat => chat.id === 'c-1'), mode);
+  }
+});
+
+test('another tab: a chat moved into a class that was deleted stays where it was, with a message about the class', async () => {
+  const { server, store } = storeFor('full');
+  await store.load();
+  server.fail = { 'PATCH /chats/:id': [404, 'Class not found'] };
+  const result = await store.move('c-1', BUS);
+  assert.equal(result.reason, 'missing');
+  assert.equal(result.message, MESSAGES.missing);
+  const row = store.snapshot().chats.find(chat => chat.id === 'c-1');
+  assert.ok(row, 'the chat is still listed');
+  assert.equal(row.class_id, null, 'and still has no class');
+});
+
+test('another tab: deleting a chat while the Tutor is answering, or after it moved on, puts it back and says so', async () => {
+  for (const [detail, reason] of [['Wait for Cordia Tutor to finish before deleting this chat', 'busy'], ['Tutor conversation changed. Refresh and try again.', 'moved']]) {
+    const { server, store } = storeFor('full');
+    await store.load();
+    server.fail = { 'DELETE /chats/:id': [409, detail] };
+    const pending = store.remove('c-live');
+    assert.ok(!store.snapshot().chats.some(chat => chat.id === 'c-live'), 'gone at once');
+    const result = await pending;
+    assert.equal(result.reason, reason);
+    assert.equal(result.message, MESSAGES[reason]);
+    assert.ok(store.snapshot().chats.some(chat => chat.id === 'c-live'), `${reason}: back in the list, nothing was deleted`);
+    assert.equal(store.snapshot().toast, null, 'no Undo for a delete that did not happen');
+  }
+});
+
+test('another tab: reading a chat that an empty new chat removed, or that was deleted, says it is gone and refreshes the list', async () => {
+  const { server, store } = storeFor('full');
+  await store.load();
+  server.fail = { 'GET /chats/:id': [404, 'Chat not found'] };
+  const result = await store.getChat('c-1');
+  assert.equal(result.reason, 'gone');
+  assert.ok(!store.snapshot().chats.some(chat => chat.id === 'c-1'));
+});
+
+test('the chat page answers a failed send from the same words, keeps the typed text, and reverses a first message that did not go', () => {
+  const home = read('pages/home.js');
+  assert.match(home, /outcome\(\{ httpStatus: status, detail \}\)/, 'a failed send is read through the data module');
+  assert.match(home, /const STALE = \['gone', 'moved', 'busy', 'missing'\]/);
+  const hook = read('lib/useTutorChat.js');
+  assert.match(hook, /onSendFailed\?\.\(\{ status: data\?\.httpStatus \|\| 0, detail: data\?\.detail/);
+  assert.match(hook, /setInput\(question\);\n      setLocalError\(data\?\.answer/, 'the question goes back in the box');
+  assert.match(home, /goTo\(''\)/, 'a first message that fails (a plan limit) goes back to the home');
+  assert.match(home, /moving\.current\?\.cancel\(\)/, 'the move back starts from where the composer is');
+});
+
+test('no connection on the first answer: nothing falls through to the Tutor-only calls, and the next try finds the state', async () => {
+  const { server, store } = storeFor('full');
+  server.down = true;
+  for (const result of [await store.getChat('c-1'), await store.start({ session: server.session }), await store.openChat('c-1', {})]) {
+    assert.equal(result.ok, false);
+    assert.equal(result.reason, 'network');
+    assert.equal(result.message, MESSAGES.network);
+  }
+  assert.ok(!server.calls.some(call => call.includes('/tutor/')), 'no Tutor call was made');
+  assert.equal((await store.classChats(CALC)).failed, true);
+  assert.equal(store.snapshot().failed, true, 'the sidebar can offer a retry');
+  server.down = false;
+  assert.equal((await store.getChat('c-1')).ok, true);
+  assert.equal(store.snapshot().failed, false);
 });
