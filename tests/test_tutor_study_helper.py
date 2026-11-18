@@ -128,10 +128,19 @@ class ChatRouteTests(unittest.TestCase):
         for item in self.patches:
             item.stop()
 
-    def ask(self, question, **extra):
+    def post(self, question, **extra):
         response = self.client.post("/chat", headers=AUTH, json={"question": question, "content": "", "local_date": "2026-11-18", **extra})
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
+
+    def ask(self, question, **extra):
+        """The web app's Tutor: every message goes through the student's Tutor session."""
+        turn = {"id": "session-1", "run_id": "run-1", "active_skill": "explain", "conversation_version": 1,
+                "messages": [{"role": "user", "text": question}]}
+        with patch("routers.chat.claim_tutor_turn", return_value=turn), \
+             patch("routers.chat.complete_tutor_turn", side_effect=lambda _u, _t, response: {**turn, "messages": [*turn["messages"], response]}), \
+             patch("routers.chat.public_tutor_session", side_effect=lambda row: {"id": row["id"], "messages": row["messages"]}):
+            return self.post(question, session_id="session-1", conversation_version=1, **extra)
 
     def test_studying_for_a_test_gets_a_plan_with_the_students_own_guide(self, *_):
         body = self.ask("I need to study for my bio test on Friday")
@@ -193,7 +202,7 @@ class ChatRouteTests(unittest.TestCase):
         with patch("routers.chat.claim_tutor_turn", return_value=turn), \
              patch("routers.chat.complete_tutor_turn", side_effect=lambda _u, _t, response: {**turn, "messages": [*turn["messages"], response]}), \
              patch("routers.chat.public_tutor_session", side_effect=lambda row: {"id": row["id"], "messages": row["messages"]}):
-            return self.ask(question, session_id="session-1", conversation_version=3)
+            return self.post(question, session_id="session-1", conversation_version=3)
 
     def test_make_a_learn_continues_the_last_plan_with_its_date(self, *_):
         plan = {"guide": {"id": GUIDE, "title": "Biology: Cells"}, "test_date": "2026-11-23", "exam": None, "actions": []}
