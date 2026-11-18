@@ -26,6 +26,7 @@ from services.llm import (
     study_guide_is_complete, study_guide_to_flashcards,
 )
 from services.text_processing import chunk_text, clean_text, html_to_text
+from services.tutor_voice import ground_general_answer, plain_opening
 from services.tutor_sessions import (
     TUTOR_SAFETY_POLICY, claim_tutor_turn, complete_tutor_turn, fail_tutor_turn,
     public_tutor_session, queue_browser_command, tutor_skill_instruction, wait_for_browser_result,
@@ -434,7 +435,7 @@ def _tutor_reply(body: ChatRequest, user_id: str, question: str, material: Mater
             full_history=bool(history),
         )
     record(user_id, "tutor")
-    return ChatResponse(answer=answer, source=material.source)
+    return ChatResponse(answer=plain_opening(answer), source=material.source)
 
 
 def _edit_outline(user_id: str, material: Material, question: str) -> Optional[ChatResponse]:
@@ -507,7 +508,9 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
             return ChatResponse(answer="Choose a study guide, note, or uploaded file before asking Cordia.")
         # A general chat: no material selected, answered from general knowledge. The source says so,
         # so the reply is never mistaken for one based on the student's material (it is saved with it).
+        # Specific names, numbers and dates in it are marked unchecked, with an offer to check them.
         reply = _tutor_reply(body, user_id, question, material, skill, turn)
+        reply.answer = ground_general_answer(reply.answer, question)
         reply.source = GENERAL_SOURCE
         return reply
     if skill == "practice" or PRACTICE_REQUEST.search(question):
