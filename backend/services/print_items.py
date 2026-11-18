@@ -7,6 +7,9 @@
                    copied from the stored answer and the sentence may say nothing the question and
                    answer don't, or the item is dropped
   short answer     the guide's own why / how / describe questions, with the stored answer as key
+  written          when the guide has too few ready matching terms or short-answer questions, Haiku
+                   writes more from the same Q/A (checked like fill-in: nothing the question and
+                   answer don't say; a short answer's key is always the stored answer)
 
 Each item names its source question (`source`, the Q/A index) so one printout never asks the same
 idea twice. Matching, short answer and fill-in are cached on the guide (study_guides.print_items)
@@ -179,6 +182,139 @@ def short_answer(pairs: list) -> list:
             items.append({"id": f"s{index}", "source": index, "question": pair["question"].strip(),
                           "key": pair["answer"].strip(), "points": SHORT_POINTS})
     return items
+
+
+# ---- matching and short answer, written when the guide has too few ready ones ----
+
+WRITE_LIMIT = 40
+
+
+def matching_candidates(pairs: list, limit: int = WRITE_LIMIT) -> list:
+    """Q/A indexes Haiku can turn into a matching term: an answer whose first sentence defines
+    something, not already a ready matching item."""
+    ready = {item["source"] for item in matching(pairs)}
+    fits = [index for index, pair in enumerate(pairs)
+            if index not in ready and 3 <= len(_first_sentence(pair["answer"]).split()) <= 30]
+    return fits[:limit]
+
+
+def short_candidates(pairs: list, limit: int = WRITE_LIMIT) -> list:
+    """Q/A indexes Haiku can turn into a short-answer question: an answer long enough to explain,
+    not already a ready short-answer item."""
+    ready = {item["source"] for item in short_answer(pairs)}
+    fits = [index for index, pair in enumerate(pairs) if index not in ready and len(pair["answer"].split()) >= 8]
+    return fits[:limit]
+
+
+def _rows(pairs: list, indexes: list) -> str:
+    return "\n".join(f"{n}. Q: {pairs[i]['question']}\n   A: {pairs[i]['answer']}" for n, i in enumerate(indexes))
+
+
+def matching_prompt(pairs: list, indexes: list) -> str:
+    return f"""Turn each question and answer below into one matching item for a printed test: a short term and its definition.
+Return a JSON object {{"items": [{{"id": <number>, "term": "...", "definition": "..."}}]}}.
+
+Rules:
+1. Use only what that item's question and answer state. Add no other fact, name, date or detail.
+2. The term is the name or idea the answer defines, one to four words, written as the question or answer writes it.
+3. The definition is a phrase of 3 to 20 words from the answer that says what the term is, means or does. It never contains the term itself.
+4. Leave an item out if its answer does not define one clear term.
+
+{_rows(pairs, indexes)}"""
+
+
+def short_prompt(pairs: list, indexes: list) -> str:
+    return f"""Write one open question for a printed short-answer test from each question and answer below.
+Return a JSON object {{"items": [{{"id": <number>, "question": "..."}}]}}.
+
+Rules:
+1. The question asks the student to explain, describe, compare or give reasons, and starts with Why, How, Explain, Describe, Compare, Discuss or In what ways.
+2. The item's answer must fully answer it. Name no fact, name, date or term that the item's question and answer do not contain.
+3. Never put the answer in the question.
+4. Leave an item out if its answer is too thin to explain.
+
+{_rows(pairs, indexes)}"""
+
+
+def check_matching(term: str, definition: str, question: str, answer: str) -> Optional[dict]:
+    """A matching item, or None when it breaks a rule: a term of 1-4 words and a definition of 3-20
+    words that say nothing the question and answer don't, and a definition that doesn't contain
+    its own term."""
+    term = " ".join(str(term or "").strip().strip("'\u2018\u2019\"").split())
+    definition = _capitalize(_plain(" ".join(str(definition or "").split())))
+    if not term or len(term.split()) > 4 or len(term) > 40:
+        return None
+    if not 3 <= len(definition.split()) <= 20 or len(definition) > 130:
+        return None
+    if normalize(term) in normalize(definition):
+        return None
+    allowed = _content_stems(question) | _content_stems(answer)
+    if _content_stems(term) - allowed or _content_stems(definition) - allowed:
+        return None
+    return {"term": _capitalize(term), "definition": definition}
+
+
+def matching_items(pairs: list, indexes: list, generated: list) -> list:
+    """Checked matching items from Haiku's reply ({"id", "term", "definition"} per item); failures,
+    repeated terms and repeated definitions (also against the ready items) are dropped."""
+    ready = matching(pairs)
+    seen_terms = {normalize(item["term"]) for item in ready}
+    seen_defs = {normalize(item["definition"]) for item in ready}
+    items, used = [], set()
+    for item in generated if isinstance(generated, list) else []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            n = int(item.get("id"))
+        except (TypeError, ValueError):
+            continue
+        if not 0 <= n < len(indexes) or n in used:
+            continue
+        index = indexes[n]
+        checked = check_matching(item.get("term"), item.get("definition"), pairs[index]["question"], pairs[index]["answer"])
+        if not checked or normalize(checked["term"]) in seen_terms or normalize(checked["definition"]) in seen_defs:
+            continue
+        used.add(n)
+        seen_terms.add(normalize(checked["term"]))
+        seen_defs.add(normalize(checked["definition"]))
+        items.append({"id": f"am{index}", "source": index, **checked})
+    return sorted(items, key=lambda item: item["source"])
+
+
+def check_short(text: str, question: str, answer: str) -> Optional[str]:
+    """A short-answer question, or None when it isn't an explain-type question, runs long, or names
+    anything the stored question and answer don't contain."""
+    text = " ".join(str(text or "").split())
+    if not text or len(text) > 220 or not _EXPLAIN.search(text):
+        return None
+    if _content_stems(text) - (_content_stems(question) | _content_stems(answer)):
+        return None
+    return text
+
+
+def short_items(pairs: list, indexes: list, generated: list) -> list:
+    """Checked short-answer items from Haiku's reply ({"id", "question"} per item). The key is
+    always the stored answer, never anything the model wrote."""
+    seen = {normalize(item["question"]) for item in short_answer(pairs)}
+    items, used = [], set()
+    for item in generated if isinstance(generated, list) else []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            n = int(item.get("id"))
+        except (TypeError, ValueError):
+            continue
+        if not 0 <= n < len(indexes) or n in used:
+            continue
+        index = indexes[n]
+        text = check_short(item.get("question"), pairs[index]["question"], pairs[index]["answer"])
+        if not text or normalize(text) in seen:
+            continue
+        used.add(n)
+        seen.add(normalize(text))
+        items.append({"id": f"as{index}", "source": index, "question": text,
+                      "key": pairs[index]["answer"].strip(), "points": SHORT_POINTS})
+    return sorted(items, key=lambda item: item["source"])
 
 
 # ---- fill in the blank ----
