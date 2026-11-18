@@ -264,6 +264,17 @@ def busy_times(user_id: str, account: str, start: datetime, end: datetime, extra
     return out
 
 
+def _span_hash(start: datetime, end: datetime) -> str:
+    """The synced_hash of a study time, written the way block times are stored (UTC)."""
+    return _hash(start.astimezone(timezone.utc).isoformat(), end.astimezone(timezone.utc).isoformat())
+
+
+def _span_hashes(start: datetime, end: datetime) -> set:
+    """Both ways a link's synced_hash may have written this time: in UTC (made by Cordia) or in the
+    event's own offset (read back from a move in Google)."""
+    return {_span_hash(start, end), _hash(start.isoformat(), end.isoformat())}
+
+
 def _event_window(event: dict) -> tuple[Optional[datetime], Optional[datetime]]:
     return _time((event.get("start") or {}).get("dateTime")), _time((event.get("end") or {}).get("dateTime"))
 
@@ -288,7 +299,8 @@ def sync_calendar(user_id: str) -> dict:
         "singleEvents": True, "showDeleted": True, "maxResults": 250,
     })
     remote = {event.get("id"): event for event in data.get("items") or []}
-    moved = removed = written = 0
+    moved = removed = written = sent = 0
+    titles = _block_titles(user_id, blocks)
 
     # The student owns study times: read their moves and deletions before writing anything.
     for block in blocks:
@@ -303,13 +315,27 @@ def sync_calendar(user_id: str) -> dict:
             removed += 1
             continue
         start, end = _event_window(event)
-        if start and end and (start != _time(block["starts_at"]) or end != _time(block["ends_at"])):
+        mine_start, mine_end = _time(block["starts_at"]), _time(block["ends_at"])
+        if start and end and (start != mine_start or end != mine_end) and link.get("synced_hash") in _span_hashes(start, end):
+            # Google still holds the time Cordia last sent, so the change is the student's, made on
+            # Cordia's Calendar page: it goes to Google instead of being read back as a Google move.
+            composio.run(account, user_id, "GOOGLECALENDAR_UPDATE_EVENT", {
+                "calendar_id": calendar,
+                "event_id": link["external_id"],
+                "summary": titles.get(block["id"], "Study")[:200],
+                "start_datetime": mine_start.astimezone(zone).strftime("%Y-%m-%dT%H:%M:%S"),
+                "end_datetime": mine_end.astimezone(zone).strftime("%Y-%m-%dT%H:%M:%S"),
+                "timezone": zone.key,
+                "description": "Planned by Cordia Classroom. Move or delete it and Cordia keeps your change.",
+            })
+            save_link(user_id, "gcal", "event", f"block:{block['id']}", link["external_id"], calendar, _span_hash(mine_start, mine_end))
+            sent += 1
+        elif start and end and (start != mine_start or end != mine_end):
             db.table("study_blocks").update({"starts_at": start.isoformat(), "ends_at": end.isoformat(), "status": "moved",
                                              "updated_at": now.isoformat()}).eq("id", block["id"]).execute()
             save_link(user_id, "gcal", "event", f"block:{block['id']}", link["external_id"], calendar, _hash(start.isoformat(), end.isoformat()))
             moved += 1
 
-    titles = _block_titles(user_id, blocks)
     for block in blocks:
         if block["status"] in ("removed",) or ("event", f"block:{block['id']}") in linked:
             continue
@@ -328,12 +354,15 @@ def sync_calendar(user_id: str) -> dict:
             written += 1
     planned = sum(1 for block in blocks if block["status"] in ("planned", "moved"))
     sync_state.record(user_id, "gcal", stats={"blocks": planned, "moved_by_you": moved, "removed_by_you": removed})
-    return {"on": True, "blocks": planned, "added": written, "moved": moved, "removed": removed}
+    return {"on": True, "blocks": planned, "added": written, "moved": moved, "removed": removed, "sent": sent}
 
 
-def _block_titles(user_id: str, blocks: list[dict]) -> dict:
-    from routers.calendar import calendar_for
-    names = {item["id"]: item.get("title") or "Assignment" for item in calendar_for(user_id).get("items") or []}
+def _block_titles(user_id: str, blocks: list[dict], items: Optional[list] = None) -> dict:
+    """Each block's title. items: the student's deadlines when the caller already has them."""
+    if items is None:
+        from routers.calendar import calendar_for
+        items = calendar_for(user_id).get("items") or []
+    names = {item["id"]: item.get("title") or "Assignment" for item in items}
     step_ids = [block["step_id"] for block in blocks if block.get("step_id")]
     steps = {}
     if step_ids:

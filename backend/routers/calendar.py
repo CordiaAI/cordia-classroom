@@ -370,19 +370,31 @@ def calendar_for(user_id: str) -> dict:
 
 @router.get("/blocks")
 def study_blocks(authorization: str = Header(default=""), days_back: int = 14, days_ahead: int = 60):
-    """Study blocks (from Plan my week and assignment plans) for the in-app calendar, which shows
-    them with or without Canvas. Google Calendar and the calendar feed get the same blocks."""
+    """Study blocks (from Plan my week, assignment plans and the Calendar page) for the in-app
+    calendar, which shows them with or without Canvas. Google Calendar and the calendar feed get the
+    same blocks. Each one carries its deadline's course (for the class colour) and whether it's done
+    (marked done, or the step it covers is checked off)."""
     from services.google_sync import _block_titles
     user_id = get_user_id(authorization)
     now = datetime.now(timezone.utc)
-    rows = get_supabase().table("study_blocks").select("id,item_key,kind,step_id,starts_at,ends_at") \
+    db = get_supabase()
+    rows = db.table("study_blocks").select("id,item_key,kind,step_id,status,starts_at,ends_at") \
         .eq("user_id", user_id).neq("status", "removed") \
         .gte("ends_at", (now - timedelta(days=max(0, min(days_back, 120)))).isoformat()) \
         .lte("starts_at", (now + timedelta(days=max(1, min(days_ahead, 180)))).isoformat()) \
         .order("starts_at").limit(500).execute().data or []
-    titles = _block_titles(user_id, rows) if rows else {}
+    if not rows:
+        return {"blocks": []}
+    items = calendar_for(user_id).get("items") or []
+    titles = _block_titles(user_id, rows, items)
+    courses = {item["id"]: item.get("course") for item in items}
+    step_ids = [row["step_id"] for row in rows if row.get("step_id")]
+    steps_done = {row["id"] for row in db.table("assignment_steps").select("id,done").eq("user_id", user_id)
+                  .in_("id", step_ids).execute().data or [] if row.get("done")} if step_ids else set()
     return {"blocks": [{"id": row["id"], "item_key": row["item_key"], "kind": row.get("kind") or "work",
-                        "title": titles.get(row["id"], "Study"), "starts_at": row["starts_at"], "ends_at": row["ends_at"]}
+                        "title": titles.get(row["id"], "Study"), "starts_at": row["starts_at"], "ends_at": row["ends_at"],
+                        "course": courses.get(row["item_key"]), "status": row.get("status") or "planned",
+                        "done": row.get("status") == "done" or row.get("step_id") in steps_done}
                        for row in rows]}
 
 

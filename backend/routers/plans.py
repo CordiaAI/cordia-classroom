@@ -9,7 +9,7 @@ Google through services.google_sync when the student has turned that sync on.
 import hashlib
 import logging
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Request
@@ -345,6 +345,110 @@ def schedule_plan(item_key: str, body: ScheduleRequest, request: Request, author
     # minutes_added below minutes_requested: the free time before the deadline ran out.
     return {"plan": _plan(user_id, item_key), "added": len(added), "minutes_added": block_minutes(added),
             "minutes_requested": max(wanted, block_minutes(added))}
+
+
+# ---- Study blocks moved, resized or added on the Calendar page ----
+
+BLOCK_MIN_MINUTES = 15
+BLOCK_MAX_MINUTES = 6 * 60
+
+
+class BlockTimes(BaseModel):
+    starts_at: datetime
+    ends_at: datetime
+
+
+class NewBlock(BaseModel):
+    item_key: str = Field(..., max_length=200)
+    # A time the student chose, or a day to find free time on (the Board's tray and Add study time).
+    starts_at: Optional[datetime] = None
+    day: Optional[date] = None
+    minutes: int = Field(default=60, ge=BLOCK_MIN_MINUTES, le=BLOCK_MAX_MINUTES)
+    time_zone: str = Field(default="", max_length=64)
+
+
+def _aware(value: datetime) -> datetime:
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+def _block_span(starts_at: datetime, ends_at: datetime) -> tuple[datetime, datetime]:
+    start, end = _aware(starts_at), _aware(ends_at)
+    minutes = (end - start).total_seconds() / 60
+    if minutes < BLOCK_MIN_MINUTES or minutes > BLOCK_MAX_MINUTES:
+        raise HTTPException(status_code=400, detail="Study time runs from 15 minutes to 6 hours.")
+    now = _now()
+    if start < now - timedelta(days=120) or start > now + timedelta(days=180):
+        raise HTTPException(status_code=400, detail="Pick a time within the next six months.")
+    return start, end
+
+
+def _block_out(user_id: str, row: dict, item: Optional[dict] = None) -> dict:
+    title = google_sync._block_titles(user_id, [row], [item] if item else None).get(row["id"], "Study")
+    return {"id": row["id"], "item_key": row["item_key"], "kind": row.get("kind") or "work", "title": title,
+            "starts_at": row["starts_at"], "ends_at": row["ends_at"], "course": (item or {}).get("course"),
+            "status": row.get("status") or "planned", "done": row.get("status") == "done"}
+
+
+@router.put("/calendar/blocks/{block_id}")
+@limiter.limit("60/minute")
+def move_block(block_id: str, body: BlockTimes, request: Request, authorization: str = Header(default="")):
+    """A study block dragged or resized on the Calendar page. It counts as the student's own move
+    (Plan my week learns their hour from it) and goes to Google Calendar when that sync is on."""
+    from ids import require_uuid
+    user_id = get_user_id(authorization)
+    require_uuid(block_id, "study block ID")
+    start, end = _block_span(body.starts_at, body.ends_at)
+    db = get_supabase()
+    found = db.table("study_blocks").select("id,status").eq("id", block_id).eq("user_id", user_id).neq("status", "removed") \
+        .limit(1).execute().data or []
+    if not found:
+        raise HTTPException(status_code=404, detail="That study time isn't on your calendar anymore.")
+    status = "done" if found[0].get("status") == "done" else "moved"
+    rows = db.table("study_blocks").update({"starts_at": start.isoformat(), "ends_at": end.isoformat(), "status": status,
+                                            "updated_at": _now().isoformat()}).eq("id", block_id).eq("user_id", user_id).execute().data or []
+    if not rows:
+        raise HTTPException(status_code=404, detail="That study time isn't on your calendar anymore.")
+    _push(user_id)
+    return {"block": _block_out(user_id, rows[0], next((i for i in calendar_for(user_id).get("items") or [] if i["id"] == rows[0]["item_key"]), None))}
+
+
+def _free_time_on(user_id: str, day: date, minutes: int, zone) -> tuple[datetime, datetime]:
+    """The first free stretch on `day` (Plan my week's study window, around busy times), as long as
+    `minutes` or as long as the day still holds."""
+    now = _now()
+    opens = max(datetime.combine(day, time(0), zone), planner._round_up(now + timedelta(minutes=15)))
+    closes = datetime.combine(day, time(23, 59), zone)
+    if opens >= closes:
+        raise HTTPException(status_code=400, detail="That day is over. Pick today or a later day.")
+    slots = planner.free_slots(_busy(user_id, opens, closes), opens, closes, zone)
+    size = min(minutes, planner._room(slots)) if slots else 0
+    placed = planner._block(slots, day, size, zone, _preferred_hour(user_id, zone)) if size >= planner.MIN_BLOCK else None
+    if not placed:
+        raise HTTPException(status_code=409, detail="There's no free time left that day. Try another day.")
+    return placed
+
+
+@router.post("/calendar/blocks")
+@limiter.limit("30/minute")
+def add_block(body: NewBlock, request: Request, authorization: str = Header(default="")):
+    """Study time for one deadline, added from the Calendar page: at the time the student picked,
+    or in the first free time on the day they dropped it on."""
+    user_id = get_user_id(authorization)
+    item = _item(user_id, _key(body.item_key))
+    zone = _zone(user_id, body.time_zone)
+    if body.starts_at:
+        start, end = _block_span(body.starts_at, _aware(body.starts_at) + timedelta(minutes=body.minutes))
+    elif body.day:
+        start, end = _block_span(*_free_time_on(user_id, body.day, body.minutes, zone))
+    else:
+        raise HTTPException(status_code=400, detail="Pick a day or a time.")
+    row = {"user_id": user_id, "item_key": item["id"], "kind": "review" if _is_exam(user_id, item) else "work",
+           "starts_at": start.isoformat(), "ends_at": end.isoformat()}
+    made = (get_supabase().table("study_blocks").insert(row).execute().data or [None])[0]
+    if not made:
+        raise HTTPException(status_code=503, detail="That study time wasn't saved. Try again.")
+    _push(user_id)
+    return {"block": _block_out(user_id, made, item)}
 
 
 class ReviewRequest(BaseModel):
