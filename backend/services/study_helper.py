@@ -47,7 +47,9 @@ COMPOUND_TESTS = {"unit", "t", "z", "f", "chi", "chi-square", "allen", "howey", 
 ASKS_ABOUT = re.compile(r"^\s*(?:what|why|how|who|when|where|which|explain|describe|define|is|are|does|do|did)\b", re.IGNORECASE)
 ASKS_FOR_HELP = re.compile(
     r"\b(?:help|what\s+(?:should|do|can)\s+i\s+(?:do|study|start)|where\s+(?:do|should)\s+i\s+(?:start|begin)|"
-    r"how\s+(?:do|should|can)\s+i\s+(?:study|prep|prepare|get\s+ready|start)|plan)\b",
+    r"how\s+(?:do|should|can)\s+i\s+(?:study|prep|prepare|get\s+ready|start)|plan|"
+    # An offer to study together: "can we study for my biology exam?", "could you review for my final?".
+    r"(?:can|could|will|would)\s+(?:we|you)\s+(?:please\s+)?(?:study|prep|prepare|review|revise|cram|get\s+ready))\b",
     re.IGNORECASE,
 )
 # "Learn" as the product, not the verb: "make a Learn for it", "set up Learn for my exam", "build a learn set",
@@ -82,8 +84,18 @@ def asks_to_study_for_test(text: str) -> bool:
     return False
 
 
+# A question about Learn ("how does a Learn session work?", "what is a Learn set?", "can you explain a Learn
+# round?") asks what it is; it doesn't ask for one to be built or opened.
+ASKS_ABOUT_LEARN = re.compile(
+    r"^\s*(?:(?:what|why|how|who|when|where|which|is|are|does|did|do\s+(?:you|we|i|they))\b|"
+    r"(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?)?(?:explain|describe|define|tell\s+me)\b)",
+    re.IGNORECASE,
+)
+
+
 def asks_for_learn(text: str) -> bool:
-    return bool(LEARN_REQUEST.search(text or ""))
+    return any(LEARN_REQUEST.search(sentence) and not ASKS_ABOUT_LEARN.search(sentence)
+               for sentence in re.split(r"(?<=[.?!;])\s+", (text or "").strip()))
 
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]

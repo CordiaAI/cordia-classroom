@@ -119,6 +119,32 @@ class IntentTests(unittest.TestCase):
                 with self.subTest(discipline=discipline, question=question):
                     self.assertTrue(study_helper.asks_to_study_for_test(question))
 
+    def test_a_question_asking_to_study_for_a_test_the_student_sits_is_a_plan_request(self):
+        for question in ["Can we study for my biology exam?", "Could you help me study for my contracts final?",
+                         "Will you help me prep for my art history midterm?", "Can you review for my nursing pharmacology quiz?",
+                         "Could we get ready for my literature test on Friday?", "Can we study for the CS 101 final?"]:
+            with self.subTest(question=question):
+                self.assertTrue(study_helper.asks_to_study_for_test(question))
+
+    def test_a_question_about_the_content_of_a_test_is_not(self):
+        for question in ["What will be on the test about mitosis?", "Can we review the Howey test for securities?",
+                         "Could you explain what the final exam covers?", "Can you study this practice test question with me?",
+                         "Can we go over my unit tests?"]:
+            with self.subTest(question=question):
+                self.assertFalse(study_helper.asks_to_study_for_test(question))
+
+    def test_a_question_about_learn_is_not_a_learn_request(self):
+        for question in ["How does a Learn session work?", "What is a Learn set?", "Why does a Learn round start with a quiz?",
+                         "Can you explain a Learn session?", "Is a Learn set the same as flashcards?"]:
+            with self.subTest(question=question):
+                self.assertFalse(study_helper.asks_for_learn(question))
+
+    def test_requests_for_learn_stay_requests_even_when_polite_or_after_a_question(self):
+        for question in ["Make a Learn for it", "Open Learn on this", "Can you make a Learn set from my notes?",
+                         "Could you open a Learn session for my chem notes?", "How does it work? Make a Learn for it."]:
+            with self.subTest(question=question):
+                self.assertTrue(study_helper.asks_for_learn(question))
+
     def test_learn_as_a_verb_is_not_a_learn_request(self):
         self.assertEqual([text for text in LEARN_ORDINARY if study_helper.asks_for_learn(text)], [])
 
