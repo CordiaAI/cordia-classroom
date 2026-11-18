@@ -362,6 +362,7 @@ async function install(context, state) {
     if (path.match(/^\/connectors\/[a-z]+\/files/)) return json({ files: [{ id: 'f1', title: 'Biology lecture 4 notes', kind: 'doc', edited: '2026-10-20' }, { id: 'f2', title: 'Syllabus', kind: 'pdf', edited: '2026-09-01' }] });
     if (path.match(/^\/connectors\/[a-z]+\/import$/)) return json({ title: 'Biology lecture 4 notes', text: 'Osmosis is the movement of water across a membrane.' });
     if (path === '/tutor/session/new') {
+      if (state.tutor.status && state.tutor.status !== 'idle') return route.fulfill({ status: 409, json: { detail: 'Wait for Cordia Tutor to finish before starting a new chat' } });
       state.chats = state.chats || [];
       const resumed = body.resume_id && state.chats.find(chat => chat.id === body.resume_id && !chat.deleted_at);
       if (body.resume_id && !resumed) return route.fulfill({ status: 404, json: { detail: 'Chat not found' } });

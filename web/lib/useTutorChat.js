@@ -63,7 +63,8 @@ const SKILL_PROGRESS = {
 // startWith: the chat page (pages/home.js): before the next message, start a new chat or open a saved
 // one (lib/chats.js); resolves to { session } to send in, or { ok: false } to stop (the question
 // goes back in the box). startMessages: what that conversation already holds, shown under the question.
-// onSendFailed({ status }): the Tutor didn't answer (a 404 or 409 from another tab, a plan limit).
+// onSendFailed({ status, detail, failed, question }): the Tutor didn't answer (a 404 or 409 from another
+// tab, a plan limit, no connection); the question is back in the box.
 // scopeClassId: the class picked in the composer ('' for all classes).
 // dropFiles: files dropped on the page attach here (off where another Tutor takes them).
 export function useTutorChat({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '', freshOnMount = false, resumeChatId = '', assignment = null, initialPrompt = '', freshOnSend = false, startWith = null, startMessages = null, onSendFailed = null, scopeClassId = '', dropFiles = true } = {}) {
@@ -470,7 +471,7 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
       setLocalError(data?.answer || apiErrorMessage(data?.detail, 'Cordia could not answer that yet.'));
       const refreshed = await apiFetch('/tutor/session');
       if (refreshed?.id) setSession(refreshed);
-      onSendFailed?.({ status: data?.httpStatus || 0, question });
+      onSendFailed?.({ status: data?.httpStatus || 0, detail: data?.detail, failed: data?.failed, question });
     }
     setLoading(false);
   }

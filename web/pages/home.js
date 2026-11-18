@@ -9,14 +9,14 @@ import { loadHome } from '../lib/homeData';
 import { homeHeadline, homeSuggestions } from '../lib/homeText.mjs';
 import { useTutorChat } from '../lib/useTutorChat';
 import { refreshShell, shellActive, shellFlag, useNewShell } from '../lib/useNewShell';
-import { latestFolders, loadFolders, onFoldersChanged } from '../lib/folders';
+import { invalidateFolders, latestFolders, loadFolders, onFoldersChanged } from '../lib/folders';
 import { useProgress } from '../lib/progress';
 import { loadOnboarding, saveOnboardingStep } from '../lib/onboarding';
 import { dayOneFinished, startWalkthrough } from '../lib/walkthrough';
 import { chatTitle } from '../lib/shellTools.mjs';
 import { HOME_ROUTE } from '../lib/newShell.mjs';
 import { pageTitle } from '../lib/pageTitle';
-import { MESSAGES, sameConversation } from '../lib/chatStore.mjs';
+import { MESSAGES, outcome, sameConversation } from '../lib/chatStore.mjs';
 import {
   chatHref, deleteChat, getChat, keepOpenChat, loadChats, moveChat, openChat, renameChat, showChatMessage, startChat, tutorPageFor, useChats,
 } from '../lib/chats';
@@ -33,6 +33,8 @@ const PILL_ICONS = { learn: GraduationCap, cards: Layers, plan: CalendarCheck };
 // same move runs back when the first message can't be sent (a plan limit), so nothing snaps.
 const MOVE = { duration: 280, easing: 'cubic-bezier(0.77, 0, 0.175, 1)' };
 const CHAT_ROUTE = '/chat/[id]';
+// Answers that mean another tab changed things (lib/chatStore.mjs outcome).
+const STALE = ['gone', 'moved', 'busy', 'missing'];
 const safe = promise => promise.catch(() => null);
 const one = value => (Array.isArray(value) ? value[0] : value);
 
@@ -130,11 +132,18 @@ function ChatScreen({ routeId, goTo, progress }) {
   const menuButton = useRef(null);
   const createdHere = useRef(false);
 
+  // Something another tab did (a 404 or 409): one plain line above the composer with the way
+  // forward, and the list looked at again. The typed text stays where it is. When the conversation
+  // moved on, the chat is read again first, so carrying on opens it properly (lib/chats.js openChat).
+  const reload = useRef(null);
   const report = useCallback(result => {
-    if (result.reason === 'gone' || result.reason === 'moved') {
-      setNotice({ reason: result.reason, text: MESSAGES[result.reason] });
-      loadChats({ fresh: true });
-    } else if (result.reason !== 'limit') showChatMessage(result.message);
+    const reason = result.reason;
+    if (!STALE.includes(reason)) { if (reason !== 'limit') showChatMessage(result.message); return; }
+    const show = () => { if (alive.current) setNotice({ reason, text: result.message || MESSAGES[reason] }); };
+    if (reason === 'missing') invalidateFolders();
+    loadChats({ fresh: true });
+    if (reason === 'moved' && chatRef.current?.id) reload.current(chatRef.current.id, { again: true }).then(done => { if (done === 'ok') show(); });
+    else show();
   }, []);
 
   // A new chat for the first message (from the home, or after this chat was deleted elsewhere).
@@ -142,8 +151,9 @@ function ChatScreen({ routeId, goTo, progress }) {
     const result = await startChat({ session, guideId: material?.kind === 'guide' ? material.id : null, classId: classId || null });
     if (!alive.current) return { ok: false };
     if (!result.ok) {
-      if (result.reason === 'moved') setNotice({ reason: 'moved', text: MESSAGES.moved });
-      return { ok: false, message: result.reason === 'moved' ? '' : result.message };
+      const stale = STALE.includes(result.reason);
+      if (stale) report(result);
+      return { ok: false, message: stale || result.reason === 'limit' ? '' : result.message };
     }
     createdHere.current = true;
     const next = { ...result.chat, class_id: result.chat.class_id || classId || null };
@@ -160,7 +170,7 @@ function ChatScreen({ routeId, goTo, progress }) {
     if (!alive.current) return { ok: false };
     if (!result.ok) {
       report(result);
-      return { ok: false, message: ['gone', 'moved'].includes(result.reason) ? '' : result.message };
+      return { ok: false, message: [...STALE, 'limit'].includes(result.reason) ? '' : result.message };
     }
     setChat(result.chat);
     setNotice(null);
@@ -168,18 +178,18 @@ function ChatScreen({ routeId, goTo, progress }) {
     return { session: result.session };
   }
 
-  const onSendFailed = useCallback(({ status, messages }) => {
-    if (status === 409) { setNotice({ reason: 'moved', text: MESSAGES.moved }); loadChats({ fresh: true }); return; }
-    if (status === 404) { setNotice({ reason: 'gone', text: MESSAGES.gone }); loadChats({ fresh: true }); return; }
+  const onSendFailed = useCallback(({ status, detail }) => {
+    const reason = outcome({ httpStatus: status, detail });
+    if (STALE.includes(reason)) { report({ reason, message: MESSAGES[reason] }); return; }
     // The first message from the home didn't go through (a plan limit, or no connection): the page
-    // goes back to the home it was, with the question still in the box.
-    if (createdHere.current && Array.isArray(messages) && messages.length === 0) {
+    // goes back to the home it was, the same move in reverse, with the question still in the box.
+    if (createdHere.current) {
       createdHere.current = false;
       setChat(null);
       keepOpenChat(null);
       goTo('');
     }
-  }, [goTo]);
+  }, [goTo, report]);
 
   const starting = !chat || notice?.reason === 'gone' ? startNew : !chat.live ? openSaved : null;
   const tutor = useTutorChat({
@@ -192,35 +202,44 @@ function ChatScreen({ routeId, goTo, progress }) {
 
   // A chat at /chat/<id>: load it. Only Tutor calls on this backend: a saved chat opens by moving
   // back into the Tutor (its address becomes the live conversation's).
+  // One load at a time per chat (development runs effects twice; opening a saved chat on the first
+  // backend moves it into the Tutor, so it must not run twice).
+  const loadingChat = useRef('');
   const loadChat = useCallback(async (id, { again = false } = {}) => {
-    const result = await getChat(id);
-    if (!alive.current) return;
-    if (result.ok && result.mustOpen) {
-      const opened = await openChat(id, {});
-      if (!alive.current) return;
-      if (opened.ok) {
-        setChat(opened.chat);
-        setClassId(opened.chat.class_id || '');
-        setNotice(null);
-        setPhase('ready');
-        if (opened.chat.id !== id) goTo(opened.chat.id);
-        return;
+    if (loadingChat.current === id) return 'pending';
+    loadingChat.current = id;
+    try {
+      const result = await getChat(id);
+      if (!alive.current) return 'left';
+      if (result.ok && result.mustOpen) {
+        const opened = await openChat(id, {});
+        if (!alive.current) return 'left';
+        if (opened.ok) {
+          setChat(opened.chat);
+          setClassId(opened.chat.class_id || '');
+          setNotice(null);
+          setPhase('ready');
+          if (opened.chat.id !== id) goTo(opened.chat.id);
+          return 'ok';
+        }
+        Object.assign(result, opened);
       }
-      Object.assign(result, opened);
-    }
-    if (!result.ok) {
-      const reason = ['gone', 'moved'].includes(result.reason) ? 'gone' : 'network';
-      if (!chatRef.current) setPhase(reason === 'gone' ? 'gone' : 'failed');
-      else setNotice({ reason, text: reason === 'gone' ? MESSAGES.gone : result.message });
-      if (reason === 'gone') loadChats({ fresh: true });
-      return;
-    }
-    seen.current = null;
-    setChat(result.chat);
-    if (!again) setClassId(result.chat.class_id || '');
-    setNotice(null);
-    setPhase('ready');
+      if (!result.ok) {
+        const reason = result.reason === 'network' || result.reason === 'error' ? 'network' : 'gone';
+        if (!chatRef.current) setPhase(reason === 'gone' ? 'gone' : 'failed');
+        else setNotice({ reason, text: reason === 'gone' ? MESSAGES.gone : result.message });
+        if (reason === 'gone') loadChats({ fresh: true });
+        return reason;
+      }
+      seen.current = null;
+      setChat(result.chat);
+      if (!again) setClassId(result.chat.class_id || '');
+      setNotice(null);
+      setPhase('ready');
+      return 'ok';
+    } finally { loadingChat.current = ''; }
   }, [goTo]);
+  reload.current = loadChat;
   useEffect(() => { if (routeId) loadChat(routeId); }, []);
 
   // While this chat is live its messages are the Tutor's conversation. If another tab moves the
@@ -243,6 +262,9 @@ function ChatScreen({ routeId, goTo, progress }) {
     });
   }, [chat?.id, chat?.live, trusted, version, tutor.loading]);
 
+  // Once the Tutor has answered, the chat is a chat: a later failure no longer sends the page home.
+  useEffect(() => { if (createdHere.current && tutor.messages.some(message => message.role !== 'user')) createdHere.current = false; }, [tutor.messages]);
+
   const messages = !chat ? tutor.messages
     : chat.live ? (trusted ? sessionMessages : seen.current || chat.messages || [])
       : tutor.loading ? sessionMessages : chat.messages || [];
@@ -260,7 +282,13 @@ function ChatScreen({ routeId, goTo, progress }) {
   const [classes, setClasses] = useState(() => (latestFolders() ? sidebarClasses(latestFolders()) : []));
   useEffect(() => {
     let live = true;
-    const load = () => loadFolders().then(result => { if (live && Array.isArray(result?.folders)) setClasses(sidebarClasses(result.folders)); });
+    const load = () => loadFolders().then(result => {
+      if (!live || !Array.isArray(result?.folders)) return;
+      const next = sidebarClasses(result.folders);
+      setClasses(next);
+      // A class deleted in another tab can't stay picked.
+      setClassId(picked => (picked && !next.some(item => String(item.id) === picked) ? '' : picked));
+    });
     load();
     const off = onFoldersChanged(load);
     return () => { live = false; off(); };
@@ -292,7 +320,8 @@ function ChatScreen({ routeId, goTo, progress }) {
   const chip = classes.find(item => String(item.id) === String(chipId || ''));
 
   // The open chat stays in Recent chats, marked current, while it is open.
-  useEffect(() => { keepOpenChat(chat ? { ...chat, title: chat.title || chatTitle(messages) } : null); }, [chat?.id, chat?.title, chat?.class_id, chat?.live, messages[0]?.text]);
+  const gone = notice?.reason === 'gone';
+  useEffect(() => { keepOpenChat(chat && !gone ? { ...chat, title: chat.title || chatTitle(messages) } : null); }, [chat?.id, chat?.title, chat?.class_id, chat?.live, messages[0]?.text, gone]);
   useEffect(() => () => keepOpenChat(null), []);
 
   // Home to chat, and back: the composer slides from where it was to where it is now; the
@@ -371,6 +400,9 @@ function ChatScreen({ routeId, goTo, progress }) {
     { key: 'delete', label: 'Delete', icon: Trash2, danger: editable, disabled: !editable, onSelect: removeChat },
   ];
 
+  // After a notice's button goes away, focus goes back to the message box.
+  const focusComposer = () => requestAnimationFrame(() => tutor.rootRef.current?.querySelector('.composer-box')?.focus({ preventScroll: true }));
+
   const headline = homeHeadline(data?.exam, data?.plan, data?.className);
   const pills = homeSuggestions({
     learn: data?.exam ? { title: data.exam.title, guideId: data.exam.guideId, date: data.exam.date } : null,
@@ -443,10 +475,15 @@ function ChatScreen({ routeId, goTo, progress }) {
               <div className="chat-notice" role="status">
                 <span className="chat-notice-text">{notice.text}</span>
                 <span className="chat-notice-actions">
-                  {notice.reason !== 'network' && (
-                    <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={() => loadChat(chat?.id || routeId, { again: true })}>Reload the chat</button>
+                  {['gone', 'moved'].includes(notice.reason) && (chat || routeId) && (
+                    <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={() => { loadChat(chat?.id || routeId, { again: true }); focusComposer(); }}>Reload the chat</button>
                   )}
-                  <Link href={HOME_ROUTE} className="c-btn c-btn--quiet c-btn--sm">Go to the home</Link>
+                  {notice.reason === 'network' && (
+                    <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={() => { loadChat(chat?.id || routeId, { again: true }); focusComposer(); }}>Try again</button>
+                  )}
+                  {['gone', 'moved'].includes(notice.reason) && (chat || routeId)
+                    ? <Link href={HOME_ROUTE} className="c-btn c-btn--quiet c-btn--sm">Go to the home</Link>
+                    : <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={() => { setNotice(null); focusComposer(); }}>Dismiss</button>}
                 </span>
               </div>
             )}

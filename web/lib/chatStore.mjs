@@ -28,6 +28,8 @@ export const MESSAGE_MS = 5000;
 export const MESSAGES = {
   gone: 'This chat was deleted or moved in another tab.',
   moved: 'This conversation moved on in another tab.',
+  busy: 'The Tutor is still answering. Wait for it to finish, then try again.',
+  missing: 'The class or material you picked was deleted in another tab. Pick another and try again.',
   purged: "This chat can't come back. It was deleted for good.",
   network: "Couldn't reach Classroom. Check your connection and try again.",
   unavailable: "You can't rename, move or delete chats yet.",
@@ -49,13 +51,22 @@ const DELETE_FAILED = {
 };
 
 // The meaning of one response. request() answers with the body plus its HTTP status (apiFetch's
-// withStatus), or { failed } when the request never got an answer.
+// withStatus), or { failed } when the request never got an answer. Every 404 and 409 another tab
+// can cause (docs/redesign/T5-backend-notes.md, "Stale tabs"):
+//   404 "Chat not found" / "That chat is already gone." / "That chat was deleted in another tab." -> gone
+//   404 "Class not found" / "Guide not found" (the class or material was deleted)  -> missing
+//   409 "Wait for Cordia Tutor to finish..." / "Cordia Tutor is already working..." -> busy
+//   409 "Tutor conversation changed. Refresh and try again."                       -> moved
+const BUSY = /wait for cordia tutor|already working on a request|received another request first/i;
+const MISSING = /^(class|guide) not found/i;
 export function outcome(response) {
   if (!response || response.failed) return 'network';
   const status = Number(response.httpStatus) || 0;
+  const detail = typeof response.detail === 'string' ? response.detail : '';
   if (status >= 200 && status < 300) return 'ok';
+  if (status === 404 && MISSING.test(detail)) return 'missing';
   if (status === 404 || status === 400) return 'gone';
-  if (status === 409) return 'moved';
+  if (status === 409) return BUSY.test(detail) ? 'busy' : 'moved';
   if (status === 402) return 'limit';
   if (status === 503 && response.code === 'chats_not_available') return 'unavailable';
   return 'error';
@@ -269,7 +280,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
   }
 
   // A new chat from a composer. The conversation it replaces is saved. { ok, chat, session }.
-  async function start({ session = null, guideId = null, classId = null } = {}) {
+  async function startChat({ session = null, guideId = null, classId = null } = {}) {
     await ready();
     if (mode === 'chats') {
       const data = await request('/chats', { method: 'POST', body: JSON.stringify({ guide_id: guideId || null, class_id: classId || null, session_id: session?.id ? String(session.id) : null }) });
@@ -291,6 +302,13 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
       refreshSoon();
     }
     return { ok: true, chat: { ...chatSummary({ id: next.id, guide_id: guideId, class_id: classId, live: true }), messages: [] }, session: next };
+  }
+
+  // Another tab changed things (a 404 or 409): look at the list again, so what shows is what is there.
+  async function start(options) {
+    const result = await startChat(options);
+    if (!result.ok && result.reason !== 'network') refreshSoon(0);
+    return result;
   }
 
   // Makes a saved chat the Tutor's current conversation, so the student can carry on in it. The
