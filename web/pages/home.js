@@ -154,7 +154,7 @@ function ChatScreen({ routeId, goTo, progress }) {
     return { session: result.session };
   }
 
-  // A saved chat carries on: it becomes the Tutor's conversation first (POST /chats/{id}/open).
+  // A saved chat carries on: it becomes the Tutor's conversation first (lib/chats.js openChat).
   async function openSaved({ session }) {
     const result = await openChat(chatRef.current.id, { session });
     if (!alive.current) return { ok: false };

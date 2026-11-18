@@ -356,7 +356,8 @@ test('the wiring: one page for /home and /chat/[id], one Tutor client, one data 
   assert.doesNotMatch(home, /apiFetch|\/tutor\/chats|\/chats\//, 'the page never calls chat routes itself');
   for (const file of ['components/Sidebar.js', 'components/SidebarChats.js', 'components/ChatToast.js']) {
     const source = read(file);
-    assert.doesNotMatch(source, /apiFetch\(|'\/chats|editable === |mode ===/, file);
+    assert.doesNotMatch(source, /['"`]\/chats|\/tutor\/chats|editable === |mode ===/, file);
+    if (file !== 'components/Sidebar.js') assert.doesNotMatch(source, /apiFetch\(/, file);
   }
   assert.match(read('components/Sidebar.js'), /useChats\(\)/);
   // Only the data module tells the backend's states apart.

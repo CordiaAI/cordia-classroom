@@ -56,21 +56,28 @@ test('one sidebar item is current: the class, the open chat or New chat, or the 
   const classIds = ['c-ma125', 'c-bus101'];
   assert.equal(sidebarCurrent('/folder/[id]', { id: 'c-bus101' }, { classIds }), 'class:c-bus101');
   assert.equal(sidebarCurrent('/folder/[id]', { id: 'c-eh101' }, { classIds }), '');
-  assert.equal(sidebarCurrent('/tutor', {}, { liveChat: false }), 'new');
-  assert.equal(sidebarCurrent('/tutor', {}, { liveChat: true }), 'chat:live');
+  assert.equal(sidebarCurrent('/tutor', {}, { liveChatId: '' }), 'new');
+  assert.equal(sidebarCurrent('/tutor', {}, { liveChatId: 'c-live' }), 'chat:c-live');
+  assert.equal(sidebarCurrent('/chat/[id]', { id: 'c-2' }), 'chat:c-2');
+  assert.equal(sidebarCurrent('/home'), 'new');
   assert.equal(sidebarCurrent('/settings'), 'account');
   assert.equal(sidebarCurrent('/library'), '');
   assert.equal(MAX_CLASSES, 5);
 });
 
-test('Recent chats: the open conversation first, then saved chats, newest first', () => {
-  const live = [{ role: 'user', text: '  Why does   the chain rule work?' }, { role: 'assistant', text: 'Because…' }];
-  const saved = [{ id: 'chat-2', title: 'Career portfolio outline' }, { id: 'chat-1', title: '' }];
-  const chats = recentChats(live, saved);
+test('Recent chats: the rows the saved-chats store gives, newest first, each opening at its own address', () => {
+  const stored = [
+    { id: 'c-live', title: 'Why does the chain rule work?', live: true, class_id: 'c-ma125' },
+    { id: 'chat-2', title: 'Career portfolio outline', class_id: null },
+    { id: 'chat-1', title: '' },
+  ];
+  const chats = recentChats(stored);
   assert.deepEqual(chats.map(chat => chat.title), ['Why does the chain rule work?', 'Career portfolio outline', 'Tutor chat']);
-  assert.equal(chats[0].href, '/tutor');
-  assert.equal(chats[1].href, '/tutor?chat=chat-2');
-  assert.deepEqual(recentChats([], saved).map(chat => chat.key), ['chat:chat-2', 'chat:chat-1']);
+  assert.deepEqual(chats.map(chat => chat.href), ['/chat/c-live', '/chat/chat-2', '/chat/chat-1']);
+  assert.deepEqual(chats.map(chat => chat.key), ['chat:c-live', 'chat:chat-2', 'chat:chat-1']);
+  assert.equal(chats[0].classId, 'c-ma125');
+  assert.deepEqual(recentChats(null), []);
+  assert.equal(recentChats(stored, 2).length, 2);
   assert.equal(chatTitle([{ role: 'user', text: 'x'.repeat(100) }]).length, 78);
 });
 
