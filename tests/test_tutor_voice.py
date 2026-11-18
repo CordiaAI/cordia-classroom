@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
 from main import app
+from rate_limit import limiter
 from routers import chat
 from services.llm import answer_question
 from services.tutor_voice import UNCHECKED_NOTE, ground_general_answer, plain_opening, states_specifics
@@ -94,6 +95,7 @@ class PromptTests(unittest.TestCase):
 class RouteTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        limiter.reset()  # /chat allows 30 a minute per client; other modules' tests use it too
 
     def ask(self, reply, body):
         ai = MagicMock()

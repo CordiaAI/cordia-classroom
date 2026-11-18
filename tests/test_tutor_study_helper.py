@@ -12,7 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT / "tests"))
 
-from main import app  # noqa: E402
+from main import app
+from rate_limit import limiter  # noqa: E402
 from routers import chat  # noqa: E402
 from services import study_helper  # noqa: E402
 from fake_supabase import FakeDB  # noqa: E402
@@ -108,6 +109,7 @@ class PlanTextTests(unittest.TestCase):
 class ChatRouteTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        limiter.reset()  # /chat allows 30 a minute per client; other modules' tests use it too
         self.db = FakeDB()
         self.db.rows("study_guides").extend([
             {"id": GUIDE, "user_id": ME, "title": "Biology: Cells", "folder_id": None, "study_guide": "Q1: What is a cell?\nA1: A unit.",
@@ -218,6 +220,7 @@ class ChatRouteTests(unittest.TestCase):
 class CheckinRouteTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        limiter.reset()  # /chat allows 30 a minute per client; other modules' tests use it too
         self.db = FakeDB()
         self.db.rows("study_guides").extend([
             {"id": GUIDE, "user_id": ME, "title": "Biology: Cells"},
