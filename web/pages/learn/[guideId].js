@@ -591,7 +591,7 @@ export default function LearnPage() {
           <div className="learn-actions">
             {!allMastered || tally.fading > 0 ? (
               <button type="button" className="c-btn c-btn--primary c-btn--lg" onClick={startRound}>
-                <Play {...ICON} />{tally.new === tally.total ? 'Start learning' : 'Next round'}
+                <Play {...ICON} />{checkin === 'pending' ? 'Start the check-in quiz' : tally.new === tally.total ? 'Start learning' : 'Next round'}
               </button>
             ) : null}
             {allMastered && (

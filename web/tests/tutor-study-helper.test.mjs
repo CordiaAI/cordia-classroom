@@ -102,6 +102,13 @@ test('the check-in starts by itself once, on the first load only; later visits t
   assert.equal((learn.match(/startRound\(\);/g) || []).length, 1);
 });
 
+// ---- Third review (F6d): Low 7 ----
+
+test('the overview start button says it starts the check-in while the check-in is waiting', () => {
+  const overview = learn.slice(learn.indexOf('<div className="learn-actions">'), learn.indexOf('{allMastered && ('));
+  assert.match(overview, /onClick=\{startRound\}>\s*<Play \{\.\.\.ICON\} \/>\{checkin === 'pending' \? 'Start the check-in quiz' : tally\.new === tally\.total \? 'Start learning' : 'Next round'\}/);
+});
+
 test('a plan button ignores clicks while its working mark is still showing', () => {
   assert.match(actions, /onClick=\{\(\) => \{ if \(!working && !marked\) run\(action\); \}\}/);
 });
