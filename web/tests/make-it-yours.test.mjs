@@ -17,6 +17,20 @@ test('Search finds the sheet by theme, make it yours, dark mode and appearance, 
   }
 });
 
+test('Search finds the sheet for what a student types to change how Cordia looks, several words and a plural included', () => {
+  for (const query of ['dark theme', 'font size', 'fonts', 'colors', 'colours', 'light theme', 'accent colour', 'turn on dark mode', 'Turn on DARK mode', 'change the font size', 'larger text', 'switch to night mode',
+    'background color', 'dark-mode', 'dark theme!', 'dark the', 'change the accent colou', 'colors fonts']) {
+    assert.equal(matchesMakeItYours(query), true, query);
+  }
+});
+
+test('Search does not find the sheet when the query carries a word that is not about looks', () => {
+  for (const query of ['dark matter', 'dark matter and dark energy', 'theme park design', 'colour theory', 'color theory of the renaissance', 'glass transition', 'font of knowledge', 'size of a cell', 'light microscopy', 'text message', 'night shift nursing', 'accent marks in french',
+    'turn on', 'change the', 'mode', 'size', 'on', 'it']) {
+    assert.equal(matchesMakeItYours(query), false, query);
+  }
+});
+
 test('Glass shows Frosted for auto (Solid when the device asks for less transparency) and is Solid under Paper & Clay', () => {
   assert.equal(shownGlass(DEFAULT_SETTINGS), 'frosted');
   assert.equal(shownGlass(DEFAULT_SETTINGS, true), 'solid');
@@ -135,4 +149,36 @@ test('Larger text scales every text size: no font size or line height left in px
   const report = execFileSync(process.execPath, [new URL('../scripts/px-to-rem.mjs', import.meta.url).pathname], { encoding: 'utf8' });
   assert.match(report, /^0 declarations to convert/m, report);
   assert.match(await source('styles/glass.css'), /font-size: 16px !important/);
+});
+
+test('the Undo toast never moves the sheet: no room that appears with it, a token for its height, a hint for the custom colour', async () => {
+  const sheet = await source('components/MakeItYours.js');
+  const tokens = await source('styles/tokens.css');
+  const system = await source('styles/system.css');
+  // The sheet makes no room that appears with the toast (it did, as --miy-toast-room, and the whole sheet jumped):
+  // the toast is placed in the footer's gap between Reset and Done, once, when it appears.
+  assert.doesNotMatch(sheet, /miy-toast-room|toast-room|:has\(\.miy-toast\)|78px/);
+  assert.match(sheet, /max-height: calc\(100dvh - 32px\);/);
+  assert.match(sheet, /onReset\(previous, resetRef\.current\)/);
+  assert.match(sheet, /bottom: `calc\(\$\{Math\.round\(window\.innerHeight - \(row\.top \+ row\.bottom\) \/ 2\)\}px - var\(--toast-h\) \/ 2\)`/);
+  assert.match(sheet, /style=\{undo\.place \|\| undefined\}/);
+  // On phones the toast sits above the footer; the footer's height is the one the toast's offset reads.
+  assert.match(sheet, /\.c-toast\.miy-toast \{ bottom: calc\(var\(--miy-foot-h\) \+ env\(safe-area-inset-bottom\) \+ var\(--toast-gap\)\) !important; \}/);
+  assert.match(sheet, /\.miy-foot \{ box-sizing: border-box; min-height: calc\(var\(--miy-foot-h\) \+ env\(safe-area-inset-bottom\)\);/);
+  assert.match(tokens, /--toast-h: 62px; --toast-bottom: 24px; --toast-gap: 16px;/);
+  assert.match(system, /\.c-toast \{\n  position: fixed; left: 50%; bottom: var\(--toast-bottom\);[^}]*min-height: var\(--toast-h\);/);
+  // Phones: the theme tiles' two rows are the same height; the custom colour says what it does.
+  assert.match(sheet, /\.miy-themes \{ grid-auto-flow: row; grid-template-columns: repeat\(4, minmax\(0, 1fr\)\); grid-auto-rows: 1fr; \}/);
+  assert.match(sheet, /data-opens-picker="" title="Custom colour" aria-describedby="miy-custom-hint"/);
+  assert.match(sheet, /<span id="miy-custom-hint" className="sr-only">Opens a colour picker<\/span>/);
+});
+
+test('/pricing keeps the plan buttons even in a narrow card, and the spec says seven tiles', async () => {
+  const pricing = await source('pages/pricing.js');
+  assert.match(pricing, /container-type: inline-size/);
+  assert.match(pricing, /\.pricing-btn\) \{ box-sizing: border-box; margin-top: auto;/, 'a bordered Current plan is as tall as the others');
+  assert.match(pricing, /@container \(max-width: 13\.5rem\) \{ \.pricing-card :global\(\.pricing-btn\) \{ min-height: calc\(2\.5em \+ 20px\); \} \}/);
+  const spec = await readFile(new URL('../../docs/redesign/DESIGN-SPEC.md', import.meta.url), 'utf8');
+  assert.match(spec, /Theme tiles: seven across on one row \(4 \+ 3 on phones\)/);
+  assert.doesNotMatch(spec, /Theme tiles: 6 across/);
 });

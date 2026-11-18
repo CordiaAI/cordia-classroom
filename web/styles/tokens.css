@@ -165,6 +165,9 @@
   /* Layout */
   --bar-h: 64px;
   --tabbar-h: 68px;
+  /* The toast: its height, its gap to the window's bottom edge, and the gap kept around it when it is placed over
+     something (components/MakeItYours.js puts it in the sheet's footer, or just above it on a phone). */
+  --toast-h: 62px; --toast-bottom: 24px; --toast-gap: 16px;
   --page-max: 1080px;
   --sidebar-width: 240px;
   --streak-width: 220px;

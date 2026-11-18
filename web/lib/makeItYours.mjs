@@ -13,15 +13,33 @@ export function openMakeItYours(returnTo = null) {
   window.dispatchEvent(new CustomEvent(MAKE_IT_YOURS_EVENT, { detail: { returnTo } }));
 }
 
-// Search finds the sheet by these words, whole (and while one is being typed: its first three letters or more, so
-// "the" or "dar" already shows it). A query that only starts with one ("dark matter", "glass transition", "colour
-// theory") is class work, not the sheet. Compared without case or extra spaces. Search lists it after the student's
-// own matches (components/SearchModal.js).
+// Search finds the sheet by what a student would type to change how Cordia looks. Two ways in, compared without
+// case, punctuation or extra spaces:
+//  - the query is the start of one of SEARCH_WORDS (three letters or more, so "the" or "dar" already shows it);
+//  - every word of the query is a settings word and at least one names the subject ("dark theme", "font size",
+//    "fonts", "colors", "turn on dark mode", "change the accent colour"; the last word may still be mid-typing).
+// A query with any other word in it ("dark matter", "theme park design", "colour theory", "glass transition") is
+// class work, not the sheet. Search lists it after the student's own matches (components/SearchModal.js).
 export const SEARCH_WORDS = ['make it yours', 'theme', 'themes', 'dark mode', 'light mode', 'dark', 'appearance', 'accent', 'colour', 'color', 'background', 'font', 'text size', 'glass'];
+const SUBJECT_WORDS = ['yours', 'theme', 'themes', 'dark', 'light', 'night', 'appearance', 'accent', 'colour', 'colours', 'color', 'colors', 'background', 'font', 'fonts', 'text', 'glass'];
+const FILLER_WORDS = ['make', 'it', 'my', 'the', 'to', 'a', 'mode', 'size', 'bigger', 'larger', 'smaller', 'change', 'turn', 'switch', 'set', 'use', 'on', 'off'];
 export function matchesMakeItYours(query) {
   const q = String(query || '').toLowerCase().replace(/\s+/g, ' ').trim();
   if (q.length < 3) return false;
-  return SEARCH_WORDS.some(word => word.startsWith(q));
+  if (SEARCH_WORDS.some(word => word.startsWith(q))) return true;
+  const words = q.split(/[^a-z]+/).filter(Boolean);
+  if (!words.length) return false;
+  let subject = false;
+  for (let i = 0; i < words.length; i += 1) {
+    const word = words[i];
+    if (SUBJECT_WORDS.includes(word)) { subject = true; continue; }
+    if (FILLER_WORDS.includes(word)) continue;
+    // The word being typed: three letters or more of a settings word.
+    if (i === words.length - 1 && word.length >= 3 && SUBJECT_WORDS.some(known => known.startsWith(word))) { subject = true; continue; }
+    if (i === words.length - 1 && word.length >= 3 && FILLER_WORDS.some(known => known.startsWith(word))) continue;
+    return false;
+  }
+  return subject;
 }
 
 // Names the sheet shows (sentence case). Presets carry their own label.

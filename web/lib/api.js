@@ -1,4 +1,5 @@
 import { formatPhone } from './phone.mjs';
+import { LOOK_KEY } from './themeBoot.mjs';
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export const REQUEST_TIMEOUT_MS = 15000;
 // AI generation routinely takes 20-60s. Aborting early charged students for guides they
@@ -75,6 +76,16 @@ export function setToken(token, email, refreshToken, name = '') {
   notifyAuthChanged();
 }
 
+function clearLook() {
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const key = localStorage.key(i);
+      if (key && (key === LOOK_KEY || key.startsWith(`${LOOK_KEY}:`))) localStorage.removeItem(key);
+    }
+    localStorage.removeItem('theme');
+  } catch { /* storage blocked */ }
+}
+
 export function clearAuth() {
   localStorage.removeItem('authToken');
   localStorage.removeItem('userEmail');
@@ -83,6 +94,9 @@ export function clearAuth() {
   localStorage.removeItem('refreshToken');
   // The new shell's answer for this account (lib/newShell.mjs SHELL_CACHE).
   localStorage.removeItem('cordiaShell');
+  // The look kept on this device for the account (lib/theme.js, one key per account) and the old light/dark key
+  // that goes with it: the next account to sign in starts from the Cordia default, never this one's look.
+  clearLook();
   notifyAuthChanged();
 }
 

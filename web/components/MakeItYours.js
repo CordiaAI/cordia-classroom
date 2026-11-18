@@ -56,9 +56,19 @@ export default function MakeItYoursHost() {
     });
   }, []);
 
-  const showUndo = useCallback(previous => {
+  // Where the toast sits is decided once, when it appears, and the sheet never moves for it. On a window wide enough
+  // for the sheet to float in it, the toast goes in the middle of the sheet's footer, between Reset and Done (the
+  // gap there is wider than the toast), centred on the footer's row. On a phone the sheet is the whole window and
+  // the gap is too narrow, so the toast sits just above the footer (the style below).
+  const showUndo = useCallback((previous, resetButton) => {
     clearTimeout(undoTimer.current);
-    setUndo({ previous, key: Date.now() });
+    let place = null;
+    if (resetButton && !matches('(max-width: 767px)')) {
+      const row = resetButton.getBoundingClientRect(); // the buttons' own row: the footer's padding is not even
+      const foot = resetButton.parentElement.getBoundingClientRect();
+      place = { left: `${Math.round(foot.left + foot.width / 2)}px`, bottom: `calc(${Math.round(window.innerHeight - (row.top + row.bottom) / 2)}px - var(--toast-h) / 2)` };
+    }
+    setUndo({ previous, key: Date.now(), place });
     undoTimer.current = setTimeout(() => setUndo(null), UNDO_MS);
   }, []);
   useEffect(() => () => clearTimeout(undoTimer.current), []);
@@ -76,18 +86,22 @@ export default function MakeItYoursHost() {
       {open && <MakeItYoursSheet phase={phase} onClose={close} onReset={showUndo} toastRef={toastRef} />}
       {undo && (
         <BodyPortal>
-          <div key={undo.key} ref={toastRef} className="c-toast miy-toast" role="status">
+          <div key={undo.key} ref={toastRef} className="c-toast miy-toast" role="status" style={undo.place || undefined}>
             <span>Back to Cordia</span>
             <button type="button" className="c-btn c-btn--quiet" onClick={onUndo}>Undo</button>
           </div>
         </BodyPortal>
       )}
       <style jsx global>{`
-        /* Reset happens in the sheet, so its Undo toast is born over it: it sits at the top, centred on the window
-           like the sheet, and the sheet makes room under it, so it never covers the footer (Reset, Done) or the
-           title. It keeps that place for its six seconds, even if the sheet closes first. */
-        .c-toast.miy-toast { top: calc(16px + env(safe-area-inset-top)); bottom: auto !important; left: 50% !important; width: max-content; }
-        :root:has(.miy-toast) .miy-scrim { --miy-toast-room: calc(78px + env(safe-area-inset-top)); }
+        /* Reset happens in the sheet, so its Undo toast is born over it, and nothing moves when it comes or goes: it
+           sits in the footer's gap between Reset and Done (placed above, in showUndo) or, on a phone, just above the
+           footer, so it never covers Reset, Done or the title. It keeps that place for its six seconds, even if the
+           sheet closes first. */
+        :root { --miy-foot-h: 70px; }
+        .c-toast.miy-toast { width: max-content; max-width: calc(100vw - 32px); }
+        @media (max-width: 767px) {
+          .c-toast.miy-toast { bottom: calc(var(--miy-foot-h) + env(safe-area-inset-bottom) + var(--toast-gap)) !important; }
+        }
       `}</style>
     </>
   );
@@ -184,7 +198,7 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
     if (atDefault) return;
     const previous = validateSettings(settings);
     commit(defaultLook());
-    onReset(previous);
+    onReset(previous, resetRef.current);
   }
 
   const radioProps = (chosen, onPick) => ({
@@ -241,12 +255,13 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
                       </button>
                     ))}
                     <span className="miy-custom-slot">
-                      <button className={'miy-dot miy-custom' + (customChosen ? ' is-chosen' : '')} data-opens-picker="" title="Custom colour"
+                      <button className={'miy-dot miy-custom' + (customChosen ? ' is-chosen' : '')} data-opens-picker="" title="Custom colour" aria-describedby="miy-custom-hint"
                         aria-label={customChosen ? `Custom colour, ${settings.customAccent}` : 'Custom colour'} {...radioProps(customChosen, openPicker)}>
                         <span className="miy-dot-fill" style={customChosen ? { background: settings.customAccent } : undefined} aria-hidden="true">
                           {!customChosen && <Pipette size={16} strokeWidth={2} />}
                         </span>
                       </button>
+                      <span id="miy-custom-hint" className="sr-only">Opens a colour picker</span>
                       <input ref={pickerRef} type="color" className="miy-picker" tabIndex={-1} aria-hidden="true"
                         value={(pickerValue || '').toLowerCase()} onChange={onCustom} />
                     </span>
@@ -319,14 +334,13 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
         /* DESIGN-SPEC 3.5 and 4.6: an 880px sheet of solid menu glass, 28px corners, over a 22% ink scrim with a
            3px blur; a full-height sheet on phones. Every value is a token. */
         .miy-scrim {
-          --miy-toast-room: 0px;
-          position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: calc(16px + var(--miy-toast-room)) 16px 16px;
+          position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 16px;
           background: var(--scrim-sheet); -webkit-backdrop-filter: var(--scrim-sheet-blur); backdrop-filter: var(--scrim-sheet-blur);
           animation: miy-fade ${OPEN_MS}ms var(--ease) both;
         }
         .miy-scrim.is-closing { animation: miy-fade-out ${CLOSE_MS}ms var(--ease-exit) both; pointer-events: none; }
         .miy-sheet {
-          position: relative; display: flex; flex-direction: column; width: min(880px, 100%); max-height: calc(100dvh - 32px - var(--miy-toast-room));
+          position: relative; display: flex; flex-direction: column; width: min(880px, 100%); max-height: calc(100dvh - 32px);
           border-radius: var(--r-panel); border: 1px solid; border-color: var(--glass-rim-border);
           background: var(--lg-menu); color: var(--ink);
           box-shadow: var(--glass-shadow-edge), var(--lg-depth-float);
@@ -352,6 +366,9 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
         .miy-label { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; }
         .miy-label > span:first-child { font: 700 0.9375rem/1.3 var(--font-sans); color: var(--ink); }
         .miy-hint { font: 500 0.8125rem/1.4 var(--font-sans); color: var(--muted); }
+        /* Glass says why it is locked in two lines or one; it always keeps two, so Reset (which changes the look, and
+           with it this hint) never makes the sheet taller or shorter under the pointer. */
+        #miy-glass-hint { min-height: calc(2 * 1.4em); }
 
         /* Tiles: theme windows, backgrounds and fonts. Chosen: the 2px accent ring with its 5px halo. Hover lifts an
            unchosen tile 1px (pointer only); nothing changes colour. */
@@ -420,7 +437,7 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
         /* Phones: a full-height sheet; labels above their controls; every target at least 44px. */
         @media (max-width: 767px) {
           .miy-scrim { padding: 0; place-items: stretch; }
-          .miy-sheet { position: fixed; inset: var(--miy-toast-room) 0 0; width: auto; height: auto; max-height: none; border-radius: 0; border-width: 0; }
+          .miy-sheet { position: fixed; inset: 0; width: auto; height: auto; max-height: none; border-radius: 0; border-width: 0; }
           @keyframes miy-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
           @keyframes miy-sink { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(24px); } }
           .miy-head { padding: calc(16px + env(safe-area-inset-top)) 16px 8px; }
@@ -429,13 +446,13 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
           .miy-body { padding: 4px 16px 0; }
           .miy-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
           .miy-label { padding-top: 0; }
-          .miy-themes { grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+          .miy-themes { grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; }
           .miy-small { width: calc((100% - 20px) / 3); min-width: 92px; }
           /* Nine 44px choices are wider than a phone: five and four, not eight and a lone custom colour. */
           .miy-dots { display: grid; grid-template-columns: repeat(5, 44px); }
           .miy-seg { max-width: 100%; }
           .miy-seg > button { min-height: 44px; }
-          .miy-foot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+          .miy-foot { box-sizing: border-box; min-height: calc(var(--miy-foot-h) + env(safe-area-inset-bottom)); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
         }
         /* Less motion: the sheet and its scrim appear and go with no movement and no fade. */
         @media (prefers-reduced-motion: reduce) {
