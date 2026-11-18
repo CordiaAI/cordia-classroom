@@ -133,14 +133,21 @@ Goal: every tool page opens inside the new shell, and every feature in the featu
 3. Learn matches `screens/4-learn-in-shell.html`: the back link to the set, the round progress, the card, and "Ask the Tutor about this", which opens a chat with the question attached.
 4. A gatekeeper walk through the feature map finds every item at its listed place.
 
-## T9 Phone layout
+## T9 Phone layout (design B, "chat first")
 
-Goal: the redesign works on phones.
+Goal: on phones the redesign is chat first, as in the redesign canvas board "iPhone B" and DESIGN-SPEC 4.7. Replaces the earlier tab-bar design (owner's decision, 2026-11-18).
 
-1. Under 768px: the top bar and a bottom tab bar (Home, Classes, New chat in the middle, Library, Tools). The sidebar becomes a drawer from the top bar's menu button, with the same sections. Tools opens a sheet listing every rail tool with its name and one-line description.
-2. The composer sits at the bottom above the tab bar; home suggestions wrap to a second line rather than scroll, and the page never scrolls sideways.
-3. Tool panes open full screen with a back button. Swipe cards and tap-to-match keep working.
-4. Every tap target is at least 44px. Checked at 390 × 844.
+Under 768px, when the new-shell switch is on:
+
+1. No tab bar. A 52px top bar: a ☰ menu button at the left, the current class (or "All classes") as a pill picker in the middle, New chat at the right.
+2. Home is the chat: the exam headline and pace line, then swipeable suggestion cards (Start Learn, Review due flashcards, Plan the next deadline) just above the composer, then the composer pinned to the bottom above the home indicator (safe-area insets respected), with +, the class picker, voice and Send.
+3. Menu drawer: ☰ or a swipe in from the left edge opens a glass drawer about 320px wide over a dimmed page. It holds the wordmark, Search, Tools as round buttons in a 4-column grid (with More tools), Classes with readiness rings, Recent chats and the account row. Tap outside, swipe left or press Escape to close; focus is trapped while it is open.
+4. The + sheet: + in the composer opens a bottom sheet with a grab handle, a row of Camera, Photos and Files, then every tool as a large tile with its name, 4 to a row. Swipe down or tap outside to close.
+5. Other pages (guide, class, Library, Calendar, Settings): the same top bar with a back arrow instead of ☰ and the page title; content full width with 12px side margins.
+6. Study screens (Learn, Flashcards, Quiz, Practice, NCLEX, Study now) are full screen, with a close button and a progress bar at the top and answer controls within thumb reach.
+7. Calendar on phones is the Agenda view. Make it yours is a full-height sheet. A tool opened from a chat opens full screen, and back returns to the chat.
+8. Every tap target is at least 44px; no sideways scrolling; keyboard-aware (the composer rises with the keyboard and the last message stays visible); reduced motion respected; light and dark. Checked at 390 × 844 and 375 × 667.
+9. When the switch is off, phones keep today's layout exactly as now.
 
 ## T10 Make it yours
 

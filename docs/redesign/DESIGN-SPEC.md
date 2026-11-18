@@ -185,6 +185,18 @@ The home is an empty chat, like ChatGPT and Claude: nothing but a headline, the 
 - Text size, Appearance and Glass use the segmented control.
 - Footer above a hairline: "Reset to Cordia" (quiet) at the left, Done (accent glass) at the right.
 
+### 4.7 Phones (design B, "chat first"; canvas board "iPhone B")
+
+Under 768px with the new shell on. No tab bar.
+
+- **Top bar:** 52px. Home: ☰ (44px) at the left, the class pill picker ("All classes" or the course code) in the middle, New chat (44px) at the right. Other pages: a back arrow instead of ☰ and the page title instead of the picker. Content is full width with 12px side margins.
+- **Home:** the exam headline and pace line (4.1's copy, wrapped for the width), then swipeable suggestion cards (Start Learn, Review due flashcards, Plan the next deadline) just above the composer. The composer is pinned to the bottom above the home indicator (`env(safe-area-inset-bottom)`), with +, the class picker, voice and Send; it rises with the keyboard and the last message stays visible.
+- **Menu drawer:** ☰ or a swipe in from the left edge. About 320px wide, menu glass over a dimmed page (the 22% `ink` scrim). Wordmark, Search, Tools as round buttons in a 4-column grid with More tools, Classes with readiness rings (3.3), Recent chats, the account row. Closes on tap outside, swipe left or Escape; focus is trapped while open.
+- **+ sheet:** a bottom sheet with a grab handle; a row of Camera, Photos and Files; then every tool as a large tile with its name, 4 to a row. Closes on swipe down or tap outside.
+- **Study screens** (Learn, Flashcards, Quiz, Practice, NCLEX, Study now): full screen, a close button and the progress bar at the top, answer controls within thumb reach at the bottom.
+- **Elsewhere:** Calendar shows the Agenda view; Make it yours is a full-height sheet; a tool opened from a chat opens full screen and back returns to the chat.
+- Tap targets at least 44px, no sideways scrolling, reduced motion respected, light and dark. With the switch off, phones keep today's layout.
+
 ## 5. Copy
 
 - Sentence case everywhere, except the sidebar headings.
