@@ -4,7 +4,7 @@ import { BookOpen, Check, CircleDot, Lightbulb, Link2, MessageCircle, X } from '
 import { dismissTip, requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { noteView, useAnswerTiming } from '../lib/learningEvents';
-import { choiceText, conceptAnswer, fillVerdict, normalize, shuffled } from '../lib/retainEngine.mjs';
+import { canChoose, choiceText, conceptAnswer, fillVerdict, normalize, shuffled } from '../lib/retainEngine.mjs';
 import { makeCloze } from '../lib/learnEngine.mjs';
 
 // Learn's format ladder (LEARN_LADDER_V2) wraps a round in <QuietLimits.Provider value>: a plan limit
@@ -578,7 +578,7 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
           {error && (
             <>
               <span className="retain-action-error" role="alert">{error}</span>
-              <button type="button" className="c-btn c-btn--secondary" onClick={() => onSwitch('mc')}>Use choices</button>
+              {canChoose(question) && <button type="button" className="c-btn c-btn--secondary" onClick={() => onSwitch('mc')}>Use choices</button>}
             </>
           )}
         </div>

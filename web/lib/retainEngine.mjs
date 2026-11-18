@@ -17,6 +17,14 @@ export const LADDER_SPACING = 6;
 const LADDER_SPACING_MAX = 10;
 const MAX_REASKS = 8;
 const TERM_MAX_WORDS = 5;
+// A multiple choice question has 3 or 4 choices. A guide-derived question keeps only related,
+// fitting choices (2 to 4), so one left with two is never asked as multiple choice: Learn and
+// Quiz ask it by typing or writing instead. Mirrors backend/services/retain.py can_choose.
+export const MIN_CHOICES = 3;
+
+export function canChoose(question) {
+  return Array.isArray(question?.options) && question.options.length >= MIN_CHOICES;
+}
 
 export function conceptAnswer(question) {
   const options = question?.options || [];
@@ -118,7 +126,13 @@ function isTerm(question) {
 // A missed idea comes back in a slightly different form so position can't be memorised:
 // terms alternate fill in the blank / multiple choice, written answers alternate with
 // multiple choice (fewer AI checks), everything else is multiple choice with new option order.
+// An idea with fewer than MIN_CHOICES choices has no multiple choice form: it comes back typed
+// (Fill in the blank, when it is on) or written.
 export function reaskType(question, firstType, reaskNumber, selected) {
+  if (!canChoose(question)) {
+    const typed = firstType !== 'written' && isTerm(question) && (selected || []).includes('fill');
+    return typed && reaskNumber % 2 === 0 ? 'fill' : 'written';
+  }
   const allowed = new Set(['mc', ...(selected || [])]);
   let cycle = ['mc'];
   if (firstType === 'written') cycle = ['mc', 'written'];

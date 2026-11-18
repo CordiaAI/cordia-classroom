@@ -368,11 +368,19 @@ _SOURCE_NOUN = (r"(?:slide ?decks?|slides?|decks?|pages?|chapters?|sections?|mod
                 r"readings?|handouts?|documents?|presentations?|passages?|excerpts?|texts?|textbooks?|notes|outlines?|"
                 r"study guides?|videos?|transcripts?|syllabus|tables?|figures?|diagrams?|charts?|graphs?|"
                 r"images?|lists?)")
+# What may follow a source noun that is the source itself and not the start of a subject term: the
+# end of the clause, or a connector ("the section on torts", "this chapter and the next"). A noun
+# that runs on into another word is a term ("the List interface", "a page table", "the document
+# object model", "the section 8 voucher"): it names the subject, so it is never a source reference.
+# A verb after it ("this table shows") is the source acting, so it counts as a connector.
+_BOUNDARY = (r"(?=\s*(?:[?.,;:!)]|$)|\s+(?:on|about|of|for|from|and|or|but|that|which|what|who|how|why|by|in|at|"
+             r"above|below|here|earlier|before|after|says?|states?|shows?|lists?|covers?|describes?|mentions?|explains?|"
+             r"includes?|discusses|contains?|gives?)\b)")
 # A numbered part ("Chapter 3", "Section 4.2", "Slide 5"); a number that runs on into a name
 # ("Chapter 11 bankruptcy", "Section 2 of the Sherman Act") is the subject, not the source.
 _NUMBERED = r"\s*#?\s*\d+(?:\.\d+)*[a-z]?(?=\s*(?:[?.,;:!)]|$|\s+(?:and|or|that|which|what|who|how|why)\b))"
 _PART = rf"(?:(?:the|this|these|each|our|today'?s)\s+)?(?:(?:first|second|third|last|next|previous|current|final)\s+)?" \
-        rf"{_SOURCE_NOUN}(?:{_NUMBERED}|(?!\s*#?\s*\d))"
+        rf"{_SOURCE_NOUN}(?:{_NUMBERED}|(?!\s*#?\s*\d){_BOUNDARY})"
 _COVERAGE_VERB = (r"(?:listed|covered|discussed|introduced|presented|mentioned|described|named|outlined|reviewed|taught|"
                   r"shown|included|highlighted|identified|summari[sz]ed|assigned|studied|learned|featured|depicted|"
                   r"illustrated|explained|defined|displayed|pictured)")
@@ -382,7 +390,7 @@ _ABOUT_SOURCE = re.compile(
     rf"\b{_COVERAGE_VERB}\s+(?:in|on|for|under|during|throughout|from|at|by)\s+{_PART}"
     rf"|\b(?:key\s+)?(?:terms|vocabulary|concepts|topics|objectives|readings|themes|takeaways)\s+(?:for|of|in|from)"
     rf"\s+(?:(?:the|this)\s+)?(?:chapter|section|module|lecture|lesson|week|part|reading|slide|page)s?"
-    rf"(?:{_NUMBERED}|(?!\s*#?\s*\d))",
+    rf"(?:{_NUMBERED}|(?!\s*#?\s*\d){_BOUNDARY})",
     re.I)
 _POINTS_AT_SOURCE = re.compile(
     # "Slide 5", "page 12", "p. 12", "Figure 2", "Table 3", "Example 2", "Problem 4"
@@ -390,14 +398,17 @@ _POINTS_AT_SOURCE = re.compile(
     # "in Lecture 4", "for Module 2", "during Week 3" (but "week 20 of pregnancy" is a subject)
     r"|\b(?:in|from|during|for|after|before)\s+(?:the\s+)?(?:modules?|lectures?|lessons?|weeks?)\s+\d+\b(?!\s+of\b)"
     # "this chapter", "these slides", "the table above", "the following list"
-    rf"|\b(?:this|these|the\s+(?:above|following|preceding|previous|attached|provided))\s+(?:{_SOURCE_NOUN}|course)\b"
+    rf"|\b(?:this|these|the\s+(?:above|following|preceding|previous|attached|provided))\s+(?:{_SOURCE_NOUN}|course){_BOUNDARY}"
     rf"|\bthe\s+{_SOURCE_NOUN}\s+(?:above|below)\b"
     # "the lecture says", "listed in the document", "on the slides?" (not "the document object model",
     # nor "the slide" a specimen sits on)
     r"|\bthe\s+(?:slides|slide ?deck|lectures?|readings?|handouts?|documents?|study guide|transcripts?|videos?|"
     r"textbook|syllabus)(?=\s*(?:[?.,;:!)]|$)|\s+(?:says?|said|states?|stated|shows?|showed|lists?|describes?|mentions?|"
     r"covers?|discusses|explains?|defines?|gives?|gave|presents?|notes?|calls?|uses?|claims?|argues?|suggests?|"
-    r"includes?|identifies|highlights?|refers?|on|in|at|for|about)\b)"
+    r"includes?|identifies|highlights?|refers?)\b)"
+    # "on the slides", "in the lecture": not "the document in the chart", "the document for informed consent"
+    r"|\bthe\s+(?:slides|slide ?deck|lectures?|readings?|handouts?|study guide|transcripts?|videos?|"
+    r"textbook|syllabus)\s+(?:on|in|at|for|about)\b"
     # "listed above", "Which characters are listed?"
     r"|\blisted\s+(?:above|below|here|earlier|previously)\b"
     r"|\b(?:is|are|was|were)\s+(?:being\s+)?(?:listed|shown|described|mentioned|discussed|presented|introduced|"

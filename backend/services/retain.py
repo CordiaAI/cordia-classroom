@@ -46,6 +46,17 @@ def answer_shape(question: str, answer: str) -> str:
     return "sentence"
 
 
+MIN_CHOICES = 3  # a multiple choice question needs at least this many choices (3 or 4); fewer is never asked as one
+
+
+def can_choose(question: dict) -> bool:
+    """Whether a question has enough choices to be asked as multiple choice. A guide-derived question
+    keeps only related, fitting choices (2 to 4), so one left with two is asked by typing it or
+    writing it instead: web/lib/retainEngine.mjs canChoose is the same rule."""
+    options = question.get("options") if isinstance(question, dict) else None
+    return isinstance(options, list) and len(options) >= MIN_CHOICES
+
+
 def concept_answer(question: dict) -> str:
     options = question.get("options") or []
     index = question.get("correct_index")
@@ -166,14 +177,22 @@ def answer_parts(answer: str) -> list:
 
 def missing_parts(text: str, answer: str) -> list:
     """The parts of a list answer (answer_parts) that a piece of writing (a memory trick) leaves
-    out: a part counts when one of its key words is there, allowing plurals, possessives and small
-    typos. [] for a one-part answer."""
+    out. A part counts when one of its distinguishing words is there (a word no other part uses:
+    "1", "2" and "gestational" for "Type 1 diabetes, Type 2 diabetes, gestational diabetes"; a part
+    with none uses all its words), allowing plurals, possessives and small typos, so a word the
+    parts share cannot stand in for the one that was left out. [] for a one-part answer."""
     parts = answer_parts(answer)
     if len(parts) < 2:
         return []
     words = _key_words(normalize(text))
-    return [part for part in parts
-            if not any(_same_word(given, word) for word in _key_words(normalize(part)) for given in words)]
+    keys = [_key_words(normalize(part)) for part in parts]
+    missing = []
+    for index, part in enumerate(parts):
+        others = [word for other, group in enumerate(keys) if other != index for word in group]
+        own = [word for word in keys[index] if not any(_same_word(word, other) for other in others)] or keys[index]
+        if not any(_same_word(given, word) for word in own for given in words):
+            missing.append(part)
+    return missing
 
 
 def mentions_answer(text: str, answer: str) -> bool:
@@ -192,9 +211,17 @@ def mentions_answer(text: str, answer: str) -> bool:
     return False
 
 
+def _open_kind(shape: str, chosen: list) -> str:
+    """The format for an idea that has too few choices to be multiple choice: a short answer is typed
+    when Fill in the blank is on (it is a Pro type, so it is never turned on for the student), anything
+    else is written."""
+    return "fill" if shape == "term" and "fill" in chosen else "written"
+
+
 def plan_session(questions: list, selected, indices=None) -> list:
     """Cards in guide order: {"type", "concepts": [index, ...]}, one first ask per idea.
-    indices: only these questions (a quiz with fewer questions than the guide has)."""
+    indices: only these questions (a quiz with fewer questions than the guide has). An idea with fewer
+    than MIN_CHOICES choices is never asked as multiple choice: Fill in the blank or Written instead."""
     chosen = [kind for kind in TYPES if kind in set(selected or ())] or ["mc"]
     assigned = {}
     wanted = set(indices) if indices is not None else None
@@ -202,9 +229,15 @@ def plan_session(questions: list, selected, indices=None) -> list:
         if wanted is not None and index not in wanted:
             continue
         shape = answer_shape(question.get("question", ""), concept_answer(question))
-        assigned[index] = next((kind for kind in FIT[shape] if kind in chosen), "mc")
+        if can_choose(question):
+            assigned[index] = next((kind for kind in FIT[shape] if kind in chosen), "mc")
+        else:
+            assigned[index] = next((kind for kind in FIT[shape] if kind in chosen and kind != "mc"), None) \
+                or _open_kind(shape, chosen)
 
     def fallback(index):
+        if not can_choose(questions[index]):
+            return _open_kind(answer_shape(questions[index].get("question", ""), concept_answer(questions[index])), chosen)
         return next((kind for kind in ("fill", "mc", "written") if kind in chosen), "mc")
 
     matching = [index for index, kind in assigned.items() if kind == "matching"]

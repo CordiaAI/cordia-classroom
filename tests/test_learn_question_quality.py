@@ -164,6 +164,71 @@ class StructureQuestionTests(unittest.TestCase):
         guide, _ = llm._postprocess_study_guide("Q1: What is sfumato?\nA1: According to the slides, a soft blending of tones.")
         self.assertIn("A1: A soft blending of tones.", guide)
 
+    SUBJECT_TERMS = {
+        "computer_science": [
+            "What does the List interface guarantee about element order?",
+            "Which method of the List interface is defined in the Collection interface?",
+            "What is the document object model?",
+            "How is an HTML page described in the document object model?",
+            "What does a page fault trigger in an operating system?",
+            "What is the difference between a linked list and an array?",
+            "Which structure is explained by the page table?",
+            "Which behaviour is defined in the List interface?",
+            "Which operations are described in the document object model?",
+        ],
+        "nursing": [
+            "Which document must a nurse complete after giving a controlled substance?",
+            "What does the document for informed consent record?",
+            "What is a medication list reconciliation?",
+        ],
+        "business_law": [
+            "What is a document of title under the UCC?",
+            "What does Section 230 of the Communications Decency Act protect?",
+            "Which section 8 housing voucher rule applies to the tenant?",
+            "What is the Chapter 7 bankruptcy process?",
+        ],
+        "art_history": [
+            "What is a page layout in an illuminated manuscript?",
+            "Which painter designed the Sistine Chapel section known as the ceiling?",
+            "What does the string section do in a symphony?",
+        ],
+        "literature": [
+            "Which characters are named in the list poem Catalogue of Ships?",
+            "What is a table of contents in a novel's front matter?",
+            "What does the text editor in a printing press change?",
+        ],
+    }
+    SOURCE_REFERENCES = [
+        "What is listed in the document?",
+        "What does the following list show?",
+        "What is described in this section?",
+        "Which terms are discussed in the page above?",
+        "What topics are covered in the section on torts?",
+        "Which key terms are listed for the chapter?",
+        "What does this table show?",
+        "What does the document say about torts?",
+        "Which concepts are introduced in this lecture?",
+    ]
+
+    def test_subject_terms_with_source_words_are_kept_in_five_subjects(self):
+        for subject, questions in self.SUBJECT_TERMS.items():
+            for question in questions:
+                self.assertFalse(refers_to_source(question), f"{subject}: {question}")
+                self.assertEqual(standalone_question(question), question, f"{subject}: {question}")
+
+    def test_questions_about_the_source_are_still_removed(self):
+        for question in self.SOURCE_REFERENCES:
+            self.assertTrue(refers_to_source(question), question)
+            self.assertIsNone(standalone_question(question), question)
+
+    def test_saved_quizzes_keep_subject_term_questions(self):
+        saved = [{"question": q, "options": ["a b", "c d", "e f", "g h"], "correct_index": 0, "choices_v": 2}
+                 for q in ("What does the List interface guarantee about element order?", "What is the document object model?")]
+        db = FakeDb({"quiz_questions": saved})
+        questions, _ = quiz._load_quiz(db, GUIDE_ID, "u1")
+        self.assertEqual([q["question"] for q in questions], [q["question"] for q in saved])
+        self.assertEqual(db.updates, [], "nothing was about the source, so nothing is written")
+
     def test_quizzes_built_from_older_guides_skip_them(self):
         text = "\n".join(f"Q{i}: {q}\nA{i}: {a}" for i, (q, a, _) in enumerate(MODEL_OUTPUT["art_history"], 1))
         questions = [pair["question"] for pair in quiz._parse_qa_pairs(text)]
@@ -366,6 +431,127 @@ class AnswerPartsTests(unittest.TestCase):
         for prose in ("Romeo and Juliet", "Hyperkalemia, a high potassium level, causes peaked T waves",
                       "In 1863, Lincoln issued it", "3.5-5.0 mEq/L", "A business to reorganize its debts while it keeps operating"):
             self.assertEqual(retain.answer_parts(prose), [prose], prose)
+
+
+class SharedWordPartsTests(unittest.TestCase):
+    """A trick that leaves out one of several items sharing a word is still incomplete."""
+
+    CASES = [
+        ("Type 1 diabetes, Type 2 diabetes, and gestational diabetes",
+         "When you see sugar, think Type 1 diabetes and gestational diabetes.", ["Type 2 diabetes"]),
+        ("First Amendment, Fifth Amendment, and Sixth Amendment",
+         "Remember the First Amendment and the Sixth Amendment together.", ["Fifth Amendment"]),
+        ("Impressionism, Post-Impressionism, and Expressionism",
+         "Think of Impressionism and Expressionism as a pair.", ["Post-Impressionism"]),
+        ("Primary succession, secondary succession, and tertiary succession",
+         "Picture primary succession and tertiary succession in a field.", ["secondary succession"]),
+        ("Binary search tree, binary heap, and binary tree",
+         "A binary heap sits beside a binary tree.", ["Binary search tree"]),
+        ("Romantic poetry, Romantic prose, and Gothic fiction",
+         "Gothic fiction and Romantic poetry share a moor.", ["Romantic prose"]),
+    ]
+
+    def test_the_omitted_item_is_reported(self):
+        for answer, trick, missing in self.CASES:
+            self.assertEqual(retain.missing_parts(trick, answer), missing, answer)
+
+    def test_a_complete_trick_passes_with_plurals_and_possessives(self):
+        for answer, _trick, _missing in self.CASES:
+            parts = retain.answer_parts(answer)
+            self.assertEqual(retain.missing_parts("Think of " + ", then ".join(parts) + ".", answer), [], answer)
+        self.assertEqual(retain.missing_parts("Type 1 diabetes, Type 2 diabetes' gestational cousins.",
+                                              "Type 1 diabetes, Type 2 diabetes, and gestational diabetes"), [])
+
+    def test_an_item_with_nothing_of_its_own_is_matched_on_all_its_words(self):
+        answer = "Heart, heart failure, and heart block"
+        self.assertEqual(retain.missing_parts("Think of a heart.", answer), ["heart failure", "heart block"])
+        self.assertEqual(retain.missing_parts("A heart with failure and a block.", answer), [])
+
+    def test_the_trick_is_retried_for_an_omitted_item_that_shares_a_word(self):
+        answer = "Type 1 diabetes, Type 2 diabetes, and gestational diabetes"
+        partial = "Picture a sugar bowl: Type 1 diabetes and gestational diabetes stand guard."
+        whole = "Picture a sugar bowl: Type 1 diabetes, Type 2 diabetes and gestational diabetes stand guard."
+        chat = MagicMock(side_effect=[reply(json.dumps({"hook": partial})), reply(json.dumps({"hook": whole}))])
+        with patch.object(llm, "get_openai_client", return_value=None), patch.object(llm, "chat", chat):
+            result = llm.memory_hook("Which types of diabetes are there?", answer)
+        self.assertEqual(result, {"hook": whole})
+        self.assertEqual(chat.call_count, 2, "the first trick left out Type 2 diabetes, so it was retried")
+        self.assertIn("Type 2 diabetes", chat.call_args.kwargs["messages"][1]["content"])
+
+
+class FewChoicesTests(unittest.TestCase):
+    """A question with fewer than 3 choices is never multiple choice (owner's rule): Learn asks it by
+    typing (Type it) or as a flashcard when the answer is long; Quiz asks it Fill in or Written."""
+
+    LONG = "Hyperkalemia changes the resting membrane potential of cardiac cells, which slows conduction and produces peaked T waves."
+
+    @staticmethod
+    def question(text, answer, wrong):
+        return {"question": text, "options": [answer, *wrong], "correct_index": 0}
+
+    def questions(self):
+        return [
+            self.question("What is the powerhouse of the cell?", "Mitochondria", ["Ribosome"]),                                 # 2: term
+            self.question("What does hyperkalemia do to the heart?", self.LONG, ["It speeds conduction and flattens T waves entirely."]),  # 2: long
+            self.question("Who painted the Mona Lisa?", "Leonardo da Vinci", ["Raphael", "Titian"]),                             # 3
+            self.question("Which structure holds a class's data?", "Fields", ["Methods", "Packages", "Imports"]),                # 4
+            self.question("What is consideration?", "Something of value", []),                                                  # 1
+        ]
+
+    def kinds(self, selected):
+        cards = retain.plan_session(self.questions(), selected)
+        return {index: card["type"] for card in cards for index in card["concepts"]}
+
+    def test_two_choices_are_never_multiple_choice(self):
+        for selected in (["mc"], ["mc", "written"], ["mc", "fill"], ["mc", "written", "fill"], [], ["mc", "matching"]):
+            kinds = self.kinds(selected)
+            for index in (0, 1, 4):
+                self.assertNotEqual(kinds[index], "mc", f"{selected}: question {index} has fewer than 3 choices")
+
+    def test_short_answers_are_typed_when_fill_is_on_and_written_otherwise(self):
+        self.assertEqual(self.kinds(["mc", "fill"])[0], "fill")
+        self.assertEqual(self.kinds(["mc"])[0], "written", "Fill in is a Pro type: it is never switched on for the student")
+        self.assertEqual(self.kinds(["mc", "written"])[0], "written")
+
+    def test_long_answers_are_written(self):
+        for selected in (["mc"], ["mc", "fill"], ["mc", "written"]):
+            self.assertEqual(self.kinds(selected)[1], "written")
+
+    def test_three_and_four_choices_stay_multiple_choice(self):
+        for selected in (["mc"], ["mc", "written"]):
+            kinds = self.kinds(selected)
+            self.assertEqual(kinds[2], "mc")
+            self.assertEqual(kinds[3], "mc")
+
+    def test_a_matching_leftover_with_two_choices_is_not_multiple_choice(self):
+        questions = [self.question(f"Define term {n}?", f"Term {n}", ["Other"]) for n in range(3)]
+        cards = retain.plan_session(questions, ["mc", "matching"])  # three terms: too few for a matching set
+        self.assertTrue(all(card["type"] != "mc" for card in cards), cards)
+        self.assertFalse(any(card["type"] == "matching" for card in cards))
+
+    def test_a_quiz_of_a_chosen_size_follows_the_same_rule(self):
+        cards = retain.plan_session(self.questions(), ["mc"], indices=[0, 2])
+        self.assertEqual({card["concepts"][0]: card["type"] for card in cards}, {0: "written", 2: "mc"})
+
+    def test_session_endpoint_serves_no_two_choice_multiple_choice(self):
+        body = SimpleNamespace(types=["mc"], count=None, learn=False)
+        with patch.object(quiz, "get_supabase", return_value=MagicMock()), \
+                patch.object(quiz, "get_user_id", return_value="u1"), \
+                patch.object(quiz, "_load_quiz", return_value=(self.questions(), True)), \
+                patch.object(quiz, "plan_for", return_value="free"), patch.object(quiz, "subscription_row", return_value=None):
+            result = quiz.start_session(GUIDE_ID, body, authorization="Bearer t")
+        by_concept = {card["concepts"][0]: card["type"] for card in result["cards"]}
+        self.assertEqual(by_concept[2], "mc")
+        self.assertTrue(all(by_concept[i] != "mc" for i in (0, 1, 4)))
+        self.assertEqual(result["questions"], self.questions(), "the questions keep their shape")
+        self.assertEqual(sorted(result), ["cards", "pro", "questions", "types"])
+
+    def test_can_choose_counts_choices_not_the_shape(self):
+        self.assertFalse(retain.can_choose({"options": ["a", "b"]}))
+        self.assertTrue(retain.can_choose({"options": ["a", "b", "c"]}))
+        self.assertTrue(retain.can_choose({"options": ["a", "b", "c", "d"]}))
+        self.assertFalse(retain.can_choose({}))
+        self.assertFalse(retain.can_choose(None))
 
 
 class MemoryHookCoverageTests(unittest.TestCase):
