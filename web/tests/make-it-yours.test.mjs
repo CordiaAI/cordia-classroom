@@ -126,7 +126,7 @@ test('Paper & Clay keeps the accent for primary actions: rings, bars, stars and 
   // Settings: the avatar, its initials, the section icons, and the sidebar's account-row initials.
   const settings = await source('pages/settings.js');
   assert.match(settings, /\.me-avatar \{[^}]*background: var\(--meter\); color: var\(--on-meter\)/);
-  assert.match(settings, /\.settings-row-label :global\(\.lucide\) \{ color: var\(--meter-ink\); \}/);
+  assert.match(system, /\.setting-text > \.lucide \{[^}]*color: var\(--meter-ink\)/);
   assert.match(system, /\.c-side \.c-side-avatar \{[^}]*color: var\(--meter-ink\)/);
 });
 

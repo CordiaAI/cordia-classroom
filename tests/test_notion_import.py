@@ -224,7 +224,7 @@ class NotionTextTests(unittest.TestCase):
         empty = {(PAGE, None): [block("paragraph", ""), block("divider"), block("image", "", external={"url": "https://example.com/a.png"}), block("to_do", "")]}
         response, _ = self.read(empty)
         self.assertEqual(response.status_code, 422)
-        self.assertEqual(response.json()["detail"], "That file has no readable text.")
+        self.assertEqual(response.json()["detail"], "That page has no readable text.")
         # A real page, even a very short to-do, does not say it.
         short, _ = self.read({(PAGE, None): [block("to_do", "Gym", checked=False)]})
         self.assertEqual(short.status_code, 200, short.text)

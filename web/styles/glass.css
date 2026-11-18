@@ -383,7 +383,7 @@ body { touch-action: manipulation; }
 
 /* Settings › Connectors: tiles with brand marks, like Cordia Assistant's Connections.
    Phones show one list with a line on what each app does. */
-.cn-card { display: grid; gap: 12px; padding: 24px; }
+.cn-card { gap: 12px; }
 .cn-card > .c-section-title, .cn-card > .c-meta { margin: 0; }
 .cn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 14px; margin: 8px 0 0; padding: 0; list-style: none; }
 .cn-grid li { display: grid; }
@@ -418,7 +418,6 @@ body { touch-action: manipulation; }
 .cn-health.is-error { color: var(--error); }
 .cn-uses { display: grid; width: 100%; padding: 4px 0; border-block: 1px solid var(--hairline); text-align: left; }
 .cn-uses .c-toggle { justify-content: space-between; width: 100%; }
-.cn-watch-note { margin: 0 0 8px; }
 .cn-target { display: grid; gap: 6px; }
 .cn-target .c-meta { margin: 0; }
 .cn-feed { display: grid; gap: 8px; width: 100%; text-align: left; }
@@ -430,17 +429,20 @@ body { touch-action: manipulation; }
 .cn-feed-row .c-input { flex: 1 1 auto; min-width: 0; }
 .cn-notice { margin: 0; color: var(--olive-ink); font: 600 0.9375rem/1.4 var(--font-sans); }
 .cn-error { margin: 0; color: var(--error); font: 600 0.9375rem/1.4 var(--font-sans); }
-.cn-sheet { width: min(560px, 100%); display: grid; gap: 14px; max-height: min(640px, 90svh); overflow: hidden; grid-template-rows: auto auto minmax(0, 1fr) auto auto; }
+.cn-row-error { color: var(--error); font: 600 0.8125rem/1.4 var(--font-sans); }
+/* The import sheet is a column: the head, an optional "Add to" dropdown, the search field, then the
+   results, which take what room is left and scroll. (It was a grid with five fixed rows, so the
+   dropdown pushed the search field into the results' row.) */
+.cn-sheet { width: min(560px, 100%); display: flex; flex-direction: column; gap: 14px; max-height: min(640px, 90svh); overflow: hidden; }
+.cn-sheet > * { flex: 0 0 auto; }
+.cn-sheet > .cn-results { flex: 0 1 auto; min-height: 0; }
 .cn-sheet .c-sheet-head { margin-bottom: 0; }
-.cn-search { display: flex; align-items: center; gap: 10px; color: var(--muted); }
-.cn-search .c-input { flex: 1 1 auto; min-width: 0; }
 .cn-results { overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--hairline); border-radius: var(--r-row); }
 .cn-result { width: 100%; border-left: 0; border-right: 0; border-bottom: 0; background: transparent; text-align: left; font: inherit; cursor: pointer; }
 .cn-result .c-grow { display: grid; gap: 2px; }
 .cn-row-title { font: 600 1.0625rem/1.35 var(--font-sans); color: var(--ink); }
 .cn-sheet > .c-meta { margin: 0; }
 @media (max-width: 560px) {
-  .cn-card { padding: 20px 16px; }
   .cn-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .cn-grid li + li { border-top: 1px solid var(--hairline); }
   .cn-tile { display: flex; align-items: center; gap: 12px; padding: 10px 0; text-align: left; border: 0; border-radius: 0; background: none; box-shadow: none; }

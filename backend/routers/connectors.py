@@ -212,6 +212,11 @@ def _drive_text(account: str, user_id: str, file_id: str) -> str:
     return files.text_from_file(str(content.get("name") or data.get("name") or ""), raw, mime)
 
 
+def _no_text(connector: str) -> HTTPException:
+    """Said only after an import was tried and read nothing."""
+    return HTTPException(status_code=422, detail=f"That {'page' if connector == 'notion' else 'file'} has no readable text.")
+
+
 def _import_text(connector: str, user_id: str, body: ImportRequest) -> tuple[str, str]:
     if connector not in {"gdrive", "gdocs", "notion", "dropbox"}:
         raise HTTPException(status_code=404, detail="Unknown connector")
@@ -226,9 +231,9 @@ def _import_text(connector: str, user_id: str, body: ImportRequest) -> tuple[str
         text, title = dropbox_sync.file_text(account, user_id, body.id, body.title), body.title
     else:
         text, title = _drive_text(account, user_id, body.id), body.title
-    # Said only here, after the import was tried and read nothing (a short to-do is still text).
+    # A short to-do is still text; empty pages, dividers and images are not.
     if not (notion_text.has_text(text) if connector == "notion" else len(text.strip()) >= 10):
-        raise HTTPException(status_code=422, detail="That file has no readable text.")
+        raise _no_text(connector)
     return text, (title or "Imported notes")[:300]
 
 
@@ -257,7 +262,7 @@ def add_to_library(connector: str, body: LibraryRequest, request: Request, autho
     guide = library_import.upsert_source(user_id, ref=f"{connector}:{body.id}", connector=connector, title=title, text=text,
                                          folder_id=folder["id"], source_type=connector, source_title=names[connector])
     if not guide:
-        raise HTTPException(status_code=422, detail="That file has no readable text.")
+        raise _no_text(connector)
     return {"guide": {"id": guide.get("id"), "title": guide.get("title")}}
 
 

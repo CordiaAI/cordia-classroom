@@ -29,8 +29,7 @@ export default function TutorSettings() {
       </div>
       <div className="c-card settings-card"><ExplanationPreference /></div>
       <style jsx>{`
-        .settings-card { display: grid; gap: 12px; padding: 20px; }
-        .settings-note { margin: -4px 0 0; }
+        .settings-note { margin: 0; }
         :global(.tutor-mode-picker) { justify-self: start; flex-wrap: wrap; }
       `}</style>
     </>

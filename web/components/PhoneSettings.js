@@ -60,12 +60,11 @@ export default function PhoneSettings() {
   }
 
   return (
-    <div className="c-card settings-phone">
-      <div className="settings-phone-head">
-        <span className="settings-phone-label"><Smartphone size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Phone</span></span>
+    <div className="c-card settings-card settings-phone">
+      <div className="settings-row">
+        <span className="setting-text"><Smartphone size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Phone</span><span className="c-meta">{current ? `${formatPhone(current)} · sign in with a texted code` : 'Add your number to sign in with a texted code.'}</span></span>
         {!step && <button type="button" className="c-btn c-btn--secondary" onClick={() => { setStep('number'); setError(''); setNotice(''); }}>{current ? 'Change' : 'Add phone'}</button>}
       </div>
-      <p className="c-meta">{current ? `${formatPhone(current)} · sign in with a texted code` : 'Add your number to sign in with a texted code.'}</p>
       {step === 'number' && (
         <form className="settings-phone-form" onSubmit={sendCode} noValidate>
           <input className="c-input" type="tel" inputMode="tel" autoComplete="tel" placeholder="(555) 123-4567" aria-label="Phone number" value={phone} onChange={event => setPhone(event.target.value)} autoFocus />
@@ -83,10 +82,7 @@ export default function PhoneSettings() {
       {error && <p className="settings-phone-error" role="alert">{error}</p>}
       {notice && <p className="settings-phone-notice" role="status">{notice}</p>}
       <style jsx>{`
-        .settings-phone { display: grid; gap: 10px; padding: 16px 20px; }
-        .settings-phone-label { display: inline-flex; align-items: center; gap: 10px; }
-        .settings-phone-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-        .settings-phone .c-meta, .settings-phone-error, .settings-phone-notice { margin: 0; }
+        .settings-phone-error, .settings-phone-notice { margin: 0; }
         .settings-phone-form { display: flex; flex-wrap: wrap; gap: 8px; }
         .settings-phone-form :global(.c-input) { flex: 1 1 200px; min-width: 0; }
         .settings-phone-code { letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
