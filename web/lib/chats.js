@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { apiFetch } from './api';
+import { apiFetch, getUserId } from './api';
 import { onTutorChats } from './tutorChats';
 import { createChatStore } from './chatStore.mjs';
 
@@ -20,7 +20,9 @@ const request = (path, options = {}) => apiFetch(path, { ...options, reportFailu
 // on the page reloads its session (lib/useTutorChat.js listens).
 const tutorChanged = () => { if (typeof window !== 'undefined') window.dispatchEvent(new Event('cordia:tutor-refresh')); };
 
-const store = createChatStore({ request, onTutorChanged: tutorChanged });
+// The store belongs to the signed-in account (getUserId): another account signing in, or signing out,
+// empties it at once (lib/chatStore.mjs), so one account's chat titles never show for another.
+const store = createChatStore({ request, identify: getUserId, onTutorChanged: tutorChanged });
 
 if (typeof window !== 'undefined') {
   // The Tutor panel or page started, resumed or deleted a chat, or its conversation grew.
@@ -29,6 +31,10 @@ if (typeof window !== 'undefined') {
   const onBack = () => { if (!document.hidden) store.load({ maxAge: 15000 }); };
   window.addEventListener('focus', onBack);
   document.addEventListener('visibilitychange', onBack);
+  // This tab signed out or in (api.js setToken and clearAuth post this), or another tab did (the
+  // saved sign-in is shared): the store lets go of the other account's chats right now.
+  window.addEventListener('message', event => { if (event.source === window && event.data?.type === 'CORDIA_AUTH_UPDATED') store.check(); });
+  window.addEventListener('storage', event => { if (!event.key || ['authToken', 'userId'].includes(event.key)) store.check(); });
 }
 
 const serverSnapshot = { chats: null, editable: false, failed: false, loaded: false, toast: null };
@@ -53,6 +59,7 @@ export const restoreChat = id => store.restore(id);
 export const classChats = classId => store.classChats(classId);
 export const keepOpenChat = chat => store.keepOpen(chat);
 export const showChatMessage = text => store.say(text);
+export const showMoreChats = () => store.showMore();
 export const dismissChatToast = id => store.dismiss(id);
 export const onChatsChanged = listener => store.subscribe(listener);
 

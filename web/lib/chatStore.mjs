@@ -20,6 +20,9 @@
 import { chatTitle } from './shellTools.mjs';
 
 export const LIST_LIMIT = 30;
+// The most the backend lists at once (GET /chats limit 1-100, no paging): "Show more" asks for this
+// many, and a class's Chats tab always does.
+export const MAX_LIMIT = 100;
 // The Undo toast after a delete stays this long (at least 5 seconds; the Library's Undo uses 6).
 export const UNDO_MS = 6000;
 export const MESSAGE_MS = 5000;
@@ -124,7 +127,23 @@ export function sameConversation(chatMessages, sessionMessages) {
   return !before || before === first(sessionMessages);
 }
 
-export function createChatStore({ request, onTutorChanged = () => {}, now = () => Date.now() }) {
+// identify(): the signed-in account's id ('' when signed out). Everything this store holds belongs to
+// one account: when the id changes (another account signs in, or this one signs out) the store is
+// emptied at once, before anything is asked, and an answer to a question asked for the earlier
+// account is dropped when it arrives (never shown, never stored).
+export function createChatStore({ request: send, identify = () => '', onTutorChanged = () => {}, now = () => Date.now() }) {
+  let owner = identify();
+  let epoch = 0; // bumped each time the account changes
+  const STALE = { failed: true, stale: true };
+  const stale = data => Boolean(data?.stale);
+  const lapsed = () => ({ ok: false, reason: 'stale', message: '' });
+  async function request(path, options) {
+    check();
+    const mine = epoch;
+    const data = await send(path, options);
+    check();
+    return mine === epoch ? data : STALE;
+  }
   let mode = null; // 'chats' (the /chats API) or 'tutor' (only the Tutor's calls); settled once per page load
   let editable = false;
   let chats = null; // newest first; null until the first answer
@@ -133,8 +152,10 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
   let loading = null;
   let lastFailure = null;
   let open = null; // the chat on screen, kept in the list (and so current in the sidebar) while it is open
+  let limit = LIST_LIMIT; // how many the sidebar asks for ("Show more" raises it)
   let toast = null;
   let toastId = 0;
+  let soon = null;
   let classMap = null;
   let classMapAt = 0;
   const removed = new Set(); // deleted here, waiting for the list to agree
@@ -142,6 +163,21 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
   const deleted = new Map(); // id -> { chat, index } for Undo
   const listeners = new Set();
   let snap = null;
+
+  // The account changed: forget everything that was learned for the one before.
+  function check({ silent = false } = {}) {
+    const id = identify();
+    if (id === owner) return false;
+    owner = id;
+    epoch += 1;
+    mode = null; editable = false; chats = null; failed = false; loadedAt = 0; loading = null; lastFailure = null;
+    open = null; toast = null; classMap = null; classMapAt = 0; limit = LIST_LIMIT;
+    removed.clear(); edits.clear(); deleted.clear();
+    clearTimeout(soon);
+    snap = null;
+    if (!silent) emit();
+    return true;
+  }
 
   function visible() {
     if (chats === null) return open ? [open] : null;
@@ -152,12 +188,19 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
     }
     return list;
   }
+  // more: the list may hold more than it shows ("Show more" in Recent chats). Only the /chats API
+  // can: the Tutor-only list is whole, and 100 is the most the backend lists at once (limited).
+  function build(failedNow) {
+    const full = mode === 'chats' && chats !== null && chats.length >= limit;
+    return { chats: visible(), editable, failed: failedNow && chats === null, loaded: chats !== null, toast, more: full && limit < MAX_LIMIT, limited: full && limit >= MAX_LIMIT };
+  }
   function emit() {
-    snap = { chats: visible(), editable, failed: failed && chats === null, loaded: chats !== null, toast };
+    snap = build(failed);
     listeners.forEach(listener => listener(snap));
   }
   function snapshot() {
-    if (!snap) snap = { chats: visible(), editable, failed: false, loaded: chats !== null, toast };
+    check({ silent: true });
+    if (!snap) snap = build(false);
     return snap;
   }
   function subscribe(listener) {
@@ -173,10 +216,13 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
     if (open?.id === id) open = null;
   }
   function say(text, extra = {}) {
+    check();
+    if (!text) return;
     toast = { id: ++toastId, kind: 'message', text, ...extra };
     emit();
   }
   function dismiss(id) {
+    check();
     if (toast && (id === undefined || toast.id === id)) { toast = null; emit(); }
   }
 
@@ -184,6 +230,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
   async function guideClasses() {
     if (classMap && now() - classMapAt < 30000) return classMap;
     const data = await request('/guides?fields=summary&limit=200');
+    if (stale(data)) return {};
     if (!Array.isArray(data?.guides)) return classMap || {};
     classMap = Object.fromEntries(data.guides.filter(guide => guide?.id && guide.folder_id).map(guide => [String(guide.id), String(guide.folder_id)]));
     classMapAt = now();
@@ -192,7 +239,9 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
 
   async function fetchList(classId = '') {
     if (mode !== 'tutor') {
-      const data = await request(`/chats?limit=${LIST_LIMIT}${classId ? `&class_id=${encodeURIComponent(classId)}` : ''}`);
+      // A class's Chats tab lists as many as the backend allows; the sidebar starts with 30.
+      const data = await request(`/chats?limit=${classId ? MAX_LIMIT : limit}${classId ? `&class_id=${encodeURIComponent(classId)}` : ''}`);
+      if (stale(data)) return lapsed();
       if (Array.isArray(data?.chats)) {
         mode = 'chats';
         editable = data.editable === true;
@@ -204,6 +253,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
       editable = false;
     }
     const [saved, session, classes] = await Promise.all([request('/tutor/chats'), request('/tutor/session'), classId ? guideClasses() : Promise.resolve(classMap || {})]);
+    if (stale(saved) || stale(session)) return lapsed();
     if (!Array.isArray(saved?.chats)) return failure(outcome(saved));
     const list = tutorChatList(saved.chats, session?.id ? session : null, classes);
     return { ok: true, chats: classId ? list.filter(chat => chat.class_id === String(classId)) : list };
@@ -211,9 +261,13 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
 
   // The list for the sidebar. Reuses an answer under 2 seconds old unless `fresh`.
   function load({ fresh = false, maxAge = 2000 } = {}) {
+    check();
     if (loading) return loading;
     if (!fresh && chats !== null && now() - loadedAt < maxAge) return Promise.resolve(snapshot());
+    const mine = epoch;
     loading = fetchList().then(result => {
+      // The account changed while this was out: its answer belongs to nobody now.
+      if (mine !== epoch) return snapshot();
       loading = null;
       if (result.ok) {
         chats = result.chats;
@@ -227,6 +281,19 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
     });
     return loading;
   }
+  // "Show more": ask for the most the backend lists at once, from now on. If that can't be read the
+  // list stays as it was (and the button stays), with a plain line.
+  async function showMore() {
+    check();
+    if (limit >= MAX_LIMIT) return snapshot();
+    const mine = epoch;
+    if (loading) await loading; // an answer for the shorter list is already on its way
+    if (mine !== epoch) return snapshot();
+    limit = MAX_LIMIT;
+    const answer = await load({ fresh: true });
+    if (mine === epoch && failed) { limit = LIST_LIMIT; say(lastFailure?.message || MESSAGES.network); }
+    return answer;
+  }
   // Which backend this is isn't known until /chats has answered once; until then nothing else is tried
   // (a failed first answer must not fall through to the Tutor-only calls, which change things).
   const unready = async () => {
@@ -234,8 +301,8 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
     return mode ? null : lastFailure || failure('network');
   };
 
-  let soon = null;
   function refreshSoon(delay = 400) {
+    check();
     clearTimeout(soon);
     soon = setTimeout(() => load({ fresh: true }), delay);
   }
@@ -256,6 +323,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
     if (notReady) return notReady;
     if (mode === 'chats') {
       const data = await request(`/chats/${encodeURIComponent(id)}`);
+      if (stale(data)) return lapsed();
       const result = outcome(data);
       if (result !== 'ok' || !data?.chat?.id) {
         if (result === 'gone') { drop(id); emit(); refreshSoon(0); }
@@ -271,6 +339,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
       return { ok: true, chat, editable, mustOpen: false };
     }
     const session = await request('/tutor/session');
+    if (stale(session)) return lapsed();
     if (!session?.id) return failure(outcome(session) === 'ok' ? 'error' : outcome(session));
     if (String(session.id) === id) {
       const classes = await guideClasses();
@@ -280,6 +349,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
       };
     }
     const saved = await request('/tutor/chats');
+    if (stale(saved)) return lapsed();
     if (!Array.isArray(saved?.chats)) return failure(outcome(saved) === 'ok' ? 'error' : outcome(saved));
     const found = saved.chats.find(chat => String(chat?.id) === id);
     if (!found) { drop(id); emit(); return failure('gone'); }
@@ -292,6 +362,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
     if (notReady) return notReady;
     if (mode === 'chats') {
       const data = await request('/chats', { method: 'POST', body: JSON.stringify({ guide_id: guideId || null, class_id: classId || null, session_id: session?.id ? String(session.id) : null }) });
+      if (stale(data)) return lapsed();
       const result = outcome(data);
       if (result !== 'ok' || !data?.chat?.id || !data?.session?.id) return failure(result === 'ok' ? 'error' : result);
       refreshSoon();
@@ -301,10 +372,12 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
     let next = session;
     if (!next?.id) {
       next = await request('/tutor/session');
+      if (stale(next)) return lapsed();
       if (!next?.id) return failure(outcome(next) === 'ok' ? 'error' : outcome(next));
     }
     if ((next.messages || []).length) {
       next = await request('/tutor/session/new', { method: 'POST', body: JSON.stringify({ session_id: next.id, guide_id: guideId || null, resume_id: null }) });
+      if (stale(next)) return lapsed();
       if (!next?.id) return failure(outcome(next) === 'ok' ? 'error' : outcome(next));
       onTutorChanged();
       refreshSoon();
@@ -323,10 +396,13 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
   // backend may give it a new id: callers go to the returned chat.id. { ok, chat, session }.
   async function openChat(id, { session = null } = {}) {
     id = String(id || '');
+    check();
+    const mine = epoch;
     const notReady = await unready();
     if (notReady) return notReady;
     if (mode === 'chats') {
       const data = await request(`/chats/${encodeURIComponent(id)}/open`, { method: 'POST' });
+      if (stale(data)) return lapsed();
       const result = outcome(data);
       if (result !== 'ok' || !data?.chat?.id || !data?.session?.id) {
         if (result === 'gone') { drop(id); emit(); }
@@ -338,8 +414,10 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
     }
     let current = session;
     if (!current?.id) current = await request('/tutor/session');
+    if (stale(current)) return lapsed();
     if (!current?.id) return failure(outcome(current) === 'ok' ? 'error' : outcome(current));
     const next = await request('/tutor/session/new', { method: 'POST', body: JSON.stringify({ session_id: current.id, guide_id: null, resume_id: id }) });
+    if (stale(next)) return lapsed();
     const result = outcome(next);
     if (!next?.id) {
       if (result === 'gone') { drop(id); emit(); }
@@ -349,6 +427,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
     onTutorChanged();
     refreshSoon();
     const classes = await guideClasses();
+    if (epoch !== mine) return lapsed();
     return { ok: true, chat: { ...liveChat(next, classes), messages: next.messages || [] }, session: next };
   }
 
@@ -358,10 +437,12 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
 
   async function edit(id, fields, messages) {
     id = String(id);
+    check();
     if (!editable) return failure('unavailable', messages);
     edits.set(id, fields);
     emit();
     const data = await request(`/chats/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(fields) });
+    if (stale(data)) return lapsed();
     edits.delete(id);
     const result = outcome(data);
     if (result === 'ok' && data?.chat?.id) {
@@ -396,6 +477,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
   // Delete: gone from the list at once, then a toast with Undo (restore).
   async function remove(id) {
     id = String(id);
+    check();
     if (!editable) return failure('unavailable', DELETE_FAILED);
     const list = visible() || [];
     const index = Math.max(0, list.findIndex(chat => chat.id === id));
@@ -403,6 +485,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
     removed.add(id);
     emit();
     const data = await request(`/chats/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (stale(data)) return lapsed();
     const result = outcome(data);
     if (result === 'ok') {
       const chat = data?.chat?.id ? chatSummary(data.chat) : before;
@@ -424,8 +507,10 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
   // Undo: the chat comes back where it was in the list.
   async function restore(id) {
     id = String(id);
+    check();
     const held = deleted.get(id);
     const data = await request(`/chats/${encodeURIComponent(id)}/restore`, { method: 'POST' });
+    if (stale(data)) return lapsed();
     const result = outcome(data);
     if (result === 'ok') {
       deleted.delete(id);
@@ -453,6 +538,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
 
   // The chat on screen: kept in the list while it is open, so the sidebar always marks it current.
   function keepOpen(chat) {
+    check();
     const next = chat?.id ? { ...chatSummary(chat), ...(edits.get(String(chat.id)) || {}) } : null;
     if (JSON.stringify(next) === JSON.stringify(open)) return;
     open = next;
@@ -461,7 +547,7 @@ export function createChatStore({ request, onTutorChanged = () => {}, now = () =
 
   return {
     subscribe, snapshot, load, refreshSoon, classChats, getChat, start, openChat, rename, move, remove, restore,
-    keepOpen, say, dismiss,
+    keepOpen, say, dismiss, showMore, check,
     get editable() { return editable; },
   };
 }

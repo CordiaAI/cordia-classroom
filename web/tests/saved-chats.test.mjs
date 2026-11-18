@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MESSAGES, createChatStore, outcome, sameConversation, tutorChatList } from '../lib/chatStore.mjs';
+import { LIST_LIMIT, MAX_LIMIT, MESSAGES, createChatStore, outcome, sameConversation, tutorChatList } from '../lib/chatStore.mjs';
 import { recentChats, sidebarCurrent } from '../lib/shellTools.mjs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -66,7 +66,7 @@ function backend(mode) {
     if (route === '/chats' && method === 'GET') {
       let chats = [...visible().map(summary), ...(server.session.messages.length ? [liveSummary()] : [])];
       if (query.get('class_id')) chats = chats.filter(chat => chat.class_id === query.get('class_id'));
-      return ok({ chats, editable });
+      return ok({ chats: chats.slice(0, Number(query.get('limit')) || 30), editable });
     }
     if (route === '/chats' && method === 'POST') {
       server.session = { ...server.session, messages: [], conversation_version: server.session.conversation_version + 1 };
@@ -104,11 +104,11 @@ function backend(mode) {
   return server;
 }
 
-function storeFor(mode) {
+function storeFor(mode, account = { id: 'user-a' }) {
   const server = backend(mode);
   let tutorChanges = 0;
-  const store = createChatStore({ request: server.request, onTutorChanged: () => { tutorChanges += 1; } });
-  return { server, store, tutorChanges: () => tutorChanges };
+  const store = createChatStore({ request: server.request, identify: () => account.id, onTutorChanged: () => { tutorChanges += 1; } });
+  return { server, store, account, tutorChanges: () => tutorChanges };
 }
 
 // Every 404 and 409 another tab can cause, with the backend's own words (docs/redesign/T5-backend-notes.md, "Stale tabs").
@@ -499,4 +499,108 @@ test('no connection on the first answer: nothing falls through to the Tutor-only
   server.down = false;
   assert.equal((await store.getChat('c-1')).ok, true);
   assert.equal(store.snapshot().failed, false);
+});
+
+// Two accounts in one tab (the Vercel Security Review on #273): the store belongs to the account.
+const everyTitle = snapshots => JSON.stringify(snapshots.map(snap => [snap.chats, snap.toast]));
+
+test("another account signing in empties the store before anything is asked, and a failed refresh never shows the earlier account's chats", async () => {
+  const { server, store, account } = storeFor('full');
+  const seen = [];
+  store.subscribe(snap => seen.push(snap));
+  await store.load();
+  assert.ok(store.snapshot().chats.some(chat => chat.title === 'Career portfolio outline'));
+  store.say('Chat deleted');
+  account.id = 'user-b';
+  server.down = true;
+  // Rendering after the switch already reads an empty store: nothing was asked yet.
+  const calls = server.calls.length;
+  assert.deepEqual([store.snapshot().chats, store.snapshot().toast, store.snapshot().loaded], [null, null, false]);
+  assert.equal(server.calls.length, calls);
+  seen.length = 0;
+  const after = await store.load();
+  assert.equal(after.failed, true);
+  assert.equal(after.chats, null);
+  assert.doesNotMatch(everyTitle([...seen, store.snapshot()]), /Career portfolio|Thesis for the EH|chain rule/, 'no earlier title ever rendered');
+  assert.equal((await store.classChats(CALC)).chats.length, 0);
+  assert.equal((await store.getChat('c-1')).ok, false);
+});
+
+test('signing out empties the store at once and tells listeners; the earlier chats and toast are gone', async () => {
+  const { store, account } = storeFor('full');
+  const seen = [];
+  await store.load();
+  store.say('Chat deleted');
+  store.subscribe(snap => seen.push(snap));
+  account.id = '';
+  store.check();
+  assert.equal(seen.length, 1);
+  assert.deepEqual([seen[0].chats, seen[0].toast, seen[0].loaded, seen[0].more], [null, null, false, false]);
+});
+
+test("an answer to a question asked for the earlier account is dropped when it arrives", async () => {
+  const { server, store, account } = storeFor('full');
+  await store.load();
+  const slow = store.load({ fresh: true });
+  account.id = 'user-b';
+  store.check();
+  const answer = await slow;
+  assert.equal(answer.chats, null, "the earlier account's list is not stored for the new one");
+  assert.equal(store.snapshot().chats, null);
+  // Mutations in flight drop the same way: Undo for the earlier account's chat shows no toast and puts nothing back.
+  const { store: other, account: accountB } = storeFor('full');
+  await other.load();
+  await other.remove('c-1');
+  assert.equal(other.snapshot().toast.kind, 'deleted');
+  const undo = other.restore('c-1');
+  accountB.id = 'user-b';
+  other.check();
+  const result = await undo;
+  assert.equal(result.reason, 'stale');
+  assert.equal(other.snapshot().toast, null);
+  assert.equal(other.snapshot().chats, null);
+});
+
+test('a student with 45 chats reaches all 45: the sidebar starts with 30 and Show more asks for the most the backend lists', async () => {
+  const { server, store } = storeFor('full');
+  for (let index = 0; index < 42; index += 1) server.saved.push({ id: `bulk-${index}`, title: `Chat ${index}`, guide_id: null, class_id: null, updated_at: at(-index - 1), messages: [{ role: 'user', text: `Chat ${index}` }] });
+  const first = await store.load();
+  assert.equal(first.chats.length, LIST_LIMIT);
+  assert.equal(first.more, true, 'Show more is offered');
+  await store.showMore();
+  const all = store.snapshot();
+  assert.equal(all.chats.length, 45);
+  assert.equal(all.more, false);
+  assert.equal(all.limited, false);
+  assert.ok(server.calls.includes(`GET /chats?limit=${MAX_LIMIT}`));
+  await store.load({ fresh: true });
+  assert.equal(store.snapshot().chats.length, 45, 'a later refresh keeps the longer list');
+  // A class's Chats tab always lists the most the backend does.
+  server.calls.length = 0;
+  await store.classChats(BUS);
+  assert.ok(server.calls.some(call => call.startsWith(`GET /chats?limit=${MAX_LIMIT}&class_id=`)));
+});
+
+test('Show more that cannot be read keeps the list and the button, with a plain line', async () => {
+  const { server, store } = storeFor('full');
+  for (let index = 0; index < 43; index += 1) server.saved.push({ id: `bulk-${index}`, title: `Chat ${index}`, guide_id: null, class_id: null, updated_at: at(-index - 1), messages: [] });
+  await store.load();
+  server.down = true;
+  await store.showMore();
+  const snap = store.snapshot();
+  assert.equal(snap.chats.length, LIST_LIMIT);
+  assert.equal(snap.more, true);
+  assert.equal(snap.toast.text, MESSAGES.network);
+});
+
+test("only the Tutor's own calls (today's backend) list every chat it keeps, so there is no Show more", async () => {
+  const { store } = storeFor('tutor');
+  assert.equal((await store.load()).more, false);
+});
+
+test('the browser store is keyed to the signed-in account and hears sign-in, sign-out and another tab', () => {
+  const chats = read('lib/chats.js');
+  assert.match(chats, /createChatStore\(\{ request, identify: getUserId/);
+  assert.match(chats, /CORDIA_AUTH_UPDATED/);
+  assert.match(chats, /addEventListener\('storage'/);
 });
