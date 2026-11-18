@@ -76,7 +76,7 @@
     .c-side-head, .c-side-new, .c-side > .c-side-item { flex: none; }
     .c-side-account { height: 56px; padding: 0 8px; }
     .c-side-account[aria-expanded='true'] { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); }
-    .c-side-account.is-active .c-side-avatar { box-shadow: 0 0 0 2px var(--olive); }
+    .c-side-account.is-active .c-side-avatar { box-shadow: 0 0 0 2px var(--meter); }
     .c-side-avatar { flex: none; width: 36px; height: 36px; }
     .c-side-who { display: grid; gap: 3px; min-width: 0; flex: 1 1 auto; }
     .c-side-who strong { font: 600 var(--fs-15)/1.2 var(--font-sans); }

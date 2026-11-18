@@ -379,7 +379,7 @@ export default function LibraryPage() {
         {item.kind === 'practice' && <Link href={item.href} className="c-btn c-btn--secondary" onClick={() => walkthroughEvent('practice-guide')}>Practice</Link>}
         {item.kind === 'learn' && <Link href={item.href} className="c-btn c-btn--secondary">Learn</Link>}
         {item.kind === 'guide' && (
-          <button type="button" className={'c-icon-btn lib-star ig-star' + (item.starred ? ' is-on' : '')} onClick={() => toggleStar(item.guide)} aria-pressed={item.starred} aria-label={item.starred ? 'Unstar' : 'Star'}>
+          <button type="button" className={'c-icon-btn c-star lib-star ig-star' + (item.starred ? ' is-on' : '')} onClick={() => toggleStar(item.guide)} aria-pressed={item.starred} aria-label={item.starred ? 'Unstar' : 'Star'}>
             <Star size={20} strokeWidth={1.75} aria-hidden="true" fill={item.starred ? 'currentColor' : 'none'} />
           </button>
         )}
@@ -589,8 +589,6 @@ export default function LibraryPage() {
         .library .lib-row-title { font:600 1.0625rem/1.15 var(--font-sans); min-width: 0; }
         .library .lib-rename { flex: 1; min-width: 0; }
         .library .lib-star.is-on { color: var(--meter-ink); }
-        /* A star is a mark, not a primary action: it reads --meter-ink over the pressed icon colour (ink under Paper & Clay). */
-        .library .lib-star.is-on :global(svg) { color: var(--meter-ink) !important; }
         .library .lib-empty-group { padding: 8px 16px 14px; margin: 0; }
         @media (max-width: 767px) {
           /* Phones: the title takes the row's width and wraps to two lines instead of pushing the buttons off-screen. */

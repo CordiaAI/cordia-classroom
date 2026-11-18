@@ -4,13 +4,13 @@
 // accent's variables are already in the cache. It is a string so a test can run it.
 //
 // Public pages stay the Cordia default in light whatever was saved: the same list that keeps them
-// light today decides it.
+// light today decides it. Pricing is light and default for everyone, signed in or not (lib/theme.js LIGHT_ONLY).
 export const LOOK_KEY = 'cordiaLook';
 
 export function bootScript(lightSignedOut) {
   return '(function(){try{'
     + 'var d=document.documentElement,ls=localStorage,p=location.pathname;'
-    + "var light=['/','/login','/signup','/reset-password'].indexOf(p)>-1||((" + JSON.stringify(lightSignedOut) + ".indexOf(p)>-1||p.indexOf('/guides/')===0)&&!ls.getItem('authToken'));"
+    + "var light=['/','/login','/signup','/pricing','/reset-password'].indexOf(p)>-1||((" + JSON.stringify(lightSignedOut) + ".indexOf(p)>-1||p.indexOf('/guides/')===0)&&!ls.getItem('authToken'));"
     + "var c=null;try{c=JSON.parse(ls.getItem('" + LOOK_KEY + "')||'null')}catch(e){}"
     // Appearance: the saved look, else the old light/dark choice, else Light. An account that is new (lib/theme.js)
     // gets Match device written into the cache as soon as the account is known, so only then does this follow

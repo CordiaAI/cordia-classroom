@@ -52,10 +52,11 @@ export function themePreference() {
   return resolveAppearance(lookSettings().appearance, deviceIsDark());
 }
 
-// Public pages stay light; Pricing and the policy pages follow the account's theme when signed in.
+// Public pages stay light; the policy pages follow the account's theme when signed in. Pricing is in
+// LIGHT_ONLY: it is the Cordia default in light for everyone, signed in or not.
 // Use-case pages (lib/useCases/) are public reading pages too.
 // So are the guides (/guides and /guides/[slug], the route pattern _app.js passes).
-export const LIGHT_WHEN_SIGNED_OUT = ['/pricing', '/privacy', '/terms', '/honor-code', '/mission', '/connect/claude', '/guides', '/guides/[slug]', ...USE_CASES.map(useCasePath), ...COMPARISONS.map(comparisonPath)];
+export const LIGHT_WHEN_SIGNED_OUT = ['/privacy', '/terms', '/honor-code', '/mission', '/connect/claude', '/guides', '/guides/[slug]', ...USE_CASES.map(useCasePath), ...COMPARISONS.map(comparisonPath)];
 export function isLightOnly(pathname) {
   if (LIGHT_WHEN_SIGNED_OUT.includes(pathname)) {
     try { return !localStorage.getItem('authToken'); } catch { return true; }

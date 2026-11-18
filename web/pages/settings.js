@@ -445,12 +445,12 @@ export default function SettingsPage() {
         .settings-row :global(.c-seg) button { display: inline-flex; align-items: center; gap: 6px; }
         .settings-row-label { display: inline-flex; align-items: center; gap: 10px; }
         .settings-export-note { flex-basis: 100%; margin: 0; }
-        .settings-row-label :global(.lucide) { color: var(--olive-ink); }
+        .settings-row-label :global(.lucide) { color: var(--meter-ink); }
         .settings-note { margin: -4px 0 0; }
         .settings-card { display: grid; gap: 12px; padding: 20px; }
         .settings-links { display: flex; gap: 20px; font:600 0.8125rem/1 var(--font-sans); }
         .me-card { display: flex; align-items: center; gap: 16px; padding: 20px; }
-        .me-avatar { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius:50%; background: var(--olive); color: var(--on-olive); font:600 1.25rem/1 var(--font-sans); }
+        .me-avatar { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius:50%; background: var(--meter); color: var(--on-meter); font:600 1.25rem/1 var(--font-sans); }
         .me-names { display: grid; gap: 2px; flex: 1; min-width: 0; }
         .me-names > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .me-names strong { font:600 1.25rem/1.15 var(--font-sans); }
@@ -465,13 +465,13 @@ export default function SettingsPage() {
         .billing-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
         @media (max-width: 1100px) and (min-width: 768px) { .billing-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         .plan-card { display: grid; gap: 12px; align-content: start; min-width: 0; padding: 24px; }
-        .plan-card-current { box-shadow: 0 0 0 2px var(--olive); }
+        .plan-card-current { box-shadow: 0 0 0 2px var(--meter); }
         .plan-price { font:600 1.75rem/1 var(--font-sans); }
         .plan-price span { font-size: 0.9375rem; font-weight:500; }
         .plan-features { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
         .plan-features li { display: flex; gap: 8px; align-items: flex-start; }
-        .plan-features :global(.lucide) { color: var(--olive-ink); margin-top: 2px; }
-        .plan-current-label { color: var(--olive-ink); font-weight:600; }
+        .plan-features :global(.lucide) { color: var(--meter-ink); margin-top: 2px; }
+        .plan-current-label { color: var(--meter-ink); font-weight:600; }
         .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
         @media (max-width: 767px) { .billing-plans { grid-template-columns: 1fr; } .me-card { flex-wrap: wrap; } .me-names { flex: 1 1 0; min-width: 0; } .me-card > :global(.c-btn) { width: 100%; } .settings-row > :global(.c-btn) { width: 100%; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

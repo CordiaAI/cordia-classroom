@@ -6,8 +6,8 @@ import { shellBootScript } from '../lib/newShell.mjs';
 import { pageDefault } from '../lib/server/newShell.mjs';
 
 // Public reading pages that stay light, and the Cordia default look, for signed-out visitors (lib/theme.js has the same rule),
-// plus every guide under /guides/.
-const LIGHT_SIGNED_OUT = ['/pricing', '/privacy', '/terms', '/honor-code', '/mission', '/instructors', '/copyright', '/guides', ...USE_CASES.map(useCasePath), ...COMPARISONS.map(comparisonPath)];
+// plus every guide under /guides/. Pricing is always light and default, signed in too (lib/themeBoot.mjs).
+const LIGHT_SIGNED_OUT = ['/privacy', '/terms', '/honor-code', '/mission', '/instructors', '/copyright', '/guides', ...USE_CASES.map(useCasePath), ...COMPARISONS.map(comparisonPath)];
 
 export default function Document() {
   return (

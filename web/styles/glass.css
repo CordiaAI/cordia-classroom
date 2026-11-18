@@ -166,7 +166,10 @@
 :is(.c-side .c-side-item[aria-current='page'], .c-nav a[aria-current='page'], .c-tabbar a[aria-current='page'],
   .c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-chip[aria-pressed='true'], .c-search-hit.is-active,
   .c-nav .c-nav-btn[aria-pressed='true'], .tutor-chats-btn[aria-pressed='true'],
-  .c-icon-btn:is([aria-pressed='true'], .is-on)) :is(svg.lucide, .lucide) { color: var(--olive-ink) !important; }
+  .c-icon-btn:is([aria-pressed='true'], .is-on)) :is(svg.lucide, .lucide) { color: var(--icon-pressed, var(--olive-ink)) !important; }
+/* A star is a mark, not a primary action: a pressed star reads --meter-ink (the accent, or ink under Paper & Clay).
+   Set on the button, so this one rule decides it and no page has to outrank the one above. */
+.c-star { --icon-pressed: var(--meter-ink); }
 /* Segment labels: muted until chosen, ink on the chosen pill (mockup 3-class-page.html:53-54), for
    tabs, radios and toggle groups alike. */
 .c-seg.c-seg > :is(button, a) { color: var(--muted); }

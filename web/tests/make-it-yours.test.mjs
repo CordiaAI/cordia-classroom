@@ -100,6 +100,17 @@ test('Paper & Clay keeps the accent for primary actions: rings, bars, stars and 
   for (const [file, pattern] of [['components/NotificationBell.js', /\.nb-badge \{[^}]*background: var\(--meter\)/], ['components/AccountMenu.js', /\.acct-badge \{[^}]*background: var\(--meter\)/], ['pages/library.js', /\.lib-star\.is-on \{ color: var\(--meter-ink\)/]]) {
     assert.match(await source(file), pattern, file);
   }
+  // A pressed star: the pressed-icon rule reads --icon-pressed, which .c-star sets to --meter-ink, so no page rule
+  // has to outrank it (it did not, and the stars stayed clay).
+  const glass = await source('styles/glass.css');
+  assert.match(glass, /\.c-icon-btn:is\(\[aria-pressed='true'\], \.is-on\)\) :is\(svg\.lucide, \.lucide\) \{ color: var\(--icon-pressed, var\(--olive-ink\)\) !important; \}/);
+  assert.match(glass, /\.c-star \{ --icon-pressed: var\(--meter-ink\); \}/);
+  for (const file of ['pages/guide/[id].js', 'components/FlashcardViewer.js', 'pages/library.js']) assert.match(await source(file), /className=\{'c-icon-btn c-star/, file);
+  // Settings: the avatar, its initials, the section icons, and the sidebar's account-row initials.
+  const settings = await source('pages/settings.js');
+  assert.match(settings, /\.me-avatar \{[^}]*background: var\(--meter\); color: var\(--on-meter\)/);
+  assert.match(settings, /\.settings-row-label :global\(\.lucide\) \{ color: var\(--meter-ink\); \}/);
+  assert.match(system, /\.c-side \.c-side-avatar \{[^}]*color: var\(--meter-ink\)/);
 });
 
 test('components a look must reach: sidebar fill, control edges, composer and floating-pane shadows, code font, corners', async () => {
