@@ -16,6 +16,7 @@ from typing import List, Optional
 from services.llm_calls import chat
 from services.models import ANTHROPIC, GROQ, GROQ_BASE_URL, study_guide_model
 from services.practice_areas import PRACTICE_AREAS, PRACTICE_BASE, classifier_prompt
+from services.text_processing import standalone_question, strip_source_attribution, strip_structure_markers
 from dotenv import load_dotenv
 import anthropic
 from openai import OpenAI
@@ -110,7 +111,8 @@ CRITICAL RULES:
 • ONLY use information that is explicitly stated in the text below.
 • NEVER invent, assume, or hallucinate any facts, terms, or answers.
 • Academic assignments, rubrics, learning objectives, exam topics, and required deliverables ARE educational content. Turn them into questions about what the student must understand or complete.
-• Worked examples, practice problems, and case studies teach a method: ask how to apply that method (with the given values, rules, or tables) and answer with the steps and result the text supports. Every question must stand alone — never refer to the source's labels such as "Problem 4", "Example 2", "Slide 5", or "the table above".
+• Worked examples, practice problems, and case studies teach a method: ask how to apply that method (with the given values, rules, or tables) and answer with the steps and result the text supports.
+• Every question must stand alone and be about the subject, never about the source itself — never refer to its labels or layout such as "Problem 4", "Example 2", "Slide 5", "Chapter 1", or "the table above", and never ask what it lists or covers.
 • If the text contains no educational content (e.g., only navigation menus, UI elements, or unrelated text), respond with exactly: "NO_EDUCATIONAL_CONTENT"
 • Every answer MUST be directly supported by the text provided.
 • A quoted passage, or any passage meant to be known word for word (a creed, oath, motto, poem, scripture, statute, definition given as a quotation), is asked about whole: its answer is the complete passage, word for word, inside quotation marks. Never split it across questions, shorten it, or paraphrase it.
@@ -211,7 +213,13 @@ def _canonical_qa(raw_result: str) -> str:
     lines = []
     for item in out:
         if isinstance(item, tuple):
-            lines.extend([f"Q0: {item[0]}", f"A0: {item[1]}"])
+            # About the subject, not the source: "According to Slide 5, what is X?" loses its lead-in,
+            # and "Which artists are listed for Chapter 1?" is dropped (text_processing).
+            question = standalone_question(item[0])
+            if question is None:
+                logger.info("Study guide: dropped a question about the source: %s", item[0][:120])
+                continue
+            lines.extend([f"Q0: {question}", f"A0: {strip_source_attribution(item[1])}"])
         else:
             lines.append(item)
     return '\n'.join(lines)
@@ -818,6 +826,10 @@ def generate_study_guide(chunks: List[str], has_images: bool = False, learning_g
     STUDY_GUIDE_COST_SAVER only downgrades short text-only batches).
     """
     client = get_openai_client()
+    # Slide and page markers are layout: left in, they become "What is shown on Slide 5?" questions.
+    chunks = [text for text in (strip_structure_markers(chunk) for chunk in chunks) if text]
+    if not chunks:
+        return ""  # nothing but markers: callers treat it as no educational content (a 422)
 
     # Group chunks into batches of ~8000 chars each (works for both XML slides
     # and regular text — matching the batch size that produced 92 Q&A for 59 slides)
@@ -1003,14 +1015,22 @@ Do NOT stop until every Q&A pair has a corresponding NCLEX question."""
             logger.error("NCLEX response was not valid JSON")
             return []
 
-    # Validate basic structure
+    # Validate basic structure: 4 options for MCQ, 5 for SATA, answers that point at an option, and a
+    # stem about the subject rather than the source ("According to slide 5, ..." loses its lead-in).
     validated = []
-    for q in questions:
-        if not all(k in q for k in ("type", "stem", "options", "correct_indices", "rationale")):
+    for q in questions if isinstance(questions, list) else []:
+        if not isinstance(q, dict) or not all(k in q for k in ("type", "stem", "options", "correct_indices", "rationale")):
             continue
-        if q["type"] not in ("mcq", "sata"):
+        if q["type"] not in ("mcq", "sata") or not isinstance(q["options"], list) or not isinstance(q["correct_indices"], list):
             continue
-        validated.append(q)
+        if len(q["options"]) != (4 if q["type"] == "mcq" else 5):
+            continue
+        if not q["correct_indices"] or not all(isinstance(i, int) and 0 <= i < len(q["options"]) for i in q["correct_indices"]):
+            continue
+        stem = standalone_question(str(q["stem"]))
+        if stem is None:
+            continue
+        validated.append({**q, "stem": stem})
     return validated
 
 
