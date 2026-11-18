@@ -22,11 +22,13 @@ function ago(iso) {
   return `${Math.round(minutes / 1440)}d`;
 }
 
-// The bell with the unread count. variant 'side': a sidebar item (wide screens); 'top': an icon
+// The bell with the unread count. variant 'side': an icon button in the sidebar's brand row (wide
+// screens; its name shows as the sidebar's tooltip, from buttonProps); with `tip`, the labelled row
+// of the sidebar the new shell's switch leaves off (components/LegacySidebar.js); 'top': an icon
 // button in the phone top bar. Opening the panel shows What's new (new features, components/
 // WhatsNewList.js) and the latest notifications, and marks both seen. The count is unread
 // notifications plus new features not shown yet.
-export default function NotificationBell({ variant = 'top', tip }) {
+export default function NotificationBell({ variant = 'top', buttonProps = {}, tip = null }) {
   const router = useRouter();
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
@@ -73,9 +75,11 @@ export default function NotificationBell({ variant = 'top', tip }) {
     if (!open || !buttonRef.current) return;
     const anchor = buttonRef.current.getBoundingClientRect();
     const width = Math.min(380, window.innerWidth - EDGE * 2);
-    const left = variant === 'side' ? anchor.right + 12 : anchor.right - width;
+    // Beside the sidebar, never over it.
+    const side = buttonRef.current.closest('.c-side')?.getBoundingClientRect();
+    const left = variant !== 'side' ? anchor.right - width : tip ? anchor.right + 12 : (side?.right ?? anchor.right) + 14;
     setPlace({ top: variant === 'side' ? anchor.top : anchor.bottom + 8, left: Math.min(Math.max(EDGE, left), window.innerWidth - width - EDGE), width });
-  }, [open, variant]);
+  }, [open, variant, Boolean(tip)]);
 
   useEffect(() => { if (open && items) panelRef.current?.querySelector('a, button')?.focus(); }, [open, items]);
 
@@ -91,10 +95,14 @@ export default function NotificationBell({ variant = 'top', tip }) {
 
   return (
     <>
-      {variant === 'side' ? (
-        <button ref={buttonRef} type="button" className="c-side-item nb-side" aria-label={label} aria-expanded={open} aria-haspopup="dialog" title={tip ? tip('Notifications') : undefined} onClick={() => setOpen(value => !value)}>
+      {variant === 'side' && tip ? (
+        <button ref={buttonRef} type="button" className="c-side-item nb-side" aria-label={label} aria-expanded={open} aria-haspopup="dialog" title={tip('Notifications')} onClick={() => setOpen(value => !value)}>
           <span className="nb-icon"><Bell size={20} strokeWidth={1.75} aria-hidden="true" />{badge}</span>
           <span className="c-side-label">Notifications</span>
+        </button>
+      ) : variant === 'side' ? (
+        <button ref={buttonRef} type="button" className="c-side-icon nb-side" aria-label={label} aria-expanded={open} aria-haspopup="dialog" {...buttonProps} onClick={() => setOpen(value => !value)}>
+          <span className="nb-icon"><Bell size={20} strokeWidth={1.75} aria-hidden="true" />{badge}</span>
         </button>
       ) : (
         <button ref={buttonRef} type="button" className="c-btn c-btn--secondary c-searchbtn nb-top" aria-label={label} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(value => !value)}>

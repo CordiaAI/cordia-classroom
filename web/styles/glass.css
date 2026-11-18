@@ -9,7 +9,7 @@
    4. ::before: the grain tile under the content (the pane isolates, the layer sits at z-index -1),
    5. ::after: the 1px rim, masked to the edge. The rim is the edge now, so the pane's 1px border
       turns clear (its width stays, so nothing moves). */
-:is(.c-card, .c-glass, .c-side, .c-topbar, .c-tabbar, .c-sheet, .tutor-drawer, .c-toast, .c-tip, .c-tutor-bubble,
+:is(.c-card, .c-glass, .c-side, .c-rail, .c-topbar, .c-tabbar, .c-sheet, .tutor-drawer, .c-toast, .c-tip, .c-tutor-bubble,
   .card, .folder-card, .stat-card, .dashboard-class-rail, .study-rail-card, .canvas-dashboard, .compact-calendar,
   .continue-card, .recent-material, .overview-snapshot, .settings-section, .create-window, .create-card,
   .practice-source-panel, .practice-main, .practice-problem-panel, .quiz-card, .quiz-question-card, .nclex-card,
@@ -30,7 +30,7 @@
   .nclex-card, .completion-card, .guide-reader-window, .sn-viewer-wrap, .sn-diagram-wrap, .extension-install-hero,
   .extension-install-step, .extension-install-footer, .c-sheet, .c-tip, .upgrade-dialog, .feedback-modal,
   .create-split-settings, .c-search-results, .sn-notes-dropdown, .account-menu-panel) { position: relative; }
-:is(.c-card, .c-glass, .c-side, .c-topbar, .c-tabbar, .c-sheet, .tutor-drawer, .c-toast, .c-tip, .c-tutor-bubble,
+:is(.c-card, .c-glass, .c-side, .c-rail, .c-topbar, .c-tabbar, .c-sheet, .tutor-drawer, .c-toast, .c-tip, .c-tutor-bubble,
   .card, .folder-card, .stat-card, .dashboard-class-rail, .study-rail-card, .canvas-dashboard, .compact-calendar,
   .continue-card, .recent-material, .overview-snapshot, .settings-section, .create-window, .create-card,
   .practice-source-panel, .practice-main, .practice-problem-panel, .quiz-card, .quiz-question-card, .nclex-card,
@@ -40,7 +40,7 @@
   content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
   background: var(--glass-grain) repeat; background-size: 180px 180px; opacity: var(--glass-grain-opacity);
 }
-:is(.c-card, .c-glass, .c-side, .c-topbar, .c-tabbar, .c-sheet, .tutor-drawer, .c-toast, .c-tip, .c-tutor-bubble,
+:is(.c-card, .c-glass, .c-side, .c-rail, .c-topbar, .c-tabbar, .c-sheet, .tutor-drawer, .c-toast, .c-tip, .c-tutor-bubble,
   .card, .folder-card, .stat-card, .dashboard-class-rail, .study-rail-card, .canvas-dashboard, .compact-calendar,
   .continue-card, .recent-material, .overview-snapshot, .settings-section, .create-window, .create-card,
   .practice-source-panel, .practice-main, .practice-problem-panel, .quiz-card, .quiz-question-card, .nclex-card,
@@ -124,7 +124,7 @@
    same (the pane under it is already blurred), and a list of rows with a blurred star, menu and
    icon each made Chrome paint flat blocks for a moment while loading or scrolling. Popovers that
    float over other content keep theirs. */
-:is(.c-card, .c-glass, .c-side, .c-sheet, .c-topbar, .c-tabbar) :not(.c-menu, .c-sheet, .c-toast, .c-tip, .c-tutor-bubble, .c-drop-hint) {
+:is(.c-card, .c-glass, .c-side, .c-rail, .c-sheet, .c-topbar, .c-tabbar) :not(.c-menu, .c-sheet, .c-toast, .c-tip, .c-tutor-bubble, .c-drop-hint) {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -156,6 +156,9 @@
   color: var(--ink) !important;
 }
 .c-chip.c-chip[aria-pressed='true'] { box-shadow: var(--selected-glass-shadow), var(--selected-glass-ring) !important; }
+/* The current view pill sits among glass controls; its own token keeps it apart from them in dark
+   (tokens.css --pill-current-bg). */
+.c-pill.c-pill:is([aria-current='page'], [aria-selected='true']) { background: var(--pill-current-bg) !important; box-shadow: var(--pill-current-shadow) !important; }
 :is(.c-side .c-side-item[aria-current='page'], .c-nav a[aria-current='page'], .c-tabbar a[aria-current='page'],
   .c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-chip[aria-pressed='true'], .c-search-hit.is-active,
   .c-nav .c-nav-btn[aria-pressed='true'], .tutor-chats-btn[aria-pressed='true'],
@@ -208,7 +211,8 @@ select.c-select.c-select {
 @media (hover: hover) { .c-toast > .c-btn--quiet:hover { background: var(--lift-pane) !important; } }
 @keyframes c-toast-in { from { opacity: 0; transform: translate(-50%, 12px) scale(.98); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (min-width: 768px) {
-  :root:has(.app-shell:not(.is-focus) .c-side) .c-toast { left: calc(50% + (var(--side-w) + var(--side-gap)) / 2); max-width: min(560px, calc(100vw - var(--side-w) - var(--side-gap) - 48px)); }
+  /* Centred between the sidebar and the tool rail. */
+  :root:has(.app-shell:not(.is-focus) .c-side) .c-toast { left: calc(50% + (var(--side-w) - var(--rail-w)) / 2); max-width: min(560px, calc(100vw - var(--side-w) - var(--rail-w) - var(--side-gap) * 2 - 48px)); }
 }
 @media (prefers-reduced-motion: reduce) { .c-toast { animation: none; } }
 
@@ -473,20 +477,20 @@ body { touch-action: manipulation; }
 
 /* Scrollbars in rounded panels (sheets, menus, the sidebar, the Tutor): a thin rounded thumb on a
    clear track, kept clear of the rounded corners, instead of the square system bar that ran into them. */
-:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options),
+:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .c-side-chat-list, .tutor-drawer, .tutor-select-options),
 :is(.c-sheet, .c-menu, .tutor-drawer) * { scrollbar-gutter: auto; }
-:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar,
+:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .c-side-chat-list, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar,
 :is(.c-sheet, .c-menu, .tutor-drawer) *::-webkit-scrollbar { width: 12px; height: 12px; }
-:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-track,
+:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .c-side-chat-list, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-track,
 :is(.c-sheet, .c-menu, .tutor-drawer) *::-webkit-scrollbar-track { background: transparent; margin: 18px 0; }
-:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-thumb,
+:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .c-side-chat-list, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-thumb,
 :is(.c-sheet, .c-menu, .tutor-drawer) *::-webkit-scrollbar-thumb { background: var(--scroll-thumb); background-clip: padding-box; border: 4px solid transparent; border-radius: 999px; min-height: 40px; }
-@media (hover: hover) { :is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-thumb:hover,
+@media (hover: hover) { :is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .c-side-chat-list, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-thumb:hover,
 :is(.c-sheet, .c-menu, .tutor-drawer) *::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: padding-box; } }
-:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-corner { background: transparent; }
+:is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .c-side-chat-list, .tutor-drawer, .tutor-select-options)::-webkit-scrollbar-corner { background: transparent; }
 /* Firefox has no track margin; a thin bar in the same colors. */
 @supports (-moz-appearance: none) {
-  :is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .tutor-drawer, .tutor-select-options),
+  :is(.c-sheet, .c-menu, .c-search-results, .c-side-nav, .c-side-chat-list, .tutor-drawer, .tutor-select-options),
   :is(.c-sheet, .c-menu, .tutor-drawer) * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
 }
 

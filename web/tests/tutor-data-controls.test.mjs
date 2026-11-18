@@ -8,7 +8,8 @@ import { readFile } from 'node:fs/promises';
 const read = path => readFile(new URL(path, import.meta.url), 'utf8');
 
 test('a saved chat is deleted only after the confirm step', async () => {
-  const widget = await read('../components/AIChatWidget.js');
+  // The panel's Past chats, and the Tutor client it uses (lib/useTutorChat.js).
+  const widget = (await read('../components/AIChatWidget.js')) + (await read('../lib/useTutorChat.js'));
   assert.match(widget, /onClick=\{\(\) => setDeletingChat\(chat\)\}/, 'the trash button only opens the confirmation');
   assert.match(widget, /<ConfirmDialog\s+title="Delete this chat\?"[\s\S]*?onConfirm=\{\(\) => deleteSavedChat\(deletingChat\)\}/);
   assert.match(widget, /apiFetch\(`\/tutor\/chats\/\$\{encodeURIComponent\(chat\.id\)\}`, \{ method: 'DELETE' \}\)/);

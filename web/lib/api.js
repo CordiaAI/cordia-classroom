@@ -81,6 +81,8 @@ export function clearAuth() {
   localStorage.removeItem('userId');
   localStorage.removeItem('userName');
   localStorage.removeItem('refreshToken');
+  // The new shell's answer for this account (lib/newShell.mjs SHELL_CACHE).
+  localStorage.removeItem('cordiaShell');
   notifyAuthChanged();
 }
 

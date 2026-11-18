@@ -1,6 +1,7 @@
 import '../styles/globals.css';
 import '../styles/classroom.css';
 import '../styles/system.css';
+import '../styles/legacy-shell.css';
 import '../styles/refine.css';
 import '../styles/tokens.css';
 import '../styles/glass.css';

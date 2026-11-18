@@ -14,7 +14,9 @@ step() { printf '\n== %s\n' "$1"; }
 hash_of() { shasum "$@" 2>/dev/null | shasum | cut -d' ' -f1; }
 
 # Keep the gate's own files out of git without touching .gitignore.
-grep -qxF '.gate-venv/' .git/info/exclude 2>/dev/null || echo '.gate-venv/' >> .git/info/exclude
+# In a git worktree .git is a file, so ask git where the shared exclude file lives.
+EXCLUDE="$(git rev-parse --git-common-dir)/info/exclude"
+grep -qxF '.gate-venv/' "$EXCLUDE" 2>/dev/null || echo '.gate-venv/' >> "$EXCLUDE"
 
 step "Node version (CI uses 22)"
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
@@ -24,7 +26,9 @@ echo "node $(node --version)"
 step "Raw colour values outside tokens.css in files this branch changed"
 BASE="$(git merge-base HEAD origin/main)"
 CHANGED="$(git diff --name-only --diff-filter=AM "$BASE" -- web | grep -E '\.(js|jsx|ts|tsx|css)$' | grep -v 'tokens\.css$' || true)"
-if [ -n "$CHANGED" ] && echo "$CHANGED" | xargs grep -nE '#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(' ; then
+# One exception: the browser's <meta name="theme-color"> cannot read a CSS variable, and its value
+# is the same on main. Every other raw colour in a changed file fails.
+if [ -n "$CHANGED" ] && echo "$CHANGED" | xargs grep -nE '#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(' | grep -v '<meta name="theme-color"' ; then
   echo "FAIL: colour values found outside tokens.css. Move them into tokens.css as tokens."
   exit 1
 fi

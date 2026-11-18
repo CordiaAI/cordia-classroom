@@ -15,7 +15,8 @@ export default function TutorBubble() {
     return () => window.removeEventListener('cordia:tutor-visibility', onVisibility);
   }, []);
 
-  if (router.pathname === '/tutor' || open) return null;
+  // The Tutor page and the chat home show the Tutor themselves.
+  if (router.pathname === '/tutor' || router.pathname === '/home' || open) return null;
 
   function show() {
     walkthroughEvent('ask');

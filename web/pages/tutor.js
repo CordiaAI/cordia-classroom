@@ -7,18 +7,21 @@ import { lastGuide } from '../lib/userStore';
 // The Tutor at full size. Everywhere else it opens as a side panel from "Ask".
 export default function TutorPage() {
   const { ready } = useRequireAuth();
-  const { query } = useRouter();
+  const { query, isReady } = useRouter();
   // /tutor?assignment=canvas-123&title=...: opened from an assignment, rubric and all.
   const key = typeof query.assignment === 'string' && /^[\w@.:-]{1,200}$/.test(query.assignment) ? query.assignment : '';
   const assignment = useMemo(() => (key ? { key, title: typeof query.title === 'string' ? query.title.slice(0, 200) : '' } : null), [key, query.title]);
   // ?ask=... fills the box with a first question (e.g. "Check my draft against the rubric").
   const ask = typeof query.ask === 'string' ? query.ask.slice(0, 500) : '';
-  if (!ready) return null;
+  // ?chat=<id>: a saved chat opened from the sidebar's Recent chats.
+  const chat = typeof query.chat === 'string' && /^[\w-]{1,64}$/.test(query.chat) ? query.chat : '';
+  // Wait for the address to be read, so a chat from Recent chats isn't preceded by a fresh one.
+  if (!ready || !isReady) return null;
   return (
     <div className="tutor-page">
       <h1 className="sr-only">Tutor</h1>
       <div className="c-glass tutor-page-panel">
-        <AIChatWidget preferredGuideId={assignment ? '' : lastGuide()?.id || ''} freshOnMount assignment={assignment} initialPrompt={ask} />
+        <AIChatWidget preferredGuideId={assignment ? '' : lastGuide()?.id || ''} freshOnMount resumeChatId={chat} assignment={assignment} initialPrompt={ask} />
       </div>
       <style jsx>{`
         .tutor-page { display: grid; justify-items: center; }

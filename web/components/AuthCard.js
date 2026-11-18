@@ -6,6 +6,7 @@ import { setToken, scheduleProactiveRefresh } from '../lib/api';
 import { supabaseAuth } from '../lib/supabase';
 import { formatPhone, normalizePhone } from '../lib/phone.mjs';
 import { takeReturnTo } from '../lib/returnTo.mjs';
+import { landingRoute } from '../lib/useNewShell';
 import SegmentedControl from './SegmentedControl';
 import AgeFields from './AgeFields';
 import { MIN_AGE, ageFrom } from '../lib/age.mjs';
@@ -79,7 +80,7 @@ export default function AuthCard({ mode: initialMode = 'signin', linkModes = fal
     if (await sendAge() === 'under_13') return;
     const back = takeReturnTo();
     if (back) window.location.assign(back);
-    else router.push('/dashboard');
+    else router.push(await landingRoute());
   }
 
   function switchMode(next) {
