@@ -459,6 +459,7 @@ function ChatScreen({ routeId, goTo, progress }) {
   const pageReady = routeId ? phase !== 'loading' : loaded;
 
   return (
+    <div className="chat-home-gate">
     <LoadGate ready={pageReady} label={routeId ? 'Loading this chat' : 'Loading your home'}>
       {chat && <Head><title>{pageTitle(title)}</title></Head>}
       <div ref={tutor.rootRef} className={'chat-home' + (chatting ? ' is-chat' : '') + (tutor.attachDropActive ? ' is-drop' : '')}>
@@ -557,5 +558,6 @@ function ChatScreen({ routeId, goTo, progress }) {
         {planning && <AssignmentSheet item={planning} onClose={() => setPlanning(null)} />}
       </div>
     </LoadGate>
+    </div>
   );
 }
