@@ -331,7 +331,7 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
 
         /* Tiles: theme windows, backgrounds and fonts. Chosen: the 2px accent ring with its 5px halo. Hover lifts an
            unchosen tile 1px (pointer only); nothing changes colour. */
-        .miy-themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+        .miy-themes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
         .miy-tiles { display: flex; flex-wrap: wrap; gap: 10px; }
         .miy-tile {
           display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 5px 5px 6px; margin: 0;

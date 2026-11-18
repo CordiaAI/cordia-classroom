@@ -13,12 +13,12 @@ export function openMakeItYours(returnTo = null) {
   window.dispatchEvent(new CustomEvent(MAKE_IT_YOURS_EVENT, { detail: { returnTo } }));
 }
 
-// Search finds the sheet by these words (and any longer query that starts one of them, so "the" or
-// "dark" already shows it). Compared without case or extra spaces.
+// Search finds the sheet by these words (and by the first three letters or more of one, so "the" or
+// "dar" already shows it). Compared without case or extra spaces.
 export const SEARCH_WORDS = ['make it yours', 'theme', 'themes', 'dark mode', 'light mode', 'dark', 'appearance', 'accent', 'colour', 'color', 'background', 'font', 'text size', 'glass'];
 export function matchesMakeItYours(query) {
   const q = String(query || '').toLowerCase().replace(/\s+/g, ' ').trim();
-  if (q.length < 2) return false;
+  if (q.length < 3) return false;
   return SEARCH_WORDS.some(word => word.startsWith(q) || q.startsWith(word));
 }
 
