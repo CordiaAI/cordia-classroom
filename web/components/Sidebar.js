@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { CalendarDays, ChartNoAxesColumn, CircleHelp, CreditCard, Ellipsis, House, Library, Link2, LogOut, MessageCircle, MessagesSquare, Megaphone, Moon, PanelLeftClose, PanelLeftOpen, Palette, Plus, Search, Settings, SquarePen, Sun, User, Users } from 'lucide-react';
+import { CalendarDays, ChartNoAxesColumn, CircleHelp, CreditCard, Ellipsis, House, Library, Link2, LogOut, MessageCircle, MessagesSquare, Megaphone, PanelLeftClose, PanelLeftOpen, Palette, Plus, Search, Settings, SquarePen, User, Users } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -21,7 +21,7 @@ import { classLabel } from '../lib/classLabel';
 import { coverFor } from '../lib/coverDesign.mjs';
 import { latestFolders, loadFolders, onFoldersChanged } from '../lib/folders';
 import { HELP_EVENT } from '../lib/help';
-import { setThemePreference, themePreference } from '../lib/theme';
+import { openMakeItYours } from '../lib/makeItYours.mjs';
 import { tierName } from '../lib/plans';
 import { loadClassReadiness } from '../lib/classReadiness';
 import { useChats } from '../lib/chats';
@@ -93,7 +93,6 @@ export default function Sidebar() {
   const countRequests = summary => setRequests((summary?.incoming_friend_requests || 0) + (summary?.incoming_follow_requests || 0));
   useEffect(() => onSocialSummary(countRequests), []);
   useEffect(() => { loadSocialSummary().then(countRequests); }, [router.pathname]);
-  const [dark, setDark] = useState(false);
   const [shortcut, setShortcut] = useState('Ctrl K');
   const avatarRef = useRef(null);
   const sideAvatarRef = useRef(null);
@@ -215,7 +214,6 @@ export default function Sidebar() {
   }, [menuFrom]);
   function toggleMenu(from) {
     hide();
-    setDark(themePreference() === 'dark');
     setMenuFrom(from);
     setMenuOpen(open => !open);
   }
@@ -231,19 +229,20 @@ export default function Sidebar() {
   }, [router.events]);
 
   // The phone top bar's menu has everything; the sidebar's has Settings, Plan, Friends, Help,
-  // Send feedback, the theme and Sign out (Progress is in the rail).
+  // Send feedback, Make it yours and Sign out (Progress is in the rail).
   const accountItems = [
     { key: 'progress', label: 'Progress', icon: ChartNoAxesColumn, onSelect: () => router.push('/progress') },
     { key: 'friends', label: 'Friends', icon: Users, badge: requests || null, badgeLabel: `${requests} ${requests === 1 ? 'request' : 'requests'}`, onSelect: () => router.push('/friends') },
     { key: 'profile', label: 'Settings', icon: Settings, onSelect: () => router.push('/settings') },
-    { key: 'appearance', label: 'Appearance', icon: Palette, onSelect: () => router.push('/settings?section=account') },
+    { key: 'appearance', label: 'Make it yours', icon: Palette, onSelect: () => openMakeItYours() },
     { key: 'plan', label: 'Plan', icon: CreditCard, onSelect: () => router.push('/settings?section=plan') },
     { key: 'connectors', label: 'Connectors', icon: Link2, onSelect: () => router.push('/settings?section=connectors') },
     { key: 'help', label: 'Help', icon: CircleHelp, onSelect: () => setShowHelp(true) },
     { key: 'feedback', label: 'Send feedback', icon: Megaphone, onSelect: () => setShowFeedback(true) },
     { key: 'signout', label: 'Sign out', icon: LogOut, separated: true, onSelect: () => signOut() },
   ];
-  const themeItem = { key: 'theme', label: dark ? 'Light theme' : 'Dark theme', icon: dark ? Sun : Moon, onSelect: () => setThemePreference(dark ? 'light' : 'dark') };
+  // Make it yours holds the light/dark choice now (with the theme, accent, background, font, text size and glass).
+  const themeItem = accountItems.find(item => item.key === 'appearance');
   const sideMenuItems = [
     ...['profile', 'plan', 'friends', 'help', 'feedback'].map(key => accountItems.find(item => item.key === key))
       .map(item => (item.key === 'plan' && plan === 'Free' ? { ...item, label: 'Upgrade' } : item)),

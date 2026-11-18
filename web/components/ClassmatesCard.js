@@ -94,10 +94,10 @@ export default function ClassmatesCard() {
         .cm-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 0; border-top: 1px solid var(--line); min-width: 0; }
         .cm-icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
         .cm-main { display: grid; gap: 2px; flex: 1 1 200px; min-width: 0; }
-        .cm-name { font: 600 15px/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+        .cm-name { font: 600 0.9375rem/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
         .cm-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
         .cm-done { font-weight: 600; color: var(--olive-ink); }
-        .cm-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 6px; color: var(--ink); font: 500 14px/1.35 var(--font-sans); }
+        .cm-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 6px; color: var(--ink); font: 500 0.875rem/1.35 var(--font-sans); }
       `}</style>
     </section>
   );

@@ -333,7 +333,7 @@ export default function QuizPage() {
         .quiz-check-note { margin: -8px 0 4px; }
         .quiz-check-wait { display: grid; justify-items: center; gap: 12px; padding: 48px 0; }
         .quiz-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-        .quiz-mode { position: relative; display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 120px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 15px/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow); }
+        .quiz-mode { position: relative; display: grid; justify-items: center; align-content: center; gap: 10px; min-height: 120px; border: 1px solid var(--line); border-radius:var(--r-card); background: var(--card); color: var(--ink); font:600 0.9375rem/1 var(--font-sans); cursor: pointer; box-shadow: var(--shadow); }
         .quiz-mode :global(.lucide) { color: var(--olive-ink); }
         .quiz-mode.is-on { border-color: var(--state-select-edge); background: var(--state-select-fill); }
         .quiz-mode :global(.quiz-lock) { position: absolute; top: 12px; right: 12px; color: var(--muted); }
@@ -341,11 +341,11 @@ export default function QuizPage() {
         .quiz-note :global(.lucide) { color: var(--olive-ink); }
         .quiz-start { justify-self: start; min-width: 180px; }
         .quiz-count { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-        .quiz-count-label { font: 600 15px/1.2 var(--font-sans); color: var(--ink); }
+        .quiz-count-label { font: 600 0.9375rem/1.2 var(--font-sans); color: var(--ink); }
         .quiz-count-step { display: inline-flex; align-items: center; gap: 6px; }
         .quiz-count-input { width: 72px; text-align: center; font-variant-numeric: tabular-nums; -moz-appearance: textfield; }
         .quiz-count-input::-webkit-outer-spin-button, .quiz-count-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        .quiz-count-rec { padding: 4px 10px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--olive-ink); font: 600 13px/1.2 var(--font-sans); }
+        .quiz-count-rec { padding: 4px 10px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--olive-ink); font: 600 0.8125rem/1.2 var(--font-sans); }
         .quiz-past-score { font-weight:600; font-variant-numeric: tabular-nums; }
         @media (max-width: 767px) { .quiz-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); } .quiz-start { width: 100%; } }
       `}</style>

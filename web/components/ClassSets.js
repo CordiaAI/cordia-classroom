@@ -126,14 +126,14 @@ function DeadlineRow({ item }) {
 function ClassStyles() {
   return (
     <style jsx global>{`
-        .cp-line { margin: 0; font: 600 17px/1.4 var(--font-sans); }
+        .cp-line { margin: 0; font: 600 1.0625rem/1.4 var(--font-sans); }
         .cp-list { list-style: none; margin: 0; padding: 8px 8px 8px 24px; display: grid; }
         .cp-row { display: flex; align-items: center; gap: 12px; min-height: 72px; border-bottom: 1px solid var(--line); }
         .cp-row:last-child { border-bottom: 0; }
         .cp-main { flex: 1; display: grid; gap: 4px; min-width: 0; }
-        .cp-title { font: 500 17px/1.3 var(--font-sans); }
+        .cp-title { font: 500 1.0625rem/1.3 var(--font-sans); }
         .cp-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-variant-numeric: tabular-nums; }
-        .cp-versions { font: 600 13px/1 var(--font-sans); white-space: nowrap; }
+        .cp-versions { font: 600 0.8125rem/1 var(--font-sans); white-space: nowrap; }
         .cp-row .c-menu-wrap:has(.cp-versions) > .c-icon-btn { width: auto; padding: 0 12px; border-radius: 999px; }
         .cp-deadline { gap: 14px; }
         .cp-deadline.is-done .cp-title { color: var(--muted); text-decoration: line-through; }

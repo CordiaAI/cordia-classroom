@@ -50,18 +50,18 @@ export default function GuideAsk({ guideId }) {
       <p className="c-meta ga-note">Answers come only from this guide. Uses your Tutor answers.</p>
       <style jsx>{`
         .ga { display: grid; gap: 12px; padding: 16px; }
-        .ga-title { display: flex; align-items: center; gap: 8px; margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .ga-title { display: flex; align-items: center; gap: 8px; margin: 0; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); }
         .ga-title :global(svg) { color: var(--olive-ink); }
         .ga-form { display: grid; gap: 6px; }
         .ga-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
         .ga-row { display: flex; gap: 8px; }
         .ga-input { flex: 1; min-width: 0; }
-        .ga-answer { display: grid; gap: 8px; justify-items: start; padding: 12px 14px; border-radius: var(--r-input); background: var(--olive-tint); color: var(--ink); font: 500 15px/1.5 var(--font-sans); }
+        .ga-answer { display: grid; gap: 8px; justify-items: start; padding: 12px 14px; border-radius: var(--r-input); background: var(--olive-tint); color: var(--ink); font: 500 0.9375rem/1.5 var(--font-sans); }
         .ga-answer.is-uncovered { background: transparent; border: 1px solid var(--line); }
         .ga-answer p { margin: 0; overflow-wrap: anywhere; }
         .ga-asked { font-weight: 600; }
-        .ga-cited { font-size: 13px; }
-        .ga-error { margin: 0; color: var(--error); font: 600 14px/1.4 var(--font-sans); }
+        .ga-cited { font-size: 0.8125rem; }
+        .ga-error { margin: 0; color: var(--error); font: 600 0.875rem/1.4 var(--font-sans); }
         .ga-note { margin: 0; }
         @media (max-width: 480px) { .ga-row { flex-direction: column; } }
       `}</style>

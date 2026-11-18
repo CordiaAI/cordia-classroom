@@ -39,7 +39,8 @@ assert.deepEqual([...nav.matchAll(/label: '([^']+)', href: '([^']+)'/g)].map(mat
 assert.match(sidebar, /const assistantItem = \{ key: 'assistant', label: 'Assistant', href: '\/assistant'/);
 const tabs = sidebar.split('const tabItems = [')[1].split('];')[0];
 assert.deepEqual([...tabs.matchAll(/label: '([^']+)', href: '([^']+)'/g)].map(match => `${match[1]} ${match[2]}`), ['Dashboard /dashboard', 'Library /library', 'Calendar /calendar', 'Assistant /assistant']);
-for (const label of ['Progress', 'Settings', 'Appearance', 'Plan', 'Help', 'Send feedback', 'Sign out']) {
+// Appearance became Make it yours (T10): the sheet holds light and dark with the rest of the look.
+for (const label of ['Progress', 'Settings', 'Make it yours', 'Plan', 'Help', 'Send feedback', 'Sign out']) {
   assert.ok(sidebar.includes(`label: '${label}'`), `missing account menu item ${label}`);
 }
 assert.match(dashboard, /notes: '\/smartnotes'/);

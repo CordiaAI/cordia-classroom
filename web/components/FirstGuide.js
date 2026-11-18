@@ -81,7 +81,7 @@ export default function FirstGuide({ canvas, coursework, onDismiss }) {
         .first-guide-head h2 { flex: 1; margin: 0; }
         .first-guide-classes { display: flex; flex-wrap: wrap; gap: 8px; }
         .first-guide-try, .first-guide-sample { justify-self: start; }
-        .first-guide-error { color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+        .first-guide-error { color: var(--error); font: 600 0.9375rem/1.4 var(--font-sans); }
       `}</style>
     </section>
   );

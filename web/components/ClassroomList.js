@@ -61,7 +61,7 @@ export default function ClassroomList({ showHeading = false }) {
         .crl-empty p { margin: 0; }
         .crl-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
         .crl-list :global(.crl-row) { display: grid; gap: 4px; padding: 14px 16px; color: var(--ink); text-decoration: none; min-width: 0; }
-        .crl-name { font: 600 16px/1.3 var(--font-sans); overflow-wrap: anywhere; }
+        .crl-name { font: 600 1rem/1.3 var(--font-sans); overflow-wrap: anywhere; }
       `}</style>
     </section>
   );
@@ -126,9 +126,9 @@ export function NewClassroomSheet({ onClose, onMade, classId = null }) {
       </div>
       <style jsx global>{`
         .ncs { width: min(480px, 100%); display: grid; gap: 16px; max-height: min(90vh, 760px); overflow-y: auto; }
-        .ncs-title { margin: 0; font: 500 28px/1.15 var(--font-display); color: var(--ink); }
+        .ncs-title { margin: 0; font: 500 1.75rem/1.15 var(--font-display); color: var(--ink); }
         .ncs-field { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
-        .ncs-field > span, .ncs-field legend { font: 600 14px/1.2 var(--font-sans); color: var(--ink); padding: 0; margin-bottom: 4px; }
+        .ncs-field > span, .ncs-field legend { font: 600 0.875rem/1.2 var(--font-sans); color: var(--ink); padding: 0; margin-bottom: 4px; }
         .ncs-choice { display: flex; gap: 10px; align-items: flex-start; color: var(--ink); cursor: pointer; }
         .ncs-choice input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--olive); flex: none; }
         .ncs-choice b { display: block; font-weight: 600; }

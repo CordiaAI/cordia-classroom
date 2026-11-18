@@ -90,8 +90,8 @@ export default function PhoneSettings() {
         .settings-phone-form { display: flex; flex-wrap: wrap; gap: 8px; }
         .settings-phone-form :global(.c-input) { flex: 1 1 200px; min-width: 0; }
         .settings-phone-code { letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
-        .settings-phone-error { color: var(--error); font: 600 15px/1.4 var(--font-sans); }
-        .settings-phone-notice { color: var(--olive-ink); font: 600 15px/1.4 var(--font-sans); }
+        .settings-phone-error { color: var(--error); font: 600 0.9375rem/1.4 var(--font-sans); }
+        .settings-phone-notice { color: var(--olive-ink); font: 600 0.9375rem/1.4 var(--font-sans); }
       `}</style>
     </div>
   );

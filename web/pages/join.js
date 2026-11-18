@@ -39,8 +39,8 @@ export default function JoinWithCode() {
       <style jsx>{`
         .jcode { width: min(440px, 100%); margin: 32px auto; padding: 24px; display: grid; gap: 12px; }
         .jcode :global(.c-title) { margin: 0; }
-        .jcode-field { font: 600 14px/1.2 var(--font-sans); color: var(--ink); }
-        .jcode-input { font: 600 22px/1.2 var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; }
+        .jcode-field { font: 600 0.875rem/1.2 var(--font-sans); color: var(--ink); }
+        .jcode-input { font: 600 1.375rem/1.2 var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; }
         .jcode-error { margin: 0; color: var(--text-error); }
       `}</style>
     </div>

@@ -30,7 +30,7 @@ export default function CanvasReminder() {
       <button type="button" className="c-icon-btn" onClick={() => setNote(null)} aria-label="Dismiss"><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
       <style jsx>{`
         .canvas-reminder { top: 80px; left: 50%; transform: translateX(-50%); }
-        .canvas-reminder-text { border: 0; background: transparent; color: var(--ink); font: 600 15px/1 var(--font-sans); cursor: pointer; padding: 0 2px; }
+        .canvas-reminder-text { border: 0; background: transparent; color: var(--ink); font: 600 0.9375rem/1 var(--font-sans); cursor: pointer; padding: 0 2px; }
         .canvas-reminder :global(.c-icon-btn) { width: 32px; height: 32px; }
         @media (max-width: 767px) { .canvas-reminder { top: 64px; } }
       `}</style>

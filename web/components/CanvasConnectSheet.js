@@ -145,21 +145,21 @@ export default function CanvasConnectSheet({ school = '', initialDomain = '', on
         <style jsx global>{`
           .ccs { width: min(560px, 100%); display: grid; gap: 16px; }
           .ccs .c-sheet-head { margin-bottom: 0; }
-          .ccs-title { margin: 0; font: 500 28px/1.1 var(--font-display); }
+          .ccs-title { margin: 0; font: 500 1.75rem/1.1 var(--font-display); }
           .ccs-form { display: grid; gap: 16px; }
-          .ccs-how { margin: 0; color: var(--ink); font: 500 15px/1.55 var(--font-sans); }
+          .ccs-how { margin: 0; color: var(--ink); font: 500 0.9375rem/1.55 var(--font-sans); }
           .ccs-how strong { font-weight: 600; }
           .ccs-value { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 4px 0 14px; border-radius: 12px; background: var(--field); border: 1px solid var(--line); }
           .ccs-value .c-meta { min-width: 64px; }
-          .ccs-date { flex: 1; min-width: 0; height: 40px; border: 0; background: transparent; color: var(--ink); font: 600 15px/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
+          .ccs-date { flex: 1; min-width: 0; height: 40px; border: 0; background: transparent; color: var(--ink); font: 600 0.9375rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
           .ccs-date:focus-visible { outline: 2px solid var(--olive); border-radius: 8px; }
-          .ccs-value strong { flex: 1; font: 600 15px/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
-          .ccs-notice { margin: 0; font: 600 15px/1.45 var(--font-sans); color: var(--ink); }
-          .ccs-check { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font: 600 15px/1 var(--font-sans); cursor: pointer; }
+          .ccs-value strong { flex: 1; font: 600 0.9375rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
+          .ccs-notice { margin: 0; font: 600 0.9375rem/1.45 var(--font-sans); color: var(--ink); }
+          .ccs-check { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font: 600 0.9375rem/1 var(--font-sans); cursor: pointer; }
           .ccs-check input { width: 20px; height: 20px; accent-color: var(--olive); }
-          .ccs-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+          .ccs-error { margin: 0; color: var(--error); font: 600 0.9375rem/1.4 var(--font-sans); }
           .ccs-blocked { display: grid; gap: 16px; justify-items: start; }
-          .ccs-line { margin: 0; font: 600 17px/1.4 var(--font-sans); }
+          .ccs-line { margin: 0; font: 600 1.0625rem/1.4 var(--font-sans); }
           .ccs-actions { display: flex; justify-content: flex-end; }
         `}</style>
       </section>

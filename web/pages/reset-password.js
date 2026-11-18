@@ -98,7 +98,7 @@ export default function ResetPasswordPage() {
         .rp-pw :global(.c-input) { width: 100%; padding-right: 48px; }
         .rp-eye { position: absolute; top: 50%; right: 4px; translate: 0 -50%; display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: var(--r-pill); background: none; color: var(--muted); cursor: pointer; }
         .rp-line { margin: 0; font: 500 var(--fs-15)/1.5 var(--font-sans); }
-        .rp-form .rp-line { min-height: 20px; font-size: var(--fs-13); line-height: 20px; }
+        .rp-form .rp-line { min-height: 20px; font-size: var(--fs-13); line-height: 1.25rem; }
         .rp-error { color: var(--error); }
         .rp-card :global(.rp-back) { justify-self: center; color: var(--muted); font: 600 var(--fs-13)/1.5 var(--font-sans); }
         @media (hover: hover) and (pointer: fine) { .rp-eye:hover { color: var(--ink); } }

@@ -294,7 +294,7 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
         .oe.has-side { grid-template-columns: minmax(0, 1fr) minmax(320px, 46%); }
         .oe-main { display: grid; gap: 12px; min-width: 0; }
         .oe-tools { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: -8px 0 0 -12px; }
-        .oe-status { font-size: 13px; }
+        .oe-status { font-size: 0.8125rem; }
         .oe-tools--read { margin-top: -8px; }
         /* Writing: the box spans the card under the toolbar (reading keeps the 68ch measure). */
         .oe-page.is-editing { max-width: none; box-shadow: 0 0 0 1px var(--line); border-radius: var(--r-input); padding: 12px; margin: -12px; }
@@ -302,11 +302,11 @@ export default function OutlineEditor({ guide, version = 0, onSaved, onAction, t
         .oe-side-item + .oe-side-item { margin-top: ${GAP}px; }
         .oe-page { min-height: 240px; outline: none; display: grid; gap: 12px; align-content: start; }
         .oe-page:empty::before { content: attr(data-placeholder); color: var(--muted); }
-        .oe-page :global(h2) { display: flex; gap: 12px; align-items: baseline; margin: 20px 0 0; font: 600 20px/1.3 var(--font-sans); letter-spacing: 0; counter-increment: oe-section; }
+        .oe-page :global(h2) { display: flex; gap: 12px; align-items: baseline; margin: 20px 0 0; font: 600 1.25rem/1.3 var(--font-sans); letter-spacing: 0; counter-increment: oe-section; }
         .oe-page :global(h2:first-child) { margin-top: 0; }
-        .oe-page :global(h2::before) { content: counter(oe-section); flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 13px/1 var(--font-sans); user-select: none; }
+        .oe-page :global(h2::before) { content: counter(oe-section); flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 0.8125rem/1 var(--font-sans); user-select: none; }
         .oe-page { counter-reset: oe-section; }
-        .oe-page :global(.oe-overview) { margin: 0; padding-bottom: 20px; border-bottom: 1px solid var(--line); font: 400 var(--fs-20, 20px)/1.5 var(--font-sans); color: var(--ink); }
+        .oe-page :global(.oe-overview) { margin: 0; padding-bottom: 20px; border-bottom: 1px solid var(--line); font: 400 var(--fs-20, 1.25rem)/1.5 var(--font-sans); color: var(--ink); }
         .oe-page :global(ul) { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
         .oe-page :global(ul ul) { margin-top: 6px; gap: 4px; list-style: circle; color: var(--muted-ink); }
         .oe-page :global(p), .oe-page :global(div) { margin: 0; }

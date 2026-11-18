@@ -144,22 +144,22 @@ export default function Instructors() {
       </section>
       <style jsx global>{`
         .ins { width: min(520px, 100%); margin: 0 auto; display: grid; gap: 24px; }
-        .ins-title { margin: 0; font: 500 40px/1.08 'Newsreader', Georgia, serif; letter-spacing: -0.02em; }
-        .ins-intro { display: grid; gap: 12px; color: var(--muted); font: 500 16px/1.55 var(--font-sans); }
+        .ins-title { margin: 0; font: 500 2.5rem/1.08 'Newsreader', Georgia, serif; letter-spacing: -0.02em; }
+        .ins-intro { display: grid; gap: 12px; color: var(--muted); font: 500 1rem/1.55 var(--font-sans); }
         .ins-intro p { margin: 0; }
         .ins-steps { margin: 0; padding-left: 22px; display: grid; gap: 4px; }
         .ins-card { display: grid; gap: 16px; padding: 28px; border-radius: 28px; background: var(--surface-card); border: 1px solid var(--hairline); box-shadow: var(--shadow-float); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); }
         .ins-form { display: grid; gap: 16px; }
-        .ins-field { position: relative; display: grid; gap: 6px; font: 600 13px/1 var(--font-sans); }
-        .ins-line { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 17px/1.4 var(--font-sans); }
-        .ins-sub { margin: 0; font: 600 18px/1.3 var(--font-sans); color: var(--ink); }
+        .ins-field { position: relative; display: grid; gap: 6px; font: 600 0.8125rem/1 var(--font-sans); }
+        .ins-line { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 1.0625rem/1.4 var(--font-sans); }
+        .ins-sub { margin: 0; font: 600 1.125rem/1.3 var(--font-sans); color: var(--ink); }
         .ins-hides { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; }
-        .ins-hides li { display: grid; gap: 2px; color: var(--muted); font: 500 15px/1.45 var(--font-sans); }
+        .ins-hides li { display: grid; gap: 2px; color: var(--muted); font: 500 0.9375rem/1.45 var(--font-sans); }
         .ins-hides strong { color: var(--ink); font-weight: 600; }
-        .ins-note { margin: 0; color: var(--muted); font: 500 14px/1.45 var(--font-sans); }
-        .ins-error { margin: 0; color: var(--error); font: 600 15px/1.4 var(--font-sans); }
+        .ins-note { margin: 0; color: var(--muted); font: 500 0.875rem/1.45 var(--font-sans); }
+        .ins-error { margin: 0; color: var(--error); font: 600 0.9375rem/1.4 var(--font-sans); }
         .ins-suggest { position: absolute; top: 100%; left: 0; right: 0; z-index: 5; margin: 4px 0 0; padding: 4px; list-style: none; border-radius: 16px; background: var(--surface-raised); box-shadow: var(--shadow-float); }
-        .ins-suggest button { width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none; font: 500 15px/1.3 var(--font-sans); text-align: left; cursor: pointer; color: var(--ink); }
+        .ins-suggest button { width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none; font: 500 0.9375rem/1.3 var(--font-sans); text-align: left; cursor: pointer; color: var(--ink); }
         .ins-suggest button:hover { background: var(--lift-pane); box-shadow: var(--lg-highlight); }
       `}</style>
     </PublicPage>

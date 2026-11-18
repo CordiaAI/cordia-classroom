@@ -27,11 +27,11 @@ export function ScoreRing({ value }) {
         .finish-ring { position: relative; width: ${size}px; height: ${size}px; display: grid; place-items: center; }
         .finish-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
         .finish-ring-track { stroke: var(--hairline); }
-        .finish-ring-fill { stroke: var(--olive); }
+        .finish-ring-fill { stroke: var(--meter); }
         .is-great .finish-ring-fill { stroke: var(--success); }
         .is-low .finish-ring-fill { stroke: var(--warning); }
         .finish-ring span { display: grid; gap: 2px; justify-items: center; }
-        .finish-ring strong { font: 600 28px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .finish-ring strong { font: 600 1.75rem/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .finish-ring small { color: var(--muted); font: 500 var(--fs-13)/1 var(--font-sans); }
       `}</style>
     </div>
@@ -82,10 +82,10 @@ export default function SessionFinish({ guideId, guideTitle, cards, accuracy, mi
       </div>
       <style jsx>{`
         .finish { display: grid; justify-items: center; gap: 16px; padding: 32px 24px; text-align: center; }
-        .finish-next { margin: 0; font-size: 15px; }
+        .finish-next { margin: 0; font-size: 0.9375rem; }
         .finish-stats { list-style: none; margin: 0; padding: 0; display: flex; gap: 40px; }
         .finish-stats li { display: grid; gap: 4px; }
-        .finish-stats strong { font:600 28px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .finish-stats strong { font:600 1.75rem/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .finish-actions { justify-content: center; flex-wrap: wrap; }
         @media (max-width: 767px) { .finish-stats { gap: 24px; } }
       `}</style>

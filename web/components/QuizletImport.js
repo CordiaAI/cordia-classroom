@@ -118,13 +118,13 @@ export default function QuizletImport({ initialUrl = '', onImport, onCancel }) {
       <style jsx>{`
         .quizlet-sheet { width: min(560px, 100%); display: grid; gap: 14px; }
         .quizlet-form { display: grid; gap: 10px; }
-        .quizlet-label { font: 600 14px/1.3 var(--font-sans); color: var(--ink); }
+        .quizlet-label { font: 600 0.875rem/1.3 var(--font-sans); color: var(--ink); }
         .quizlet-url { position: relative; display: flex; align-items: center; }
         .quizlet-url :global(svg) { position: absolute; left: 14px; color: var(--muted); pointer-events: none; }
         .quizlet-url :global(input) { width: 100%; padding-left: 42px; }
         .quizlet-note, .quizlet-steps { margin: 0; }
         .quizlet-steps { padding-left: 20px; display: grid; gap: 2px; }
-        .quizlet-text { min-height: 180px; font-family: var(--font-mono, monospace); font-size: 13px; tab-size: 4; }
+        .quizlet-text { min-height: 180px; font-family: var(--font-mono, monospace); font-size: 0.8125rem; tab-size: 4; }
         .quizlet-error { margin: 0; color: var(--error); font-weight: 600; }
         .quizlet-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
         .quizlet-switch { margin-right: auto; }

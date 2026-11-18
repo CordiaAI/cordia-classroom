@@ -59,9 +59,9 @@ export default function App({ Component, pageProps }) {
   }, []);
   // Time zone, Retain misses and the study log: once per load, as soon as someone is signed in.
   useEffect(() => { if (getToken()) { syncServerCopies(); showConnectedAppSets(); } }, [router.pathname]);
-  // The account's saved theme replaces the local cache as soon as the account loads.
+  // The account's saved look (light/dark and Make it yours) replaces the local cache as soon as the account loads.
   const progress = useProgress();
-  useEffect(() => { if (progress.theme) syncThemeFromAccount(); }, [progress.theme]);
+  useEffect(() => { syncThemeFromAccount(); }, [progress]);
   const [timerState, setTimerState] = useState({
     mode: 'focus', minutes: 25, seconds: 0, isRunning: false
   });

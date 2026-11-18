@@ -84,7 +84,7 @@ export default function ConnectedApps() {
         .ca-head .c-meta { margin: 0; }
         .ca-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
         .ca-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'name action' 'meta action'; align-items: center; column-gap: 12px; row-gap: 2px; padding: 12px 0; border-top: 1px solid var(--hairline); }
-        .ca-name { grid-area: name; font: 600 15px/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+        .ca-name { grid-area: name; font: 600 0.9375rem/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
         .ca-row .c-meta { grid-area: meta; }
         .ca-disconnect { grid-area: action; }
         .ca-status:empty { display: none; }

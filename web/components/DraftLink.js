@@ -87,10 +87,10 @@ export default function DraftLink({ item, draft: initial }) {
       {error && <p className="cn-error" role="alert">{error}</p>}
       <style jsx>{`
         .dl { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--hairline); }
-        .dl-title { margin: 0; font: 600 14px/1.4 var(--font-sans); color: var(--muted); }
+        .dl-title { margin: 0; font: 600 0.875rem/1.4 var(--font-sans); color: var(--muted); }
         .dl .c-meta { margin: 0; }
         .dl-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
-        .dl-name { color: var(--ink); font: 600 15px/1.4 var(--font-sans); }
+        .dl-name { color: var(--ink); font: 600 0.9375rem/1.4 var(--font-sans); }
         .dl-words { font-variant-numeric: tabular-nums; white-space: nowrap; }
         .dl :global(.dl-feedback), .dl .dl-link, .dl .dl-cancel { justify-self: start; }
         .dl-results { max-height: 220px; overflow: auto; }

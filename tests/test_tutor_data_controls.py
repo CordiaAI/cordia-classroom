@@ -147,6 +147,91 @@ class TutorDataControlsTests(unittest.TestCase):
         self.assertEqual(data["tutor_memory"], [])
         self.assertEqual([chat["id"] for chat in data["tutor_chats"]], [ANA_CHAT])
 
+    # Deleted chats in the export -----------------------------------------------------------------
+    def _delete_chat_row(self, chat_id="aaaaaaaa-0000-4000-8000-000000000002", deleted_at="2026-11-10T08:30:00+00:00"):
+        self.db.rows("tutor_chats").append(
+            {"id": chat_id, "user_id": ANA, "guide_id": None, "title": "Krebs cycle review",
+             "messages": [{"role": "user", "text": "Where does the Krebs cycle happen?"}],
+             "created_at": "2026-11-01T09:00:00+00:00", "updated_at": "2026-11-09T09:00:00+00:00", "deleted_at": deleted_at})
+        return chat_id
+
+    def test_a_deleted_chat_is_exported_marked_deleted_with_its_purge_date(self):
+        from services import account_export
+        deleted = self._delete_chat_row()
+        data = self.client.get("/auth/account/export", headers=self.as_("ana")).json()
+        chats = {chat["id"]: chat for chat in data["tutor_chats"]}
+        self.assertEqual(sorted(chats), [ANA_CHAT, deleted])
+        gone = chats[deleted]
+        self.assertIs(gone["deleted"], True)
+        self.assertEqual(gone["deleted_at"], "2026-11-10T08:30:00+00:00")
+        self.assertEqual(gone["purge_on"], "2026-12-10T08:30:00+00:00")  # 30 days later
+        self.assertEqual(gone["messages"], [{"role": "user", "text": "Where does the Krebs cycle happen?"}])
+        note = data["deleted_chats_note"]
+        self.assertIn("30 days", note)
+        self.assertIn("permanently deleted", note)  # the daily clean-up removes it on its purge date ...
+        self.assertIn("within a day of that date", note)  # ... or at the next run, which is at most a day later
+        self.assertNotIn("on or after", note)
+        self.assertEqual(account_export.DELETED_KEEP_DAYS, 30)
+
+    def test_the_purge_date_follows_the_purge_period_the_purge_uses(self):
+        from services import account_export, saved_chats
+        self.assertIs(account_export.DELETED_KEEP_DAYS, saved_chats.DELETED_KEEP_DAYS)
+        deleted = self._delete_chat_row(deleted_at="2026-11-10T08:30:00Z")
+        with patch.object(account_export, "DELETED_KEEP_DAYS", 7):
+            data = account_export.build(self.db, ANA)
+        gone = next(chat for chat in data["tutor_chats"] if chat["id"] == deleted)
+        self.assertEqual(gone["purge_on"], "2026-11-17T08:30:00+00:00")
+
+    def test_a_chat_that_is_not_deleted_is_exported_exactly_as_before(self):
+        data = self.client.get("/auth/account/export", headers=self.as_("ana")).json()
+        self.assertEqual(data["tutor_chats"], [{
+            "id": ANA_CHAT, "guide_id": None, "title": "Cell biology", "messages": [{"role": "user", "text": "What is osmosis?"}],
+            "created_at": None, "updated_at": "2026-11-08T10:00:00+00:00"}])
+        self.assertNotIn("deleted_chats_note", data)
+        # A restored chat (deleted_at cleared) is a live one again.
+        self._delete_chat_row("aaaaaaaa-0000-4000-8000-000000000003", deleted_at=None)
+        data = self.client.get("/auth/account/export", headers=self.as_("ana")).json()
+        for chat in data["tutor_chats"]:
+            for field in ("deleted", "deleted_at", "purge_on"):
+                self.assertNotIn(field, chat)
+
+    def test_the_export_works_before_the_saved_chats_migration(self):
+        real = self.db.table
+
+        def table(name):
+            query = real(name)
+            if name != "tutor_chats":
+                return query
+            select = query.select
+
+            def checked(columns="*", **kwargs):
+                if "deleted_at" in columns:
+                    raise Exception('{"code": "42703", "message": "column tutor_chats.deleted_at does not exist"}')
+                return select(columns, **kwargs)
+            query.select = checked
+            return query
+        with patch.object(self.db, "table", side_effect=table):
+            response = self.client.get("/auth/account/export", headers=self.as_("ana"))
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()
+        self.assertEqual(data["unavailable"], [])
+        self.assertEqual([chat["id"] for chat in data["tutor_chats"]], [ANA_CHAT])
+        self.assertEqual(data["tutor_chats"][0]["title"], "Cell biology")
+        self.assertNotIn("deleted_at", data["tutor_chats"][0])
+        self.assertNotIn("deleted_chats_note", data)
+
+    def test_a_real_error_reading_chats_is_still_reported_not_swallowed(self):
+        from services import account_export
+        real = self.db.table
+
+        def table(name):
+            if name == "tutor_chats":
+                raise RuntimeError("connection reset")
+            return real(name)
+        with patch.object(self.db, "table", side_effect=table):
+            data = account_export.build(self.db, ANA)
+        self.assertEqual(data["unavailable"], ["tutor_chats"])
+
 
 if __name__ == "__main__":
     unittest.main()

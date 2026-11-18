@@ -16,6 +16,7 @@ import { useFileDragging } from '../lib/fileDrop';
 import { FOCUS_ROUTES } from '../lib/featureReleases';
 import { useNewShell } from '../lib/useNewShell';
 import { WhatsNewWatcher } from './WhatsNew';
+import MakeItYoursHost from './MakeItYours';
 
 const WIDE = ['/guide/[id]', '/practice', '/practice/[guideId]', '/smartnotes', '/canvas', '/tutor'];
 // Study screens run in focus mode: no top bar or tab bar, just the screen's own exit.
@@ -65,6 +66,8 @@ export default function Layout({ children, timerState, setTimerState }) {
       <AgeGate />
       <Walkthrough />
       <FeatureOnboarding />
+      {/* Make it yours opens from the account menus, Settings and Search, in either shell and at every width. */}
+      <MakeItYoursHost />
       <TimerEngine timerState={timerState} setTimerState={setTimerState} />
       {!pageOwnsTutor && <TutorDrawer preferredGuideId={activeGuideId} preferredNoteId={activeNoteId} />}
     </div>

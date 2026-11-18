@@ -35,19 +35,19 @@ export function WhatsNewList({ items, onShow }) {
       </ul>
       <style jsx>{`
         .wnl { display: grid; gap: 2px; }
-        .wnl-head { margin: 4px 8px 2px; font: 600 13px/1.3 var(--font-sans); color: var(--muted-ink); }
+        .wnl-head { margin: 4px 8px 2px; font: 600 0.8125rem/1.3 var(--font-sans); color: var(--muted-ink); }
         .wnl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
         .wnl-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 10px; padding: 10px 8px; border-radius: var(--r-input); }
         .wnl-row.is-new { background: var(--olive-tint); }
         .wnl-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
         .wnl-row.is-new .wnl-icon { background: var(--card); }
         .wnl-main { display: grid; gap: 2px; min-width: 0; }
-        .wnl-title { font: 600 15px/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
-        .wnl-dot { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--olive); vertical-align: middle; }
-        .wnl-text { font: 500 14px/1.35 var(--font-sans); color: var(--muted-ink); overflow-wrap: anywhere; }
+        .wnl-title { font: 600 0.9375rem/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+        .wnl-dot { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--meter); vertical-align: middle; }
+        .wnl-text { font: 500 0.875rem/1.35 var(--font-sans); color: var(--muted-ink); overflow-wrap: anywhere; }
         .wnl-foot { display: flex; align-items: center; gap: 12px; margin-top: 2px; }
-        .wnl-date { font-size: 12px; }
-        .wnl-show { min-height: 32px; padding: 0 2px; border: 0; background: none; color: var(--olive-ink); font: 600 14px/1 var(--font-sans); cursor: pointer; }
+        .wnl-date { font-size: 0.75rem; }
+        .wnl-show { min-height: 32px; padding: 0 2px; border: 0; background: none; color: var(--olive-ink); font: 600 0.875rem/1 var(--font-sans); cursor: pointer; }
         .wnl-show:hover { text-decoration: underline; }
       `}</style>
     </section>

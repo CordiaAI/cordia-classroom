@@ -136,16 +136,16 @@ export default function InviteDialog({ classroom, onClose }) {
       <style jsx global>{`
         .inv { width: min(520px, 100%); display: grid; gap: 16px; max-height: min(90vh, 760px); overflow-y: auto; }
         .inv-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-        .inv-title { margin: 0; font: 500 26px/1.15 var(--font-display); color: var(--ink); overflow-wrap: anywhere; }
+        .inv-title { margin: 0; font: 500 1.625rem/1.15 var(--font-display); color: var(--ink); overflow-wrap: anywhere; }
         .inv-link, .inv-friends { display: grid; gap: 8px; }
-        .inv-label { margin: 0; font: 600 14px/1.2 var(--font-sans); color: var(--ink); }
+        .inv-label { margin: 0; font: 600 0.875rem/1.2 var(--font-sans); color: var(--ink); }
         .inv-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
         .inv-row .c-input { flex: 1 1 200px; min-width: 0; }
-        .inv-code { font: 600 24px/1.2 var(--font-mono); letter-spacing: 0.12em; color: var(--ink); }
+        .inv-code { font: 600 1.5rem/1.2 var(--font-mono); letter-spacing: 0.12em; color: var(--ink); }
         .inv-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; max-height: 240px; overflow-y: auto; }
         .inv-friend { display: flex; align-items: center; gap: 10px; color: var(--ink); cursor: pointer; }
         .inv-friend input { width: 18px; height: 18px; accent-color: var(--olive); }
-        .inv-avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--olive-tint); color: var(--olive-ink); font: 600 13px/1 var(--font-sans); flex: none; }
+        .inv-avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--olive-tint); color: var(--olive-ink); font: 600 0.8125rem/1 var(--font-sans); flex: none; }
       `}</style>
     </BodyPortal>
   );

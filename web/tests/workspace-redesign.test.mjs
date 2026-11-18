@@ -122,14 +122,16 @@ test('walkthrough routes put a guide id in the path only encoded', async () => {
   assert.doesNotMatch(controller, /\/(guide|quiz)\/\$\{guide\.id\}|'\/guide\/' \+ built\.guideId/);
 });
 
-test('Settings: Account (with theme), Tutor (with Explain style), Plan, Connectors; old tabs still land', async () => {
+test('Settings: Account (with Appearance, which opens Make it yours), Tutor (with Explain style), Plan, Connectors; old tabs still land', async () => {
   const settings = await source('pages/settings.js');
 
   for (const key of ['account', 'tutor', 'plan', 'connectors']) assert.match(settings, new RegExp(`\\{ key: '${key}', label: `));
   assert.doesNotMatch(settings, /key: 'study'|key: 'appearance'|key: 'learn'|<LearnCordia/);
   assert.match(settings, /study: 'tutor', appearance: 'account'/);
   assert.match(settings, /section === 'learn'\).*openHelp\(\)/);
-  assert.match(settings, /<SegmentedControl kind="group" label="Theme">/);
+  // The separate light/dark control moved into Make it yours (T10); Account › Appearance opens the sheet.
+  assert.doesNotMatch(settings, /<SegmentedControl kind="group" label="Theme">|setThemePreference/);
+  assert.match(settings, /openMakeItYours\(event\.currentTarget\)/);
   assert.match(settings, /<LearningStylePicker /);
 });
 

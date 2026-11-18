@@ -110,8 +110,8 @@ export default function RecapCard({ guides, folders, since, cardsStudied = 0, se
         .recap { display: grid; gap: 16px; padding: 20px; border-radius:var(--r-card); }
         .recap-stats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
         .recap-stats li { display: grid; gap: 4px; min-width: 0; }
-        .recap-stats strong { font:600 28px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--olive-ink); }
-        .recap-stats .recap-class { font:600 20px/1.15 var(--font-sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .recap-stats strong { font:600 1.75rem/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--olive-ink); }
+        .recap-stats .recap-class { font:600 1.25rem/1.15 var(--font-sans); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       `}</style>
     </section>
   );

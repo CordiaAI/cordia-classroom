@@ -13,6 +13,8 @@ machines never sync the same user at once:
   study-session reminders when they're due (checked every minute).
 - Exams found in Canvas get their review sessions scheduled once Calendar sync is on.
 - Once a day, what happened after each adaptive decision (services.decision_outcomes).
+- Once a day, deleted Tutor chats that are past their 30 days are removed for good, for every student
+  (services.saved_chats.run_purge_if_due; it does nothing until the saved-chats migration has run).
 On by default on Fly (FLY_APP_NAME is set there), off elsewhere; SYNC_WORKER=1 or 0 overrides.
 """
 
@@ -163,6 +165,11 @@ def _loop() -> None:
             decision_outcomes.run_if_due(get_supabase)
         except Exception:
             log.exception("decision outcomes failed")
+        try:
+            from services import saved_chats
+            saved_chats.run_purge_if_due()
+        except Exception:
+            log.exception("saved chats purge failed")
         time.sleep(REMINDER_SECONDS)
 
 

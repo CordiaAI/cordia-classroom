@@ -20,9 +20,9 @@ export default function UserChip({ person, meta }) {
       <style jsx global>{`
         .uc { display: flex; align-items: center; gap: 12px; min-width: 0; color: var(--ink); text-decoration: none; }
         a.uc:hover .uc-names strong { text-decoration: underline; text-underline-offset: 3px; }
-        .uc-avatar { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 15px/1 var(--font-sans); }
+        .uc-avatar { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 0.9375rem/1 var(--font-sans); }
         .uc-names { display: grid; gap: 2px; min-width: 0; }
-        .uc-names strong { font: 600 15px/1.3 var(--font-sans); }
+        .uc-names strong { font: 600 0.9375rem/1.3 var(--font-sans); }
         .uc-name { display: flex; align-items: center; gap: 4px; min-width: 0; }
       `}</style>
     </>

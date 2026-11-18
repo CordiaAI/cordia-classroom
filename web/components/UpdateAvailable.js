@@ -53,7 +53,7 @@ export default function UpdateAvailable({ guideId, viewer, onChanged }) {
       <style jsx>{`
         .update-banner { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: start; padding: 16px; margin: 0 0 16px; }
         .update-banner :global(.update-icon) { color: var(--olive-ink); margin-top: 2px; }
-        .update-title { margin: 0 0 2px; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .update-title { margin: 0 0 2px; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); }
         .update-text p { margin: 0; }
         .update-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
         @media (max-width: 480px) { .update-actions { display: grid; grid-template-columns: 1fr; } }
@@ -102,12 +102,12 @@ function ChangesDialog({ guideId, viewer, busy, onAccept, onStay, onClose }) {
       </div>
       <style jsx global>{`
         .changes-sheet { width: min(560px, 100%); max-height: min(80vh, 720px); overflow-y: auto; display: grid; gap: 16px; }
-        .changes-title { margin: 0; font: 500 26px/1.15 var(--font-display); color: var(--ink); }
+        .changes-title { margin: 0; font: 500 1.625rem/1.15 var(--font-display); color: var(--ink); }
         .changes-list { display: grid; gap: 16px; }
         .changes-group h3 { margin: 0 0 8px; font: 600 var(--fs-13)/1.2 var(--font-sans); color: var(--muted-ink); }
         .changes-group ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
         .changes-group li { padding: 12px; border-radius: var(--r-row); background: var(--card-sunk); overflow-wrap: anywhere; }
-        .changes-q { margin: 0 0 4px; font: 600 15px/1.35 var(--font-sans); color: var(--ink); }
+        .changes-q { margin: 0 0 4px; font: 600 0.9375rem/1.35 var(--font-sans); color: var(--ink); }
         .changes-a { margin: 0; color: var(--ink); }
         .changes-before { margin: 4px 0 0; color: var(--muted-ink); }
         .changes-before s { text-decoration-thickness: 1px; }
@@ -152,7 +152,7 @@ export function GuideUnavailable({ title, reason }) {
       <Link href="/library" className="c-btn c-btn--secondary">Back to Library</Link>
       <style jsx>{`
         .gone { max-width: 560px; margin: 48px auto; padding: 24px; display: grid; gap: 12px; justify-items: start; }
-        .gone-title { margin: 0; font: 500 30px/1.15 var(--font-display); color: var(--ink); overflow-wrap: anywhere; }
+        .gone-title { margin: 0; font: 500 1.875rem/1.15 var(--font-display); color: var(--ink); overflow-wrap: anywhere; }
         .gone-reason { margin: 0; color: var(--ink); }
         .gone p { margin: 0; }
       `}</style>

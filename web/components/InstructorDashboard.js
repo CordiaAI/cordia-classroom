@@ -121,22 +121,22 @@ export default function InstructorDashboard({ room, onToast }) {
         .idb-card { display: grid; gap: 12px; padding: 16px; min-width: 0; }
         .idb-card :global(.c-meta), .idb-note { margin: 0; }
         .idb-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-        .idb-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .idb-title { margin: 0; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); }
         .idb-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
         .idb-guide { display: grid; gap: 4px; }
         .idb-mile { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; color: var(--ink); }
         .idb-mile-main { min-width: 0; overflow-wrap: anywhere; }
         .idb-mile-when { flex: none; }
         .idb-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .idb-table thead th { font: 600 13px/1.3 var(--font-sans); color: var(--muted-ink); text-align: left; padding: 0 8px 6px 0; }
+        .idb-table thead th { font: 600 0.8125rem/1.3 var(--font-sans); color: var(--muted-ink); text-align: left; padding: 0 8px 6px 0; }
         .idb-table thead th:not(:first-child) { width: 72px; text-align: center; padding-right: 0; }
-        .idb-table tbody th { display: grid; gap: 2px; text-align: left; font: 400 14px/1.35 var(--font-sans); color: var(--ink); padding: 8px 8px 8px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
-        .idb-table td { text-align: center; font: 600 14px/1 var(--font-sans); color: var(--ink); border-top: 1px solid var(--line); }
+        .idb-table tbody th { display: grid; gap: 2px; text-align: left; font: 400 0.875rem/1.35 var(--font-sans); color: var(--ink); padding: 8px 8px 8px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+        .idb-table td { text-align: center; font: 600 0.875rem/1 var(--font-sans); color: var(--ink); border-top: 1px solid var(--line); }
         .idb-member { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-width: 0; }
-        .idb-share { flex: none; font: 500 13px/1.3 var(--font-sans); color: var(--muted-ink); }
+        .idb-share { flex: none; font: 500 0.8125rem/1.3 var(--font-sans); color: var(--muted-ink); }
         .idb-share.is-on { color: var(--olive-ink); }
         @media (max-width: 520px) {
-          .idb-table thead th:not(:first-child) { width: 52px; font-size: 12px; }
+          .idb-table thead th:not(:first-child) { width: 52px; font-size: 0.75rem; }
         }
       `}</style>
     </div>
