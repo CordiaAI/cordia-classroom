@@ -25,6 +25,7 @@ import { openMakeItYours } from '../lib/makeItYours.mjs';
 import { tierName } from '../lib/plans';
 import { loadClassReadiness } from '../lib/classReadiness';
 import { useChats } from '../lib/chats';
+import { MAX_LIMIT } from '../lib/chatStore.mjs';
 import { MAX_CLASSES, recentChats, sidebarCurrent } from '../lib/shellTools.mjs';
 import SidebarChats from './SidebarChats';
 import ChatToast from './ChatToast';
@@ -158,7 +159,7 @@ export default function Sidebar() {
   // Recent chats: every chat, newest first, from the saved-chats store the chat page shares
   // (lib/chats.js). Each opens at /chat/<id>; the open one is current.
   const saved = useChats();
-  const chats = recentChats(saved.chats);
+  const chats = recentChats(saved.chats, MAX_LIMIT);
   const query = router.query || {};
   const current = sidebarCurrent(router.pathname, query, {
     classIds: shownClasses.map(item => String(item.id)),
@@ -346,7 +347,7 @@ export default function Sidebar() {
             {classes && classes.length === 0 && <p className="c-side-empty c-side-label">No classes yet</p>}
           </div>
 
-          <SidebarChats chats={chats} current={current} editable={saved.editable} classes={classes || []} failed={saved.failed} loaded={saved.loaded} />
+          <SidebarChats chats={chats} current={current} editable={saved.editable} classes={classes || []} failed={saved.failed} loaded={saved.loaded} more={saved.more} limited={saved.limited} />
           {/* Folded, the chats open from one icon, in a menu beside the sidebar. */}
           <button ref={chatsRef} type="button" className="c-side-item c-side-chats-icon" aria-label="Recent chats" aria-haspopup="menu" aria-expanded={chatsOpen}
             aria-current={folded && current.startsWith('chat:') ? 'page' : undefined} {...tipFor('chats')} onClick={() => { hide(); setChatsOpen(open => !open); }}>

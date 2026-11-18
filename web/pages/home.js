@@ -125,6 +125,13 @@ function ChatScreen({ routeId, goTo, progress }) {
   const [notice, setNotice] = useState(null);
   const [renaming, setRenaming] = useState(false);
   const [planning, setPlanning] = useState(null);
+  // A chat that was opened (not one made here): its guide goes with its next questions (lib/useTutorChat.js).
+  const [chatContext, setChatContext] = useState(null);
+  // The first message made a chat and then couldn't be sent (a plan limit, no connection): the page is
+  // the home again at once, without waiting for the address to follow.
+  const [returned, setReturned] = useState(false);
+  // "Reload the chat" on the page for a chat that is gone: '' | 'loading' | 'still gone'.
+  const [retry, setRetry] = useState('');
   const chatRef = useRef(null);
   chatRef.current = chat;
   const alive = useRef(true);
@@ -158,6 +165,7 @@ function ChatScreen({ routeId, goTo, progress }) {
       return { ok: false, message: stale || result.reason === 'limit' ? '' : result.message };
     }
     createdHere.current = true;
+    setReturned(false);
     const next = { ...result.chat, class_id: result.chat.class_id || classId || null };
     setChat(next);
     setNotice(null);
@@ -187,6 +195,7 @@ function ChatScreen({ routeId, goTo, progress }) {
     // goes back to the home it was, the same move in reverse, with the question still in the box.
     if (createdHere.current) {
       createdHere.current = false;
+      setReturned(true);
       setChat(null);
       keepOpenChat(null);
       goTo('');
@@ -197,6 +206,7 @@ function ChatScreen({ routeId, goTo, progress }) {
   const tutor = useTutorChat({
     freshOnSend: true,
     scopeClassId: classId,
+    chatContext,
     startWith: starting,
     startMessages: starting === openSaved ? chat?.messages || [] : [],
     onSendFailed,
@@ -218,6 +228,7 @@ function ChatScreen({ routeId, goTo, progress }) {
         if (!alive.current) return 'left';
         if (opened.ok) {
           setChat(opened.chat);
+          setChatContext({ key: opened.chat.id, guideId: opened.chat.guide_id });
           setClassId(opened.chat.class_id || '');
           setNotice(null);
           setPhase('ready');
@@ -235,7 +246,7 @@ function ChatScreen({ routeId, goTo, progress }) {
       }
       seen.current = null;
       setChat(result.chat);
-      if (!again) setClassId(result.chat.class_id || '');
+      if (!again) { setChatContext({ key: result.chat.id, guideId: result.chat.guide_id }); setClassId(result.chat.class_id || ''); }
       setNotice(null);
       setPhase('ready');
       return 'ok';
@@ -315,11 +326,23 @@ function ChatScreen({ routeId, goTo, progress }) {
     return () => window.removeEventListener('cordia:make-guide', onMake);
   }, [tutor.attachments, classId]);
 
-  const chatting = Boolean(chat) || Boolean(routeId) || (tutor.sentHere && tutor.messages.length > 0);
+  const chatting = !returned && (Boolean(chat) || Boolean(routeId) || (tutor.sentHere && tutor.messages.length > 0));
   const row = chat ? (store.chats || []).find(item => item.id === chat.id) : null;
   const title = row?.title || chat?.title || chatTitle(messages);
   const chipId = chat ? (row && store.editable ? row.class_id : chat.class_id) : classId;
   const chip = classes.find(item => String(item.id) === String(chipId || ''));
+
+  // A chat's class is also the class its next question is asked about, whichever menu moved it: the
+  // chat's ⋯ (moveTo below) or its row's in Recent chats (the list changes, and this follows).
+  const rowClass = row && store.editable ? row.class_id || '' : undefined;
+  const lastRowClass = useRef(rowClass);
+  useEffect(() => {
+    const before = lastRowClass.current;
+    lastRowClass.current = rowClass;
+    if (before === undefined || rowClass === undefined || before === rowClass) return;
+    setClassId(rowClass);
+    setChat(current => (current && (current.class_id || '') !== rowClass ? { ...current, class_id: rowClass || null } : current));
+  }, [rowClass]);
 
   // The open chat stays in Recent chats, marked current, while it is open.
   const gone = notice?.reason === 'gone';
@@ -401,16 +424,26 @@ function ChatScreen({ routeId, goTo, progress }) {
     return <span className={'c-class-dot' + (tone ? '' : ' is-none')} style={tone ? { '--dot': `var(--cover-ink-${tone})` } : undefined} aria-hidden="true" />;
   };
   const menuItems = [
-    { key: 'rename', label: 'Rename', icon: PenLine, disabled: !editable, onSelect: beginRename },
+    { key: 'rename', label: 'Rename', icon: PenLine, onSelect: beginRename },
     {
-      key: 'move', label: 'Move to class', icon: FolderInput, disabled: !editable,
+      key: 'move', label: 'Move to class', icon: FolderInput,
       items: [
         { key: 'none', label: 'No class', icon: dot(0), current: !chipId, onSelect: () => moveTo(null) },
         ...classes.map(item => ({ key: String(item.id), label: item.code, meta: item.name !== item.code ? item.name : undefined, icon: dot(item.tone), current: String(chipId || '') === String(item.id), onSelect: () => moveTo(String(item.id)) })),
       ],
     },
-    { key: 'delete', label: 'Delete', icon: Trash2, danger: editable, disabled: !editable, onSelect: removeChat },
+    { key: 'delete', label: 'Delete', icon: Trash2, danger: true, onSelect: removeChat },
   ];
+
+  // "Reload the chat" on the page for a chat that is gone: the button says it is working, and says so
+  // if the chat is still gone (it may have come back, or been opened in another tab).
+  async function reloadGone() {
+    if (retry === 'loading') return;
+    setRetry('loading');
+    const reason = await loadChat(routeId);
+    if (!alive.current) return;
+    setRetry(reason === 'gone' ? 'still gone' : '');
+  }
 
   // After a notice's button goes away, focus goes back to the message box.
   const focusComposer = () => requestAnimationFrame(() => tutor.rootRef.current?.querySelector('.composer-box')?.focus({ preventScroll: true }));
@@ -442,9 +475,10 @@ function ChatScreen({ routeId, goTo, progress }) {
                   onBlur={event => finishRename(event.currentTarget.value)} />
               ) : <h1 className="chat-home-title c-truncate">{phase === 'ready' ? title : 'Chat'}</h1>}
               {chip && !renaming && <span className="chat-home-chip"><span className="c-class-dot" style={{ '--dot': `var(--cover-ink-${chip.tone})` }} aria-hidden="true" />{chip.code}</span>}
-              {chat && phase === 'ready' && (
+              {/* Chats can be renamed, moved and deleted once the backend can (nothing greyed out before). */}
+              {chat && phase === 'ready' && editable && (
                 <span className="chat-home-menu">
-                  <Menu label="Chat options" items={menuItems} note={editable ? '' : MESSAGES.unavailable} triggerRef={menuButton} />
+                  <Menu label="Chat options" items={menuItems} triggerRef={menuButton} />
                 </span>
               )}
             </>
@@ -460,10 +494,11 @@ function ChatScreen({ routeId, goTo, progress }) {
           <div className="chat-home-stage">
             <div className="chat-home-hero chat-home-missing" role="alert">
               <p className="chat-home-line">{phase === 'gone' ? MESSAGES.gone : "Couldn't load this chat. Check your connection and try again."}</p>
+              {retry === 'still gone' && <p className="chat-home-line">It's still gone, so there is nothing to reload. Go to the home to start a new chat.</p>}
               <div className="chat-notice-actions">
                 {phase === 'failed' && <button type="button" className="c-btn c-btn--secondary" onClick={() => { setPhase('loading'); loadChat(routeId); }}>Try again</button>}
                 <Link href={HOME_ROUTE} className="c-btn c-btn--secondary">Go to the home</Link>
-                {phase === 'gone' && <button type="button" className="c-btn c-btn--quiet" onClick={() => loadChat(routeId)}>Reload the chat</button>}
+                {phase === 'gone' && <button type="button" className="c-btn c-btn--quiet" aria-disabled={retry === 'loading' || undefined} onClick={reloadGone}>{retry === 'loading' ? 'Reloading…' : 'Reload the chat'}</button>}
               </div>
             </div>
           </div>
@@ -501,7 +536,7 @@ function ChatScreen({ routeId, goTo, progress }) {
             )}
 
             <div ref={composerRef} className="chat-home-composer">
-              <Composer tutor={tutor} classes={classes} classId={classId} onClassChange={setClassId} variant={chatting ? 'chat' : 'home'} showError={!chatting} autoFocus />
+              <Composer tutor={tutor} classes={classes} classId={classId} onClassChange={setClassId} variant={chatting ? 'chat' : 'home'} showError={!chatting} quietBusy={notice?.reason === 'busy'} autoFocus />
             </div>
 
             {!chatting && pills.length > 0 && (

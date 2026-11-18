@@ -25,7 +25,8 @@ export function buildGuideFrom(action, { files = [], folderId = '' } = {}) {
 // pasted notes goes to the New sheet. Talks to the Tutor through tutor (lib/useTutorChat.js).
 // variant: 'home' (88px box) or 'chat' (52px box, at the bottom of a chat).
 // showError: the Tutor's last error shows here (the home before it has a chat to show it in).
-export default function Composer({ tutor, classes = [], classId = '', onClassChange, variant = 'home', autoFocus = false, showError = false }) {
+// quietBusy: the page already says the Tutor is busy (a notice), so this doesn't say it again.
+export default function Composer({ tutor, classes = [], classId = '', onClassChange, variant = 'home', autoFocus = false, showError = false, quietBusy = false }) {
   const id = useId();
   const boxRef = useRef(null);
   const {
@@ -84,7 +85,7 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
   const hint = !session ? 'Connecting to the Tutor. If this stays, refresh the page.'
     : remaining <= 0 ? 'This chat is full. Start a new chat from the sidebar.'
       : input.trim() && !canSubmit && !attachments.length ? 'This Tutor mode needs material. Attach a file or pick a class.'
-        : busy && input.trim() ? 'The Tutor is still answering your last message.'
+        : busy && input.trim() && !quietBusy ? 'The Tutor is still answering your last message.'
           : '';
 
   return (

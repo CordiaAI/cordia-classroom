@@ -67,13 +67,17 @@ const SKILL_PROGRESS = {
 // onSendFailed({ status, detail, failed, question }): the Tutor didn't answer (a 404 or 409 from another
 // tab, a plan limit, no connection); the question is back in the box.
 // scopeClassId: the class picked in the composer ('' for all classes).
+// chatContext: { key, guideId } for a chat that was opened (not one just started here): its next
+// questions go with its own guide (or with no guide when it has none), as they did when it was
+// started, until the student picks other material.
 // dropFiles: files dropped on the page attach here (off where another Tutor takes them).
-export function useTutorChat({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '', freshOnMount = false, resumeChatId = '', assignment = null, initialPrompt = '', freshOnSend = false, startWith = null, startMessages = null, onSendFailed = null, scopeClassId = '', dropFiles = true } = {}) {
+export function useTutorChat({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '', freshOnMount = false, resumeChatId = '', assignment = null, initialPrompt = '', freshOnSend = false, startWith = null, startMessages = null, onSendFailed = null, scopeClassId = '', chatContext = null, dropFiles = true } = {}) {
   // An assignment being worked on: its instructions and rubric go with every question until cleared.
   const [working, setWorking] = useState(assignment);
   useEffect(() => { setWorking(assignment); }, [assignment?.key]);
   const router = useRouter();
   const [loadedGuides, setLoadedGuides] = useState([]);
+  const [guidesLoaded, setGuidesLoaded] = useState(Boolean(providedGuides));
   const [notes, setNotes] = useState([]);
   const [classes, setClasses] = useState([]);
   const [contextKey, setContextKey] = useState('');
@@ -174,7 +178,7 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
         loadFolders(),
       ]).then(([guideData, noteData, folderData]) => {
         if (!active) return;
-        if (Array.isArray(guideData?.guides)) setLoadedGuides(guideData.guides);
+        if (Array.isArray(guideData?.guides)) { setLoadedGuides(guideData.guides); setGuidesLoaded(true); }
         if (Array.isArray(noteData?.notes)) setNotes(noteData.notes);
         if (Array.isArray(folderData?.folders)) setClasses(folderData.folders);
       });
@@ -260,6 +264,7 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
   const guides = providedGuides || loadedGuides;
   // A class picked in the composer (scopeClassId): only that class's guides and notes are offered,
   // and the question goes with the class (class_id), as when a guide in that class is picked.
+  const chatGuideId = chatContext?.guideId ? String(chatContext.guideId) : '';
   const inScope = item => !scopeClassId || String(item?.folder_id || '') === String(scopeClassId);
   const combinedAttachments = combineAttachments(attachments);
   const attachedMaterial = {
@@ -267,7 +272,8 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
     content: combinedAttachments.content,
   };
   const materials = [
-    ...guides.filter(inScope).map(item => ({ ...item, kind: 'guide', key: `guide:${item.id}` })),
+    // An open chat's own guide stays offered even when the chat has since moved to another class.
+    ...guides.filter(item => inScope(item) || (chatGuideId && String(item.id) === chatGuideId)).map(item => ({ ...item, kind: 'guide', key: `guide:${item.id}` })),
     ...notes.filter(inScope).map(item => ({ ...item, kind: 'note', key: `note:${item.id}` })),
     ...(attachments.length ? [{ ...attachedMaterial, kind: 'attachment', key: 'attachment' }] : []),
     ...(session?.browser_content_available ? [{ ...(browserMaterial || {}), title: browserMaterial?.title || 'Captured browser material', kind: 'browser', key: 'browser' }] : []),
@@ -276,7 +282,27 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
   // The material on screen always wins: each navigation re-applies it, so the chip
   // never keeps showing a guide from an earlier page.
   useEffect(() => { appliedPreferred.current = ''; }, [router.asPath, preferredGuideId, preferredNoteId]);
+  // An opened chat carries on about its own guide: set once per chat, as soon as that guide is
+  // known, or no material when it has none or the guide is gone (never another guide's content).
+  const chatKey = chatContext?.key ? String(chatContext.key) : '';
+  const appliedChat = useRef('');
+  const skipFallback = useRef(false);
+  const chatMaterial = chatGuideId ? `guide:${chatGuideId}` : 'none';
   useEffect(() => {
+    if (!chatKey || appliedChat.current === chatKey) return;
+    if (chatMaterial === 'none' || materials.some(item => item.key === chatMaterial)) {
+      appliedChat.current = chatKey;
+      skipFallback.current = true;
+      setContextKey(chatMaterial);
+    } else if (guidesLoaded) {
+      appliedChat.current = chatKey;
+      skipFallback.current = true;
+      setContextKey('none');
+    }
+  }, [chatKey, chatMaterial, guidesLoaded, materials.length]);
+  useEffect(() => {
+    if (skipFallback.current) { skipFallback.current = false; return; }
+    if (chatKey && appliedChat.current !== chatKey) return;
     const preferred = preferredGuideId ? `guide:${preferredGuideId}` : preferredNoteId ? `note:${preferredNoteId}` : '';
     if (preferred && preferred !== appliedPreferred.current && materials.some(item => item.key === preferred)) {
       appliedPreferred.current = preferred;
@@ -326,7 +352,11 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
   const hasRequiredContext = (Boolean(material) && (material.kind !== 'browser' || Boolean(material.content))) || selectedSkill?.requires_context === false || (general && ['', 'explain'].includes(skillOverride));
   const needsTargetClass = selectedSkillId === 'organize';
   const canSubmit = hasRequiredContext && (!needsTargetClass || Boolean(targetClassId));
-  const remaining = MAX_MESSAGES - messages.filter(message => message.role === 'user').length;
+  // How many questions this chat has room for: counted on the conversation that is carried on. On the
+  // chat page that is the chat being continued (a saved one's own messages, or none for a new chat),
+  // not the Tutor's live conversation, which may belong to a different chat and be full.
+  const counted = typeof startWith === 'function' ? startMessages || [] : messages;
+  const remaining = MAX_MESSAGES - counted.filter(message => message.role === 'user').length;
   const busy = loading || freshPending || (session?.status && session.status !== 'idle');
   const progressLabel = SKILL_PROGRESS[session?.active_skill] || 'Cordia is working…';
 
@@ -404,13 +434,17 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
     if (starting) {
       const started = await startWith({ session, material, question });
       if (!started?.session?.id) {
+        // No chat was made, so nothing was sent: everything goes back as it was in one step (the
+        // page stays what it was, the question back in the box), then the session is read again.
         sendingRef.current = false;
         startedRef.current = false;
+        setSentHere(false);
+        setSession(session);
         setInput(question);
         if (started?.message) setLocalError(started.message);
+        setLoading(false);
         const refreshed = await apiFetch('/tutor/session');
         if (refreshed?.id) setSession(refreshed);
-        setLoading(false);
         return;
       }
       current = started.session;
@@ -470,11 +504,17 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
       }
       setSession(data.session);
     } else {
+      // The Tutor didn't answer. The session goes back to before the question and the question to the
+      // box in the same step as the page's own reply (onSendFailed: the home first message goes back
+      // to the home), so no frame shows a half-way layout; the session is read again after.
+      setSession(current);
       setInput(question);
       setLocalError(data?.answer || apiErrorMessage(data?.detail, 'Cordia could not answer that yet.'));
+      setLoading(false);
+      onSendFailed?.({ status: data?.httpStatus || 0, detail: data?.detail, failed: data?.failed, question });
       const refreshed = await apiFetch('/tutor/session');
       if (refreshed?.id) setSession(refreshed);
-      onSendFailed?.({ status: data?.httpStatus || 0, detail: data?.detail, failed: data?.failed, question });
+      return;
     }
     setLoading(false);
   }

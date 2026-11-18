@@ -839,7 +839,17 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
     /* A chat row's ⋯ sits over the row's right end, shown on hover and on keyboard focus (always on
        touch screens); the title stops short of it. Hovering the ⋯ keeps the row's hover pane. */
     .c-side-chat-row { position: relative; min-width: 0; }
-    .c-side-chat-row.has-more .c-side-chat { padding-right: 40px; }
+    /* The title only gives up room for the ⋯ while the ⋯ is showing (hover, keyboard focus, menu open). */
+    .c-side-chat-row.has-more:is(:focus-within, :has(.c-side-chat-more[aria-expanded='true'])) .c-side-chat { padding-right: 40px; }
+    @media (hover: hover) { .c-side-chat-row.has-more:hover .c-side-chat { padding-right: 40px; } }
+    @media (hover: none) { .c-side-chat-row.has-more .c-side-chat { padding-right: 40px; } }
+    /* A row that goes folds shut as it fades (Sidebar: SidebarChats keeps it for the exit). */
+    .c-side-chat-row.is-leaving { display: grid; grid-template-rows: 1fr; pointer-events: none; animation: c-row-out var(--dur-exit) var(--ease-exit) both; }
+    .c-side-chat-ghost { min-height: 0; overflow: hidden; }
+    @media (prefers-reduced-motion: reduce) { .c-side-chat-row.is-leaving { animation: none; } }
+    .c-side-more { list-style: none; }
+    .c-side-more-btn { width: 100%; border: 0; background: none; cursor: pointer; text-align: left; }
+    .c-side-more-btn[aria-disabled='true'] { opacity: .6; cursor: default; }
     .c-side-chat-row > .c-menu-wrap { position: absolute; top: 2px; right: 2px; }
     .c-side .c-side-chat-more { position: relative; width: 32px; height: 32px; opacity: 0; transition: opacity var(--dur) var(--ease), background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
     .c-side .c-side-chat-more::after { content: ''; position: absolute; inset: -2px; }
@@ -965,6 +975,7 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 @keyframes c-shell-in-left { from { opacity: 0; transform: translateX(6px); } to { opacity: 1; transform: none; } }
 @keyframes c-shell-in-right { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
 @keyframes c-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes c-row-out { from { grid-template-rows: 1fr; opacity: 1; margin-bottom: 0; } to { grid-template-rows: 0fr; opacity: 0; margin-bottom: -2px; } }
 
 @media (prefers-reduced-motion: reduce) {
   .c-shell-tip, .c-shell-tip.is-right { transform: translate(0, -50%); }
@@ -1064,6 +1075,8 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 /* A chat's header (4.3): the title, its class, and ⋯ at the right. Rename edits the title in place,
    in the title's own type, so nothing moves when it opens. */
 .chat-home-menu { flex: none; margin-left: auto; }
+/* Phones keep the chat as it was: no chat menu there (renaming, moving and deleting are on larger screens). */
+@media (max-width: 767px) { .chat-home-menu { display: none; } }
 .chat-home-menu .c-icon-btn[aria-expanded='true'] { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
 .chat-home-top .chat-home-rename {
   flex: 0 1 520px; min-width: 120px; height: 36px; margin: 0 0 0 -6px; padding: 0 10px;
@@ -1079,14 +1092,19 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
   color: var(--ink); font: 500 0.9375rem/1.4 var(--font-sans);
 }
 .chat-notice-text { flex: 1 1 260px; min-width: 0; }
-.chat-notice-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.chat-notice-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .chat-home-missing { justify-items: start; gap: 16px; }
 /* On the home and in a chat the composer holds the bottom, so the chats toast shows under the header. */
 @media (min-width: 768px) {
   :root[data-shell='new'] .app-shell:has(.chat-home) .c-chat-toast { top: calc(var(--side-gap) + 60px); bottom: auto; animation-name: c-toast-drop; }
 }
-@media (prefers-reduced-motion: reduce) { :root[data-shell='new'] .app-shell:has(.chat-home) .c-chat-toast { animation: none; } }
 @keyframes c-toast-drop { from { opacity: 0; transform: translate(-50%, -12px) scale(.98); } to { opacity: 1; transform: translate(-50%, 0); } }
+/* Leaving: it fades and settles toward where it came from (the same toast, going the other way). */
+.c-chat-toast[data-leaving] { animation: c-toast-out var(--dur-exit) var(--ease-exit) both; }
+@media (min-width: 768px) { :root[data-shell='new'] .app-shell:has(.chat-home) .c-chat-toast[data-leaving] { animation-name: c-toast-lift; } }
+@keyframes c-toast-out { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, 8px) scale(.98); } }
+@keyframes c-toast-lift { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -8px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { :root[data-shell='new'] .app-shell:has(.chat-home) .c-chat-toast, .c-chat-toast[data-leaving] { animation: none; } }
 .chat-home-missing .chat-home-line { color: var(--ink); }
 
 /* The composer: strong glass, 28px corners; focus rings the whole composer, not the box. */
