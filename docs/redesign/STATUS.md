@@ -26,6 +26,7 @@ States: waiting, building, checking, fixing, merged, blocked.
 
 Newest first. One entry per hand-off, check, verdict, fix request, merge or block.
 
+- 2026-11-18 T10 diff review (Rook, af01ede0e1e2a685e) reported AFTER Jude merged #270: NOT FINISHED, 0 High, 4 Medium, 7 Low, all now on `main`. Medium: (1) stars stay clay under Paper & Clay (`glass.css:166-169` outranks the meter-ink rule); (2) Settings avatar, initials and section icons clay under Paper & Clay (`settings.js:448, 452`); (3) signed-in `/pricing` shows the saved look, against criterion 9; (4) `/pricing` at Larger: the plan button label wraps inside a fixed 44px pill. Low: Undo toast inside the sheet footer; Paper & Clay tile alone on a second row; engine notes outdated; ~0.6s of the previous account's dark on a shared browser; `--font-mono` default changed (Consolas on Windows); custom colour picker outside the Accent radiogroup; Search ranks Make it yours above the student's items. Passed: criteria 1-7, decisions A, C, E (962 px-to-rem pairs equal at Default), sheet layout, keyboard, motion, first paint. Director's call on (3), per criterion 9: `/pricing` is always the Cordia default. Follow-up T10b (Opus) queued for the next free builder slot, ahead of F10; card in the director's scratchpad `cards/T10b.txt`. T5 UI diff review (Rook, a5e3b7208826c9a72) started in `../cordia-review` at 0db6089.
 - 2026-11-18 Jude merged #272 (b8be5b3). `~/cordia-main` (Jude's) was at b3dd777; told him to move it to `origin/main` and deploy from there. T5 UI merged with `main` (0db6089; one conflict in `system.css`; 8 px font sizes converted; `--muted-strong` defined in every block that sets `--muted`; 485 node tests, 22 Python contract tests, build OK, chats-check 20/20) and opened as DRAFT #273. F5 (Learn question quality) handed to Atlas (Opus, aa34181e464c87936) in `../cordia-F5` on `feedback/F5-learn-question-quality` from b8be5b3. Builders now: F6 (Sage) and F5 (Atlas).
 - 2026-11-18 F10 (Calendar with four views) added to feedback batch 1 by Jude, queued after F6 and F5; details in `docs/redesign/FEEDBACK-BATCH-1.md`.
 - 2026-11-18 Follow-up CordiaAI/cordia-classroom#272 (`fix/after-270-271`, Juno a5dd35187ef5e9ee7): 3c8a740 cherry-picks 0d7bf8f (memory context skips deleted chats); 100be3e sets `NEW_ACCOUNT_CUTOFF` to 2026-11-18T18:55:05Z with tests on both sides. 5 files; builder: 170 Python tests, 458 node tests, build OK; CI pending at last look. Then Jude deploys the backend from a `main` checkout. Note: `docs/redesign/T10-engine-notes.md` still mentions the 2099 placeholder (doc only).
@@ -119,6 +120,8 @@ Findings logged instead of blocking a merge, under fast mode. Clear each one or 
 - Not yet checked by anyone: Safari and Firefox, and the fallback without `backdrop-filter`.
 
 - T5 backend, Low (review 3): (1) `_virtual` row `editable: true` after the migration with 503s on edit; (4) practice feedback dropped silently after 3 conflicts, log it; (5) crash-orphaned empty rows count toward the list's `limit`.
+
+- T10, Low (review of #270), carried into T10b: see the 2026-11-18 log entry.
 
 ## Blocked
 
