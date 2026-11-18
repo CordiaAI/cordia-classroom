@@ -12,7 +12,7 @@ test('Search finds the sheet by theme, make it yours, dark mode and appearance, 
   for (const query of ['theme', 'Theme', 'make it yours', 'dark mode', 'Dark  mode', 'appearance', 'the', 'light mode', 'text size', 'font']) {
     assert.equal(matchesMakeItYours(query), true, query);
   }
-  for (const query of ['', 'th', 'cell biology', 'theory of mind', 'organic chemistry', 'photosynthesis']) {
+  for (const query of ['', 'th', 'cell biology', 'theory of mind', 'organic chemistry', 'photosynthesis', 'dark matter', 'glass transition', 'colour theory', 'background of the cold war', 'theme park design']) {
     assert.equal(matchesMakeItYours(query), false, query);
   }
 });
@@ -74,6 +74,9 @@ test('the sheet opens from the account menus, Settings and Search, in both navig
   const search = await source('components/SearchModal.js');
   assert.match(search, /matchesMakeItYours\(q\)/);
   assert.match(search, /openMakeItYours\(openerRef\.current\)/);
+  // The student's own matches come first; the sheet follows them, before public sets.
+  assert.match(search, /\[\.\.\.found, \.\.\.settings, \.\.\.more\]/);
+  assert.match(search, /\[\.\.\.guides, \.\.\.cards, \.\.\.notes, \.\.\.settings, \.\.\.more\]/);
   const settings = await source('pages/settings.js');
   assert.match(settings, /openMakeItYours\(event\.currentTarget\)/);
   // Mounted in the signed-in Layout, outside the new-shell switch, so every student gets it at every width.

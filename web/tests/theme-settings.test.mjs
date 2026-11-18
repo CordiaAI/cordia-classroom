@@ -232,6 +232,19 @@ test('first paint: public pages are the Cordia default in light', () => {
   assert.equal(pricing.links.length, 0, 'no look fonts preloaded');
 });
 
+test("first paint: on a shared browser, the previous account's look never paints for the next one", () => {
+  const theirs = JSON.stringify({ ...bootCache({ ...paperClay(), appearance: 'dark', size: 'larger' }), u: 'account-a' });
+  const next = boot({ deviceDark: true, storage: { [LOOK_KEY]: theirs, theme: 'dark', userId: 'account-b', authToken: 'x' } });
+  assert.equal(next.root.getAttribute('data-theme'), 'light');
+  assert.deepEqual(lookAttributes(next.root), []);
+  assert.equal(next.links.length, 0);
+  // The same account, or a cache from before the stamp, still paints its own look.
+  const own = boot({ storage: { [LOOK_KEY]: theirs, userId: 'account-a', authToken: 'x' } }).root;
+  assert.equal(own.getAttribute('data-theme'), 'dark');
+  assert.equal(own.getAttribute('data-look'), 'paper-clay');
+  assert.equal(boot({ storage: { [LOOK_KEY]: cached({ appearance: 'dark' }), userId: 'account-b' } }).root.getAttribute('data-theme'), 'dark', 'unstamped cache');
+});
+
 test('first paint: a damaged cache is ignored, never thrown, and never sets odd attributes', () => {
   assert.equal(boot({ storage: { [LOOK_KEY]: '{not json' } }).root.getAttribute('data-theme'), 'light');
   const hostile = JSON.stringify({ a: { 'onclick': 'x', 'data-accent': 'plum', 'data-bg': 5 }, v: { color: 'red', '--ca-l-fill': '1, 2, 3' }, f: ['https://evil.example/x.woff2', '/fonts/inter-latin.woff2'], ap: 'dark' });

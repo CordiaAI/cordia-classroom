@@ -1,5 +1,6 @@
 import { USE_CASES, useCasePath } from './useCases/index.mjs';
 import { COMPARISONS, comparisonPath } from './comparisons/index.mjs';
+import { getUserId } from './api';
 import { accountCreatedAt, getProgress, progressLoaded, updateProgress } from './progress';
 import { DEFAULT_SETTINGS, accountSettings, applySettings, bootCache, defaultAppearance, defaultSettingsFor, resolveAppearance } from './themeSettings.mjs';
 import { LOOK_KEY } from './themeBoot.mjs';
@@ -17,11 +18,25 @@ function deviceIsDark() {
   try { return typeof window !== 'undefined' && Boolean(window.matchMedia) && window.matchMedia(DEVICE_DARK).matches; } catch { return false; }
 }
 
-function readCache() {
+// The device cache names the account that wrote it (`u`). Another account's cache is not this student's look: on a
+// shared browser the next account to sign in sees the Cordia default in Light (never the previous account's dark)
+// until its own look or its creation time arrives (syncThemeFromAccount). A cache with no `u` predates the stamp
+// and is trusted, as before; the next sync stamps it.
+function rawCache() {
   try { return JSON.parse(localStorage.getItem(LOOK_KEY) || 'null'); } catch { return null; }
+}
+function foreignCache(raw = rawCache()) {
+  const id = getUserId();
+  return Boolean(raw && typeof raw.u === 'string' && raw.u && id && raw.u !== id);
+}
+function readCache() {
+  const raw = rawCache();
+  return foreignCache(raw) ? null : raw;
 }
 
 function legacyTheme() {
+  // The old light/dark key is shared by every account on the browser too: it is the previous account's while the cache is.
+  if (foreignCache()) return null;
   try {
     const saved = localStorage.getItem(KEY);
     return saved === 'dark' || saved === 'light' ? saved : null;
@@ -91,7 +106,8 @@ function holdTransitions() {
 }
 
 function cache(settings) {
-  try { localStorage.setItem(LOOK_KEY, JSON.stringify(bootCache(settings))); } catch { /* storage blocked */ }
+  const id = getUserId();
+  try { localStorage.setItem(LOOK_KEY, JSON.stringify({ ...bootCache(settings), ...(id ? { u: id } : {}) })); } catch { /* storage blocked */ }
 }
 
 // Saves a look (any shape; it is validated) on this device and on the account, and applies it.
@@ -116,21 +132,28 @@ export function setThemePreference(preference) {
 // light/dark choice carries that over). An account with no saved look gets its own default look, cached on this
 // device so first paint has it from then on: Light for an existing account, Match device for a new one, and every
 // other setting at its default, so the previous account's theme, accent, font, text size and glass never carry
-// over on a shared browser. Until the account's own saved copy is read nothing changes (the cache may be its
-// own), and until its creation time is known the appearance stays as it is, so a student is never moved on a guess.
+// over on a shared browser. Until the account's own saved copy is read nothing changes (the progress in memory may
+// still be the previous account's), and until its creation time is known the appearance stays as it is (Light when
+// the cache is another account's), so a student is never moved on a guess.
 export function syncThemeFromAccount() {
+  if (!progressLoaded()) return;
   const progress = getProgress();
   const created = accountCreatedAt();
   if (progress.look) {
     const saved = accountSettings(progress.look, created);
-    if (JSON.stringify(saved) !== JSON.stringify(lookSettings())) { cache(saved); applyTheme(lastPath); }
+    if (JSON.stringify(saved) !== JSON.stringify(lookSettings()) || !stamped()) { cache(saved); applyTheme(lastPath); }
     return;
   }
-  if (!progressLoaded()) return;
   const explicit = progress.theme === 'light' || progress.theme === 'dark' ? progress.theme : null;
   const appearance = explicit || (created ? defaultAppearance(created) : lookSettings().appearance);
   const next = bootCache({ ...DEFAULT_SETTINGS, appearance });
-  if (JSON.stringify(readCache()?.s) === JSON.stringify(next.s)) return;
+  if (JSON.stringify(readCache()?.s) === JSON.stringify(next.s) && stamped()) return;
   cache(next.s);
   applyTheme(lastPath);
+}
+
+// True when the device cache carries this account's id (or there is no account to stamp it with).
+function stamped() {
+  const id = getUserId();
+  return !id || rawCache()?.u === id;
 }

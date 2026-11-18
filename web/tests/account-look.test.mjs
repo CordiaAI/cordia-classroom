@@ -63,6 +63,7 @@ async function browser({ users = {}, store = new Map() } = {}) {
   const theme = await load('theme.js', {
     './useCases/index.mjs': { USE_CASES: [], useCasePath: page => `/${page.slug}` },
     './comparisons/index.mjs': { COMPARISONS: [], comparisonPath: page => `/${page.slug}` },
+    './api': api,
     './progress': progress,
     './themeSettings.mjs': settingsModule,
     './themeBoot.mjs': bootModule,
@@ -122,10 +123,16 @@ test('account switch: B, with no saved look, gets the defaults, not A\'s Paper &
   assert.equal(b.cachedLook().look, 'paper-clay');
   assert.equal(b.cachedLook().appearance, 'dark');
 
-  // B signs in on the same browser. Before B's copy is read nothing changes; after it, B has the defaults.
+  // B signs in on the same browser. Before B's copy is read the cache is not written, and A's look is not B's:
+  // B is painted the Cordia default in Light (never A's dark); after B's copy is read, B has the defaults.
   b.signIn(B);
   b.theme.syncThemeFromAccount();
-  assert.equal(b.cachedLook().look, 'paper-clay', 'nothing moves before B\'s own copy is read');
+  assert.equal(b.cachedLook().look, 'paper-clay', 'the cache is not written before B\'s own copy is read');
+  b.theme.applyTheme('/library');
+  assert.equal(b.root.getAttribute('data-theme'), 'light', 'A\'s dark never paints for B');
+  assert.equal(b.root.getAttribute('data-look'), null);
+  assert.equal(b.root.getAttribute('data-size'), null);
+  assert.equal(b.theme.lookSettings().appearance, 'light');
   await b.progress.loadProgress();
   b.theme.syncThemeFromAccount();
   assert.deepEqual(b.cachedLook(), { ...DEFAULT_SETTINGS, appearance: 'light' });
@@ -145,7 +152,7 @@ test('account switch: an old explicit dark choice still carries over as the appe
   assert.deepEqual(b.cachedLook(), { ...DEFAULT_SETTINGS, appearance: 'dark' });
 });
 
-test('account switch: with no creation time known, the appearance is not moved on a guess but the rest is reset', async () => {
+test('account switch: with no creation time known, B is Light (A\'s dark is not B\'s) and the rest is reset', async () => {
   // (Which accounts count as new is tested in theme-settings.test.mjs with its own cut-off.)
   const b = await browser({ users: { [A]: { created: EXISTING } } });
   b.signIn(A);
@@ -155,7 +162,8 @@ test('account switch: with no creation time known, the appearance is not moved o
   await b.progress.loadProgress();
   assert.equal(b.progress.accountCreatedAt(), '');
   b.theme.syncThemeFromAccount();
-  assert.deepEqual(b.cachedLook(), { ...DEFAULT_SETTINGS, appearance: 'dark' }, 'appearance is not moved on a guess; everything else is the default');
+  assert.deepEqual(b.cachedLook(), { ...DEFAULT_SETTINGS, appearance: 'light' }, 'Light until B\'s creation time is known; everything else is the default');
+  assert.equal(JSON.parse(localStorage.getItem(bootModule.LOOK_KEY)).u, B, 'the cache now names B');
 });
 
 test('the same account reloading paints its own saved look, and the sync never resets a saved look', async () => {

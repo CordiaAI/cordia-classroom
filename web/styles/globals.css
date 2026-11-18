@@ -733,7 +733,7 @@ input::placeholder { color: var(--text-muted); }
 .practice-source-panel > header span { color: var(--accent); font-size: 0.8125rem; font-weight:600; letter-spacing:0; }
 .practice-problem-heading .practice-kind { display: inline-flex; margin-left: 9px; padding: 5px 8px; border: 1px solid var(--border-subtle); border-radius:999px; background: var(--surface); color: var(--text-secondary); font-size: 0.8125rem; font-weight:600; text-transform: capitalize; }
 .practice-problem-heading h2 { max-width: 900px; margin: 8px 0 20px; font-size: max(0.8125rem, clamp(1.15rem, 2vw, 1.7rem)); line-height:1.15; letter-spacing:-0.015em; }
-.practice-code { max-width: 900px; margin: -4px 0 20px; padding: 16px; overflow-x: auto; border: 1px solid var(--hairline); border-radius:12px; background: var(--ink); color: var(--canvas); font:500 0.8125rem/1.5 var(--font-mono); white-space: pre; }
+.practice-code { max-width: 900px; margin: -4px 0 20px; padding: 16px; overflow-x: auto; border: 1px solid var(--hairline); border-radius:12px; background: var(--ink); color: var(--canvas); font:500 0.8125rem/1.5 var(--font-code-block); white-space: pre; }
 .practice-tests { max-width: 900px; margin: -6px 0 20px; padding: 12px 15px; border: 1px solid var(--border-subtle); border-radius:12px; background: var(--sand); }
 .practice-tests strong { font-size: 0.8125rem; }
 .practice-tests ul { margin: 7px 0 0; padding-left: 19px; }
