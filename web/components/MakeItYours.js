@@ -401,7 +401,8 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
           .miy-dot:not([aria-checked='true']):hover .miy-dot-fill { transform: translateY(-1px); }
         }
         .miy-tile:not([aria-checked='true']):active { transform: var(--press); }
-        .miy-dot:active .miy-dot-fill { transform: var(--press); }
+        /* As specific as the hover lift, and after it, so a press under the pointer settles instead of staying lifted. */
+        .miy-dot:not([aria-checked='true']):active .miy-dot-fill, .miy-dot[aria-checked='true']:active .miy-dot-fill { transform: var(--press); }
         .miy-tile:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 7px; }
         .miy-dot:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 0; }
         .miy-sheet.is-keyed :is(.miy-tile, .miy-dot-fill) { transition: none; }
