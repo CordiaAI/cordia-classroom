@@ -409,13 +409,29 @@ _LEADING = re.compile(rf"^\s*{_ATTRIBUTION}\s+{_PART}(?:\s*\([^)]*\))?\s*[,:]\s*
 _TRAILING = re.compile(rf"\s*,?\s*{_ATTRIBUTION}\s+{_PART}\s*(?=[?.!]?\s*$)", re.I)
 
 
+# Every pattern above needs one of these; most questions have none, so the patterns are skipped
+# (guides are parsed on hot paths such as class progress).
+_SOURCE_WORDS = (
+    "slide", "deck", "page", "p.", "pg", "chapter", "section", "part", "module", "lecture", "lesson", "week", "reading",
+    "handout", "document", "presentation", "passage", "excerpt", "text", "notes", "outline", "guide", "video",
+    "transcript", "syllabus", "table", "fig", "diagram", "chart", "graph", "image", "list", "exhibit", "example",
+    "problem", "exercise", "course", "shown", "described", "presented", "mentioned", "discussed", "introduced", "outlined",
+    "highlighted", "depicted", "illustrated", "featured", "pictured", "displayed",
+)
+
+
+def _may_refer(text: str) -> bool:
+    lower = text.lower()
+    return any(word in lower for word in _SOURCE_WORDS)
+
+
 def refers_to_source(question: str) -> bool:
     """Whether a question is about the source's layout or contents rather than the subject: it
     names a slide, page, figure or numbered lecture, points at "this chapter" or "the lecture", or
     asks what the source lists, covers or shows. Subject terms that share these words stay clear
     ("Chapter 11 bankruptcy", "Section 2 of the Sherman Act", "a page fault", "a listed company")."""
     text = str(question or "")
-    return bool(_ABOUT_SOURCE.search(text) or _POINTS_AT_SOURCE.search(text))
+    return _may_refer(text) and bool(_ABOUT_SOURCE.search(text) or _POINTS_AT_SOURCE.search(text))
 
 
 def _sentence_case(text: str) -> str:
@@ -426,6 +442,8 @@ def strip_source_attribution(text: str) -> str:
     """Without a leading or trailing "according to Slide 5" / "In this lecture,": what is left is
     about the subject. Used on questions and answers."""
     value = str(text or "").strip()
+    if not _may_refer(value):
+        return value
     stripped = _TRAILING.sub("", _LEADING.sub("", value)).strip()
     return _sentence_case(stripped) if stripped and stripped != value else value
 
@@ -435,12 +453,16 @@ def standalone_question(question: str):
     itself ("Which artists are listed for Chapter 1?", "What is shown on Slide 7?") and no rewrite
     can fix it. "According to Slide 5, what is X?" becomes "What is X?"."""
     text = str(question or "").strip()
-    if not text or _ABOUT_SOURCE.search(text):
+    if not text:
+        return None
+    if not _may_refer(text):
+        return text
+    if _ABOUT_SOURCE.search(text):
         return None
     rewritten = strip_source_attribution(text)
     if rewritten != text and not rewritten.endswith("?") and text.endswith("?"):
         rewritten = rewritten.rstrip(".!") + "?"
-    if len(rewritten.split()) < 2 or refers_to_source(rewritten):
+    if refers_to_source(rewritten) or (rewritten != text and len(rewritten.split()) < 2):
         return None
     return rewritten
 

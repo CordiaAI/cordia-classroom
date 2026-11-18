@@ -571,9 +571,11 @@ def memory_hook(question: str, answer: str, style="link", interests=(), previous
     """A memory trick for a missed question ("Help me remember"): links the question's cue to the
     answer, in one of the student's preferred styles (style: a MEMORY_STYLES key or a list of them;
     the model picks the one that suits this answer), anchored in their own material when something
-    there fits. Kept only when it states the answer and is written to the student; {} otherwise.
+    there fits. Kept only when it states the answer and is written to the student; {} otherwise. A
+    list answer ("Freud, Jung, and Adler") needs every part in the trick: one that leaves parts out is
+    asked for again once, naming them, and dropped if it still does.
     Returns {"hook"} plus {"linked": {kind, id, title}} when it built on a piece of context."""
-    from services.retain import mentions_answer
+    from services.retain import answer_parts, mentions_answer, missing_parts
     keys = [style] if isinstance(style, str) else list(style or ())
     picked = [MEMORY_STYLES[key] for key in keys if key in MEMORY_STYLES] or [MEMORY_STYLES["link"]]
     if len(picked) == 1:
@@ -583,37 +585,56 @@ def memory_hook(question: str, answer: str, style="link", interests=(), previous
     likes = ", ".join(str(item).replace("_", " ") for item in interests or ()) or "none given"
     context = list(context or ())[:5]
     material = "\n".join(f"[{i}] {item['title']}: {item['snippet']}" for i, item in enumerate(context, 1))
-    response = chat(get_openai_client(), "retain_remember",
-        messages=[
-            {"role": "system", "content": (
-                "Write one memory trick for a question a student just missed, for any subject. It must "
-                "start from the question's cue and lead to the answer (\"When you see X, think Y\"), "
-                "in one or two sentences under 40 words, written to them as \"you\". Build it on the "
-                "exact names, words and numbers in the answer, using whichever fits best: a vivid image, "
-                "a link to something they already know, an acronym or first letters, a number shape or "
-                "rhyme, or a tiny story. Make it specific, vivid and funny; a generic line that just "
-                "restates the fact fails. " + preferred
-                + "If the student's own material below gives a natural anchor (something they already "
-                "studied or heard), build on it and set \"linked\" to its number; otherwise null. Their "
-                "interests may give the link only when one fits. The trick must contain the answer exactly "
-                "as given and never change, round or blur it. Any comparison stated as fact must be true; "
-                "otherwise make it plainly wordplay. "
-                + (CRUDE_HUMOR_RULE if crude else "Playful is good; never mocking, crude, or about the student themselves. ")
-                + "\n\nEXAMPLES:\n" + MEMORY_EXAMPLES
-                + '\n\nReturn JSON: {"hook": "...", "linked": number or null}'
-            )},
-            {"role": "user", "content": (
-                f"QUESTION:\n{question[:1500]}\n\nANSWER:\n{answer[:1000]}\n\nINTERESTS: {likes}"
-                + (f"\n\nTHE STUDENT'S OWN MATERIAL:\n{material}" if material else "")
-                + (f"\n\nTAKE A DIFFERENT ANGLE FROM THIS ONE:\n{previous[:400]}" if previous else "")
-            )},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.8,
+    system = (
+        "Write one memory trick for a question a student just missed, for any subject. It must "
+        "start from the question's cue and lead to the answer (\"When you see X, think Y\"), "
+        "in one or two sentences under 40 words (up to 70 when the answer lists several parts), "
+        "written to them as \"you\". Build it on the exact names, words and numbers in the answer; "
+        "when the answer lists several parts (names, steps, items), give every part its own hook, in "
+        "order, since one hook for the topic leaves the parts unlearned. Use whichever fits best: a "
+        "vivid image, a link to something they already know, an acronym or first letters, a number "
+        "shape or rhyme, or a tiny story. Make it specific, vivid and funny; a generic line that just "
+        "restates the fact fails. " + preferred
+        + "If the student's own material below gives a natural anchor (something they already "
+        "studied or heard), build on it and set \"linked\" to its number; otherwise null. Their "
+        "interests may give the link only when one fits. The trick must contain the answer exactly "
+        "as given and never change, round or blur it. Any comparison stated as fact must be true; "
+        "otherwise make it plainly wordplay. "
+        + (CRUDE_HUMOR_RULE if crude else "Playful is good; never mocking, crude, or about the student themselves. ")
+        + "\n\nEXAMPLES:\n" + MEMORY_EXAMPLES
+        + '\n\nReturn JSON: {"hook": "...", "linked": number or null}'
     )
-    parsed = _practice_json(response.choices[0].message.content)
-    hook = student_feedback(parsed.get("hook"))
-    if not hook or not mentions_answer(hook, answer):
+    user = (
+        f"QUESTION:\n{question[:1500]}\n\nANSWER:\n{answer[:1000]}\n\nINTERESTS: {likes}"
+        + (f"\n\nTHE STUDENT'S OWN MATERIAL:\n{material}" if material else "")
+        + (f"\n\nTAKE A DIFFERENT ANGLE FROM THIS ONE:\n{previous[:400]}" if previous else "")
+    )
+    client = get_openai_client()
+
+    def ask(content: str) -> tuple:
+        response = chat(client, "retain_remember",
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": content}],
+            response_format={"type": "json_object"},
+            temperature=0.8,
+        )
+        parsed = _practice_json(response.choices[0].message.content)
+        return parsed, student_feedback(parsed.get("hook"))
+
+    def covers(hook: str) -> bool:
+        return bool(hook) and mentions_answer(hook, answer) and not missing_parts(hook, answer)
+
+    parsed, hook = ask(user)
+    if not covers(hook) and len(answer_parts(answer)) > 1:
+        # A list answer whose trick skipped parts: once more, naming the parts it left out.
+        left_out = (missing_parts(hook, answer) if hook else []) or answer_parts(answer)
+        try:
+            parsed, hook = ask(user + "\n\nYOUR FIRST TRICK LEFT OUT THESE PARTS OF THE ANSWER: "
+                               + "; ".join(left_out)
+                               + ". Give every part of the answer its own hook, in order.")
+        except Exception:
+            logger.warning("Help me remember: retry for a missing part failed", exc_info=True)
+            return {}
+    if not covers(hook):
         return {}
     result = {"hook": hook}
     linked = parsed.get("linked")
