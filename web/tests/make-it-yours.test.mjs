@@ -159,8 +159,8 @@ test('the Undo toast never moves the sheet: no room that appears with it, a toke
   // the toast is placed in the footer's gap between Reset and Done, once, when it appears.
   assert.doesNotMatch(sheet, /miy-toast-room|toast-room|:has\(\.miy-toast\)|78px/);
   assert.match(sheet, /max-height: calc\(100dvh - 32px\);/);
-  assert.match(sheet, /onReset\(previous, resetRef\.current\?\.parentElement\)/);
-  assert.match(sheet, /bottom: `calc\(\$\{Math\.round\(window\.innerHeight - \(box\.top \+ box\.bottom\) \/ 2\)\}px - var\(--toast-h\) \/ 2\)`/);
+  assert.match(sheet, /onReset\(previous, resetRef\.current\)/);
+  assert.match(sheet, /bottom: `calc\(\$\{Math\.round\(window\.innerHeight - \(row\.top \+ row\.bottom\) \/ 2\)\}px - var\(--toast-h\) \/ 2\)`/);
   assert.match(sheet, /style=\{undo\.place \|\| undefined\}/);
   // On phones the toast sits above the footer; the footer's height is the one the toast's offset reads.
   assert.match(sheet, /\.c-toast\.miy-toast \{ bottom: calc\(var\(--miy-foot-h\) \+ env\(safe-area-inset-bottom\) \+ var\(--toast-gap\)\) !important; \}/);

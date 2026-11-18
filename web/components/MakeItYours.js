@@ -60,12 +60,13 @@ export default function MakeItYoursHost() {
   // for the sheet to float in it, the toast goes in the middle of the sheet's footer, between Reset and Done (the
   // gap there is wider than the toast), centred on the footer's row. On a phone the sheet is the whole window and
   // the gap is too narrow, so the toast sits just above the footer (the style below).
-  const showUndo = useCallback((previous, footer) => {
+  const showUndo = useCallback((previous, resetButton) => {
     clearTimeout(undoTimer.current);
     let place = null;
-    if (footer && !matches('(max-width: 767px)')) {
-      const box = footer.getBoundingClientRect();
-      place = { left: `${Math.round(box.left + box.width / 2)}px`, bottom: `calc(${Math.round(window.innerHeight - (box.top + box.bottom) / 2)}px - var(--toast-h) / 2)` };
+    if (resetButton && !matches('(max-width: 767px)')) {
+      const row = resetButton.getBoundingClientRect(); // the buttons' own row: the footer's padding is not even
+      const foot = resetButton.parentElement.getBoundingClientRect();
+      place = { left: `${Math.round(foot.left + foot.width / 2)}px`, bottom: `calc(${Math.round(window.innerHeight - (row.top + row.bottom) / 2)}px - var(--toast-h) / 2)` };
     }
     setUndo({ previous, key: Date.now(), place });
     undoTimer.current = setTimeout(() => setUndo(null), UNDO_MS);
@@ -197,7 +198,7 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
     if (atDefault) return;
     const previous = validateSettings(settings);
     commit(defaultLook());
-    onReset(previous, resetRef.current?.parentElement);
+    onReset(previous, resetRef.current);
   }
 
   const radioProps = (chosen, onPick) => ({
