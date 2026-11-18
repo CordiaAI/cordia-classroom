@@ -26,6 +26,7 @@
   /* Neutrals: ink, muted (ink at 64%), and three surface levels */
   --ink: #171B18;
   --muted: rgba(23, 27, 24, 0.64);
+  --muted-strong: rgba(23, 27, 24, 0.74);   /* small text straight on the bright clouds (the chat's footnote): 4.5:1 there */
   --canvas: #EDF2F4;                       /* 1 backdrop */
   --surface-card: rgba(255, 255, 252, 0.55); /* 2 glass card */
   --surface-raised: rgba(255, 255, 252, 0.86); /* 3 raised glass: nav, sheets, menus, Tutor */
@@ -316,6 +317,7 @@
 [data-theme='dark'] {
   color-scheme: dark;
   --ink: #ECECEA;                          /* 12.2:1 on the dark card; pure white glared */
+  --muted-strong: rgba(255, 255, 255, 0.82);
   --muted: rgba(255, 255, 255, 0.75);      /* 4.5:1 or better on dark glass over the clouds, under the sheen and a hover pane too */
   --canvas: #1A1D20;
   --surface-card: rgba(39, 42, 48, 0.55);

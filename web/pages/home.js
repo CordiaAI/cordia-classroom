@@ -370,13 +370,17 @@ function ChatScreen({ routeId, goTo, progress }) {
     }
   }
 
+  // A chat's class is also the class its next question is asked about (POST /chat class_id).
   async function moveTo(target) {
     const before = chat.class_id;
+    const pickedBefore = classId;
     setChat(current => ({ ...current, class_id: target }));
+    setClassId(target || '');
     const result = await moveChat(chat.id, target);
     if (!alive.current) return;
     if (!result.ok) {
       setChat(current => (current ? { ...current, class_id: before } : current));
+      setClassId(pickedBefore);
       report(result);
     }
   }
