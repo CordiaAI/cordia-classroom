@@ -105,19 +105,19 @@ def related_material(db, user_id: str, guide_id: str, question: str, answer: str
     except Exception:
         logger.warning("Memory context: lectures unavailable", exc_info=True)
     try:
-        def saved(columns):
-            return (db.table("tutor_chats").select(columns).eq("user_id", user_id)
-                    .order("updated_at", desc=True).limit(20).execute().data or [])
+        def saved(columns, live_only):
+            query = db.table("tutor_chats").select(columns).eq("user_id", user_id)
+            if live_only:
+                query = query.is_("deleted_at", "null")  # before the 20 newest are taken: deleted chats must not crowd out live ones
+            return query.order("updated_at", desc=True).limit(20).execute().data or []
         try:
-            chats = saved("id, title, messages, deleted_at")
+            chats = saved("id, title, messages", True)
         except Exception as error:
             from services.tutor_sessions import is_missing_saved_chats_schema  # here: no LMS or class code
             if not is_missing_saved_chats_schema(error):
                 raise  # logged below; the trick goes without Tutor chats this time
-            chats = saved("id, title, messages")  # before migration 20261130120000 there is no deleted_at
+            chats = saved("id, title, messages", False)  # before migration 20261130120000 there is no deleted_at
         for chat in chats:
-            if chat.get("deleted_at"):  # a deleted chat is not material
-                continue
             messages = [m for m in (chat.get("messages") or []) if isinstance(m, dict)]
             said = " ".join(str(m.get("text") or m.get("content") or "") for m in messages)
             hits, text = _snippet(said, terms)
