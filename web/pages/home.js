@@ -103,6 +103,8 @@ export default function ChatHome() {
     setScreen({ key: own ? screen.key : screen.key + 1, id: routeId });
   }
   const goTo = useCallback(id => {
+    // Phones keep the chat on the home, as before: they have no chat address (the Tutor page is theirs).
+    if (id && !shellActive()) return;
     handoff.current = id || '';
     router.replace(id ? chatHref(id) : HOME_ROUTE, undefined, { scroll: false });
   }, [router]);
