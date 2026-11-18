@@ -185,7 +185,7 @@ The home is an empty chat, like ChatGPT and Claude: nothing but a headline, the 
 - Text size, Appearance and Glass use the segmented control.
 - Footer above a hairline: "Reset to Cordia" (quiet) at the left, Done (accent glass) at the right.
 
-### 4.7 Phones (design B, "chat first"; canvas board "iPhone B")
+### 4.7 Phones (design B, "chat first"; `screens/iphone-b-chat-first.png`)
 
 Under 768px with the new shell on. No tab bar.
 

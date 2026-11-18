@@ -135,7 +135,7 @@ Goal: every tool page opens inside the new shell, and every feature in the featu
 
 ## T9 Phone layout (design B, "chat first")
 
-Goal: on phones the redesign is chat first, as in the redesign canvas board "iPhone B" and DESIGN-SPEC 4.7. Replaces the earlier tab-bar design (owner's decision, 2026-11-18).
+Goal: on phones the redesign is chat first, as in `screens/iphone-b-chat-first.png` (canvas board "iPhone B") and DESIGN-SPEC 4.7. The picture is the visual reference; the written spec wins where they differ. Replaces the earlier tab-bar design (owner's decision, 2026-11-18).
 
 Under 768px, when the new-shell switch is on:
 
