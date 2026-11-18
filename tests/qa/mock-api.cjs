@@ -375,9 +375,9 @@ async function install(context, state) {
     }
     if (path === '/chat') {
       // A plan limit (state.tutorLimit), or a conversation that moved on in another tab (the version).
+      if (state.chatDelay) await new Promise(resolve => setTimeout(resolve, state.chatDelay));
       if (state.tutorLimit) return route.fulfill({ status: 402, json: { detail: { code: 'limit_reached', feature: 'tutor', message: "You've used all 10 Tutor questions on the Free plan this month." } } });
       if (body.session_id && body.conversation_version != null && body.conversation_version !== state.tutor.conversation_version) return route.fulfill({ status: 409, json: { detail: 'Tutor conversation changed. Refresh and try again.' } });
-      if (state.chatDelay) await new Promise(resolve => setTimeout(resolve, state.chatDelay));
       state.tutor = { ...state.tutor, messages: [...state.tutor.messages, { role: 'user', text: body.question }, { role: 'ai', text: state.tutorReply || 'Here is a **simple** explanation from your guide.' }], conversation_version: state.tutor.conversation_version + 1, updated_at: new Date().toISOString() };
       return json({ answer: 'ok', session: state.tutor });
     }

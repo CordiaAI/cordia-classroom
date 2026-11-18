@@ -329,13 +329,19 @@ function ChatScreen({ routeId, goTo, progress }) {
   const composerRef = useRef(null);
   const lastTop = useRef(null);
   const wasChatting = useRef(chatting);
+  const moving = useRef(null);
   useLayoutEffect(() => {
     const element = composerRef.current;
     if (!element) return;
     const top = layoutTop(element);
     if (wasChatting.current !== chatting && lastTop.current !== null && !reducedMotion()) {
-      const delta = lastTop.current - top;
-      if (Math.abs(delta) > 1) element.animate([{ transform: `translateY(${delta}px)` }, { transform: 'none' }], MOVE);
+      // Reversing a move that is still running starts from where the composer is now, not from
+      // where the first move was heading.
+      const running = moving.current?.playState === 'running';
+      const shift = running ? new DOMMatrixReadOnly(getComputedStyle(element).transform).m42 : 0;
+      moving.current?.cancel();
+      const delta = lastTop.current + shift - top;
+      moving.current = Math.abs(delta) > 1 ? element.animate([{ transform: `translateY(${delta}px)` }, { transform: 'none' }], MOVE) : null;
     }
     wasChatting.current = chatting;
     lastTop.current = top;
