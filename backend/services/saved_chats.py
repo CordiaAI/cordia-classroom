@@ -468,11 +468,18 @@ def _reset(user_id: str, session: dict, messages: list, chat_id, guide_id, stamp
 
 
 def _tidy(user_id: str, session: dict, live, keep) -> None:
-    """TIDY (step 4): the chat that was live is removed when it is empty and was never used (no messages,
-    not renamed, not saved into since it was read). Failures are logged; nothing depends on this."""
-    if (live and live["id"] != keep and not (session.get("messages") or []) and not (live.get("messages") or [])
-            and not live.get("renamed")):
-        _discard(user_id, live)
+    """TIDY (step 4), after the reset went through: the chat that was live is removed when it is empty and
+    was never used (no messages, not renamed, not saved into since it was read) and the session does not
+    point at it again (another tab may have opened it since). Then the student's old deleted chats are
+    purged. Failures are only logged: the reset already went through and nothing depends on this."""
+    try:
+        if (live and live["id"] != keep and not (session.get("messages") or []) and not (live.get("messages") or [])
+                and not live.get("renamed")):
+            current = _session(user_id)
+            if current and current.get("live_chat_id") != live["id"]:
+                _discard(user_id, live)
+    except Exception:
+        logger.warning("Saved chats: could not tidy after changing the live chat", exc_info=True)
     _purge_deleted(user_id)
 
 
@@ -484,43 +491,36 @@ def _start_new(user_id: str, session_id: str, guide_id, class_id):
     """New chat: an empty row of its own first, then save the current conversation, then point the session
     at the new row with an empty conversation."""
     fields = {"guide_id": guide_id, "class_id": class_id or _guide_class(user_id, guide_id)}
-    made = None
-    for _ in range(ATTEMPTS):
-        try:
+    made = None  # the empty row this request created and that no session points at (yet)
+    try:
+        for _ in range(ATTEMPTS):
             session, live = _settled(user_id)
-        except HTTPException:
-            _discard(user_id, made)
-            raise
-        if made and session.get("live_chat_id") == made["id"]:
-            return made, _full_session(user_id, session_id)  # an earlier reset went through; its answer was lost
-        if _busy(session):
-            _discard(user_id, made)
-            raise HTTPException(status_code=409, detail=BUSY_DETAIL)
-        if made is None:
-            stamp = _now()
-            made = (_chats().insert({"user_id": user_id, **fields, "title": "", "renamed": False, "messages": [],
-                                     "created_at": stamp, "updated_at": stamp}).execute().data or [None])[0]
+            if _busy(session):
+                raise HTTPException(status_code=409, detail=BUSY_DETAIL)
             if made is None:
-                raise _conflict()
-        try:
-            saved = _save(user_id, session, live)
-        except Exception:
-            _discard(user_id, made)
-            raise
-        if not saved:
-            continue
-        try:
-            done = _reset(user_id, session, [], made["id"], guide_id, _now())
-        except Exception as error:
-            if not _is_fk(error):
-                raise  # the answer is unknown: the new row may be live now, so it stays
-            made = None  # the new row was removed meanwhile (the old panel's delete): make another
-            continue
-        if done:
-            _tidy(user_id, session, live, made["id"])
-            return made, done[0]
-    _discard(user_id, made)
-    raise _conflict()
+                stamp = _now()
+                made = (_chats().insert({"user_id": user_id, **fields, "title": "", "renamed": False, "messages": [],
+                                         "created_at": stamp, "updated_at": stamp}).execute().data or [None])[0]
+                if made is None:
+                    raise _conflict()
+            if not _save(user_id, session, live):
+                continue  # another request saved into the live chat since it was read: read again
+            try:
+                done = _reset(user_id, session, [], made["id"], guide_id, _now())
+            except Exception as error:
+                if not _is_fk(error):
+                    made = None  # the answer is unknown: the new row may be live now, so it stays
+                    raise
+                made = None  # the new row was removed meanwhile (the old panel's delete): make another
+                continue
+            if done:
+                new, made = made, None
+                _tidy(user_id, session, live, new["id"])
+                return new, done[0]
+        raise _conflict()
+    except Exception:
+        _discard(user_id, made)  # only this request's own empty row, still unused
+        raise
 
 
 def _back_to_empty(user_id: str, session: dict) -> None:
@@ -545,13 +545,15 @@ def _start_open(user_id: str, session_id: str, chat_id: str):
             return _virtual(user_id, session), _full_session(user_id, session_id)
         if live and live["id"] == chat_id:
             return live, _full_session(user_id, session_id)  # already the current conversation
-        target = _row(user_id, chat_id)
-        if not _usable(target):
-            raise HTTPException(status_code=404, detail="Chat not found")
         if _busy(session):
             raise HTTPException(status_code=409, detail=BUSY_DETAIL)
         if not _save(user_id, session, live):
-            continue
+            continue  # another request saved into the live chat since it was read: read again
+        # The chat being opened is read after the save, right before the reset, so a delete in another tab
+        # is seen as late as possible; one that still lands in between is caught after the reset.
+        target = _row(user_id, chat_id)
+        if not _usable(target):
+            raise HTTPException(status_code=404, detail="Chat not found")
         try:
             done = _reset(user_id, session, list(target.get("messages") or []), target["id"], target.get("guide_id"),
                           target.get("updated_at") or _now())
@@ -563,7 +565,13 @@ def _start_open(user_id: str, session_id: str, chat_id: str):
             break
     else:
         raise _conflict()
-    after = _row(user_id, chat_id)
+    try:
+        after = _row(user_id, chat_id)
+    except Exception:
+        # The reset went through; if the chat was deleted meanwhile, the next read finds the session pointing
+        # at a deleted chat and gives the conversation a chat of its own, so nothing is lost or hidden.
+        logger.warning("Saved chats: could not check the opened chat after the reset", exc_info=True)
+        after = target
     if not _usable(after):
         _back_to_empty(user_id, done[0])
         raise HTTPException(status_code=404, detail="That chat was deleted in another tab.")

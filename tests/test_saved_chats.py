@@ -299,6 +299,24 @@ class AfterMigrationTests(SavedChatsBase):
     def live_id(self, user=ANA):
         return self.session(user).get("live_chat_id")
 
+    def reachable(self, word):
+        """Ids of the chats Ana can open now (the list) whose messages hold `word`."""
+        found = []
+        for chat in self.call("GET", "/chats?limit=100").json()["chats"]:
+            messages = self.call("GET", f"/chats/{chat['id']}").json()["chat"]["messages"]
+            if any(word in (m.get("text") or "") for m in messages):
+                found.append(chat["id"])
+        return found
+
+    def holding(self, word, deleted=None):
+        """Ana's chat rows (deleted, not deleted, or either) whose saved messages hold `word`."""
+        return [r["id"] for r in self.rows("tutor_chats") if any(word in (m.get("text") or "") for m in r.get("messages") or [])
+                and (deleted is None or bool(r.get("deleted_at")) == deleted)]
+
+    def keep_talking(self, text):
+        """The student sends a message in the Tutor: a full turn through the functions POST /chat uses."""
+        send(text)
+
     # Listing --------------------------------------------------------------------------------------
     def test_the_list_is_newest_first_and_only_the_callers_not_deleted_chats(self):
         response = self.call("GET", "/chats")
@@ -695,19 +713,6 @@ class TwoTabTests(AfterMigrationTests):
         for chat in listed:
             self.assertEqual(self.call("GET", f"/chats/{chat['id']}").json()["chat"]["live"], chat["id"] in live)
         self.assertFalse(set(live) & {c["id"] for c in self.call("GET", "/tutor/chats").json()["chats"]})
-
-    def reachable(self, word):
-        """Ids of the chats Ana can open now (the list) whose messages hold `word`."""
-        found = []
-        for chat in self.call("GET", "/chats?limit=100").json()["chats"]:
-            messages = self.call("GET", f"/chats/{chat['id']}").json()["chat"]["messages"]
-            if any(word in (m.get("text") or "") for m in messages):
-                found.append(chat["id"])
-        return found
-
-    def holding(self, word, deleted=None):
-        return [r["id"] for r in self.rows("tutor_chats") if any(word in (m.get("text") or "") for m in r.get("messages") or [])
-                and (deleted is None or bool(r.get("deleted_at")) == deleted)]
 
     def assert_what_was_typed_after_is_kept(self, word="Hardy-Weinberg"):
         """The student keeps talking, then starts another chat: the messages end up in exactly one chat they
@@ -1129,6 +1134,58 @@ class Interleavings(SavedChatsBase):
 
     def test_every_pair_from_an_empty_live_chat(self):
         self.matrix("empty")
+
+    def test_a_turn_in_flight_across_every_step_of_every_change(self):
+        """POST /chat's claim lands just before each database call of a change of the live chat (or a delete,
+        open or list), and its answer is written after that request has finished. The student's message and
+        the answer end up in one chat they can open, never only in a deleted one they did not delete."""
+        found, runs = [], 0
+        for state, action in itertools.product(("normal", "norow", "empty"), (
+                "new", "panel_new", "open_rates", "open_titration", "open_live", "delete_live", "delete_rates", "list")):
+            at = 1
+            while True:
+                held = {}
+
+                def claim():
+                    try:
+                        held["turn"] = tutor_sessions.claim_tutor_turn(ANA, SESSION, None, "Quick check: Krebs cycle", None)
+                    except HTTPException as error:
+                        return error.status_code
+                    return 200
+                self.errors = []
+                self.fresh(state)
+                seen = {"n": 0, "b": None}
+
+                def step(query):
+                    seen["n"] += 1
+                    if seen["n"] == at and seen["b"] is None:
+                        seen["b"] = claim()
+                self.db.step = step
+                code_a = self.safely(action)
+                self.db.step = None
+                if seen["b"] is None:
+                    break
+                runs += 1
+                completed = False
+                if held.get("turn"):
+                    try:
+                        tutor_sessions.complete_tutor_turn(ANA, held["turn"], {"answer": "It oxidises acetyl-CoA."})
+                        completed = True
+                    except HTTPException:
+                        pass  # the change won: the turn's answer is refused (409), its question was saved
+                codes = [(action, code_a), ("turn", 200 if completed else 409)]
+                bad = self.problems(state, codes)
+                if held.get("turn") and not completed:
+                    opened = [self.texts(saved_chats.get_chat(ANA, c["id"])["chat"]["messages"])
+                              for c in saved_chats.list_chats(ANA, 100)["chats"]]
+                    if len([text for text in opened if TURN_WORD in text]) != 1:
+                        bad.append("the question of a turn whose answer was refused is not in exactly one chat")
+                bad += self.follow_up() + self.errors
+                if bad:
+                    found.append(f"{state}: {action} with a claim before call {at}: {bad}")
+                at += 1
+        self.assertGreater(runs, 100)
+        self.assertEqual(found, [], "\n".join(found[:40]))
 
 
 class Crash(BaseException):
