@@ -714,7 +714,7 @@ html.is-restyling :not(.miy-sheet, .miy-sheet *), html.is-restyling :not(.miy-sh
 .setting-text > .c-section-title { margin: 0; grid-column: 2; grid-row: 1; }
 .setting-text > .c-meta { margin: 0; grid-column: 2; grid-row: 2; }
 @media (max-width: 767px) { .settings-row > .c-btn { width: 100%; } }
-/* A sub-setting under a card's main one: a hairline above, its line left and a quiet action right. */
+/* A sub-setting under a card's main one: its line on the left and a quiet action on the right. */
 .settings-sub { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem 1rem; flex-wrap: wrap; margin-top: 0.5rem; }
 /* A lone button in a card sits at its start, not stretched across it. */
 .settings-card > .c-btn { justify-self: start; }
@@ -725,6 +725,8 @@ html.is-restyling :not(.miy-sheet, .miy-sheet *), html.is-restyling :not(.miy-sh
 .settings-card .c-btn--quiet { padding-inline: var(--space-4); }
 /* A quiet action at a card's right edge lines its text up with the switches and icons above and below it. */
 .settings-head > .c-btn--quiet, .settings-sub > .c-btn--quiet { margin-inline-end: calc(var(--space-4) * -1); }
+/* On a phone the action wraps under its line: pull its start in too, so the words line up with the line above. */
+@media (max-width: 767px) { .settings-sub > .c-btn--quiet { margin-inline-start: calc(var(--space-4) * -1); } }
 
 /* ---------- Numbered steps (Canvas connect, Chrome extension) ---------- */
 .c-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }

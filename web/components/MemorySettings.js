@@ -76,11 +76,12 @@ export default function MemorySettings() {
         .mem-note { margin: 0; }
         .mem-list { list-style: none; margin: 0; padding: 0; display: grid; }
         /* Icon, text and Forget share one centre line; every row is the same height at least. */
-        .mem-row { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) 2.5rem; align-items: center; column-gap: 0.75rem; min-height: 3.5rem; padding: 0.375rem 0; }
+        .mem-row { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) 2.75rem; align-items: center; column-gap: 0.75rem; min-height: 3.5rem; padding: 0.375rem 0; }
         .mem-icon { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%; background: var(--glass-inner); color: var(--olive-ink); }
         .mem-text { display: grid; gap: 0.125rem; min-width: 0; overflow-wrap: anywhere; }
         .mem-from { font-size: 0.8125rem; }
-        .mem :global(.mem-forget) { justify-self: end; }
+        /* A touch target of 44 px (2.75rem) at the default text size, growing with it. */
+        .mem :global(.mem-forget) { justify-self: end; width: 2.75rem; height: 2.75rem; }
       `}</style>
     </div>
   );

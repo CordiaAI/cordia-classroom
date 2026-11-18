@@ -383,7 +383,7 @@ body { touch-action: manipulation; }
 
 /* Settings › Connectors: tiles with brand marks, like Cordia Assistant's Connections.
    Phones show one list with a line on what each app does. */
-.cn-card { gap: 12px; }
+.cn-card { gap: 0.75rem; }
 .cn-card > .c-section-title, .cn-card > .c-meta { margin: 0; }
 .cn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 14px; margin: 8px 0 0; padding: 0; list-style: none; }
 .cn-grid li { display: grid; }
@@ -395,8 +395,6 @@ body { touch-action: manipulation; }
 .cn-tag, .cn-chev { display: none; }
 .cn-badge { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--r-pill); border: 1px solid var(--hairline); color: var(--muted); font: 600 0.8125rem/1 var(--font-sans); }
 .cn-badge.is-on { border-color: transparent; background: var(--success-bg); color: var(--success); }
-/* On a phone the tile has no glass of its own, and the green is 4.1:1 on the dark field; the word carries the state, so it takes the ink there. */
-[data-theme='dark'] .cn-badge.is-on { color: var(--ink); }
 .cn-badge.is-warn { border-color: transparent; background: var(--warning-bg); color: var(--warning); }
 .cn-detail.is-canvas { max-height: 90svh; overflow-y: auto; }
 .cn-canvas-meta { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
@@ -435,7 +433,7 @@ body { touch-action: manipulation; }
 /* The import sheet is a column: the head, an optional "Add to" dropdown, the search field, then the
    results, which take what room is left and scroll. (It was a grid with five fixed rows, so the
    dropdown pushed the search field into the results' row.) */
-.cn-sheet { width: min(560px, 100%); display: flex; flex-direction: column; gap: 14px; max-height: min(640px, 90svh); overflow: hidden; }
+.cn-sheet { width: min(35rem, 100%); display: flex; flex-direction: column; gap: 0.875rem; max-height: min(40rem, 90svh); overflow: hidden; }
 .cn-sheet > * { flex: 0 0 auto; }
 .cn-sheet > .cn-results { flex: 0 1 auto; min-height: 0; }
 .cn-sheet .c-sheet-head { margin-bottom: 0; }
@@ -445,6 +443,10 @@ body { touch-action: manipulation; }
 .cn-row-title { font: 600 1.0625rem/1.35 var(--font-sans); color: var(--ink); }
 .cn-sheet > .c-meta { margin: 0; }
 @media (max-width: 560px) {
+  /* On a phone the tile has no glass of its own, so the badge sits straight on the page: the green is
+     4.3:1 in light and 4.1:1 in dark there. The word carries the state, so it takes the ink (14:1 and
+     12:1); the green stays on the badge's fill. On the glass tiles at desktop width it keeps its colour. */
+  .cn-badge.is-on { color: var(--ink); }
   .cn-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .cn-grid li + li { border-top: 1px solid var(--hairline); }
   .cn-tile { display: flex; align-items: center; gap: 12px; padding: 10px 0; text-align: left; border: 0; border-radius: 0; background: none; box-shadow: none; }

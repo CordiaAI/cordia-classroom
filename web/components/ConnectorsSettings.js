@@ -4,7 +4,7 @@ import { ChevronRight, Copy, Mail, Search, Wallet, X } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import ConfirmDialog from './ConfirmDialog';
 import { SectionLoader } from './CordiaLoader';
-import { apiErrorMessage, apiFetch } from '../lib/api';
+import { AI_TIMEOUT_MS, apiErrorMessage, apiFetch } from '../lib/api';
 import { canvasStatus, disconnectCanvas, displayDate, settleCanvasSync, syncCanvas } from '../lib/canvas';
 import { loadFolders } from '../lib/folders';
 import CanvasConnectSheet from './CanvasConnectSheet';
@@ -107,6 +107,9 @@ function healthLine(health) {
     .map(([key, value]) => { const [noun, ...rest] = STAT_WORDS[key].split(' '); return [`${value} ${noun}${value === 1 ? '' : 's'}`, ...rest].join(' '); });
   return [health.last_synced_at && `Last synced ${agoLabel(health.last_synced_at)}`, ...counts].filter(Boolean).join(' · ');
 }
+// A page too long, or too slow, to bring in whole: the text ends with a line saying so; the sheet says it too.
+const PARTIAL_NOTICE = "Only part of that page came in. The last line of the text says what was left out.";
+
 function ImportSheet({ connector, onClose }) {
   // Where an import goes: the New sheet's Paste (to review first) or straight into a class in Library.
   const [classes, setClasses] = useState([]);
@@ -117,7 +120,7 @@ function ImportSheet({ connector, onClose }) {
     setBusy(file.id); setError(''); setFailed(null); setAdded(null);
     const data = await addToLibrary(connector.id, { id: file.id, title: file.title, folderId: target });
     setBusy('');
-    if (data?.guide?.id) setAdded(data.guide);
+    if (data?.guide?.id) setAdded({ ...data.guide, partial: Boolean(data.partial) });
     else setFailed({ id: file.id, text: apiErrorMessage(data?.detail, "That didn't import. Try again.") });
   }
   const [query, setQuery] = useState('');
@@ -146,11 +149,12 @@ function ImportSheet({ connector, onClose }) {
   async function pick(file) {
     if (target) { addToClass(file); return; }
     setBusy(file.id); setError(''); setFailed(null);
-    const data = await apiFetch(`/connectors/${connector.id}/import`, { method: 'POST', body: JSON.stringify({ id: file.id, title: file.title }) });
+    // A page with many nested toggles is read a few calls at a time on the server, for up to 25 s: wait as long as an AI job.
+    const data = await apiFetch(`/connectors/${connector.id}/import`, { method: 'POST', body: JSON.stringify({ id: file.id, title: file.title }), timeoutMs: AI_TIMEOUT_MS });
     if (!data?.text) { setBusy(''); setFailed({ id: file.id, text: apiErrorMessage(data?.detail, "That didn't import. Try again.") }); return; }
     setBusy('');
     onClose();
-    openNewSheet('paste', { text: data.text, title: data.title });
+    openNewSheet('paste', { text: data.text, title: data.title, notice: data.partial ? PARTIAL_NOTICE : '' });
   }
 
   return (
@@ -164,7 +168,7 @@ function ImportSheet({ connector, onClose }) {
           {classes.length > 0 && (
             <label className="cn-target">
               <span className="c-meta">Add to</span>
-              <select className="c-input" value={target} onChange={event => { setTarget(event.target.value); setAdded(null); }}>
+              <select className="c-input" value={target} onChange={event => { setTarget(event.target.value); setAdded(null); setFailed(null); }}>
                 <option value="">New guide (review it first)</option>
                 {classes.map(folder => <option key={folder.id} value={folder.id}>{classLabel(folder.name).title} in Library</option>)}
               </select>
@@ -190,7 +194,7 @@ function ImportSheet({ connector, onClose }) {
               ))}
             </div>
           )}
-          {added && <p className="cn-notice" role="status">Added <a href={`/guide/${added.id}`}>{added.title}</a> to Library.</p>}
+          {added && <p className="cn-notice" role="status">Added <a href={`/guide/${added.id}`}>{added.title}</a> to Library.{added.partial && ` ${PARTIAL_NOTICE}`}</p>}
           {error && <p className="cn-error" role="alert">{error}</p>}
           <p className="c-meta">{target ? 'It goes into the class as notes, ready for cards and quizzes. Importing it again brings in changes.' : 'Imports open in New so you can check the text before making a guide.'}</p>
         </div>

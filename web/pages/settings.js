@@ -445,12 +445,12 @@ export default function SettingsPage() {
         .settings-links { display: flex; gap: 1.25rem; font:600 0.8125rem/1 var(--font-sans); }
         /* Straight on the page backdrop, so the strong muted ink (4.5:1 there), not the card muted. */
         .settings-links a { color: var(--muted-strong); }
-        .me-card { display: flex; align-items: center; gap: 16px; }
+        .me-card { display: flex; align-items: center; gap: 1rem; }
         .me-avatar { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius:50%; background: var(--meter); color: var(--on-meter); font:600 1.25rem/1 var(--font-sans); }
         .me-names { display: grid; gap: 2px; flex: 1; min-width: 0; }
         .me-names > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .me-names strong { font:600 1.25rem/1.15 var(--font-sans); }
-        .billing-current-plan { margin-bottom: 16px; }
+        .billing-current-plan { margin-bottom: 1rem; }
         .plan-badge { justify-self: start; padding: 6px 14px; border-radius:var(--r-pill); background: var(--card-sunk); font-weight:600; }
         .plan-badge[data-plan="plus"] { color: var(--meter-ink); }
         .plan-usage { display: grid; gap: 10px; }
@@ -468,7 +468,9 @@ export default function SettingsPage() {
         .plan-features li { display: flex; gap: 8px; align-items: flex-start; }
         .plan-features :global(.lucide) { color: var(--meter-ink); margin-top: 2px; }
         .plan-current-label { color: var(--meter-ink); font-weight:600; }
-        .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .plan-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+        /* A long plan name at Larger text wraps inside the card instead of running into its padding. */
+        .plan-actions :global(.c-btn) { min-width: 0; max-width: 100%; height: auto; padding-block: 0.75rem; white-space: normal; text-align: center; line-height: 1.25; }
         @media (max-width: 767px) { .billing-plans { grid-template-columns: 1fr; } .me-card { flex-wrap: wrap; } .me-names { flex: 1 1 0; min-width: 0; } .me-card > :global(.c-btn) { width: 100%; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
