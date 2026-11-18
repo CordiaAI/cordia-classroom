@@ -32,6 +32,138 @@ function summary(guide) {
   return { ...rest, flashcard_count: flashcards?.length || 0 };
 }
 
+// Saved chats (backend routers/chats.py, docs/redesign/T5-backend-notes.md). Set state.chatsApi:
+//   undefined   today's live backend: every /chats route answers 404 (the UI uses /tutor/chats)
+//   'fallback'  the new backend before its migration: list and get work, editable is false, and
+//               rename, move, delete and restore answer 503 { code: 'chats_not_available' }
+//   'full'      the new backend with its migration: everything works
+// state.chats holds the saved chats; state.tutor is the live conversation (its chat id is
+// state.liveId with 'full', the session's id otherwise). state.chatsDown: /chats can't be reached.
+let chatSerial = 0;
+const chatId = () => `c0000000-0000-4000-8000-${String(++chatSerial).padStart(12, '0')}`;
+const firstQuestion = messages => {
+  const text = String((messages || []).find(message => message.role === 'user')?.text || '').split(/\s+/).filter(Boolean).join(' ');
+  return text.length > 80 ? text.slice(0, 77) + '…' : text || 'Tutor chat';
+};
+function guideClass(state, guideId) {
+  const guide = state.guides.find(item => item.id === guideId);
+  return guide && state.folders.some(folder => folder.id === guide.folder_id) ? guide.folder_id : null;
+}
+function liveSummary(state) {
+  const live = state.live || {};
+  const id = state.chatsApi === 'full' ? state.liveId : state.tutor.id;
+  const classId = state.chatsApi === 'full' ? (live.class_id || null) : guideClass(state, state.tutor.active_guide_id);
+  return { id, title: live.renamed ? live.title : firstQuestion(state.tutor.messages), guide_id: state.tutor.active_guide_id || null, class_id: classId, live: true, created_at: live.created_at || state.tutor.updated_at || new Date().toISOString(), updated_at: state.tutor.updated_at || new Date().toISOString() };
+}
+function savedSummary(state, row) {
+  const classId = state.chatsApi === 'full' ? (row.class_id || null) : guideClass(state, row.guide_id);
+  return { id: row.id, title: row.title || firstQuestion(row.messages), guide_id: row.guide_id || null, class_id: classId, live: false, created_at: row.created_at || row.updated_at, updated_at: row.updated_at };
+}
+// The live conversation becomes a saved chat (a new chat or an opened one takes its place).
+function saveLive(state) {
+  if (!state.tutor.messages.length) return;
+  const live = state.live || {};
+  const id = state.chatsApi === 'full' && state.liveId ? state.liveId : chatId();
+  state.chats = state.chats || [];
+  state.chats.unshift({ id, guide_id: state.tutor.active_guide_id || null, class_id: state.chatsApi === 'full' ? live.class_id || null : null, title: live.renamed ? live.title : firstQuestion(state.tutor.messages), renamed: Boolean(live.renamed), messages: state.tutor.messages, created_at: live.created_at, updated_at: state.tutor.updated_at || new Date().toISOString() });
+}
+function freshLive(state, fields = {}) {
+  state.liveId = chatId();
+  state.live = { class_id: fields.class_id || null, created_at: new Date().toISOString() };
+  state.tutor = { ...state.tutor, messages: fields.messages || [], active_guide_id: fields.guide_id || null, conversation_version: state.tutor.conversation_version + 1, updated_at: new Date().toISOString() };
+}
+// What another tab can do, for tests: delete a chat, start a new chat, or purge a deleted one.
+const otherTab = {
+  remove(state, id) {
+    if (state.chatsApi === 'full' && id === state.liveId) { saveLive(state); freshLive(state); }
+    const row = (state.chats || []).find(chat => chat.id === id);
+    if (row) row.deleted_at = new Date().toISOString();
+  },
+  newChat(state) { saveLive(state); freshLive(state); },
+  purge(state, id) { state.chats = (state.chats || []).filter(chat => chat.id !== id); },
+};
+
+// state.startFail: starting a chat fails: 'network', or [status, detail] (409 busy, 409 changed, 404 class gone).
+function failStart(route, fail) {
+  return fail === 'network' ? route.abort('failed') : route.fulfill({ status: fail[0], json: { detail: fail[1] } });
+}
+
+function chatsRoute(state, path, method, url, body) {
+  const mode = state.chatsApi;
+  const notAvailable = { status: 503, json: { detail: "Saved chats aren't set up yet.", code: 'chats_not_available' } };
+  const gone = { status: 404, json: { detail: 'That chat is already gone.' } };
+  const saved = () => (state.chats || []).filter(chat => !chat.deleted_at);
+  const isLive = id => id === (mode === 'full' ? state.liveId : state.tutor.id);
+  if (mode === 'full' && !state.liveId) state.liveId = chatId();
+  let m;
+  if (path === '/chats' && method === 'GET') {
+    const classId = url.searchParams.get('class_id');
+    let chats = saved().map(row => savedSummary(state, row));
+    if (state.tutor.messages.length) chats.push(liveSummary(state));
+    if (classId) chats = chats.filter(chat => chat.class_id === classId);
+    chats.sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
+    return { json: { chats: chats.slice(0, Number(url.searchParams.get('limit')) || 30), editable: mode === 'full' } };
+  }
+  if (path === '/chats' && method === 'POST') {
+    if (state.tutor.status && state.tutor.status !== 'idle') return { status: 409, json: { detail: 'Wait for Cordia Tutor to finish before starting a new chat' } };
+    if (state.tutor.messages.length) saveLive(state);
+    freshLive(state, { guide_id: body.guide_id, class_id: mode === 'full' ? body.class_id : null });
+    if (mode !== 'full') state.liveId = null;
+    return { json: { chat: liveSummary(state), session: state.tutor } };
+  }
+  if ((m = path.match(/^\/chats\/([^/]+)\/open$/)) && method === 'POST') {
+    const row = saved().find(chat => chat.id === m[1]);
+    if (!row) return gone;
+    saveLive(state);
+    state.chats = state.chats.filter(chat => chat !== row);
+    state.liveId = mode === 'full' ? row.id : null;
+    state.live = { class_id: row.class_id || null, title: row.title, renamed: row.renamed, created_at: row.created_at };
+    state.tutor = { ...state.tutor, messages: row.messages || [], active_guide_id: row.guide_id || null, conversation_version: state.tutor.conversation_version + 1, updated_at: new Date().toISOString() };
+    return { json: { chat: liveSummary(state), session: state.tutor } };
+  }
+  if ((m = path.match(/^\/chats\/([^/]+)\/restore$/)) && method === 'POST') {
+    if (mode !== 'full') return notAvailable;
+    const row = (state.chats || []).find(chat => chat.id === m[1] && chat.deleted_at);
+    if (!row) return gone;
+    row.deleted_at = null;
+    return { json: { chat: savedSummary(state, row), editable: true } };
+  }
+  if ((m = path.match(/^\/chats\/([^/]+)$/))) {
+    const id = m[1];
+    const row = saved().find(chat => chat.id === id);
+    if (method === 'GET') {
+      if (isLive(id) && (state.tutor.messages.length || mode === 'full')) return { json: { chat: { ...liveSummary(state), messages: state.tutor.messages, session_id: state.tutor.id, conversation_version: state.tutor.conversation_version }, editable: mode === 'full' } };
+      if (!row) return gone;
+      return { json: { chat: { ...savedSummary(state, row), messages: row.messages || [] }, editable: mode === 'full' } };
+    }
+    if (mode !== 'full') return notAvailable;
+    if (method === 'PATCH') {
+      const target = isLive(id) ? (state.live = state.live || {}) : row;
+      if (!target) return gone;
+      if ('title' in body) { target.title = String(body.title).trim(); target.renamed = true; }
+      if ('class_id' in body) {
+        if (body.class_id && !state.folders.some(folder => folder.id === body.class_id)) return { status: 404, json: { detail: 'Class not found' } };
+        target.class_id = body.class_id || null;
+      }
+      return { json: { chat: isLive(id) ? liveSummary(state) : savedSummary(state, row), editable: true } };
+    }
+    if (method === 'DELETE') {
+      if (isLive(id)) {
+        if (!state.tutor.messages.length) return gone;
+        saveLive(state);
+        const deleted = state.chats[0];
+        deleted.deleted_at = new Date().toISOString();
+        freshLive(state);
+        return { json: { chat: { ...savedSummary(state, deleted), deleted_at: deleted.deleted_at }, editable: true } };
+      }
+      if (!row) return gone;
+      row.deleted_at = new Date().toISOString();
+      return { json: { chat: { ...savedSummary(state, row), deleted_at: row.deleted_at }, editable: true } };
+    }
+  }
+  return null;
+}
+
 async function install(context, state) {
   await context.route(/supabase\.co\/auth\/v1\//, async route => {
     const req = route.request();
@@ -147,7 +279,15 @@ async function install(context, state) {
     ] } : { connected: false });
     if (path === '/calendar/connection' && method === 'POST') return json({ connected: true, items: [] });
     if (path === '/tutor/session') return json(state.tutor);
-    if (path === '/tutor/chats') return json({ chats: state.chats || [] });
+    if (path === '/tutor/chats') return json({ chats: (state.chats || []).filter(chat => !chat.deleted_at).map(({ id, guide_id, title, updated_at }) => ({ id, guide_id, title, updated_at })) });
+    if (path === '/chats' || path.startsWith('/chats/')) {
+      if (state.chatsDown) return route.abort('failed');
+      if (path === '/chats' && method === 'POST' && state.startFail) return failStart(route, state.startFail);
+      if (!state.chatsApi) return route.fulfill({ status: 404, json: { detail: 'Not Found' } });
+      if (state.chatsDelay) await new Promise(resolve => setTimeout(resolve, state.chatsDelay));
+      const answer = chatsRoute(state, path, method, url, body);
+      return answer ? route.fulfill({ status: answer.status || 200, json: answer.json }) : route.fulfill({ status: 404, json: { detail: 'Not Found' } });
+    }
     if (path === '/connectors' && method === 'GET') {
       state.linked = state.linked || {};
       return json({ connectors: [['gcal', 'Google Calendar', 'Put your deadlines on your calendar.'], ['apple_calendar', 'Apple Calendar', 'Subscribe to your deadlines on iPhone and Mac.'], ['gtasks', 'Google Tasks', 'Turn deadlines into to-dos.'], ['gdrive', 'Google Drive', 'Import course files into a guide.'], ['dropbox', 'Dropbox', 'Class folders that fill your Library.'], ['gdocs', 'Google Docs', 'Import notes into a guide.'], ['notion', 'Notion', 'Import notes into a guide.'], ['gsheets', 'Google Sheets', 'Your grades and study time in a sheet.'], ['github', 'GitHub', 'Your code on programming assignments.'], ['slack', 'Slack', 'Class channels and study sessions.'], ['gmail', 'Gmail', 'Cordia texts you about emails that need a reply.'], ['outlook', 'Outlook', 'Cordia texts you about emails that need a reply.'], ['ynab', 'YNAB', 'Check your budget by text.']].map(([id, name, tagline]) => ({ id, name, tagline, available: true, connected: Boolean(state.linked[id]), ...(['gmail', 'outlook'].includes(id) ? { watch_dates: Boolean((state.watch || {})[id]) } : {}), uses: { tutor: true, assistant: true }, health: { sync_on: Boolean((state.syncing || {})[id]), last_synced_at: state.syncing?.[id] ? new Date(Date.now() - 240000).toISOString() : null, stats: state.syncing?.[id] ? (id === 'gcal' ? { blocks: 6 } : { tasks: 12 }) : {}, error: null, needs_reconnect: false } })) });
@@ -228,17 +368,26 @@ async function install(context, state) {
     if (path.match(/^\/connectors\/[a-z]+\/files/)) return json({ files: [{ id: 'f1', title: 'Biology lecture 4 notes', kind: 'doc', edited: '2026-10-20' }, { id: 'f2', title: 'Syllabus', kind: 'pdf', edited: '2026-09-01' }] });
     if (path.match(/^\/connectors\/[a-z]+\/import$/)) return json({ title: 'Biology lecture 4 notes', text: 'Osmosis is the movement of water across a membrane.' });
     if (path === '/tutor/session/new') {
+      if (state.startFail) return failStart(route, state.startFail);
+      if (state.tutor.status && state.tutor.status !== 'idle') return route.fulfill({ status: 409, json: { detail: 'Wait for Cordia Tutor to finish before starting a new chat' } });
       state.chats = state.chats || [];
-      if (state.tutor.messages.length) state.chats.unshift({ id: 'c' + (state.chats.length + 1), guide_id: state.tutor.active_guide_id || null, title: state.tutor.messages[0].text.slice(0, 80), updated_at: new Date().toISOString(), messages: state.tutor.messages });
-      const resumed = body.resume_id && state.chats.find(chat => chat.id === body.resume_id);
+      const resumed = body.resume_id && state.chats.find(chat => chat.id === body.resume_id && !chat.deleted_at);
+      if (body.resume_id && !resumed) return route.fulfill({ status: 404, json: { detail: 'Chat not found' } });
+      saveLive(state);
       if (resumed) state.chats = state.chats.filter(chat => chat !== resumed);
-      state.tutor = { ...state.tutor, messages: resumed ? resumed.messages : [], active_guide_id: resumed ? resumed.guide_id : body.guide_id, conversation_version: state.tutor.conversation_version + 1 };
+      state.liveId = state.chatsApi === 'full' ? (resumed ? resumed.id : chatId()) : null;
+      state.live = resumed ? { class_id: resumed.class_id || null, title: resumed.title, renamed: resumed.renamed, created_at: resumed.created_at } : { created_at: new Date().toISOString() };
+      state.tutor = { ...state.tutor, messages: resumed ? resumed.messages : [], active_guide_id: resumed ? resumed.guide_id : body.guide_id, conversation_version: state.tutor.conversation_version + 1, updated_at: new Date().toISOString() };
       return json(state.tutor);
     }
     if (path === '/chat') {
+      // A plan limit (state.tutorLimit), or a conversation that moved on in another tab (the version).
+      if (state.chatDelay) await new Promise(resolve => setTimeout(resolve, state.chatDelay));
+      if (state.tutorLimit) return route.fulfill({ status: 402, json: { detail: { code: 'limit_reached', feature: 'tutor', message: "You've used all 10 Tutor questions on the Free plan this month." } } });
+      if (body.session_id && body.conversation_version != null && body.conversation_version !== state.tutor.conversation_version) return route.fulfill({ status: 409, json: { detail: 'Tutor conversation changed. Refresh and try again.' } });
       // state.chatReply(body): a reply of its own ({ answer, study_plan, link, ... }), e.g. a study plan.
-      const { answer = 'Here is a **simple** explanation from your guide.', ...extra } = state.chatReply?.(body) || {};
-      state.tutor = { ...state.tutor, messages: [...state.tutor.messages, { role: 'user', text: body.question }, { role: 'ai', text: answer, ...extra }], conversation_version: state.tutor.conversation_version + 1 };
+      const { answer = state.tutorReply || 'Here is a **simple** explanation from your guide.', ...extra } = state.chatReply?.(body) || {};
+      state.tutor = { ...state.tutor, messages: [...state.tutor.messages, { role: 'user', text: body.question }, { role: 'ai', text: answer, ...extra }], conversation_version: state.tutor.conversation_version + 1, updated_at: new Date().toISOString() };
       return json({ answer, ...extra, session: state.tutor });
     }
     // Learn's finished check-in (backend routers/tutor.py tutor_checkin): the Tutor's next steps join the chat.
@@ -287,4 +436,4 @@ async function install(context, state) {
   });
 }
 
-module.exports = { install, createState, TOKEN, USER };
+module.exports = { install, createState, TOKEN, USER, otherTab };

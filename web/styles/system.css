@@ -230,6 +230,10 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
 .c-menu [role='menuitem']:focus-visible { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); text-decoration: none; transition: none; } /* arrow keys: next frame (DESIGN-SPEC 6.1) */
 @media (hover: hover) { .c-menu [role='menuitem']:hover { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); text-decoration: none; } }
 .c-menu [role='menuitem'].is-danger { color: var(--error); }
+/* Disabled items stay reachable by the keyboard and read out, but look and act inert. */
+.c-menu [role='menuitem'][aria-disabled='true'] { color: var(--muted); cursor: default; }
+@media (hover: hover) { .c-menu [role='menuitem'][aria-disabled='true']:hover { background: transparent; box-shadow: none; } }
+.c-menu-note { max-width: 260px; margin: 4px 0 0; padding: 8px 14px 6px; border-top: 1px solid var(--line); color: var(--muted); font: 500 0.8125rem/1.4 var(--font-sans); white-space: normal; }
 .c-menu hr { margin: 6px 8px; border: 0; border-top: 1px solid var(--line); }
 .c-menu-wrap { position: relative; }
 /* Menus from components/Menu.js render at the end of <body>, fixed under their button. */
@@ -832,6 +836,36 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
     .c-side-chats { flex: 1 1 0; min-height: 148px; }
     .c-side-chat-list { flex: 1 1 0; min-height: 0; margin: 0 -12px; padding: 0 12px 4px; overflow: hidden auto; overscroll-behavior: contain; }
     .c-side-chat { flex: none; font: 500 0.875rem/1.3 var(--font-sans); }
+    /* A chat row's ⋯ sits over the row's right end, shown on hover and on keyboard focus (always on
+       touch screens); the title stops short of it. Hovering the ⋯ keeps the row's hover pane. */
+    .c-side-chat-row { position: relative; min-width: 0; }
+    /* The title only gives up room for the ⋯ while the ⋯ is showing (hover, keyboard focus, menu open). */
+    .c-side-chat-row.has-more:is(:focus-within, :has(.c-side-chat-more[aria-expanded='true'])) .c-side-chat { padding-right: 40px; }
+    @media (hover: hover) { .c-side-chat-row.has-more:hover .c-side-chat { padding-right: 40px; } }
+    @media (hover: none) { .c-side-chat-row.has-more .c-side-chat { padding-right: 40px; } }
+    /* A row that goes folds shut as it fades (Sidebar: SidebarChats keeps it for the exit). */
+    .c-side-chat-row.is-leaving { display: grid; grid-template-rows: 1fr; pointer-events: none; animation: c-row-out var(--dur-exit) var(--ease-exit) both; }
+    .c-side-chat-ghost { min-height: 0; overflow: hidden; }
+    @media (prefers-reduced-motion: reduce) { .c-side-chat-row.is-leaving { animation: none; } }
+    .c-side-more { list-style: none; }
+    .c-side-more-btn { width: 100%; border: 0; background: none; cursor: pointer; text-align: left; }
+    .c-side-more-btn[aria-disabled='true'] { opacity: .6; cursor: default; }
+    .c-side-chat-row > .c-menu-wrap { position: absolute; top: 2px; right: 2px; }
+    .c-side .c-side-chat-more { position: relative; width: 32px; height: 32px; opacity: 0; transition: opacity var(--dur) var(--ease), background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+    .c-side .c-side-chat-more::after { content: ''; position: absolute; inset: -2px; }
+    .c-side-chat-row:focus-within .c-side-chat-more, .c-side .c-side-chat-more[aria-expanded='true'] { opacity: 1; }
+    .c-side .c-side-chat-more[aria-expanded='true'] { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
+    @media (hover: hover) {
+      .c-side-chat-row:hover .c-side-chat-more { opacity: 1; }
+      .c-side-chat-row:hover .c-side-chat:not([aria-current='page']) { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
+    }
+    @media (hover: none) { .c-side .c-side-chat-more { opacity: 1; } }
+    .c-side-chat-rename {
+      box-sizing: border-box; width: 100%; height: 36px; padding: 0 12px; border: 0; border-radius: var(--r-input);
+      background: var(--lg-fill-field); box-shadow: var(--glass-inner-shadow); color: var(--ink); font: 500 0.875rem/1.3 var(--font-sans);
+    }
+    .c-side-chat-rename:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+    .c-side-retry { padding: 0; border: 0; background: none; color: var(--olive-ink); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
     .c-side-chats-icon { display: none; }
 
     /* The account row, under the one hairline: a 36px avatar (initials in olive on selected glass),
@@ -941,6 +975,7 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 @keyframes c-shell-in-left { from { opacity: 0; transform: translateX(6px); } to { opacity: 1; transform: none; } }
 @keyframes c-shell-in-right { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
 @keyframes c-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes c-row-out { from { grid-template-rows: 1fr; opacity: 1; margin-bottom: 0; } to { grid-template-rows: 0fr; opacity: 0; margin-bottom: -2px; } }
 
 @media (prefers-reduced-motion: reduce) {
   .c-shell-tip, .c-shell-tip.is-right { transform: translate(0, -50%); }
@@ -998,7 +1033,7 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 }
 .chat-home { box-sizing: border-box; display: flex; flex-direction: column; min-height: calc(100dvh - 160px); }
 .chat-home-top { flex: none; display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 8px; min-width: 0; }
-.chat-home-date { margin-left: auto; color: var(--muted); font: 500 0.8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chat-home-date { margin-left: auto; color: var(--muted-strong); font: 500 0.8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .chat-home-top h1.chat-home-title { min-width: 0; margin: 0 0 0 4px; color: var(--ink); font: 600 1.0625rem/1.3 var(--font-sans) !important; letter-spacing: 0 !important; }
 .chat-home-chip { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: var(--r-pill); background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); color: var(--ink); font: 600 0.8125rem/1 var(--font-sans); }
 .chat-home-stage { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 20px; padding: 0 24px 72px; }
@@ -1015,7 +1050,7 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 .chat-home-pill .lucide { flex: none; color: var(--muted); }
 @media (hover: hover) { .chat-home-pill:hover { transform: var(--lift); box-shadow: var(--glass-inner-shadow), var(--lift-shadow); text-decoration: none; } }
 .chat-home-pill:active { transform: var(--press); }
-.chat-home-note { flex: none; margin: 0 0 4px; padding: 0 16px; text-align: center; color: var(--muted); font: 500 0.8125rem/1.4 var(--font-sans); }
+.chat-home-note { flex: none; margin: 0 0 4px; padding: 0 16px; text-align: center; color: var(--muted-strong); font: 500 0.8125rem/1.4 var(--font-sans); }
 
 /* The chat: the conversation scrolls in a 760px column; the composer sits under it. */
 .chat-home.is-chat .chat-home-stage { justify-content: flex-end; gap: 12px; padding: 0 0 8px; }
@@ -1033,6 +1068,44 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 .chat-home-thread .cordia-tutor-message.error { align-self: stretch; padding: 10px 14px; border-radius: var(--r-input); background: var(--error-bg); color: var(--error); font-size: 0.9375rem; }
 .cordia-tutor-avatar { position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
 .cordia-tutor-avatar svg, .cordia-tutor-avatar img { width: 22px; height: auto; }
+
+/* Undo while it is working: still focusable, but it looks and acts inert. */
+.c-chat-toast .c-btn[aria-disabled='true'] { opacity: .55; cursor: default; pointer-events: none; }
+
+/* A chat's header (4.3): the title, its class, and ⋯ at the right. Rename edits the title in place,
+   in the title's own type, so nothing moves when it opens. */
+.chat-home-menu { flex: none; margin-left: auto; }
+/* Phones keep the chat as it was: no chat menu there (renaming, moving and deleting are on larger screens). */
+@media (max-width: 767px) { .chat-home-menu { display: none; } }
+.chat-home-menu .c-icon-btn[aria-expanded='true'] { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
+.chat-home-top .chat-home-rename {
+  flex: 0 1 520px; min-width: 120px; height: 36px; margin: 0 0 0 -6px; padding: 0 10px;
+  border: 0; border-radius: var(--r-input); background: var(--lg-fill-field); box-shadow: var(--glass-inner-shadow);
+  color: var(--ink); font: 600 1.0625rem/1.3 var(--font-sans);
+}
+.chat-home-top .chat-home-rename:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 0; }
+
+/* Another tab changed this chat: one plain line above the composer, with the way forward. */
+.chat-notice {
+  box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; width: calc(100% - 48px); max-width: 760px; margin: 0 auto;
+  padding: 6px 6px 6px 16px; border-radius: var(--r-card); background: var(--glass-inner); box-shadow: var(--glass-inner-shadow);
+  color: var(--ink); font: 500 0.9375rem/1.4 var(--font-sans);
+}
+.chat-notice-text { flex: 1 1 260px; min-width: 0; }
+.chat-notice-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.chat-home-missing { justify-items: start; gap: 16px; }
+/* On the home and in a chat the composer holds the bottom, so the chats toast shows under the header. */
+@media (min-width: 768px) {
+  :root[data-shell='new'] .app-shell:has(.chat-home) .c-chat-toast { top: calc(var(--side-gap) + 60px); bottom: auto; animation-name: c-toast-drop; }
+}
+@keyframes c-toast-drop { from { opacity: 0; transform: translate(-50%, -12px) scale(.98); } to { opacity: 1; transform: translate(-50%, 0); } }
+/* Leaving: it fades and settles toward where it came from (the same toast, going the other way). */
+.c-chat-toast[data-leaving] { animation: c-toast-out var(--dur-exit) var(--ease-exit) both; }
+@media (min-width: 768px) { :root[data-shell='new'] .app-shell:has(.chat-home) .c-chat-toast[data-leaving] { animation-name: c-toast-lift; } }
+@keyframes c-toast-out { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, 8px) scale(.98); } }
+@keyframes c-toast-lift { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -8px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { :root[data-shell='new'] .app-shell:has(.chat-home) .c-chat-toast, .c-chat-toast[data-leaving] { animation: none; } }
+.chat-home-missing .chat-home-line { color: var(--ink); }
 
 /* The composer: strong glass, 28px corners; focus rings the whole composer, not the box. */
 .composer {

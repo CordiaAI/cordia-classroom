@@ -49,6 +49,7 @@
   /* Neutrals: ink, muted (ink at 64%), and three surface levels */
   --ink: #171B18;
   --muted: rgba(23, 27, 24, 0.64);
+  --muted-strong: rgba(23, 27, 24, 0.74);   /* small text straight on the bright clouds (the chat's footnote): 4.5:1 there */
   --canvas: #EDF2F4;                       /* 1 backdrop */
   --surface-card: rgba(255, 255, 252, 0.55); /* 2 glass card */
   --surface-raised: rgba(255, 255, 252, 0.86); /* 3 raised glass: nav, sheets, menus, Tutor */
@@ -401,6 +402,7 @@
 [data-theme='dark'] {
   color-scheme: dark;
   --ink: #ECECEA;                          /* 12.2:1 on the dark card; pure white glared */
+  --muted-strong: rgba(255, 255, 255, 0.82);
   --muted: rgba(255, 255, 255, 0.75);      /* 4.5:1 or better on dark glass over the clouds, under the sheen and a hover pane too */
   --canvas: #1A1D20;
   --surface-card: rgba(39, 42, 48, 0.55);
@@ -668,7 +670,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
 }
 /* Dusk's violet top is darker than the clouds: in light, muted text on the page itself needs a little more ink to
    hold 4.5:1. */
-:root[data-bg='dusk']:not([data-theme='dark']) { --muted: rgba(23, 27, 24, 0.72); }
+:root[data-bg='dusk']:not([data-theme='dark']) { --muted: rgba(23, 27, 24, 0.72); --muted-strong: rgba(23, 27, 24, 0.8); }
 :root[data-bg='paper'] {
   --canvas: #F3F1EA;
   --backdrop-sky: none;
@@ -742,7 +744,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
   --ca-d-fill: 217, 119, 87; --ca-d-ink: 232, 145, 111; --ca-d-on: 26, 25, 24; --ca-d-glass-press: 227, 138, 107; --ca-d-tint: 232, 145, 111;
 }
 :root[data-look='paper-clay'] {
-  --ink: #141413; --text-secondary: #3D3D3A; --muted: #6B6A64; --text-disabled: #9C9A92;
+  --ink: #141413; --text-secondary: #3D3D3A; --muted: #6B6A64; --muted-strong: #55544E; --text-disabled: #9C9A92;
   --hairline: rgba(31, 30, 29, 0.10); --line-strong: rgba(31, 30, 29, 0.20);
   /* Control borders: the spec's #8F8C82 moved the smallest step (9 per channel, darker) that holds 3:1 on the
      hover and pressed fills too (the owner's decision A): 3.03 on pressed #E8E6DC, 3.27 on hover #F0EEE6. */
@@ -799,7 +801,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
   --r-pane: 16px;
 }
 [data-theme='dark'][data-look='paper-clay'] {
-  --ink: #FAF9F5; --text-secondary: #C2C0B6; --muted: #A6A39A; --text-disabled: #85837B;
+  --ink: #FAF9F5; --text-secondary: #C2C0B6; --muted: #A6A39A; --muted-strong: #BDBAB1; --text-disabled: #85837B;
   --hairline: rgba(250, 249, 245, 0.12); --line-strong: rgba(250, 249, 245, 0.20);
   /* Control borders: the spec's #8A877E moved the smallest step that passes (8 per channel; lighter, the passing
      direction on dark): 3.02 on pressed #45443F, 3.57 on hover #3A3936 (decision A). */

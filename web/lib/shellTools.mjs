@@ -76,11 +76,13 @@ export function railCurrent(pathname) {
   return '';
 }
 
-// The one sidebar item for this page, or '': 'new' (the chat home, or a new Tutor chat), 'chat:live' (the Tutor's
-// open conversation), 'class:<id>' (a class listed in the sidebar), 'account' (Settings, Billing).
-export function sidebarCurrent(pathname, query = {}, { classIds = [], liveChat = false } = {}) {
+// The one sidebar item for this page, or '': 'new' (the chat home, or a new Tutor chat), 'chat:<id>' (the
+// open chat: /chat/<id>, or the Tutor page's live conversation, liveChatId), 'class:<id>' (a class
+// listed in the sidebar), 'account' (Settings, Billing).
+export function sidebarCurrent(pathname, query = {}, { classIds = [], liveChatId = '' } = {}) {
   if (pathname === '/home') return 'new';
-  if (pathname === '/tutor') return liveChat ? 'chat:live' : 'new';
+  if (pathname === '/chat/[id]') return one(query.id) ? 'chat:' + one(query.id) : 'new';
+  if (pathname === '/tutor') return liveChatId ? 'chat:' + liveChatId : 'new';
   if (pathname === '/folder/[id]' && classIds.includes(String(one(query.id) || ''))) return 'class:' + one(query.id);
   if (pathname === '/settings' || pathname.startsWith('/settings/') || pathname === '/billing') return 'account';
   return '';
@@ -93,16 +95,13 @@ export function chatTitle(messages) {
   return title.length > 80 ? title.slice(0, 77) + '…' : title || 'Tutor chat';
 }
 
-// Recent chats, newest first: the Tutor's open conversation (when it has messages), then the
-// saved ones (GET /tutor/chats, newest first). Saved chats open at /tutor?chat=<id>.
-export function recentChats(liveMessages, saved, limit = 30) {
-  const live = (liveMessages || []).some(message => message?.role === 'user')
-    ? [{ key: 'chat:live', id: '', title: chatTitle(liveMessages), href: '/tutor' }]
-    : [];
-  const rest = (Array.isArray(saved) ? saved : []).filter(chat => chat?.id).map(chat => ({
-    key: 'chat:' + chat.id, id: String(chat.id), title: String(chat.title || '').trim() || 'Tutor chat', href: '/tutor?chat=' + encodeURIComponent(chat.id),
+// Recent chats, as the saved-chats store gives them (lib/chats.js: newest first, the live
+// conversation included). Every chat opens at /chat/<id>.
+export function recentChats(chats, limit = 30) {
+  return (Array.isArray(chats) ? chats : []).filter(chat => chat?.id).slice(0, limit).map(chat => ({
+    key: 'chat:' + chat.id, id: String(chat.id), title: String(chat.title || '').trim() || 'Tutor chat',
+    href: '/chat/' + encodeURIComponent(chat.id), live: Boolean(chat.live), classId: chat.class_id || null,
   }));
-  return [...live, ...rest].slice(0, limit);
 }
 
 // Classes in the sidebar: up to five, by course code (DESIGN-SPEC 3.2).

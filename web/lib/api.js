@@ -237,7 +237,8 @@ export async function authorizedFetch(path, options = {}) {
 // request returns { detail, failed: 'timeout' | 'network' } instead, so the caller can say which.
 // quietLimit: a plan limit (402) returns its error to the caller without opening the upgrade dialog
 // (Learn's format ladder falls back quietly instead of interrupting a round).
-export async function apiFetch(path, { reportFailure = false, quietLimit = false, ...options } = {}) {
+// withStatus: the answer also carries its HTTP status (saved chats tell 404 from 409, lib/chats.js).
+export async function apiFetch(path, { reportFailure = false, quietLimit = false, withStatus = false, ...options } = {}) {
   if (typeof window === 'undefined' || !getToken()) return null;
   try {
     let resp = await fetchWithTimeout(API + path, {
@@ -263,6 +264,7 @@ export async function apiFetch(path, { reportFailure = false, quietLimit = false
     const data = await responseJson(resp);
     if (!quietLimit) announceLimit(resp, data);
     else if (resp.status === 402 && data && typeof data === 'object') data.limit_reached = true;
+    if (withStatus && data && typeof data === 'object' && !Array.isArray(data)) data.httpStatus = resp.status;
     return data;
   } catch (e) {
     console.error('API fetch error:', path, e);
