@@ -18,7 +18,7 @@ DEFAULTS = {
 }
 # bigserial ids: 1, 2, 3, ...
 SERIAL_TABLES = {"notifications", "social_rate_events"}
-ID_TABLES = {"schools", "classes", "class_terms", "folders", "study_guides", "shared_sets", "shared_set_reports",
+ID_TABLES = {"schools", "classes", "class_terms", "folders", "study_guides", "tutor_chats", "shared_sets", "shared_set_reports",
              "class_merge_proposals", "copyright_takedowns", "instructor_blocks", "canvas_activity",
              "assignment_steps", "study_blocks", "generation_jobs", "lectures", "classrooms", "classroom_invites"}
 
@@ -87,6 +87,11 @@ class Query:
                 query.filters.append(lambda r: not (r.get(key) is None if value in (None, "null") else r.get(key) == value))
                 return query
 
+            def in_(self, key, values):
+                values = list(values)
+                query.filters.append(lambda r: r.get(key) not in values)
+                return query
+
         return Negated()
 
     def in_(self, key, values):
@@ -138,8 +143,10 @@ class Query:
         self.op, self.payload = "update", payload
         return self
 
-    def delete(self):
-        self.op = "delete"
+    def delete(self, count=None, returning=None):
+        """returning=minimal answers no rows (only the count, when one is asked for), like PostgREST."""
+        self.op, self.count = "delete", count
+        self.minimal = str(getattr(returning, "value", returning) or "") == "minimal"
         return self
 
     def _match(self, row):
@@ -203,7 +210,8 @@ class Query:
         if self.op == "delete":
             gone = [r for r in rows if self._match(r)]
             self.db.tables[self.name] = [r for r in rows if not self._match(r)]
-            return SimpleNamespace(data=gone)
+            return SimpleNamespace(data=[] if getattr(self, "minimal", False) else gone,
+                                   count=len(gone) if getattr(self, "count", None) else None)
         raise AssertionError(self.op)
 
 
