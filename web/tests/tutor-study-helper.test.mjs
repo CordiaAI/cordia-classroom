@@ -87,3 +87,21 @@ test('a resumed ordinary round is never reported as the check-in', () => {
   assert.match(learn, /setCheckin\(resumable && pending\.checkin \? 'running' : 'pending'\)/);
   assert.match(learn, /if \(checkin === 'pending'\) setCheckin\('running'\)/);
 });
+
+// ---- Second review (F6c): finding 3 and Low 7 ----
+
+test('the check-in starts by itself once, on the first load only; later visits to the overview show its button', () => {
+  const effect = learn.slice(learn.indexOf('const checkinAuto = useRef(false);'));
+  const body = effect.slice(0, effect.indexOf('}, [checkin, questions, screen]);'));
+  // Consumed the first time questions load, whatever happens next.
+  assert.match(body, /if \(checkinAuto\.current \|\| !questions\?\.length\) return;\s*checkinAuto\.current = true;/);
+  // It starts only if the check-in is waiting and the overview is showing at that moment.
+  assert.match(body, /if \(checkin !== 'pending' \|\| screen !== 'home'\) return;\s*setCheckin\('running'\);\s*startRound\(\);/);
+  // Coming back to the overview later (after a resumed round) offers the button instead of starting again.
+  assert.match(learn, /\{checkin === 'pending' \? 'Start the check-in quiz' : 'Next round'\}/);
+  assert.equal((learn.match(/startRound\(\);/g) || []).length, 1);
+});
+
+test('a plan button ignores clicks while its working mark is still showing', () => {
+  assert.match(actions, /onClick=\{\(\) => \{ if \(!working && !marked\) run\(action\); \}\}/);
+});

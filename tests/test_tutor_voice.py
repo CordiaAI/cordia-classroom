@@ -21,13 +21,15 @@ AUTH = {"Authorization": "Bearer test"}
 DISCIPLINES = {
     "nursing": ("What is the normal adult heart rate?", "A normal adult resting heart rate is 60 to 100 beats per minute.",
                 "Heart rate is how often the heart beats; a resting rate is taken when the person is calm."),
-    "art history": ("Who painted the Night Watch?", "Rembrandt painted it in 1642 for a civic guard company.",
+    # A question that asks who, how many or what year is answered with a specific, so the general answers
+    # here go with questions that don't (the second review's question-side rule flags those).
+    "art history": ("Tell me about the Night Watch", "Rembrandt painted it in 1642 for a civic guard company.",
                     "A group portrait shows several sitters together, often arranged to show their roles."),
     "business law": ("What case set the rule on consideration?", "The rule comes from Currie v Misa, decided in 1875.",
                      "Consideration is something of value that each side gives up to make a promise binding."),
     "literature": ("When was Beloved published?", "Toni Morrison published it on September 16 of that year.",
                    "A frame narrative is a story told inside another story, which shapes how we read it."),
-    "computer science": ("Who designed the first compiler?", "It was built by a team of three engineers at the lab.",
+    "computer science": ("Tell me about the first compiler", "It was built by a team of three engineers at the lab.",
                          "A compiler translates source code into instructions a machine can run, before it runs."),
 }
 
@@ -50,6 +52,21 @@ class SpecificsTests(unittest.TestCase):
         self.assertFalse(states_specifics("There are two ways to think about it.", "Explain recursion"))
         self.assertFalse(states_specifics("In Python, a list keeps its order.", "what is a list in python"))
         self.assertFalse(states_specifics("1. **Identify The Variables**\nWrite down what you know.", "how do I start"))
+
+    def test_a_full_name_or_an_amount_is_flagged_in_every_discipline(self):
+        # Second review: a name at the very start of a sentence, a currency amount and a percent are specifics too.
+        for answer in ["Florence Nightingale founded modern nursing.", "Jan van Eyck painted it.", "Chief Justice Marshall wrote the opinion.",
+                       "Toni Morrison wrote it.", "Ada Lovelace wrote the first program.", "Sales of goods for $500 or more need a writing.",
+                       "About 60 percent of an adult's weight is water.", "About sixty percent of cases settle."]:
+            with self.subTest(answer=answer):
+                self.assertTrue(ground_general_answer(answer, "Tell me about it").endswith(UNCHECKED_NOTE))
+        self.assertTrue(states_specifics("Morrison wrote it.", "who wrote it?"))
+
+    def test_a_capital_word_that_starts_a_plain_sentence_is_not_a_name(self):
+        for answer in ["Sterile technique keeps the field clean.", "Italian painters used linear perspective.", "The Greek word means measure.",
+                       "Contract law protects promises.", "Free verse has no set meter.", "Big O describes growth."]:
+            with self.subTest(answer=answer):
+                self.assertEqual(ground_general_answer(answer, "Explain it"), answer)
 
     def test_an_answer_that_already_offers_to_check_the_material_is_left_alone(self):
         answer = "It may have been 1642, but pick your guide and I can confirm it."

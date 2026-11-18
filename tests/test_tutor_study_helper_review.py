@@ -152,6 +152,57 @@ class IntentTests(unittest.TestCase):
         self.assertEqual([text for text in LEARN_REQUESTS if not study_helper.asks_for_learn(text)], [])
 
 
+# ---- Second review (F6c): Learn is a closed grammar the whole sentence must match ----
+
+# The reviewer's 18 questions about Learn (rook-f6b/intent_new.py learn_q) and the planner's harder ones.
+LEARN_QUESTIONS = [
+    "How long does a Learn round take?", "Does the Learn set use my flashcards?", "What happens when I finish a Learn session?",
+    "Where do I find my Learn set?", "Which guide does a Learn session use?", "Tell me about the Learn set",
+    "Do you know how a Learn round scores me?", "Can a Learn set be shared?", "So how do I start a Learn round?",
+    "I'm confused about what a Learn session is", "Should I make a Learn set or flashcards?", "Why would I open Learn for this?",
+    "Explain what a Learn round is, please", "I don't get the Learn session thing", "When should I start a Learn round?",
+    "Is it worth it to make a Learn set for this?", "Hmm, what's a Learn session?", "Wait, can you tell me what a Learn round does?",
+    "Make a Learn set or a quiz, which is better?", "Make a Learn set?", "Start a Learn round? Or review the guide first?",
+    "Can you make a Learn set? Or is that only for guides?", "Before I make a Learn set, what does it include?",
+    "The button says Start a Learn round but nothing happens", "make me learn for the test", "Don't make a Learn set yet",
+    "How do I make a Learn set for Hamlet?", "Would a Learn round help with dosage calculations?",
+    "Could I start a Learn session without a guide?",
+]
+# The reviewer's 12 requests (learn_r) and one per discipline; the last two put the request next to another sentence.
+LEARN_ASKED = [
+    "Make a Learn set for my pharm notes", "Open Learn for this", "Start a Learn round", "Please build a Learn set from this",
+    "Can you start a Learn session for me?", "Let's open a Learn round on chapter 4", "Learn for this.", "Okay, make me a Learn for it",
+    "Create a learn set please", "Could you build me a Learn set?", "Set up Learn for my exam", "I want a Learn session on this guide",
+    "Build a Learn set from my torts outline", "Start a Learn round on the Baroque unit", "Make a Learn set for Beloved",
+    "Please create a Learn set for data structures", "Start a Learn round on sterile technique",
+    "How does it work? Make a Learn for it.", "Make a Learn set for it. My test is Friday.",
+]
+
+
+class LearnGrammarTests(unittest.TestCase):
+    def test_no_question_about_learn_is_a_request(self):
+        self.assertEqual([text for text in LEARN_QUESTIONS if study_helper.asks_for_learn(text)], [])
+        self.assertEqual([text for text in LEARN_QUESTIONS if study_helper.split_learn_request(text)[0]], [])
+
+    def test_every_request_for_learn_is(self):
+        self.assertEqual([text for text in LEARN_ASKED if not study_helper.asks_for_learn(text)], [])
+
+    def test_a_polite_question_is_an_ask_and_an_imperative_is_a_do(self):
+        for text in ["Can you start a Learn session for me?", "Could you build me a Learn set?", "can you build a learn set",
+                     "Can you make a Learn set from my notes?"]:
+            with self.subTest(text=text):
+                self.assertEqual(study_helper.split_learn_request(text)[0], "ask")
+        for text in ["Make a Learn for it", "Start a Learn round on sterile technique", "Please build a Learn set from this",
+                     "How does it work? Make a Learn for it.", "Learn for this."]:
+            with self.subTest(text=text):
+                self.assertEqual(study_helper.split_learn_request(text)[0], "do")
+
+    def test_the_rest_is_what_is_left_once_the_request_is_taken_out(self):
+        self.assertEqual(study_helper.split_learn_request("Make a Learn set for it. My test is Friday."), ("do", "My test is Friday."))
+        self.assertEqual(study_helper.split_learn_request("How does it work? Make a Learn for it."), ("do", "How does it work?"))
+        self.assertEqual(study_helper.split_learn_request("What is a Learn set?"), (None, "What is a Learn set?"))
+
+
 # ---- Routes: the web Tutor (session) and the extension side panel (no session) ----
 
 EXTENSION = {"content": "Moles count particles. Avogadro's number relates moles to particles. " * 5, "history": [],
@@ -193,7 +244,8 @@ class RouteTests(unittest.TestCase):
         return len(self.db.rows("study_guides"))
 
     def in_session(self, question, **extra):
-        turn = {"id": "session-1", "run_id": "run-1", "active_skill": "explain", "conversation_version": 1,
+        limiter.reset()  # 30 a minute per client
+        turn ={"id": "session-1", "run_id": "run-1", "active_skill": "explain", "conversation_version": 1,
                 "messages": [{"role": "user", "text": question}]}
         with patch("routers.chat.claim_tutor_turn", return_value=turn), \
              patch("routers.chat.complete_tutor_turn", side_effect=lambda _u, _t, response: {**turn, "messages": [*turn["messages"], response]}), \
@@ -223,6 +275,57 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(body["action"], "study_plan")
         body = self.in_session("Make a Learn for it", note_id=NOTE)
         self.assertEqual(body["action"], "navigate")
+
+    def test_a_question_about_learn_never_builds_or_opens_anything(self, *_):
+        for question in LEARN_QUESTIONS:
+            for extra in ({"note_id": NOTE}, {"guide_id": GUIDE}):
+                with self.subTest(question=question, selected=list(extra)[0]):
+                    before = self.guides()
+                    body = self.in_session(question, **extra)
+                    self.assertIsNone(body.get("action"))
+                    self.assertEqual(body["answer"], "ANSWERED")
+                    self.assertEqual(self.guides(), before)
+
+    def test_a_request_for_learn_on_a_selected_guide_opens_it(self, *_):
+        for question in LEARN_ASKED:
+            with self.subTest(question=question):
+                before = self.guides()
+                body = self.in_session(question, guide_id=GUIDE)
+                self.assertEqual(body["action"], "navigate")
+                self.assertTrue(body["link"]["href"].startswith(f"/learn/{GUIDE}"))
+                self.assertEqual(self.guides(), before)
+
+    def test_a_question_shaped_request_never_builds_it_offers_the_build_button(self, *_):
+        for question in ["Can you make a Learn set from my notes?", "Can you make a Learn set from a PDF?"]:
+            with self.subTest(question=question):
+                before = self.guides()
+                body = self.in_session(question, note_id=NOTE)
+                self.assertEqual(self.guides(), before)
+                self.assertEqual(body["action"], "study_plan")
+                self.assertIn("I'll turn Chem notes into a Learn set", body["answer"])
+                self.assertEqual(body["study_plan"]["actions"], [{"kind": "build", "label": "Build the Learn set", "prompt": "Make a Learn for it"}])
+                # The button's own words are an imperative, so pressing it builds.
+                self.assertEqual(study_helper.split_learn_request(body["study_plan"]["actions"][0]["prompt"])[0], "do")
+
+    def test_make_a_learn_for_it_builds_once(self, *_):
+        before = self.guides()
+        body = self.in_session("Make a Learn for it", note_id=NOTE)
+        self.assertEqual(self.guides(), before + 1)
+        self.assertEqual(body["action"], "navigate")
+
+    def test_the_extension_gets_its_normal_answer_for_learn_questions_and_requests(self, *_):
+        for question in ["Can you make a Learn set from my notes?", "Can you make a Learn set from a PDF?", "Make a Learn for it",
+                         *LEARN_QUESTIONS[:6], *LEARN_ASKED[:6]]:
+            with self.subTest(question=question):
+                limiter.reset()
+                before = self.guides()
+                response = self.client.post("/chat", headers=AUTH, json={"question": question, **EXTENSION})
+                self.assertEqual(response.status_code, 200, response.text)
+                body = response.json()
+                self.assertEqual(body["answer"], "ANSWERED")
+                self.assertIsNone(body.get("action"))
+                self.assertIsNone(body.get("study_plan"))
+                self.assertEqual(self.guides(), before)
 
     def test_the_extension_side_panel_gets_its_normal_answer_for_every_probe(self, *_):
         # The side panel's request (extension/background.js askTutor): no session_id, no local_date.
@@ -353,6 +456,93 @@ class GroundingTests(unittest.TestCase):
         self.assertEqual([answer for question, answer in SPECIFIC if not states_specifics(answer, question)], [])
 
 
+# ---- Second review (F6c): names at the start of a sentence, amounts, and questions that ask for a specific ----
+
+# The reviewer's 48 plain answers that were not flagged (rook-f6b/ground_new.py), word for word.
+SECOND_PLAIN = [
+    ('what is afterload?', 'Afterload is the resistance the ventricle pushes against to eject blood. Higher resistance means the heart works harder with each beat.'),
+    ('why do we elevate the head of the bed?', 'Raising the head of the bed helps the lungs expand and lowers the chance of aspiration. It also eases breathing for patients with heart failure.'),
+    ('what is a nursing diagnosis?', "A nursing diagnosis names a patient's response to a health problem, not the disease itself. It guides which interventions the nurse plans."),
+    ('why check a pulse before giving a cardiac drug?', "Some cardiac drugs slow the heart. Checking the pulse first tells you whether it's safe to give the dose or hold it and call the provider."),
+    ('what is the difference between edema and dehydration?', 'Edema is extra fluid trapped in the tissues, while dehydration is too little fluid in the body overall. One swells the tissues; the other dries them out.'),
+    ('why do we turn bedbound patients?', 'Turning shifts pressure off bony areas so the skin keeps its blood supply. Without it, pressure injuries can form quickly.'),
+    ('what is therapeutic communication?', 'Therapeutic communication uses listening, open questions and reflection to help the patient share concerns. The focus stays on the patient, not the nurse.'),
+    ('what is a sterile field?', 'A sterile field is an area kept free of microorganisms for a procedure. Anything that touches it must be sterile too, or the field is contaminated.'),
+    ('how do diuretics work?', 'Diuretics make the kidneys pass more salt and water. That lowers the fluid volume in the blood vessels, which can bring blood pressure down.'),
+    ('what is a fresco?', 'A fresco is painted onto wet plaster, so the pigment becomes part of the wall as it dries. Artists had to work fast, one section at a time.'),
+    ('what is iconography?', 'Iconography is the study of the symbols and subjects in an image. It asks what the objects, gestures and figures were meant to signal to viewers.'),
+    ('what is sfumato?', 'Sfumato is a soft blending of tones with no hard outlines. Edges melt into shadow, which gives faces a hazy, lifelike look.'),
+    ('what is abstract expressionism?', 'Abstract expressionism puts gesture and feeling ahead of recognizable subjects. The act of painting itself becomes part of the meaning.'),
+    ('why is linear perspective important?', 'Linear perspective lets a flat surface suggest depth. Lines that recede toward a vanishing point make the space feel measurable and real.'),
+    ('what is a still life?', "A still life shows objects that don't move, like fruit, flowers or tableware. Artists use it to study light, texture and arrangement."),
+    ('what is the difference between a relief and a sculpture in the round?', 'A relief projects from a flat background and is meant to be seen from the front. A sculpture in the round stands free and can be viewed from every side.'),
+    ('what does patronage mean in art?', 'Patronage is the support of artists by people or institutions who pay for their work. Patrons often shaped the subject, size and setting of what was made.'),
+    ('what is impasto?', 'Impasto is paint laid on thickly, so brush or knife marks stay visible. The texture catches light and adds energy to the surface.'),
+    ('what is a breach of contract?', 'A breach happens when one party fails to do what the contract requires without a legal excuse. The other party may then seek a remedy, such as damages.'),
+    ('what is an agency relationship?', 'In an agency relationship, one person acts on behalf of another with their consent. The principal can be bound by what the agent does within their authority.'),
+    ('what is a tort?', 'A tort is a civil wrong that causes harm to someone, apart from a broken contract. The injured person can sue for compensation.'),
+    ('what is limited liability?', 'Limited liability means owners can lose what they invested in the business, but their personal assets are usually protected from its debts.'),
+    ('what is a fiduciary duty?', "A fiduciary duty requires someone to act in another person's best interest, with loyalty and care. Directors owe this to the company they serve."),
+    ('what is mitigation of damages?', "Mitigation means the injured party must take reasonable steps to limit their losses after a breach. They can't recover for harm they could easily have avoided."),
+    ('what is the parol evidence rule?', 'The parol evidence rule limits using earlier or outside statements to change the terms of a written contract that the parties meant to be final.'),
+    ('what is a warranty?', 'A warranty is a promise about the quality or condition of goods. If the goods fall short, the buyer may have a claim against the seller.'),
+    ('what is vicarious liability?', "Vicarious liability holds one party responsible for another's actions, like an employer for an employee acting within the job."),
+    ('what is a partnership?', 'A partnership is a business owned by two or more people who share profits and, usually, responsibility for its debts.'),
+    ('what is a motif?', 'A motif is an image, idea or phrase that keeps coming back in a work. Each return adds weight and helps build the theme.'),
+    ('what is stream of consciousness?', "Stream of consciousness follows a character's thoughts as they flow, jumping between memories, feelings and impressions without tidy order."),
+    ('what is an unreliable narrator?', "An unreliable narrator tells the story in a way the reader can't fully trust. Gaps or contradictions invite the reader to read between the lines."),
+    ('what is a tragic flaw?', 'A tragic flaw is a trait that leads the hero toward downfall. Pride, ambition or indecision are common examples.'),
+    ('what is free verse?', "Free verse is poetry without a set meter or rhyme scheme. Its rhythm comes from the natural flow of speech and the poet's line breaks."),
+    ('what is an epistolary novel?', 'An epistolary novel tells its story through letters, diary entries or other documents. Readers piece events together from what each writer reveals.'),
+    ('what is the climax of a story?', 'The climax is the point of highest tension, where the central conflict comes to a head. After it, events begin to wind down.'),
+    ('what is satire?', 'Satire uses humor, irony or exaggeration to criticize people, institutions or ideas. It often aims to provoke change, not just laughter.'),
+    ('what is a bildungsroman?', 'A bildungsroman follows a young character growing up, from youth into maturity. The story tracks how experiences shape who they become.'),
+    ('what is imagery?', 'Imagery is language that appeals to the senses, helping readers see, hear, smell, taste or feel a scene. It makes abstract ideas concrete.'),
+    ('what is a stack?', 'A stack stores items so the last one added is the first one removed. Think of a pile of plates: you take from the top.'),
+    ('what is a race condition?', 'A race condition happens when the result depends on the timing of threads that share data. If they interleave badly, the data ends up wrong.'),
+    ('what is polymorphism?', 'Polymorphism lets different types respond to the same call in their own way. A draw method might render a circle or a square depending on the object.'),
+    ('what is a REST API?', 'A REST API exposes resources at URLs and uses HTTP methods like GET and POST to read or change them. Each request carries what the server needs.'),
+    ('what is memoization?', 'Memoization stores the results of expensive calls, so the same input returns the saved answer instead of recomputing it.'),
+    ('what does a compiler do?', 'A compiler translates source code into a lower-level form, such as machine code, before the program runs. It also catches many errors early.'),
+    ('what is a linked list?', 'A linked list stores items in nodes, and each node points to the next one. Inserting in the middle is cheap, but finding an item means walking the list.'),
+    ('what is an index in a database?', 'An index is a structure that speeds up lookups on a column. The database can jump to matching rows instead of scanning the whole table.'),
+    ('what is a pure function?', 'A pure function returns the same output for the same input and changes nothing outside itself. That makes it easy to test and reason about.'),
+    ("what's the difference between a process and a thread?", 'A process has its own memory space, while threads inside a process share memory. Threads are lighter to create, but sharing makes bugs easier.'),
+]
+# Plain sentences that start with a capital modifier, a capitalized common phrase or a symbol.
+SECOND_PLAIN_SHORT = ["The Greek word means measure.", "Italian painters used linear perspective.", "Binary search halves the list each time.",
+                      "Big O describes growth.", "Free verse has no set meter.", "Sterile technique keeps the field clean.",
+                      "Contract law protects promises."]
+# A full name at the start of a sentence, a currency amount, a percent, or a question that asks for a specific.
+SECOND_SPECIFIC = [("", "Toni Morrison wrote it."), ("", "Tim Berners-Lee invented it."), ("", "Alexander Fleming discovered it by accident."),
+                   ("", "Florence Nightingale founded modern nursing."), ("", "Ada Lovelace wrote the first program."),
+                   ("", "Chief Justice Marshall wrote the opinion."), ("", "Jan van Eyck painted it."),
+                   ("", "Sales of goods for $500 or more need a writing."), ("", "About 60 percent of an adult's weight is water."),
+                   ("", "About sixty percent of cases settle."), ("who wrote it?", "Morrison wrote it.")]
+
+
+class SecondGroundingTests(unittest.TestCase):
+    def test_the_reviewers_plain_answers_stay_plain(self):
+        self.assertEqual(len(SECOND_PLAIN), 48)
+        self.assertEqual([answer for question, answer in SECOND_PLAIN if states_specifics(answer, question)], [])
+
+    def test_capital_modifiers_and_common_phrases_at_the_start_stay_plain(self):
+        self.assertEqual([text for text in SECOND_PLAIN_SHORT if states_specifics(text, "")], [])
+
+    def test_names_at_the_start_amounts_percents_and_who_questions_are_flagged(self):
+        self.assertEqual([answer for question, answer in SECOND_SPECIFIC if not states_specifics(answer, question)], [])
+
+    def test_a_question_that_asks_for_a_specific_flags_the_answer(self):
+        for question in ["who wrote it?", "Whom did she marry?", "whose idea was it?", "what year did it end?", "Which year was it signed?",
+                         "what date is the holiday?", "how many are there?", "How old was he?", "what percent of cases settle?"]:
+            with self.subTest(question=question):
+                self.assertTrue(states_specifics("It was settled then.", question))
+        self.assertFalse(states_specifics("It was settled then.", "why was it settled?"))
+
+    def test_an_amount_the_student_gave_is_not_a_new_fact(self):
+        self.assertFalse(states_specifics("Yes, $500 is the line for goods.", "is the threshold $500?"))
+
+
 # ---- Openers (finding 6) ----
 
 KEPT = ["Yo-yo dieting raises risk.", "Hey Jude is a Beatles song.", "Dude ranches were common in the West.",
@@ -370,6 +560,14 @@ class OpeningTests(unittest.TestCase):
 
     def test_slang_and_filler_openers_followed_by_punctuation_are_dropped(self):
         self.assertEqual({text: plain_opening(text) for text in STRIPPED}, STRIPPED)
+
+    def test_a_slang_word_ending_a_sentence_is_a_word_not_an_opener(self):
+        # Low 5: slang takes a comma, "!" or a dash; only "great/good question" may end with a period.
+        for text in ["Fam. Medicine is a specialty.", "Sup. Mitosis splits a cell.", "Bro. Code is a set of rules.", "Lol. Cats purr."]:
+            with self.subTest(text=text):
+                self.assertEqual(plain_opening(text), text)
+        self.assertEqual(plain_opening("Yo! Let's go."), "Let's go.")
+        self.assertEqual(plain_opening("Good question. Irony is a gap."), "Irony is a gap.")
 
 
 # ---- Dates (finding 9) and the plan's date label (finding 13) ----
@@ -394,6 +592,17 @@ class DateTests(unittest.TestCase):
         self.assertEqual(self.parse("test due 12/3"), date(2026, 12, 3))
         self.assertEqual(self.parse("my final is Dec 3"), date(2026, 12, 3))
         self.assertEqual(self.parse("test tomorrow on contracts"), date(2026, 11, 19))
+
+    def test_the_test_word_takes_is_or_an_apostrophe_s_in_every_date_rule(self):
+        # Low 6: "my exam's today", "the quiz’s on 12/3" (curly), "my final's tomorrow".
+        self.assertEqual(self.parse("my exam's today"), WEDNESDAY)
+        self.assertEqual(self.parse("my exam’s today"), WEDNESDAY)
+        self.assertEqual(self.parse("the quiz’s on 12/3"), date(2026, 12, 3))
+        self.assertEqual(self.parse("the test's 12/3"), date(2026, 12, 3))
+        self.assertEqual(self.parse("my final is on 12/3"), date(2026, 12, 3))
+        for text in ["my exam's tomorrow", "my bio exam’s on Friday", "the midterm is next week", "my quiz’s Dec 3"]:
+            with self.subTest(text=text):
+                self.assertTrue(study_helper.asks_to_study_for_test(text))
 
     def test_the_plan_names_the_day_short(self):
         answer, _ = study_helper.plan_reply(today=WEDNESDAY, when=date(2026, 11, 23), guide={"id": GUIDE, "title": "Biology"}, exam=None)
