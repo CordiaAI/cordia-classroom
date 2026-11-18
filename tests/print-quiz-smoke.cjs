@@ -33,7 +33,7 @@ const pools = {
     blanks: i % 4 === 0 ? ['one', 'two'] : ['here'], points: i % 4 === 0 ? 2 : 1,
   })),
   short: Array.from({ length: 10 }, (_, i) => ({ id: `s${i}`, source: 60 + i, question: `How does mechanism ${i + 1} explain the pattern described in the unit?`, key: `Key points for answer ${i + 1}.`, points: 4 })),
-  mc_flagged: 0, fill_possible: 14, fill_locked: false,
+  mc_flagged: 0, fill_possible: 14, can_write: true,
 };
 
 // name: [format in the link (mc.matching.fill.short-flags), mixed?]
