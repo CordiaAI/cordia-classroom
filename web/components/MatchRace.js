@@ -22,7 +22,7 @@ function TimerRing({ left }) {
         .race-ring { position: relative; width: ${RING.size}px; height: ${RING.size}px; display: inline-grid; place-items: center; font: 600 15px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .race-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
         .race-ring-track { stroke: var(--hairline); }
-        .race-ring-fill { stroke: var(--olive); transition: stroke-dashoffset 1s linear, stroke 300ms ease; }
+        .race-ring-fill { stroke: var(--meter); transition: stroke-dashoffset 1s linear, stroke 300ms ease; }
         .is-low .race-ring-fill { stroke: var(--warning); }
         .is-urgent .race-ring-fill { stroke: var(--error); }
         .is-urgent { color: var(--error); animation: race-tick 1s ease-in-out infinite; }

@@ -242,7 +242,7 @@ export default function ProfilePage() {
           .up-facts { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 6px 0 0; padding: 0; list-style: none; color: var(--ink); font: 500 15px/1.4 var(--font-sans); }
           .up-facts li { display: inline-flex; align-items: center; gap: 6px; }
           .up-facts :global(svg) { color: var(--olive-ink); }
-          .up-badge { padding: 2px 10px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--olive-ink); font-weight: 600; }
+          .up-badge { padding: 2px 10px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--meter-ink); font-weight: 600; }
           .up-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
           .up-counts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 0; color: var(--muted); font: 500 15px/1.4 var(--font-sans); }
           .up-counts strong { color: var(--ink); font-weight: 600; }

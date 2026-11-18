@@ -24,7 +24,7 @@
       display: flex; flex-direction: column; gap: 2px; padding: 14px 12px 12px;
       overflow: hidden;
       border: 1px solid var(--glass-edge);
-      border-radius: 24px; /* Fill, blur and shadow: the liquid glass recipe in glass.css. */
+      border-radius: var(--r-pane); /* Fill, blur and shadow: the liquid glass recipe in glass.css. */
       transition: width 200ms var(--ease);
     }
     .c-side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 4px 0 8px; margin-bottom: 8px; }
@@ -116,7 +116,7 @@
   :root[data-shell='new'] .c-legacy-nav .c-side { display: none; }
   :root[data-shell='new'] .app-shell:not(.is-focus) .c-shell-ghost {
     display: block; position: fixed; top: var(--side-gap); bottom: var(--side-gap); z-index: 95;
-    border-radius: 24px; pointer-events: none;
+    border-radius: var(--r-pane); pointer-events: none;
   }
   :root[data-shell='new'] .c-shell-ghost.is-side { left: var(--side-gap); width: var(--side-w); }
   :root[data-shell='new'] .c-shell-ghost.is-rail { right: var(--side-gap); width: var(--rail-w); }

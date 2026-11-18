@@ -651,7 +651,7 @@ function Heatmap({ guide }) {
         .crh tbody th { font: 400 14px/1.35 var(--font-sans); color: var(--ink); text-align: left; padding: 6px 8px 6px 0; overflow-wrap: anywhere; vertical-align: middle; }
         .crh td { position: relative; text-align: center; font: 600 14px/1 var(--font-sans); color: var(--ink); padding: 10px 0; }
         .crh-shade { position: absolute; inset: 2px 4px; border-radius: var(--r-input); }
-        .crh-shade.is-knows { background: var(--olive); }
+        .crh-shade.is-knows { background: var(--meter); }
         .crh-shade.is-learning { background: var(--warning); }
         .crh-n { position: relative; }
       `}</style>

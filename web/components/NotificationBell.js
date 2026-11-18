@@ -163,7 +163,7 @@ export default function NotificationBell({ variant = 'top', buttonProps = {}, ti
       <style jsx global>{`
         .nb-icon { position: relative; display: inline-flex; }
         .nb-top { position: relative; }
-        .nb-badge { position: absolute; top: -6px; right: -8px; display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--olive); color: var(--on-olive); font: 700 11px/1 var(--font-sans); }
+        .nb-badge { position: absolute; top: -6px; right: -8px; display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--meter); color: var(--on-meter); font: 700 11px/1 var(--font-sans); }
         .nb-top .nb-badge { top: 2px; right: 2px; }
         .nb-panel { position: fixed; z-index: 170; display: grid; gap: 8px; padding: 12px; max-height: min(480px, calc(100vh - 96px)); overflow-y: auto; }
         .nb-title { margin: 4px 8px 0; }
@@ -175,7 +175,7 @@ export default function NotificationBell({ variant = 'top', buttonProps = {}, ti
         .nb-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
         .nb-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px; border-radius: var(--r-input); color: var(--ink); text-decoration: none; font: 500 15px/1.35 var(--font-sans); }
         .nb-item:hover, .nb-item:focus-visible { background: var(--lift-pane); text-decoration: none; }
-        .nb-item.is-new .nb-text strong::after { content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--olive); vertical-align: middle; }
+        .nb-item.is-new .nb-text strong::after { content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--meter); vertical-align: middle; }
         .nb-avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 13px/1 var(--font-sans); }
         .nb-text { overflow-wrap: anywhere; }
         .nb-time { white-space: nowrap; }

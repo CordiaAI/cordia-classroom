@@ -27,7 +27,7 @@ export function ScoreRing({ value }) {
         .finish-ring { position: relative; width: ${size}px; height: ${size}px; display: grid; place-items: center; }
         .finish-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
         .finish-ring-track { stroke: var(--hairline); }
-        .finish-ring-fill { stroke: var(--olive); }
+        .finish-ring-fill { stroke: var(--meter); }
         .is-great .finish-ring-fill { stroke: var(--success); }
         .is-low .finish-ring-fill { stroke: var(--warning); }
         .finish-ring span { display: grid; gap: 2px; justify-items: center; }

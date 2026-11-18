@@ -43,7 +43,7 @@ export function WhatsNewList({ items, onShow }) {
         .wnl-row.is-new .wnl-icon { background: var(--card); }
         .wnl-main { display: grid; gap: 2px; min-width: 0; }
         .wnl-title { font: 600 15px/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
-        .wnl-dot { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--olive); vertical-align: middle; }
+        .wnl-dot { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--meter); vertical-align: middle; }
         .wnl-text { font: 500 14px/1.35 var(--font-sans); color: var(--muted-ink); overflow-wrap: anywhere; }
         .wnl-foot { display: flex; align-items: center; gap: 12px; margin-top: 2px; }
         .wnl-date { font-size: 12px; }

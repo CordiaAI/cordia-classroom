@@ -39,7 +39,7 @@ export default function ClassCard({ folder, name, href, onOpen, open, count, met
         .cc-body { display: grid; gap: 4px; padding: 14px 16px 16px; min-width: 0; }
         .cc-code { color: var(--muted); font: 600 13px/1.2 var(--font-sans); letter-spacing: .02em; }
         .cc-title { font: 600 17px/1.25 var(--font-sans); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-        .cc-count { justify-self: start; margin-top: 4px; display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px; background: var(--olive-tint); color: var(--olive-ink); font: 600 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .cc-count { justify-self: start; margin-top: 4px; display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px; background: var(--olive-tint); color: var(--meter-ink); font: 600 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .cc-count.is-empty { padding: 0; background: transparent; color: var(--muted); font-weight: 500; }
         .cc-menu { position: absolute; top: 8px; right: 8px; z-index: 2; border-radius: 999px; background: var(--surface-raised); }
         @media (max-width: 767px) {

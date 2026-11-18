@@ -249,10 +249,13 @@ test('Paper & Clay: the owner\'s values are the ones in tokens.css', () => {
   const dark = paperClay('dark');
   const hex = list => toHex(list);
   assert.deepEqual([hex(light.surfaces.canvas), hex(light.surfaces.sidebar), hex(light.surfaces.raised), hex(light.others.hover), hex(light.others.pressed)], ['#FAF9F5', '#F5F4ED', '#FFFFFF', '#F0EEE6', '#E8E6DC']);
-  assert.deepEqual([hex(light.text.ink), hex(light.text.body), hex(light.text.muted), hex(light.disabled), hex(light.text.clay), hex(light.edge)], ['#141413', '#3D3D3A', '#6B6A64', '#9C9A92', '#A24A29', '#8F8C82']);
+  assert.deepEqual([hex(light.text.ink), hex(light.text.body), hex(light.text.muted), hex(light.disabled), hex(light.text.clay)], ['#141413', '#3D3D3A', '#6B6A64', '#9C9A92', '#A24A29']);
   assert.deepEqual([hex(light.fill), hex(light.hover), hex(light.on)], ['#AE5630', '#9C4A27', '#FFFFFF']);
   assert.deepEqual([hex(dark.surfaces.canvas), hex(dark.surfaces.sidebar), hex(dark.surfaces.raised), hex(dark.others.hover), hex(dark.others.pressed)], ['#262624', '#1F1E1D', '#30302E', '#3A3936', '#45443F']);
-  assert.deepEqual([hex(dark.text.ink), hex(dark.text.body), hex(dark.text.muted), hex(dark.disabled), hex(dark.text.clay), hex(dark.edge)], ['#FAF9F5', '#C2C0B6', '#A6A39A', '#85837B', '#E8916F', '#8A877E']);
+  assert.deepEqual([hex(dark.text.ink), hex(dark.text.body), hex(dark.text.muted), hex(dark.disabled), hex(dark.text.clay)], ['#FAF9F5', '#C2C0B6', '#A6A39A', '#85837B', '#E8916F']);
+  // Control borders are the one change from the spec (the owner's decision A): moved the smallest step that holds
+  // 3:1 on the hover and pressed fills (spec #8F8C82 light, #8A877E dark).
+  assert.deepEqual([hex(light.edge), hex(dark.edge)], ['#868379', '#928F86']);
   assert.deepEqual([hex(dark.fill), hex(dark.hover), hex(dark.on)], ['#D97757', '#E38A6B', '#1A1918']);
   assert.deepEqual(rgba(token(LOOK_LIGHT, '--hairline')), [31, 30, 29, 0.10]);
   assert.deepEqual(rgba(token(LOOK_DARK, '--hairline')), [250, 249, 245, 0.12]);
@@ -274,21 +277,20 @@ for (const mode of ['light', 'dark']) {
     assert.ok(contrast(look.on, look.hover) >= 4.5, `label on hover ${contrast(look.on, look.hover).toFixed(2)}`);
   });
 
-  test(`Paper & Clay ${mode}: control borders hold 3:1 on the canvas, the sidebar and raised surfaces`, () => {
+  test(`Paper & Clay ${mode}: control borders hold 3:1 on the canvas, the sidebar, raised surfaces and the hover and pressed fills`, () => {
     const look = paperClay(mode);
-    for (const [surfaceName, surface] of Object.entries(look.surfaces)) assert.ok(contrast(look.edge, surface) >= 3, `${mode} control border on ${surfaceName} ${contrast(look.edge, surface).toFixed(2)}`);
+    for (const [surfaceName, surface] of Object.entries({ ...look.surfaces, ...look.others })) assert.ok(contrast(look.edge, surface) >= 3, `${mode} control border on ${surfaceName} ${contrast(look.edge, surface).toFixed(2)}`);
   });
 }
 
 // What falls short, written down rather than hidden: pairs the spec does not require (or, for muted text
-// on a pressed fill and a control border on hover or pressed, that the source design itself calls out).
+// on a pressed fill, that the source design itself calls out; it is momentary). Control borders are required
+// to pass on hover and pressed (above), not listed here.
 // The measured number is asserted, so a colour change shows up here. Disabled text is meant to fail 4.5:1.
 const KNOWN = {
   'light disabled on canvas': 2.68, 'light disabled on sidebar': 2.56, 'light disabled on raised': 2.82,
   'dark disabled on canvas': 3.99, 'dark disabled on sidebar': 4.38, 'dark disabled on raised': 3.48,
   'light disabled on hover': 2.43, 'light disabled on pressed': 2.25, 'dark disabled on hover': 3.04, 'dark disabled on pressed': 2.57,
-  'light control border on hover': 2.90, 'light control border on pressed': 2.69,
-  'dark control border on pressed': 2.72,
   'light muted on pressed': 4.34, 'dark muted on pressed': 3.87, 'dark clay on pressed': 4.05,
 };
 test('Paper & Clay: disabled text and the weaker pairs are measured and reported', t => {
@@ -296,7 +298,7 @@ test('Paper & Clay: disabled text and the weaker pairs are measured and reported
   for (const mode of ['light', 'dark']) {
     const look = paperClay(mode);
     for (const [name, surface] of Object.entries({ ...look.surfaces, ...look.others })) {
-      const checks = { disabled: [look.disabled, 4.5], 'control border': [look.edge, 3], muted: [look.text.muted, 4.5], clay: [look.text.clay, 4.5] };
+      const checks = { disabled: [look.disabled, 4.5], muted: [look.text.muted, 4.5], clay: [look.text.clay, 4.5] };
       for (const [what, [color, need]] of Object.entries(checks)) {
         const ratio = contrast(color, surface);
         if (ratio < need) found[`${mode} ${what} on ${name}`] = Number(ratio.toFixed(2));

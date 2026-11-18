@@ -199,7 +199,7 @@ function GuidesPanel({ q, filters, onFilter }) {
         .exg-card :global(.exg-title:hover) { text-decoration: underline; text-underline-offset: 3px; }
         .exg-outline { margin: 0; color: var(--muted-ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .exg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
-        .exg-badge { display: inline-flex; align-items: center; gap: 4px; font: 600 13px/1.3 var(--font-sans); color: var(--olive-ink); }
+        .exg-badge { display: inline-flex; align-items: center; gap: 4px; font: 600 13px/1.3 var(--font-sans); color: var(--meter-ink); }
         .exg-facts { margin: 0; overflow-wrap: anywhere; }
         .exg-similar { display: grid; gap: 4px; justify-items: start; }
         .exg-similar :global(.exg-flip) { transform: rotate(180deg); }

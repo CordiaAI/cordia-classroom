@@ -112,7 +112,7 @@ export default function CourseWork({ data, extraUpcoming = [], onPlan, actions }
         :global(.cw-tabs) { justify-self: start; margin: 4px 4px 6px; }
         .cw-tab { display: inline-flex; align-items: center; gap: 8px; }
         .cw-badge { min-width: 22px; padding: 2px 7px; border-radius: var(--r-pill); background: var(--surface-raised); color: var(--muted); font: 600 12px/1.3 var(--font-sans); text-align: center; }
-        .cw-tab[aria-selected='true'] .cw-badge { background: var(--olive-tint); color: var(--olive-ink); }
+        .cw-tab[aria-selected='true'] .cw-badge { background: var(--olive-tint); color: var(--meter-ink); }
         .cw-tab.is-missing .cw-badge { background: var(--error-bg); color: var(--error); }
         .cw-list { display: grid; }
         .cw-row { display: flex; align-items: center; gap: 14px; padding: 10px 12px; border-radius: var(--r-input); }

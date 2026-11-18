@@ -735,7 +735,7 @@ export default function GuidePage() {
         .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
         .guide-rename { flex: 1 1 auto; min-width: 0; }
         .guide-title-input { font:600 28px/1.15 var(--font-display); height: 52px; }
-        .guide-head :global(.guide-starred) { color: var(--olive-ink); }
+        .guide-head :global(.guide-starred) { color: var(--meter-ink); }
         .guide-src { font:600 13px/1.5 var(--font-sans); }
         .guide-src a { display: inline-flex; align-items: center; gap: 6px; }
         .guide-notes { display: grid; gap: 16px; padding: 32px 40px; }
@@ -750,7 +750,7 @@ export default function GuidePage() {
         .guide-notes :global(strong) { font-weight: 600; color: var(--ink); }
         .guide-overview { margin: 0; padding-bottom: 24px; border-bottom: 1px solid var(--line); font: 400 var(--fs-20)/1.5 var(--font-sans); color: var(--ink); }
         .guide-outline-num { display: inline-grid; place-items: center; width: 28px; height: 28px; margin-right: 10px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); font: 600 var(--fs-13)/1 var(--font-sans); vertical-align: 3px; }
-        .guide-key { display: grid; gap: 16px; padding: 24px 28px; border-radius: 16px; background: var(--olive-tint); }
+        .guide-key { display: grid; gap: 16px; padding: 24px 28px; border-radius: var(--r-row); background: var(--olive-tint); }
         @media (max-width: 767px) {
           .guide-meta { margin-left: 0; }
           .guide-notes { padding: 24px 18px; }

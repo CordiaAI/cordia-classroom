@@ -89,3 +89,29 @@ test('the sheet is a labelled modal dialog with real radio controls, and never s
   assert.doesNotMatch(sheet, /Claude|Anthropic/);
   assert.doesNotMatch(sheet, /transition:\s*all/);
 });
+
+test('Paper & Clay keeps the accent for primary actions: rings, bars, stars and badges read --meter, ink under the look', async () => {
+  const tokens = await source('styles/tokens.css');
+  assert.match(tokens, /--meter: var\(--olive\);\n  --meter-ink: var\(--olive-ink\);\n  --on-meter: var\(--on-olive\);/);
+  assert.equal((tokens.match(/--meter: var\(--ink\); --meter-ink: var\(--ink\); --on-meter: var\(--surface-raised\);/g) || []).length, 2, 'light and dark look');
+  const system = await source('styles/system.css');
+  assert.match(system, /\.c-ring-fill \{ stroke: var\(--meter\)/);
+  assert.match(system, /\.c-bar > span \{[^}]*background: var\(--meter\)/);
+  for (const [file, pattern] of [['components/NotificationBell.js', /\.nb-badge \{[^}]*background: var\(--meter\)/], ['components/AccountMenu.js', /\.acct-badge \{[^}]*background: var\(--meter\)/], ['pages/library.js', /\.lib-star\.is-on \{ color: var\(--meter-ink\)/]]) {
+    assert.match(await source(file), pattern, file);
+  }
+});
+
+test('components a look must reach: sidebar fill, control edges, composer and floating-pane shadows, code font, corners', async () => {
+  const tokens = await source('styles/tokens.css');
+  for (const hook of ['--field-edge: var(--lg-edge);', '--check-edge: var(--muted);', '--toggle-edge: var(--line);', '--r-pane: 24px;', '--pane-float-shadow: var(--glass-shadow);', '--surface-sidebar: var(--glass-fill);', '--shadow-composer: var(--glass-shadow);']) assert.ok(tokens.includes(hook), hook);
+  assert.equal((tokens.match(/--lg-border: var\(--hairline\);/g) || []).length, 2, 'under the look the shared edge goes back to the hairline');
+  const glass = await source('styles/glass.css');
+  assert.match(glass, /\.c-side \{ background: var\(--glass-sheen\), var\(--surface-sidebar\) !important; \}/);
+  assert.match(glass, /:is\(\.c-sheet, \.c-toast, \.upgrade-dialog, \.feedback-modal\) \{ box-shadow: var\(--pane-float-shadow\) !important; \}/);
+  assert.match(glass, /\.c-input[^{]*\{\n[^}]*border: 1px solid var\(--field-edge\)/);
+  const system = await source('styles/system.css');
+  assert.match(system, /\.composer \{[^}]*border-radius: var\(--r-panel\)[^}]*box-shadow: var\(--shadow-composer\)/);
+  const globals = await source('styles/globals.css');
+  assert.doesNotMatch(globals, /Courier New|SFMono-Regular, Consolas/);
+});

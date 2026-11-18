@@ -87,7 +87,7 @@ export default function MergeLectures({ lecture, folders = [], onMerged, onCance
         .merge-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; overflow: auto; min-height: 0; }
         .merge-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-input); background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
         .merge-row.is-on { border-color: var(--olive); background: var(--olive-tint); }
-        .merge-check { flex: none; width: 20px; height: 20px; display: grid; place-items: center; border: 1.5px solid var(--line); border-radius: 6px; color: var(--on-olive); }
+        .merge-check { flex: none; width: 20px; height: 20px; display: grid; place-items: center; border: 1.5px solid var(--toggle-edge); border-radius: 6px; color: var(--on-olive); }
         .is-on .merge-check { background: var(--olive); border-color: var(--olive); }
         .merge-main { display: grid; gap: 2px; min-width: 0; }
         .merge-title { font: 600 15px/1.3 var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

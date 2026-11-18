@@ -63,6 +63,10 @@
   background: var(--glass-sheen), var(--glass-fill-strong) !important;
 }
 .c-sheet { background: var(--glass-sheen), var(--lg-grain), var(--glass-fill-strong) !important; }
+/* Sheets, dialogs and toasts float: the glass shadow on Cordia, the menu shadow under a flat look. */
+:is(.c-sheet, .c-toast, .upgrade-dialog, .feedback-modal) { box-shadow: var(--pane-float-shadow) !important; }
+/* The sidebar is a pane with a fill of its own once a look gives it one (the pane fill otherwise). */
+.c-side { background: var(--glass-sheen), var(--surface-sidebar) !important; }
 /* Menus and popovers float over text, so their fill stays solid; they keep their own frost and rim. */
 :is(.c-menu, .c-search-results, .tutor-select-options, .sn-notes-dropdown, .account-menu-panel) {
   background: var(--lg-menu) !important;
@@ -171,7 +175,7 @@
 /* Fields: a slightly clearer pane, set into the surface. */
 :is(.c-input, .c-select, .c-search .c-input, textarea.c-input) {
   background: var(--lg-sheen), var(--lg-fill-field);
-  border: 1px solid var(--lg-edge);
+  border: 1px solid var(--field-edge);
   -webkit-backdrop-filter: var(--lg-filter);
   backdrop-filter: var(--lg-filter);
   box-shadow: inset 0 1px 2px var(--lg-border-shade), inset 0 -1px 0 var(--lg-rim-low);
@@ -195,7 +199,7 @@ select.c-select.c-select {
    to the left of the content (the sidebar takes the left), and the padding was lopsided, so a
    plain "Saved" looked off-center even inside its own pill. */
 .c-toast {
-  min-height: 48px; padding: 8px 24px; justify-content: center; text-align: center; border-radius: 24px;
+  min-height: 48px; padding: 8px 24px; justify-content: center; text-align: center; border-radius: var(--r-pane);
   max-width: min(560px, calc(100vw - 32px));
   /* Near-solid and frosted, so text scrolling under it never shows through. */
   background: var(--lg-sheen), var(--surface-raised) !important;
@@ -282,7 +286,7 @@ select.c-select.c-select {
    its own; the field shows focus once, as a soft olive glow (it had two hard olive boxes). */
 .cordia-tutor-input {
   background: var(--lg-sheen), var(--lg-fill-field);
-  border-color: var(--lg-edge);
+  border-color: var(--field-edge);
   -webkit-backdrop-filter: var(--lg-filter);
   backdrop-filter: var(--lg-filter);
   box-shadow: var(--lg-highlight);
@@ -556,7 +560,7 @@ body { touch-action: manipulation; }
 /* Every text box is a field pane, whether or not it uses .c-input. */
 textarea:not(.c-input) {
   background: var(--lg-sheen), var(--lg-fill-field) !important;
-  border: 1px solid var(--lg-edge) !important;
+  border: 1px solid var(--field-edge) !important;
   box-shadow: inset 0 1px 2px var(--lg-border-shade), inset 0 -1px 0 var(--lg-rim-low) !important;
 }
 

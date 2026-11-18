@@ -521,12 +521,12 @@ function CalendarClassChooser({ classes, onClose }) {
 function CompactStyles() {
   return (
     <style jsx global>{`
-      .compact-calendar { display: flex; min-width: 0; min-height: 255px; flex-direction: column; padding: 26px; border: 1px solid var(--border-default); border-radius:20px; background: var(--surface); box-shadow: var(--shadow-md); }
+      .compact-calendar { display: flex; min-width: 0; min-height: 255px; flex-direction: column; padding: 26px; border: 1px solid var(--border-default); border-radius: var(--r-card); background: var(--surface); box-shadow: var(--shadow-md); }
       .compact-calendar header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
       .compact-eyebrow { color: var(--accent); font-size: 13px; font-weight:600; letter-spacing:0; text-transform:none; }
       .compact-calendar h2 { margin: 5px 0 0; font-size:20px; letter-spacing:-0.015em; }
       .compact-calendar > p, .compact-agenda > p { margin: 18px 0; color: var(--text-muted); line-height:1.5; }
-      .compact-calendar > button { align-self: flex-start; margin-top: auto; padding: 10px 14px; border: 1px solid var(--border-default); border-radius:12px; color: var(--ink); background: var(--bg-hover); font: inherit; font-size: 13px; font-weight:600; cursor: pointer; }
+      .compact-calendar > button { align-self: flex-start; margin-top: auto; padding: 10px 14px; border: 1px solid var(--border-default); border-radius: var(--r-input); color: var(--ink); background: var(--bg-hover); font: inherit; font-size: 13px; font-weight:600; cursor: pointer; }
       .compact-calendar-mark { display: grid; width: 43px; height: 43px; flex: 0 0 auto; place-items: center; border-radius:12px; color: var(--accent); background: var(--bg-hover); font-weight:600; }
       .compact-calendar-link { flex: 0 0 auto; padding: 0; border: 0; color: var(--accent); background: transparent; font: inherit; font-size: 13px; font-weight:600; cursor: pointer; }
       .compact-agenda { display: grid; margin-top: 13px; }
@@ -535,7 +535,7 @@ function CompactStyles() {
       .compact-agenda small { overflow: hidden; color: var(--text-muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
       .compact-date { color: var(--accent); font-size: 13px; font-weight:600; }
       .compact-calendar-error { margin-top: 12px; color: var(--error); font-size: 13px; line-height:1.5; }
-      @media (max-width: 620px) { .compact-calendar { min-height: 0; border-radius:20px; padding: 22px; } }
+      @media (max-width: 620px) { .compact-calendar { min-height: 0; border-radius: var(--r-card); padding: 22px; } }
     `}</style>
   );
 }

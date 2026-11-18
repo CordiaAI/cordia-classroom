@@ -307,7 +307,7 @@ export default function FlashcardViewer({
         .fc > * { min-width: 0; }
         .fc-bar { position: sticky; top: calc(var(--bar-h) + 12px); z-index: 20; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius:var(--r-pill); }
         .fc-name { flex: 1; min-width: 0; padding: 0 8px; font:600 17px/1.15 var(--font-sans); }
-        .fc-bar :global(.is-starred) { color: var(--olive-ink); }
+        .fc-bar :global(.is-starred) { color: var(--meter-ink); }
         .fc-progress { display: flex; align-items: center; gap: 12px; }
         .fc-progress .c-bar { flex: 1; }
         .fc-count { display: inline-flex; align-items: center; gap: 8px; font: 500 var(--fs-13)/1 var(--font-sans); color: var(--muted); }

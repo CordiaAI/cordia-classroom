@@ -456,7 +456,7 @@ export default function SettingsPage() {
         .me-names strong { font:600 20px/1.15 var(--font-sans); }
         .billing-current-plan { display: grid; gap: 12px; padding: 20px; margin-bottom: 16px; }
         .plan-badge { justify-self: start; padding: 6px 14px; border-radius:var(--r-pill); background: var(--card-sunk); font-weight:600; }
-        .plan-badge[data-plan="plus"] { color: var(--olive-ink); }
+        .plan-badge[data-plan="plus"] { color: var(--meter-ink); }
         .plan-usage { display: grid; gap: 10px; }
         .plan-usage-row { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; }
         .plan-usage-row .c-bar { grid-column: 1 / -1; }
