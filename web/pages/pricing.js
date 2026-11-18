@@ -88,7 +88,7 @@ export default function Pricing() {
         .pricing-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
         .pricing-card li { display: flex; gap: 8px; align-items: flex-start; font:500 0.9375rem/1.5 var(--font-sans); }
         .pricing-card li :global(.lucide) { color: var(--olive-ink); margin-top: 2px; flex: 0 0 auto; }
-        .pricing-card :global(.pricing-btn) { margin-top: auto; display: inline-flex; align-items: center; justify-content: center; height: auto; min-height: 44px; padding: 10px 20px; border: 0; border-radius:999px; background: var(--olive); color: var(--on-olive); font:600 0.9375rem/1.25 var(--font-sans); line-height: 1.25 !important; text-align: center; text-decoration: none; cursor: pointer; }
+        .pricing-card :global(.pricing-btn) { box-sizing: border-box; margin-top: auto; display: inline-flex; align-items: center; justify-content: center; height: auto; min-height: 44px; padding: 10px 20px; border: 0; border-radius:999px; background: var(--olive); color: var(--on-olive); font:600 0.9375rem/1.25 var(--font-sans); line-height: 1.25 !important; text-align: center; text-decoration: none; cursor: pointer; }
         .pricing-card :global(.pricing-btn.is-secondary) { background: var(--glass); color: var(--ink); border: 1px solid var(--line); }
         .pricing-card :global(.pricing-btn.is-current) { background: transparent; color: var(--ink); border: 1px solid var(--line); cursor: default; }
         /* In a narrow card (a wide window at a large text setting) "Get Academic Weapon" can take two lines while the

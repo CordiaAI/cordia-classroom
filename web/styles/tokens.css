@@ -165,10 +165,9 @@
   /* Layout */
   --bar-h: 64px;
   --tabbar-h: 68px;
-  /* The toast: its height, its gap to the window's bottom edge, and the room a sheet keeps clear below itself so a toast
-     that appears over it never lands on its footer (components/MakeItYours.js). */
-  --toast-h: 52px; --toast-bottom: 24px; --toast-gap: 16px;
-  --toast-room: calc(var(--toast-bottom) + var(--toast-h) + var(--toast-gap));
+  /* The toast: its height, its gap to the window's bottom edge, and the gap kept around it when it is placed over
+     something (components/MakeItYours.js puts it in the sheet's footer, or just above it on a phone). */
+  --toast-h: 62px; --toast-bottom: 24px; --toast-gap: 16px;
   --page-max: 1080px;
   --sidebar-width: 240px;
   --streak-width: 220px;

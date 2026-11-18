@@ -155,14 +155,17 @@ test('the Undo toast never moves the sheet: no room that appears with it, a toke
   const sheet = await source('components/MakeItYours.js');
   const tokens = await source('styles/tokens.css');
   const system = await source('styles/system.css');
-  // The room under the sheet is there for its whole open life, not only while a toast shows.
-  assert.doesNotMatch(sheet, /miy-toast-room|:has\(\.miy-toast\)|78px/);
-  assert.match(sheet, /grid-template-rows: minmax\(0, 1fr\) auto minmax\(calc\(var\(--toast-room\) - 16px\), 1fr\)/);
-  assert.match(sheet, /max-height: calc\(100dvh - 16px - var\(--toast-room\)\)/);
+  // The sheet makes no room that appears with the toast (it did, as --miy-toast-room, and the whole sheet jumped):
+  // the toast is placed in the footer's gap between Reset and Done, once, when it appears.
+  assert.doesNotMatch(sheet, /miy-toast-room|toast-room|:has\(\.miy-toast\)|78px/);
+  assert.match(sheet, /max-height: calc\(100dvh - 32px\);/);
+  assert.match(sheet, /onReset\(previous, resetRef\.current\?\.parentElement\)/);
+  assert.match(sheet, /bottom: `calc\(\$\{Math\.round\(window\.innerHeight - \(box\.top \+ box\.bottom\) \/ 2\)\}px - var\(--toast-h\) \/ 2\)`/);
+  assert.match(sheet, /style=\{undo\.place \|\| undefined\}/);
   // On phones the toast sits above the footer; the footer's height is the one the toast's offset reads.
   assert.match(sheet, /\.c-toast\.miy-toast \{ bottom: calc\(var\(--miy-foot-h\) \+ env\(safe-area-inset-bottom\) \+ var\(--toast-gap\)\) !important; \}/);
   assert.match(sheet, /\.miy-foot \{ box-sizing: border-box; min-height: calc\(var\(--miy-foot-h\) \+ env\(safe-area-inset-bottom\)\);/);
-  assert.match(tokens, /--toast-h: 52px; --toast-bottom: 24px; --toast-gap: 16px;\n  --toast-room: calc\(var\(--toast-bottom\) \+ var\(--toast-h\) \+ var\(--toast-gap\)\);/);
+  assert.match(tokens, /--toast-h: 62px; --toast-bottom: 24px; --toast-gap: 16px;/);
   assert.match(system, /\.c-toast \{\n  position: fixed; left: 50%; bottom: var\(--toast-bottom\);[^}]*min-height: var\(--toast-h\);/);
   // Phones: the theme tiles' two rows are the same height; the custom colour says what it does.
   assert.match(sheet, /\.miy-themes \{ grid-auto-flow: row; grid-template-columns: repeat\(4, minmax\(0, 1fr\)\); grid-auto-rows: 1fr; \}/);
@@ -173,6 +176,7 @@ test('the Undo toast never moves the sheet: no room that appears with it, a toke
 test('/pricing keeps the plan buttons even in a narrow card, and the spec says seven tiles', async () => {
   const pricing = await source('pages/pricing.js');
   assert.match(pricing, /container-type: inline-size/);
+  assert.match(pricing, /\.pricing-btn\) \{ box-sizing: border-box; margin-top: auto;/, 'a bordered Current plan is as tall as the others');
   assert.match(pricing, /@container \(max-width: 13\.5rem\) \{ \.pricing-card :global\(\.pricing-btn\) \{ min-height: calc\(2\.5em \+ 20px\); \} \}/);
   const spec = await readFile(new URL('../../docs/redesign/DESIGN-SPEC.md', import.meta.url), 'utf8');
   assert.match(spec, /Theme tiles: seven across on one row \(4 \+ 3 on phones\)/);
