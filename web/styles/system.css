@@ -640,6 +640,10 @@ body:has(.about) .c-fab { display: none; }
 .c-list > .c-list-row:first-child { border-top-left-radius: inherit; border-top-right-radius: inherit; }
 .c-list > .c-list-row:last-child { border-bottom-left-radius: inherit; border-bottom-right-radius: inherit; }
 
+/* While a look changes (lib/theme.js saveLook), nothing outside the Make it yours sheet transitions, so every
+   colour changes on the same frame. */
+html.is-restyling :not(.miy-sheet, .miy-sheet *), html.is-restyling :not(.miy-sheet *)::before, html.is-restyling :not(.miy-sheet *)::after { transition: none !important; }
+
 /* Keyboard focus, everywhere: a solid 2px ring in --focus-ring, 2px out (3:1 or better on every
    surface in both themes). !important so no component's own outline, or outline: none, can hide it.
    Two fields draw their box on a wrapper, which takes the ring instead: the Tutor's message box

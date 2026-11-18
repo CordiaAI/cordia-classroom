@@ -735,7 +735,7 @@ export default function GuidePage() {
         .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
         .guide-rename { flex: 1 1 auto; min-width: 0; }
         .guide-title-input { font:600 1.75rem/1.15 var(--font-display); height: 52px; }
-        .guide-head :global(.guide-starred) { color: var(--meter-ink); }
+        .guide-head :global(.guide-starred), .guide-head :global(.guide-starred svg) { color: var(--meter-ink) !important; }
         .guide-src { font:600 0.8125rem/1.5 var(--font-sans); }
         .guide-src a { display: inline-flex; align-items: center; gap: 6px; }
         .guide-notes { display: grid; gap: 16px; padding: 32px 40px; }

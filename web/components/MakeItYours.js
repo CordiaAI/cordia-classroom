@@ -319,11 +319,13 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
         .miy-head { display: flex; align-items: flex-start; gap: 12px; padding: 24px 28px 8px; }
         .miy-head-text { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
         .miy-head h2 { margin: 0; font: 600 1.875rem/1.15 var(--font-display); letter-spacing: var(--track-title); color: var(--ink); outline: none; }
+        /* Focus lands on the title so it is read first; it is not a control, so it shows no ring. */
+        .miy-sheet .miy-head h2:focus-visible { outline: none !important; }
         .miy-head p { margin: 0; font: 500 0.9375rem/1.4 var(--font-sans); color: var(--muted); }
         .miy-close.miy-close { width: 40px; height: 40px; flex: none; color: var(--muted); }
 
         .miy-body { flex: 1; min-height: 0; overflow: auto; padding: 4px 28px 0; overscroll-behavior: contain; }
-        .miy-row { display: grid; grid-template-columns: 184px minmax(0, 1fr); gap: 20px; align-items: start; padding: 14px 0; border-top: 1px solid var(--hairline); }
+        .miy-row { display: grid; grid-template-columns: 184px minmax(0, 1fr); gap: 20px; align-items: start; padding: 12px 0; border-top: 1px solid var(--hairline); }
         .miy-row:first-child { border-top: 0; }
         .miy-label { display: flex; flex-direction: column; gap: 4px; padding-top: 6px; }
         .miy-label > span:first-child { font: 700 0.9375rem/1.3 var(--font-sans); color: var(--ink); }
@@ -331,7 +333,7 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
 
         /* Tiles: theme windows, backgrounds and fonts. Chosen: the 2px accent ring with its 5px halo. Hover lifts an
            unchosen tile 1px (pointer only); nothing changes colour. */
-        .miy-themes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+        .miy-themes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
         .miy-tiles { display: flex; flex-wrap: wrap; gap: 10px; }
         .miy-tile {
           display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 5px 5px 6px; margin: 0;
@@ -341,16 +343,16 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
         }
         .miy-tile[aria-checked='true'] { box-shadow: var(--tile-ring); cursor: default; }
         .miy-small { width: 92px; }
-        .miy-art { position: relative; display: block; height: 50px; border-radius: var(--r-input); overflow: hidden; box-shadow: var(--swatch-dot-edge); }
+        .miy-art { position: relative; display: block; height: 44px; border-radius: var(--r-input); overflow: hidden; box-shadow: var(--swatch-dot-edge); }
         .miy-art-bg { height: 52px; }
-        .miy-art-side { position: absolute; left: 6px; top: 6px; bottom: 6px; width: 16px; border-radius: 5px; background: var(--swatch-tile-side); }
-        .miy-art-dot { position: absolute; left: 28px; top: 9px; width: 22px; height: 8px; border-radius: var(--r-pill); }
-        .miy-art-line { position: absolute; left: 28px; right: 8px; bottom: 9px; height: 10px; border-radius: 6px; background: var(--swatch-tile-line); }
+        .miy-art-side { position: absolute; left: 6px; top: 5px; bottom: 5px; width: 16px; border-radius: 5px; background: var(--swatch-tile-side); }
+        .miy-art-dot { position: absolute; left: 28px; top: 8px; width: 22px; height: 8px; border-radius: var(--r-pill); }
+        .miy-art-line { position: absolute; left: 28px; right: 8px; bottom: 8px; height: 10px; border-radius: 6px; background: var(--swatch-tile-line); }
         .miy-art-look { display: grid; place-items: center; background: var(--swatch-look-paper-clay); box-shadow: inset 0 0 0 1px var(--swatch-look-paper-clay-edge); }
         .miy-look-aa { font: 600 1.375rem/1 var(--swatch-look-paper-clay-font); color: var(--swatch-look-paper-clay-ink); }
         .miy-look-dot { position: absolute; right: 8px; bottom: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--swatch-look-paper-clay-dot); }
         .miy-name { font: 600 0.8125rem/1.25 var(--font-sans); color: var(--ink); }
-        .miy-font { height: 76px; align-items: center; justify-content: center; gap: 4px; }
+        .miy-font { height: 70px; align-items: center; justify-content: center; gap: 4px; }
         .miy-font-aa { font-size: 1.625rem; font-weight: 600; line-height: 1; color: var(--ink); }
         .miy-font-name { font-size: 0.8125rem; font-weight: 600; line-height: 1.25; color: var(--muted); }
 
@@ -408,9 +410,9 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
           .miy-seg > button { min-height: 44px; }
           .miy-foot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
         }
+        /* Less motion: the sheet and its scrim appear and go with no movement and no fade. */
         @media (prefers-reduced-motion: reduce) {
-          .miy-sheet, .miy-scrim.is-closing .miy-sheet { animation-name: miy-fade; }
-          .miy-scrim.is-closing .miy-sheet { animation-name: miy-fade-out; }
+          .miy-scrim, .miy-sheet, .miy-scrim.is-closing, .miy-scrim.is-closing .miy-sheet { animation: none; }
           .miy-tile, .miy-dot-fill { transition: none; }
           .miy-tile:hover, .miy-tile:active, .miy-dot .miy-dot-fill { transform: none !important; }
         }

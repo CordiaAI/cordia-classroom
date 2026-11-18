@@ -666,6 +666,9 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
   --backdrop-sky: linear-gradient(170deg, #C9C3DA 0%, #E9DCE0 55%, #F1E3D3 100%);
   --backdrop-sky-opacity: 1; --backdrop-sky-filter: none;
 }
+/* Dusk's violet top is darker than the clouds: in light, muted text on the page itself needs a little more ink to
+   hold 4.5:1. */
+:root[data-bg='dusk']:not([data-theme='dark']) { --muted: rgba(23, 27, 24, 0.72); }
 :root[data-bg='paper'] {
   --canvas: #F3F1EA;
   --backdrop-sky: none;
@@ -757,6 +760,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
   --seg-pill-base: #FFFFFF; --seg-pill-base-solid: #FFFFFF; --seg-pill-tint: rgba(0, 0, 0, 0);
   --pill-current-base: #FFFFFF; --pill-current-base-solid: #FFFFFF;
   --selected-glass: linear-gradient(#F0EEE6, #F0EEE6);
+  --state-select-fill: #F0EEE6; --state-select-edge: var(--control-edge);  /* chosen tiles: neutral, never a clay wash */
   --selected-glass-shadow: 0 0 0 1px var(--hairline); --selected-glass-ring: 0 0 0 0 rgba(0, 0, 0, 0);
   /* Solid, flat glass: no frost, no sheen, no grain. The rim becomes the 1px hairline border. */
   --glass-blur: none;
@@ -802,7 +806,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
   --control-edge: #928F86;
   --scrim: rgba(0, 0, 0, 0.65);
   --wash: rgba(250, 249, 245, 0.05);
-  --olive-tint: rgba(250, 249, 245, 0.08);
+  --olive-tint: rgba(250, 249, 245, 0.04);  /* no lighter than the hover fill, so muted text on a tinted block holds 4.5:1 */
   --surface-card: #30302E; --surface-raised: #30302E; --surface-sidebar: #1F1E1D;
   --glass-fill: #30302E; --glass-fill-strong: #30302E; --glass-solid: #30302E; --glass-control: #30302E;
   --lg-fill-menu: #30302E; --lg-fill-field: #30302E;
@@ -812,6 +816,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
   --seg-pill-base: #45443F; --seg-pill-base-solid: #45443F; --seg-pill-tint: rgba(0, 0, 0, 0);
   --pill-current-base: #45443F; --pill-current-base-solid: #45443F;
   --selected-glass: linear-gradient(#3A3936, #3A3936);
+  --state-select-fill: #3A3936; --state-select-edge: var(--control-edge);
   --selected-glass-shadow: 0 0 0 1px var(--hairline); --selected-glass-ring: 0 0 0 0 rgba(0, 0, 0, 0);
   --glass-blur: none;
   --glass-sheen: none; --olive-glass-sheen: none;

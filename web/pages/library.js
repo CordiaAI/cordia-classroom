@@ -572,7 +572,7 @@ export default function LibraryPage() {
         .library .lib-group-toggle .is-closed { transform: rotate(-90deg); }
         .library .lib-group-name { min-width: 0; color: var(--ink); font:600 1.25rem/1.15 var(--font-sans); text-decoration: none; }
         .library a.lib-group-name:hover { text-decoration: underline; }
-        .library .lib-group-count { flex: none; display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--olive-ink); font: 600 0.8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .library .lib-group-count { flex: none; display: inline-flex; align-items: center; height: 28px; padding: 0 12px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--meter-ink); font: 600 0.8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
         .library .lib-group-count.is-empty { background: transparent; color: var(--muted); font-weight: 500; }
         .library .lib-loose { display: flex; align-items: center; gap: 12px; padding: 16px 18px; text-decoration: none; }
         .library .lib-list { list-style: none; margin: 0; padding: 0; }
@@ -589,6 +589,8 @@ export default function LibraryPage() {
         .library .lib-row-title { font:600 1.0625rem/1.15 var(--font-sans); min-width: 0; }
         .library .lib-rename { flex: 1; min-width: 0; }
         .library .lib-star.is-on { color: var(--meter-ink); }
+        /* A star is a mark, not a primary action: it reads --meter-ink over the pressed icon colour (ink under Paper & Clay). */
+        .library .lib-star.is-on :global(svg) { color: var(--meter-ink) !important; }
         .library .lib-empty-group { padding: 8px 16px 14px; margin: 0; }
         @media (max-width: 767px) {
           /* Phones: the title takes the row's width and wraps to two lines instead of pushing the buttons off-screen. */

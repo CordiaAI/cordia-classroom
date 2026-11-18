@@ -80,6 +80,15 @@ export function applyTheme(pathname = typeof window !== 'undefined' ? window.loc
   watchDevice();
 }
 
+// A look change swaps every colour at once: for two frames nothing on the page transitions, so parts with
+// their own colour transition don't fade in one by one behind the rest (styles/system.css, .is-restyling).
+function holdTransitions() {
+  if (typeof document === 'undefined' || typeof requestAnimationFrame === 'undefined') return;
+  const root = document.documentElement;
+  root.classList.add('is-restyling');
+  requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove('is-restyling')));
+}
+
 function cache(settings) {
   try { localStorage.setItem(LOOK_KEY, JSON.stringify(bootCache(settings))); } catch { /* storage blocked */ }
 }
@@ -88,6 +97,7 @@ function cache(settings) {
 // The account save is the same quiet, delayed one progress uses; if it fails the device copy stays.
 export function saveLook(next) {
   const settings = accountSettings(next, accountCreatedAt());
+  holdTransitions();
   cache(settings);
   const explicit = settings.appearance === 'system' ? null : settings.appearance;
   if (explicit) { try { localStorage.setItem(KEY, explicit); } catch { /* storage blocked */ } }
