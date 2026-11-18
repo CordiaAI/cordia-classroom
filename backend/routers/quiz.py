@@ -206,8 +206,10 @@ def _standard_questions(qa_pairs: list, rng=None) -> list:
             shortlist = same[:min(6, len(same))]
             picked = conform(answer, rng.sample(shortlist, min(3, len(shortlist))), candidates, seed=pair["question"])
             distractors = _not_longest(answer, picked, same or candidates)
-        if len(distractors) < 3:
-            continue  # always four choices: a question the guide can't give three fitting wrong ones is left out
+        if not distractors:
+            continue
+        # Only related, fitting choices, however few: this list also serves shared guides, merges and
+        # edited questions, whose ideas and positions must stay. AI quizzes always have four (_load_quiz).
         options, correct_index = _choices(answer, distractors, rng)
         questions.append({
             "question": pair["question"],

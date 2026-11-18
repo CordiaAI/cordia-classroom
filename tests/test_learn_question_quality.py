@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "bac
 
 from routers import quiz  # noqa: E402
 from services import llm, retain  # noqa: E402
-from services.choice_shapes import fits  # noqa: E402
+from services.choice_shapes import fits, is_value  # noqa: E402
 from services.text_processing import (  # noqa: E402
     chunk_text, extract_slideshow_content, format_slideshow_text, refers_to_source, standalone_question,
     strip_structure_markers,
@@ -278,9 +278,12 @@ def length_ok(answer, value):
 class ChoiceTests(unittest.TestCase):
     """Problem 2."""
 
-    def assert_good(self, question, label):
+    def assert_good(self, question, label, four=True):
         options = question["options"]
-        self.assertEqual(len(options), 4, f"{label}: {question['question']} -> {options}")
+        if four:
+            self.assertEqual(len(options), 4, f"{label}: {question['question']} -> {options}")
+        else:
+            self.assertGreaterEqual(len(options), 2, label)
         answer = options[question["correct_index"]]
         for option in options:
             self.assertTrue(length_ok(answer, option), f"{label}: {answer!r} vs {option!r}")
@@ -307,10 +310,16 @@ class ChoiceTests(unittest.TestCase):
         self.assertEqual(out, ["Total quality management"])
 
     def test_free_choices_never_borrow_an_unrelated_answer(self):
+        # Guide-derived choices (shared guides, merges, edited questions, a model outage) keep every idea
+        # that has a related choice, so they may have fewer than four, but never an unrelated one; a
+        # value always gets four.
         for subject, pairs in GUIDES.items():
             qa = [{"question": q, "answer": a} for q, a in pairs]
-            for question in quiz._standard_questions(qa):
-                self.assert_good(question, subject)
+            questions = quiz._standard_questions(qa)
+            self.assertTrue(questions, subject)
+            for question in questions:
+                answer = question["options"][question["correct_index"]]
+                self.assert_good(question, subject, four=is_value(answer))
         qa = [{"question": q, "answer": a} for q, a in GUIDES["business_law"]]
         ford = next(q for q in quiz._standard_questions(qa) if q["question"].startswith("Who pioneered"))
         self.assertNotIn("Hyundai", ford["options"])
