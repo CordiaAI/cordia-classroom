@@ -2,6 +2,7 @@ import { Trash2 } from 'lucide-react';
 import NapkinVisual from './NapkinVisual';
 import CordiaLoader from './CordiaLoader';
 import AcademicInfinityMark from './AcademicInfinityMark';
+import StudyPlanActions from './StudyPlanActions';
 import { inlineParts, parseTutorAnswer } from '../lib/tutorFormat.mjs';
 import { speakableText } from '../lib/useTutorChat';
 
@@ -75,6 +76,7 @@ export default function TutorMessages({ tutor, avatar = false }) {
             {item.title || item.url}
           </button>
         ))}
+        {message.study_plan && <StudyPlanActions plan={message.study_plan} tutor={tutor} latest={index === messages.length - 1} />}
         {message.link ? (
           <button type="button" className="cordia-tutor-guide-link" onClick={() => router.push(message.link.href)}>
             Open {message.link.label}

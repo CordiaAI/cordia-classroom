@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Brain, CalendarClock, Check, GraduationCap, Layers, ListChecks, NotebookPen, PenLine, Play, Repeat, Shuffle, Target, TextCursorInput, Timer } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Brain, CalendarClock, Check, GraduationCap, Layers, ListChecks, MessageCircle, NotebookPen, PenLine, Play, Repeat, Shuffle, Target, TextCursorInput, Timer } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import { saveLearnLevels } from '../../lib/progressSave';
 import { useRequireAuth } from '../../lib/auth';
@@ -191,6 +191,12 @@ export default function LearnPage() {
   // Each card's logged format decision, by card id; its answer points at it.
   const decisions = useRef({});
   const today = dayKey();
+  // The Tutor's check-in (?checkin=1, from a study plan): the first round starts by itself, and when it
+  // ends the score goes back to the Tutor, which posts what to do next and when.
+  // '' | 'pending' (start it) | 'running' | 'sending' | 'sent' | 'failed'
+  const [checkin, setCheckin] = useState('');
+  const checkinSeen = useRef(false);
+  const checkinResult = useRef(null);
 
   useEffect(() => {
     try {
@@ -274,6 +280,10 @@ export default function LearnPage() {
       roundStart.current = Date.now();
     }
     if (linked || resumable) save(restored, linked || saved.test_date || '', list, format);
+    if (router.query.checkin === '1' && list.length && !guide?.viewer && !checkinSeen.current) {
+      checkinSeen.current = true;
+      setCheckin(resumable ? 'running' : 'pending');
+    }
     if (!list.length) setError(session?.detail || (guide?.viewer ? 'This guide has no questions to learn from yet.' : guide && !String(guide.notes || '').trim()
       ? 'This guide has no notes or questions to learn from yet.'
       : 'Learn needs questions and answers. Open the guide and make its study set first.'));
@@ -284,6 +294,11 @@ export default function LearnPage() {
   useEffect(() => {
     if (ready && guideId) load();
   }, [ready, guideId]);
+  useEffect(() => {
+    if (checkin !== 'pending' || !questions?.length || screen !== 'home') return;
+    setCheckin('running');
+    startRound();
+  }, [checkin, questions, screen]);
   const gate = useLoadGate(questions !== null || making);
   // Only recognition tiles on: the first mastery step explains once why it asks for recall.
   const noteCard = screen === 'round' ? currentCard(round) : null;
@@ -356,6 +371,7 @@ export default function LearnPage() {
   function startRound() {
     const next = LEARN_LADDER_V2 ? createLadderRound(questions, levels, { ...ladderContext(), carry: carry.current }) : createRound(questions, levels, today, types);
     if (!next.queue.length) return;
+    if (['sent', 'failed'].includes(checkin)) setCheckin(''); // later rounds are ordinary rounds
     carry.current = [];
     decide(currentCard(next));
     setRound(next);
@@ -411,7 +427,33 @@ export default function LearnPage() {
     const cleared = results.filter(([, item]) => !item.missed).map(([concept]) => questions[concept]?.question).filter(Boolean);
     rememberRetainMisses(guideId, missed.map(question => ({ question: question.question, answer: conceptAnswer(question) })).filter(item => item.question && item.answer), { cleared });
     recordStudy({ guideId, guideTitle: title, minutes: (Date.now() - roundStart.current) / 60000, cards: results.length, right: results.length - missed.length, total: results.length, kind: 'quiz' });
+    if (checkin === 'running') {
+      const after = counts(questions, levels, today);
+      checkinResult.current = {
+        checkin_id: `${guideId}:${roundStart.current}`, guide_id: guideId, right: results.length - missed.length, total: results.length,
+        remaining: after.total - after.mastered, test_date: testDate || null, local_date: today,
+      };
+      sendCheckin();
+    }
     setScreen('checkpoint');
+  }
+
+  // The check-in's score goes to the Tutor's conversation (POST /tutor/session/checkin, posted once per check-in).
+  async function sendCheckin() {
+    if (!checkinResult.current) return;
+    setCheckin('sending');
+    const sent = await apiFetch('/tutor/session/checkin', { method: 'POST', body: JSON.stringify(checkinResult.current) });
+    setCheckin(sent?.id ? 'sent' : 'failed');
+    if (sent?.id) {
+      const query = { ...router.query };
+      delete query.checkin; // a refresh doesn't start another check-in
+      router.replace({ pathname: router.pathname, query }, undefined, { shallow: true });
+    }
+  }
+
+  function backToTutor() {
+    try { sessionStorage.setItem('cordiaTutorKeep', '1'); } catch { /* opens on a new chat instead */ }
+    router.push('/tutor');
   }
 
   // A timed test is marked: what it missed drops back to Learning for the next rounds.
@@ -572,6 +614,7 @@ export default function LearnPage() {
           </div>
           <div className="c-bar" role="progressbar" aria-label="Round" aria-valuemin={0} aria-valuemax={round.queue.length} aria-valuenow={round.position}><span style={{ width: Math.round((round.position / round.queue.length) * 100) + '%' }} /></div>
           {recallNoteNow && <p className="learn-recall-note" role="status">{RECALL_NOTE}</p>}
+          {checkin === 'running' && <p className="learn-recall-note">Check-in quiz: answer what you can, guesses included. Your Tutor plans the rest from your score.</p>}
           <QuietLimits.Provider value={LEARN_LADDER_V2}>
           {card.type === 'mc' && <McCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
           {card.type === 'fill' && <FillCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
@@ -589,7 +632,7 @@ export default function LearnPage() {
       {screen === 'checkpoint' && round && (
         <div className="learn-home">
           <section className="c-card learn-panel">
-            <h2 className="c-section-title">Round {roundNumber} done</h2>
+            <h2 className="c-section-title">{checkin && checkin !== 'running' ? 'Check-in done' : `Round ${roundNumber} done`}</h2>
             <div className="learn-ready"><span className="learn-ready-num">{ready_}%</span><span className="c-meta">ready</span></div>
             <LadderBar tally={tally} />
             <ul className="learn-moves">
@@ -603,10 +646,25 @@ export default function LearnPage() {
             {plan && !plan.past && <p className="c-meta">{whenLabel(plan)}</p>}
             {LEARN_LADDER_V2 && round.fallbackUsed && <p className="c-meta learn-fallback">{FALLBACK_LINE}</p>}
           </section>
+          {['sending', 'sent', 'failed'].includes(checkin) && (
+            <p className={'c-meta learn-checkin-status' + (checkin === 'failed' ? ' is-failed' : '')} role="status">
+              {checkin === 'sending' ? 'Sending your score to the Tutor…'
+                : checkin === 'sent' ? 'Your Tutor has your next steps and when to do them.'
+                : "The Tutor didn't get your score. Your progress is saved here."}
+              {checkin === 'failed' && <button type="button" className="c-btn c-btn--quiet c-btn--sm" onClick={sendCheckin}>Send it again</button>}
+            </p>
+          )}
           <div className="learn-actions">
+            {['sending', 'sent', 'failed'].includes(checkin) && (
+              <button type="button" className={'c-btn c-btn--primary c-btn--lg learn-back-tutor' + (checkin === 'sending' ? ' is-busy' : '')}
+                onClick={backToTutor} disabled={checkin === 'sending'} aria-busy={checkin === 'sending' || undefined}>
+                <span className="learn-back-face"><MessageCircle {...ICON} />Back to the Tutor</span>
+                {checkin === 'sending' && <span className="learn-back-spinner"><CordiaLoader size={22} label="Sending your score" /></span>}
+              </button>
+            )}
             {allMastered && !tally.fading
-              ? <Link href={finalHref} className="c-btn c-btn--primary c-btn--lg"><Target {...ICON} />Final check</Link>
-              : <button type="button" className="c-btn c-btn--primary c-btn--lg" onClick={startRound}>Next round<ArrowRight {...ICON} /></button>}
+              ? <Link href={finalHref} className={'c-btn c-btn--lg ' + (checkin ? 'c-btn--secondary' : 'c-btn--primary')}><Target {...ICON} />Final check</Link>
+              : <button type="button" className={'c-btn c-btn--lg ' + (checkin ? 'c-btn--secondary' : 'c-btn--primary')} onClick={startRound}>Next round<ArrowRight {...ICON} /></button>}
             <button type="button" className="c-btn c-btn--secondary c-btn--lg" onClick={() => setScreen('home')}>Overview</button>
           </div>
         </div>
@@ -663,6 +721,13 @@ export default function LearnPage() {
         .learn-date select { width: auto; min-width: 170px; }
         .learn-recall-note { margin: 0; padding: 10px 14px; border-radius: var(--r-row); background: var(--olive-tint); color: var(--ink); font: 600 0.875rem/1.45 var(--font-sans); }
         .learn-fallback { margin: 0; }
+        .learn-checkin-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; min-height: 36px; }
+        .learn-checkin-status.is-failed { color: var(--error); }
+        .learn-back-tutor { position: relative; }
+        .learn-back-face { display: inline-flex; align-items: center; gap: 8px; }
+        /* The label keeps its width while the mark shows, so the row doesn't move. */
+        .learn-back-tutor.is-busy .learn-back-face { visibility: hidden; }
+        .learn-back-spinner { position: absolute; inset: 0; display: grid; place-items: center; }
         .learn-actions { display: flex; flex-wrap: wrap; gap: 10px; }
         .learn-test-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         a.learn-way { text-decoration: none; }
