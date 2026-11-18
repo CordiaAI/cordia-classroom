@@ -20,8 +20,9 @@ from auth_utils import get_user_id
 from ids import require_uuid
 from services import print_items, retain
 from services import blanks
-from services.choice_shapes import conform, is_value, repair, shape
+from services.choice_shapes import conform, fits, is_value, repair, shape
 from services.distractor_check import keep_valid
+from services.text_processing import standalone_question
 from services.entitlements import LIMITS, plan_for, record, remaining, require, subscription_row
 
 
@@ -43,7 +44,7 @@ class RetainAttempt(BaseModel):
     response: str = Field(default="", max_length=4000)
     credit: Optional[float] = None
     token: Optional[str] = Field(default=None, max_length=128)
-    self_marked: bool = False  # a typed answer the student counted as right after seeing the answer
+    self_marked: bool = False  # a typed or written answer the student counted as right after seeing the answer
 
 
 class QuizSubmission(BaseModel):
@@ -89,7 +90,9 @@ class RememberRequest(BaseModel):
 
 
 def _parse_qa_pairs(text: str) -> list:
-    """Parse Question 1: ... Answer 1: ... format into list of {question, answer}."""
+    """Parse Question 1: ... Answer 1: ... format into list of {question, answer}. Guides written
+    before questions were checked for it may still ask about the source ("Which artists are listed
+    for Chapter 1?"): those are left out, and "According to Slide 5, what is X?" asks "What is X?"."""
     pairs = []
     lines = text.split('\n')
     current_q = None
@@ -98,7 +101,7 @@ def _parse_qa_pairs(text: str) -> list:
         q_match = re.match(r'^Q(\d+):\s*(.+)', line)
         a_match = re.match(r'^A(\d+):\s*(.+)', line)
         if q_match:
-            current_q = q_match.group(2).strip()
+            current_q = standalone_question(q_match.group(2).strip())
         elif a_match and current_q:
             pairs.append({"question": current_q, "answer": a_match.group(2).strip()})
             current_q = None
@@ -202,9 +205,11 @@ def _standard_questions(qa_pairs: list, rng=None) -> list:
             same = _same_kind(answer, candidates)
             shortlist = same[:min(6, len(same))]
             picked = conform(answer, rng.sample(shortlist, min(3, len(shortlist))), candidates, seed=pair["question"])
-            distractors = _not_longest(answer, picked, same or [c for c in candidates if not is_value(c)])
+            distractors = _not_longest(answer, picked, same or candidates)
         if not distractors:
             continue
+        # Only related, fitting choices, however few: this list also serves shared guides, merges and
+        # edited questions, whose ideas and positions must stay. AI quizzes always have four (_load_quiz).
         options, correct_index = _choices(answer, distractors, rng)
         questions.append({
             "question": pair["question"],
@@ -221,8 +226,41 @@ def _free_candidates(qa_pairs: list, index: int, others: list) -> list:
     choices all come from the guide's own answers, so when every answer is a description the check
     rejects them all; topping up keeps the question instead of dropping it."""
     pair = qa_pairs[index]
-    kept, rejected = keep_valid(_other_answers(qa_pairs, index), pair["question"], pair["answer"], others)
+    cue = _cue(pair["question"])
+    cues = {}
+    for other in qa_pairs:
+        cues.setdefault(other["answer"].strip().casefold(), set()).add(_cue(other["question"]))
+    # Only answers to the same kind of question ("Who ...?" for "Who ...?", "Which company ...?" for
+    # "Which company ...?"), of the same kind and length: never a company offered for a person.
+    related = [value for value in _other_answers(qa_pairs, index)
+               if cue in cues.get(value.casefold(), ()) and fits(pair["answer"], value)]
+    kept, rejected = keep_valid(related, pair["question"], pair["answer"], others)
     return kept if len(kept) >= 3 else kept + rejected[:3 - len(kept)]
+
+
+# What a question asks for, from its opening words: a person, a time, a place, an amount, the noun
+# after "which" ("which company" -> "which:compa"), or anything else ("what" is as often followed by a
+# verb, "What carries oxygen?", as by a noun, so it says nothing more).
+_CUES = (
+    ("person", re.compile(r"^\s*(?:who|whom|whose)\b", re.I)),
+    ("time", re.compile(r"^\s*(?:when\b|(?:in\s+|on\s+)?(?:what|which)\s+(?:year|date|decade|century|era|period|month|day)\b)", re.I)),
+    ("place", re.compile(r"^\s*(?:where\b|(?:in\s+)?(?:what|which)\s+(?:country|city|state|region|continent|place|location)\b)", re.I)),
+    ("amount", re.compile(r"^\s*(?:how\s+(?:many|much|long|often|far|old)\b|(?:what|which)\s+(?:percentage|percent|number|"
+                          r"amount|dose|dosage|range|rate|value|level|ratio)\b)", re.I)),
+)
+_WHICH = re.compile(r"^\s*which\s+(?:(?:type|kind|sort|form)s?\s+of\s+)?([a-z][a-z\-]*)", re.I)
+_NOT_A_NOUN = {"is", "are", "was", "were", "does", "do", "did", "has", "have", "had", "can", "could", "should", "would",
+               "will", "may", "might", "must", "happens", "happened", "causes", "caused", "makes", "made", "the", "a", "an"}
+
+
+def _cue(question: str) -> str:
+    for name, pattern in _CUES:
+        if pattern.search(question or ""):
+            return name
+    which = _WHICH.match(question or "")
+    if which and which.group(1).lower() not in _NOT_A_NOUN:
+        return "which:" + which.group(1).lower()[:5]
+    return "other"
 
 
 def _pairs(qa_pairs: list) -> list:
@@ -232,11 +270,13 @@ def _pairs(qa_pairs: list) -> list:
 def _balanced_distractors(answer: str, generated: list, fallback: list, seed: str = "") -> list:
     """Prefer distinct model choices close to the correct answer's visible length, in the answer's
     format: a year, date or amount only ever gets the same kind of value written the same way
-    (off-format model choices are rewritten or replaced), and text prefers text of its own kind."""
+    (off-format model choices are rewritten or replaced), and text only gets text that fits it."""
     if is_value(answer):
         return conform(answer, generated, fallback, seed=seed or answer)
-    generated = [str(value) for value in generated]
-    same_generated, same_fallback = _same_kind(answer, generated), _same_kind(answer, fallback)
+    # Only choices that fit (choice_shapes.fits): the same kind of thing (a list of as many items for
+    # a list, names for names) within the length bound. Nothing else fills in, however few are left.
+    fitting = [str(value).strip() for value in [*generated, *fallback] if fits(answer, value)]
+    same = _same_kind(answer, fitting)
     lower = max(1, round(len(answer) * 0.65))
     upper = max(lower, round(len(answer) * 1.35))
     seen = {answer.casefold()}
@@ -255,12 +295,9 @@ def _balanced_distractors(answer: str, generated: list, fallback: list, seed: st
             if len(accepted) == 3:
                 return
 
-    add(same_generated, enforce_length=True)
-    add(same_fallback, enforce_length=True)
-    add(sorted([*same_generated, *same_fallback], key=lambda value: abs(len(str(value)) - len(answer))))
-    text = [value for value in [*generated, *fallback] if not is_value(value)]
-    add(sorted(text, key=lambda value: abs(len(str(value)) - len(answer))))
-    return _not_longest(answer, accepted[:3], [*same_generated, *same_fallback] or text)
+    add(same, enforce_length=True)  # the model's first, in its order
+    add(sorted(fitting, key=lambda value: (value not in same, abs(len(value) - len(answer)))))
+    return _not_longest(answer, accepted[:3], fitting)
 
 
 def _replacement_distractors(client, wanted: list, pairs: list) -> dict:
@@ -331,7 +368,7 @@ def _top_up(client, questions: list, pairs: list, targets: Optional[set] = None)
             extra = []
             for value in keep_valid(fresh.get(question, []), question, answer, pairs)[0]:
                 key = choice_text(value).casefold()
-                if key and key not in seen:
+                if key and key not in seen and fits(answer, value):
                     seen.add(key)
                     extra.append(value)
             if not extra:
@@ -408,7 +445,7 @@ def _rebuild_standouts(supabase, guide_id: str, user_id: str, questions: list) -
         for item in wanted:
             valid = keep_valid(fresh.get(item["question"], []), item["question"], item["answer"], pairs)[0]
             distractors = _balanced_distractors(item["answer"], valid, [], seed=item["question"])
-            if len(distractors) >= 2:
+            if len(distractors) == 3:  # four choices, or the old ones stay
                 options, correct_index = _choices(item["answer"], distractors)
                 fixed[item["question"]] = {"options": options, "correct_index": correct_index}
     tried = {q["question"] for q in standouts}
@@ -418,6 +455,26 @@ def _rebuild_standouts(supabase, guide_id: str, user_id: str, questions: list) -
         _save_quiz(supabase, guide_id, user_id, out)
     except Exception:
         logger.warning("Rebuilt choices not saved", exc_info=True)
+    return out
+
+
+def _without_source_questions(supabase, guide_id: str, user_id: str, questions: list) -> list:
+    """A saved quiz without questions about the source rather than the subject ("Which artists are
+    listed for Chapter 1?"), and with "According to Slide 5, what is X?" asked as "What is X?". Saved
+    when anything changed, so answers are checked against the same list the session showed."""
+    out, changed = [], False
+    for question in questions:
+        if isinstance(question, dict) and isinstance(question.get("question"), str):
+            text = standalone_question(question["question"])
+            if text is None:
+                changed = True
+                continue
+            if text != question["question"]:
+                question, changed = {**question, "question": text}, True
+        out.append(question)
+    if changed:
+        logger.info("Quiz for guide %s: %s question(s) about the source removed or reworded", guide_id, len(questions) - len(out))
+        _save_quiz(supabase, guide_id, user_id, out)
     return out
 
 
@@ -442,6 +499,8 @@ def _load_quiz(supabase, guide_id: str, user_id: str, regenerate: bool = False) 
     # Read the small question set first; the guide text is only needed to build one.
     if not regenerate:
         cached = _guide_columns(supabase, guide_id, user_id, "quiz_questions").get("quiz_questions")
+        if cached:
+            cached = _without_source_questions(supabase, guide_id, user_id, cached)
         if cached:
             return _rebuild_standouts(supabase, guide_id, user_id, [even_choices(q) if isinstance(q, dict) else q for q in cached]), True
 
@@ -506,7 +565,13 @@ def _load_quiz(supabase, guide_id: str, user_id: str, regenerate: bool = False) 
         options, correct_index = _choices(correct_answer, distractors)
         questions.append({"question": pair["question"], "options": options, "correct_index": correct_index})
 
-    questions = [{**q, "choices_v": CHOICES_VERSION} for q in _top_up(client, questions, others)]
+    # Exactly four choices: a question still short of three fitting wrong ones after the top-up is
+    # left out of the quiz rather than shown with two or three.
+    built = _top_up(client, questions, others)
+    questions = [{**q, "choices_v": CHOICES_VERSION} for q in built if len(q["options"]) == 4]
+    if len(questions) < len(qa_pairs):
+        logger.info("Quiz for guide %s: %s of %s questions left out for want of four fitting choices",
+                    guide_id, len(qa_pairs) - len(questions), len(qa_pairs))
     if not questions:
         raise HTTPException(status_code=502, detail="Could not create balanced Retain options")
     _save_quiz(supabase, guide_id, user_id, questions)
@@ -678,7 +743,7 @@ def refresh_choices(guide_id: str, authorization: str = Header(default="")):
     for question in questions:
         text = str(question.get("question") or "") if isinstance(question, dict) else ""
         replacement = fixed.get(text) if text in flagged else None
-        if replacement and len(replacement["options"]) >= min(3, len(question["options"])):
+        if replacement and len(replacement["options"]) >= min(4, len(question["options"])):
             updated.append({**question, "options": replacement["options"], "correct_index": replacement["correct_index"]})
             changed += 1
         else:

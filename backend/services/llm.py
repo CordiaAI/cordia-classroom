@@ -16,6 +16,7 @@ from typing import List, Optional
 from services.llm_calls import chat
 from services.models import ANTHROPIC, GROQ, GROQ_BASE_URL, study_guide_model
 from services.practice_areas import PRACTICE_AREAS, PRACTICE_BASE, classifier_prompt
+from services.text_processing import standalone_question, strip_source_attribution, strip_structure_markers
 from dotenv import load_dotenv
 import anthropic
 from openai import OpenAI
@@ -110,7 +111,8 @@ CRITICAL RULES:
 • ONLY use information that is explicitly stated in the text below.
 • NEVER invent, assume, or hallucinate any facts, terms, or answers.
 • Academic assignments, rubrics, learning objectives, exam topics, and required deliverables ARE educational content. Turn them into questions about what the student must understand or complete.
-• Worked examples, practice problems, and case studies teach a method: ask how to apply that method (with the given values, rules, or tables) and answer with the steps and result the text supports. Every question must stand alone — never refer to the source's labels such as "Problem 4", "Example 2", "Slide 5", or "the table above".
+• Worked examples, practice problems, and case studies teach a method: ask how to apply that method (with the given values, rules, or tables) and answer with the steps and result the text supports.
+• Every question must stand alone and be about the subject, never about the source itself — never refer to its labels or layout such as "Problem 4", "Example 2", "Slide 5", "Chapter 1", or "the table above", and never ask what it lists or covers.
 • If the text contains no educational content (e.g., only navigation menus, UI elements, or unrelated text), respond with exactly: "NO_EDUCATIONAL_CONTENT"
 • Every answer MUST be directly supported by the text provided.
 • A quoted passage, or any passage meant to be known word for word (a creed, oath, motto, poem, scripture, statute, definition given as a quotation), is asked about whole: its answer is the complete passage, word for word, inside quotation marks. Never split it across questions, shorten it, or paraphrase it.
@@ -211,7 +213,13 @@ def _canonical_qa(raw_result: str) -> str:
     lines = []
     for item in out:
         if isinstance(item, tuple):
-            lines.extend([f"Q0: {item[0]}", f"A0: {item[1]}"])
+            # About the subject, not the source: "According to Slide 5, what is X?" loses its lead-in,
+            # and "Which artists are listed for Chapter 1?" is dropped (text_processing).
+            question = standalone_question(item[0])
+            if question is None:
+                logger.info("Study guide: dropped a question about the source: %s", item[0][:120])
+                continue
+            lines.extend([f"Q0: {question}", f"A0: {strip_source_attribution(item[1])}"])
         else:
             lines.append(item)
     return '\n'.join(lines)
@@ -563,9 +571,12 @@ def memory_hook(question: str, answer: str, style="link", interests=(), previous
     """A memory trick for a missed question ("Help me remember"): links the question's cue to the
     answer, in one of the student's preferred styles (style: a MEMORY_STYLES key or a list of them;
     the model picks the one that suits this answer), anchored in their own material when something
-    there fits. Kept only when it states the answer and is written to the student; {} otherwise.
+    there fits. Kept only when it states the answer and is written to the student; {} otherwise. A
+    list answer ("Freud, Jung, and Adler") needs every part in the trick: one that leaves parts out is
+    asked for again once, naming them, and dropped if it still does.
     Returns {"hook"} plus {"linked": {kind, id, title}} when it built on a piece of context."""
-    from services.retain import mentions_answer
+    from services.retain import ANSWER_MAX_CHARS, answer_parts, mentions_answer, missing_parts
+    answer = str(answer or "")[:ANSWER_MAX_CHARS]  # all of it the model is shown; every check below sees the same text
     keys = [style] if isinstance(style, str) else list(style or ())
     picked = [MEMORY_STYLES[key] for key in keys if key in MEMORY_STYLES] or [MEMORY_STYLES["link"]]
     if len(picked) == 1:
@@ -575,37 +586,56 @@ def memory_hook(question: str, answer: str, style="link", interests=(), previous
     likes = ", ".join(str(item).replace("_", " ") for item in interests or ()) or "none given"
     context = list(context or ())[:5]
     material = "\n".join(f"[{i}] {item['title']}: {item['snippet']}" for i, item in enumerate(context, 1))
-    response = chat(get_openai_client(), "retain_remember",
-        messages=[
-            {"role": "system", "content": (
-                "Write one memory trick for a question a student just missed, for any subject. It must "
-                "start from the question's cue and lead to the answer (\"When you see X, think Y\"), "
-                "in one or two sentences under 40 words, written to them as \"you\". Build it on the "
-                "exact names, words and numbers in the answer, using whichever fits best: a vivid image, "
-                "a link to something they already know, an acronym or first letters, a number shape or "
-                "rhyme, or a tiny story. Make it specific, vivid and funny; a generic line that just "
-                "restates the fact fails. " + preferred
-                + "If the student's own material below gives a natural anchor (something they already "
-                "studied or heard), build on it and set \"linked\" to its number; otherwise null. Their "
-                "interests may give the link only when one fits. The trick must contain the answer exactly "
-                "as given and never change, round or blur it. Any comparison stated as fact must be true; "
-                "otherwise make it plainly wordplay. "
-                + (CRUDE_HUMOR_RULE if crude else "Playful is good; never mocking, crude, or about the student themselves. ")
-                + "\n\nEXAMPLES:\n" + MEMORY_EXAMPLES
-                + '\n\nReturn JSON: {"hook": "...", "linked": number or null}'
-            )},
-            {"role": "user", "content": (
-                f"QUESTION:\n{question[:1500]}\n\nANSWER:\n{answer[:1000]}\n\nINTERESTS: {likes}"
-                + (f"\n\nTHE STUDENT'S OWN MATERIAL:\n{material}" if material else "")
-                + (f"\n\nTAKE A DIFFERENT ANGLE FROM THIS ONE:\n{previous[:400]}" if previous else "")
-            )},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.8,
+    system = (
+        "Write one memory trick for a question a student just missed, for any subject. It must "
+        "start from the question's cue and lead to the answer (\"When you see X, think Y\"), "
+        "in one or two sentences under 40 words (up to 70 when the answer lists several parts), "
+        "written to them as \"you\". Build it on the exact names, words and numbers in the answer; "
+        "when the answer lists several parts (names, steps, items), give every part its own hook, in "
+        "order, since one hook for the topic leaves the parts unlearned. Use whichever fits best: a "
+        "vivid image, a link to something they already know, an acronym or first letters, a number "
+        "shape or rhyme, or a tiny story. Make it specific, vivid and funny; a generic line that just "
+        "restates the fact fails. " + preferred
+        + "If the student's own material below gives a natural anchor (something they already "
+        "studied or heard), build on it and set \"linked\" to its number; otherwise null. Their "
+        "interests may give the link only when one fits. The trick must contain the answer exactly "
+        "as given and never change, round or blur it. Any comparison stated as fact must be true; "
+        "otherwise make it plainly wordplay. "
+        + (CRUDE_HUMOR_RULE if crude else "Playful is good; never mocking, crude, or about the student themselves. ")
+        + "\n\nEXAMPLES:\n" + MEMORY_EXAMPLES
+        + '\n\nReturn JSON: {"hook": "...", "linked": number or null}'
     )
-    parsed = _practice_json(response.choices[0].message.content)
-    hook = student_feedback(parsed.get("hook"))
-    if not hook or not mentions_answer(hook, answer):
+    user = (
+        f"QUESTION:\n{question[:1500]}\n\nANSWER:\n{answer}\n\nINTERESTS: {likes}"
+        + (f"\n\nTHE STUDENT'S OWN MATERIAL:\n{material}" if material else "")
+        + (f"\n\nTAKE A DIFFERENT ANGLE FROM THIS ONE:\n{previous[:400]}" if previous else "")
+    )
+    client = get_openai_client()
+
+    def ask(content: str) -> tuple:
+        response = chat(client, "retain_remember",
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": content}],
+            response_format={"type": "json_object"},
+            temperature=0.8,
+        )
+        parsed = _practice_json(response.choices[0].message.content)
+        return parsed, student_feedback(parsed.get("hook"))
+
+    def covers(hook: str) -> bool:
+        return bool(hook) and mentions_answer(hook, answer) and not missing_parts(hook, answer)
+
+    parsed, hook = ask(user)
+    if not covers(hook) and len(answer_parts(answer)) > 1:
+        # A list answer whose trick skipped parts: once more, naming the parts it left out.
+        left_out = (missing_parts(hook, answer) if hook else []) or answer_parts(answer)
+        try:
+            parsed, hook = ask(user + "\n\nYOUR FIRST TRICK LEFT OUT THESE PARTS OF THE ANSWER: "
+                               + "; ".join(left_out)
+                               + ". Give every part of the answer its own hook, in order.")
+        except Exception:
+            logger.warning("Help me remember: retry for a missing part failed", exc_info=True)
+            return {}
+    if not covers(hook):
         return {}
     result = {"hook": hook}
     linked = parsed.get("linked")
@@ -818,6 +848,10 @@ def generate_study_guide(chunks: List[str], has_images: bool = False, learning_g
     STUDY_GUIDE_COST_SAVER only downgrades short text-only batches).
     """
     client = get_openai_client()
+    # Slide and page markers are layout: left in, they become "What is shown on Slide 5?" questions.
+    chunks = [text for text in (strip_structure_markers(chunk) for chunk in chunks) if text]
+    if not chunks:
+        return ""  # nothing but markers: callers treat it as no educational content (a 422)
 
     # Group chunks into batches of ~8000 chars each (works for both XML slides
     # and regular text — matching the batch size that produced 92 Q&A for 59 slides)
@@ -1003,14 +1037,22 @@ Do NOT stop until every Q&A pair has a corresponding NCLEX question."""
             logger.error("NCLEX response was not valid JSON")
             return []
 
-    # Validate basic structure
+    # Validate basic structure: 4 options for MCQ, 5 for SATA, answers that point at an option, and a
+    # stem about the subject rather than the source ("According to slide 5, ..." loses its lead-in).
     validated = []
-    for q in questions:
-        if not all(k in q for k in ("type", "stem", "options", "correct_indices", "rationale")):
+    for q in questions if isinstance(questions, list) else []:
+        if not isinstance(q, dict) or not all(k in q for k in ("type", "stem", "options", "correct_indices", "rationale")):
             continue
-        if q["type"] not in ("mcq", "sata"):
+        if q["type"] not in ("mcq", "sata") or not isinstance(q["options"], list) or not isinstance(q["correct_indices"], list):
             continue
-        validated.append(q)
+        if len(q["options"]) != (4 if q["type"] == "mcq" else 5):
+            continue
+        if not q["correct_indices"] or not all(isinstance(i, int) and 0 <= i < len(q["options"]) for i in q["correct_indices"]):
+            continue
+        stem = standalone_question(str(q["stem"]))
+        if stem is None:
+            continue
+        validated.append({**q, "stem": stem})
     return validated
 
 
