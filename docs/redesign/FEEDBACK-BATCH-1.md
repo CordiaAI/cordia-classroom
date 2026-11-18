@@ -71,3 +71,8 @@ Lines, in priority order:
 The Haiku call does not count toward the student's monthly limits, is logged to `usage_events` as feature `tutor_status`, and never delays or blocks the real answer; if the answer starts first, the lines are never shown.
 In voice mode (F11): the same lines as captions while the Tutor thinks, never spoken.
 Director's note: Haiku is already the product's light tier (CLAUDE.md), so this adds a call on an existing model, not a model change.
+
+F6b Tutor tools and grounding redesign (Jude, 2026-11-18), Opus, queued after F11.
+1. Building a Learn set: drop the phrase matching. Expose the existing build_guide and practice skills to the Tutor model as tools and let it decide when the student is asking for one. A tool call that would build a guide must confirm in one line ("Making a Learn set on heart failure, digoxin and diuretics. Starting now.") so nothing is ever built silently. Test with the 31 natural commands from the last review (scratchpad rook-f6d/fresh_learn.py) plus 25 ordinary questions that must not build anything.
+2. The "unchecked" line: drop the word patterns. When no material is selected, run a Claude Haiku check (light tier, low effort) on the finished answer that returns only the specific claims (names, numbers, dates, quotes) not supported by the student's selected material, and show the line only if there are any. Test across nursing, art history, law, literature and CS, including two-letter names and answers starting with "Usually" or "Tell".
+Log both to usage_events; neither counts toward the student's limits. Haiku is the product's existing light tier (CLAUDE.md), so no new model.
