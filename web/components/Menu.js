@@ -5,12 +5,16 @@ import BodyPortal from './BodyPortal';
 const GAP = 6;
 const EDGE = 8;
 
-// A ⋯ button with a small glass menu. items: [{ label, meta, icon, onSelect, danger, items, current }]
+// A ⋯ button with a small glass menu. items: [{ label, meta, icon, onSelect, danger, items, current, disabled }]
 // trigger and triggerClassName: a different button face (the composer's class picker).
-// An item with `items` opens a second level (e.g. Move to class), with a way back.
+// An item with `items` opens a second level (e.g. Move to class), with a way back (its first row, or ←).
+// disabled items stay in the list for the keyboard and screen readers but do nothing; note: one
+// plain line under the items (why they are disabled). triggerRef: the ⋯ button, for callers that
+// return focus to it. Arrows, Home and End move; Escape closes and returns focus to the button, and
+// so does choosing an item (the item may then move focus somewhere else).
 // The menu renders at the end of <body>, placed under its button (above it when there's no room
 // below), so a list row or card never covers it.
-export default function Menu({ label = 'More', items, align = 'right', trigger, triggerClassName = 'c-icon-btn' }) {
+export default function Menu({ label = 'More', items, align = 'right', trigger, triggerClassName = 'c-icon-btn', note = '', triggerRef = null }) {
   const [open, setOpen] = useState(false);
   const [sub, setSub] = useState(null);
   const [place, setPlace] = useState(null); // { top, left }
@@ -38,7 +42,8 @@ export default function Menu({ label = 'More', items, align = 'right', trigger, 
 
   useEffect(() => {
     if (!open) return undefined;
-    menuRef.current?.querySelector('[role="menuitem"]')?.focus();
+    const menu = menuRef.current;
+    (menu?.querySelector('[role="menuitem"][aria-current="true"]') || menu?.querySelector(sub ? '[role="menuitem"]:not(.c-menu-back)' : '[role="menuitem"]'))?.focus();
     const inside = target => rootRef.current?.contains(target) || menuRef.current?.contains(target);
     const onDown = event => { if (!inside(event.target)) close(false); };
     const onScroll = event => { if (!menuRef.current?.contains(event.target)) close(false); };
@@ -63,16 +68,20 @@ export default function Menu({ label = 'More', items, align = 'right', trigger, 
     event.stopPropagation();
     const list = [...menuRef.current.querySelectorAll('[role="menuitem"]')];
     const index = list.indexOf(document.activeElement);
-    if (event.key === 'Escape') { event.preventDefault(); if (sub) setSub(null); else close(); }
+    if (event.key === 'Escape') { event.preventDefault(); close(); }
     if (event.key === 'ArrowDown') { event.preventDefault(); list[(index + 1) % list.length]?.focus(); }
     if (event.key === 'ArrowUp') { event.preventDefault(); list[(index - 1 + list.length) % list.length]?.focus(); }
+    if (event.key === 'Home') { event.preventDefault(); list[0]?.focus(); }
+    if (event.key === 'End') { event.preventDefault(); list[list.length - 1]?.focus(); }
+    if (event.key === 'ArrowLeft' && sub) { event.preventDefault(); setSub(null); }
+    if (event.key === 'Tab') close(false);
   }
 
   const shown = sub ? sub.items : items;
 
   return (
     <div className="c-menu-wrap" ref={rootRef} onClick={event => event.stopPropagation()}>
-      <button ref={buttonRef} type="button" className={triggerClassName} aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} onClick={() => (open ? close(false) : setOpen(true))}>
+      <button ref={element => { buttonRef.current = element; if (triggerRef) triggerRef.current = element; }} type="button" className={triggerClassName} aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} onClick={() => (open ? close(false) : setOpen(true))}>
         {trigger || <Ellipsis size={20} strokeWidth={1.75} aria-hidden="true" />}
       </button>
       {open && (
@@ -99,10 +108,11 @@ export default function Menu({ label = 'More', items, align = 'right', trigger, 
                 role="menuitem"
                 className={(item.danger ? 'is-danger' : '') + (item.meta ? ' has-meta' : '')}
                 aria-current={item.current ? 'true' : undefined}
-                disabled={item.disabled}
+                aria-disabled={item.disabled ? 'true' : undefined}
                 onClick={() => {
+                  if (item.disabled) return;
                   if (item.items) { setSub(item); return; }
-                  close(false);
+                  close(true);
                   item.onSelect?.();
                 }}
               >
@@ -113,6 +123,7 @@ export default function Menu({ label = 'More', items, align = 'right', trigger, 
                 </span>
               </button>
             ))}
+            {note && !sub && <p className="c-menu-note">{note}</p>}
           </div>
         </BodyPortal>
       )}

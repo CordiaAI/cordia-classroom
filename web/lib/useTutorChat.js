@@ -59,10 +59,14 @@ const SKILL_PROGRESS = {
 
 // freshOnMount: the full Tutor page opens on a new chat; the side panel starts one each time it opens.
 // resumeChatId: the full Tutor page opens that saved chat instead (the sidebar's Recent chats).
-// freshOnSend: the chat home; its first message starts a new chat (the one before is saved).
+// freshOnSend: the chat home; the sidebar's New chat empties it again.
+// startWith: the chat page (pages/home.js): before the next message, start a new chat or open a saved
+// one (lib/chats.js); resolves to { session } to send in, or { ok: false } to stop (the question
+// goes back in the box). startMessages: what that conversation already holds, shown under the question.
+// onSendFailed({ status }): the Tutor didn't answer (a 404 or 409 from another tab, a plan limit).
 // scopeClassId: the class picked in the composer ('' for all classes).
 // dropFiles: files dropped on the page attach here (off where another Tutor takes them).
-export function useTutorChat({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '', freshOnMount = false, resumeChatId = '', assignment = null, initialPrompt = '', freshOnSend = false, scopeClassId = '', dropFiles = true } = {}) {
+export function useTutorChat({ guides: providedGuides = null, preferredGuideId = '', preferredNoteId = '', freshOnMount = false, resumeChatId = '', assignment = null, initialPrompt = '', freshOnSend = false, startWith = null, startMessages = null, onSendFailed = null, scopeClassId = '', dropFiles = true } = {}) {
   // An assignment being worked on: its instructions and rubric go with every question until cleared.
   const [working, setWorking] = useState(assignment);
   useEffect(() => { setWorking(assignment); }, [assignment?.key]);
@@ -215,11 +219,14 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
     refresh();
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
+    // Saved chats changed the conversation (lib/chats.js: a chat deleted, started or opened).
+    window.addEventListener('cordia:tutor-refresh', onVisible);
     return () => {
       active = false;
       window.clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
+      window.removeEventListener('cordia:tutor-refresh', onVisible);
     };
   }, []);
 
@@ -382,35 +389,30 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
     sendingRef.current = true;
     setLoading(true);
     setSentHere(true);
-    // freshOnSend (the chat home): the first message from here starts a new chat, so the one
-    // before is saved under Past chats, the same as the Tutor page's new chat.
-    const fresh = freshOnSend && !startedRef.current && (session.messages || []).length > 0;
     startedRef.current = true;
+    // startWith (the chat page): this message starts a new chat, or carries on a saved one, first.
+    const starting = typeof startWith === 'function';
     const asked = { role: 'user', text: question };
     setSession(current => ({
       ...current,
       status: 'running',
-      messages: fresh ? [asked] : [...(current?.messages || []), asked],
+      messages: [...(starting ? startMessages || [] : current?.messages || []), asked],
     }));
     let current = session;
-    if (fresh) {
-      const next = await apiFetch('/tutor/session/new', {
-        method: 'POST',
-        body: JSON.stringify({ session_id: session.id, guide_id: material?.kind === 'guide' ? material.id : null, resume_id: null }),
-      });
-      if (!next?.id) {
+    if (starting) {
+      const started = await startWith({ session, material, question });
+      if (!started?.session?.id) {
         sendingRef.current = false;
         startedRef.current = false;
         setInput(question);
-        setLocalError(apiErrorMessage(next?.detail, 'Could not start a new chat.'));
+        if (started?.message) setLocalError(started.message);
         const refreshed = await apiFetch('/tutor/session');
         if (refreshed?.id) setSession(refreshed);
         setLoading(false);
         return;
       }
-      current = next;
-      tutorChatsChanged();
-      setSession({ ...next, status: 'running', messages: [asked] });
+      current = started.session;
+      setSession({ ...current, status: 'running', messages: [...(current.messages || []), asked] });
     }
     const selectedContent = material?.kind === 'guide'
       ? (material.study_guide || material.notes || '')
@@ -420,6 +422,7 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
     const data = await apiFetch('/chat', {
       method: 'POST',
       timeoutMs: 120000,
+      withStatus: true,
       body: JSON.stringify({
         question,
         content: selectedContent,
@@ -467,6 +470,7 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
       setLocalError(data?.answer || apiErrorMessage(data?.detail, 'Cordia could not answer that yet.'));
       const refreshed = await apiFetch('/tutor/session');
       if (refreshed?.id) setSession(refreshed);
+      onSendFailed?.({ status: data?.httpStatus || 0, question });
     }
     setLoading(false);
   }

@@ -22,6 +22,10 @@ const WIDE = ['/guide/[id]', '/practice', '/practice/[guideId]', '/smartnotes', 
 const FOCUS = FOCUS_ROUTES;
 // Pages that show the Tutor themselves: the full Tutor page and the chat home.
 const OWNS_TUTOR = ['/tutor', '/home'];
+// The chat home and a chat are one page (pages/home.js, also at /chat/[id]): moving from one to the
+// other keeps it mounted, so the home turns into its chat in one move (the page resets itself when
+// a different chat opens).
+const CHAT_ROUTES = ['/home', '/chat/[id]'];
 
 export default function Layout({ children, timerState, setTimerState }) {
   const router = useRouter();
@@ -30,11 +34,11 @@ export default function Layout({ children, timerState, setTimerState }) {
   // and the window's width; null while the page hydrates (lib/useNewShell.js).
   const shell = useNewShell();
   // The Tutor page and the home show the Tutor full size, so the side panel stays out of the way there.
-  const pageOwnsTutor = OWNS_TUTOR.includes(router.pathname);
+  const pageOwnsTutor = OWNS_TUTOR.includes(router.pathname) || CHAT_ROUTES.includes(router.pathname);
   const activeGuideId = router.query.guideId || (router.pathname === '/guide/[id]' ? router.query.id : '');
   const activeNoteId = router.pathname === '/smartnotes' ? router.query.id : '';
   // Remount the page when the material changes (guide A -> guide B), not on every query tweak.
-  const routeKey = `${router.pathname}:${router.query.id || ''}:${router.query.guideId || ''}`;
+  const routeKey = CHAT_ROUTES.includes(router.pathname) ? 'chat' : `${router.pathname}:${router.query.id || ''}:${router.query.guideId || ''}`;
 
   return (
     <div className={'app-shell' + (FOCUS.includes(router.pathname) ? ' is-focus' : '')}>

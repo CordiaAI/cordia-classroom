@@ -24,8 +24,10 @@ import { HELP_EVENT } from '../lib/help';
 import { setThemePreference, themePreference } from '../lib/theme';
 import { tierName } from '../lib/plans';
 import { loadClassReadiness } from '../lib/classReadiness';
-import { liveMessages, loadSavedChats, onTutorChats } from '../lib/tutorChats';
+import { useChats } from '../lib/chats';
 import { MAX_CLASSES, recentChats, sidebarCurrent } from '../lib/shellTools.mjs';
+import SidebarChats from './SidebarChats';
+import ChatToast from './ChatToast';
 import { HOME_ROUTE } from '../lib/newShell.mjs';
 
 // Phones (under 768px) keep the top bar and tab bar until the phone layout (T9). The top bar's
@@ -154,22 +156,14 @@ export default function Sidebar() {
     return () => { live = false; router.events.off('routeChangeComplete', onRoute); };
   }, [classKey, router.events]);
 
-  // Recent chats: the Tutor's open conversation and its saved chats (until saved chats get their
-  // own pages, T5).
-  const [saved, setSaved] = useState([]);
-  const [live, setLive] = useState(() => liveMessages());
-  useEffect(() => {
-    let alive = true;
-    const reload = () => loadSavedChats().then(chats => { if (alive) setSaved(chats); });
-    reload();
-    const off = onTutorChats(({ saved: changed }) => { setLive(liveMessages()); if (changed) reload(); });
-    return () => { alive = false; off(); };
-  }, []);
-  const chats = recentChats(live, saved);
+  // Recent chats: every chat, newest first, from the saved-chats store the chat page shares
+  // (lib/chats.js). Each opens at /chat/<id>; the open one is current.
+  const saved = useChats();
+  const chats = recentChats(saved.chats);
   const query = router.query || {};
   const current = sidebarCurrent(router.pathname, query, {
     classIds: shownClasses.map(item => String(item.id)),
-    liveChat: chats.some(chat => chat.key === 'chat:live'),
+    liveChatId: chats.find(chat => chat.live)?.id || '',
   });
 
   useEffect(() => {
@@ -281,11 +275,6 @@ export default function Sidebar() {
       window.dispatchEvent(new Event('cordia:tutor-new'));
     }
   }
-  // The open conversation reopens as it is; a saved chat reopens from /tutor?chat=<id>.
-  function openChat(chat) {
-    if (chat.key === 'chat:live') try { sessionStorage.setItem('cordiaTutorKeep', '1'); } catch { /* storage blocked */ }
-  }
-
   const sideTips = [
     { key: 'toggle', title: collapsed ? 'Expand sidebar' : 'Collapse sidebar' },
     { key: 'bell', title: 'Notifications' },
@@ -358,20 +347,7 @@ export default function Sidebar() {
             {classes && classes.length === 0 && <p className="c-side-empty c-side-label">No classes yet</p>}
           </div>
 
-          <div className="c-side-section c-side-chats" role="group" aria-labelledby="c-side-chats">
-            <h2 id="c-side-chats" className="c-side-heading c-side-heading-row">Recent chats</h2>
-            {chats.length > 0 ? (
-              <ul className="c-side-list c-side-chat-list">
-                {chats.map(chat => (
-                  <li key={chat.key}>
-                    <Link className="c-side-item c-side-chat" href={chat.href} onClick={() => openChat(chat)} aria-current={current === chat.key ? 'page' : undefined}>
-                      <span className="c-side-label">{chat.title}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="c-side-empty">Chats with the Tutor show up here.</p>}
-          </div>
+          <SidebarChats chats={chats} current={current} editable={saved.editable} classes={classes || []} failed={saved.failed} />
           {/* Folded, the chats open from one icon, in a menu beside the sidebar. */}
           <button ref={chatsRef} type="button" className="c-side-item c-side-chats-icon" aria-label="Recent chats" aria-haspopup="menu" aria-expanded={chatsOpen}
             aria-current={folded && current.startsWith('chat:') ? 'page' : undefined} {...tipFor('chats')} onClick={() => { hide(); setChatsOpen(open => !open); }}>
@@ -390,7 +366,8 @@ export default function Sidebar() {
       </aside>
       <ShellTipLayer tip={menuOpen || chatsOpen ? null : tip} items={sideTips} side="right" />
       <ShellMenu open={chatsOpen && folded} onClose={closeChats} anchorRef={chatsRef} side="right" label="Recent chats"
-        items={chats.slice(0, 12).map(chat => ({ key: chat.key, label: chat.title, href: chat.href, current: current === chat.key, onSelect: () => openChat(chat) }))} />
+        items={chats.slice(0, 12).map(chat => ({ key: chat.key, label: chat.title, href: chat.href, current: current === chat.key }))} />
+      <ChatToast />
 
 
       {/* Phones: brand, search and account on top; the tab bar below. */}
