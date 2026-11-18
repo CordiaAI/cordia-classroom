@@ -15,7 +15,8 @@
   /* Type */
   --font-sans: 'Quicksand', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: 'Newsreader', Georgia, serif;
-  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-code-block: ui-monospace, SFMono-Regular, Consolas, monospace;  /* practice code blocks, their stack before T10; the paper pair replaces it */
   --font-code-note: 'Courier New', monospace;  /* code on the note paper; a font pair with its own code font replaces it */
   /* The five font pairs (<html data-font>, end of this file): a display font for headings and a UI
      font for everything else. The sheet previews each pair from these. */
@@ -598,7 +599,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
 @font-face { font-family: 'Instrument Sans'; src: url('/fonts/instrument-sans-latin.woff2') format('woff2'); font-style: normal; font-weight: 400 700; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 @font-face { font-family: 'JetBrains Mono'; src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2'); font-style: normal; font-weight: 100 800; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 :root[data-font='readable'] { --font-sans: var(--font-readable-ui); --font-display: var(--font-readable-display); }
-:root[data-font='paper'], :root[data-look='paper-clay']:not([data-font]) { --font-sans: var(--font-paper-ui); --font-display: var(--font-paper-display); --font-mono: var(--font-paper-mono); --font-code-note: var(--font-paper-mono); }
+:root[data-font='paper'], :root[data-look='paper-clay']:not([data-font]) { --font-sans: var(--font-paper-ui); --font-display: var(--font-paper-display); --font-mono: var(--font-paper-mono); --font-code-note: var(--font-paper-mono); --font-code-block: var(--font-paper-mono); }
 
 /* ---- Accent: <html data-accent="ocean|indigo|clay|rose|plum|graphite|teal|custom">. Olive is the
    default and needs no attribute. Each accent is a set of seeds (channels, R, G, B): --ca-l-* for

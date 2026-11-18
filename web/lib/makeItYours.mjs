@@ -13,13 +13,15 @@ export function openMakeItYours(returnTo = null) {
   window.dispatchEvent(new CustomEvent(MAKE_IT_YOURS_EVENT, { detail: { returnTo } }));
 }
 
-// Search finds the sheet by these words (and by the first three letters or more of one, so "the" or
-// "dar" already shows it). Compared without case or extra spaces.
+// Search finds the sheet by these words, whole (and while one is being typed: its first three letters or more, so
+// "the" or "dar" already shows it). A query that only starts with one ("dark matter", "glass transition", "colour
+// theory") is class work, not the sheet. Compared without case or extra spaces. Search lists it after the student's
+// own matches (components/SearchModal.js).
 export const SEARCH_WORDS = ['make it yours', 'theme', 'themes', 'dark mode', 'light mode', 'dark', 'appearance', 'accent', 'colour', 'color', 'background', 'font', 'text size', 'glass'];
 export function matchesMakeItYours(query) {
   const q = String(query || '').toLowerCase().replace(/\s+/g, ' ').trim();
   if (q.length < 3) return false;
-  return SEARCH_WORDS.some(word => word.startsWith(q) || q.startsWith(word));
+  return SEARCH_WORDS.some(word => word.startsWith(q));
 }
 
 // Names the sheet shows (sentence case). Presets carry their own label.

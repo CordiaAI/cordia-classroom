@@ -82,12 +82,20 @@ export default function MakeItYoursHost() {
           </div>
         </BodyPortal>
       )}
+      <style jsx global>{`
+        /* Reset happens in the sheet, so its Undo toast is born over it: it sits at the top, centred on the window
+           like the sheet, and the sheet makes room under it, so it never covers the footer (Reset, Done) or the
+           title. It keeps that place for its six seconds, even if the sheet closes first. */
+        .c-toast.miy-toast { top: calc(16px + env(safe-area-inset-top)); bottom: auto !important; left: 50% !important; width: max-content; }
+        :root:has(.miy-toast) .miy-scrim { --miy-toast-room: calc(78px + env(safe-area-inset-top)); }
+      `}</style>
     </>
   );
 }
 
 // Arrow keys move along a row of tiles or swatches and pick as they go, like native radio buttons (and show
-// on the next frame: the sheet drops its transitions while the keyboard drives it).
+// on the next frame: the sheet drops its transitions while the keyboard drives it). The custom colour is the
+// Accent row's ninth choice: arrows only move to it, since picking it opens the colour picker (Enter or Space).
 function onRadioKeys(event, setKeyed) {
   const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
   if (!step && event.key !== 'Home' && event.key !== 'End') return;
@@ -98,7 +106,7 @@ function onRadioKeys(event, setKeyed) {
   const next = step ? radios[(at + step + radios.length) % radios.length] : radios[event.key === 'Home' ? 0 : radios.length - 1];
   setKeyed(true);
   next.focus();
-  next.click();
+  if (!next.hasAttribute('data-opens-picker')) next.click();
 }
 
 function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
@@ -109,6 +117,7 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
   const resetRef = useRef(null);
   const pending = useRef(null);
   const frame = useRef(0);
+  const pickerRef = useRef(null);
 
   // Every pick applies to the whole app at once and saves (the device at once, the account quietly).
   const commit = useCallback(next => {
@@ -161,6 +170,15 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
     });
   }
   const pickerValue = (settings.accent === 'custom' && settings.customAccent) || cssVar(`--swatch-accent-${ACCENTS.includes(settings.accent) ? settings.accent : 'olive'}`, '') || undefined;
+  // The ninth Accent choice opens the browser's colour picker (it is a radio for arrows and screen readers; the
+  // colour input itself is out of the tab order and hidden from them).
+  function openPicker() {
+    const input = pickerRef.current;
+    if (!input) return;
+    try { if (typeof input.showPicker === 'function') { input.showPicker(); return; } } catch { /* not allowed here: fall back */ }
+    input.click();
+  }
+  const customChosen = settings.accent === 'custom';
 
   function reset() {
     if (atDefault) return;
@@ -175,7 +193,7 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
   // A row whose current value is none of its tiles (a font after Paper & Clay) still needs one tab stop.
   const firstTabStop = (ids, current) => (ids.includes(current) ? null : ids[0]);
   const fontStop = firstTabStop(FONTS, settings.font);
-  const accentStop = firstTabStop(ACCENTS, settings.accent);
+  const accentStop = customChosen ? null : firstTabStop(ACCENTS, settings.accent);
 
   return (
     <BodyPortal>
@@ -222,14 +240,17 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
                         <span className="miy-dot-fill" style={{ background: `var(--swatch-accent-${accent})` }} aria-hidden="true" />
                       </button>
                     ))}
-                  </div>
-                  <label className={'miy-dot miy-custom' + (settings.accent === 'custom' ? ' is-chosen' : '')} title="Custom colour">
-                    <span className="miy-dot-fill" style={settings.accent === 'custom' ? { background: settings.customAccent } : undefined} aria-hidden="true">
-                      {settings.accent !== 'custom' && <Pipette size={16} strokeWidth={2} />}
+                    <span className="miy-custom-slot">
+                      <button className={'miy-dot miy-custom' + (customChosen ? ' is-chosen' : '')} data-opens-picker="" title="Custom colour"
+                        aria-label={customChosen ? `Custom colour, ${settings.customAccent}` : 'Custom colour'} {...radioProps(customChosen, openPicker)}>
+                        <span className="miy-dot-fill" style={customChosen ? { background: settings.customAccent } : undefined} aria-hidden="true">
+                          {!customChosen && <Pipette size={16} strokeWidth={2} />}
+                        </span>
+                      </button>
+                      <input ref={pickerRef} type="color" className="miy-picker" tabIndex={-1} aria-hidden="true"
+                        value={(pickerValue || '').toLowerCase()} onChange={onCustom} />
                     </span>
-                    <input type="color" className="miy-picker" aria-label={settings.accent === 'custom' ? `Custom colour, ${settings.customAccent} in use` : 'Custom colour'}
-                      value={(pickerValue || '').toLowerCase()} onChange={onCustom} />
-                  </label>
+                  </div>
                 </div>
                 <p className="miy-note" role="status" aria-live="polite">{adjusted ? 'Adjusted so text stays readable' : ''}</p>
               </div>
@@ -298,13 +319,14 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
         /* DESIGN-SPEC 3.5 and 4.6: an 880px sheet of solid menu glass, 28px corners, over a 22% ink scrim with a
            3px blur; a full-height sheet on phones. Every value is a token. */
         .miy-scrim {
-          position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 16px;
+          --miy-toast-room: 0px;
+          position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: calc(16px + var(--miy-toast-room)) 16px 16px;
           background: var(--scrim-sheet); -webkit-backdrop-filter: var(--scrim-sheet-blur); backdrop-filter: var(--scrim-sheet-blur);
           animation: miy-fade ${OPEN_MS}ms var(--ease) both;
         }
         .miy-scrim.is-closing { animation: miy-fade-out ${CLOSE_MS}ms var(--ease-exit) both; pointer-events: none; }
         .miy-sheet {
-          position: relative; display: flex; flex-direction: column; width: min(880px, 100%); max-height: calc(100dvh - 32px);
+          position: relative; display: flex; flex-direction: column; width: min(880px, 100%); max-height: calc(100dvh - 32px - var(--miy-toast-room));
           border-radius: var(--r-panel); border: 1px solid; border-color: var(--glass-rim-border);
           background: var(--lg-menu); color: var(--ink);
           box-shadow: var(--glass-shadow-edge), var(--lg-depth-float);
@@ -333,7 +355,8 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
 
         /* Tiles: theme windows, backgrounds and fonts. Chosen: the 2px accent ring with its 5px halo. Hover lifts an
            unchosen tile 1px (pointer only); nothing changes colour. */
-        .miy-themes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+        /* Every theme tile on one row (seven, or eight with Custom), so none sits alone on a second row. */
+        .miy-themes { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
         .miy-tiles { display: flex; flex-wrap: wrap; gap: 10px; }
         .miy-tile {
           display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 5px 5px 6px; margin: 0;
@@ -351,7 +374,7 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
         .miy-art-look { display: grid; place-items: center; background: var(--swatch-look-paper-clay); box-shadow: inset 0 0 0 1px var(--swatch-look-paper-clay-edge); }
         .miy-look-aa { font: 600 1.375rem/1 var(--swatch-look-paper-clay-font); color: var(--swatch-look-paper-clay-ink); }
         .miy-look-dot { position: absolute; right: 8px; bottom: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--swatch-look-paper-clay-dot); }
-        .miy-name { font: 600 0.8125rem/1.25 var(--font-sans); color: var(--ink); }
+        .miy-name { font: 600 0.8125rem/1.25 var(--font-sans); color: var(--ink); text-wrap: balance; }
         .miy-font { height: 70px; align-items: center; justify-content: center; gap: 4px; }
         .miy-font-aa { font-size: 1.625rem; font-weight: 600; line-height: 1; color: var(--ink); }
         .miy-font-name { font-size: 0.8125rem; font-weight: 600; line-height: 1.25; color: var(--muted); }
@@ -365,19 +388,21 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
           transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
         }
         .miy-dot[aria-checked='true'] .miy-dot-fill, .miy-custom.is-chosen .miy-dot-fill { box-shadow: var(--dot-ring); }
+        .miy-custom-slot { position: relative; display: inline-grid; }
         .miy-custom .miy-dot-fill { background: var(--swatch-custom-wheel); color: var(--swatch-custom-icon); }
         .miy-custom .miy-dot-fill svg { filter: var(--swatch-custom-icon-shadow); }
         .miy-custom.is-chosen .miy-dot-fill { color: transparent; }
-        .miy-picker { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; cursor: pointer; }
-        .miy-custom:has(.miy-picker:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 0; }
+        /* The colour input sits under its radio, so the browser opens the picker there; the radio takes every click. */
+        .miy-picker { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; }
         .miy-note { margin: 0; min-height: 1.25rem; font: 600 0.8125rem/1.4 var(--font-sans); color: var(--muted); }
 
         @media (hover: hover) {
           .miy-tile:not([aria-checked='true']):hover { transform: translateY(-1px); }
-          .miy-dot:not([aria-checked='true']):hover .miy-dot-fill, .miy-custom:not(.is-chosen):hover .miy-dot-fill { transform: translateY(-1px); }
+          .miy-dot:not([aria-checked='true']):hover .miy-dot-fill { transform: translateY(-1px); }
         }
         .miy-tile:not([aria-checked='true']):active { transform: var(--press); }
-        .miy-dot:active .miy-dot-fill { transform: var(--press); }
+        /* As specific as the hover lift, and after it, so a press under the pointer settles instead of staying lifted. */
+        .miy-dot:not([aria-checked='true']):active .miy-dot-fill, .miy-dot[aria-checked='true']:active .miy-dot-fill { transform: var(--press); }
         .miy-tile:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 7px; }
         .miy-dot:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 0; }
         .miy-sheet.is-keyed :is(.miy-tile, .miy-dot-fill) { transition: none; }
@@ -395,7 +420,7 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
         /* Phones: a full-height sheet; labels above their controls; every target at least 44px. */
         @media (max-width: 767px) {
           .miy-scrim { padding: 0; place-items: stretch; }
-          .miy-sheet { position: fixed; inset: 0; width: auto; height: auto; max-height: none; border-radius: 0; border-width: 0; }
+          .miy-sheet { position: fixed; inset: var(--miy-toast-room) 0 0; width: auto; height: auto; max-height: none; border-radius: 0; border-width: 0; }
           @keyframes miy-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
           @keyframes miy-sink { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(24px); } }
           .miy-head { padding: calc(16px + env(safe-area-inset-top)) 16px 8px; }
@@ -404,8 +429,10 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
           .miy-body { padding: 4px 16px 0; }
           .miy-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
           .miy-label { padding-top: 0; }
-          .miy-themes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .miy-themes { grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); }
           .miy-small { width: calc((100% - 20px) / 3); min-width: 92px; }
+          /* Nine 44px choices are wider than a phone: five and four, not eight and a lone custom colour. */
+          .miy-dots { display: grid; grid-template-columns: repeat(5, 44px); }
           .miy-seg { max-width: 100%; }
           .miy-seg > button { min-height: 44px; }
           .miy-foot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }

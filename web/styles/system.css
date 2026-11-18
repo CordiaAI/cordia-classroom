@@ -210,7 +210,7 @@ textarea.c-input { height: auto; min-height: 120px; padding: var(--space-3) var(
   background: var(--card); color: var(--ink); font:600 0.8125rem/1 var(--font-sans); cursor: pointer;
   display: grid; place-items: center;
 }
-.c-avatar.is-active { box-shadow: 0 0 0 2px var(--olive); }
+.c-avatar.is-active { box-shadow: 0 0 0 2px var(--meter); }
 .c-avatar { position: relative; }
 
 .c-menu {
@@ -868,12 +868,12 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
     .c-side-retry { padding: 0; border: 0; background: none; color: var(--olive-ink); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
     .c-side-chats-icon { display: none; }
 
-    /* The account row, under the one hairline: a 36px avatar (initials in olive on selected glass),
+    /* The account row, under the one hairline: a 36px avatar (initials in --meter-ink, olive or ink under Paper & Clay, on selected glass),
        the name, the plan and school, and ⋯ (its menu: components/AccountMenu.js). */
     .c-side-foot { flex: none; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); }
     .c-side-account { height: 52px; padding: 0 6px; gap: 12px; }
     .c-side-account[aria-expanded='true'] { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
-    .c-side .c-side-avatar { flex: none; width: 36px; height: 36px; border: 0; background: var(--selected-glass); box-shadow: var(--selected-glass-shadow); color: var(--olive-ink); font: 700 0.8125rem/1 var(--font-sans); }
+    .c-side .c-side-avatar { flex: none; width: 36px; height: 36px; border: 0; background: var(--selected-glass); box-shadow: var(--selected-glass-shadow); color: var(--meter-ink); font: 700 0.8125rem/1 var(--font-sans); }
     .c-side-who { display: grid; gap: 2px; min-width: 0; flex: 1 1 auto; }
     .c-side-who strong { font: 600 0.875rem/1.25 var(--font-sans); color: var(--ink); }
     .c-side-who span { color: var(--muted); font: 500 0.75rem/1.25 var(--font-sans); }

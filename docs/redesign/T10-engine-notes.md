@@ -70,7 +70,8 @@ The light/dark choice was saved in `progress.theme` (Supabase user metadata, key
 `localStorage` copy. The look is saved the same way, as `progress.look` (about 120 bytes), so it needs
 **no new column or table and no migration**, and it saves to the account today. `progress.js` merges it like
 `theme` (whichever copy changed last). The device copy is `localStorage.cordiaLook`, written by `saveLook`
-(`{ s: settings, a: attributes, ap: appearance, v: customVariables, f: fontFiles }`). The account save is the
+(`{ s: settings, a: attributes, ap: appearance, v: customVariables, f: fontFiles, u: userId }`; `u` names the account
+that wrote it, see "Shared browsers" below). The account save is the
 same quiet delayed one progress already uses; if it fails the device copy stays. `progress.theme` is still
 written when the appearance is Light or Dark, for older tabs.
 
@@ -80,9 +81,16 @@ The script in `_document.js` reads `cordiaLook`, sets `data-theme` and the attri
 `<link rel="preload">` for the saved font pair's files, so nothing flashes the default. With no saved look it
 falls back to the old `theme` key, then to **Light** (it cannot know the account yet; a new account's Match device
 is written into the cache as soon as the account loads, see below). Public pages use the same list that kept them light
-before (signed-out visitors on Pricing, policy and guide pages; `/`, `/login`, `/signup`, `/reset-password`;
+before (signed-out visitors on policy and guide pages; `/`, `/login`, `/signup`, `/pricing`, `/reset-password`;
 `/print/*` in `theme.js`): they get no attributes and light, and moving to one from the app clears the look.
-Signed-in students on Pricing and the policy pages see their own look, as they already saw dark.
+Signed-in students on the policy pages see their own look, as they already saw dark. **Pricing is the Cordia default in
+light for everyone, signed in or not** (the director's call on criterion 9, after the review of pull request 270).
+
+**Shared browsers.** The cache is one per browser, so it names the account that wrote it (`u`, the same user id the
+`userId` key and the `cordiaProgress:<id>` key already hold). When the signed-in id differs from `u`, the first-paint
+script and `theme.js` ignore the cache and the old `theme` key and paint the Cordia default in Light, so the next account
+never sees the previous one's dark; once that account's own copy is read, `syncThemeFromAccount` writes its own look
+(or its default, from its creation time) stamped with its id. A cache without `u` predates the stamp and is trusted.
 
 ## Paper & Clay (the seventh preset, a full look)
 
@@ -173,10 +181,13 @@ colour); the neutral `--olive-tint`. The contrast of the given pairs is checked 
   anything that uses `--glass-shadow` is flat under the look. Sheets, dialogs, the toast and the Tutor bubble are
   panes, so they are flat with a hairline too (the source design floats dialogs and toasts with `shadow-lg`; that
   needs a floating-pane token they do not have yet). The Tutor bubble keeps a shadow on hover.
-- Code: `.practice-code` (`globals.css:736`) and `globals.css:1115` name their own monospace; only
-  `.tutor-work` and the Quizlet import use `--font-mono`, so JetBrains Mono reaches those two.
-- Progress rings and bars, stars and a few badges read `--olive` or `--olive-ink` directly, so the accent shows
-  there as well as on primary actions (nothing at token level can tell a ring from a button).
+- Code: `--font-mono` keeps its default stack from before T10 (`ui-monospace, 'SF Mono', Menlo, monospace`).
+  `.practice-code` reads `--font-code-block` (its own stack from before T10, `ui-monospace, SFMono-Regular, Consolas,
+  monospace`) and the note paper reads `--font-code-note`; the paper pair sets all three to JetBrains Mono.
+- Progress rings and bars, stars, badges and the Settings avatar read `--meter`, `--meter-ink` and `--on-meter`, which are
+  the accent by default and ink under Paper & Clay (the owner's decision B: the accent on primary actions only). A pressed
+  star reads `--meter-ink` through `--icon-pressed`, set by `.c-star` (`glass.css`), because the shared pressed-icon
+  rule outranks any page rule.
 - `.pricing-card`, the print pages and the note paper keep their own paper (public pages never get the look; note
   paper is cream in both themes by design).
 
@@ -195,8 +206,10 @@ Signed-out and public pages are unchanged (always Cordia default, light).
   are the pure helpers (tested); `DEFAULT_SETTINGS.appearance` is `light`, so every fallback elsewhere (junk values,
   a missing value, no account) is Light.
 - The creation time is Supabase's own `created_at`, which `progress.js` already receives from `GET /auth/v1/user`
-  when the account loads. It is kept on the device as `localStorage.cordiaAccount` (`{ id, created }`, ignored for
-  any other account) and read with `accountCreatedAt()`. It is not part of `progress`, so it is never written back
+  when the account loads. It is kept on the device under a per-account key, `localStorage['cordiaAccount:<user id>']`,
+  whose value is the creation time alone (an old shared `cordiaAccount` `{ id, created }` copy is carried over once,
+  then removed), and read with `accountCreatedAt()`. The key name contains the user id, as `cordiaProgress:<user id>`
+  already does; the review of pull request 270 accepted that. It is not part of `progress`, so it is never written back
   and does not ride in the token.
 - `theme.js`: `lookSettings()` fills a missing appearance from the account's default. `syncThemeFromAccount()`,
   once the account is known and there is no saved look or saved light/dark, writes the default into the device cache
@@ -261,7 +274,8 @@ device shows selected for a new account with no saved choice, Light for an exist
 6. The sheet should call `saveLook(next)` on every pick (it applies live and saves), use `PRESETS`,
    `resolveTheme`, `applyPreset`, `withCustomAccent` and the swatch tokens, show Match device highlighting
    from `resolveAppearance`, and for Reset keep the previous settings object for Undo and call
-   `saveLook(DEFAULT_SETTINGS)`. The existing Sidebar and Settings light/dark toggles still work and write
+   `saveLook(defaultLook())` (built: `components/MakeItYours.js`; `DEFAULT_SETTINGS` would move an existing account
+   off Light). The existing Sidebar and Settings light/dark toggles still work and write
    the appearance; the sheet replaces them.
 7. Radio group for Glass: `auto` should show Frosted selected (or Solid when the device asks for
    reduced transparency).
