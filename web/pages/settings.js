@@ -442,7 +442,9 @@ export default function SettingsPage() {
         .settings-row :global(.c-seg) button { display: inline-flex; align-items: center; gap: 6px; }
         .settings-export-note { flex-basis: 100%; margin: 0; }
         .settings-note { margin: 0; }
-        .settings-links { display: flex; gap: 20px; font:600 0.8125rem/1 var(--font-sans); }
+        .settings-links { display: flex; gap: 1.25rem; font:600 0.8125rem/1 var(--font-sans); }
+        /* Straight on the page backdrop, so the strong muted ink (4.5:1 there), not the card muted. */
+        .settings-links a { color: var(--muted-strong); }
         .me-card { display: flex; align-items: center; gap: 16px; }
         .me-avatar { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius:50%; background: var(--meter); color: var(--on-meter); font:600 1.25rem/1 var(--font-sans); }
         .me-names { display: grid; gap: 2px; flex: 1; min-width: 0; }

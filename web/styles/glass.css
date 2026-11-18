@@ -395,6 +395,8 @@ body { touch-action: manipulation; }
 .cn-tag, .cn-chev { display: none; }
 .cn-badge { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--r-pill); border: 1px solid var(--hairline); color: var(--muted); font: 600 0.8125rem/1 var(--font-sans); }
 .cn-badge.is-on { border-color: transparent; background: var(--success-bg); color: var(--success); }
+/* On a phone the tile has no glass of its own, and the green is 4.1:1 on the dark field; the word carries the state, so it takes the ink there. */
+[data-theme='dark'] .cn-badge.is-on { color: var(--ink); }
 .cn-badge.is-warn { border-color: transparent; background: var(--warning-bg); color: var(--warning); }
 .cn-detail.is-canvas { max-height: 90svh; overflow-y: auto; }
 .cn-canvas-meta { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }

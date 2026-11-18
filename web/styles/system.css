@@ -51,7 +51,7 @@ a { color: var(--olive-ink); }
 @media (hover: hover) { .c-btn--quiet:hover:not(:disabled) { background: var(--lift-pane); } }
 .c-btn--danger { color: var(--error); }
 /* refine.css sets every quiet button to ink, after this file: a quiet destructive action keeps its red. */
-.c-btn--quiet.c-btn--danger { color: var(--error); }
+.c-btn--quiet.c-btn--danger:not(:disabled) { color: var(--error); }
 .c-btn--block { width: 100%; }
 .c-btn--lg { height: 52px; min-height: 52px; padding: 0 32px; font-size: 1.0625rem; }
 .c-btn kbd {
@@ -715,13 +715,16 @@ html.is-restyling :not(.miy-sheet, .miy-sheet *), html.is-restyling :not(.miy-sh
 .setting-text > .c-meta { margin: 0; grid-column: 2; grid-row: 2; }
 @media (max-width: 767px) { .settings-row > .c-btn { width: 100%; } }
 /* A sub-setting under a card's main one: a hairline above, its line left and a quiet action right. */
-.settings-sub { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem 1rem; flex-wrap: wrap; padding-top: 0.75rem; border-top: 1px solid var(--hairline); }
+.settings-sub { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem 1rem; flex-wrap: wrap; margin-top: 0.5rem; }
+/* A lone button in a card sits at its start, not stretched across it. */
+.settings-card > .c-btn { justify-self: start; }
 .settings-sub > .c-meta { margin: 0; flex: 1 1 12rem; }
 /* A card's title with one quiet action on its right. */
 .settings-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: 2.75rem; }
 .settings-head > .c-section-title { margin: 0; }
 .settings-card .c-btn--quiet { padding-inline: var(--space-4); }
-@media (max-width: 767px) { .settings-sub > .c-btn { width: 100%; } }
+/* A quiet action at a card's right edge lines its text up with the switches and icons above and below it. */
+.settings-head > .c-btn--quiet, .settings-sub > .c-btn--quiet { margin-inline-end: calc(var(--space-4) * -1); }
 
 /* ---------- Numbered steps (Canvas connect, Chrome extension) ---------- */
 .c-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
