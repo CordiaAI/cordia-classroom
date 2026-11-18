@@ -456,39 +456,50 @@ def claim_tutor_turn(
 
 
 def complete_tutor_turn(user_id: str, turn: dict, response: dict):
-    messages = list(turn.get("messages") or [])
+    claimed = list(turn.get("messages") or [])
     assistant_message = {"role": "ai", "text": response.get("answer") or ""}
     if response.get("source"):
         assistant_message["source"] = response["source"]
     for key in ("guide", "link", "confirm", "visual", "study_plan"):
         if response.get(key):
             assistant_message[key] = response[key]
-    messages.append(assistant_message)
     next_version = (turn.get("conversation_version") or 0) + 1
     action_result = {
         "status": "completed",
         "action": response.get("action") or "answered",
     }
-    result = (
-        get_supabase().table("tutor_sessions")
-        .update({
-            "status": "idle",
-            "run_id": None,
-            "run_started_at": None,
-            "messages": messages[-MAX_SESSION_MESSAGES:],
-            "conversation_version": next_version,
-            "last_action_result": action_result,
-            "action_history": [*(turn.get("action_history") or []), _history_entry(action_result)][-MAX_ACTION_HISTORY:],
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        })
-        .eq("id", turn["id"])
-        .eq("user_id", user_id)
-        .eq("run_id", turn["run_id"])
-        .execute()
-    )
-    if not result.data:
-        raise HTTPException(status_code=409, detail="Tutor response could not be synchronized")
-    return result.data[0]
+    # A reply posted outside the turn while it ran (append_tutor_message: a Learn check-in, practice
+    # feedback) is kept, before this answer. The write applies only to the copy it read (same updated_at).
+    for _ in range(3):
+        current = (
+            get_supabase().table("tutor_sessions").select("messages,updated_at")
+            .eq("id", turn["id"]).eq("user_id", user_id).eq("run_id", turn["run_id"]).limit(1).execute().data
+        )
+        if not current:
+            break
+        posted = [message for message in current[0].get("messages") or [] if message not in claimed]
+        messages = [*claimed, *posted, assistant_message]
+        query = (
+            get_supabase().table("tutor_sessions")
+            .update({
+                "status": "idle",
+                "run_id": None,
+                "run_started_at": None,
+                "messages": messages[-MAX_SESSION_MESSAGES:],
+                "conversation_version": next_version,
+                "last_action_result": action_result,
+                "action_history": [*(turn.get("action_history") or []), _history_entry(action_result)][-MAX_ACTION_HISTORY:],
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            })
+            .eq("id", turn["id"])
+            .eq("user_id", user_id)
+            .eq("run_id", turn["run_id"])
+        )
+        query = query.eq("updated_at", current[0]["updated_at"]) if current[0].get("updated_at") else query.is_("updated_at", "null")
+        result = query.execute()
+        if result.data:
+            return result.data[0]
+    raise HTTPException(status_code=409, detail="Tutor response could not be synchronized")
 
 
 def fail_tutor_turn(user_id: str, turn: dict | None, detail: str):
