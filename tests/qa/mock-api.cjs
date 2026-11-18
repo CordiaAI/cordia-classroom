@@ -236,8 +236,18 @@ async function install(context, state) {
       return json(state.tutor);
     }
     if (path === '/chat') {
-      state.tutor = { ...state.tutor, messages: [...state.tutor.messages, { role: 'user', text: body.question }, { role: 'ai', text: 'Here is a **simple** explanation from your guide.' }], conversation_version: state.tutor.conversation_version + 1 };
-      return json({ answer: 'ok', session: state.tutor });
+      // state.chatReply(body): a reply of its own ({ answer, study_plan, link, ... }), e.g. a study plan.
+      const { answer = 'Here is a **simple** explanation from your guide.', ...extra } = state.chatReply?.(body) || {};
+      state.tutor = { ...state.tutor, messages: [...state.tutor.messages, { role: 'user', text: body.question }, { role: 'ai', text: answer, ...extra }], conversation_version: state.tutor.conversation_version + 1 };
+      return json({ answer, ...extra, session: state.tutor });
+    }
+    // Learn's finished check-in (backend routers/tutor.py tutor_checkin): the Tutor's next steps join the chat.
+    if (path === '/tutor/session/checkin') {
+      if (state.failCheckin) return route.fulfill({ status: 409, json: { detail: 'The Tutor was busy. Your check-in is saved in Learn; try again.' } });
+      state.checkin = body;
+      const text = `Check-in done: ${body.right} of ${body.total} right. Next: one Learn round a day, and a final check the day before.`;
+      state.tutor = { ...state.tutor, messages: [...state.tutor.messages, { role: 'ai', text, link: { href: `/learn/${body.guide_id}`, label: 'Learn' } }], conversation_version: state.tutor.conversation_version + 1 };
+      return json(state.tutor);
     }
     if ((m = path.match(/^\/quiz\/([^/]+)\/history$/))) return json({ attempts: state.populated ? [{ id: 'q1', score: 80, correct_answers: 4, total_questions: 5, completed_at: new Date().toISOString() }] : [] });
     if ((m = path.match(/^\/quiz\/([^/]+)\/session$/))) {

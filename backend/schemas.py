@@ -107,6 +107,8 @@ class ChatRequest(BaseModel):
     history: List[ChatTurn] = Field(default_factory=list, max_length=400)
     # Clients that render bold, numbered steps, and grey explanation lines.
     rich_text: bool = False
+    # The student's own calendar day, so "tomorrow" and "Friday" mean their days, not the server's.
+    local_date: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
     @field_validator("mode")
     @classmethod
@@ -136,6 +138,8 @@ class ChatResponse(BaseModel):
     confirm: Optional[dict] = None
     # A visual the student described: {"title", "text"}; the app draws it with Napkin.
     visual: Optional[dict] = None
+    # A study plan for a test (services/study_helper.plan_reply): {"guide", "test_date", "exam", "actions"}.
+    study_plan: Optional[dict] = None
     skill: Optional[str] = None
     session: Optional[dict] = None
 
