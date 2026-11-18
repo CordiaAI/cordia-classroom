@@ -229,6 +229,22 @@
   --swatch-look-paper-clay-ink: #141413;
   --swatch-look-paper-clay-font: var(--font-paper-display);
   --swatch-accent-paperclay: #AE5630;
+  /* The sheet itself (DESIGN-SPEC 3.5): a 22% ink scrim with a 3px blur; the theme tiles' mini window (a
+     sidebar strip and a line of text on the background); the Custom swatch's colour wheel; the chosen
+     ring (2px accent with a 5px soft halo) and the accent dots' gap ring (2px of the sheet, then 2px accent). */
+  --scrim-sheet: rgba(23, 27, 24, 0.22);
+  --scrim-sheet-blur: blur(3px);
+  --swatch-tile-side: rgba(255, 255, 255, 0.62);
+  --swatch-tile-line: rgba(255, 255, 255, 0.70);
+  --swatch-dot-edge: inset 0 0 0 1px rgba(23, 27, 24, 0.10);
+  --swatch-custom-wheel: conic-gradient(from 0deg, #8E3E62, #8A5426, #536149, #2E6B5E, #2F5F86, #6A4A7E, #8E3E62);
+  --swatch-custom-icon: #FFFFFF;
+  --swatch-custom-icon-shadow: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+  --tile-ring: 0 0 0 2px var(--olive), 0 0 0 5px rgba(var(--accent-rgb), 0.18);
+  --dot-ring: 0 0 0 2px var(--lg-fill-menu), 0 0 0 4px var(--olive);
+  /* Panes that float over the page (sheets, dialogs, toasts): the glass shadow on Cordia's glass; a look
+     that flattens resting panes gives them a real float shadow instead. */
+  --pane-float-shadow: var(--glass-shadow);
 
   /* Older glass names, kept so every screen resolves to the v2 values above. */
   --lg-filter: var(--glass-blur);
@@ -472,6 +488,11 @@
   --swatch-look-paper-clay: #262624;
   --swatch-look-paper-clay-edge: rgba(250, 249, 245, 0.16);
   --swatch-look-paper-clay-ink: #FAF9F5;
+  --scrim-sheet: rgba(0, 0, 0, 0.45);
+  --swatch-tile-side: rgba(255, 255, 255, 0.10);
+  --swatch-tile-line: rgba(255, 255, 255, 0.16);
+  --swatch-dot-edge: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  --tile-ring: 0 0 0 2px var(--olive), 0 0 0 5px rgba(var(--accent-tint-rgb), 0.22);
   --backdrop-wash: none;
   --backdrop-field:
     radial-gradient(55% 48% at 16% 20%, #2B3327 0%, #2B3327 35%, transparent 75%),

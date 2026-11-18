@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SectionLoader } from '../components/CordiaLoader';
-import { setThemePreference } from '../lib/theme';
+import { openMakeItYours } from '../lib/makeItYours.mjs';
 import { useRouter } from 'next/router';
 import { useRequireAuth } from '../lib/auth';
 import Link from 'next/link';
@@ -12,7 +12,7 @@ import { useLearningStyle } from '../lib/learningStyle';
 import TutorSettings from '../components/TutorSettings';
 import MemoryTrickSettings from '../components/MemoryTrickSettings';
 import MemorySettings from '../components/MemorySettings';
-import { Check, CreditCard, Download, LogOut, Moon, Puzzle, Sun, Trash2, UserRound } from 'lucide-react';
+import { Check, CreditCard, Download, LogOut, Palette, Puzzle, Trash2, UserRound } from 'lucide-react';
 import { downloadMyData } from '../lib/accountExport';
 import BodyPortal from '../components/BodyPortal';
 import SharingSettings from '../components/SharingSettings';
@@ -69,8 +69,6 @@ export default function SettingsPage() {
   const [managing, setManaging] = useState(false);
   const [message, setMessage] = useState('');
 
-  // Theme state
-  const [theme, setTheme] = useState('light');
 
   // Study style (in Tutor)
   const { learningStyle, saveStyle } = useLearningStyle();
@@ -93,8 +91,6 @@ export default function SettingsPage() {
       setEmail(identity.email || getUserEmail() || '');
       setProfileName(identity.name || '');
     });
-    const saved = localStorage.getItem('theme') || 'light';
-    setTheme(saved);
 
     if (router.query.billing === 'success') {
       setActiveSection('plan');
@@ -177,11 +173,6 @@ export default function SettingsPage() {
       setMessage(apiErrorMessage(data?.detail, 'Could not open billing management. Please try again.'));
       setManaging(false);
     }
-  }
-
-  function setAppearance(next) {
-    setTheme(next);
-    setThemePreference(next);
   }
 
   async function deleteAccount(event) {
@@ -386,12 +377,11 @@ export default function SettingsPage() {
               </div>
               <button type="button" className="c-btn c-btn--secondary" onClick={() => { clearAuth(); router.push('/'); }}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" />Sign out</button>
             </div>
+            {/* Appearance: light or dark lives in Make it yours now, with the theme, accent, background, font, text size and glass. */}
             <div className="c-card settings-row">
-              <span className="c-section-title">Theme</span>
-              <SegmentedControl kind="group" label="Theme">
-                <button type="button" className={theme !== 'dark' ? 'is-active' : ''} aria-pressed={theme !== 'dark'} onClick={() => setAppearance('light')}><Sun size={18} strokeWidth={1.75} aria-hidden="true" /> Light</button>
-                <button type="button" className={theme === 'dark' ? 'is-active' : ''} aria-pressed={theme === 'dark'} onClick={() => setAppearance('dark')}><Moon size={18} strokeWidth={1.75} aria-hidden="true" /> Dark</button>
-              </SegmentedControl>
+              <span className="settings-row-label"><Palette size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title" id="settings-appearance">Appearance</span></span>
+              <button type="button" className="c-btn c-btn--secondary" aria-describedby="settings-appearance-note" onClick={event => openMakeItYours(event.currentTarget)}>Make it yours</button>
+              <p className="c-meta settings-export-note" id="settings-appearance-note">Theme, accent, background, font, text size, light or dark, and glass.</p>
             </div>
             <div className="c-card settings-row">
               <span className="settings-row-label"><UserRound size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Profile and privacy</span></span>

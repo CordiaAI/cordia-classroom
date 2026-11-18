@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
-import { ArrowRight, BookOpen, CalendarDays, Compass, Globe, Layers, Library, Mic, NotebookPen, Search, Settings, X } from 'lucide-react';
+import { ArrowRight, BookOpen, CalendarDays, Compass, Globe, Layers, Library, Mic, NotebookPen, Palette, Search, Settings, X } from 'lucide-react';
+import { matchesMakeItYours, openMakeItYours } from '../lib/makeItYours.mjs';
 import { apiFetch } from '../lib/api';
 import { supabaseRest } from '../lib/serverCopies';
 import { searchRows } from '../lib/searchResults.mjs';
@@ -19,6 +20,8 @@ const JUMPS = [
   { key: 'j-calendar', kind: 'jump', icon: CalendarDays, title: 'Calendar', href: '/calendar' },
   { key: 'j-settings', kind: 'jump', icon: Settings, title: 'Settings', href: '/settings' },
 ];
+// "theme", "make it yours", "dark mode", "appearance" and the like open the Make it yours sheet.
+const MAKE_IT_YOURS = { key: 's-make-it-yours', kind: 'setting', icon: Palette, title: 'Make it yours', meta: 'Theme, colours, font, text size, light or dark', sheet: true };
 
 // ⌘K / Ctrl K: one search over study guides, flashcards, notes and lectures, then the top public
 // sets from everyone (Discover) and a link to see them all on /explore.
@@ -35,6 +38,8 @@ export default function SearchModal({ onClose, instant = false }) {
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
+  // What Search was opened from, so a sheet opened from here hands focus back there.
+  const openerRef = useRef(typeof document !== 'undefined' ? document.activeElement : null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -69,7 +74,8 @@ export default function SearchModal({ onClose, instant = false }) {
       return [...recent, ...notes, ...JUMPS];
     }
     const more = publicSetRows(publicHits, query);
-    if (found) return [...found, ...more];
+    const settings = matchesMakeItYours(q) ? [MAKE_IT_YOURS] : [];
+    if (found) return [...settings, ...found, ...more];
     const guides = guideHits.slice(0, 6).map(hit => ({ key: 'g' + hit.id, kind: 'guide', title: hit.title, href: '/guide/' + hit.id }));
     const cards = [];
     for (const guide of library?.guides || []) {
@@ -83,13 +89,14 @@ export default function SearchModal({ onClose, instant = false }) {
       .filter(note => `${note.title} ${plain(note.content)}`.toLowerCase().includes(q))
       .slice(0, 6)
       .map(note => ({ key: 'n' + note.id, kind: 'note', title: note.title || 'Untitled', href: '/smartnotes?id=' + note.id }));
-    return [...guides, ...cards, ...notes, ...more];
+    return [...settings, ...guides, ...cards, ...notes, ...more];
   }, [query, guideHits, library, found, publicHits]);
 
   useEffect(() => setActive(0), [results.length]);
 
   function go(result) {
     onClose();
+    if (result.sheet) { openMakeItYours(openerRef.current); return; }
     router.push(result.href);
   }
 
@@ -100,8 +107,8 @@ export default function SearchModal({ onClose, instant = false }) {
     if (event.key === 'Enter' && results[active]) go(results[active]);
   }
 
-  const ICON = { guide: BookOpen, card: Layers, note: NotebookPen, lecture: Mic, recent: BookOpen, jump: ArrowRight, public: Globe, explore: Compass };
-  const GROUP = { guide: 'Guides', card: 'Cards', note: 'Notes', lecture: 'Lectures', recent: 'Recent', jump: 'Go to', public: 'Public sets', explore: '' };
+  const ICON = { setting: Palette, guide: BookOpen, card: Layers, note: NotebookPen, lecture: Mic, recent: BookOpen, jump: ArrowRight, public: Globe, explore: Compass };
+  const GROUP = { setting: 'Settings', guide: 'Guides', card: 'Cards', note: 'Notes', lecture: 'Lectures', recent: 'Recent', jump: 'Go to', public: 'Public sets', explore: '' };
 
   return (
     <BodyPortal>
@@ -132,7 +139,7 @@ export default function SearchModal({ onClose, instant = false }) {
               </li>
             );
           })}
-          {query.trim() && !results.some(result => result.kind !== 'explore') && <li className="c-meta c-search-none">Nothing of yours matches</li>}
+          {query.trim() && !results.some(result => !['explore', 'setting'].includes(result.kind)) && <li className="c-meta c-search-none">Nothing of yours matches</li>}
         </ul>
       </div>
       <style jsx>{`

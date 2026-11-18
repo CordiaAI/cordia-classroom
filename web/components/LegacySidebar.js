@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { CalendarDays, ChartNoAxesColumn, CircleHelp, CreditCard, Ellipsis, FolderPlus, House, Library, Link2, LogOut, MessageCircle, Megaphone, Moon, Palette, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, Sun, User, Users } from 'lucide-react';
+import { CalendarDays, ChartNoAxesColumn, CircleHelp, CreditCard, Ellipsis, FolderPlus, House, Library, Link2, LogOut, MessageCircle, Megaphone, Palette, PanelLeftClose, PanelLeftOpen, Plus, Search, Settings, User, Users } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -20,7 +20,7 @@ import { classLabel } from '../lib/classLabel';
 import { coverFor } from '../lib/coverDesign.mjs';
 import { latestFolders, loadFolders, onFoldersChanged } from '../lib/folders';
 import { HELP_EVENT } from '../lib/help';
-import { setThemePreference, themePreference } from '../lib/theme';
+import { openMakeItYours } from '../lib/makeItYours.mjs';
 
 // TODAY'S NAVIGATION, restored as it is on main (git show origin/main:web/components/Sidebar.js).
 // Layout shows it when the new shell's switch is off (lib/newShell.mjs) and on every phone; the
@@ -99,7 +99,6 @@ export default function Sidebar({ timerState, setTimerState }) {
   const countRequests = summary => setRequests((summary?.incoming_friend_requests || 0) + (summary?.incoming_follow_requests || 0));
   useEffect(() => onSocialSummary(countRequests), []);
   useEffect(() => { loadSocialSummary().then(countRequests); }, [router.pathname]);
-  const [dark, setDark] = useState(false);
   const timerRef = useRef(null);
   const [shortcut, setShortcut] = useState('Ctrl K');
   const avatarRef = useRef(null);
@@ -184,7 +183,6 @@ export default function Sidebar({ timerState, setTimerState }) {
     if (refocus) (menuFrom === 'side' ? sideAvatarRef : avatarRef).current?.focus({ preventScroll: true });
   }, [menuFrom]);
   function toggleMenu(from) {
-    setDark(themePreference() === 'dark');
     setMenuFrom(from);
     setMenuOpen(open => !open);
   }
@@ -206,19 +204,20 @@ export default function Sidebar({ timerState, setTimerState }) {
   }, [timerOpen]);
 
   // The phone top bar's menu has everything; the sidebar's has Settings, Help, Send feedback,
-  // the theme and Sign out (Progress is in the sidebar; Appearance, Plan and Connectors are in Settings).
+  // Make it yours and Sign out (Progress is in the sidebar; Plan and Connectors are in Settings).
   const accountItems = [
     { key: 'progress', label: 'Progress', icon: ChartNoAxesColumn, onSelect: () => router.push('/progress') },
     { key: 'friends', label: 'Friends', icon: Users, badge: requests || null, badgeLabel: `${requests} ${requests === 1 ? 'request' : 'requests'}`, onSelect: () => router.push('/friends') },
     { key: 'profile', label: 'Settings', icon: Settings, onSelect: () => router.push('/settings') },
-    { key: 'appearance', label: 'Appearance', icon: Palette, onSelect: () => router.push('/settings?section=account') },
+    { key: 'appearance', label: 'Make it yours', icon: Palette, onSelect: () => openMakeItYours() },
     { key: 'plan', label: 'Plan', icon: CreditCard, onSelect: () => router.push('/settings?section=plan') },
     { key: 'connectors', label: 'Connectors', icon: Link2, onSelect: () => router.push('/settings?section=connectors') },
     { key: 'help', label: 'Help', icon: CircleHelp, onSelect: () => setShowHelp(true) },
     { key: 'feedback', label: 'Send feedback', icon: Megaphone, onSelect: () => setShowFeedback(true) },
     { key: 'signout', label: 'Sign out', icon: LogOut, separated: true, onSelect: () => signOut() },
   ];
-  const themeItem = { key: 'theme', label: dark ? 'Light theme' : 'Dark theme', icon: dark ? Sun : Moon, onSelect: () => setThemePreference(dark ? 'light' : 'dark') };
+  // Make it yours holds the light/dark choice now (with the theme, accent, background, font, text size and glass).
+  const themeItem = accountItems.find(item => item.key === 'appearance');
   const sideMenuItems = [
     ...accountItems.filter(item => ['friends', 'profile', 'help', 'feedback'].includes(item.key)),
     themeItem,
