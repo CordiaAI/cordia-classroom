@@ -110,15 +110,21 @@ def related_material(db, user_id: str, guide_id: str, question: str, answer: str
                     .order("updated_at", desc=True).limit(20).execute().data or [])
         try:
             chats = saved("id, title, messages, deleted_at")
-        except Exception:  # before migration 20261130120000 there is no deleted_at
-            chats = saved("id, title, messages")
+        except Exception as error:
+            from services.tutor_sessions import is_missing_saved_chats_schema  # here: no LMS or class code
+            if not is_missing_saved_chats_schema(error):
+                raise  # logged below; the trick goes without Tutor chats this time
+            chats = saved("id, title, messages")  # before migration 20261130120000 there is no deleted_at
         for chat in chats:
             if chat.get("deleted_at"):  # a deleted chat is not material
                 continue
-            said = " ".join(str(m.get("text") or m.get("content") or "") for m in (chat.get("messages") or []) if isinstance(m, dict))
+            messages = [m for m in (chat.get("messages") or []) if isinstance(m, dict)]
+            said = " ".join(str(m.get("text") or m.get("content") or "") for m in messages)
             hits, text = _snippet(said, terms)
             if hits >= 2:  # a passing word in a long chat is not a link
-                found.append({"kind": "tutor", "id": chat["id"], "title": chat.get("title") or "Tutor chat",
+                # Chats saved since T5 keep no title until the student names one: the first question is it.
+                first = next((str(m.get("text") or "") for m in messages if m.get("role") == "user" and m.get("text")), "")
+                found.append({"kind": "tutor", "id": chat["id"], "title": chat.get("title") or " ".join(first.split())[:80] or "Tutor chat",
                               "snippet": text, "_score": hits})
     except Exception:
         logger.warning("Memory context: Tutor chats unavailable", exc_info=True)

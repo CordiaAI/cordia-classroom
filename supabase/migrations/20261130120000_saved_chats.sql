@@ -2,24 +2,31 @@
 -- Redesign T5, saved chats: every Tutor conversation becomes a chat with its own id (the URL
 -- /chat/[id]), a title, an optional class, and a delete the student can undo.
 --
--- This adds four columns, a check and four indexes to public.tutor_chats, the table that already
--- holds the student's saved Tutor chats (per guide, or general). No second store, nothing copied:
---   class_id    the class (folder) the chat belongs to; null = in no class. Deleting the class
---               un-files its chats, it never deletes them.
---   renamed     true once the student typed a title. Until then the title is the first message.
---   live        the one chat that is the Tutor's current conversation. While a chat is live its
---               messages stay in public.tutor_sessions (the row the web app and the extension
---               share) and the backend reads them from there; the chat row keeps the id, title and
---               class, and takes a copy of the messages when the conversation moves on.
---   deleted_at  soft delete: set by Delete, cleared by Undo. The backend removes the row for good
---               30 days later (a daily job in the sync worker, and when the student next starts a chat).
+-- How to apply: this file carries its own begin; ... commit; and is applied as ONE script (paste the
+-- whole file into the SQL editor and run it once, or psql -f). Do not run parts of it. It applies
+-- completely or not at all, and it gives up after 5 seconds instead of queueing behind a long lock
+-- (set local lock_timeout): if that happens nothing changed, run it again at a quieter moment.
+--
+-- This adds three columns and three indexes to public.tutor_chats, the table that already holds the
+-- student's saved Tutor chats (per guide, or general), and one column and one index to
+-- public.tutor_sessions. No second store, nothing copied:
+--   tutor_chats.class_id    the class (folder) the chat belongs to; null = in no class. Deleting the
+--                           class un-files its chats, it never deletes them.
+--   tutor_chats.renamed     true once the student typed a title. Until then the title is the first message.
+--   tutor_chats.deleted_at  soft delete: set by Delete, cleared by Undo. The backend removes the row for
+--                           good 30 days later (a daily job in the sync worker, and when the student next
+--                           starts a chat).
+--   tutor_sessions.live_chat_id  which chat the Tutor's current conversation is. It is the single record
+--                           of the live chat: the backend writes it in the same row update as the
+--                           conversation itself, so the messages and the chat they belong to can never
+--                           disagree. While a chat is live its messages stay in tutor_sessions (the row
+--                           the web app and the extension share); its tutor_chats row keeps the id, title
+--                           and class, and a copy of the messages taken before the conversation moves on.
+--                           Null = the conversation has no chat yet (everything from before this; the
+--                           backend gives it one the first time it is listed or moved on). No backfill.
+--                           Removing a chat row sets it back to null (on delete set null); the
+--                           conversation itself is in tutor_sessions and stays.
 -- updated_at (already there) stays the chat's last activity. Renaming or moving does not touch it.
---
--- A chat is never live and deleted at once: tutor_chats_live_not_deleted makes the database refuse it,
--- so two requests racing (two tabs) fail with an error the backend answers as a conflict (409) instead
--- of leaving the student talking into a deleted chat.
---
--- The whole file is one transaction: it applies completely or not at all.
 --
 -- Existing chats keep their id, title, messages and times. The backfill below files a chat that is
 -- about a guide under that guide's class (only when the guide and the class are the chat's owner's),
@@ -27,21 +34,22 @@
 -- class_id, so it runs only the first time the file is applied. Running the file again after launch
 -- changes nothing and never re-files a chat a student moved out of a class.
 --
--- Only the backend (service role) reads or writes this table; the owner check is in the endpoints
+-- Only the backend (service role) reads or writes these tables; the owner check is in the endpoints
 -- (GET/PATCH/DELETE /chats...). Row-level security is switched on with no client policy and the
--- client roles have no grant, exactly as for tutor_chats and tutor_sessions. A student can never
--- read another student's chat, and cannot read their own except through the backend.
+-- client roles have no grant, exactly as before. A student can never read another student's chat,
+-- and cannot read their own except through the backend.
 --
 -- Before this runs the backend answers every /chats endpoint without an error: the list falls back
 -- to the Tutor chats that already exist, and rename, move, delete and undo say "not available yet".
 -- Once it has run, never roll the backend back to an older release: the old code trims saved chats to
--- the newest 30 and would delete chats past that.
+-- the newest 30 and would delete chats past that, and it knows nothing of live_chat_id.
 
 begin;
 
+set local lock_timeout = '5s';
+
 alter table public.tutor_chats
   add column if not exists renamed boolean not null default false,
-  add column if not exists live boolean not null default false,
   add column if not exists deleted_at timestamptz;
 
 -- class_id and its backfill go together, once: the backfill runs only if this file is the one that
@@ -68,14 +76,14 @@ begin
 end
 $saved_chats$;
 
--- A chat is never both the live conversation and deleted.
-alter table public.tutor_chats drop constraint if exists tutor_chats_live_not_deleted;
-alter table public.tutor_chats
-  add constraint tutor_chats_live_not_deleted check (not (live and deleted_at is not null));
+-- The one record of which chat is live (nullable, no backfill).
+alter table public.tutor_sessions
+  add column if not exists live_chat_id uuid references public.tutor_chats(id) on delete set null;
 
--- At most one live chat per student (the Tutor has one current conversation).
-create unique index if not exists tutor_chats_one_live_per_user
-  on public.tutor_chats (user_id) where live;
+-- Removing a chat row (the purge, a hard delete) looks up the session that points at it; the purge
+-- also asks which of its candidates a session points at, to leave those alone.
+create index if not exists tutor_sessions_live_chat_id
+  on public.tutor_sessions (live_chat_id) where live_chat_id is not null;
 
 -- A class page's Chats tab, and Recent chats: this student's chats that are not deleted, newest first.
 create index if not exists tutor_chats_user_class_updated

@@ -351,14 +351,20 @@ def queue_browser_command(user_id: str, turn: dict, command_type: str, goal: str
 
 
 def append_tutor_message(user_id: str, text: str):
-    """Post a Tutor reply outside a chat turn (e.g. feedback on a missed practice answer)."""
-    row = get_or_create_tutor_session(user_id)
-    messages = list(row.get("messages") or [])
-    messages.append({"role": "ai", "text": text})
-    get_supabase().table("tutor_sessions").update({
-        "messages": messages[-MAX_SESSION_MESSAGES:],
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }).eq("id", row["id"]).eq("user_id", user_id).execute()
+    """Post a Tutor reply outside a chat turn (e.g. feedback on a missed practice answer). The write only
+    applies to the conversation it read (same updated_at): a new chat or an open in another tab in between
+    is never overwritten with the old conversation; the reply is then added to the current one instead."""
+    for _ in range(3):
+        row = get_or_create_tutor_session(user_id)
+        messages = list(row.get("messages") or [])
+        messages.append({"role": "ai", "text": text})
+        query = get_supabase().table("tutor_sessions").update({
+            "messages": messages[-MAX_SESSION_MESSAGES:],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", row["id"]).eq("user_id", user_id)
+        query = query.eq("updated_at", row["updated_at"]) if row.get("updated_at") else query.is_("updated_at", "null")
+        if query.execute().data:
+            return
 
 
 def wait_for_browser_result(user_id: str, turn: dict, answer: str):
@@ -527,36 +533,61 @@ def delete_tutor_chat(user_id: str, chat_id: str) -> bool:
     return bool(gone)
 
 
-SAVED_CHAT_COLUMNS = ("live", "deleted_at", "class_id", "renamed")
-_SAVED_CHAT_COLUMN = re.compile(r"\b(?:" + "|".join(SAVED_CHAT_COLUMNS) + r")\b")  # whole names: "delivery" is not "live"
+# The columns migration 20261130120000 adds: three on tutor_chats, and the live-chat pointer on tutor_sessions.
+SAVED_CHAT_COLUMNS = ("deleted_at", "class_id", "renamed", "live_chat_id")
+_SAVED_CHAT_COLUMN = re.compile(r"\b(?:" + "|".join(SAVED_CHAT_COLUMNS) + r")\b")  # whole names: "deleted_atx" is not "deleted_at"
 
 
 def is_missing_saved_chats_schema(error: Exception) -> bool:
-    """The database error says tutor_chats lacks a column that migration 20261130120000 adds (or the table is missing)."""
+    """The database error says a column that migration 20261130120000 adds is missing (42703 from Postgres on a
+    select or a filter; PGRST204 from PostgREST on an insert or an update, also while its schema cache has not
+    reloaded right after the migration), or the tutor_chats table itself is missing."""
     text = str(error)
     if not any(mark in text for mark in ("PGRST204", "PGRST205", "42703", "42P01", "does not exist", "Could not find")):
         return False
     return "tutor_chats" in text or bool(_SAVED_CHAT_COLUMN.search(text))
 
 
+def _live_chat_id(user_id: str):
+    """The chat the student's Tutor session is (tutor_sessions.live_chat_id). Raises before the migration."""
+    rows = get_supabase().table("tutor_sessions").select("live_chat_id").eq("user_id", user_id).limit(1).execute().data
+    return rows[0].get("live_chat_id") if rows else None
+
+
+def _titled(user_id: str, rows: list) -> list:
+    """A chat saved without a title takes its first message, as start_tutor_chat titles them; one with no
+    messages either is an empty chat nobody used and is not listed."""
+    missing = [row["id"] for row in rows if not row.get("title")]
+    if not missing:
+        return rows
+    said = {row["id"]: row.get("messages") or []
+            for row in _chats_table().select("id,messages").eq("user_id", user_id).in_("id", missing).execute().data or []}
+    for row in rows:
+        if not row.get("title") and said.get(row["id"]):
+            row["title"] = _chat_title(said[row["id"]])
+    return [row for row in rows if row.get("title")]
+
+
 def list_tutor_chats(user_id: str) -> list:
-    """The past chats the Tutor panel lists. Once the saved-chats migration has run, the live chat and
-    deleted chats are left out; before it, every row is a past chat."""
-    def newest(after_migration: bool):
+    """The past chats the Tutor panel lists. Once the saved-chats migration has run, the live chat (the one
+    the Tutor session points at) and deleted chats are left out; before it, every row is a past chat."""
+    def newest(after_migration: bool, live_chat_id=None):
         query = _chats_table().select("id,guide_id,title,updated_at").eq("user_id", user_id)
         if after_migration:
-            query = query.neq("live", True).is_("deleted_at", "null")
+            query = query.is_("deleted_at", "null")
+            if live_chat_id:
+                query = query.neq("id", live_chat_id)
         return query.order("updated_at", desc=True).limit(MAX_SAVED_CHATS)
     try:
         try:
-            result = newest(True).execute()
+            result = newest(True, _live_chat_id(user_id)).execute()
         except Exception as error:
             if not is_missing_saved_chats_schema(error):
                 raise
             result = newest(False).execute()
+        return _titled(user_id, result.data or [])
     except Exception as error:
         _chats_unavailable(error)
-    return result.data or []
 
 
 def start_tutor_chat(user_id: str, session_id: str, guide_id: str | None = None, resume_id: str | None = None):
