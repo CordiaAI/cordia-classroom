@@ -33,7 +33,7 @@ test('a section code in the title or a class name is read, and a missing class s
   assert.equal(plan('Packback #12', 'Introduction to Music'), "Plan Introduction to Music's Packback");
   assert.equal(plan('Quiz 3', 'S1-FA24'), 'Plan your quiz');
   assert.equal(plan('Quiz 3', 'Fall 2024'), 'Plan your quiz');
-  assert.equal(plan('Quiz 3', 'Statistics for Nurses'), "Plan Statistics for Nurses's quiz");
+  assert.equal(plan('Quiz 3', 'Statistics for Nurses'), "Plan Statistics for Nurses' quiz");
 });
 
 test('nothing left of the title still reads as a sentence', () => {
