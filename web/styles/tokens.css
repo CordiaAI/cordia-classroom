@@ -99,7 +99,7 @@
   --on-error: #FFFFFF;                     /* label on a filled red button, both themes */
   --success: #2F6B3F;
   --success-bg: rgba(57, 114, 75, 0.12);
-  --warning: #7F5600;                      /* 5.2:1 on its own tint over a card (was 4.4–4.6) */
+  --warning: #664600;                      /* 7.4:1 on its own tint over white, 5.5:1 over the grey glass sheet (#7F5600 was 4.6:1 there) */
   --warning-bg: rgba(154, 103, 0, 0.12);
   --error: #B42318;
   --error-bg: rgba(180, 35, 24, 0.08);

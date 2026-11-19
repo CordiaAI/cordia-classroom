@@ -433,7 +433,8 @@ body { touch-action: manipulation; }
 .cn-warning { margin: 0; padding: 0.5rem 0.75rem; border-radius: var(--r-input); background: var(--warning-bg); color: var(--warning); font: 600 0.9375rem/1.4 var(--font-sans); }
 .cn-hub { display: grid; gap: 0.5rem; }
 .cn-hub .c-meta { margin: 0; }
-.cn-hub-names { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.cn-hub-names { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; max-height: 11rem; overflow-y: auto; padding: 2px; }
+.cn-hub-name { max-width: 100%; white-space: normal; text-align: left; overflow-wrap: anywhere; }
 .cn-row-error { color: var(--error); font: 600 0.8125rem/1.4 var(--font-sans); }
 /* The import sheet is a column: the head, an optional "Add to" dropdown, the search field, then the
    results, which take what room is left and scroll. (It was a grid with five fixed rows, so the

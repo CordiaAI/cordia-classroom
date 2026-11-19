@@ -109,8 +109,9 @@ function healthLine(health) {
 }
 // A page too long, or too slow, to bring in whole: the server says what was left out and why (note); this is for when it doesn't.
 const PARTIAL_NOTICE = 'Only part of that page came in.';
-const HUB_SHOWN = 6;
-const hubNames = names => names.slice(0, HUB_SHOWN);
+// In the text above a pasted import the names are a sentence, so a long list is cut there; in the hub sheet every name is a button.
+const NOTICE_NAMES = 6;
+const noticeNames = names => `${names.slice(0, NOTICE_NAMES).join(', ')}${names.length > NOTICE_NAMES ? ` and ${names.length - NOTICE_NAMES} more` : ''}`;
 
 function ImportSheet({ connector, onClose }) {
   // Where an import goes: the New sheet's Paste (to review first) or straight into a class in Library.
@@ -164,7 +165,7 @@ function ImportSheet({ connector, onClose }) {
     setBusy('');
     onClose();
     // What was left out is said above the text, not in it: the text is only the page's own notes.
-    const also = data.sub_pages?.length ? ` It also has sub-pages (${hubNames(data.sub_pages).join(', ')}). Import those one at a time.` : '';
+    const also = data.sub_pages?.length ? ` It also has sub-pages (${noticeNames(data.sub_pages)}). Import those one at a time.` : '';
     openNewSheet('paste', { text: data.text, title: data.title, notice: `${data.partial ? data.note || PARTIAL_NOTICE : ''}${also}`.trim() });
   }
 
@@ -215,10 +216,9 @@ function ImportSheet({ connector, onClose }) {
             <div className="cn-hub" role="status">
               <p className="c-meta">This page's notes are in its sub-pages. Search for one:</p>
               <div className="cn-hub-names">
-                {hubNames(hub.names).map(name => (
-                  <button key={name} type="button" className="c-btn c-btn--secondary" onClick={() => { setHub(null); setQuery(name); inputRef.current?.focus(); }}>{name}</button>
+                {hub.names.map((name, index) => (
+                  <button key={`${name}-${index}`} type="button" className="c-btn c-btn--secondary cn-hub-name" onClick={() => { setHub(null); setQuery(name); inputRef.current?.focus(); }}>{name}</button>
                 ))}
-                {hub.names.length > HUB_SHOWN && <span className="c-meta">and {hub.names.length - HUB_SHOWN} more</span>}
               </div>
             </div>
           )}
