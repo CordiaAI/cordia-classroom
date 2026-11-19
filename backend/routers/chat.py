@@ -27,7 +27,7 @@ from services.llm import (
     study_guide_is_complete, study_guide_to_flashcards,
 )
 from services import study_helper
-from services.text_processing import chunk_text, clean_text, html_to_text
+from services.text_processing import chunk_text, clean_text, html_to_text, without_import_lines
 from services.tutor_voice import ground_general_answer, plain_opening
 from services.tutor_sessions import (
     TUTOR_SAFETY_POLICY, claim_tutor_turn, complete_tutor_turn, fail_tutor_turn,
@@ -178,7 +178,7 @@ def _load_owned_material(body: ChatRequest, user_id: str) -> Material:
     sent = (body.content or "")[:MAX_CONTENT_LENGTH]
     if body.guide_id:
         guide = _owned_row("study_guides", "id,title,folder_id,study_guide,notes,source_url", body.guide_id, user_id, "guide")
-        text = guide.get("study_guide") or guide.get("notes") or sent
+        text = guide.get("study_guide") or without_import_lines(guide.get("notes") or "") or sent
         source = {"type": "study_guide", "id": guide["id"], "title": guide.get("title") or "Study Guide"}
         return Material(text[:MAX_CONTENT_LENGTH], source, guide=guide)
     if body.note_id:

@@ -71,6 +71,15 @@ def _request(method: str, path: str, **kwargs):
     return response
 
 
+def _json(response):
+    """The response body as a dict, {} when it is empty, None when it isn't a JSON object (a gateway's HTML 502/504 page)."""
+    try:
+        body = response.json() if response.content else {}
+    except ValueError:
+        return None
+    return body if isinstance(body, dict) else None
+
+
 def _auth_config(connector: str) -> str:
     """The env override if set, else the project's Composio-managed config, created on first use."""
     override = os.getenv(AUTH_CONFIG_ENV[connector], "")
@@ -80,7 +89,7 @@ def _auth_config(connector: str) -> str:
     if toolkit in _auth_configs:
         return _auth_configs[toolkit]
     listed = _request("GET", "/auth_configs", params={"toolkit_slug": toolkit, "limit": 50})
-    items = (listed.json() or {}).get("items", []) if listed.ok else []
+    items = (_json(listed) or {}).get("items", []) if listed.ok else []
     found = next((c.get("id") for c in items if (c.get("toolkit") or {}).get("slug") == toolkit
                   and c.get("status") == "ENABLED" and c.get("is_composio_managed")), None)
     if not found:
@@ -91,7 +100,7 @@ def _auth_config(connector: str) -> str:
         if not created.ok:
             log.warning("composio auth config failed %s %s %s", toolkit, created.status_code, created.text[:300])
             raise HTTPException(status_code=503, detail="This connection isn't set up yet. Try again later.")
-        body = created.json() or {}
+        body = _json(created) or {}
         found = (body.get("auth_config") or {}).get("id") or body.get("id")
     if not found:
         raise HTTPException(status_code=503, detail="This connection isn't set up yet. Try again later.")
@@ -109,7 +118,7 @@ def active_accounts(user_id: str) -> dict[str, str]:
         return {}
     by_toolkit = {toolkit: connector for connector, toolkit in TOOLKITS.items()}
     found = {}
-    for item in (response.json() or {}).get("items", []):
+    for item in (_json(response) or {}).get("items", []):
         # Checked here too: only this student's live accounts, whatever the filter did.
         if item.get("user_id") != user_id or item.get("status") != "ACTIVE":
             continue
@@ -133,7 +142,7 @@ def start_link(user_id: str, connector: str, callback_url: str) -> str:
         "user_id": user_id,
         "callback_url": callback_url,
     })
-    url = (response.json() or {}).get("redirect_url") if response.ok else None
+    url = (_json(response) or {}).get("redirect_url") if response.ok else None
     if not url:
         log.warning("composio link failed %s %s", response.status_code, response.text[:300])
         raise HTTPException(status_code=502, detail="Couldn't start the connection. Try again in a minute.")
@@ -158,7 +167,13 @@ def run(account_id: str, user_id: str, slug: str, arguments: dict) -> dict:
         "version": "latest",
         "arguments": arguments,
     })
-    body = response.json() if response.content else {}
+    body = _json(response)
+    if body is None:
+        # A gateway's HTML error page (or any body that isn't a JSON object) is the app not answering, whatever the status.
+        log.warning("composio %s answered with something that isn't JSON (%s)", slug, response.status_code)
+        if response.status_code == 429:
+            raise HTTPException(status_code=429, detail="The app is busy. Try again in a minute.")
+        raise HTTPException(status_code=502, detail="The app didn't respond. Try again in a minute.")
     if not response.ok or body.get("successful") is False:
         log.warning("composio %s failed %s %s", slug, response.status_code, str(body.get("error"))[:300])
         # The app itself said "slow down" (HTTP 429, or its error says so): a caller that can wait may try once more.

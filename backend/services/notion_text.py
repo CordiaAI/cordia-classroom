@@ -148,6 +148,34 @@ def _pause() -> float:
     return random.uniform(RETRY_PAUSE * 0.5, RETRY_PAUSE * 1.5)
 
 
+_gates: dict = {}  # user id -> [semaphore, readers using it]
+_gates_lock = threading.Lock()
+
+
+class _Gate:
+    """At most PARALLEL Notion calls in flight per student, across every read they have going (an
+    import and a Library save, two tabs, the Tutor), not just inside one. Entries are dropped once
+    nothing uses them."""
+
+    def __init__(self, user_id: str):
+        self.user_id = user_id
+
+    def __enter__(self):
+        with _gates_lock:
+            entry = _gates.setdefault(self.user_id, [threading.BoundedSemaphore(PARALLEL), 0])
+            entry[1] += 1
+        entry[0].acquire()
+        return self
+
+    def __exit__(self, *exc):
+        with _gates_lock:
+            entry = _gates[self.user_id]
+            entry[0].release()
+            entry[1] -= 1
+            if not entry[1]:
+                del _gates[self.user_id]
+
+
 def spend_call(user_id: str) -> bool:
     """Count one Notion call (a search) against the student's hour; False when they are out."""
     return rate_limit.user_allowance(user_id, "notion-calls", CALL_BUDGET, CALL_WINDOW)
@@ -227,6 +255,13 @@ class _Reader:
             self.calls += 1
         return ""
 
+    def _fetch(self, arguments: dict) -> dict:
+        """One call to Notion, one of at most PARALLEL in flight for this student."""
+        if not self.user_id:
+            return self.fetch(arguments)
+        with _Gate(self.user_id):
+            return self.fetch(arguments)
+
     def _stop(self, reason: str) -> None:
         with self.lock:
             self.cut = self.cut or reason
@@ -235,7 +270,7 @@ class _Reader:
         """One Notion call. A 429 is asked again once, after a short random pause, if the clock, the
         caps and the student's hour allow it."""
         try:
-            return self.fetch(arguments)
+            return self._fetch(arguments)
         except HTTPException as error:
             if error.status_code != 429:
                 raise
@@ -247,7 +282,7 @@ class _Reader:
                 self._stop(reason)
                 raise
             _sleep(pause)
-            return self.fetch(arguments)
+            return self._fetch(arguments)
 
     def _children(self, block_id: str, sink: list, root: bool = False) -> None:
         """Every child of a block, listing by listing, handed to `sink` as each one arrives, so what a

@@ -4,6 +4,7 @@ Composio, and Apple Calendar through a subscribed calendar feed. One connection 
 
 import hashlib
 import hmac
+import logging
 import os
 import re
 import time
@@ -24,6 +25,7 @@ from services import connector_settings, google_sync, notion_text, sync_state
 from services import file_extraction as files
 from services.text_processing import OUTLINE_MAX_POINTS
 
+log = logging.getLogger(__name__)
 router = APIRouter(tags=["connectors"])
 
 # Shown in this order. ids match Cordia Assistant's, so one connection serves both apps.
@@ -311,8 +313,13 @@ def add_to_library(connector: str, body: LibraryRequest, authorization: str = He
     if not guide:
         raise _no_text(connector)
     notes = [found.note] if found.note else []
-    if outcome.get("cut"):
-        notes.append(f"A guide keeps the first {OUTLINE_MAX_POINTS} points, so the rest of this {'page' if connector == 'notion' else 'file'} wasn't added.")
+    what = "page" if connector == "notion" else "file"
+    if outcome.get("points_cut"):
+        notes.append(f"A guide keeps the first {OUTLINE_MAX_POINTS} points, so the rest of this {what} wasn't added.")
+    if outcome.get("dropped"):
+        count = outcome["dropped"]
+        notes.append(f"{count} very short line{'s' if count != 1 else ''} (under five characters, not in a list) of this {what} "
+                     f"{'were' if count != 1 else 'was'} left out.")
     if outcome.get("kept"):
         notes = ["Notion was slow; your earlier copy was kept." if found.reason == "time"
                  else "Only part of that page came in this time, so your earlier copy was kept."]
@@ -455,6 +462,9 @@ def _notion_material(account: str, user_id: str, name: str, found: dict, search_
     except HTTPException as error:
         if error.status_code == 429 and error.detail == notion_text.OVER_BUDGET:
             return {**found, "problem": error.detail}
+        return {**found, "problem": f"{name} was slow to answer. Ask again in a minute."}
+    except Exception:  # noqa: BLE001 - whatever Notion or the gateway sent back, the message is still answered
+        log.warning("notion read for the Tutor failed", exc_info=True)
         return {**found, "problem": f"{name} was slow to answer. Ask again in a minute."}
     return {**found, "problem": f"I couldn't find that in {name}. Put the page's name in quotes, like “Week 3 notes”."}
 
