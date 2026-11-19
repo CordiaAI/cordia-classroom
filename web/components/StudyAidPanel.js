@@ -5,6 +5,7 @@ import { noteView } from '../lib/learningEvents';
 import MermaidDiagram from './MermaidDiagram';
 import NapkinVisual from './NapkinVisual';
 import SegmentedControl from './SegmentedControl';
+import useDictation from '../lib/useDictation';
 
 function normalize(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -71,28 +72,13 @@ function CheckedAttempt({ guideId, number, mode, task, placeholder, allowSpeech 
   const [attempt, setAttempt] = useState('');
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [listening, setListening] = useState(false);
-  const recognitionRef = useRef(null);
-  const Recognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
-
-  useEffect(() => () => recognitionRef.current?.stop(), []);
-
-  function toggleListening() {
-    if (listening) { recognitionRef.current?.stop(); return; }
-    const recognition = new Recognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.onresult = event => {
-      const spoken = Array.from(event.results).map(result => result[0].transcript).join(' ');
-      setAttempt(prev => (prev ? prev + ' ' : '') + spoken);
-    };
-    recognition.onend = () => setListening(false);
-    recognitionRef.current = recognition;
-    setListening(true);
-    recognition.start();
-  }
+  const caretRef = useRef(null);
+  // Speaking fills the answer box where the caret was (lib/dictation.mjs); words still being
+  // recognized show under it.
+  const { Recognition, listening, interim, toggle: toggleListening, abort: stopListening } = useDictation({ text: attempt, setText: setAttempt });
 
   async function submit() {
+    stopListening();
     setBusy(true);
     const data = await apiFetch('/study-aids/check', {
       method: 'POST',
@@ -106,11 +92,12 @@ function CheckedAttempt({ guideId, number, mode, task, placeholder, allowSpeech 
   return (
     <div className="study-aid-attempt">
       <p className="study-aid-task"><strong>Your turn:</strong> {task}</p>
-      <textarea value={attempt} onChange={event => setAttempt(event.target.value)} placeholder={placeholder} rows={3} maxLength={2000} />
+      <textarea value={attempt} onChange={event => setAttempt(event.target.value)} onSelect={event => { caretRef.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd }; }} placeholder={placeholder} rows={3} maxLength={2000} />
+      {listening && <p className={'dictation-interim' + (interim ? ' is-heard' : '')} role="status" aria-live="off">{interim || 'Listening…'}</p>}
       <div className="study-aid-actions">
         <button type="button" className="btn" onClick={submit} disabled={busy || !attempt.trim()}>{busy ? 'Checking…' : 'Check my answer'}</button>
         {allowSpeech && Recognition && (
-          <button type="button" className="btn-outline" onClick={toggleListening}>{listening ? 'Stop' : 'Say it'}</button>
+          <button type="button" className="btn-outline" onClick={() => toggleListening(caretRef.current || {})}>{listening ? 'Stop' : 'Say it'}</button>
         )}
         {result?.verdict && result.verdict !== 'got_it' && (
           <button type="button" className="btn-outline" onClick={() => setResult(null)}>Try again</button>

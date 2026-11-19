@@ -1182,6 +1182,9 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 @media (hover: hover) { .composer-file-remove:hover { background: var(--glass-inner); } }
 .composer-note { margin: 0 8px 2px; color: var(--muted); font: 500 0.8125rem/1.4 var(--font-sans); }
 .composer-note.is-error { color: var(--error); }
+/* Dictation: while the mic is on, the words still being recognized show here, apart from the box, in italics (a plain "Listening…" before any are heard). */
+.dictation-interim { margin: 0 8px 2px; color: var(--muted-strong); font: 500 0.875rem/1.4 var(--font-sans); overflow-wrap: anywhere; }
+.dictation-interim.is-heard { font-style: italic; }
 
 /* The class picker (components/ClassPicker.js): a quiet button with the class's dot and code. */
 .c-class-picker {

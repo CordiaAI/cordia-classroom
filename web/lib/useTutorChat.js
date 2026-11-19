@@ -7,6 +7,7 @@ import { walkthroughEvent } from './walkthrough';
 import { tutorMode } from './tutorPrefs';
 import { unsupportedFileMessage, useFileDropZone } from './fileDrop';
 import { loadSavedChats, reportTutorSession, tutorChatsChanged } from './tutorChats';
+import useDictation from './useDictation';
 
 // The Tutor client: one conversation with the server's Tutor session (GET /tutor/session,
 // POST /chat), its material, attachments, modes, saved chats, voice and limits. The side panel and
@@ -109,35 +110,18 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
   const [savedChats, setSavedChats] = useState(null);
   const [chatsError, setChatsError] = useState('');
   const [deletingChat, setDeletingChat] = useState(null); // a saved chat waiting for "Delete" to be confirmed
-  const [listening, setListening] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState(-1);
-  const recognitionRef = useRef(null);
+  // Dictation (lib/dictation.mjs): the words that are final go in the box, at the caret; what is
+  // still being recognized (interim) shows apart from it.
+  const { Recognition, listening, interim, toggle: toggleMic, abort: stopDictation } = useDictation({ text: input, setText: setInput });
   // Read after mount: the server render has no browser speech APIs, and the first client
   // render must match it.
-  const [speech, setSpeech] = useState({ Recognition: null, canSpeak: false });
-  useEffect(() => setSpeech({ Recognition: window.SpeechRecognition || window.webkitSpeechRecognition || null, canSpeak: 'speechSynthesis' in window }), []);
-  const { Recognition, canSpeak } = speech;
+  const [canSpeak, setCanSpeak] = useState(false);
+  useEffect(() => setCanSpeak('speechSynthesis' in window), []);
 
   useEffect(() => () => {
-    recognitionRef.current?.stop();
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
   }, []);
-
-  function toggleMic() {
-    if (listening) { recognitionRef.current?.stop(); return; }
-    const recognition = new Recognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.onresult = event => {
-      const spoken = Array.from(event.results).map(result => result[0].transcript).join(' ').trim();
-      if (spoken) setInput(previous => (previous ? previous + ' ' : '') + spoken);
-    };
-    recognition.onerror = () => setListening(false);
-    recognition.onend = () => setListening(false);
-    recognitionRef.current = recognition;
-    setListening(true);
-    recognition.start();
-  }
 
   function toggleSpeech(index, text) {
     window.speechSynthesis.cancel();
@@ -414,6 +398,7 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
   async function sendMessage() {
     const question = input.trim();
     if (!question || !canSubmit || busy || remaining <= 0 || !session?.id) return;
+    stopDictation();
     walkthroughEvent('ask');
     setChatsOpen(false);
     setInput('');
@@ -641,6 +626,6 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
     hasRequiredContext, canSubmit, remaining, busy, loading, progressLabel, localError, setLocalError,
     chatsOpen, setChatsOpen, savedChats, chatsError, deletingChat, setDeletingChat, deleteSavedChat, startChat,
     deleteFromTutor, openSource,
-    Recognition, canSpeak, listening, toggleMic, speakingIndex, toggleSpeech,
+    Recognition, canSpeak, listening, interim, toggleMic, speakingIndex, toggleSpeech,
   };
 }

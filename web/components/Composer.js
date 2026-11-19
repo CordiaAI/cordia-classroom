@@ -29,9 +29,10 @@ export function buildGuideFrom(action, { files = [], folderId = '' } = {}) {
 export default function Composer({ tutor, classes = [], classId = '', onClassChange, variant = 'home', autoFocus = false, showError = false, quietBusy = false }) {
   const id = useId();
   const boxRef = useRef(null);
+  const caretRef = useRef(null); // the box's selection, so dictation goes where the student left the caret
   const {
     input, setInput, attachments, setAttachments, removeAttachment, attachFiles, extracting, attachDropActive, fileRef, combinedAttachments, contextKey,
-    sendMessage, session, busy, canSubmit, remaining, Recognition, listening, toggleMic, localError,
+    sendMessage, session, busy, canSubmit, remaining, Recognition, listening, interim, toggleMic, localError,
   } = tutor;
   const minHeight = variant === 'home' ? 88 : 52;
   const hasSomething = Boolean(input.trim()) || attachments.length > 0;
@@ -111,6 +112,7 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
         onChange={event => setInput(event.target.value)}
         onKeyDown={onKeyDown}
         onPaste={onPaste}
+        onSelect={event => { caretRef.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd }; }}
         placeholder="Ask the Tutor, or drop in slides, a PDF or a lecture"
         rows={1}
         style={{ height: minHeight }}
@@ -121,7 +123,7 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
           {extracting ? <CordiaLoader size={20} label="Reading files" /> : <Paperclip size={20} strokeWidth={1.75} aria-hidden="true" />}
         </button>
         {Recognition && (
-          <button type="button" className={'composer-icon' + (listening ? ' is-on' : '')} onClick={toggleMic} disabled={blocked && !listening}
+          <button type="button" className={'composer-icon' + (listening ? ' is-on' : '')} onClick={() => toggleMic(caretRef.current || {})} disabled={blocked && !listening}
             aria-label={listening ? 'Stop listening' : 'Talk to the Tutor'} aria-pressed={listening}>
             <Mic size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
@@ -132,6 +134,9 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
           <ArrowUp size={18} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </div>
+      {listening && (
+        <p className={'dictation-interim' + (interim ? ' is-heard' : '')} role="status" aria-live="off">{interim || 'Listening…'}</p>
+      )}
       {contextKey === 'attachment' && combinedAttachments.trimmed.length > 0 && (
         <p className="composer-note" role="status">Too long to read whole, so the Tutor reads part of: {combinedAttachments.trimmed.join(', ')}</p>
       )}
