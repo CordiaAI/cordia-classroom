@@ -204,7 +204,7 @@ export default function BoardView({ deadlines, blocks, needs, readiness, now, we
         .bd-cards :global(.bd-due) { background: var(--surface-raised); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-edge); }
         .bd-cards :global(.bd-when) { color: var(--tone-ink, var(--muted)); font: 600 0.8125rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
         .bd-cards :global(.bd-due-when) { color: var(--muted); font: 500 0.8125rem/1.2 var(--font-sans); }
-        .bd-cards :global(.bd-title) { font: 600 0.9375rem/1.3 var(--font-sans); overflow-wrap: break-word; hyphens: auto; }
+        .bd-cards :global(.bd-title) { font: 600 0.9375rem/1.3 var(--font-sans); overflow-wrap: break-word; }
         .bd-cards :global(.bd-card.is-done) { background: color-mix(in srgb, var(--surface-raised) 50%, transparent); box-shadow: inset 0 0 0 0.0625rem var(--hairline); }
         .bd-cards :global(.bd-card.is-done .bd-when) { color: var(--muted); }
         .bd-cards :global(.bd-card.is-done .bd-title) { color: var(--muted); text-decoration: line-through; }
@@ -212,7 +212,7 @@ export default function BoardView({ deadlines, blocks, needs, readiness, now, we
         .bd-cards :global(.bd-exam) { gap: 0.375rem; color: var(--on-olive); background: var(--olive-glass-sheen), var(--olive); box-shadow: var(--olive-glass-shadow); }
         @media (hover: hover) { .bd-cards :global(.bd-exam:hover) { box-shadow: var(--olive-glass-shadow-hover); } }
         .bd-cards :global(.bd-exam-when) { display: flex; align-items: center; gap: 0.375rem; font: 600 0.8125rem/1.2 var(--font-sans); }
-        .bd-cards :global(.bd-exam-title) { font: 600 1.0625rem/1.3 var(--font-sans); overflow-wrap: break-word; hyphens: auto; }
+        .bd-cards :global(.bd-exam-title) { font: 600 1.0625rem/1.3 var(--font-sans); overflow-wrap: break-word; }
         .bd-cards :global(.bd-exam-ready) { display: flex; align-items: center; gap: 0.5rem; font: 600 0.875rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
         .bd-cards :global(.bd-exam-ready--none) { font-weight: 500; }
         .bd-cards :global(.bd-exam .c-ring-track) { stroke: var(--on-olive); opacity: 0.3; }

@@ -242,16 +242,23 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
 
   // Never show the connect steps, or a week still missing its blocks, while loading: the loader instead.
   if (status === 'checking' || gate === 'waiting' || gate === 'loader') {
-    return compact ? <SectionLoader height={183} label="Loading calendar" /> : <><PageTitle /><LoadingArea phase={gate === 'loader' ? 'loader' : 'waiting'} label="Loading calendar" /></>;
+    return compact ? <SectionLoader height={183} label="Loading calendar" /> : <CalendarViews loading={<LoadingArea phase={gate === 'loader' ? 'loader' : 'waiting'} label="Loading calendar" />} />;
   }
   if (status === 'error') {
     return (
       <>
-        {!compact && <PageTitle />}
-        <div className="c-empty" role="alert">
-          <p>{error}</p>
-          <button type="button" className="c-btn c-btn--secondary" onClick={() => refresh()}>Try again</button>
-        </div>
+        {compact ? null : <CalendarViews loading={(
+          <div className="c-empty" role="alert">
+            <p>{error}</p>
+            <button type="button" className="c-btn c-btn--secondary" onClick={() => refresh()}>Try again</button>
+          </div>
+        )} />}
+        {compact && (
+          <div className="c-empty" role="alert">
+            <p>{error}</p>
+            <button type="button" className="c-btn c-btn--secondary" onClick={() => refresh()}>Try again</button>
+          </div>
+        )}
       </>
     );
   }
@@ -415,11 +422,6 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
       {foundClasses && <CalendarClassChooser classes={foundClasses} onClose={() => setFoundClasses(null)} />}
     </>
   );
-}
-
-// The page title while the calendar loads, the same size as the loaded header's.
-function PageTitle() {
-  return <h1 className="c-title" style={{ fontSize: '2.25rem', lineHeight: 1.1 }}>Calendar</h1>;
 }
 
 // Right after a calendar link connects: the classes Cordia read from it, all kept unless the

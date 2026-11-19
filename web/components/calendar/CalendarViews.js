@@ -49,7 +49,8 @@ function useNow() {
 // The Calendar: one header (title, range, back / Today / next, the view switch, Plan my week) over
 // Week, Board, Month or Agenda. The views share the model (lib/calendarViews.mjs) and the writes
 // here: moving and adding study time (with Undo or a clear error) and Find time.
-export default function CalendarViews({ deadlines, blocks, needs, readiness, setRawBlocks, reloadBlocks, tools, below }) {
+// loading: what shows under the title until the data is in (the title itself never moves).
+export default function CalendarViews({ deadlines = [], blocks = [], needs = [], readiness = {}, setRawBlocks, reloadBlocks, tools, below, loading = null }) {
   const wide = useWide();
   const now = useNow();
   const router = useRouter();
@@ -140,14 +141,14 @@ export default function CalendarViews({ deadlines, blocks, needs, readiness, set
       <header className="cal-head">
         <div className="cal-head-main">
           <h1 className="c-title cal-title">Calendar</h1>
-          <p className="cal-range" aria-live="polite">{range}</p>
-          <div className="cal-nav">
+          {!loading && <p className="cal-range" aria-live="polite">{range}</p>}
+          {!loading && <div className="cal-nav">
             <button type="button" className="c-icon-btn" onClick={() => go(-1)} aria-label={view === 'month' ? 'Previous month' : 'Previous week'}><ArrowLeft {...ICON} /></button>
             <button type="button" className="c-btn c-btn--quiet cal-today" onClick={() => setAnchor(new Date())} aria-pressed={isNow}>Today</button>
             <button type="button" className="c-icon-btn" onClick={() => go(1)} aria-label={view === 'month' ? 'Next month' : 'Next week'}><ArrowRight {...ICON} /></button>
-          </div>
+          </div>}
         </div>
-        <div className="cal-head-actions">
+        {!loading && <div className="cal-head-actions">
           {wide && (
             <SegmentedControl kind="tabs" label="Calendar view" className="cal-switch">
               {VIEWS.map(name => (
@@ -156,15 +157,15 @@ export default function CalendarViews({ deadlines, blocks, needs, readiness, set
             </SegmentedControl>
           )}
           <Link href="/week" className="c-btn c-btn--primary cal-plan"><CalendarCheck {...ICON} />Plan my week</Link>
-        </div>
+        </div>}
       </header>
 
-      <div id="cal-view" role={wide ? 'tabpanel' : undefined} aria-labelledby={wide ? `cal-tab-${view}` : undefined} className={`cal-view cal-view--${view}`}>
+      {loading || <div id="cal-view" role={wide ? 'tabpanel' : undefined} aria-labelledby={wide ? `cal-tab-${view}` : undefined} className={`cal-view cal-view--${view}`}>
         {view === 'week' && <WeekView {...shared} onMove={move} />}
         {view === 'board' && <BoardView {...shared} onAdd={add} />}
         {view === 'month' && <MonthView {...shared} anchor={anchor} onPickMonth={setAnchor} />}
         {view === 'agenda' && <AgendaView {...shared} wide={wide} onJump={day => setAnchor(day)} />}
-      </div>
+      </div>}
 
       {tools}
       {below}
