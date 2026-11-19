@@ -136,6 +136,9 @@ export default function PrintQuizSheet({ guideId, onClose }) {
         .pqs-stepper { display: inline-flex; align-items: center; gap: 4px; }
         .pqs .pqs-step[aria-disabled='true'] { opacity: .4; cursor: default; background: transparent; box-shadow: none; }
         .pqs .pqs-step[aria-disabled='true']:active { transform: none; }
+        /* A finger needs 44px: the 40px button keeps its look, its target grows. */
+        .pqs-step { position: relative; }
+        @media (pointer: coarse) { .pqs-step::after { content: ''; position: absolute; inset: -2px; } }
         .pqs-count { min-width: 4.5rem; display: inline-flex; align-items: baseline; justify-content: center; gap: 4px; font: 600 1rem/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink); }
         .pqs-count b { font-weight: 600; }
         .pqs-max { font: 500 var(--fs-13)/1 var(--font-sans); color: var(--muted); }
