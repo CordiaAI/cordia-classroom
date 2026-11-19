@@ -1,9 +1,9 @@
 """F1b second review (#285): the reviewer's probes (probe3.py, probe4.py) as tests, and the findings
 behind them. A gateway's HTML error page is never a 500; a Library import keeps every paragraph and
 short bullet or says it didn't; the import's own lines stay out of cards and quizzes; two reads at
-once stay inside three calls in flight. The real Notion and Composio APIs are never called."""
+once stay inside three calls in flight. (Which import lines stay out, and where, is in
+test_notion_third_review.py: round 3 scoped them to the guides the first Notion import filed.) The real Notion and Composio APIs are never called."""
 from pathlib import Path
-import re
 import sys
 import threading
 import unittest
@@ -189,73 +189,17 @@ class LibraryKeepsEverything(Base):
         self.assertTrue(all(len(line) <= 602 for line in outline.splitlines() if line.startswith("- ")))
 
 
-class ImportLinesStayOutOfStudyMaterial(unittest.TestCase):
-    """M3: F1 filed the note and the sub-page lines as outline bullets; they never reach cards or quizzes."""
-
-    F1_NOTES = (
-        "## Week 3\n- Glycolysis makes ATP\n- The rest of this Notion page wasn't imported because Notion was slow to answer.\n"
-        "- Sub-page: Lecture 4\n- Database: Reading list\n- Part of this Notion page couldn't be read, so it isn't all here.\n"
-        "* Sub-page: Lecture 5\n## Sub-page: Lecture 6\n1. Sub-page: Lecture 7\n- Mitochondria are the site of the Krebs cycle")
-
-    def test_clean_text_drops_bulleted_and_heading_forms(self):
-        from services.text_processing import clean_text
-        cleaned = clean_text(self.F1_NOTES)
-        for stray in ("Sub-page", "Database: Reading", "wasn't imported", "couldn't be read"):
-            self.assertNotIn(stray, cleaned)
-        self.assertIn("Glycolysis makes ATP", cleaned)
-        self.assertIn("Krebs cycle", cleaned)
-
-    def test_the_outline_and_the_review_never_carry_them(self):
-        from services.text_processing import text_to_outline, without_import_lines
-        self.assertNotIn("Sub-page", text_to_outline(self.F1_NOTES))
-        self.assertNotIn("Database: Reading", without_import_lines(self.F1_NOTES))
-        self.assertIn("Glycolysis", without_import_lines(self.F1_NOTES))
-
-    def test_a_course_statement_that_starts_with_database_stays(self):
-        from services.text_processing import clean_text
-        for line in ("Database: normalization removes redundancy",
-                     "- Database: a structured collection of data.",
-                     "## Database systems",
-                     "- Databases store rows"):
-            self.assertIn(line, clean_text(f"Intro to data\n{line}\nMore detail follows here"))
-
-    def test_a_review_guide_is_built_without_them(self):
-        from fake_supabase import FakeDB
-        from routers import plans
-        db = FakeDB()
-        db.rows("study_guides").append({"id": "g1", "user_id": USER, "title": "Week 3", "notes": self.F1_NOTES, "study_guide": "",
-                                        "folder_id": FOLDER, "source_type": "notion", "source_title": "Notion", "created_at": "2026-11-01"})
-        db.rows("folders").append({"id": FOLDER, "user_id": USER, "name": "Bio"})
-        with patch("routers.plans.get_supabase", return_value=db), patch("services.library_import.get_supabase", return_value=db):
-            try:
-                plans.build_review(USER, FOLDER, "Review", "review:x")
-            except Exception:  # the build may need more tables than the fake has; the guide it filed is what matters
-                pass
-        for row in db.rows("study_guides"):
-            if row.get("source_type") == "review":
-                self.assertNotIn("Sub-page", row["notes"])
-                self.assertIn("Glycolysis", row["notes"])
-
-    def test_the_tutor_reads_a_guide_without_them(self):
-        from routers import chat
-        row = {"id": "g1", "title": "Week 3", "folder_id": None, "study_guide": "", "notes": self.F1_NOTES, "source_url": None}
-        with patch.object(chat, "_owned_row", return_value=row):
-            body = chat.ChatRequest(question="quiz me", content="", guide_id="g1")
-            material = chat._load_owned_material(body, USER)
-        self.assertNotIn("Sub-page", material.content)
-        self.assertIn("Glycolysis", material.content)
-
-
 class TheOneOffScript(unittest.TestCase):
-    """M3: the clean of already-filed guides is a script for Jude, not something this code runs."""
+    """M3: the clean of already-filed guides is a script for Jude, not something this code runs. What
+    it removes, and that it agrees with the app, is tested on Postgres in tests/notion-oneoff-sql.test.js
+    and in test_notion_third_review.py."""
 
     SCRIPT = ROOT / "supabase" / "oneoff" / "20261119_clean_notion_import_lines.sql"
 
-    def test_it_is_marked_not_run_and_counts_before_it_changes(self):
+    def test_it_is_marked_not_run_and_lists_before_it_changes(self):
         text = self.SCRIPT.read_text()
         self.assertEqual(text.splitlines()[0], "-- NOT RUN: for Jude to review and run")
-        self.assertIn("count(distinct id) as guides_to_clean", text)
-        self.assertLess(text.index("count(distinct id)"), text.index("update public.study_guides"))
+        self.assertLess(text.index("line_to_remove"), text.index("update public.study_guides"))
         self.assertIn("external_source_id like 'notion:%'", text)
 
     def test_nothing_in_the_code_runs_it(self):
@@ -265,28 +209,6 @@ class TheOneOffScript(unittest.TestCase):
                     self.assertNotIn("oneoff", path.read_text(), path)
                 except UnicodeDecodeError:
                     pass
-
-    def test_its_patterns_pick_the_same_lines_as_the_code(self):
-        from services.text_processing import _IMPORT_NOTE
-        text = self.SCRIPT.read_text()
-        literals = re.findall(r"btrim\(line, E' \\t\\r'\) (!?~) '((?:[^']|'')*)'", text)
-        wanted = {pattern.replace("''", "'") for op, pattern in literals if op == "~"}
-        self.assertEqual(len(wanted), 2, wanted)
-        notes, database = sorted(wanted, key=lambda pattern: "Database" in pattern)
-        python = lambda pattern: re.compile(pattern.replace("[:space:]", r"\s"))  # noqa: E731
-        notes_re, database_re = python(notes), python(database)
-
-        def script_says(line):
-            line = line.strip()
-            return bool(notes_re.search(line) or (database_re.search(line) and not re.search(r"[.!?]$", line)))
-
-        for line in ["- Sub-page: Lecture 4", "* Sub-page: Lecture 5", "## Sub-page: Lecture 6", "Sub-page: Lecture 7", "1. Sub-page: Lecture 8",
-                     "- The rest of this Notion page wasn't imported because Notion was slow to answer.",
-                     "- Part of this Notion page couldn't be read, so it isn't all here.",
-                     "- Database: Reading list", "## Database: Reading list", "Database: normalization removes redundancy",
-                     "- Database: a structured collection of data.", "- Databases store rows", "- Glycolysis makes ATP", "",
-                     "- Database: " + "x" * 101, "  - Sub-page: Indented"]:
-            self.assertEqual(script_says(line), bool(_IMPORT_NOTE.match(line.strip())), line)
 
 
 class AtMostThreeCallsPerStudent(Base):
