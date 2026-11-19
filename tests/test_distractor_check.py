@@ -59,13 +59,17 @@ class TopUpTests(unittest.TestCase):
 
     def test_rejected_replacements_are_checked_again_and_short_questions_topped_up(self):
         built = [{"question": GUIDE[0][0], "options": [GUIDE[0][1], "Vocal music set to a sacred Latin text"], "correct_index": 0}]
-        fresh = {GUIDE[0][0]: ["Absolute music is plain", "Dance music for the court", "Music for silent films"]}
+        fresh = {GUIDE[0][0]: ["Absolute music is plain", "Dance music for the court",
+                               "Dance music written for royal courts and their ceremonies", "Music composed to accompany silent films"]}
         with patch.object(quiz, "_replacement_distractors", return_value=fresh):
             out = quiz._top_up(None, built, self.PAIRS, targets={GUIDE[0][0]})
         options = out[0]["options"]
         self.assertEqual(options[out[0]["correct_index"]], GUIDE[0][1])
         self.assertNotIn("Absolute music is plain", options)
-        self.assertEqual(set(options) - {GUIDE[0][1]}, {"Vocal music set to a sacred Latin text", "Dance music for the court", "Music for silent films"})
+        self.assertNotIn("Dance music for the court", options, "less than half the answer's length (feedback F5)")
+        self.assertEqual(set(options) - {GUIDE[0][1]}, {"Vocal music set to a sacred Latin text",
+                                                         "Dance music written for royal courts and their ceremonies",
+                                                         "Music composed to accompany silent films"})
 
     def test_a_failed_regeneration_keeps_what_there_is(self):
         built = [{"question": GUIDE[0][0], "options": [GUIDE[0][1], "Vocal music set to a sacred Latin text"], "correct_index": 0}]

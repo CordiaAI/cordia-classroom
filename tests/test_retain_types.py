@@ -132,6 +132,16 @@ class FillInTheBlankTests(unittest.TestCase):
         self.assertEqual(retain.first_try_credit(question, {**mine, "self_marked": False}, "u1", GUIDE_ID), 0.0)
         self.assertEqual(retain.first_try_credit(question, {**mine, "credit": 0}, "u1", GUIDE_ID), 0.0)
 
+    def test_a_written_answer_the_ai_could_not_check_can_be_self_marked(self):
+        question = {"question": "Why?", "options": ["Because", "x"], "correct_index": 0}
+        mine = {"type": "written", "concept": 0, "response": "because", "credit": 1, "token": None, "self_marked": True}
+        self.assertEqual(retain.first_try_credit(question, mine, "u1", GUIDE_ID), 1.0)
+        self.assertEqual(retain.first_try_credit(question, {**mine, "self_marked": False}, "u1", GUIDE_ID), 0.0)
+        self.assertEqual(retain.first_try_credit(question, {**mine, "credit": 0}, "u1", GUIDE_ID), 0.0)
+        # A forged token is still checked, never waved through by self_marked.
+        with patch.dict(os.environ, {"RETAIN_SIGNING_KEY": "k"}):
+            self.assertEqual(retain.first_try_credit(question, {**mine, "token": "forged"}, "u1", GUIDE_ID), 0.0)
+
 
 class SignedGradeTests(unittest.TestCase):
     def test_only_an_unaltered_grade_counts(self):

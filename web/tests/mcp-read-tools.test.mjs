@@ -42,6 +42,18 @@ function fakeDb(tables, rpc = {}) {
   return { from: query, rpc: async (name, args) => (rpc[name] ? { data: rpc[name](args), error: null } : { data: null, error: { message: 'missing' } }) };
 }
 
+// The backend's POST /mcp/question-wording (services/text_processing.shown_questions), for these
+// fixtures: "According to Slide N, ..." is shown reworded, one about the source is hidden, and a
+// quiz that would be all hidden is shown as it is.
+function wordingReply(options) {
+  const quizzes = options.body.quizzes.map(quiz => {
+    const marks = quiz.map(({ question: text }) => (/listed for Chapter|shown on Slide/i.test(text) ? { hidden: true }
+      : /^According to Slide \d+, /i.test(text) ? { shown: text.replace(/^According to Slide \d+, (\w)/i, (_, first) => first.toUpperCase()) } : {}));
+    return marks.every(mark => mark.hidden) ? marks.map(() => ({})) : marks;
+  });
+  return { ok: true, status: 200, json: async () => ({ quizzes }) };
+}
+
 function context(tables, extra = {}) {
   const db = fakeDb(tables, extra.rpc);
   let courses = null;
@@ -50,7 +62,7 @@ function context(tables, extra = {}) {
     baseUrl: 'https://classroom.cordiacode.com',
     timeZone: extra.timeZone || 'America/Chicago',
     courses: () => courses || (courses = loadCourses(db)),
-    fetchBackend: extra.fetchBackend || (async () => ({ ok: false, status: 500 })),
+    fetchBackend: extra.fetchBackend || (async (path, options) => (path === '/mcp/question-wording' && !extra.wordingDown ? wordingReply(options) : { ok: false, status: 500 })),
     load: async () => {},
   };
 }
@@ -225,6 +237,47 @@ test('get_due_cards: Study now\'s order, the student\'s day, confidence and miss
   const whole = await call('get_due_cards', context({ ...tables, study_guides: [later] }), { study_set_id: U(8) });
   assert.equal(whole.structuredContent.cards.length, 2, 'Study now on one set with nothing due runs its whole deck');
   assert.equal((await call('get_due_cards', ctx, { study_set_id: U(999) })).isError, true);
+});
+
+// Second review of PR 281: the connector asks quiz questions as the app does.
+const SOURCE_QUIZ = [
+  { question: 'Which artists are listed for Chapter 1?', options: ['Giotto', 'Raphael', 'Titian', 'Duccio'], correct_index: 0 },
+  { question: 'According to Slide 5, what is the normal serum potassium range?', options: ['3.5-5.0 mEq/L', '2.0-3.0 mEq/L', '5.5-7.0 mEq/L', '1.0-2.5 mEq/L'], correct_index: 0 },
+  { question: 'Who painted the Mona Lisa?', options: ['Leonardo da Vinci'], correct_index: 0 },
+];
+const sourceGuide = {
+  ...guides[0], id: U(7), quiz_questions: SOURCE_QUIZ,
+  flashcards: SOURCE_QUIZ.map(item => ({ front: item.question, back: item.options[0] })),
+  flashcard_progress: { schedule: { 0: { box: 2, due: '2099-01-01' }, 1: { box: 1, due: '2000-01-01' }, 2: { box: 1, due: '2099-01-01' } },
+    learn: { levels: { 0: { l: 1, at: '2026-11-01', q: 'which artists are listed for chapter 1' }, 1: { l: 1, at: '2026-11-01', q: 'according to slide 5 what is the normal serum potas' } } } },
+};
+
+test('get_study_set quiz: no hidden questions, the shown wording, no choices under three', async () => {
+  const ctx = context({ ...tables, study_guides: [sourceGuide] });
+  const { quiz } = (await call('get_study_set', ctx, { study_set_id: U(7), include: ['quiz'] })).structuredContent.sections;
+  assert.deepEqual(quiz.map(item => item.question_id), [`${U(7)}:quiz:1`, `${U(7)}:quiz:2`], 'positions as saved; the hidden one left out');
+  assert.equal(quiz[0].question, 'What is the normal serum potassium range?');
+  assert.equal(quiz[0].options.length, 4);
+  assert.deepEqual(quiz[1].options, [], 'one choice: asked typed, never as a one-option list');
+  assert.equal(quiz[1].answer, 'Leonardo da Vinci');
+});
+
+test('get_due_cards: shown wording, no hidden questions, one item per idea, keyed by the saved text', async () => {
+  const misses = [{ guide_id: U(7), items: [{ question: SOURCE_QUIZ[1].question, answer: '3.5-5.0 mEq/L', sure: true }, { question: SOURCE_QUIZ[0].question, answer: 'Giotto' }] }];
+  const ctx = context({ ...tables, study_guides: [sourceGuide], retain_misses: misses });
+  const { cards } = (await call('get_due_cards', ctx, { study_set_id: U(7) })).structuredContent;
+  assert.ok(cards.every(card => !/Chapter 1|Slide 5/.test(card.front)), JSON.stringify(cards));
+  const potassium = cards.filter(card => card.front === 'What is the normal serum potassium range?');
+  assert.equal(potassium.length, 1, 'the card, the idea and the miss are one item');
+  assert.equal(potassium[0].card_id, `${U(7)}:card:1`);
+  assert.ok(!cards.some(card => card.card_id === `${U(7)}:idea:0` || card.card_id.includes('miss')), 'the hidden question is not asked');
+});
+
+test('quiz wording comes from the backend: when it can\'t say, the quiz tools say so', async () => {
+  const ctx = context({ ...tables, study_guides: [sourceGuide] }, { wordingDown: true });
+  assert.equal((await call('get_due_cards', ctx, { study_set_id: U(7) })).isError, true);
+  assert.equal((await call('get_study_set', ctx, { study_set_id: U(7), include: ['quiz'] })).isError, true);
+  assert.equal((await call('get_study_set', ctx, { study_set_id: U(7) })).isError, undefined, 'sections without the quiz need no wording');
 });
 
 test('get_progress: the backend\'s Progress numbers plus the study log\'s streak with a freeze', async () => {

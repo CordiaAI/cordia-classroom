@@ -41,7 +41,19 @@ function fakeDb(tables, rpc = {}) {
   };
 }
 
-function context(tables, { rpc, backend } = {}) {
+// The backend's POST /mcp/question-wording (services/text_processing.shown_questions), for these
+// fixtures: "According to Slide N, ..." is shown reworded, one about the source is hidden, and a
+// quiz that would be all hidden is shown as it is.
+function wordingReply(options) {
+  const quizzes = options.body.quizzes.map(quiz => {
+    const marks = quiz.map(({ question: text }) => (/listed for Chapter|shown on Slide/i.test(text) ? { hidden: true }
+      : /^According to Slide \d+, /i.test(text) ? { shown: text.replace(/^According to Slide \d+, (\w)/i, (_, first) => first.toUpperCase()) } : {}));
+    return marks.every(mark => mark.hidden) ? marks.map(() => ({})) : marks;
+  });
+  return { ok: true, status: 200, json: async () => ({ quizzes }) };
+}
+
+function context(tables, { rpc, backend, wordingDown = false } = {}) {
   const db = fakeDb(tables, rpc);
   const sent = [];
   return {
@@ -50,7 +62,11 @@ function context(tables, { rpc, backend } = {}) {
     baseUrl: 'https://classroom.cordiacode.com',
     timeZone: 'America/Chicago',
     load: async () => {},
-    fetchBackend: async (path, options) => { sent.push({ path, ...options }); return backend ? backend(path, options) : { ok: true, status: 200, json: async () => ({ logged: false }) }; },
+    fetchBackend: async (path, options) => {
+      if (path === '/mcp/question-wording') return wordingDown ? { ok: false, status: 503 } : wordingReply(options);
+      sent.push({ path, ...options });
+      return backend ? backend(path, options) : { ok: true, status: 200, json: async () => ({ logged: false }) };
+    },
   };
 }
 
@@ -171,6 +187,25 @@ test('record_answer: unknown, foreign and mismatched items are refused the same 
   const practice = await call('record_answer', ctx, { ...base, item_type: 'practice', item_id: `${GUIDE}:practice:0` });
   assert.equal(practice.isError, undefined);
   assert.deepEqual(ctx.db.calls.at(-1).args.practice, { index: 0, status: 'correct', message: 'Answered in a connected AI app.' });
+});
+
+test('record_answer: a hidden question is never answered; a reworded one is, under its saved text', async () => {
+  const quiz = [
+    { question: 'Which artists are listed for Chapter 1?', options: ['Giotto', 'Raphael', 'Titian', 'Duccio'], correct_index: 0 },
+    { question: 'According to Slide 5, what is the normal serum potassium range?', options: ['3.5-5.0 mEq/L', '2', '5', '1'], correct_index: 0 },
+  ];
+  const tables = () => ({ study_guides: [{ ...guide(), quiz_questions: quiz, flashcards: [] }], retain_misses: [], study_days: [] });
+  const base = { item_type: 'quiz_question', correct: false, confidence: 'sure', idempotency_key: 'k' };
+  const ctx = context(tables(), { rpc: { mcp_record_answer: args => ({ data: { ...args.result, replayed: false } }) } });
+  const hidden = await call('record_answer', ctx, { ...base, item_id: `${GUIDE}:quiz:0` });
+  assert.equal(hidden.isError, true);
+  const shown = await call('record_answer', ctx, { ...base, item_id: `${GUIDE}:quiz:1` });
+  assert.equal(shown.isError, undefined);
+  const sent = ctx.db.calls.find(item => item.name === 'mcp_record_answer').args;
+  assert.deepEqual(Object.keys(sent.learn.levels), ['1']);
+  assert.equal(sent.misses[0].question, quiz[1].question, 'the miss is kept under the saved text');
+  const down = await call('record_answer', context(tables(), { wordingDown: true }), { ...base, item_id: `${GUIDE}:quiz:1` });
+  assert.equal(down.isError, true);
 });
 
 test('create_study_set: queued at once; plan limits and refused links come back as clear errors', async () => {
