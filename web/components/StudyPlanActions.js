@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { Hammer, Link2, Paperclip, Play } from 'lucide-react';
 import { apiFetch } from '../lib/api';
-import CordiaLoader from './CordiaLoader';
+import CordiaLoader, { useWorkingMark } from './CordiaLoader';
 
 // The buttons under a Tutor study plan (backend services/study_helper.plan_reply): start the check-in
 // in Learn, ask the Tutor to build the Learn set, build an exam's review set from Canvas, or attach notes.
@@ -21,6 +21,11 @@ export function learnLink(guideId, testDate) {
 export default function StudyPlanActions({ plan, tutor, latest }) {
   const [working, setWorking] = useState('');
   const [problem, setProblem] = useState('');
+  // The working mark replaces the label after 300ms and stays at least 500ms (useWorkingMark), on the
+  // button that was pressed.
+  const marked = useWorkingMark(Boolean(working));
+  const pressed = useRef('');
+  if (working) pressed.current = working;
   const actions = (plan?.actions || []).filter(action => action.kind !== 'link' || insideApp(action.href));
   if (!actions.length) return null;
 
@@ -59,30 +64,34 @@ export default function StudyPlanActions({ plan, tutor, latest }) {
           // Asking the Tutor or opening the file picker only makes sense from the latest reply.
           // The working button keeps its look (aria-disabled, ignored clicks) so its mark stays readable; the rest disable.
           const busy = working === action.kind;
+          const showMark = marked && pressed.current === action.kind;
           const off = !busy && (Boolean(working) || tutor.busy || (!latest && action.kind !== 'canvas_review'));
           return (
-            <button key={action.kind + index} type="button" className={`c-btn c-btn--sm ${tone} plan-btn${busy ? ' is-busy' : ''}`}
-              onClick={() => { if (!working) run(action); }} disabled={off} aria-disabled={busy || undefined} aria-busy={busy || undefined}>
+            <button key={action.kind + index} type="button" className={`c-btn c-btn--sm ${tone} plan-btn${busy ? ' is-busy' : ''}${showMark ? ' is-marked' : ''}`}
+              onClick={() => { if (!working && !marked) run(action); }} disabled={off} aria-disabled={busy || undefined} aria-busy={busy || undefined}>
               <span className="plan-face">{body}</span>
-              {busy && <span className="plan-spinner"><CordiaLoader size={18} label={`${action.label}: working`} /></span>}
+              {(busy || showMark) && <span className="plan-spinner"><CordiaLoader size={18} label={`${action.label}: working`} /></span>}
             </button>
           );
         })}
       </div>
       {problem && <p className="plan-problem" role="alert">{problem}</p>}
       <style jsx>{`
-        .plan-actions { display: grid; gap: 8px; margin: 12px 0 10px; }
-        .plan-row { display: flex; flex-wrap: wrap; gap: 8px; }
+        .plan-actions { display: grid; gap: var(--space-2); margin: var(--space-3) 0 0.625rem; }
+        .plan-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
         .plan-actions :global(.plan-btn.is-busy) { cursor: progress; }
-        .plan-actions :global(.plan-btn) { position: relative; padding: 0 16px; font-family: var(--font-sans); font-size: 0.875rem; }
-        .plan-face { display: inline-flex; align-items: center; gap: 8px; }
-        /* Pressed: disabled at once. The mark replaces the label only after 300ms, so a quick answer never
-           flashes it, and the label keeps its width, so nothing moves while it works. */
-        .is-busy .plan-face { animation: plan-hide 0s 300ms forwards; }
-        .plan-spinner { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; animation: plan-show 150ms var(--ease) 300ms forwards; }
-        @keyframes plan-hide { to { visibility: hidden; } }
-        @keyframes plan-show { to { opacity: 1; } }
-        .plan-problem { margin: 0; padding: 8px 12px; border-radius: var(--r-input); background: var(--error-bg); color: var(--error); font: 500 0.8125rem/1.45 var(--font-sans); }
+        .plan-actions :global(.plan-btn) { position: relative; padding: 0 var(--space-4); font-family: var(--font-sans); font-size: 0.875rem; }
+        /* Phones and touch screens: a 44px tap target. */
+        @media (max-width: 767px), (pointer: coarse) { .plan-actions :global(.plan-btn) { height: 2.75rem !important; min-height: 2.75rem !important; } }
+        .plan-face { display: inline-flex; align-items: center; gap: var(--space-2); }
+        /* Pressed: disabled at once. After 300ms (is-marked) the mark replaces the label, which keeps its
+           width, so nothing moves while it works. With reduced motion it shows without the fade. */
+        .is-marked .plan-face { visibility: hidden; }
+        .plan-spinner { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; }
+        .is-marked .plan-spinner { opacity: 1; animation: plan-show 150ms var(--ease); }
+        @keyframes plan-show { from { opacity: 0; } to { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) { .is-marked .plan-spinner { animation: none; } }
+        .plan-problem { margin: 0; padding: var(--space-2) var(--space-3); border-radius: var(--r-input); background: var(--error-bg); color: var(--error); font: 500 0.8125rem/1.45 var(--font-sans); }
       `}</style>
     </div>
   );

@@ -78,8 +78,17 @@ PAGES = {
 GUIDE_TABS = {"flashcards": "/flashcards/study?guideId={id}", "quiz": "/quiz/{id}", "practice": "/practice/{id}"}
 
 
+# "Don't…", "please don't…", "let's not…": nothing to do in the app.
+SAYS_NOT = re.compile(r"^\s*+(?:(?:ok(?:ay)?|so|and|no|please)[,!.]?\s++)*+(?:don['’]?t|do\s++not|never|let['’]?s\s++not)\b",
+                      re.IGNORECASE)
+
+
 def _asks_for_app_action(question: str) -> bool:
-    if QUESTION_START.search(question):
+    # A question ("open Learn for the art history guide?") asks about the app, not for an action in it, unless
+    # it's a polite request ("can you open my Biology class?"); neither does a "don't".
+    if QUESTION_START.search(question) or SAYS_NOT.search(question):
+        return False
+    if question.rstrip().endswith("?") and not study_helper.POLITE_START.search(question):
         return False
     return bool(APP_ALWAYS.search(question) or (APP_VERB.search(question) and APP_NOUN.search(question)))
 
@@ -380,6 +389,18 @@ STUDY_HELPER_SKILLS = {None, "explain", "plan", "retain"}
 BUILD_WINDOW = timedelta(minutes=15)
 
 
+def _about_learn(question: str) -> bool:
+    """Learn named but not asked for ("please don't open Learn for the ethics guide", "make a Learn set or a
+    quiz, which is better?"): the Tutor answers it, and the app-action planner never sees it, since it could
+    build or open something nobody asked for. Unless another tool is asked for by name after it ("make a
+    Learn set for it and make flashcards too"): that tool gets the turn."""
+    if not study_helper.asks_about_learn(question):
+        return False
+    another = study_helper.ANOTHER_TOOL.search(question)
+    rest = question[another.start():another.start() + 120] if another else ""  # the tool is named right after it
+    return not (rest and (MAKE_THING.search(rest) or VISUAL_REQUEST.search(rest)))
+
+
 def _today(body: ChatRequest) -> date:
     if body.local_date:
         try:
@@ -468,14 +489,21 @@ def _recent_build(user_id: str, material: Material, title: str) -> Optional[dict
 
 
 def _make_learn(body: ChatRequest, user_id: str, question: str, material: Material, class_id: Optional[str],
-                skill: Optional[str], turn: Optional[dict]) -> ChatResponse:
-    """"Make a Learn for it": build the set (the build_guide or practice skill) when there isn't one, then open Learn."""
+                skill: Optional[str], turn: Optional[dict], form: str = "do") -> ChatResponse:
+    """"Make a Learn for it": build the set (the build_guide or practice skill) when there isn't one, then open Learn.
+    A build costs a model call, so it starts only from an imperative or the build button; a polite question
+    ("can you make a Learn set from my notes?") gets the offer and the button instead."""
     today = _today(body)
     plan = _last_plan(turn) or {}
     when = study_helper.parse_test_date(question, today)
     if not when and plan.get("test_date"):
         when = date.fromisoformat(plan["test_date"])
     guide = material.guide
+    if not guide and material.content.strip() and form == "ask":
+        offer, build = study_helper.build_offer(material.title)
+        return ChatResponse(answer=offer, action="study_plan", source=material.source,
+                            study_plan={"guide": None, "test_date": when.isoformat() if when else None, "exam": plan.get("exam"),
+                                        "actions": [build]})
     if not guide and material.content.strip():
         kind = "practice" if skill == "practice" or re.search(r"\bpractice\b", question, re.IGNORECASE) else "guide"
         _check_picked_class(user_id, body)
@@ -506,11 +534,11 @@ def _study_helper(body: ChatRequest, user_id: str, question: str, material: Mate
         return None
     # Another tool asked for by name ("make flashcards…", "draw a diagram…") is that tool's, even if it
     # also says "learn"; what's left once the Learn request itself is taken out decides.
-    rest = study_helper.LEARN_REQUEST.sub(" ", question)
+    form, rest = study_helper.split_learn_request(question)
     if MAKE_THING.search(rest) or VISUAL_REQUEST.search(rest):
         return None
-    if study_helper.asks_for_learn(question):
-        return _make_learn(body, user_id, question, material, class_id, skill, turn)
+    if form:
+        return _make_learn(body, user_id, question, material, class_id, skill, turn, form)
     if skill not in STUDY_HELPER_SKILLS:
         return None
     if study_helper.asks_to_study_for_test(question):
@@ -632,7 +660,7 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
             return _tutor_reply(body, user_id, question, Material(content=app["text"], source=source), skill, turn)
     about_material = bool(material.content.strip() and PRACTICE_REQUEST.search(question))
     if (skill in {None, "explain", "build_guide", "practice", "organize", "plan", "retain"} and not body.class_id
-            and not about_material and _asks_for_app_action(question)):
+            and not about_material and not _about_learn(question) and _asks_for_app_action(question)):
         done = _app_action(user_id, question, material, authorization)
         if done:
             return done
@@ -646,7 +674,8 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
     if skill == "organize":
         return _organize(material, body.class_id, authorization)
     # Before the empty-material check: a new notes page can be edited while still empty.
-    if material.guide and (skill == "edit_outline" or (skill in {None, "explain"} and _asks_to_edit_outline(question))):
+    if material.guide and (skill == "edit_outline" or (skill in {None, "explain"} and not _about_learn(question)
+                                                       and _asks_to_edit_outline(question))):
         edited = _edit_outline(user_id, material, question)
         if edited:
             return edited
