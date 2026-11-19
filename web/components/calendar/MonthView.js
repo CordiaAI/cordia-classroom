@@ -76,7 +76,7 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
                       onClick={() => pick(day)} onKeyDown={event => onKeyDown(event, day)}>
                       <span className="mo-top" aria-hidden="true">
                         <span className="mo-num">{day.getDate()}</span>
-                        {cell.study > 0 && <span className="mo-study"><StudyIcon size={14} />{cell.study}</span>}
+                        {cell.study > 0 && <span className="mo-study"><StudyIcon size={14} />{cell.study} study</span>}
                       </span>
                       <span className="mo-chips" aria-hidden="true">
                         {cell.due.map(entry => (
@@ -191,6 +191,8 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
         @media (hover: hover) { :is(a, button).mo-due-row:hover { transform: translateY(-0.0625rem); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-edge); } }
         :is(a, button).mo-due-row:active { transform: scale(0.98); }
         .mo-due-icon { display: grid; color: var(--tone-ink, var(--muted)); }
+        .mo-due-icon :global(.lucide), .mo-study :global(.lucide) { color: currentColor; }
+        .mo-study :global(.lucide) { width: 0.875rem; height: 0.875rem; }
         .mo-due-main { display: grid; gap: 0.125rem; min-width: 0; }
         .mo-due-title { overflow: hidden; font: 600 1rem/1.3 var(--font-sans); text-overflow: ellipsis; }
         .mo-due-meta { display: flex; flex-wrap: wrap; gap: 0.25rem 0.625rem; align-items: center; }

@@ -16,6 +16,12 @@ import AgendaView from './AgendaView';
 const VIEW_KEY = 'cordiaCalendarView';
 const UNDO_MS = 6000;
 
+// Undo puts focus back on the block it moved (the toast's button goes away with the toast).
+function focusBlock(id) {
+  const find = () => document.querySelector(`[data-block="${CSS.escape(String(id))}"]`);
+  requestAnimationFrame(() => find()?.focus({ preventScroll: true }));
+}
+
 function savedView() {
   try { return localStorage.getItem(VIEW_KEY); } catch { return null; }
 }
@@ -50,7 +56,7 @@ function useNow() {
 // Week, Board, Month or Agenda. The views share the model (lib/calendarViews.mjs) and the writes
 // here: moving and adding study time (with Undo or a clear error) and Find time.
 // loading: what shows under the title until the data is in (the title itself never moves).
-export default function CalendarViews({ deadlines = [], blocks = [], needs = [], readiness = {}, setRawBlocks, reloadBlocks, tools, below, loading = null }) {
+export default function CalendarViews({ deadlines = [], blocks = [], needs = [], readiness = {}, readinessIn = true, setRawBlocks, reloadBlocks, tools, below, loading = null }) {
   const wide = useWide();
   const now = useNow();
   const router = useRouter();
@@ -90,7 +96,9 @@ export default function CalendarViews({ deadlines = [], blocks = [], needs = [],
     setRawBlocks(list => list.map(row => (row.id === block.id ? { ...row, ...saved } : row)));
     if (!quiet) {
       const day = next.start.toLocaleDateString('en-US', { weekday: 'short' });
-      say(`${block.title} moved to ${day}, ${span(next.start, next.end)}`, { undo: () => move({ ...block, ...next }, before, { quiet: true }) });
+      say(`${block.title} moved to ${day}, ${span(next.start, next.end)}`, {
+        undo: () => { focusBlock(block.id); return move({ ...block, ...next }, before, { quiet: true }).then(() => focusBlock(block.id)); },
+      });
     }
     return true;
   }, [say, setRawBlocks]);
@@ -135,7 +143,7 @@ export default function CalendarViews({ deadlines = [], blocks = [], needs = [],
   const isNow = view === 'month' ? anchor.getMonth() === now.getMonth() && anchor.getFullYear() === now.getFullYear() : sameDay(weekStart, startOfWeek(now));
   const range = view === 'month' ? monthLabel(anchor) : weekRangeLabel(weekStart);
 
-  const shared = { deadlines, blocks, needs, readiness, now, weekStart, saving, onOpen: open, onFind: find, finding };
+  const shared = { deadlines, blocks, needs, readiness, readinessIn, now, weekStart, saving, onOpen: open, onFind: find, finding };
   return (
     <div className="cal">
       <header className="cal-head">

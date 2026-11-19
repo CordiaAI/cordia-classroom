@@ -40,6 +40,18 @@ export function ReadyRing({ percent, size = 36, stroke, label = 'the exam' }) {
   return <ProgressRing value={percent / 100} size={size} stroke={stroke || (size >= 100 ? 8 : size >= 30 ? 3 : 2.25)} label={false} title={`${percent}% ready for ${label}`} />;
 }
 
+// The ring's track alone, in the same place and size: while readiness is still loading, and for an
+// exam with no review set yet (the exam card keeps its shape either way).
+export function EmptyRing({ size = 36, stroke }) {
+  const width = stroke || (size >= 100 ? 8 : size >= 30 ? 3 : 2.25);
+  const radius = (size - width) / 2;
+  return (
+    <span className="c-ring" style={{ width: size, height: size }} aria-hidden="true">
+      <svg width={size} height={size}><circle className="c-ring-track" cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={width} /></svg>
+    </span>
+  );
+}
+
 // What a screen reader hears for a deadline.
 export function dueLabel(entry) {
   const what = entry.exam ? 'Exam' : entry.type === 'quiz' ? 'Quiz' : 'Due';
@@ -47,16 +59,20 @@ export function dueLabel(entry) {
 }
 
 // A deadline as a chip (Week's Due strip, Month cells): the flag in the class's ink, the title,
-// struck through and faded once done. Canvas items open in Canvas, lecture to-dos in Cordia.
-export function DueChip({ entry, compact = false }) {
-  const className = `cal-chip${entry.done ? ' is-done' : ''}${compact ? ' cal-chip--compact' : ''}`;
+// struck through and faded once done. Canvas items open in Canvas, lecture to-dos in Cordia. An
+// exam (onOpen given) is olive, like the grid's, and opens its review.
+export function DueChip({ entry, compact = false, onOpen, readiness }) {
+  const exam = Boolean(onOpen);
+  const className = `cal-chip${entry.done ? ' is-done' : ''}${compact ? ' cal-chip--compact' : ''}${exam ? ' is-exam' : ''}`;
   const body = (
     <>
       {compact ? <span className="cal-dot" aria-hidden="true" /> : <DueIcon entry={entry} size={14} />}
       <span className="cal-chip-text">{entry.title}</span>
     </>
   );
-  const common = { className, style: toneStyle(entry.cls), title: dueLabel(entry), 'aria-label': dueLabel(entry) };
+  const label = `${dueLabel(entry)}${readiness ? `, ${readiness.percent}% ready` : ''}`;
+  const common = { className, style: exam ? undefined : toneStyle(entry.cls), title: label, 'aria-label': label };
+  if (exam) return <button type="button" {...common} onClick={() => onOpen(entry)}>{body}</button>;
   if (entry.url && entry.internal) return <a href={entry.url} {...common}>{body}</a>;
   if (entry.url) return <a href={entry.url} target="_blank" rel="noreferrer" {...common}>{body}</a>;
   return <span {...common} role="note">{body}</span>;
@@ -128,8 +144,14 @@ export function SharedStyles() {
       .cal-chip.is-done .lucide { color: var(--muted); }
       .cal-chip.is-done .cal-chip-text { text-decoration: line-through; color: var(--muted); }
       .cal-chip--compact { min-height: 1.5rem; padding: 0.125rem 0.5rem; font-weight: 500; }
-      @media (hover: hover) { a.cal-chip:hover { transform: translateY(-0.0625rem); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-edge); } }
-      a.cal-chip:active { transform: scale(0.97); }
+      button.cal-chip { width: 100%; border: 0; text-align: left; cursor: pointer; }
+      .cal-chip.is-exam { color: var(--on-olive); background: var(--olive-glass-sheen), var(--olive); box-shadow: var(--olive-glass-shadow); }
+      .cal-chip.is-exam .lucide { color: currentColor; }
+      @media (hover: hover) {
+        :is(a, button).cal-chip:hover { transform: translateY(-0.0625rem); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-edge); }
+        .cal-chip.is-exam:hover { box-shadow: var(--olive-glass-shadow-hover); }
+      }
+:is(a, button).cal-chip:active { transform: scale(0.97); }
       .cal-menu-wrap { position: relative; display: inline-flex; min-width: 0; }
       .cal-menu { position: absolute; top: calc(100% + 0.375rem); z-index: 40; display: grid; min-width: 15rem; max-width: min(20rem, calc(100vw - 2rem)); max-height: 20rem; overflow-y: auto; padding: 0.375rem; }
       .cal-menu--start { left: 0; }

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { CalendarCheck, Flag, GripVertical, Plus } from 'lucide-react';
-import { clock, dayEntries, dueSoon, dueWhen, hoursLabel, plannedHours, sameDay, span, startOfDay, weekDays } from '../../lib/calendarViews.mjs';
+import { clock, dayEntries, dueBy, dueSoon, dueWhen, hoursLabel, plannedHours, roomOn, sameDay, span, startOfDay, weekDays } from '../../lib/calendarViews.mjs';
 import { dayKey } from '../../lib/learnEngine.mjs';
-import { ClassTag, ICON, MenuButton, ReadyRing, SMALL_ICON, toneStyle } from './parts';
+import { ClassTag, EmptyRing, ICON, MenuButton, ReadyRing, SMALL_ICON, toneStyle } from './parts';
 
 const DRAG_TYPE = 'application/x-cordia-deadline';
 const longDay = day => day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -11,7 +11,7 @@ const longDay = day => day.toLocaleDateString('en-US', { weekday: 'long', month:
 // small bar, the exam card with its readiness ring and "Add study time" per day. "Needs a time" sits
 // on top: drag an item onto a day (or pick the day from its menu) to make a study block there, or
 // let Find time place them all with Plan my week's own scheduling.
-export default function BoardView({ deadlines, blocks, needs, readiness, now, weekStart, saving, onOpen, onFind, finding, onAdd }) {
+export default function BoardView({ deadlines, blocks, needs, readiness, readinessIn, now, weekStart, saving, onOpen, onFind, finding, onAdd }) {
   const days = weekDays(weekStart);
   const [over, setOver] = useState('');
   const [dragging, setDragging] = useState('');
@@ -25,10 +25,13 @@ export default function BoardView({ deadlines, blocks, needs, readiness, now, we
   const scale = Math.max(4, ...hours);
   const exams = weekDue.filter(entry => entry.exam && !entry.done);
 
-  // Deadlines a day's study time can go to: not done, not a lecture to-do, due that day or later.
-  const forDay = day => deadlines.filter(entry => !entry.done && !entry.internal && entry.at >= startOfDay(day) && entry.at >= now)
+  // Deadlines a day's study time can go to: not done, not a lecture to-do, with room that day
+  // before they're due (on the due day itself, only when there is time left before the deadline).
+  const forDay = day => deadlines.filter(entry => !entry.done && !entry.internal && dueBy(entry) > now && roomOn(day, entry, now))
     .slice(0, 12);
-  const dayChoices = entry => days.filter(day => open(day) && startOfDay(day) <= entry.at);
+  const dayChoices = entry => days.filter(day => open(day) && roomOn(day, entry, now));
+  const draggedEntry = deadlines.find(entry => entry.id === dragging);
+  const takes = day => open(day) && (!draggedEntry || roomOn(day, draggedEntry, now));
 
   function drop(event, day) {
     event.preventDefault();
@@ -36,14 +39,14 @@ export default function BoardView({ deadlines, blocks, needs, readiness, now, we
     setDragging('');
     const id = event.dataTransfer.getData(DRAG_TYPE);
     const entry = deadlines.find(item => item.id === id);
-    if (entry && open(day)) onAdd(entry, day);
+    if (entry && open(day) && roomOn(day, entry, now)) onAdd(entry, day);
   }
 
   function card(entry) {
     if (entry.kind === 'study') {
       return (
         <li key={entry.key}>
-          <button type="button" className={`bd-card bd-study${entry.done ? ' is-done' : ''}${saving.has(entry.id) ? ' is-saving' : ''}`} style={toneStyle(entry.cls)} onClick={() => onOpen(entry)}
+          <button type="button" data-block={entry.id} className={`bd-card bd-study${entry.done ? ' is-done' : ''}${saving.has(entry.id) ? ' is-saving' : ''}`} style={toneStyle(entry.cls)} onClick={() => onOpen(entry)}
             aria-label={`${entry.fullTitle}${entry.cls ? `, ${entry.cls.code}` : ''}, ${span(entry.start, entry.end)}${entry.done ? ', done' : ''}`}>
             <span className="bd-when">{span(entry.start, entry.end)}</span>
             <span className="bd-title">{entry.title}</span>
@@ -61,7 +64,7 @@ export default function BoardView({ deadlines, blocks, needs, readiness, now, we
             <span className="bd-exam-title">{entry.cls ? `${entry.cls.code} ` : ''}{entry.title}</span>
             {ready
               ? <span className="bd-exam-ready"><ReadyRing percent={ready.percent} size={36} label={entry.title} />{ready.percent}% ready</span>
-              : <span className="bd-exam-ready bd-exam-ready--none">No review set yet</span>}
+              : <span className="bd-exam-ready bd-exam-ready--none"><EmptyRing size={36} />{readinessIn ? 'No review set yet' : ''}</span>}
           </button>
         </li>
       );
@@ -130,9 +133,9 @@ export default function BoardView({ deadlines, blocks, needs, readiness, now, we
         {days.map((day, index) => {
           const isToday = sameDay(day, now);
           const entries = dayEntries(day, deadlines, blocks);
-          const canDrop = open(day);
+          const canDrop = takes(day);
           return (
-            <section key={dayKey(day)} className={`bd-col${isToday ? ' is-today' : ''}${over === dayKey(day) ? ' is-over' : ''}${dragging && canDrop ? ' is-target' : ''}${canDrop ? '' : ' is-past'}`}
+            <section key={dayKey(day)} className={`bd-col${isToday ? ' is-today' : ''}${over === dayKey(day) ? ' is-over' : ''}${dragging && canDrop ? ' is-target' : ''}${open(day) ? '' : ' is-past'}`}
               aria-label={`${isToday ? 'Today, ' : ''}${longDay(day)}: ${hoursLabel(hours[index])} of study planned`}
               onDragOver={event => { if (canDrop && event.dataTransfer.types.includes(DRAG_TYPE)) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
               onDragEnter={event => { if (canDrop && event.dataTransfer.types.includes(DRAG_TYPE)) setOver(dayKey(day)); }}
@@ -144,9 +147,9 @@ export default function BoardView({ deadlines, blocks, needs, readiness, now, we
                 <span className="bd-hours">{hoursLabel(hours[index])}</span>
               </header>
               {entries.length > 0 && <ul className="bd-cards">{entries.map(card)}</ul>}
-              {canDrop && (
+              {open(day) && (
                 <MenuButton className="bd-add" icon={<Plus {...SMALL_ICON} />} label="Add study time" menuLabel={`Add study time on ${longDay(day)}`} heading="Study for"
-                  empty="Nothing due from this day on" align={index > 3 ? 'end' : 'start'}
+                  empty="Nothing left to study for that day" align={index > 3 ? 'end' : 'start'}
                   items={forDay(day).map(entry => ({ key: entry.key, label: entry.title, detail: `${entry.cls ? entry.cls.code + ' · ' : ''}due ${dueWhen(entry.at, now)}`, disabled: saving.has(entry.id), onSelect: () => onAdd(entry, day) }))} />
               )}
             </section>
@@ -212,8 +215,9 @@ export default function BoardView({ deadlines, blocks, needs, readiness, now, we
         .bd-cards :global(.bd-exam) { gap: 0.375rem; color: var(--on-olive); background: var(--olive-glass-sheen), var(--olive); box-shadow: var(--olive-glass-shadow); }
         @media (hover: hover) { .bd-cards :global(.bd-exam:hover) { box-shadow: var(--olive-glass-shadow-hover); } }
         .bd-cards :global(.bd-exam-when) { display: flex; align-items: center; gap: 0.375rem; font: 600 0.8125rem/1.2 var(--font-sans); }
+        .bd-cards :global(.bd-exam .lucide) { width: 1rem; height: 1rem; color: currentColor; }
         .bd-cards :global(.bd-exam-title) { font: 600 1.0625rem/1.3 var(--font-sans); overflow-wrap: break-word; }
-        .bd-cards :global(.bd-exam-ready) { display: flex; align-items: center; gap: 0.5rem; font: 600 0.875rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
+        .bd-cards :global(.bd-exam-ready) { display: flex; align-items: center; gap: 0.5rem; min-height: 2.25rem; font: 600 0.875rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
         .bd-cards :global(.bd-exam-ready--none) { font-weight: 500; }
         .bd-cards :global(.bd-exam .c-ring-track) { stroke: var(--on-olive); opacity: 0.3; }
         .bd-cards :global(.bd-exam .c-ring-fill) { stroke: var(--on-olive); }

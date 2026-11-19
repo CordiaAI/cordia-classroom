@@ -125,7 +125,9 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     loadExamReadiness(exams).catch(() => ({})).then(map => { if (live) setReadiness({ key: examKey, map: map || {} }); });
     return () => { live = false; };
   }, [compact, dataIn, examKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const gate = useLoadGate(dataIn && (compact || readiness.key === examKey));
+  // The views show as soon as the deadlines and blocks are in; the rings fill when readiness is.
+  const gate = useLoadGate(dataIn);
+  const readinessIn = compact || readiness.key === examKey;
 
   useEffect(() => {
     const accountId = getUserId();
@@ -405,6 +407,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
         blocks={model.blocks}
         needs={model.needs}
         readiness={readiness.map}
+        readinessIn={readinessIn}
         setRawBlocks={setBlocks}
         reloadBlocks={reloadBlocks}
         tools={tools}

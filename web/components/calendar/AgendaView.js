@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { ArrowLeft, ArrowRight, CalendarCheck, GraduationCap } from 'lucide-react';
-import { agendaDays, clock, dueSoon, dueWhen, monthGrid, rowAction, sameDay, span, startOfWeek } from '../../lib/calendarViews.mjs';
+import { agendaDays, clock, dueBy, dueSoon, dueWhen, monthGrid, rowAction, sameDay, span, startOfWeek } from '../../lib/calendarViews.mjs';
 import { dayKey } from '../../lib/learnEngine.mjs';
-import { ClassTag, DueIcon, ICON, ReadyRing, SMALL_ICON, StudyIcon, toneStyle } from './parts';
+import { ClassTag, DueIcon, EmptyRing, ICON, ReadyRing, SMALL_ICON, StudyIcon, toneStyle } from './parts';
 
 const longDate = day => day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
@@ -19,14 +20,15 @@ function kindText(entry) {
 
 // The nearest exam still ahead with its readiness (or none yet), for the card at the top.
 function nextExam(deadlines, readiness, now) {
-  const exams = deadlines.filter(entry => entry.exam && !entry.done && entry.at >= now && entry.at - now <= 14 * 86400000);
+  const exams = deadlines.filter(entry => entry.exam && !entry.done && dueBy(entry) >= now && entry.at - now <= 14 * 86400000);
   return exams.find(entry => readiness[entry.id]) || exams[0] || null;
 }
 
 // Agenda (B): Yesterday, Today, Tomorrow and later as one list, each row with one action; beside
 // it the next exam's readiness, a mini month and Needs study time. On a phone, the only view.
-export default function AgendaView({ deadlines, blocks, needs, readiness, now, weekStart, saving, onOpen, onFind, finding, wide, onJump }) {
+export default function AgendaView({ deadlines, blocks, needs, readiness, readinessIn, now, weekStart, saving, onOpen, onFind, finding, wide, onJump }) {
   const days = agendaDays(weekStart, deadlines, blocks, now);
+  const empty = !days.some(({ entries }) => entries.length);
   const exam = nextExam(deadlines, readiness, now);
   const ready = exam && readiness[exam.id];
 
@@ -52,7 +54,13 @@ export default function AgendaView({ deadlines, blocks, needs, readiness, now, w
   return (
     <div className={`ag${wide ? ' ag--wide' : ''}`}>
       <section className="c-card ag-list" aria-label="Agenda">
-        {days.map(({ day, entries }) => (
+        {empty && (
+          <div className="ag-none">
+            <p className="ag-none-text">Nothing due or planned this week.</p>
+            <Link href="/week" className="c-btn c-btn--secondary ag-none-plan"><CalendarCheck {...SMALL_ICON} />Plan my week</Link>
+          </div>
+        )}
+        {!empty && days.map(({ day, entries }) => (
           <section key={dayKey(day)} className="ag-day" aria-labelledby={`ag-${dayKey(day)}`}>
             <h2 id={`ag-${dayKey(day)}`} className="ag-day-head">
               <span className={`ag-day-name${sameDay(day, now) ? ' is-today' : ''}`}>{relative(day, now)}</span>
@@ -62,7 +70,7 @@ export default function AgendaView({ deadlines, blocks, needs, readiness, now, w
               <ul className="ag-rows">
                 {entries.map(entry => {
                   const finished = entry.done;
-                  const past = entry.kind === 'study' ? entry.end < now : entry.at < now;
+                  const past = entry.kind === 'study' ? entry.end < now : dueBy(entry) < now;
                   const examReady = entry.kind === 'due' && entry.exam && readiness[entry.id];
                   return (
                     <li key={entry.key} className={`ag-row${finished ? ' is-done' : ''}${past && !finished ? ' is-past' : ''}${entry.exam ? ' is-exam' : ''}`} style={toneStyle(entry.cls)}>
@@ -89,25 +97,26 @@ export default function AgendaView({ deadlines, blocks, needs, readiness, now, w
       <aside className="ag-side" aria-label="This week at a glance">
         {exam && (
           <section className="c-card ag-exam" aria-label="Next exam">
-            {ready ? (
-              <span className="ag-exam-ring">
-                <ReadyRing percent={ready.percent} size={112} label={exam.title} />
-                <span className="ag-exam-pct" aria-hidden="true">{ready.percent}</span>
-              </span>
-            ) : null}
+            {/* The ring's place is kept while readiness loads and when there is no review set yet,
+                so nothing beside or below it moves when it fills. */}
+            <span className="ag-exam-ring">
+              {ready ? <ReadyRing percent={ready.percent} size={112} label={exam.title} /> : <EmptyRing size={112} />}
+              {ready && <span className="ag-exam-pct" aria-hidden="true">{ready.percent}%</span>}
+            </span>
             <div className="ag-exam-text">
               <p className="ag-exam-what">{exam.cls ? `${exam.cls.code} · ` : ''}{exam.at.toLocaleDateString('en-US', { weekday: 'long' })}{exam.allDay ? '' : ` ${clock(exam.at)}`}</p>
               <h2 className="ag-exam-title">{exam.title}</h2>
               {ready ? (
                 <>
+                  <p className="ag-exam-ready">{ready.percent}% ready</p>
                   <p className="ag-exam-pace">{ready.left ? `${ready.left} ${ready.left === 1 ? 'idea' : 'ideas'} left.${ready.perDay ? ` ${ready.perDay} a day keeps you on pace.` : ''}` : 'Every idea mastered.'}</p>
                 </>
-              ) : (
+              ) : readinessIn ? (
                 <>
                   <p className="ag-exam-pace">No review set yet. Make one to see how ready you are.</p>
                   <button type="button" className="c-btn c-btn--secondary ag-act" onClick={() => onOpen(exam)}>Make a review set</button>
                 </>
-              )}
+              ) : <p className="ag-exam-pace">Checking how ready you are…</p>}
             </div>
           </section>
         )}
@@ -148,10 +157,13 @@ export default function AgendaView({ deadlines, blocks, needs, readiness, now, w
         .ag-time { color: var(--muted); font: 600 0.9375rem/1.3 var(--font-sans); font-variant-numeric: tabular-nums; }
         .ag-row:not(.is-done):not(.is-past) .ag-time { color: var(--ink); }
         .ag-icon { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: var(--r-input); color: var(--tone-ink, var(--muted)); background: color-mix(in srgb, var(--tone, var(--glass-inner)) 78%, transparent); box-shadow: inset 0 0 0 0.0625rem var(--hairline); }
+        /* The icon takes its row's class ink (the global icon rule would make it muted). */
+        .ag-icon :global(.lucide) { color: currentColor; }
         .ag-row.is-exam .ag-icon { background: var(--glass-inner); color: var(--ink); }
         .ag-main { display: grid; gap: 0.125rem; min-width: 0; }
         .ag-main :global(.ag-title) { min-width: 0; overflow: hidden; color: var(--ink); font: 600 1.0625rem/1.35 var(--font-sans); text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
-        .ag-main :global(a.ag-title) { border-radius: 0.25rem; }
+        /* The title link is 44px tall (2.75rem) without moving the row: padding out, margin back in. */
+        .ag-main :global(a.ag-title) { display: block; padding-block: 0.6875rem; margin-block: -0.6875rem; border-radius: 0.25rem; }
         @media (hover: hover) { .ag-main :global(a.ag-title:hover) { text-decoration: underline; text-underline-offset: 0.2em; } }
         .ag-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; color: var(--muted); font: 500 0.875rem/1.3 var(--font-sans); }
         .ag-ready { display: inline-flex; align-items: center; gap: 0.375rem; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -162,12 +174,18 @@ export default function AgendaView({ deadlines, blocks, needs, readiness, now, w
         .ag-row.is-done :global(.ag-title) { text-decoration: line-through; color: var(--muted); }
         .ag-row.is-past :global(.ag-title) { color: var(--muted); }
         .ag-empty { margin: 0; padding: 0.5rem 0; color: var(--muted); font: 500 0.9375rem/1.4 var(--font-sans); }
+        .ag-none { display: grid; justify-items: start; gap: 0.75rem; padding: 0.5rem 0; }
+        .ag-none-text { margin: 0; color: var(--ink); font: 600 1.0625rem/1.4 var(--font-sans); }
+        .ag-none :global(.ag-none-plan) { min-height: 2.75rem; }
 
         .ag-side { display: grid; gap: 1rem; min-width: 0; }
         .ag-exam { display: flex; align-items: center; gap: 1.125rem; padding: 1.25rem; }
         .ag-exam-ring { position: relative; display: grid; place-items: center; flex: 0 0 auto; }
-        .ag-exam-pct { position: absolute; font: 600 2.125rem/1 var(--font-display); color: var(--ink); font-variant-numeric: tabular-nums; }
-        .ag-exam-text { display: grid; gap: 0.25rem; min-width: 0; justify-items: start; }
+        .ag-exam-pct { position: absolute; font: 600 2.125rem/1 var(--font-display); color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+        .ag-exam-ready { color: var(--ink); font: 600 1rem/1.3 var(--font-sans); font-variant-numeric: tabular-nums; }
+        /* As tall as the text is once readiness is in (kicker, title, "% ready", two lines of pace), so the
+           card doesn't grow when it arrives. */
+        .ag-exam-text { display: grid; gap: 0.25rem; align-content: start; min-width: 0; min-height: 7.625rem; justify-items: start; }
         .ag-exam-text p { margin: 0; }
         .ag-exam-what { color: var(--muted); font: 600 0.875rem/1.35 var(--font-sans); }
         .ag-exam-title { margin: 0; color: var(--ink); font: 600 1.5rem/1.2 var(--font-display); letter-spacing: -0.01em; }

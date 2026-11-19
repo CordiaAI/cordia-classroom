@@ -12,6 +12,12 @@ function daysUntil(date, today) {
 
 const reviewTitle = title => `${String(title || '').trim()}: review`.toLowerCase();
 
+// The two ways a guide belongs to an exam, shared by the Dashboard countdown, the sidebar's rings
+// and the Calendar: the exam's review set ("<exam>: review"), or a guide Learn was given a test
+// date for.
+export const reviewSetFor = (title, guides) => (guides || []).find(item => String(item?.title || '').trim().toLowerCase() === reviewTitle(title)) || null;
+export const learnTestDate = guide => guide?.flashcard_progress?.learn?.test_date || null;
+
 // guides: list summaries (flashcard_progress.learn.test_date); exams: calendar or course-work items
 // of type 'exam'. An exam's guide is its review set ("<exam>: review"); any guide with a Learn
 // test date counts too. Returns { guideId, title, date, daysLeft } or null.
@@ -21,11 +27,11 @@ export function nearestExam(guides, exams, today = dayKey()) {
   (exams || []).forEach(exam => {
     if (exam?.done || !exam?.due_at) return;
     const date = dayKey(exam.due_at);
-    const guide = (guides || []).find(item => String(item.title || '').trim().toLowerCase() === reviewTitle(exam.title));
+    const guide = reviewSetFor(exam.title, guides);
     if (guide && inRange(date)) found.push({ guideId: guide.id, title: String(exam.title).trim(), date });
   });
   (guides || []).forEach(guide => {
-    const date = guide?.flashcard_progress?.learn?.test_date;
+    const date = learnTestDate(guide);
     if (inRange(date) && !found.some(item => item.guideId === guide.id)) found.push({ guideId: guide.id, title: String(guide.title || '').replace(/: review$/i, ''), date });
   });
   const nearest = found.sort((a, b) => a.date.localeCompare(b.date))[0];

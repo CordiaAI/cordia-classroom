@@ -4,11 +4,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  agendaDays, buildBlocks, dueSoon, buildDeadlines, classFor, classIndex, courseKey, dayEntries, examProgress, examReviewGuide,
-  gridBox, hasStudyTime, lanes, monthCell, monthGrid, needsStudyTime, nowLine, pickView, plannedHours, rowAction,
-  shiftBlock, span, startOfWeek, weekRangeLabel,
+  agendaDays, blockLabel, blockTitle, buildBlocks, cleanTitle, dueBy, dueSoon, buildDeadlines, classFor, classIndex, courseKey, dayEntries,
+  endsInTime, examProgress, examReviewGuide, gridBox, hasStudyTime, lanes, monthCell, monthGrid, needsStudyTime, nowLine, offGrid,
+  pickView, plannedHours, roomOn, rowAction, shiftBlock, span, startOfWeek, weekRangeLabel,
 } from '../lib/calendarViews.mjs';
 import { classExams, examReadiness, learnQuestions } from '../lib/examCountdown.mjs';
+import { deadlineTitle } from '../lib/formatters.js';
 
 // Wednesday, Nov 18, 2026, 10:40 AM (local), the mockups' "now".
 const NOW = new Date(2026, 10, 18, 10, 40);
@@ -180,4 +181,62 @@ test('exam readiness equals Learn\'s and the sidebar\'s for the same review set'
   // The sidebar finds the same review set for the class.
   const sidebar = classExams(['f-ma'], [guide], [{ ...ITEMS[2], due_at: '2026-11-19T15:30:00.000Z' }], '2026-11-18');
   assert.equal(sidebar['f-ma'].guideId, 'g1');
+});
+
+// ---- Review round (PR 284) ----
+
+test('an all-day deadline due today is still open until the day ends', () => {
+  const [today] = buildDeadlines([{ id: 'canvas-a', title: 'Peer review [EH-101-002]', course: 'EH 101', due_at: '2026-11-18T00:00:00', all_day: true, type: 'assignment' }], index);
+  assert.equal(dueBy(today).getTime(), new Date(2026, 10, 19).getTime());
+  assert.equal(rowAction(today, [], NOW), 'find');
+  assert.deepEqual(dueSoon([today], NOW).map(entry => entry.id), ['canvas-a']);
+  assert.equal(rowAction(today, [], new Date(2026, 10, 19, 0, 1)), null, 'over once the day ends');
+});
+
+test('Add study time only offers a day with room before the deadline', () => {
+  const due = hour => ({ at: new Date(2026, 10, 20, hour), allDay: false });
+  const friday = new Date(2026, 10, 20);
+  assert.equal(roomOn(friday, due(8), NOW), false, 'due before the 9 AM window opens');
+  assert.equal(roomOn(friday, { at: new Date(2026, 10, 20, 9, 20), allDay: false }, NOW), false, '20 minutes is too short');
+  assert.equal(roomOn(friday, due(15), NOW), true);
+  assert.equal(roomOn(friday, { at: friday, allDay: true }, NOW), true, 'all day: the whole day');
+  assert.equal(roomOn(new Date(2026, 10, 18), due(15), new Date(2026, 10, 18, 21, 50)), false, 'today, after the window');
+  // A block moved past its deadline doesn't fit.
+  const block = { start: new Date(2026, 10, 20, 14), end: new Date(2026, 10, 20, 15, 30) };
+  assert.equal(endsInTime(block, due(15)), false);
+  assert.equal(endsInTime(block, due(16)), true);
+  assert.equal(endsInTime(block, null), true);
+});
+
+test('the Week grid marks what falls outside 8 AM to 10 PM', () => {
+  assert.equal(offGrid(new Date(2026, 10, 18, 7), new Date(2026, 10, 18, 7, 45)), 'earlier');
+  assert.equal(offGrid(new Date(2026, 10, 18, 23, 59), new Date(2026, 10, 19, 1, 29)), 'later');
+  assert.equal(offGrid(new Date(2026, 10, 18, 7, 30), new Date(2026, 10, 18, 8, 30)), '', 'partly inside: shown');
+  assert.equal(offGrid(new Date(2026, 10, 18, 21), new Date(2026, 10, 18, 22, 30)), '');
+});
+
+test('titles lose the Canvas section code the way the home cleans them', () => {
+  assert.equal(cleanTitle('Exam 3 [MA-125-001]'), deadlineTitle({ title: 'Exam 3 [MA-125-001]' }));
+  assert.equal(blockTitle('Review: Exam 3 [MA-125-001]'), 'Review: Exam 3');
+  assert.equal(blockTitle('Argument essay draft [EH-101-002]: Outline'), 'Argument essay draft: Outline');
+  assert.equal(blockTitle('Work on Lab [3] write-up'), 'Work on Lab [3] write-up');
+  const exam = byId('canvas-3');
+  assert.equal(blockLabel('Review: Exam 3 [MA-125-001]', exam), 'Review: Exam 3');
+  const essay = buildDeadlines([{ id: 'canvas-e', title: 'Argument essay draft [EH-101-002]', due_at: at(19, 23, 59) }], index)[0];
+  assert.equal(blockLabel('Argument essay draft [EH-101-002]: Finish the draft', essay), 'Finish the draft');
+  assert.equal(blocks.find(b => b.id === 'b1').fullTitle, 'Review: Exam 3');
+});
+
+test('readiness finds a guide by its Learn test date, as the sidebar does', () => {
+  const exam = byId('canvas-3'); // MA 125, Thursday Nov 19
+  const dated = { id: 'g-dated', title: 'Calculus chapter 5', folder_id: 'f-ma', flashcard_progress: { learn: { test_date: '2026-11-19' } } };
+  const elsewhere = { id: 'g-cis', title: 'Loops', folder_id: 'f-cis', flashcard_progress: { learn: { test_date: '2026-11-19' } } };
+  assert.equal(examReviewGuide(exam, [elsewhere, dated]).id, 'g-dated');
+  assert.equal(examReviewGuide(exam, [elsewhere]), null, 'another class\'s guide');
+  // The sidebar's ring for MA 125 is the same guide.
+  assert.equal(classExams(['f-ma'], [dated], [], '2026-11-18')['f-ma'].guideId, 'g-dated');
+  // A class that isn't the student's: the only guide dated that day.
+  const [loose] = buildDeadlines([{ id: 'canvas-z', title: 'Midterm', course: 'PHL 210', due_at: at(19, 9), type: 'exam' }], index);
+  assert.equal(examReviewGuide(loose, [dated]).id, 'g-dated');
+  assert.equal(examReviewGuide(loose, [dated, elsewhere]), null, 'two dated that day: not a guess');
 });

@@ -4,7 +4,8 @@
 // and drag maths). No browser APIs, so it is tested in Node (web/tests/calendar-views.test.mjs).
 import { colorFor, coverFor, COVER_COLORS } from './coverDesign.mjs';
 import { counts, dayKey, restoreLevels, testPlan } from './learnEngine.mjs';
-import { examReadiness, learnQuestions } from './examCountdown.mjs';
+import { examReadiness, learnQuestions, learnTestDate, reviewSetFor } from './examCountdown.mjs';
+import { deadlineTitle } from './formatters.js';
 
 export const VIEWS = ['week', 'board', 'month', 'agenda'];
 export const VIEW_LABELS = { week: 'Week', board: 'Board', month: 'Month', agenda: 'Agenda' };
@@ -15,6 +16,11 @@ export const SNAP_MINUTES = 15;
 export const MIN_BLOCK_MINUTES = 15;
 export const MAX_BLOCK_MINUTES = 6 * 60;
 export const NEEDS_DAYS = 7;
+// Where Add study time can put a block on a day (backend services/planner.py: DAY_START, DAY_END,
+// MIN_BLOCK), so a day is only offered when it has room before the deadline.
+export const PLAN_START_HOUR = 9;
+export const PLAN_END_HOUR = 22;
+export const PLAN_MIN_MINUTES = 25;
 const DAY = 86400000;
 
 // ---- Dates ----
@@ -116,7 +122,10 @@ export function courseKey(text) {
 }
 
 const SECTION_CODE = /\s*\[([^\]]{2,80})\]\s*$/;
-export const cleanTitle = title => String(title || '').replace(SECTION_CODE, '') || String(title || '');
+// A title without its Canvas section code ("Exam 3 [MA-125-001]" -> "Exam 3"): the home's own
+// cleaning (lib/formatters.js deadlineTitle, used by lib/homeData.js). The one place the Calendar
+// cleans titles, so a newer cleaner can be swapped in here.
+export const cleanTitle = title => deadlineTitle({ title });
 const courseOf = item => item?.course || String(item?.title || '').match(SECTION_CODE)?.[1] || '';
 
 // Canvas names a class "MUL 101 MUL-101-102: Introduction to Music"; its code reads first.
@@ -182,11 +191,15 @@ export function buildDeadlines(items, index) {
   }).sort((a, b) => a.at - b.at);
 }
 
+// A block's full title without section codes: "Review: Exam 3 [MA-125-001]" -> "Review: Exam 3",
+// "Essay [EH-101-002]: Outline" -> "Essay: Outline" (the backend names blocks after the raw title).
+export const blockTitle = title => (String(title || '').trim() || 'Study').split(': ').map(cleanTitle).join(': ');
+
 // A block's own words: "Argument essay draft: Finish the draft" reads "Finish the draft" (its class
 // and deadline show beside it); "Review: Exam 3" and "Work on Quiz 10" stay as they are.
 export function blockLabel(title, deadline) {
-  const text = String(title || '').trim() || 'Study';
-  for (const name of [deadline?.rawTitle, deadline?.title].filter(Boolean)) {
+  const text = blockTitle(title);
+  for (const name of [deadline?.title, deadline?.rawTitle && cleanTitle(deadline.rawTitle)].filter(Boolean)) {
     if (text.toLowerCase().startsWith(`${name.toLowerCase()}: `) && text.length > name.length + 2) return text.slice(name.length + 2);
   }
   return text;
@@ -204,7 +217,7 @@ export function buildBlocks(blocks, deadlines, index) {
       id: block.id,
       itemKey: block.item_key,
       title: blockLabel(block.title, deadline),
-      fullTitle: block.title || 'Study',
+      fullTitle: blockTitle(block.title),
       start: new Date(block.starts_at),
       end: new Date(block.ends_at),
       review: block.kind === 'review',
@@ -216,19 +229,36 @@ export function buildBlocks(blocks, deadlines, index) {
 }
 
 export const entryTime = entry => (entry.kind === 'study' ? entry.start : entry.at);
+
+// When a deadline is over: its due time, or the end of its day when it is due all day (the feed
+// gives those as the day's local midnight).
+export const dueBy = entry => (entry.allDay ? addDays(startOfDay(entry.at), 1) : entry.at);
+
+// Can Add study time place a block for this deadline on this day? Only when Plan my week's window
+// that day, from now on, leaves room for its shortest block before the deadline.
+export function roomOn(day, entry, now = new Date()) {
+  const base = startOfDay(day).getTime();
+  const soon = Math.ceil((now.getTime() + 15 * 60000) / (15 * 60000)) * 15 * 60000;
+  const opens = Math.max(base + PLAN_START_HOUR * 3600000, soon);
+  const closes = Math.min(base + PLAN_END_HOUR * 3600000, dueBy(entry).getTime());
+  return closes - opens >= PLAN_MIN_MINUTES * 60000;
+}
+
+// A moved study block still ends by its deadline (or has none to keep to).
+export const endsInTime = (span, deadline) => !deadline || span.end.getTime() <= dueBy(deadline).getTime();
 const classMatch = (block, deadline) => (deadline.cls ? block.cls?.key === deadline.cls.key : block.itemKey === deadline.id);
 
 // Has study time: a block for the deadline's class (or for the deadline itself, when it has no
 // class) that starts before it is due and inside the week before it.
 export function hasStudyTime(deadline, blocks) {
-  const due = deadline.at.getTime();
+  const due = dueBy(deadline).getTime();
   return (blocks || []).some(block => classMatch(block, deadline) && block.start.getTime() < due && block.end.getTime() > due - NEEDS_DAYS * DAY);
 }
 
 // Deadlines Plan my week could schedule in the next 7 days (the pool "Needs study time" is drawn from).
 export function dueSoon(deadlines, now = new Date()) {
   const from = now.getTime();
-  return (deadlines || []).filter(entry => !entry.done && !entry.internal && entry.at.getTime() > from && entry.at.getTime() <= from + NEEDS_DAYS * DAY);
+  return (deadlines || []).filter(entry => !entry.done && !entry.internal && dueBy(entry).getTime() > from && entry.at.getTime() <= from + NEEDS_DAYS * DAY);
 }
 
 // "Needs study time": a deadline in the next 7 days, not done, with no study block for that class
@@ -240,7 +270,7 @@ export function needsStudyTime(deadlines, blocks, now = new Date()) {
 // The one action an Agenda row offers.
 export function rowAction(entry, blocks, now = new Date()) {
   if (entry.kind === 'study') return entry.done || entry.end < now ? null : 'start';
-  if (entry.done || entry.at < now) return null;
+  if (entry.done || dueBy(entry) < now) return null;
   if (entry.exam) return 'review';
   if (entry.internal) return null;
   return hasStudyTime(entry, blocks) ? 'planned' : 'find';
@@ -287,6 +317,12 @@ export function agendaDays(weekStart, deadlines, blocks, now = new Date()) {
 // ---- The Week grid ----
 
 export const GRID_MINUTES = (DAY_END_HOUR - DAY_START_HOUR) * 60;
+
+// Is something wholly before or after the grid's hours? 'earlier', 'later', or '' when it shows.
+export function offGrid(start, end) {
+  if (!gridBox(start, end).hidden) return '';
+  return (new Date(start) - startOfDay(start)) / 60000 < DAY_START_HOUR * 60 ? 'earlier' : 'later';
+}
 
 // A block's place in its day column, as fractions of the grid's height (clipped to 8 AM-10 PM).
 export function gridBox(start, end) {
@@ -353,12 +389,18 @@ export const sameSpan = (a, b) => a.start.getTime() === b.start.getTime() && a.e
 
 // ---- Exam readiness (Learn's own number, DESIGN-SPEC 3.3) ----
 
-const reviewTitle = title => `${String(title || '').trim()}: review`.toLowerCase();
-
-// An exam's review set: the guide Plan my week builds for it ("<exam>: review").
+// An exam's guide, matched the way the sidebar and the Dashboard countdown match it
+// (lib/examCountdown.mjs): its review set ("<exam>: review"), else a guide Learn was given this
+// exam's date as its test date, in the exam's class (or the only one that day, when the class
+// isn't one of the student's).
 export function examReviewGuide(exam, guides) {
-  const wanted = reviewTitle(exam.rawTitle || exam.title);
-  return (guides || []).find(guide => String(guide?.title || '').trim().toLowerCase() === wanted) || null;
+  const own = reviewSetFor(exam.rawTitle || exam.title, guides);
+  if (own) return own;
+  const day = dayKey(exam.at);
+  const dated = (guides || []).filter(guide => learnTestDate(guide) === day);
+  const classId = exam.cls?.classId;
+  if (classId) return dated.find(guide => String(guide?.folder_id || '') === String(classId)) || null;
+  return dated.length === 1 ? dated[0] : null;
 }
 
 // Readiness for one exam from its full review guide: the same sum as Learn and the sidebar

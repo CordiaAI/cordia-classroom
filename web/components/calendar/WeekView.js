@@ -1,12 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
-import { Flag } from 'lucide-react';
-import { DAY_END_HOUR, DAY_START_HOUR, GRID_MINUTES, clock, gridBox, lanes, nowLine, sameDay, sameSpan, shiftBlock, span, weekDays } from '../../lib/calendarViews.mjs';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, Flag } from 'lucide-react';
+import { DAY_END_HOUR, DAY_START_HOUR, GRID_MINUTES, clock, endsInTime, gridBox, lanes, nowLine, offGrid, sameDay, sameSpan, shiftBlock, span, weekDays } from '../../lib/calendarViews.mjs';
 import { dayKey } from '../../lib/learnEngine.mjs';
 import { DueChip, MenuButton, ReadyRing, toneStyle } from './parts';
 
 const STRIP_CHIPS = 2;
 const KEY_SETTLE_MS = 800;
 const EXAM_MINUTES = 90;
+// A block narrower than this (in rem, so Larger text counts) drops its time line; an exam's
+// readiness shows as the ring alone.
+const NARROW_REM = 6.5;
+const TINY_REM = 4; // narrower still: one line of title, ending in an ellipsis
+const useBrowserLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+const examSpan = entry => ({ start: entry.at, end: new Date(entry.at.getTime() + EXAM_MINUTES * 60000) });
 const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR - 1 }, (_, i) => DAY_START_HOUR + 1 + i);
 const hourLabel = hour => `${hour % 12 || 12} ${hour < 12 ? 'AM' : 'PM'}`;
 const dayName = day => day.toLocaleDateString('en-US', { weekday: 'short' });
@@ -15,7 +21,9 @@ const longDay = day => day.toLocaleDateString('en-US', { weekday: 'long', month:
 // Week (A): a time grid from 8 AM to 10 PM with a Due strip over each day, study blocks as glass
 // in their class's tint, timed exams as solid olive blocks, today's column tinted and an olive now
 // line. A study block moves by dragging it (or its bottom edge, to change its length) or with the
-// keyboard: arrows move it 15 minutes or a day, Shift with Up or Down changes its length.
+// keyboard: arrows move it 15 minutes or a day, Shift with Up or Down changes its length. Nothing is
+// lost outside 8 AM-10 PM: an exam there joins the Due strip, a block there is counted at the
+// column's top or bottom edge ("1 earlier", "1 later") and opens from that menu.
 export default function WeekView({ deadlines, blocks, readiness, now, weekStart, saving, onOpen, onMove }) {
   const days = weekDays(weekStart);
   const body = useRef(null);
@@ -24,12 +32,30 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
   const suppressClick = useRef('');
   const [draft, setDraft] = useState(null); // { id, start, end } shown in place of the saved time
   const [said, setSaid] = useState('');
+  const [columnRem, setColumnRem] = useState(null); // a day column's width in rem, once measured
 
   useEffect(() => () => clearTimeout(keyed.current?.timer), []);
+  // Measured before paint, so blocks never redraw narrower after they first show.
+  useBrowserLayoutEffect(() => {
+    const element = body.current;
+    if (!element) return undefined;
+    const measure = () => {
+      const column = element.querySelector('.wk-col');
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      if (column) setColumnRem(column.getBoundingClientRect().width / rem);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const weekDue = deadlines.filter(entry => days.some(day => sameDay(day, entry.at)));
-  const timedExams = weekDue.filter(entry => entry.exam && !entry.allDay);
-  const strip = weekDue.filter(entry => !(entry.exam && !entry.allDay));
+  // Timed exams sit in the grid when their time is inside it; the rest join the Due strip.
+  const gridExam = entry => entry.exam && !entry.allDay && !offGrid(examSpan(entry).start, examSpan(entry).end);
+  const timedExams = weekDue.filter(gridExam);
+  const strip = weekDue.filter(entry => !gridExam(entry));
   const saved = id => blocks.find(item => item.id === id);
   const where = ({ start, end }) => `${start.toLocaleDateString('en-US', { weekday: 'long' })}, ${span(start, end)}`;
   const line = days.some(day => sameDay(day, now)) ? nowLine(now) : null;
@@ -58,9 +84,13 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
       if (!state.moved && Math.abs(dx) + Math.abs(dy) < 5) return;
       state.moved = true;
       const minutes = dy / state.minutePx;
-      state.next = state.resize
+      const next = state.resize
         ? shiftBlock(state.block, { minutes, resize: true })
         : shiftBlock(state.block, { days: dayShift(state.block, Math.round(dx / state.columnPx)), minutes });
+      // Past the deadline it stops: study time has to end before it's due.
+      if (!endsInTime(next, state.block.deadline)) { state.late = true; return; }
+      state.late = false;
+      state.next = next;
       setDraft({ id: state.block.id, ...state.next });
     };
     const end = cancelled => () => {
@@ -74,6 +104,8 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
       if (!cancelled && state.next && !sameSpan(state.next, state.block)) {
         setSaid(`Moved to ${where(state.next)}`);
         onMove(state.block, state.next);
+      } else if (!cancelled && state.late) {
+        setSaid(lateText(state.block));
       }
     };
     const up = end(false);
@@ -111,10 +143,15 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
     const next = resize
       ? shiftBlock(base, { minutes: step[1], resize: true })
       : shiftBlock(base, { days: dayShift(base, step[0]), minutes: step[1] });
+    if (!endsInTime(next, block.deadline)) { setSaid(lateText(block)); return; }
     setDraft({ id: block.id, ...next });
     setSaid(`${resize ? 'Length' : 'Time'}: ${where(next)}. Saves when you stop.`);
     clearTimeout(keyed.current?.timer);
     keyed.current = { block, next, timer: setTimeout(settle, KEY_SETTLE_MS) };
+  }
+
+  function lateText(block) {
+    return `${block.title} has to end before ${block.deadline.title} is due, ${block.deadline.allDay ? longDay(block.deadline.at) : `${longDay(block.deadline.at)} at ${clock(block.deadline.at)}`}.`;
   }
 
   function onClick(block) {
@@ -146,14 +183,18 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
           const rest = due.slice(STRIP_CHIPS);
           return (
             <div key={dayKey(day)} className="wk-strip-day">
-              {due.slice(0, STRIP_CHIPS).map(entry => <DueChip key={entry.key} entry={entry} />)}
+              {due.slice(0, STRIP_CHIPS).map(entry => <DueChip key={entry.key} entry={entry} onOpen={entry.exam ? onOpen : undefined} readiness={readiness[entry.id]} />)}
               {rest.length > 0 && (
                 <MenuButton className="wk-more" label={`+${rest.length} more`} menuLabel={`More due ${longDay(day)}`}
                   items={rest.map(entry => ({
                     key: entry.key, label: entry.title,
                     detail: `${entry.cls ? entry.cls.code + ' · ' : ''}${entry.allDay ? 'All day' : clock(entry.at)}${entry.done ? ' · done' : ''}`,
-                    disabled: !entry.url,
-                    onSelect: () => { if (entry.internal) window.location.assign(entry.url); else window.open(entry.url, '_blank', 'noopener'); },
+                    disabled: !entry.url && !entry.exam,
+                    onSelect: () => {
+                      if (entry.exam) onOpen(entry);
+                      else if (entry.internal) window.location.assign(entry.url);
+                      else window.open(entry.url, '_blank', 'noopener');
+                    },
                   }))} />
               )}
             </div>
@@ -182,27 +223,49 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
           <ul className="wk-layer" aria-label="Study time and exams this week">
             {days.flatMap((day, index) => {
               const dayBlocks = blocks.map(shown).filter(block => sameDay(block.start, day));
-              const exams = timedExams.filter(entry => sameDay(entry.at, day)).map(entry => ({ ...entry, start: entry.at, end: new Date(entry.at.getTime() + EXAM_MINUTES * 60000) }));
-              const placed = lanes([...dayBlocks, ...exams]);
+              const exams = timedExams.filter(entry => sameDay(entry.at, day)).map(entry => ({ ...entry, ...examSpan(entry) }));
+              const inGrid = dayBlocks.filter(block => !offGrid(block.start, block.end));
+              const edges = ['earlier', 'later'].map(side => ({ side, blocks: dayBlocks.filter(block => offGrid(block.start, block.end) === side) })).filter(edge => edge.blocks.length);
+              const placed = lanes([...inGrid, ...exams]);
+              const laneOf = key => placed[key] || { lane: 0, lanes: 1 };
               const place = (key, box) => {
-                const lane = placed[key] || { lane: 0, lanes: 1 };
+                const lane = laneOf(key);
                 return {
                   top: `${box.top * 100}%`, height: `${box.height * 100}%`,
                   left: `calc(${((index + lane.lane / lane.lanes) / 7) * 100}% + 0.25rem)`,
                   width: `calc(${100 / 7 / lane.lanes}% - 0.5rem)`,
                 };
               };
-              return [...exams, ...dayBlocks].sort((a, b) => a.start - b.start).map(entry => {
+              const width = key => (columnRem === null ? Infinity : columnRem / laneOf(key).lanes - 0.5);
+              const narrow = key => width(key) < NARROW_REM;
+              const edgeItems = edges.map(({ side, blocks: off }) => (
+                <li key={`edge-${dayKey(day)}-${side}`} className={`wk-edge wk-edge--${side}`} style={{ left: `calc(${(index / 7) * 100}% + 0.25rem)`, width: `calc(${100 / 7}% - 0.5rem)` }}>
+                  <MenuButton className="wk-edge-btn" align={index > 3 ? 'end' : 'start'}
+                    icon={side === 'earlier' ? <ArrowUp size={14} strokeWidth={1.75} aria-hidden="true" /> : <ArrowDown size={14} strokeWidth={1.75} aria-hidden="true" />}
+                    label={`${off.length} ${side}`}
+                    menuLabel={`Study time ${side === 'earlier' ? 'before 8 AM' : 'after 10 PM'}, ${longDay(day)}`}
+                    triggerProps={{ 'aria-label': `${off.length} study ${off.length === 1 ? 'time' : 'times'} ${side === 'earlier' ? 'before 8 AM' : 'after 10 PM'}, ${longDay(day)}` }}
+                    items={off.map(block => ({ key: block.key, label: block.title, detail: `${span(block.start, block.end)}${block.cls ? ` · ${block.cls.code}` : ''}${block.done ? ' · done' : ''}`, onSelect: () => onOpen(saved(block.id) || block) }))} />
+                </li>
+              ));
+              return edgeItems.concat([...exams, ...inGrid].sort((a, b) => a.start - b.start).map(entry => {
                 const box = gridBox(entry.start, entry.end);
-                if (box.hidden) return null;
                 if (entry.kind === 'due') {
                   const ready = readiness[entry.id];
+                  const slim = narrow(entry.key);
                   return (
                     <li key={entry.key} className="wk-item" style={place(entry.key, box)}>
                       <button type="button" className={`wk-block wk-exam${entry.done ? ' is-done' : ''}`} onClick={() => onOpen(entry)}
                         aria-label={`Exam: ${entry.cls ? entry.cls.code + ' ' : ''}${entry.title}, ${longDay(entry.at)}, ${clock(entry.at)}${ready ? `, ${ready.percent}% ready` : ''}. Opens your review.`}>
-                        <span className="wk-block-title"><Flag size={14} strokeWidth={1.75} aria-hidden="true" />{entry.cls ? `${entry.cls.code} ` : ''}{entry.title}</span>
-                        <span className="wk-block-time">{clock(entry.at)}{ready ? <span className="wk-ready"><ReadyRing percent={ready.percent} size={16} label={entry.title} />{ready.percent}%</span> : null}</span>
+                        <span className="wk-exam-top">
+                          <Flag size={14} strokeWidth={1.75} aria-hidden="true" />
+                          <span className="wk-exam-name">{entry.title}</span>
+                          {ready && !slim && <span className="wk-ready"><ReadyRing percent={ready.percent} size={16} label={entry.title} />{ready.percent}%</span>}
+                        </span>
+                        <span className="wk-block-time">
+                          {entry.cls && !slim ? `${entry.cls.code} · ` : ''}{clock(entry.at)}
+                          {ready && slim && <span className="wk-ready"><ReadyRing percent={ready.percent} size={16} label={entry.title} /></span>}
+                        </span>
                       </button>
                     </li>
                   );
@@ -211,13 +274,15 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
                 const minutes = box.height * GRID_MINUTES;
                 const short = minutes < 50;
                 const mid = !short && minutes < 100;
+                const slim = narrow(block.key);
+                const tiny = width(block.key) < TINY_REM;
                 const busy = saving.has(block.id);
                 const moving = draft && draft.id === block.id;
                 const original = saved(block.id) || block;
                 return (
                   <li key={block.key} className={`wk-item${moving ? ' is-moving' : ''}`} style={place(block.key, box)}>
-                    <button type="button"
-                      className={`wk-block${block.done ? ' is-done' : ''}${short ? ' is-short' : ''}${mid ? ' is-mid' : ''}${moving ? ' is-moving' : ''}${busy ? ' is-saving' : ''}`}
+                    <button type="button" data-block={block.id}
+                      className={`wk-block${block.done ? ' is-done' : ''}${short ? ' is-short' : ''}${mid ? ' is-mid' : ''}${slim ? ' is-slim' : ''}${tiny ? ' is-tiny' : ''}${moving ? ' is-moving' : ''}${busy ? ' is-saving' : ''}`}
                       style={toneStyle(block.cls)}
                       aria-roledescription={block.done ? undefined : 'movable study time'}
                       aria-describedby={block.done ? undefined : 'wk-help'}
@@ -228,12 +293,12 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
                       onBlur={settle}
                       onClick={() => onClick(original)}>
                       <span className="wk-block-title">{block.title}</span>
-                      {!short && <span className="wk-block-time">{span(block.start, block.end)}</span>}
+                      {!short && !slim && <span className="wk-block-time">{span(block.start, block.end)}</span>}
                       {!block.done && <span className="wk-resize" data-resize="" aria-hidden="true" />}
                     </button>
                   </li>
                 );
-              });
+              }));
             })}
           </ul>
         </div>
@@ -282,8 +347,10 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
         .wk-block.is-mid { gap: 0; padding-block: 0.25rem; }
         .wk-block-title, .wk-block-time { flex-shrink: 0; }
         .wk-block-time { flex-wrap: wrap; }
-        .wk-block-title { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font: 600 0.875rem/1.2 var(--font-sans); }
-        .wk-block:is(.is-short, .is-mid) .wk-block-title { -webkit-line-clamp: 1; }
+        .wk-block-title { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; font: 600 0.875rem/1.2 var(--font-sans); }
+        /* One line ends in an ellipsis, never a word cut off at the edge. */
+        .wk-block:is(.is-short, .is-tiny, .is-mid:not(.is-slim)) .wk-block-title { display: block; flex-shrink: 1; min-width: 0; white-space: nowrap; text-overflow: ellipsis; overflow-wrap: normal; }
+        .wk-block.is-slim { padding-inline: 0.375rem; }
         .wk-block-time { display: flex; align-items: center; gap: 0.5rem; color: var(--tone-ink, var(--muted)); font: 600 0.8125rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
         .wk-resize { position: absolute; left: 0; right: 0; bottom: 0; height: 0.625rem; cursor: ns-resize; }
         .wk-resize::after { content: ''; position: absolute; left: 50%; bottom: 0.1875rem; width: 1.25rem; height: 0.1875rem; margin-left: -0.625rem; border-radius: 0.125rem; background: var(--tone-ink, var(--muted)); opacity: 0; transition: opacity 180ms var(--ease); }
@@ -299,16 +366,33 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
         .wk-block.is-done .wk-block-time { color: var(--muted); }
         .wk-block.is-done .wk-block-title { text-decoration: line-through; color: var(--muted); }
         .wk-exam { cursor: pointer; touch-action: auto; color: var(--on-olive); background: var(--olive-glass-sheen), var(--olive); box-shadow: var(--olive-glass-shadow); }
-                .wk-exam .wk-block-title { font-size: 0.8125rem; }
-        .wk-exam .wk-block-title :global(.lucide) { margin-right: 0.25rem; vertical-align: -0.125rem; }
-        .wk-exam .wk-block-time { color: var(--on-olive); }
-        .wk-ready { display: inline-flex; align-items: center; gap: 0.25rem; }
+        .wk-exam-top { display: flex; align-items: center; gap: 0.25rem; min-width: 0; font: 600 0.875rem/1.2 var(--font-sans); }
+        .wk-exam :global(.lucide) { flex: 0 0 auto; width: 0.875rem; height: 0.875rem; color: currentColor; }
+        .wk-exam-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .wk-exam .wk-block-time { display: flex; overflow: hidden; color: var(--on-olive); }
+        .wk-ready { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 0.25rem; font: 600 0.8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .wk-exam :global(.c-ring-track) { stroke: var(--on-olive); opacity: 0.3; }
         .wk-exam :global(.c-ring-fill) { stroke: var(--on-olive); }
         @media (hover: hover) { .wk-exam:hover { box-shadow: var(--olive-glass-shadow-hover); } }
-        .wk-empty { position: absolute; top: 1.5rem; left: 50%; z-index: 2; max-width: 24rem; margin: 0; padding: 0.75rem 1rem; transform: translateX(-50%); border-radius: var(--r-row); background: var(--glass-inner); box-shadow: inset 0 0 0 0.0625rem var(--hairline); color: var(--muted); font: 500 0.9375rem/1.45 var(--font-sans); text-align: center; }
+        /* Over the now line (z-index 1), on raised glass so the line doesn't run through the words. */
+        .wk-empty { position: absolute; top: 1.5rem; left: 50%; z-index: 3; max-width: 24rem; margin: 0; padding: 0.75rem 1rem; transform: translateX(-50%); border-radius: var(--r-row); background: var(--surface-raised); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-edge); color: var(--muted); font: 500 0.9375rem/1.45 var(--font-sans); text-align: center; }
+        .wk-edge { position: absolute; z-index: 3; display: flex; justify-content: center; pointer-events: auto; }
+        .wk-edge--earlier { top: 0.25rem; }
+        .wk-edge--later { bottom: 0.25rem; }
+        .wk-edge :global(.wk-edge-btn) {
+          display: inline-flex; align-items: center; gap: 0.25rem; min-height: 1.75rem; padding: 0 0.5rem; border: 0; border-radius: var(--r-pill);
+          background: var(--surface-raised); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-edge);
+          color: var(--ink); font: 600 0.8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer;
+          transition: transform 180ms var(--ease), box-shadow 180ms var(--ease);
+        }
+        .wk-edge :global(.wk-edge-btn .lucide) { width: 0.875rem; height: 0.875rem; color: currentColor; }
+        @media (hover: hover) { .wk-edge :global(.wk-edge-btn:hover) { transform: translateY(-0.0625rem); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-lift); } }
+        .wk-edge :global(.wk-edge-btn:active) { transform: scale(0.97); }
         .wk-sr { position: absolute; width: 0.0625rem; height: 0.0625rem; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-        @media (prefers-reduced-motion: reduce) { .wk-block, .wk-resize::after { transition: none; } .wk-block:hover, .wk-block.is-moving { transform: none; } }
+        @media (prefers-reduced-motion: reduce) {
+          .wk-block, .wk-resize::after, .wk-edge :global(.wk-edge-btn) { transition: none; }
+          .wk-block:hover, .wk-block.is-moving, .wk-edge :global(.wk-edge-btn:hover) { transform: none; }
+        }
       `}</style>
     </section>
   );
