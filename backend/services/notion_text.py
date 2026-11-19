@@ -152,28 +152,43 @@ _gates: dict = {}  # user id -> [semaphore, readers using it]
 _gates_lock = threading.Lock()
 
 
+class _OutOfTime(Exception):
+    """The read's clock ran out while a call waited for a free slot: the call is never made."""
+
+
 class _Gate:
     """At most PARALLEL Notion calls in flight per student, across every read they have going (an
     import and a Library save, two tabs, the Tutor), not just inside one. A call a read gave up
-    waiting for still counts until it ends. Entries are dropped once nothing uses them."""
+    waiting for still counts until it ends. A call waits for a slot only until its read's deadline,
+    and is not made at all once the deadline has passed (_OutOfTime), so no call starts after the
+    read gave up. Entries are dropped once nothing uses them."""
 
-    def __init__(self, user_id: str):
-        self.user_id = user_id
+    def __init__(self, user_id: str, deadline: float):
+        self.user_id, self.deadline = user_id, deadline
         self.entry = None
+
+    def _leave(self, release: bool) -> None:
+        with _gates_lock:
+            if release:
+                self.entry[0].release()
+            self.entry[1] -= 1
+            if not self.entry[1] and _gates.get(self.user_id) is self.entry:
+                del _gates[self.user_id]
 
     def __enter__(self):
         with _gates_lock:
             self.entry = _gates.setdefault(self.user_id, [threading.BoundedSemaphore(PARALLEL), 0])
             self.entry[1] += 1
-        self.entry[0].acquire()
+        if not self.entry[0].acquire(timeout=max(self.deadline - time.monotonic(), 0)):
+            self._leave(release=False)
+            raise _OutOfTime()
+        if time.monotonic() >= self.deadline:
+            self._leave(release=True)
+            raise _OutOfTime()
         return self
 
     def __exit__(self, *exc):
-        with _gates_lock:
-            self.entry[0].release()
-            self.entry[1] -= 1
-            if not self.entry[1] and _gates.get(self.user_id) is self.entry:
-                del _gates[self.user_id]
+        self._leave(release=True)
 
 
 def reset_gates() -> None:
@@ -265,7 +280,7 @@ class _Reader:
         """One call to Notion, one of at most PARALLEL in flight for this student."""
         if not self.user_id:
             return self.fetch(arguments)
-        with _Gate(self.user_id):
+        with _Gate(self.user_id, self.deadline):
             return self.fetch(arguments)
 
     def _stop(self, reason: str) -> None:
@@ -305,6 +320,9 @@ class _Reader:
                 arguments["start_cursor"] = cursor
             try:
                 data = self._call(arguments)
+            except _OutOfTime:
+                self._stop("time")
+                return
             except HTTPException:
                 if root and not sink and not cursor:
                     raise

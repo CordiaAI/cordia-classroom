@@ -113,12 +113,32 @@ const PARTIAL_NOTICE = 'Only part of that page came in.';
 const NOTICE_NAMES = 6;
 const noticeNames = names => `${names.slice(0, NOTICE_NAMES).join(', ')}${names.length > NOTICE_NAMES ? ` and ${names.length - NOTICE_NAMES} more` : ''}`;
 
+// A list that scrolls up and down: fades the edge that has more (fade-top / fade-bottom). A callback ref,
+// since the list only appears once a hub page comes back.
+function useEdgeFade() {
+  const [list, setList] = useState(null);
+  useEffect(() => {
+    if (!list) return undefined;
+    const update = () => {
+      const more = list.scrollHeight - list.clientHeight > 1;
+      list.classList.toggle('fade-top', more && list.scrollTop > 4);
+      list.classList.toggle('fade-bottom', more && list.scrollTop < list.scrollHeight - list.clientHeight - 4);
+    };
+    update();
+    list.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => { list.removeEventListener('scroll', update); window.removeEventListener('resize', update); };
+  }, [list]);
+  return setList;
+}
+
 function ImportSheet({ connector, onClose }) {
   // Where an import goes: the New sheet's Paste (to review first) or straight into a class in Library.
   const [classes, setClasses] = useState([]);
   const [target, setTarget] = useState('');
   const [added, setAdded] = useState(null);
   const [hub, setHub] = useState(null); // a page that is only sub-pages: { id, names }
+  const setHubList = useEdgeFade();
   useEffect(() => { loadFolders().then(data => setClasses(Array.isArray(data?.folders) ? data.folders : [])); }, []);
   async function addToClass(file) {
     setBusy(file.id); setError(''); setFailed(null); setAdded(null); setHub(null);
@@ -215,7 +235,7 @@ function ImportSheet({ connector, onClose }) {
           {hub && (
             <div className="cn-hub" role="status">
               <p className="c-meta">This page's notes are in its sub-pages. Search for one:</p>
-              <div className="cn-hub-names">
+              <div className="cn-hub-names" ref={setHubList}>
                 {hub.names.map((name, index) => (
                   <button key={`${name}-${index}`} type="button" className="c-btn c-btn--secondary cn-hub-name" onClick={() => { setHub(null); setQuery(name); inputRef.current?.focus(); }}>{name}</button>
                 ))}

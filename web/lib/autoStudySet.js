@@ -11,7 +11,7 @@ export function makeStudySet(guide) {
   const job = (async () => {
     const generated = await apiFetch('/generate', {
       method: 'POST',
-      body: JSON.stringify({ content: studySetSource(guide.notes), notes: false, study_guide: true, flashcards: true, request_id: studySetRequestId(guide.id) }),
+      body: JSON.stringify({ content: studySetSource(guide.notes, guide), notes: false, study_guide: true, flashcards: true, request_id: studySetRequestId(guide.id) }),
       timeoutMs: 6 * 60 * 1000,
     });
     if (!generated?.study_guide || generated.study_guide.startsWith('[Error')) {

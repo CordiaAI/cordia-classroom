@@ -109,7 +109,7 @@ def _link(user_id: str, connector: str, guide_id: str, ref: str, outline: str, n
 
 def folder_material(user_id: str, folder_id: str, *, source_title_prefix: Optional[str] = None, limit_chars: int = 120_000) -> list[dict]:
     """The guides in a class folder (imports and the student's own), newest first, for a review set."""
-    q = get_supabase().table("study_guides").select("id,title,notes,study_guide,source_type,source_title,created_at") \
+    q = get_supabase().table("study_guides").select("id,title,notes,study_guide,source_type,source_title,created_at,external_source_id") \
         .eq("user_id", user_id).eq("folder_id", folder_id)
     if source_title_prefix:
         q = q.like("source_title", f"{source_title_prefix}%")

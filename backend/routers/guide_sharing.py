@@ -236,7 +236,7 @@ def ask_guide(body: AskRequest, ctx: Ctx = Depends(access.guide("view"))):
     from services import guide_tutor
     from services.entitlements import record, require
     require(ctx.user_id, "tutor")
-    extra = (ctx.db.table("study_guides").select("quiz_questions").eq("id", ctx.guide["id"]).limit(1).execute().data or [{}])[0]
+    extra = (ctx.db.table("study_guides").select("quiz_questions,external_source_id").eq("id", ctx.guide["id"]).limit(1).execute().data or [{}])[0]
     result = guide_tutor.ask({**ctx.guide, **extra}, body.question.strip(), body.detail)
     if not result:
         raise HTTPException(status_code=502, detail="The Tutor couldn't answer right now. Try again.")

@@ -5,6 +5,7 @@ Handles LMS content, slideshows, and general educational material.
 
 import re
 import logging
+from datetime import datetime, timezone
 from html.parser import HTMLParser
 from typing import List, NamedTuple, Tuple
 
@@ -170,22 +171,72 @@ def extract_slideshow_content(text: str) -> List[dict]:
     return slides
 
 
-# What an import says about itself, not about the subject: the line that tells the student part of a
-# Notion page wasn't brought in (notion_text._NOTES; a test keeps the two in step) and the "Sub-page:
-# Title" / "Database: Title" pointers older imports wrote. Never study content, so no outline, card or
-# question is made from them. Guides filed by an older import hold them as outline lines ("- Sub-page:
-# Lecture 4", "## The rest of..."), so a leading bullet or heading mark is allowed. "Database: ..." only
-# counts in that outline form and as a short title (no sentence end): a plain "Database: normalization
-# removes redundancy" line is a course statement and stays.
-_LIST_MARK = r"(?:(?:[-*•▪◦·]|\d{1,2}[.)]|#{1,6})\s+)?"
-_IMPORT_NOTE = re.compile(
-    r"^" + _LIST_MARK + r"(?:The rest of this Notion page wasn't imported because\b|Part of this Notion page couldn't be read, so it isn't all here\b|Sub-page: )"
-    r"|^(?:[-*•▪◦·]|#{1,6})\s+Database: (?![^\n]*[.!?]$)\S[^\n]{0,99}$")
+# The first Notion import (F1, live from about 01:47 UTC on 19 Nov 2026) wrote lines about the import
+# itself into the notes of the guides it filed: a "Sub-page: <title>" or "Database: <title>" line for
+# each sub-page and database, and, when it stopped early, a closing sentence saying so. Its outline
+# step turned each into "- <line>", or "## <line>" for a short title followed by a longer line. The
+# importer since then writes neither. Only those exact lines, and only in a guide that import filed
+# (external_source_id "notion:...", made since F1 went live), are left out of what the model is given;
+# the same line anywhere else ("- Database: Westlaw and LexisNexis" in law notes, a web-design page's
+# "- Sub-page: a page nested under a parent page") is the course's own text and is never touched.
+# A title that starts with a small letter or ends with a full stop reads as a definition, not a page
+# name, so it is kept even in such a guide. supabase/oneoff/20261119_clean_notion_import_lines.sql
+# applies the same rule to the stored notes (a test keeps the two in step).
+NOTION_SOURCE_PREFIX = "notion:"
+F1_NOTION_LIVE = "2026-11-19T01:45:00+00:00"
+F1_IMPORT_NOTES = (
+    "The rest of this Notion page wasn't imported because Notion was slow to answer.",
+    "The rest of this Notion page wasn't imported because the page is longer than Cordia reads at once.",
+    "Part of this Notion page couldn't be read, so it isn't all here.",
+)
+_F1_POINTER = re.compile(r"^(- |## )(?:Sub-page|Database): (\S.*)$")
 
 
-def without_import_lines(text: str) -> str:
-    """The text with the lines an import wrote about itself (see _IMPORT_NOTE) taken out."""
-    return "\n".join(line for line in (text or "").splitlines() if not _IMPORT_NOTE.match(line.strip()))
+def is_f1_import_line(line: str) -> bool:
+    """True for a line exactly as the first Notion import wrote it about itself (see above)."""
+    line = (line or "").rstrip(" \t\r")
+    if line.startswith("- ") and line[2:] in F1_IMPORT_NOTES:
+        return True
+    match = _F1_POINTER.match(line)
+    if not match:
+        return False
+    mark, title = match.groups()
+    if title[0].islower() or title.endswith("."):
+        return False
+    if mark == "## ":  # F1's outline only made a heading of a short title without closing punctuation
+        written = line[3:]
+        return 3 <= len(written) <= 80 and len(written.split()) <= 10 and not written.endswith((",", ";", ":", "?", "!"))
+    return True
+
+
+def _iso_time(value):
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def from_f1_notion_import(guide) -> bool:
+    """A guide the first Notion import may have filed: a Notion source made since F1 went live. A row
+    read without created_at counts (every caller in the app reads it; see without_import_lines)."""
+    guide = guide or {}
+    if not str(guide.get("external_source_id") or "").startswith(NOTION_SOURCE_PREFIX):
+        return False
+    made = guide.get("created_at")
+    if not made:
+        return True
+    made = _iso_time(made)
+    return made is None or made >= _iso_time(F1_NOTION_LIVE)
+
+
+def without_import_lines(text: str, guide) -> str:
+    """`text` (the guide's notes, or text made from them) without the lines the first Notion import
+    wrote about itself, when `guide` is one that import filed; any other guide's text comes back as it is.
+    `guide` is the row, with external_source_id and created_at."""
+    if not text or not from_f1_notion_import(guide):
+        return text or ""
+    return "\n".join(line for line in text.split("\n") if not is_f1_import_line(line))
 
 
 _SHORT_BULLET = re.compile(r"^(?:[-*•▪◦·]|\d{1,2}[.)])\s+\S")
@@ -224,7 +275,7 @@ def clean_text_counted(text: str) -> Tuple[str, int]:
     }
 
     lines = text.splitlines()
-    non_empty_lines = [line.strip() for line in lines if line.strip() and not _IMPORT_NOTE.match(line.strip())]
+    non_empty_lines = [line.strip() for line in lines if line.strip()]
 
     if not non_empty_lines:
         return "", 0
