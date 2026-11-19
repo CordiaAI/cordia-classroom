@@ -439,6 +439,10 @@ class ConnectorWordingTests(unittest.TestCase):
         body = mcp.WordingRequest(quizzes=[[]], cards=[["Which artists are listed for Chapter 1?", "According to Slide 5, what is X?",
                                                          "Who painted the Mona Lisa?"]])
         self.assertEqual(mcp.question_wording_marks(body)["cards"], [[{"hidden": True}, {"shown": "What is X?"}, {}]])
+        # sent alone (the only card its quiz doesn't hold), a hidden card stays hidden: the deck-wide
+        # "never all hidden" rule is the app's, over the whole deck
+        lone = mcp.WordingRequest(quizzes=[[{"question": "Who painted the Mona Lisa?"}]], cards=[["Which artists are listed for Chapter 1?"]])
+        self.assertEqual(mcp.question_wording_marks(lone)["cards"], [[{"hidden": True}]])
 
 
 # --- Must-fix 3: a hidden question's flashcard is never studied -------------------------------------

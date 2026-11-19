@@ -36,12 +36,17 @@ async function recordAnswer(ctx, { item_type, item_id, correct, confidence, resp
     .select('id, title, flashcards, flashcard_progress, quiz_questions, practice_state').eq('id', parsed.guideId).maybeSingle();
   if (error) return unavailable('study set');
   if (!row) return notFound('study set');
-  // Marked as the app asks them: a hidden question (about the source) is never answered here.
-  let guide;
-  try {
-    [guide] = await withShownQuizzes(ctx, [row]);
-  } catch {
-    return unavailable('study set');
+  // An idea or a miss is marked as the app asks it, so a hidden one (about the source) is never
+  // answered here; a card or a practice problem doesn't depend on its wording, so it isn't looked up.
+  // If the backend can't say, the answer is still saved, against the saved text.
+  let guide = row;
+  if (parsed.kind === 'idea' || parsed.kind === 'miss') {
+    try {
+      const [marked] = await withShownQuizzes(ctx, [row]);
+      if (marked && marked.wording !== 'unknown') guide = marked;
+    } catch {
+      guide = row;
+    }
   }
   const today = localDay(new Date(), ctx.timeZone);
   const [{ data: missRow }, { data: dayRow }] = await Promise.all([

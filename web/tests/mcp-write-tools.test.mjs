@@ -45,12 +45,12 @@ function fakeDb(tables, rpc = {}) {
 // fixtures: "According to Slide N, ..." is shown reworded, one about the source is hidden, and a
 // quiz that would be all hidden is shown as it is.
 function wordingReply(options) {
-  const quizzes = options.body.quizzes.map(quiz => {
-    const marks = quiz.map(({ question: text }) => (/listed for Chapter|shown on Slide/i.test(text) ? { hidden: true }
-      : /^According to Slide \d+, /i.test(text) ? { shown: text.replace(/^According to Slide \d+, (\w)/i, (_, first) => first.toUpperCase()) } : {}));
-    return marks.every(mark => mark.hidden) ? marks.map(() => ({})) : marks;
-  });
-  return { ok: true, status: 200, json: async () => ({ quizzes }) };
+  const mark = text => (/listed for Chapter|shown on Slide/i.test(text) ? { hidden: true }
+    : /^According to Slide \d+, /i.test(text) ? { shown: text.replace(/^According to Slide \d+, (\w)/i, (_, first) => first.toUpperCase()) } : {});
+  const shown = marks => (marks.every(item => item.hidden) ? marks.map(() => ({})) : marks);
+  const quizzes = options.body.quizzes.map(quiz => shown(quiz.map(({ question: text }) => mark(text))));
+  const cards = (options.body.cards || []).map(fronts => fronts.map(mark)); // each on its own (backend _card_mark)
+  return { ok: true, status: 200, json: async () => ({ quizzes, cards }) };
 }
 
 function context(tables, { rpc, backend, wordingDown = false } = {}) {
@@ -204,8 +204,24 @@ test('record_answer: a hidden question is never answered; a reworded one is, und
   const sent = ctx.db.calls.find(item => item.name === 'mcp_record_answer').args;
   assert.deepEqual(Object.keys(sent.learn.levels), ['1']);
   assert.equal(sent.misses[0].question, quiz[1].question, 'the miss is kept under the saved text');
-  const down = await call('record_answer', context(tables(), { wordingDown: true }), { ...base, item_id: `${GUIDE}:quiz:1` });
-  assert.equal(down.isError, true);
+  // Review finding 7: when the backend can't say, the answer is still saved, against the saved text.
+  const downCtx = context(tables(), { wordingDown: true, rpc: { mcp_record_answer: args => ({ data: { ...args.result, replayed: false } }) } });
+  const down = await call('record_answer', downCtx, { ...base, item_id: `${GUIDE}:quiz:1` });
+  assert.equal(down.isError, undefined);
+  assert.equal(downCtx.db.calls.find(item => item.name === 'mcp_record_answer').args.misses[0].question, quiz[1].question);
+});
+
+test('record_answer: the wording is looked up only for an idea or a miss, never for a card or practice', async () => {
+  const asked = [];
+  const ctx = context({ study_guides: [guide()], retain_misses: [], study_days: [] });
+  const fetchBackend = ctx.fetchBackend;
+  ctx.fetchBackend = async (path, options) => { if (path === '/mcp/question-wording') asked.push(path); return fetchBackend(path, options); };
+  const base = { correct: true, confidence: 'sure', idempotency_key: 'k' };
+  await call('record_answer', ctx, { ...base, item_type: 'flashcard', item_id: `${GUIDE}:card:0` });
+  await call('record_answer', ctx, { ...base, item_type: 'practice', item_id: `${GUIDE}:practice:0` });
+  assert.equal(asked.length, 0);
+  await call('record_answer', ctx, { ...base, idempotency_key: 'k2', item_type: 'quiz_question', item_id: `${GUIDE}:quiz:0` });
+  assert.equal(asked.length, 1);
 });
 
 test('create_study_set: queued at once; plan limits and refused links come back as clear errors', async () => {

@@ -116,12 +116,17 @@ function sectionItems(guide, name, today) {
   if (name === 'outline') return notes.sections.map(section => ({ heading: section.heading, points: section.points.map(point => clip(point.text, 600)) }));
   if (name === 'key_terms') return keyTerms(notes);
   if (name === 'flashcards') {
-    return (Array.isArray(guide.flashcards) ? guide.flashcards : []).map((card, index) => ({
-      card_id: `${guide.id}:card:${index}`,
-      front: clip(card.front, 500),
-      back: clip(card.back, 2000),
-      due_on: cardDue(guide.flashcard_progress, index) || today,
-    }));
+    // As the app's deck shows them (flashcards marked by withShownQuizzes): one about the source is
+    // left out, a reworded one is shown in its new words.
+    return (Array.isArray(guide.flashcards) ? guide.flashcards : [])
+      .map((card, index) => ({ card, index }))
+      .filter(({ card }) => card && !card.hidden)
+      .map(({ card, index }) => ({
+        card_id: `${guide.id}:card:${index}`,
+        front: clip(card.shown || card.front, 500),
+        back: clip(card.back, 2000),
+        due_on: cardDue(guide.flashcard_progress, index) || today,
+      }));
   }
   if (name === 'quiz') {
     // As the app asks them (quiz_questions marked by withShownQuizzes): one about the source is left
@@ -156,12 +161,13 @@ async function getStudySet(ctx, { study_set_id, include, cursor }) {
   const courses = await ctx.courses();
   const wanted = SECTIONS.filter(name => (include?.length ? include : ['notes', 'outline', 'key_terms']).includes(name));
   let guide = saved;
-  if (wanted.includes('quiz')) {
+  if (wanted.includes('quiz') || wanted.includes('flashcards')) {
     try {
       [guide] = await withShownQuizzes(ctx, [saved]);
     } catch {
-      return unavailable('quiz');
+      guide = null;
     }
+    if (!guide || guide.wording === 'unknown') return unavailable(wanted.includes('quiz') ? 'quiz' : 'flashcards');
   }
   const today = localDay(new Date(), ctx.timeZone);
   // One list across the requested sections, so a cursor can resume mid-section.
@@ -274,7 +280,9 @@ async function getDueCards(ctx, { study_set_id, course_id, limit }) {
   if (study_set_id && !saved?.length) return notFound('study set');
   let guides;
   try {
-    guides = await withShownQuizzes(ctx, saved || []);
+    // A set whose wording the backend couldn't be asked about in this read is left out (never asked
+    // a question the app would hide); the most recent sets come first, so it is the oldest.
+    guides = (await withShownQuizzes(ctx, saved || [])).filter(guide => guide.wording !== 'unknown');
   } catch {
     return unavailable('flashcards');
   }

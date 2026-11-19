@@ -8,6 +8,7 @@ import { READ_TOOLS, READ_ONLY } from '../lib/mcp/readTools.mjs';
 import { loadCourses } from '../lib/mcp/courses.mjs';
 import { MAX_CHARS, decodeCursor } from '../lib/mcp/output.mjs';
 import { localDay, zonedIso } from '../lib/mcp/zoned.mjs';
+import { MAX_CHARS as WORDING_CHARS, MAX_REQUESTS, MAX_TEXTS, packed, withShownQuizzes } from '../lib/mcp/wording.mjs';
 
 const U = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
@@ -46,12 +47,12 @@ function fakeDb(tables, rpc = {}) {
 // fixtures: "According to Slide N, ..." is shown reworded, one about the source is hidden, and a
 // quiz that would be all hidden is shown as it is.
 function wordingReply(options) {
-  const quizzes = options.body.quizzes.map(quiz => {
-    const marks = quiz.map(({ question: text }) => (/listed for Chapter|shown on Slide/i.test(text) ? { hidden: true }
-      : /^According to Slide \d+, /i.test(text) ? { shown: text.replace(/^According to Slide \d+, (\w)/i, (_, first) => first.toUpperCase()) } : {}));
-    return marks.every(mark => mark.hidden) ? marks.map(() => ({})) : marks;
-  });
-  return { ok: true, status: 200, json: async () => ({ quizzes }) };
+  const mark = text => (/listed for Chapter|shown on Slide/i.test(text) ? { hidden: true }
+    : /^According to Slide \d+, /i.test(text) ? { shown: text.replace(/^According to Slide \d+, (\w)/i, (_, first) => first.toUpperCase()) } : {});
+  const shown = marks => (marks.every(item => item.hidden) ? marks.map(() => ({})) : marks);
+  const quizzes = options.body.quizzes.map(quiz => shown(quiz.map(({ question: text }) => mark(text))));
+  const cards = (options.body.cards || []).map(fronts => fronts.map(mark)); // each on its own (backend _card_mark)
+  return { ok: true, status: 200, json: async () => ({ quizzes, cards }) };
 }
 
 function context(tables, extra = {}) {
@@ -278,6 +279,52 @@ test('quiz wording comes from the backend: when it can\'t say, the quiz tools sa
   assert.equal((await call('get_due_cards', ctx, { study_set_id: U(7) })).isError, true);
   assert.equal((await call('get_study_set', ctx, { study_set_id: U(7), include: ['quiz'] })).isError, true);
   assert.equal((await call('get_study_set', ctx, { study_set_id: U(7) })).isError, undefined, 'sections without the quiz need no wording');
+});
+
+// Final round must-fix 3 (rook-f5v2/hiddencard.mjs): the hidden question's flashcard is due today and
+// still never comes back, whether its quiz question marks it or only its own front does.
+test('get_due_cards: a hidden question\'s flashcard is never asked, even when it is due', async () => {
+  const today = localDay(new Date(), 'America/Chicago');
+  const due = { schedule: { 0: { box: 3, due: today }, 1: { box: 2, due: today }, 2: { box: 1, due: today } } };
+  for (const [label, saved] of [
+    ['marked through its quiz question', { ...sourceGuide, flashcard_progress: due }],
+    ['marked by its own front (no quiz)', { ...sourceGuide, quiz_questions: [], flashcard_progress: due }],
+    ['a card the quiz does not hold', { ...sourceGuide, quiz_questions: SOURCE_QUIZ.slice(1), flashcard_progress: due }],
+  ]) {
+    for (const args of [{ study_set_id: U(7) }, {}]) {
+      const ctx = context({ ...tables, study_guides: [saved], retain_misses: [] });
+      const { cards } = (await call('get_due_cards', ctx, args)).structuredContent;
+      assert.deepEqual(cards.map(card => card.card_id), [`${U(7)}:card:1`, `${U(7)}:card:2`], label);
+      assert.equal(cards[0].front, 'What is the normal serum potassium range?', label);
+    }
+  }
+});
+
+test('get_study_set flashcards: a hidden card is left out, a reworded one shows its new front', async () => {
+  const ctx = context({ ...tables, study_guides: [{ ...sourceGuide, quiz_questions: [] }] });
+  const { flashcards } = (await call('get_study_set', ctx, { study_set_id: U(7), include: ['flashcards'] })).structuredContent.sections;
+  assert.deepEqual(flashcards.map(card => card.card_id), [`${U(7)}:card:1`, `${U(7)}:card:2`]);
+  assert.equal(flashcards[0].front, 'What is the normal serum potassium range?');
+});
+
+test('wording requests: within the backend\'s bounds, a long question as its head and tail, a set past the last request left out', async () => {
+  const long = 'According to Slide 5, ' + 'x'.repeat(3000) + ' what is Y?';
+  const many = Array.from({ length: 60 }, (_, at) => ({ id: U(200 + at), quiz_questions: Array.from({ length: 300 }, (__, n) => ({ question: `Question ${at}-${n} ${'y'.repeat(150)}?`, options: ['a', 'b', 'c'], correct_index: 0 })), flashcards: [] }));
+  const requests = packed(many.map(guide => ({ quiz: guide.quiz_questions.map(q => ({ text: q.question, answered: true })), cards: [] })));
+  assert.ok(requests.length > MAX_REQUESTS, 'a read this big takes more requests than one call may make');
+  for (const request of requests) {
+    const texts = request.parts.flatMap(part => [...part.quiz, ...part.cards]);
+    assert.ok(request.parts.length <= 100 && texts.length <= MAX_TEXTS && texts.reduce((sum, item) => sum + item.text.length, 0) <= WORDING_CHARS);
+  }
+  const bodies = [];
+  const ctx = { fetchBackend: async (path, options) => { bodies.push(options.body); return wordingReply(options); } };
+  const marked = await withShownQuizzes(ctx, [{ id: U(199), quiz_questions: [{ question: long, options: ['a', 'b', 'c'], correct_index: 0 }, SOURCE_QUIZ[0], SOURCE_QUIZ[2]], flashcards: [] }, ...many]);
+  assert.equal(bodies.length, MAX_REQUESTS);
+  assert.equal(bodies[0].quizzes[0][0].question.length, 2001, 'the first and last 1,000 characters');
+  assert.equal(marked[0].quiz_questions[0].shown, undefined, 'a cut question is asked as saved, never in a wording missing its middle');
+  assert.equal(marked[0].quiz_questions[1].hidden, true, 'its hidden mark still counts');
+  assert.ok(marked.some(guide => guide.wording === 'unknown'), 'the sets no request reached are marked unknown');
+  assert.ok(marked.slice(0, 2).every(guide => guide.wording !== 'unknown'));
 });
 
 test('get_progress: the backend\'s Progress numbers plus the study log\'s streak with a freeze', async () => {

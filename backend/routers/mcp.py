@@ -235,11 +235,20 @@ def _question_wording(authorization: str, body: WordingRequest) -> dict:
 
 def question_wording_marks(body: WordingRequest) -> dict:
     """The marks for a request already let through (no database, no AI): the only work the route does."""
-    from services.text_processing import shown_cards, shown_questions
+    from services.text_processing import shown_questions
     quizzes = [_wording_marks(shown_questions([{"question": item.question, "options": ["answer" if item.answered else ""], "correct_index": 0}
                                                for item in quiz])) for quiz in body.quizzes]
-    cards = [_wording_marks(shown_cards([{"front": front, "back": "answer"} for front in fronts])) for fronts in body.cards]
+    # A set's cards are sent only in part (those its quiz doesn't hold), so each is marked on its own,
+    # as shown_cards marks one: the deck-wide rule (none hidden when all would be) is applied by the
+    # app over the whole deck (web/lib/mcp/wording.mjs).
+    cards = [[_card_mark(front) for front in fronts] for fronts in body.cards]
     return {"quizzes": quizzes, "cards": cards}
+
+
+def _card_mark(front: str) -> dict:
+    from services.text_processing import standalone_question
+    asked = standalone_question(front)
+    return {"hidden": True} if asked is None else ({"shown": asked} if asked != front else {})
 
 
 @router.post("/question-wording", dependencies=[Depends(ai_rate_limit(max_calls=60, window_seconds=60))])

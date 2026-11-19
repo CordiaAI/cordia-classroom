@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import CordiaLoader, { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
 import { useRouter } from 'next/router';
 import { apiFetch } from '../../lib/api';
@@ -10,6 +10,7 @@ import { saveStudyResults } from '../../lib/progressSave';
 import { needsStudySet } from '../../lib/studySet.mjs';
 import { makeStudySet } from '../../lib/autoStudySet';
 import { loadStudyGuide } from '../../lib/studyGuide';
+import { studiedCards } from '../../lib/studyQueue';
 import UpdateAvailable, { GuideUnavailable } from '../../components/UpdateAvailable';
 
 
@@ -25,6 +26,9 @@ export default function FlashcardStudy() {
   const gate = useLoadGate(Boolean(guide) || Boolean(error) || Boolean(gone) || making);
   // Someone else's shared guide (Stage 4): your own progress, and no owner actions.
   const viewer = guide?.viewer || null;
+  // The deck as studied: a card about the source itself is left out (the backend marks it hidden), a
+  // reworded one shows its new front. Results are saved by each card's place in the saved deck.
+  const deck = useMemo(() => studiedCards(guide).map(card => ({ ...card, question: card.front, front: card.shown || card.front })), [guide]);
 
   useEffect(() => {
     if (!ready || !guideId) return;
@@ -47,8 +51,10 @@ export default function FlashcardStudy() {
     });
   }, [ready, guideId, reload]);
 
-  const onFinish = useCallback(async ({ known, missed, seconds }) => {
-    const cards = guide?.flashcards || [];
+  const onFinish = useCallback(async ({ known: shownKnown, missed: shownMissed, seconds }) => {
+    const cards = deck;
+    const known = shownKnown.map(at => deck[at]?.index).filter(Number.isInteger);
+    const missed = shownMissed.map(at => deck[at]?.index).filter(Number.isInteger);
     // Merged into what was saved before, so one round never erases earlier progress.
     const progress = applyResults(guide?.flashcard_progress, { known, missed });
     setGuide(current => ({ ...current, flashcard_progress: progress }));
@@ -61,7 +67,7 @@ export default function FlashcardStudy() {
         body: JSON.stringify({ guide_id: guideId, session_type: 'flashcard', duration_seconds: seconds, metadata: { cards_studied: cards.length, cards_correct: known.length } }),
       }),
     ]);
-  }, [guide, guideId]);
+  }, [deck, guide, guideId]);
 
   async function toggleStar() {
     setGuide(current => ({ ...current, is_bookmarked: !current.is_bookmarked }));
@@ -80,7 +86,7 @@ export default function FlashcardStudy() {
     </div>
   );
   if (!guide || gate === 'waiting' || gate === 'loader') return <LoadingArea phase={gate === 'waiting' ? 'waiting' : 'loader'} label="Loading cards" />;
-  if (!guide.flashcards?.length) return <div className="c-empty"><p className="c-section-title">No cards</p><button type="button" className="c-btn c-btn--secondary" onClick={goBack}>Back</button></div>;
+  if (!deck.length) return <div className="c-empty"><p className="c-section-title">No cards</p><button type="button" className="c-btn c-btn--secondary" onClick={goBack}>Back</button></div>;
 
   return (
     <Reveal phase={gate}>
@@ -89,7 +95,7 @@ export default function FlashcardStudy() {
     {viewer && <UpdateAvailable guideId={guideId} viewer={viewer} onChanged={() => setReload(n => n + 1)} />}
     <FlashcardViewer
       key={viewer ? `v${viewer.version}` : 'own'}
-      flashcards={guide.flashcards}
+      flashcards={deck}
       guideId={guideId}
       logMode="flashcards"
       title={guide.title}

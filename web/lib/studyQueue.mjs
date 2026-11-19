@@ -22,11 +22,21 @@ import { FAMILIAR, LEARNING, answer, askCard, dayKey, isFading, restoreLevels, s
 import { askable, conceptAnswer, questionText } from './retainEngine.mjs';
 
 // A card is due when it is new, or its spaced-review day has come (lib/spacedReview.mjs). `today`
-// is the student's local day (the server passes the one in their time zone).
+// is the student's local day (the server passes the one in their time zone). A card about the source
+// itself is never studied: marked `hidden` (backend shown_cards), or made from a quiz question that is.
 export function dueCards(guide, today = dayKey()) {
+  const cards = studiedCards(guide);
+  const due = new Set(dueIndices(guide?.flashcard_progress, Array.isArray(guide?.flashcards) ? guide.flashcards.length : 0, today));
+  return cards.filter(card => due.has(card.index));
+}
+
+// The guide's flashcards that can be studied, each with its `index` (its place in the saved deck,
+// which its schedule is keyed by).
+export function studiedCards(guide) {
   const cards = Array.isArray(guide?.flashcards) ? guide.flashcards : [];
-  const due = new Set(dueIndices(guide?.flashcard_progress, cards.length, today));
-  return cards.map((card, index) => ({ ...card, index })).filter(card => due.has(card.index));
+  const byKey = quizByKey(guide);
+  return cards.map((card, index) => ({ ...card, index }))
+    .filter(card => card && !card.hidden && !byKey.get(questionKey(card.front))?.hidden);
 }
 
 // Works on a full guide or a list summary (flashcard_count plus flashcard_progress).
@@ -98,10 +108,11 @@ export function buildStudyQueue(guides, stored = {}, { guideId = '', today = day
     learnLists.push(learn);
     // Study now on a guide with nothing due still runs a full round of its cards.
     const due = dueCards(guide, today);
-    const pool = guideId && !due.length ? (guide.flashcards || []).map((card, index) => ({ ...card, index })) : due;
+    const pool = guideId && !due.length ? studiedCards(guide) : due;
     for (const card of pool) {
-      // A flashcard is the student's own and is always reviewed; it shows its question's wording.
-      cards.push({ kind: 'card', guideId: guide.id, guideTitle: guide.title, index: card.index, question: card.front, front: shownFor(byKey, card.front), back: card.back, image: card.image, front_image: card.front_image });
+      // A flashcard is the student's own and is reviewed unless it is about the source (studiedCards);
+      // it shows its own reworded front, else its question's wording.
+      cards.push({ kind: 'card', guideId: guide.id, guideTitle: guide.title, index: card.index, question: card.front, front: card.shown || shownFor(byKey, card.front), back: card.back, image: card.image, front_image: card.front_image });
     }
     for (const idea of learnIdeas(guide, today)) {
       learn.push({ kind: 'learn', guideId: guide.id, guideTitle: guide.title, concept: idea.concept, question: idea.question, front: idea.front, back: idea.back });
