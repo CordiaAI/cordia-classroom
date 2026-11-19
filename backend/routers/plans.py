@@ -109,12 +109,16 @@ def make_plan(user_id: str, item: dict) -> dict:
 
 
 def _zone(user_id: str, time_zone: Optional[str]) -> "planner.ZoneInfo":
-    if time_zone:
+    """The browser's zone when it names a real one; else the zone saved when sync was turned on; else
+    UTC. A zone that isn't real with none saved is refused rather than read as UTC."""
+    if time_zone and google_sync.zone_of(time_zone).key == time_zone:
         return google_sync.zone_of(time_zone)
     for app in SYNC_APPS:
         saved = (sync_state.get(user_id, app).get("stats") or {}).get("time_zone")
         if saved:
             return google_sync.zone_of(saved)
+    if time_zone:
+        raise HTTPException(status_code=400, detail="Unknown time zone. Reload the page and try again.")
     return google_sync.zone_of("UTC")
 
 
@@ -371,15 +375,44 @@ def _aware(value: datetime) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
 
+def _in_range(start: datetime) -> datetime:
+    """A block's start, checked before any arithmetic on it (a year-9999 time would overflow)."""
+    start = _aware(start)
+    now = _now()
+    try:
+        early = start < now - timedelta(days=120)
+    except OverflowError:
+        early = True
+    if early or start > now + timedelta(days=180):
+        raise HTTPException(status_code=400, detail="Pick a time within the next six months.")
+    return start
+
+
 def _block_span(starts_at: datetime, ends_at: datetime) -> tuple[datetime, datetime]:
-    start, end = _aware(starts_at), _aware(ends_at)
+    start, end = _in_range(starts_at), _aware(ends_at)
     minutes = (end - start).total_seconds() / 60
     if minutes < BLOCK_MIN_MINUTES or minutes > BLOCK_MAX_MINUTES:
         raise HTTPException(status_code=400, detail="Study time runs from 15 minutes to 6 hours.")
-    now = _now()
-    if start < now - timedelta(days=120) or start > now + timedelta(days=180):
-        raise HTTPException(status_code=400, detail="Pick a time within the next six months.")
     return start, end
+
+
+def _deadline(item: Optional[dict], zone) -> Optional[datetime]:
+    """When study time for a deadline has to be over: its due time, or the end of the day for an
+    all-day one (the feed gives those as a date at midnight)."""
+    if not item or not item.get("due_at"):
+        return None
+    if item.get("all_day"):
+        try:
+            return datetime.combine(date.fromisoformat(str(item["due_at"])[:10]) + timedelta(days=1), time(0), zone)
+        except (ValueError, OverflowError):
+            return None
+    return google_sync._time(item["due_at"])
+
+
+def _before_deadline(end: datetime, item: Optional[dict], zone) -> None:
+    due = _deadline(item, zone)
+    if due and end > due:
+        raise HTTPException(status_code=409, detail="That's after it's due. Pick a time before the deadline.")
 
 
 def _block_out(user_id: str, row: dict, item: Optional[dict] = None) -> dict:
@@ -399,32 +432,42 @@ def move_block(block_id: str, body: BlockTimes, request: Request, authorization:
     require_uuid(block_id, "study block ID")
     start, end = _block_span(body.starts_at, body.ends_at)
     db = get_supabase()
-    found = db.table("study_blocks").select("id,status").eq("id", block_id).eq("user_id", user_id).neq("status", "removed") \
+    found = db.table("study_blocks").select("id,item_key,status").eq("id", block_id).eq("user_id", user_id).neq("status", "removed") \
         .limit(1).execute().data or []
     if not found:
         raise HTTPException(status_code=404, detail="That study time isn't on your calendar anymore.")
+    item = next((i for i in calendar_for(user_id).get("items") or [] if i["id"] == found[0]["item_key"]), None)
+    _before_deadline(end, item, _zone(user_id, None))
     status = "done" if found[0].get("status") == "done" else "moved"
+    # Still not removed: a Google sync may have taken it off since the read above.
     rows = db.table("study_blocks").update({"starts_at": start.isoformat(), "ends_at": end.isoformat(), "status": status,
-                                            "updated_at": _now().isoformat()}).eq("id", block_id).eq("user_id", user_id).execute().data or []
+                                            "updated_at": _now().isoformat()}).eq("id", block_id).eq("user_id", user_id) \
+        .neq("status", "removed").execute().data or []
     if not rows:
         raise HTTPException(status_code=404, detail="That study time isn't on your calendar anymore.")
     _push(user_id)
-    return {"block": _block_out(user_id, rows[0], next((i for i in calendar_for(user_id).get("items") or [] if i["id"] == rows[0]["item_key"]), None))}
+    return {"block": _block_out(user_id, rows[0], item)}
 
 
-def _free_time_on(user_id: str, day: date, minutes: int, zone) -> tuple[datetime, datetime]:
-    """The first free stretch on `day` (Plan my week's study window, around busy times), as long as
-    `minutes` or as long as the day still holds."""
+def _free_time_on(user_id: str, day: date, minutes: int, zone, due: Optional[datetime]) -> tuple[datetime, datetime]:
+    """The first free stretch on `day` before the deadline (Plan my week's study window, around busy
+    times), as long as `minutes` or as long as the day still holds."""
     now = _now()
+    if not now.date() - timedelta(days=1) <= day <= now.date() + timedelta(days=180):
+        raise HTTPException(status_code=400, detail="Pick a day within the next six months.")
     opens = max(datetime.combine(day, time(0), zone), planner._round_up(now + timedelta(minutes=15)))
     closes = datetime.combine(day, time(23, 59), zone)
     if opens >= closes:
         raise HTTPException(status_code=400, detail="That day is over. Pick today or a later day.")
+    if due and due < closes:
+        closes = due
+        if opens >= closes:
+            raise HTTPException(status_code=409, detail="It's due before then. Pick a day before the deadline.")
     slots = planner.free_slots(_busy(user_id, opens, closes), opens, closes, zone)
     size = min(minutes, planner._room(slots)) if slots else 0
     placed = planner._block(slots, day, size, zone, _preferred_hour(user_id, zone)) if size >= planner.MIN_BLOCK else None
     if not placed:
-        raise HTTPException(status_code=409, detail="There's no free time left that day. Try another day.")
+        raise HTTPException(status_code=409, detail="There's no free time left that day before it's due. Try another day.")
     return placed
 
 
@@ -437,11 +480,13 @@ def add_block(body: NewBlock, request: Request, authorization: str = Header(defa
     item = _item(user_id, _key(body.item_key))
     zone = _zone(user_id, body.time_zone)
     if body.starts_at:
-        start, end = _block_span(body.starts_at, _aware(body.starts_at) + timedelta(minutes=body.minutes))
+        start = _in_range(body.starts_at)
+        start, end = _block_span(start, start + timedelta(minutes=body.minutes))
     elif body.day:
-        start, end = _block_span(*_free_time_on(user_id, body.day, body.minutes, zone))
+        start, end = _block_span(*_free_time_on(user_id, body.day, body.minutes, zone, _deadline(item, zone)))
     else:
         raise HTTPException(status_code=400, detail="Pick a day or a time.")
+    _before_deadline(end, item, zone)
     row = {"user_id": user_id, "item_key": item["id"], "kind": "review" if _is_exam(user_id, item) else "work",
            "starts_at": start.isoformat(), "ends_at": end.isoformat()}
     made = (get_supabase().table("study_blocks").insert(row).execute().data or [None])[0]
