@@ -185,6 +185,11 @@ class PageRead:
         cut = cut[:cut.rfind("\n")] if "\n" in cut else cut
         return PageRead(body=cut, partial=True, reason=self.reason if self.partial else "size", sub_pages=self.sub_pages)
 
+    def text_within(self, limit: int) -> tuple[str, bool]:
+        """(text, partial) of within(limit)."""
+        cut = self.within(limit)
+        return cut.body, cut.partial
+
     def problem(self) -> HTTPException:
         """Why a page with no text gave none: the clock or a failed call (try again), a cap (too large
         for here), the student's hour; otherwise it really has none (the caller says so)."""
