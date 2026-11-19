@@ -36,13 +36,18 @@ test('F1 follow-up: partial imports are said outside the text, in warning style,
   assert.match(connectors, /\{added\?\.partial && <p className="cn-warning" role="status">\{added\.note\}<\/p>\}/);
   assert.match(connectors, /added\.kept \? <><a href=\{`\/guide\/\$\{added\.id\}`\}>\{added\.title\}<\/a> is already in Library\.<\/> : <>Added/);
   assert.doesNotMatch(connectors, /cn-notice" role="status">Added[^\n]*partial/);
-  // The Library path waits as long as the server reads, like the import.
-  assert.match(studyPlans, /addToLibrary = [^\n]*timeoutMs: 120000/);
+  // The Library path waits as long as the server reads, like the import: post() already allows 120 s.
+  assert.match(studyPlans, /const post = \(url, body, timeoutMs = 120000\)/);
+  assert.match(studyPlans, /addToLibrary = [^\n]*post\(`\/connectors\/\$\{connector\}\/library`/);
   // New sheet: the notice sits outside the textarea's label and describes it.
   assert.match(sheet, /\{notice && <p id="new-paste-notice" className="cn-warning" role="status">\{notice\}<\/p>\}\s*<label className="c-field">\s*<span className="sr-only">Text<\/span>/);
   assert.match(sheet, /aria-describedby=\{notice \? 'new-paste-notice' : undefined\}/);
   // A page that is only sub-pages: each name is a button that fills the search, in a neutral block.
   assert.match(connectors, /className="cn-hub" role="status"/);
+  // Every sub-page name is a button (wrapping, in a scrolling block); none is cut to "and N more".
+  assert.match(connectors, /hub\.names\.map\(\(name, index\) =>/);
+  assert.doesNotMatch(connectors, /\$\{hub\.names\.length - /);
+  assert.match(glass, /\.cn-hub-name \{[^}]*white-space: normal/);
   assert.match(connectors, /onClick=\{\(\) => \{ setHub\(null\); setQuery\(name\);/);
   assert.match(glass, /\.cn-warning \{[^}]*var\(--warning-bg\)[^}]*var\(--warning\)/);
   assert.doesNotMatch(glass.match(/\.cn-warning \{[^}]*\}/)[0], /#[0-9a-fA-F]{3,8}|rgba?\(/, 'colours come from tokens');
