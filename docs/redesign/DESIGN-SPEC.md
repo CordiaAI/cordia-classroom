@@ -143,7 +143,7 @@ The home is an empty chat, like ChatGPT and Claude: nothing but a headline, the 
 - The column sits a little above the vertical middle, 760px wide, 20px between its parts.
 - Headline in Newsreader 40/600: "<Weekday> is your <class name> exam." when an exam with a review set is within 7 days ("Tomorrow" and "Today" when they apply). Under it, 17px muted: "<N> ideas left to master. <K> today keeps you on pace.", where K is the number Learn's pacing gives for today. With no such exam: "What are you studying?" and no second line.
 - The composer (4.2).
-- Under it, up to three suggestion pills (40px, `glass-inner`, 18px icon, 15/600 label), in this order when they exist: "Start Learn for <exam>" (opens Learn on the review set), "Review <N> due flashcards" (opens Study now), "Plan the <next Canvas deadline>" (opens its assignment sheet). Pills with nothing behind them are left out; with none, the row is hidden.
+- Under it, up to three suggestion pills (40px, `glass-inner`, 18px icon, 15/600 label), in this order when they exist: "Start Learn for <exam>" (opens Learn on the review set), "Review flashcards (<N> due)" (opens Study now capped at 50 cards), "Plan <class>'s <next Canvas deadline, in plain words>" (opens its assignment sheet; for example "Plan EH 101's Packback discussion"). Pills with nothing behind them are left out; with none, the row is hidden.
 - At the bottom of the page, 13px muted, centered: "The Tutor answers from your class material. Check anything that matters before you rely on it."
 - When the student sends a message, the home becomes a chat (4.3): the headline and suggestions go, the message appears, and the composer moves to the bottom.
 
