@@ -759,7 +759,8 @@ class EveryRouteShowsTests(unittest.TestCase):
         for name in sorted(os.listdir(routers)):
             if not name.endswith(".py"):
                 continue
-            source = open(os.path.join(routers, name)).read()
+            with open(os.path.join(routers, name)) as handle:
+                source = handle.read()
             for node in ast.walk(ast.parse(source)):
                 if not isinstance(node, ast.FunctionDef):
                     continue

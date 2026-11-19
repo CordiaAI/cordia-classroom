@@ -27,7 +27,7 @@ from services.llm import (
     study_guide_is_complete, study_guide_to_flashcards,
 )
 from services import study_helper
-from services.text_processing import chunk_text, clean_text, html_to_text
+from services.text_processing import asked_as, chunk_text, clean_text, html_to_text
 from services.tutor_voice import ground_general_answer, plain_opening
 from services.tutor_sessions import (
     TUTOR_SAFETY_POLICY, claim_tutor_turn, complete_tutor_turn, fail_tutor_turn,
@@ -562,7 +562,8 @@ def _tutor_reply(body: ChatRequest, user_id: str, question: str, material: Mater
     retain = _verified_retain_context(body, material.content)
     if retain:
         answer = explain_retain_answer(
-            question=retain.question,
+            # Checked against the guide in its saved wording; explained in the wording the student saw.
+            question=asked_as(retain.question),
             options=retain.options,
             selected_answer=retain.selected_answer,
             correct_answer=retain.correct_answer,

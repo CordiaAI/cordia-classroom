@@ -22,7 +22,7 @@ from services import print_items, retain
 from services import blanks
 from services.choice_shapes import conform, fits, is_value, repair, shape
 from services.distractor_check import keep_valid
-from services.text_processing import shown_pairs, shown_questions
+from services.text_processing import asked_as, shown_pairs, shown_questions
 from services.entitlements import LIMITS, plan_for, record, remaining, require, subscription_row
 
 
@@ -711,8 +711,9 @@ def refresh_choices(guide_id: str, authorization: str = Header(default="")):
     questions = _saved_questions(supabase, guide_id, user_id)
     pairs = [(str(q.get("question") or ""), retain.concept_answer(q)) for q in questions if isinstance(q, dict)]
     trimmed, flagged = {}, set()
-    for question in questions:
-        if not isinstance(question, dict) or not isinstance(question.get("options"), list):
+    # A question about the source is never asked, so its choices are never worth a refresh (or a charge).
+    for question, shown in zip(questions, shown_questions(questions)):
+        if not isinstance(question, dict) or not isinstance(question.get("options"), list) or shown.get("hidden"):
             continue
         text, answer = str(question.get("question") or ""), retain.concept_answer(question)
         wrong = [str(option) for i, option in enumerate(question["options"]) if i != question.get("correct_index")]
@@ -757,6 +758,12 @@ def _print_fill(client, pairs: list) -> Optional[list]:
     return print_items.fill_items(pairs, indexes, generated)
 
 
+def _hidden_source(shown: list, item: dict) -> bool:
+    """Whether a printable item (a cached fill-in sentence) comes from a pair about the source."""
+    source = item.get("source") if isinstance(item, dict) else None
+    return isinstance(source, int) and 0 <= source < len(shown) and bool(shown[source].get("hidden"))
+
+
 @router.post("/{guide_id}/print-items", dependencies=[Depends(ai_rate_limit())])
 def printable_items(guide_id: str, body: PrintRequest, authorization: str = Header(default="")):
     """Everything a printable quiz can use, per type, from the guide's own questions and answers.
@@ -771,8 +778,10 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
     pairs = _parse_qa_pairs(row.get("study_guide") or "")
     if len(pairs) < 2:
         raise HTTPException(status_code=400, detail="This guide needs questions and answers before it can be printed.")
-    # Printed as the student sees them (reworded, none about the source); the cache stays keyed by
-    # the saved pairs, so fill-in sentences already paid for are reused.
+    # Printed as the student sees them: every type keeps the saved pair's index as its `source` (the
+    # same one the quiz's multiple choice gets), a pair about the source is left out of every type
+    # and never sent to be written up, and the cache stays keyed by the saved pairs, so fill-in
+    # sentences already paid for are reused.
     shown = shown_pairs(pairs)
     mc, flagged = print_items.multiple_choice(shown_questions(_load_quiz(supabase, guide_id, user_id)[0]), pairs)
     cache = print_items.cached(row.get("print_items"), pairs)
@@ -782,11 +791,13 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
         items["fill"] = cache["fill"]
     fill_locked = False
     if body.fill and "fill" not in items:
-        if remaining(user_id, "ai_quiz") <= 0:
+        if not print_items.fill_candidates(shown):
+            items["fill"] = []  # nothing to write up: no AI call, nothing charged
+        elif remaining(user_id, "ai_quiz") <= 0:
             fill_locked = True
         else:
             require(user_id, "ai_quiz")
-            fill = _print_fill(get_openai_client(), pairs)
+            fill = _print_fill(get_openai_client(), shown)
             if fill is not None:
                 items["fill"] = fill
                 record(user_id, "ai_quiz")
@@ -806,8 +817,8 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
         "mc_flagged": flagged,
         "matching": items["matching"],
         "short": items["short"],
-        "fill": items.get("fill"),
-        "fill_possible": len(print_items.fill_candidates(pairs)),
+        "fill": None if items.get("fill") is None else [item for item in items["fill"] if not _hidden_source(shown, item)],
+        "fill_possible": len(print_items.fill_candidates(shown)),
         "fill_locked": fill_locked,
     }
 
@@ -822,7 +833,7 @@ def grade_written(guide_id: str, body: WrittenAnswer, authorization: str = Heade
         raise HTTPException(status_code=400, detail="Unknown question")
     question = questions[body.concept]
     require(user_id, "light")  # the student's own allowance, also on someone else's guide
-    result = grade_written_answer(question.get("question", ""), retain.concept_answer(question), body.answer.strip())
+    result = grade_written_answer(asked_as(question.get("question")), retain.concept_answer(question), body.answer.strip())
     if not result:
         raise HTTPException(status_code=502, detail="Cordia could not check this answer right now. Please try again.")
     record(user_id, "light")
@@ -859,7 +870,7 @@ def explain_miss(guide_id: str, body: MissRequest, authorization: str = Header(d
         pairs = _parse_qa_pairs(((guide.data or [{}])[0].get("study_guide")) or "")
     passage = next((pair["answer"] for pair in pairs if pair["question"].strip() == str(question.get("question") or "").strip()), "")
     require(user_id, "light")
-    result = explain_miss_briefly(question.get("question", ""), correct, body.chosen.strip(), passage)
+    result = explain_miss_briefly(asked_as(question.get("question")), correct, body.chosen.strip(), passage)
     if not result:
         raise HTTPException(status_code=502, detail="Cordia could not explain this one right now.")
     record(user_id, "light")
@@ -906,8 +917,10 @@ def help_me_remember(guide_id: str, body: RememberRequest, authorization: str = 
     from services.memory_context import related_material
     require(user_id, "light")
     answer = retain.concept_answer(question)
-    context = related_material(supabase, user_id, guide_id, question.get("question", ""), answer)
-    result = memory_hook(question.get("question", ""), answer, styles, interests,
+    # The question as the student was asked it ("What is X?", not "According to Slide 5, what is X?").
+    asked = asked_as(question.get("question"))
+    context = related_material(supabase, user_id, guide_id, asked, answer)
+    result = memory_hook(asked, answer, styles, interests,
                          (body.previous or "").strip(), crude=crude_allowed(supabase, user_id), context=context)
     if not result:
         raise HTTPException(status_code=502, detail="Cordia couldn't come up with one right now. Try again.")

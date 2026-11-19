@@ -46,12 +46,20 @@ TEXTS = {
     "leading attributions": f'"According to the slides, " * {N // 26} + "what is x?"',
     "number lines": f'"\\n".join(["Dose (mg):", "4000"] * {N // 16})',
     "year lines": f'"\\n".join(["1789", "Storming"] * {N // 14})',
+    # Second review: the reviewer's worst cases (timing.py), and the new visual and "in class" rules
+    "comma per chain": f'"What is x" + ", per the slides" * {N // 16} + "?"',
+    "framed trailing chain": f'"What is x" + " as discussed in the lecture" * {N // 28} + "?"',
+    "mixed lead and trail": '"According to the text, " * 43 + "what is x" + ", according to the text" * 43 + "?"',
+    "picture of a name": f'"In the image of " + "the Parthenon " * {N // 14} + ", x?"',
+    "in class chain": f'"What is x" + ", as discussed in class" * {N // 22} + "?"',
+    "one digit line": f'"1" + "9" * {N}',
 }
 
 CHECKS = ("refers_to_source", "standalone_question", "strip_source_attribution", "strip_structure_markers",
-          "shown_questions", "attach_values")
-CALLS = {"shown_questions": "tp.shown_questions([{{'question': text, 'options': ['a'], 'correct_index': 0}}] * 3)",
-         "attach_values": "tp.attach_values(text.split(chr(10)))"}
+          "shown_questions", "content_lines", "clean_text")
+# shown_questions on three different questions (a remembered answer would hide the cost).
+CALLS = {"shown_questions": "tp.shown_questions([{{'question': text + mark, 'options': ['a'], 'correct_index': 0}} for mark in ('', ' ', '  ')])",
+         "content_lines": "tp.content_lines(text.split(chr(10)))"}
 
 CHILD = """\
 import json, sys, time
@@ -103,6 +111,16 @@ class SourceCheckTimingTests(unittest.TestCase):
         self.assertTrue(refers_to_source(f"What is shown on Slide 5? {filler}"))
         self.assertTrue(standalone_question(f"According to Slide 5, what is X? {filler}").startswith("What is X?"))
         self.assertTrue(standalone_question(f"{filler}What is X, according to the lecture?").endswith("What is X?"))
+
+
+    def test_a_whole_quiz_of_worst_case_questions_stays_under_the_limit_per_question(self):
+        """The API's largest quiz (50 questions), each a different 2000-character stack of
+        attributions, nothing remembered between them: under LIMIT_MS a question."""
+        setup = """from services import text_processing as tp
+quiz = [{'question': "According to the text, " * 43 + f"what is x{i}" + ", according to the text" * 43 + "?",
+         'options': ['a'], 'correct_index': 0} for i in range(50)]"""
+        ms = timed(setup, "tp._standalone_cached.cache_clear(); tp.shown_questions(quiz)")
+        self.assertLess(ms / 50, LIMIT_MS, f"shown_questions on 50 worst-case questions: {took(ms)}")
 
 
 class ListAnswerTimingTests(unittest.TestCase):

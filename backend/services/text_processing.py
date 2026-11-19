@@ -5,6 +5,7 @@ Handles LMS content, slideshows, and general educational material.
 
 import re
 import logging
+from functools import lru_cache
 from html.parser import HTMLParser
 from typing import List, Tuple
 
@@ -103,7 +104,8 @@ def is_navigation_text(text: str) -> bool:
     # Non-content patterns
     if re.match(r'^[\d\s\-\./]+$', text_lower):  # Just numbers/dates
         return True
-    if re.match(r'^(mon|tue|wed|thu|fri|sat|sun)', text_lower) and len(text_lower) < 20:
+    # A day ("Mon", "Tuesday, Nov 18"), not a word that starts like one ("Monet", "Sunflowers", "Saturn")
+    if re.match(r'^(mon|tues?|wed(nes)?|thu(rs)?|fri|sat(ur)?|sun)(day)?\b', text_lower) and len(text_lower) < 20:
         return True
     if text_lower.startswith('http') or text_lower.startswith('www'):  # URLs
         return True
@@ -111,29 +113,29 @@ def is_navigation_text(text: str) -> bool:
     return False
 
 
-# A line that is only a value: a number, amount, ratio or range ("4000", "3/4", "135-145", "98.6").
-_VALUE_LINE = re.compile(r"^\d[\d.,/:%\-–]{0,15}$")
-_YEAR_LINE = re.compile(r"^(?:1\d|20)\d\d$")
+# A line that is only a value: a number, year, amount, ratio, range or step number ("4000", "1789",
+# "3/4", "135-145", "98.6", "12,000", "(2)"). It is as often the fact itself as a page number, so the
+# filters below that drop number-only lines let it through. It stays exactly where it is: whether a
+# year belongs to the line above it ("The Starry Night" / "1889") or below it ("1789" / "Storming of
+# the Bastille") can't be told from the text, and joining it to either would pin it to the wrong
+# entry half the time. In place, the guide model reads it in its context.
+_VALUE_LINE = re.compile(r"^\(?\d[\d.,/:%\-–]{0,15}\)?$")
 
 
-def attach_values(lines: List[str]) -> List[str]:
-    """Stripped, non-empty lines with each value line joined to what it belongs to, so the filters
-    below that drop number-only lines (page numbers, dates in a menu) never drop a fact: a value
-    under a label ("Maximum daily dose (mg):" / "4000") joins the label, and a year that opens an
-    entry ("1789" / "Storming of the Bastille") joins the entry. Any subject, any source."""
-    items = [line.strip() for line in lines if line and line.strip()]
-    out, year = [], ""
-    for index, line in enumerate(items):
-        if year:
-            line, year = f"{year} {line}", ""
-        elif _VALUE_LINE.match(line) and out and out[-1].endswith(":"):
-            out[-1] = f"{out[-1]} {line}"
-            continue
-        elif _YEAR_LINE.match(line) and index + 1 < len(items) and items[index + 1][:1].isalpha():
-            year = line
-            continue
-        out.append(line)
-    return out
+def is_value_line(line: str) -> bool:
+    return bool(_VALUE_LINE.match(line))
+
+
+def _beside_value(lines: List[str], index: int) -> bool:
+    return any(0 <= at < len(lines) and is_value_line(lines[at]) for at in (index - 1, index + 1))
+
+
+def content_lines(lines: List[str]) -> List[str]:
+    """Stripped, non-empty lines, in order; a value line is kept as its own line, where it is."""
+    return [line.strip() for line in lines if line and line.strip()]
+
+
+attach_values = content_lines  # the F5 name (it joined value lines to their neighbours; it no longer does)
 
 
 def is_slideshow_content(text: str) -> Tuple[bool, str]:
@@ -162,7 +164,7 @@ def extract_slideshow_content(text: str) -> List[dict]:
     slides = []
     current_slide = {"title": "", "content": []}
 
-    for line in attach_values(text.split('\n')):
+    for line in content_lines(text.split('\n')):
         # Stop at the extra page content block appended by the extension
         # to avoid processing duplicated content
         if re.match(r'^-+\s*additional\s*page\s*content\s*-*', line, re.IGNORECASE):
@@ -180,7 +182,7 @@ def extract_slideshow_content(text: str) -> List[dict]:
         if not current_slide["title"] and len(line) < 100:
             current_slide["title"] = line
         else:
-            if not is_navigation_text(line):
+            if is_value_line(line) or not is_navigation_text(line):
                 current_slide["content"].append(line)
 
     # Don't forget last slide
@@ -214,7 +216,7 @@ def clean_text(text: str) -> str:
         "summary", "key points", "conclusion",
     }
 
-    non_empty_lines = attach_values(text.splitlines())
+    non_empty_lines = content_lines(text.splitlines())
 
     if not non_empty_lines:
         return ""
@@ -245,13 +247,19 @@ def clean_text(text: str) -> str:
 
     cleaned_lines = []
 
-    for line in non_empty_lines:
+    for index, line in enumerate(non_empty_lines):
+        # A value ("1789", "4000", "7") is kept, though the checks below would take it for a page number
+        if is_value_line(line):
+            cleaned_lines.append(line)
+            continue
+
         # Skip navigation elements
         if is_navigation_text(line):
             continue
 
-        # Skip very short lines unless they're headers
-        if len(line) < 5 and not line.endswith(':'):
+        # Skip very short lines unless they're headers, or name the value beside them ("Sula" / "1973"):
+        # dropping that name would leave its value next to another entry's
+        if len(line) < 5 and not line.endswith(':') and not _beside_value(non_empty_lines, index):
             continue
 
         # Skip lines that are just punctuation or special characters
@@ -271,6 +279,9 @@ def clean_text(text: str) -> str:
         for line in non_empty_lines:
             line_l = line.lower()
             if line_l.startswith('http') or line_l.startswith('www'):
+                continue
+            if is_value_line(line):
+                cleaned_lines.append(line)
                 continue
             if len(line) < 3:
                 continue
@@ -396,12 +407,16 @@ _CHECK_CHARS = 1000  # a long question is checked at its first and last 1000 cha
 # "material": "defined in SI units", "the methods in the class", "the course of the disease". A
 # chart is only the source when it is pointed at ("this chart", "Chart 3"): "the chart" is as often
 # a patient's record ("the vital signs shown in the chart").
+# Pictures, charts and tables: a question pointed at one needs it in front of the student, so no
+# rewrite saves it ("Based on the graph, what is the equilibrium price?").
+_VISUAL_NOUNS = ("tables?", "figures?", "diagrams?", "graphs?", "images?", "maps?", "photos?", "photographs?",
+                 "pictures?", "illustrations?", "exhibits?")
 _NOUNS = ("slide ?decks?", "slides?", "decks?", "pages?", "chapters?", "sections?", "modules?", "lectures?", "lessons?",
           "readings?", "handouts?", "documents?", "presentations?", "passages?", "excerpts?", "texts?", "textbooks?",
-          "notes", "outlines?", "study guides?", "videos?", "transcripts?", "syllabus", "tables?", "figures?",
-          "diagrams?", "graphs?", "images?", "lists?")
+          "notes", "outlines?", "study guides?", "videos?", "transcripts?", "syllabus", *_VISUAL_NOUNS, "lists?")
 _SOURCE_NOUN = "(?:" + "|".join((*_NOUNS, "charts?")) + ")"
 _PART_NOUN = "(?:" + "|".join(_NOUNS) + ")"
+_VISUAL = re.compile(r"\b(?:" + "|".join((*_VISUAL_NOUNS, "charts?", r"fig\.")) + r")(?![\w-])", re.I)
 # "of" + a name is the subject ("the first section of the Uniform Commercial Code", "Problem 4 of
 # Hilbert's problems"); "of 12", "of the reading" is still the source.
 _OF_A_NAME = r"\sof\s(?:the\s)?(?-i:[A-Z])"
@@ -418,9 +433,12 @@ _BOUNDARY = (rf"(?=\s?(?:[?.,;:!)]|$)|(?!{_OF_A_NAME})\s(?:on|about|of|for|from|
 _NUMBERED = r"\s?#?\s?\d+(?:\.\d+)*[a-z]?(?=\s?(?:[?.,;:!)]|$|\s(?:and|or|that|which|what|who|how|why)\b))"
 _PART = rf"(?:(?:the|this|these|each|our|today'?s)\s)?(?:(?:first|second|third|last|next|previous|current|final)\s)?" \
         rf"(?:{_PART_NOUN}(?:{_NUMBERED}|(?!\s?#?\s?\d){_BOUNDARY})|charts?{_NUMBERED})"
+# What a source does with an idea: "listed for Chapter 1", "covered in this lecture" (the source's
+# contents) and "As reviewed in the lecture, ..." (an attribution) use the same list.
 _COVERAGE_VERB = (r"(?:listed|covered|discussed|introduced|presented|mentioned|described|named|outlined|reviewed|taught|"
                   r"shown|included|highlighted|identified|summari[sz]ed|assigned|studied|learned|featured|depicted|"
-                  r"illustrated|explained|defined|displayed|pictured)")
+                  r"illustrated|explained|defined|displayed|pictured|stated|noted|seen|emphasi[sz]ed|addressed|"
+                  r"examined|explored)")
 # The source, or the person presenting it, as the one acting: "the excerpt introduces", "does the
 # chapter compare", "the lecturer gives". Not "the document for informed consent", "the text editor".
 _ACTOR = (r"(?:slides|slide ?deck|lectures?|lecturer|professor|instructor|teacher|readings?|handouts?|documents?|"
@@ -457,22 +475,37 @@ _POINTS_AT_SOURCE = re.compile(
     # "on the slides", "in the lecture": not "the document in the chart", "the document for informed consent"
     r"|\bthe\s(?:slides|slide ?deck|lectures?|readings?|handouts?|study guide|transcripts?|videos?|"
     r"textbook|syllabus)\s(?:on|in|at|for|about)\b"
-    # "listed above", "Which characters are listed?", "Which drug is listed first?"
+    # "the professor's example", "the instructor's point" (not "the clinical instructor's responsibility")
+    r"|\bthe\s(?:professor|instructor|lecturer|teacher)'s\s(?:examples?|points?|explanations?|analog(?:y|ies)|"
+    r"stor(?:y|ies)|demonstrations?|notes|comments?|definitions?|summary|opinions?|arguments?)\b"
+    # "listed above", "Which characters are listed?"
     r"|\blisted\s(?:above|below|here|earlier|previously)\b"
     r"|\b(?:is|are|was|were)\s(?:being\s)?(?:listed|shown|described|mentioned|discussed|presented|introduced|"
-    r"outlined|highlighted|depicted|illustrated|featured|pictured|displayed)\s?[?.]?\s?$"
-    r"|\b(?:is|are|was|were)\s(?:listed|shown|mentioned|named|presented|given|introduced)\s"
-    r"(?:first|second|third|last|next)\s?[?.]?\s?$",
+    r"outlined|highlighted|depicted|illustrated|featured|pictured|displayed)\s?[?.]?\s?$",
     re.I)
+# "Which drug is listed first?": the order of the file. Not when the question names what the order
+# is in ("In the Bill of Rights, which freedom is listed first?", "In Maslow's hierarchy, ...").
+_LISTED_ORDINAL = re.compile(
+    r"\b(?:is|are|was|were)\s(?:listed|shown|mentioned|named|presented|given|introduced)\s"
+    r"(?:first|second|third|last|next)\s?[?.]?\s?$", re.I)
+_NAMED_CONTEXT = re.compile(r"^\s?(?:in|under|within|among|for|of|on)\s[^,]{1,80},", re.I)
+# "In the image of the Parthenon, ...", "On the map of Europe, ...": a picture of a named thing.
+# Not a graph, chart or table of one ("the graph of y = x^2", "the table of contents").
+_VISUAL_OF = re.compile(
+    r"^\s?(?:in|on|from|based on|according to|using|looking at)\s(?:the|this|these|each)\s"
+    r"(?:images?|photos?|photographs?|pictures?|illustrations?|diagrams?|maps?)\s(?:of|above|below)\b[^,?]{0,80},", re.I)
 # "According to Slide 5", "As discussed in the lecture", "per the syllabus": an attribution wherever
 # it sits. A bare "in the slides" is one only before a comma or at the start ("In this lecture, ..."):
 # at the end it may belong to the question ("Which poets are mentioned in the passage?").
-_FRAMING = (r"(?:according to|based on|as (?:stated|described|shown|explained|noted|defined|outlined|discussed|"
-            r"listed|seen|mentioned|presented|covered|taught|introduced) (?:in|on|by)|per)")
+_FRAMING = rf"(?:according to|based on|as {_COVERAGE_VERB} (?:in|on|by)|per)"
 _ATTRIBUTION = rf"(?:{_FRAMING}|in|on|from|within|throughout)"
-_LEADING = re.compile(rf"^\s?{_ATTRIBUTION}\s{_PART}(?:\s?\([^)]*\))?\s?[,:]\s?", re.I)
-_TRAILING_FRAMED = re.compile(rf"(?:\s?,\s?{_ATTRIBUTION}|\s?{_FRAMING})\s{_PART}\s?(?=[?.!]?\s?$)", re.I)
-_TRAILING = re.compile(rf"\s?,?\s?{_ATTRIBUTION}\s{_PART}\s?(?=[?.!]?\s?$)", re.I)
+# "As discussed in class": class is the source only bare, after a framing verb ("the class" is often
+# the subject: "the methods in the class").
+_IN_CLASS = rf"as {_COVERAGE_VERB} in class(?![\w-])"
+_LEADING = re.compile(rf"^\s?(?:{_ATTRIBUTION}\s{_PART}(?:\s?\([^)]*\))?|{_IN_CLASS})\s?[,:]\s?", re.I)
+_TRAILING_FRAMED = re.compile(
+    rf"(?:\s?,\s?\b{_ATTRIBUTION}\s{_PART}|\s?\b{_FRAMING}\s{_PART}|\s?,?\s?\b{_IN_CLASS})\s?(?=[?.!]?\s?$)", re.I)
+_TRAILING = re.compile(rf"\s?,?\s?\b{_ATTRIBUTION}\s{_PART}\s?(?=[?.!]?\s?$)", re.I)
 # What is left of a rewrite that still needs the file: only an ordinal or a generic noun ("What is
 # the second step?", "What does the first bullet say?", "What is the author's main argument?",
 # "Which painting appears first?").
@@ -498,7 +531,7 @@ _SOURCE_WORDS = (
     "transcript", "syllabus", "table", "fig", "diagram", "chart", "graph", "image", "list", "exhibit", "example",
     "problem", "exercise", "course", "shown", "described", "presented", "mentioned", "discussed", "introduced", "outlined",
     "highlighted", "depicted", "illustrated", "featured", "pictured", "displayed", "professor", "instructor", "teacher",
-    "article",
+    "article", "map", "photo", "picture", "class", "listed", "named", "given",
 )
 
 
@@ -527,30 +560,50 @@ def refers_to_source(question: str) -> bool:
     shows. Subject terms that share these words stay clear ("Chapter 11 bankruptcy", "Section 2 of
     the Sherman Act", "a page fault", "a listed company", "the vital signs in the chart")."""
     text = _squash(question)
-    return _may_refer(text) and any(
-        _ABOUT_SOURCE.search(part) or _POINTS_AT_SOURCE.search(part) for part in _windows(text))
+    if not _may_refer(text):
+        return False
+    if any(_ABOUT_SOURCE.search(part) or _POINTS_AT_SOURCE.search(part) for part in _windows(text)):
+        return True
+    return bool(_LISTED_ORDINAL.search(_windows(text)[-1])) and not _NAMED_CONTEXT.match(text)
 
 
 def _sentence_case(text: str) -> str:
     return text[:1].upper() + text[1:] if text else text
 
 
-def _until_stable(text: str, leading, trailing) -> str:
-    """`text` with attributions taken off its start and end, again and again until none is left
-    ("In the lecture, in Chapter 3, what is X?"). Each pass shortens the text, so this ends."""
-    while True:
-        stripped = trailing.sub("", leading.sub("", text)).strip()
+# Stacked attributions ("In the lecture, in Chapter 3, what is X?") come off one per end per pass. A
+# real question has two or three; three passes bound the work on hostile text (a question that is the
+# same attribution repeated), and whatever is left is still checked for pointing at the source.
+_MAX_PASSES = 3
+
+
+def _until_stable(text: str, leading, trailing, taken: list) -> str:
+    """`text` with attributions taken off its start and end (added to `taken`), pass after pass
+    until none is left or _MAX_PASSES passes have run."""
+    for _ in range(_MAX_PASSES):
+        stripped = text
+        found = leading.search(stripped)
+        if found:
+            taken.append(found.group())
+            stripped = stripped[found.end():].strip()
+        found = trailing.search(stripped)
+        if found:
+            taken.append(found.group())
+            stripped = (stripped[:found.start()] + stripped[found.end():]).strip()
         if stripped == text:
-            return text
+            break
         text = stripped
+    return text
 
 
-def _without_attribution(text: str, trailing=_TRAILING) -> str:
-    """A squashed text without its leading and trailing attributions (only the ends are touched)."""
+def _without_attribution(text: str, trailing=_TRAILING, taken=None) -> str:
+    """A squashed text without its leading and trailing attributions (only the ends are touched).
+    What was taken off is added to `taken` when it is given."""
+    taken = [] if taken is None else taken
     if len(text) <= 2 * _CHECK_CHARS:
-        return _until_stable(text, _LEADING, trailing)
+        return _until_stable(text, _LEADING, trailing, taken)
     head, middle, tail = text[:_CHECK_CHARS], text[_CHECK_CHARS:-_CHECK_CHARS], text[-_CHECK_CHARS:]
-    return (_until_stable(head, _LEADING, _NOTHING) + middle + _until_stable(tail, _NOTHING, trailing)).strip()
+    return (_until_stable(head, _LEADING, _NOTHING, taken) + middle + _until_stable(tail, _NOTHING, trailing, taken)).strip()
 
 
 _NOTHING = re.compile(r"(?!)")
@@ -567,31 +620,56 @@ def strip_source_attribution(text: str) -> str:
     return _sentence_case(stripped) if stripped and stripped != squashed else value
 
 
+_CACHED_CHARS = 2000  # questions this long or shorter are remembered (a quiz is read on every Learn, Study now and print)
+
+
 def standalone_question(question: str):
     """The question as a stand-alone question about the subject, or None when it is about the source
     itself ("Which artists are listed for Chapter 1?", "What is shown on Slide 7?") and no rewrite
     can fix it. "According to Slide 5, what is X?" and "As discussed in the lecture, what is X?"
     become "What is X?"; a rewrite left with only an ordinal or a generic noun ("What is the second
-    step?") still needs the file, so it is None. Running it again changes nothing."""
+    step?") still needs the file, and one whose attribution was a picture, chart or table ("Based
+    on the graph, ...") still needs that, so both are None. Running it again changes nothing."""
     text = str(question or "").strip()
     if not text:
         return None
+    if len(text) <= _CACHED_CHARS:
+        return _standalone_cached(text)
+    return _standalone(text)
+
+
+def _standalone(text: str):
     squashed = _squash(text)
     if not _may_refer(squashed):
         return text
+    if _VISUAL_OF.match(squashed[:_CHECK_CHARS]):
+        return None
     # The attribution comes off first: "As discussed in the lecture, what is X?" is about X.
-    framed = _without_attribution(squashed, _TRAILING_FRAMED)
+    taken = []
+    framed = _without_attribution(squashed, _TRAILING_FRAMED, taken)
     if any(_ABOUT_SOURCE.search(part) for part in _windows(framed)):
         return None
-    rewritten = _without_attribution(framed)
+    rewritten = _without_attribution(framed, _TRAILING, taken)
     if rewritten == squashed:
         return None if refers_to_source(text) else text
+    if any(_VISUAL.search(part) for part in taken):
+        return None
     rewritten = _sentence_case(rewritten)
     if text.endswith("?") and not rewritten.endswith("?"):
         rewritten = rewritten.rstrip(".!") + "?"
     if len(rewritten.split()) < 2 or refers_to_source(rewritten) or any(_GENERIC.search(part) for part in _windows(rewritten)):
         return None
     return rewritten
+
+
+_standalone_cached = lru_cache(maxsize=4096)(_standalone)
+
+
+def asked_as(question) -> str:
+    """The wording to put to a model or a person: the stand-alone question, or the saved text when
+    there is none (a question about the source is never asked, but its text still names the idea)."""
+    text = str(question or "")
+    return standalone_question(text) or text
 
 
 def shown_questions(questions):
@@ -624,15 +702,23 @@ def shown_questions(questions):
     return out
 
 
+def shown_guide(row):
+    """A study_guides row for a response: its quiz_questions as shown_questions marks them. Every
+    route that returns a guide's quiz sends it through here (or through shown_questions), so Study
+    now, the Dashboard and Learn read the same wording and the same hidden questions."""
+    if isinstance(row, dict) and isinstance(row.get("quiz_questions"), list):
+        return {**row, "quiz_questions": shown_questions(row["quiz_questions"])}
+    return row
+
+
 def shown_pairs(pairs: list) -> list:
-    """Q/A pairs for a page that only shows them (a printed quiz): reworded like shown_questions,
-    without the ones about the source. All of them, as they are, if none would be left."""
-    out = []
-    for pair in pairs or []:
-        text = standalone_question(pair.get("question"))
-        if text is not None:
-            out.append({**pair, "question": text})
-    return out or list(pairs or [])
+    """Q/A pairs for a page that only shows them (a printed quiz), each in its place, so an item's
+    `source` is the same index in the saved pairs and the saved quiz: reworded like shown_questions,
+    and `hidden` on one about the source, which the page leaves out. None hidden when all would be."""
+    pairs = list(pairs or [])
+    marks = shown_questions([{"question": pair.get("question")} for pair in pairs])
+    return [{**pair, "question": mark.get("shown", pair.get("question")), **({"hidden": True} if mark.get("hidden") else {})}
+            for pair, mark in zip(pairs, marks)]
 
 
 def build_review_sections(text: str, max_length: int = 6000) -> List[dict]:

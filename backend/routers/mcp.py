@@ -187,3 +187,36 @@ def _log_answers(authorization: str, body: AnswerEvents) -> dict:
 async def log_answers(body: AnswerEvents, request: Request, authorization: str = Header(default="")):
     """Answers given in a connected app, logged like the app's (when the learning log is on)."""
     return await run_in_threadpool(_log_answers, authorization, body)
+
+
+# How the app shows each saved quiz question (services/text_processing.shown_questions): the
+# connected app reads quiz_questions itself, as saved, and asks here which to reword and which are
+# about the source and never asked. 100 study sets (get_due_cards reads at most that many) of up to
+# 200 questions; a question is checked at its first and last 1000 characters, so its length is capped.
+class WordingRequest(BaseModel):
+    quizzes: list[list[str]] = Field(..., max_length=100)
+
+    @field_validator("quizzes")
+    @classmethod
+    def bounded(cls, value):
+        if any(len(quiz) > 200 or any(len(text) > 20_000 for text in quiz) for quiz in value):
+            raise ValueError("at most 200 questions of 20,000 characters per study set")
+        return value
+
+
+def _question_wording(authorization: str, body: WordingRequest) -> dict:
+    from services.text_processing import shown_questions
+    _student(authorization)
+    marks = []
+    for quiz in body.quizzes:
+        shown = shown_questions([{"question": text} for text in quiz])
+        marks.append([{key: item[key] for key in ("shown", "hidden") if key in item} for item in shown])
+    return {"quizzes": marks}
+
+
+@router.post("/question-wording")
+@limiter.limit("120/minute")
+async def question_wording(body: WordingRequest, request: Request, authorization: str = Header(default="")):
+    """For each study set's saved quiz, in order: {"shown": wording} for a question asked in other
+    words, {"hidden": true} for one about the source that is never asked, {} for one asked as saved."""
+    return await run_in_threadpool(_question_wording, authorization, body)

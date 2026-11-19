@@ -15,7 +15,6 @@ import hmac
 import os
 import re
 import unicodedata
-from bisect import bisect_left
 from collections import Counter
 
 TYPES = ("mc", "written", "fill", "matching")
@@ -203,46 +202,48 @@ def missing_parts(text: str, answer: str) -> list:
     "1", "2" and "gestational" for "Type 1 diabetes, Type 2 diabetes, gestational diabetes"),
     allowing plurals, possessives and small typos, so a word the parts share cannot stand in for the
     one that was left out. A part with no word of its own ("right atrium" beside "left atrium" and
-    "right ventricle") counts only when all its words are there together, at most one word apart,
-    not scattered through the trick. [] for a one-part answer.
+    "right ventricle") counts only when all its words are in one clause of the trick ("On the right
+    side, the atrium collects blood"), not split between two ("LEFT side: atrium ...; the right
+    ventricle ..."). [] for a one-part answer.
     Each part's words are counted once and each trick word is compared once per part word, so the
     work is linear in the trick and the answer is at most PART_MAX_COUNT parts (answer_parts)."""
     parts = answer_parts(answer)
     if len(parts) < 2:
         return []
-    words = _part_words(str(text or "")[:ANSWER_MAX_CHARS * 3])
+    text = str(text or "")[:ANSWER_MAX_CHARS * 3]
+    words = _part_words(text)
     keys = [_part_words(part) for part in parts]
     used_by = Counter(stem for group in keys for stem in {_stem(word) for word in group})
     missing = []
     for index, part in enumerate(parts):
         own = [word for word in keys[index] if used_by[_stem(word)] == 1]
         if own:
-            found = any(_same_word(given, word) for word in own for given in words)
+            found = any(_names(given, word) for word in own for given in words)
         else:
-            found = _together(words, list(dict.fromkeys(keys[index])))
+            found = _together(_clauses(text), list(dict.fromkeys(keys[index])))
         if not found:
             missing.append(part)
     return missing
 
 
-def _together(words: list, wanted: list) -> bool:
-    """Whether every word in `wanted` appears in `words` within a stretch of len(wanted) + 1 words."""
-    if not wanted:
-        return True
-    at = [[i for i, given in enumerate(words) if _same_word(given, word)] for word in wanted]
-    if not all(at):
-        return False
-    span = len(wanted) + 1
-    for start in at[0]:
-        if all(_near(positions, start, span) for positions in at[1:]):
-            return True
-    return False
+# Where a clause ends: a sentence end, a semicolon or a line break (not the point in "3.5").
+_CLAUSE_END = re.compile(r"[!?;\n]+|\.(?=\s|$)")
 
 
-def _near(positions: list, position: int, span: int) -> bool:
-    """Whether a sorted list of positions holds one less than `span` from `position`."""
-    i = bisect_left(positions, position - span + 1)
-    return i < len(positions) and positions[i] < position + span
+def _clauses(text: str) -> list:
+    """The key words of each clause of a piece of writing, in order."""
+    return [words for words in (_part_words(clause) for clause in _CLAUSE_END.split(text)) if words]
+
+
+def _together(clauses: list, wanted: list) -> bool:
+    """Whether one clause holds every word in `wanted` (in any order, any distance apart)."""
+    return any(all(any(_names(given, word) for given in clause) for word in wanted) for clause in clauses)
+
+
+def _names(given: str, word: str) -> bool:
+    """A trick's word names a part's word: the same word (_same_word), or the first half of a
+    shared hyphen ("First-" in "First- and second-degree murder" names "first-degree")."""
+    return _same_word(given, word) or (len(given) > 2 and given.endswith("-") and word.startswith(given))
 
 
 def mentions_answer(text: str, answer: str) -> bool:
