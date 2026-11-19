@@ -23,6 +23,7 @@
 
 import { conceptAnswer } from './retainEngine.mjs';
 import { FAMILIAR, FADE_DAYS, LEARNING, MASTERED, NEW, ROUND_SIZE, dayKey, isFading, isTerm } from './learnEngine.mjs';
+import { askable, canChoose } from './retainEngine.mjs';
 
 export const LADDER_TYPES = ['mc', 'fill', 'written', 'self'];
 export const LADDER_DEFAULT = ['mc', 'fill', 'written'];
@@ -123,6 +124,14 @@ function finalFormat(question, index, testFormat, fillAvailable) {
   return null; // short answer uses the mastery formats (Fill in the blank and Written); mix and not sure use the ladder
 }
 
+// An idea with fewer than three choices is never asked as multiple choice: a short answer is typed
+// (Type it; Written on a plan without Fill in the blank, with no upgrade note), a long one is a
+// flashcard. Returns the format that replaces 'mc' for this question.
+function withoutChoice(question, fillAvailable) {
+  if (!isTerm(question)) return 'self';
+  return fillAvailable ? 'fill' : 'written';
+}
+
 // How to ask this question now. ctx: { types, today, fillAvailable, testFormat, testDate, index }.
 // Returns { type (card), format, recall, practice, fallback }.
 export function askLadder(question, entry, ctx = {}) {
@@ -131,6 +140,10 @@ export function askLadder(question, entry, ctx = {}) {
   const recall = entry.l >= FAMILIAR || isFading(entry, today);
   if (!recall) {
     const first = recognitionFormat(ctx.types);
+    if (first === 'mc' && !canChoose(question)) {
+      const format = withoutChoice(question, fillAvailable);
+      return { type: cardType(format, question), format, recall: false, practice: false, fallback: false };
+    }
     if (first) return { type: cardType(first, question), format: first, recall: false, practice: false, fallback: false };
     // Only recall formats are on: a new idea is asked in its recall format, and a right answer
     // still only takes it to Familiar.
@@ -140,6 +153,10 @@ export function askLadder(question, entry, ctx = {}) {
   const left = daysUntil(ctx.testDate, today);
   if (left !== null && left >= 0 && left <= FINAL_DAYS) {
     const leaning = finalFormat(question, ctx.index || 0, ctx.testFormat, fillAvailable);
+    if (leaning && leaning.format === 'mc' && !canChoose(question)) {
+      const format = withoutChoice(question, fillAvailable);
+      return { type: cardType(format, question), format, recall: false, practice: true, fallback: false };
+    }
     if (leaning) {
       return { type: cardType(leaning.format, question), format: leaning.format, recall: leaning.mastery, practice: !leaning.mastery, fallback: Boolean(leaning.fallback) };
     }
@@ -152,7 +169,7 @@ export function askLadder(question, entry, ctx = {}) {
 // before the rest), then the usual order (learnEngine.pickRound): confident misses, ideas in
 // progress, new ones, then fading ones.
 export function pickLadderRound(questions, levels, today = dayKey(), carry = [], size = ROUND_SIZE) {
-  const valid = index => Boolean(conceptAnswer(questions[index]));
+  const valid = index => askable(questions[index]);
   const rank = index => {
     const entry = levels[index];
     if (entry.l === MASTERED) return isFading(entry, today) ? 4 : 99;
@@ -241,7 +258,8 @@ export function ladderDecision(question, entry, ctx = {}, chosen = null) {
   const mask = {};
   cards.forEach(option => {
     const format = formatOf[option];
-    if (asked.recall && RECOGNITION.includes(format) && !asked.practice) mask[option] = 'needs_recall';
+    if (option === 'mc' && !canChoose(question)) mask[option] = 'few_choices';
+    else if (asked.recall && RECOGNITION.includes(format) && !asked.practice) mask[option] = 'needs_recall';
     else if (!asked.recall && RECALL.includes(format) && recognitionFormat(ctx.types)) mask[option] = 'recall_not_needed';
     else if (!picked.includes(format) && !(asked.recall && !picked.some(type => RECALL.includes(type)))) mask[option] = 'turned_off';
     else if (option === 'fill' && !term) mask[option] = 'long_answer';

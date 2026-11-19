@@ -20,8 +20,9 @@ from auth_utils import get_user_id
 from ids import require_uuid
 from services import print_items, retain
 from services import blanks
-from services.choice_shapes import conform, is_value, repair, shape
+from services.choice_shapes import conform, fits, is_value, repair, shape
 from services.distractor_check import keep_valid
+from services.text_processing import asked_as, shown_pairs, shown_questions
 from services.entitlements import LIMITS, plan_for, record, remaining, require, subscription_row
 
 
@@ -43,7 +44,7 @@ class RetainAttempt(BaseModel):
     response: str = Field(default="", max_length=4000)
     credit: Optional[float] = None
     token: Optional[str] = Field(default=None, max_length=128)
-    self_marked: bool = False  # a typed answer the student counted as right after seeing the answer
+    self_marked: bool = False  # a typed or written answer the student counted as right after seeing the answer
 
 
 class QuizSubmission(BaseModel):
@@ -89,7 +90,9 @@ class RememberRequest(BaseModel):
 
 
 def _parse_qa_pairs(text: str) -> list:
-    """Parse Question 1: ... Answer 1: ... format into list of {question, answer}."""
+    """Parse Question 1: ... Answer 1: ... format into list of {question, answer}, every pair as
+    written: idea ids, Learn levels and quiz positions are keyed by the saved wording, so a pair
+    about the source is reworded or hidden only where it is shown (text_processing.shown_questions)."""
     pairs = []
     lines = text.split('\n')
     current_q = None
@@ -202,9 +205,10 @@ def _standard_questions(qa_pairs: list, rng=None) -> list:
             same = _same_kind(answer, candidates)
             shortlist = same[:min(6, len(same))]
             picked = conform(answer, rng.sample(shortlist, min(3, len(shortlist))), candidates, seed=pair["question"])
-            distractors = _not_longest(answer, picked, same or [c for c in candidates if not is_value(c)])
-        if not distractors:
-            continue
+            distractors = _not_longest(answer, picked, same or candidates)
+        # Only related, fitting choices, however few (even none): this list also serves shared guides,
+        # merges and edited questions, whose ideas and positions must stay. An idea with fewer than 3
+        # choices is asked typed (retain.can_choose), never left out. AI quizzes have four (_load_quiz).
         options, correct_index = _choices(answer, distractors, rng)
         questions.append({
             "question": pair["question"],
@@ -221,8 +225,41 @@ def _free_candidates(qa_pairs: list, index: int, others: list) -> list:
     choices all come from the guide's own answers, so when every answer is a description the check
     rejects them all; topping up keeps the question instead of dropping it."""
     pair = qa_pairs[index]
-    kept, rejected = keep_valid(_other_answers(qa_pairs, index), pair["question"], pair["answer"], others)
+    cue = _cue(pair["question"])
+    cues = {}
+    for other in qa_pairs:
+        cues.setdefault(other["answer"].strip().casefold(), set()).add(_cue(other["question"]))
+    # Only answers to the same kind of question ("Who ...?" for "Who ...?", "Which company ...?" for
+    # "Which company ...?"), of the same kind and length: never a company offered for a person.
+    related = [value for value in _other_answers(qa_pairs, index)
+               if cue in cues.get(value.casefold(), ()) and fits(pair["answer"], value)]
+    kept, rejected = keep_valid(related, pair["question"], pair["answer"], others)
     return kept if len(kept) >= 3 else kept + rejected[:3 - len(kept)]
+
+
+# What a question asks for, from its opening words: a person, a time, a place, an amount, the noun
+# after "which" ("which company" -> "which:compa"), or anything else ("what" is as often followed by a
+# verb, "What carries oxygen?", as by a noun, so it says nothing more).
+_CUES = (
+    ("person", re.compile(r"^\s*(?:who|whom|whose)\b", re.I)),
+    ("time", re.compile(r"^\s*(?:when\b|(?:in\s+|on\s+)?(?:what|which)\s+(?:year|date|decade|century|era|period|month|day)\b)", re.I)),
+    ("place", re.compile(r"^\s*(?:where\b|(?:in\s+)?(?:what|which)\s+(?:country|city|state|region|continent|place|location)\b)", re.I)),
+    ("amount", re.compile(r"^\s*(?:how\s+(?:many|much|long|often|far|old)\b|(?:what|which)\s+(?:percentage|percent|number|"
+                          r"amount|dose|dosage|range|rate|value|level|ratio)\b)", re.I)),
+)
+_WHICH = re.compile(r"^\s*which\s+(?:(?:type|kind|sort|form)s?\s+of\s+)?([a-z][a-z\-]*)", re.I)
+_NOT_A_NOUN = {"is", "are", "was", "were", "does", "do", "did", "has", "have", "had", "can", "could", "should", "would",
+               "will", "may", "might", "must", "happens", "happened", "causes", "caused", "makes", "made", "the", "a", "an"}
+
+
+def _cue(question: str) -> str:
+    for name, pattern in _CUES:
+        if pattern.search(question or ""):
+            return name
+    which = _WHICH.match(question or "")
+    if which and which.group(1).lower() not in _NOT_A_NOUN:
+        return "which:" + which.group(1).lower()[:5]
+    return "other"
 
 
 def _pairs(qa_pairs: list) -> list:
@@ -232,11 +269,13 @@ def _pairs(qa_pairs: list) -> list:
 def _balanced_distractors(answer: str, generated: list, fallback: list, seed: str = "") -> list:
     """Prefer distinct model choices close to the correct answer's visible length, in the answer's
     format: a year, date or amount only ever gets the same kind of value written the same way
-    (off-format model choices are rewritten or replaced), and text prefers text of its own kind."""
+    (off-format model choices are rewritten or replaced), and text only gets text that fits it."""
     if is_value(answer):
         return conform(answer, generated, fallback, seed=seed or answer)
-    generated = [str(value) for value in generated]
-    same_generated, same_fallback = _same_kind(answer, generated), _same_kind(answer, fallback)
+    # Only choices that fit (choice_shapes.fits): the same kind of thing (a list of as many items for
+    # a list, names for names) within the length bound. Nothing else fills in, however few are left.
+    fitting = [str(value).strip() for value in [*generated, *fallback] if fits(answer, value)]
+    same = _same_kind(answer, fitting)
     lower = max(1, round(len(answer) * 0.65))
     upper = max(lower, round(len(answer) * 1.35))
     seen = {answer.casefold()}
@@ -255,12 +294,9 @@ def _balanced_distractors(answer: str, generated: list, fallback: list, seed: st
             if len(accepted) == 3:
                 return
 
-    add(same_generated, enforce_length=True)
-    add(same_fallback, enforce_length=True)
-    add(sorted([*same_generated, *same_fallback], key=lambda value: abs(len(str(value)) - len(answer))))
-    text = [value for value in [*generated, *fallback] if not is_value(value)]
-    add(sorted(text, key=lambda value: abs(len(str(value)) - len(answer))))
-    return _not_longest(answer, accepted[:3], [*same_generated, *same_fallback] or text)
+    add(same, enforce_length=True)  # the model's first, in its order
+    add(sorted(fitting, key=lambda value: (value not in same, abs(len(value) - len(answer)))))
+    return _not_longest(answer, accepted[:3], fitting)
 
 
 def _replacement_distractors(client, wanted: list, pairs: list) -> dict:
@@ -331,7 +367,7 @@ def _top_up(client, questions: list, pairs: list, targets: Optional[set] = None)
             extra = []
             for value in keep_valid(fresh.get(question, []), question, answer, pairs)[0]:
                 key = choice_text(value).casefold()
-                if key and key not in seen:
+                if key and key not in seen and fits(answer, value):
                     seen.add(key)
                     extra.append(value)
             if not extra:
@@ -366,7 +402,7 @@ def _quiz_for_guide(guide_id: str, authorization: str, regenerate: bool = False)
     """Load or generate a Retain quiz, optionally replacing saved distractors."""
     require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
-    return {"questions": _load_quiz(get_supabase(), guide_id, user_id, regenerate)[0]}
+    return {"questions": shown_questions(_load_quiz(get_supabase(), guide_id, user_id, regenerate)[0])}
 
 
 CHOICES_VERSION = 2  # questions checked (and, if needed, rebuilt) by _rebuild_standouts
@@ -408,7 +444,7 @@ def _rebuild_standouts(supabase, guide_id: str, user_id: str, questions: list) -
         for item in wanted:
             valid = keep_valid(fresh.get(item["question"], []), item["question"], item["answer"], pairs)[0]
             distractors = _balanced_distractors(item["answer"], valid, [], seed=item["question"])
-            if len(distractors) >= 2:
+            if len(distractors) == 3:  # four choices, or the old ones stay
                 options, correct_index = _choices(item["answer"], distractors)
                 fixed[item["question"]] = {"options": options, "correct_index": correct_index}
     tried = {q["question"] for q in standouts}
@@ -502,11 +538,24 @@ def _load_quiz(supabase, guide_id: str, user_id: str, regenerate: bool = False) 
             seed=pair["question"],
         )
         if not distractors:
-            continue
+            continue  # _top_up asks for choices for it
         options, correct_index = _choices(correct_answer, distractors)
         questions.append({"question": pair["question"], "options": options, "correct_index": correct_index})
 
-    questions = [{**q, "choices_v": CHOICES_VERSION} for q in _top_up(client, questions, others)]
+    # Every idea stays, in guide order. Multiple choice always has exactly four choices: an idea still
+    # short of three fitting wrong ones after the top-up keeps only its answer, so it is asked typed
+    # (retain.can_choose), never left out and never shown with two or three.
+    built = {q["question"]: q for q in _top_up(client, questions, others)}
+    questions = []
+    for pair in qa_pairs:
+        question = built.get(pair["question"])
+        if not question or len(question["options"]) != 4:
+            question = {"question": pair["question"], "options": [choice_text(pair["answer"])], "correct_index": 0}
+        questions.append({**question, "choices_v": CHOICES_VERSION})
+    typed = sum(1 for q in questions if len(q["options"]) != 4)
+    if typed:
+        logger.info("Quiz for guide %s: %s of %s questions asked typed for want of four fitting choices",
+                    guide_id, typed, len(qa_pairs))
     if not questions:
         raise HTTPException(status_code=502, detail="Could not create balanced Retain options")
     _save_quiz(supabase, guide_id, user_id, questions)
@@ -613,6 +662,8 @@ def start_session(guide_id: str, body: SessionRequest, authorization: str = Head
         _save_quiz(supabase, guide_id, user_id, questions)
     if body.learn and blanks.learn_ladder_v2():
         return _learn_session(supabase, guide_id, user_id, questions, body.types, viewer=viewer)
+    # As the student sees them: same positions, a question about the source hidden (never asked).
+    questions = shown_questions(questions)
     # A random set of the size the student chose, asked in random order. Only those questions count
     # toward Pro types and the score (submit divides by the questions answered).
     cards = retain.shuffled_cards(retain.plan_session(questions, body.types, retain.pick_questions(questions, body.count)))
@@ -639,7 +690,7 @@ def _learn_session(supabase, guide_id: str, user_id: str, questions: list, types
         fill_available = True
     building = blanks.start_blanks(supabase, guide_id, user_id, questions) if fill_available and not viewer else False
     return {
-        "questions": questions,
+        "questions": shown_questions(questions),
         "cards": [],
         "types": [],
         "pro": plan_for(subscription_row(user_id)) == "pro",
@@ -660,8 +711,9 @@ def refresh_choices(guide_id: str, authorization: str = Header(default="")):
     questions = _saved_questions(supabase, guide_id, user_id)
     pairs = [(str(q.get("question") or ""), retain.concept_answer(q)) for q in questions if isinstance(q, dict)]
     trimmed, flagged = {}, set()
-    for question in questions:
-        if not isinstance(question, dict) or not isinstance(question.get("options"), list):
+    # A question about the source is never asked, so its choices are never worth a refresh (or a charge).
+    for question, shown in zip(questions, shown_questions(questions)):
+        if not isinstance(question, dict) or not isinstance(question.get("options"), list) or shown.get("hidden"):
             continue
         text, answer = str(question.get("question") or ""), retain.concept_answer(question)
         wrong = [str(option) for i, option in enumerate(question["options"]) if i != question.get("correct_index")]
@@ -670,7 +722,7 @@ def refresh_choices(guide_id: str, authorization: str = Header(default="")):
             flagged.add(text)
             trimmed[text] = {**question, "options": [answer, *kept], "correct_index": 0}
     if not flagged:
-        return {"changed": 0, "questions": questions}
+        return {"changed": 0, "questions": shown_questions(questions)}
     require(user_id, "light")
     fixed = {q["question"]: q for q in _top_up(get_openai_client(), list(trimmed.values()), pairs, targets=flagged)}
     changed = 0
@@ -678,7 +730,7 @@ def refresh_choices(guide_id: str, authorization: str = Header(default="")):
     for question in questions:
         text = str(question.get("question") or "") if isinstance(question, dict) else ""
         replacement = fixed.get(text) if text in flagged else None
-        if replacement and len(replacement["options"]) >= min(3, len(question["options"])):
+        if replacement and len(replacement["options"]) >= min(4, len(question["options"])):
             updated.append({**question, "options": replacement["options"], "correct_index": replacement["correct_index"]})
             changed += 1
         else:
@@ -686,7 +738,7 @@ def refresh_choices(guide_id: str, authorization: str = Header(default="")):
     if changed:
         _save_quiz(supabase, guide_id, user_id, updated)
     record(user_id, "light")
-    return {"changed": changed, "flagged": len(flagged), "questions": updated}
+    return {"changed": changed, "flagged": len(flagged), "questions": shown_questions(updated)}
 
 
 def _print_fill(client, pairs: list) -> Optional[list]:
@@ -706,6 +758,12 @@ def _print_fill(client, pairs: list) -> Optional[list]:
     return print_items.fill_items(pairs, indexes, generated)
 
 
+def _hidden_source(shown: list, item: dict) -> bool:
+    """Whether a printable item (a cached fill-in sentence) comes from a pair about the source."""
+    source = item.get("source") if isinstance(item, dict) else None
+    return isinstance(source, int) and 0 <= source < len(shown) and bool(shown[source].get("hidden"))
+
+
 @router.post("/{guide_id}/print-items", dependencies=[Depends(ai_rate_limit())])
 def printable_items(guide_id: str, body: PrintRequest, authorization: str = Header(default="")):
     """Everything a printable quiz can use, per type, from the guide's own questions and answers.
@@ -720,19 +778,26 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
     pairs = _parse_qa_pairs(row.get("study_guide") or "")
     if len(pairs) < 2:
         raise HTTPException(status_code=400, detail="This guide needs questions and answers before it can be printed.")
-    mc, flagged = print_items.multiple_choice(_load_quiz(supabase, guide_id, user_id)[0], pairs)
+    # Printed as the student sees them: every type keeps the saved pair's index as its `source` (the
+    # same one the quiz's multiple choice gets), a pair about the source is left out of every type
+    # and never sent to be written up, and the cache stays keyed by the saved pairs, so fill-in
+    # sentences already paid for are reused.
+    shown = shown_pairs(pairs)
+    mc, flagged = print_items.multiple_choice(shown_questions(_load_quiz(supabase, guide_id, user_id)[0]), pairs)
     cache = print_items.cached(row.get("print_items"), pairs)
     items = {"v": print_items.VERSION, "source": print_items.source_hash(pairs),
-             "matching": print_items.matching(pairs), "short": print_items.short_answer(pairs)}
+             "matching": print_items.matching(shown), "short": print_items.short_answer(shown)}
     if "fill" in cache:
         items["fill"] = cache["fill"]
     fill_locked = False
     if body.fill and "fill" not in items:
-        if remaining(user_id, "ai_quiz") <= 0:
+        if not print_items.fill_candidates(shown):
+            items["fill"] = []  # nothing to write up: no AI call, nothing charged
+        elif remaining(user_id, "ai_quiz") <= 0:
             fill_locked = True
         else:
             require(user_id, "ai_quiz")
-            fill = _print_fill(get_openai_client(), pairs)
+            fill = _print_fill(get_openai_client(), shown)
             if fill is not None:
                 items["fill"] = fill
                 record(user_id, "ai_quiz")
@@ -752,8 +817,8 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
         "mc_flagged": flagged,
         "matching": items["matching"],
         "short": items["short"],
-        "fill": items.get("fill"),
-        "fill_possible": len(print_items.fill_candidates(pairs)),
+        "fill": None if items.get("fill") is None else [item for item in items["fill"] if not _hidden_source(shown, item)],
+        "fill_possible": len(print_items.fill_candidates(shown)),
         "fill_locked": fill_locked,
     }
 
@@ -768,7 +833,7 @@ def grade_written(guide_id: str, body: WrittenAnswer, authorization: str = Heade
         raise HTTPException(status_code=400, detail="Unknown question")
     question = questions[body.concept]
     require(user_id, "light")  # the student's own allowance, also on someone else's guide
-    result = grade_written_answer(question.get("question", ""), retain.concept_answer(question), body.answer.strip())
+    result = grade_written_answer(asked_as(question.get("question")), retain.concept_answer(question), body.answer.strip())
     if not result:
         raise HTTPException(status_code=502, detail="Cordia could not check this answer right now. Please try again.")
     record(user_id, "light")
@@ -805,7 +870,7 @@ def explain_miss(guide_id: str, body: MissRequest, authorization: str = Header(d
         pairs = _parse_qa_pairs(((guide.data or [{}])[0].get("study_guide")) or "")
     passage = next((pair["answer"] for pair in pairs if pair["question"].strip() == str(question.get("question") or "").strip()), "")
     require(user_id, "light")
-    result = explain_miss_briefly(question.get("question", ""), correct, body.chosen.strip(), passage)
+    result = explain_miss_briefly(asked_as(question.get("question")), correct, body.chosen.strip(), passage)
     if not result:
         raise HTTPException(status_code=502, detail="Cordia could not explain this one right now.")
     record(user_id, "light")
@@ -852,8 +917,10 @@ def help_me_remember(guide_id: str, body: RememberRequest, authorization: str = 
     from services.memory_context import related_material
     require(user_id, "light")
     answer = retain.concept_answer(question)
-    context = related_material(supabase, user_id, guide_id, question.get("question", ""), answer)
-    result = memory_hook(question.get("question", ""), answer, styles, interests,
+    # The question as the student was asked it ("What is X?", not "According to Slide 5, what is X?").
+    asked = asked_as(question.get("question"))
+    context = related_material(supabase, user_id, guide_id, asked, answer)
+    result = memory_hook(asked, answer, styles, interests,
                          (body.previous or "").strip(), crude=crude_allowed(supabase, user_id), context=context)
     if not result:
         raise HTTPException(status_code=502, detail="Cordia couldn't come up with one right now. Try again.")

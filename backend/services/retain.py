@@ -15,6 +15,7 @@ import hmac
 import os
 import re
 import unicodedata
+from collections import Counter
 
 TYPES = ("mc", "written", "fill", "matching")
 PRO_TYPES = {"fill", "matching"}
@@ -46,8 +47,22 @@ def answer_shape(question: str, answer: str) -> str:
     return "sentence"
 
 
+MIN_CHOICES = 3  # a multiple choice question needs at least this many choices (3 or 4); fewer is never asked as one
+
+
+def can_choose(question: dict) -> bool:
+    """Whether a question has enough choices to be asked as multiple choice. A guide-derived question
+    keeps only related, fitting choices (2 to 4), so one left with two is asked by typing it or
+    writing it instead: web/lib/retainEngine.mjs canChoose is the same rule."""
+    options = question.get("options") if isinstance(question, dict) else None
+    return isinstance(options, list) and len(options) >= MIN_CHOICES
+
+
 def concept_answer(question: dict) -> str:
-    options = question.get("options") or []
+    """The question's answer, or "" for a row with none (a malformed saved row is never asked)."""
+    if not isinstance(question, dict):
+        return ""
+    options = question.get("options") if isinstance(question.get("options"), list) else []
     index = question.get("correct_index")
     return str(options[index]) if isinstance(index, int) and 0 <= index < len(options) else ""
 
@@ -81,6 +96,28 @@ def _distance(a: str, b: str) -> int:
     return previous[-1]
 
 
+def _within(a: str, b: str, limit: int) -> bool:
+    """Whether a and b are at most `limit` edits apart (_distance(a, b) <= limit), working only in a
+    band `limit` wide around the diagonal and stopping as soon as every cell in a row is past it."""
+    n, m = len(a), len(b)
+    if abs(n - m) > limit:
+        return False
+    over = limit + 1
+    previous = [j if j <= limit else over for j in range(m + 1)]
+    for i in range(1, n + 1):
+        current = [over] * (m + 1)
+        current[0] = i if i <= limit else over
+        best = current[0]
+        for j in range(max(1, i - limit), min(m, i + limit) + 1):
+            value = min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] != b[j - 1]), over)
+            current[j] = value
+            best = min(best, value)
+        if best > limit:
+            return False
+        previous = current
+    return previous[m] <= limit
+
+
 def fill_matches(response: str, answer: str) -> bool:
     """Same meaning-preserving tolerance as the browser: case, articles, plurals, small typos."""
     given = normalize(response)
@@ -106,7 +143,9 @@ def _key_words(text: str) -> list:
 def _same_word(a: str, b: str) -> bool:
     if a == b or re.sub(r"s$", "", a) == re.sub(r"s$", "", b):
         return True
-    return len(a) >= 5 and len(b) >= 5 and not re.search(r"\d", a + b) and _distance(a, b) <= max(len(a), len(b)) // 5
+    longest = max(len(a), len(b))
+    return (len(a) >= 5 and len(b) >= 5 and abs(len(a) - len(b)) <= longest // 5 and not re.search(r"\d", a + b)
+            and _within(a, b, longest // 5))
 
 
 def fill_verdict(response: str, answer: str) -> str:
@@ -132,12 +171,166 @@ def fill_verdict(response: str, answer: str) -> str:
     return "wrong"
 
 
+PART_MAX_WORDS = 6
+PART_MAX_COUNT = 12     # a longer list is one answer, not parts to check
+ANSWER_MAX_CHARS = 1000  # a longer answer is one answer too: this is also all of it the model is shown
+WORD_MAX_CHARS = 40
+_SERIES_END = re.compile(r"^(?:and|or|&)\s+", re.I)
+_LAST_PAIR = re.compile(r"^(.+?)\s+(?:and|or|&)\s+(.+)$", re.I)
+
+
+def answer_parts(answer: str) -> list:
+    """The parts of a list answer ("Sigmund Freud, Carl Jung, and Alfred Adler" -> three names;
+    "Offer; acceptance; consideration"), else [answer]. A list is three or more short items split
+    by semicolons, or by commas with "and"/"or" before the last one (four or more need none), so a
+    sentence with commas ("Hyperkalemia, a high potassium level, causes peaked T waves") and a pair
+    or title ("Romeo and Juliet") stay one part. At most PART_MAX_COUNT parts in at most
+    ANSWER_MAX_CHARS characters: anything longer is returned whole, so the work never grows with
+    what was saved in the guide."""
+    raw = str(answer or "")
+    whole = raw.strip()
+    if len(raw) > ANSWER_MAX_CHARS:
+        return [whole]
+    text = " ".join(whole.split()).rstrip(".")
+    semicolons = ";" in text
+    items = [item.strip() for item in (text.split(";") if semicolons else text.split(",")) if item.strip()]
+    if len(items) > PART_MAX_COUNT:
+        return [whole]
+    listed = semicolons and len(items) >= 3
+    if not semicolons and len(items) >= 2:
+        if _SERIES_END.match(items[-1]):
+            listed = len(items) >= 3                     # "A, B, and C"
+        elif (pair := _LAST_PAIR.match(items[-1])):
+            items[-1:] = [pair.group(1), pair.group(2)]  # "A, B and C"
+            listed = True
+        else:
+            listed = len(items) >= 4                     # "A, B, C, D"
+    if not listed or len(items) > PART_MAX_COUNT:
+        return [whole]
+    items = [_SERIES_END.sub("", item).strip() for item in items]
+    if any(not item or len(item.split()) > PART_MAX_WORDS for item in items):
+        return [whole]
+    return items
+
+
+def _stem(word: str) -> str:
+    return word[:-1] if word.endswith("s") else word
+
+
+def _part_words(text: str) -> list:
+    return [word[:WORD_MAX_CHARS] for word in _key_words(normalize(text))]
+
+
+def missing_parts(text: str, answer: str) -> list:
+    """The parts of a list answer (answer_parts) that a piece of writing (a memory trick) leaves
+    out. A part counts when one of its distinguishing words is there (a word no other part uses:
+    "1", "2" and "gestational" for "Type 1 diabetes, Type 2 diabetes, gestational diabetes"),
+    allowing plurals, possessives and small typos, so a word the parts share cannot stand in for the
+    one that was left out. A part with no word of its own ("right atrium" beside "left atrium" and
+    "right ventricle") counts only when all its words are in one clause of the trick ("On the right
+    side, the atrium collects blood"), not split between two ("LEFT side: atrium ...; the right
+    ventricle ..."). [] for a one-part answer.
+    The trick is read at most TRICK_MAX_CHARS, the answer at most PART_MAX_COUNT parts
+    (answer_parts), and words are matched by lookup, with at most FUZZY_MAX_CHECKS typo comparisons
+    in all (_Words), so the work stays small whatever was saved in the guide."""
+    parts = answer_parts(answer)
+    if len(parts) < 2:
+        return []
+    text = str(text or "")[:TRICK_MAX_CHARS]
+    budget = _Budget()
+    trick = _Words(_part_words(text), budget)
+    keys = [_part_words(part) for part in parts]
+    used_by = Counter(stem for group in keys for stem in {_stem(word) for word in group})
+    clauses = None
+    missing = []
+    for index, part in enumerate(parts):
+        own = [word for word in keys[index] if used_by[_stem(word)] == 1]
+        if own:
+            found = any(trick.names(word) for word in own)
+        else:
+            if clauses is None:
+                clauses = [_Words(words, budget) for words in _clauses(text)]
+            found = _together(clauses, list(dict.fromkeys(keys[index])))
+        if not found:
+            missing.append(part)
+    return missing
+
+
+# Where a clause ends: a sentence end, a semicolon or a line break (not the point in "3.5").
+_CLAUSE_END = re.compile(r"[!?;\n]+|\.(?=\s|$)")
+
+
+def _clauses(text: str) -> list:
+    """The key words of each clause of a piece of writing, in order."""
+    return [words for words in (_part_words(clause) for clause in _CLAUSE_END.split(text)) if words]
+
+
+def _together(clauses: list, wanted: list) -> bool:
+    """Whether one clause (a _Words) holds every word in `wanted` (in any order, any distance apart)."""
+    return any(all(clause.names(word) for word in wanted) for clause in clauses)
+
+
+TRICK_MAX_CHARS = ANSWER_MAX_CHARS * 3  # a memory trick is at most 600 characters (llm.HOOK_LIST_MAX_CHARS)
+FUZZY_MAX_CHECKS = 400  # typo comparisons per check, in all: a word found by lookup costs none
+
+
+class _Budget:
+    def __init__(self):
+        self.left = FUZZY_MAX_CHECKS
+
+
+class _Words:
+    """The words of a piece of writing, for asking whether it names a word (_same_word: the same
+    word, its plural or a small typo; or the first half of a shared hyphen, "First-" in "First- and
+    second-degree murder" naming "first-degree"). The same word and its plural are found by lookup;
+    typos are compared only against words of a near length, and at most `budget.left` times across
+    every _Words sharing the budget, so the cost never grows with what the writing or the answer
+    holds. A word past the budget counts only when it is there as written."""
+
+    def __init__(self, words: list, budget: "_Budget"):
+        unique = list(dict.fromkeys(words))
+        self.exact = set(unique) | {_stem(word) for word in unique}
+        self.halves = [word for word in unique if len(word) > 2 and word.endswith("-")]
+        self.by_length = {}
+        for word in unique:
+            if len(word) >= 5 and not re.search(r"\d", word):
+                self.by_length.setdefault(len(word), []).append(word)
+        self.budget = budget
+
+    def names(self, word: str) -> bool:
+        if word in self.exact or _stem(word) in self.exact:
+            return True
+        if any(word.startswith(half) for half in self.halves[:20]):
+            return True
+        if len(word) < 5 or re.search(r"\d", word):
+            return False
+        for length in range(len(word) - len(word) // 4 - 1, len(word) + len(word) // 4 + 2):
+            for given in self.by_length.get(length, ()):
+                if self.budget.left <= 0:
+                    return False
+                self.budget.left -= 1
+                if _same_word(given, word):
+                    return True
+        return False
+
+
 def mentions_answer(text: str, answer: str) -> bool:
     """Whether a piece of writing (a memory hook) states the answer: every number in it, and all of
-    its key words (at least half when it has more than six), allowing plurals and small typos."""
-    words = _key_words(normalize(text))
+    its key words (at least half when it has more than six), allowing plurals and small typos. The
+    writing is read at most TRICK_MAX_CHARS and the answer at most ANSWER_MAX_CHARS, and words are
+    matched as _Words does, so the cost stays small whatever the two hold."""
+    words = _key_words(normalize(str(text or "")[:TRICK_MAX_CHARS]))
     if not words:
         return False
+    given = _Words([word[:WORD_MAX_CHARS] for word in words], _Budget())
+    for accepted in sorted(_accepted(str(answer or "")[:ANSWER_MAX_CHARS])):
+        target = list(dict.fromkeys(word[:WORD_MAX_CHARS] for word in _key_words(accepted)))
+        if not target or any(re.search(r"\d", word) and word not in given.exact for word in target):
+            continue
+        covered = sum(1 for word in target if given.names(word))
+        if covered == len(target) or (len(target) > 6 and covered * 2 >= len(target)):
+            return True
+    return False
     for accepted in _accepted(answer):
         target = _key_words(accepted)
         if not target or any(re.search(r"\d", word) and word not in words for word in target):
@@ -148,19 +341,34 @@ def mentions_answer(text: str, answer: str) -> bool:
     return False
 
 
+def _open_kind(shape: str, chosen: list) -> str:
+    """The format for an idea that has too few choices to be multiple choice: a short answer is typed
+    when Fill in the blank is on (it is a Pro type, so it is never turned on for the student), anything
+    else is written."""
+    return "fill" if shape == "term" and "fill" in chosen else "written"
+
+
 def plan_session(questions: list, selected, indices=None) -> list:
     """Cards in guide order: {"type", "concepts": [index, ...]}, one first ask per idea.
-    indices: only these questions (a quiz with fewer questions than the guide has)."""
+    indices: only these questions (a quiz with fewer questions than the guide has). An idea with fewer
+    than MIN_CHOICES choices is never asked with choices (multiple choice or matching): Fill in the blank
+    or Written instead (the owner's rule)."""
     chosen = [kind for kind in TYPES if kind in set(selected or ())] or ["mc"]
     assigned = {}
     wanted = set(indices) if indices is not None else None
     for index, question in enumerate(questions):
-        if wanted is not None and index not in wanted:
+        if (wanted is not None and index not in wanted) or (isinstance(question, dict) and question.get("hidden")):
             continue
         shape = answer_shape(question.get("question", ""), concept_answer(question))
-        assigned[index] = next((kind for kind in FIT[shape] if kind in chosen), "mc")
+        if can_choose(question):
+            assigned[index] = next((kind for kind in FIT[shape] if kind in chosen), "mc")
+        else:
+            assigned[index] = next((kind for kind in FIT[shape] if kind in chosen and kind in ("fill", "written")), None) \
+                or _open_kind(shape, chosen)
 
     def fallback(index):
+        if not can_choose(questions[index]):
+            return _open_kind(answer_shape(questions[index].get("question", ""), concept_answer(questions[index])), chosen)
         return next((kind for kind in ("fill", "mc", "written") if kind in chosen), "mc")
 
     matching = [index for index, kind in assigned.items() if kind == "matching"]
@@ -190,8 +398,10 @@ MAX_QUIZ_QUESTIONS = 50  # the most a guide's quiz holds (routers/quiz.py builds
 
 
 def askable(questions: list) -> list:
-    """Indexes of questions that have an answer to check."""
-    return [index for index, question in enumerate(questions) if concept_answer(question)]
+    """Indexes of questions that have an answer to check and are not hidden (a question about the
+    source rather than the subject, text_processing.shown_questions: it keeps its place, unasked)."""
+    return [index for index, question in enumerate(questions)
+            if concept_answer(question) and not (isinstance(question, dict) and question.get("hidden"))]
 
 
 def pick_questions(questions: list, count=None, rng=None) -> list:
@@ -249,5 +459,10 @@ def first_try_credit(question: dict, attempt: dict, user_id: str, guide_id: str)
         # right" / "I was right"). Their call, like a flashcard's Got it: it only moves their own score.
         return 1.0 if attempt.get("self_marked") and attempt.get("credit") == 1 else 0.0
     if kind == "written":
+        if not attempt.get("token"):
+            # The AI check didn't come back (grading failed, or the AI checks are used up), so the
+            # student looked at the right answer and marked their own. Their call, like a flashcard's
+            # Got it: it only moves their own score.
+            return 1.0 if attempt.get("self_marked") and attempt.get("credit") == 1 else 0.0
         return verified_credit(user_id, guide_id, attempt.get("concept"), attempt.get("credit"), attempt.get("token"))
     return 0.0
