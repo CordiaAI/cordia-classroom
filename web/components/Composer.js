@@ -29,7 +29,7 @@ export function buildGuideFrom(action, { files = [], folderId = '' } = {}) {
 export default function Composer({ tutor, classes = [], classId = '', onClassChange, variant = 'home', autoFocus = false, showError = false, quietBusy = false }) {
   const id = useId();
   const boxRef = useRef(null);
-  const caretRef = useRef(null); // the box's selection, so dictation goes where the student left the caret
+  const touchedRef = useRef(false); // the student has been in the box, so its caret is theirs
   const {
     input, setInput, attachments, setAttachments, removeAttachment, attachFiles, extracting, attachDropActive, fileRef, combinedAttachments, contextKey,
     sendMessage, session, busy, canSubmit, remaining, Recognition, listening, interim, toggleMic, localError,
@@ -112,7 +112,7 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
         onChange={event => setInput(event.target.value)}
         onKeyDown={onKeyDown}
         onPaste={onPaste}
-        onSelect={event => { caretRef.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd }; }}
+        onFocus={() => { touchedRef.current = true; }}
         placeholder="Ask the Tutor, or drop in slides, a PDF or a lecture"
         rows={1}
         style={{ height: minHeight }}
@@ -123,7 +123,7 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
           {extracting ? <CordiaLoader size={20} label="Reading files" /> : <Paperclip size={20} strokeWidth={1.75} aria-hidden="true" />}
         </button>
         {Recognition && (
-          <button type="button" className={'composer-icon' + (listening ? ' is-on' : '')} onClick={() => toggleMic(caretRef.current || {})} disabled={blocked && !listening}
+          <button type="button" className={'composer-icon' + (listening ? ' is-on' : '')} onClick={() => toggleMic(touchedRef.current && boxRef.current ? { start: boxRef.current.selectionStart, end: boxRef.current.selectionEnd } : {})} disabled={blocked && !listening}
             aria-label={listening ? 'Stop listening' : 'Talk to the Tutor'} aria-pressed={listening}>
             <Mic size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>

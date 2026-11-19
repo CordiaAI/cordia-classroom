@@ -123,4 +123,5 @@ test('every dictation box shares the one handler, with no per-event appending le
   assert.match(read('lib/useTutorChat.js'), /stopDictation\(\);\s*walkthroughEvent\('ask'\)/, 'Send stops the mic before the message goes');
   assert.match(read('components/StudyAidPanel.js'), /stopListening\(\);\s*setBusy\(true\)/, 'Check my answer stops the mic first');
   assert.match(read('lib/useDictation.js'), /interimResults = true/);
+  assert.match(read('lib/useDictation.js'), /useState\(\{ Recognition: null \}\)/, 'the recognizer class is held in an object: a class given to a state setter is called as an updater');
 });

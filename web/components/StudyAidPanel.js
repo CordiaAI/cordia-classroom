@@ -72,7 +72,8 @@ function CheckedAttempt({ guideId, number, mode, task, placeholder, allowSpeech 
   const [attempt, setAttempt] = useState('');
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
-  const caretRef = useRef(null);
+  const boxRef = useRef(null);
+  const touchedRef = useRef(false); // the student has been in the box, so its caret is theirs
   // Speaking fills the answer box where the caret was (lib/dictation.mjs); words still being
   // recognized show under it.
   const { Recognition, listening, interim, toggle: toggleListening, abort: stopListening } = useDictation({ text: attempt, setText: setAttempt });
@@ -92,12 +93,12 @@ function CheckedAttempt({ guideId, number, mode, task, placeholder, allowSpeech 
   return (
     <div className="study-aid-attempt">
       <p className="study-aid-task"><strong>Your turn:</strong> {task}</p>
-      <textarea value={attempt} onChange={event => setAttempt(event.target.value)} onSelect={event => { caretRef.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd }; }} placeholder={placeholder} rows={3} maxLength={2000} />
+      <textarea ref={boxRef} value={attempt} onChange={event => setAttempt(event.target.value)} onFocus={() => { touchedRef.current = true; }} placeholder={placeholder} rows={3} maxLength={2000} />
       {listening && <p className={'dictation-interim' + (interim ? ' is-heard' : '')} role="status" aria-live="off">{interim || 'Listening…'}</p>}
       <div className="study-aid-actions">
         <button type="button" className="btn" onClick={submit} disabled={busy || !attempt.trim()}>{busy ? 'Checking…' : 'Check my answer'}</button>
         {allowSpeech && Recognition && (
-          <button type="button" className="btn-outline" onClick={() => toggleListening(caretRef.current || {})}>{listening ? 'Stop' : 'Say it'}</button>
+          <button type="button" className="btn-outline" onClick={() => toggleListening(touchedRef.current && boxRef.current ? { start: boxRef.current.selectionStart, end: boxRef.current.selectionEnd } : {})}>{listening ? 'Stop' : 'Say it'}</button>
         )}
         {result?.verdict && result.verdict !== 'got_it' && (
           <button type="button" className="btn-outline" onClick={() => setResult(null)}>Try again</button>

@@ -13,8 +13,10 @@ export default function useDictation({ text, setText, lang = 'en-US' }) {
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState('');
   // Read after mount: the server render has no recognizer, and the first client render must match it.
-  const [Recognition, setRecognition] = useState(null);
-  useEffect(() => setRecognition(window.SpeechRecognition || window.webkitSpeechRecognition || null), []);
+  // (Held in an object: a class passed straight to a state setter would be called as an updater.)
+  const [found, setFound] = useState({ Recognition: null });
+  useEffect(() => setFound({ Recognition: window.SpeechRecognition || window.webkitSpeechRecognition || null }), []);
+  const { Recognition } = found;
   const activeRef = useRef(null); // { recognition, state, written: texts this dictation put in the box }
 
   const abort = useCallback(() => {
