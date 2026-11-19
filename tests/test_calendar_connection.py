@@ -48,7 +48,9 @@ class CalendarConnectionTests(unittest.TestCase):
             patch("services.google_sync._block_titles", return_value={"b1": "Essay: Outline"}),
         ):
             result = calendar.study_blocks("Bearer token")
-        database.table.assert_called_with("study_blocks")
+        # The blocks first; then the steps they cover (to show a checked-off step as done), still the caller's own.
+        self.assertEqual(database.table.call_args_list[0].args[0], "study_blocks")
+        database.table.assert_any_call("assignment_steps")
         query.eq.assert_any_call("user_id", "user-9")
         query.neq.assert_any_call("status", "removed")
         self.assertEqual([block["title"] for block in result["blocks"]], ["Essay: Outline", "Study"])
