@@ -158,14 +158,20 @@ test('a box that holds only so much gets the words cut to fit, never what was ty
 });
 
 test('the recognizer errors say one plain thing', () => {
-  assert.equal(dictationError('not-allowed'), 'Microphone blocked. Allow it in site settings.');
-  assert.equal(dictationError('network'), 'Voice needs a connection. Try again.');
+  assert.equal(dictationError('not-allowed'), 'Mic blocked. Allow it in settings.');
+  assert.equal(dictationError('network'), 'No connection. Try again.');
   assert.equal(dictationError('audio-capture'), 'No microphone found.');
   assert.equal(dictationError('service-not-allowed'), dictationError('not-allowed'));
-  assert.equal(dictationError('no-speech'), "Didn't catch anything. Try again.");
+  assert.equal(dictationError('no-speech'), "Didn't hear that. Try again.");
   assert.equal(dictationError('no-speech', true), '', 'words were heard, so "nothing" would be wrong');
-  // One line in the narrowest box (the 360px drawer, 312px of text at 14px): 48 characters at most.
-  for (const code of ['not-allowed', 'no-speech', 'network', 'audio-capture', 'something-new']) assert.ok(dictationError(code).length <= 48, `${code}: ${dictationError(code).length}`);
+  // The narrowest place an error shows is the study aid at a 360px viewport: its line is 212px wide at
+  // 14px/500, about 34 characters. The Tutor drawer (312px) is wider. tests/qa/dictation-check.cjs
+  // measures the real line at 360 and 390; this is the cheap guard on the text.
+  const STUDY_AID_SLOT_360 = 212;
+  const AVERAGE_CHARACTER = 6.2; // px per character, 14px/500 sans, a mixed-case sentence
+  const MAX_CHARACTERS = Math.floor(STUDY_AID_SLOT_360 / AVERAGE_CHARACTER);
+  assert.equal(MAX_CHARACTERS, 34);
+  for (const code of ['not-allowed', 'service-not-allowed', 'no-speech', 'network', 'audio-capture', 'something-new']) assert.ok(dictationError(code).length <= MAX_CHARACTERS, `${code}: ${dictationError(code).length} characters, ${MAX_CHARACTERS} fit the study aid at 360px`);
   assert.equal(dictationError('aborted'), '', 'we stopped it ourselves');
   assert.ok(dictationError('something-new'), 'any other error still says something');
   assert.equal(dictationHeard(startDictation('', 0, 0)), false);

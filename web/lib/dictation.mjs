@@ -101,10 +101,10 @@ export function dictationError(code, heardAnything = false) {
   switch (String(code || '')) {
     case 'aborted': return '';
     case 'not-allowed':
-    case 'service-not-allowed': return 'Microphone blocked. Allow it in site settings.';
-    case 'no-speech': return heardAnything ? '' : "Didn't catch anything. Try again.";
+    case 'service-not-allowed': return 'Mic blocked. Allow it in settings.';
+    case 'no-speech': return heardAnything ? '' : "Didn't hear that. Try again.";
     case 'audio-capture': return 'No microphone found.';
-    case 'network': return 'Voice needs a connection. Try again.';
+    case 'network': return 'No connection. Try again.';
     default: return 'Voice input stopped. Try again.';
   }
 }

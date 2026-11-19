@@ -189,6 +189,18 @@ test('a course number from 1900 to 2099 is a level, unless a term or year word s
   assert.equal(plan('Quiz 4', 'ECE 2035'), "Plan ECE 2035's Quiz 4");
 });
 
+test('a month and year ("May 2025 Cohort ABSN") is a cohort, not a department: the label says "your"', () => {
+  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'SEPT', 'OCT', 'NOV', 'DEC',
+    'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  for (const month of months) {
+    for (const course of [`${month} 2025 Cohort ABSN`, `${month.toUpperCase()} 2026`, `${month.toLowerCase()} 2025 Nursing`]) assert.equal(classShort(course), '', course);
+  }
+  for (const course of ['May 2025 Cohort ABSN', 'JAN 2026 Cohort ABSN', 'AUG 2025 Cohort ABSN', 'SEPT 2025 Cohort ABSN', 'DEC 2025 Cohort ABSN']) assert.equal(plan('Quiz 4', course), 'Plan your Quiz 4', course);
+  assert.equal(classShort('May 2025 - NUR 210'), 'NUR 210', 'a real class after the month still names the class');
+  assert.equal(classShort('MAY 2035'), '', 'a month then a year-like number is a year, as the card says');
+  assert.equal(classShort('MATH 2024'), 'MATH 2024', 'a real department keeps its level');
+});
+
 test('a leading id goes: "HW 6:" with a space, "P4:" and "MP2 -", but "P53 Pathway Quiz" keeps its protein', () => {
   assert.equal(planTitle('HW 6: Dynamic Programming'), 'Dynamic Programming');
   assert.equal(planTitle('Q 2: Limits'), 'Limits');

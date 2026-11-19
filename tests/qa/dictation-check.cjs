@@ -35,6 +35,17 @@ const FAKE = prefixed => `
     window.${prefixed ? 'webkitSpeechRecognition' : 'SpeechRecognition'} = Fake;
   })();`;
 
+// Layout-shift entries exist in Chromium only; WebKit has no 'layout-shift' type. Geometry (the
+// rects compared before and after) is what every check asserts in both browsers; the shift score is
+// an extra check where the browser reports one, and the run says where it did not.
+const startShiftScore = (page, scope = 'body') => page.evaluate(scope => {
+  window.__cls = null;
+  if (!(window.PerformanceObserver && PerformanceObserver.supportedEntryTypes || []).includes('layout-shift')) return;
+  window.__cls = 0;
+  new PerformanceObserver(list => { for (const entry of list.getEntries()) if (scope === 'body' || (entry.sources || []).some(source => source.node && source.node.nodeType === 1 && source.node.closest(scope))) window.__cls += entry.value; }).observe({ type: 'layout-shift' });
+}, scope);
+const noShift = async page => { const score = await page.evaluate(() => window.__cls); expect(score === null || score === 0, 'layout shift score ' + score); };
+
 const box = page => page.locator('.composer-box');
 const value = page => box(page).inputValue();
 const interim = page => page.evaluate(() => document.querySelector('.dictation-interim')?.textContent || null);
@@ -184,9 +195,9 @@ async function suite(label, browserType, prefixed) {
     await context.close();
   });
 
-  await check(`${label}: the composer does not move when the line fills, wraps or empties (0 px, CLS 0)`, async () => {
+  await check(`${label}: the composer does not move when the line fills, wraps or empties (0 px; shift score 0 where the browser reports one)`, async () => {
     const { context, page } = await open(browser, prefixed);
-    await page.evaluate(() => { window.__cls = 0; new PerformanceObserver(list => { for (const entry of list.getEntries()) window.__cls += entry.value; }).observe({ type: 'layout-shift', buffered: false }); });
+    await startShiftScore(page);
     const top = () => page.evaluate(() => { const form = document.querySelector('.composer').getBoundingClientRect(); const note = document.querySelector('.chat-home-note')?.getBoundingClientRect(); return [form.top, form.height, note ? note.top : 0].join(','); });
     const idle = await top();
     await mic(page).click();
@@ -201,11 +212,11 @@ async function suite(label, browserType, prefixed) {
     await page.evaluate(() => window.__silence());
     await page.waitForTimeout(200);
     same(await top(), idle, 'ending moves nothing');
-    same(await page.evaluate(() => window.__cls), 0, 'layout shift score');
+    await noShift(page);
     await context.close();
   });
 
-  for (const [code, wanted] of [['not-allowed', /Microphone blocked.*site settings/], ['no-speech', /Didn't catch anything/], ['network', /needs a connection/], ['audio-capture', /No microphone found/]]) {
+  for (const [code, wanted] of [['not-allowed', /Mic blocked.*settings/], ['no-speech', /Didn't hear that/], ['network', /No connection/], ['audio-capture', /No microphone found/]]) {
     await check(`${label}: a ${code} error says so in the line under the box and ends listening`, async () => {
       const { context, page } = await open(browser, prefixed);
       await mic(page).click();
@@ -264,7 +275,7 @@ async function suite(label, browserType, prefixed) {
   // and an error is one line that stays until the next mic press or a keystroke.
   const LONG = 'Why does the derivative of x squared equal two x and how do I show it from the definition of a limit step by step please and then what';
   // Layout shift from `scope` (a selector) only: other things on a guide page (a tip that arrives after a few seconds) are not the line's.
-  const watch = (page, scope = 'body') => page.evaluate(scope => { window.__cls = 0; new PerformanceObserver(list => { for (const entry of list.getEntries()) if (entry.sources.some(source => source.node && source.node.nodeType === 1 && source.node.closest(scope))) window.__cls += entry.value; }).observe({ type: 'layout-shift' }); }, scope);
+  const watch = startShiftScore;
   const lineHeight = page => page.evaluate(() => document.querySelector('.dictation-slot [role=alert], .dictation-slot .dictation-interim')?.getBoundingClientRect().height || 0);
   const aidRoutes = async page => {
     await page.route(/localhost:8000\/learning-style/, route => route.fulfill({ json: { enabled: true, style: 'aural' } }));
@@ -280,10 +291,10 @@ async function suite(label, browserType, prefixed) {
     return opened;
   };
   const sayIt = page => page.evaluate(() => [...document.querySelectorAll('.study-aid-attempt .study-aid-actions button')].find(button => /Say it|Stop/.test(button.textContent)).click());
-  const aidBox = page => page.evaluate(() => { const rect = selector => { const element = document.querySelector(selector); return element ? [element.getBoundingClientRect().left, element.getBoundingClientRect().width, element.getBoundingClientRect().height].map(Math.round).join('x') : null; }; return { panel: rect('.study-aid-panel'), textarea: rect('.study-aid-attempt textarea'), scroll: document.documentElement.scrollWidth }; });
+  const aidBox = page => page.evaluate(() => { const rect = selector => { const element = document.querySelector(selector); return element ? [element.getBoundingClientRect().left, element.getBoundingClientRect().width, element.getBoundingClientRect().height].map(Math.round).join('x') : null; }; const slot = document.querySelector('.study-aid-attempt .dictation-slot'); const slotRect = slot ? slot.getBoundingClientRect() : null; return { panel: rect('.study-aid-panel'), textarea: rect('.study-aid-attempt textarea'), slot: slotRect ? [slotRect.left, slotRect.top, slotRect.width, slotRect.height].map(Math.round).join('x') : null, scroll: document.documentElement.scrollWidth }; });
 
   for (const [width, height] of [[390, 844], [1440, 900]]) {
-    await check(`${label}: study aid at ${width}px, a long interim phrase leaves the panel as wide as before (CLS 0)`, async () => {
+    await check(`${label}: study aid at ${width}px, a long interim phrase leaves the panel as wide as before (shift score 0 where reported)`, async () => {
       const { context, page } = await openAid(width, height);
       await watch(page, '.study-aid-panel');
       const idle = await aidBox(page);
@@ -298,12 +309,12 @@ async function suite(label, browserType, prefixed) {
       await page.evaluate(() => window.__silence());
       await page.waitForTimeout(300);
       same(JSON.stringify(await aidBox(page)), JSON.stringify(idle), 'ending changes no width');
-      same(await page.evaluate(() => window.__cls), 0, 'layout shift score');
+      await noShift(page);
       await context.close();
     });
   }
 
-  await check(`${label}: study aid at 390px, the error is one line and nothing moves when it comes or goes (CLS 0)`, async () => {
+  await check(`${label}: study aid at 390px, the error is one line and nothing moves when it comes or goes (shift score 0 where reported)`, async () => {
     const { context, page } = await openAid(390, 844);
     await watch(page, '.study-aid-panel');
     const idle = await aidBox(page);
@@ -319,11 +330,66 @@ async function suite(label, browserType, prefixed) {
     await page.waitForTimeout(200);
     same(await page.evaluate(() => document.querySelector('.dictation-slot [role=alert]')), null, 'a keystroke clears it');
     same(JSON.stringify((await aidBox(page)).panel), JSON.stringify(idle.panel), 'clearing it moves nothing');
-    same(await page.evaluate(() => window.__cls), 0, 'layout shift score');
+    await noShift(page);
     await context.close();
   });
 
-  await check(`${label}: Tutor drawer (360px), the longest error is one line, the interim line does not widen it, CLS 0`, async () => {
+  // The study aid's line is the narrowest place an error shows: 212px at a 360px viewport, 242px at 390px.
+  // Every message must be whole in it (no ellipsis, nothing scrolled off), one line, with nothing moving.
+  for (const width of [360, 390]) {
+    await check(`${label}: study aid at ${width}px, every error message fits its line whole (no ellipsis), and nothing moves`, async () => {
+      const { context, page } = await openAid(width, 844);
+      await watch(page, '.study-aid-panel');
+      const idle = await aidBox(page);
+      const widths = [];
+      for (const code of ['not-allowed', 'service-not-allowed', 'no-speech', 'network', 'audio-capture', 'something-new']) {
+        await sayIt(page);
+        await page.waitForTimeout(150);
+        await page.evaluate(name => window.__error(name), code);
+        await page.waitForTimeout(250);
+        const line = await page.evaluate(() => {
+          const element = document.querySelector('.study-aid-attempt .dictation-slot [role=alert]');
+          if (!element) return null;
+          const range = document.createRange(); range.selectNodeContents(element);
+          return { text: element.textContent, room: element.clientWidth, needs: element.scrollWidth, text_width: Math.round(range.getBoundingClientRect().width), height: element.getBoundingClientRect().height, overflow: getComputedStyle(element).textOverflow };
+        });
+        expect(line, `${code}: an error line is showing`);
+        widths.push(`${code}=${line.text_width}/${line.room}px`);
+        expect(line.needs <= line.room, `${code} is cut off: ${JSON.stringify(line)}`);
+        expect(line.text_width <= line.room, `${code} is wider than its line: ${JSON.stringify(line)}`);
+        expect(line.height < 24, `${code} is one line high: ${line.height}`);
+        same(JSON.stringify(await aidBox(page)), JSON.stringify(idle), `${code} moves nothing`);
+        await sayIt(page); // the next press clears it
+        await page.waitForTimeout(150);
+        await page.evaluate(() => window.__silence && window.__silence());
+        await page.waitForTimeout(100);
+      }
+      if (width === 360) console.log('     study aid line at 360px: ' + widths.join(' '));
+      await noShift(page);
+      await context.close();
+    });
+  }
+
+  await check(`${label}: the fade at the left edge follows the line's width when the window is resized, not only the words`, async () => {
+    const { context, page } = await open(browser, prefixed, { width: 390, height: 844 });
+    await mic(page).click();
+    await emit(page, 0, [['Why does the derivative of x squared equal two x and how do', false]]);
+    await page.waitForTimeout(100);
+    const state = () => page.evaluate(() => { const line = document.querySelector('.dictation-interim'); return { clipped: line.dataset.clipped, scrolled: line.scrollLeft > 0 }; });
+    const narrow = await state();
+    same(narrow.clipped + narrow.scrolled, 'truetrue', 'at 390px the phrase runs past the left edge and fades');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(300);
+    const wide = await state();
+    same(wide.clipped + wide.scrolled, 'falsefalse', 'at 1440px the same words fit: no fade, with the words unchanged');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(300);
+    const back = await state();
+    same(back.clipped + back.scrolled, 'truetrue', 'narrow again: the fade returns');
+    await context.close();
+  });
+
+  await check(`${label}: Tutor drawer (360px), the longest error is one line, the interim line does not widen it, shift score 0 where reported`, async () => {
     const { context, page } = await open(browser, prefixed, { url: state => `/guide/${state.guides[0].id}` });
     const bubble = page.locator('button.c-tutor-bubble');
     await bubble.waitFor({ timeout: 60000 });
@@ -358,7 +424,7 @@ async function suite(label, browserType, prefixed) {
     await page.waitForTimeout(200);
     same(await page.evaluate(() => document.querySelector('#cordia-tutor-drawer .dictation-slot [role=alert]')), null, 'the next mic press clears the error');
     same(await drawer(), idle, 'clearing moves nothing');
-    same(await page.evaluate(() => window.__cls), 0, 'layout shift score');
+    await noShift(page);
     await context.close();
   });
 

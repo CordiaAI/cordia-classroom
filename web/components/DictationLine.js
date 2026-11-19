@@ -9,9 +9,19 @@ export default function DictationLine({ available, listening, interim, error }) 
   const lineRef = useRef(null);
   useLayoutEffect(() => {
     const line = lineRef.current;
-    if (!line) return;
-    line.scrollLeft = line.scrollWidth;
-    line.dataset.clipped = String(line.scrollLeft > 0); // the left edge fades once the words run past it
+    if (!line) return undefined;
+    // The newest words stay in view and the left edge fades once earlier words run past it. The
+    // box can change width while it shows (rotating the phone, the drawer opening), so the fade is
+    // worked out again whenever the line is resized, not only when the words change.
+    const place = () => {
+      line.scrollLeft = line.scrollWidth;
+      line.dataset.clipped = String(line.scrollLeft > 0);
+    };
+    place();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(place);
+    observer.observe(line);
+    return () => observer.disconnect();
   }, [interim, listening, error]);
   if (!available) return null;
   return (

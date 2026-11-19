@@ -48,9 +48,11 @@ const TERMS = new Set(['FA', 'FALL', 'SP', 'SPR', 'SPRNG', 'SPRING', 'SU', 'SUM'
 // Words that sit before a number without naming a department ("Sec 02", "Week 5", "COVID 19"), and
 // words an all-caps title starts with ("INTRO TO CS 101").
 const NOT_DEPARTMENTS = new Set(['SEC', 'SECT', 'SECTION', 'LAB', 'LEC', 'LECTURE', 'WEEK', 'WK', 'UNIT', 'MOD', 'MODULE', 'CH', 'CHAP', 'CHAPTER', 'PART', 'PT', 'SESSION', 'GROUP', 'COHORT', 'TEAM', 'BLOCK', 'CLASS', 'COVID', 'COURSE', 'TERM', 'YEAR', 'GRADE', 'LEVEL', 'ROOM', 'RM', 'CRN', 'STEP', 'DAY', 'PERIOD', 'QTR']);
-// Words that go before a four-digit year, not a course number ("FY 2025", "Class of 2025"); the
-// terms above do too ("Spring 2025").
-const YEAR_WORDS = new Set(['OF', 'IN', 'FY', 'AY', 'CY', 'SY', 'CLASS', 'YEAR', 'SEMESTER', 'SEM']);
+// Words that go before a four-digit year, not a course number ("FY 2025", "Class of 2025", "May 2025
+// Cohort ABSN"): month names and abbreviations too. The terms above do as well ("Spring 2025").
+const YEAR_WORDS = new Set(['OF', 'IN', 'FY', 'AY', 'CY', 'SY', 'CLASS', 'YEAR', 'SEMESTER', 'SEM',
+  'JAN', 'JANUARY', 'FEB', 'FEBRUARY', 'MAR', 'MARCH', 'APR', 'APRIL', 'MAY', 'JUN', 'JUNE', 'JUL', 'JULY',
+  'AUG', 'AUGUST', 'SEP', 'SEPT', 'SEPTEMBER', 'OCT', 'OCTOBER', 'NOV', 'NOVEMBER', 'DEC', 'DECEMBER']);
 const LEADING_WORDS = new Set(['TO', 'OF', 'AND', 'THE', 'FOR', 'IN', 'ON', 'AT', 'A', 'AN', 'INTRO', 'INTRODUCTION']);
 
 // "EH-102-136" or "MUL 101 MUL-101-102: Introduction to Music" -> "EH 102", "MUL 101"; "Art History
@@ -58,8 +60,9 @@ const LEADING_WORDS = new Set(['TO', 'OF', 'AND', 'THE', 'FOR', 'IN', 'ON', 'AT'
 // way students name a class. A class named only in words keeps its name, cut at a dash, a colon, a
 // bracket or "Section", without its term ("SP25 Adult Health I" -> "Adult Health I"). When unsure
 // (a section code, a term, "Week 5", "COVID 19") it names nothing, and the label says "your". A
-// number from 1900 to 2099 is a course level ("ECE 2035") unless a term or year word sits right
-// before it ("Fall 2025", "FY 2025", "Class of 2025").
+// number from 1900 to 2099 is a course level ("ECE 2035") unless the department is a term, month or
+// year word ("Fall 2025", "FY 2025", "May 2025"), or the word before the department is one ("Class
+// of 2025", "Spring ECE 2035"): then it is a year and the label says "your".
 export function classShort(course) {
   const text = String(course || '').trim();
   const pattern = /\b([A-Z]{2,5}[\s_-]+[A-Z]{2,5}|[A-Za-z]{2,5})[\s_-]*(\d{3,4}[A-Za-z]?)\b/g;
