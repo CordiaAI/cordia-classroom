@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Bell, BellOff, CalendarCheck, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, ExternalLink, KeyRound, RefreshCw, Unlink } from 'lucide-react';
+import { Bell, BellOff, ClipboardCopy, ClipboardPaste, ExternalLink, KeyRound, RefreshCw, Unlink } from 'lucide-react';
 import { apiErrorMessage, apiFetch, getUserId } from '../lib/api';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { CanvasCalendarFeed, CanvasCalendarNav, CanvasFeedLink } from './CanvasShots';
@@ -23,6 +23,10 @@ import CanvasConnectSheet from './CanvasConnectSheet';
 import BodyPortal from './BodyPortal';
 import Toggle from './Toggle';
 import { deadlineCourse, deadlineTitle } from '../lib/formatters';
+import { loadFolders } from '../lib/folders';
+import { loadBlocks, loadExamReadiness } from '../lib/calendarData';
+import { buildBlocks, buildDeadlines, classIndex, needsStudyTime } from '../lib/calendarViews.mjs';
+import CalendarViews from './calendar/CalendarViews';
 
 const FEED_KEY = 'cordiaCanvasCalendarFeed';
 const REMINDER_KEY = 'cordiaCalendarReminders';
@@ -47,32 +51,10 @@ function dueLabel(item) {
     + (item.all_day ? '' : ` · ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
 }
 
-function startOfWeek(date) {
-  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  start.setDate(start.getDate() - start.getDay());
-  return start;
-}
-
-function addDays(date, days) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
 // "Today" is the student's local day, not the server's UTC day.
 function localDueToday(items) {
   const today = new Date().toDateString();
   return items.filter(item => new Date(item?.due_at || '').toDateString() === today);
-}
-
-function timeLabel(item) {
-  if (item.all_day) return 'All day';
-  return new Date(item.due_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
-function weekSummary(items) {
-  const tests = items.filter(item => item.type === 'exam' || item.type === 'quiz').length;
-  return `${items.length} due${tests ? ` · ${tests} ${tests === 1 ? 'test' : 'tests'}` : ''}`;
 }
 
 function notifyDueToday(items, userId) {
@@ -92,10 +74,13 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
   const [cached] = useState(() => readCalendarCache());
   const [status, setStatus] = useState(cached ? 'connected' : 'checking'); // checking | connected | disconnected | error
   const connected = status === 'connected';
-  // Deadlines, lecture to-dos, study blocks and the Canvas offer arrive before the week shows.
+  // Deadlines, lecture to-dos, study blocks, the Canvas offer and the classes (their colours)
+  // arrive before the calendar shows, and then the readiness of any exam coming up.
   const [extrasIn, setExtrasIn] = useState(0);
   const arrived = () => setExtrasIn(count => count + 1);
-  const gate = useLoadGate(status !== 'checking' && extrasIn >= 3);
+  const [folders, setFolders] = useState([]);
+  useEffect(() => { if (compact) { arrived(); return; } loadFolders().catch(() => null).then(data => { setFolders(Array.isArray(data?.folders) ? data.folders : []); arrived(); }); }, [compact]);
+  const [readiness, setReadiness] = useState({ key: null, map: {} });
   const [items, setItems] = useState(() => cached?.items || []);
   const [dueToday, setDueToday] = useState(() => localDueToday(cached?.items || []));
   // To-dos confirmed from lectures show alongside the Canvas feed.
@@ -103,7 +88,8 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
   useEffect(() => { confirmedTodos().catch(() => null).then(data => { setLectureItems(lectureCalendarItems(data?.todos)); arrived(); }); }, []);
   // Study blocks from Plan my week (and assignment plans) show too, with or without Canvas.
   const [blocks, setBlocks] = useState([]);
-  useEffect(() => { apiFetch('/calendar/blocks').catch(() => null).then(data => { setBlocks(Array.isArray(data?.blocks) ? data.blocks : []); arrived(); }); }, []);
+  useEffect(() => { loadBlocks().catch(() => null).then(data => { setBlocks(Array.isArray(data?.blocks) ? data.blocks : []); arrived(); }); }, []);
+  const reloadBlocks = useCallback(() => loadBlocks().catch(() => null).then(data => { if (Array.isArray(data?.blocks)) setBlocks(data.blocks); }), []);
   // Canvas token connection (all classes and course files), offered when the backend has it.
   const [canvasReady, setCanvasReady] = useState(false);
   const [tokenOpen, setTokenOpen] = useState(false);
@@ -118,7 +104,30 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
   const [error, setError] = useState('');
   const [reminders, setReminders] = useState(false);
   const [userId, setUserId] = useState('');
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+
+  // The four views' model: deadlines and study blocks with their classes' colours.
+  const dataIn = status !== 'checking' && extrasIn >= 4;
+  const model = useMemo(() => {
+    const index = classIndex(folders);
+    const deadlines = buildDeadlines(mergeCalendarItems(status === 'connected' ? items : [], lectureItems), index);
+    const blockEntries = buildBlocks(blocks, deadlines, index);
+    return { deadlines, blocks: blockEntries, needs: needsStudyTime(deadlines, blockEntries, new Date()) };
+  }, [folders, status, items, lectureItems, blocks]);
+  // Exams from yesterday to a month ahead get Learn's readiness (the same number as the sidebar).
+  const exams = useMemo(() => {
+    const from = Date.now() - 86400000;
+    return model.deadlines.filter(entry => entry.exam && entry.at.getTime() >= from && entry.at.getTime() <= from + 31 * 86400000);
+  }, [model.deadlines]);
+  const examKey = exams.map(entry => entry.id).join(',');
+  useEffect(() => {
+    if (compact || !dataIn) return undefined;
+    let live = true;
+    loadExamReadiness(exams).catch(() => ({})).then(map => { if (live) setReadiness({ key: examKey, map: map || {} }); });
+    return () => { live = false; };
+  }, [compact, dataIn, examKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The views show as soon as the deadlines and blocks are in; the rings fill when readiness is.
+  const gate = useLoadGate(dataIn);
+  const readinessIn = compact || readiness.key === examKey;
 
   useEffect(() => {
     const accountId = getUserId();
@@ -235,14 +244,24 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
 
   // Never show the connect steps, or a week still missing its blocks, while loading: the loader instead.
   if (status === 'checking' || gate === 'waiting' || gate === 'loader') {
-    return compact ? <SectionLoader height={183} label="Loading calendar" /> : <LoadingArea phase={gate === 'loader' ? 'loader' : 'waiting'} label="Loading calendar" />;
+    return compact ? <SectionLoader height={183} label="Loading calendar" /> : <CalendarViews loading={<LoadingArea phase={gate === 'loader' ? 'loader' : 'waiting'} label="Loading calendar" />} />;
   }
   if (status === 'error') {
     return (
-      <div className="c-empty" role="alert">
-        <p>{error}</p>
-        <button type="button" className="c-btn c-btn--secondary" onClick={() => refresh()}>Try again</button>
-      </div>
+      <>
+        {compact ? null : <CalendarViews loading={(
+          <div className="c-empty" role="alert">
+            <p>{error}</p>
+            <button type="button" className="c-btn c-btn--secondary" onClick={() => refresh()}>Try again</button>
+          </div>
+        )} />}
+        {compact && (
+          <div className="c-empty" role="alert">
+            <p>{error}</p>
+            <button type="button" className="c-btn c-btn--secondary" onClick={() => refresh()}>Try again</button>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -269,7 +288,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
         <section className="c-card cal-connect cal-connect--one" aria-label="Connect Canvas">
           <KeyRound size={28} strokeWidth={1.75} aria-hidden="true" />
           <h2 className="c-section-title">Add your Canvas deadlines</h2>
-          <p className="c-meta">Your study blocks and lecture to-dos are below. Connect Canvas to add every class’s deadlines, kept in sync.</p>
+          <p className="c-meta">Your study time and lecture to-dos are above. Connect Canvas to add every class’s deadlines, kept in sync.</p>
           <button type="button" className="c-btn c-btn--primary" data-spot="calendar-feed" onClick={() => setTokenOpen(true)}>Connect Canvas</button>
           <button type="button" className="c-btn c-btn--quiet" onClick={() => setFeedOpen(true)}>Use a calendar link instead</button>
           <style jsx>{`
@@ -356,118 +375,55 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
     );
   }
 
-  const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
-  const weekEnd = addDays(weekStart, 7).getTime();
-  const weekItems = allItems
-    .filter(item => dateValue(item) >= weekStart.getTime() && dateValue(item) < weekEnd)
-    .sort((a, b) => dateValue(a) - dateValue(b));
-  const weekBlocks = blocks.filter(block => {
-    const start = new Date(block.starts_at).getTime();
-    return start >= weekStart.getTime() && start < weekEnd;
-  });
-  const todayKey = new Date().toDateString();
-  const rangeLabel = `${days[0].toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${days[6].toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
-
-  function itemCard(item) {
-    const past = dateValue(item) < Date.now() && new Date(item.due_at).toDateString() !== todayKey;
-    const body = (
-      <>
-        <span className="calendar-item-meta">
-          <span className={`calendar-kind calendar-kind-${item.type}`}>{item.type}</span>
-          <small>{timeLabel(item)}</small>
-        </span>
-        <strong title={deadlineTitle(item)}>{deadlineTitle(item)}</strong>
-        {deadlineCourse(item) && <small>{deadlineCourse(item)}</small>}
-      </>
-    );
-    const className = `calendar-item${past ? ' calendar-item-past' : ''}${item.done ? ' calendar-item-done' : ''}`;
-    if (item.internal) return <a key={item.id} className={className + ' calendar-item-lecture'} href={item.url} title={`Open the lecture: ${item.title}`}>{body}</a>;
-    return item.url
-      ? <a key={item.id} className={className} href={item.url} target="_blank" rel="noreferrer" title={`Open in Canvas: ${item.title}`}>{body}</a>
-      : <div key={item.id} className={className}>{body}</div>;
-  }
-
-  // A study block: the time it's planned for and what it's for. It opens Your week, where the plan lives.
-  function blockCard(block) {
-    const start = new Date(block.starts_at);
-    const end = new Date(block.ends_at);
-    const clock = date => date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    return (
-      <Link key={'block-' + block.id} href="/week" className={'calendar-item calendar-item-block' + (end.getTime() < Date.now() ? ' calendar-item-past' : '')} title={`Study block: ${block.title}`}>
-        <span className="calendar-item-meta">
-          <span className="calendar-kind calendar-kind-study">{block.kind === 'review' ? 'Review' : 'Study'}</span>
-          <small>{clock(start)} – {clock(end)}</small>
-        </span>
-        <strong title={block.title}>{block.title}</strong>
-      </Link>
-    );
-  }
-
   const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
-  const summary = [connected && weekSummary(weekItems), weekBlocks.length && `${weekBlocks.length} study block${weekBlocks.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
-  return (
-    <div className="cal-stack">
-    <section className="calendar-dashboard">
-      <header className="cal-head">
-        <div className="c-row">
-          <button type="button" className="c-icon-btn" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="Previous week"><ChevronLeft {...ICON} /></button>
-          <h2 className="c-section-title">{rangeLabel}</h2>
-          <button type="button" className="c-icon-btn" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="Next week"><ChevronRight {...ICON} /></button>
-          {summary && <span className="c-meta">{summary}</span>}
-        </div>
-        <div className="c-row c-row--wrap">
-          <button type="button" className="c-btn c-btn--quiet" onClick={() => setWeekStart(startOfWeek(new Date()))}>This week</button>
-          <Link href="/week" className="c-btn c-btn--secondary"><CalendarCheck {...ICON} />Plan my week</Link>
-          {connected && <button type="button" className="c-btn c-btn--secondary" onClick={toggleReminders} aria-pressed={reminders}>{reminders ? <Bell {...ICON} /> : <BellOff {...ICON} />}Reminders</button>}
-          {/* Connected with a token, the Canvas page's Sync now updates everything: one sync control, not two. */}
-          {connected && !fromToken && <button type="button" className="c-icon-btn" onClick={() => refresh()} disabled={loading} aria-label="Refresh"><RefreshCw {...ICON} /></button>}
-          {connected && (fromToken
-            ? <Link href="/settings?section=connectors" className="c-btn c-btn--quiet">Canvas settings</Link>
-            : <button type="button" className="c-icon-btn" onClick={disconnect} aria-label="Disconnect calendar"><Unlink {...ICON} /></button>)}
-        </div>
-        <style jsx>{`
-          .cal-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-          .cal-stack { display: grid; gap: 24px; }
-        `}</style>
-      </header>
-      {connected && error && <div className="canvas-inline-error" role="alert">{error}</div>}
-      <div className="calendar-week">
-        {days.map(day => {
-          const dayItems = weekItems.filter(item => new Date(item.due_at).toDateString() === day.toDateString());
-          // Deadlines and study blocks in time order.
-          const entries = [
-            ...dayItems.map(item => ({ at: dateValue(item), node: itemCard(item) })),
-            ...weekBlocks.filter(block => new Date(block.starts_at).toDateString() === day.toDateString())
-              .map(block => ({ at: new Date(block.starts_at).getTime(), node: blockCard(block) })),
-          ].sort((a, b) => a.at - b.at);
-          const isToday = day.toDateString() === todayKey;
-          return (
-            <section key={day.toISOString()} className={`calendar-day${isToday ? ' calendar-day-today' : ''}`} aria-label={day.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}>
-              <header>
-                <span>{day.toLocaleDateString([], { weekday: 'short' })}</span>
-                <strong>{day.getDate()}</strong>
-                {isToday && <em>Today</em>}
-              </header>
-              <div className="calendar-day-items">
-                {entries.length ? entries.map(entry => entry.node) : <p className="calendar-day-empty">{connected ? 'Nothing due' : 'Nothing planned'}</p>}
-              </div>
-            </section>
-          );
-        })}
+  // Canvas's own controls, kept from the old week: reminders, refresh and disconnect (or, connected
+  // with an access token, Canvas settings, where Sync now updates everything).
+  const tools = connected ? (
+    <div className="cal-tools">
+      <p className="c-meta cal-tools-note">{fromToken ? 'Canvas deadlines, kept in sync' : 'Canvas deadlines from your calendar link'}</p>
+      <div className="cal-tools-actions">
+        <button type="button" className="c-btn c-btn--quiet" onClick={toggleReminders} aria-pressed={reminders}>{reminders ? <Bell {...ICON} /> : <BellOff {...ICON} />}Reminders</button>
+        {!fromToken && <button type="button" className="c-btn c-btn--quiet" onClick={() => refresh()} disabled={loading}><RefreshCw {...ICON} />{loading ? 'Refreshing…' : 'Refresh'}</button>}
+        {fromToken
+          ? <Link href="/settings?section=connectors" className="c-btn c-btn--quiet">Canvas settings</Link>
+          : <button type="button" className="c-btn c-btn--quiet" onClick={disconnect} disabled={loading}><Unlink {...ICON} />Disconnect</button>}
       </div>
-    </section>
-    {connectCard}
-    {/* Outside the connect card: connecting hides the card, and the sheet's next step is
-        choosing classes (feedback 10). The calendar reloads once the sheet closes. */}
-    {tokenOpen && (
-      <CanvasConnectSheet
-        school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''}
-        onClose={() => { setTokenOpen(false); if (tokenConnected) { setTokenConnected(false); refresh(); } }}
-        onConnected={data => { if (data?.connected) { setCanvasReady(false); setTokenConnected(true); } }}
-      />
-    )}
-    {foundClasses && <CalendarClassChooser classes={foundClasses} onClose={() => setFoundClasses(null)} />}
+      {error && <div className="canvas-inline-error" role="alert">{error}</div>}
+      <style jsx>{`
+        .cal-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.25rem 1rem; }
+        .cal-tools p { margin: 0; }
+        .cal-tools .cal-tools-note { color: var(--muted-strong); }
+        .cal-tools-actions { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+        .cal-tools-actions :global(.c-btn) { min-height: 2.75rem; }
+        .cal-tools :global(.canvas-inline-error) { flex-basis: 100%; }
+      `}</style>
     </div>
+  ) : null;
+
+  return (
+    <>
+      <CalendarViews
+        deadlines={model.deadlines}
+        blocks={model.blocks}
+        needs={model.needs}
+        readiness={readiness.map}
+        readinessIn={readinessIn}
+        setRawBlocks={setBlocks}
+        reloadBlocks={reloadBlocks}
+        tools={tools}
+        below={connectCard}
+      />
+      {/* Outside the connect card: connecting hides the card, and the sheet's next step is
+          choosing classes (feedback 10). The calendar reloads once the sheet closes. */}
+      {tokenOpen && (
+        <CanvasConnectSheet
+          school={typeof window !== 'undefined' ? localStorage.getItem('cordiaSchool') || '' : ''}
+          onClose={() => { setTokenOpen(false); if (tokenConnected) { setTokenConnected(false); refresh(); } }}
+          onConnected={data => { if (data?.connected) { setCanvasReady(false); setTokenConnected(true); } }}
+        />
+      )}
+      {foundClasses && <CalendarClassChooser classes={foundClasses} onClose={() => setFoundClasses(null)} />}
+    </>
   );
 }
 
