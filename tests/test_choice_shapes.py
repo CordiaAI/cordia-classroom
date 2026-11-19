@@ -83,18 +83,13 @@ class QuizOptionTests(unittest.TestCase):
                     self.assertTrue(same_shape(answer, option), f"{question}: {option}")
 
     def test_free_quiz_prefers_text_of_the_same_kind(self):
-        # Feedback F5: no answer in this guide fits "Hemoglobin" (a date or amount never does, "Henry
-        # Dunant" answers a "Who" question, and the mitochondria answer is a true statement three times
-        # its length), so the question is left out rather than asked with an unrelated choice or with
-        # fewer than four. The value questions still get four.
         for _ in range(10):
-            questions = quiz._standard_questions(self.PAIRS)
-            self.assertNotIn("What carries oxygen?", [q["question"] for q in questions])
-            self.assertTrue(all(len(q["options"]) == 4 for q in questions))
-            self.assertGreaterEqual(len(questions), 3)
-            for q in questions:
-                answer = q["options"][q["correct_index"]]
-                self.assertTrue(all(is_value(option) == is_value(answer) for option in q["options"]))
+            q = next(q for q in quiz._standard_questions(self.PAIRS) if q["question"] == "What carries oxygen?")
+            wrong = [o for i, o in enumerate(q["options"]) if i != q["correct_index"]]
+            self.assertGreaterEqual(len(wrong), 1)
+            self.assertFalse(any(is_value(option) for option in wrong), "a term never gets a date or amount as a choice")
+            # Another question's full answer is a true statement, never a wrong choice (distractor_check).
+            self.assertNotIn("The mitochondria in each cell", wrong)
 
     def test_ai_choices_off_format_are_rewritten_or_replaced(self):
         out = quiz._balanced_distractors("1863", ["In 1861", "the late 1800s", "1870"], ["Hemoglobin", "45%"], seed="When?")

@@ -4,7 +4,7 @@ import { BookOpen, Check, CircleDot, Lightbulb, Link2, MessageCircle, X } from '
 import { dismissTip, requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { noteView, useAnswerTiming } from '../lib/learningEvents';
-import { canChoose, choiceText, conceptAnswer, fillVerdict, gradeFailure, normalize, shuffled } from '../lib/retainEngine.mjs';
+import { choiceText, conceptAnswer, fillVerdict, normalize, shuffled } from '../lib/retainEngine.mjs';
 import { makeCloze } from '../lib/learnEngine.mjs';
 
 // Learn's format ladder (LEARN_LADDER_V2) wraps a round in <QuietLimits.Provider value>: a plan limit
@@ -527,18 +527,13 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
   const [busy, setBusy] = useState(false);
   const [grade, setGrade] = useState(null);
   const [error, setError] = useState('');
-  // The AI check didn't come back: the student sees the model answer and marks it themselves,
-  // recorded like a self-checked flashcard (selfMarked, no token). Nothing here needs the AI.
-  const [selfCheck, setSelfCheck] = useState(false);
   const [remembering, setRemembering] = useState(false);
   const timing = useAnswerTiming();
-  const time = useRef(null);
-  const modelAnswer = conceptAnswer(question);
 
   async function check(event) {
     event.preventDefault();
-    if (busy || grade || selfCheck || !value.trim()) return;
-    time.current = timing.done(); // the answer, not the grading round trip
+    if (busy || grade || !value.trim()) return;
+    const time = timing.done(); // the answer, not the grading round trip
     setBusy(true);
     setError('');
     const data = await apiFetch(`/quiz/${guideId}/grade`, {
@@ -553,24 +548,12 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
       return;
     }
     if (typeof data?.credit !== 'number') {
-      const failure = gradeFailure(data);
-      setError(failure.message);
-      // No AI checks left: asking again can't help, so the answer shows now. A failed try (network,
-      // server) can be tried again, or the student can check it themselves.
-      if (failure.limit) setSelfCheck(true);
+      setError(data?.detail || 'Cordia could not check this answer right now.');
       return;
     }
     setGrade(data);
     if (data.credit !== 1) askTutorAboutMiss(guideId, question, value.trim());
-    onResult([{ concept, credit: data.credit, response: value.trim(), token: data.token, timing: time.current, answerChars: value.trim().length }]);
-  }
-
-  function mark(credit) {
-    if (grade) return;
-    const response = value.trim();
-    setGrade({ credit, answer: modelAnswer, explanation: 'You checked this one yourself.', self: true });
-    if (credit !== 1) askTutorAboutMiss(guideId, question, response);
-    onResult([{ concept, credit, response, timing: time.current ?? timing.done(), answerChars: response.length, selfMarked: true }]);
+    onResult([{ concept, credit: data.credit, response: value.trim(), token: data.token, timing: time, answerChars: value.trim().length }]);
   }
 
   const [tone, label] = grade ? VERDICTS[grade.credit] : [];
@@ -585,33 +568,20 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
         placeholder="Your answer"
         aria-label="Your answer"
         rows={4}
-        readOnly={Boolean(grade) || busy || selfCheck}
+        readOnly={Boolean(grade) || busy}
         maxLength={4000}
         autoFocus
       />
-      {!grade && !selfCheck && (
+      {!grade && (
         <div className="retain-written-actions">
           <button type="submit" className="c-btn c-btn--primary" disabled={busy || !value.trim()}>{busy ? 'Checking…' : 'Check'}</button>
           {error && (
             <>
               <span className="retain-action-error" role="alert">{error}</span>
-              <button type="button" className="c-btn c-btn--secondary" onClick={() => setSelfCheck(true)}>Check it myself</button>
-              {canChoose(question) && <button type="button" className="c-btn c-btn--secondary" onClick={() => onSwitch?.('mc')}>Use choices</button>}
+              <button type="button" className="c-btn c-btn--secondary" onClick={() => onSwitch('mc')}>Use choices</button>
             </>
           )}
         </div>
-      )}
-      {!grade && selfCheck && (
-        <>
-          <div className="retain-feedback partial" role="status">
-            <strong>{error || 'Check this one yourself.'}</strong> Here is the answer. Compare it with yours.
-            <p className="retain-guide-answer"><span>Answer</span>{modelAnswer}</p>
-          </div>
-          <div className="quiz-next-row">
-            <button type="button" className="c-btn c-btn--secondary" onClick={() => mark(0)}>I missed it</button>
-            <button type="button" className="c-btn c-btn--primary quiz-next" onClick={() => mark(1)} autoFocus>I got it</button>
-          </div>
-        </>
       )}
       {grade && (
         <div className={'retain-feedback ' + tone} role="status">

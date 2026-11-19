@@ -16,8 +16,6 @@ import re
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
-from services.retain import answer_parts
-
 MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september",
           "october", "november", "december"]
 _ABBR = {m[:3]: i for i, m in enumerate(MONTHS)}
@@ -150,45 +148,6 @@ def same_shape(answer, other) -> bool:
 def is_value(answer) -> bool:
     """Answers whose wrong choices can be made safely (years, dates, amounts, or one inside a short phrase)."""
     return shape(answer).kind in (*VALUE_KINDS, "templated")
-
-
-# A wrong choice's visible length: at least half the right answer's and at most double it, or
-# within a few characters of it (short answers: "O(n)" for "O(log n)").
-LENGTH_RATIO = 0.5
-LENGTH_SLACK = 6
-
-
-def similar_length(answer, other) -> bool:
-    a, b = len(_strip(answer)), len(_strip(other))
-    return min(a, b) >= LENGTH_RATIO * max(a, b) or abs(a - b) <= LENGTH_SLACK
-
-
-def _capitals(parts: list) -> str:
-    """'names' when every part after the first starts with a capital, 'terms' when none does."""
-    rest = [part[:1] for part in parts[1:] if part[:1].isalpha()]
-    if rest and all(letter.isupper() for letter in rest):
-        return "names"
-    return "terms" if rest and all(letter.islower() for letter in rest) else "mixed"
-
-
-def fits(answer, candidate) -> bool:
-    """Whether `candidate` can be a wrong choice for `answer` without giving it away: the same kind
-    of thing (a year, date or amount written the same way for a value; a list of as many items for
-    a list, names for names and terms for terms; text for text) and a similar length. Any subject:
-    it reads only the shape of the text."""
-    if not str(candidate if candidate is not None else "").strip() or _key(candidate) == _key(answer):
-        return False
-    if is_value(answer) or is_value(candidate):
-        return same_shape(answer, candidate)
-    ours, theirs = answer_parts(str(answer)), answer_parts(str(candidate))
-    if (len(ours) > 1) != (len(theirs) > 1):
-        return False
-    if len(ours) > 1:
-        if len(theirs) != len(ours) and (len(ours) < 4 or abs(len(theirs) - len(ours)) > 1):
-            return False
-        if {_capitals(ours), _capitals(theirs)} == {"names", "terms"}:
-            return False
-    return similar_length(answer, candidate)
 
 
 # Making new values in the same style ---------------------------------------------------------------
