@@ -39,6 +39,16 @@ export function openProblems(practice) {
 }
 
 const SESSION_CARD_LIMIT = 30;
+// The home's "Review flashcards (688 due)" starts a round of this many cards, not all 688.
+export const DUE_REVIEW_CARDS = 50;
+const MOST_CARDS = 100;
+
+// How many flashcards a round takes, from ?cards= in the address bar: a whole number from 1 to 100,
+// else the usual 30.
+export function cardLimit(value) {
+  const count = /^\d{1,4}$/.test(String(value ?? '').trim()) ? Number(value) : 0;
+  return count >= 1 ? Math.min(count, MOST_CARDS) : SESSION_CARD_LIMIT;
+}
 
 // Learn ideas worth a look today: still being learned (Learning, Familiar) or Mastered and fading.
 export function learnIdeas(guide, today = dayKey()) {
@@ -63,8 +73,9 @@ function dealt(lists) {
 // The round from what's loaded: misses the student was sure of, due flashcards, Learn ideas, then
 // other misses. A question found in more than one place is one item carrying each source:
 // index (flashcard), concept (Learn idea), miss (Retain miss). interleave (a folder or classroom
-// round) deals cards and ideas one guide at a time, so the 30-card cap takes from every guide.
-export function buildStudyQueue(guides, stored = {}, { guideId = '', today = dayKey(), interleave = false } = {}) {
+// round) deals cards and ideas one guide at a time, so the card cap takes from every guide. cards is
+// that cap (30 unless a round asks for more: the home's due-flashcards button asks for 50).
+export function buildStudyQueue(guides, stored = {}, { guideId = '', today = dayKey(), interleave = false, cards: cardCap = SESSION_CARD_LIMIT } = {}) {
   const cardLists = [];
   const learnLists = [];
   for (const guide of guides) {
@@ -92,7 +103,7 @@ export function buildStudyQueue(guides, stored = {}, { guideId = '', today = day
   }
   const ordered = [
     ...misses.filter(item => item.sure),
-    ...cards.slice(0, SESSION_CARD_LIMIT),
+    ...cards.slice(0, cardCap),
     ...learn.slice(0, SESSION_CARD_LIMIT),
     ...misses.filter(item => !item.sure),
   ];
