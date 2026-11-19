@@ -124,9 +124,10 @@ export function SharedStyles() {
       }
       .cal-chip .lucide { flex: 0 0 auto; color: var(--tone-ink, var(--muted)); }
       .cal-chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .cal-chip.is-done { opacity: 0.62; }
+      .cal-chip.is-done { background: var(--glass-inner); }
+      .cal-chip.is-done .lucide { color: var(--muted); }
       .cal-chip.is-done .cal-chip-text { text-decoration: line-through; color: var(--muted); }
-      .cal-chip--compact { min-height: 1.5rem; padding: 0.125rem 0.4375rem; font-weight: 500; }
+      .cal-chip--compact { min-height: 1.5rem; padding: 0.125rem 0.5rem; font-weight: 500; }
       @media (hover: hover) { a.cal-chip:hover { transform: translateY(-0.0625rem); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-edge); } }
       a.cal-chip:active { transform: scale(0.97); }
       .cal-menu-wrap { position: relative; display: inline-flex; min-width: 0; }

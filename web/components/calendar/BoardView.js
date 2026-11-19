@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { CalendarCheck, Flag, GripVertical, Plus } from 'lucide-react';
-import { clock, dayEntries, dueWhen, hoursLabel, plannedHours, sameDay, span, startOfDay, weekDays } from '../../lib/calendarViews.mjs';
+import { clock, dayEntries, dueSoon, dueWhen, hoursLabel, plannedHours, sameDay, span, startOfDay, weekDays } from '../../lib/calendarViews.mjs';
 import { dayKey } from '../../lib/learnEngine.mjs';
 import { ClassTag, ICON, MenuButton, ReadyRing, SMALL_ICON, toneStyle } from './parts';
 
@@ -69,7 +69,7 @@ export default function BoardView({ deadlines, blocks, needs, readiness, now, we
     const body = (
       <>
         <ClassTag cls={entry.cls} from={entry.from} />
-        <span className="bd-due-when">{entry.done ? 'Done' : entry.allDay ? 'Due today' : `Due ${clock(entry.at)}`}</span>
+        <span className="bd-due-when">{entry.done ? 'Done' : entry.allDay ? 'Due, all day' : `Due ${clock(entry.at)}`}</span>
         <span className="bd-title">{entry.title}</span>
       </>
     );
@@ -94,7 +94,7 @@ export default function BoardView({ deadlines, blocks, needs, readiness, now, we
       <section className="c-card bd-tray" aria-labelledby="bd-tray-title">
         <div className="bd-tray-text">
           <h2 id="bd-tray-title" className="bd-tray-title">Needs a time</h2>
-          <p className="bd-tray-help">{needs.length ? 'Drag onto a day, or let Cordia find time.' : 'Everything due this week has study time.'}</p>
+          <p className="bd-tray-help">{needs.length ? 'Drag onto a day, or let Cordia find time.' : dueSoon(deadlines, now).length ? 'Everything due in the next 7 days has study time.' : 'Nothing due in the next 7 days.'}</p>
         </div>
         {needs.length > 0 && (
           <ul className="bd-tray-items">
@@ -204,26 +204,35 @@ export default function BoardView({ deadlines, blocks, needs, readiness, now, we
         .bd-cards :global(.bd-due) { background: var(--surface-raised); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-edge); }
         .bd-cards :global(.bd-when) { color: var(--tone-ink, var(--muted)); font: 600 0.8125rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
         .bd-cards :global(.bd-due-when) { color: var(--muted); font: 500 0.8125rem/1.2 var(--font-sans); }
-        .bd-cards :global(.bd-title) { font: 600 0.9375rem/1.3 var(--font-sans); overflow-wrap: anywhere; }
-        .bd-cards :global(.bd-card.is-done) { opacity: 0.6; }
+        .bd-cards :global(.bd-title) { font: 600 0.9375rem/1.3 var(--font-sans); overflow-wrap: break-word; hyphens: auto; }
+        .bd-cards :global(.bd-card.is-done) { background: color-mix(in srgb, var(--surface-raised) 50%, transparent); box-shadow: inset 0 0 0 0.0625rem var(--hairline); }
+        .bd-cards :global(.bd-card.is-done .bd-when) { color: var(--muted); }
         .bd-cards :global(.bd-card.is-done .bd-title) { color: var(--muted); text-decoration: line-through; }
         .bd-cards :global(.bd-card.is-saving) { opacity: 0.72; cursor: progress; }
         .bd-cards :global(.bd-exam) { gap: 0.375rem; color: var(--on-olive); background: var(--olive-glass-sheen), var(--olive); box-shadow: var(--olive-glass-shadow); }
         @media (hover: hover) { .bd-cards :global(.bd-exam:hover) { box-shadow: var(--olive-glass-shadow-hover); } }
         .bd-cards :global(.bd-exam-when) { display: flex; align-items: center; gap: 0.375rem; font: 600 0.8125rem/1.2 var(--font-sans); }
-        .bd-cards :global(.bd-exam-title) { font: 600 1.0625rem/1.3 var(--font-sans); overflow-wrap: anywhere; }
+        .bd-cards :global(.bd-exam-title) { font: 600 1.0625rem/1.3 var(--font-sans); overflow-wrap: break-word; hyphens: auto; }
         .bd-cards :global(.bd-exam-ready) { display: flex; align-items: center; gap: 0.5rem; font: 600 0.875rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
         .bd-cards :global(.bd-exam-ready--none) { font-weight: 500; }
         .bd-cards :global(.bd-exam .c-ring-track) { stroke: var(--on-olive); opacity: 0.3; }
         .bd-cards :global(.bd-exam .c-ring-fill) { stroke: var(--on-olive); }
         .bd-col :global(.bd-add) {
           display: inline-flex; align-items: center; gap: 0.25rem; width: 100%; min-height: 2.75rem; padding: 0 0.375rem; border: 0; border-radius: var(--r-input);
-          background: transparent; color: var(--muted); font: 600 0.8125rem/1.2 var(--font-sans); white-space: nowrap; cursor: pointer; text-align: left;
+          background: transparent; color: var(--muted); font: 600 0.8125rem/1.2 var(--font-sans); cursor: pointer; text-align: left;
           transition: transform 180ms var(--ease), background-color 180ms var(--ease);
         }
         .bd-col :global(.cal-menu-wrap) { display: flex; }
         @media (hover: hover) { .bd-col :global(.bd-add:hover) { background: var(--glass-inner); } }
         .bd-col :global(.bd-add:active) { transform: scale(0.97); }
+        @media (max-width: 1279px) {
+          .bd-cols { gap: 0.375rem; }
+          .bd-col { padding: 0.5rem 0.3125rem 0.375rem; }
+          .bd-cards :global(.bd-card) { padding: 0.5rem 0.5rem; }
+          .bd-cards :global(.bd-title) { font-size: 0.875rem; }
+          .bd-cards :global(.bd-exam-title) { font-size: 0.9375rem; }
+          .bd-head { padding: 0 0.125rem; }
+        }
         @media (prefers-reduced-motion: reduce) {
           .bd-col, .bd-tray :global(.bd-tray-item), .bd-cards :global(.bd-card), .bd-col :global(.bd-add) { transition: none; }
           .bd-tray :global(.bd-tray-item:hover), .bd-cards :global(.bd-card:hover) { transform: none; }

@@ -371,7 +371,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
   // with an access token, Canvas settings, where Sync now updates everything).
   const tools = connected ? (
     <div className="cal-tools">
-      <p className="c-meta">{fromToken ? 'Canvas deadlines, kept in sync' : 'Canvas deadlines from your calendar link'}</p>
+      <p className="c-meta cal-tools-note">{fromToken ? 'Canvas deadlines, kept in sync' : 'Canvas deadlines from your calendar link'}</p>
       <div className="cal-tools-actions">
         <button type="button" className="c-btn c-btn--quiet" onClick={toggleReminders} aria-pressed={reminders}>{reminders ? <Bell {...ICON} /> : <BellOff {...ICON} />}Reminders</button>
         {!fromToken && <button type="button" className="c-btn c-btn--quiet" onClick={() => refresh()} disabled={loading}><RefreshCw {...ICON} />{loading ? 'Refreshing…' : 'Refresh'}</button>}
@@ -383,6 +383,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
       <style jsx>{`
         .cal-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.25rem 1rem; }
         .cal-tools p { margin: 0; }
+        .cal-tools .cal-tools-note { color: var(--muted-strong); }
         .cal-tools-actions { display: flex; flex-wrap: wrap; gap: 0.25rem; }
         .cal-tools-actions :global(.c-btn) { min-height: 2.75rem; }
         .cal-tools :global(.canvas-inline-error) { flex-basis: 100%; }

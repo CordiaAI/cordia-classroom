@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  agendaDays, buildBlocks, buildDeadlines, classFor, classIndex, courseKey, dayEntries, examProgress, examReviewGuide,
+  agendaDays, buildBlocks, dueSoon, buildDeadlines, classFor, classIndex, courseKey, dayEntries, examProgress, examReviewGuide,
   gridBox, hasStudyTime, lanes, monthCell, monthGrid, needsStudyTime, nowLine, pickView, plannedHours, rowAction,
   shiftBlock, span, startOfWeek, weekRangeLabel,
 } from '../lib/calendarViews.mjs';
@@ -76,6 +76,8 @@ test('Needs study time: due in the next 7 days, not done, no block for that clas
   // A block more than a week before the deadline doesn't count.
   const old = buildBlocks([{ id: 'z', item_key: 'canvas-5', kind: 'work', title: 'Old', starts_at: at(10, 10), ends_at: at(10, 11) }], deadlines, index);
   assert.equal(hasStudyTime(byId('canvas-5'), old), false);
+  // The pool it's drawn from: due in the next 7 days, open, not a lecture to-do.
+  assert.deepEqual(dueSoon(deadlines, NOW).map(entry => entry.id), ['canvas-2', 'canvas-3', 'canvas-4', 'canvas-6', 'canvas-5']);
   // Already past: never "needs" anything.
   assert.deepEqual(needsStudyTime(deadlines, [], new Date(2026, 11, 30)), []);
 });

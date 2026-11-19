@@ -159,7 +159,7 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
         .mo-dow { display: grid; place-items: center; height: 1.75rem; color: var(--muted); font: 600 0.875rem/1 var(--font-sans); }
         .mo-gridcell { display: grid; min-width: 0; }
         .mo-cell {
-          display: flex; flex-direction: column; gap: 0.3125rem; min-width: 0; min-height: 6.5rem; padding: 0.5rem 0.5rem 0.4375rem;
+          display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; min-height: 6.5rem; padding: 0.5rem;
           border: 0; border-radius: var(--r-input); text-align: left; color: var(--ink); cursor: pointer;
           background: var(--glass-inner); box-shadow: inset 0 0 0 0.0625rem var(--hairline);
           transition: transform 180ms var(--ease), box-shadow 180ms var(--ease);
@@ -176,9 +176,9 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
         .mo-cell.is-today .mo-num { color: var(--olive-ink); }
         .mo-study { display: inline-flex; align-items: center; gap: 0.25rem; min-width: 0; overflow: hidden; color: var(--muted); font: 500 0.8125rem/1 var(--font-sans); white-space: nowrap; }
         .mo-chips { display: grid; gap: 0.25rem; min-width: 0; }
-        .mo-chip { display: flex; align-items: center; gap: 0.3125rem; min-width: 0; min-height: 1.5rem; padding: 0.125rem 0.375rem; border-radius: 0.5rem; background: color-mix(in srgb, var(--tone, var(--glass-inner)) 78%, transparent); font: 600 0.8125rem/1.2 var(--font-sans); }
+        .mo-chip { display: flex; align-items: center; gap: 0.25rem; min-width: 0; min-height: 1.5rem; padding: 0.125rem 0.375rem; border-radius: 0.5rem; background: color-mix(in srgb, var(--tone, var(--glass-inner)) 78%, transparent); font: 600 0.8125rem/1.2 var(--font-sans); }
         .mo-chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .mo-chip.is-done { opacity: 0.62; }
+        .mo-chip.is-done { background: var(--glass-inner); }
         .mo-chip.is-done .mo-chip-text { text-decoration: line-through; color: var(--muted); }
         .mo-more { padding: 0 0.375rem; color: var(--olive-ink); font: 600 0.8125rem/1.2 var(--font-sans); }
 
@@ -196,7 +196,7 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
         .mo-due-meta { display: flex; flex-wrap: wrap; gap: 0.25rem 0.625rem; align-items: center; }
         .mo-ready { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--ink); font: 600 0.8125rem/1 var(--font-sans); }
         .mo-due-time { color: var(--muted); font: 600 0.875rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .mo-due-row.is-done { opacity: 0.62; }
+        .mo-due-row.is-done .mo-due-icon { color: var(--muted); }
         .mo-due-row.is-done .mo-due-title { text-decoration: line-through; color: var(--muted); }
         .mo-line { position: relative; display: grid; grid-template-columns: 3.5rem minmax(0, 1fr); height: calc(2.25rem * ${DAY_END_HOUR - DAY_START_HOUR}); margin: 0.75rem 0 0.5rem; }
         .mo-hours { position: relative; }
@@ -211,7 +211,8 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
         .mo-block:active { transform: scale(0.98); }
         .mo-block-title { min-width: 0; max-width: 100%; overflow: hidden; font: 600 0.9375rem/1.4 var(--font-sans); text-overflow: ellipsis; white-space: nowrap; }
         .mo-block-time { overflow: hidden; color: var(--tone-ink, var(--muted)); font: 600 0.8125rem/1.6 var(--font-sans); text-overflow: ellipsis; white-space: nowrap; }
-        .mo-block.is-done { opacity: 0.6; }
+        .mo-block.is-done { background: var(--glass-inner); }
+        .mo-block.is-done .mo-block-time { color: var(--muted); }
         .mo-block.is-done .mo-block-title { text-decoration: line-through; color: var(--muted); }
         .mo-free { position: absolute; left: 4rem; top: 0.5rem; margin: 0; color: var(--muted); font: 500 0.875rem/1.3 var(--font-sans); }
         @media (prefers-reduced-motion: reduce) { .mo-cell, .mo-due-row, .mo-block { transition: none; } .mo-cell:hover, .mo-block:hover { transform: none; } }

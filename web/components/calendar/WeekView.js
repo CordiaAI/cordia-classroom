@@ -176,6 +176,9 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
           })}
           {/* One layer over the seven columns: a block moving to another day keeps its element,
               so a drag keeps its pointer and the keyboard keeps its focus. */}
+          {!weekDue.length && !blocks.some(block => days.some(day => sameDay(day, block.start))) && (
+            <p className="wk-empty">Nothing due or planned this week. Plan my week fits what's due into your free time.</p>
+          )}
           <ul className="wk-layer" aria-label="Study time and exams this week">
             {days.flatMap((day, index) => {
               const dayBlocks = blocks.map(shown).filter(block => sameDay(block.start, day));
@@ -248,7 +251,7 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
         .wk-day.is-today .wk-day-name { color: var(--ink); }
         .wk-day.is-today .wk-day-num { background: var(--olive-glass-sheen), var(--olive); color: var(--on-olive); box-shadow: var(--olive-glass-shadow); }
         .wk-strip { align-items: start; padding-bottom: 0.75rem; }
-        .wk-strip-label { display: flex; align-items: center; gap: 0.25rem; align-self: center; color: var(--muted); font: 600 0.875rem/1 var(--font-sans); }
+        .wk-strip-label { display: flex; align-items: center; gap: 0.25rem; align-self: start; min-height: 1.75rem; color: var(--muted); font: 600 0.875rem/1 var(--font-sans); }
         .wk-strip-day { display: grid; gap: 0.25rem; min-width: 0; padding: 0 0.25rem; }
         .wk-strip-day :global(.wk-more) { min-height: 1.75rem; padding: 0 0.5rem; border: 0; border-radius: var(--r-input); background: transparent; color: var(--olive-ink); font: 600 0.8125rem/1 var(--font-sans); cursor: pointer; text-align: left; }
         @media (hover: hover) { .wk-strip-day :global(.wk-more:hover) { background: var(--glass-inner); } }
@@ -276,7 +279,10 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
           transition: transform 180ms var(--ease), box-shadow 180ms var(--ease), opacity 180ms var(--ease);
         }
         .wk-block.is-short { flex-direction: row; align-items: center; padding-block: 0.125rem; }
-        .wk-block-title { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font: 600 0.875rem/1.25 var(--font-sans); }
+        .wk-block.is-mid { gap: 0; padding-block: 0.25rem; }
+        .wk-block-title, .wk-block-time { flex-shrink: 0; }
+        .wk-block-time { flex-wrap: wrap; }
+        .wk-block-title { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font: 600 0.875rem/1.2 var(--font-sans); }
         .wk-block:is(.is-short, .is-mid) .wk-block-title { -webkit-line-clamp: 1; }
         .wk-block-time { display: flex; align-items: center; gap: 0.5rem; color: var(--tone-ink, var(--muted)); font: 600 0.8125rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
         .wk-resize { position: absolute; left: 0; right: 0; bottom: 0; height: 0.625rem; cursor: ns-resize; }
@@ -289,15 +295,18 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
         .wk-block:focus-visible .wk-resize::after { opacity: 0.6; }
         .wk-block.is-moving { transform: scale(1.02); box-shadow: inset 0 0 0 0.125rem var(--olive), var(--shadow-float); transition: none; }
         .wk-block.is-saving { opacity: 0.72; cursor: progress; }
-        .wk-block.is-done { opacity: 0.6; cursor: pointer; touch-action: auto; }
+        .wk-block.is-done { cursor: pointer; touch-action: auto; background: var(--glass-inner); box-shadow: inset 0 0 0 0.0625rem var(--hairline); }
+        .wk-block.is-done .wk-block-time { color: var(--muted); }
         .wk-block.is-done .wk-block-title { text-decoration: line-through; color: var(--muted); }
         .wk-exam { cursor: pointer; touch-action: auto; color: var(--on-olive); background: var(--olive-glass-sheen), var(--olive); box-shadow: var(--olive-glass-shadow); }
-                .wk-exam .wk-block-title :global(.lucide) { margin-right: 0.25rem; vertical-align: -0.125rem; }
+                .wk-exam .wk-block-title { font-size: 0.8125rem; }
+        .wk-exam .wk-block-title :global(.lucide) { margin-right: 0.25rem; vertical-align: -0.125rem; }
         .wk-exam .wk-block-time { color: var(--on-olive); }
         .wk-ready { display: inline-flex; align-items: center; gap: 0.25rem; }
         .wk-exam :global(.c-ring-track) { stroke: var(--on-olive); opacity: 0.3; }
         .wk-exam :global(.c-ring-fill) { stroke: var(--on-olive); }
         @media (hover: hover) { .wk-exam:hover { box-shadow: var(--olive-glass-shadow-hover); } }
+        .wk-empty { position: absolute; top: 1.5rem; left: 50%; z-index: 2; max-width: 24rem; margin: 0; padding: 0.75rem 1rem; transform: translateX(-50%); border-radius: var(--r-row); background: var(--glass-inner); box-shadow: inset 0 0 0 0.0625rem var(--hairline); color: var(--muted); font: 500 0.9375rem/1.45 var(--font-sans); text-align: center; }
         .wk-sr { position: absolute; width: 0.0625rem; height: 0.0625rem; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
         @media (prefers-reduced-motion: reduce) { .wk-block, .wk-resize::after { transition: none; } .wk-block:hover, .wk-block.is-moving { transform: none; } }
       `}</style>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, CalendarCheck, GraduationCap } from 'lucide-react';
-import { agendaDays, clock, dueWhen, monthGrid, rowAction, sameDay, span, startOfWeek } from '../../lib/calendarViews.mjs';
+import { agendaDays, clock, dueSoon, dueWhen, monthGrid, rowAction, sameDay, span, startOfWeek } from '../../lib/calendarViews.mjs';
 import { dayKey } from '../../lib/learnEngine.mjs';
 import { ClassTag, DueIcon, ICON, ReadyRing, SMALL_ICON, StudyIcon, toneStyle } from './parts';
 
@@ -9,7 +9,7 @@ const longDate = day => day.toLocaleDateString('en-US', { weekday: 'long', month
 function timeText(entry) {
   if (entry.kind === 'study') return span(entry.start, entry.end);
   if (entry.exam && !entry.allDay) return clock(entry.at);
-  return entry.allDay ? 'Due today' : `Due ${clock(entry.at)}`;
+  return entry.allDay ? 'Due, all day' : `Due ${clock(entry.at)}`;
 }
 
 function kindText(entry) {
@@ -96,10 +96,10 @@ export default function AgendaView({ deadlines, blocks, needs, readiness, now, w
               </span>
             ) : null}
             <div className="ag-exam-text">
-              <p className="ag-exam-what">{exam.cls ? `${exam.cls.code} ` : ''}{exam.title} · {exam.at.toLocaleDateString('en-US', { weekday: 'long' })} {clock(exam.at)}</p>
+              <p className="ag-exam-what">{exam.cls ? `${exam.cls.code} · ` : ''}{exam.at.toLocaleDateString('en-US', { weekday: 'long' })}{exam.allDay ? '' : ` ${clock(exam.at)}`}</p>
+              <h2 className="ag-exam-title">{exam.title}</h2>
               {ready ? (
                 <>
-                  <p className="ag-exam-ready">{ready.percent}% ready</p>
                   <p className="ag-exam-pace">{ready.left ? `${ready.left} ${ready.left === 1 ? 'idea' : 'ideas'} left.${ready.perDay ? ` ${ready.perDay} a day keeps you on pace.` : ''}` : 'Every idea mastered.'}</p>
                 </>
               ) : (
@@ -130,7 +130,7 @@ export default function AgendaView({ deadlines, blocks, needs, readiness, now, w
                 <CalendarCheck {...ICON} />{finding ? 'Finding time…' : needs.length === 1 ? 'Find time' : needs.length === 2 ? 'Find time for both' : `Find time for all ${needs.length}`}
               </button>
             </>
-          ) : <p className="ag-side-help">Everything due this week has study time.</p>}
+          ) : <p className="ag-side-help">{dueSoon(deadlines, now).length ? 'Everything due in the next 7 days has study time.' : 'Nothing due in the next 7 days.'}</p>}
         </section>
       </aside>
 
@@ -150,17 +150,17 @@ export default function AgendaView({ deadlines, blocks, needs, readiness, now, w
         .ag-icon { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: var(--r-input); color: var(--tone-ink, var(--muted)); background: color-mix(in srgb, var(--tone, var(--glass-inner)) 78%, transparent); box-shadow: inset 0 0 0 0.0625rem var(--hairline); }
         .ag-row.is-exam .ag-icon { background: var(--glass-inner); color: var(--ink); }
         .ag-main { display: grid; gap: 0.125rem; min-width: 0; }
-        .ag-title { min-width: 0; overflow: hidden; color: var(--ink); font: 600 1.0625rem/1.35 var(--font-sans); text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
-        a.ag-title { border-radius: 0.25rem; }
-        @media (hover: hover) { a.ag-title:hover { text-decoration: underline; text-underline-offset: 0.2em; } }
+        .ag-main :global(.ag-title) { min-width: 0; overflow: hidden; color: var(--ink); font: 600 1.0625rem/1.35 var(--font-sans); text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+        .ag-main :global(a.ag-title) { border-radius: 0.25rem; }
+        @media (hover: hover) { .ag-main :global(a.ag-title:hover) { text-decoration: underline; text-underline-offset: 0.2em; } }
         .ag-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; color: var(--muted); font: 500 0.875rem/1.3 var(--font-sans); }
         .ag-ready { display: inline-flex; align-items: center; gap: 0.375rem; color: var(--ink); font-variant-numeric: tabular-nums; }
         .ag-action { display: flex; justify-content: flex-end; min-width: 6.5rem; }
         .ag-row :global(.ag-act) { min-height: 2.75rem; white-space: nowrap; }
-        .ag-planned { padding: 0 0.75rem; color: var(--muted); font: 600 0.9375rem/1 var(--font-sans); }
-        .ag-row.is-done { opacity: 0.62; }
-        .ag-row.is-done .ag-title { text-decoration: line-through; color: var(--muted); }
-        .ag-row.is-past .ag-title { color: var(--muted); }
+        .ag-action :global(.ag-planned) { padding: 0 0.75rem; color: var(--muted); font: 600 0.9375rem/1 var(--font-sans); }
+        .ag-row.is-done .ag-icon { background: var(--glass-inner); color: var(--muted); }
+        .ag-row.is-done :global(.ag-title) { text-decoration: line-through; color: var(--muted); }
+        .ag-row.is-past :global(.ag-title) { color: var(--muted); }
         .ag-empty { margin: 0; padding: 0.5rem 0; color: var(--muted); font: 500 0.9375rem/1.4 var(--font-sans); }
 
         .ag-side { display: grid; gap: 1rem; min-width: 0; }
@@ -170,7 +170,7 @@ export default function AgendaView({ deadlines, blocks, needs, readiness, now, w
         .ag-exam-text { display: grid; gap: 0.25rem; min-width: 0; justify-items: start; }
         .ag-exam-text p { margin: 0; }
         .ag-exam-what { color: var(--muted); font: 600 0.875rem/1.35 var(--font-sans); }
-        .ag-exam-ready { color: var(--ink); font: 600 1.5rem/1.2 var(--font-display); font-variant-numeric: tabular-nums; }
+        .ag-exam-title { margin: 0; color: var(--ink); font: 600 1.5rem/1.2 var(--font-display); letter-spacing: -0.01em; }
         .ag-exam-pace { color: var(--muted); font: 500 0.875rem/1.45 var(--font-sans); }
         .ag-needs { display: grid; gap: 0.625rem; padding: 1.25rem; }
         .ag-side-title { margin: 0; color: var(--ink); font: 600 1.1875rem/1.3 var(--font-sans); }
@@ -188,8 +188,8 @@ export default function AgendaView({ deadlines, blocks, needs, readiness, now, w
           .ag-time { grid-area: time; font-size: 0.875rem; color: var(--muted); }
           .ag-action { grid-area: action; justify-content: flex-start; min-width: 0; }
           .ag-action:empty { display: none; }
-          .ag-planned { padding: 0; font-size: 0.875rem; }
-          .ag-title { white-space: normal; }
+          .ag-action :global(.ag-planned) { padding: 0; font-size: 0.875rem; }
+          .ag-main :global(.ag-title) { white-space: normal; }
           .ag-exam { padding: 1rem; }
         }
       `}</style>

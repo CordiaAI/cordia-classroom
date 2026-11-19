@@ -225,12 +225,16 @@ export function hasStudyTime(deadline, blocks) {
   return (blocks || []).some(block => classMatch(block, deadline) && block.start.getTime() < due && block.end.getTime() > due - NEEDS_DAYS * DAY);
 }
 
+// Deadlines Plan my week could schedule in the next 7 days (the pool "Needs study time" is drawn from).
+export function dueSoon(deadlines, now = new Date()) {
+  const from = now.getTime();
+  return (deadlines || []).filter(entry => !entry.done && !entry.internal && entry.at.getTime() > from && entry.at.getTime() <= from + NEEDS_DAYS * DAY);
+}
+
 // "Needs study time": a deadline in the next 7 days, not done, with no study block for that class
 // before it. Lecture to-dos aren't included: Plan my week can't schedule them (they aren't Canvas items).
 export function needsStudyTime(deadlines, blocks, now = new Date()) {
-  const from = now.getTime();
-  const until = from + NEEDS_DAYS * DAY;
-  return (deadlines || []).filter(entry => !entry.done && !entry.internal && entry.at.getTime() > from && entry.at.getTime() <= until && !hasStudyTime(entry, blocks));
+  return dueSoon(deadlines, now).filter(entry => !hasStudyTime(entry, blocks));
 }
 
 // The one action an Agenda row offers.
