@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Flag } from 'lucide-react';
-import { DAY_END_HOUR, DAY_START_HOUR, GRID_MINUTES, clock, endsInTime, gridBox, lanes, nowLine, offGrid, sameDay, sameSpan, shiftBlock, span, weekDays } from '../../lib/calendarViews.mjs';
+import { Flag } from 'lucide-react';
+import { DAY_END_HOUR, DAY_START_HOUR, GRID_MINUTES, clock, endsInTime, gridBox, lanes, nowLine, offGrid, sameDay, sameSpan, shiftBlock, span, startsInGrid, weekDays } from '../../lib/calendarViews.mjs';
 import { dayKey } from '../../lib/learnEngine.mjs';
-import { DueChip, MenuButton, ReadyRing, toneStyle } from './parts';
+import { DueChip, EdgeMenu, MenuButton, ReadyRing, toneStyle } from './parts';
 
 const STRIP_CHIPS = 2;
 const KEY_SETTLE_MS = 800;
+const REFUSAL_REPEAT_MS = 3000; // a key held against the deadline says why once, not on every press
 const EXAM_MINUTES = 90;
 // A block narrower than this (in rem, so Larger text counts) drops its time line; an exam's
 // readiness shows as the ring alone.
@@ -22,9 +23,10 @@ const longDay = day => day.toLocaleDateString('en-US', { weekday: 'long', month:
 // in their class's tint, timed exams as solid olive blocks, today's column tinted and an olive now
 // line. A study block moves by dragging it (or its bottom edge, to change its length) or with the
 // keyboard: arrows move it 15 minutes or a day, Shift with Up or Down changes its length. Nothing is
-// lost outside 8 AM-10 PM: an exam there joins the Due strip, a block there is counted at the
-// column's top or bottom edge ("1 earlier", "1 later") and opens from that menu.
-export default function WeekView({ deadlines, blocks, readiness, now, weekStart, saving, onOpen, onMove }) {
+// lost outside 8 AM-10 PM: an exam starting there joins the Due strip, a block there is counted in a
+// band above or below the grid ("1 earlier", "1 later", never over a block) and opens from that menu.
+// A move the deadline won't allow stops, and onRefuse says why (the page's toast).
+export default function WeekView({ deadlines, blocks, readiness, now, weekStart, saving, onOpen, onMove, onRefuse = () => {} }) {
   const days = weekDays(weekStart);
   const body = useRef(null);
   const drag = useRef(null);
@@ -34,7 +36,8 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
   const [said, setSaid] = useState('');
   const [columnRem, setColumnRem] = useState(null); // a day column's width in rem, once measured
 
-  useEffect(() => () => clearTimeout(keyed.current?.timer), []);
+  const refused = useRef({ text: '', at: 0 });
+  useEffect(() => () => { clearTimeout(keyed.current?.timer); document.documentElement.classList.remove('cal-refusing'); }, []);
   // Measured before paint, so blocks never redraw narrower after they first show.
   useBrowserLayoutEffect(() => {
     const element = body.current;
@@ -52,13 +55,23 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
   }, []);
 
   const weekDue = deadlines.filter(entry => days.some(day => sameDay(day, entry.at)));
-  // Timed exams sit in the grid when their time is inside it; the rest join the Due strip.
-  const gridExam = entry => entry.exam && !entry.allDay && !offGrid(examSpan(entry).start, examSpan(entry).end);
+  // Timed exams sit in the grid when they start inside it; the rest join the Due strip.
+  const gridExam = entry => entry.exam && !entry.allDay && startsInGrid(entry.at);
   const timedExams = weekDue.filter(gridExam);
   const strip = weekDue.filter(entry => !gridExam(entry));
   const saved = id => blocks.find(item => item.id === id);
   const where = ({ start, end }) => `${start.toLocaleDateString('en-US', { weekday: 'long' })}, ${span(start, end)}`;
   const line = days.some(day => sameDay(day, now)) ? nowLine(now) : null;
+  // Study time wholly outside the grid's hours, by side and day: the bands above and below the grid.
+  const off = side => days.map(day => blocks.filter(block => sameDay(block.start, day) && offGrid(block.start, block.end) === side));
+  const bands = { earlier: off('earlier'), later: off('later') };
+
+  function refuse(text) {
+    const at = Date.now();
+    if (refused.current.text === text && at - refused.current.at < REFUSAL_REPEAT_MS) return;
+    refused.current = { text, at };
+    onRefuse(text);
+  }
 
   function metrics() {
     const rect = body.current.getBoundingClientRect();
@@ -87,9 +100,13 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
       const next = state.resize
         ? shiftBlock(state.block, { minutes, resize: true })
         : shiftBlock(state.block, { days: dayShift(state.block, Math.round(dx / state.columnPx)), minutes });
-      // Past the deadline it stops: study time has to end before it's due.
-      if (!endsInTime(next, state.block.deadline)) { state.late = true; return; }
-      state.late = false;
+      // Past the deadline it stops: study time has to end before it's due. The pointer and the
+      // toast say so while it's held there.
+      if (!endsInTime(next, state.block.deadline)) {
+        if (!state.late) { state.late = true; document.documentElement.classList.add('cal-refusing'); refuse(lateText(state.block)); }
+        return;
+      }
+      if (state.late) { state.late = false; document.documentElement.classList.remove('cal-refusing'); }
       state.next = next;
       setDraft({ id: state.block.id, ...state.next });
     };
@@ -98,6 +115,7 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', cancel);
       drag.current = null;
+      document.documentElement.classList.remove('cal-refusing');
       if (!state.moved) return;
       suppressClick.current = state.block.id; // the click that ends a drag doesn't open the block
       setDraft(null);
@@ -105,7 +123,7 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
         setSaid(`Moved to ${where(state.next)}`);
         onMove(state.block, state.next);
       } else if (!cancelled && state.late) {
-        setSaid(lateText(state.block));
+        refuse(lateText(state.block)); // Still on screen from the drag; said again if it timed out.
       }
     };
     const up = end(false);
@@ -143,7 +161,7 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
     const next = resize
       ? shiftBlock(base, { minutes: step[1], resize: true })
       : shiftBlock(base, { days: dayShift(base, step[0]), minutes: step[1] });
-    if (!endsInTime(next, block.deadline)) { setSaid(lateText(block)); return; }
+    if (!endsInTime(next, block.deadline)) { refuse(lateText(block)); return; }
     setDraft({ id: block.id, ...next });
     setSaid(`${resize ? 'Length' : 'Time'}: ${where(next)}. Saves when you stop.`);
     clearTimeout(keyed.current?.timer);
@@ -202,6 +220,8 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
         })}
       </div>
 
+      {bands.earlier.some(list => list.length) && <EdgeBand side="earlier" days={days} lists={bands.earlier} onOpen={onOpen} />}
+
       <div className="wk-grid">
         <div className="wk-gutter" aria-hidden="true">
           {HOURS.map(hour => <span key={hour} style={{ top: `${((hour - DAY_START_HOUR) / (DAY_END_HOUR - DAY_START_HOUR)) * 100}%` }}>{hourLabel(hour)}</span>)}
@@ -225,7 +245,6 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
               const dayBlocks = blocks.map(shown).filter(block => sameDay(block.start, day));
               const exams = timedExams.filter(entry => sameDay(entry.at, day)).map(entry => ({ ...entry, ...examSpan(entry) }));
               const inGrid = dayBlocks.filter(block => !offGrid(block.start, block.end));
-              const edges = ['earlier', 'later'].map(side => ({ side, blocks: dayBlocks.filter(block => offGrid(block.start, block.end) === side) })).filter(edge => edge.blocks.length);
               const placed = lanes([...inGrid, ...exams]);
               const laneOf = key => placed[key] || { lane: 0, lanes: 1 };
               const place = (key, box) => {
@@ -238,17 +257,7 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
               };
               const width = key => (columnRem === null ? Infinity : columnRem / laneOf(key).lanes - 0.5);
               const narrow = key => width(key) < NARROW_REM;
-              const edgeItems = edges.map(({ side, blocks: off }) => (
-                <li key={`edge-${dayKey(day)}-${side}`} className={`wk-edge wk-edge--${side}`} style={{ left: `calc(${(index / 7) * 100}% + 0.25rem)`, width: `calc(${100 / 7}% - 0.5rem)` }}>
-                  <MenuButton className="wk-edge-btn" align={index > 3 ? 'end' : 'start'}
-                    icon={side === 'earlier' ? <ArrowUp size={14} strokeWidth={1.75} aria-hidden="true" /> : <ArrowDown size={14} strokeWidth={1.75} aria-hidden="true" />}
-                    label={`${off.length} ${side}`}
-                    menuLabel={`Study time ${side === 'earlier' ? 'before 8 AM' : 'after 10 PM'}, ${longDay(day)}`}
-                    triggerProps={{ 'aria-label': `${off.length} study ${off.length === 1 ? 'time' : 'times'} ${side === 'earlier' ? 'before 8 AM' : 'after 10 PM'}, ${longDay(day)}` }}
-                    items={off.map(block => ({ key: block.key, label: block.title, detail: `${span(block.start, block.end)}${block.cls ? ` · ${block.cls.code}` : ''}${block.done ? ' · done' : ''}`, onSelect: () => onOpen(saved(block.id) || block) }))} />
-                </li>
-              ));
-              return edgeItems.concat([...exams, ...inGrid].sort((a, b) => a.start - b.start).map(entry => {
+              return [...exams, ...inGrid].sort((a, b) => a.start - b.start).map(entry => {
                 const box = gridBox(entry.start, entry.end);
                 if (entry.kind === 'due') {
                   const ready = readiness[entry.id];
@@ -298,11 +307,13 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
                     </button>
                   </li>
                 );
-              }));
+              });
             })}
           </ul>
         </div>
       </div>
+
+      {bands.later.some(list => list.length) && <EdgeBand side="later" days={days} lists={bands.later} onOpen={onOpen} />}
       <p id="wk-help" className="wk-sr">Drag to move it, or drag its bottom edge to change its length. With the keyboard, arrow keys move it by 15 minutes or a day, Shift with Up or Down changes its length, and Escape cancels. Enter opens it.</p>
       <p className="wk-sr" aria-live="polite">{said}</p>
 
@@ -376,24 +387,33 @@ export default function WeekView({ deadlines, blocks, readiness, now, weekStart,
         @media (hover: hover) { .wk-exam:hover { box-shadow: var(--olive-glass-shadow-hover); } }
         /* Over the now line (z-index 1), on raised glass so the line doesn't run through the words. */
         .wk-empty { position: absolute; top: 1.5rem; left: 50%; z-index: 3; max-width: 24rem; margin: 0; padding: 0.75rem 1rem; transform: translateX(-50%); border-radius: var(--r-row); background: var(--surface-raised); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-edge); color: var(--muted); font: 500 0.9375rem/1.45 var(--font-sans); text-align: center; }
-        .wk-edge { position: absolute; z-index: 3; display: flex; justify-content: center; pointer-events: auto; }
-        .wk-edge--earlier { top: 0.25rem; }
-        .wk-edge--later { bottom: 0.25rem; }
-        .wk-edge :global(.wk-edge-btn) {
-          display: inline-flex; align-items: center; gap: 0.25rem; min-height: 1.75rem; padding: 0 0.5rem; border: 0; border-radius: var(--r-pill);
-          background: var(--surface-raised); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-edge);
-          color: var(--ink); font: 600 0.8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer;
-          transition: transform 180ms var(--ease), box-shadow 180ms var(--ease);
-        }
-        .wk-edge :global(.wk-edge-btn .lucide) { width: 0.875rem; height: 0.875rem; color: currentColor; }
-        @media (hover: hover) { .wk-edge :global(.wk-edge-btn:hover) { transform: translateY(-0.0625rem); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-lift); } }
-        .wk-edge :global(.wk-edge-btn:active) { transform: scale(0.97); }
         .wk-sr { position: absolute; width: 0.0625rem; height: 0.0625rem; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
         @media (prefers-reduced-motion: reduce) {
-          .wk-block, .wk-resize::after, .wk-edge :global(.wk-edge-btn) { transition: none; }
-          .wk-block:hover, .wk-block.is-moving, .wk-edge :global(.wk-edge-btn:hover) { transform: none; }
+          .wk-block, .wk-resize::after { transition: none; }
+          .wk-block:hover, .wk-block.is-moving { transform: none; }
         }
       `}</style>
     </section>
+  );
+}
+
+// A band above or below the hour grid, in the grid's columns: each day's study time outside 8 AM to
+// 10 PM as "N earlier" or "N later". Its own row, so it never sits over a block.
+function EdgeBand({ side, days, lists, onOpen }) {
+  return (
+    <div className={`wk-band wk-band--${side}`}>
+      <span aria-hidden="true" />
+      {days.map((day, index) => (
+        <div key={dayKey(day)} className="wk-band-day">
+          {lists[index].length > 0 && <EdgeMenu side={side} blocks={lists[index]} day={day} onOpen={onOpen} align={index > 3 ? 'end' : 'start'} />}
+        </div>
+      ))}
+      <style jsx>{`
+        .wk-band { display: grid; grid-template-columns: var(--wk-gutter) repeat(7, minmax(0, 1fr)); align-items: center; min-height: 2.25rem; }
+        .wk-band--earlier { padding-bottom: 0.375rem; }
+        .wk-band--later { padding-top: 0.375rem; }
+        .wk-band-day { display: flex; justify-content: center; min-width: 0; padding: 0 0.25rem; }
+      `}</style>
+    </div>
   );
 }

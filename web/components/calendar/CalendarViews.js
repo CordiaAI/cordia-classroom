@@ -169,7 +169,7 @@ export default function CalendarViews({ deadlines = [], blocks = [], needs = [],
       </header>
 
       {loading || <div id="cal-view" role={wide ? 'tabpanel' : undefined} aria-labelledby={wide ? `cal-tab-${view}` : undefined} className={`cal-view cal-view--${view}`}>
-        {view === 'week' && <WeekView {...shared} onMove={move} />}
+        {view === 'week' && <WeekView {...shared} onMove={move} onRefuse={text => say(text, { error: true })} />}
         {view === 'board' && <BoardView {...shared} onAdd={add} />}
         {view === 'month' && <MonthView {...shared} anchor={anchor} onPickMonth={setAnchor} />}
         {view === 'agenda' && <AgendaView {...shared} wide={wide} onJump={day => setAnchor(day)} />}

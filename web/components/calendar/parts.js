@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Flag, GraduationCap } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Flag, GraduationCap } from 'lucide-react';
 import ProgressRing from '../ProgressRing';
-import { dueClock } from '../../lib/calendarViews.mjs';
+import { DAY_END_HOUR, DAY_START_HOUR, dueClock, span } from '../../lib/calendarViews.mjs';
 
 // Pieces the four Calendar views share: class colours, the flag for anything due, the exam
 // readiness ring, a deadline chip, and a small menu (Add study time, Plan on…, +N more).
@@ -122,6 +122,25 @@ export function MenuButton({ label, className = 'c-btn c-btn--quiet', icon = nul
   );
 }
 
+// Study time wholly before 8 AM or after 10 PM, outside the time grid (Week's bands above and below
+// the grid, the Month panel's timeline): "2 earlier" or "1 later", a menu that opens each block.
+const hourText = hour => `${hour % 12 || 12} ${hour < 12 ? 'AM' : 'PM'}`;
+export function EdgeMenu({ side, blocks, day, onOpen, align = 'start' }) {
+  const when = side === 'earlier' ? `before ${hourText(DAY_START_HOUR)}` : `after ${hourText(DAY_END_HOUR)}`;
+  const date = day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const Arrow = side === 'earlier' ? ArrowUp : ArrowDown;
+  return (
+    <MenuButton className="cal-edge-btn" align={align} icon={<Arrow size={14} strokeWidth={1.75} aria-hidden="true" />}
+      label={`${blocks.length} ${side}`} menuLabel={`Study time ${when}, ${date}`}
+      triggerProps={{ 'aria-label': `${blocks.length} study ${blocks.length === 1 ? 'time' : 'times'} ${when}, ${date}` }}
+      items={blocks.map(block => ({
+        key: block.key, label: block.title,
+        detail: `${span(block.start, block.end)}${block.cls ? ` · ${block.cls.code}` : ''}${block.done ? ' · done' : ''}`,
+        onSelect: () => onOpen(block),
+      }))} />
+  );
+}
+
 // Styles every view uses (global: the pieces above render inside each view's own markup).
 export function SharedStyles() {
   return (
@@ -160,7 +179,19 @@ export function SharedStyles() {
       .cal-menu-label { font: 600 0.875rem/1.3 var(--font-sans); color: var(--ink); }
       .cal-menu-detail { font: 500 0.8125rem/1.3 var(--font-sans); color: var(--muted); }
       .cal-menu-head { margin: 0; padding: 0.5rem 0.75rem 0.25rem; font: 600 0.8125rem/1.3 var(--font-sans); color: var(--muted); }
-      @media (prefers-reduced-motion: reduce) { .cal-chip { transition: none; } }
+      .cal-edge-btn {
+        display: inline-flex; align-items: center; gap: 0.25rem; min-height: 1.75rem; padding: 0 0.625rem; border: 0; border-radius: var(--r-pill);
+        background: var(--surface-raised); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-edge);
+        color: var(--ink); font: 600 0.8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer;
+        transition: transform 180ms var(--ease), box-shadow 180ms var(--ease);
+      }
+      .cal-edge-btn .lucide { width: 0.875rem; height: 0.875rem; color: currentColor; }
+      @media (hover: hover) { .cal-edge-btn:hover { transform: translateY(-0.0625rem); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-lift); } }
+      .cal-edge-btn:active { transform: scale(0.97); }
+      .cal-edge-btn[aria-expanded='true'] { box-shadow: inset 0 0 0 0.125rem var(--olive), var(--glass-shadow-edge); }
+      /* A drag held past the deadline: the pointer says it won't go there (the toast says why). */
+      html.cal-refusing, html.cal-refusing * { cursor: not-allowed !important; }
+      @media (prefers-reduced-motion: reduce) { .cal-chip, .cal-edge-btn { transition: none; } .cal-edge-btn:hover, .cal-edge-btn:active { transform: none; } }
     `}</style>
   );
 }

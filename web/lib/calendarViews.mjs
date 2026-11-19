@@ -4,7 +4,7 @@
 // and drag maths). No browser APIs, so it is tested in Node (web/tests/calendar-views.test.mjs).
 import { colorFor, coverFor, COVER_COLORS } from './coverDesign.mjs';
 import { counts, dayKey, restoreLevels, testPlan } from './learnEngine.mjs';
-import { examReadiness, learnQuestions, learnTestDate, reviewSetFor } from './examCountdown.mjs';
+import { classExams, examReadiness, learnQuestions, learnTestDate, reviewSetFor } from './examCountdown.mjs';
 import { deadlineTitle } from './formatters.js';
 
 export const VIEWS = ['week', 'board', 'month', 'agenda'];
@@ -324,6 +324,13 @@ export function offGrid(start, end) {
   return (new Date(start) - startOfDay(start)) / 60000 < DAY_START_HOUR * 60 ? 'earlier' : 'later';
 }
 
+// Does a timed exam start inside the grid's hours? One that starts before 8 AM (or at 10 PM or
+// later) joins the Due strip, where its start time reads in full.
+export function startsInGrid(date) {
+  const minutes = (new Date(date) - startOfDay(date)) / 60000;
+  return minutes >= DAY_START_HOUR * 60 && minutes < DAY_END_HOUR * 60;
+}
+
 // A block's place in its day column, as fractions of the grid's height (clipped to 8 AM-10 PM).
 export function gridBox(start, end) {
   const day = startOfDay(start);
@@ -401,6 +408,29 @@ export function examReviewGuide(exam, guides) {
   const classId = exam.cls?.classId;
   if (classId) return dated.find(guide => String(guide?.folder_id || '') === String(classId)) || null;
   return dated.length === 1 ? dated[0] : null;
+}
+
+// Each exam's guide, so a ring here always matches the sidebar's: its review set, else the guide the
+// sidebar rings for the exam's class (classExams: that class's nearest Learn test date in the next
+// two weeks), given to the class's exam nearest that date; else a guide dated that very day
+// (examReviewGuide). { [examId]: guide summary }.
+export function examGuides(exams, guides, today = dayKey()) {
+  const found = {};
+  const all = exams || [];
+  const open = all.filter(exam => !exam.done); // The sidebar leaves done exams out.
+  all.forEach(exam => { const own = reviewSetFor(exam.rawTitle || exam.title, guides); if (own) found[exam.id] = own; });
+  const items = open.map(exam => ({ title: exam.rawTitle || exam.title, due_at: exam.source?.due_at || exam.at.toISOString(), type: 'exam' }));
+  const classIds = [...new Set(open.map(exam => exam.cls?.classId).filter(Boolean))];
+  const rings = classExams(classIds, guides, items, today);
+  Object.entries(rings).forEach(([classId, ring]) => {
+    const guide = (guides || []).find(item => item.id === ring.guideId);
+    if (!guide || Object.values(found).some(item => item.id === guide.id)) return;
+    const gap = exam => Math.abs(new Date(`${dayKey(exam.at)}T12:00:00`) - new Date(`${ring.date}T12:00:00`));
+    const nearest = open.filter(exam => exam.cls?.classId === classId && !found[exam.id]).sort((a, b) => gap(a) - gap(b) || a.at - b.at)[0];
+    if (nearest) found[nearest.id] = guide;
+  });
+  all.forEach(exam => { if (!found[exam.id]) { const dated = examReviewGuide(exam, guides); if (dated) found[exam.id] = dated; } });
+  return found;
 }
 
 // Readiness for one exam from its full review guide: the same sum as Learn and the sidebar

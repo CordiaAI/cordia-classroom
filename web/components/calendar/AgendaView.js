@@ -98,10 +98,9 @@ export default function AgendaView({ deadlines, blocks, needs, readiness, readin
         {exam && (
           <section className="c-card ag-exam" aria-label="Next exam">
             {/* The ring's place is kept while readiness loads and when there is no review set yet,
-                so nothing beside or below it moves when it fills. */}
+                so nothing beside or below it moves when it fills. Its number reads once, beside it. */}
             <span className="ag-exam-ring">
               {ready ? <ReadyRing percent={ready.percent} size={112} label={exam.title} /> : <EmptyRing size={112} />}
-              {ready && <span className="ag-exam-pct" aria-hidden="true">{ready.percent}%</span>}
             </span>
             <div className="ag-exam-text">
               <p className="ag-exam-what">{exam.cls ? `${exam.cls.code} · ` : ''}{exam.at.toLocaleDateString('en-US', { weekday: 'long' })}{exam.allDay ? '' : ` ${clock(exam.at)}`}</p>
@@ -181,7 +180,6 @@ export default function AgendaView({ deadlines, blocks, needs, readiness, readin
         .ag-side { display: grid; gap: 1rem; min-width: 0; }
         .ag-exam { display: flex; align-items: center; gap: 1.125rem; padding: 1.25rem; }
         .ag-exam-ring { position: relative; display: grid; place-items: center; flex: 0 0 auto; }
-        .ag-exam-pct { position: absolute; font: 600 2.125rem/1 var(--font-display); color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
         .ag-exam-ready { color: var(--ink); font: 600 1rem/1.3 var(--font-sans); font-variant-numeric: tabular-nums; }
         /* As tall as the text is once readiness is in (kicker, title, "% ready", two lines of pace), so the
            card doesn't grow when it arrives. */

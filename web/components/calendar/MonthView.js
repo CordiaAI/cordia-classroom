@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { DAY_END_HOUR, DAY_START_HOUR, addDays, clock, dayEntries, gridBox, lanes, monthCell, monthGrid, nowLine, sameDay, span } from '../../lib/calendarViews.mjs';
+import { DAY_END_HOUR, DAY_START_HOUR, addDays, clock, dayEntries, gridBox, lanes, monthCell, monthGrid, nowLine, offGrid, sameDay, span } from '../../lib/calendarViews.mjs';
 import { dayKey } from '../../lib/learnEngine.mjs';
-import { ClassTag, DueIcon, ReadyRing, StudyIcon, toneStyle } from './parts';
+import { ClassTag, DueIcon, EdgeMenu, ReadyRing, StudyIcon, toneStyle } from './parts';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }, (_, i) => DAY_START_HOUR + i);
@@ -14,7 +14,8 @@ function firstPick(anchor, now) {
 
 // Month (C): the month as a grid, each day with up to two deadline chips, "+N more" and its study
 // count; today outlined. Picking a day (click, or arrow keys) shows its deadlines and its timeline
-// in the panel at the right.
+// in the panel at the right, with study time before 8 AM or after 10 PM as "N earlier" / "N later"
+// above and below the timeline, as in Week.
 export default function MonthView({ deadlines, blocks, readiness, now, anchor, onOpen, onPickMonth }) {
   const [picked, setPicked] = useState(() => firstPick(anchor, now));
   const grid = useRef(null);
@@ -51,7 +52,9 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
   const entries = dayEntries(picked, deadlines, blocks);
   const due = entries.filter(entry => entry.kind === 'due');
   const study = entries.filter(entry => entry.kind === 'study');
-  const placed = lanes(study);
+  const inLine = study.filter(block => !offGrid(block.start, block.end));
+  const edge = side => study.filter(block => offGrid(block.start, block.end) === side);
+  const placed = lanes(inLine);
   const line = today ? nowLine(now) : null;
 
   return (
@@ -76,7 +79,7 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
                       onClick={() => pick(day)} onKeyDown={event => onKeyDown(event, day)}>
                       <span className="mo-top" aria-hidden="true">
                         <span className="mo-num">{day.getDate()}</span>
-                        {cell.study > 0 && <span className="mo-study"><StudyIcon size={14} />{cell.study} study</span>}
+                        {cell.study > 0 && <span className="mo-study"><StudyIcon size={14} />{cell.study}<span className="mo-study-word">study</span></span>}
                       </span>
                       <span className="mo-chips" aria-hidden="true">
                         {cell.due.map(entry => (
@@ -125,15 +128,15 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
             })}
           </ul>
         )}
+        {edge('earlier').length > 0 && <div className="mo-edge"><EdgeMenu side="earlier" blocks={edge('earlier')} day={picked} onOpen={onOpen} /></div>}
         <div className="mo-line" aria-label={`Study time ${today ? 'today' : `on ${longDay(picked)}`}`} role="list">
           <div className="mo-hours" aria-hidden="true">
             {HOURS.map(hour => <span key={hour} style={{ top: `${((hour - DAY_START_HOUR) / (DAY_END_HOUR - DAY_START_HOUR)) * 100}%` }}>{hourLabel(hour)}</span>)}
           </div>
           <div className="mo-track">
             {line !== null && <span className="mo-now" style={{ top: `${line * 100}%` }} aria-hidden="true" />}
-            {study.map(block => {
+            {inLine.map(block => {
               const box = gridBox(block.start, block.end);
-              if (box.hidden) return null;
               const lane = placed[block.key] || { lane: 0, lanes: 1 };
               return (
                 <span key={block.key} role="listitem" className="mo-slot" style={{ top: `${box.top * 100}%`, height: `${box.height * 100}%`, left: `${(lane.lane / lane.lanes) * 100}%`, width: `${100 / lane.lanes}%` }}>
@@ -146,8 +149,9 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
               );
             })}
           </div>
-          {!study.length && <p className="mo-free">No study time planned.</p>}
+          {!inLine.length && <p className="mo-free">{study.length ? 'No study time from 8 AM to 10 PM.' : 'No study time planned.'}</p>}
         </div>
+        {edge('later').length > 0 && <div className="mo-edge"><EdgeMenu side="later" blocks={edge('later')} day={picked} onOpen={onOpen} /></div>}
       </aside>
 
       <style jsx>{`
@@ -163,6 +167,7 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
           border: 0; border-radius: var(--r-input); text-align: left; color: var(--ink); cursor: pointer;
           background: var(--glass-inner); box-shadow: inset 0 0 0 0.0625rem var(--hairline);
           transition: transform 180ms var(--ease), box-shadow 180ms var(--ease);
+          container-type: inline-size;
         }
         .mo-cell.is-out { background: transparent; box-shadow: none; }
         .mo-cell.is-out .mo-num { color: var(--muted); font-weight: 500; }
@@ -175,6 +180,9 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
         .mo-num { font: 600 1rem/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .mo-cell.is-today .mo-num { color: var(--olive-ink); }
         .mo-study { display: inline-flex; align-items: center; gap: 0.25rem; min-width: 0; overflow: hidden; color: var(--muted); font: 500 0.8125rem/1 var(--font-sans); white-space: nowrap; }
+        /* "2 study" while the word fits beside the date; else the count alone (the cell's label says it). */
+        @container (max-width: 6rem) { .mo-study-word { display: none; } }
+        @container (max-width: 3.5rem) { .mo-study :global(.lucide) { display: none; } }
         .mo-chips { display: grid; gap: 0.25rem; min-width: 0; }
         .mo-chip { display: flex; align-items: center; gap: 0.25rem; min-width: 0; min-height: 1.5rem; padding: 0.125rem 0.375rem; border-radius: 0.5rem; background: color-mix(in srgb, var(--tone, var(--glass-inner)) 78%, transparent); font: 600 0.8125rem/1.2 var(--font-sans); }
         .mo-chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -182,6 +190,9 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
         .mo-chip.is-done .mo-chip-text { text-decoration: line-through; color: var(--muted); }
         .mo-more { padding: 0 0.375rem; color: var(--olive-ink); font: 600 0.8125rem/1.2 var(--font-sans); }
 
+        .mo-edge { display: flex; padding-left: 3.5rem; }
+        .mo-edge + .mo-line { margin-top: 0.25rem; }
+        .mo-line + .mo-edge { margin-top: -0.25rem; }
         .mo-panel { display: grid; gap: 0.75rem; min-width: 0; padding: 1.25rem; }
         .mo-panel-kicker { margin: 0; color: var(--muted); font: 600 0.9375rem/1.2 var(--font-sans); }
         .mo-panel-date { margin: -0.375rem 0 0; color: var(--ink); font: 600 1.875rem/1.15 var(--font-display); letter-spacing: -0.01em; }

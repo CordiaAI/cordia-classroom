@@ -5,6 +5,7 @@ import { dayKey } from '../../lib/learnEngine.mjs';
 import { ClassTag, EmptyRing, ICON, MenuButton, ReadyRing, SMALL_ICON, toneStyle } from './parts';
 
 const DRAG_TYPE = 'application/x-cordia-deadline';
+const NO_SET = 'No review set yet';
 const longDay = day => day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
 // Board (D): seven day columns with their cards in time order, each day's planned study hours as a
@@ -62,9 +63,15 @@ export default function BoardView({ deadlines, blocks, needs, readiness, readine
             aria-label={`Exam: ${entry.cls ? entry.cls.code + ' ' : ''}${entry.title}, ${entry.allDay ? 'all day' : clock(entry.at)}${ready ? `, ${ready.percent}% ready` : ''}. Opens your review.`}>
             <span className="bd-exam-when"><Flag size={16} strokeWidth={1.75} aria-hidden="true" />Exam{entry.allDay ? '' : ` · ${clock(entry.at)}`}</span>
             <span className="bd-exam-title">{entry.cls ? `${entry.cls.code} ` : ''}{entry.title}</span>
-            {ready
-              ? <span className="bd-exam-ready"><ReadyRing percent={ready.percent} size={36} label={entry.title} />{ready.percent}% ready</span>
-              : <span className="bd-exam-ready bd-exam-ready--none"><EmptyRing size={36} />{readinessIn ? 'No review set yet' : ''}</span>}
+            {/* The words sit over a hidden copy of the longest they can be, so the card is as tall
+                before readiness arrives as after, at any width or text size. */}
+            <span className={`bd-exam-ready${ready ? '' : ' bd-exam-ready--none'}`}>
+              {ready ? <ReadyRing percent={ready.percent} size={36} label={entry.title} /> : <EmptyRing size={36} />}
+              <span className="bd-exam-ready-text">
+                <span className="bd-exam-ready-room" aria-hidden="true">{NO_SET}</span>
+                <span>{ready ? `${ready.percent}% ready` : readinessIn ? NO_SET : ''}</span>
+              </span>
+            </span>
           </button>
         </li>
       );
@@ -219,6 +226,9 @@ export default function BoardView({ deadlines, blocks, needs, readiness, readine
         .bd-cards :global(.bd-exam-title) { font: 600 1.0625rem/1.3 var(--font-sans); overflow-wrap: break-word; }
         .bd-cards :global(.bd-exam-ready) { display: flex; align-items: center; gap: 0.5rem; min-height: 2.25rem; font: 600 0.875rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
         .bd-cards :global(.bd-exam-ready--none) { font-weight: 500; }
+        .bd-cards :global(.bd-exam-ready-text) { display: grid; min-width: 0; }
+        .bd-cards :global(.bd-exam-ready-text > span) { grid-area: 1 / 1; }
+        .bd-cards :global(.bd-exam-ready-room) { visibility: hidden; font-weight: 600; }
         .bd-cards :global(.bd-exam .c-ring-track) { stroke: var(--on-olive); opacity: 0.3; }
         .bd-cards :global(.bd-exam .c-ring-fill) { stroke: var(--on-olive); }
         .bd-col :global(.bd-add) {

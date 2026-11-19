@@ -1,7 +1,7 @@
 import { apiFetch } from './api';
 import { acceptWeek, timeZone } from './studyPlans';
 import { dayKey } from './learnEngine.mjs';
-import { examProgress, examReviewGuide } from './calendarViews.mjs';
+import { examGuides, examProgress } from './calendarViews.mjs';
 
 // The Calendar page's reads and writes (backend routers/calendar.py and routers/plans.py). Moving,
 // resizing and adding study time go through the same study_blocks rows as Plan my week, and from
@@ -9,10 +9,11 @@ import { examProgress, examReviewGuide } from './calendarViews.mjs';
 
 export const loadBlocks = () => apiFetch('/calendar/blocks');
 
-// A study block dragged, resized or moved with the keyboard. Resolves { block } or { error }.
+// A study block dragged, resized or moved with the keyboard, with the browser's zone (an all-day
+// deadline ends at midnight there). Resolves { block } or { error }.
 export async function moveBlock(id, start, end) {
   const data = await apiFetch(`/calendar/blocks/${encodeURIComponent(id)}`, {
-    method: 'PUT', body: JSON.stringify({ starts_at: start.toISOString(), ends_at: end.toISOString() }), timeoutMs: 60000, reportFailure: true,
+    method: 'PUT', body: JSON.stringify({ starts_at: start.toISOString(), ends_at: end.toISOString(), time_zone: timeZone() }), timeoutMs: 60000, reportFailure: true,
   });
   return data?.block ? { block: data.block } : { error: saveError(data, 'That study time didn’t move. It’s back where it was.') };
 }
@@ -45,8 +46,9 @@ export async function loadExamReadiness(exams) {
   if (!exams.length) return {};
   const data = await apiFetch('/guides?fields=summary&limit=500');
   const guides = Array.isArray(data?.guides) ? data.guides : [];
+  const picked = examGuides(exams, guides);
   const found = await Promise.all(exams.map(async exam => {
-    const summary = examReviewGuide(exam, guides);
+    const summary = picked[exam.id];
     if (!summary) return null;
     const full = await apiFetch('/guides/' + encodeURIComponent(summary.id));
     return full?.guide ? [exam.id, { guideId: summary.id, ...examProgress(full.guide, exam.at) }] : null;

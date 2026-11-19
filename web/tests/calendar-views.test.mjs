@@ -5,8 +5,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   agendaDays, blockLabel, blockTitle, buildBlocks, cleanTitle, dueBy, dueSoon, buildDeadlines, classFor, classIndex, courseKey, dayEntries,
-  endsInTime, examProgress, examReviewGuide, gridBox, hasStudyTime, lanes, monthCell, monthGrid, needsStudyTime, nowLine, offGrid,
-  pickView, plannedHours, roomOn, rowAction, shiftBlock, span, startOfWeek, weekRangeLabel,
+  endsInTime, examGuides, examProgress, examReviewGuide, gridBox, hasStudyTime, lanes, monthCell, monthGrid, needsStudyTime, nowLine, offGrid,
+  pickView, plannedHours, roomOn, rowAction, shiftBlock, span, startOfWeek, startsInGrid, weekRangeLabel,
 } from '../lib/calendarViews.mjs';
 import { classExams, examReadiness, learnQuestions } from '../lib/examCountdown.mjs';
 import { deadlineTitle } from '../lib/formatters.js';
@@ -239,4 +239,30 @@ test('readiness finds a guide by its Learn test date, as the sidebar does', () =
   const [loose] = buildDeadlines([{ id: 'canvas-z', title: 'Midterm', course: 'PHL 210', due_at: at(19, 9), type: 'exam' }], index);
   assert.equal(examReviewGuide(loose, [dated]).id, 'g-dated');
   assert.equal(examReviewGuide(loose, [dated, elsewhere]), null, 'two dated that day: not a guess');
+});
+
+// ---- Round 2 (PR 284) ----
+
+test('readiness is the sidebar\'s when the Learn test date is a day off the exam', () => {
+  const exam = byId('canvas-3'); // MA 125, Thursday Nov 19
+  const dayOff = { id: 'g-off', title: 'Calculus chapter 5', folder_id: 'f-ma', flashcard_progress: { learn: { test_date: '2026-11-18' } } };
+  const sidebar = classExams(['f-ma'], [dayOff], [{ title: exam.rawTitle, due_at: ITEMS[2].due_at, type: 'exam' }], '2026-11-18');
+  assert.equal(sidebar['f-ma'].guideId, 'g-off');
+  assert.equal(examGuides([exam], [dayOff], '2026-11-18')['canvas-3'].id, 'g-off', 'the ring the sidebar shows');
+  assert.equal(examReviewGuide(exam, [dayOff]), null, 'the exact-day rule alone missed it');
+  // Two MA 125 exams: the class's one guide goes to the exam nearest its date, not to both.
+  const [later] = buildDeadlines([{ id: 'canvas-m', title: 'Midterm [MA-125-001]', due_at: at(27, 9), type: 'exam' }], index);
+  const both = examGuides([exam, later], [dayOff], '2026-11-18');
+  assert.equal(both['canvas-3'].id, 'g-off');
+  assert.equal(both['canvas-m'], undefined);
+  // A review set still wins for its own exam.
+  const set = { id: 'g-set', title: 'Midterm [MA-125-001]: review', folder_id: 'f-ma' };
+  assert.equal(examGuides([exam, later], [dayOff, set], '2026-11-18')['canvas-m'].id, 'g-set');
+});
+
+test('an exam that starts before 8 AM goes to the Due strip, not the top of the grid', () => {
+  assert.equal(startsInGrid(new Date(2026, 10, 16, 7)), false, '7 AM, though it runs into the grid');
+  assert.equal(startsInGrid(new Date(2026, 10, 16, 8)), true);
+  assert.equal(startsInGrid(new Date(2026, 10, 16, 21, 30)), true);
+  assert.equal(startsInGrid(new Date(2026, 10, 16, 22)), false);
 });
