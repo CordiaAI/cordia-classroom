@@ -294,6 +294,17 @@ class HubPage(Base):
         response = self.post(fake)
         self.assertEqual(response.status_code, 422)
         self.assertIn("This page's notes are in its sub-pages: Lecture 1", response.json()["detail"])
+        self.assertEqual(response.json()["sub_pages"], [f"Lecture {i}" for i in range(1, 9)])
+
+    def test_the_library_path_names_them_too(self):
+        from fake_supabase import FakeDB
+        db = FakeDB()
+        db.rows("folders").append({"id": FOLDER, "user_id": USER, "name": "Biology"})
+        fake = SlowNotion({PAGE: [child_page("Lecture 1", "cp1"), child_page("Lecture 2", "cp2")]})
+        with patch("routers.drive.get_supabase", return_value=db), patch("services.library_import.get_supabase", return_value=db):
+            response = self.post(fake, "library", folder_id=FOLDER)
+        self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(response.json()["sub_pages"], ["Lecture 1", "Lecture 2"])
 
     def test_a_cap_hit_before_any_text_says_the_page_is_too_large(self):
         from services import notion_text
@@ -443,7 +454,7 @@ class LibraryPath(Base):
         self.assertEqual(response.status_code, 200, response.text)
         body = response.json()
         self.assertTrue(body["partial"])
-        self.assertIn("400", body["note"])
+        self.assertIn("first 400 points", body["note"])
         self.assertEqual(self.db.rows("study_guides")[0]["notes"].count("\n- ") + 1, 400)
 
     def test_a_page_under_the_limit_is_not_partial(self):

@@ -54,7 +54,8 @@ export const notionPages = query => apiFetch(`/notion/pages?q=${encodeURICompone
 export const notionHome = () => apiFetch('/notion/home');
 export const notionSetup = (pageId, title) => post('/notion/setup', { page_id: pageId, title });
 export const notionSync = () => post('/notion/sync', {});
-export const addToLibrary = (connector, { id, title, folderId }) => post(`/connectors/${connector}/library`, { id, title, folder_id: folderId });
+// A page is read a few Notion calls at a time on the server, for up to 25 s: wait as long as an AI job, not 15 s.
+export const addToLibrary = (connector, { id, title, folderId }) => apiFetch(`/connectors/${connector}/library`, { method: 'POST', body: JSON.stringify({ id, title, folder_id: folderId }), timeoutMs: 120000 });
 
 // Phase 5 apps (backend routers/apps.py): a GitHub repo on an assignment, the Sheets export and Slack.
 export const githubRepos = query => apiFetch(`/github/repos?q=${encodeURIComponent(query || '')}`);

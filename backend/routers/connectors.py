@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import NamedTuple, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from auth_utils import get_user_id
@@ -202,10 +202,17 @@ class ImportRequest(BaseModel):
     title: str = Field(default="", max_length=300)
 
 
-def _sub_pages_error(titles: list) -> HTTPException:
+class SubPagesOnly(HTTPException):
     """A page that is only sub-pages (a course hub, a table of contents): which ones to import instead."""
-    shown = ", ".join(titles[:6]) + (f" and {len(titles) - 6} more" if len(titles) > 6 else "")
-    return HTTPException(status_code=422, detail=f"This page's notes are in its sub-pages: {shown}. Import one of those.")
+
+    def __init__(self, titles: list):
+        shown = ", ".join(titles[:6]) + (f" and {len(titles) - 6} more" if len(titles) > 6 else "")
+        super().__init__(status_code=422, detail=f"This page's notes are in its sub-pages: {shown}. Import one of those.")
+        self.titles = list(titles)
+
+    def response(self) -> JSONResponse:
+        """The 422 with the titles too, so the sheet can offer each as a search."""
+        return JSONResponse(status_code=422, content={"detail": self.detail, "sub_pages": self.titles[:40]})
 
 
 def _drive_text(account: str, user_id: str, file_id: str) -> str:
@@ -246,7 +253,7 @@ def _import_text(connector: str, user_id: str, body: ImportRequest) -> Imported:
         read = notion_text.read_page(account, user_id, body.id)
         if not read.readable:
             if read.sub_pages:
-                raise _sub_pages_error(read.sub_pages)
+                raise SubPagesOnly(read.sub_pages)
             # A read the clock, a cap or a failed call stopped before any text is not "no text".
             raise read.problem() if read.reason else _no_text(connector)
         read = read.within(files.MAX_TEXT_CHARS)
@@ -269,7 +276,10 @@ def import_file(connector: str, body: ImportRequest, authorization: str = Header
     """The file's text, for the student to review on Create before making a guide."""
     user_id = get_user_id(authorization)
     user_rate_limit(user_id, "connector-import", 10)
-    found = _import_text(connector, user_id, body)
+    try:
+        found = _import_text(connector, user_id, body)
+    except SubPagesOnly as hub:
+        return hub.response()
     return {"title": found.title, "text": found.text[:files.MAX_TEXT_CHARS], "partial": found.partial, "note": found.note,
             "sub_pages": list(found.sub_pages)}
 
@@ -289,7 +299,10 @@ def add_to_library(connector: str, body: LibraryRequest, authorization: str = He
     user_id = get_user_id(authorization)
     user_rate_limit(user_id, "connector-library", 10)
     folder = _own_folder(user_id, body.folder_id)
-    found = _import_text(connector, user_id, body)
+    try:
+        found = _import_text(connector, user_id, body)
+    except SubPagesOnly as hub:
+        return hub.response()
     names = {"gdrive": "Google Drive", "gdocs": "Google Docs", "notion": "Notion", "dropbox": "Dropbox"}
     outcome: dict = {}
     guide = library_import.upsert_source(user_id, ref=f"{connector}:{body.id}", connector=connector, title=found.title, text=found.text,
@@ -299,7 +312,7 @@ def add_to_library(connector: str, body: LibraryRequest, authorization: str = He
         raise _no_text(connector)
     notes = [found.note] if found.note else []
     if outcome.get("cut"):
-        notes.append(f"The rest of this {'page' if connector == 'notion' else 'file'} wasn't added because a guide keeps the first {OUTLINE_MAX_POINTS} points.")
+        notes.append(f"A guide keeps the first {OUTLINE_MAX_POINTS} points, so the rest of this {'page' if connector == 'notion' else 'file'} wasn't added.")
     if outcome.get("kept"):
         notes = ["Notion was slow; your earlier copy was kept." if found.reason == "time"
                  else "Only part of that page came in this time, so your earlier copy was kept."]
