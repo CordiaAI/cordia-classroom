@@ -5,8 +5,9 @@ Handles LMS content, slideshows, and general educational material.
 
 import re
 import logging
+from datetime import datetime, timezone
 from html.parser import HTMLParser
-from typing import List, Tuple
+from typing import List, NamedTuple, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +171,78 @@ def extract_slideshow_content(text: str) -> List[dict]:
     return slides
 
 
+# The first Notion import (F1, live from about 01:47 UTC on 19 Nov 2026) wrote lines about the import
+# itself into the notes of the guides it filed: a "Sub-page: <title>" or "Database: <title>" line for
+# each sub-page and database, and, when it stopped early, a closing sentence saying so. Its outline
+# step turned each into "- <line>", or "## <line>" for a short title followed by a longer line. The
+# importer since then writes neither. Only those exact lines, and only in a guide that import filed
+# (external_source_id "notion:...", made since F1 went live), are left out of what the model is given;
+# the same line anywhere else ("- Database: Westlaw and LexisNexis" in law notes, a web-design page's
+# "- Sub-page: a page nested under a parent page") is the course's own text and is never touched.
+# A title that starts with a small letter or ends with a full stop reads as a definition, not a page
+# name, so it is kept even in such a guide. The clean-up SQL for Jude (20261119_clean_notion_import_lines.sql
+# under supabase/) applies the same rule to the stored notes; tests/fixtures/f1_import_lines.json keeps them in step.
+NOTION_SOURCE_PREFIX = "notion:"
+F1_NOTION_LIVE = "2026-11-19T01:45:00+00:00"
+F1_IMPORT_NOTES = (
+    "The rest of this Notion page wasn't imported because Notion was slow to answer.",
+    "The rest of this Notion page wasn't imported because the page is longer than Cordia reads at once.",
+    "Part of this Notion page couldn't be read, so it isn't all here.",
+)
+_F1_POINTER = re.compile(r"^(- |## )(?:Sub-page|Database): (\S.*)$")
+
+
+def is_f1_import_line(line: str) -> bool:
+    """True for a line exactly as the first Notion import wrote it about itself (see above)."""
+    line = (line or "").rstrip(" \t\r")
+    if line.startswith("- ") and line[2:] in F1_IMPORT_NOTES:
+        return True
+    match = _F1_POINTER.match(line)
+    if not match:
+        return False
+    mark, title = match.groups()
+    if title[0].islower() or title.endswith("."):
+        return False
+    if mark == "## ":  # F1's outline only made a heading of a short title without closing punctuation
+        written = line[3:]
+        return 3 <= len(written) <= 80 and len(written.split()) <= 10 and not written.endswith((",", ";", ":", "?", "!"))
+    return True
+
+
+def _iso_time(value):
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def from_f1_notion_import(guide) -> bool:
+    """A guide the first Notion import may have filed: a Notion source made since F1 went live. A row
+    read without created_at counts (every caller in the app reads it; see without_import_lines)."""
+    guide = guide or {}
+    if not str(guide.get("external_source_id") or "").startswith(NOTION_SOURCE_PREFIX):
+        return False
+    made = guide.get("created_at")
+    if not made:
+        return True
+    made = _iso_time(made)
+    return made is None or made >= _iso_time(F1_NOTION_LIVE)
+
+
+def without_import_lines(text: str, guide) -> str:
+    """`text` (the guide's notes, or text made from them) without the lines the first Notion import
+    wrote about itself, when `guide` is one that import filed; any other guide's text comes back as it is.
+    `guide` is the row, with external_source_id and created_at."""
+    if not text or not from_f1_notion_import(guide):
+        return text or ""
+    return "\n".join(line for line in text.split("\n") if not is_f1_import_line(line))
+
+
+_SHORT_BULLET = re.compile(r"^(?:[-*•▪◦·]|\d{1,2}[.)])\s+\S")
+_SHORT_TERM = re.compile(r"^(?=.*[^\W\d_])..")  # two characters or more, one of them a letter
+
+
 def clean_text(text: str) -> str:
     """
     Clean and filter text content, removing navigation and UI elements.
@@ -177,8 +250,15 @@ def clean_text(text: str) -> str:
     Includes a safety net: if filtering removes >85% of lines, falls back
     to minimal cleaning to avoid discarding real content.
     """
+    return clean_text_counted(text)[0]
+
+
+def clean_text_counted(text: str) -> Tuple[str, int]:
+    """clean_text, and how many short lines with real letters in them ("Na" on a line of its own) it
+    had to drop, so a caller that files the text can tell the student. Short list items ("- Na",
+    "- K+") are kept: in notes imported from an app they are the content."""
     if not text:
-        return ""
+        return "", 0
 
     # Strip non-educational sections (References, See also, etc.)
     # These are section-level blocks, not individual nav lines
@@ -198,7 +278,7 @@ def clean_text(text: str) -> str:
     non_empty_lines = [line.strip() for line in lines if line.strip()]
 
     if not non_empty_lines:
-        return ""
+        return "", 0
 
     # First pass: remove non-educational sections
     filtered_lines = []
@@ -225,14 +305,22 @@ def clean_text(text: str) -> str:
         non_empty_lines = filtered_lines
 
     cleaned_lines = []
+    dropped = 0
 
     for line in non_empty_lines:
+        # Very short lines are dropped unless they're headers or list items; a short line with a letter
+        # in it ("Na", "K+") that isn't a navigation word may be a real term, so it is counted for the
+        # caller to say so.
+        short = len(line) < 5 and not line.endswith(':') and not _SHORT_BULLET.match(line)
+        if short and _SHORT_TERM.search(line) and (len(line) < 3 or not is_navigation_text(line)):
+            dropped += 1
+            continue
+
         # Skip navigation elements
         if is_navigation_text(line):
             continue
 
-        # Skip very short lines unless they're headers
-        if len(line) < 5 and not line.endswith(':'):
+        if short:
             continue
 
         # Skip lines that are just punctuation or special characters
@@ -249,17 +337,19 @@ def clean_text(text: str) -> str:
             f"/{len(non_empty_lines)} lines — falling back to minimal cleaning"
         )
         cleaned_lines = []
+        dropped = 0
         for line in non_empty_lines:
             line_l = line.lower()
             if line_l.startswith('http') or line_l.startswith('www'):
                 continue
             if len(line) < 3:
+                dropped += bool(_SHORT_TERM.search(line)) and not _SHORT_BULLET.match(line)
                 continue
             if re.match(r'^[\W\d]+$', line):
                 continue
             cleaned_lines.append(line)
 
-    return '\n'.join(cleaned_lines)
+    return '\n'.join(cleaned_lines), dropped
 
 
 # text_processing.py (replace chunk_text with this)
@@ -526,19 +616,83 @@ def _looks_like_heading(line: str, following: str) -> bool:
             and bool(following) and len(following) > len(line))
 
 
-def text_to_outline(text: str, max_points: int = 400) -> str:
+OUTLINE_MAX_POINTS = 400
+OUTLINE_POINT_CHARS = 600   # one point is about a paragraph; a longer one is split, never cut
+OUTLINE_HEADING_CHARS = 120
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
+
+class Outline(NamedTuple):
+    """An outline and what it left out. cut: `max_points` stopped it, so later points are not in it;
+    dropped: short lines with letters in them ("Na" alone on a line) that cleaning removed."""
+    text: str
+    cut: bool
+    dropped: int = 0
+
+
+def _split_long(text: str, limit: int) -> List[str]:
+    """`text` as pieces of at most `limit` characters, all of it kept: whole sentences packed
+    together, and a sentence longer than the limit split at a space."""
+    if len(text) <= limit:
+        return [text]
+    pieces: List[str] = []
+    current = ""
+    for sentence in _SENTENCE_END.split(text):
+        while len(sentence) > limit:
+            cut = sentence.rfind(" ", 0, limit + 1)
+            cut = cut if cut > 0 else limit
+            if current:
+                pieces.append(current)
+                current = ""
+            pieces.append(sentence[:cut].strip())
+            sentence = sentence[cut:].strip()
+        if current and len(current) + 1 + len(sentence) > limit:
+            pieces.append(current)
+            current = sentence
+        else:
+            current = f"{current} {sentence}" if current else sentence
+    if current:
+        pieces.append(current)
+    return [piece for piece in pieces if piece]
+
+
+def _points(text: str) -> List[str]:
+    return [f"- {piece}" for piece in _split_long(text, OUTLINE_POINT_CHARS)]
+
+
+def _heading(text: str) -> List[str]:
+    """"## Heading" for a title; a title past OUTLINE_HEADING_CHARS keeps its first part as the
+    heading and the rest as points under it."""
+    first, *rest = _split_long(text, OUTLINE_HEADING_CHARS)
+    return [f"## {first}", *(f"- {piece}" for piece in rest)]
+
+
+def text_to_outline(text: str, max_points: int = OUTLINE_MAX_POINTS) -> str:
     """Document or slide text as the outline guides use ("## Heading" then "- point" lines), so an
     imported file opens in Library ready to read and to make cards from. Slides keep their titles
-    as headings; long paragraphs become one point each."""
-    text = clean_text(text or "")
+    as headings; a long paragraph becomes several points, at sentence ends."""
+    return build_outline(text, max_points).text
+
+
+def outline_from_text(text: str, max_points: int = OUTLINE_MAX_POINTS) -> tuple[str, bool]:
+    """(outline, cut): the outline text_to_outline makes, and whether anything was left out of it
+    (`max_points` stopped it, or a short line was dropped), so a caller that files it can say so."""
+    outline = build_outline(text, max_points)
+    return outline.text, outline.cut or bool(outline.dropped)
+
+
+def build_outline(text: str, max_points: int = OUTLINE_MAX_POINTS) -> Outline:
+    text, dropped = clean_text_counted(text or "")
     if not text.strip():
-        return ""
+        return Outline("", False, dropped)
     lines_out: List[str] = []
     is_slides, _ = is_slideshow_content(text)
     if is_slides:
         for slide in extract_slideshow_content(text):
-            lines_out.append(f"## {slide['title'][:120] or 'Slide'}")
-            lines_out.extend(f"- {line[:600]}" for line in slide["content"] if line.strip())
+            lines_out.extend(_heading(slide["title"]) if slide["title"] else ["## Slide"])
+            for line in slide["content"]:
+                if line.strip():
+                    lines_out.extend(_points(line.strip()))
     else:
         lines = [line.strip() for line in text.splitlines() if line.strip()]
         for index, line in enumerate(lines):
@@ -546,24 +700,27 @@ def text_to_outline(text: str, max_points: int = 400) -> str:
             heading = _MD_HEADING.match(line)
             bullet = _BULLET.match(line)
             if heading:
-                lines_out.append(f"## {heading.group(1).strip()[:120]}")
+                lines_out.extend(_heading(heading.group(1).strip()))
             elif bullet:
-                lines_out.append(f"- {bullet.group(1).strip()[:600]}")
+                lines_out.extend(_points(bullet.group(1).strip()))
             elif _looks_like_heading(line, following):
                 lines_out.append(f"## {line}")
             else:
-                lines_out.append(f"- {line[:600]}")
+                lines_out.extend(_points(line))
     points = 0
+    cut = False
     kept = []
     for line in lines_out:
         if line.startswith("- "):
             points += 1
             if points > max_points:
+                cut = True
                 break
         kept.append(line)
     # A heading with nothing under it adds nothing.
-    return "\n".join(line for index, line in enumerate(kept)
-                     if not line.startswith("## ") or (index + 1 < len(kept) and kept[index + 1].startswith("- ")))
+    outline = "\n".join(line for index, line in enumerate(kept)
+                        if not line.startswith("## ") or (index + 1 < len(kept) and kept[index + 1].startswith("- ")))
+    return Outline(outline, cut, dropped)
 
 
 _CHANGE_WORDS = re.compile(

@@ -429,6 +429,20 @@ body { touch-action: manipulation; }
 .cn-feed-row .c-input { flex: 1 1 auto; min-width: 0; }
 .cn-notice { margin: 0; color: var(--olive-ink); font: 600 0.9375rem/1.4 var(--font-sans); }
 .cn-error { margin: 0; color: var(--error); font: 600 0.9375rem/1.4 var(--font-sans); }
+/* Said when something was left out (an import that came in only in part): a warning, not an error and not a success. */
+.cn-warning { margin: 0; padding: 0.5rem 0.75rem; border-radius: var(--r-input); background: var(--warning-bg); color: var(--warning); font: 600 0.9375rem/1.4 var(--font-sans); }
+.cn-hub { display: grid; gap: 0.5rem; }
+.cn-hub .c-meta { margin: 0; }
+/* The sub-page names scroll inside the sheet. The padding keeps the 2px focus ring (2px outside the
+   button) inside the scroll box; the edge with more names below or above fades (fade-top/fade-bottom,
+   set as it scrolls), and keyboard focus scrolls a name clear of the fade. */
+.cn-hub-names { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; max-height: 11rem; overflow-y: auto; padding: 0.25rem; scroll-padding-block: 1.875rem; }
+.cn-hub-names.fade-bottom { -webkit-mask-image: linear-gradient(to bottom, var(--on-olive) calc(100% - 1.5rem), transparent); mask-image: linear-gradient(to bottom, var(--on-olive) calc(100% - 1.5rem), transparent); }
+.cn-hub-names.fade-top { -webkit-mask-image: linear-gradient(to top, var(--on-olive) calc(100% - 1.5rem), transparent); mask-image: linear-gradient(to top, var(--on-olive) calc(100% - 1.5rem), transparent); }
+.cn-hub-names.fade-top.fade-bottom { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--on-olive) 1.5rem, var(--on-olive) calc(100% - 1.5rem), transparent); mask-image: linear-gradient(to bottom, transparent, var(--on-olive) 1.5rem, var(--on-olive) calc(100% - 1.5rem), transparent); }
+/* A long name wraps onto more lines: the pill grows (never below the 44px tap height) instead of
+   letting the text run out of it. */
+.cn-hub .cn-hub-name { height: auto; min-height: 2.75rem; max-width: 100%; padding-block: 0.625rem; white-space: normal; text-align: left; overflow-wrap: anywhere; line-height: 1.3 !important; }
 .cn-row-error { color: var(--error); font: 600 0.8125rem/1.4 var(--font-sans); }
 /* The import sheet is a column: the head, an optional "Add to" dropdown, the search field, then the
    results, which take what room is left and scroll. (It was a grid with five fixed rows, so the

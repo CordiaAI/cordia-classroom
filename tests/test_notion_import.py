@@ -54,6 +54,8 @@ class NotionTextTests(unittest.TestCase):
         from fastapi.testclient import TestClient
         from main import app
         from rate_limit import limiter
+        from services import notion_text
+        notion_text.reset_gates()  # calls an earlier test gave up waiting for still count until they end
         limiter.reset()  # imports allow 10 a minute per client; each test makes several
         self.client = TestClient(app)
         self.auth = {"Authorization": "Bearer t"}
@@ -312,6 +314,8 @@ class NotionBudgetTests(unittest.TestCase):
         from fastapi.testclient import TestClient
         from main import app
         from rate_limit import limiter
+        from services import notion_text
+        notion_text.reset_gates()
         limiter.reset()
         self.client = TestClient(app)
         self.auth = {"Authorization": "Bearer t"}
@@ -354,7 +358,9 @@ class NotionBudgetTests(unittest.TestCase):
         self.assertTrue(response.json()["partial"])
         text = response.json()["text"]
         self.assertIn("Question 0", text)
-        self.assertTrue(text.splitlines()[-1].endswith("because Notion was slow to answer."), text.splitlines()[-1])
+        # The note is for the student, not part of the text.
+        self.assertEqual(response.json()["note"], "The rest of this Notion page wasn't imported because Notion was slow to answer.")
+        self.assertNotIn("wasn't imported", text)
         self.assertLess(len(fake.calls), 41)
 
     def test_a_first_call_that_never_answers_is_a_502_inside_the_budget(self):
@@ -402,9 +408,8 @@ class NotionBudgetTests(unittest.TestCase):
                 response = self.post(ThreadSafePages(toggles(60)))
             self.assertEqual(response.status_code, 200, response.text)
             self.assertTrue(response.json()["partial"], cap)
-            lines = response.json()["text"].splitlines()
-            self.assertEqual(lines[-1], "The rest of this Notion page wasn't imported because the page is longer than Cordia reads at once.")
-            self.assertEqual(lines[-2], "")
+            self.assertEqual(response.json()["note"], "The rest of this Notion page wasn't imported because the page is longer than Cordia reads at once.")
+            self.assertNotIn("wasn't imported", response.json()["text"])
             self.assertIn("Question 0", response.json()["text"])
             self.assertIn("cut short (size)", logged.output[0])
 
@@ -419,9 +424,10 @@ class NotionBudgetTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertTrue(response.json()["partial"])
         self.assertIn("Answer 4", response.json()["text"])
-        self.assertTrue(response.json()["text"].splitlines()[-1].startswith("Part of this Notion page couldn't be read"))
+        self.assertEqual(response.json()["note"], "Part of this Notion page couldn't be read, so it isn't all here.")
+        self.assertNotIn("couldn't be read", response.json()["text"])
 
-    def test_the_character_limit_keeps_the_note_as_the_last_line(self):
+    def test_the_character_limit_cuts_at_a_line_and_says_so(self):
         from services import file_extraction
         long_line = "x" * 900
         tree = {(PAGE, None): [block("paragraph", f"{long_line}{i}") for i in range(80)]}
@@ -430,7 +436,8 @@ class NotionBudgetTests(unittest.TestCase):
         body = response.json()
         self.assertTrue(body["partial"])
         self.assertLessEqual(len(body["text"]), 10_000)
-        self.assertIn("longer than Cordia reads at once", body["text"].splitlines()[-1])
+        self.assertIn("longer than Cordia reads at once", body["note"])
+        self.assertTrue(body["text"].splitlines()[-1].startswith("x" * 900))
 
     def test_a_hub_page_of_sub_pages_names_them(self):
         tree = {(PAGE, None): [child_page(f"Lecture {i}", f"cp{i}") for i in range(1, 9)]}
@@ -442,12 +449,13 @@ class NotionBudgetTests(unittest.TestCase):
         # Sub-pages are not read into this page: one call, for the hub itself.
         self.assertEqual(fake.calls, [PAGE])
 
-    def test_sub_page_titles_stay_in_place_on_a_page_with_notes(self):
+    def test_sub_page_titles_are_listed_beside_the_text_not_in_it(self):
         tree = {(PAGE, None): [block("heading_1", "Week 3"), block("paragraph", "Overview of the week."), child_page("Lecture 3", "cp3"),
                                {"object": "block", "id": "db", "type": "child_database", "has_children": False, "child_database": {"title": "Flashcards"}}]}
         response = self.post(ThreadSafePages(tree))
         self.assertEqual(response.status_code, 200, response.text)
-        self.assertEqual(response.json()["text"].splitlines(), ["# Week 3", "Overview of the week.", "Sub-page: Lecture 3", "Database: Flashcards"])
+        self.assertEqual(response.json()["text"].splitlines(), ["# Week 3", "Overview of the week."])
+        self.assertEqual(response.json()["sub_pages"], ["Lecture 3", "Flashcards"])
 
     def test_one_tutor_message_makes_at_most_the_stated_number_of_notion_calls(self):
         from routers import connectors
@@ -470,7 +478,8 @@ class NotionBudgetTests(unittest.TestCase):
         total = counts["search"] + counts["blocks"]
         self.assertEqual(counts["search"], 1)  # the first page found is the one read
         self.assertLessEqual(total, notion_text.TUTOR_MAX_CALLS)
-        self.assertIn("no text on it", found["problem"])
+        # The call cap stopped the read before any text: it says the page is too large, not that it is empty.
+        self.assertIn("too large to read here", found["problem"])
 
         # Three searches that find nothing, then one that does: still inside the same number.
         counts.update(search=0, blocks=0)

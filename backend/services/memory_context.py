@@ -11,6 +11,8 @@ from __future__ import annotations
 import logging
 import re
 
+from services.text_processing import without_import_lines
+
 logger = logging.getLogger(__name__)
 
 MAX_LINKS = 3
@@ -86,10 +88,10 @@ def related_material(db, user_id: str, guide_id: str, question: str, answer: str
         return []
     found = []
     try:
-        guides = _search(db, "study_guides", "id, title, notes, study_guide", user_id, terms, exclude=guide_id)
+        guides = _search(db, "study_guides", "id, title, notes, study_guide, external_source_id, created_at", user_id, terms, exclude=guide_id)
         known = _known_well(db, user_id, [g["id"] for g in guides])
         for guide in guides:
-            hits, text = _snippet(guide.get("notes") or guide.get("study_guide") or "", terms)
+            hits, text = _snippet(without_import_lines(guide.get("notes") or "", guide) or guide.get("study_guide") or "", terms)
             if hits:
                 # A guide the student already knows well is the better anchor: one bonus hit.
                 found.append({"kind": "guide", "id": guide["id"], "title": guide.get("title") or "Study guide",

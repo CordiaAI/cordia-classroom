@@ -173,7 +173,7 @@ export default function NewSheet() {
   recordingRef.current = recording;
   // The name an opened-with text comes with (an imported Doc), used instead of a made-up one.
   const pasteTitleRef = useRef('');
-  const [notice, setNotice] = useState(''); // said above the pasted text (an import that came in only in part)
+  const [notice, setNotice] = useState(''); // said above the pasted text, outside its label (an import that came in only in part)
   // Opened to build straight away (the composer's "make a guide"): Create runs once the files,
   // link or text are in, through the same steps as pressing it.
   const [autoCreate, setAutoCreate] = useState(false);
@@ -498,11 +498,13 @@ export default function NewSheet() {
               </>
             )}
             {mode === 'paste' && (
-              <label className="c-field">
-                {notice && <span className="c-meta" role="status">{notice}</span>}
-                <span className="sr-only">Text</span>
-                <textarea className="c-input new-text" value={text} onChange={event => setText(event.target.value)} placeholder="Paste notes" autoFocus />
-              </label>
+              <>
+                {notice && <p id="new-paste-notice" className="cn-warning" role="status">{notice}</p>}
+                <label className="c-field">
+                  <span className="sr-only">Text</span>
+                  <textarea className="c-input new-text" value={text} onChange={event => setText(event.target.value)} placeholder="Paste notes" aria-describedby={notice ? 'new-paste-notice' : undefined} autoFocus />
+                </label>
+              </>
             )}
             {mode === 'link' && (
               <label className="c-field">

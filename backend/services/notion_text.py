@@ -2,16 +2,24 @@
 
 Notion hands a page back as a tree of blocks: the page's own children first, then each block's
 children through another call (a toggle's contents, a bullet's sub-bullets, a column, a table's rows).
-Every text-bearing block type is read, long pages are read page by page, and nested children are
-followed level by level, a few calls at a time (PARALLEL), so a page with many toggles isn't read one
-call after another. The clock is the real limit: TIME_BUDGET seconds for the whole read, with caps on
-depth, calls and blocks behind it so one page can't run away. When a limit stops the read, the result
-says so (PageRead.partial, and a plain last line in the text): nothing is dropped silently. Composio
-returns the list as Notion does ({"results": [...]}) or wrapped one level down ({"block_child_data":
-{...}}); both are read. The tree is read-only: nothing here writes to Notion.
+Every text-bearing block type is read, long pages are read listing by listing, and nested children are
+followed level by level, a few calls at a time (PARALLEL, Notion's own limit is about three a second),
+so a page with many toggles isn't read one call after another. The clock is the real limit:
+TIME_BUDGET seconds for the whole read, with caps on depth, calls and blocks behind it so one page
+can't run away, and a call budget per student per hour so nobody can run Notion dry.
+
+Whatever was read is kept: blocks are handed to the reader as each listing arrives, so a limit that
+stops the read late (the clock, a cap, a failed call) leaves the page as far as it got, never nothing.
+The result says it stopped (PageRead.partial, .reason, .note) but the note is not part of the text:
+the text is the page's own lines, so a guide, card or question is never made from the note, and
+sub-page titles are listed separately (PageRead.sub_pages), not written into the lines. A 429 from
+Notion is tried once more after a short random pause. Composio returns the list as Notion does
+({"results": [...]}) or wrapped one level down ({"block_child_data": {...}}); both are read. The
+tree is read-only: nothing here writes to Notion.
 """
 
 import logging
+import random
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
@@ -20,6 +28,7 @@ from typing import Callable, Optional
 
 from fastapi import HTTPException
 
+import rate_limit
 from services import composio
 
 log = logging.getLogger(__name__)
@@ -28,7 +37,10 @@ TIME_BUDGET = 25.0  # seconds for one page, all calls together (the browser wait
 MAX_DEPTH = 6       # levels of children below the page that are followed
 MAX_CALLS = 250     # Notion calls for one page, including the first
 MAX_BLOCKS = 5000   # blocks read for one page
-PARALLEL = 4        # calls in flight at once
+PARALLEL = 3        # calls in flight at once (Notion allows about three requests a second)
+CALL_BUDGET = 1200  # Notion calls one student can make in CALL_WINDOW, searches and reads together
+CALL_WINDOW = 3600.0
+RETRY_PAUSE = 1.0   # a 429 waits between half and one and a half of this, then asks once more
 # The Tutor reads one page per message and answers while the student waits: one budget for the
 # searches and the page together.
 TUTOR_TIME_BUDGET = 20.0
@@ -118,17 +130,86 @@ def _text(kind: str, body: dict) -> str:
 _NOTES = {
     "time": "The rest of this Notion page wasn't imported because Notion was slow to answer.",
     "size": "The rest of this Notion page wasn't imported because the page is longer than Cordia reads at once.",
+    "budget": "The rest of this Notion page wasn't imported because you've reached this hour's limit of Notion reads. Try again later.",
     "missed": "Part of this Notion page couldn't be read, so it isn't all here.",
 }
+# Said when nothing could be read at all.
+SLOW = "Notion was slow to answer. Try again in a minute."
+OVER_BUDGET = "You've used a lot of Notion reads in the last hour. Try again in a little while."
+TOO_LARGE = "That page is too large to read here."
+
+
+def _sleep(seconds: float) -> None:
+    time.sleep(seconds)
+
+
+def _pause() -> float:
+    """How long to wait before asking Notion again after a 429: random, so retries don't arrive together."""
+    return random.uniform(RETRY_PAUSE * 0.5, RETRY_PAUSE * 1.5)
+
+
+_gates: dict = {}  # user id -> [semaphore, readers using it]
+_gates_lock = threading.Lock()
+
+
+class _OutOfTime(Exception):
+    """The read's clock ran out while a call waited for a free slot: the call is never made."""
+
+
+class _Gate:
+    """At most PARALLEL Notion calls in flight per student, across every read they have going (an
+    import and a Library save, two tabs, the Tutor), not just inside one. A call a read gave up
+    waiting for still counts until it ends. A call waits for a slot only until its read's deadline,
+    and is not made at all once the deadline has passed (_OutOfTime), so no call starts after the
+    read gave up. Entries are dropped once nothing uses them."""
+
+    def __init__(self, user_id: str, deadline: float):
+        self.user_id, self.deadline = user_id, deadline
+        self.entry = None
+
+    def _leave(self, release: bool) -> None:
+        with _gates_lock:
+            if release:
+                self.entry[0].release()
+            self.entry[1] -= 1
+            if not self.entry[1] and _gates.get(self.user_id) is self.entry:
+                del _gates[self.user_id]
+
+    def __enter__(self):
+        with _gates_lock:
+            self.entry = _gates.setdefault(self.user_id, [threading.BoundedSemaphore(PARALLEL), 0])
+            self.entry[1] += 1
+        if not self.entry[0].acquire(timeout=max(self.deadline - time.monotonic(), 0)):
+            self._leave(release=False)
+            raise _OutOfTime()
+        if time.monotonic() >= self.deadline:
+            self._leave(release=True)
+            raise _OutOfTime()
+        return self
+
+    def __exit__(self, *exc):
+        self._leave(release=True)
+
+
+def reset_gates() -> None:
+    """Forget every student's calls in flight (for tests, next to rate_limit.limiter.reset)."""
+    with _gates_lock:
+        _gates.clear()
+
+
+def spend_call(user_id: str) -> bool:
+    """Count one Notion call (a search) against the student's hour; False when they are out."""
+    return rate_limit.user_allowance(user_id, "notion-calls", CALL_BUDGET, CALL_WINDOW)
 
 
 @dataclass
 class PageRead:
-    """What a page read found. text is the page's lines, ending with a plain line that says so when
-    a limit or a failed call kept part of the page out (partial); body is the lines alone."""
+    """What a page read found. body is the page's own lines, nothing else: no note, no sub-page
+    titles. When a limit or a failed call kept part of the page out, partial is True, reason says
+    why ("time", "size", "budget" or "missed") and note is the plain sentence for the student."""
     body: str = ""
     partial: bool = False
-    reason: str = ""            # "time", "size" or "missed" when partial
+    reason: str = ""
     sub_pages: list = field(default_factory=list)  # titles of sub-pages and databases, in order
 
     @property
@@ -143,30 +224,42 @@ class PageRead:
 
     @property
     def text(self) -> str:
-        return f"{self.body}\n\n{self.note}" if self.body and self.note else self.body
+        return self.body
+
+    def within(self, limit: int) -> "PageRead":
+        """The same read cut to `limit` characters at a line: partial (size) when that left lines out."""
+        if len(self.body) <= limit:
+            return self
+        cut = self.body[:limit]
+        cut = cut[:cut.rfind("\n")] if "\n" in cut else cut
+        return PageRead(body=cut, partial=True, reason=self.reason if self.partial else "size", sub_pages=self.sub_pages)
 
     def text_within(self, limit: int) -> tuple[str, bool]:
-        """(text, partial) cut to `limit` characters at a line, the note kept as the last line."""
-        text = self.text
-        if len(text) <= limit:
-            return text, self.partial
-        note = _NOTES["size"]
-        room = max(limit - len(note) - 2, 0)
-        cut = self.body[:room]
-        cut = cut[:cut.rfind("\n")] if "\n" in cut else cut
-        return f"{cut}\n\n{note}", True
+        """(text, partial) of within(limit)."""
+        cut = self.within(limit)
+        return cut.body, cut.partial
+
+    def problem(self) -> HTTPException:
+        """Why a page with no text gave none: the clock or a failed call (try again), a cap (too large
+        for here), the student's hour; otherwise it really has none (the caller says so)."""
+        if self.reason in {"time", "missed"}:
+            return HTTPException(status_code=502, detail=SLOW)
+        if self.reason == "budget":
+            return HTTPException(status_code=429, detail=OVER_BUDGET)
+        if self.reason == "size":
+            return HTTPException(status_code=422, detail=TOO_LARGE)
+        return HTTPException(status_code=422, detail="That page has no readable text.")
 
 
 class _Reader:
-    def __init__(self, fetch: Callable[[dict], dict], deadline: float, max_calls: int):
-        self.fetch, self.deadline, self.max_calls = fetch, deadline, max_calls
+    def __init__(self, fetch: Callable[[dict], dict], deadline: float, max_calls: int, user_id: str = ""):
+        self.fetch, self.deadline, self.max_calls, self.user_id = fetch, deadline, max_calls, user_id
         self.lock = threading.Lock()
         self.calls = self.blocks = 0
-        self.kids: dict = {}      # id(block) -> the block's children, once read
-        self.cut = ""             # why a limit stopped the read: "time" or "size"
+        self.kids: dict = {}      # id(block) -> the block's children, as far as they were read
+        self.cut = ""             # why a limit stopped the read: "time", "size" or "budget"
         self.lost = False         # a call after the first failed
         self.lines: list = []
-        self.written = 0          # lines that are the page's own text, not sub-page titles
         self.sub_pages: list = []
 
     # -- fetching, level by level --
@@ -178,40 +271,69 @@ class _Reader:
                 return "time"
             if self.calls >= self.max_calls or self.blocks >= MAX_BLOCKS:
                 return "size"
+            if self.user_id and not rate_limit.user_allowance(self.user_id, "notion-calls", CALL_BUDGET, CALL_WINDOW):
+                return "budget"
             self.calls += 1
         return ""
+
+    def _fetch(self, arguments: dict) -> dict:
+        """One call to Notion, one of at most PARALLEL in flight for this student."""
+        if not self.user_id:
+            return self.fetch(arguments)
+        with _Gate(self.user_id, self.deadline):
+            return self.fetch(arguments)
 
     def _stop(self, reason: str) -> None:
         with self.lock:
             self.cut = self.cut or reason
 
-    def _children(self, block_id: str, root: bool = False) -> list:
-        """Every child of a block, page by page. A failure on the page's own first call is the
+    def _call(self, arguments: dict) -> dict:
+        """One Notion call. A 429 is asked again once, after a short random pause, if the clock, the
+        caps and the student's hour allow it."""
+        try:
+            return self._fetch(arguments)
+        except HTTPException as error:
+            if error.status_code != 429:
+                raise
+            pause = _pause()
+            if time.monotonic() + pause >= self.deadline:
+                raise
+            reason = self._take()
+            if reason:
+                self._stop(reason)
+                raise
+            _sleep(pause)
+            return self._fetch(arguments)
+
+    def _children(self, block_id: str, sink: list, root: bool = False) -> None:
+        """Every child of a block, listing by listing, handed to `sink` as each one arrives, so what a
+        late limit stops is only what hadn't come yet. A failure on the page's own first call is the
         caller's (a 502); a failure later keeps what was read, since part of a page beats none."""
-        found: list = []
         cursor = None
         while True:
             reason = self._take()
             if reason:
                 self._stop(reason)
-                break
+                return
             arguments = {"block_id": block_id, "page_size": PAGE_SIZE}
             if cursor:
                 arguments["start_cursor"] = cursor
             try:
-                data = self.fetch(arguments)
+                data = self._call(arguments)
+            except _OutOfTime:
+                self._stop("time")
+                return
             except HTTPException:
-                if root and not found and not cursor:
+                if root and not sink and not cursor:
                     raise
                 self.lost = True
-                break
+                return
             blocks, cursor = _listing(data)
             with self.lock:
                 self.blocks += len(blocks)
-            found.extend(blocks)
+                sink.extend(blocks)
             if not cursor:
-                break
-        return found
+                return
 
     def _wait(self, futures: list) -> bool:
         """True when every call finished inside the budget; the stragglers are left behind."""
@@ -222,6 +344,11 @@ class _Reader:
         if late:
             self._stop("time")
         return not late
+
+    def _seen(self, sink: list) -> list:
+        """What a sink holds right now, copied: a call left behind may still add to the sink."""
+        with self.lock:
+            return list(sink)
 
     @staticmethod
     def _source(block: dict) -> str:
@@ -235,10 +362,22 @@ class _Reader:
     def load(self, page_id: str) -> list:
         pool = ThreadPoolExecutor(max_workers=PARALLEL, thread_name_prefix="notion-read")
         try:
-            first = pool.submit(self._children, page_id, True)
-            if not self._wait([first]):
-                raise HTTPException(status_code=502, detail="The app didn't respond. Try again in a minute.")
-            top = level = first.result()
+            sink: list = []
+            first = pool.submit(self._children, page_id, sink, True)
+            finished = self._wait([first])
+            top = self._seen(sink)
+            if finished and first.exception() is not None:
+                if not top:
+                    first.result()  # the page's own first call failed: the caller's error
+                self.lost = True
+            if not top:
+                if self.cut == "time":
+                    raise HTTPException(status_code=502, detail=SLOW)
+                if self.cut == "budget":
+                    raise HTTPException(status_code=429, detail=OVER_BUDGET)
+            if self.cut:  # out of time, calls or budget with the page's own blocks in hand: no children can follow
+                return top
+            level = top
             for depth in range(MAX_DEPTH + 1):
                 inline, pending = [], []
                 for block in level:
@@ -256,15 +395,15 @@ class _Reader:
                     break
                 for block in inline:
                     self.kids[id(block)] = [item for item in block["children"] if isinstance(item, dict)]
-                calls = [(block, pool.submit(self._children, self._source(block))) for block in pending]
-                self._wait([future for _, future in calls])
-                for block, future in calls:
-                    if not future.done() or future.cancelled():
-                        continue
-                    if future.exception() is not None:
+                calls = []
+                for block in pending:
+                    kids: list = []
+                    calls.append((block, kids, pool.submit(self._children, self._source(block), kids)))
+                self._wait([future for _, _, future in calls])
+                for block, kids, future in calls:
+                    self.kids[id(block)] = self._seen(kids)
+                    if future.done() and not future.cancelled() and future.exception() is not None:
                         self.lost = True
-                        continue
-                    self.kids[id(block)] = future.result()
                 level = [item for block in inline + pending for item in self.kids.get(id(block), [])]
                 if self.cut:
                     break
@@ -283,9 +422,7 @@ class _Reader:
             body = block.get(kind) if isinstance(block.get(kind), dict) else {}
             number = number + 1 if kind == "numbered_list_item" else 0
             if kind in _SUBPAGES:
-                title = str(body.get("title") or "").strip() or "Untitled"
-                self.sub_pages.append(title)
-                self.lines.append(f"{'  ' * indent}{_SUBPAGES[kind]}: {title}")
+                self.sub_pages.append(str(body.get("title") or "").strip() or "Untitled")
                 continue
             if kind not in _SKIPPED and kind not in _CONTAINERS:
                 text = _text(kind, body)
@@ -293,7 +430,6 @@ class _Reader:
                     mark = ("#" * _HEADINGS[kind] + " " if kind in _HEADINGS else "- " if kind in _BULLETS
                             else f"{number}. " if kind == "numbered_list_item" else "")
                     self.lines.append("  " * indent + mark + text)
-                    self.written += 1
             inner = self.kids.get(id(block))
             if inner:
                 self.read(inner, indent if kind in _CONTAINERS or kind in _HEADINGS else indent + 1)
@@ -302,17 +438,18 @@ class _Reader:
 def read_page(account: str, user_id: str, page_id: str, *, deadline: Optional[float] = None,
               max_calls: Optional[int] = None) -> PageRead:
     """The page's text as lines: "# heading", "- bullet or to-do", "1. step", plain paragraphs, with
-    sub-items indented two spaces per level and sub-pages listed as "Sub-page: Title". `deadline` (a
-    time.monotonic() value) and `max_calls` let a caller that has already spent some of its budget
-    share what is left."""
+    sub-items indented two spaces per level. Sub-pages and databases are not read into the page: their
+    titles come back in PageRead.sub_pages. `deadline` (a time.monotonic() value) and `max_calls` let a
+    caller that has already spent some of its budget share what is left. Raises a 502 only when the
+    page's own first listing never came, and a 429 when the student is out of Notion reads."""
     reader = _Reader(lambda arguments: composio.run(account, user_id, SLUG, arguments),
                      deadline if deadline is not None else time.monotonic() + TIME_BUDGET,
-                     MAX_CALLS if max_calls is None else max_calls)
+                     MAX_CALLS if max_calls is None else max_calls, user_id)
     reader.read(reader.load(page_id), 0)
     reason = reader.cut or ("missed" if reader.lost else "")
     if reason:
         log.warning("notion page cut short (%s): %d calls, %d blocks, %d lines read", reason, reader.calls, reader.blocks, len(reader.lines))
-    return PageRead(body="\n".join(reader.lines) if reader.written else "", partial=bool(reason), reason=reason, sub_pages=reader.sub_pages)
+    return PageRead(body="\n".join(reader.lines), partial=bool(reason), reason=reason, sub_pages=reader.sub_pages)
 
 
 def has_text(text: str) -> bool:

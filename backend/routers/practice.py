@@ -12,7 +12,7 @@ from schemas import PracticeGradeRequest, PracticeProgressRequest, PracticeRecog
 from services.entitlements import record, require
 from services.guidance import learning_guidance
 from services.llm import generate_verified_practice_set, grade_practice_answer, recognize_handwriting
-from services.text_processing import html_to_text
+from services.text_processing import html_to_text, without_import_lines
 from services.tutor_sessions import append_tutor_message
 
 logger = logging.getLogger(__name__)
@@ -46,8 +46,9 @@ def create_practice_set(body: PracticeRequest, request: Request, authorization: 
     """Generate ten practice problems from a guide or uploaded text."""
     user_id = get_user_id(authorization)
     if body.guide_id:
-        guide = _owned_guide(body.guide_id, user_id, "id,title,study_guide,notes")
-        content = "\n\n".join(filter(None, [html_to_text(guide.get("notes") or ""), guide.get("study_guide") or ""]))
+        guide = _owned_guide(body.guide_id, user_id, "id,title,study_guide,notes,external_source_id,created_at")
+        notes = html_to_text(without_import_lines(guide.get("notes") or "", guide))
+        content = "\n\n".join(filter(None, [notes, guide.get("study_guide") or ""]))
         title = guide.get("title") or "Study Guide"
         source = {"type": "study_guide", "id": guide["id"], "title": title}
     else:

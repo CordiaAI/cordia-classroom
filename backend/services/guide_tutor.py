@@ -17,6 +17,7 @@ from __future__ import annotations
 from services import guide_versions as versions
 from services import llm
 from services.guide_access import outline_preview
+from services.text_processing import without_import_lines
 
 NOT_COVERED = "This guide doesn't cover that. Try asking about something in its outline or questions."
 MAX_OUTLINE_CHARS = 12000
@@ -43,7 +44,7 @@ def guide_context(guide: dict) -> tuple[str, list]:
     """(the text the model sees, the ideas in order) for this guide only."""
     content = versions.live_content(guide)
     ideas = versions.content_ideas(content)[:MAX_IDEAS]
-    outline = "\n".join(outline_preview(guide.get("notes") or "", lines=400))[:MAX_OUTLINE_CHARS]
+    outline = "\n".join(outline_preview(without_import_lines(guide.get("notes") or "", guide), lines=400))[:MAX_OUTLINE_CHARS]
     lines = [f"TITLE: {guide.get('title') or 'Untitled'}", "", "OUTLINE:", outline or "(none)", "", "IDEAS:"]
     lines += [f"[{n}] Q: {idea['question'][:600]}\n    A: {idea['answer'][:1200]}" for n, idea in enumerate(ideas, 1)]
     return "\n".join(lines), ideas

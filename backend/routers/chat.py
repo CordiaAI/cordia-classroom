@@ -27,7 +27,7 @@ from services.llm import (
     study_guide_is_complete, study_guide_to_flashcards,
 )
 from services import study_helper
-from services.text_processing import chunk_text, clean_text, html_to_text
+from services.text_processing import chunk_text, clean_text, html_to_text, without_import_lines
 from services.tutor_voice import ground_general_answer, plain_opening
 from services.tutor_sessions import (
     TUTOR_SAFETY_POLICY, claim_tutor_turn, complete_tutor_turn, fail_tutor_turn,
@@ -125,6 +125,10 @@ class Material:
         return (self.source or {}).get("title") or "Study Material"
 
 
+# A guide read as material: where it came from too, so lines an import wrote about itself stay out (without_import_lines).
+GUIDE_MATERIAL_COLUMNS = "id,title,folder_id,study_guide,notes,source_url,external_source_id,created_at"
+
+
 def _owned_row(table: str, columns: str, row_id: str, user_id: str, kind: str) -> dict:
     require_uuid(row_id, f"{kind} ID")
     result = get_supabase().table(table).select(columns).eq("id", row_id).eq("user_id", user_id).execute()
@@ -177,8 +181,8 @@ def _load_material(body: ChatRequest, user_id: str) -> Material:
 def _load_owned_material(body: ChatRequest, user_id: str) -> Material:
     sent = (body.content or "")[:MAX_CONTENT_LENGTH]
     if body.guide_id:
-        guide = _owned_row("study_guides", "id,title,folder_id,study_guide,notes,source_url", body.guide_id, user_id, "guide")
-        text = guide.get("study_guide") or guide.get("notes") or sent
+        guide = _owned_row("study_guides", GUIDE_MATERIAL_COLUMNS, body.guide_id, user_id, "guide")
+        text = guide.get("study_guide") or without_import_lines(guide.get("notes") or "", guide) or sent
         source = {"type": "study_guide", "id": guide["id"], "title": guide.get("title") or "Study Guide"}
         return Material(text[:MAX_CONTENT_LENGTH], source, guide=guide)
     if body.note_id:
@@ -371,8 +375,8 @@ def _app_action(user_id: str, question: str, material: Material, authorization: 
         return ChatResponse(answer=f"Made a notes page, {title(created)}.", action="navigate", link=guide_link(created))
     if action == "make":
         kind = "practice" if plan.get("kind") == "practice" else "guide"
-        loaded = _owned_row("study_guides", "id,title,folder_id,study_guide,notes,source_url", guide["id"], user_id, "guide")
-        content = (loaded.get("study_guide") or loaded.get("notes") or "")[:MAX_CONTENT_LENGTH]
+        loaded = _owned_row("study_guides", GUIDE_MATERIAL_COLUMNS, guide["id"], user_id, "guide")
+        content = (loaded.get("study_guide") or without_import_lines(loaded.get("notes") or "", loaded))[:MAX_CONTENT_LENGTH]
         if not content.strip():
             return ChatResponse(answer=f"{title(guide)} has no material to build from yet.")
         source = {"type": "study_guide", "id": loaded["id"], "title": title(loaded)}
@@ -657,7 +661,11 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
             return ChatResponse(answer=app["problem"])
         if app:
             source = {"type": "connector", "id": app["connector"], "title": app["title"]}
-            return _tutor_reply(body, user_id, question, Material(content=app["text"], source=source), skill, turn)
+            reply = _tutor_reply(body, user_id, question, Material(content=app["text"], source=source), skill, turn)
+            # Part of the page wasn't read: said after the answer, never inside the material the answer is made from.
+            if app.get("note"):
+                reply.answer = f"{reply.answer}\n\n{app['note']}"
+            return reply
     about_material = bool(material.content.strip() and PRACTICE_REQUEST.search(question))
     if (skill in {None, "explain", "build_guide", "practice", "organize", "plan", "retain"} and not body.class_id
             and not about_material and not _about_learn(question) and _asks_for_app_action(question)):

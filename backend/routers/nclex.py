@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from typing import List
 from database import get_supabase
 from services.llm import generate_nclex_questions
+from services.text_processing import without_import_lines
 from auth_utils import get_user_id
 from ids import require_uuid
 from services.entitlements import record, require
@@ -37,7 +38,7 @@ def generate_nclex(guide_id: str, authorization: str = Header(default="")):
     supabase = get_supabase()
 
     result = supabase.table("study_guides") \
-        .select("notes, study_guide, nclex_questions") \
+        .select("notes, study_guide, nclex_questions, external_source_id, created_at") \
         .eq("id", guide_id) \
         .eq("user_id", user_id) \
         .execute()
@@ -46,7 +47,7 @@ def generate_nclex(guide_id: str, authorization: str = Header(default="")):
         raise HTTPException(status_code=404, detail="Guide not found")
 
     row = result.data[0]
-    notes = row.get("notes") or ""
+    notes = without_import_lines(row.get("notes") or "", row)
     study_guide = row.get("study_guide") or ""
 
     if not notes and not study_guide:
