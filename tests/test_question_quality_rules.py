@@ -329,10 +329,13 @@ class SubjectQuestionTests(unittest.TestCase):
         for verb in verbs:
             self.assertEqual(standalone_question(f"As {verb} in the lecture, what is a tort?"), "What is a tort?", verb)
 
-    def test_a_visual_attribution_is_hidden_not_rewritten(self):
-        for question in ("Based on the graph, what is the equilibrium price?", "As shown in the diagram, what is the root of the tree?",
-                         "According to Figure 2, which chamber pumps blood to the lungs?", "Based on the map, which river formed the border?"):
-            self.assertIsNone(standalone_question(question), question)
+    def test_a_visual_opening_is_trimmed_never_hidden(self):
+        # The owner's rule: no question is hidden for its opening, a picture's included.
+        for question, want in (("Based on the graph, what is the equilibrium price?", "What is the equilibrium price?"),
+                               ("As shown in the diagram, what is the root of the tree?", "What is the root of the tree?"),
+                               ("According to Figure 2, which chamber pumps blood to the lungs?", "Which chamber pumps blood to the lungs?"),
+                               ("Based on the map, which river formed the border?", "Which river formed the border?")):
+            self.assertEqual(standalone_question(question), want, question)
 
     def test_every_case_is_stable_and_shown_twice_is_shown_once(self):
         # rook-f5/idem.py and rook-f5b/idem.py

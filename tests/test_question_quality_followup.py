@@ -596,12 +596,12 @@ FRESH = [
     ("According to the slides, who painted Las Meninas?", "Who painted Las Meninas?"),
     ("Which painting is shown on this slide?", None),
     ("What does the figure in the foreground of Las Meninas represent?", "KEEP"),
-    ("In the image of the Parthenon, which order are the columns?", None),
+    ("In the image of the Parthenon, which order are the columns?", "KEEP"),
     # business law
     ("In the Bill of Rights, which freedom is listed first?", "KEEP"),
     ("Under the UCC, what is the perfect tender rule?", "KEEP"),
     ("As defined in the reading, what is a fiduciary duty?", "What is a fiduciary duty?"),
-    ("Based on the graph, what is the equilibrium price?", None),
+    ("Based on the graph, what is the equilibrium price?", "What is the equilibrium price?"),
     ("What does the table of contents of the Restatement cover?", "KEEP"),
     ("In Maslow's hierarchy, which need is listed first?", "KEEP"),
     # literature
@@ -614,7 +614,7 @@ FRESH = [
     ("In the periodic table, which element is listed first?", "KEEP"),
     ("Which element of the list is returned by pop()?", "KEEP"),
     ("What does the professor's example of recursion compute?", None),
-    ("As shown in the diagram, what is the root of the tree?", None),
+    ("As shown in the diagram, what is the root of the tree?", "What is the root of the tree?"),
     ("What is the page table entry used for?", "KEEP"),
     # source-only once the attribution is gone
     ("According to the lecture, what are the four steps?", None),
@@ -622,19 +622,22 @@ FRESH = [
     ("What is the key takeaway, as stated in the module?", None),
 ]
 
-# A stripped attribution that names a picture, chart or table: the question needs it, so it is hidden.
-VISUAL = [
-    "Based on the graph, what is the equilibrium price?",
-    "As shown in the diagram, what is the root of the tree?",
-    "According to Figure 2, which chamber pumps blood to the lungs?",
-    "According to Table 3, what is the normal serum sodium range?",
-    "Based on the map, which river formed the border?",
-    "As depicted in the image, which order are the columns?",
-    "What is the equilibrium price, based on the chart above?",
-    "In this photo, which architectural style is shown?",
-    "In the image of the Parthenon, which order are the columns?",
-    "In the diagram of the heart, which valve is labelled B?",
-]
+# The owner's rule: a picture, chart or table in an opening is trimmed like any other opening that
+# only names the source, or the question is asked as written; it is never hidden for it. Only a
+# question about the picture's own layout (a label, a point on it) or contents is hidden.
+VISUAL = {
+    "Based on the graph, what is the equilibrium price?": "What is the equilibrium price?",
+    "As shown in the diagram, what is the root of the tree?": "What is the root of the tree?",
+    "According to Figure 2, which chamber pumps blood to the lungs?": "Which chamber pumps blood to the lungs?",
+    "According to Table 3, what is the normal serum sodium range?": "What is the normal serum sodium range?",
+    "Based on the map, which river formed the border?": "Which river formed the border?",
+    "As depicted in the image, which order are the columns?": "Which order are the columns?",
+    "What is the equilibrium price, based on the chart above?": "What is the equilibrium price?",
+    "In the image of the Parthenon, which order are the columns?": "KEEP",
+    # the question itself is about the picture: hidden for what it asks, never for its opening
+    "In this photo, which architectural style is shown?": None,
+    "In the diagram of the heart, which valve is labelled B?": None,
+}
 # Not a picture: subject terms and a patient's chart.
 NOT_VISUAL = [
     "According to the chart, what was the client's last blood pressure?",
@@ -660,9 +663,9 @@ class SecondReviewQuestionTests(unittest.TestCase):
                          "Which artist is named first, according to the slides?"):
             self.assertIsNone(standalone_question(question), question)
 
-    def test_a_visual_attribution_is_hidden_not_rewritten(self):
-        for question in VISUAL:
-            self.assertIsNone(standalone_question(question), question)
+    def test_a_visual_opening_is_trimmed_or_kept_never_hidden(self):
+        for question, want in VISUAL.items():
+            self.assertEqual(standalone_question(question), question if want == "KEEP" else want, question)
         for question in NOT_VISUAL:
             self.assertEqual(standalone_question(question), question)
 
