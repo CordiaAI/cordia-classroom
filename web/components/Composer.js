@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useRef } from 'react';
 import { ArrowUp, FileText, Mic, Paperclip, X } from 'lucide-react';
 import ClassPicker from './ClassPicker';
 import CordiaLoader from './CordiaLoader';
+import DictationLine from './DictationLine';
 import { UPLOAD_ACCEPT } from '../lib/uploadTypes.mjs';
 import { MAX_ATTACHMENTS } from '../lib/useTutorChat';
 import { openNewSheet } from '../lib/newSheet';
@@ -32,7 +33,7 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
   const touchedRef = useRef(false); // the student has been in the box, so its caret is theirs
   const {
     input, setInput, attachments, setAttachments, removeAttachment, attachFiles, extracting, attachDropActive, fileRef, combinedAttachments, contextKey,
-    sendMessage, session, busy, canSubmit, remaining, Recognition, listening, interim, toggleMic, localError,
+    sendMessage, session, busy, canSubmit, remaining, Recognition, listening, interim, dictationError, toggleMic, localError,
   } = tutor;
   const minHeight = variant === 'home' ? 88 : 52;
   const hasSomething = Boolean(input.trim()) || attachments.length > 0;
@@ -134,9 +135,7 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
           <ArrowUp size={18} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </div>
-      {listening && (
-        <p className={'dictation-interim' + (interim ? ' is-heard' : '')} role="status" aria-live="off">{interim || 'Listening…'}</p>
-      )}
+      <DictationLine available={Boolean(Recognition)} listening={listening} interim={interim} error={dictationError} />
       {contextKey === 'attachment' && combinedAttachments.trimmed.length > 0 && (
         <p className="composer-note" role="status">Too long to read whole, so the Tutor reads part of: {combinedAttachments.trimmed.join(', ')}</p>
       )}

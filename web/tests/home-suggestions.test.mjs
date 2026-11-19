@@ -7,23 +7,78 @@ import { DUE_REVIEW_CARDS, buildStudyQueue, cardLimit } from '../lib/studyQueue.
 
 const plan = (title, course) => planLabel({ title, course });
 
-test('the Plan label names the class and drops ids and numbering, keeping the meaning', () => {
+test('the Plan label names the class and drops ids, keeping the meaning and the number', () => {
   assert.equal(plan('Packback Discussion #12', 'EH-101-136'), "Plan EH 101's Packback discussion");
   assert.equal(plan('Packback #9', 'REL-200-101'), "Plan REL 200's Packback");
   assert.equal(plan('Concert Report #2', 'MUL-101-102'), "Plan MUL 101's Concert report");
   assert.equal(plan('A05 Seven Ethical Frameworks Quiz', 'BUS-101-101'), "Plan BUS 101's Seven Ethical Frameworks quiz");
   assert.equal(plan('A07AA Rough Draft, Resume', 'BUS-101-101'), "Plan BUS 101's Rough Draft, Resume");
-  assert.equal(plan('Reading response 8', 'ENG-102-104'), "Plan ENG 102's Reading response");
   assert.equal(plan('Lab report', 'BIO-101'), "Plan BIO 101's Lab report");
-  assert.equal(plan('Essay 2', 'ENG-101-004'), "Plan ENG 101's essay");
-  assert.equal(plan('Discussion 3: Ethics in Nursing', 'NUR-220'), "Plan NUR 220's Discussion: Ethics in Nursing");
   assert.equal(plan('Midterm Exam', 'HIS-110'), "Plan HIS 110's Midterm exam");
+  assert.equal(plan('Case Study - Pharmacology', 'NUR-230'), "Plan NUR 230's Case Study: Pharmacology");
 });
 
-test('the meaning stays: part numbers like Week 5 or Chapter 4 are not numbering', () => {
-  assert.equal(plan('Week 5 Discussion', 'PSY-101'), "Plan PSY 101's Week 5 discussion");
-  assert.equal(plan('Chapter 4 Quiz #2', 'CHM-111'), "Plan CHM 111's Chapter 4 quiz");
-  assert.equal(plan('Case Study - Pharmacology', 'NUR-230'), "Plan NUR 230's Case Study: Pharmacology");
+test('the number after a work word stays: Quiz 4, Lab 3, Problem Set 4, Exam 3', () => {
+  for (const title of ['Quiz 4', 'Lab 3', 'Problem Set 4', 'Exam 3', 'Test 2', 'Midterm 2', 'Essay 2', 'Reading response 8', 'Discussion 3: Ethics in Nursing', 'Exam 3: Cardiac', 'Module 3 Quiz 2', 'Lab 07: Pointers']) {
+    assert.equal(planTitle(title).replace(/: .*/, ''), title.replace(/: .*/, ''), title);
+  }
+  assert.equal(planTitle('Exam 1 (1 of 2)'), 'Exam 1');
+  assert.equal(planTitle('Care Plan 2 - Heart Failure'), 'Care Plan 2: Heart Failure');
+  assert.equal(plan('Quiz 4', 'NUR-210'), "Plan NUR 210's Quiz 4");
+});
+
+test('part words are not ids: Wk5, Ch5, Pt2, U2, Week 5, Part 2 stay', () => {
+  assert.equal(planTitle('Wk5 Discussion'), 'Wk5 discussion');
+  assert.equal(planTitle('Ch5 Reading Quiz'), 'Ch5 Reading quiz');
+  assert.equal(planTitle('U2 Test'), 'U2 test');
+  assert.equal(planTitle('Pt2 Final Paper'), 'Pt2 Final paper');
+  assert.equal(planTitle('Week 5 Discussion'), 'Week 5 discussion');
+  assert.equal(planTitle('Group Project Part 2'), 'Group Project Part 2');
+  assert.equal(planTitle('Wk 5 Discussion'), 'Wk 5 discussion');
+  assert.equal(planTitle('A1C Lab Report'), 'A1C Lab report', 'a lab value is not an id');
+  assert.equal(planTitle('B12 Deficiency Case Study'), 'B12 Deficiency Case Study');
+});
+
+test('an id goes only when words follow; a title of only codes falls back to "next assignment"', () => {
+  assert.equal(planTitle('PA3: Hash Tables'), 'Hash Tables');
+  assert.equal(planTitle('HW3 Review'), 'review');
+  for (const title of ['HW3', 'A05', 'Q1', '#12', 'NUR-210-01 [A05]', 'ENG-101-004', 'NUR-210-01', '']) {
+    assert.equal(planTitle(title), '', title);
+    assert.equal(plan(title, 'NUR-210'), "Plan NUR 210's next assignment", title);
+  }
+  assert.equal(planTitle('Catch-22 Discussion'), 'Catch-22 discussion', 'a hyphenated name is not a section code');
+  assert.equal(planTitle('COVID-19 Reflection'), 'COVID-19 reflection');
+});
+
+test('only a fully Title Case title gets its last work noun lowercased', () => {
+  assert.equal(planTitle('Packback Discussion'), 'Packback discussion');
+  assert.equal(planTitle('Hamlet Act 3 Response'), 'Hamlet Act 3 response');
+  assert.equal(planTitle('Annotated Bibliography for the Harlem Renaissance Paper'), 'Annotated Bibliography for the Harlem Renaissance paper');
+  assert.equal(planTitle('Annotated bibliography for the Harlem Renaissance Paper'), 'Annotated bibliography for the Harlem Renaissance Paper', 'a lowercase word: case left alone');
+  assert.equal(planTitle('iPad Lab Report'), 'iPad Lab Report');
+  assert.equal(planTitle('Lab report'), 'Lab report');
+  assert.equal(planTitle('FINAL EXAM'), 'FINAL EXAM');
+  assert.equal(planTitle('Case Brief 4: Hadley v. Baxendale'), 'Case Brief 4: Hadley v. Baxendale');
+});
+
+test('realistic titles: nursing, art history, business law, literature, computer science', () => {
+  const titles = {
+    'NCLEX Practice Quiz 4': 'NCLEX Practice Quiz 4',
+    'Med-Surg Clinical Reflection 3': 'Med-Surg Clinical Reflection 3',
+    'Care Plan 2 - Heart Failure': 'Care Plan 2: Heart Failure',
+    'Visual Analysis Paper 2: Caravaggio': 'Visual Analysis Paper 2: Caravaggio',
+    'Baroque Art Response - Week 9': 'Baroque Art Response: Week 9',
+    'Contracts Memo 1': 'Contracts Memo 1',
+    'UCC Article 2 Quiz': 'UCC Article 2 quiz',
+    'Sonnet 18 Close Reading': 'Sonnet 18 Close reading',
+    'Essay 2 (Draft)': 'Essay 2 (Draft)',
+    '1984 Essay': '1984 essay',
+    'Title IX Training': 'Title IX Training',
+    'CS 101 Project 2: Linked Lists': 'CS 101 Project 2: Linked Lists',
+    'Assignment 3 - Recursion': 'Assignment 3: Recursion',
+    'Chapter 12 Homework': 'Chapter 12 homework',
+  };
+  for (const [title, wanted] of Object.entries(titles)) assert.equal(planTitle(title), wanted, title);
 });
 
 test('a section code in the title or a class name is read, and a missing class says "your"', () => {
@@ -31,9 +86,9 @@ test('a section code in the title or a class name is read, and a missing class s
   assert.equal(planTitle('Lab report [BIO-101-002]'), 'Lab report');
   assert.equal(plan('Packback #12', 'EH 101'), "Plan EH 101's Packback");
   assert.equal(plan('Packback #12', 'Introduction to Music'), "Plan Introduction to Music's Packback");
-  assert.equal(plan('Quiz 3', 'S1-FA24'), 'Plan your quiz');
-  assert.equal(plan('Quiz 3', 'Fall 2024'), 'Plan your quiz');
-  assert.equal(plan('Quiz 3', 'Statistics for Nurses'), "Plan Statistics for Nurses' quiz");
+  assert.equal(plan('Quiz 3', 'S1-FA24'), 'Plan your Quiz 3');
+  assert.equal(plan('Quiz 3', 'Fall 2024'), 'Plan your Quiz 3');
+  assert.equal(plan('Quiz 3', 'Statistics for Nurses'), "Plan Statistics for Nurses' Quiz 3");
 });
 
 test('nothing left of the title still reads as a sentence', () => {
@@ -48,6 +103,37 @@ test('the class is the department and level, however the course is written', () 
   assert.equal(classShort('bio101'), 'BIO 101');
   assert.equal(classShort('CHEM-2210L-01'), 'CHEM 2210L');
   assert.equal(classShort(''), '');
+});
+
+test('a two-word department is kept, and false departments are not read as one', () => {
+  assert.equal(classShort('Spring 2025 ART HIST 210'), 'ART HIST 210');
+  assert.equal(classShort('BUS LAW 3310'), 'BUS LAW 3310');
+  assert.equal(classShort('Intro to CS 101'), 'CS 101');
+  assert.equal(classShort('INTRO TO CS 101'), 'CS 101');
+  assert.equal(classShort('Art History Survey II (ARTH-2202-01)'), 'ARTH 2202');
+  assert.equal(classShort('ARTH2201'), 'ARTH 2201');
+  assert.equal(classShort('BIOL 1010 Sec 02'), 'BIOL 1010');
+  assert.equal(classShort('202510-CS-1301-A'), 'CS 1301');
+  assert.equal(classShort('2024FA-ENG-101-01'), 'ENG 101');
+  for (const course of ['Sec 02 Biology', 'Lab 02 - Chemistry', 'Week 5', 'COVID 19 Seminar', 'FA24', 'Fall 2024', 'Fall 2024 Cohort A', 'S1-FA24', 'CS']) {
+    assert.doesNotMatch(classShort(course), /^(SEC|LAB|WEEK|COVID|FA|FALL|COHORT)\b|^CS$/i, course);
+  }
+  assert.equal(classShort('Week 5'), '');
+  assert.equal(classShort('COVID 19 Seminar'), '');
+});
+
+test('a class named in words is cut at a dash, a bracket or Section, and loses its term', () => {
+  assert.equal(classShort('Contracts I - Section 3'), 'Contracts I');
+  assert.equal(classShort('SP25 Adult Health I'), 'Adult Health I');
+  assert.equal(classShort('Nursing Fundamentals Fall 2024'), 'Nursing Fundamentals');
+  assert.equal(classShort('Lab 02 - Chemistry'), 'Chemistry');
+  assert.equal(classShort('Sec 02 Biology'), 'Biology');
+  assert.equal(classShort('American Literature II'), 'American Literature II');
+  assert.equal(classShort('Pathophysiology'), 'Pathophysiology');
+  assert.equal(classShort('NURS 3310: Adult Health II'), 'NURS 3310');
+  assert.equal(classShort('ENGL 1102 - Comp II'), 'ENGL 1102');
+  assert.equal(classShort('Shakespeare (ENG 340)'), 'ENG 340');
+  assert.equal(classShort('MGT 4400 Business Law & Ethics'), 'MGT 4400');
 });
 
 test('copy rules: sentence case, no exclamation marks, numerals, nothing over a line long', () => {

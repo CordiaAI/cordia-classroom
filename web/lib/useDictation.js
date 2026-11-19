@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { applyResults, dictationInterim, dictationText, finishDictation, startDictation } from './dictation.mjs';
+import { applyResults, dictationError, dictationHeard, dictationInterim, dictationText, finishDictation, startDictation } from './dictation.mjs';
+
+const ERROR_SHOWN_MS = 8000;
 
 // Dictation into a text box (the Tutor's composer, a study-aid answer): the rules are in
 // dictation.mjs. The box gets the words that are final, where the caret was when the mic went on;
 // `interim` is what is still being recognized, to show apart from the box.
-//   text, setText: the box's value and its setter.
-// Returns { Recognition, listening, interim, toggle(caret), abort }. toggle takes the box's
+//   text, setText: the box's value and its setter; maxLength: how much the box holds (the words
+//   heard are cut to fit, never what was typed).
+// Returns { Recognition, listening, interim, error, toggle(caret), abort }. toggle takes the box's
 // { start, end } selection (or nothing, to go at the end). Stop and silence keep what was heard;
-// abort (Send, unmount) and the student typing while listening drop what was still interim and
-// stop, so nothing lands in a message that has gone or been changed.
-export default function useDictation({ text, setText, lang = 'en-US' }) {
+// abort (Send, a new chat, unmount) and the student typing while listening drop what was still
+// interim and stop, so nothing lands in a message that has gone or been changed. error is one plain
+// line when the recognizer failed (the mic is blocked, nothing was heard, no connection); it goes
+// on the next try, or after a few seconds.
+export default function useDictation({ text, setText, lang = 'en-US', maxLength }) {
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState('');
+  const [error, setError] = useState('');
   // Read after mount: the server render has no recognizer, and the first client render must match it.
   // (Held in an object: a class passed straight to a state setter would be called as an updater.)
   const [found, setFound] = useState({ Recognition: null });
@@ -24,11 +30,18 @@ export default function useDictation({ text, setText, lang = 'en-US' }) {
     activeRef.current = null;
     setListening(false);
     setInterim('');
+    setError('');
     if (!active) return;
     try { active.recognition.abort(); } catch { /* already stopped */ }
   }, []);
 
   useEffect(() => abort, [abort]);
+
+  useEffect(() => {
+    if (!error) return undefined;
+    const timer = setTimeout(() => setError(''), ERROR_SHOWN_MS);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   // The student typed (or Send cleared the box) while listening: the box is theirs again.
   useEffect(() => {
@@ -40,12 +53,13 @@ export default function useDictation({ text, setText, lang = 'en-US' }) {
     const active = activeRef.current;
     if (active) { active.recognition.stop(); return; }
     if (!Recognition) return;
+    setError('');
     const recognition = new Recognition();
     recognition.lang = lang;
     recognition.interimResults = true;
     const session = { recognition, state: startDictation(text, caret.start, caret.end), written: [text] };
     const show = () => {
-      const next = dictationText(session.state);
+      const next = dictationText(session.state, maxLength);
       if (!session.written.includes(next)) session.written.push(next);
       setText(next);
       setInterim(dictationInterim(session.state));
@@ -63,12 +77,17 @@ export default function useDictation({ text, setText, lang = 'en-US' }) {
       setListening(false);
       setInterim('');
     };
-    recognition.onerror = end;
+    recognition.onerror = event => {
+      if (activeRef.current !== session) return;
+      const message = dictationError(event?.error, dictationHeard(session.state));
+      end();
+      setError(message);
+    };
     recognition.onend = end;
     activeRef.current = session;
     setListening(true);
     try { recognition.start(); } catch { abort(); }
-  }, [Recognition, lang, text, setText, abort]);
+  }, [Recognition, lang, text, setText, maxLength, abort]);
 
-  return { Recognition, listening, interim, toggle, abort };
+  return { Recognition, listening, interim, error, toggle, abort };
 }

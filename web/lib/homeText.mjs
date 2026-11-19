@@ -41,39 +41,74 @@ const shorten = (text, max = 40) => {
 // The nouns an assignment title ends in ("Packback Discussion", "Lab Report"): lowercased at the end
 // of the Plan label, since the label reads as a sentence.
 const WORK_NOUNS = new Set(['assignment', 'bibliography', 'discussion', 'draft', 'essay', 'exam', 'final', 'homework', 'journal', 'lab', 'memo', 'midterm', 'outline', 'paper', 'portfolio', 'post', 'presentation', 'project', 'proposal', 'quiz', 'reading', 'reflection', 'report', 'response', 'review', 'summary', 'test', 'worksheet']);
-// Words whose number says which part of the course it is, not which copy of the work ("Week 5").
-const PART_WORDS = new Set(['chapter', 'lesson', 'module', 'part', 'section', 'session', 'unit', 'week']);
+// Small words that stay lowercase in a Title Case title ("Hadley v. Baxendale", "Ethics of Care").
+const MINOR_WORDS = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'in', 'of', 'on', 'or', 'the', 'to', 'v', 'vs', 'with']);
 
 const TERMS = new Set(['FA', 'FALL', 'SP', 'SPR', 'SPRNG', 'SPRING', 'SU', 'SUM', 'SUMR', 'WI', 'WIN', 'WINT']);
+// Words that sit before a number without naming a department ("Sec 02", "Week 5", "COVID 19"), and
+// words an all-caps title starts with ("INTRO TO CS 101").
+const NOT_DEPARTMENTS = new Set(['SEC', 'SECT', 'SECTION', 'LAB', 'LEC', 'LECTURE', 'WEEK', 'WK', 'UNIT', 'MOD', 'MODULE', 'CH', 'CHAP', 'CHAPTER', 'PART', 'PT', 'SESSION', 'GROUP', 'COHORT', 'TEAM', 'BLOCK', 'CLASS', 'COVID', 'COURSE', 'TERM', 'YEAR', 'GRADE', 'LEVEL', 'ROOM', 'RM', 'CRN', 'STEP', 'DAY', 'PERIOD', 'QTR']);
+const LEADING_WORDS = new Set(['TO', 'OF', 'AND', 'THE', 'FOR', 'IN', 'ON', 'AT', 'A', 'AN', 'INTRO', 'INTRODUCTION']);
 
-// "EH-102-136" or "MUL 101 MUL-101-102: Introduction to Music" -> "EH 102", "MUL 101": the department
-// and level, the way students name a class. A class named only in words keeps its name; anything
-// else (a bare section code) names nothing.
+// "EH-102-136" or "MUL 101 MUL-101-102: Introduction to Music" -> "EH 102", "MUL 101"; "Art History
+// 210 (ART HIST 210)" -> "ART HIST 210": the department (one word, or two in capitals) and level, the
+// way students name a class. A class named only in words keeps its name, cut at a dash, a colon, a
+// bracket or "Section", without its term ("SP25 Adult Health I" -> "Adult Health I"). When unsure
+// (a section code, a term, "Week 5", "COVID 19") it names nothing, and the label says "your".
 export function classShort(course) {
   const text = String(course || '').trim();
-  // A term ("FA24", "Fall 2024") is not a class.
-  const code = [...text.matchAll(/\b([A-Za-z]{2,5})[\s_-]*(\d{2,4}[A-Za-z]?)\b/g)].find(([, dept, level]) => !TERMS.has(dept.toUpperCase()) && !/^(19|20)\d\d$/.test(level));
-  if (code) return `${code[1].toUpperCase()} ${code[2].toUpperCase()}`;
-  return /[a-z]/.test(text) && /\s/.test(text) && !/\b(?:19|20)\d\d\b/.test(text) ? shorten(text.replace(/:.*$/, ''), 28) : '';
+  const pattern = /\b([A-Z]{2,5}[\s_-]+[A-Z]{2,5}|[A-Za-z]{2,5})[\s_-]*(\d{3,4}[A-Za-z]?)\b/g;
+  for (const [, dept, level] of text.matchAll(pattern)) {
+    const parts = dept.split(/[\s_-]+/);
+    while (parts.length > 1 && LEADING_WORDS.has(parts[0].toUpperCase())) parts.shift();
+    if (parts.some(part => TERMS.has(part.toUpperCase()) || NOT_DEPARTMENTS.has(part.toUpperCase()))) continue;
+    if (/^(19|20)\d\d$/.test(level)) continue;
+    return `${parts.join(' ').toUpperCase()} ${level.toUpperCase()}`;
+  }
+  const name = text
+    .replace(/^\s*(?:(?:spring|summer|fall|winter|spr|sum|fal|win|sp|su|fa|wi)\s*['’]?\d{2,4}|(?:19|20)\d\d(?:\d\d)?)\b[\s,.:-]*/i, '')
+    .replace(/^\s*(?:sec|section|lab|week|unit|group|cohort)\b\s*\d*[\s,.:–—-]*/i, '')
+    .replace(/\s+[–—-]\s+.*$/, '')
+    .replace(/[:(\[].*$/, '')
+    .replace(/\b(?:section|sec)\b.*$/i, '')
+    .replace(/[\s,.-]*\b(?:spring|summer|fall|winter)\s*(?:19|20)?\d\d\s*$/i, '')
+    .trim();
+  const words = name.split(/\s+/).filter(Boolean);
+  const named = /[a-z]/.test(name) && !/\b(?:19|20)\d\d\b/.test(name) && !NOT_DEPARTMENTS.has(words[0]?.toUpperCase()) && (words.length > 1 || /^[A-Za-z]{5,}$/.test(name));
+  return named ? shorten(name, 28) : '';
 }
 
-// An assignment's title in plain words for the Plan label: the Canvas section code, ids ("A05"),
-// "#12" and trailing numbering ("Reading response 8") go, the meaning stays. "" if nothing is left.
+// A leading id Canvas puts on an assignment ("A05", "A07AA", "HW3", "PA3"), and a section code
+// ("NUR-210-01"). Part words ("Wk5", "Ch5", "Pt2", "U2") are not ids: the number says which part.
+const ASSIGNMENT_ID = /^(?:a|as|asg|dq|hw|pa|pr|ps|q|ws)(?:\d{1,3}|\d{2,3}[a-z]{1,3})$/i;
+const SECTION_CODE = /^[A-Za-z]{2,5}[-_]\d{3,4}[A-Za-z]?(?:[-_]\d{1,3})?$/;
+const isCode = token => { const bare = token.replace(/[:.,–—-]+$/, ''); return ASSIGNMENT_ID.test(bare) || SECTION_CODE.test(bare) || /^\d{1,3}$/.test(bare); };
+
+// Every word starts with a capital (small words aside): "Packback Discussion", not "Lab report".
+const isTitleCase = title => title.split(/\s+/).every(word => {
+  const letters = word.replace(/^[^A-Za-z]+/, '');
+  return !letters || MINOR_WORDS.has(letters.toLowerCase().replace(/\.$/, '')) || /^[A-Z]/.test(letters);
+});
+
+// An assignment's title in plain words for the Plan label: the Canvas section code, ids ("A05",
+// "PA3:"), "#12" and "(1 of 2)" go; the meaning stays, numbers included ("Quiz 4", "Lab 3", "Problem
+// Set 4"). The last word is lowercased when it is a work noun and the whole title is in Title Case,
+// since the label reads as a sentence. "" if only codes are left ("NUR-210-01 [A05]").
 export function planTitle(raw) {
   let title = String(raw || '')
     .replace(/\s*\[[^\]]*\]\s*$/, '')
     .replace(/\s*\(\s*\d+\s*(?:of|\/)\s*\d+\s*\)/gi, '')
-    .replace(/\s*#\s*\d+[A-Za-z]?/g, '')
-    .replace(/^\s*[A-Za-z]{1,3}\d{1,3}[A-Za-z]{0,3}\b[\s:.–—-]*/, '');
-  // A number straight after a word, then a separator or the end: "Discussion 3: Ethics", "Essay 2".
-  title = title.replace(/([A-Za-z]+)[\s.,-]+(?:no\.?\s*)?\d{1,3}[A-Za-z]?(?=\s*(?:[:–—-]|$))/gi, (match, word) => (PART_WORDS.has(word.toLowerCase()) ? match : word));
-  title = title
+    .replace(/\s*#\s*\d+[A-Za-z]?/g, '');
+  const tokens = title.split(/\s+/).filter(Boolean);
+  if (tokens.every(isCode)) return '';
+  while (tokens.length > 1 && isCode(tokens[0]) && !tokens.every(isCode)) tokens.shift();
+  title = tokens.join(' ')
     .replace(/\s+[–—-]\s+/g, ': ')
     .replace(/\s+([:,;.])/g, '$1')
     .replace(/\s+/g, ' ')
     .replace(/^[\s:,;.–—-]+|[\s:,;.–—-]+$/g, '');
   const last = title.match(/[A-Za-z]+$/)?.[0];
-  if (last && WORK_NOUNS.has(last.toLowerCase()) && last !== last.toUpperCase()) title = title.slice(0, -last.length) + last.toLowerCase();
+  if (last && WORK_NOUNS.has(last.toLowerCase()) && last !== last.toUpperCase() && isTitleCase(title)) title = title.slice(0, -last.length) + last.toLowerCase();
   return title;
 }
 

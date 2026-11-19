@@ -1182,9 +1182,15 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 @media (hover: hover) { .composer-file-remove:hover { background: var(--glass-inner); } }
 .composer-note { margin: 0 8px 2px; color: var(--muted); font: 500 0.8125rem/1.4 var(--font-sans); }
 .composer-note.is-error { color: var(--error); }
-/* Dictation: while the mic is on, the words still being recognized show here, apart from the box, in italics (a plain "Listening…" before any are heard). */
-.dictation-interim { margin: 0 0.5rem 0.125rem; color: var(--muted-strong); font: 500 0.875rem/1.4 var(--font-sans); overflow-wrap: anywhere; }
+/* Dictation (components/DictationLine.js): the slot holds one line whenever the browser can dictate, so the box
+   never moves. While the mic is on, the words still being recognized show in it, apart from the box, in
+   italics on one line with the newest in view (a plain "Listening…" before any are heard). An error from the
+   recognizer is one plain line in the same slot, in the error colour. */
+.dictation-slot { margin: 0 0.5rem 0.125rem; min-height: 1.225rem; }
+.dictation-interim { margin: 0; color: var(--muted-strong); font: 500 0.875rem/1.4 var(--font-sans); white-space: nowrap; overflow: hidden; }
 .dictation-interim.is-heard { font-style: italic; }
+.dictation-interim.is-error { color: var(--error); font-style: normal; white-space: normal; }
+.cordia-tutor > .dictation-slot { margin: -0.25rem 1.5rem 0.5rem; }
 
 /* The class picker (components/ClassPicker.js): a quiet button with the class's dot and code. */
 .c-class-picker {

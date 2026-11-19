@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { applyResults, dictationInterim, dictationText, finishDictation, startDictation } from '../lib/dictation.mjs';
+import { applyResults, dictationError, dictationHeard, dictationInterim, dictationText, finishDictation, startDictation } from '../lib/dictation.mjs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -113,6 +113,63 @@ test('empty and odd events change nothing', () => {
   assert.equal(dictationText(applyResults(state, { resultIndex: 3, results: [] })), 'typed');
 });
 
+test('a new results list (resultIndex goes back) with other words is added after what is held, not over it', () => {
+  const steps = play('', [0, 0], [
+    event(0, heard('first part', true)),
+    event(1, heard('first part', true), heard('second', true)),
+    event(0, heard('third bit', true)),
+    event(1, heard('third bit', true), heard('fourth', true)),
+  ]);
+  assert.deepEqual(steps.slice(0, 4).map(step => step.text), ['first part', 'first part second', 'first part second third bit', 'first part second third bit fourth']);
+  // Back at an index already held with the same words, or the same words carried on: nothing is added.
+  const same = play('', [0, 0], [event(0, heard('hello', true)), event(1, heard('hello', true), heard('and', true)), event(0, heard('hello', true), heard('and bye', true))]);
+  assert.equal(same.at(-2).text, 'hello and bye');
+  const grown = play('', [0, 0], [event(0, heard('what time', true)), event(1, heard('what time', true), heard('is it', false)), event(0, heard('what time is', true))]);
+  assert.equal(grown.at(-2).text, 'what time is', 'a longer version of the same words replaces it');
+});
+
+test('Android Chrome: finals that repeat the one before and go on keep one copy', () => {
+  const steps = play('', [0, 0], [
+    event(0, heard('hello', true)),
+    event(1, heard('hello', true), heard('hello world', true)),
+    event(1, heard('hello', true), heard('hello world', true), heard('hello world how are you', true)),
+    event(0, heard('hello', true), heard('hello world', true), heard('hello world how are you', true)),
+  ]);
+  assert.deepEqual(steps.slice(0, 4).map(step => step.text), ['hello', 'hello world', 'hello world how are you', 'hello world how are you']);
+  // The same words said twice, apart, are two phrases; a word that merely starts the next one is not a repeat.
+  assert.equal(dictationText(final(play('', [0, 0], [event(0, heard('no', true)), event(1, heard('no', true), heard('no', true))]))), 'no no');
+  assert.equal(dictationText(final(play('', [0, 0], [event(0, heard('I', true)), event(1, heard('I', true), heard('Iceland is cold', true))]))), 'I Iceland is cold');
+  assert.equal(dictationText(final(play('', [0, 0], [event(0, heard('Hello', true)), event(1, heard('Hello', true), heard('hello, world', true))]))), 'hello, world');
+});
+
+test('a box that holds only so much gets the words cut to fit, never what was typed', () => {
+  const state = final(play('Typed before', [12, 12], [event(0, heard('one two three four five', true))]));
+  assert.equal(dictationText(state, 1000), 'Typed before one two three four five');
+  assert.equal(dictationText(state, 25), 'Typed before one two', 'cut at a whole word');
+  assert.equal(dictationText(state, 26), 'Typed before one two three');
+  assert.equal(dictationText(state, 8), 'Typed before', 'no room: what was typed alone');
+  const after = final(play('Start end', [5, 5], [event(0, heard('middle words here', true))]));
+  assert.equal(dictationText(after, 16), 'Start middle end');
+  assert.equal(dictationText(after, 15), 'Start end', 'a word that does not fit whole is left out; the typed text stays');
+  assert.equal(dictationText(after, 9), 'Start end', 'no room: the typed text alone');
+  const long = dictationText(final(play('', [0, 0], [event(0, heard(Array.from({ length: 600 }, (_, at) => `word${at}`).join(' '), true))])), 2000);
+  assert.ok(long.length <= 2000 && long.length > 1980, 'a long dictation fills the box without going over: ' + long.length);
+  assert.ok(dictationText(final(play('', [0, 0], [event(0, heard('x'.repeat(3000), true))])), 2000).length <= 2000);
+});
+
+test('the recognizer errors say one plain thing', () => {
+  assert.equal(dictationError('not-allowed'), 'Your browser is blocking the microphone. Allow it in site settings.');
+  assert.equal(dictationError('service-not-allowed'), dictationError('not-allowed'));
+  assert.equal(dictationError('no-speech'), "Didn't catch anything. Try again.");
+  assert.equal(dictationError('no-speech', true), '', 'words were heard, so "nothing" would be wrong');
+  assert.match(dictationError('network'), /connect|connection/i);
+  assert.match(dictationError('audio-capture'), /microphone/i);
+  assert.equal(dictationError('aborted'), '', 'we stopped it ourselves');
+  assert.ok(dictationError('something-new'), 'any other error still says something');
+  assert.equal(dictationHeard(startDictation('', 0, 0)), false);
+  assert.equal(dictationHeard(applyResults(startDictation('', 0, 0), event(0, heard('hi')))), true);
+});
+
 test('every dictation box shares the one handler, with no per-event appending left', () => {
   for (const file of ['lib/useTutorChat.js', 'components/StudyAidPanel.js']) {
     const source = read(file);
@@ -123,5 +180,27 @@ test('every dictation box shares the one handler, with no per-event appending le
   assert.match(read('lib/useTutorChat.js'), /stopDictation\(\);\s*walkthroughEvent\('ask'\)/, 'Send stops the mic before the message goes');
   assert.match(read('components/StudyAidPanel.js'), /stopListening\(\);\s*setBusy\(true\)/, 'Check my answer stops the mic first');
   assert.match(read('lib/useDictation.js'), /interimResults = true/);
+  assert.match(read('lib/useDictation.js'), /onerror = event =>[\s\S]*dictationError\(event\?\.error/, 'a recognizer error is read, not just ended');
   assert.match(read('lib/useDictation.js'), /useState\(\{ Recognition: null \}\)/, 'the recognizer class is held in an object: a class given to a state setter is called as an updater');
+});
+
+test('New chat and switching chats stop the mic; the Tutor panel and page show the interim line and use the caret', () => {
+  const tutor = read('lib/useTutorChat.js');
+  assert.match(tutor, /async function startChat[\s\S]*?stopDictation\(\);/, 'starting a chat stops dictation');
+  assert.match(tutor, /const onNew = \(\) => \{\s*stopDictation\(\);/, "the sidebar's New chat stops dictation");
+  assert.match(tutor, /stopDictation\(\); \}, \[router\.asPath/, 'moving to another chat stops dictation');
+  const widget = read('components/AIChatWidget.js');
+  assert.match(widget, /<DictationLine /, 'the panel and the Tutor page show what is being heard');
+  assert.doesNotMatch(widget, /onClick=\{toggleMic\}/, 'the click event is not the caret');
+  assert.match(widget, /toggleMic\(touchedRef\.current && boxRef\.current \? \{ start: boxRef\.current\.selectionStart, end: boxRef\.current\.selectionEnd \} : \{\}\)/);
+  for (const file of ['components/Composer.js', 'components/StudyAidPanel.js', 'components/AIChatWidget.js']) assert.match(read(file), /<DictationLine /, `${file} shows the one line`);
+  assert.match(read('components/StudyAidPanel.js'), /maxLength: ATTEMPT_MAX/, 'dictated words stop at what the answer box holds');
+});
+
+test('the dictation line holds one line, on one line, and never uses a raw colour', () => {
+  const css = read('styles/system.css');
+  assert.match(css, /\.dictation-slot \{[^}]*min-height: 1\.225rem/, 'the slot keeps its line');
+  assert.match(css, /\.dictation-interim \{[^}]*white-space: nowrap; overflow: hidden/, 'interim words stay on one line');
+  assert.match(css, /\.dictation-interim\.is-error \{[^}]*color: var\(--error\)/);
+  assert.doesNotMatch(css.match(/\.dictation-slot[^\n]*\n(?:\.dictation-interim[^\n]*\n)+/)?.[0] || '', /#[0-9a-f]{3,8}\b|rgba?\(/i);
 });

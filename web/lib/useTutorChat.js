@@ -113,11 +113,13 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
   const [speakingIndex, setSpeakingIndex] = useState(-1);
   // Dictation (lib/dictation.mjs): the words that are final go in the box, at the caret; what is
   // still being recognized (interim) shows apart from it.
-  const { Recognition, listening, interim, toggle: toggleMic, abort: stopDictation } = useDictation({ text: input, setText: setInput });
+  const { Recognition, listening, interim, error: dictationError, toggle: toggleMic, abort: stopDictation } = useDictation({ text: input, setText: setInput });
   // Read after mount: the server render has no browser speech APIs, and the first client
   // render must match it.
   const [canSpeak, setCanSpeak] = useState(false);
   useEffect(() => setCanSpeak('speechSynthesis' in window), []);
+  // Another chat (a saved one from the sidebar, a new one) is another box: the mic goes off with the page.
+  useEffect(() => { stopDictation(); }, [router.asPath, stopDictation]);
 
   useEffect(() => () => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
@@ -526,6 +528,7 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
     const onVisibility = event => { if (event.detail?.open) setFreshPending(true); };
     // The sidebar's New chat, pressed while the full Tutor page is already open.
     const onNew = () => {
+      stopDictation();
       if (freshOnMount) setFreshPending(true);
       // The chat home empties again; its next message starts the new chat (freshOnSend).
       if (freshOnSend && !sendingRef.current) { startedRef.current = false; setSentHere(false); setInput(''); setAttachments([]); setLocalError(''); }
@@ -575,6 +578,7 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
 
   async function startChat({ guideId = null, resume = null, opening = false } = {}) {
     if (!session?.id || (busy && !opening)) return;
+    stopDictation(); // words heard after this belong to nothing: the new chat starts with its own box
     setChatsError('');
     const next = await apiFetch('/tutor/session/new', {
       method: 'POST',
@@ -626,6 +630,6 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
     hasRequiredContext, canSubmit, remaining, busy, loading, progressLabel, localError, setLocalError,
     chatsOpen, setChatsOpen, savedChats, chatsError, deletingChat, setDeletingChat, deleteSavedChat, startChat,
     deleteFromTutor, openSource,
-    Recognition, canSpeak, listening, interim, toggleMic, speakingIndex, toggleSpeech,
+    Recognition, canSpeak, listening, interim, dictationError, toggleMic, speakingIndex, toggleSpeech,
   };
 }

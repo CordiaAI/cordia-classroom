@@ -5,7 +5,10 @@ import { noteView } from '../lib/learningEvents';
 import MermaidDiagram from './MermaidDiagram';
 import NapkinVisual from './NapkinVisual';
 import SegmentedControl from './SegmentedControl';
+import DictationLine from './DictationLine';
 import useDictation from '../lib/useDictation';
+
+const ATTEMPT_MAX = 2000; // what the answer box holds, typed or spoken
 
 function normalize(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -76,7 +79,7 @@ function CheckedAttempt({ guideId, number, mode, task, placeholder, allowSpeech 
   const touchedRef = useRef(false); // the student has been in the box, so its caret is theirs
   // Speaking fills the answer box where the caret was (lib/dictation.mjs); words still being
   // recognized show under it.
-  const { Recognition, listening, interim, toggle: toggleListening, abort: stopListening } = useDictation({ text: attempt, setText: setAttempt });
+  const { Recognition, listening, interim, error: dictationError, toggle: toggleListening, abort: stopListening } = useDictation({ text: attempt, setText: setAttempt, maxLength: ATTEMPT_MAX });
 
   async function submit() {
     stopListening();
@@ -93,8 +96,8 @@ function CheckedAttempt({ guideId, number, mode, task, placeholder, allowSpeech 
   return (
     <div className="study-aid-attempt">
       <p className="study-aid-task"><strong>Your turn:</strong> {task}</p>
-      <textarea ref={boxRef} value={attempt} onChange={event => setAttempt(event.target.value)} onFocus={() => { touchedRef.current = true; }} placeholder={placeholder} rows={3} maxLength={2000} />
-      {listening && <p className={'dictation-interim' + (interim ? ' is-heard' : '')} role="status" aria-live="off">{interim || 'Listening…'}</p>}
+      <textarea ref={boxRef} value={attempt} onChange={event => setAttempt(event.target.value)} onFocus={() => { touchedRef.current = true; }} placeholder={placeholder} rows={3} maxLength={ATTEMPT_MAX} />
+      <DictationLine available={allowSpeech && Boolean(Recognition)} listening={listening} interim={interim} error={dictationError} />
       <div className="study-aid-actions">
         <button type="button" className="btn" onClick={submit} disabled={busy || !attempt.trim()}>{busy ? 'Checking…' : 'Check my answer'}</button>
         {allowSpeech && Recognition && (
