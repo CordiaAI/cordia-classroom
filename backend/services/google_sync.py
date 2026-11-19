@@ -14,7 +14,6 @@ Ground rules (see migration 20261023130000_connector_sync.sql):
 import hashlib
 import logging
 import threading
-from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -28,10 +27,10 @@ from services.deadlines import marks
 log = logging.getLogger(__name__)
 CONTAINER_NAME = "Cordia"
 HORIZON_DAYS = 60
-SYNC_WAIT_SECONDS = 90   # how long a sync waits for this student's sync already running here
+SYNC_PASSES = 3          # times a running sync goes round again for changes made while it ran
 CLAIM_MINUTES = 10       # an event claim older than this was left by a sync that died: take it over
-_locks: dict[tuple[str, str], threading.Lock] = {}
-_locks_guard = threading.Lock()
+_running: dict[tuple[str, str], dict] = {}  # syncs running on this machine, by student and app
+_running_guard = threading.Lock()
 
 
 def zone_of(name: Optional[str]) -> ZoneInfo:
@@ -144,24 +143,33 @@ def _due_date(dt: datetime, zone: ZoneInfo) -> str:
     return f"{dt.astimezone(zone).date().isoformat()}T00:00:00.000Z"
 
 
-@contextmanager
-def _one_sync(user_id: str, connector: str):
-    """One sync at a time per student and app on this machine. Two quick changes on the Calendar
-    page each start a sync; the second waits and then sees the events the first made. Yields False
-    when the other sync didn't finish in time (the background worker catches up later)."""
-    with _locks_guard:
-        lock = _locks.setdefault((user_id, connector), threading.Lock())
-    got = lock.acquire(timeout=SYNC_WAIT_SECONDS)
+def _one_at_a_time(user_id: str, connector: str, run) -> dict:
+    """One sync at a time per student and app on this machine. A sync asked for while one runs
+    returns at once (a move on the Calendar page never waits on it); the running one goes round
+    again so it sends that change too. Past SYNC_PASSES the background worker catches up."""
+    key = (user_id, connector)
+    with _running_guard:
+        if key in _running:
+            _running[key]["again"] = True
+            return {"on": True, "busy": True}
+        mine = _running[key] = {"again": False}
     try:
-        yield got
+        for _ in range(SYNC_PASSES):
+            result = run(user_id)
+            with _running_guard:
+                if not mine["again"]:
+                    del _running[key]  # In the same hold as the check, so no request slips between.
+                    return result
+                mine["again"] = False
+        return result
     finally:
-        if got:
-            lock.release()
+        with _running_guard:
+            if _running.get(key) is mine:
+                del _running[key]
 
 
 def sync_tasks(user_id: str) -> dict:
-    with _one_sync(user_id, "gtasks") as got:
-        return _sync_tasks(user_id) if got else {"on": True, "busy": True}
+    return _one_at_a_time(user_id, "gtasks", _sync_tasks)
 
 
 def _sync_tasks(user_id: str) -> dict:
@@ -306,8 +314,7 @@ def _event_window(event: dict) -> tuple[Optional[datetime], Optional[datetime]]:
 
 
 def sync_calendar(user_id: str) -> dict:
-    with _one_sync(user_id, "gcal") as got:
-        return _sync_calendar(user_id) if got else {"on": True, "busy": True}
+    return _one_at_a_time(user_id, "gcal", _sync_calendar)
 
 
 def _pending(link: Optional[dict]) -> bool:
@@ -391,25 +398,33 @@ def _sync_calendar(user_id: str) -> dict:
             save_link(user_id, "gcal", "event", f"block:{block['id']}", link["external_id"], calendar, _hash(start.isoformat(), end.isoformat()))
             moved += 1
 
+    taken = {link.get("external_id") for link in linked.values()}
     for block in blocks:
         if block["status"] in ("removed",) or ("event", f"block:{block['id']}") in linked:
             continue
         if not _claim_event(user_id, calendar, block["id"]):
             continue  # Another sync (on another machine) is making this one.
         start, end = _time(block["starts_at"]), _time(block["ends_at"])
-        try:
-            made = composio.run(account, user_id, "GOOGLECALENDAR_CREATE_EVENT", {
-                "calendar_id": calendar,
-                "summary": titles.get(block["id"], "Study")[:200],
-                "start_datetime": start.astimezone(zone).strftime("%Y-%m-%dT%H:%M:%S"),
-                "end_datetime": end.astimezone(zone).strftime("%Y-%m-%dT%H:%M:%S"),
-                "timezone": zone.key,
-                "description": "Planned by Cordia Classroom. Move or delete it and Cordia keeps your change.",
-            })
-        except Exception:
-            _drop_claim(user_id, block["id"])
-            raise
-        external = made.get("id") or (made.get("response_data") or {}).get("id") or (made.get("event") or {}).get("id")
+        summary = titles.get(block["id"], "Study")[:200]
+        # A sync that died after making the event but before saving its link left it in Cordia's
+        # calendar with no link: keep that one rather than make a second.
+        external = next((event_id for event_id, event in remote.items() if event_id not in taken and event.get("status") != "cancelled"
+                         and event.get("summary") == summary and _event_window(event) == (start, end)), None)
+        if not external:
+            try:
+                made = composio.run(account, user_id, "GOOGLECALENDAR_CREATE_EVENT", {
+                    "calendar_id": calendar,
+                    "summary": summary,
+                    "start_datetime": start.astimezone(zone).strftime("%Y-%m-%dT%H:%M:%S"),
+                    "end_datetime": end.astimezone(zone).strftime("%Y-%m-%dT%H:%M:%S"),
+                    "timezone": zone.key,
+                    "description": "Planned by Cordia Classroom. Move or delete it and Cordia keeps your change.",
+                })
+            except Exception:
+                _drop_claim(user_id, block["id"])
+                raise
+            external = made.get("id") or (made.get("response_data") or {}).get("id") or (made.get("event") or {}).get("id")
+        taken.add(external)
         if external:
             save_link(user_id, "gcal", "event", f"block:{block['id']}", external, calendar, _hash(start.isoformat(), end.isoformat()))
             written += 1

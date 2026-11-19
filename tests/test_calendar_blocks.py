@@ -210,6 +210,27 @@ class CalendarBlockRoutes(BlockRoutesSetup):
         start = datetime.fromisoformat(made.json()["block"]["starts_at"]).astimezone(ZONE)
         self.assertEqual((start.date(), start.hour), (friday, 9))
 
+    def test_an_evening_move_on_an_all_day_deadline_needs_no_saved_zone(self):
+        # Round 2 probe: no zone saved (sync never turned on). The page sends the browser's zone with
+        # the move, as it does with an add, so the day ends at midnight in Chicago, not in UTC.
+        friday = (NOW + timedelta(days=2)).astimezone(ZONE).date()
+        items = ITEMS + [{"id": "canvas-3", "title": "Reading", "due_at": f"{friday.isoformat()}T00:00:00", "all_day": True, "course": "HY 201"}]
+        self.block(B1)["item_key"] = "canvas-3"
+        evening = datetime.combine(friday, datetime.min.time(), ZONE).replace(hour=19)
+
+        def move(start, **zone):
+            with patch("routers.plans.calendar_for", return_value={"items": items}):
+                return self.client.put(f"/calendar/blocks/{B1}", headers={"Authorization": "Bearer ana"},
+                                       json={"starts_at": start.isoformat(), "ends_at": (start + timedelta(hours=1)).isoformat(), **zone})
+        self.assertEqual(move(evening, time_zone="America/Chicago").status_code, 200)
+        self.assertEqual(datetime.fromisoformat(self.block(B1)["starts_at"]), evening)
+        # Truly after the deadline (Saturday evening): still refused, the block stays on Friday.
+        late = move(evening + timedelta(days=1), time_zone="America/Chicago")
+        self.assertEqual(late.status_code, 409, late.text)
+        self.assertEqual(datetime.fromisoformat(self.block(B1)["starts_at"]), evening)
+        # A zone that isn't real, with none saved, is refused like an add.
+        self.assertEqual(move(evening, time_zone="Not/AZone").status_code, 400)
+
     def test_no_block_starts_or_moves_past_its_deadline(self):
         _friday, due, items = self.friday_due(15)
         self.assertEqual(self.add(items, {"item_key": "canvas-3", "starts_at": (due - timedelta(minutes=30)).isoformat(), "minutes": 60}).status_code, 409)
@@ -319,7 +340,7 @@ class CordiaMovesReachGoogle(unittest.TestCase):
             return {"items": list(self.remote.values())}
         if slug in ("GOOGLECALENDAR_CREATE_EVENT", "GOOGLECALENDAR_UPDATE_EVENT"):
             event_id = args.get("event_id") or f"e{len(self.remote) + 1}"
-            self.remote[event_id] = {"id": event_id, "status": "confirmed",
+            self.remote[event_id] = {"id": event_id, "status": "confirmed", "summary": args.get("summary"),
                                      "start": {"dateTime": args["start_datetime"] + offset}, "end": {"dateTime": args["end_datetime"] + offset}}
             return {"id": event_id}
         raise AssertionError(slug)
@@ -433,6 +454,60 @@ class CordiaMovesReachGoogle(unittest.TestCase):
         self.assertEqual(self.db.rows("connector_links"), [])
         google_sync.sync_calendar(ANA)  # The next sync makes it.
         self.assertEqual(len(self.creates()), 1)
+
+    # ---- Round 2 (PR 284): an event made before its link was saved is found, not made again ----
+
+    def test_an_event_made_by_a_sync_that_died_is_adopted_not_made_twice(self):
+        from services import google_sync
+        self.add_block_row(B1, 20)
+        block = self.db.rows("study_blocks")[0]
+        start = datetime.fromisoformat(block["starts_at"]).astimezone(ZONE)
+        # A sync made B1's event, then died before saving the link: only its stale claim is left.
+        self.remote["e7"] = {"id": "e7", "status": "confirmed", "summary": "Work on Argument essay draft",
+                             "start": {"dateTime": start.isoformat()}, "end": {"dateTime": (start + timedelta(minutes=60)).isoformat()}}
+        self.db.rows("connector_links").append({"user_id": ANA, "connector": "gcal", "kind": "event", "cordia_id": f"block:{B1}",
+                                                "external_id": f"pending:{B1}", "container_id": "cal-cordia", "synced_hash": "",
+                                                "removed_by_student": False,
+                                                "updated_at": (datetime.now(timezone.utc) - timedelta(minutes=11)).isoformat()})
+        result = google_sync.sync_calendar(ANA)
+        self.assertEqual(self.creates(), [])
+        self.assertEqual(result["added"], 1)
+        links = [row for row in self.db.rows("connector_links") if row["connector"] == "gcal"]
+        self.assertEqual([(row["cordia_id"], row["external_id"]) for row in links], [(f"block:{B1}", "e7")])
+        google_sync.sync_calendar(ANA)
+        self.assertEqual(self.creates(), [])
+        # A different event at another time in Cordia's calendar is not taken for it.
+        self.add_block_row(B2, 30)
+        google_sync.sync_calendar(ANA)
+        self.assertEqual(len(self.creates()), 1)
+
+    def test_a_sync_asked_for_while_one_runs_returns_at_once_and_the_running_one_catches_it(self):
+        import threading
+        import time
+        from services import google_sync
+        self.add_block_row(B1, 20)
+        inside = threading.Event()
+        let_go = threading.Event()
+        plain = self.run_tool
+
+        def held(account, user, slug, args):
+            if slug == "GOOGLECALENDAR_EVENTS_LIST" and not inside.is_set():
+                inside.set()
+                let_go.wait(5)
+            return plain(account, user, slug, args)
+        with patch("services.composio.run", side_effect=held):
+            first = threading.Thread(target=google_sync.sync_calendar, args=(ANA,))
+            first.start()
+            self.assertTrue(inside.wait(5))
+            self.add_block_row(B2, 30)  # Added while the first sync is still listing Google's events.
+            began = time.monotonic()
+            second = google_sync.sync_calendar(ANA)
+            self.assertLess(time.monotonic() - began, 1)  # The route's answer doesn't wait on the other sync.
+            self.assertTrue(second.get("busy"))
+            let_go.set()
+            first.join(5)
+        self.assertEqual(len(self.creates()), 2)  # The running sync went round again and made B2's event.
+        self.assertEqual(google_sync._running, {})  # Nothing left behind per student.
 
 
 class TwoQuickAdds(BlockRoutesSetup):

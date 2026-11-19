@@ -360,6 +360,8 @@ BLOCK_MAX_MINUTES = 6 * 60
 class BlockTimes(BaseModel):
     starts_at: datetime
     ends_at: datetime
+    # The browser's zone, as an add sends it: an all-day deadline ends at midnight there.
+    time_zone: str = Field(default="", max_length=64)
 
 
 class NewBlock(BaseModel):
@@ -437,7 +439,7 @@ def move_block(block_id: str, body: BlockTimes, request: Request, authorization:
     if not found:
         raise HTTPException(status_code=404, detail="That study time isn't on your calendar anymore.")
     item = next((i for i in calendar_for(user_id).get("items") or [] if i["id"] == found[0]["item_key"]), None)
-    _before_deadline(end, item, _zone(user_id, None))
+    _before_deadline(end, item, _zone(user_id, body.time_zone))
     status = "done" if found[0].get("status") == "done" else "moved"
     # Still not removed: a Google sync may have taken it off since the read above.
     rows = db.table("study_blocks").update({"starts_at": start.isoformat(), "ends_at": end.isoformat(), "status": status,
