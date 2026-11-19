@@ -28,20 +28,28 @@ export default function MemoryTrickSettings() {
       <h2 className="c-section-title">Memory tricks</h2>
       {state.adult_confirmed ? (
         <>
-          <Toggle checked={state.crude_humor} disabled={busy} onChange={value => save('/memory-tricks/settings', { crude_humor: value })} label="Crude humor in memory tricks" />
-          <p className="c-meta settings-note">Help me remember may use crude or innuendo puns on the answer’s own words and numbers, if that makes it stick. Never slurs or anything hateful.</p>
-          <button type="button" className="c-btn c-btn--quiet c-btn--sm mts-undo" disabled={busy} onClick={() => save('/age-confirmation', { adult: false })}>Remove my 18+ confirmation</button>
+          <Toggle
+            checked={state.crude_humor}
+            disabled={busy}
+            onChange={value => save('/memory-tricks/settings', { crude_humor: value })}
+            label="Crude humor in memory tricks"
+            description="Help me remember may use crude or innuendo puns on the answer’s own words and numbers, if that makes it stick. Never slurs or anything hateful."
+          />
+          <div className="settings-sub">
+            <p className="c-meta">You’ve confirmed you’re 18 or older.</p>
+            <button type="button" className="c-btn c-btn--quiet" disabled={busy} onClick={() => save('/age-confirmation', { adult: false })}>Remove my 18+ confirmation</button>
+          </div>
         </>
       ) : (
         <>
-          <p className="c-meta settings-note">Some memory-trick options are for adults. Confirm your age to see them.</p>
+          <p className="c-meta mts-note">Some memory-trick options are for adults. Confirm your age to see them.</p>
           <button type="button" className="c-btn c-btn--secondary mts-confirm" disabled={busy} onClick={() => save('/age-confirmation', { adult: true })}>I’m 18 or older</button>
         </>
       )}
       {error && <p className="retain-action-error" role="alert">{error}</p>}
       <style jsx>{`
-        .mts { display: grid; gap: var(--space-3); }
-        .mts :global(.mts-confirm), .mts :global(.mts-undo) { justify-self: start; }
+        .mts-note { margin: 0; }
+        .mts :global(.mts-confirm) { justify-self: start; }
       `}</style>
     </div>
   );

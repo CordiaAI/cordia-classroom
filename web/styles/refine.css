@@ -114,7 +114,7 @@ svg.lucide { width: 20px; height: 20px; stroke-width: 1.75; color: var(--muted);
 strong, b { font-weight: 600; }
 
 /* Card padding: 20px (rows 16px 20px; the reading page keeps its 40px page margins). */
-.grove-card, .plan-card, .pricing-card, .focus-card, .insights-card, .learn, .me-card, .recap, .grove-grid, .heat { padding: 20px !important; }
+.grove-card, .pricing-card, .focus-card, .insights-card, .learn, .recap, .grove-grid, .heat { padding: 20px !important; }
 .today-continue { padding: 16px 20px !important; border-radius: var(--r-row) !important; }
 
 

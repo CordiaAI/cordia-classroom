@@ -47,7 +47,7 @@ export default function ConnectedApps() {
   }
 
   return (
-    <section className="c-card ca" aria-labelledby="ca-title">
+    <section className="c-card settings-card ca" aria-labelledby="ca-title">
       <div className="ca-head">
         <span className="ca-title"><Bot {...ICON} /><h2 id="ca-title" className="c-section-title">Connected AI apps</h2></span>
         <p className="c-meta">Apps like Claude that you let read your study material and add to your Library. They can't see your Canvas data, texts or other connected accounts.</p>
@@ -76,7 +76,6 @@ export default function ConnectedApps() {
         />
       )}
       <style jsx>{`
-        .ca { display: grid; gap: 14px; padding: 20px 24px; }
         .ca-head { display: grid; gap: 6px; }
         .ca-title { display: inline-flex; align-items: center; gap: 10px; }
         .ca-title h2 { margin: 0; }

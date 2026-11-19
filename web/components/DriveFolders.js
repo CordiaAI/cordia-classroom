@@ -108,7 +108,7 @@ export default function DriveFolders({ app = 'drive' }) {
           </label>
           {classId && (
             <>
-              <label className="cn-search">
+              <label className="c-search">
                 <Search size={20} strokeWidth={1.75} aria-hidden="true" />
                 <input className="c-input" type="search" placeholder={`Search your ${appName} folders`} aria-label={`Search your ${appName} folders`} value={query} onChange={event => setQuery(event.target.value)} />
               </label>
