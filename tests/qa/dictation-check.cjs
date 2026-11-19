@@ -29,6 +29,7 @@ const FAKE = prefixed => `
       abort() { window.__calls.push('abort'); this.live = false; }
       finish() { if (!this.live) return; this.live = false; setTimeout(() => this.onend && this.onend(), 0); }
     }
+    window.__error = code => { window.__rec.onerror && window.__rec.onerror({ error: code }); window.__rec.finish(); };
     window.__emit = (resultIndex, rows) => window.__rec.onresult({ resultIndex, results: rows.map(([transcript, isFinal]) => Object.assign([{ transcript }], { isFinal })) });
     window.__silence = () => window.__rec.finish();
     window.${prefixed ? 'webkitSpeechRecognition' : 'SpeechRecognition'} = Fake;
@@ -40,7 +41,7 @@ const interim = page => page.evaluate(() => document.querySelector('.dictation-i
 const emit = (page, index, rows) => page.evaluate(([i, r]) => window.__emit(i, r), [index, rows]);
 const mic = page => page.locator('button.composer-icon[aria-label*="isten"], button.composer-icon[aria-label*="Talk"]');
 
-async function open(browser, prefixed, { width = 1440, height = 900 } = {}) {
+async function open(browser, prefixed, { width = 1440, height = 900, url = '/home' } = {}) {
   const context = await browser.newContext({ viewport: { width, height } });
   await context.addInitScript(FAKE(prefixed));
   await install(context, createState(true));
@@ -50,11 +51,13 @@ async function open(browser, prefixed, { width = 1440, height = 900 } = {}) {
   await page.goto(BASE + '/login');
   await page.evaluate(([token, user]) => { localStorage.setItem('authToken', token); localStorage.setItem('userId', user); localStorage.setItem('refreshToken', 'r'); localStorage.setItem('theme', 'light'); }, [TOKEN, USER]);
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    try { await page.goto(BASE + '/home'); break; } catch (error) { if (attempt === 2) throw error; await page.waitForTimeout(500); }
+    try { await page.goto(BASE + url); break; } catch (error) { if (attempt === 2) throw error; await page.waitForTimeout(500); }
   }
-  await page.waitForSelector('.composer-box', { timeout: 60000 });
-  await page.waitForTimeout(1200);
-  await page.waitForSelector('button.composer-icon[aria-label="Talk to the Tutor"]', { timeout: 10000 });
+  if (url === '/home') {
+    await page.waitForSelector('.composer-box', { timeout: 60000 });
+    await page.waitForTimeout(1200);
+    await page.waitForSelector('button.composer-icon[aria-label="Talk to the Tutor"]', { timeout: 10000 });
+  }
   return { context, page, problems };
 }
 
@@ -174,6 +177,72 @@ async function suite(label, browserType, prefixed) {
     await page.keyboard.press('Space');
     await page.waitForTimeout(150);
     same(await mic(page).getAttribute('aria-pressed'), 'false', 'Space on the mic turns it off');
+    await context.close();
+  });
+
+  await check(`${label}: the composer does not move when the line fills, wraps or empties (0 px, CLS 0)`, async () => {
+    const { context, page } = await open(browser, prefixed);
+    await page.evaluate(() => { window.__cls = 0; new PerformanceObserver(list => { for (const entry of list.getEntries()) window.__cls += entry.value; }).observe({ type: 'layout-shift', buffered: false }); });
+    const top = () => page.evaluate(() => { const form = document.querySelector('.composer').getBoundingClientRect(); const note = document.querySelector('.chat-home-note')?.getBoundingClientRect(); return [form.top, form.height, note ? note.top : 0].join(','); });
+    const idle = await top();
+    await mic(page).click();
+    same(await top(), idle, 'turning the mic on moves nothing');
+    await emit(page, 0, [['Why does the derivative of x squared equal two x', false]]);
+    same(await top(), idle, 'first interim words move nothing');
+    await emit(page, 0, [['Why does the derivative of x squared equal two x and how do I show it from the definition of a limit step by step please and then what', false]]);
+    const one = await page.evaluate(() => document.querySelector('.dictation-interim').getBoundingClientRect().height);
+    same(await top(), idle, 'a long phrase stays on one line and moves nothing');
+    expect(one < 24, 'the interim line is one line high: ' + one);
+    await emit(page, 0, [['Why does the derivative of x squared equal two x', true]]);
+    await page.evaluate(() => window.__silence());
+    await page.waitForTimeout(200);
+    same(await top(), idle, 'ending moves nothing');
+    same(await page.evaluate(() => window.__cls), 0, 'layout shift score');
+    await context.close();
+  });
+
+  for (const [code, wanted] of [['not-allowed', /blocking the microphone.*site settings/], ['no-speech', /Didn't catch anything/], ['network', /connect/]]) {
+    await check(`${label}: a ${code} error says so in the line under the box and ends listening`, async () => {
+      const { context, page } = await open(browser, prefixed);
+      await mic(page).click();
+      await page.evaluate(name => window.__error(name), code);
+      await page.waitForTimeout(150);
+      const message = await page.evaluate(() => document.querySelector('.dictation-slot [role=alert]')?.textContent || '');
+      expect(wanted.test(message), 'the line says ' + JSON.stringify(message));
+      same(await mic(page).getAttribute('aria-pressed'), 'false', 'the mic is off');
+      await mic(page).click();
+      same(await page.evaluate(() => document.querySelector('.dictation-slot [role=alert]')), null, 'the error goes on the next try');
+      await context.close();
+    });
+  }
+
+  await check(`${label}: New chat while listening stops the mic and late words do not land`, async () => {
+    const { context, page } = await open(browser, prefixed);
+    await mic(page).click();
+    await emit(page, 0, [['first words', true], ['still', false]]);
+    await page.getByRole('link', { name: /new chat/i }).first().click();
+    await page.waitForTimeout(300);
+    same(await mic(page).getAttribute('aria-pressed'), 'false', 'the mic is off');
+    await emit(page, 0, [['first words', true], ['late words', true]]).catch(() => {});
+    await page.waitForTimeout(100);
+    same(await value(page), '', 'nothing lands in the new chat');
+    await context.close();
+  });
+
+  await check(`${label}: the Tutor page shows the interim words and puts the words at the caret`, async () => {
+    const { context, page } = await open(browser, prefixed, { url: '/tutor' });
+    const input = page.locator('textarea[aria-label="Message"]');
+    await page.waitForSelector('.cordia-tutor-mic', { timeout: 30000 });
+    await input.fill('one two');
+    await input.evaluate(element => { element.focus(); element.setSelectionRange(3, 3); });
+    await page.locator('.cordia-tutor-mic').click();
+    await emit(page, 0, [['hearing this', false]]);
+    await page.waitForTimeout(80);
+    same(await interim(page), 'hearing this', 'the interim words show under the box');
+    await emit(page, 0, [['middle', true]]);
+    await page.evaluate(() => window.__silence());
+    await page.waitForTimeout(150);
+    same(await input.inputValue(), 'one middle two', 'the words go where the caret was');
     await context.close();
   });
 
