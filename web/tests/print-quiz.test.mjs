@@ -121,3 +121,62 @@ test('a format survives the print link', () => {
   assert.equal(back.versions, true);
   assert.deepEqual(decodeFormat('garbage').on, DEFAULT_FORMAT.on);
 });
+
+// ---- The most each type can supply (feedback b24fe320) and the types the guide has to write (298f5965) ----
+import { clampToSupply, estimatePools, listTypes, setCount, supplyLimits, writeNeeds } from '../lib/printQuiz.mjs';
+
+const ready = (type, count) => range(0, count).map(i => ({ id: `${type}${i}`, source: `${type}${i}`, term: `Term ${i}`, definition: `Definition ${i}`, question: `Why ${i}?`, key: 'Because.', parts: [], blanks: ['x'], options: ['a', 'b', 'c'], answer: 0, points: 1 }));
+const SMALL = { mc: ready('mc', 5), matching: ready('m', 3), short: ready('s', 2), fill: null, fill_possible: 0, matching_possible: 0, short_possible: 0, can_write: true };
+
+test('the maximum per type is what the guide can supply', () => {
+  assert.deepEqual(supplyLimits(SMALL), { mc: 5, matching: 2, fill: 0, short: 2 }); // 3 ideas hold 2 terms and the spare definition
+  assert.equal(supplyLimits({ ...SMALL, matching: ready('m', 17) }).matching, 15); // 15 terms in 2 blocks need 17 ideas
+  assert.equal(supplyLimits({ ...SMALL, matching: ready('m', 16) }).matching, 14); // 15 would need 17
+  assert.equal(supplyLimits({ ...SMALL, mc: ready('mc', 80) }).mc, 50);
+});
+
+test('ideas the guide could still write raise the maximum only while an AI quiz is left', () => {
+  const more = { ...SMALL, matching_possible: 10, short_possible: 6, fill_possible: 12 };
+  assert.deepEqual(supplyLimits(more), { mc: 5, matching: 11, fill: 12, short: 8 }); // 13 ideas: 11 terms + 2 blocks
+  assert.deepEqual(supplyLimits({ ...more, can_write: false }), { mc: 5, matching: 2, fill: 0, short: 2 });
+  assert.equal(supplyLimits({ ...more, fill: ready('f', 7) }).fill, 7); // written fill-in: the exact count
+});
+
+test('a count stops at the maximum, whatever was saved or chosen', () => {
+  const limits = supplyLimits(SMALL);
+  const saved = cleanFormat({ counts: { mc: 12, matching: 16, fill: 6, short: 9 }, on: { mc: true, matching: true, fill: false, short: true } });
+  const clamped = clampToSupply(saved, limits);
+  assert.deepEqual(clamped.counts, { mc: 5, matching: 2, fill: 6, short: 2 }); // fill has no supply: it keeps its count so the printout can say so
+  assert.equal(setCount(saved, 'matching', 9, limits.matching).counts.matching, 2);
+  assert.equal(setCount(saved, 'matching', 0, limits.matching).counts.matching, 1);
+  assert.equal(setCount(saved, 'mc', 60).counts.mc, 50);
+  const print = buildPrint(estimatePools(SMALL), clamped);
+  assert.deepEqual(print.capped, {}); // nothing was asked beyond the supply, so there is nothing to apologise for
+});
+
+test('only the types short of ready items are written, and only when the guide could write more', () => {
+  const more = { ...SMALL, matching_possible: 10, short_possible: 6, fill_possible: 12 };
+  const wanted = cleanFormat({ counts: { mc: 4, matching: 8, fill: 6, short: 2 }, on: { mc: true, matching: true, fill: true, short: true } });
+  assert.deepEqual(writeNeeds(more, wanted), { write: ['matching', 'fill'], locked: [] }); // short: 2 wanted, 2 ready
+  assert.deepEqual(writeNeeds(more, cleanFormat({ ...wanted, on: { mc: true, matching: false, fill: false, short: false } })), { write: [], locked: [] });
+  assert.deepEqual(writeNeeds({ ...more, matching_possible: 0 }, wanted).write, ['fill']); // nothing more to write: no request
+  assert.deepEqual(writeNeeds({ ...more, can_write: false }, wanted), { write: [], locked: ['matching', 'fill'] }); // no AI quiz left
+});
+
+test('the estimate counts each idea the guide could write once, and totals follow the clamped counts', () => {
+  const more = { ...SMALL, matching_possible: 10, short_possible: 6, fill_possible: 12 };
+  const pools = estimatePools(more);
+  assert.equal(pools.matching.length, 13);
+  assert.equal(pools.short.length, 8);
+  assert.equal(pools.fill.length, 12);
+  const format = cleanFormat({ counts: { mc: 4, matching: 8, fill: 6, short: 8 }, on: { mc: true, matching: true, fill: true, short: true } });
+  const print = buildPrint(pools, clampToSupply(format, supplyLimits(more)));
+  assert.equal(print.questions, 4 + 8 + 6 + 8);
+  assert.deepEqual(print.capped, {});
+});
+
+test('types are listed for the notes', () => {
+  assert.equal(listTypes(['fill']), 'fill-in-the-blank sentences');
+  assert.equal(listTypes(['matching', 'short']), 'extra matching terms and extra short-answer questions');
+  assert.equal(listTypes(['fill', 'matching', 'short']), 'fill-in-the-blank sentences, extra matching terms and extra short-answer questions');
+});

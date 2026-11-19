@@ -536,7 +536,7 @@ export default function GuidePage() {
         ) : (
           <h1 className="c-title guide-title">
             <button type="button" className="guide-title-btn" onClick={() => setRenaming(guide.title)}>{guide.title}</button>
-            <button type="button" className="c-icon-btn guide-rename-btn" onClick={() => setRenaming(guide.title)} aria-label="Rename guide"><Pencil size={18} strokeWidth={1.75} aria-hidden="true" /></button>
+            <span className="guide-rename-slot"><button type="button" className="c-icon-btn guide-rename-btn" onClick={() => setRenaming(guide.title)} aria-label="Rename guide"><Pencil size={18} strokeWidth={1.75} aria-hidden="true" /></button></span>
           </h1>
         )}
         <button type="button" className={'c-icon-btn c-star' + (guide.is_bookmarked ? ' guide-starred' : '')} onClick={toggleStar} aria-pressed={Boolean(guide.is_bookmarked)} aria-label={guide.is_bookmarked ? 'Unstar' : 'Star'}>
@@ -716,8 +716,13 @@ export default function GuidePage() {
         .guide-dup span { min-width: 0; overflow-wrap: anywhere; }
         .guide-dup-review { min-height: 32px; padding: 0 4px; border: 0; background: none; color: var(--olive-ink); font: 600 0.9375rem/1 var(--font-sans); cursor: pointer; }
         .guide-dup-review:hover { text-decoration: underline; }
-        .guide-title { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-wrap: anywhere; }
-        .guide-title :global(.guide-rename-btn) { flex: 0 0 auto; color: var(--muted); }
+        /* The pencil sits 12px after the title and is centred on the title's first line, however many
+           lines the title wraps to: its slot is exactly one title line tall and the row aligns to the top. */
+        .guide-title { --guide-title-size: var(--fs-40); flex: 1 1 0; min-width: 0; display: flex; align-items: flex-start; gap: 12px; overflow-wrap: anywhere; }
+        .guide-rename-slot { --guide-title-line: calc(var(--guide-title-size) * var(--lh-title)); flex: 0 0 auto; display: flex; align-items: flex-start; height: var(--guide-title-line); }
+        .guide-title :global(.guide-rename-btn) { position: relative; width: 36px; height: 36px; margin-block: calc((var(--guide-title-line) - 36px) / 2); color: var(--muted); }
+        /* A finger needs 44px: the same quiet 36px circle with a larger target around it. */
+        @media (pointer: coarse) { .guide-title :global(.guide-rename-btn)::after { content: ''; position: absolute; inset: -4px; } }
         .guide-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: -8px 0 0 48px; }
         .guide-nclex { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; border-radius: var(--r-row); background: var(--olive-tint); font: 600 0.9375rem/1.4 var(--font-sans); }
         .guide-nclex :global(.lucide) { color: var(--olive-ink); flex: 0 0 auto; }
@@ -731,7 +736,7 @@ export default function GuidePage() {
         .guide-tabs-row .c-pills :global(.c-pill) { flex: 0 0 auto; }
         .guide-tabs-row, .guide-head { min-width: 0; max-width: 100%; }
         :global(.guide-view) { justify-self: start; }
-        .guide-title-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing:-0.015em; text-align: left; cursor: text; border-radius:var(--r-input); }
+        .guide-title-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing:-0.015em; text-align: left; cursor: text; border-radius:var(--r-input); text-wrap: pretty; /* lines fill the box, so the pencil stays 12px from the first line's end */ }
         .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
         .guide-rename { flex: 1 1 auto; min-width: 0; }
         .guide-title-input { font:600 1.75rem/1.15 var(--font-display); height: 52px; }
@@ -757,6 +762,7 @@ export default function GuidePage() {
           /* Phones: back and the actions share the top row; the title gets its own full-width row below. */
           .guide-head > :first-child { margin-right: auto; }
           .guide-title, .guide-rename { order: 4; flex: 1 1 100%; }
+          .guide-title { --guide-title-size: var(--fs-28); }
           .guide-head :global(:is(.guide-title, .guide-title-btn, .guide-title-input)) { font-size: var(--fs-28) !important; overflow-wrap: break-word; hyphens: auto; }
         }
       `}</style>

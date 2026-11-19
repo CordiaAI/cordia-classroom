@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch } from '../../../lib/api';
 import { useRequireAuth } from '../../../lib/auth';
 import { classLabel } from '../../../lib/classLabel';
-import { TYPE_NAMES, buildPrint, decodeFormat } from '../../../lib/printQuiz.mjs';
+import { TYPE_NAMES, buildPrint, clampToSupply, decodeFormat, listTypes, supplyLimits, writeNeeds } from '../../../lib/printQuiz.mjs';
 
 // A printable quiz: the student's format (?f=, lib/printQuiz.mjs) laid out on Letter paper, then
 // the browser's print dialog. No server-side PDF: "Save as PDF" in that dialog makes one.
@@ -181,18 +181,51 @@ export default function PrintQuizPage() {
   const { ready } = useRequireAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [problems, setProblems] = useState([]);
+  const [held, setHeld] = useState([]); // types a write could not supply: their own note says why, so no "enough for N" on top
   const [seed] = useState(() => Number(router.query.seed) || (Date.now() % 100000) + 1);
   const format = useMemo(() => decodeFormat(router.query.f), [router.query.f]);
 
+  // The guide's free items first. Then, only for the types the format needs beyond what is ready and the
+  // guide could supply, one request writes them (one AI quiz). A refusal (402, no AI quiz left) or a failed
+  // write leaves the free items in place with a note, and nothing is asked for beyond what the guide can supply.
   useEffect(() => {
-    if (!ready || !id || !router.isReady) return;
-    apiFetch(`/quiz/${id}/print-items`, { method: 'POST', timeoutMs: 90000, body: JSON.stringify({ fill: Boolean(format.on.fill) }) }).then(result => {
-      if (Array.isArray(result?.mc)) setData(result);
-      else setError(apiErrorMessage(result?.detail, 'This quiz could not be prepared for printing.'));
-    });
+    if (!ready || !id || !router.isReady) return undefined;
+    let alive = true;
+    (async () => {
+      let result = await apiFetch(`/quiz/${id}/print-items`, { method: 'POST', timeoutMs: 90000, body: JSON.stringify({ write: [] }) });
+      if (!alive) return;
+      if (!Array.isArray(result?.mc)) { setError(apiErrorMessage(result?.detail, 'This quiz could not be prepared for printing.')); return; }
+      const free = result;
+      const { write } = writeNeeds(free, format);
+      const problems = [];
+      const heldBack = [];
+      if (write.length) {
+        const written = await apiFetch(`/quiz/${id}/print-items`, { method: 'POST', timeoutMs: 90000, quietLimit: true, body: JSON.stringify({ write }) });
+        if (!alive) return;
+        if (Array.isArray(written?.mc)) {
+          result = written;
+          const failed = (written.write_failed || []).filter(type => write.includes(type));
+          heldBack.push(...failed);
+          if (failed.length) problems.push(`${listTypes(failed).replace(/^./, letter => letter.toUpperCase())} could not be written just now, so they are left out. Print again in a minute.`);
+        } else if (written?.limit_reached || written?.detail?.code === 'limit_reached') {
+          heldBack.push(...write);
+          problems.push(`${listTypes(write).replace(/^./, letter => letter.toUpperCase())} need an AI quiz, and this month's are used up.`);
+        } else {
+          heldBack.push(...write);
+          problems.push(`${listTypes(write).replace(/^./, letter => letter.toUpperCase())} could not be written just now, so they are left out.`);
+        }
+      }
+      setProblems(problems);
+      setHeld(heldBack);
+      setData(result);
+    })();
+    return () => { alive = false; };
   }, [ready, id, router.isReady, format]);
 
-  const print = useMemo(() => (data ? buildPrint({ mc: data.mc, matching: data.matching, fill: data.fill || [], short: data.short }, format, Number(router.query.seed) || seed) : null), [data, format, seed, router.query.seed]);
+  const limits = useMemo(() => (data ? supplyLimits(data) : null), [data]);
+  const needs = useMemo(() => (data ? writeNeeds(data, format) : { write: [], locked: [] }), [data, format]);
+  const print = useMemo(() => (data ? buildPrint({ mc: data.mc, matching: data.matching, fill: data.fill || [], short: data.short }, clampToSupply(format, limits), Number(router.query.seed) || seed, { locked: [...needs.locked, ...held] }) : null), [data, format, limits, needs, held, seed, router.query.seed]);
 
   // The print dialog opens once the fonts are in, so the page breaks are the real ones.
   useEffect(() => {
@@ -208,7 +241,8 @@ export default function PrintQuizPage() {
   const notes = print ? [
     ...print.notes,
     ...(data.mc_flagged && format.on.mc ? [`${data.mc_flagged === 1 ? '1 multiple-choice question is' : `${data.mc_flagged} multiple-choice questions are`} left out because an answer choice is another question's answer. Use Refresh answer choices on the guide to fix them.`] : []),
-    ...(data.fill_locked && format.on.fill ? ["Fill in the blank needs an AI quiz, and this month's are used up."] : []),
+    ...(needs.locked.length ? [`${listTypes(needs.locked).replace(/^./, letter => letter.toUpperCase())} need an AI quiz, and this month's are used up.`] : []),
+    ...problems,
   ] : [];
 
   return (

@@ -81,7 +81,10 @@ class MissRequest(BaseModel):
 
 
 class PrintRequest(BaseModel):
-    fill: bool = False  # write the fill-in sentences now if they aren't cached (one AI quiz)
+    fill: bool = False  # the same as write=["fill"]; kept for the first printable-quiz clients
+    # Types to write now when they aren't cached: the guide had too few ready matching terms or
+    # short-answer questions, or fill-in sentences are wanted. All of it is one AI quiz.
+    write: List[Literal["fill", "matching", "short"]] = Field(default_factory=list, max_length=3)
 
 
 class RememberRequest(BaseModel):
@@ -754,30 +757,55 @@ def refresh_choices(guide_id: str, authorization: str = Header(default="")):
     return {"changed": changed, "flagged": len(flagged), "questions": updated}
 
 
-def _print_fill(client, pairs: list) -> Optional[list]:
-    """Checked fill-in items written by Haiku from the guide's Q/A, or None when the call fails."""
-    indexes = print_items.fill_candidates(pairs)
+def _print_write(client, pairs: list, indexes: list, prompt: str, build) -> Optional[list]:
+    """Checked items written by Haiku (task print_fill) from the guide's Q/A, or None when the call fails."""
     if not indexes:
         return []
     try:
         response = chat(client, "print_fill",
-                        messages=[{"role": "system", "content": "Write fill-in-the-blank test sentences. Return valid JSON only."},
-                                  {"role": "user", "content": print_items.fill_prompt(pairs, indexes)}],
+                        messages=[{"role": "system", "content": "Write printed-test items. Return valid JSON only."},
+                                  {"role": "user", "content": prompt}],
                         temperature=0.3, response_format={"type": "json_object"})
         generated = json.loads(response.choices[0].message.content or "{}").get("items", [])
     except Exception:
-        logger.warning("Fill-in sentences unavailable", exc_info=True)
+        logger.warning("Printed-test items unavailable", exc_info=True)
         return None
-    return print_items.fill_items(pairs, indexes, generated)
+    return build(pairs, indexes, generated)
+
+
+def _print_fill(client, pairs: list) -> Optional[list]:
+    """Checked fill-in items written by Haiku from the guide's Q/A, or None when the call fails."""
+    indexes = print_items.fill_candidates(pairs)
+    return _print_write(client, pairs, indexes, print_items.fill_prompt(pairs, indexes) if indexes else "", print_items.fill_items)
+
+
+def _print_matching(client, pairs: list) -> Optional[list]:
+    indexes = print_items.matching_candidates(pairs)
+    return _print_write(client, pairs, indexes, print_items.matching_prompt(pairs, indexes) if indexes else "", print_items.matching_items)
+
+
+def _print_short(client, pairs: list) -> Optional[list]:
+    indexes = print_items.short_candidates(pairs)
+    return _print_write(client, pairs, indexes, print_items.short_prompt(pairs, indexes) if indexes else "", print_items.short_items)
+
+
+# What each writable type is cached under, and what writes it.
+_PRINT_WRITERS = {
+    "fill": ("fill", lambda client, pairs: _print_fill(client, pairs)),
+    "matching": ("ai_matching", lambda client, pairs: _print_matching(client, pairs)),
+    "short": ("ai_short", lambda client, pairs: _print_short(client, pairs)),
+}
 
 
 @router.post("/{guide_id}/print-items", dependencies=[Depends(ai_rate_limit())])
 def printable_items(guide_id: str, body: PrintRequest, authorization: str = Header(default="")):
     """Everything a printable quiz can use, per type, from the guide's own questions and answers.
-    Multiple choice comes from the saved quiz (built first if the guide has none yet); matching and
-    short answer are picked without AI; fill-in sentences are written by Haiku only when asked for
-    and not cached yet, which counts as one AI quiz. Matching, short answer and fill-in are cached
-    on the guide, so reprinting or changing the format reuses them."""
+    Multiple choice comes from the saved quiz (built first if the guide has none yet); ready matching
+    terms and short-answer questions are picked without AI. Fill-in sentences, and matching terms and
+    short-answer questions beyond the ready ones, are written by Haiku only when asked for (write) and
+    not cached yet. Everything written in one request counts as one AI quiz, and with none left that
+    request is a 402 before any AI spend (the free types come from a request without write). Written
+    items are cached on the guide, so reprinting or changing the format reuses them."""
     require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
@@ -789,18 +817,28 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
     cache = print_items.cached(row.get("print_items"), pairs)
     items = {"v": print_items.VERSION, "source": print_items.source_hash(pairs),
              "matching": print_items.matching(pairs), "short": print_items.short_answer(pairs)}
-    if "fill" in cache:
-        items["fill"] = cache["fill"]
-    fill_locked = False
-    if body.fill and "fill" not in items:
-        if remaining(user_id, "ai_quiz") <= 0:
-            fill_locked = True
-        else:
-            require(user_id, "ai_quiz")
-            fill = _print_fill(get_openai_client(), pairs)
-            if fill is not None:
-                items["fill"] = fill
-                record(user_id, "ai_quiz")
+    for _, (key, _writer) in _PRINT_WRITERS.items():
+        if key in cache:
+            items[key] = cache[key]
+    wanted = set(body.write) | ({"fill"} if body.fill else set())
+    candidates = {"fill": print_items.fill_candidates(pairs), "matching": print_items.matching_candidates(pairs),
+                  "short": print_items.short_candidates(pairs)}
+    to_write = [kind for kind in _PRINT_WRITERS if kind in wanted and _PRINT_WRITERS[kind][0] not in items and candidates[kind]]
+    write_failed = []
+    if to_write:
+        require(user_id, "ai_quiz")  # a 402 with the plan's limit details, like a Quiz refresh, before any AI spend
+        client = get_openai_client()
+        wrote = False
+        for kind in to_write:
+            key, writer = _PRINT_WRITERS[kind]
+            written = writer(client, pairs)
+            if written is None:
+                write_failed.append(kind)
+            else:
+                items[key] = written
+                wrote = True
+        if wrote:
+            record(user_id, "ai_quiz")
     if items != cache:
         try:
             supabase.table("study_guides").update({"print_items": items}).eq("id", guide_id).eq("user_id", user_id).execute()
@@ -815,11 +853,16 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
         "class_name": class_name,
         "mc": mc,
         "mc_flagged": flagged,
-        "matching": items["matching"],
-        "short": items["short"],
+        "matching": [*items["matching"], *items.get("ai_matching", [])],
+        "short": [*items["short"], *items.get("ai_short", [])],
         "fill": items.get("fill"),
-        "fill_possible": len(print_items.fill_candidates(pairs)),
-        "fill_locked": fill_locked,
+        "fill_possible": len(candidates["fill"]),
+        # How many more the guide could have written, while not yet written: 0 once they are.
+        "matching_possible": 0 if "ai_matching" in items else len(candidates["matching"]),
+        "short_possible": 0 if "ai_short" in items else len(candidates["short"]),
+        # Whether a write would go ahead, so the sheet can say so before anything is requested.
+        "can_write": remaining(user_id, "ai_quiz") > 0,
+        "write_failed": write_failed,
     }
 
 
