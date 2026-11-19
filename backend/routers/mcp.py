@@ -193,14 +193,20 @@ async def log_answers(body: AnswerEvents, request: Request, authorization: str =
 # connected app reads quiz_questions itself, as saved, and asks here which to reword and which are
 # about the source and never asked. 100 study sets (get_due_cards reads at most that many) of up to
 # 200 questions; a question is checked at its first and last 1000 characters, so its length is capped.
+# `answered`: whether the saved question has an answer (a quiz is never left with nothing to ask).
+class WordingQuestion(BaseModel):
+    question: str = Field(..., max_length=20_000)
+    answered: bool = True
+
+
 class WordingRequest(BaseModel):
-    quizzes: list[list[str]] = Field(..., max_length=100)
+    quizzes: list[list[WordingQuestion]] = Field(..., max_length=100)
 
     @field_validator("quizzes")
     @classmethod
     def bounded(cls, value):
-        if any(len(quiz) > 200 or any(len(text) > 20_000 for text in quiz) for quiz in value):
-            raise ValueError("at most 200 questions of 20,000 characters per study set")
+        if any(len(quiz) > 200 for quiz in value):
+            raise ValueError("at most 200 questions per study set")
         return value
 
 
@@ -209,7 +215,8 @@ def _question_wording(authorization: str, body: WordingRequest) -> dict:
     _student(authorization)
     marks = []
     for quiz in body.quizzes:
-        shown = shown_questions([{"question": text} for text in quiz])
+        shown = shown_questions([{"question": item.question, "options": ["answer" if item.answered else ""], "correct_index": 0}
+                                 for item in quiz])
         marks.append([{key: item[key] for key in ("shown", "hidden") if key in item} for item in shown])
     return {"quizzes": marks}
 

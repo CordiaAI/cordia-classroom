@@ -8,11 +8,12 @@ import { buildStudyQueue } from '../studyQueue.mjs';
 import { parseQAPairs, parseStudyNotes } from '../guideText.mjs';
 import { cardDue } from '../spacedReview.mjs';
 import { itemFingerprint } from '../learningEvents.mjs';
-import { choiceText, conceptAnswer } from '../retainEngine.mjs';
+import { canChoose, choiceText, conceptAnswer, questionText } from '../retainEngine.mjs';
 import { questionKey } from '../retainMisses.mjs';
 import { freezeStreak, semesterStart } from '../streak.mjs';
 import { loadCourses } from './courses.mjs';
 import { registerTools } from './register.mjs';
+import { withShownQuizzes } from './wording.mjs';
 import { clip, decodeCursor, encodeCursor, failure, fitItems, notFound, ok, unavailable } from './output.mjs';
 import { localDate, localDay, zonedIso } from './zoned.mjs';
 
@@ -123,12 +124,17 @@ function sectionItems(guide, name, today) {
     }));
   }
   if (name === 'quiz') {
-    return (Array.isArray(guide.quiz_questions) ? guide.quiz_questions : []).map((question, index) => ({
-      question_id: `${guide.id}:quiz:${index}`,
-      question: clip(question.question, 600),
-      options: Array.isArray(question.options) ? question.options.map(option => clip(choiceText(option), 300)) : [],
-      answer: clip(choiceText(conceptAnswer(question)), 600),
-    }));
+    // As the app asks them (quiz_questions marked by withShownQuizzes): one about the source is left
+    // out, a reworded one is shown in its new words, and one with fewer than 3 choices is asked typed.
+    return (Array.isArray(guide.quiz_questions) ? guide.quiz_questions : [])
+      .map((question, index) => ({ question, index }))
+      .filter(({ question }) => question && !question.hidden)
+      .map(({ question, index }) => ({
+        question_id: `${guide.id}:quiz:${index}`,
+        question: clip(questionText(question), 600),
+        options: canChoose(question) ? question.options.map(option => clip(choiceText(option), 300)) : [],
+        answer: clip(choiceText(conceptAnswer(question)), 600),
+      }));
   }
   const evaluations = guide.practice_state?.progress?.evaluations || {};
   return (Array.isArray(guide.practice_state?.problems) ? guide.practice_state.problems : []).map((problem, index) => ({
@@ -142,13 +148,21 @@ function sectionItems(guide, name, today) {
 async function getStudySet(ctx, { study_set_id, include, cursor }) {
   const state = decodeCursor(cursor);
   if (!state) return failure('That cursor is not valid. Call get_study_set again without a cursor.', 'invalid_input');
-  const { data: guide, error } = await ctx.db.from('study_guides')
+  const { data: saved, error } = await ctx.db.from('study_guides')
     .select('id, title, folder_id, created_at, source_type, notes, study_guide, flashcards, flashcard_progress, quiz_questions, practice_state')
     .eq('id', study_set_id).maybeSingle();
   if (error) return unavailable('study set');
-  if (!guide) return notFound('study set');
+  if (!saved) return notFound('study set');
   const courses = await ctx.courses();
   const wanted = SECTIONS.filter(name => (include?.length ? include : ['notes', 'outline', 'key_terms']).includes(name));
+  let guide = saved;
+  if (wanted.includes('quiz')) {
+    try {
+      [guide] = await withShownQuizzes(ctx, [saved]);
+    } catch {
+      return unavailable('quiz');
+    }
+  }
   const today = localDay(new Date(), ctx.timeZone);
   // One list across the requested sections, so a cursor can resume mid-section.
   const items = wanted.flatMap(name => sectionItems(guide, name, today).map(item => ({ name, item })));
@@ -248,16 +262,22 @@ const WRONG = new Set(['wrong', 'again']);
 function itemId(item) {
   if (item.index !== undefined) return `${item.guideId}:card:${item.index}`;
   if (item.concept !== undefined) return `${item.guideId}:idea:${item.concept}`;
-  return `${item.guideId}:miss:${encodeURIComponent(questionKey(item.front)).slice(0, 200)}`;
+  return `${item.guideId}:miss:${encodeURIComponent(questionKey(item.question)).slice(0, 200)}`;
 }
 
 async function getDueCards(ctx, { study_set_id, course_id, limit }) {
   let request = ctx.db.from('study_guides').select('id, title, folder_id, flashcards, flashcard_progress, quiz_questions').order('created_at', { ascending: false });
   if (study_set_id) request = request.eq('id', study_set_id);
   else if (course_id) request = request.eq('folder_id', course_id);
-  const { data: guides, error } = await request.limit(100);
+  const { data: saved, error } = await request.limit(100);
   if (error) return unavailable('flashcards');
-  if (study_set_id && !guides?.length) return notFound('study set');
+  if (study_set_id && !saved?.length) return notFound('study set');
+  let guides;
+  try {
+    guides = await withShownQuizzes(ctx, saved || []);
+  } catch {
+    return unavailable('flashcards');
+  }
   const ids = (guides || []).map(guide => guide.id);
   const [{ data: missRows }, { data: events }] = ids.length ? await Promise.all([
     ctx.db.from('retain_misses').select('guide_id, items').in('guide_id', ids),
@@ -279,7 +299,7 @@ async function getDueCards(ctx, { study_set_id, course_id, limit }) {
   const courses = await ctx.courses();
   const cards = items.slice(0, limit).map(item => {
     const guide = byId.get(item.guideId);
-    const seen = history.get(`${item.guideId}\n${itemFingerprint(item.front)}`) || { confidence: null, wrong: 0 };
+    const seen = history.get(`${item.guideId}\n${itemFingerprint(item.question)}`) || { confidence: null, wrong: 0 };
     return {
       card_id: itemId(item),
       kind: item.index !== undefined ? 'flashcard' : item.concept !== undefined ? 'learn_idea' : 'missed_question',

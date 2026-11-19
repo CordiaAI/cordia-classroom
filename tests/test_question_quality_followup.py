@@ -908,6 +908,19 @@ class PromptWordingTests(unittest.TestCase):
         self.assertEqual(explain.call_args.kwargs["question"], "What is the normal serum potassium range?")
 
 
+class NothingLeftToAskTests(unittest.TestCase):
+    def test_a_quiz_is_never_left_with_nothing_to_ask(self):
+        rows = [dict(RAW_QUIZ[0]), {"question": "What is x?", "options": [], "correct_index": 0}, None]
+        shown = shown_questions(rows)
+        self.assertFalse(any(isinstance(q, dict) and q.get("hidden") for q in shown))
+        body = SimpleNamespace(types=["mc"], count=None, learn=False)
+        with patch.object(quiz, "get_supabase", return_value=MagicMock()), patch.object(quiz, "get_user_id", return_value="u1"), \
+                patch.object(quiz, "_load_quiz", return_value=(rows, True)), patch.object(quiz, "plan_for", return_value="free"), \
+                patch.object(quiz, "subscription_row", return_value=None):
+            result = quiz.start_session(GUIDE_ID, body, authorization="Bearer t")
+        self.assertEqual([i for card in result["cards"] for i in card["concepts"]], [0], "a malformed row is skipped, not a crash")
+
+
 # --- Low 11: a part's words may sit apart within one clause ------------------------------------------
 
 class PartsInProseTests(unittest.TestCase):
@@ -917,6 +930,10 @@ class PartsInProseTests(unittest.TestCase):
         prose = ("On the right side, the atrium collects blood and the ventricle pumps it to the lungs; "
                  "on the left side, the atrium and ventricle send it to the body.")
         self.assertEqual(retain.missing_parts(prose, self.CHAMBERS), [])
+
+    def test_a_shared_hyphen_names_both_parts(self):
+        self.assertEqual(retain.missing_parts("First- and second-degree murder differ by premeditation; voluntary manslaughter "
+                                              "is heat of passion.", "First-degree murder, second-degree murder, and voluntary manslaughter"), [])
 
     def test_words_split_across_clauses_do_not(self):
         self.assertEqual(retain.missing_parts("Picture LEFT side: atrium then ventricle; the right ventricle pumps to lungs.",
@@ -928,11 +945,18 @@ class PartsInProseTests(unittest.TestCase):
 class ConnectorWordingTests(unittest.TestCase):
     def test_the_wording_route_marks_each_quiz_like_shown_questions(self):
         from routers import mcp
-        body = mcp.WordingRequest(quizzes=[[q["question"] for q in RAW_QUIZ], ["Which works are shown on Slide 4?"]])
+        body = mcp.WordingRequest(quizzes=[
+            [{"question": q["question"]} for q in RAW_QUIZ],
+            [{"question": "Which works are shown on Slide 4?"}],
+            [{"question": "Which works are shown on Slide 4?"}, {"question": "What is x?", "answered": False}],
+        ])
         with patch.object(mcp, "_student", return_value=("u1", MagicMock())):
             out = mcp._question_wording("Bearer t", body)
         self.assertEqual(out["quizzes"][0], [{"hidden": True}, {"shown": "What is the normal serum potassium range?"}, {}])
         self.assertEqual(out["quizzes"][1], [{}], "a quiz all about the source is shown as it is")
+        self.assertEqual(out["quizzes"][2], [{}, {}], "nor is one left with nothing to ask")
+        with self.assertRaises(Exception):
+            mcp.WordingRequest(quizzes=[[{"question": "x"}] * 201])
 
 
 if __name__ == "__main__":

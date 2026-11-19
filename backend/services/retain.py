@@ -59,7 +59,10 @@ def can_choose(question: dict) -> bool:
 
 
 def concept_answer(question: dict) -> str:
-    options = question.get("options") or []
+    """The question's answer, or "" for a row with none (a malformed saved row is never asked)."""
+    if not isinstance(question, dict):
+        return ""
+    options = question.get("options") if isinstance(question.get("options"), list) else []
     index = question.get("correct_index")
     return str(options[index]) if isinstance(index, int) and 0 <= index < len(options) else ""
 

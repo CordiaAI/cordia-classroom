@@ -678,7 +678,7 @@ def shown_questions(questions):
     is shown as "What is X?") and `hidden` on one about the source itself ("Which artists are listed
     for Chapter 1?"), which keeps its place but is never asked. The saved `question` text is never
     changed: Learn levels, answer logs, misses and idea ids are keyed by it, and attempts by
-    position. A quiz that would be all hidden is shown as it is, never as an empty quiz."""
+    position. A quiz that would have nothing left to ask is shown as it is, never as an empty quiz."""
     if not isinstance(questions, list):
         return questions
     out, hidden = [], 0
@@ -696,10 +696,16 @@ def shown_questions(questions):
             elif standalone != text:
                 item["shown"] = standalone
         out.append(item)
-    if hidden and hidden == sum(1 for item in out if isinstance(item, dict)):
+    if hidden and not any(isinstance(item, dict) and not item.get("hidden") and _has_answer(item) for item in out):
         return [{key: value for key, value in item.items() if key != "hidden"} if isinstance(item, dict) else item
                 for item in out]
     return out
+
+
+def _has_answer(question: dict) -> bool:
+    """Whether a saved question has an answer to check (retain.concept_answer is not empty)."""
+    options, index = question.get("options"), question.get("correct_index")
+    return isinstance(options, list) and isinstance(index, int) and 0 <= index < len(options) and bool(str(options[index]).strip())
 
 
 def shown_guide(row):
@@ -716,7 +722,7 @@ def shown_pairs(pairs: list) -> list:
     `source` is the same index in the saved pairs and the saved quiz: reworded like shown_questions,
     and `hidden` on one about the source, which the page leaves out. None hidden when all would be."""
     pairs = list(pairs or [])
-    marks = shown_questions([{"question": pair.get("question")} for pair in pairs])
+    marks = shown_questions([{"question": pair.get("question"), "options": [pair.get("answer") or ""], "correct_index": 0} for pair in pairs])
     return [{**pair, "question": mark.get("shown", pair.get("question")), **({"hidden": True} if mark.get("hidden") else {})}
             for pair, mark in zip(pairs, marks)]
 

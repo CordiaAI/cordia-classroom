@@ -76,7 +76,7 @@ export default function FlashcardViewer({
   }, []);
   function logCard(credit) {
     if (!logMode || !card) return;
-    logAnswer({ guideId: card.guideId || guideId, question: card.front, mode: logMode, type: 'flashcard', credit, timing: cardTimer.current?.done() });
+    logAnswer({ guideId: card.guideId || guideId, question: card.question ?? card.front, mode: logMode, type: 'flashcard', credit, timing: cardTimer.current?.done() });
   }
   useEffect(() => { if (flipped) walkthroughEvent('card-flipped'); }, [flipped]);
   // First flashcard session on a keyboard computer: point out Space, 1 and 2.
