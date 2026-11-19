@@ -9,7 +9,8 @@
   short answer     the guide's own why / how / describe questions, with the stored answer as key
 
 Each item names its source question (`source`, the Q/A index) so one printout never asks the same
-idea twice. Matching, short answer and fill-in are cached on the guide (study_guides.print_items)
+idea twice. Pairs come as text_processing.shown_pairs gives them: each in its place, reworded, and
+`hidden` on one about the source, which no type prints. Matching, short answer and fill-in are cached on the guide (study_guides.print_items)
 under a hash of the Q/A they came from.
 """
 
@@ -109,12 +110,13 @@ def strip_stem(question: str, options: list) -> list:
 def multiple_choice(quiz: list, pairs: list) -> tuple:
     """(items, flagged): printable multiple-choice questions from the cached quiz. A question whose
     choices fail the distractor check is left out (flagged counts them) until the student refreshes
-    the answer choices; the saved quiz itself is never changed here."""
+    the answer choices; the saved quiz itself is never changed here. A question shown_questions
+    hid (about the source) is left out, and one it reworded is printed in its shown wording."""
     index_of = {normalize(pair["question"]): i for i, pair in enumerate(pairs)}
     others = [(str(q.get("question") or ""), concept_answer(q)) for q in quiz if isinstance(q, dict)]
     items, flagged = [], 0
     for position, question in enumerate(quiz):
-        if not isinstance(question, dict) or not isinstance(question.get("options"), list):
+        if not isinstance(question, dict) or not isinstance(question.get("options"), list) or question.get("hidden"):
             continue
         text, answer = str(question.get("question") or ""), concept_answer(question)
         options = [_plain(option) for option in question["options"]]
@@ -126,8 +128,9 @@ def multiple_choice(quiz: list, pairs: list) -> tuple:
             flagged += 1
             continue
         source = index_of.get(normalize(text), f"quiz:{position}")
-        items.append({"id": f"mc{position}", "source": source, "question": text,
-                      "options": strip_stem(text, options), "answer": correct})
+        shown = str(question.get("shown") or text)
+        items.append({"id": f"mc{position}", "source": source, "question": shown,
+                      "options": strip_stem(shown, options), "answer": correct})
     return items, flagged
 
 
@@ -150,6 +153,8 @@ def matching(pairs: list) -> list:
     writes it, the definition the answer's first sentence without its "X is" / "It is" opening."""
     items, seen = [], set()
     for index, pair in enumerate(pairs):
+        if pair.get("hidden"):
+            continue
         term = (_defined_term(pair["question"]) or "").strip("'‘’\"")
         if not term or len(term.split()) > 4 or len(term) > 40:
             continue
@@ -175,7 +180,7 @@ def short_answer(pairs: list) -> list:
     keyed with the stored answer."""
     items = []
     for index, pair in enumerate(pairs):
-        if _EXPLAIN.search(pair["question"]) and len(pair["answer"].split()) >= 8:
+        if not pair.get("hidden") and _EXPLAIN.search(pair["question"]) and len(pair["answer"].split()) >= 8:
             items.append({"id": f"s{index}", "source": index, "question": pair["question"].strip(),
                           "key": pair["answer"].strip(), "points": SHORT_POINTS})
     return items
@@ -188,7 +193,7 @@ def fill_candidates(pairs: list, limit: int = 40) -> list:
     but short enough for one sentence. Ideas matching and short answer can't use come first, so a
     mixed printout covers more of the guide."""
     used = {item["source"] for item in matching(pairs) + short_answer(pairs)}
-    fits = [index for index, pair in enumerate(pairs) if 1 <= len(pair["answer"].split()) <= 35]
+    fits = [index for index, pair in enumerate(pairs) if not pair.get("hidden") and 1 <= len(pair["answer"].split()) <= 35]
     ordered = [index for index in fits if index not in used] + [index for index in fits if index in used]
     return sorted(ordered[:limit])
 

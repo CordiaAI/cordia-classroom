@@ -17,6 +17,7 @@ from __future__ import annotations
 from services import guide_versions as versions
 from services import llm
 from services.guide_access import outline_preview
+from services.text_processing import asked_as
 
 NOT_COVERED = "This guide doesn't cover that. Try asking about something in its outline or questions."
 MAX_OUTLINE_CHARS = 12000
@@ -45,7 +46,8 @@ def guide_context(guide: dict) -> tuple[str, list]:
     ideas = versions.content_ideas(content)[:MAX_IDEAS]
     outline = "\n".join(outline_preview(guide.get("notes") or "", lines=400))[:MAX_OUTLINE_CHARS]
     lines = [f"TITLE: {guide.get('title') or 'Untitled'}", "", "OUTLINE:", outline or "(none)", "", "IDEAS:"]
-    lines += [f"[{n}] Q: {idea['question'][:600]}\n    A: {idea['answer'][:1200]}" for n, idea in enumerate(ideas, 1)]
+    # Each idea as the student is asked it ("What is X?", not "According to Slide 5, what is X?").
+    lines += [f"[{n}] Q: {asked_as(idea['question'])[:600]}\n    A: {idea['answer'][:1200]}" for n, idea in enumerate(ideas, 1)]
     return "\n".join(lines), ideas
 
 
@@ -65,7 +67,7 @@ def ask(guide: dict, question: str, detail: str = "short") -> dict:
     if not isinstance(parsed, dict) or "covered" not in parsed:
         return {}
     numbers = [n for n in parsed.get("ideas") or [] if isinstance(n, int) and 1 <= n <= len(ideas)]
-    cited = [{"idea_id": ideas[n - 1]["idea_id"], "question": ideas[n - 1]["question"]} for n in dict.fromkeys(numbers)]
+    cited = [{"idea_id": ideas[n - 1]["idea_id"], "question": asked_as(ideas[n - 1]["question"])} for n in dict.fromkeys(numbers)]
     answer = str(parsed.get("answer") or "").strip()[:MAX_ANSWER_CHARS] if parsed.get("covered") else ""
     if not parsed.get("covered") or not answer:
         return {"covered": False, "answer": NOT_COVERED, "cited": []}

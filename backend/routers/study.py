@@ -19,6 +19,7 @@ from rate_limit import ai_rate_limit
 from services import guide_access
 from services import guide_versions as versions
 from services import viewer_study as study
+from services.text_processing import shown_questions
 from routers import quiz as quiz_router
 
 router = APIRouter(prefix="/guides", tags=["study shared guides"])
@@ -66,7 +67,7 @@ def study_guide(gate: Ctx = Depends(STUDY)):
         "id": guide["id"],
         "title": content.get("title") or guide.get("title") or "Untitled",
         "flashcards": content["cards"],
-        "quiz_questions": ctx["questions"],
+        "quiz_questions": shown_questions(ctx["questions"]),
         "flashcard_progress": study.progress_view(ctx),
         "viewer": {
             "version": content["version"],

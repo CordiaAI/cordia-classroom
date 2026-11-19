@@ -383,7 +383,7 @@ _DECOR = r"[ \t\-\u2013\u2014_=*#|\[\]()]{0,40}"
 _GAP = r"[ \t]{0,3}"
 _NUMBER = r"\d{1,4}"
 _MARKER_LINES = re.compile(
-    r"^(?:"
+    r"^(?=[^\n\d]{0,60}\d)(?:"  # every marker has a number near its start: other lines are passed over at once
     rf"{_DECOR}(?:slide|page|pg\.?|p\.){_GAP}{_NUMBER}(?:{_GAP}(?:of|/){_GAP}{_NUMBER})?{_DECOR}"
     rf"|{_GAP}{_NUMBER}[ \t]{{1,3}}/[ \t]{{1,3}}{_NUMBER}{_GAP}"
     rf"|{_GAP}[\-\u2013\u2014]{{1,3}}{_GAP}{_NUMBER}{_GAP}[\-\u2013\u2014]{{1,3}}{_GAP}"

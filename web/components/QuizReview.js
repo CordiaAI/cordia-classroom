@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, MessageCircle, Minus, Sparkles, X } from 'lucide-react';
 import { expected } from '../lib/submitQuiz.mjs';
+import { questionText } from '../lib/retainEngine.mjs';
 import { MissFeedback, missDetail } from './RetainCards';
 
 const SURE = { sure: 'Sure', think: 'Think so', guess: 'Guess' };
@@ -23,7 +24,7 @@ function Row({ row, number, question, guideId, onSelfCheck }) {
     <li className={'rv-item is-' + tone}>
       <div className="rv-top">
         <span className="rv-num">{number}</span>
-        <span className="rv-q">{question.question}</span>
+        <span className="rv-q">{questionText(question)}</span>
         <span className={'rv-mark is-' + tone}>{tone !== 'unchecked' && <Icon size={16} strokeWidth={2.25} aria-hidden="true" />}{label}</span>
       </div>
       <dl className="rv-answers">

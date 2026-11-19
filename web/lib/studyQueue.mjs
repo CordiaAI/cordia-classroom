@@ -11,11 +11,15 @@
 // Flashcards and Learn's ideas both come from the guide's Q&A pairs, so the same question can be
 // due in more than one place. The queue holds it once, and an answer is saved to every place it
 // came from (session.js), so no record says something the others contradict.
+// Every record is keyed by the question's saved text (item.question); the backend may show a
+// question in other words (its `shown` wording, item.front) or hide one about the source (`hidden`:
+// never asked here). Items are joined by the saved text, so a reworded idea and its flashcard stay
+// one item, and a hidden question's level and schedule are kept, untouched, for when it is asked.
 // Pure: the web app (lib/studyQueue.js) and the MCP server (get_due_cards) both order Study now here.
 import { questionKey } from './retainMisses.mjs';
 import { dueIndices } from './spacedReview.mjs';
 import { FAMILIAR, LEARNING, answer, askCard, dayKey, isFading, restoreLevels, saveableLevels } from './learnEngine.mjs';
-import { conceptAnswer } from './retainEngine.mjs';
+import { askable, conceptAnswer, questionText } from './retainEngine.mjs';
 
 // A card is due when it is new, or its spaced-review day has come (lib/spacedReview.mjs). `today`
 // is the student's local day (the server passes the one in their time zone).
@@ -48,8 +52,25 @@ export function learnIdeas(guide, today = dayKey()) {
   const levels = restoreLevels(questions, saved);
   return questions
     .map((question, concept) => ({ question, concept, entry: levels[concept] }))
-    .filter(({ question, entry }) => conceptAnswer(question) && (entry.l === LEARNING || entry.l === FAMILIAR || isFading(entry, today)))
-    .map(({ question, concept, entry }) => ({ concept, front: question.question, back: conceptAnswer(question), level: entry.l }));
+    .filter(({ question, entry }) => askable(question) && (entry.l === LEARNING || entry.l === FAMILIAR || isFading(entry, today)))
+    .map(({ question, concept, entry }) => ({ concept, question: question.question, front: questionText(question), back: conceptAnswer(question), level: entry.l }));
+}
+
+// The guide's quiz questions by their saved text's key (the first with that text), for showing a
+// flashcard or a miss in its question's wording, or leaving out a miss whose question is hidden.
+function quizByKey(guide) {
+  const byKey = new Map();
+  for (const question of Array.isArray(guide?.quiz_questions) ? guide.quiz_questions : []) {
+    const key = questionKey(question?.question);
+    if (key && !byKey.has(key)) byKey.set(key, question);
+  }
+  return byKey;
+}
+
+// The wording to show for a saved text: its quiz question's (shown when reworded), else as saved.
+function shownFor(byKey, text) {
+  const question = byKey.get(questionKey(text));
+  return question && !question.hidden ? questionText(question) : String(text || '');
 }
 
 // Several lists dealt in turn, one item from each, so no one list fills the round.
@@ -67,19 +88,23 @@ function dealt(lists) {
 export function buildStudyQueue(guides, stored = {}, { guideId = '', today = dayKey(), interleave = false } = {}) {
   const cardLists = [];
   const learnLists = [];
+  const quizzes = new Map();
   for (const guide of guides) {
     const cards = [];
     const learn = [];
+    const byKey = quizByKey(guide);
+    quizzes.set(guide.id, byKey);
     cardLists.push(cards);
     learnLists.push(learn);
     // Study now on a guide with nothing due still runs a full round of its cards.
     const due = dueCards(guide, today);
     const pool = guideId && !due.length ? (guide.flashcards || []).map((card, index) => ({ ...card, index })) : due;
     for (const card of pool) {
-      cards.push({ kind: 'card', guideId: guide.id, guideTitle: guide.title, index: card.index, front: card.front, back: card.back, image: card.image, front_image: card.front_image });
+      // A flashcard is the student's own and is always reviewed; it shows its question's wording.
+      cards.push({ kind: 'card', guideId: guide.id, guideTitle: guide.title, index: card.index, question: card.front, front: shownFor(byKey, card.front), back: card.back, image: card.image, front_image: card.front_image });
     }
     for (const idea of learnIdeas(guide, today)) {
-      learn.push({ kind: 'learn', guideId: guide.id, guideTitle: guide.title, concept: idea.concept, front: idea.front, back: idea.back });
+      learn.push({ kind: 'learn', guideId: guide.id, guideTitle: guide.title, concept: idea.concept, question: idea.question, front: idea.front, back: idea.back });
     }
   }
   const cards = interleave ? dealt(cardLists) : cardLists.flat();
@@ -88,7 +113,11 @@ export function buildStudyQueue(guides, stored = {}, { guideId = '', today = day
   for (const [id, items] of Object.entries(stored || {})) {
     const guide = guides.find(item => item.id === id);
     if (!guide || !Array.isArray(items)) continue;
-    items.forEach(item => misses.push({ kind: 'miss', guideId: id, guideTitle: guide.title, front: item.question, back: item.answer, miss: true, sure: Boolean(item.sure) }));
+    const byKey = quizzes.get(id);
+    items.forEach(item => {
+      if (byKey.get(questionKey(item?.question))?.hidden) return; // about the source: never asked
+      misses.push({ kind: 'miss', guideId: id, guideTitle: guide.title, question: item.question, front: shownFor(byKey, item.question), back: item.answer, miss: true, sure: Boolean(item.sure) });
+    });
   }
   const ordered = [
     ...misses.filter(item => item.sure),
@@ -99,7 +128,7 @@ export function buildStudyQueue(guides, stored = {}, { guideId = '', today = day
   const byKey = new Map();
   const items = [];
   for (const item of ordered) {
-    const text = questionKey(item.front);
+    const text = questionKey(item.question);
     const key = text && item.guideId + '\n' + text;
     const first = key && byKey.get(key);
     if (!first) { items.push({ ...item }); if (key) byKey.set(key, items[items.length - 1]); continue; }

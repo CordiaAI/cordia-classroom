@@ -13,6 +13,7 @@ from services.llm import guide_title
 from services.sharing import on_guide_changed
 from routers.quiz import start_quiz_warmup
 from services import guide_versions, ideas
+from services.text_processing import shown_guide
 from auth_utils import get_user_id
 from ids import is_uuid, require_uuid
 from rate_limit import ai_rate_limit
@@ -95,7 +96,7 @@ def list_guides(folder_id: Optional[str] = None, limit: int = 50, offset: int = 
         .range(offset, offset + limit - 1) \
         .execute()
 
-    guides = result.data or []
+    guides = [shown_guide(guide) for guide in result.data or []]
     if summary:
         for guide in guides:
             cards = guide.pop("flashcards", None)
@@ -180,7 +181,7 @@ def create_guide(user_id: str, request: SaveGuideRequest, extra: Optional[dict] 
     if result.data:
         row = result.data[0]
         start_quiz_warmup(row, user_id)
-        return row
+        return shown_guide(row)
     raise HTTPException(status_code=500, detail="Failed to save guide")
 
 
@@ -321,7 +322,7 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
     guide = result.data[0]
     if {"title", "notes", "study_guide", "flashcards"} & set(update_data):
         guide = {**guide, **(_new_version(supabase, user_id, guide_id) or {})}
-    return {"guide": guide}
+    return {"guide": shown_guide(guide)}
 
 
 def _follow_ideas(db, user_id: str, guide_id: str, update: dict) -> dict:
@@ -408,7 +409,7 @@ def get_guide(guide_id: str, fields: str = "", authorization: str = Header(defau
     if not result.data:
         raise HTTPException(status_code=404, detail="Guide not found")
 
-    return {"guide": result.data[0]}
+    return {"guide": shown_guide(result.data[0])}
 
 
 @router.delete("/{guide_id}")
