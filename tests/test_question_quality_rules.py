@@ -86,6 +86,12 @@ class ExactMarkerLinesTests(unittest.TestCase):
             kept = [line for line in lines if line not in MARKER_LINES]
             self.assertEqual(strip_structure_markers("\n".join(lines)).split("\n") if kept else [""], kept or [""])
 
+    def test_a_slide_whose_title_is_only_a_marker_has_no_title_in_the_prompt(self):
+        for title in ("Slide 5", "Untitled Slide 3", "--- Slide 2 ---"):
+            block = format_slideshow_text([{"title": title, "content": ["Mitosis splits a cell."]}])
+            self.assertNotIn("<TITLE>", block, title)
+        self.assertIn("<TITLE>Slide 6: Sodium</TITLE>", format_slideshow_text([{"title": "Slide 6: Sodium", "content": ["Na"]}]))
+
     def test_no_line_joining_helper_exists(self):
         self.assertFalse(hasattr(tp, "attach_values"))
 

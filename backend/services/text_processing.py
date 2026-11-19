@@ -758,9 +758,10 @@ def format_slideshow_text(slides: List[dict]) -> str:
 
 def _slide_block(title: str, content_text: str) -> str:
     """One slide for the guide prompt. No slide number and no made-up "Untitled Slide N" title: a
-    number in the prompt is what questions like "What is shown on Slide 5?" were written from."""
+    number in the prompt is what questions like "What is shown on Slide 5?" were written from. A
+    title that is only a marker ("Slide 5", "Untitled Slide 3") is no title."""
     title = (title or '').strip()
-    heading = f"<TITLE>{title}</TITLE>\n" if title else ""
+    heading = f"<TITLE>{title}</TITLE>\n" if title and not _MARKER_LINES.match(title) else ""
     return f"<SLIDE>\n{heading}<CONTENT>\n{content_text.strip()}\n</CONTENT>\n</SLIDE>"
 
 

@@ -324,10 +324,11 @@ def mentions_answer(text: str, answer: str) -> bool:
         return False
     given = _Words([word[:WORD_MAX_CHARS] for word in words], _Budget())
     for accepted in sorted(_accepted(str(answer or "")[:ANSWER_MAX_CHARS])):
-        target = list(dict.fromkeys(word[:WORD_MAX_CHARS] for word in _key_words(accepted)))
+        target = [word[:WORD_MAX_CHARS] for word in _key_words(accepted)]
         if not target or any(re.search(r"\d", word) and word not in given.exact for word in target):
             continue
-        covered = sum(1 for word in target if given.names(word))
+        found = {word: given.names(word) for word in dict.fromkeys(target)}  # each word looked up once
+        covered = sum(1 for word in target if found[word])
         if covered == len(target) or (len(target) > 6 and covered * 2 >= len(target)):
             return True
     return False

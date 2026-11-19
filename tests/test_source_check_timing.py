@@ -86,7 +86,8 @@ CHECKS = ("refers_to_source", "standalone_question", "strip_source_attribution",
 # shown_questions on three different questions (a remembered answer would hide the cost).
 CALLS = {"shown_questions": "tp.shown_questions([{{'question': text + mark, 'options': ['a'], 'correct_index': 0}} for mark in ('', ' ', '  ')])",
          "_cue": "quiz._cue(text)"}
-SETUP = "from services import text_processing as tp\nfrom routers import quiz\ntext = "
+SETUP = "from services import text_processing as tp\ntext = "
+SETUPS = {"_cue": "from services import text_processing as tp\nfrom routers import quiz\ntext = "}
 
 CHILD = """\
 import json, sys, time
@@ -125,7 +126,7 @@ class SourceCheckTimingTests(unittest.TestCase):
         for label, expression in TEXTS.items():
             for check in CHECKS:
                 with self.subTest(text=label, check=check):
-                    ms = timed(SETUP + expression, CALLS.get(check, "tp.{check}(text)").format(check=check))
+                    ms = timed(SETUPS.get(check, SETUP) + expression, CALLS.get(check, "tp.{check}(text)").format(check=check))
                     self.assertLess(ms, LIMIT_MS, f"{check}({label}): {took(ms)}")
 
     def test_marker_removal_is_fast_on_the_largest_capture(self):
