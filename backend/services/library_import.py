@@ -17,7 +17,7 @@ from typing import Optional
 
 from database import get_supabase
 from services.llm import guide_title
-from services.text_processing import text_to_outline
+from services.text_processing import outline_from_text
 
 log = logging.getLogger(__name__)
 
@@ -57,11 +57,17 @@ def class_folder(user_id: str, class_id: Optional[str]) -> Optional[str]:
 
 
 def upsert_source(user_id: str, *, ref: str, connector: str, title: str, text: str, folder_id: Optional[str],
-                  source_type: str, source_title: str, source_url: Optional[str] = None) -> Optional[dict]:
-    """Create or refresh the guide for one source. Returns the guide, or None when there's no text."""
-    outline = text_to_outline(text)
+                  source_type: str, source_title: str, source_url: Optional[str] = None,
+                  partial: bool = False, outcome: Optional[dict] = None) -> Optional[dict]:
+    """Create or refresh the guide for one source. Returns the guide, or None when there's no text.
+    partial: the text is only part of the source (a slow or cut-off read): it never replaces a longer
+    copy that is already filed. outcome, when given, is filled with cut (the outline keeps only its
+    first points) and kept (an earlier, longer copy was left as it was), for a caller that tells the student."""
+    outline, cut = outline_from_text(text)
     if not outline:
         return None
+    outcome = outcome if outcome is not None else {}
+    outcome["cut"] = cut
     db = get_supabase()
     found = (db.table("study_guides").select("id,notes,title,folder_id").eq("user_id", user_id)
              .eq("external_source_id", ref).limit(1).execute().data or [None])[0]
@@ -70,7 +76,9 @@ def upsert_source(user_id: str, *, ref: str, connector: str, title: str, text: s
         link = (db.table("connector_links").select("synced_hash").eq("user_id", user_id).eq("connector", connector)
                 .eq("kind", "file").eq("cordia_id", found["id"]).limit(1).execute().data or [{}])[0]
         untouched = link.get("synced_hash") == _hash(found.get("notes") or "")
-        if untouched and (found.get("notes") or "") != outline:
+        if partial and len(found.get("notes") or "") > len(outline):
+            outcome["kept"] = True
+        elif untouched and (found.get("notes") or "") != outline:
             db.table("study_guides").update({"notes": outline}).eq("id", found["id"]).eq("user_id", user_id).execute()
             _link(user_id, connector, found["id"], ref, outline, now)
         return found

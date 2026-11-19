@@ -170,6 +170,12 @@ def extract_slideshow_content(text: str) -> List[dict]:
     return slides
 
 
+# What an import says about itself, not about the subject: the line that tells the student part of a
+# Notion page wasn't brought in (notion_text._NOTES; a test keeps the two in step) and the "Sub-page:
+# Title" pointers older imports wrote. Never study content, so no outline, card or question is made from them.
+_IMPORT_NOTE = re.compile(r"^(?:The rest of this Notion page wasn't imported because\b|Part of this Notion page couldn't be read, so it isn't all here\b|Sub-page: )")
+
+
 def clean_text(text: str) -> str:
     """
     Clean and filter text content, removing navigation and UI elements.
@@ -195,7 +201,7 @@ def clean_text(text: str) -> str:
     }
 
     lines = text.splitlines()
-    non_empty_lines = [line.strip() for line in lines if line.strip()]
+    non_empty_lines = [line.strip() for line in lines if line.strip() and not _IMPORT_NOTE.match(line.strip())]
 
     if not non_empty_lines:
         return ""
@@ -526,13 +532,22 @@ def _looks_like_heading(line: str, following: str) -> bool:
             and bool(following) and len(following) > len(line))
 
 
-def text_to_outline(text: str, max_points: int = 400) -> str:
+OUTLINE_MAX_POINTS = 400
+
+
+def text_to_outline(text: str, max_points: int = OUTLINE_MAX_POINTS) -> str:
     """Document or slide text as the outline guides use ("## Heading" then "- point" lines), so an
     imported file opens in Library ready to read and to make cards from. Slides keep their titles
     as headings; long paragraphs become one point each."""
+    return outline_from_text(text, max_points)[0]
+
+
+def outline_from_text(text: str, max_points: int = OUTLINE_MAX_POINTS) -> tuple[str, bool]:
+    """(outline, cut): the outline text_to_outline makes, and whether `max_points` left points out,
+    so a caller that files it can say so."""
     text = clean_text(text or "")
     if not text.strip():
-        return ""
+        return "", False
     lines_out: List[str] = []
     is_slides, _ = is_slideshow_content(text)
     if is_slides:
@@ -554,16 +569,19 @@ def text_to_outline(text: str, max_points: int = 400) -> str:
             else:
                 lines_out.append(f"- {line[:600]}")
     points = 0
+    cut = False
     kept = []
     for line in lines_out:
         if line.startswith("- "):
             points += 1
             if points > max_points:
+                cut = True
                 break
         kept.append(line)
     # A heading with nothing under it adds nothing.
-    return "\n".join(line for index, line in enumerate(kept)
-                     if not line.startswith("## ") or (index + 1 < len(kept) and kept[index + 1].startswith("- ")))
+    outline = "\n".join(line for index, line in enumerate(kept)
+                        if not line.startswith("## ") or (index + 1 < len(kept) and kept[index + 1].startswith("- ")))
+    return outline, cut
 
 
 _CHANGE_WORDS = re.compile(

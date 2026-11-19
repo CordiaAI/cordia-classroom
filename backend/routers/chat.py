@@ -657,7 +657,11 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
             return ChatResponse(answer=app["problem"])
         if app:
             source = {"type": "connector", "id": app["connector"], "title": app["title"]}
-            return _tutor_reply(body, user_id, question, Material(content=app["text"], source=source), skill, turn)
+            reply = _tutor_reply(body, user_id, question, Material(content=app["text"], source=source), skill, turn)
+            # Part of the page wasn't read: said after the answer, never inside the material the answer is made from.
+            if app.get("note"):
+                reply.answer = f"{reply.answer}\n\n{app['note']}"
+            return reply
     about_material = bool(material.content.strip() and PRACTICE_REQUEST.search(question))
     if (skill in {None, "explain", "build_guide", "practice", "organize", "plan", "retain"} and not body.class_id
             and not about_material and not _about_learn(question) and _asks_for_app_action(question)):

@@ -8,6 +8,7 @@ of what is connected; Classroom stores nothing about it.
 import json
 import logging
 import os
+import re
 from urllib.parse import urlparse
 
 import requests
@@ -145,6 +146,9 @@ def disconnect(user_id: str, connector: str) -> None:
             _request("DELETE", f"/connected_accounts/{account}")
 
 
+_SLOW_DOWN = re.compile(r"\b429\b|rate.?limit|too many requests", re.I)
+
+
 def run(account_id: str, user_id: str, slug: str, arguments: dict) -> dict:
     """Run one Composio tool for the student's account and return its data, or raise a 502."""
     response = _request("POST", f"/tools/execute/{slug}", json={
@@ -157,6 +161,9 @@ def run(account_id: str, user_id: str, slug: str, arguments: dict) -> dict:
     body = response.json() if response.content else {}
     if not response.ok or body.get("successful") is False:
         log.warning("composio %s failed %s %s", slug, response.status_code, str(body.get("error"))[:300])
+        # The app itself said "slow down" (HTTP 429, or its error says so): a caller that can wait may try once more.
+        if response.status_code == 429 or _SLOW_DOWN.search(str(body.get("error"))):
+            raise HTTPException(status_code=429, detail="The app is busy. Try again in a minute.")
         raise HTTPException(status_code=502, detail="The app didn't respond. Try again in a minute.")
     data = body.get("data") or {}
     # A few tools hand back their result as a JSON string rather than an object.
