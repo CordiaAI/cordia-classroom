@@ -436,7 +436,7 @@ body { touch-action: manipulation; }
 /* The sub-page names scroll inside the sheet. The padding keeps the 2px focus ring (2px outside the
    button) inside the scroll box; the edge with more names below or above fades (fade-top/fade-bottom,
    set as it scrolls), and keyboard focus scrolls a name clear of the fade. */
-.cn-hub-names { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; max-height: 11rem; overflow-y: auto; padding: 0.25rem; scroll-padding-block: 1.5rem; }
+.cn-hub-names { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; max-height: 11rem; overflow-y: auto; padding: 0.25rem; scroll-padding-block: 1.875rem; }
 .cn-hub-names.fade-bottom { -webkit-mask-image: linear-gradient(to bottom, var(--on-olive) calc(100% - 1.5rem), transparent); mask-image: linear-gradient(to bottom, var(--on-olive) calc(100% - 1.5rem), transparent); }
 .cn-hub-names.fade-top { -webkit-mask-image: linear-gradient(to top, var(--on-olive) calc(100% - 1.5rem), transparent); mask-image: linear-gradient(to top, var(--on-olive) calc(100% - 1.5rem), transparent); }
 .cn-hub-names.fade-top.fade-bottom { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--on-olive) 1.5rem, var(--on-olive) calc(100% - 1.5rem), transparent); mask-image: linear-gradient(to bottom, transparent, var(--on-olive) 1.5rem, var(--on-olive) calc(100% - 1.5rem), transparent); }

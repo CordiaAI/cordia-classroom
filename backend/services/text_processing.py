@@ -180,8 +180,8 @@ def extract_slideshow_content(text: str) -> List[dict]:
 # the same line anywhere else ("- Database: Westlaw and LexisNexis" in law notes, a web-design page's
 # "- Sub-page: a page nested under a parent page") is the course's own text and is never touched.
 # A title that starts with a small letter or ends with a full stop reads as a definition, not a page
-# name, so it is kept even in such a guide. supabase/oneoff/20261119_clean_notion_import_lines.sql
-# applies the same rule to the stored notes (a test keeps the two in step).
+# name, so it is kept even in such a guide. The clean-up SQL for Jude (20261119_clean_notion_import_lines.sql
+# under supabase/) applies the same rule to the stored notes; tests/fixtures/f1_import_lines.json keeps them in step.
 NOTION_SOURCE_PREFIX = "notion:"
 F1_NOTION_LIVE = "2026-11-19T01:45:00+00:00"
 F1_IMPORT_NOTES = (

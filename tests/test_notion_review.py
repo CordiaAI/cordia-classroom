@@ -241,17 +241,18 @@ class NothingLeaksIntoGuides(Base):
     """R-M2: the partial note and sub-page titles are never study content (probe_outline.py)."""
 
     def test_the_probe_case_makes_no_note_bullet_and_no_sub_page_section(self):
+        # The reader never writes either into the text: the note is PageRead.note and the sub-pages are
+        # PageRead.sub_pages. (Guides an older import filed with them are handled per guide: round 3,
+        # test_notion_third_review.py; the shared outline step leaves such lines alone, since in a
+        # course's own notes they are content.)
         from services import notion_text as nt
         from services.text_processing import text_to_outline
-        page = nt.PageRead(body="# Week 3\n- Glycolysis\n  - 2 ATP net\nSub-page: Lecture 4", partial=True, reason="time")
+        page = nt.PageRead(body="# Week 3\n- Glycolysis\n  - 2 ATP net", partial=True, reason="time", sub_pages=["Lecture 4"])
         outline = text_to_outline(page.text)
         self.assertNotIn("Sub-page", outline)
         self.assertNotIn("wasn't imported", outline)
         self.assertIn("2 ATP net", outline)
-        # Even when the note is put on by hand, the outline drops it.
-        for reason in nt._NOTES:
-            hand = f"# Week 3\n- Glycolysis\n  - 2 ATP net\n\n{nt._NOTES[reason]}"
-            self.assertNotIn("Notion page", text_to_outline(hand), reason)
+        self.assertEqual(page.note, nt._NOTES["time"])
 
     def test_a_page_with_sub_pages_keeps_titles_out_of_the_text_and_in_the_response(self):
         tree = {PAGE: [block("heading_1", "Week 3"), block("paragraph", "Overview of the week."), child_page("Lecture 3", "cp3"),
@@ -278,12 +279,12 @@ class NothingLeaksIntoGuides(Base):
         for stray in ("Sub-page", "Lecture 4", "wasn't imported", "couldn't be read"):
             self.assertNotIn(stray, notes)
 
-    def test_the_text_processing_pattern_matches_every_note_the_reader_writes(self):
+    def test_no_note_the_reader_has_ever_reaches_the_text(self):
         from services import notion_text as nt
-        from services.text_processing import clean_text
-        for note in nt._NOTES.values():
-            self.assertEqual(clean_text(f"Cells make ATP from glucose.\n{note}\nMitochondria are the site."),
-                             "Cells make ATP from glucose.\nMitochondria are the site.")
+        for reason, note in nt._NOTES.items():
+            page = nt.PageRead(body="Cells make ATP from glucose.\nMitochondria are the site.", partial=True, reason=reason)
+            self.assertNotIn(note, page.text, reason)
+            self.assertNotIn(note, page.within(30).text, reason)
 
     def test_a_course_line_that_starts_with_database_is_still_study_content(self):
         from services.text_processing import clean_text

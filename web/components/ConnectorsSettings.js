@@ -124,10 +124,13 @@ function useEdgeFade() {
       list.classList.toggle('fade-top', more && list.scrollTop > 4);
       list.classList.toggle('fade-bottom', more && list.scrollTop < list.scrollHeight - list.clientHeight - 4);
     };
+    // The browser scrolls a focused name only just into view, under the fade: bring it clear (scroll-padding-block).
+    const reveal = event => event.target.scrollIntoView?.({ block: 'nearest' });
     update();
     list.addEventListener('scroll', update, { passive: true });
+    list.addEventListener('focusin', reveal);
     window.addEventListener('resize', update);
-    return () => { list.removeEventListener('scroll', update); window.removeEventListener('resize', update); };
+    return () => { list.removeEventListener('scroll', update); list.removeEventListener('focusin', reveal); window.removeEventListener('resize', update); };
   }, [list]);
   return setList;
 }
