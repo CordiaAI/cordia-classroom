@@ -64,7 +64,7 @@ export function DueChip({ entry, compact = false }) {
 
 // A small menu under its button: role="menu", arrow keys move, Escape closes and puts focus back.
 // items: [{ key, label, detail?, onSelect, disabled? }]
-export function MenuButton({ label, className = 'c-btn c-btn--quiet', icon = null, items, heading, empty = 'Nothing to pick', disabled = false, align = 'start', menuLabel }) {
+export function MenuButton({ label, className = 'c-btn c-btn--quiet', icon = null, items, heading, empty = 'Nothing to pick', disabled = false, align = 'start', menuLabel, triggerProps = {} }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef(null);
   const trigger = useRef(null);
@@ -87,7 +87,7 @@ export function MenuButton({ label, className = 'c-btn c-btn--quiet', icon = nul
   }
   return (
     <span className="cal-menu-wrap" ref={wrap} onKeyDown={onKeyDown}>
-      <button ref={trigger} type="button" className={className} aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen(value => !value)}>
+      <button ref={trigger} type="button" className={className} aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen(value => !value)} {...triggerProps}>
         {icon}{label}
       </button>
       {open && (
