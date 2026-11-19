@@ -54,6 +54,8 @@ class NotionTextTests(unittest.TestCase):
         from fastapi.testclient import TestClient
         from main import app
         from rate_limit import limiter
+        from services import notion_text
+        notion_text.reset_gates()  # calls an earlier test gave up waiting for still count until they end
         limiter.reset()  # imports allow 10 a minute per client; each test makes several
         self.client = TestClient(app)
         self.auth = {"Authorization": "Bearer t"}
@@ -312,6 +314,8 @@ class NotionBudgetTests(unittest.TestCase):
         from fastapi.testclient import TestClient
         from main import app
         from rate_limit import limiter
+        from services import notion_text
+        notion_text.reset_gates()
         limiter.reset()
         self.client = TestClient(app)
         self.auth = {"Authorization": "Bearer t"}

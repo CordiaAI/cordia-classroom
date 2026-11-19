@@ -154,26 +154,32 @@ _gates_lock = threading.Lock()
 
 class _Gate:
     """At most PARALLEL Notion calls in flight per student, across every read they have going (an
-    import and a Library save, two tabs, the Tutor), not just inside one. Entries are dropped once
-    nothing uses them."""
+    import and a Library save, two tabs, the Tutor), not just inside one. A call a read gave up
+    waiting for still counts until it ends. Entries are dropped once nothing uses them."""
 
     def __init__(self, user_id: str):
         self.user_id = user_id
+        self.entry = None
 
     def __enter__(self):
         with _gates_lock:
-            entry = _gates.setdefault(self.user_id, [threading.BoundedSemaphore(PARALLEL), 0])
-            entry[1] += 1
-        entry[0].acquire()
+            self.entry = _gates.setdefault(self.user_id, [threading.BoundedSemaphore(PARALLEL), 0])
+            self.entry[1] += 1
+        self.entry[0].acquire()
         return self
 
     def __exit__(self, *exc):
         with _gates_lock:
-            entry = _gates[self.user_id]
-            entry[0].release()
-            entry[1] -= 1
-            if not entry[1]:
+            self.entry[0].release()
+            self.entry[1] -= 1
+            if not self.entry[1] and _gates.get(self.user_id) is self.entry:
                 del _gates[self.user_id]
+
+
+def reset_gates() -> None:
+    """Forget every student's calls in flight (for tests, next to rate_limit.limiter.reset)."""
+    with _gates_lock:
+        _gates.clear()
 
 
 def spend_call(user_id: str) -> bool:

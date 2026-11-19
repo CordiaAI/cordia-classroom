@@ -89,6 +89,8 @@ class Base(unittest.TestCase):
         from fastapi.testclient import TestClient
         from main import app
         from rate_limit import limiter
+        from services import notion_text
+        notion_text.reset_gates()  # calls an earlier test gave up waiting for still count until they end
         limiter.reset()  # also forgets the per-student limits and Notion call budgets
         self.client = TestClient(app)
         self.auth = {"Authorization": "Bearer t"}
