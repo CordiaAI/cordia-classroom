@@ -24,8 +24,8 @@ test('the plan buttons use tokens and rem only, and keep their width while worki
     assert.doesNotMatch(source, /#[0-9a-f]{3,8}\b|rgba?\(/i);
     assert.doesNotMatch(source, /font[^;]*\d+px/);
   }
-  assert.match(actions, /\.is-busy \.plan-face \{ animation: plan-hide 0s 300ms forwards; \}/);
-  assert.match(learn, /\.learn-back-tutor\.is-busy \.learn-back-face \{ animation: learn-back-hide 0s 300ms forwards; \}/);
+  assert.match(actions, /\.is-marked \.plan-face \{ visibility: hidden; \}/);
+  assert.match(learn, /\.learn-back-tutor\.is-marked \.learn-back-face \{ visibility: hidden; \}/);
 });
 
 test('the Tutor gets the student\'s own day, so "Friday" means their Friday', () => {
@@ -41,12 +41,16 @@ test('Learn runs the check-in once, sends the score back, and returns to the sam
 
 // ---- F6 review follow-up (F6b): findings 7, 8, 10, 12, 14 and 16 ----
 
-const style = source => (source.match(/<style jsx>\{`([\s\S]*?)`\}<\/style>/) || [])[1] || '';
+const style = source => [...source.matchAll(/<style jsx(?: global)?>\{`([\s\S]*?)`\}<\/style>/g)].map(match => match[1]).join('\n');
 const checkinRules = () => style(learn).split('\n').filter(line => /learn-checkin|learn-back/.test(line)).join('\n');
 
-test('with reduced motion the working mark still shows: the 300ms wait is a timer, not an animation delay', { todo: 'F6b: fixed in a later milestone of this branch' }, () => {
+test('with reduced motion the working mark still shows: the 300ms wait is a timer, not an animation delay', () => {
+  const loader = read('components/CordiaLoader.js');
+  assert.match(loader, /const MARK_AFTER = 300;/);
+  assert.match(loader, /const MARK_HOLD = 500;/);
+  assert.match(loader, /export function useWorkingMark\(active\)/);
   for (const source of [actions, learn]) {
-    assert.match(source, /setTimeout\([^)]*300\)/);
+    assert.match(source, /useWorkingMark\(/);
     assert.match(source, /@media \(prefers-reduced-motion: reduce\)/);
   }
   assert.match(style(actions), /\.is-marked \.plan-face \{[^}]*visibility: hidden/);
@@ -55,29 +59,56 @@ test('with reduced motion the working mark still shows: the 300ms wait is a time
   assert.doesNotMatch(style(actions) + checkinRules(), /animation: [\w-]+ [^;]*300ms/);
 });
 
-test("the check-in's status line sits on the Learn card, not on the bare backdrop", { todo: 'F6b: fixed in a later milestone of this branch' }, () => {
+test("the check-in's status line sits on the Learn card, not on the bare backdrop", () => {
   const checkpoint = learn.slice(learn.indexOf("screen === 'checkpoint'"));
   const card = checkpoint.slice(0, checkpoint.indexOf('</section>'));
   assert.match(card, /learn-checkin-status/);
 });
 
-test('plan buttons and "Send it again" are 44px tap targets on touch screens and phones', { todo: 'F6b: fixed in a later milestone of this branch' }, () => {
+test('plan buttons and "Send it again" are 44px tap targets on touch screens and phones', () => {
   assert.match(style(actions), /@media \(max-width: 767px\), \(pointer: coarse\) \{[^}]*\.plan-btn\)[^}]*min-height: 2\.75rem !important/);
   assert.match(checkinRules() + style(learn), /@media \(max-width: 767px\), \(pointer: coarse\) \{[^}]*\.learn-checkin-again[^}]*min-height: 2\.75rem !important/);
   assert.match(learn, /className="c-btn c-btn--quiet c-btn--sm learn-checkin-again"/);
 });
 
-test('the new plan and check-in rules use tokens and rem, never px', { todo: 'F6b: fixed in a later milestone of this branch' }, () => {
-  assert.doesNotMatch(style(actions), /\d+px/);
-  assert.doesNotMatch(checkinRules(), /\d+px/);
+test('the new plan and check-in rules use tokens and rem, never px', () => {
+  // Breakpoints in @media conditions and comments aside.
+  const rules = css => css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media \([^{]*\{/g, '');
+  assert.doesNotMatch(rules(style(actions)), /\d+px/);
+  assert.doesNotMatch(rules(checkinRules()), /\d+px/);
 });
 
-test('Overview is a quiet button next to the check-in\'s two actions', { todo: 'F6b: fixed in a later milestone of this branch' }, () => {
+test('Overview is a quiet button next to the check-in\'s two actions', () => {
   assert.match(learn, /className=\{'c-btn c-btn--lg ' \+ \(checkinShown \? 'c-btn--quiet' : 'c-btn--secondary'\)\} onClick=\{\(\) => setScreen\('home'\)\}>Overview/);
 });
 
-test('a resumed ordinary round is never reported as the check-in', { todo: 'F6b: fixed in a later milestone of this branch' }, () => {
+test('a resumed ordinary round is never reported as the check-in', () => {
   assert.match(learn, /writeResume\('learn', guideId, \{[^}]*checkin: checkin === 'running'/);
   assert.match(learn, /setCheckin\(resumable && pending\.checkin \? 'running' : 'pending'\)/);
   assert.match(learn, /if \(checkin === 'pending'\) setCheckin\('running'\)/);
+});
+
+// ---- Second review (F6c): finding 3 and Low 7 ----
+
+test('the check-in starts by itself once, on the first load only; later visits to the overview show its button', () => {
+  const effect = learn.slice(learn.indexOf('const checkinAuto = useRef(false);'));
+  const body = effect.slice(0, effect.indexOf('}, [checkin, questions, screen]);'));
+  // Consumed the first time questions load, whatever happens next.
+  assert.match(body, /if \(checkinAuto\.current \|\| !questions\?\.length\) return;\s*checkinAuto\.current = true;/);
+  // It starts only if the check-in is waiting and the overview is showing at that moment.
+  assert.match(body, /if \(checkin !== 'pending' \|\| screen !== 'home'\) return;\s*setCheckin\('running'\);\s*startRound\(\);/);
+  // Coming back to the overview later (after a resumed round) offers the button instead of starting again.
+  assert.match(learn, /\{checkin === 'pending' \? 'Start the check-in quiz' : 'Next round'\}/);
+  assert.equal((learn.match(/startRound\(\);/g) || []).length, 1);
+});
+
+// ---- Third review (F6d): Low 7 ----
+
+test('the overview start button says it starts the check-in while the check-in is waiting', () => {
+  const overview = learn.slice(learn.indexOf('<div className="learn-actions">'), learn.indexOf('{allMastered && ('));
+  assert.match(overview, /onClick=\{startRound\}>\s*<Play \{\.\.\.ICON\} \/>\{checkin === 'pending' \? 'Start the check-in quiz' : tally\.new === tally\.total \? 'Start learning' : 'Next round'\}/);
+});
+
+test('a plan button ignores clicks while its working mark is still showing', () => {
+  assert.match(actions, /onClick=\{\(\) => \{ if \(!working && !marked\) run\(action\); \}\}/);
 });

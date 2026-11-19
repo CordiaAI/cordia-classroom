@@ -62,7 +62,7 @@ export default function DraftLink({ item, draft: initial }) {
         </>
       ) : picking ? (
         <>
-          <label className="cn-search">
+          <label className="c-search">
             <Search size={20} strokeWidth={1.75} aria-hidden="true" />
             <input className="c-input" type="search" autoFocus placeholder="Search your Google Docs" aria-label="Search your Google Docs" value={query} onChange={event => setQuery(event.target.value)} />
           </label>

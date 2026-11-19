@@ -17,25 +17,6 @@ export const LADDER_SPACING = 6;
 const LADDER_SPACING_MAX = 10;
 const MAX_REASKS = 8;
 const TERM_MAX_WORDS = 5;
-// A multiple choice question has 3 or 4 choices. A guide-derived question keeps only related,
-// fitting choices (2 to 4), so one left with two is never asked as multiple choice: Learn and
-// Quiz ask it by typing or writing instead. Mirrors backend/services/retain.py can_choose.
-export const MIN_CHOICES = 3;
-
-export function canChoose(question) {
-  return Array.isArray(question?.options) && question.options.length >= MIN_CHOICES;
-}
-
-// Why an AI check of a written answer didn't come back (the reply to POST /quiz/{id}/grade had no
-// credit). `limit`: the student's AI checks are used up, so asking again can't help. Either way the
-// card offers the model answer to check by hand (WrittenCard), so a Written question is never a dead
-// end for a free or a Pro student. Only a plain sentence is shown; a plan-limit body (detail is an object) is not.
-export function gradeFailure(data) {
-  const limit = Boolean(data?.limit_reached) || data?.detail?.code === 'limit_reached';
-  if (limit) return { limit, message: "You've used your AI checks for now." };
-  const detail = typeof data?.detail === 'string' && data.detail.trim() ? data.detail.trim() : '';
-  return { limit, message: detail || 'Cordia could not check this answer right now.' };
-}
 
 export function conceptAnswer(question) {
   const options = question?.options || [];
@@ -137,13 +118,7 @@ function isTerm(question) {
 // A missed idea comes back in a slightly different form so position can't be memorised:
 // terms alternate fill in the blank / multiple choice, written answers alternate with
 // multiple choice (fewer AI checks), everything else is multiple choice with new option order.
-// An idea with fewer than MIN_CHOICES choices has no multiple choice form: it comes back typed
-// (Fill in the blank, when it is on) or written.
 export function reaskType(question, firstType, reaskNumber, selected) {
-  if (!canChoose(question)) {
-    const typed = firstType !== 'written' && isTerm(question) && (selected || []).includes('fill');
-    return typed && reaskNumber % 2 === 0 ? 'fill' : 'written';
-  }
   const allowed = new Set(['mc', ...(selected || [])]);
   let cycle = ['mc'];
   if (firstType === 'written') cycle = ['mc', 'written'];

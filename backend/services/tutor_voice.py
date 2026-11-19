@@ -7,11 +7,16 @@
 """
 import re
 
-SLANG_OPENER = re.compile(
-    r"^\s*(?:yo+|ay+o*|sup|wa+s+up|what'?s up|hey+(?:\s+there)?|heya|hiya|dude|bro|fam|lol|"
-    r"ok(?:ay)?\s+so|alright\s+so|so\s+basically|great question|good question)\b[\s,!.:;—–-]*",
-    re.IGNORECASE,
-)
+# A slang or filler opener counts only when punctuation follows it ("Yo, here's…", "Hey there! …",
+# "Great question! …"), so real words that start the same way stay ("Yo-yo dieting", "Hey Jude is…",
+# "Dude ranches", "What's up with…", "Good question to ask: …", "Okay so-called experts").
+# Linear time (security review): runs of one kind of character (spaces, repeated letters, digits) are taken
+# whole (++, *+) wherever what follows can't start with that same character, so nothing is tried twice.
+SLANG = (r"yo++|ay++o*+|sup|wa++s++up|what'?s\s++up|hey++(?:\s++there)?|heya|hiya|dude|bro|fam|lol|ok(?:ay)?\s++so|"
+         r"alright\s++so|so\s++basically")
+# A period after a slang word ends a sentence the word belongs to ("Fam. Medicine is…"), so slang takes a comma,
+# "!" or a dash; only "great/good question" may end with a period.
+SLANG_OPENER = re.compile(rf"^\s*+(?:(?:{SLANG})(?:[,!]++|\s*+[—–])|(?:great|good)\s++question[!.,]++)\s++", re.IGNORECASE)
 
 
 def plain_opening(answer: str) -> str:
@@ -24,26 +29,65 @@ def plain_opening(answer: str) -> str:
     return rest[:1].upper() + rest[1:]
 
 
-NUMBER_WORDS = ("one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|"
-                "sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|hundred|thousand|million|billion|dozen")
+TENS = "twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety"
+NUMBER_WORD = re.compile(rf"^(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|"
+                         rf"sixteen|seventeen|eighteen|nineteen|{TENS}|hundred|thousand|million|billion|dozen|"
+                         rf"(?:{TENS})-(?:one|two|three|four|five|six|seven|eight|nine))$")
 MONTHS = ("january|february|march|april|may|june|july|august|september|october|november|december|"
           "jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec")
-# Counts of things that are about the answer itself, not facts about the world ("two ways", "three steps").
-META_NOUNS = {"ways", "steps", "things", "tips", "examples", "points", "ideas", "parts", "questions", "options",
-              "reasons", "sentences", "words", "lines", "bullets", "times", "minutes", "seconds", "hours", "days"}
 YEAR = re.compile(r"\b(?:1[0-9]{3}|20[0-9]{2})s?\b")
+# Amounts: "$500", "£ 20", "60 percent", "sixty per cent", "3 percentage points", "40 dollars".
+_AMOUNT_WORD = (rf"one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|"
+                rf"seventeen|eighteen|nineteen|hundred|(?:{TENS})(?:-(?:one|two|three|four|five|six|seven|eight|nine))?")
+# A number starts only where a run of digits, commas and periods starts, so "1,2,3,…" is read once, not once
+# from each digit (".5 percent" still reads 5).
+_NUMBER = r"(?<![\d,.])[.,]*+(\d[\d,.]*+)"
+AMOUNT = re.compile(rf"[$£€¥]\s?+(\d[\d,.]*+)"
+                    rf"|(?:{_NUMBER}|\b({_AMOUNT_WORD}))\s++(?:percent|per\s++cent|percentage\s++points?)\b"
+                    rf"|{_NUMBER}\s++(?:dollars?|euros?|pounds)\b", re.IGNORECASE)
+# A question asking who, when or how many is answered with a specific, whatever words the answer uses, as long
+# as the answer has one to give: a name, a number or a number word (see _could_be_specific).
+ASKS_FOR_SPECIFIC = re.compile(r"^\s*+(?:who|whom|whose|what\s++year|which\s++year|what\s++date|how\s++many|how\s++old|"
+                               r"what\s++percent)\b", re.IGNORECASE)
+# Bare decimals ("below 3.5"), ranges ("60 to 100"), fractions ("a third of", "two-thirds") and centuries
+# ("the seventeenth century", "twelfth-century France") are facts too.
+_ORDINAL = ("first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|"
+            "fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth|twenty-first|\\d{1,2}(?:st|nd|rd|th)")
+_FRACTION = "halves|thirds?|quarters?|fifths?|sixths?|eighths?|tenths?"
+MEASURE = re.compile(rf"(?<![\d,.])\d++\.\d++(?![\d.]?\d)"
+                     rf"|(?<![\d,.])\d++(?:\s++(?:to|-|–)\s++|–)\d++(?![\d.,]?\d)"
+                     rf"|\b(?:a|one|two|three|four|five)[\s-](?:{_FRACTION})\s++of\b|\b(?:one|two|three|four|five)-(?:{_FRACTION})\b"
+                     rf"|\b(?:{_ORDINAL})[\s-]century\b", re.IGNORECASE)
 DATE = re.compile(rf"\b(?:{MONTHS})\.?\s+\d{{1,2}}(?:st|nd|rd|th)?\b|\b\d{{1,2}}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:{MONTHS})\b", re.IGNORECASE)
-# The number is any case; the words between it and the plural noun must be capitalized ("six Confederate veterans").
-COUNT = re.compile(rf"\b(?i:\d[\d,.]*|{NUMBER_WORDS})\s+(?:[A-Z][a-z]+\s+)*([a-z]+s)\b")
+# Counts about the answer's own structure ("here are three steps", "two ways to see it"), not facts.
+META_NOUNS = {"ways", "steps", "things", "tips", "examples", "points", "ideas", "parts", "questions", "options", "reasons"}
+# Plurals without an s ("six men", "fifty-six people").
+IRREGULAR_PLURALS = {"men", "women", "people", "children", "feet", "teeth", "mice", "geese", "oxen", "persons", "data", "criteria"}
+# Words that end a count: after "one is", "two plus two", "Step 2 is", "one by one as" nothing is being counted.
+FUNCTION_WORDS = set("""
+a an the and or but nor so if then than that this these those which who whom whose what when where while as at by for from in
+into of on onto to with without within about above after before below between over under through per via like unlike plus
+minus times is are was were be been being am has have had do does did can could will would shall should may might must
+it its they them their we us our you your he him his she her not no yes each every any some more most less least same
+other another again also only just even still thus here there always perhaps unless across besides whereas towards
+sometimes afterwards ago apart
+""".split())
+# A unit right after a numeral ("500 mg", "5.0 mEq/L", "120 mmHg", "20%").
+UNIT = re.compile(r"^(?:°[cf]?|mg|mcg|µg|μg|g|kg|ml|l|dl|mmol|mol|meq|mmhg|cm|mm|km|m|ft|lb|lbs|oz|bpm|kcal|cal|hz|khz|mhz|ghz|"
+                  r"kb|mb|gb|tb|ms|ns|mph|kph|[a-zµμ]{1,5}/[a-z]{1,5})$", re.IGNORECASE)
+TOKEN = re.compile(r"\d[\d,.]*%?|°[CFcf]?|[A-Za-zµμ][\w'’/-]*")
 WORD = re.compile(r"[A-Za-z][A-Za-z'’]*")
-# Words that are capitalized for grammar, not because they name someone or something.
-COMMON_CAPS = {"i", "i'm", "i've", "i'd", "i'll"}
+# Capitalized for grammar or code, not because they name someone or something.
+COMMON_CAPS = {"i", "i'm", "i've", "i'd", "i'll", "true", "false", "none", "null", "nil"}
+DETERMINERS = {"the", "a", "an", "this", "that", "these", "those", "its", "their", "his", "her", "our", "your", "each",
+               "every", "any", "some", "no"}
+CODE = re.compile(r"```.*?(?:```|$)|`[^`\n]*`", re.DOTALL)
 
 
 def _plain_lines(answer: str) -> list[str]:
-    """The reply's sentences without markdown markers or bold step titles."""
+    """The reply's sentences without code, markdown markers or bold step titles."""
     lines = []
-    for line in (answer or "").splitlines():
+    for line in CODE.sub(" ", answer or "").splitlines():
         line = re.sub(r"^\s*(?:>\s*|[-*]\s+|\d+[.)]\s+)", "", line)
         if re.match(r"^\*\*[^*]+\*\*\s*$", line.strip()):
             continue  # a bold step title on its own line
@@ -51,30 +95,142 @@ def _plain_lines(answer: str) -> list[str]:
     return lines
 
 
-def _names(answer: str, asked: set) -> bool:
-    """A capitalized word that isn't the first word of its sentence and wasn't in the question."""
+def _sentences(answer: str):
     for line in _plain_lines(answer):
-        for sentence in re.split(r"(?<=[.!?:;])\s+", line):
-            words = WORD.findall(sentence)
-            for word in words[1:]:
-                bare = re.sub(r"['’]s$", "", word.lower())
-                if word[0].isupper() and not word.isupper() and bare not in asked and bare not in COMMON_CAPS:
+        yield from (sentence for sentence in re.split(r"(?<=[.!?:;])\s+", line) if sentence.strip())
+
+
+def _counts(sentence: str, asked: set, asked_numbers: set) -> bool:
+    """A number followed (within three words) by what it counts: "six men", "six former soldiers",
+    "206 bones", "fifty-six people", "six of them", or a numeral with a unit ("5.0 mEq/L")."""
+    tokens = [token.rstrip(".,") or token for token in TOKEN.findall(sentence)]
+    for index, token in enumerate(tokens):
+        word = token.lower()
+        digits = token[0].isdigit()
+        if not digits and not NUMBER_WORD.match(word):
+            continue
+        if word in asked or token.rstrip("%") in asked_numbers:
+            continue
+        if digits and token.endswith("%"):
+            return True
+        ahead = [item.lower() for item in tokens[index + 1:index + 4]]
+        if digits and ahead and UNIT.match(ahead[0]):
+            return True
+        if ahead[:2] and ahead[0] == "of" and ahead[1:2] and ahead[1] in {"them", "these", "those", "us", "whom"}:
+            return True
+        for following in ahead:
+            if following in FUNCTION_WORDS or following[0].isdigit():
+                break
+            plural = following in IRREGULAR_PLURALS or (following.endswith("s") and not following.endswith("ss") and len(following) > 3)
+            if plural:
+                if following not in META_NOUNS:
                     return True
+                break
+    return False
+
+
+# Capitalized adjectives that describe rather than name, before a common word ("the Greek word", "the State
+# bringing charges", "a Gothic arch"). A closed list: any other capitalized word after "the", "a" or "its"
+# is a name ("the Warren court", "the Medici family", "the Coase theorem", "the Spenserian stanza").
+ADJECTIVES = {"state", "court", "federal", "greek", "latin", "roman", "english", "french", "german", "italian", "spanish",
+              "american", "chinese", "japanese", "arabic", "gothic", "baroque"}
+
+
+def _names(sentence: str, asked: set) -> bool:
+    """A run of capitalized words that names someone or something ("Caravaggio", "Pulaski, Tennessee",
+    "the Braden scale"), not a capital the sentence or code needs, a symbol ("Na", "CoA"), or one of the
+    capitalized adjectives before a common word ("the Greek word", "the State bringing charges")."""
+    words = list(WORD.finditer(sentence))
+    index = 0
+    while index < len(words):
+        if not words[index].group(0)[0].isupper():
+            index += 1
+            continue
+        end = index
+        while end + 1 < len(words) and words[end + 1].group(0)[0].isupper() \
+                and sentence[words[end].end():words[end + 1].start()] in {" ", "-"}:
+            end += 1
+        run = [match.group(0) for match in words[index:end + 1]]
+        names = [_is_name(word, asked) for word in run]
+        if index == 0:
+            # The sentence's first word is capitalized anyway: it counts only next to another name in its run
+            # ("Toni Morrison", "Italian Renaissance painters"; not "Big O"), never when it's "The" or "In".
+            first = run[0].lower()
+            names[0] = names[0] and any(names[1:]) and first not in FUNCTION_WORDS and first not in DETERMINERS
+        named = [word for word, is_name in zip(run, names) if is_name]
+        before = words[index - 1].group(0).lower() if index and sentence[words[index - 1].end():words[index].start()].strip() == "" else ""
+        after = words[end + 1].group(0) if end + 1 < len(words) and sentence[words[end].end():words[end + 1].start()].strip() == "" else ""
+        adjective = len(named) == 1 and named[0].lower() in ADJECTIVES and (index == 0 or before in DETERMINERS) \
+            and after[:1].islower()
+        if len(named) >= 2 or (named and not adjective):
+            return True
+        index = end + 1
+    return False
+
+
+def _is_name(word: str, asked: set) -> bool:
+    bare = re.sub(r"['’]s$", "", word.lower())
+    if word.isupper() or bare in COMMON_CAPS or bare in asked:
+        return False
+    letters = re.sub(r"[^A-Za-z]", "", word)
+    if len(letters) <= 2 or (len(letters) <= 4 and any(char.isupper() for char in letters[1:])):
+        return False  # a symbol: Na, Fe, CoA, NaCl
+    return True
+
+
+# Words that start a sentence capitalized without naming anyone ("Everyone…", "Both…").
+PRONOUNS = {"everyone", "everybody", "someone", "somebody", "anyone", "anybody", "nobody", "people", "both", "either", "neither",
+            "many", "all", "most", "few", "several", "whoever"}
+
+
+def _could_be_specific(answer: str, asked: set) -> bool:
+    """Whether the answer holds something a who, when or how-many question could be answered with: a digit, a
+    number word, a capitalized word after a sentence's first word, or a first word that reads as a name
+    ("Morrison wrote it."), not "The nurse…", "Patrons paid…", "Shareholders elect…" or a word from the question."""
+    for sentence in _sentences(answer):
+        if re.search(r"\d", sentence):
+            return True
+        for position, word in enumerate(WORD.findall(sentence)):
+            lower = word.lower()
+            if lower == "one" or NUMBER_WORD.match(lower):
+                return True
+            bare = re.sub(r"['’]s$", "", lower)
+            if not word[0].isupper() or bare in COMMON_CAPS or bare in asked:
+                continue
+            if position:
+                return True
+            plural = bare.endswith("s") and not bare.endswith("ss")
+            if not plural and bare not in FUNCTION_WORDS | DETERMINERS | PRONOUNS:
+                return True
+    return False
+
+
+def _new_measures(text: str, asked: set, asked_numbers: set) -> bool:
+    """A decimal, range, fraction or century the student didn't give."""
+    given = {number.rstrip(".,") for number in asked_numbers}
+    for match in MEASURE.finditer(text):
+        numbers = re.findall(r"\d+(?:\.\d+)?", match.group(0))
+        if any(number not in given for number in numbers) if numbers else \
+                not all(word in asked for word in re.findall(r"[a-z]+", match.group(0).lower())):
+            return True
     return False
 
 
 def states_specifics(answer: str, question: str = "") -> bool:
-    """Whether the reply states a specific name, number, count or date the student didn't give."""
+    """Whether the reply states a specific name, number, count, amount or date the student didn't give."""
     asked = {word.lower() for word in WORD.findall(question or "")}
     asked_numbers = set(re.findall(r"\d[\d,.]*", question or ""))
+    if ASKS_FOR_SPECIFIC.match(question or "") and _could_be_specific(answer, asked):
+        return True
     text = "\n".join(_plain_lines(answer))
     if any(year not in asked_numbers for year in YEAR.findall(text)) or DATE.search(text):
         return True
-    for match in COUNT.finditer(text):
-        number = match.group(0).split()[0]
-        if match.group(1).lower() not in META_NOUNS and number.lower() not in asked and number not in asked_numbers:
-            return True
-    return _names(answer, asked)
+    amounts = [next(group for group in match.groups() if group) for match in AMOUNT.finditer(text)]
+    if any(amount.lower() not in asked and amount.rstrip(".,") not in asked_numbers for amount in amounts):
+        return True
+    if _new_measures(text, asked, asked_numbers):
+        return True
+    return any(_counts(sentence, asked, asked_numbers) or _names(sentence, asked) for sentence in _sentences(answer))
 
 
 UNCHECKED_NOTE = ("I don't have your class material for this, so treat the names, numbers and dates above as unchecked. "

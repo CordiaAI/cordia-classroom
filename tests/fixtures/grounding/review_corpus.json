@@ -1,0 +1,4527 @@
+[
+[
+"who founded the KKK?",
+"It was founded by six Confederate veterans in Pulaski, Tennessee.",
+"rook-f6/ground.py"
+],
+[
+"who founded the KKK?",
+"It was founded by six Confederate veterans.",
+"rook-f6/ground.py"
+],
+[
+"who founded the klan?",
+"It was founded by six former soldiers.",
+"rook-f6/ground.py"
+],
+[
+"who founded the klan?",
+"Six veterans founded it.",
+"rook-f6/ground.py"
+],
+[
+"who founded the klan?",
+"It was started by six men.",
+"rook-f6/ground.py"
+],
+[
+"who founded the klan?",
+"It was started by six former Confederate officers.",
+"rook-f6/ground.py"
+],
+[
+"how many justices on the supreme court?",
+"There are nine justices.",
+"rook-f6/ground.py"
+],
+[
+"how many people signed the declaration of independence?",
+"Fifty-six people signed it.",
+"rook-f6/ground.py"
+],
+[
+"how many bones in the adult body?",
+"An adult has 206 bones.",
+"rook-f6/ground.py"
+],
+[
+"how many members in the original group?",
+"The group had a dozen members at first.",
+"rook-f6/ground.py"
+],
+[
+"when did ww2 end?",
+"It ended in 1945.",
+"rook-f6/ground.py"
+],
+[
+"what is the normal potassium level?",
+"Normal potassium is 3.5 to 5.0 mEq/L.",
+"rook-f6/ground.py"
+],
+[
+"what is the normal heart rate?",
+"A normal resting heart rate is 60 to 100 beats per minute.",
+"rook-f6/ground.py"
+],
+[
+"how many lines in a sonnet?",
+"A sonnet has fourteen lines.",
+"rook-f6/ground.py"
+],
+[
+"how long was the hundred years war?",
+"It actually lasted 116 years.",
+"rook-f6/ground.py"
+],
+[
+"who wrote the federalist papers?",
+"They were written by three authors under a shared pen name.",
+"rook-f6/ground.py"
+],
+[
+"who were the founders?",
+"There were six of them.",
+"rook-f6/ground.py"
+],
+[
+"how many children did he have?",
+"He had six children.",
+"rook-f6/ground.py"
+],
+[
+"",
+"--- false negatives (should flag)",
+"rook-f6/ground.py"
+],
+[
+"",
+"what does a beta blocker do?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Beta blockers slow the heart rate and lower blood pressure. They block adrenaline at beta receptors, so the heart beats with less force.",
+"rook-f6/ground.py"
+],
+[
+"",
+"why do we check potassium before giving digoxin?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Low potassium makes digoxin toxicity more likely. Check the level first, and hold the dose and tell the provider if it is low.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what's the difference between type 1 and type 2 diabetes?",
+"rook-f6/ground.py"
+],
+[
+"",
+"In type 1, the body makes little or no insulin. In type 2, the body makes insulin but the cells respond poorly to it.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is preload?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Preload is how much the heart muscle is stretched at the end of filling. More blood returning to the heart means more preload, as the Frank-Starling law describes.",
+"rook-f6/ground.py"
+],
+[
+"",
+"how many chambers does the heart have?",
+"rook-f6/ground.py"
+],
+[
+"",
+"The heart has four chambers: two atria on top and two ventricles below.",
+"rook-f6/ground.py"
+],
+[
+"",
+"art history",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is chiaroscuro?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Chiaroscuro is the use of strong contrast between light and dark to give figures volume. Painters like Caravaggio made it dramatic.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what makes gothic architecture gothic?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Gothic buildings use pointed arches, ribbed vaults and flying buttresses. These let walls be thinner and hold large stained glass windows.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is impressionism?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Impressionism is a style that captures light and a passing moment with quick, visible brushstrokes. Painters often worked outdoors.",
+"rook-f6/ground.py"
+],
+[
+"",
+"explain one-point perspective",
+"rook-f6/ground.py"
+],
+[
+"",
+"One-point perspective makes parallel lines meet at a single vanishing point on the horizon. It creates the look of depth on a flat surface.",
+"rook-f6/ground.py"
+],
+[
+"",
+"business law",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is consideration in a contract?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Consideration is something of value each side gives up. Without it, a promise is usually not enforceable as a contract.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is the difference between an LLC and a corporation?",
+"rook-f6/ground.py"
+],
+[
+"",
+"An LLC gives owners limited liability with flexible tax treatment. A corporation is a separate legal entity owned by shareholders, with more formal rules.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what does the UCC cover?",
+"rook-f6/ground.py"
+],
+[
+"",
+"The UCC covers sales of goods and some other commercial deals. Most states in the United States have adopted Article 2 for sales.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is promissory estoppel?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Promissory estoppel lets a court enforce a promise when someone relied on it and would be harmed. It fills the gap when there is no consideration.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is a sonnet?",
+"rook-f6/ground.py"
+],
+[
+"",
+"A sonnet is a poem of fourteen lines, usually in iambic pentameter. It often turns its argument at a set point, called the volta.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is dramatic irony?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Dramatic irony is when the audience knows something a character does not. It builds tension because we watch the character act without that knowledge.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is the theme of Hamlet?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Hamlet explores revenge, doubt and how hard it is to act. The prince keeps delaying, and that delay drives the tragedy.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is a foil character?",
+"rook-f6/ground.py"
+],
+[
+"",
+"A foil is a character whose traits contrast with another's, so the other's traits stand out. In Shakespeare, Laertes is a foil to Hamlet.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is recursion?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Recursion is when a function calls itself on a smaller version of the problem. Each call needs a base case, or it never stops.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is big O notation?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Big O describes how running time grows as the input grows. For example, a loop over n items is O(n).",
+"rook-f6/ground.py"
+],
+[
+"",
+"what's a hash table?",
+"rook-f6/ground.py"
+],
+[
+"",
+"A hash table stores key and value pairs. A hash function turns each key into an index, so lookups are fast on average.",
+"rook-f6/ground.py"
+],
+[
+"",
+"how does binary search work?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Binary search checks the middle item of a sorted list. If the target is smaller, it searches the left half; otherwise, the right half. It repeats until it finds the item.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what does git rebase do?",
+"rook-f6/ground.py"
+],
+[
+"",
+"Rebase moves your commits so they sit on top of another branch. Git rewrites them one by one as new commits.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is a python list comprehension?",
+"rook-f6/ground.py"
+],
+[
+"",
+"A list comprehension builds a list in one line, like [x * 2 for x in nums]. Python reads it left to right.",
+"rook-f6/ground.py"
+],
+[
+"",
+"explain photosynthesis",
+"rook-f6/ground.py"
+],
+[
+"",
+"Plants use sunlight, water and carbon dioxide to make glucose and oxygen. It happens in the chloroplasts, mostly in the leaves.",
+"rook-f6/ground.py"
+],
+[
+"",
+"what is supply and demand?",
+"rook-f6/ground.py"
+],
+[
+"",
+"When demand rises and supply stays the same, prices go up. When supply rises and demand stays the same, prices fall.",
+"rook-f6/ground.py"
+],
+[
+"",
+"explain recursion with steps",
+"rook-f6/ground.py"
+],
+[
+"",
+"Recursion solves a problem by solving smaller copies of it.\n1. **Find the base case**\nThe smallest input you can answer directly.\n> Without it, the calls never end.\n2. **Reduce the problem**\nCall the function on a smaller input.\n> Each call gets closer to the base case.",
+"rook-f6/ground.py"
+],
+[
+"what does git rebase do?",
+"Rebase moves your commits so they sit on top of another branch. Git rewrites them one by one as new commits.",
+"rook-f6/ground2.py"
+],
+[
+"nursing: which drugs raise bleeding risk?",
+"NSAIDs and anticoagulants both raise bleeding risk. Watch for bruising and dark stools.",
+"rook-f6/ground2.py"
+],
+[
+"what do SSRIs treat?",
+"They treat depression and anxiety. SSRIs keep more serotonin available between nerve cells.",
+"rook-f6/ground2.py"
+],
+[
+"why monitor sodium?",
+"Low Na can cause confusion and seizures. Correct it slowly.",
+"rook-f6/ground2.py"
+],
+[
+"how does dict.get work in python?",
+"It returns the value for a key, or a default if the key is missing. It never raises an error, so it returns None when no default is given.",
+"rook-f6/ground2.py"
+],
+[
+"how do I check a key in a dict?",
+"Use the in operator. It returns True if the key exists and False if not.",
+"rook-f6/ground2.py"
+],
+[
+"what is a linked list?",
+"A linked list stores items in nodes. Each node points to the next one.\n```\nclass Node:\n    def __init__(self, value):\n        self.value = value\n        self.next = None\n```",
+"rook-f6/ground2.py"
+],
+[
+"what is a metaphor?",
+"A metaphor says one thing is another to show a likeness. For example, \"time is a thief\" suggests time takes things from us. It comes from the Greek word for carrying over.",
+"rook-f6/ground2.py"
+],
+[
+"what is iambic pentameter?",
+"It is a line of five iambs, each an unstressed then a stressed syllable. English poets used it a lot because it sounds close to natural speech.",
+"rook-f6/ground2.py"
+],
+[
+"what is a tort?",
+"A tort is a civil wrong that causes harm, like negligence. The injured person can sue for damages in court rather than the State bringing charges.",
+"rook-f6/ground2.py"
+],
+[
+"what is a fresco?",
+"A fresco is paint applied to wet plaster, so the color becomes part of the wall. Italian Renaissance painters used it for large church walls.",
+"rook-f6/ground2.py"
+],
+[
+"explain the Krebs cycle",
+"It breaks down acetyl CoA to release energy carriers. It happens in the mitochondria, and each turn makes NADH and FADH2.",
+"rook-f6/ground2.py"
+],
+[
+"what is a vital sign?",
+"Vital signs are temperature, pulse, breathing rate and blood pressure. Some places add pain or oxygen saturation as a fifth or sixth sign.",
+"rook-f6/ground2.py"
+],
+[
+"what is a vector in math?",
+"A vector has both size and direction. You can add two vectors tip to tail.",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Hey there! Mitosis is...",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Heyday of the Renaissance was...",
+"rook-f6/ground2.py"
+],
+[
+"",
+"So basically the cell divides.",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Okay so the heart...",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Ok so you...",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Bro-ken lines are...",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Dude ranches were...",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Great question! Mitosis",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Great Questions in Philosophy is a book.",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Sup. Mitosis",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Supply rises",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Alright so",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Yo-yo dieting raises risk.",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Hey Jude is a Beatles song.",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Okay so-called experts",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Fam. Medicine is",
+"rook-f6/ground2.py"
+],
+[
+"",
+"What's up with mitosis is that it splits.",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Good question to ask: is it alive?",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Hey, wait: the answer is 4.",
+"rook-f6/ground2.py"
+],
+[
+"",
+"OK so what?",
+"rook-f6/ground2.py"
+],
+[
+"",
+"Yo, here's the deal.",
+"rook-f6/ground2.py"
+],
+[
+"",
+"what will be on the test about mitosis?",
+"rook-f6/intent.py"
+],
+[
+"",
+"Is the Allen test on radial artery done before an ABG? I'm reviewing it",
+"rook-f6/intent.py"
+],
+[
+"",
+"Help me review the Allen test steps",
+"rook-f6/intent.py"
+],
+[
+"",
+"Can you review this practice test question with me?",
+"rook-f6/intent.py"
+],
+[
+"",
+"What's the Romberg test and how do I prepare the patient for it?",
+"rook-f6/intent.py"
+],
+[
+"",
+"I'm reviewing the final stage of labor, what happens?",
+"rook-f6/intent.py"
+],
+[
+"",
+"Help me revise the final paragraph of my essay on Gatsby",
+"rook-f6/intent.py"
+],
+[
+"",
+"Review the final scene of Hamlet with me",
+"rook-f6/intent.py"
+],
+[
+"",
+"What happens in the final act of Macbeth? I'm preparing a presentation",
+"rook-f6/intent.py"
+],
+[
+"",
+"I have a question about the final exam format",
+"rook-f6/intent.py"
+],
+[
+"",
+"We got a final answer of 42, is that right?",
+"rook-f6/intent.py"
+],
+[
+"",
+"I have a test tube question: why does the precipitate form?",
+"rook-f6/intent.py"
+],
+[
+"",
+"Help me review the Howey test for securities",
+"rook-f6/intent.py"
+],
+[
+"",
+"Can you help me prepare for the bar exam essay on the Howey test?",
+"rook-f6/intent.py"
+],
+[
+"",
+"I'm studying how to write unit tests in Python",
+"rook-f6/intent.py"
+],
+[
+"",
+"Review my unit tests for this function",
+"rook-f6/intent.py"
+],
+[
+"",
+"How do I prepare a test case for binary search?",
+"rook-f6/intent.py"
+],
+[
+"",
+"I'm reviewing the t-test vs z-test, what's the difference?",
+"rook-f6/intent.py"
+],
+[
+"",
+"Can you review my answer to quiz question 3?",
+"rook-f6/intent.py"
+],
+[
+"",
+"Explain the final cause in Aristotle; I'm reviewing for class",
+"rook-f6/intent.py"
+],
+[
+"",
+"I'm ready for the next quiz question",
+"rook-f6/intent.py"
+],
+[
+"",
+"What's the business judgment rule? I have the final case brief due",
+"rook-f6/intent.py"
+],
+[
+"",
+"Studying Monet's later work, why did his final paintings get so blurry?",
+"rook-f6/intent.py"
+],
+[
+"",
+"I got the quiz back, why was question 2 wrong?",
+"rook-f6/intent.py"
+],
+[
+"",
+"Review the rationale for the last NCLEX practice quiz answer",
+"rook-f6/intent.py"
+],
+[
+"",
+"I need to study for my bio test",
+"rook-f6/intent.py"
+],
+[
+"",
+"help me prep for the midterm",
+"rook-f6/intent.py"
+],
+[
+"",
+"I have an exam on Friday",
+"rook-f6/intent.py"
+],
+[
+"",
+"my art history final is next week, help",
+"rook-f6/intent.py"
+],
+[
+"",
+"test tomorrow on contracts, what should I do",
+"rook-f6/intent.py"
+],
+[
+"",
+"I've got a quiz Thursday in CS 101",
+"rook-f6/intent.py"
+],
+[
+"",
+"STUDY_FOR_TEST on ordinary questions:",
+"rook-f6/intent.py"
+],
+[
+"",
+"recall on real study requests:",
+"rook-f6/intent.py"
+],
+[
+"",
+"Make me a list of things to learn for the quiz",
+"rook-f6/intent.py"
+],
+[
+"",
+"Help me make sense of what I need to learn for the final",
+"rook-f6/intent.py"
+],
+[
+"",
+"Make a learning plan for chapter 3",
+"rook-f6/intent.py"
+],
+[
+"",
+"What did we learn for today? make it short",
+"rook-f6/intent.py"
+],
+[
+"",
+"Can you open the learn page?",
+"rook-f6/intent.py"
+],
+[
+"",
+"start learning for the exam",
+"rook-f6/intent.py"
+],
+[
+"",
+"I want to start to learn for my exam",
+"rook-f6/intent.py"
+],
+[
+"",
+"Make a flashcard set so I can learn for the test",
+"rook-f6/intent.py"
+],
+[
+"",
+"Create a summary of what to learn for Friday",
+"rook-f6/intent.py"
+],
+[
+"",
+"Generate examples of how to learn for a test efficiently",
+"rook-f6/intent.py"
+],
+[
+"",
+"LEARN_REQUEST (builds a guide when material has no guide):",
+"rook-f6/intent.py"
+],
+[
+"",
+"Each one is processed once.",
+"rook-f6/intent.py"
+],
+[
+"",
+"Two plus two is four.",
+"rook-f6/intent.py"
+],
+[
+"",
+"Step 2 is the same.",
+"rook-f6/intent.py"
+],
+[
+"",
+"The left one has more weight.",
+"rook-f6/intent.py"
+],
+[
+"",
+"This one was the first draft.",
+"rook-f6/intent.py"
+],
+[
+"",
+"count noise:",
+"rook-f6/intent.py"
+],
+[
+"",
+" ordinary questions hijacked into a plan",
+"rook-f6/intent.py"
+],
+[
+"",
+"Q1: What is a mole?\nA1: A count of particles.",
+"rook-f6/probe.py"
+],
+[
+"",
+"What is a mole?",
+"rook-f6/probe.py"
+],
+[
+"",
+"A count.",
+"rook-f6/probe.py"
+],
+[
+"",
+"Study Guide",
+"rook-f6/probe.py"
+],
+[
+"",
+"Study guide",
+"rook-f6/probe.py"
+],
+[
+"",
+" -> action=",
+"rook-f6/probe.py"
+],
+[
+"",
+"Chem 101 Week 3",
+"rook-f6/probe2.py"
+],
+[
+"",
+"Moles count particles. Avogadro's number relates moles to particles. ",
+"rook-f6/probe2.py"
+],
+[
+"",
+"I need to study for my chem test on Friday",
+"rook-f6/probe2.py"
+],
+[
+"",
+"make a learn for it",
+"rook-f6/probe2.py"
+],
+[
+"",
+"I need to study for my history test",
+"rook-f6/probe2.py"
+],
+[
+"who painted the Sistine ceiling?",
+"Michelangelo painted it between 1508 and 1512.",
+"rook-f6b/ground_new.py"
+],
+[
+"who painted the Sistine ceiling?",
+"Michelangelo painted it for Pope Julius II.",
+"rook-f6b/ground_new.py"
+],
+[
+"how many amendments are in the Bill of Rights?",
+"There are ten amendments in it.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a normal sodium level?",
+"Normal sodium is about 135 to 145 mEq/L.",
+"rook-f6b/ground_new.py"
+],
+[
+"how much acetaminophen per day max?",
+"Most adults should stay under 4 g a day.",
+"rook-f6b/ground_new.py"
+],
+[
+"who wrote Beloved?",
+"Toni Morrison wrote it, and it won the Pulitzer.",
+"rook-f6b/ground_new.py"
+],
+[
+"who wrote Beloved?",
+"It was written by Morrison.",
+"rook-f6b/ground_new.py"
+],
+[
+"how many sections in the Canterbury Tales?",
+"There are twenty-four tales.",
+"rook-f6b/ground_new.py"
+],
+[
+"when was the UCC drafted?",
+"It was first published in the early 1950s.",
+"rook-f6b/ground_new.py"
+],
+[
+"what's the statute of frauds threshold for goods?",
+"Sales of goods for $500 or more need a writing.",
+"rook-f6b/ground_new.py"
+],
+[
+"how many cranial nerves are there?",
+"There are twelve pairs of cranial nerves.",
+"rook-f6b/ground_new.py"
+],
+[
+"how many cranial nerves are there?",
+"Humans have twelve cranial nerves.",
+"rook-f6b/ground_new.py"
+],
+[
+"who invented the World Wide Web?",
+"Tim Berners-Lee proposed it at CERN.",
+"rook-f6b/ground_new.py"
+],
+[
+"how many bits in an IPv6 address?",
+"An IPv6 address has 128 bits.",
+"rook-f6b/ground_new.py"
+],
+[
+"how long does a patent last?",
+"A utility patent generally lasts twenty years from filing.",
+"rook-f6b/ground_new.py"
+],
+[
+"how big was the Louisiana Purchase?",
+"It roughly doubled the size of the country, adding about 828,000 square miles.",
+"rook-f6b/ground_new.py"
+],
+[
+"how many lines does a villanelle have?",
+"A villanelle has nineteen lines.",
+"rook-f6b/ground_new.py"
+],
+[
+"when did Gothic start?",
+"Gothic architecture began in twelfth-century France.",
+"rook-f6b/ground_new.py"
+],
+[
+"what dose of epinephrine for anaphylaxis?",
+"The usual adult IM dose is 0.3 mg.",
+"rook-f6b/ground_new.py"
+],
+[
+"who founded the Bauhaus?",
+"Walter Gropius founded it in Weimar.",
+"rook-f6b/ground_new.py"
+],
+[
+"how many justices decided Marbury?",
+"Four justices took part in the decision.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is the speed of a pentium?",
+"The first ones ran at 60 MHz.",
+"rook-f6b/ground_new.py"
+],
+[
+"what percentage of the body is water?",
+"About 60 percent of an adult's weight is water.",
+"rook-f6b/ground_new.py"
+],
+[
+"how many stanzas in a sestina?",
+"A sestina has six stanzas and a three-line envoi.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is afterload?",
+"Afterload is the resistance the ventricle pushes against to eject blood. Higher resistance means the heart works harder with each beat.",
+"rook-f6b/ground_new.py"
+],
+[
+"why do we elevate the head of the bed?",
+"Raising the head of the bed helps the lungs expand and lowers the chance of aspiration. It also eases breathing for patients with heart failure.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a nursing diagnosis?",
+"A nursing diagnosis names a patient's response to a health problem, not the disease itself. It guides which interventions the nurse plans.",
+"rook-f6b/ground_new.py"
+],
+[
+"why check a pulse before giving a cardiac drug?",
+"Some cardiac drugs slow the heart. Checking the pulse first tells you whether it's safe to give the dose or hold it and call the provider.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is the difference between edema and dehydration?",
+"Edema is extra fluid trapped in the tissues, while dehydration is too little fluid in the body overall. One swells the tissues; the other dries them out.",
+"rook-f6b/ground_new.py"
+],
+[
+"what does SBAR stand for?",
+"SBAR stands for Situation, Background, Assessment and Recommendation. It gives a handoff a clear order so nothing important gets skipped.",
+"rook-f6b/ground_new.py"
+],
+[
+"why do we turn bedbound patients?",
+"Turning shifts pressure off bony areas so the skin keeps its blood supply. Without it, pressure injuries can form quickly.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is therapeutic communication?",
+"Therapeutic communication uses listening, open questions and reflection to help the patient share concerns. The focus stays on the patient, not the nurse.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a sterile field?",
+"A sterile field is an area kept free of microorganisms for a procedure. Anything that touches it must be sterile too, or the field is contaminated.",
+"rook-f6b/ground_new.py"
+],
+[
+"how do diuretics work?",
+"Diuretics make the kidneys pass more salt and water. That lowers the fluid volume in the blood vessels, which can bring blood pressure down.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a fresco?",
+"A fresco is painted onto wet plaster, so the pigment becomes part of the wall as it dries. Artists had to work fast, one section at a time.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is iconography?",
+"Iconography is the study of the symbols and subjects in an image. It asks what the objects, gestures and figures were meant to signal to viewers.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is sfumato?",
+"Sfumato is a soft blending of tones with no hard outlines. Edges melt into shadow, which gives faces a hazy, lifelike look.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a triptych?",
+"A triptych is a work made of three panels, usually hinged so the side panels can fold over the center. Many were made for altars.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is abstract expressionism?",
+"Abstract expressionism puts gesture and feeling ahead of recognizable subjects. The act of painting itself becomes part of the meaning.",
+"rook-f6b/ground_new.py"
+],
+[
+"why is linear perspective important?",
+"Linear perspective lets a flat surface suggest depth. Lines that recede toward a vanishing point make the space feel measurable and real.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a still life?",
+"A still life shows objects that don't move, like fruit, flowers or tableware. Artists use it to study light, texture and arrangement.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is the difference between a relief and a sculpture in the round?",
+"A relief projects from a flat background and is meant to be seen from the front. A sculpture in the round stands free and can be viewed from every side.",
+"rook-f6b/ground_new.py"
+],
+[
+"what does patronage mean in art?",
+"Patronage is the support of artists by people or institutions who pay for their work. Patrons often shaped the subject, size and setting of what was made.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is impasto?",
+"Impasto is paint laid on thickly, so brush or knife marks stay visible. The texture catches light and adds energy to the surface.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a breach of contract?",
+"A breach happens when one party fails to do what the contract requires without a legal excuse. The other party may then seek a remedy, such as damages.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is an agency relationship?",
+"In an agency relationship, one person acts on behalf of another with their consent. The principal can be bound by what the agent does within their authority.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a tort?",
+"A tort is a civil wrong that causes harm to someone, apart from a broken contract. The injured person can sue for compensation.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is limited liability?",
+"Limited liability means owners can lose what they invested in the business, but their personal assets are usually protected from its debts.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a fiduciary duty?",
+"A fiduciary duty requires someone to act in another person's best interest, with loyalty and care. Directors owe this to the company they serve.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is mitigation of damages?",
+"Mitigation means the injured party must take reasonable steps to limit their losses after a breach. They can't recover for harm they could easily have avoided.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is the parol evidence rule?",
+"The parol evidence rule limits using earlier or outside statements to change the terms of a written contract that the parties meant to be final.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a warranty?",
+"A warranty is a promise about the quality or condition of goods. If the goods fall short, the buyer may have a claim against the seller.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is vicarious liability?",
+"Vicarious liability holds one party responsible for another's actions, like an employer for an employee acting within the job.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a partnership?",
+"A partnership is a business owned by two or more people who share profits and, usually, responsibility for its debts.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a motif?",
+"A motif is an image, idea or phrase that keeps coming back in a work. Each return adds weight and helps build the theme.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is stream of consciousness?",
+"Stream of consciousness follows a character's thoughts as they flow, jumping between memories, feelings and impressions without tidy order.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is an unreliable narrator?",
+"An unreliable narrator tells the story in a way the reader can't fully trust. Gaps or contradictions invite the reader to read between the lines.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a tragic flaw?",
+"A tragic flaw is a trait that leads the hero toward downfall. Pride, ambition or indecision are common examples.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is free verse?",
+"Free verse is poetry without a set meter or rhyme scheme. Its rhythm comes from the natural flow of speech and the poet's line breaks.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is an epistolary novel?",
+"An epistolary novel tells its story through letters, diary entries or other documents. Readers piece events together from what each writer reveals.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is the climax of a story?",
+"The climax is the point of highest tension, where the central conflict comes to a head. After it, events begin to wind down.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is satire?",
+"Satire uses humor, irony or exaggeration to criticize people, institutions or ideas. It often aims to provoke change, not just laughter.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a bildungsroman?",
+"A bildungsroman follows a young character growing up, from youth into maturity. The story tracks how experiences shape who they become.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is imagery?",
+"Imagery is language that appeals to the senses, helping readers see, hear, smell, taste or feel a scene. It makes abstract ideas concrete.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a stack?",
+"A stack stores items so the last one added is the first one removed. Think of a pile of plates: you take from the top.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a race condition?",
+"A race condition happens when the result depends on the timing of threads that share data. If they interleave badly, the data ends up wrong.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is polymorphism?",
+"Polymorphism lets different types respond to the same call in their own way. A draw method might render a circle or a square depending on the object.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a REST API?",
+"A REST API exposes resources at URLs and uses HTTP methods like GET and POST to read or change them. Each request carries what the server needs.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is memoization?",
+"Memoization stores the results of expensive calls, so the same input returns the saved answer instead of recomputing it.",
+"rook-f6b/ground_new.py"
+],
+[
+"what does a compiler do?",
+"A compiler translates source code into a lower-level form, such as machine code, before the program runs. It also catches many errors early.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a linked list?",
+"A linked list stores items in nodes, and each node points to the next one. Inserting in the middle is cheap, but finding an item means walking the list.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is an index in a database?",
+"An index is a structure that speeds up lookups on a column. The database can jump to matching rows instead of scanning the whole table.",
+"rook-f6b/ground_new.py"
+],
+[
+"what is a pure function?",
+"A pure function returns the same output for the same input and changes nothing outside itself. That makes it easy to test and reason about.",
+"rook-f6b/ground_new.py"
+],
+[
+"what's the difference between a process and a thread?",
+"A process has its own memory space, while threads inside a process share memory. Threads are lighter to create, but sharing makes bugs easier.",
+"rook-f6b/ground_new.py"
+],
+[
+"",
+"specifics missed ",
+"rook-f6b/ground_new.py"
+],
+[
+"",
+"/10 flagged",
+"rook-f6b/ground_new.py"
+],
+[
+"",
+"Can you review the steps of a sterile dressing change? I keep mixing them up",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Why do we hold metformin before a contrast test?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"I'm reviewing heart sounds; what does an S3 mean in heart failure?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"What's a positive Homans sign, and is that test still used?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Could you explain how to prep a patient for a colonoscopy?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Can we review how Baroque differs from Renaissance composition?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Why is the final panel of the Ghent Altarpiece so important?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"I'm studying contrapposto, can you give me a simple example?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Could you review my thesis statement about Kahlo's self-portraits?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"What did the critics say about the final Impressionist exhibition?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Can we go over the elements of negligence? I learn better with examples",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Explain the reasonable person test in tort law",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Could you review whether this clause counts as a liquidated damages provision?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"What's the final step in forming a contract, acceptance?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"How does the business judgment rule test director decisions?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Can you help me prepare a close reading of the final stanza of Ode to a Nightingale?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"I'm reviewing Pride and Prejudice, why does Darcy change?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"What does the green light symbolize? I'm prepping a seminar talk",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Could we study the narrator's unreliability in The Remains of the Day?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Is the final chapter of Beloved meant to be hopeful?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Can you review my quicksort, it fails the last test case",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"How do I write a test for an async function in Jest?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Can we study how Dijkstra's algorithm handles negative edges?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Why does my final variable throw an error when I reassign it in Java?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Could you prep me a quick explanation of closures in JavaScript?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Can we study for my biochem exam on Thursday?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Could you help me get ready for my torts midterm next week?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"I have a pharmacology quiz tomorrow and I'm lost",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Would you help me prepare for my Renaissance art final?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"My data structures exam is on Monday, where do I start?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Need to cram for my anatomy test tonight",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Can you help me review for my contracts final?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"I've got an American lit quiz on Friday",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Will you help me study for the algorithms midterm?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"How should I study for my nursing fundamentals exam in 3 days?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Help me prepare for my art history test on Dec 2",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"There's a business law exam next Tuesday, can you make me a plan?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Could we prep for my CS 201 final?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Getting ready for my Shakespeare exam, what should I study first?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Can you help me study? I have a microbiology test Wednesday",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"How long does a Learn round take?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Does the Learn set use my flashcards?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"What happens when I finish a Learn session?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Where do I find my Learn set?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Which guide does a Learn session use?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Tell me about the Learn set",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Do you know how a Learn round scores me?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Can a Learn set be shared?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"So how do I start a Learn round?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"I'm confused about what a Learn session is",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Should I make a Learn set or flashcards?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Why would I open Learn for this?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Explain what a Learn round is, please",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"I don't get the Learn session thing",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"When should I start a Learn round?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Is it worth it to make a Learn set for this?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Hmm, what's a Learn session?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Wait, can you tell me what a Learn round does?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Make a Learn set for my pharm notes",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Open Learn for this",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Start a Learn round",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Please build a Learn set from this",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Can you start a Learn session for me?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Let's open a Learn round on chapter 4",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Learn for this.",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Okay, make me a Learn for it",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Create a learn set please",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Could you build me a Learn set?",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"Set up Learn for my exam",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"I want a Learn session on this guide",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"learn questions treated as requests:",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"learn requests missed:",
+"rook-f6b/intent_new.py"
+],
+[
+"",
+"false triggers ",
+"rook-f6b/intent_new.py"
+],
+[
+"Tell me about modern nursing",
+"Florence Nightingale reformed hospital sanitation during the Crimean War.",
+"rook-f6c/ground.py"
+],
+[
+"Explain this painting",
+"Artemisia Gentileschi painted Judith with fierce realism.",
+"rook-f6c/ground.py"
+],
+[
+"Explain legal realism",
+"Oliver Wendell Holmes wrote that the life of the law has been experience.",
+"rook-f6c/ground.py"
+],
+[
+"Tell me about this novel",
+"Chinua Achebe wrote it as a response to colonial novels.",
+"rook-f6c/ground.py"
+],
+[
+"Explain early compilers",
+"Grace Hopper built one of the first compilers.",
+"rook-f6c/ground.py"
+],
+[
+"Explain digoxin toxicity",
+"Digoxin toxicity is more likely when potassium falls below 3.5.",
+"rook-f6c/ground.py"
+],
+[
+"Explain the statute of frauds",
+"The statute of frauds covers sales of goods priced at $500 or more.",
+"rook-f6c/ground.py"
+],
+[
+"Do contract cases go to trial?",
+"Roughly 70 percent of contract cases settle before trial.",
+"rook-f6c/ground.py"
+],
+[
+"Is this complication common?",
+"About a third of patients develop this complication.",
+"rook-f6c/ground.py"
+],
+[
+"Explain the water lilies",
+"Monet painted more than 250 versions of them.",
+"rook-f6c/ground.py"
+],
+[
+"Explain potassium",
+"The normal potassium range is 3.5 to 5.0 mEq/L.",
+"rook-f6c/ground.py"
+],
+[
+"Explain the ruling",
+"Six justices joined the majority.",
+"rook-f6c/ground.py"
+],
+[
+"Who painted the Sistine Chapel ceiling?",
+"It was painted by a Florentine artist over several years.",
+"rook-f6c/ground.py"
+],
+[
+"How many bones are in the adult body?",
+"There are a little over two hundred.",
+"rook-f6c/ground.py"
+],
+[
+"Explain Hamlet's context",
+"Hamlet was first performed around the turn of the seventeenth century.",
+"rook-f6c/ground.py"
+],
+[
+"Explain this author's style",
+"Morrison used shifting points of view.",
+"rook-f6c/ground.py"
+],
+[
+"Explain this technique",
+"Rembrandt used a dark ground under his portraits.",
+"rook-f6c/ground.py"
+],
+[
+"Explain the war's end",
+"The Treaty of Westphalia ended the long war.",
+"rook-f6c/ground.py"
+],
+[
+"Explain energy needs",
+"A typical adult needs about 2,000 calories a day.",
+"rook-f6c/ground.py"
+],
+[
+"Explain Python's origin",
+"Python was released by Guido van Rossum.",
+"rook-f6c/ground.py"
+],
+[
+"Explain bylaws",
+"The board needs a two-thirds vote to amend the bylaws.",
+"rook-f6c/ground.py"
+],
+[
+"Explain the drug",
+"The drug has a half-life of 36 hours.",
+"rook-f6c/ground.py"
+],
+[
+"Explain kernel time",
+"Ninety-five percent of the code runs in user space.",
+"rook-f6c/ground.py"
+],
+[
+"Explain heart rate",
+"Normal is 60 to 100.",
+"rook-f6c/ground.py"
+],
+[
+"What year did the Baroque begin?",
+"It began at the end of the Renaissance.",
+"rook-f6c/ground.py"
+],
+[
+"Explain this case",
+"Marbury established judicial review.",
+"rook-f6c/ground.py"
+],
+[
+"Explain the poem",
+"Keats wrote it in the spring before he died.",
+"rook-f6c/ground.py"
+],
+[
+"Explain sorting",
+"Dijkstra argued against goto statements.",
+"rook-f6c/ground.py"
+],
+[
+"Explain the dose",
+"Give 0.5 mg twice daily.",
+"rook-f6c/ground.py"
+],
+[
+"Explain the sale",
+"The buyer paid 40 dollars for each share.",
+"rook-f6c/ground.py"
+],
+[
+"Why does hand hygiene matter?",
+"Hand hygiene before and after patient contact lowers the spread of infection.",
+"rook-f6c/ground.py"
+],
+[
+"How do diuretics work?",
+"Diuretics help the kidneys remove extra fluid, which lowers blood pressure.",
+"rook-f6c/ground.py"
+],
+[
+"What should I check before giving meds?",
+"A nurse checks the patient's identity before giving any medication.",
+"rook-f6c/ground.py"
+],
+[
+"What causes pressure injuries?",
+"Pressure injuries form when skin is squeezed against a bed or chair for a long time.",
+"rook-f6c/ground.py"
+],
+[
+"What are signs of fluid overload?",
+"Fluid overload can show up as swelling in the legs and crackles in the lungs.",
+"rook-f6c/ground.py"
+],
+[
+"What does insulin do?",
+"Insulin moves glucose from the blood into the cells.",
+"rook-f6c/ground.py"
+],
+[
+"Explain therapeutic communication",
+"Therapeutic communication means listening closely and responding without judgment.",
+"rook-f6c/ground.py"
+],
+[
+"What is sepsis?",
+"Sepsis is the body's extreme response to an infection, and it can damage organs.",
+"rook-f6c/ground.py"
+],
+[
+"Who is responsible for confirming the dose?",
+"The nurse giving the medication confirms the dose, route and time.",
+"rook-f6c/ground.py"
+],
+[
+"How should pain be assessed?",
+"Pain is whatever the patient says it is, so the nurse asks them to rate it.",
+"rook-f6c/ground.py"
+],
+[
+"What is chiaroscuro?",
+"Chiaroscuro uses strong contrasts of light and dark to model form.",
+"rook-f6c/ground.py"
+],
+[
+"Why did Impressionists paint outside?",
+"Impressionist painters worked outdoors to catch changing light.",
+"rook-f6c/ground.py"
+],
+[
+"What is a fresco?",
+"A fresco is painted onto wet plaster so the color binds with the wall.",
+"rook-f6c/ground.py"
+],
+[
+"How do Gothic cathedrals stay up?",
+"Gothic cathedrals use pointed arches and flying buttresses to carry the weight of tall walls.",
+"rook-f6c/ground.py"
+],
+[
+"Explain linear perspective",
+"Linear perspective makes parallel lines meet at a vanishing point.",
+"rook-f6c/ground.py"
+],
+[
+"What is iconography?",
+"Iconography is the study of what the symbols in an image mean.",
+"rook-f6c/ground.py"
+],
+[
+"What makes Baroque art dramatic?",
+"Baroque art often shows a dramatic moment in the middle of the action.",
+"rook-f6c/ground.py"
+],
+[
+"What is abstract art?",
+"Abstract art does not try to show things as they look in the world.",
+"rook-f6c/ground.py"
+],
+[
+"Who decided what Renaissance artists painted?",
+"Patrons paid for many works, so their wishes shaped what artists made.",
+"rook-f6c/ground.py"
+],
+[
+"What is relief sculpture?",
+"Sculptors working in relief carve figures that project from a flat background.",
+"rook-f6c/ground.py"
+],
+[
+"What makes a contract binding?",
+"A contract needs an offer, acceptance and consideration to be binding.",
+"rook-f6c/ground.py"
+],
+[
+"Define negligence",
+"Negligence means failing to take the care a reasonable person would take.",
+"rook-f6c/ground.py"
+],
+[
+"Why form an LLC?",
+"An LLC protects its owners from most of the company's debts.",
+"rook-f6c/ground.py"
+],
+[
+"What is agency law?",
+"Agency law covers when one person can act for another.",
+"rook-f6c/ground.py"
+],
+[
+"What is a breach?",
+"A breach of contract happens when one side does not do what it promised.",
+"rook-f6c/ground.py"
+],
+[
+"Explain promissory estoppel",
+"Promissory estoppel can enforce a promise when someone relied on it.",
+"rook-f6c/ground.py"
+],
+[
+"What is strict liability?",
+"Strict liability holds a seller responsible even without fault.",
+"rook-f6c/ground.py"
+],
+[
+"Who oversees the officers of a corporation?",
+"Shareholders elect the board, and the board oversees the officers.",
+"rook-f6c/ground.py"
+],
+[
+"What does fraud require?",
+"Fraud requires a false statement that the other side relied on.",
+"rook-f6c/ground.py"
+],
+[
+"Explain firm offers",
+"Under the UCC, a merchant's signed firm offer can stay open without consideration.",
+"rook-f6c/ground.py"
+],
+[
+"What is an unreliable narrator?",
+"An unreliable narrator tells the story in a way readers cannot fully trust.",
+"rook-f6c/ground.py"
+],
+[
+"Explain free indirect discourse",
+"Free indirect discourse blends the narrator's voice with a character's thoughts.",
+"rook-f6c/ground.py"
+],
+[
+"What is a volta?",
+"A sonnet's turn, or volta, shifts the poem's argument.",
+"rook-f6c/ground.py"
+],
+[
+"What is foreshadowing?",
+"Foreshadowing hints at events that come later in the story.",
+"rook-f6c/ground.py"
+],
+[
+"What is magical realism?",
+"Magical realism places strange events inside an ordinary, realistic world.",
+"rook-f6c/ground.py"
+],
+[
+"What is tone?",
+"The tone of a poem is the attitude the speaker takes toward the subject.",
+"rook-f6c/ground.py"
+],
+[
+"What is a foil?",
+"A foil is a character who brings out another character's traits by contrast.",
+"rook-f6c/ground.py"
+],
+[
+"Explain stream of consciousness",
+"Stream of consciousness follows a character's thoughts as they arrive.",
+"rook-f6c/ground.py"
+],
+[
+"Who is the target of satire?",
+"Satire uses humor to criticize people or institutions that hold power.",
+"rook-f6c/ground.py"
+],
+[
+"What is an epistolary novel?",
+"An epistolary novel tells its story through letters or documents.",
+"rook-f6c/ground.py"
+],
+[
+"Why are hash tables fast?",
+"A hash table stores values by key, so lookups are usually fast.",
+"rook-f6c/ground.py"
+],
+[
+"What is recursion?",
+"Recursion solves a problem by calling the same function on a smaller piece of it.",
+"rook-f6c/ground.py"
+],
+[
+"What is a linked list?",
+"A linked list stores each item with a pointer to the next one.",
+"rook-f6c/ground.py"
+],
+[
+"What does Big O mean?",
+"Big O describes how an algorithm's running time grows with its input.",
+"rook-f6c/ground.py"
+],
+[
+"How does a stack work?",
+"A stack removes the most recently added item first.",
+"rook-f6c/ground.py"
+],
+[
+"How does binary search work?",
+"Binary search keeps halving the range until it finds the target.",
+"rook-f6c/ground.py"
+],
+[
+"What is a race condition?",
+"A race condition happens when two threads change shared data at the same time.",
+"rook-f6c/ground.py"
+],
+[
+"What is encapsulation?",
+"Encapsulation keeps an object's data behind its methods.",
+"rook-f6c/ground.py"
+],
+[
+"Who runs the compiler, the OS or the programmer?",
+"The programmer runs the compiler, which turns source code into machine instructions.",
+"rook-f6c/ground.py"
+],
+[
+"Why cache results?",
+"Caching keeps recent results close by so the program can reuse them.",
+"rook-f6c/ground.py"
+],
+[
+"",
+"computer science",
+"rook-f6c/ground.py"
+],
+[
+"",
+"specifics caught ",
+"rook-f6c/ground.py"
+],
+[
+"",
+" plain flagged ",
+"rook-f6c/ground.py"
+],
+[
+"",
+"What is on a typical pharmacology exam?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"How is the bar exam graded?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Explain the Turing test",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Why do conservators test pigments with X-rays?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"What does the Rorschach test measure?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Can you explain the Apgar test for newborns?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"How do I write a test case for a binary search?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"What's the difference between a midterm paper and a final paper?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Summarize the reasonable person test in negligence",
+"rook-f6c/intent.py"
+],
+[
+"",
+"The exam's format is multiple choice, right?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Tell me about the Howey test for securities",
+"rook-f6c/intent.py"
+],
+[
+"",
+"What's the Lemon test in constitutional law?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Describe how unit tests differ from integration tests",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Could you review the difference between mitosis and meiosis?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Can we study the themes of Beloved together?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Can you review my essay on Caravaggio?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Would you prepare a summary of the Sherman Act?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"I failed the quiz last week, why is heparin monitored with aPTT?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Is it normal to feel anxious before an exam?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"What did the final chapter of Middlemarch say about marriage?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"How do quizzes in Learn work?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Can you help me with question 4 from the quiz?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"How do nurses help a patient prepare for a pelvic exam tomorrow?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Can you help me understand the chi-square test?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Could you review what the midterm covered last year?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Can we review the quiz I took on Monday?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Would you explain why my exam on Friday was graded harshly?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Can you prepare a rubric for the final project?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"My test results came back, what does a high TSH mean?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Can we study for my pharmacology exam?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Could you help me prep for the art history midterm on Thursday?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"My contracts final is Dec 9, where do I start?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"I've got a lit quiz tomorrow and I'm behind",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Help me get ready for my data structures exam",
+"rook-f6c/intent.py"
+],
+[
+"",
+"exam's today and I haven't studied biochem",
+"rook-f6c/intent.py"
+],
+[
+"",
+"There's a test on Monday in nursing fundamentals, can you make me a plan?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"I have an exam in three days on the Romantics",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Can you review for my torts midterm with me?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"What should I study for the CS quiz next week?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"how should I prepare for my Renaissance art final",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Quiz on Friday about Shakespeare's sonnets, help",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Would you help me cram for tomorrow's anatomy test?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"I've got my business law exam this Thursday",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Our algorithms midterm is next week, plan please",
+"rook-f6c/intent.py"
+],
+[
+"",
+"test’s today in pharm, help!",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Could we prepare for the Baroque quiz together?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"my final's tomorrow",
+"rook-f6c/intent.py"
+],
+[
+"",
+"ordinary flagged:",
+"rook-f6c/intent.py"
+],
+[
+"",
+"requests missed:",
+"rook-f6c/intent.py"
+],
+[
+"",
+"what should I do today?",
+"rook-f6c/intent.py"
+],
+[
+"",
+"study chapter 3/4 for the exam",
+"rook-f6c/intent.py"
+],
+[
+"",
+"It's today",
+"rook-f6c/intent.py"
+],
+[
+"",
+"it's 12/3",
+"rook-f6c/intent.py"
+],
+[
+"",
+"review sections 2/3 before my exam friday",
+"rook-f6c/intent.py"
+],
+[
+"",
+"I have a quiz on 12/3",
+"rook-f6c/intent.py"
+],
+[
+"",
+"Can a Learn set include my pharmacology flashcards?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Should I build a Learn set for the Baroque unit or just reread my notes?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Don't make a Learn set for torts yet, I'm still adding notes.",
+"rook-f6c/learn.py"
+],
+[
+"",
+"I wonder whether a Learn round covers the Beloved essay prompts.",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Is a Learn session better than the practice quiz for Big O?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"ok so what's the difference between Learn and flashcards for pharm?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Make a Learn set or a practice quiz for contracts, which is better?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Would a Learn round help me with Renaissance perspective?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"How long does a Learn session take for the heart failure meds?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"I'm not sure I want a Learn set for recursion.",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Can you explain how a Learn set decides which questions come back?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Hey, does Learn work for literary terms like free indirect discourse?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Why did my Learn round on Gothic cathedrals show the same card twice?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"I think making a Learn set for the UCC chapter would be overkill.",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Could a Learn session replace my outline for negligence?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"So if I start a Learn round on sorting algorithms, do I lose my progress?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Should I start a Learn round now or after the Toni Morrison reading?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Please don't open Learn for the nursing ethics guide.",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Learn sets vs practice tests for constitutional law?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Can a Learn set be made from a PDF of a poem?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"What happens if I make a Learn set from two different chapters?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"My friend said to make a Learn set for anatomy, is that worth it?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Making a Learn set from my CS notes, does it cost anything?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Not now, but would a Learn round on Impressionism be useful later?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Learn for this or flashcards, what do you suggest?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Let's not make a Learn set until Friday.",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Can you not build a Learn set yet?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Make a Learn set for the test, or should I just use flashcards?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Can we start Learn for the anatomy guide or is it locked?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Make a Learn set?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Open Learn for the art history guide?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"I'd like to make a Learn set but my notes aren't done",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Make a Learn set from my notes, why not?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Could you tell me how to start a Learn round?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"A Learn set for the contracts notes might be too much.",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Start a Learn round versus a practice test: which is faster?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Do I have to make a Learn set before the check-in?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Make a Learn set for it. Wait, is that the same as a quiz?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Shouldn't I make a Learn set for pharmacology first?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Wouldn't it be easier to build a Learn set for recursion?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Why make a Learn set for Hamlet when I have flashcards?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Okay, make a Learn set for the sonnets? Or is that silly",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Can you make a Learn set and a study guide from these notes?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Make a Learn set for my pharmacology notes",
+"rook-f6c/learn.py"
+],
+[
+"",
+"ok, build me a Learn set from this",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Please create a Learn session on the Baroque chapter",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Let's start a Learn round on contract formation",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Go ahead and make a learn set for Beloved",
+"rook-f6c/learn.py"
+],
+[
+"",
+"I want a Learn set for my algorithms notes",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Set up Learn for my nursing exam, please",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Learn for this, please.",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Great, now make a Learn for it",
+"rook-f6c/learn.py"
+],
+[
+"",
+"I'd like a Learn set on the UCC",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Generate a new Learn set from these notes",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Open Learn for it now",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Start a quick Learn round for me",
+"rook-f6c/learn.py"
+],
+[
+"",
+"I need you to build a Learn set using my CS notes",
+"rook-f6c/learn.py"
+],
+[
+"",
+"yes, make the Learn set",
+"rook-f6c/learn.py"
+],
+[
+"",
+"My exam is Friday. Make a Learn set for it.",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Make a Learn set for heart failure meds and digoxin",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Build a Learn set out of the Hamlet notes!",
+"rook-f6c/learn.py"
+],
+[
+"",
+"I want to make a Learn set",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Can you make a Learn set from my notes on Gothic art?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Could you build a Learn round for torts?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Would you set up a Learn session on recursion please?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Can we make a Learn set for the sonnets?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Will you please make a learn set from this?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Hey, can you create a Learn set for pharmacology?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Could you please generate a Learn set out of my lecture?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"So can we start a Learn round on Big O?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Can a Learn set include my flashcards?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"Can you make a Learn set from my notes?",
+"rook-f6c/learn.py"
+],
+[
+"",
+"It was commissioned by the Medici family.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"Most of it hangs in the Uffizi gallery now.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"The ruling came from the Warren court.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"This is described by the Starling law of the heart.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"It was signed at the Paris conference.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"She belonged to the Bloomsbury group of writers.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"The idea comes from the Coase theorem.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"Nurses use the Braden scale to rate risk.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"He trained in the Rubens workshop.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"It follows the Dewey system of shelving.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"The poem copies the Spenserian stanza.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"A Turing machine reads one symbol at a time.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"Look at the Glasgow coma scale.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"This was the Ming dynasty style.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"It ran on the Unix operating system.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"The Krebs cycle makes ATP.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"Many students confuse it with the Harlem renaissance.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"He studied under the Jesuit order.",
+"rook-f6c/regress.py"
+],
+[
+"",
+"Explain it",
+"rook-f6c/regress.py"
+],
+[
+"What is tenebrism?",
+"Tenebrism is painting with very strong contrasts of light and dark. It spread through the Caravaggio circle and shaped how later painters lit their scenes.",
+"rook-f6c/replies.py"
+],
+[
+"Explain Miranda warnings",
+"Police must tell a suspect in custody that they can stay silent and can have a lawyer. The Warren court set this rule, and courts throw out statements taken without it.",
+"rook-f6c/replies.py"
+],
+[
+"How do nurses assess pressure injury risk?",
+"Nurses score the patient on the Braden scale when they arrive and again each shift. A low score means higher risk, so the plan adds turning and padding.",
+"rook-f6c/replies.py"
+],
+[
+"Explain the Bloomsbury writers",
+"They were a circle of writers and artists who met in London homes. Woolf belonged to the Bloomsbury group and wrote about consciousness.",
+"rook-f6c/replies.py"
+],
+[
+"Explain transaction costs",
+"Transaction costs are what it takes to make a deal happen, like searching and bargaining. The idea comes from the Coase theorem, which says who owns a right matters less when bargaining is cheap.",
+"rook-f6c/replies.py"
+],
+[
+"Explain Unix",
+"Unix is an operating system built around small tools that do one job each. Linux follows the Unix design, so most commands work the same way.",
+"rook-f6c/replies.py"
+],
+[
+"",
+"bio test?",
+"rook-f6c/sessions.py"
+],
+[
+"",
+"theirs untouched:",
+"rook-f6c/sessions.py"
+],
+[
+"",
+"theirs after:",
+"rook-f6c/sessions.py"
+],
+[
+"",
+"identical posted msg:",
+"rook-f6c/sessions.py"
+],
+[
+"",
+"Check-in done: 3 of 7",
+"rook-f6c/sessions.py"
+],
+[
+"",
+"Here is the plan",
+"rook-f6c/sessions.py"
+],
+[
+"",
+"NO ERROR",
+"rook-f6c/sessions.py"
+],
+[
+"",
+"Yo, digoxin slows the heart.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Yooo! Chiaroscuro is light and dark.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Hey there! Consideration is value exchanged.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Sup, a volta is a turn.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Dude, recursion calls itself.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Bro — a stack is LIFO.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Great question! Sepsis is serious.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Good question. Free verse has no meter.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Okay so, a tort is a civil wrong.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Alright so, hashing maps keys.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Wassup! Here's the plan.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"lol, that one trips everyone up. Torts are civil wrongs.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Heyyy, insulin lowers glucose.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Fam, here's the deal: tone is attitude.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Yo-yo dieting changes weight quickly.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Hey Jude is a ballad.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Dude ranches host tourists.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"What's up with the volta is that it turns.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Good question design starts with the objective.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Okay so-called experts disagree.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Bro Code is a parody.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Sup is short for supremum in analysis.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Fam. Medicine is a specialty.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Yo La Tengo is a band.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Great questions lead to good answers.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Lol is an abbreviation readers know.",
+"rook-f6c/slang.py"
+],
+[
+"",
+"Let's get you ready for your test in 5 days. Here's the plan:\n1. **Check-in quiz today:** a short Learn round on Cell Biology Basics.\n2. **A Learn round each day.**\n3. **Final check** the day before.",
+"rook-f6/audit.cjs"
+],
+[
+"",
+"Start the check-in quiz",
+"rook-f6/audit.cjs"
+],
+[
+"",
+"Build it from Canvas",
+"rook-f6/audit.cjs"
+],
+[
+"",
+", false], [",
+"rook-f6/audit.cjs"
+],
+[
+"",
+", true], [",
+"rook-f6/audit.cjs"
+],
+[
+"",
+"I need to study for my midterm in 5 days",
+"rook-f6/audit.cjs"
+],
+[
+"",
+"390 plan button heights",
+"rook-f6/audit.cjs"
+],
+[
+"",
+"what is osmosis?",
+"rook-f6/audit.cjs"
+],
+[
+"",
+"Concept explained in plain words",
+"rook-f6/learn.cjs"
+],
+[
+"",
+"round never finished",
+"rook-f6/learn.cjs"
+],
+[
+"",
+"The Tutor's voice guards: no slang openers, and no specific fact stated as settled without material.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Bearer test",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"What is the normal adult heart rate?",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"A normal adult resting heart rate is 60 to 100 beats per minute.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Heart rate is how often the heart beats; a resting rate is taken when the person is calm.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Tell me about the Night Watch",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Rembrandt painted it in 1642 for a civic guard company.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"A group portrait shows several sitters together, often arranged to show their roles.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"What case set the rule on consideration?",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"The rule comes from Currie v Misa, decided in 1875.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Consideration is something of value that each side gives up to make a promise binding.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"When was Beloved published?",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Toni Morrison published it on September 16 of that year.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"A frame narrative is a story told inside another story, which shapes how we read it.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Tell me about the first compiler",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"It was built by a team of three engineers at the lab.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"A compiler translates source code into instructions a machine can run, before it runs.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"It was founded in Pulaski, Tennessee by six Confederate veterans.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"It may have been 1642, but pick your guide and I can confirm it.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Florence Nightingale founded modern nursing.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Jan van Eyck painted it.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Chief Justice Marshall wrote the opinion.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Toni Morrison wrote it.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Ada Lovelace wrote the first program.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Sales of goods for $500 or more need a writing.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"About 60 percent of an adult's weight is water.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"About sixty percent of cases settle.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Sterile technique keeps the field clean.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Italian painters used linear perspective.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"The Greek word means measure.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Contract law protects promises.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Free verse has no set meter.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Big O describes growth.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Osmosis is water moving.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Let's go through it.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"A tort is a civil wrong.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Irony is a gap between words and meaning.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"You can solve this in two steps.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Yoga aside, rest helps recovery.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Superposition means both at once.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"never present a specific name, number, count or date as settled fact",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"warm, plain voice; no slang or filler openers",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Yo, it was founded by six Confederate veterans.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"It was founded by three people in 1865.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Who founded it?",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"The answer is 4.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"What is 2 + 2?",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"There are two ways to think about it.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Explain recursion",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"In Python, a list keeps its order.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"what is a list in python",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"1. **Identify The Variables**\nWrite down what you know.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"how do I start",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Morrison wrote it.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"who wrote it?",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Yo, osmosis is water moving.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Yo! Let's go through it.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Hey there! A tort is a civil wrong.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Great question! Irony is a gap between words and meaning.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"It was founded by six Confederate veterans.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Three people founded it in 1865.",
+"tests/test_tutor_voice.py"
+],
+[
+"",
+"Tell me about it",
+"tests/test_tutor_voice.py"
+],
+[
+"what is a typical adult dose?",
+"The usual adult dose is 500 mg every 6 hours.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"who painted it?",
+"It was painted by Rembrandt van Rijn for a civic guard company.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Tim Berners-Lee invented it.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Alexander Fleming discovered it by accident.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"who wrote it?",
+"Morrison wrote it.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"Explain the range",
+"The usual range is 135–145.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what does a beta blocker do?",
+"Beta blockers slow the heart rate and lower blood pressure. They block adrenaline at beta receptors, so the heart beats with less force.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"why do we check potassium before giving digoxin?",
+"Low potassium makes digoxin toxicity more likely. Check the level first, and hold the dose and tell the provider if it is low.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what's the difference between type 1 and type 2 diabetes?",
+"In type 1, the body makes little or no insulin. In type 2, the body makes insulin but the cells respond poorly to it.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is preload?",
+"Preload is how much the heart muscle is stretched at the end of filling. More blood returning to the heart means more preload, as the Frank-Starling law describes.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is afterload?",
+"Afterload is the pressure the heart has to push against to eject blood. High blood pressure raises it, so the heart works harder with each beat.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what makes gothic architecture gothic?",
+"Gothic buildings use pointed arches, ribbed vaults and flying buttresses. These let walls be thinner and hold large stained glass windows.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is impressionism?",
+"Impressionism is a style that captures light and a passing moment with quick, visible brushstrokes. Painters often worked outdoors.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"explain one-point perspective",
+"One-point perspective makes parallel lines meet at a single vanishing point on the horizon. It creates the look of depth on a flat surface.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is contrapposto?",
+"Contrapposto is a pose where a figure puts its weight on one leg. The hips and shoulders tilt in opposite directions, so the body looks relaxed.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is a still life?",
+"A still life is a picture of objects that don't move, such as fruit, flowers or cups. Artists use it to study light, texture and arrangement.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is iconography?",
+"Iconography is the study of the symbols and figures in an image and what they mean. A key or a skull, for example, can carry a meaning viewers recognised.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what did patrons do?",
+"A patron paid an artist to make a work and often chose its subject. Patrons shaped what art got made and how it looked.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is abstract art?",
+"Abstract art doesn't try to show things as they look. It uses shape, color and line to make its effect on their own.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is a medium in art?",
+"The medium is the material an artist works in, like oil paint, marble or ink. Each one limits and shapes what the artist can do.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is consideration in a contract?",
+"Consideration is something of value each side gives up. Without it, a promise is usually not enforceable as a contract.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is the difference between an LLC and a corporation?",
+"An LLC gives owners limited liability with flexible tax treatment. A corporation is a separate legal entity owned by shareholders, with more formal rules.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is promissory estoppel?",
+"Promissory estoppel lets a court enforce a promise when someone relied on it and would be harmed. It fills the gap when there is no consideration.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is a fiduciary duty?",
+"A fiduciary duty is a duty to act in someone else's best interest. A company's directors, for example, must put the company ahead of their own gain.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"how does a contract form?",
+"A contract forms when one side makes an offer and the other accepts it on the same terms. A reply that changes the terms is a counteroffer, not an acceptance.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is negligence?",
+"Negligence is a failure to take the care a reasonable person would take. The injured person has to show a duty, a breach of it, and harm the breach caused.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is an agent?",
+"An agent acts for someone else, called the principal. What the agent agrees to within their authority binds the principal.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what happens when a contract is broken?",
+"The usual remedy is money damages that put the other side where they would have been. A court orders the promise carried out only when money can't fix the harm.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is limited liability?",
+"Limited liability means owners can lose what they put into the business but not their personal assets. Creditors can only go after the business itself.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is dramatic irony?",
+"Dramatic irony is when the audience knows something a character does not. It builds tension because we watch the character act without that knowledge.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is the theme of Hamlet?",
+"Hamlet explores revenge, doubt and how hard it is to act. The prince keeps delaying, and that delay drives the tragedy.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is an unreliable narrator?",
+"An unreliable narrator tells the story in a way we can't fully trust. Their bias, gaps or mistakes make the reader question what really happened.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is foreshadowing?",
+"Foreshadowing is a hint early in a story about what will happen later. It builds suspense and makes the ending feel earned.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is a motif?",
+"A motif is an image, idea or phrase that comes back again and again in a work. Each time it returns, it adds to the larger meaning.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is free verse?",
+"Free verse is poetry without a set rhyme scheme or regular meter. It follows the rhythm of natural speech instead.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is the climax of a story?",
+"The climax is the turning point, where the main conflict reaches its highest tension. After it, the story moves toward its resolution.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is a protagonist?",
+"The protagonist is the main character, the one the story follows. Their goals and struggles drive the plot.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what does tone mean in literature?",
+"Tone is the writer's attitude toward the subject or the reader. Word choice, rhythm and detail all shape whether it feels playful, bitter or calm.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is recursion?",
+"Recursion is when a function calls itself on a smaller version of the problem. Each call needs a base case, or it never stops.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is big O notation?",
+"Big O describes how running time grows as the input grows. For example, a loop over n items is O(n).",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what's a hash table?",
+"A hash table stores key and value pairs. A hash function turns each key into an index, so lookups are fast on average.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"how does binary search work?",
+"Binary search checks the middle item of a sorted list. If the target is smaller, it searches the left half; otherwise, the right half. It repeats until it finds the item.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what is a python list comprehension?",
+"A list comprehension builds a list in one line, like [x * 2 for x in nums]. Python reads it left to right.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"explain recursion with steps",
+"Recursion solves a problem by solving smaller copies of it.\n1. **Find the base case**\nThe smallest input you can answer directly.\n> Without it, the calls never end.\n2. **Reduce the problem**\nCall the function on a smaller input.\n> Each call gets closer to the base case.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"do",
+"My test is Friday.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"do",
+"How does it work?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what year did it end?",
+"It ended in ninety-one.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"Which year was it signed?",
+"Seventeen eighty-seven, I believe.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what date is the holiday?",
+"On day twelve.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"how many are there?",
+"There are twelve.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"How old was he?",
+"He was forty.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"what percent of cases settle?",
+"Roughly sixty, by most counts.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"F6 review follow-up (F6b): every probe sentence from the independent review, kept as a test.\n\n- Intent: an ordinary question that happens to contain \"test\", \"final\" or \"quiz\" never becomes a study\n  plan; real \"I have a test\" requests in every discipline still do. \"Learn\" counts only as the product.\n- The extension side panel (no session_id) always gets a normal text answer; no guide is ever built from it.\n- Grounding: plain answers are not marked unchecked; answers that state counts, amounts or names are.\n- Openers: slang and filler openers are stripped only when punctuation follows them.\n- Dates: \"chapters 3/4\", \"sections 1/2\" and \"what should I do today?\" are not test dates.\n- A check-in posted while a Tutor turn is running is kept when the turn completes.\n",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Make a Learn for it",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"set up Learn for my exam",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"can you build a learn set",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"open Learn for biology",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"ok make a Learn for it",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"start a Learn round",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Learn for this, please",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Make a Learn set or a quiz, which is better?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Start a Learn round? Or review the guide first?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Can you make a Learn set? Or is that only for guides?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Before I make a Learn set, what does it include?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"The button says Start a Learn round but nothing happens",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"make me learn for the test",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Don't make a Learn set yet",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"How do I make a Learn set for Hamlet?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Would a Learn round help with dosage calculations?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Could I start a Learn session without a guide?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Build a Learn set from my torts outline",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Start a Learn round on the Baroque unit",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Make a Learn set for Beloved",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Please create a Learn set for data structures",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Start a Learn round on sterile technique",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"How does it work? Make a Learn for it.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Make a Learn set for it. My test is Friday.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Use `range(10)` to loop ten times.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Call `print(True)` and it prints True.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Binary search halves the list each time.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Dude ranches were common in the West.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Heyday of the Renaissance was brief.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Supply rises.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Bro-ken lines are dashed.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Sup-port the joint.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Great question! Mitosis splits a cell.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Good question. Irony is a gap.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Yo — let's go.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Okay so, the heart pumps.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Here's the deal.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Mitosis splits a cell.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Irony is a gap.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Let's go.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"The heart pumps.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"It comes from the Greek word for carrying over.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"The injured person can sue for damages in court rather than the State bringing charges.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"{case: milliseconds} for every case that finished (all cases, or the names given), and the cases still\n    running when the child was stopped.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"I need to study for my pharmacology exam on Friday",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"help me get ready for my NCLEX practice test",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"my med-surg final is next week",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"help me prep for the art history midterm tomorrow",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"I've got an art history quiz Thursday",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"I have a business law final in 5 days",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"studying for my contracts exam, where do I start?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"I've got a literature quiz Dec 3, can you help me get ready?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"I need to study for my English test",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"studying for my algorithms test next week",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"exam tomorrow in data structures, help",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Make a Learn set for it and make flashcards too",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Can we study for my biology exam?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Could you help me study for my contracts final?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Will you help me prep for my art history midterm?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Can you review for my nursing pharmacology quiz?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Could we get ready for my literature test on Friday?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Can we study for the CS 101 final?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"What will be on the test about mitosis?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Can we review the Howey test for securities?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Could you explain what the final exam covers?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Can you study this practice test question with me?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Can we go over my unit tests?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"How does a Learn session work?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"What is a Learn set?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Why does a Learn round start with a quiz?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Can you explain a Learn session?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Is a Learn set the same as flashcards?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Open Learn on this",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Could you open a Learn session for my chem notes?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Can you make a Learn set from a PDF?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Sup. Mitosis splits a cell.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Bro. Code is a set of rules.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Lol. Cats purr.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"my exam's tomorrow",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"my bio exam’s on Friday",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"the midterm is next week",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"my quiz’s Dec 3",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"on Mon, Nov 23 (5 days away)",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Check-in done on Biology: 3 of 7 right.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Open my calendar?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Move this guide to Biology?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Please don't open my calendar",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Don't delete it",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Let's not move it yet",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"let’s not rename it",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Do not open the library",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Open my calendar",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Can you open my Biology class?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Could you move this guide to Biology?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"put this guide in Biology",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"make a class called Art History",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"How should the client prepare for the stress test on Friday?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Explain how patients get ready for a colonoscopy exam",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"last question",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Check-in done.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Make a Learn set for it ",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Biology: Cells",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Q1: What is a cell?\nA1: A unit.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Chem notes",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"<p>Moles count particles.</p>",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"It's on Friday",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Whom did she marry?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"whose idea was it?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"It was settled then.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"why was it settled?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"who settled it?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Yes, $500 is the line for goods.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"is the threshold $500?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Yo! Let's go.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"quiz on chapters 3/4 on Friday",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"I need to study sections 1/2 for the test",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"review chapters 3/4",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"I want to study today for my exam",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"my exam is today",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"test today, help",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"exam on 12/3",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"test due 12/3",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"my final is Dec 3",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"test tomorrow on contracts",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"my exam's today",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"my exam’s today",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"the quiz’s on 12/3",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"the test's 12/3",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"my final is on 12/3",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Osmosis is water moving across a membrane.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Water moving across a membrane.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Yes, below 3.5 is low.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"is 3.5 low for potassium?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Rate it on the scale you use.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"how do I rate pain?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"I have a patient care exam tomorrow",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"(the next case after the ones listed)",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"a pattern never finished; finished so far: ",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"I'll turn Chem notes into a Learn set",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Make   a\tLearn\n set   for   it",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Can  you make a Learn set?",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Explain it.",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"",
+"Build the Learn set",
+"tests/test_tutor_study_helper_review.py"
+],
+[
+"I need to study for my pharmacology exam on Friday",
+"Pharmacology Unit 2",
+"tests/test_tutor_study_helper.py"
+],
+[
+"help me prep for the art history midterm tomorrow",
+"Art History: Baroque",
+"tests/test_tutor_study_helper.py"
+],
+[
+"I have a business law final in 5 days",
+"Business Law — Contracts",
+"tests/test_tutor_study_helper.py"
+],
+[
+"I've got a literature quiz Dec 3, can you help me get ready?",
+"Literature: Beloved",
+"tests/test_tutor_study_helper.py"
+],
+[
+"studying for my algorithms test next week",
+"Algorithms and Data Structures",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"The Tutor as a study helper: a test to study for gets a plan with buttons, \"make a Learn for it\" builds\nthe set and opens Learn, and a finished check-in comes back to the Tutor with what to do next and when.",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"The web app's Tutor: every message goes through the student's Tutor session.",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"What is osmosis?",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"Explain the doctrine of consideration",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"make practice questions for my test",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"help me learn about cells",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"I have to review the reading",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"make it easier to learn this",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"I want to learn this",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"**Final check** the day before, Sunday.",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"tell me the test date",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"master about 2 ideas a day",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"final check on Sunday",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"Your test is tomorrow",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"Your test is today",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"add your test date in Learn",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"Strong start",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"starting point",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"I need to study for my bio test on Friday",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"I need to study for my chemistry final",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"I need to study for my chem test",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"help me prep for the hist midterm",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"set up Learn for it",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"Your test is in 5 days",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"test tomorrow",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"exam on friday",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"exam next wednesday",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"exam wednesday",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"in two weeks",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"on Jan 9",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"the 3rd of December",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"my test friday",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"Check-in done on Biology: Cells: 3 of 7 right.",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"Learn for Biology: Cells",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"bio test friday",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"^Let's get you ready for your test",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"\\byo\\b|\\bhey\\b|great question",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"Chemistry Final Review",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"Midterm Exam",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"HIST 210",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"A count of particles.",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"Attach notes",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"I have a bio test",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"bio test",
+"tests/test_tutor_study_helper.py"
+],
+[
+"",
+"Biology 101",
+"tests/test_tutor_study_helper.py"
+]
+]

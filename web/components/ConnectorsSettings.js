@@ -4,7 +4,7 @@ import { ChevronRight, Copy, Mail, Search, Wallet, X } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import ConfirmDialog from './ConfirmDialog';
 import { SectionLoader } from './CordiaLoader';
-import { apiFetch } from '../lib/api';
+import { AI_TIMEOUT_MS, apiErrorMessage, apiFetch } from '../lib/api';
 import { canvasStatus, disconnectCanvas, displayDate, settleCanvasSync, syncCanvas } from '../lib/canvas';
 import { loadFolders } from '../lib/folders';
 import CanvasConnectSheet from './CanvasConnectSheet';
@@ -107,6 +107,9 @@ function healthLine(health) {
     .map(([key, value]) => { const [noun, ...rest] = STAT_WORDS[key].split(' '); return [`${value} ${noun}${value === 1 ? '' : 's'}`, ...rest].join(' '); });
   return [health.last_synced_at && `Last synced ${agoLabel(health.last_synced_at)}`, ...counts].filter(Boolean).join(' · ');
 }
+// A page too long, or too slow, to bring in whole: the text ends with a line saying so; the sheet says it too.
+const PARTIAL_NOTICE = "Only part of that page came in. The last line of the text says what was left out.";
+
 function ImportSheet({ connector, onClose }) {
   // Where an import goes: the New sheet's Paste (to review first) or straight into a class in Library.
   const [classes, setClasses] = useState([]);
@@ -114,16 +117,17 @@ function ImportSheet({ connector, onClose }) {
   const [added, setAdded] = useState(null);
   useEffect(() => { loadFolders().then(data => setClasses(Array.isArray(data?.folders) ? data.folders : [])); }, []);
   async function addToClass(file) {
-    setBusy(file.id); setError(''); setAdded(null);
+    setBusy(file.id); setError(''); setFailed(null); setAdded(null);
     const data = await addToLibrary(connector.id, { id: file.id, title: file.title, folderId: target });
     setBusy('');
-    if (data?.guide?.id) setAdded(data.guide);
-    else setError(data?.detail || "That didn't import. Try again.");
+    if (data?.guide?.id) setAdded({ ...data.guide, partial: Boolean(data.partial) });
+    else setFailed({ id: file.id, text: apiErrorMessage(data?.detail, "That didn't import. Try again.") });
   }
   const [query, setQuery] = useState('');
   const [found, setFound] = useState(null);
   const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(''); // the search failed
+  const [failed, setFailed] = useState(null); // an import was tried and failed: { id, text }, shown on that row only
   const inputRef = useRef(null);
   useEffect(() => {
     inputRef.current?.focus();
@@ -144,12 +148,13 @@ function ImportSheet({ connector, onClose }) {
 
   async function pick(file) {
     if (target) { addToClass(file); return; }
-    setBusy(file.id); setError('');
-    const data = await apiFetch(`/connectors/${connector.id}/import`, { method: 'POST', body: JSON.stringify({ id: file.id, title: file.title }) });
-    if (!data?.text) { setBusy(''); setError(data?.detail || "That didn't import. Try again."); return; }
+    setBusy(file.id); setError(''); setFailed(null);
+    // A page with many nested toggles is read a few calls at a time on the server, for up to 25 s: wait as long as an AI job.
+    const data = await apiFetch(`/connectors/${connector.id}/import`, { method: 'POST', body: JSON.stringify({ id: file.id, title: file.title }), timeoutMs: AI_TIMEOUT_MS });
+    if (!data?.text) { setBusy(''); setFailed({ id: file.id, text: apiErrorMessage(data?.detail, "That didn't import. Try again.") }); return; }
     setBusy('');
     onClose();
-    openNewSheet('paste', { text: data.text, title: data.title });
+    openNewSheet('paste', { text: data.text, title: data.title, notice: data.partial ? PARTIAL_NOTICE : '' });
   }
 
   return (
@@ -163,13 +168,13 @@ function ImportSheet({ connector, onClose }) {
           {classes.length > 0 && (
             <label className="cn-target">
               <span className="c-meta">Add to</span>
-              <select className="c-input" value={target} onChange={event => { setTarget(event.target.value); setAdded(null); }}>
+              <select className="c-input" value={target} onChange={event => { setTarget(event.target.value); setAdded(null); setFailed(null); }}>
                 <option value="">New guide (review it first)</option>
                 {classes.map(folder => <option key={folder.id} value={folder.id}>{classLabel(folder.name).title} in Library</option>)}
               </select>
             </label>
           )}
-          <label className="cn-search">
+          <label className="c-search">
             <Search {...ICON} />
             <input ref={inputRef} className="c-input" type="search" placeholder={`Search ${connector.name}`} aria-label={`Search ${connector.name}`} value={query} onChange={event => setQuery(event.target.value)} />
           </label>
@@ -181,13 +186,15 @@ function ImportSheet({ connector, onClose }) {
                 <button key={file.id} type="button" className="c-list-row cn-result" onClick={() => pick(file)} disabled={Boolean(busy)}>
                   <span className="c-grow">
                     <span className="cn-row-title c-truncate">{file.title}</span>
-                    <span className="c-meta">{busy === file.id ? 'Importing…' : [file.kind, file.edited && `edited ${file.edited}`].filter(Boolean).join(' · ')}</span>
+                    {failed?.id === file.id && busy !== file.id
+                      ? <span className="cn-row-error" role="alert">{failed.text}</span>
+                      : <span className="c-meta">{busy === file.id ? 'Importing…' : [file.kind, file.edited && `edited ${file.edited}`].filter(Boolean).join(' · ')}</span>}
                   </span>
                 </button>
               ))}
             </div>
           )}
-          {added && <p className="cn-notice" role="status">Added <a href={`/guide/${added.id}`}>{added.title}</a> to Library.</p>}
+          {added && <p className="cn-notice" role="status">Added <a href={`/guide/${added.id}`}>{added.title}</a> to Library.{added.partial && ` ${PARTIAL_NOTICE}`}</p>}
           {error && <p className="cn-error" role="alert">{error}</p>}
           <p className="c-meta">{target ? 'It goes into the class as notes, ready for cards and quizzes. Importing it again brings in changes.' : 'Imports open in New so you can check the text before making a guide.'}</p>
         </div>
@@ -388,8 +395,8 @@ export default function ConnectorsSettings() {
     return (
       <div className="cn-uses">
         <Toggle label={busy === `watch-${connector.id}` ? 'Checking your mail…' : 'Watch for date changes'} checked={Boolean(connector.watch_dates)}
+          description="Reads only mail from your school. When a professor moves a date or gives you an extension, it shows on your Dashboard. Nothing changes until you confirm."
           disabled={busy === `watch-${connector.id}`} onChange={on => setWatch(connector, on)} />
-        <p className="c-meta cn-watch-note">Reads only mail from your school. When a professor moves a date or gives you an extension, it shows on your Dashboard. Nothing changes until you confirm.</p>
       </div>
     );
   }
@@ -454,7 +461,7 @@ export default function ConnectorsSettings() {
 
   const active = open && open !== 'canvas' && connectors?.find(item => item.id === open);
   return (
-    <div className="c-card cn-card">
+    <div className="c-card settings-card cn-card">
       <h2 className="c-section-title">Connect your apps</h2>
       <p className="c-meta">Tap one to see what it does and how to connect it. Once it's connected, choose whether the Tutor and Cordia Assistant use it.</p>
       {connectors === null ? <SectionLoader label="Loading connectors" /> : (

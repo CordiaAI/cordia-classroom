@@ -255,7 +255,7 @@ export default function SettingsPage() {
               <SectionLoader height={160} label="Loading your plan" />
             ) : (
               <>
-                <div className="c-card billing-current-plan">
+                <div className="c-card settings-card billing-current-plan">
                   <div className="plan-badge" data-plan={isPlus ? 'plus' : 'free'}>
                     {onTrial ? `${tierName(status.tier)} trial` : tierName(currentTier)}
                   </div>
@@ -282,7 +282,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="billing-plans">
-                  <div className={'c-card plan-card' + (!isPlus ? ' plan-card-current' : '')}>
+                  <div className={'c-card settings-card plan-card' + (!isPlus ? ' plan-card-current' : '')}>
                     <h2 className="c-section-title">Free</h2>
                     <div className="plan-price">$0 <span>/month</span></div>
                     <ul className="plan-features">
@@ -294,7 +294,7 @@ export default function SettingsPage() {
                   {Object.entries(TIERS).map(([key, tier]) => {
                     const current = currentTier === key;
                     return (
-                      <div key={key} className={'c-card plan-card plan-card-pro' + (current ? ' plan-card-current' : '')}>
+                      <div key={key} className={'c-card settings-card plan-card plan-card-pro' + (current ? ' plan-card-current' : '')}>
                         <h2 className="c-section-title">{tier.name}</h2>
                         <div className="plan-price">{tier.price}<span>/{tier.per}</span></div>
                         <span className="c-meta">{tier.pitch}</span>
@@ -338,8 +338,8 @@ export default function SettingsPage() {
         {activeSection === 'connectors' && (
           <div className="profile-section c-stack" role="tabpanel" id="panel-connectors" aria-labelledby="tab-connectors">
             <ConnectorsSettings />
-            <div className="c-card settings-row">
-              <span className="settings-row-label"><Puzzle size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Chrome extension</span></span>
+            <div className="c-card settings-card settings-row">
+              <span className="setting-text"><Puzzle size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Chrome extension</span></span>
               {extensionInstalled
                 ? <span className="c-meta">Installed</span>
                 : <a className="c-btn c-btn--secondary" href={EXTENSION_STORE_URL} target="_blank" rel="noopener noreferrer">Get extension</a>}
@@ -369,7 +369,7 @@ export default function SettingsPage() {
 
         {activeSection === 'account' && (
           <div className="profile-section c-stack" role="tabpanel" id="panel-account" aria-labelledby="tab-account">
-            <div className="c-card me-card">
+            <div className="c-card settings-card me-card">
               <div className="me-avatar" aria-hidden="true">{initials}</div>
               <div className="me-names">
                 <strong>{profileName || 'Your account'}</strong>
@@ -378,27 +378,25 @@ export default function SettingsPage() {
               <button type="button" className="c-btn c-btn--secondary" onClick={() => { clearAuth(); router.push('/'); }}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" />Sign out</button>
             </div>
             {/* Appearance: light or dark lives in Make it yours now, with the theme, accent, background, font, text size and glass. */}
-            <div className="c-card settings-row">
-              <span className="settings-row-label"><Palette size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title" id="settings-appearance">Appearance</span></span>
+            <div className="c-card settings-card settings-row">
+              <span className="setting-text"><Palette size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title" id="settings-appearance">Appearance</span><span className="c-meta" id="settings-appearance-note">Theme, accent, background, font, text size, light or dark, and glass.</span></span>
               <button type="button" className="c-btn c-btn--secondary" aria-describedby="settings-appearance-note" onClick={event => openMakeItYours(event.currentTarget)}>Make it yours</button>
-              <p className="c-meta settings-export-note" id="settings-appearance-note">Theme, accent, background, font, text size, light or dark, and glass.</p>
             </div>
-            <div className="c-card settings-row">
-              <span className="settings-row-label"><UserRound size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Profile and privacy</span></span>
+            <div className="c-card settings-card settings-row">
+              <span className="setting-text"><UserRound size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Profile and privacy</span></span>
               <Link href="/settings/privacy" className="c-btn c-btn--secondary">Open</Link>
             </div>
             <PhoneSettings />
-            <div className="c-card settings-row">
-              <span className="settings-row-label"><Download size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Download my data</span></span>
+            <div className="c-card settings-card settings-row">
+              <span className="setting-text"><Download size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Download my data</span><span className="c-meta">Your profile, guides, notes, lectures, practice history, Tutor chats and what the Tutor remembers, as one JSON file.</span></span>
               <button type="button" className="c-btn c-btn--secondary" disabled={exporting === 'busy'}
                 onClick={async () => { setExporting('busy'); setExporting((await downloadMyData()) ? '' : 'failed'); }}>
                 {exporting === 'busy' ? 'Preparing…' : 'Download'}
               </button>
-              <p className="c-meta settings-export-note">Your profile, guides, notes, lectures, practice history, Tutor chats and what the Tutor remembers, as one JSON file.</p>
               {exporting === 'failed' && <p className="retain-action-error settings-export-note" role="alert">The download didn’t start. Try again.</p>}
             </div>
-            <div className="c-card settings-row">
-              <span className="settings-row-label"><Trash2 size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Delete account</span></span>
+            <div className="c-card settings-card settings-row">
+              <span className="setting-text"><Trash2 size={20} strokeWidth={1.75} aria-hidden="true" /><span className="c-section-title">Delete account</span></span>
               <button type="button" className="c-btn c-btn--secondary settings-danger" onClick={() => setDeleting({ text: '', busy: false, error: '' })}>Delete account</button>
             </div>
             <nav className="settings-links" aria-label="Policies">
@@ -441,20 +439,18 @@ export default function SettingsPage() {
         :global(.profile-tabs) { justify-self: start; max-width: 100%; overflow-x: auto; }
         .profile-message { padding: 14px 18px; border-radius:var(--r-card); background: var(--olive-tint); font-weight:600; }
         .profile-section { animation: fadeIn 0.2s ease; }
-        .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; flex-wrap: wrap; }
         .settings-row :global(.c-seg) button { display: inline-flex; align-items: center; gap: 6px; }
-        .settings-row-label { display: inline-flex; align-items: center; gap: 10px; }
         .settings-export-note { flex-basis: 100%; margin: 0; }
-        .settings-row-label :global(.lucide) { color: var(--meter-ink); }
-        .settings-note { margin: -4px 0 0; }
-        .settings-card { display: grid; gap: 12px; padding: 20px; }
-        .settings-links { display: flex; gap: 20px; font:600 0.8125rem/1 var(--font-sans); }
-        .me-card { display: flex; align-items: center; gap: 16px; padding: 20px; }
+        .settings-note { margin: 0; }
+        .settings-links { display: flex; gap: 1.25rem; font:600 0.8125rem/1 var(--font-sans); }
+        /* Straight on the page backdrop, so the strong muted ink (4.5:1 there), not the card muted. */
+        .settings-links a { color: var(--muted-strong); }
+        .me-card { display: flex; align-items: center; gap: 1rem; }
         .me-avatar { display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 auto; border-radius:50%; background: var(--meter); color: var(--on-meter); font:600 1.25rem/1 var(--font-sans); }
         .me-names { display: grid; gap: 2px; flex: 1; min-width: 0; }
         .me-names > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .me-names strong { font:600 1.25rem/1.15 var(--font-sans); }
-        .billing-current-plan { display: grid; gap: 12px; padding: 20px; margin-bottom: 16px; }
+        .billing-current-plan { margin-bottom: 1rem; }
         .plan-badge { justify-self: start; padding: 6px 14px; border-radius:var(--r-pill); background: var(--card-sunk); font-weight:600; }
         .plan-badge[data-plan="plus"] { color: var(--meter-ink); }
         .plan-usage { display: grid; gap: 10px; }
@@ -464,7 +460,7 @@ export default function SettingsPage() {
         .plan-warning { color: var(--error); font-weight:600; }
         .billing-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
         @media (max-width: 1100px) and (min-width: 768px) { .billing-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-        .plan-card { display: grid; gap: 12px; align-content: start; min-width: 0; padding: 24px; }
+        .plan-card { align-content: start; }
         .plan-card-current { box-shadow: 0 0 0 2px var(--meter); }
         .plan-price { font:600 1.75rem/1 var(--font-sans); }
         .plan-price span { font-size: 0.9375rem; font-weight:500; }
@@ -472,8 +468,10 @@ export default function SettingsPage() {
         .plan-features li { display: flex; gap: 8px; align-items: flex-start; }
         .plan-features :global(.lucide) { color: var(--meter-ink); margin-top: 2px; }
         .plan-current-label { color: var(--meter-ink); font-weight:600; }
-        .plan-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        @media (max-width: 767px) { .billing-plans { grid-template-columns: 1fr; } .me-card { flex-wrap: wrap; } .me-names { flex: 1 1 0; min-width: 0; } .me-card > :global(.c-btn) { width: 100%; } .settings-row > :global(.c-btn) { width: 100%; } }
+        .plan-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+        /* A long plan name at Larger text wraps inside the card instead of running into its padding. */
+        .plan-actions :global(.c-btn) { min-width: 0; max-width: 100%; height: auto; padding-block: 0.75rem; white-space: normal; text-align: center; line-height: 1.25; }
+        @media (max-width: 767px) { .billing-plans { grid-template-columns: 1fr; } .me-card { flex-wrap: wrap; } .me-names { flex: 1 1 0; min-width: 0; } .me-card > :global(.c-btn) { width: 100%; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </>

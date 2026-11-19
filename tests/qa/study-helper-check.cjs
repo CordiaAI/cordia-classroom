@@ -63,6 +63,32 @@ async function finishRound(page) {
   throw new Error('the check-in round never finished');
 }
 
+
+// Contrast of an element's first text line against the pixels right around it (the real backdrop, glass included).
+async function contrast(page, selector) {
+  const el = page.locator(selector).first();
+  await el.scrollIntoViewIfNeeded();
+  const tr = await el.evaluate(node => {
+    const range = document.createRange(); range.selectNodeContents(node.firstChild); const b = range.getBoundingClientRect();
+    return { x: b.x, y: b.y, w: b.width, h: b.height, color: getComputedStyle(node).color };
+  });
+  const shot = await page.screenshot();
+  return page.evaluate(async ({ b64, tr }) => {
+    const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
+    const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
+    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
+    const lum = rgb => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]); };
+    const fg = tr.color.match(/[\d.]+/g).map(Number); const alpha = fg[3] ?? 1; const ratios = [];
+    for (let x = tr.x; x < tr.x + tr.w; x += 6) for (const y of [tr.y - 1, tr.y + tr.h + 1]) {
+      const bg = Array.from(ctx.getImageData(Math.round(x * devicePixelRatio), Math.round(y * devicePixelRatio), 1, 1).data).slice(0, 3);
+      const mixed = fg.slice(0, 3).map((v, i) => v * alpha + bg[i] * (1 - alpha));
+      const [hi, lo] = [lum(mixed), lum(bg)].sort((a, b) => b - a); ratios.push((hi + 0.05) / (lo + 0.05));
+    }
+    ratios.sort((a, b) => a - b);
+    return { min: +ratios[0].toFixed(2), median: +ratios[Math.floor(ratios.length / 2)].toFixed(2) };
+  }, { b64: shot.toString('base64'), tr });
+}
+
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
@@ -160,6 +186,91 @@ async function finishRound(page) {
     expect(await build.getAttribute('aria-disabled') === 'true', 'the button is not marked as working');
     await page.screenshot({ path: path.join(OUT, 'home-canvas-building-light.png') });
     await page.waitForURL(new RegExp(`/learn/${GUIDE}\\?test=${day(6)}&checkin=1`), { timeout: 90000 });
+    await context.close();
+  });
+
+  // F6b: the check-in end at both widths and in both schemes; status lines on the card at 4.5:1; 44px tap
+  // targets at 390; the working mark still shows with reduced motion.
+  for (const [width, height] of [[1440, 900], [390, 844]]) {
+    for (const scheme of ['light', 'dark']) {
+      for (const fail of [false, true]) {
+        await check(`${scheme} @${width}: check-in end (${fail ? 'not sent' : 'sent'}) reads at 4.5:1 on the card`, async () => {
+          const context = await browser.newContext({ viewport: { width, height }, colorScheme: scheme });
+          const state = createState(true);
+          state.chatReply = planReply;
+          state.failCheckin = fail;
+          await install(context, state);
+          const page = await context.newPage();
+          await page.goto(BASE + '/login');
+          await page.evaluate(([token, user, theme]) => { localStorage.setItem('authToken', token); localStorage.setItem('userId', user); localStorage.setItem('refreshToken', 'r'); localStorage.setItem('theme', theme); }, [TOKEN, USER, scheme]);
+          if (!fail) {
+            await page.goto(BASE + '/home');
+            const box = page.locator('textarea').first();
+            await box.waitFor({ timeout: 30000 });
+            await box.fill('I need to study for my bio test in 5 days');
+            await box.press('Enter');
+            await page.locator('.plan-actions').waitFor({ timeout: 15000 });
+            await page.waitForTimeout(400);
+            await page.screenshot({ path: path.join(OUT, `plan-${scheme}-${width}.png`) });
+            if (width === 390) {
+              for (const target of await page.locator('.plan-actions .plan-btn').all()) {
+                const box = await target.boundingBox();
+                expect(box.height >= 44, `plan button is ${box.height}px tall at 390`);
+              }
+            }
+          }
+          await page.goto(BASE + `/learn/${GUIDE}?test=${TEST_DATE}&checkin=1`);
+          await page.locator('text=Check-in quiz: one short round').waitFor({ timeout: 90000 });
+          await finishRound(page);
+          await page.locator(fail ? "text=The Tutor didn't get your score" : 'text=Your Tutor has your next steps').waitFor({ timeout: 10000 });
+          await page.waitForTimeout(500);
+          expect(await page.locator('.learn-panel .learn-checkin-status').count() === 1, 'the status line is not on the card');
+          const ratio = await contrast(page, '.learn-checkin-status');
+          console.log(`     contrast ${JSON.stringify(ratio)}`);
+          expect(ratio.min >= 4.5, `status line contrast ${ratio.min}`);
+          if (fail && width === 390) {
+            const again = await page.locator('button:has-text("Send it again")').boundingBox();
+            expect(again.height >= 44, `"Send it again" is ${again.height}px tall at 390`);
+          }
+          await page.screenshot({ path: path.join(OUT, `checkin-end-${fail ? 'failed' : 'sent'}-${scheme}-${width}.png`), fullPage: width === 390 });
+          await context.close();
+        });
+      }
+    }
+  }
+  await check('reduced motion: a working plan button still shows its mark', async () => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'light', reducedMotion: 'reduce' });
+    const state = createState(true);
+    state.chatReply = () => ({ action: 'study_plan', answer: "Let's get you ready for Midterm in 6 days.",
+      study_plan: { guide: null, test_date: day(6), exam: { key: 'canvas-77', title: 'Midterm' }, actions: [{ kind: 'canvas_review', label: 'Build it from Canvas', item_key: 'canvas-77' }] } });
+    await install(context, state);
+    await context.route(/localhost:8000\/plans\/canvas-77\/review-set$/, async route => { await new Promise(resolve => setTimeout(resolve, 2000)); route.fulfill({ status: 502, json: { detail: 'Canvas is not answering.' } }); });
+    const page = await context.newPage();
+    await page.goto(BASE + '/login');
+    await page.evaluate(([token, user]) => { localStorage.setItem('authToken', token); localStorage.setItem('userId', user); localStorage.setItem('refreshToken', 'r'); localStorage.setItem('theme', 'light'); }, [TOKEN, USER]);
+    await page.goto(BASE + '/home');
+    const box = page.locator('textarea').first();
+    await box.waitFor({ timeout: 30000 });
+    await box.fill('help me prep for the midterm');
+    await box.press('Enter');
+    const build = page.locator('.plan-actions button:has-text("Build it from Canvas")');
+    await build.waitFor({ timeout: 15000 });
+    // When the mark appears, measured in the page from the press.
+    await build.evaluate(node => {
+      window.__markAt = null;
+      node.addEventListener('click', () => { window.__pressAt = performance.now(); }, { capture: true, once: true });
+      new MutationObserver(() => { if (node.classList.contains('is-marked') && window.__markAt === null) window.__markAt = performance.now(); })
+        .observe(node, { attributes: true, attributeFilter: ['class'] });
+    });
+    await build.click();
+    await page.waitForTimeout(700);
+    const after = await page.evaluate(() => Math.round(window.__markAt - window.__pressAt));
+    console.log(`     mark shown ${after}ms after the press`);
+    expect(after >= 290 && after < 600, `the mark showed ${after}ms after the press`);
+    const seen = await build.evaluate(node => ({ face: getComputedStyle(node.querySelector('.plan-face')).visibility, mark: getComputedStyle(node.querySelector('.plan-spinner')).opacity }));
+    expect(seen.face === 'hidden' && seen.mark === '1', `with reduced motion the mark is ${JSON.stringify(seen)}`);
+    await page.screenshot({ path: path.join(OUT, 'plan-working-reduced-motion.png') });
+    await page.locator('text=Canvas is not answering.').waitFor({ timeout: 10000 });
     await context.close();
   });
   await browser.close();

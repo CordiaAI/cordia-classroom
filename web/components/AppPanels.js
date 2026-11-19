@@ -160,7 +160,7 @@ export function SlackPanel() {
       )}
       {picking ? (
         <>
-          <label className="cn-search">
+          <label className="c-search">
             <Search size={20} strokeWidth={1.75} aria-hidden="true" />
             <input className="c-input" type="search" autoFocus placeholder="Search channels" aria-label="Search Slack channels" value={query} onChange={event => setQuery(event.target.value)} />
           </label>
