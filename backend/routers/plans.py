@@ -108,9 +108,13 @@ def make_plan(user_id: str, item: dict) -> dict:
     return _plan(user_id, item["id"])
 
 
-def _zone(user_id: str, time_zone: Optional[str]) -> "planner.ZoneInfo":
+# With no zone to go on, the last place on Earth a day ends: a move that's in time anywhere is kept.
+LATEST_ZONE = "Etc/GMT+12"
+
+
+def _zone(user_id: str, time_zone: Optional[str], unknown: str = "UTC") -> "planner.ZoneInfo":
     """The browser's zone when it names a real one; else the zone saved when sync was turned on; else
-    UTC. A zone that isn't real with none saved is refused rather than read as UTC."""
+    `unknown` (UTC). A zone that isn't real with none saved is refused rather than guessed."""
     if time_zone and google_sync.zone_of(time_zone).key == time_zone:
         return google_sync.zone_of(time_zone)
     for app in SYNC_APPS:
@@ -119,7 +123,7 @@ def _zone(user_id: str, time_zone: Optional[str]) -> "planner.ZoneInfo":
             return google_sync.zone_of(saved)
     if time_zone:
         raise HTTPException(status_code=400, detail="Unknown time zone. Reload the page and try again.")
-    return google_sync.zone_of("UTC")
+    return google_sync.zone_of(unknown)
 
 
 def _busy(user_id: str, start: datetime, end: datetime) -> list:
@@ -439,7 +443,7 @@ def move_block(block_id: str, body: BlockTimes, request: Request, authorization:
     if not found:
         raise HTTPException(status_code=404, detail="That study time isn't on your calendar anymore.")
     item = next((i for i in calendar_for(user_id).get("items") or [] if i["id"] == found[0]["item_key"]), None)
-    _before_deadline(end, item, _zone(user_id, body.time_zone))
+    _before_deadline(end, item, _zone(user_id, body.time_zone, unknown=LATEST_ZONE))
     status = "done" if found[0].get("status") == "done" else "moved"
     # Still not removed: a Google sync may have taken it off since the read above.
     rows = db.table("study_blocks").update({"starts_at": start.isoformat(), "ends_at": end.isoformat(), "status": status,

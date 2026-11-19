@@ -79,7 +79,7 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
                       onClick={() => pick(day)} onKeyDown={event => onKeyDown(event, day)}>
                       <span className="mo-top" aria-hidden="true">
                         <span className="mo-num">{day.getDate()}</span>
-                        {cell.study > 0 && <span className="mo-study"><StudyIcon size={14} />{cell.study}<span className="mo-study-word">study</span></span>}
+                        {cell.study > 0 && <span className="mo-study"><StudyIcon size={14} /><span>{cell.study}</span><span>study</span></span>}
                       </span>
                       <span className="mo-chips" aria-hidden="true">
                         {cell.due.map(entry => (
@@ -179,10 +179,11 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
         .mo-top { display: flex; align-items: center; justify-content: space-between; gap: 0.25rem; min-width: 0; }
         .mo-num { font: 600 1rem/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .mo-cell.is-today .mo-num { color: var(--olive-ink); }
-        .mo-study { display: inline-flex; align-items: center; gap: 0.25rem; min-width: 0; overflow: hidden; color: var(--muted); font: 500 0.8125rem/1 var(--font-sans); white-space: nowrap; }
-        /* "2 study" while the word fits beside the date; else the count alone (the cell's label says it). */
-        @container (max-width: 6rem) { .mo-study-word { display: none; } }
-        @container (max-width: 3.5rem) { .mo-study :global(.lucide) { display: none; } }
+        /* "2 study" while the word fits beside the date. When it doesn't, the word wraps onto a second
+           line that is clipped away, so the count stands alone (the cell's label says it in full):
+           never a word cut off at the edge, at any width or text size. */
+        .mo-study { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; column-gap: 0.25rem; min-width: 0; height: 0.875rem; overflow: hidden; color: var(--muted); font: 500 0.8125rem/1 var(--font-sans); white-space: nowrap; }
+        @container (max-width: 3rem) { .mo-study :global(.lucide) { display: none; } } /* room for the count alone */
         .mo-chips { display: grid; gap: 0.25rem; min-width: 0; }
         .mo-chip { display: flex; align-items: center; gap: 0.25rem; min-width: 0; min-height: 1.5rem; padding: 0.125rem 0.375rem; border-radius: 0.5rem; background: color-mix(in srgb, var(--tone, var(--glass-inner)) 78%, transparent); font: 600 0.8125rem/1.2 var(--font-sans); }
         .mo-chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

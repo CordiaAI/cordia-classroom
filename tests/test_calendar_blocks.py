@@ -230,6 +230,10 @@ class CalendarBlockRoutes(BlockRoutesSetup):
         self.assertEqual(datetime.fromisoformat(self.block(B1)["starts_at"]), evening)
         # A zone that isn't real, with none saved, is refused like an add.
         self.assertEqual(move(evening, time_zone="Not/AZone").status_code, 400)
+        # No zone at all (a page from before this round), none saved: a move in time anywhere on
+        # Earth is allowed; one after the day has ended everywhere is still refused.
+        self.assertEqual(move(evening - timedelta(hours=1)).status_code, 200)
+        self.assertEqual(move(evening + timedelta(days=1)).status_code, 409)
 
     def test_no_block_starts_or_moves_past_its_deadline(self):
         _friday, due, items = self.friday_due(15)
