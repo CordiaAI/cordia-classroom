@@ -14,12 +14,14 @@
 import json
 import os
 import random
+import re
 import sys
 import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "backend"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # fake_supabase
 os.environ.setdefault("RETAIN_SIGNING_KEY", "test-only-key")
 
 from routers import quiz  # noqa: E402
@@ -460,6 +462,476 @@ class SharedWordPartTests(unittest.TestCase):
                                               "Romanesque, Gothic, Renaissance, and Baroque"), [])
         self.assertEqual(retain.missing_parts("An offer met by acceptance with consideration seals it.",
                                               "Offer, acceptance, and consideration"), [])
+
+
+# === Second review of PR 281 ======================================================================
+
+from services import text_processing as tp  # noqa: E402
+from services.text_processing import clean_text  # noqa: E402
+
+# --- High 1: a value or year line stays where it is, and is never dropped ----------------------------
+
+# Every subject, both orders: an entry then its year, and a year then its entry. Joining a year to
+# the line after it pins it to the wrong entry in the first order; keeping each line in place is
+# right in both.
+TIMELINES = {
+    "art history": ["The Starry Night", "1889", "Cafe Terrace at Night", "1888", "Sunflowers", "1887"],
+    "history": ["Declaration of Independence", "1776", "Constitution signed", "1787"],
+    "business law": ["Marbury v. Madison", "1803", "McCulloch v. Maryland", "1819"],
+    "literature": ["The Bluest Eye", "1970", "Sula", "1973", "Beloved", "1987"],
+    "nursing": ["Nightingale Training School opens", "1860", "International Council of Nurses founded", "1899"],
+    "computer science": ["ARPANET sends its first message", "1969", "World Wide Web proposed", "1989"],
+}
+
+
+def year_first(lines):
+    """The same timeline written year first ("1889" / "The Starry Night")."""
+    out = []
+    for at in range(0, len(lines), 2):
+        out += [lines[at + 1], lines[at]]
+    return out
+
+
+def slide_lines(text):
+    slides = extract_slideshow_content(text)
+    return [(slide["title"], slide["content"]) for slide in slides]
+
+
+class ValueLinesStayTests(unittest.TestCase):
+    def test_no_year_is_attached_to_another_entry_in_any_subject_or_order(self):
+        for subject, lines in TIMELINES.items():
+            for order, ordered in (("entry then year", lines), ("year then entry", year_first(lines))):
+                with self.subTest(subject=subject, order=order):
+                    self.assertEqual(clean_text("\n".join(ordered)).split("\n"), ordered)
+                    slides = slide_lines("--- Slide 1 ---\nTimeline\n" + "\n".join(ordered))
+                    self.assertEqual(slides, [("Timeline", ordered)])
+
+    def test_the_reviewers_captures(self):
+        # A page number under a heading stays a line of its own, never "Contraindications: 14".
+        self.assertEqual(clean_text("--- Page 3 ---\nContraindications:\n14\nSevere hepatic impairment and known hypersensitivity").split("\n"),
+                         ["--- Page 3 ---", "Contraindications:", "14", "Severe hepatic impairment and known hypersensitivity"])
+        self.assertEqual(clean_text("Company profile\nFounded\n1998\nHeadquarters\nSeattle, Washington\nEmployees\n12,000").split("\n"),
+                         ["Company profile", "Founded", "1998", "Headquarters", "Seattle, Washington", "Employees", "12,000"])
+        self.assertEqual(clean_text("Steps:\n1.\nInitialize the array\n2.\nSort it").split("\n"),
+                         ["Steps:", "1.", "Initialize the array", "2.", "Sort it"])
+        self.assertEqual(clean_text("Statute of limitations for written contracts (years):\n6\nin most states").split("\n"),
+                         ["Statute of limitations for written contracts (years):", "6", "in most states"])
+
+    def test_slides_never_merge(self):
+        text = ("Slide 1\nRevolution\nStorming of the Bastille\n1789\nSlide 2\nTerror\nRobespierre's Committee of Public Safety")
+        self.assertEqual(slide_lines(text), [("Revolution", ["Storming of the Bastille", "1789"]),
+                                             ("Terror", ["Robespierre's Committee of Public Safety"])])
+        self.assertEqual(slide_lines("--- Slide 1 ---\nDates\nThe Bastille falls\n1789\n--- Slide 2 ---\nTerror\nThe Committee forms"),
+                         [("Dates", ["The Bastille falls", "1789"]), ("Terror", ["The Committee forms"])])
+
+    def test_references_after_a_year_are_still_stripped(self):
+        text = ("Overview\nThe Treaty of Westphalia ended the Thirty Years' War in Europe.\n1648\nReferences\n"
+                "Smith, J. (2001). Peace of Westphalia. Oxford.")
+        self.assertEqual(clean_text(text).split("\n"),
+                         ["Overview", "The Treaty of Westphalia ended the Thirty Years' War in Europe.", "1648"])
+
+    def test_unlabelled_values_are_kept(self):
+        self.assertEqual(clean_text("Apgar score at 1 minute\n7\nindicates mild distress").split("\n"),
+                         ["Apgar score at 1 minute", "7", "indicates mild distress"])
+        self.assertEqual(clean_text("Lines in a Shakespearean sonnet\n14\nthree quatrains and a couplet").split("\n"),
+                         ["Lines in a Shakespearean sonnet", "14", "three quatrains and a couplet"])
+
+    def test_the_facts_table_survives_clean_text_and_slideshow_extraction(self):
+        for label, (text, kept) in FACTS.items():
+            with self.subTest(fact=label):
+                cleaned = clean_text(text)
+                slides = extract_slideshow_content("--- Slide 1 ---\nFacts\n" + text)
+                content = "\n" + "\n".join(line for slide in slides for line in [slide["title"], *slide["content"]]) + "\n"
+                for fact in kept:
+                    self.assertIn(fact, cleaned, f"clean_text: {cleaned!r}")
+                    self.assertIn(fact, content, f"slides: {content!r}")
+
+    def test_labelled_markers_and_navigation_are_still_dropped(self):
+        self.assertEqual(clean_text("Mitosis\nProphase begins\nNext\n- 4 -\n\u2022"), "Mitosis\nProphase begins")
+
+
+# --- High 2: one verb list for "As <verb> in <source>" --------------------------------------------------
+
+VERBS = ["stated", "described", "shown", "explained", "noted", "defined", "outlined", "discussed", "listed", "seen",
+         "mentioned", "presented", "covered", "taught", "introduced", "reviewed", "highlighted", "illustrated",
+         "summarized", "summarised", "emphasized", "identified", "addressed", "examined", "explored", "learned",
+         "studied", "depicted", "featured"]
+VERB_SOURCES = ["the lecture", "Chapter 3", "the reading", "this module", "the slides"]
+VERB_SUBJECTS = {"nursing": "what is the antidote for heparin?", "art history": "who painted Las Meninas?",
+                 "business law": "what is promissory estoppel?", "literature": "who narrates Beloved?",
+                 "computer science": "what is a hash collision?"}
+
+
+class VerbMatrixTests(unittest.TestCase):
+    def test_every_coverage_verb_frames_an_attribution_leading_and_trailing(self):
+        wrong = []
+        for verb in VERBS:
+            for source in VERB_SOURCES:
+                for subject, rest in VERB_SUBJECTS.items():
+                    expected = rest[0].upper() + rest[1:]
+                    for asked in (f"As {verb} in {source}, {rest}", f"{expected[:-1]}, as {verb} in {source}?"):
+                        got = standalone_question(asked)
+                        if got != expected:
+                            wrong.append((asked, got))
+        self.assertEqual(wrong, [])
+
+    def test_one_verb_list(self):
+        self.assertIn(tp._COVERAGE_VERB, tp._FRAMING)
+
+
+# --- Medium 8 and 9, and the reviewer's fresh cases ----------------------------------------------------
+
+FRESH = [
+    # nursing
+    ("As reviewed in the lecture, what is the antidote for heparin?", "What is the antidote for heparin?"),
+    ("In anaphylaxis, which drug is given first?", "KEEP"),
+    ("Per the module, what is the first-line treatment for hypoglycemia in a conscious client?",
+     "What is the first-line treatment for hypoglycemia in a conscious client?"),
+    ("The nurse reviews the client's chart. Which lab value is listed first as abnormal?", "KEEP"),
+    ("Which medication on the client's medication list should the nurse question?", "KEEP"),
+    ("What does the instructor recommend for preventing falls?", None),
+    # art history
+    ("According to the slides, who painted Las Meninas?", "Who painted Las Meninas?"),
+    ("Which painting is shown on this slide?", None),
+    ("What does the figure in the foreground of Las Meninas represent?", "KEEP"),
+    ("In the image of the Parthenon, which order are the columns?", None),
+    # business law
+    ("In the Bill of Rights, which freedom is listed first?", "KEEP"),
+    ("Under the UCC, what is the perfect tender rule?", "KEEP"),
+    ("As defined in the reading, what is a fiduciary duty?", "What is a fiduciary duty?"),
+    ("Based on the graph, what is the equilibrium price?", None),
+    ("What does the table of contents of the Restatement cover?", "KEEP"),
+    ("In Maslow's hierarchy, which need is listed first?", "KEEP"),
+    # literature
+    ("What does the speaker of the poem compare love to?", "KEEP"),
+    ("In the excerpt, what does Gatsby's smile reveal?", "What does Gatsby's smile reveal?"),
+    ("Which line of the sonnet contains the volta?", "KEEP"),
+    ("As discussed in class, what is free indirect discourse?", "What is free indirect discourse?"),
+    # computer science
+    ("What is the time complexity of inserting into a hash table?", "KEEP"),
+    ("In the periodic table, which element is listed first?", "KEEP"),
+    ("Which element of the list is returned by pop()?", "KEEP"),
+    ("What does the professor's example of recursion compute?", None),
+    ("As shown in the diagram, what is the root of the tree?", None),
+    ("What is the page table entry used for?", "KEEP"),
+    # source-only once the attribution is gone
+    ("According to the lecture, what are the four steps?", None),
+    ("Per the slides, what is the third example?", None),
+    ("What is the key takeaway, as stated in the module?", None),
+]
+
+# A stripped attribution that names a picture, chart or table: the question needs it, so it is hidden.
+VISUAL = [
+    "Based on the graph, what is the equilibrium price?",
+    "As shown in the diagram, what is the root of the tree?",
+    "According to Figure 2, which chamber pumps blood to the lungs?",
+    "According to Table 3, what is the normal serum sodium range?",
+    "Based on the map, which river formed the border?",
+    "As depicted in the image, which order are the columns?",
+    "What is the equilibrium price, based on the chart above?",
+    "In this photo, which architectural style is shown?",
+    "In the image of the Parthenon, which order are the columns?",
+    "In the diagram of the heart, which valve is labelled B?",
+]
+# Not a picture: subject terms and a patient's chart.
+NOT_VISUAL = [
+    "According to the chart, what was the client's last blood pressure?",
+    "In the graph of y = x^2, where is the vertex?",
+    "What is the figure of speech in 'the wind whispered'?",
+    "In the periodic table, which element is listed first?",
+    "What does a Gantt chart show?",
+]
+
+
+class SecondReviewQuestionTests(unittest.TestCase):
+    def test_the_reviewers_fresh_cases(self):
+        for question, want in FRESH:
+            with self.subTest(question=question):
+                got = standalone_question(question)
+                self.assertEqual(got, question if want == "KEEP" else want)
+
+    def test_listed_first_in_a_named_subject_is_asked_as_written(self):
+        for question in ("In the Bill of Rights, which freedom is listed first?", "In Maslow's hierarchy, which need is listed first?",
+                         "In the periodic table, which element is listed first?", "Under the UCC, which remedy is listed first?"):
+            self.assertEqual(standalone_question(question), question)
+        for question in ("Which drug is listed first?", "In the lecture, which drug is listed first?",
+                         "Which artist is named first, according to the slides?"):
+            self.assertIsNone(standalone_question(question), question)
+
+    def test_a_visual_attribution_is_hidden_not_rewritten(self):
+        for question in VISUAL:
+            self.assertIsNone(standalone_question(question), question)
+        for question in NOT_VISUAL:
+            self.assertEqual(standalone_question(question), question)
+
+    def test_every_case_is_stable(self):
+        for question, _ in FRESH:
+            once = standalone_question(question)
+            if once is not None:
+                self.assertEqual(standalone_question(once), once, question)
+
+
+# --- High 3: every route that returns quiz_questions sends shown / hidden ----------------------------
+
+RAW_QUIZ = [
+    {"question": "Which artists are listed for Chapter 1?", "options": ["Giotto, Cimabue", "B b", "C c", "D d"], "correct_index": 0},
+    {"question": "According to Slide 5, what is the normal serum potassium range?",
+     "options": ["3.5-5.0 mEq/L", "2.0-3.0 mEq/L", "5.5-7.0 mEq/L", "1.0-2.5 mEq/L"], "correct_index": 0},
+    {"question": "Who painted the Mona Lisa?", "options": ["Leonardo da Vinci", "Raphael", "Titian", "Giotto"], "correct_index": 0},
+]
+
+
+def assert_shown(test, questions, where):
+    test.assertEqual([q["question"] for q in questions], [q["question"] for q in RAW_QUIZ], f"{where}: saved text kept")
+    test.assertTrue(questions[0].get("hidden"), f"{where}: about the source")
+    test.assertEqual(questions[1].get("shown"), "What is the normal serum potassium range?", where)
+    test.assertNotIn("hidden", questions[2], where)
+    test.assertNotIn("shown", questions[2], where)
+
+
+def quiz_lists(value, found):
+    """Every quiz_questions list anywhere in a JSON response."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key == "quiz_questions" and isinstance(item, list):
+                found.append(item)
+            else:
+                quiz_lists(item, found)
+    elif isinstance(value, list):
+        for item in value:
+            quiz_lists(item, found)
+    return found
+
+
+class EveryRouteShowsTests(unittest.TestCase):
+    USER = "00000000-0000-4000-8000-000000000001"
+    GUIDE = "10000000-0000-4000-8000-000000000001"
+    JOB = "30000000-0000-4000-8000-000000000001"
+
+    def setUp(self):
+        from fastapi.testclient import TestClient
+        import main
+        from fake_supabase import FakeDB, route_patches
+        os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
+        self.db = FakeDB()
+        self.db.rows("study_guides").append({
+            "id": self.GUIDE, "user_id": self.USER, "title": "Electrolytes", "folder_id": None, "notes": "",
+            "study_guide": GUIDE_TEXT, "flashcards": [], "flashcard_progress": {}, "quiz_questions": [dict(q) for q in RAW_QUIZ],
+            "created_at": "2026-11-01T00:00:00Z", "is_bookmarked": False, "print_items": None})
+        self.db.rows("generation_jobs").append({"id": self.JOB, "user_id": self.USER, "status": "done", "study_set_id": self.GUIDE})
+        self.patches = route_patches(["guides", "jobs", "quiz"], lambda header: self.USER, self.db)
+        for item in self.patches:
+            item.start()
+        self.client = TestClient(main.app, raise_server_exceptions=True)
+
+    def tearDown(self):
+        for item in self.patches:
+            item.stop()
+
+    def test_the_guide_routes_send_the_quiz_as_shown(self):
+        calls = {
+            "GET /guides": lambda: self.client.get("/guides", headers={"Authorization": "Bearer t"}),
+            "GET /guides/{id}": lambda: self.client.get(f"/guides/{self.GUIDE}", headers={"Authorization": "Bearer t"}),
+            "PATCH /guides/{id}": lambda: self.client.patch(f"/guides/{self.GUIDE}", json={"title": "Electrolytes"},
+                                                            headers={"Authorization": "Bearer t"}),
+            "GET /study-set-jobs/{id}": lambda: self.client.get(f"/study-set-jobs/{self.JOB}", headers={"Authorization": "Bearer t"}),
+        }
+        for route, call in calls.items():
+            with self.subTest(route=route):
+                response = call()
+                self.assertEqual(response.status_code, 200, response.text)
+                found = quiz_lists(response.json(), [])
+                self.assertEqual(len(found), 1, f"{route} returns the quiz once")
+                assert_shown(self, found[0], route)
+        self.assertEqual(self.db.rows("study_guides")[0]["quiz_questions"], RAW_QUIZ, "the saved quiz is never rewritten")
+
+    def test_no_route_returns_a_guide_row_without_the_serializer(self):
+        """A route that reads quiz_questions (or a whole study_guides row) either shows it with
+        shown_guide / shown_questions or is listed here as never returning it."""
+        import ast
+        internal = {
+            ("guides.py", "_follow_ideas"), ("guide_sharing.py", "copy_guide"), ("guide_sharing.py", "ask_guide"),
+            ("quiz.py", "_load_quiz"), ("quiz.py", "_saved_questions"), ("quiz.py", "_save_quiz"), ("stats.py", "_student_results"),
+            ("study.py", "quiz_questions"),
+        }
+        routers = os.path.join(os.path.dirname(os.path.dirname(__file__)), "backend", "routers")
+        unshown = []
+        for name in sorted(os.listdir(routers)):
+            if not name.endswith(".py"):
+                continue
+            source = open(os.path.join(routers, name)).read()
+            for node in ast.walk(ast.parse(source)):
+                if not isinstance(node, ast.FunctionDef):
+                    continue
+                body = ast.get_source_segment(source, node) or ""
+                reads = "quiz_questions" in body or re.search(r'study_guides"\)\s*\\?\s*\.select\("\*"\)', body)
+                if reads and "shown_" not in body and (name, node.name) not in internal:
+                    unshown.append(f"{name}:{node.name}")
+        self.assertEqual(unshown, [])
+
+
+# --- High 4 (the owner's must-fix) is in web/tests/question-display.test.mjs; Medium 5: print ---------
+
+PRINT_GUIDE = "\n".join(f"Q{i}: {q}\nA{i}: {a}" for i, (q, a) in enumerate([
+    ("Which artists are listed for Chapter 1?", "Giotto, Cimabue and Duccio"),
+    ("What is chiaroscuro?", "Chiaroscuro is the strong contrast between light and dark used to model form in painting."),
+    ("According to the slides, what is impasto?", "Impasto is paint laid on so thickly that brush or knife marks stay visible on the surface."),
+    ("Why did Renaissance painters adopt linear perspective?",
+     "It let them build a convincing illusion of depth on a flat surface using a single vanishing point and orthogonals."),
+    ("Who painted the Mona Lisa?", "Leonardo da Vinci"),
+], 1))
+
+
+class PrintSourcesTests(unittest.TestCase):
+    def printed(self, fill=False, cached=None, generated=None, guide=PRINT_GUIDE):
+        pairs = quiz._parse_qa_pairs(guide)
+        saved = [{"question": p["question"], "options": [p["answer"], "x1 y1 z1", "x2 y2 z2", "x3 y3 z3"], "correct_index": 0,
+                  "choices_v": 2} for p in pairs]
+        row = {"title": "t", "folder_id": None, "study_guide": guide, "print_items": cached}
+        chat = MagicMock(return_value=reply(json.dumps({"items": generated or []})))
+        require, record = MagicMock(), MagicMock()
+        with patch.object(quiz, "get_supabase", return_value=MagicMock()), patch.object(quiz, "get_user_id", return_value="u1"), \
+                patch.object(quiz, "_guide_columns", return_value=row), patch.object(quiz, "_load_quiz", return_value=(saved, True)), \
+                patch.object(quiz, "remaining", return_value=5), patch.object(quiz, "require", require), \
+                patch.object(quiz, "record", record), patch.object(quiz, "chat", chat), \
+                patch.object(quiz, "get_openai_client", return_value=None):
+            out = quiz.printable_items(GUIDE_ID, SimpleNamespace(fill=fill), authorization="Bearer t")
+        return out, pairs, chat, record
+
+    def test_every_type_uses_the_saved_pair_index(self):
+        out, pairs, _, _ = self.printed()
+        for kind in ("mc", "matching", "short"):
+            for item in out[kind]:
+                text = item.get("question") or item.get("term")
+                pair = pairs[item["source"]]["question"]
+                self.assertIn(normalize_words(text), normalize_words(standalone_question(pair) or ""), f"{kind}: {item}")
+        sources = [item["source"] for kind in ("mc", "matching", "short") for item in out[kind]]
+        self.assertNotIn(0, sources, "a question about the source is not printed")
+        self.assertIn(2, [item["source"] for item in out["matching"]], "impasto is matched at its own index")
+        self.assertEqual([item["question"] for item in out["mc"] if item["source"] == 2], ["What is impasto?"])
+
+    def test_fill_in_is_built_and_cached_without_hidden_pairs(self):
+        generated = [{"id": n, "sentence": s} for n, s in enumerate([
+            "[[Giotto]] painted for Chapter 1.", "[[Chiaroscuro]] is the strong contrast between light and dark.",
+            "[[Impasto]] is paint laid on thickly.", "Painters used a single [[vanishing point]].", "[[Leonardo da Vinci]] painted it."])]
+        out, pairs, chat, record = self.printed(fill=True, generated=generated)
+        prompt = chat.call_args.kwargs["messages"][1]["content"]
+        self.assertNotIn("Chapter 1", prompt)
+        self.assertNotIn("According to the slides", prompt)
+        self.assertTrue(all(item["source"] != 0 for item in out["fill"]))
+        record.assert_called_once()
+        # A cache written before the source question was hidden is filtered as it is served.
+        cache = {"v": 1, "source": __import__("services.print_items", fromlist=["x"]).source_hash(pairs),
+                 "fill": [{"id": "f0", "source": 0, "parts": [{"blank": "Giotto"}], "blanks": ["Giotto"], "points": 1}]}
+        out, _, chat, record = self.printed(fill=True, cached=cache)
+        self.assertEqual(out["fill"], [])
+        chat.assert_not_called()
+        record.assert_not_called()
+
+    def test_nothing_is_charged_when_only_hidden_pairs_could_be_filled(self):
+        long = "It let painters build a convincing illusion of depth on a flat surface, with every line of the floor, the walls " \
+               "and the ceiling running to one vanishing point placed at the eye level of a viewer standing in front of it."
+        guide = (f"Q1: Which artists are listed for Chapter 1?\nA1: Giotto\nQ2: Why did painters adopt linear perspective?\nA2: {long}\n"
+                 f"Q3: How did linear perspective change altarpieces?\nA3: {long}")
+        out, _, chat, record = self.printed(fill=True, guide=guide)
+        self.assertEqual(out["fill"], [])
+        self.assertEqual(out["fill_possible"], 0)
+        chat.assert_not_called()
+        record.assert_not_called()
+
+
+def normalize_words(text):
+    return " ".join(re.findall(r"[a-z0-9]+", str(text).lower()))
+
+
+# --- Low 13: refreshing choices is not charged for hidden questions ----------------------------------
+
+class RefreshHiddenTests(unittest.TestCase):
+    def test_hidden_only_flags_cost_nothing(self):
+        questions = [
+            # Its wrong choice is another question's answer, but the question is never asked.
+            {"question": "Which artists are listed for Chapter 1?", "options": ["Giotto", "Leonardo da Vinci", "C c", "D d"], "correct_index": 0},
+            {"question": "Who painted the Mona Lisa?", "options": ["Leonardo da Vinci", "Raphael", "Titian", "Michelangelo"], "correct_index": 0},
+        ]
+        require, record, top_up = MagicMock(), MagicMock(), MagicMock(return_value=[])
+        with patch.object(quiz, "get_supabase", return_value=MagicMock()), patch.object(quiz, "get_user_id", return_value="u1"), \
+                patch.object(quiz, "_saved_questions", return_value=questions), patch.object(quiz, "require", require), \
+                patch.object(quiz, "record", record), patch.object(quiz, "_top_up", top_up):
+            out = quiz.refresh_choices(GUIDE_ID, authorization="Bearer t")
+        self.assertEqual(out["changed"], 0)
+        require.assert_not_called()
+        record.assert_not_called()
+        top_up.assert_not_called()
+        self.assertTrue(out["questions"][0].get("hidden"))
+
+
+# --- Low 14: AI prompts ask the question as it is shown ----------------------------------------------
+
+class PromptWordingTests(unittest.TestCase):
+    QUESTIONS = [dict(RAW_QUIZ[1])]
+
+    def run_route(self, route, body, target):
+        fake = MagicMock(return_value={"credit": 1, "explanation": "ok", "hook": "h", "why": "w"})
+        guide = MagicMock()
+        guide.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = SimpleNamespace(
+            data=[{"study_guide": "Q1: " + RAW_QUIZ[1]["question"] + "\nA1: 3.5-5.0 mEq/L"}])
+        with patch.object(quiz, "get_supabase", return_value=guide), patch.object(quiz, "get_user_id", return_value="u1"), \
+                patch.object(quiz, "_saved_questions", return_value=self.QUESTIONS), \
+                patch.object(quiz, "_questions_for", return_value=(self.QUESTIONS, False)), \
+                patch.object(quiz, "_memory_preferences", return_value=(["link"], [])), \
+                patch.object(quiz, "require", MagicMock()), patch.object(quiz, "record", MagicMock()), \
+                patch.object(quiz, target, fake), \
+                patch("services.memory_context.related_material", return_value=None), \
+                patch("services.adult_content.crude_allowed", return_value=False):
+            getattr(quiz, route)(GUIDE_ID, body, authorization="Bearer t")
+        return fake.call_args.args[0]
+
+    def test_grade_why_and_remember_ask_the_shown_wording(self):
+        shown = "What is the normal serum potassium range?"
+        self.assertEqual(self.run_route("grade_written", quiz.WrittenAnswer(concept=0, answer="3.5 to 5"), "grade_written_answer"), shown)
+        self.assertEqual(self.run_route("explain_miss", quiz.MissRequest(concept=0, chosen="2.0-3.0 mEq/L"), "explain_miss_briefly"), shown)
+        self.assertEqual(self.run_route("help_me_remember", quiz.RememberRequest(concept=0), "memory_hook"), shown)
+
+    def test_the_tutor_explains_the_shown_wording(self):
+        from routers import chat as chat_router
+        from schemas import ChatRequest
+        body = ChatRequest(question="Why?", content="", guide_id=GUIDE_ID, retain_context={
+            "question": RAW_QUIZ[1]["question"], "options": RAW_QUIZ[1]["options"],
+            "selected_answer": "2.0-3.0 mEq/L", "correct_answer": "3.5-5.0 mEq/L"})
+        material = SimpleNamespace(content="Q1: " + RAW_QUIZ[1]["question"] + "\nA1: 3.5-5.0 mEq/L", source=None)
+        explain = MagicMock(return_value="Because.")
+        with patch.object(chat_router, "require", MagicMock()), patch.object(chat_router, "record", MagicMock()), \
+                patch.object(chat_router, "learning_guidance", return_value=""), patch.object(chat_router, "style_instruction", return_value=""), \
+                patch.object(chat_router, "explain_retain_answer", explain):
+            chat_router._tutor_reply(body, "u1", "Why?", material, "retain", None)
+        self.assertEqual(explain.call_args.kwargs["question"], "What is the normal serum potassium range?")
+
+
+# --- Low 11: a part's words may sit apart within one clause ------------------------------------------
+
+class PartsInProseTests(unittest.TestCase):
+    CHAMBERS = "Left atrium, left ventricle, right atrium, and right ventricle"
+
+    def test_words_of_a_part_within_one_clause_count(self):
+        prose = ("On the right side, the atrium collects blood and the ventricle pumps it to the lungs; "
+                 "on the left side, the atrium and ventricle send it to the body.")
+        self.assertEqual(retain.missing_parts(prose, self.CHAMBERS), [])
+
+    def test_words_split_across_clauses_do_not(self):
+        self.assertEqual(retain.missing_parts("Picture LEFT side: atrium then ventricle; the right ventricle pumps to lungs.",
+                                              self.CHAMBERS), ["right atrium"])
+
+
+# --- Medium 7: the connected-app route that says how each question is shown --------------------------
+
+class ConnectorWordingTests(unittest.TestCase):
+    def test_the_wording_route_marks_each_quiz_like_shown_questions(self):
+        from routers import mcp
+        body = mcp.WordingRequest(quizzes=[[q["question"] for q in RAW_QUIZ], ["Which works are shown on Slide 4?"]])
+        with patch.object(mcp, "_student", return_value=("u1", MagicMock())):
+            out = mcp._question_wording("Bearer t", body)
+        self.assertEqual(out["quizzes"][0], [{"hidden": True}, {"shown": "What is the normal serum potassium range?"}, {}])
+        self.assertEqual(out["quizzes"][1], [{}], "a quiz all about the source is shown as it is")
 
 
 if __name__ == "__main__":
