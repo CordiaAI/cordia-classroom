@@ -4,17 +4,17 @@ They read as the student, through a Supabase client built with that token, so Ro
 and the connected-app role decide what they see. They call the same functions the app's routes do.
 """
 from datetime import date, datetime, timedelta, timezone
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Header, HTTPException, Query, Request
-from pydantic import BaseModel, Field, field_validator
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from pydantic import BaseModel, Field, field_validator, model_validator
 from starlette.concurrency import run_in_threadpool
 
 from auth_utils import verify_mcp_token
 from database import get_student_supabase
 from ids import is_uuid
-from rate_limit import limiter
+from rate_limit import ai_rate_limit, limiter
 from routers.stats import _graded_items, _student_results, activity_rows, streak_summary
 from services.mcp_progress import progress_summary
 
@@ -189,41 +189,62 @@ async def log_answers(body: AnswerEvents, request: Request, authorization: str =
     return await run_in_threadpool(_log_answers, authorization, body)
 
 
-# How the app shows each saved quiz question (services/text_processing.shown_questions): the
-# connected app reads quiz_questions itself, as saved, and asks here which to reword and which are
-# about the source and never asked. 100 study sets (get_due_cards reads at most that many) of up to
-# 200 questions; a question is checked at its first and last 1000 characters, so its length is capped.
+# How the app shows each saved quiz question and flashcard (services/text_processing.shown_questions
+# and shown_cards): the connected app reads them itself, as saved, and asks here which to reword and
+# which are about the source and never asked. The work is bounded per request: at most 100 study sets,
+# 2,000 texts and 200,000 characters in all, and a text of at most 2,001 characters (a longer question
+# is sent as its first and last 1,000, where its openings are; web/lib/mcp/wording.mjs). The worst
+# request allowed takes well under 200 ms of CPU (tests/test_question_quality_final.py); the app splits
+# a bigger read into several requests. Limited per connection (its token), not per address.
+WORDING_MAX_SETS = 100
+WORDING_MAX_TEXTS = 2_000
+WORDING_MAX_CHARS = 200_000
+WORDING_TEXT_CHARS = 2_001
+WordingText = Annotated[str, Field(max_length=WORDING_TEXT_CHARS)]
+
+
 # `answered`: whether the saved question has an answer (a quiz is never left with nothing to ask).
 class WordingQuestion(BaseModel):
-    question: str = Field(..., max_length=20_000)
+    question: WordingText
     answered: bool = True
 
 
 class WordingRequest(BaseModel):
-    quizzes: list[list[WordingQuestion]] = Field(..., max_length=100)
+    quizzes: list[list[WordingQuestion]] = Field(..., max_length=WORDING_MAX_SETS)
+    # Per study set, in the same order: the flashcard fronts its quiz doesn't hold.
+    cards: list[list[WordingText]] = Field(default_factory=list, max_length=WORDING_MAX_SETS)
 
-    @field_validator("quizzes")
-    @classmethod
-    def bounded(cls, value):
-        if any(len(quiz) > 200 for quiz in value):
-            raise ValueError("at most 200 questions per study set")
-        return value
+    @model_validator(mode="after")
+    def bounded(self):
+        texts = [item.question for quiz in self.quizzes for item in quiz] + [front for fronts in self.cards for front in fronts]
+        if len(texts) > WORDING_MAX_TEXTS:
+            raise ValueError(f"at most {WORDING_MAX_TEXTS} questions and cards per request")
+        if sum(len(text) for text in texts) > WORDING_MAX_CHARS:
+            raise ValueError(f"at most {WORDING_MAX_CHARS} characters per request")
+        return self
+
+
+def _wording_marks(items: list) -> list:
+    return [{key: item[key] for key in ("shown", "hidden") if key in item} for item in items]
 
 
 def _question_wording(authorization: str, body: WordingRequest) -> dict:
-    from services.text_processing import shown_questions
     _student(authorization)
-    marks = []
-    for quiz in body.quizzes:
-        shown = shown_questions([{"question": item.question, "options": ["answer" if item.answered else ""], "correct_index": 0}
-                                 for item in quiz])
-        marks.append([{key: item[key] for key in ("shown", "hidden") if key in item} for item in shown])
-    return {"quizzes": marks}
+    return question_wording_marks(body)
 
 
-@router.post("/question-wording")
-@limiter.limit("120/minute")
+def question_wording_marks(body: WordingRequest) -> dict:
+    """The marks for a request already let through (no database, no AI): the only work the route does."""
+    from services.text_processing import shown_cards, shown_questions
+    quizzes = [_wording_marks(shown_questions([{"question": item.question, "options": ["answer" if item.answered else ""], "correct_index": 0}
+                                               for item in quiz])) for quiz in body.quizzes]
+    cards = [_wording_marks(shown_cards([{"front": front, "back": "answer"} for front in fronts])) for fronts in body.cards]
+    return {"quizzes": quizzes, "cards": cards}
+
+
+@router.post("/question-wording", dependencies=[Depends(ai_rate_limit(max_calls=60, window_seconds=60))])
 async def question_wording(body: WordingRequest, request: Request, authorization: str = Header(default="")):
     """For each study set's saved quiz, in order: {"shown": wording} for a question asked in other
-    words, {"hidden": true} for one about the source that is never asked, {} for one asked as saved."""
+    words, {"hidden": true} for one about the source that is never asked, {} for one asked as saved;
+    and the same for each flashcard front sent in `cards`."""
     return await run_in_threadpool(_question_wording, authorization, body)

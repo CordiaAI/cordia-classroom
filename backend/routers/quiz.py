@@ -759,9 +759,10 @@ def _print_fill(client, pairs: list) -> Optional[list]:
 
 
 def _hidden_source(shown: list, item: dict) -> bool:
-    """Whether a printable item (a cached fill-in sentence) comes from a pair about the source."""
+    """Whether a printable item (a cached fill-in sentence) comes from a pair about the source: its
+    `source` is not in print_items.open_indexes, the one index list every print type reads."""
     source = item.get("source") if isinstance(item, dict) else None
-    return isinstance(source, int) and 0 <= source < len(shown) and bool(shown[source].get("hidden"))
+    return isinstance(source, int) and 0 <= source < len(shown) and source not in print_items.open_indexes(shown)
 
 
 @router.post("/{guide_id}/print-items", dependencies=[Depends(ai_rate_limit())])

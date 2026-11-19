@@ -13,7 +13,7 @@ from services.llm import guide_title
 from services.sharing import on_guide_changed
 from routers.quiz import start_quiz_warmup
 from services import guide_versions, ideas
-from services.text_processing import shown_guide
+from services.text_processing import shown_guide, unmarked
 from auth_utils import get_user_id
 from ids import is_uuid, require_uuid
 from rate_limit import ai_rate_limit
@@ -96,7 +96,7 @@ def list_guides(folder_id: Optional[str] = None, limit: int = 50, offset: int = 
         .range(offset, offset + limit - 1) \
         .execute()
 
-    guides = [shown_guide(guide) for guide in result.data or []]
+    guides = result.data or []
     if summary:
         for guide in guides:
             cards = guide.pop("flashcards", None)
@@ -104,7 +104,7 @@ def list_guides(folder_id: Optional[str] = None, limit: int = 50, offset: int = 
             learned = flashcard_learn_levels(cards, guide.get("flashcard_progress"))
             if learned:
                 guide["flashcard_learn"] = learned
-    return {"guides": guides}
+    return {"guides": [shown_guide(guide) for guide in guides]}
 
 
 def _learn_fingerprint(question) -> str:
@@ -161,7 +161,7 @@ def create_guide(user_id: str, request: SaveGuideRequest, extra: Optional[dict] 
         data["folder_id"] = request.folder_id
 
     if request.flashcards:
-        data["flashcards"] = request.flashcards
+        data["flashcards"] = unmarked(request.flashcards)
 
     if request.external_source_id:
         data["external_source_id"] = request.external_source_id
@@ -303,6 +303,8 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
     update_data = request.model_dump(exclude_unset=True)
     update_data.pop("keep_title", None)
     update_data.pop("share_default", None)
+    if "flashcards" in update_data:
+        update_data["flashcards"] = unmarked(update_data["flashcards"])  # a response's marks are never saved
     require_own_folder(supabase, user_id, update_data.get("folder_id"))
     if {"study_guide", "flashcards"} & set(update_data):
         update_data.update(_follow_ideas(supabase, user_id, guide_id, update_data))

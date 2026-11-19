@@ -960,8 +960,10 @@ class ConnectorWordingTests(unittest.TestCase):
         self.assertEqual(out["quizzes"][0], [{"hidden": True}, {"shown": "What is the normal serum potassium range?"}, {}])
         self.assertEqual(out["quizzes"][1], [{}], "a quiz all about the source is shown as it is")
         self.assertEqual(out["quizzes"][2], [{}, {}], "nor is one left with nothing to ask")
+        # The final round's caps are per request (tests/test_question_quality_final.py has the CPU bound)
+        mcp.WordingRequest(quizzes=[[{"question": "x"}] * 201])
         with self.assertRaises(Exception):
-            mcp.WordingRequest(quizzes=[[{"question": "x"}] * 201])
+            mcp.WordingRequest(quizzes=[[{"question": "x"}] * 2001])
 
 
 if __name__ == "__main__":

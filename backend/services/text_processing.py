@@ -584,6 +584,9 @@ _FRAMED_TRAIL = re.compile(rf"\s(?P<clause>{_FRAMING}\s{_CLAUSE})\s?", re.I)
 _BARE_AT = re.compile(r"\s(?=(?:in|on|from|during|throughout|within)\s)", re.I)
 _BARE_TRAIL = re.compile(rf"\s(?P<clause>(?:in|on|from|during|throughout|within)\s{_CLAUSE})\s?", re.I)
 _MID = re.compile(rf"\s?,\s?(?P<clause>{_STARTER}\s{_CLAUSE})\s?,\s?", re.I)
+# An opening that starts a later sentence: "A client is prescribed furosemide. According to the
+# lecture, which assessment comes first?" (a scenario before the question, as NCLEX stems are).
+_SENTENCE_LEAD = re.compile(rf"(?<=[.!?]\s)(?P<clause>{_STARTER}\s{_CLAUSE})\s?,\s?(?P<next>\S)", re.I)
 _BRACKET = re.compile(r"\s?(?:\((?P<round>[^()\[\]]{1,100})\)|\[(?P<square>[^()\[\]]{1,100})\])", re.I)
 _STARTS_OPENING = re.compile(rf"^(?:{_STARTER}|see|cf\.?)\s", re.I)
 
@@ -670,11 +673,15 @@ def _trailing_opening(core: str):
 
 
 def _mid_openings(core: str):
-    """(asked, read): `core` with openings between commas and in brackets taken out. `asked` keeps
+    """(asked, read): `core` with openings between commas, at the start of a later sentence and in
+    brackets taken out. `asked` keeps
     every one that names more than the source ("What, according to Vasari, ...", "(ACE inhibitor)");
     `read`, what the checks see, also loses the ones that open like an attribution."""
     def asked_mid(found):
         return " " if _names_only_the_source(found.group("clause")) else found.group(0)
+
+    def asked_sentence(found):
+        return found.group("next").upper() if _names_only_the_source(found.group("clause")) else found.group(0)
 
     def asked_bracket(found):
         inner = found.group("round") or found.group("square")
@@ -689,8 +696,8 @@ def _mid_openings(core: str):
             return fn(text)
         return fn(text[:_CHECK_CHARS]) + text[_CHECK_CHARS:-_CHECK_CHARS] + fn(text[-_CHECK_CHARS:])
 
-    asked = windowed(core, lambda text: _BRACKET.sub(asked_bracket, _MID.sub(asked_mid, text)))
-    read = windowed(core, lambda text: _BRACKET.sub(read_bracket, _MID.sub(" ", text)))
+    asked = windowed(core, lambda text: _BRACKET.sub(asked_bracket, _MID.sub(asked_mid, _SENTENCE_LEAD.sub(asked_sentence, text))))
+    read = windowed(core, lambda text: _BRACKET.sub(read_bracket, _MID.sub(" ", _SENTENCE_LEAD.sub(lambda found: found.group("next"), text))))
     return _squash(asked), _squash(read)
 
 
@@ -906,34 +913,84 @@ def asked_as(question) -> str:
     return standalone_question(text) or text
 
 
+# A quiz with this many characters or fewer is remembered whole, by its texts: a /guides list reads
+# up to 100 guides on every Dashboard and Library load, and the 4096 questions remembered one by one
+# would not hold them. 256 quizzes of at most 50,000 characters each bound the memory.
+_MEMO_CHARS = 50_000
+_HIDDEN = ("hidden", None)
+
+
+def _marks(texts: tuple, answered: tuple) -> tuple:
+    """For each text: _HIDDEN (about the source itself, never asked), ("shown", wording) (asked in
+    other words) or None (asked as saved, or not a text). None hidden when nothing answered would be
+    left to ask."""
+    marks, hidden = [], 0
+    for text in texts:
+        if text is None:
+            marks.append(None)
+            continue
+        standalone = standalone_question(text)
+        if standalone is None:
+            marks.append(_HIDDEN)
+            hidden += 1
+        else:
+            marks.append(("shown", standalone) if standalone != text else None)
+    if hidden and not any(mark is not _HIDDEN and ok for mark, ok in zip(marks, answered)):
+        marks = [None if mark is _HIDDEN else mark for mark in marks]
+    return tuple(marks)
+
+
+_marks_remembered = lru_cache(maxsize=256)(_marks)
+
+
+def _marked(items, key: str, answered) -> list:
+    """`items` with `shown` / `hidden` set from the text under `key` (any stale ones dropped)."""
+    texts = tuple(item.get(key) if isinstance(item, dict) and isinstance(item.get(key), str) else None for item in items)
+    flags = tuple(isinstance(item, dict) and answered(item) for item in items)
+    small = sum(len(text) for text in texts if text) <= _MEMO_CHARS
+    marks = (_marks_remembered if small else _marks)(texts, flags)
+    out = []
+    for item, mark in zip(items, marks):
+        if not isinstance(item, dict):
+            out.append(item)
+            continue
+        clean = {name: value for name, value in item.items() if name not in ("shown", "hidden")}
+        if mark is _HIDDEN:
+            clean["hidden"] = True
+        elif mark:
+            clean["shown"] = mark[1]
+        out.append(clean)
+    return out
+
+
 def shown_questions(questions):
     """The quiz as the student sees it, for a response: the same list, in the same order, with
-    `shown` on a question whose wording asks about the source ("According to Slide 5, what is X?"
+    `shown` on a question whose opening only names the source ("According to Slide 5, what is X?"
     is shown as "What is X?") and `hidden` on one about the source itself ("Which artists are listed
     for Chapter 1?"), which keeps its place but is never asked. The saved `question` text is never
     changed: Learn levels, answer logs, misses and idea ids are keyed by it, and attempts by
     position. A quiz that would have nothing left to ask is shown as it is, never as an empty quiz."""
     if not isinstance(questions, list):
         return questions
-    out, hidden = [], 0
-    for question in questions:
-        if not isinstance(question, dict):
-            out.append(question)
-            continue
-        item = {key: value for key, value in question.items() if key not in ("shown", "hidden")}
-        text = item.get("question")
-        if isinstance(text, str):
-            standalone = standalone_question(text)
-            if standalone is None:
-                item["hidden"] = True
-                hidden += 1
-            elif standalone != text:
-                item["shown"] = standalone
-        out.append(item)
-    if hidden and not any(isinstance(item, dict) and not item.get("hidden") and _has_answer(item) for item in out):
-        return [{key: value for key, value in item.items() if key != "hidden"} if isinstance(item, dict) else item
-                for item in out]
-    return out
+    return _marked(questions, "question", _has_answer)
+
+
+def shown_cards(cards):
+    """Flashcards as the student sees them, marked like shown_questions by their front: `shown` for a
+    front asked in other words, `hidden` for one about the source itself, never studied (Study now,
+    the flashcard deck, connected apps). Saved fronts never change: progress is keyed by position."""
+    if not isinstance(cards, list):
+        return cards
+    return _marked(cards, "front", lambda card: bool(str(card.get("back") or "").strip()))
+
+
+def unmarked(items):
+    """Items as they are saved: without the `shown` / `hidden` marks a response adds (a client that
+    sends a guide's cards back, adding one, must not save them)."""
+    if not isinstance(items, list):
+        return items
+    return [{key: value for key, value in item.items() if key not in ("shown", "hidden")} if isinstance(item, dict) else item
+            for item in items]
 
 
 def _has_answer(question: dict) -> bool:
@@ -943,12 +1000,18 @@ def _has_answer(question: dict) -> bool:
 
 
 def shown_guide(row):
-    """A study_guides row for a response: its quiz_questions as shown_questions marks them. Every
-    route that returns a guide's quiz sends it through here (or through shown_questions), so Study
-    now, the Dashboard and Learn read the same wording and the same hidden questions."""
-    if isinstance(row, dict) and isinstance(row.get("quiz_questions"), list):
-        return {**row, "quiz_questions": shown_questions(row["quiz_questions"])}
-    return row
+    """A study_guides row (or a guide built for a response) as the student sees it: its quiz_questions
+    as shown_questions marks them and its flashcards as shown_cards marks them. Every route that
+    returns a guide's quiz or cards sends it through here, so Study now, the Dashboard, the deck and
+    Learn read the same wording and the same hidden questions."""
+    if not isinstance(row, dict):
+        return row
+    out = row
+    if isinstance(row.get("quiz_questions"), list):
+        out = {**out, "quiz_questions": shown_questions(row["quiz_questions"])}
+    if isinstance(row.get("flashcards"), list):
+        out = {**out, "flashcards": shown_cards(row["flashcards"])}
+    return out
 
 
 def shown_pairs(pairs: list) -> list:

@@ -19,7 +19,7 @@ from rate_limit import ai_rate_limit
 from services import guide_access
 from services import guide_versions as versions
 from services import viewer_study as study
-from services.text_processing import shown_questions
+from services.text_processing import shown_guide
 from routers import quiz as quiz_router
 
 router = APIRouter(prefix="/guides", tags=["study shared guides"])
@@ -63,11 +63,11 @@ def study_guide(gate: Ctx = Depends(STUDY)):
         study.pin(db, viewer, guide["id"], ctx["current"])
     status = study.update_status(db, viewer, ctx)
     content = ctx["content"]
-    return {"guide": {
+    return {"guide": shown_guide({
         "id": guide["id"],
         "title": content.get("title") or guide.get("title") or "Untitled",
         "flashcards": content["cards"],
-        "quiz_questions": shown_questions(ctx["questions"]),
+        "quiz_questions": ctx["questions"],
         "flashcard_progress": study.progress_view(ctx),
         "viewer": {
             "version": content["version"],
@@ -75,7 +75,7 @@ def study_guide(gate: Ctx = Depends(STUDY)):
             "author": guide_access.author(db, guide),
             **status,
         },
-    }}
+    })}
 
 
 class LearnSave(BaseModel):

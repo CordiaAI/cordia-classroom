@@ -332,14 +332,6 @@ def mentions_answer(text: str, answer: str) -> bool:
         if covered == len(target) or (len(target) > 6 and covered * 2 >= len(target)):
             return True
     return False
-    for accepted in _accepted(answer):
-        target = _key_words(accepted)
-        if not target or any(re.search(r"\d", word) and word not in words for word in target):
-            continue
-        covered = sum(1 for word in target if any(_same_word(given, word) for given in words))
-        if covered == len(target) or (len(target) > 6 and covered * 2 >= len(target)):
-            return True
-    return False
 
 
 def _open_kind(shape: str, chosen: list) -> str:

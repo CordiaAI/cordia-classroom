@@ -358,5 +358,219 @@ class ValuesSurviveExactlyTests(unittest.TestCase):
             self.assertNotIn(gone, out)
 
 
+
+# --- Must-fix 1: the connected app's wording route --------------------------------------------------
+
+def hostile(shape, size, salt):
+    """Question text shaped to make the checks work hardest (rook-f5v2/mcpload.py, timing.py)."""
+    if shape == "attributions":
+        text = "In the lecture, as reviewed in Chapter 1.1.1, the slides on " * (size // 60 + 1)
+    elif shape == "slide":
+        text = "According to Slide 5, " * (size // 22 + 1)
+    elif shape == "commas":
+        text = "In the lecture, " + ", in the lecture" * (size // 16)
+    else:
+        words = ["slide", "page", "the", "lecture", "according to", "in", "chapter", "listed", "shown", "of", "this", ",", "?",
+                 "as discussed in", "Figure", "1", "(see p. 4)", "labeled B", "point E", "on the graph"]
+        rng = __import__("random").Random(salt)
+        text = " ".join(rng.choice(words) for _ in range(size // 3))
+    return (text[:size - 10] + f" {salt:08d}?")[:size]
+
+
+class ConnectorWordingTests(unittest.TestCase):
+    CPU_BOUND = 0.200  # seconds of CPU for the worst request the route lets through
+
+    def test_each_request_is_capped_in_texts_characters_and_text_length(self):
+        from routers import mcp
+        mcp.WordingRequest(quizzes=[[{"question": "x" * 2001}]], cards=[["y" * 2001]])
+        for body in ({"quizzes": [[{"question": "x" * 2002}]]},
+                     {"quizzes": [[{"question": "x"}]], "cards": [["y" * 2002]]},
+                     {"quizzes": [[{"question": "x"}] * 1500], "cards": [["y"] * 501]},
+                     {"quizzes": [[{"question": "x" * 2000}] * 101]},
+                     {"quizzes": [[{"question": "x"}]] * 101}):
+            with self.assertRaises(Exception):
+                mcp.WordingRequest(**body)
+
+    def test_the_worst_allowed_request_stays_under_the_cpu_bound(self):
+        import time
+        from routers import mcp
+        from services import text_processing as tp
+        worst = 0.0
+        for shape in ("attributions", "slide", "commas", "soup"):
+            for size in (2001, 1000, 100):
+                count = min(mcp.WORDING_MAX_TEXTS, mcp.WORDING_MAX_CHARS // size)
+                texts = [hostile(shape, size, n) for n in range(count)]
+                half = count // 2
+                body = mcp.WordingRequest(quizzes=[[{"question": t} for t in texts[:half]]], cards=[texts[half:]])
+                self.assertLessEqual(sum(len(t) for t in texts), mcp.WORDING_MAX_CHARS)
+                best = None
+                for _ in range(3):
+                    tp._standalone_cached.cache_clear()
+                    tp._marks_remembered.cache_clear()
+                    start = time.process_time()
+                    mcp.question_wording_marks(body)
+                    spent = time.process_time() - start
+                    best = spent if best is None else min(best, spent)
+                worst = max(worst, best)
+        self.assertLess(worst, self.CPU_BOUND, f"worst request took {worst * 1000:.0f} ms of CPU")
+
+    def test_the_limit_is_per_connection_not_per_address(self):
+        from fastapi import HTTPException
+        from starlette.requests import Request
+        from routers import mcp
+        import rate_limit
+        route = next(r for r in mcp.router.routes if getattr(r, "path", "").endswith("/question-wording"))
+        limit = route.dependencies[0].dependency
+        rate_limit._hits.clear()
+
+        def request(token, address):
+            return Request({"type": "http", "path": "/mcp/question-wording", "route": route, "client": (address, 1), "headers": [
+                (b"authorization", f"Bearer {token}".encode()), (b"fly-client-ip", address.encode())]})
+        for n in range(60):
+            limit(request("one", f"10.0.0.{n}"))  # a new address every time: still one connection
+        with self.assertRaises(HTTPException) as caught:
+            limit(request("one", "10.0.1.1"))
+        self.assertEqual(caught.exception.status_code, 429)
+        limit(request("two", "10.0.0.1"))  # another connection on a used address is not limited
+        rate_limit._hits.clear()
+
+    def test_flashcard_fronts_are_marked_like_questions(self):
+        from routers import mcp
+        body = mcp.WordingRequest(quizzes=[[]], cards=[["Which artists are listed for Chapter 1?", "According to Slide 5, what is X?",
+                                                         "Who painted the Mona Lisa?"]])
+        self.assertEqual(mcp.question_wording_marks(body)["cards"], [[{"hidden": True}, {"shown": "What is X?"}, {}]])
+
+
+# --- Must-fix 3: a hidden question's flashcard is never studied -------------------------------------
+
+class HiddenCardTests(unittest.TestCase):
+    def test_every_route_marks_flashcards_and_a_save_never_keeps_the_marks(self):
+        from services.text_processing import shown_cards, shown_guide, unmarked
+        cards = [{"front": "Which artists are listed for Chapter 1?", "back": "Giotto"},
+                 {"front": "According to Slide 5, what is the normal potassium range?", "back": "3.5-5.0 mEq/L"},
+                 {"front": "Who painted the Mona Lisa?", "back": "Leonardo", "hidden": True, "shown": "stale"}]
+        marked = shown_cards(cards)
+        self.assertEqual([card.get("hidden") for card in marked], [True, None, None], "a stale mark is never trusted")
+        self.assertEqual(marked[1]["shown"], "What is the normal potassium range?")
+        self.assertEqual([card["front"] for card in marked], [card["front"] for card in cards])
+        self.assertEqual(shown_guide({"flashcards": cards})["flashcards"], marked)
+        self.assertEqual(unmarked(marked), [{k: v for k, v in card.items() if k not in ("shown", "hidden")} for card in cards])
+
+    def test_the_guide_update_route_saves_cards_without_marks(self):
+        from routers import guides
+        from services.text_processing import shown_cards
+        saved = {}
+
+        class Table:
+            def update(self, data):
+                saved.update(data)
+                return self
+
+            def __getattr__(self, name):
+                return lambda *a, **k: self
+
+            def execute(self):
+                return MagicMock(data=[{"id": "g", **saved}])
+        db = MagicMock()
+        db.table.return_value = Table()
+        cards = shown_cards([{"front": "Which artists are listed for Chapter 1?", "back": "Giotto"},
+                             {"front": "Who painted the Mona Lisa?", "back": "Leonardo"}])
+        self.assertTrue(cards[0]["hidden"])
+        with patch.object(guides, "get_supabase", return_value=db), patch.object(guides, "get_user_id", return_value="u1"), \
+                patch.object(guides, "_follow_ideas", return_value={}), patch.object(guides, "on_guide_changed"), \
+                patch.object(guides, "_new_version", return_value={}):
+            out = guides.update_guide("00000000-0000-0000-0000-000000000001", guides.SaveGuideRequest(title="Art", flashcards=cards), authorization="Bearer t")
+        self.assertEqual(saved["flashcards"], [{"front": "Which artists are listed for Chapter 1?", "back": "Giotto"},
+                                               {"front": "Who painted the Mona Lisa?", "back": "Leonardo"}])
+        self.assertTrue(out["guide"]["flashcards"][0]["hidden"], "the reply is marked again")
+
+
+# --- Mediums -----------------------------------------------------------------------------------------
+
+class ClassroomTests(unittest.TestCase):
+    IDEAS = [{"idea_id": "a", "question": "Which artists are listed for Chapter 1?", "answer": "Giotto"},
+             {"idea_id": "b", "question": "According to Slide 5, what is the normal potassium range?", "answer": "3.5-5.0"},
+             {"idea_id": "c", "question": "Who painted the Mona Lisa?", "answer": "Leonardo"}]
+
+    def test_readiness_counts_only_ideas_that_are_asked_in_their_asked_wording(self):
+        from services import classroom_study as cstudy
+        ideas = cstudy.asked_ideas(self.IDEAS)
+        self.assertEqual([idea["idea_id"] for idea in ideas], ["b", "c"])
+        self.assertEqual(ideas[0]["question"], "What is the normal potassium range?")
+        progress = {"a": {"l": 3, "at": "2026-11-18"}, "b": {"l": 1}, "c": {"l": 3, "at": "2026-11-18"}}
+        tally = cstudy.tally(ideas, progress, "2026-11-19")
+        self.assertEqual((tally["total"], tally["mastered"], tally["learning"]), (2, 1, 1))
+        with patch.object(cstudy.versions, "live_content", return_value={"cards": []}), \
+                patch.object(cstudy.versions, "owner_questions", return_value=[]), \
+                patch.object(cstudy.versions, "content_ideas", return_value=self.IDEAS):
+            self.assertEqual([idea["idea_id"] for idea in cstudy.guide_ideas({"id": "g"})[2]], ["b", "c"])
+
+    def test_due_counts_skip_hidden_cards_and_questions(self):
+        from services import classroom_study as cstudy
+        content = {"cards": [{"idea_id": "a", "front": "Which artists are listed for Chapter 1?", "back": "Giotto"},
+                             {"idea_id": "c", "front": "Who painted the Mona Lisa?", "back": "Leonardo"}]}
+        questions = [{"idea_id": "a", "question": "Which artists are listed for Chapter 1?", "options": ["Giotto"], "correct_index": 0},
+                     {"idea_id": "c", "question": "Who painted the Mona Lisa?", "options": ["Leonardo"], "correct_index": 0}]
+        progress = {"a": {"l": 1}, "c": {"l": 1}}
+        self.assertEqual(cstudy.due_count({}, progress, content, questions, "2026-11-19"), 2, "one card and one idea, not four")
+
+    def test_a_guides_list_is_remembered_per_quiz(self):
+        # rook-f5v2/listcost.py: /guides?limit=100 of 50 questions each, read twice
+        from services import text_processing as tp
+        guides = [{"quiz_questions": [{"question": f"Explain how item {g}-{n} is listed on a balance sheet.", "options": ["a", "b", "c"],
+                                       "correct_index": 0} for n in range(50)]} for g in range(100)]
+        tp._marks_remembered.cache_clear()
+        first = [tp.shown_guide(guide) for guide in guides]
+        hits = tp._marks_remembered.cache_info().hits
+        second = [tp.shown_guide(guide) for guide in guides]
+        self.assertEqual(first, second)
+        self.assertEqual(tp._marks_remembered.cache_info().hits - hits, 100, "every quiz of the second read is remembered")
+        self.assertGreaterEqual(tp._marks_remembered.cache_info().maxsize, 100)
+
+    def test_cached_nclex_stems_are_asked_as_the_app_asks(self):
+        from routers import nclex
+        cached = [{"type": "mcq", "stem": "A client is prescribed furosemide. According to the lecture, which finding is the priority?",
+                   "options": ["a", "b", "c", "d"], "correct_indices": [0], "rationale": "r"},
+                  {"type": "mcq", "stem": "Which drugs are listed for Chapter 1?", "options": ["a", "b", "c", "d"], "correct_indices": [0],
+                   "rationale": "r"}]
+        db = MagicMock()
+        db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = MagicMock(
+            data=[{"notes": "n", "study_guide": "s", "nclex_questions": cached}])
+        with patch.object(nclex, "get_supabase", return_value=db), patch.object(nclex, "get_user_id", return_value="u1"):
+            out = nclex.generate_nclex("00000000-0000-0000-0000-000000000001", authorization="Bearer t")
+        self.assertEqual([q["stem"] for q in out["questions"]],
+                         ["A client is prescribed furosemide. Which finding is the priority?", "Which drugs are listed for Chapter 1?"],
+                         "reworded in place; none dropped, since answers are checked by position")
+
+    def test_a_scenario_stems_opening_is_trimmed_never_hidden(self):
+        self.assertEqual(standalone_question("A client with heart failure is prescribed furosemide. As discussed in the lecture on "
+                                             "diuretics, which assessment is the priority?"),
+                         "A client with heart failure is prescribed furosemide. As discussed in the lecture on diuretics, which "
+                         "assessment is the priority?")
+
+
+# --- Must-fix 4: print keeps every index and reads one list ------------------------------------------
+
+class PrintTests(unittest.TestCase):
+    def test_every_type_and_the_writer_read_one_open_index_list(self):
+        from services import print_items
+        from services.text_processing import shown_pairs
+        pairs = shown_pairs([
+            {"question": "Which artists are listed for Chapter 1?", "answer": "Giotto, Cimabue and Duccio"},
+            {"question": "What is chiaroscuro?", "answer": "Chiaroscuro is the strong contrast between light and dark used to model form."},
+            {"question": "Why did Renaissance painters adopt linear perspective?",
+             "answer": "It let them build a convincing illusion of depth on a flat surface using one vanishing point."},
+            {"question": "As reviewed in the lecture, what is impasto?", "answer": "Impasto is paint laid on thickly enough to show marks."},
+        ])
+        self.assertEqual(len(pairs), 4, "a hidden pair keeps its place")
+        self.assertEqual(print_items.open_indexes(pairs), [1, 2, 3])
+        self.assertEqual(pairs[3]["question"], "What is impasto?")
+        used = {item["source"] for item in print_items.matching(pairs) + print_items.short_answer(pairs)}
+        self.assertNotIn(0, used | set(print_items.fill_candidates(pairs)))
+        written = print_items.fill_items(pairs, [0, 1], [{"id": 0, "sentence": "The artists were [[Giotto]]."},
+                                                          {"id": 1, "sentence": "[[Chiaroscuro]] is the strong contrast between light and dark."}])
+        self.assertEqual([item["source"] for item in written], [1], "the writer never prints a hidden pair, whatever it was sent")
+
+
 if __name__ == "__main__":
     unittest.main()

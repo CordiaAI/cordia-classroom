@@ -21,6 +21,7 @@ from typing import Optional
 
 from services import guide_access as access
 from services import guide_versions as versions
+from services.text_processing import shown_cards, shown_questions
 
 MAX_GUIDES = 30
 GROUP_MIN = 3
@@ -115,7 +116,16 @@ def guide_ideas(guide: dict) -> tuple:
     """(content, questions, ideas) of the guide as it is now."""
     content = versions.live_content(guide)
     questions = versions.owner_questions(content, guide["id"])
-    return content, questions, versions.content_ideas(content)
+    return content, questions, asked_ideas(versions.content_ideas(content))
+
+
+def asked_ideas(ideas_list: list) -> list:
+    """The guide's ideas as students are asked them (text_processing.shown_questions): one about the
+    source itself, which is never asked, is left out of readiness, the group heatmap and the
+    instructor's list; the rest carry the wording they are asked in. Keyed by idea_id as before."""
+    marks = shown_questions([{"question": str(idea.get("question") or ""), "options": [str(idea.get("answer") or "")], "correct_index": 0}
+                             for idea in ideas_list])
+    return [{**idea, "question": mark.get("shown", idea.get("question") or "")} for idea, mark in zip(ideas_list, marks) if not mark.get("hidden")]
 
 
 def studied(progress: dict) -> bool:
@@ -160,11 +170,15 @@ def nearest_milestone(db, room_id: str, today: str) -> Optional[dict]:
 def due_count(guide: dict, progress: dict, content: dict, questions: list, today: str) -> int:
     """Cards due (new or their day has come) plus Learn ideas worth a look, as Study now counts them."""
     due = 0
-    for card in content["cards"]:
+    for card in shown_cards(content["cards"]):
+        if isinstance(card, dict) and card.get("hidden"):
+            continue  # about the source: never studied
         entry = progress.get(card.get("idea_id")) if isinstance(card, dict) else None
         if not entry or not entry.get("due") or str(entry["due"])[:10] <= today:
             due += 1
-    for question in questions:
+    for question in shown_questions(questions):
+        if isinstance(question, dict) and question.get("hidden"):
+            continue
         entry = progress.get(question.get("idea_id")) if isinstance(question, dict) else None
         if entry and level_of(entry, today) in ("learning", "familiar"):
             due += 1

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from typing import List
 from database import get_supabase
 from services.llm import generate_nclex_questions
+from services.text_processing import asked_as
 from auth_utils import get_user_id
 from ids import require_uuid
 from services.entitlements import record, require
@@ -58,7 +59,10 @@ def generate_nclex(guide_id: str, authorization: str = Header(default="")):
     # Return cached questions if already generated
     cached = row.get("nclex_questions")
     if cached:
-        return {"questions": cached, "cached": True}
+        # Saved before the stems were checked: each is asked as the app asks any question (an opening
+        # that only names the source trimmed), in its place, since answers are checked by position.
+        return {"questions": [{**q, "stem": asked_as(q["stem"])} if isinstance(q, dict) and isinstance(q.get("stem"), str) else q
+                              for q in cached], "cached": True}
 
     require(user_id, "nclex")
     questions = generate_nclex_questions(combined)
