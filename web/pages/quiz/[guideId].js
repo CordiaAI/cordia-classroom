@@ -5,7 +5,7 @@ import { apiFetch, openUpgrade } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import { LEARN_LADDER_V2 } from '../../lib/featureFlags';
 import useSessionTracker from '../../lib/useSessionTracker';
-import { PRO_TYPES, TYPE_LABELS } from '../../lib/retainEngine.mjs';
+import { PRO_TYPES, TYPE_LABELS, askable } from '../../lib/retainEngine.mjs';
 import { ArrowLeft, Lock, ListChecks, Minus, PenLine, Play, Plus, RefreshCw, Repeat, TextCursorInput, Shuffle as PairsIcon, Timer } from 'lucide-react';
 import { parseQAPairs } from '../../lib/formatters';
 import { clampCount, minutesFor, quizLimit, recommendedCount } from '../../lib/quizLength.mjs';
@@ -96,8 +96,9 @@ export default function QuizPage() {
       setTitle(guide?.guide?.title || '');
       setViewer(guide?.guide?.viewer || null);
       if (guide?.unavailable) setGone(guide);
-      // The saved quiz's size, or its Q/A pairs before one is built (a quiz uses at most the first 50).
-      const saved = Array.isArray(guide?.guide?.quiz_questions) ? guide.guide.quiz_questions.length : 0;
+      // The saved quiz's size (the questions it can ask: a hidden one, about the source, never is), or
+      // its Q/A pairs before one is built (a quiz uses at most the first 50).
+      const saved = Array.isArray(guide?.guide?.quiz_questions) ? guide.guide.quiz_questions.filter(askable).length : 0;
       const pairs = saved || parseQAPairs(guide?.guide?.study_guide || '').length;
       setAvailable(pairs);
       setCount(recommendedCount(pairs));

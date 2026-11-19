@@ -277,7 +277,9 @@ export async function apiFetch(path, { reportFailure = false, quietLimit = false
 
     const data = await responseJson(resp);
     if (!quietLimit) announceLimit(resp, data);
-    else if (resp.status === 402 && data && typeof data === 'object') data.limit_reached = true;
+    // Every 402 says so on the reply, quiet or not, so a caller (a Written card out of AI checks) can
+    // tell a plan limit from a failed try whatever shape the detail has.
+    if (resp.status === 402 && data && typeof data === 'object' && !Array.isArray(data)) data.limit_reached = true;
     if (withStatus && data && typeof data === 'object' && !Array.isArray(data)) data.httpStatus = resp.status;
     return data;
   } catch (e) {

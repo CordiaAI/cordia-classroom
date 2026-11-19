@@ -2,7 +2,7 @@
 // with (Learn's types) and there is one clock for the whole test. Marking: lib/submitQuiz.mjs.
 // Ideas missed on the test drop back to Learning so Learn's next rounds pick them up.
 
-import { conceptAnswer, shuffled } from './retainEngine.mjs';
+import { askable, shuffled } from './retainEngine.mjs';
 import { LEARNING, cardFor, cleanTypes } from './learnEngine.mjs';
 
 // A flashcard flip shows the answer, so a test asks those students with choices instead.
@@ -15,7 +15,7 @@ export const DEFAULT_MINUTES = 1;
 export function buildTest(questions, types, seed = Date.now() % 233280) {
   const picked = cleanTypes(types).filter(type => TEST_TYPES.includes(type));
   const ways = picked.length ? picked : ['mc'];
-  const concepts = questions.map((_, index) => index).filter(index => conceptAnswer(questions[index]));
+  const concepts = questions.map((_, index) => index).filter(index => askable(questions[index]));
   return shuffled(concepts, seed).map((concept, position) => {
     const type = cardFor(ways[position % ways.length], questions[concept]);
     return { id: position, concept, type };

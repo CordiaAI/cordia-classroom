@@ -17,6 +17,7 @@ from ids import is_uuid, require_uuid
 from rate_limit import limiter
 from routers.guides import require_own_folder
 from services.entitlements import require
+from services.text_processing import shown_guide
 
 router = APIRouter(prefix="/study-set-jobs", tags=["jobs"])
 JOB_COLUMNS = "id,status,progress,study_set_id,error,title,source,client_name,created_at,updated_at"
@@ -95,7 +96,7 @@ def job_status(job_id: str, authorization: str = Header(default="")):
     guide = None
     if job["status"] == "done" and job.get("study_set_id"):
         found = db.table("study_guides").select("*").eq("id", job["study_set_id"]).eq("user_id", user_id).limit(1).execute().data
-        guide = found[0] if found else None
+        guide = shown_guide(found[0]) if found else None
     return {"job": job, "guide": guide}
 
 
