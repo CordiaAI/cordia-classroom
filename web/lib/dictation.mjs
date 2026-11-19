@@ -101,7 +101,7 @@ export function dictationError(code, heardAnything = false) {
   switch (String(code || '')) {
     case 'aborted': return '';
     case 'not-allowed':
-    case 'service-not-allowed': return 'Mic blocked. Allow it in settings.';
+    case 'service-not-allowed': return 'Allow the mic in your browser.';
     case 'no-speech': return heardAnything ? '' : "Didn't hear that. Try again.";
     case 'audio-capture': return 'No microphone found.';
     case 'network': return 'No connection. Try again.';

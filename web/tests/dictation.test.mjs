@@ -158,7 +158,7 @@ test('a box that holds only so much gets the words cut to fit, never what was ty
 });
 
 test('the recognizer errors say one plain thing', () => {
-  assert.equal(dictationError('not-allowed'), 'Mic blocked. Allow it in settings.');
+  assert.equal(dictationError('not-allowed'), 'Allow the mic in your browser.');
   assert.equal(dictationError('network'), 'No connection. Try again.');
   assert.equal(dictationError('audio-capture'), 'No microphone found.');
   assert.equal(dictationError('service-not-allowed'), dictationError('not-allowed'));

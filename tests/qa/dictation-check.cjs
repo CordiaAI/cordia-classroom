@@ -216,7 +216,7 @@ async function suite(label, browserType, prefixed) {
     await context.close();
   });
 
-  for (const [code, wanted] of [['not-allowed', /Mic blocked.*settings/], ['no-speech', /Didn't hear that/], ['network', /No connection/], ['audio-capture', /No microphone found/]]) {
+  for (const [code, wanted] of [['not-allowed', /Allow the mic in your browser/], ['no-speech', /Didn't hear that/], ['network', /No connection/], ['audio-capture', /No microphone found/]]) {
     await check(`${label}: a ${code} error says so in the line under the box and ends listening`, async () => {
       const { context, page } = await open(browser, prefixed);
       await mic(page).click();
