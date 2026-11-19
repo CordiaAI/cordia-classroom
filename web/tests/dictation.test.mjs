@@ -158,12 +158,14 @@ test('a box that holds only so much gets the words cut to fit, never what was ty
 });
 
 test('the recognizer errors say one plain thing', () => {
-  assert.equal(dictationError('not-allowed'), 'Your browser is blocking the microphone. Allow it in site settings.');
+  assert.equal(dictationError('not-allowed'), 'Microphone blocked. Allow it in site settings.');
+  assert.equal(dictationError('network'), 'Voice needs a connection. Try again.');
+  assert.equal(dictationError('audio-capture'), 'No microphone found.');
   assert.equal(dictationError('service-not-allowed'), dictationError('not-allowed'));
   assert.equal(dictationError('no-speech'), "Didn't catch anything. Try again.");
   assert.equal(dictationError('no-speech', true), '', 'words were heard, so "nothing" would be wrong');
-  assert.match(dictationError('network'), /connect|connection/i);
-  assert.match(dictationError('audio-capture'), /microphone/i);
+  // One line in the narrowest box (the 360px drawer, 312px of text at 14px): 48 characters at most.
+  for (const code of ['not-allowed', 'no-speech', 'network', 'audio-capture', 'something-new']) assert.ok(dictationError(code).length <= 48, `${code}: ${dictationError(code).length}`);
   assert.equal(dictationError('aborted'), '', 'we stopped it ourselves');
   assert.ok(dictationError('something-new'), 'any other error still says something');
   assert.equal(dictationHeard(startDictation('', 0, 0)), false);
@@ -203,4 +205,26 @@ test('the dictation line holds one line, on one line, and never uses a raw colou
   assert.match(css, /\.dictation-interim \{[^}]*white-space: nowrap; overflow: hidden/, 'interim words stay on one line');
   assert.match(css, /\.dictation-interim\.is-error \{[^}]*color: var\(--error\)/);
   assert.doesNotMatch(css.match(/\.dictation-slot[^\n]*\n(?:\.dictation-interim[^\n]*\n)+/)?.[0] || '', /#[0-9a-f]{3,8}\b|rgba?\(/i);
+});
+
+test('a restarted recognizer says the same final in another case: it is the same words, once', () => {
+  const steps = play('', [0, 0], [
+    event(0, heard('what time', true)),
+    event(1, heard('what time', true), heard('is it', true)),
+    event(0, heard('What time', true)),
+  ]);
+  assert.equal(dictationText(final(steps)), 'What time is it');
+  const again = play('', [0, 0], [event(0, heard('hello there', true)), event(0, heard('Hello there', true))]);
+  assert.equal(dictationText(final(again)), 'Hello there');
+  const other = play('', [0, 0], [event(0, heard('hello there', true)), event(1, heard('hello there', true), heard('more', true)), event(0, heard('Good morning', true))]);
+  assert.equal(dictationText(final(other)), 'hello there more Good morning', 'other words after a restart are still added');
+});
+
+test('an error stays until the next mic press or a keystroke: no timer', () => {
+  const source = read('lib/useDictation.js');
+  assert.doesNotMatch(source, /setTimeout|ERROR_SHOWN/, 'nothing clears the error on its own');
+  assert.match(source, /if \(text !== errorTextRef\.current\) setError\(''\)/, 'typing clears it');
+  assert.match(source, /if \(active\) \{ active\.recognition\.stop\(\); return; \}\s*if \(!Recognition\) return;\s*setError\(''\)/, 'the next mic press clears it');
+  assert.match(read('styles/system.css'), /\.dictation-interim\.is-error \{[^}]*\}/);
+  assert.doesNotMatch(read('styles/system.css').match(/\.dictation-interim\.is-error \{[^}]*\}/)[0], /white-space: normal/, 'an error line does not wrap');
 });

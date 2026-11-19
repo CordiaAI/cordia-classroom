@@ -41,11 +41,15 @@ const interim = page => page.evaluate(() => document.querySelector('.dictation-i
 const emit = (page, index, rows) => page.evaluate(([i, r]) => window.__emit(i, r), [index, rows]);
 const mic = page => page.locator('button.composer-icon[aria-label*="isten"], button.composer-icon[aria-label*="Talk"]');
 
-async function open(browser, prefixed, { width = 1440, height = 900, url = '/home' } = {}) {
+// url: a path, or a function of the mock state (a guide's page needs a guide's id); before(page): routes to add.
+async function open(browser, prefixed, { width = 1440, height = 900, url = '/home', before } = {}) {
   const context = await browser.newContext({ viewport: { width, height } });
   await context.addInitScript(FAKE(prefixed));
-  await install(context, createState(true));
+  const state = createState(true);
+  await install(context, state);
   const page = await context.newPage();
+  if (before) await before(page);
+  if (typeof url === 'function') url = url(state);
   const problems = [];
   page.on('pageerror', error => problems.push(error.message));
   await page.goto(BASE + '/login');
@@ -58,7 +62,7 @@ async function open(browser, prefixed, { width = 1440, height = 900, url = '/hom
     await page.waitForTimeout(1200);
     await page.waitForSelector('button.composer-icon[aria-label="Talk to the Tutor"]', { timeout: 10000 });
   }
-  return { context, page, problems };
+  return { context, page, problems, state };
 }
 
 const GROWING = ['What', 'What time', 'What time is', 'What time is it', 'What time is it right'];
@@ -201,7 +205,7 @@ async function suite(label, browserType, prefixed) {
     await context.close();
   });
 
-  for (const [code, wanted] of [['not-allowed', /blocking the microphone.*site settings/], ['no-speech', /Didn't catch anything/], ['network', /connect/]]) {
+  for (const [code, wanted] of [['not-allowed', /Microphone blocked.*site settings/], ['no-speech', /Didn't catch anything/], ['network', /needs a connection/], ['audio-capture', /No microphone found/]]) {
     await check(`${label}: a ${code} error says so in the line under the box and ends listening`, async () => {
       const { context, page } = await open(browser, prefixed);
       await mic(page).click();
@@ -253,6 +257,124 @@ async function suite(label, browserType, prefixed) {
     await page.waitForTimeout(100);
     const fit = await page.evaluate(() => { const note = document.querySelector('.dictation-interim').getBoundingClientRect(); const form = document.querySelector('.composer').getBoundingClientRect(); return { inside: note.left >= form.left && note.right <= form.right + 1, scroll: document.documentElement.scrollWidth <= window.innerWidth }; });
     expect(fit.inside && fit.scroll, 'the line wraps inside the composer, no sideways scroll ' + JSON.stringify(fit));
+    await context.close();
+  });
+
+  // The study aid and the Tutor drawer hold the same line. A long phrase must not widen what holds it,
+  // and an error is one line that stays until the next mic press or a keystroke.
+  const LONG = 'Why does the derivative of x squared equal two x and how do I show it from the definition of a limit step by step please and then what';
+  // Layout shift from `scope` (a selector) only: other things on a guide page (a tip that arrives after a few seconds) are not the line's.
+  const watch = (page, scope = 'body') => page.evaluate(scope => { window.__cls = 0; new PerformanceObserver(list => { for (const entry of list.getEntries()) if (entry.sources.some(source => source.node && source.node.nodeType === 1 && source.node.closest(scope))) window.__cls += entry.value; }).observe({ type: 'layout-shift' }); }, scope);
+  const lineHeight = page => page.evaluate(() => document.querySelector('.dictation-slot [role=alert], .dictation-slot .dictation-interim')?.getBoundingClientRect().height || 0);
+  const aidRoutes = async page => {
+    await page.route(/localhost:8000\/learning-style/, route => route.fulfill({ json: { enabled: true, style: 'aural' } }));
+    await page.route(/localhost:8000\/study-aids$/, route => route.fulfill({ json: { mode: 'aural', script: 'Concept one is an idea explained in plain words.', task: 'Explain concept one to a friend in your own words.' } }));
+  };
+  const openAid = async (width, height) => {
+    const opened = await open(browser, prefixed, { width, height, url: state => `/guide/${state.guides[0].id}?learn=1`, before: aidRoutes });
+    await opened.page.getByText('By page', { exact: true }).click({ timeout: 90000 });
+    await opened.page.waitForSelector('.study-aid-attempt textarea', { timeout: 60000 });
+    await opened.page.waitForTimeout(2500);
+    await opened.page.locator('.study-aid-attempt textarea').scrollIntoViewIfNeeded();
+    await opened.page.waitForTimeout(400);
+    return opened;
+  };
+  const sayIt = page => page.evaluate(() => [...document.querySelectorAll('.study-aid-attempt .study-aid-actions button')].find(button => /Say it|Stop/.test(button.textContent)).click());
+  const aidBox = page => page.evaluate(() => { const rect = selector => { const element = document.querySelector(selector); return element ? [element.getBoundingClientRect().left, element.getBoundingClientRect().width, element.getBoundingClientRect().height].map(Math.round).join('x') : null; }; return { panel: rect('.study-aid-panel'), textarea: rect('.study-aid-attempt textarea'), scroll: document.documentElement.scrollWidth }; });
+
+  for (const [width, height] of [[390, 844], [1440, 900]]) {
+    await check(`${label}: study aid at ${width}px, a long interim phrase leaves the panel as wide as before (CLS 0)`, async () => {
+      const { context, page } = await openAid(width, height);
+      await watch(page, '.study-aid-panel');
+      const idle = await aidBox(page);
+      await sayIt(page);
+      await page.waitForTimeout(300);
+      same(JSON.stringify(await aidBox(page)), JSON.stringify(idle), 'listening changes no width');
+      await emit(page, 0, [[LONG, false]]);
+      await page.waitForTimeout(250);
+      same(JSON.stringify(await aidBox(page)), JSON.stringify(idle), 'a long interim phrase changes no width');
+      expect((await lineHeight(page)) < 24, 'the phrase stays one line high');
+      await emit(page, 0, [['Concept one is plain words', true]]);
+      await page.evaluate(() => window.__silence());
+      await page.waitForTimeout(300);
+      same(JSON.stringify(await aidBox(page)), JSON.stringify(idle), 'ending changes no width');
+      same(await page.evaluate(() => window.__cls), 0, 'layout shift score');
+      await context.close();
+    });
+  }
+
+  await check(`${label}: study aid at 390px, the error is one line and nothing moves when it comes or goes (CLS 0)`, async () => {
+    const { context, page } = await openAid(390, 844);
+    await watch(page, '.study-aid-panel');
+    const idle = await aidBox(page);
+    await sayIt(page);
+    await page.evaluate(() => window.__error('not-allowed'));
+    await page.waitForTimeout(300);
+    expect((await lineHeight(page)) < 24, 'the error is one line high: ' + (await lineHeight(page)));
+    same(JSON.stringify(await aidBox(page)), JSON.stringify(idle), 'the error moves nothing');
+    await page.waitForTimeout(8600); // longer than the old timer: it stays until the student acts
+    same(await page.evaluate(() => Boolean(document.querySelector('.dictation-slot [role=alert]'))), true, 'the error is still there after 8.6 s');
+    await page.locator('.study-aid-attempt textarea').click();
+    await page.keyboard.type('a');
+    await page.waitForTimeout(200);
+    same(await page.evaluate(() => document.querySelector('.dictation-slot [role=alert]')), null, 'a keystroke clears it');
+    same(JSON.stringify((await aidBox(page)).panel), JSON.stringify(idle.panel), 'clearing it moves nothing');
+    same(await page.evaluate(() => window.__cls), 0, 'layout shift score');
+    await context.close();
+  });
+
+  await check(`${label}: Tutor drawer (360px), the longest error is one line, the interim line does not widen it, CLS 0`, async () => {
+    const { context, page } = await open(browser, prefixed, { url: state => `/guide/${state.guides[0].id}` });
+    const bubble = page.locator('button.c-tutor-bubble');
+    await bubble.waitFor({ timeout: 60000 });
+    await bubble.click();
+    await page.waitForSelector('#cordia-tutor-drawer .cordia-tutor-mic', { timeout: 60000 });
+    await page.waitForTimeout(1200);
+    // Words that land in an empty drawer box make Send appear: that is the box filling, not the line. Start with text in it.
+    await page.locator('#cordia-tutor-drawer textarea').fill('Explain');
+    await page.waitForTimeout(300);
+    await watch(page);
+    const drawer = () => page.evaluate(() => { const rect = document.querySelector('#cordia-tutor-drawer').getBoundingClientRect(); const slot = document.querySelector('#cordia-tutor-drawer .dictation-slot').getBoundingClientRect(); return `${Math.round(rect.width)} ${Math.round(slot.top)}`; });
+    const idle = await drawer();
+    const micButton = page.locator('#cordia-tutor-drawer .cordia-tutor-mic');
+    await micButton.click();
+    await emit(page, 0, [[LONG, false]]);
+    await page.waitForTimeout(200);
+    same(await drawer(), idle, 'a long interim phrase moves and widens nothing');
+    await emit(page, 0, [['the chain rule', true]]);
+    await page.evaluate(() => window.__silence());
+    await page.waitForTimeout(250);
+    for (const code of ['not-allowed', 'network', 'audio-capture']) {
+      await micButton.click();
+      await page.evaluate(name => window.__error(name), code);
+      await page.waitForTimeout(250);
+      const high = await lineHeight(page);
+      expect(high > 0 && high < 24, `${code} is one line high in the drawer: ${high}`);
+      const clipped = await page.evaluate(() => { const line = document.querySelector('#cordia-tutor-drawer .dictation-slot [role=alert]'); return line.scrollWidth > line.clientWidth; });
+      expect(!clipped, `${code} is not cut off in the drawer`);
+      same(await drawer(), idle, `${code} moves nothing`);
+    }
+    await micButton.click(); // the next press clears it
+    await page.waitForTimeout(200);
+    same(await page.evaluate(() => document.querySelector('#cordia-tutor-drawer .dictation-slot [role=alert]')), null, 'the next mic press clears the error');
+    same(await drawer(), idle, 'clearing moves nothing');
+    same(await page.evaluate(() => window.__cls), 0, 'layout shift score');
+    await context.close();
+  });
+
+  await check(`${label}: the interim line fades at the left edge once it is scrolled, and the composer's bottom padding leaves the words 12px from the edge`, async () => {
+    const { context, page } = await open(browser, prefixed);
+    await mic(page).click();
+    await emit(page, 0, [['Why', false]]);
+    await page.waitForTimeout(100);
+    same(await page.evaluate(() => document.querySelector('.dictation-interim').dataset.clipped), 'false', 'a short phrase is not faded');
+    await emit(page, 0, [[LONG, false]]);
+    await page.waitForTimeout(100);
+    const faded = await page.evaluate(() => { const line = document.querySelector('.dictation-interim'); const style = getComputedStyle(line); return { clipped: line.dataset.clipped, mask: style.maskImage || style.webkitMaskImage, scrolled: line.scrollLeft > 0 }; });
+    expect(faded.clipped === 'true' && faded.scrolled && /gradient/.test(faded.mask), 'a long phrase fades on the left: ' + JSON.stringify(faded));
+    const gap = await page.evaluate(() => { const line = document.querySelector('.dictation-interim'); const range = document.createRange(); range.selectNodeContents(line); const text = range.getBoundingClientRect(); const composer = document.querySelector('.composer').getBoundingClientRect(); return { padding: getComputedStyle(document.querySelector('.composer')).paddingBottom, below: Math.round((composer.bottom - text.bottom) * 10) / 10 }; });
+    same(gap.padding, '11px', 'bottom padding while the line shows');
+    expect(gap.below >= 11.5 && gap.below <= 13, 'the words end about 12px from the composer edge: ' + gap.below);
     await context.close();
   });
   await browser.close();

@@ -1184,12 +1184,18 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 .composer-note.is-error { color: var(--error); }
 /* Dictation (components/DictationLine.js): the slot holds one line whenever the browser can dictate, so the box
    never moves. While the mic is on, the words still being recognized show in it, apart from the box, in
-   italics on one line with the newest in view (a plain "Listening…" before any are heard). An error from the
-   recognizer is one plain line in the same slot, in the error colour. */
-.dictation-slot { margin: 0 0.5rem 0.125rem; min-height: 1.225rem; }
-.dictation-interim { margin: 0; color: var(--muted-strong); font: 500 0.875rem/1.4 var(--font-sans); white-space: nowrap; overflow: hidden; }
+   italics on one line with the newest in view (a plain "Listening…" before any are heard); once they run past
+   the left edge they fade out there. An error from the recognizer is one plain line in the same slot, in the
+   error colour. The line's own width is 0 with a floor of the slot's: a long phrase never counts toward the
+   width of whatever holds the slot (a panel, the drawer), it only scrolls inside it. */
+.dictation-slot { margin: 0 0.5rem; min-height: 1.225rem; }
+.dictation-interim { width: 0; min-width: 100%; margin: 0; color: var(--muted-strong); font: 500 0.875rem/1.4 var(--font-sans); white-space: nowrap; overflow: hidden; }
 .dictation-interim.is-heard { font-style: italic; }
-.dictation-interim.is-error { color: var(--error); font-style: normal; white-space: normal; }
+.dictation-interim[data-clipped='true'] { -webkit-mask-image: var(--fade-edge-left); mask-image: var(--fade-edge-left); }
+.dictation-interim.is-error { color: var(--error); font-style: normal; text-overflow: ellipsis; }
+/* The slot's line has its own leading under the text, so with it showing the composer's bottom padding is
+   11px: the words end 12px from the edge (DESIGN-SPEC 4.2; it was 10px plus the slot's 2px margin). */
+.composer:has(> .dictation-slot) { padding-bottom: 11px; }
 .cordia-tutor > .dictation-slot { margin: -0.25rem 1.5rem 0.5rem; }
 
 /* The class picker (components/ClassPicker.js): a quiet button with the class's dot and code. */

@@ -48,21 +48,29 @@ const TERMS = new Set(['FA', 'FALL', 'SP', 'SPR', 'SPRNG', 'SPRING', 'SU', 'SUM'
 // Words that sit before a number without naming a department ("Sec 02", "Week 5", "COVID 19"), and
 // words an all-caps title starts with ("INTRO TO CS 101").
 const NOT_DEPARTMENTS = new Set(['SEC', 'SECT', 'SECTION', 'LAB', 'LEC', 'LECTURE', 'WEEK', 'WK', 'UNIT', 'MOD', 'MODULE', 'CH', 'CHAP', 'CHAPTER', 'PART', 'PT', 'SESSION', 'GROUP', 'COHORT', 'TEAM', 'BLOCK', 'CLASS', 'COVID', 'COURSE', 'TERM', 'YEAR', 'GRADE', 'LEVEL', 'ROOM', 'RM', 'CRN', 'STEP', 'DAY', 'PERIOD', 'QTR']);
+// Words that go before a four-digit year, not a course number ("FY 2025", "Class of 2025"); the
+// terms above do too ("Spring 2025").
+const YEAR_WORDS = new Set(['OF', 'IN', 'FY', 'AY', 'CY', 'SY', 'CLASS', 'YEAR', 'SEMESTER', 'SEM']);
 const LEADING_WORDS = new Set(['TO', 'OF', 'AND', 'THE', 'FOR', 'IN', 'ON', 'AT', 'A', 'AN', 'INTRO', 'INTRODUCTION']);
 
 // "EH-102-136" or "MUL 101 MUL-101-102: Introduction to Music" -> "EH 102", "MUL 101"; "Art History
 // 210 (ART HIST 210)" -> "ART HIST 210": the department (one word, or two in capitals) and level, the
 // way students name a class. A class named only in words keeps its name, cut at a dash, a colon, a
 // bracket or "Section", without its term ("SP25 Adult Health I" -> "Adult Health I"). When unsure
-// (a section code, a term, "Week 5", "COVID 19") it names nothing, and the label says "your".
+// (a section code, a term, "Week 5", "COVID 19") it names nothing, and the label says "your". A
+// number from 1900 to 2099 is a course level ("ECE 2035") unless a term or year word sits right
+// before it ("Fall 2025", "FY 2025", "Class of 2025").
 export function classShort(course) {
   const text = String(course || '').trim();
   const pattern = /\b([A-Z]{2,5}[\s_-]+[A-Z]{2,5}|[A-Za-z]{2,5})[\s_-]*(\d{3,4}[A-Za-z]?)\b/g;
-  for (const [, dept, level] of text.matchAll(pattern)) {
+  for (const { 1: dept, 2: level, index } of text.matchAll(pattern)) {
     const parts = dept.split(/[\s_-]+/);
     while (parts.length > 1 && LEADING_WORDS.has(parts[0].toUpperCase())) parts.shift();
     if (parts.some(part => TERMS.has(part.toUpperCase()) || NOT_DEPARTMENTS.has(part.toUpperCase()))) continue;
-    if (/^(19|20)\d\d$/.test(level)) continue;
+    if (/^(19|20)\d\d$/.test(level)) {
+      const before = text.slice(0, index).match(/([A-Za-z]+)[\s_-]*$/)?.[1]?.toUpperCase();
+      if (parts.some(part => YEAR_WORDS.has(part.toUpperCase())) || TERMS.has(before) || YEAR_WORDS.has(before)) continue;
+    }
     return `${parts.join(' ').toUpperCase()} ${level.toUpperCase()}`;
   }
   const name = text
@@ -81,6 +89,10 @@ export function classShort(course) {
 // A leading id Canvas puts on an assignment ("A05", "A07AA", "HW3", "PA3"), and a section code
 // ("NUR-210-01"). Part words ("Wk5", "Ch5", "Pt2", "U2") are not ids: the number says which part.
 const ASSIGNMENT_ID = /^(?:a|as|asg|dq|hw|pa|pr|ps|q|ws)(?:\d{1,3}|\d{2,3}[a-z]{1,3})$/i;
+// An id that leads the title, with something after it: "HW 6:" (a space before the number, then a
+// colon), "P4:" and "MP2 -" (a programming project; only with a colon or dash after, since "P53 Pathway
+// Quiz" is a protein).
+const SPACED_ID = /^(?:(?:a|as|asg|dq|hw|pa|pr|ps|q|ws|p|mp)\s+\d{1,3}[A-Za-z]{0,3}\s*:|(?:p|mp)\d{1,2}\s*[:–—-])\s+(?=\S)/i;
 const SECTION_CODE = /^[A-Za-z]{2,5}[-_]\d{3,4}[A-Za-z]?(?:[-_]\d{1,3})?$/;
 const isCode = token => { const bare = token.replace(/[:.,–—-]+$/, ''); return ASSIGNMENT_ID.test(bare) || SECTION_CODE.test(bare) || /^\d{1,3}$/.test(bare); };
 
@@ -98,7 +110,9 @@ export function planTitle(raw) {
   let title = String(raw || '')
     .replace(/\s*\[[^\]]*\]\s*$/, '')
     .replace(/\s*\(\s*\d+\s*(?:of|\/)\s*\d+\s*\)/gi, '')
-    .replace(/\s*#\s*\d+[A-Za-z]?/g, '');
+    .replace(/\s*#\s*\d+[A-Za-z]?/g, '')
+    .trimStart()
+    .replace(SPACED_ID, '');
   const tokens = title.split(/\s+/).filter(Boolean);
   if (tokens.every(isCode)) return '';
   while (tokens.length > 1 && isCode(tokens[0]) && !tokens.every(isCode)) tokens.shift();

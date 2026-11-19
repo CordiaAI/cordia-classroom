@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { applyResults, dictationError, dictationHeard, dictationInterim, dictationText, finishDictation, startDictation } from './dictation.mjs';
 
-const ERROR_SHOWN_MS = 8000;
-
 // Dictation into a text box (the Tutor's composer, a study-aid answer): the rules are in
 // dictation.mjs. The box gets the words that are final, where the caret was when the mic went on;
 // `interim` is what is still being recognized, to show apart from the box.
@@ -12,8 +10,9 @@ const ERROR_SHOWN_MS = 8000;
 // { start, end } selection (or nothing, to go at the end). Stop and silence keep what was heard;
 // abort (Send, a new chat, unmount) and the student typing while listening drop what was still
 // interim and stop, so nothing lands in a message that has gone or been changed. error is one plain
-// line when the recognizer failed (the mic is blocked, nothing was heard, no connection); it goes
-// on the next try, or after a few seconds.
+// line when the recognizer failed (the mic is blocked, nothing was heard, no connection); it stays
+// until the student presses the mic again or types in the box, never on a timer, so the page does
+// not change under them.
 export default function useDictation({ text, setText, lang = 'en-US', maxLength }) {
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState('');
@@ -37,11 +36,14 @@ export default function useDictation({ text, setText, lang = 'en-US', maxLength 
 
   useEffect(() => abort, [abort]);
 
+  // The error stays until the next mic press (toggle clears it) or a keystroke in the box. The text
+  // the box held when the error came in (the words heard up to then included) is the baseline.
+  const errorTextRef = useRef(null);
   useEffect(() => {
-    if (!error) return undefined;
-    const timer = setTimeout(() => setError(''), ERROR_SHOWN_MS);
-    return () => clearTimeout(timer);
-  }, [error]);
+    if (!error) { errorTextRef.current = null; return; }
+    if (errorTextRef.current === null) { errorTextRef.current = text; return; }
+    if (text !== errorTextRef.current) setError('');
+  }, [error, text]);
 
   // The student typed (or Send cleared the box) while listening: the box is theirs again.
   useEffect(() => {

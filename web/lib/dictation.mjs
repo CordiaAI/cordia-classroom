@@ -27,6 +27,8 @@ const words = value => String(value || '').replace(/\s+/g, ' ').trim();
 const spoken = state => Object.keys(state.finals).map(Number).sort((a, b) => a - b).map(index => state.finals[index]).filter(Boolean).join(' ');
 // The key after every one used so far, dropped ones included.
 const nextKey = state => Math.max(-1, ...Object.keys(state.finals).map(Number), ...Object.keys(state.dropped || {}).map(Number)) + 1;
+// The same words, whatever the case ("what time" and "What time").
+const sameWords = (next, held) => next.toLowerCase() === held.toLowerCase();
 // `next` is `held` and goes on ("hello" -> "hello world", "hello" -> "Hello, world").
 const goesOn = (next, held) => next.length > held.length && next.toLowerCase().startsWith(held.toLowerCase()) && /^[\s,.;:!?]/.test(next.slice(held.length));
 
@@ -50,8 +52,10 @@ export function applyResults(state, event) {
     }
     let key = index + base;
     if (dropped[key] || finals[key] === transcript) continue;
-    // Back at an index already held, with other words: a new list, so add after what is held.
-    if (backwards && finals[key] !== undefined && !goesOn(transcript, finals[key])) {
+    // Back at an index already held, with other words: a new list, so add after what is held. The
+    // same words in another case are the same final said again (a restarted recognizer capitalizes
+    // it): they replace it.
+    if (backwards && finals[key] !== undefined && !sameWords(transcript, finals[key]) && !goesOn(transcript, finals[key])) {
       base = nextKey({ finals, dropped }) - index;
       key = index + base;
     }
@@ -92,15 +96,15 @@ export function dictationText(state, maxLength = Infinity) {
 }
 
 // What the recognizer's error says, in plain words for the line under the box ('' for nothing to
-// say). `heardAnything`: words were heard before it stopped, so "no speech" would not be true.
+// say). Each is short enough for one line in the narrowest box (the 360px Tutor drawer). `heardAnything`: words were heard before it stopped, so "no speech" would not be true.
 export function dictationError(code, heardAnything = false) {
   switch (String(code || '')) {
     case 'aborted': return '';
     case 'not-allowed':
-    case 'service-not-allowed': return 'Your browser is blocking the microphone. Allow it in site settings.';
+    case 'service-not-allowed': return 'Microphone blocked. Allow it in site settings.';
     case 'no-speech': return heardAnything ? '' : "Didn't catch anything. Try again.";
-    case 'audio-capture': return 'No microphone found. Check that one is plugged in.';
-    case 'network': return "Voice input couldn't connect. Check your connection and try again.";
+    case 'audio-capture': return 'No microphone found.';
+    case 'network': return 'Voice needs a connection. Try again.';
     default: return 'Voice input stopped. Try again.';
   }
 }

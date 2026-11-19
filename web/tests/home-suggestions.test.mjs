@@ -178,3 +178,24 @@ test('?cards= is a whole number from 1 to 100, and anything else falls back to 3
   assert.equal(cardLimit('1'), 1);
   for (const bad of [undefined, '', '0', '-5', '12.5', 'abc', '50; drop', null]) assert.equal(cardLimit(bad), 30, String(bad));
 });
+
+test('a course number from 1900 to 2099 is a level, unless a term or year word sits right before it', () => {
+  assert.equal(classShort('ECE 2035'), 'ECE 2035');
+  assert.equal(classShort('ARH 2051 Art History II'), 'ARH 2051');
+  assert.equal(classShort('MATH 2024'), 'MATH 2024');
+  assert.equal(classShort('Fall 2025 - ECE 2035'), 'ECE 2035');
+  assert.equal(classShort('2025SP MATH-1314-002'), 'MATH 1314');
+  for (const course of ['Fall 2025', 'Spring 2026', 'FY 2025', 'Class of 2025', 'Spring ECE 2035']) assert.equal(classShort(course), '', course);
+  assert.equal(plan('Quiz 4', 'ECE 2035'), "Plan ECE 2035's Quiz 4");
+});
+
+test('a leading id goes: "HW 6:" with a space, "P4:" and "MP2 -", but "P53 Pathway Quiz" keeps its protein', () => {
+  assert.equal(planTitle('HW 6: Dynamic Programming'), 'Dynamic Programming');
+  assert.equal(planTitle('Q 2: Limits'), 'Limits');
+  assert.equal(planTitle('P4: Malloc Lab'), 'Malloc lab');
+  assert.equal(planTitle('MP2 - Linked Lists'), 'Linked Lists');
+  assert.equal(planTitle('P53 Pathway Quiz'), 'P53 Pathway quiz');
+  assert.equal(planTitle('Lab 5: Binary Search Trees'), 'Lab 5: Binary Search Trees', 'Lab is not an id word');
+  assert.equal(planTitle('HW 6'), 'HW 6', 'nothing after it: kept');
+  assert.equal(planTitle('Q 2 Limits'), 'Q 2 Limits', 'no colon: kept');
+});
