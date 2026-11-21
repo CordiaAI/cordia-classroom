@@ -266,3 +266,19 @@ test('an exam that starts before 8 AM goes to the Due strip, not the top of the 
   assert.equal(startsInGrid(new Date(2026, 10, 16, 21, 30)), true);
   assert.equal(startsInGrid(new Date(2026, 10, 16, 22)), false);
 });
+
+// ---- Round 3 (PR 284) ----
+
+test('a guide dated weeks before an exam is not that exam\'s readiness', () => {
+  // MA 125's guide has a Learn test date of Fri Nov 20; the class's only exam is the final, Dec 18.
+  const [final] = buildDeadlines([{ id: 'canvas-f', title: 'Final exam [MA-125-001]', due_at: new Date(2026, 11, 18, 9).toISOString(), type: 'exam' }], index);
+  const quiz = { id: 'g-nov20', title: 'Chapter 6 practice', folder_id: 'f-ma', flashcard_progress: { learn: { test_date: '2026-11-20' } } };
+  assert.equal(classExams(['f-ma'], [quiz], [], '2026-11-19')['f-ma'].guideId, 'g-nov20', 'the sidebar still rings the guide for its own date');
+  assert.equal(examGuides([final], [quiz], '2026-11-19')['canvas-f'], undefined, 'four weeks off: not the final\'s');
+  // A day off still counts (round 2), and a guide dated the final's own day is the final's.
+  const [friday] = buildDeadlines([{ id: 'canvas-q', title: 'Quiz 6 [MA-125-001]', due_at: at(21, 9), type: 'exam' }], index);
+  assert.equal(examGuides([final, friday], [quiz], '2026-11-19')['canvas-q'].id, 'g-nov20');
+  assert.equal(examGuides([final, friday], [quiz], '2026-11-19')['canvas-f'], undefined);
+  const dec18 = { id: 'g-dec18', title: 'Final review notes', folder_id: 'f-ma', flashcard_progress: { learn: { test_date: '2026-12-18' } } };
+  assert.equal(examGuides([final], [quiz, dec18], '2026-11-19')['canvas-f'].id, 'g-dec18', 'falls back to the exact-day guide');
+});

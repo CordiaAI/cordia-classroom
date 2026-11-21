@@ -412,8 +412,10 @@ export function examReviewGuide(exam, guides) {
 
 // Each exam's guide, so a ring here always matches the sidebar's: its review set, else the guide the
 // sidebar rings for the exam's class (classExams: that class's nearest Learn test date in the next
-// two weeks), given to the class's exam nearest that date; else a guide dated that very day
+// two weeks), given to the class's exam nearest that date when it is within a day of it (a guide
+// dated weeks before the final is another test's); else a guide dated that very day
 // (examReviewGuide). { [examId]: guide summary }.
+const RING_MATCH_DAYS = 1;
 export function examGuides(exams, guides, today = dayKey()) {
   const found = {};
   const all = exams || [];
@@ -426,7 +428,8 @@ export function examGuides(exams, guides, today = dayKey()) {
     const guide = (guides || []).find(item => item.id === ring.guideId);
     if (!guide || Object.values(found).some(item => item.id === guide.id)) return;
     const gap = exam => Math.abs(new Date(`${dayKey(exam.at)}T12:00:00`) - new Date(`${ring.date}T12:00:00`));
-    const nearest = open.filter(exam => exam.cls?.classId === classId && !found[exam.id]).sort((a, b) => gap(a) - gap(b) || a.at - b.at)[0];
+    const nearest = open.filter(exam => exam.cls?.classId === classId && !found[exam.id] && gap(exam) <= RING_MATCH_DAYS * 86400000 + 3600000)
+      .sort((a, b) => gap(a) - gap(b) || a.at - b.at)[0];
     if (nearest) found[nearest.id] = guide;
   });
   all.forEach(exam => { if (!found[exam.id]) { const dated = examReviewGuide(exam, guides); if (dated) found[exam.id] = dated; } });
