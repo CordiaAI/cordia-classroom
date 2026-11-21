@@ -107,20 +107,48 @@ function healthLine(health) {
     .map(([key, value]) => { const [noun, ...rest] = STAT_WORDS[key].split(' '); return [`${value} ${noun}${value === 1 ? '' : 's'}`, ...rest].join(' '); });
   return [health.last_synced_at && `Last synced ${agoLabel(health.last_synced_at)}`, ...counts].filter(Boolean).join(' · ');
 }
-// A page too long, or too slow, to bring in whole: the text ends with a line saying so; the sheet says it too.
-const PARTIAL_NOTICE = "Only part of that page came in. The last line of the text says what was left out.";
+// A page too long, or too slow, to bring in whole: the server says what was left out and why (note); this is for when it doesn't.
+const PARTIAL_NOTICE = 'Only part of that page came in.';
+// In the text above a pasted import the names are a sentence, so a long list is cut there; in the hub sheet every name is a button.
+const NOTICE_NAMES = 6;
+const noticeNames = names => `${names.slice(0, NOTICE_NAMES).join(', ')}${names.length > NOTICE_NAMES ? ` and ${names.length - NOTICE_NAMES} more` : ''}`;
+
+// A list that scrolls up and down: fades the edge that has more (fade-top / fade-bottom). A callback ref,
+// since the list only appears once a hub page comes back.
+function useEdgeFade() {
+  const [list, setList] = useState(null);
+  useEffect(() => {
+    if (!list) return undefined;
+    const update = () => {
+      const more = list.scrollHeight - list.clientHeight > 1;
+      list.classList.toggle('fade-top', more && list.scrollTop > 4);
+      list.classList.toggle('fade-bottom', more && list.scrollTop < list.scrollHeight - list.clientHeight - 4);
+    };
+    // The browser scrolls a focused name only just into view, under the fade: bring it clear (scroll-padding-block).
+    const reveal = event => event.target.scrollIntoView?.({ block: 'nearest' });
+    update();
+    list.addEventListener('scroll', update, { passive: true });
+    list.addEventListener('focusin', reveal);
+    window.addEventListener('resize', update);
+    return () => { list.removeEventListener('scroll', update); list.removeEventListener('focusin', reveal); window.removeEventListener('resize', update); };
+  }, [list]);
+  return setList;
+}
 
 function ImportSheet({ connector, onClose }) {
   // Where an import goes: the New sheet's Paste (to review first) or straight into a class in Library.
   const [classes, setClasses] = useState([]);
   const [target, setTarget] = useState('');
   const [added, setAdded] = useState(null);
+  const [hub, setHub] = useState(null); // a page that is only sub-pages: { id, names }
+  const setHubList = useEdgeFade();
   useEffect(() => { loadFolders().then(data => setClasses(Array.isArray(data?.folders) ? data.folders : [])); }, []);
   async function addToClass(file) {
-    setBusy(file.id); setError(''); setFailed(null); setAdded(null);
+    setBusy(file.id); setError(''); setFailed(null); setAdded(null); setHub(null);
     const data = await addToLibrary(connector.id, { id: file.id, title: file.title, folderId: target });
     setBusy('');
-    if (data?.guide?.id) setAdded({ ...data.guide, partial: Boolean(data.partial) });
+    if (data?.guide?.id) setAdded({ ...data.guide, partial: Boolean(data.partial), kept: Boolean(data.kept), note: data.note || (data.partial ? PARTIAL_NOTICE : '') });
+    else if (Array.isArray(data?.sub_pages) && data.sub_pages.length) setHub({ id: file.id, names: data.sub_pages });
     else setFailed({ id: file.id, text: apiErrorMessage(data?.detail, "That didn't import. Try again.") });
   }
   const [query, setQuery] = useState('');
@@ -148,13 +176,20 @@ function ImportSheet({ connector, onClose }) {
 
   async function pick(file) {
     if (target) { addToClass(file); return; }
-    setBusy(file.id); setError(''); setFailed(null);
+    setBusy(file.id); setError(''); setFailed(null); setHub(null);
     // A page with many nested toggles is read a few calls at a time on the server, for up to 25 s: wait as long as an AI job.
     const data = await apiFetch(`/connectors/${connector.id}/import`, { method: 'POST', body: JSON.stringify({ id: file.id, title: file.title }), timeoutMs: AI_TIMEOUT_MS });
-    if (!data?.text) { setBusy(''); setFailed({ id: file.id, text: apiErrorMessage(data?.detail, "That didn't import. Try again.") }); return; }
+    if (!data?.text) {
+      setBusy('');
+      if (Array.isArray(data?.sub_pages) && data.sub_pages.length) setHub({ id: file.id, names: data.sub_pages });
+      else setFailed({ id: file.id, text: apiErrorMessage(data?.detail, "That didn't import. Try again.") });
+      return;
+    }
     setBusy('');
     onClose();
-    openNewSheet('paste', { text: data.text, title: data.title, notice: data.partial ? PARTIAL_NOTICE : '' });
+    // What was left out is said above the text, not in it: the text is only the page's own notes.
+    const also = data.sub_pages?.length ? ` It also has sub-pages (${noticeNames(data.sub_pages)}). Import those one at a time.` : '';
+    openNewSheet('paste', { text: data.text, title: data.title, notice: `${data.partial ? data.note || PARTIAL_NOTICE : ''}${also}`.trim() });
   }
 
   return (
@@ -168,7 +203,7 @@ function ImportSheet({ connector, onClose }) {
           {classes.length > 0 && (
             <label className="cn-target">
               <span className="c-meta">Add to</span>
-              <select className="c-input" value={target} onChange={event => { setTarget(event.target.value); setAdded(null); setFailed(null); }}>
+              <select className="c-input" value={target} onChange={event => { setTarget(event.target.value); setAdded(null); setFailed(null); setHub(null); }}>
                 <option value="">New guide (review it first)</option>
                 {classes.map(folder => <option key={folder.id} value={folder.id}>{classLabel(folder.name).title} in Library</option>)}
               </select>
@@ -194,7 +229,22 @@ function ImportSheet({ connector, onClose }) {
               ))}
             </div>
           )}
-          {added && <p className="cn-notice" role="status">Added <a href={`/guide/${added.id}`}>{added.title}</a> to Library.{added.partial && ` ${PARTIAL_NOTICE}`}</p>}
+          {added && (
+            <p className="cn-notice" role="status">
+              {added.kept ? <><a href={`/guide/${added.id}`}>{added.title}</a> is already in Library.</> : <>Added <a href={`/guide/${added.id}`}>{added.title}</a> to Library.</>}
+            </p>
+          )}
+          {added?.partial && <p className="cn-warning" role="status">{added.note}</p>}
+          {hub && (
+            <div className="cn-hub" role="status">
+              <p className="c-meta">This page's notes are in its sub-pages. Search for one:</p>
+              <div className="cn-hub-names" ref={setHubList}>
+                {hub.names.map((name, index) => (
+                  <button key={`${name}-${index}`} type="button" className="c-btn c-btn--secondary cn-hub-name" onClick={() => { setHub(null); setQuery(name); inputRef.current?.focus(); }}>{name}</button>
+                ))}
+              </div>
+            </div>
+          )}
           {error && <p className="cn-error" role="alert">{error}</p>}
           <p className="c-meta">{target ? 'It goes into the class as notes, ready for cards and quizzes. Importing it again brings in changes.' : 'Imports open in New so you can check the text before making a guide.'}</p>
         </div>

@@ -21,7 +21,7 @@ from rate_limit import limiter
 from routers.calendar import calendar_for
 from services import composio, google_sync, library_import, planner, sync_state
 from services.llm import plan_assignment
-from services.text_processing import text_to_outline
+from services.text_processing import text_to_outline, without_import_lines
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["plans"])
@@ -235,7 +235,7 @@ def build_review(user_id: str, folder_id: str, title: str, ref: str, prefix: Opt
         raise HTTPException(status_code=404, detail="This class has no material yet. Link a Drive folder, turn on Canvas imports, or add your own notes.")
     lines: list[str] = []
     for source in reversed(sources):  # Oldest first: the order the course covered it.
-        outline = source.get("notes") or ""
+        outline = without_import_lines(source.get("notes") or "", source)
         if not any(line.startswith("- ") for line in outline.splitlines()):
             outline = text_to_outline(source.get("study_guide") or "")
         name = (source.get("title") or "Notes")[:80]

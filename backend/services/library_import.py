@@ -17,7 +17,7 @@ from typing import Optional
 
 from database import get_supabase
 from services.llm import guide_title
-from services.text_processing import text_to_outline
+from services.text_processing import build_outline
 
 log = logging.getLogger(__name__)
 
@@ -57,11 +57,21 @@ def class_folder(user_id: str, class_id: Optional[str]) -> Optional[str]:
 
 
 def upsert_source(user_id: str, *, ref: str, connector: str, title: str, text: str, folder_id: Optional[str],
-                  source_type: str, source_title: str, source_url: Optional[str] = None) -> Optional[dict]:
-    """Create or refresh the guide for one source. Returns the guide, or None when there's no text."""
-    outline = text_to_outline(text)
+                  source_type: str, source_title: str, source_url: Optional[str] = None,
+                  partial: bool = False, outcome: Optional[dict] = None) -> Optional[dict]:
+    """Create or refresh the guide for one source. Returns the guide, or None when there's no text.
+    partial: the text is only part of the source (a slow or cut-off read): it never replaces a longer
+    copy that is already filed. outcome, when given, is filled with cut (the outline keeps only its
+    first points), dropped (short lines left out) and kept (an earlier, longer copy was left as it was),
+    for a caller that tells the student; cut is true when anything at all was left out."""
+    built = build_outline(text)
+    outline = built.text
     if not outline:
         return None
+    outcome = outcome if outcome is not None else {}
+    outcome["cut"] = built.cut or bool(built.dropped)
+    outcome["points_cut"] = built.cut
+    outcome["dropped"] = built.dropped
     db = get_supabase()
     found = (db.table("study_guides").select("id,notes,title,folder_id").eq("user_id", user_id)
              .eq("external_source_id", ref).limit(1).execute().data or [None])[0]
@@ -70,7 +80,9 @@ def upsert_source(user_id: str, *, ref: str, connector: str, title: str, text: s
         link = (db.table("connector_links").select("synced_hash").eq("user_id", user_id).eq("connector", connector)
                 .eq("kind", "file").eq("cordia_id", found["id"]).limit(1).execute().data or [{}])[0]
         untouched = link.get("synced_hash") == _hash(found.get("notes") or "")
-        if untouched and (found.get("notes") or "") != outline:
+        if partial and len(found.get("notes") or "") > len(outline):
+            outcome["kept"] = True
+        elif untouched and (found.get("notes") or "") != outline:
             db.table("study_guides").update({"notes": outline}).eq("id", found["id"]).eq("user_id", user_id).execute()
             _link(user_id, connector, found["id"], ref, outline, now)
         return found
@@ -97,7 +109,7 @@ def _link(user_id: str, connector: str, guide_id: str, ref: str, outline: str, n
 
 def folder_material(user_id: str, folder_id: str, *, source_title_prefix: Optional[str] = None, limit_chars: int = 120_000) -> list[dict]:
     """The guides in a class folder (imports and the student's own), newest first, for a review set."""
-    q = get_supabase().table("study_guides").select("id,title,notes,study_guide,source_type,source_title,created_at") \
+    q = get_supabase().table("study_guides").select("id,title,notes,study_guide,source_type,source_title,created_at,external_source_id") \
         .eq("user_id", user_id).eq("folder_id", folder_id)
     if source_title_prefix:
         q = q.like("source_title", f"{source_title_prefix}%")

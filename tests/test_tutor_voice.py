@@ -173,16 +173,12 @@ ALLOWED = {
 
 
 def _load_main_tutor_voice():
-    import subprocess
+    """The pre-F6 baseline, always from the saved snapshot: main's file moves on (F6 itself is on main
+    now), so reading it from git would make every allow-list entry look unused and make local runs and
+    CI disagree."""
     import types
-    source = None
-    for ref in ("origin/main", "main"):
-        shown = subprocess.run(["git", "show", f"{ref}:backend/services/tutor_voice.py"], cwd=ROOT, capture_output=True, text=True)
-        if shown.returncode == 0:
-            source = shown.stdout
-            break
     module = types.ModuleType("main_tutor_voice")
-    exec(compile(source or MAIN_SNAPSHOT.read_text(), "main_tutor_voice.py", "exec"), module.__dict__)
+    exec(compile(MAIN_SNAPSHOT.read_text(), "main_tutor_voice.py", "exec"), module.__dict__)
     return module
 
 
