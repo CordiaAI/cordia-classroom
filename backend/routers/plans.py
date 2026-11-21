@@ -9,7 +9,7 @@ Google through services.google_sync when the student has turned that sync on.
 import hashlib
 import logging
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Request
@@ -108,14 +108,22 @@ def make_plan(user_id: str, item: dict) -> dict:
     return _plan(user_id, item["id"])
 
 
-def _zone(user_id: str, time_zone: Optional[str]) -> "planner.ZoneInfo":
-    if time_zone:
+# With no zone to go on, the last place on Earth a day ends: a move that's in time anywhere is kept.
+LATEST_ZONE = "Etc/GMT+12"
+
+
+def _zone(user_id: str, time_zone: Optional[str], unknown: str = "UTC") -> "planner.ZoneInfo":
+    """The browser's zone when it names a real one; else the zone saved when sync was turned on; else
+    `unknown` (UTC). A zone that isn't real with none saved is refused rather than guessed."""
+    if time_zone and google_sync.zone_of(time_zone).key == time_zone:
         return google_sync.zone_of(time_zone)
     for app in SYNC_APPS:
         saved = (sync_state.get(user_id, app).get("stats") or {}).get("time_zone")
         if saved:
             return google_sync.zone_of(saved)
-    return google_sync.zone_of("UTC")
+    if time_zone:
+        raise HTTPException(status_code=400, detail="Unknown time zone. Reload the page and try again.")
+    return google_sync.zone_of(unknown)
 
 
 def _busy(user_id: str, start: datetime, end: datetime) -> list:
@@ -345,6 +353,153 @@ def schedule_plan(item_key: str, body: ScheduleRequest, request: Request, author
     # minutes_added below minutes_requested: the free time before the deadline ran out.
     return {"plan": _plan(user_id, item_key), "added": len(added), "minutes_added": block_minutes(added),
             "minutes_requested": max(wanted, block_minutes(added))}
+
+
+# ---- Study blocks moved, resized or added on the Calendar page ----
+
+BLOCK_MIN_MINUTES = 15
+BLOCK_MAX_MINUTES = 6 * 60
+
+
+class BlockTimes(BaseModel):
+    starts_at: datetime
+    ends_at: datetime
+    # The browser's zone, as an add sends it: an all-day deadline ends at midnight there.
+    time_zone: str = Field(default="", max_length=64)
+
+
+class NewBlock(BaseModel):
+    item_key: str = Field(..., max_length=200)
+    # A time the student chose, or a day to find free time on (the Board's tray and Add study time).
+    starts_at: Optional[datetime] = None
+    day: Optional[date] = None
+    minutes: int = Field(default=60, ge=BLOCK_MIN_MINUTES, le=BLOCK_MAX_MINUTES)
+    time_zone: str = Field(default="", max_length=64)
+
+
+def _aware(value: datetime) -> datetime:
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+def _in_range(start: datetime) -> datetime:
+    """A block's start, checked before any arithmetic on it (a year-9999 time would overflow)."""
+    start = _aware(start)
+    now = _now()
+    try:
+        early = start < now - timedelta(days=120)
+    except OverflowError:
+        early = True
+    if early or start > now + timedelta(days=180):
+        raise HTTPException(status_code=400, detail="Pick a time within the next six months.")
+    return start
+
+
+def _block_span(starts_at: datetime, ends_at: datetime) -> tuple[datetime, datetime]:
+    start, end = _in_range(starts_at), _aware(ends_at)
+    minutes = (end - start).total_seconds() / 60
+    if minutes < BLOCK_MIN_MINUTES or minutes > BLOCK_MAX_MINUTES:
+        raise HTTPException(status_code=400, detail="Study time runs from 15 minutes to 6 hours.")
+    return start, end
+
+
+def _deadline(item: Optional[dict], zone) -> Optional[datetime]:
+    """When study time for a deadline has to be over: its due time, or the end of the day for an
+    all-day one (the feed gives those as a date at midnight)."""
+    if not item or not item.get("due_at"):
+        return None
+    if item.get("all_day"):
+        try:
+            return datetime.combine(date.fromisoformat(str(item["due_at"])[:10]) + timedelta(days=1), time(0), zone)
+        except (ValueError, OverflowError):
+            return None
+    return google_sync._time(item["due_at"])
+
+
+def _before_deadline(end: datetime, item: Optional[dict], zone) -> None:
+    due = _deadline(item, zone)
+    if due and end > due:
+        raise HTTPException(status_code=409, detail="That's after it's due. Pick a time before the deadline.")
+
+
+def _block_out(user_id: str, row: dict, item: Optional[dict] = None) -> dict:
+    title = google_sync._block_titles(user_id, [row], [item] if item else None).get(row["id"], "Study")
+    return {"id": row["id"], "item_key": row["item_key"], "kind": row.get("kind") or "work", "title": title,
+            "starts_at": row["starts_at"], "ends_at": row["ends_at"], "course": (item or {}).get("course"),
+            "status": row.get("status") or "planned", "done": row.get("status") == "done"}
+
+
+@router.put("/calendar/blocks/{block_id}")
+@limiter.limit("60/minute")
+def move_block(block_id: str, body: BlockTimes, request: Request, authorization: str = Header(default="")):
+    """A study block dragged or resized on the Calendar page. It counts as the student's own move
+    (Plan my week learns their hour from it) and goes to Google Calendar when that sync is on."""
+    from ids import require_uuid
+    user_id = get_user_id(authorization)
+    require_uuid(block_id, "study block ID")
+    start, end = _block_span(body.starts_at, body.ends_at)
+    db = get_supabase()
+    found = db.table("study_blocks").select("id,item_key,status").eq("id", block_id).eq("user_id", user_id).neq("status", "removed") \
+        .limit(1).execute().data or []
+    if not found:
+        raise HTTPException(status_code=404, detail="That study time isn't on your calendar anymore.")
+    item = next((i for i in calendar_for(user_id).get("items") or [] if i["id"] == found[0]["item_key"]), None)
+    _before_deadline(end, item, _zone(user_id, body.time_zone, unknown=LATEST_ZONE))
+    status = "done" if found[0].get("status") == "done" else "moved"
+    # Still not removed: a Google sync may have taken it off since the read above.
+    rows = db.table("study_blocks").update({"starts_at": start.isoformat(), "ends_at": end.isoformat(), "status": status,
+                                            "updated_at": _now().isoformat()}).eq("id", block_id).eq("user_id", user_id) \
+        .neq("status", "removed").execute().data or []
+    if not rows:
+        raise HTTPException(status_code=404, detail="That study time isn't on your calendar anymore.")
+    _push(user_id)
+    return {"block": _block_out(user_id, rows[0], item)}
+
+
+def _free_time_on(user_id: str, day: date, minutes: int, zone, due: Optional[datetime]) -> tuple[datetime, datetime]:
+    """The first free stretch on `day` before the deadline (Plan my week's study window, around busy
+    times), as long as `minutes` or as long as the day still holds."""
+    now = _now()
+    if not now.date() - timedelta(days=1) <= day <= now.date() + timedelta(days=180):
+        raise HTTPException(status_code=400, detail="Pick a day within the next six months.")
+    opens = max(datetime.combine(day, time(0), zone), planner._round_up(now + timedelta(minutes=15)))
+    closes = datetime.combine(day, time(23, 59), zone)
+    if opens >= closes:
+        raise HTTPException(status_code=400, detail="That day is over. Pick today or a later day.")
+    if due and due < closes:
+        closes = due
+        if opens >= closes:
+            raise HTTPException(status_code=409, detail="It's due before then. Pick a day before the deadline.")
+    slots = planner.free_slots(_busy(user_id, opens, closes), opens, closes, zone)
+    size = min(minutes, planner._room(slots)) if slots else 0
+    placed = planner._block(slots, day, size, zone, _preferred_hour(user_id, zone)) if size >= planner.MIN_BLOCK else None
+    if not placed:
+        raise HTTPException(status_code=409, detail="There's no free time left that day before it's due. Try another day.")
+    return placed
+
+
+@router.post("/calendar/blocks")
+@limiter.limit("30/minute")
+def add_block(body: NewBlock, request: Request, authorization: str = Header(default="")):
+    """Study time for one deadline, added from the Calendar page: at the time the student picked,
+    or in the first free time on the day they dropped it on."""
+    user_id = get_user_id(authorization)
+    item = _item(user_id, _key(body.item_key))
+    zone = _zone(user_id, body.time_zone)
+    if body.starts_at:
+        start = _in_range(body.starts_at)
+        start, end = _block_span(start, start + timedelta(minutes=body.minutes))
+    elif body.day:
+        start, end = _block_span(*_free_time_on(user_id, body.day, body.minutes, zone, _deadline(item, zone)))
+    else:
+        raise HTTPException(status_code=400, detail="Pick a day or a time.")
+    _before_deadline(end, item, zone)
+    row = {"user_id": user_id, "item_key": item["id"], "kind": "review" if _is_exam(user_id, item) else "work",
+           "starts_at": start.isoformat(), "ends_at": end.isoformat()}
+    made = (get_supabase().table("study_blocks").insert(row).execute().data or [None])[0]
+    if not made:
+        raise HTTPException(status_code=503, detail="That study time wasn't saved. Try again.")
+    _push(user_id)
+    return {"block": _block_out(user_id, made, item)}
 
 
 class ReviewRequest(BaseModel):

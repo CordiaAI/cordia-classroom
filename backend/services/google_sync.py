@@ -13,6 +13,7 @@ Ground rules (see migration 20261023130000_connector_sync.sql):
 
 import hashlib
 import logging
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -26,6 +27,10 @@ from services.deadlines import marks
 log = logging.getLogger(__name__)
 CONTAINER_NAME = "Cordia"
 HORIZON_DAYS = 60
+SYNC_PASSES = 3          # times a running sync goes round again for changes made while it ran
+CLAIM_MINUTES = 10       # an event claim older than this was left by a sync that died: take it over
+_running: dict[tuple[str, str], dict] = {}  # syncs running on this machine, by student and app
+_running_guard = threading.Lock()
 
 
 def zone_of(name: Optional[str]) -> ZoneInfo:
@@ -138,7 +143,36 @@ def _due_date(dt: datetime, zone: ZoneInfo) -> str:
     return f"{dt.astimezone(zone).date().isoformat()}T00:00:00.000Z"
 
 
+def _one_at_a_time(user_id: str, connector: str, run) -> dict:
+    """One sync at a time per student and app on this machine. A sync asked for while one runs
+    returns at once (a move on the Calendar page never waits on it); the running one goes round
+    again so it sends that change too. Past SYNC_PASSES the background worker catches up."""
+    key = (user_id, connector)
+    with _running_guard:
+        if key in _running:
+            _running[key]["again"] = True
+            return {"on": True, "busy": True}
+        mine = _running[key] = {"again": False}
+    try:
+        for _ in range(SYNC_PASSES):
+            result = run(user_id)
+            with _running_guard:
+                if not mine["again"]:
+                    del _running[key]  # In the same hold as the check, so no request slips between.
+                    return result
+                mine["again"] = False
+        return result
+    finally:
+        with _running_guard:
+            if _running.get(key) is mine:
+                del _running[key]
+
+
 def sync_tasks(user_id: str) -> dict:
+    return _one_at_a_time(user_id, "gtasks", _sync_tasks)
+
+
+def _sync_tasks(user_id: str) -> dict:
     state = sync_state.get(user_id, "gtasks")
     tasklist = state.get("container_id")
     if not tasklist:
@@ -264,11 +298,56 @@ def busy_times(user_id: str, account: str, start: datetime, end: datetime, extra
     return out
 
 
+def _span_hash(start: datetime, end: datetime) -> str:
+    """The synced_hash of a study time, written the way block times are stored (UTC)."""
+    return _hash(start.astimezone(timezone.utc).isoformat(), end.astimezone(timezone.utc).isoformat())
+
+
+def _span_hashes(start: datetime, end: datetime) -> set:
+    """Both ways a link's synced_hash may have written this time: in UTC (made by Cordia) or in the
+    event's own offset (read back from a move in Google)."""
+    return {_span_hash(start, end), _hash(start.isoformat(), end.isoformat())}
+
+
 def _event_window(event: dict) -> tuple[Optional[datetime], Optional[datetime]]:
     return _time((event.get("start") or {}).get("dateTime")), _time((event.get("end") or {}).get("dateTime"))
 
 
+def _fetch_event(account: str, user_id: str, calendar: str, event_id: str) -> Optional[dict]:
+    """One event by id (Google still returns a deleted one, marked cancelled), or None when the
+    lookup failed and nothing is known about it."""
+    try:
+        data = composio.run(account, user_id, "GOOGLECALENDAR_EVENTS_GET", {"calendar_id": calendar, "event_id": event_id})
+    except HTTPException:
+        return None
+    event = data.get("event") or data.get("response_data") or data
+    return event if isinstance(event, dict) and (event.get("id") or event.get("status")) else None
+
+
 def sync_calendar(user_id: str) -> dict:
+    return _one_at_a_time(user_id, "gcal", _sync_calendar)
+
+
+def _pending(link: Optional[dict]) -> bool:
+    return bool(link) and str(link.get("external_id") or "").startswith("pending:")
+
+
+def _claim_event(user_id: str, calendar: str, block_id: str) -> bool:
+    """Claims a block's event before making it, so a sync on another machine doesn't make it too:
+    only one insert of the link row can win (its key is the block)."""
+    made = get_supabase().table("connector_links").upsert({
+        "user_id": user_id, "connector": "gcal", "kind": "event", "cordia_id": f"block:{block_id}", "external_id": f"pending:{block_id}",
+        "container_id": calendar, "synced_hash": "", "removed_by_student": False, "updated_at": _now().isoformat(),
+    }, on_conflict="user_id,connector,kind,cordia_id", ignore_duplicates=True).execute().data
+    return bool(made)
+
+
+def _drop_claim(user_id: str, block_id: str) -> None:
+    get_supabase().table("connector_links").delete().eq("user_id", user_id).eq("connector", "gcal").eq("kind", "event") \
+        .eq("cordia_id", f"block:{block_id}").eq("external_id", f"pending:{block_id}").execute()
+
+
+def _sync_calendar(user_id: str) -> dict:
     state = sync_state.get(user_id, "gcal")
     calendar = state.get("container_id")
     if not calendar:
@@ -288,14 +367,28 @@ def sync_calendar(user_id: str) -> dict:
         "singleEvents": True, "showDeleted": True, "maxResults": 250,
     })
     remote = {event.get("id"): event for event in data.get("items") or []}
-    moved = removed = written = 0
+    moved = removed = written = sent = 0
+    titles = _block_titles(user_id, blocks)
 
     # The student owns study times: read their moves and deletions before writing anything.
+    stale = (now - timedelta(minutes=CLAIM_MINUTES)).isoformat()
     for block in blocks:
         link = linked.get(("event", f"block:{block['id']}"))
-        if not link or link.get("removed_by_student"):
+        if _pending(link) and str(link.get("updated_at") or "") < stale:
+            _drop_claim(user_id, block["id"])  # Left by a sync that died: made below instead.
+            linked.pop(("event", f"block:{block['id']}"))
+            continue
+        if not link or link.get("removed_by_student") or _pending(link):
             continue
         event = remote.get(link["external_id"])
+        mine_start, mine_end = _time(block["starts_at"]), _time(block["ends_at"])
+        if event is None and link.get("synced_hash") not in _span_hashes(mine_start, mine_end):
+            # The block's time isn't the one Cordia last sent, so the student moved it here, and its
+            # event may still sit at the old time, outside the window listed above (a block moved from
+            # more than a day ago into the future). Ask Google for that event by id before deciding.
+            event = _fetch_event(account, user_id, calendar, link["external_id"])
+            if event is None:
+                continue  # Couldn't tell: leave the block alone and try again on the next sync.
         if event is None or event.get("status") == "cancelled":
             db.table("study_blocks").update({"status": "removed", "updated_at": now.isoformat()}).eq("id", block["id"]).execute()
             save_link(user_id, "gcal", "event", f"block:{block['id']}", link["external_id"], calendar, link.get("synced_hash") or "", removed=True)
@@ -303,37 +396,69 @@ def sync_calendar(user_id: str) -> dict:
             removed += 1
             continue
         start, end = _event_window(event)
-        if start and end and (start != _time(block["starts_at"]) or end != _time(block["ends_at"])):
+        if start and end and (start != mine_start or end != mine_end) and link.get("synced_hash") in _span_hashes(start, end):
+            # Google still holds the time Cordia last sent, so the change is the student's, made on
+            # Cordia's Calendar page: it goes to Google instead of being read back as a Google move.
+            composio.run(account, user_id, "GOOGLECALENDAR_UPDATE_EVENT", {
+                "calendar_id": calendar,
+                "event_id": link["external_id"],
+                "summary": titles.get(block["id"], "Study")[:200],
+                "start_datetime": mine_start.astimezone(zone).strftime("%Y-%m-%dT%H:%M:%S"),
+                "end_datetime": mine_end.astimezone(zone).strftime("%Y-%m-%dT%H:%M:%S"),
+                "timezone": zone.key,
+                "description": "Planned by Cordia Classroom. Move or delete it and Cordia keeps your change.",
+            })
+            save_link(user_id, "gcal", "event", f"block:{block['id']}", link["external_id"], calendar, _span_hash(mine_start, mine_end))
+            sent += 1
+        elif start and end and (start != mine_start or end != mine_end):
             db.table("study_blocks").update({"starts_at": start.isoformat(), "ends_at": end.isoformat(), "status": "moved",
                                              "updated_at": now.isoformat()}).eq("id", block["id"]).execute()
             save_link(user_id, "gcal", "event", f"block:{block['id']}", link["external_id"], calendar, _hash(start.isoformat(), end.isoformat()))
             moved += 1
 
-    titles = _block_titles(user_id, blocks)
+    taken = {link.get("external_id") for link in linked.values()}
     for block in blocks:
         if block["status"] in ("removed",) or ("event", f"block:{block['id']}") in linked:
             continue
+        if not _claim_event(user_id, calendar, block["id"]):
+            continue  # Another sync (on another machine) is making this one.
         start, end = _time(block["starts_at"]), _time(block["ends_at"])
-        made = composio.run(account, user_id, "GOOGLECALENDAR_CREATE_EVENT", {
-            "calendar_id": calendar,
-            "summary": titles.get(block["id"], "Study")[:200],
-            "start_datetime": start.astimezone(zone).strftime("%Y-%m-%dT%H:%M:%S"),
-            "end_datetime": end.astimezone(zone).strftime("%Y-%m-%dT%H:%M:%S"),
-            "timezone": zone.key,
-            "description": "Planned by Cordia Classroom. Move or delete it and Cordia keeps your change.",
-        })
-        external = made.get("id") or (made.get("response_data") or {}).get("id") or (made.get("event") or {}).get("id")
+        summary = titles.get(block["id"], "Study")[:200]
+        # A sync that died after making the event but before saving its link left it in Cordia's
+        # calendar with no link: keep that one rather than make a second.
+        external = next((event_id for event_id, event in remote.items() if event_id not in taken and event.get("status") != "cancelled"
+                         and event.get("summary") == summary and _event_window(event) == (start, end)), None)
+        if not external:
+            try:
+                made = composio.run(account, user_id, "GOOGLECALENDAR_CREATE_EVENT", {
+                    "calendar_id": calendar,
+                    "summary": summary,
+                    "start_datetime": start.astimezone(zone).strftime("%Y-%m-%dT%H:%M:%S"),
+                    "end_datetime": end.astimezone(zone).strftime("%Y-%m-%dT%H:%M:%S"),
+                    "timezone": zone.key,
+                    "description": "Planned by Cordia Classroom. Move or delete it and Cordia keeps your change.",
+                })
+            except Exception:
+                _drop_claim(user_id, block["id"])
+                raise
+            external = made.get("id") or (made.get("response_data") or {}).get("id") or (made.get("event") or {}).get("id")
+        taken.add(external)
         if external:
             save_link(user_id, "gcal", "event", f"block:{block['id']}", external, calendar, _hash(start.isoformat(), end.isoformat()))
             written += 1
+        else:
+            _drop_claim(user_id, block["id"])
     planned = sum(1 for block in blocks if block["status"] in ("planned", "moved"))
     sync_state.record(user_id, "gcal", stats={"blocks": planned, "moved_by_you": moved, "removed_by_you": removed})
-    return {"on": True, "blocks": planned, "added": written, "moved": moved, "removed": removed}
+    return {"on": True, "blocks": planned, "added": written, "moved": moved, "removed": removed, "sent": sent}
 
 
-def _block_titles(user_id: str, blocks: list[dict]) -> dict:
-    from routers.calendar import calendar_for
-    names = {item["id"]: item.get("title") or "Assignment" for item in calendar_for(user_id).get("items") or []}
+def _block_titles(user_id: str, blocks: list[dict], items: Optional[list] = None) -> dict:
+    """Each block's title. items: the student's deadlines when the caller already has them."""
+    if items is None:
+        from routers.calendar import calendar_for
+        items = calendar_for(user_id).get("items") or []
+    names = {item["id"]: item.get("title") or "Assignment" for item in items}
     step_ids = [block["step_id"] for block in blocks if block.get("step_id")]
     steps = {}
     if step_ids:
