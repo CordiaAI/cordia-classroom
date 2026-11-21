@@ -221,6 +221,8 @@
      1px border carries it: the rim's stops on the top, right, bottom and left edges. */
   --glass-rim-border: rgba(255, 255, 255, 0.80) rgba(255, 255, 255, 0.30) rgba(255, 255, 255, 0.42) rgba(255, 255, 255, 0.72);
   --glass-rim-mask-webkit: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  /* A line of text that runs on past its left edge fades out there (alpha only, no colour). */
+  --fade-edge-left: linear-gradient(to right, transparent, #000 1.5rem);
 
   /* The backdrop (DESIGN-SPEC 2.1): the cloud photo, blurred a little, under a white light from
      the top left and a faint olive tint from the bottom right. Dark lays the clouds at 18% over
