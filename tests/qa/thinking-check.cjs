@@ -164,7 +164,8 @@ async function ask(page, text, { drawer = false } = {}) {
       expect(await line(page) === 'Reading your question', `still: ${await line(page)}`);
       expect(state.stepCalls >= 1, `the poll ran (${state.stepCalls})`);
       expect(state.stepCalls <= 4, `and backed off: ${state.stepCalls} polls in about 6 s`);
-      const own = logged.filter(text => !/429|Too Many Requests|Failed to load resource/i.test(text));
+      // The browser itself notes a 429 response, and next dev adds its own noise; the app's own log line is what must be gone.
+      const own = logged.filter(text => /API fetch error/.test(text));
       expect(own.length === 0, `nothing logged by the app: ${JSON.stringify(own)}`);
       await context.close();
     });
