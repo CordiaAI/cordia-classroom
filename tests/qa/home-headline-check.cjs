@@ -1,7 +1,7 @@
 // The home headline by class picker (FEEDBACK-BATCH-1 H1) in a real browser against a local dev
 // server and the mock API: each branch, the 150ms cross-fade (instant with reduced motion), the
-// column's place, fit at 1440, 1024 and 390 and at Larger text, and contrast in light, dark and
-// Paper & Clay. Run the app on the port first:
+// column's place, fit at 1440, 1024 and 390 and at Larger text, the greeting following the clock with
+// the page open (a fake clock), and contrast in light, dark and Paper & Clay. Run the app on the port first:
 //   npm run dev --prefix web -- -p 3117
 //   BASE=http://localhost:3117 node tests/qa/home-headline-check.cjs   (OUT=dir keeps screenshots; ONLY=regex runs some checks)
 const path = require('path');
@@ -16,6 +16,7 @@ const BUS = 'f0000000-0000-4000-8000-000000000002';
 const LIT = 'f0000000-0000-4000-8000-000000000003';
 const CHM = 'f0000000-0000-4000-8000-000000000004';
 const CLASSES = [['BIO 101', 'exam'], ['BUS 210', 'deadline'], ['ENG 220', 'weak'], ['CHM 110', 'class']];
+const fingerprint = text => String(text).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 48);
 const results = [];
 const expect = (condition, message) => { if (!condition) throw new Error(message); };
 
@@ -37,18 +38,22 @@ function seed() {
   ];
   const base = state.guides[0];
   const make = (id, title, folder, extra = {}) => ({ ...base, id: 'a0000000-0000-4000-8000-0000000001' + id, title, folder_id: folder, flashcard_progress: { known: [] }, ...extra });
-  const levels = Object.fromEntries(['membrane', 'osmosis', 'symbolism', 'narrator', 'green light', 'wealth'].map((name, index) => [index, { l: index < 3 ? 1 : index === 3 ? 2 : 3, at: key(day(index < 2 ? -1 : -3)), q: `what is ${name}` }]));
+  // Learn's saved levels are for the guide's own questions, which the mock makes from the base guide (a level
+  // for a question since edited out does not count).
+  const title = 'The Great Gatsby: Themes and Symbols';
+  const levels = Object.fromEntries([1, 2, 3, 4, 5, 6].map((number, index) => [index, { l: index < 3 ? 1 : index === 3 ? 2 : 3, at: key(day(index < 2 ? -1 : -3)), q: fingerprint(`What is concept ${number} in ${base.title}?`) }]));
+  levels[40] = { l: 1, at: key(day(-1)), q: 'a question since edited out' };
   state.guides = [
     make('01', 'Exam 3: review', BIO),
     make('02', 'Packback prep', BUS),
-    make('03', 'The Great Gatsby: Themes and Symbols', LIT, { flashcard_progress: { learn: { levels } } }),
+    make('03', title, LIT, { flashcard_progress: { learn: { levels } } }),
     make('04', 'Stoichiometry basics', CHM),
   ];
   return state;
 }
 
-async function open(browser, { width = 1440, height = 900, theme = 'light', reduced = false, look = '', size = '' } = {}) {
-  const context = await browser.newContext({ viewport: { width, height }, colorScheme: theme, reducedMotion: reduced ? 'reduce' : 'no-preference' });
+async function open(browser, { width = 1440, height = 900, theme = 'light', reduced = false, look = '', size = '', name = 'Jane Smith', clock = '' } = {}) {
+  const context = await browser.newContext({ viewport: { width, height }, colorScheme: theme, reducedMotion: reduced ? 'reduce' : 'no-preference', ...(clock ? { timezoneId: 'UTC' } : {}) });
   const state = seed();
   await install(context, state);
   await context.route(/localhost:8000\/calendar\/coursework/, route => route.fulfill({ json: { connected: true, counts: { upcoming: 2, missing: 0, completed: 0 }, missing: [], completed: [], upcoming: [
@@ -56,11 +61,13 @@ async function open(browser, { width = 1440, height = 900, theme = 'light', redu
     { id: 'canvas-2', title: 'A05 Packback Discussion: Seven Ethical Frameworks and the Case for Stakeholder Theory', course: 'BUS-210-004', due_at: at(2), type: 'assignment', done: false, points: 50, url: 'https://school.instructure.com/courses/1/assignments/2' },
   ] } }));
   await context.route(/localhost:8000\/calendar\/connection/, route => route.fulfill({ json: { connected: false } }));
+  await context.route(/localhost:8000\/auth\/me/, route => route.fulfill({ json: { user_id: USER, email: 'test.student@example.com', name } }));
   const page = await context.newPage();
+  if (clock) await page.clock.install({ time: new Date(clock) });
   const problems = [];
   page.on('pageerror', error => problems.push(error.message));
   await page.goto(BASE + '/login');
-  await page.evaluate(([token, user, mode]) => { localStorage.setItem('authToken', token); localStorage.setItem('userId', user); localStorage.setItem('refreshToken', 'r'); localStorage.setItem('theme', mode); }, [TOKEN, USER, theme]);
+  await page.evaluate(([token, user, mode, userName]) => { localStorage.setItem('authToken', token); localStorage.setItem('userId', user); localStorage.setItem('refreshToken', 'r'); localStorage.setItem('theme', mode); localStorage.setItem('userName', userName); }, [TOKEN, USER, theme, name]);
   await page.goto(BASE + '/home');
   await page.waitForSelector('.chat-home-headline', { timeout: 60000 });
   await page.waitForTimeout(900);
@@ -131,7 +138,7 @@ async function contrast(page) {
   await check('All classes: a greeting with the first name, nothing under it', async () => {
     const { page, problems, context } = await open(browser);
     const { title, line } = await hero(page);
-    expect(/^(Good (morning|afternoon|evening), Test|Up late, Test\?|What's on your mind, Test\?|Ready when you are, Test)$/.test(title), `greeting: ${title}`);
+    expect(/^(Good (morning|afternoon|evening), Jane|Up late, Jane\?|What's on your mind, Jane\?|Ready when you are, Jane)$/.test(title), `greeting: ${title}`);
     expect(line === '', `line: ${line}`);
     await page.reload(); await page.waitForSelector('.chat-home-headline'); await page.waitForTimeout(600);
     expect((await hero(page)).title === title, 'the same greeting after a reload');
@@ -142,8 +149,8 @@ async function contrast(page) {
 
   const expected = {
     exam: ({ title, line }) => /^(Today|Tomorrow|Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday) is your Introduction to Biology exam\.$/.test(title) && /ideas? left to master\. \d+ today keeps you on pace\.$/.test(line),
-    deadline: ({ title, line }) => /^Packback discussion for BUS 210 is due (Friday|Saturday|Sunday|Monday|Tuesday|Wednesday|Thursday)\.$/.test(title) && /^Due \w+ at 11:59 PM$/.test(line),
-    weak: ({ title, line }) => title === 'Want another look at The Great Gatsby: Themes and Symbols?' && /^\d+% ready in ENG 220$/.test(line),
+    deadline: ({ title, line }) => /^Packback Discussion for BUS\u00a0210 is due (Friday|Saturday|Sunday|Monday|Tuesday|Wednesday|Thursday)\.$/.test(title) && /^Due \w+ at 11:59 PM$/.test(line),
+    weak: ({ title, line }) => title === 'Want another look at The Great Gatsby: Themes and Symbols?' && /^\d+% ready in ENG\u00a0220$/.test(line),
     class: ({ title, line }) => /^(What's next in General Chemistry\?|Picking up General Chemistry\?|Where were we in General Chemistry\?|Let's work on General Chemistry)$/.test(title) && line === '',
   };
   for (const [width, label] of [[1440, '1440'], [1024, '1024'], [390, '390']]) {
@@ -265,13 +272,77 @@ async function contrast(page) {
     await context.close();
   });
 
+  await check('a placeholder profile name ("Test Student", a username) gives a greeting with no name', async () => {
+    for (const name of ['Test Student', 'jane.doe']) {
+      const { page, context } = await open(browser, { name });
+      const { title } = await hero(page);
+      expect(/^(Good (morning|afternoon|evening)|Up late\?|What's on your mind\?|Ready when you are)$/.test(title), `${name}: ${title}`);
+      await context.close();
+    }
+  });
+
+  await check('the weak idea\'s "% ready" is the number Learn shows for that guide', async () => {
+    const { page, state, context } = await open(browser);
+    const { examReadiness, learnQuestions } = await import(path.join(__dirname, '../../web/lib/examCountdown.mjs'));
+    const guide = state.guides.find(item => item.folder_id === LIT);
+    const learn = examReadiness(learnQuestions(guide), guide.flashcard_progress.learn);
+    await pick(page, 'ENG 220');
+    await page.waitForTimeout(350);
+    const words = await hero(page);
+    expect(words.line === `${learn}% ready in ENG 220`, `home says ${JSON.stringify(words.line)}, Learn says ${learn}%`);
+    await context.close();
+  });
+
+  // The headline follows the clock with the page open: a fake clock (UTC), the page loaded, then time moves.
+  // The greeting needs a day on which the time-of-day line is the day's line and the next day's is not.
+  await check('with the page open, the greeting changes at 11 PM and again at midnight, at once, with no fade', async () => {
+    const { headlineSeed } = await import(path.join(__dirname, '../../web/lib/homeHeadline.mjs'));
+    const days = Array.from({ length: 30 }, (_, index) => new Date(Date.UTC(2026, 10, 1 + index)).toISOString().slice(0, 10));
+    const today = days.find((value, index) => headlineSeed(USER, '', value) % 4 < 2 && headlineSeed(USER, '', days[index + 1]) % 4 >= 2);
+    expect(today, 'a day with a time-of-day line followed by a neutral one');
+    const next = new Date(Date.parse(today + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
+    const { page, context } = await open(browser, { clock: `${today}T22:58:00Z` });
+    const copies = () => page.evaluate(() => document.querySelectorAll('.chat-home-headline').length);
+    expect(/^Good evening, Jane$/.test((await hero(page)).title), '22:58 ' + (await hero(page)).title);
+    await page.clock.fastForward(4 * 60000);
+    await page.waitForTimeout(40);
+    expect((await hero(page)).title === 'Up late, Jane?', '23:02 ' + (await hero(page)).title);
+    expect((await copies()) === 1, 'no second copy while it changes: ' + (await copies()));
+    await page.clock.fastForward(60 * 60000);
+    await page.waitForTimeout(40);
+    const after = (await hero(page)).title;
+    expect(/^(What's on your mind, Jane\?|Ready when you are, Jane)$/.test(after), `00:02 ${next}: ${after}`);
+    expect((await copies()) === 1, 'no second copy at midnight: ' + (await copies()));
+    await page.reload(); await page.waitForSelector('.chat-home-headline'); await page.waitForTimeout(700);
+    expect((await hero(page)).title === after, 'a reload agrees: ' + (await hero(page)).title);
+    await context.close();
+  });
+
+  await check('with the page open, 5:00, noon and 5 PM change the greeting; coming back to the tab checks the clock too', async () => {
+    const { headlineSeed } = await import(path.join(__dirname, '../../web/lib/homeHeadline.mjs'));
+    const day = Array.from({ length: 30 }, (_, index) => new Date(Date.UTC(2026, 10, 1 + index)).toISOString().slice(0, 10)).find(value => headlineSeed(USER, '', value) % 4 === 0 || headlineSeed(USER, '', value) % 4 === 1);
+    const { page, context } = await open(browser, { clock: `${day}T11:58:00Z` });
+    expect((await hero(page)).title === 'Good morning, Jane', '11:58 ' + (await hero(page)).title);
+    await page.clock.fastForward(4 * 60000); await page.waitForTimeout(40);
+    expect((await hero(page)).title === 'Good afternoon, Jane', '12:02 ' + (await hero(page)).title);
+    await page.clock.fastForward(5 * 3600000); await page.waitForTimeout(40);
+    expect((await hero(page)).title === 'Good evening, Jane', '17:02 ' + (await hero(page)).title);
+    // A tab that slept past 11 PM (its timer never ran) is brought up to date when it is shown again.
+    await page.clock.setSystemTime(new Date(`${day}T23:30:00Z`)); await page.waitForTimeout(40);
+    expect((await hero(page)).title === 'Good evening, Jane', 'the timer has not run yet: ' + (await hero(page)).title);
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.waitForTimeout(40);
+    expect((await hero(page)).title === 'Up late, Jane?', 'after the tab is shown: ' + (await hero(page)).title);
+    await context.close();
+  });
+
   await check('a class change asks the server for nothing', async () => {
     const { page, state, context } = await open(browser);
     const before = state.calls.length;
     for (const [code] of CLASSES) { await pick(page, code); await page.waitForTimeout(250); }
     await pick(page, 'All classes');
     await page.waitForTimeout(400);
-    const made = state.calls.slice(before).filter(call => !/\/auth\/me|\/folders/.test(call));
+    const made = state.calls.slice(before).filter(call => !/\/auth\/me|\/auth\/refresh|\/folders/.test(call));
     expect(made.length === 0, 'requests after picking: ' + made.join(', '));
     await context.close();
   });

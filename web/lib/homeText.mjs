@@ -42,7 +42,7 @@ const shorten = (text, max = 40) => {
 // of the Plan label, since the label reads as a sentence.
 const WORK_NOUNS = new Set(['assignment', 'bibliography', 'discussion', 'draft', 'essay', 'exam', 'final', 'homework', 'journal', 'lab', 'memo', 'midterm', 'outline', 'paper', 'portfolio', 'post', 'presentation', 'project', 'proposal', 'quiz', 'reading', 'reflection', 'report', 'response', 'review', 'summary', 'test', 'worksheet']);
 // Small words that stay lowercase in a Title Case title ("Hadley v. Baxendale", "Ethics of Care").
-const MINOR_WORDS = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'in', 'of', 'on', 'or', 'the', 'to', 'v', 'vs', 'with']);
+export const MINOR_WORDS = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'in', 'of', 'on', 'or', 'the', 'to', 'v', 'vs', 'with']);
 
 const TERMS = new Set(['FA', 'FALL', 'SP', 'SPR', 'SPRNG', 'SPRING', 'SU', 'SUM', 'SUMR', 'WI', 'WIN', 'WINT']);
 // Words that sit before a number without naming a department ("Sec 02", "Week 5", "COVID 19"), and
@@ -76,7 +76,14 @@ export function classShort(course) {
     }
     return `${parts.join(' ').toUpperCase()} ${level.toUpperCase()}`;
   }
-  const name = text
+  const { name, named } = wordsName(text);
+  return named ? shorten(name, 28) : '';
+}
+
+// A class named only in words, without its term, section or anything after a dash, colon or bracket
+// ("SP25 Adult Health I: Spring" -> "Adult Health I"); named says whether it reads as a class name.
+function wordsName(value) {
+  const name = String(value || '')
     .replace(/^\s*(?:(?:spring|summer|fall|winter|spr|sum|fal|win|sp|su|fa|wi)\s*['’]?\d{2,4}|(?:19|20)\d\d(?:\d\d)?)\b[\s,.:-]*/i, '')
     .replace(/^\s*(?:sec|section|lab|week|unit|group|cohort)\b\s*\d*[\s,.:–—-]*/i, '')
     .replace(/\s+[–—-]\s+.*$/, '')
@@ -86,7 +93,16 @@ export function classShort(course) {
     .trim();
   const words = name.split(/\s+/).filter(Boolean);
   const named = /[a-z]/.test(name) && !/\b(?:19|20)\d\d\b/.test(name) && !NOT_DEPARTMENTS.has(words[0]?.toUpperCase()) && (words.length > 1 || /^[A-Za-z]{5,}$/.test(name));
-  return named ? shorten(name, 28) : '';
+  return { name, named };
+}
+
+// A class's name in words alone, whole (not cut for a label), for telling two classes apart: "Calculus
+// I" is not "Calculus II". A course code in the text is left out ("MATH 101 Calculus I" -> "Calculus I");
+// '' when nothing in it reads as a name.
+export function classNameWords(value) {
+  const bare = String(value || '').replace(/\b[A-Za-z]{2,5}[\s_-]*\d{3,4}[A-Za-z]?(?:[-_]\d{1,3})?\b/g, ' ').replace(/^[\s:–—,.-]+/, '');
+  const { name, named } = wordsName(bare);
+  return named ? name : '';
 }
 
 // A leading id Canvas puts on an assignment ("A05", "A07AA", "HW3", "PA3"), and a section code
@@ -108,8 +124,8 @@ const isTitleCase = title => title.split(/\s+/).every(word => {
 // An assignment's title in plain words for the Plan label: the Canvas section code, ids ("A05",
 // "PA3:"), "#12" and "(1 of 2)" go; the meaning stays, numbers included ("Quiz 4", "Lab 3", "Problem
 // Set 4"). The last word is lowercased when it is a work noun and the whole title is in Title Case,
-// since the label reads as a sentence. "" if only codes are left ("NUR-210-01 [A05]").
-export function planTitle(raw) {
+// since the label reads as a sentence (lowerLast: false keeps the title's own case). "" if only codes are left ("NUR-210-01 [A05]").
+export function planTitle(raw, { lowerLast = true } = {}) {
   let title = String(raw || '')
     .replace(/\s*\[[^\]]*\]\s*$/, '')
     .replace(/\s*\(\s*\d+\s*(?:of|\/)\s*\d+\s*\)/gi, '')
@@ -125,7 +141,7 @@ export function planTitle(raw) {
     .replace(/\s+/g, ' ')
     .replace(/^[\s:,;.–—-]+|[\s:,;.–—-]+$/g, '');
   const last = title.match(/[A-Za-z]+$/)?.[0];
-  if (last && WORK_NOUNS.has(last.toLowerCase()) && last !== last.toUpperCase() && isTitleCase(title)) title = title.slice(0, -last.length) + last.toLowerCase();
+  if (lowerLast && last && WORK_NOUNS.has(last.toLowerCase()) && last !== last.toUpperCase() && isTitleCase(title)) title = title.slice(0, -last.length) + last.toLowerCase();
   return title;
 }
 
