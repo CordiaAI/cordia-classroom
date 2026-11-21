@@ -83,7 +83,8 @@ const MENU_GAP = 6; // px between the button and its menu, and kept clear of the
 
 // Where a menu fits: below its button unless it doesn't and there is more room above ('auto'), or
 // always 'above' / 'below'. The floor is the window's bottom, or the Tutor button's top when the
-// menu would sit over it, so a menu is never under the Tutor button or off screen. Measured before
+// menu would sit over it, so a menu is never under the Tutor button or off screen. An upward menu
+// over the Tutor button is raised until its bottom clears the button's top. Measured before
 // paint and before focus moves in, so the page never scrolls to a menu that is about to flip.
 function placeMenu(menu, button, placement) {
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
@@ -92,12 +93,22 @@ function placeMenu(menu, button, placement) {
   let floor = window.innerHeight;
   const tutor = document.querySelector('.c-tutor-bubble');
   const bubble = tutor?.getBoundingClientRect();
-  if (bubble && bubble.width && bubble.left < box.right && bubble.right > box.left) floor = Math.min(floor, bubble.top);
+  const overTutor = Boolean(bubble && bubble.width && bubble.left < box.right && bubble.right > box.left);
+  if (overTutor) floor = Math.min(floor, bubble.top);
   const below = floor - at.bottom - MENU_GAP * 2;
-  const above = at.top - MENU_GAP * 2;
+  let above = at.top - MENU_GAP * 2;
   const tall = menu.scrollHeight;
   const up = placement === 'above' || (placement === 'auto' && tall > below && above > below);
   menu.classList.toggle('cal-menu--up', up);
+  menu.style.bottom = '';
+  if (up && overTutor) {
+    // Upward menus hang from the top of their wrapper (bottom: 100% + 0.375rem); lift the bottom
+    // edge when that would land inside the Tutor button's top edge.
+    const anchor = menu.offsetParent?.getBoundingClientRect().top ?? at.top;
+    const natural = anchor - 0.375 * rem;
+    if (natural > bubble.top - MENU_GAP) menu.style.bottom = `calc(100% + ${anchor - bubble.top + MENU_GAP}px)`;
+    above = Math.min(above, bubble.top - MENU_GAP * 2);
+  }
   menu.style.maxHeight = `${Math.max(8 * rem, Math.min(20 * rem, up ? above : below))}px`;
 }
 
