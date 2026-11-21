@@ -153,6 +153,13 @@
   --shadow-float: 0 2px 8px rgba(16, 24, 16, 0.06), 0 18px 48px rgba(16, 24, 16, 0.14);
   /* Keyboard focus ring (system.css): 3:1 or better against every surface in this theme. */
   --focus-ring: #536149;
+  /* The composer's focus (VISUAL-POLISH V1.2): a 2px ring of the focus colour, softened to a share of it,
+     and a 4px halo of the accent tint around it. The share is the lightest that still holds 3:1 against
+     the composer's glass on every background and glass level (tests/composer-focus.test.mjs). */
+  --focus-ring-rgb: 83, 97, 73;            /* --focus-ring, as channels */
+  --composer-focus-alpha: 0.7;
+  --composer-focus-ring: rgba(var(--focus-ring-rgb), var(--composer-focus-alpha));
+  --composer-focus-halo: rgba(var(--accent-rgb), 0.14);
 
   /* Radii */
   --r-input: 12px; --r-row: 16px; --r-card: 20px; --r-panel: 28px; --r-pill: 999px;
@@ -534,6 +541,9 @@
   --lg-depth-float: 0 2px 8px rgba(0, 0, 0, 0.30), 0 22px 48px -14px rgba(0, 0, 0, 0.55);
   --lg-press: rgba(255, 255, 255, 0.06);
   --focus-ring: #CFDAC3;
+  --focus-ring-rgb: 207, 218, 195;
+  --composer-focus-alpha: 0.6;
+  --composer-focus-halo: rgba(var(--accent-tint-rgb), 0.14);
   --shot-frame: #2F3238; --shot-edge: rgba(255, 255, 255, 0.16); --shot-chrome: #24272C; --shot-line: rgba(255, 255, 255, 0.22);
   --shot-soft: #3A3E45; --shot-nav: #1E2A33; --shot-text: #FFFFFF; --shot-link: #8CC4FF; --shot-mark: #C3CFB6;
   --scroll-thumb: rgba(255, 255, 255, 0.18); --scroll-thumb-hover: rgba(255, 255, 255, 0.30);
@@ -657,6 +667,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
   --olive-ink: rgb(var(--ca-l-ink, 83, 97, 73));
   --on-olive: rgb(var(--ca-l-on, 255, 255, 255));
   --focus-ring: rgb(var(--ca-l-ink, 83, 97, 73));
+  --focus-ring-rgb: var(--ca-l-ink, 83, 97, 73);
 }
 [data-theme='dark']:is([data-accent], [data-look='paper-clay']) {
   --accent-tint-rgb: var(--ca-d-tint, 195, 207, 182);
@@ -665,6 +676,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
   --on-olive: rgb(var(--ca-d-on, 18, 22, 15));
   --olive-glass-press: rgb(var(--ca-d-glass-press, 115, 132, 106));
   --focus-ring: rgb(var(--ca-d-ink, 207, 218, 195));
+  --focus-ring-rgb: var(--ca-d-ink, 207, 218, 195);
 }
 
 /* ---- Background: <html data-bg="dusk|paper|meadow">. Clouds is the default and needs no
@@ -797,6 +809,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
   --lg-depth-float: 0 8px 28px rgba(20, 20, 19, 0.12), 0 2px 6px rgba(20, 20, 19, 0.06);
   --glass-shadow-lift: var(--glass-shadow-edge), var(--lg-depth-float);
   --shadow-composer: 0 4px 20px rgba(20, 20, 19, 0.06), 0 0 0 0.5px rgba(31, 30, 29, 0.15);
+  --composer-focus-alpha: 0.7;   /* the clay ring holds 3:1 on the white composer (tests/composer-focus.test.mjs) */
   /* Corners: controls 8, cards 12 to 16, the composer and panels 20; chips stay pills. */
   --r-input: 8px; --r-row: 12px; --r-card: 16px; --r-panel: 20px;
   /* Tutor replies speak in the display font (the serif); everything else stays in the UI font. */
@@ -850,6 +863,7 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
   --lg-depth-float: 0 8px 28px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.35);
   --glass-shadow-lift: var(--glass-shadow-edge), var(--lg-depth-float);
   --shadow-composer: 0 4px 20px rgba(0, 0, 0, 0.25), 0 0 0 0.5px rgba(250, 249, 245, 0.15);
+  --composer-focus-alpha: 0.64;
   --r-input: 8px; --r-row: 12px; --r-card: 16px; --r-panel: 20px;
   --font-reply: var(--font-display);
   --meter: var(--ink); --meter-ink: var(--ink); --on-meter: var(--surface-raised);
@@ -867,6 +881,11 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
 [data-theme='dark'][data-look='paper-clay']:not([data-bg='clouds'], [data-bg='dusk'], [data-bg='meadow']) {
   --canvas: #262624; --backdrop-sky: none; --backdrop-wash: none; --backdrop-field: none;
 }
+/* A custom accent's ink is fitted to exactly 4.5:1 on the darkest glass, so its composer ring keeps more of
+   it to hold 3:1 on the lightest (tests/composer-focus.test.mjs). After the look, so a custom accent over
+   Paper & Clay keeps it too. */
+:root[data-accent='custom'] { --composer-focus-alpha: 0.74; }
+[data-theme='dark'][data-accent='custom'] { --composer-focus-alpha: 0.68; }
 
 /* Less motion: nothing lifts or scales. */
 @media (prefers-reduced-motion: reduce) {
