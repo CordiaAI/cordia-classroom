@@ -134,8 +134,8 @@ button:not(:disabled):active, .btn:not(:disabled):active { transform: var(--pres
 .cordia-tutor-visual { margin-top: 10px; min-width: 0; }
 .cordia-tutor-message.user { align-self: flex-end; max-width: 82%; padding: 10px 14px; border-radius:20px; background: var(--accent-strong); border-color: transparent; }
 .cordia-tutor .cordia-tutor-message.user { color: var(--accent-on); }
-.cordia-tutor-message.tutor-thinking { display: flex; align-items: center; gap: 10px; color: var(--muted-ink); font-weight:600; }
-.cordia-tutor-message.tutor-thinking .cordia-loader { gap: 0; }
+/* One fixed width, so a longer line never makes the bubble grow or shrink as the lines change. */
+.cordia-tutor-message.tutor-thinking { display: flex; align-items: center; gap: 10px; width: min(92%, 22rem); }
 .cordia-tutor-answer p { margin: 0 0 8px; }
 .cordia-tutor-answer p:last-child { margin-bottom: 0; }
 .cordia-tutor-answer strong { font-weight:600; color: var(--ink); }

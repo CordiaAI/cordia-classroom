@@ -1091,7 +1091,8 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 .chat-home-column { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 .chat-home-thread .cordia-tutor-message { position: relative; max-width: none; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--ink); font: 500 1.0625rem/1.55 var(--font-sans); }
 .chat-home-thread .cordia-tutor-message:is(.ai, .tutor-thinking) { align-self: stretch; padding-left: 44px; min-height: 32px; }
-.chat-home-thread .cordia-tutor-message.tutor-thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.9375rem; }
+/* The thinking line is the Tutor's own text style (components/TutorThinking.js), so only its row is set here. */
+.chat-home-thread .cordia-tutor-message.tutor-thinking { display: flex; align-items: center; gap: 10px; width: auto; }
 .chat-home-thread .cordia-tutor-message.user {
   align-self: flex-end; max-width: 78%; padding: 12px 16px; border-radius: 20px 20px 6px 20px;
   background: var(--glass-sheen), var(--glass-fill-strong) !important; box-shadow: var(--glass-shadow); color: var(--ink) !important;
