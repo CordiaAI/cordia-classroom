@@ -9,6 +9,7 @@ The published extension reads only `plan` ("classroom_plus" = paid, "free"), so 
 keeps its old meaning for every paid tier; `tier` says which paid tier it is.
 """
 
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional
@@ -16,6 +17,8 @@ from typing import Optional
 from fastapi import HTTPException
 
 from database import get_supabase
+
+logger = logging.getLogger(__name__)
 
 PRO = "classroom_plus"  # the `plan` value every paid tier reports (extension compatibility)
 TIERS = ("free", "pro", "weapon")
@@ -199,7 +202,9 @@ def measured_usage(user_id: str, feature: str, month: Optional[str] = None) -> i
             if len(rows) < MEASURED_PAGE:
                 return total
             offset += MEASURED_PAGE
-    except Exception:
+    except Exception as error:
+        # Shows in `fly logs`. Only the feature and the kind of error: never the student's id or anything they said.
+        logger.warning("usage_events could not be read for %s (%s); counting the %s used so far", MEASURED[feature], type(error).__name__, total)
         return total
 
 

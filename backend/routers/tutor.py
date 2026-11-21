@@ -223,8 +223,11 @@ class SpeakRequest(BaseModel):
     sample: bool = False
 
 
-@router.post("/speak")
-@limiter.limit("120/minute")
+# Per student, beside a per-address ceiling: each call can spend ElevenLabs characters, and a student behind a shared
+# address (a campus, a phone network) must not use up everyone else's. A reply is a sentence a call, about one every
+# few seconds, so 60 a minute is well above real talking; the ceiling lets a dozen students talk at once from one address.
+@router.post("/speak", dependencies=[Depends(ai_rate_limit(60, 60))])
+@limiter.limit("600/minute")
 def tutor_speak(body: SpeakRequest, request: Request, authorization: str = Header(default="")):
     """Speak one sentence in the student's chosen voice (ElevenLabs, streamed as mp3). Only words from the latest
     replies in the student's own Tutor session, or the fixed sample. Charged to the monthly `voice_characters`

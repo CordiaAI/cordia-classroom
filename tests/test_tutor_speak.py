@@ -211,6 +211,43 @@ class SpeakRouteTests(unittest.TestCase):
         self.assertNotIn(SECRET[-8:], stream.getvalue())
 
 
+@patch("routers.tutor.get_user_id", return_value="student-1")
+class SpeakRateLimitTests(unittest.TestCase):
+    """Review fix: /tutor/speak is limited per student (60 a minute) beside a per-address ceiling (600 a minute)."""
+
+    def setUp(self):
+        import rate_limit
+        from rate_limit import limiter
+        rate_limit._hits.clear()
+        limiter.reset()
+        self.addCleanup(rate_limit._hits.clear)
+        self.addCleanup(limiter.reset)
+        self.client = TestClient(app)
+        # No ElevenLabs key: a call that gets past the limits answers 503 at once, so nothing is spoken or charged.
+        env = patch.dict(os.environ, {"ELEVENLABS_API_KEY": ""})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def speak(self, headers):
+        return self.client.post("/tutor/speak", headers=headers, json={"session_id": SESSION, "text": "Water follows the salt."}).status_code
+
+    def test_one_student_is_limited_and_a_neighbour_on_the_same_address_is_not(self, _):
+        address = {"Fly-Client-IP": "203.0.113.7"}
+        mine = {**address, "Authorization": "Bearer student-one"}
+        neighbour = {**address, "Authorization": "Bearer student-two"}
+        codes = [self.speak(mine) for _ in range(61)]
+        self.assertEqual(set(codes[:60]), {503})
+        self.assertEqual(codes[60], 429)
+        self.assertEqual(self.speak(neighbour), 503)
+
+    def test_one_address_cannot_get_round_the_limit_with_a_new_token_each_time(self, _):
+        address = {"Fly-Client-IP": "203.0.113.9"}
+        codes = [self.speak({**address, "Authorization": f"Bearer made-up-{n}"}) for n in range(601)]
+        self.assertEqual(set(codes[:600]), {503})
+        self.assertEqual(codes[600], 429)
+        self.assertEqual(self.speak({"Fly-Client-IP": "198.51.100.4", "Authorization": "Bearer other"}), 503)
+
+
 class SpokenFromRepliesTests(unittest.TestCase):
     def test_words_in_order_from_a_latest_reply_with_some_left_out(self):
         self.assertTrue(tutor_speech.spoken_from_replies("Osmosis is water moving across a membrane.", MESSAGES))
@@ -291,6 +328,17 @@ class VoiceLimitTests(unittest.TestCase):
         broken.table.side_effect = RuntimeError("relation does not exist")
         with patch.object(entitlements, "get_supabase", return_value=broken):
             self.assertEqual(entitlements.measured_usage("student-1", "voice_characters"), 0)
+
+    def test_an_unreadable_usage_table_is_logged_without_the_student_or_anything_they_said(self):
+        broken = MagicMock()
+        broken.table.side_effect = RuntimeError("relation does not exist for student-secret-id")
+        with patch.object(entitlements, "get_supabase", return_value=broken), \
+                self.assertLogs("services.entitlements", level="WARNING") as logged:
+            entitlements.measured_usage("student-secret-id", "voice_characters")
+        line = logged.output[0]
+        self.assertIn("tutor_voice", line)
+        self.assertIn("RuntimeError", line)
+        self.assertNotIn("student-secret-id", line)
 
     def test_the_ledger_count_for_a_measured_feature_is_never_used(self):
         supabase = MagicMock()
