@@ -255,6 +255,47 @@ class StatusRouteTests(unittest.TestCase):
         self.assertEqual(self.client.get("/tutor/steps", headers=AUTH, params={"session_id": SESSION}).json(), {"steps": []})
 
 
+@patch("routers.tutor.get_user_id", return_value="student-1")
+class StatusLimitTests(unittest.TestCase):
+    """Review fix: the status call spends tokens, so each student has their own limit beside the per-address one,
+    and the step poll is counted per student, not per address."""
+
+    def setUp(self):
+        import rate_limit
+        rate_limit._hits.clear()
+        self.addCleanup(rate_limit._hits.clear)
+        self.client = TestClient(app)
+
+    def test_status_is_limited_per_student_and_a_neighbour_on_the_same_address_is_not(self, _):
+        same_address = {"Fly-Client-IP": "203.0.113.7"}
+        mine = {**same_address, "Authorization": "Bearer student-one"}
+        neighbour = {**same_address, "Authorization": "Bearer student-two"}
+        with patch("services.tutor_status._ask", return_value=[]):
+            codes = [self.client.post("/tutor/status", headers=mine, json={"question": "Explain osmosis"}).status_code for _ in range(21)]
+            self.assertEqual(codes[:20], [200] * 20)
+            self.assertEqual(codes[20], 429)
+            self.assertEqual(self.client.post("/tutor/status", headers=neighbour, json={"question": "Explain osmosis"}).status_code, 200)
+
+    def test_the_step_poll_is_counted_per_student_not_per_address(self, _):
+        same_address = {"Fly-Client-IP": "203.0.113.7"}
+        mine = {**same_address, "Authorization": "Bearer student-one"}
+        neighbour = {**same_address, "Authorization": "Bearer student-two"}
+        params = {"session_id": SESSION}
+        codes = [self.client.get("/tutor/steps", headers=mine, params=params).status_code for _ in range(241)]
+        self.assertEqual(set(codes[:240]), {200})
+        self.assertEqual(codes[240], 429)
+        self.assertEqual(self.client.get("/tutor/steps", headers=neighbour, params=params).status_code, 200)
+
+    def test_the_limit_answers_with_a_plain_429_the_web_app_ignores(self, _):
+        mine = {"Authorization": "Bearer student-one"}
+        with patch("services.tutor_status._ask", return_value=[]):
+            for _ in range(20):
+                self.client.post("/tutor/status", headers=mine, json={"question": "Explain osmosis"})
+            response = self.client.post("/tutor/status", headers=mine, json={"question": "Explain osmosis"})
+        self.assertEqual(response.status_code, 429)
+        self.assertNotIn("lines", response.json())
+
+
 class StepStoreTests(unittest.TestCase):
     def tearDown(self):
         tutor_status.end()
@@ -342,6 +383,29 @@ class RealStepTests(unittest.TestCase):
         with patch("routers.chat.write_visual_text", side_effect=written):
             self.post(question="Draw a diagram of the Krebs cycle")
         self.assertEqual(self.seen, [["Drawing a diagram"]])
+
+    def test_a_diagram_that_cannot_be_written_is_not_left_as_a_step(self, *_):
+        # Review fix: the answer carries on as text, so nobody is told about a diagram that was never drawn.
+        def nothing(question, material):
+            self.snapshot()  # while the Tutor really is trying to draw
+            return None
+
+        with patch("routers.chat.write_visual_text", side_effect=nothing), patch("routers.chat.answer_question", side_effect=self.answer), \
+                patch("routers.chat.ground_general_answer", side_effect=lambda a, q: a):
+            self.post(question="Draw a diagram of the Krebs cycle", content="")
+        self.assertEqual(self.seen, [["Drawing a diagram"], []])
+
+    def test_retracting_a_step_takes_back_only_the_newest_one(self, *_):
+        tutor_status.begin("u", SESSION)
+        try:
+            for step in ("Drawing a diagram", "Reading Cells", "Drawing a diagram"):
+                tutor_status.note_step(step)
+            tutor_status.retract_step("Drawing a diagram")
+            self.assertEqual(tutor_status.steps_for("u", SESSION), ["Drawing a diagram", "Reading Cells"])
+            tutor_status.retract_step("Never noted")
+            self.assertEqual(tutor_status.steps_for("u", SESSION), ["Drawing a diagram", "Reading Cells"])
+        finally:
+            tutor_status.end()
 
     def test_building_a_guide_shows_building_your_study_guide(self, *_):
         def built(*_a, **_k):

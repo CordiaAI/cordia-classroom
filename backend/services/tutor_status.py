@@ -71,6 +71,24 @@ def note_step(text: str) -> None:
         _prune(now)
 
 
+def retract_step(text: str) -> None:
+    """The step was noted for work that came to nothing (a diagram that could not be written, so the answer
+    carries on as text): take it back, so no one is told about something that did not happen."""
+    key = _bound.get()
+    line = " ".join(str(text or "").split())[:MAX_STEP_CHARS]
+    if not key or not line:
+        return
+    with _lock:
+        entry = _steps.get(key)
+        if not entry or line not in entry[0]:
+            return
+        steps = list(entry[0])
+        steps.reverse()
+        steps.remove(line)  # the newest one
+        steps.reverse()
+        _steps[key] = (steps, entry[1])
+
+
 def end() -> None:
     """The request is over (answered or failed): its steps are no longer true."""
     key = _bound.get()
