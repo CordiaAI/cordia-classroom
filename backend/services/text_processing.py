@@ -3,6 +3,7 @@ Text processing utilities for content extraction and cleaning.
 Handles LMS content, slideshows, and general educational material.
 """
 
+import bisect
 import re
 import logging
 from functools import lru_cache
@@ -474,9 +475,10 @@ _ACTS = (r"(?:say|state|show|list|describe|mention|cover|discuss|explain|define|
          r"teach|call|refer|name)")
 # What the source contains or shows: "listed for Chapter 1", "covered in this lecture", "the key
 # terms for Chapter 3". No rewrite saves these.
+_CONTENT_WORDS = "(?:terms|vocabulary|concepts|topics|objectives|readings|themes|takeaways)"
 _ABOUT_SOURCE = re.compile(
     rf"\b{_COVERAGE_VERB}\s(?:in|on|for|under|during|throughout|from|at|by)\s{_PART}"
-    rf"|\b(?:key\s)?(?:terms|vocabulary|concepts|topics|objectives|readings|themes|takeaways)\s(?:for|of|in|from)"
+    rf"|\b(?:key\s)?{_CONTENT_WORDS}\s(?:for|of|in|from)"
     rf"\s(?:(?:the|this)\s)?(?:chapter|section|module|lecture|lesson|week|part|reading|slide|page)s?"
     rf"(?:{_NUMBERED}|(?!\s?#?\s?\d){_BOUNDARY})",
     re.I)
@@ -519,10 +521,29 @@ _LISTED_ORDINAL = re.compile(
 # on the graph?") needs the picture, so it is never asked. A point or line named by a letter is a
 # label only in a question that names a picture, chart or table: "from point A to point B" is a
 # distance problem.
-_LAYOUT_MARK = re.compile(
-    r"\b(?:labell?ed|marked|shaded|circled|lettered|arrowed)\s(?:as\s|with\s)?(?-i:[A-Z])(?![\w'\u2019-])", re.I)
-_LAYOUT_POINT = re.compile(
-    r"\b(?:point|line|curve|area|region|label|arrow|letter|segment|quadrant|box)\s(?-i:[A-Z])(?![\w'\u2019-])", re.I)
+_MARK_VERB = "(?:labell?ed|marked|shaded|circled|lettered|arrowed)"
+_LAYOUT_NOUN = "(?:point|line|curve|area|region|label|arrow|letter|segment|quadrant|box)"
+_LAYOUT_MARK = re.compile(rf"\b{_MARK_VERB}\s(?:as\s|with\s)?(?-i:[A-Z])(?![\w'\u2019-])", re.I)
+_LAYOUT_POINT = re.compile(rf"\b{_LAYOUT_NOUN}\s(?-i:[A-Z])(?![\w'\u2019-])", re.I)
+
+
+def _spellings(alternation: str) -> frozenset:
+    """Every word a plain alternation of words matches: "(?:listed|summari[sz]ed|labell?ed)" gives
+    listed, summarised, summarized, labeled and labelled."""
+    words = set()
+    for word in alternation[3:-1].split("|"):
+        forms = [word]
+        for part, choices in (("[sz]", ("s", "z")), ("l?", ("l", ""))):
+            forms = [form.replace(part, choice, 1) for form in forms for choice in choices] if part in word else forms
+        words.update(forms)
+    return frozenset(words)
+
+
+# Each pattern needs one of these as a whole word (a word, then a space), so a question without one
+# is never searched: the search costs far more than reading its words.
+_ABOUT_WORDS = _spellings(_COVERAGE_VERB) | _spellings(_CONTENT_WORDS)
+_MARK_WORDS = _spellings(_MARK_VERB)
+_LAYOUT_WORDS = _spellings(_LAYOUT_NOUN)
 # What is left that still needs the file: only an ordinal or a generic noun ("What is the second
 # step?", "What does the first bullet say?", "What is the author's main argument?", "Which painting
 # appears first?", "What topics are covered?"). Anchored at the start, so a question that opens on
@@ -641,14 +662,37 @@ def _names_only_the_source(phrase: str, nouns=_SOURCE_NOUN_WORDS) -> bool:
     if not words or len(words) > 30:
         return False
     named = False
-    pointed = any(word in _POINTING or word[:1].isdigit() for word in words)
+    pointed = None
     for word in words:
-        base = re.sub(r"['’]s$", "", word)
-        if base in nouns or (base in ("chart", "charts") and pointed):
+        if (word in _FILLER_WORDS or word.isdigit()) and word not in nouns:
+            continue
+        base = _base_word(word)
+        if base in ("chart", "charts") and base not in nouns:
+            if pointed is None:
+                pointed = any(other in _POINTING or other[:1].isdigit() for other in words)
+            if pointed:
+                named = True
+                continue
+            return False
+        if base in nouns:
             named = True
-        elif not (base in _FILLER_WORDS or _NUMERAL.match(base) or _SOURCE_VERB.match(base)):
+        elif not _source_word(base):
             return False
     return named
+
+
+# Words that may be in an opening at the end of a question that only names the lecture's own parts.
+_OPENING_WORDS = _LECTURE_NOUN_WORDS | _FILLER_WORDS
+
+
+def _base_word(word: str) -> str:
+    """A phrase word without a possessive "'s" ("lecture's" is "lecture")."""
+    return word[:-2] if word.endswith(("'s", "’s")) else word
+
+
+def _source_word(base: str) -> bool:
+    """Whether a word other than a source noun may be in an opening that only names the source."""
+    return base in _FILLER_WORDS or bool(_NUMERAL.match(base)) or bool(_SOURCE_VERB.match(base))
 
 
 def _trailing_opening(core: str):
@@ -751,14 +795,42 @@ class _Opened:
         if self.trail:
             return
         unread = None
-        for at in _BARE_AT.finditer(self.core, max(0, len(self.core) - 120)):
+        tail_at = max(0, len(self.core) - 120)
+        # Each place a candidate could start is checked in constant time against the words after it,
+        # read from the end: whether one is a lecture noun (else it and every later one is part of what
+        # is asked), and `floor`, the last place before which _names_only_the_source must say no (a
+        # word no such opening holds comes after it, or more than 30 words do). Only a candidate past
+        # the floor, or the first one left unread, is matched in full, so the work stays linear.
+        tail = self.core[tail_at:].lower()
+        words = list(_PHRASE_WORD.finditer(tail))
+        last_noun = next((tail_at + word.start() for word in reversed(words) if word.group() in _LECTURE_NOUN_WORDS), -1)
+        if last_noun < 0:
+            return
+        if "(" in tail or "[" in tail:  # the words _names_only_the_source reads: brackets left out
+            words = list(_PHRASE_WORD.finditer(_BRACKET.sub(lambda found: " " * len(found.group()), tail)))
+        floor = -1
+        for count, word in enumerate(reversed(words), 1):
+            if count > 30:
+                floor = tail_at + word.start()
+                break
+            text = word.group()
+            if text in _OPENING_WORDS or text.isdigit():
+                continue
+            base = _base_word(text)
+            if base not in _OPENING_WORDS and base not in ("chart", "charts") and not _source_word(base):
+                floor = tail_at + word.start()
+                break
+        for at in _BARE_AT.finditer(self.core, tail_at):
+            if last_noun <= at.start():
+                break  # "in the passage", "in the table": part of what is asked (so is every later one)
+            may_name_only = floor < at.start()
+            if unread and not may_name_only:
+                continue  # names more than the source, and an earlier one is already left unread
             found = _BARE_TRAIL.fullmatch(self.core, at.start())
             if not found:
                 continue
             clause = found.group("clause")
-            if not any(word in _LECTURE_NOUN_WORDS for word in _PHRASE_WORD.findall(clause.lower())):
-                continue  # "in the passage", "in the table": part of what is asked
-            if _names_only_the_source(clause, _LECTURE_NOUN_WORDS):
+            if may_name_only and _names_only_the_source(clause, _LECTURE_NOUN_WORDS):
                 head = self.core[:at.start()].split()
                 # "Which novels are on the reading list?": after "are" it is what the question asks
                 if len(head) >= 3 and head[-1].lower() not in _LINKING:
@@ -790,14 +862,16 @@ def _sentence_case(text: str) -> str:
 _MAX_PASSES = 5
 
 # Every check needs one of these words; most questions have none, so they are skipped (guides are
-# parsed on hot paths such as class progress). Word starts, so "context" is not "text".
-_MAY_REFER = re.compile(
-    r"\b(?:" + "|".join(sorted((_SOURCE_NOUN_WORDS | {"chart"}) - {"p", "pg", "pp", "fig"}, key=len, reverse=True)) + r")(?:e?s)?\b"
-    r"|\b(?:p|pp|pg|fig)\.?\s?\d"
-    r"|\b(?:listed|covered|discussed|introduced|presented|mentioned|described|named|outlined|reviewed|taught|shown|"
-    r"included|highlighted|identified|featured|depicted|illustrated|explained|defined|displayed|pictured|given|"
-    r"examples?|problems?|exercises?|lecturer|labell?ed|marked|shaded|circled|lettered|arrowed)\b",
-    re.I)
+# parsed on hot paths such as class progress). Whole words, so "context" is not "text". Read as a set
+# of words, so a question's cost is one pass over it whatever it holds.
+_MAY_REFER_WORDS = frozenset(
+    {noun + ending for noun in (_SOURCE_NOUN_WORDS | {"chart"}) - {"p", "pp", "pg", "fig"} for ending in ("", "s", "es")}
+    | set("""listed covered discussed introduced presented mentioned described named outlined reviewed taught shown
+    included highlighted identified featured depicted illustrated explained defined displayed pictured given example
+    examples problem problems exercise exercises lecturer labeled labelled marked shaded circled lettered
+    arrowed""".split()))
+_WORD = re.compile(r"\w+")
+_PAGE_REF = re.compile(r"\b(?:p|pp|pg|fig)\.?\s?\d", re.I)
 
 
 def _squash(text) -> str:
@@ -806,7 +880,8 @@ def _squash(text) -> str:
 
 
 def _may_refer(text: str) -> bool:
-    return bool(_MAY_REFER.search(text))
+    # "p. 12", "pg 4", "fig3": a page word before a number
+    return not _MAY_REFER_WORDS.isdisjoint(_WORD.findall(text.lower())) or bool(_PAGE_REF.search(text))
 
 
 def _windows(text: str) -> list:
@@ -821,9 +896,12 @@ def _about_the_source(read: str, whole: str) -> bool:
     """Whether a question (`read`: its openings already off) asks what the source contains or shows,
     or about a picture's own labels (`whole`: the question as saved). Read before an attribution to
     the lecture is trimmed from its end ("Which poets are mentioned in the passage?")."""
-    if any(_ABOUT_SOURCE.search(part) or _LAYOUT_MARK.search(part) for part in _windows(read)):
+    parts = [(part, _WORD.findall(part.lower())) for part in _windows(read)]
+    if any((not _ABOUT_WORDS.isdisjoint(words) and _ABOUT_SOURCE.search(part))
+           or (not _MARK_WORDS.isdisjoint(words) and _LAYOUT_MARK.search(part)) for part, words in parts):
         return True
-    return any(_LAYOUT_POINT.search(part) for part in _windows(read)) and any(_VISUAL.search(part) for part in _windows(whole))
+    return (any(not _LAYOUT_WORDS.isdisjoint(words) and _LAYOUT_POINT.search(part) for part, words in parts)
+            and any(_VISUAL.search(part) for part in _windows(whole)))
 
 
 def _points_at_source(read: str, kept_lead: bool) -> bool:

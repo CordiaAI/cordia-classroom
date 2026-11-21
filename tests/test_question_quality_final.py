@@ -361,6 +361,11 @@ class ValuesSurviveExactlyTests(unittest.TestCase):
 
 # --- Must-fix 1: the connected app's wording route --------------------------------------------------
 
+# The narrow round's slow requests (382, 326 and 232 ms of CPU before): every place "on"/"in" could
+# start an attribution at the end of the question was checked in full.
+BARE_TRAILS = (" on unit", " in p 4", " in the lecture x", " in class z per lecture", " in lecture x", " in class")
+
+
 def hostile(shape, size, salt):
     """Question text shaped to make the checks work hardest (rook-f5v2/mcpload.py, timing.py)."""
     if shape == "attributions":
@@ -369,6 +374,9 @@ def hostile(shape, size, salt):
         text = "According to Slide 5, " * (size // 22 + 1)
     elif shape == "commas":
         text = "In the lecture, " + ", in the lecture" * (size // 16)
+    elif shape in BARE_TRAILS:
+        # rook-f5final/worst.py and timing3.py: an attribution with no comma, again and again, at the end
+        text = "What is the dose" + shape * (size // len(shape) + 1)
     else:
         words = ["slide", "page", "the", "lecture", "according to", "in", "chapter", "listed", "shown", "of", "this", ",", "?",
                  "as discussed in", "Figure", "1", "(see p. 4)", "labeled B", "point E", "on the graph"]
@@ -396,8 +404,8 @@ class ConnectorWordingTests(unittest.TestCase):
         from routers import mcp
         from services import text_processing as tp
         worst = 0.0
-        for shape in ("attributions", "slide", "commas", "soup"):
-            for size in (2001, 1000, 100):
+        for shape in ("attributions", "slide", "commas", "soup", *BARE_TRAILS):
+            for size in (2001, 1000, 140, 120, 100):
                 count = min(mcp.WORDING_MAX_TEXTS, mcp.WORDING_MAX_CHARS // size)
                 texts = [hostile(shape, size, n) for n in range(count)]
                 half = count // 2
