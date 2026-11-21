@@ -42,7 +42,7 @@ const shorten = (text, max = 40) => {
 // of the Plan label, since the label reads as a sentence.
 const WORK_NOUNS = new Set(['assignment', 'bibliography', 'discussion', 'draft', 'essay', 'exam', 'final', 'homework', 'journal', 'lab', 'memo', 'midterm', 'outline', 'paper', 'portfolio', 'post', 'presentation', 'project', 'proposal', 'quiz', 'reading', 'reflection', 'report', 'response', 'review', 'summary', 'test', 'worksheet']);
 // Small words that stay lowercase in a Title Case title ("Hadley v. Baxendale", "Ethics of Care").
-const MINOR_WORDS = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'in', 'of', 'on', 'or', 'the', 'to', 'v', 'vs', 'with']);
+export const MINOR_WORDS = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'in', 'of', 'on', 'or', 'the', 'to', 'v', 'vs', 'with']);
 
 const TERMS = new Set(['FA', 'FALL', 'SP', 'SPR', 'SPRNG', 'SPRING', 'SU', 'SUM', 'SUMR', 'WI', 'WIN', 'WINT']);
 // Words that sit before a number without naming a department ("Sec 02", "Week 5", "COVID 19"), and
@@ -76,7 +76,14 @@ export function classShort(course) {
     }
     return `${parts.join(' ').toUpperCase()} ${level.toUpperCase()}`;
   }
-  const name = text
+  const { name, named } = wordsName(text);
+  return named ? shorten(name, 28) : '';
+}
+
+// A class named only in words, without its term, section or anything after a dash, colon or bracket
+// ("SP25 Adult Health I: Spring" -> "Adult Health I"); named says whether it reads as a class name.
+function wordsName(value) {
+  const name = String(value || '')
     .replace(/^\s*(?:(?:spring|summer|fall|winter|spr|sum|fal|win|sp|su|fa|wi)\s*['’]?\d{2,4}|(?:19|20)\d\d(?:\d\d)?)\b[\s,.:-]*/i, '')
     .replace(/^\s*(?:sec|section|lab|week|unit|group|cohort)\b\s*\d*[\s,.:–—-]*/i, '')
     .replace(/\s+[–—-]\s+.*$/, '')
@@ -86,7 +93,56 @@ export function classShort(course) {
     .trim();
   const words = name.split(/\s+/).filter(Boolean);
   const named = /[a-z]/.test(name) && !/\b(?:19|20)\d\d\b/.test(name) && !NOT_DEPARTMENTS.has(words[0]?.toUpperCase()) && (words.length > 1 || /^[A-Za-z]{5,}$/.test(name));
-  return named ? shorten(name, 28) : '';
+  return { name, named };
+}
+
+// A term or a section, and nothing else: "Fall 2026", "Spring '26", "SP25", "2026FA", "Section 02",
+// "Sec 2", "Section B", or a section number with a leading zero ("02", "001"). A bare year ("2035") or
+// number ("2", "101") is a course level, not a section ("Spanish - 2", "Biology - 101"), and a short
+// code ("L1") could be anything, so none of those is one.
+const TERM_WORD = String.raw`(?:spring|summer|fall|winter|spr|sum|fal|win|sp|su|fa|wi)`;
+const TERM = String.raw`(?:${TERM_WORD}\s*['\u2019]?\s*(?:19|20)?\d{2}|(?:19|20)\d{2}\s*${TERM_WORD})`;
+const SECTION = String.raw`(?:sec|sect|section)\.?\s*#?\s*(?:\d{1,3}[a-z]?|[a-z])`;
+const ONLY_TERM_OR_SECTION = new RegExp(String.raw`^(?:${TERM}|${SECTION}|0\d{1,2})$`, 'i');
+const isTermOrSection = text => text.split(/\s*[,;/&]\s*|\s+and\s+/i).every(part => ONLY_TERM_OR_SECTION.test(part.trim()));
+const LEADING_TERM = new RegExp(String.raw`^(?:${TERM}|${SECTION})\b[\s,.:\u2013\u2014-]*`, 'i');
+// What can end a name, with the part to look at: a bracket, a dash or a colon, or just a space.
+const TAILS = [
+  /\s*[(\[]\s*([^()\[\]]*?)\s*[)\]]\s*$/,
+  /(?:\s[\u2013\u2014-]\s|\s*:\s*)((?:(?!\s[\u2013\u2014-]\s|:)[^()\[\]])*?)\s*$/,
+  new RegExp(String.raw`\s+((?:${SECTION}|${TERM}))$`, 'i'),
+];
+
+// Takes a term or a section off the end of a name, one at a time, and off the front: "Calculus II:
+// Section 2" -> "Calculus II", "Business Ethics (Section 02)" -> "Business Ethics", "SP25 Adult Health
+// II" -> "Adult Health II". Only those: anything else after a dash, colon or bracket ("Biology - Lab",
+// "Art History: Renaissance", "Nursing (Pharmacology)") is part of the name and stays.
+function withoutTerms(text) {
+  let name = text.replace(/\s+/g, ' ').trim();
+  for (let round = 0; round < 8; round += 1) {
+    const before = name;
+    name = name.replace(LEADING_TERM, '').replace(/^[\s:\u2013\u2014,.-]+/, '').replace(/\(\s*\)|\[\s*\]/g, ' ').replace(/\s+/g, ' ').replace(/[\s,;:\u2013\u2014-]+$/, '').trim();
+    for (const pattern of TAILS) {
+      const match = name.match(pattern);
+      if (match && (!match[1] || isTermOrSection(match[1]))) { name = name.slice(0, match.index).replace(/[\s,;:\u2013\u2014-]+$/, ''); break; }
+    }
+    if (name === before) break;
+  }
+  return name;
+}
+
+// A class's name in words alone, whole (not cut for a label), for telling two classes apart: "Calculus
+// I" is not "Calculus II", "Biology - Lab" is not "Biology - Lecture", "Nursing" is not "Nursing -
+// Pharmacology". A course code in the text is left out ("MATH 101 Calculus I" -> "Calculus I"); a
+// term or a section ("Section 02", "SP25", "Fall 2026") is left out and nothing else is; '' when
+// nothing in it reads as a name.
+export function classNameWords(value) {
+  // Only a real course code goes: "Lab 101" and "Week 5" are words of the name, not a department.
+  const bare = String(value || '').replace(/\b([A-Za-z]{2,5})[\s_-]*\d{3,4}[A-Za-z]?(?:[-_]\d{1,3})?\b/g, (code, dept) => (NOT_DEPARTMENTS.has(dept.toUpperCase()) ? code : ' ')).replace(/^[\s:\u2013\u2014,.-]+/, '');
+  const name = withoutTerms(bare);
+  const words = name.split(/\s+/).filter(Boolean);
+  const named = /[a-z]/i.test(name) && !/\b(?:19|20)\d\d\b/.test(name) && !NOT_DEPARTMENTS.has(words[0]?.toUpperCase()) && (words.length > 1 || /^[A-Za-z]{5,}$/.test(name));
+  return named ? name : '';
 }
 
 // A leading id Canvas puts on an assignment ("A05", "A07AA", "HW3", "PA3"), and a section code
@@ -108,8 +164,8 @@ const isTitleCase = title => title.split(/\s+/).every(word => {
 // An assignment's title in plain words for the Plan label: the Canvas section code, ids ("A05",
 // "PA3:"), "#12" and "(1 of 2)" go; the meaning stays, numbers included ("Quiz 4", "Lab 3", "Problem
 // Set 4"). The last word is lowercased when it is a work noun and the whole title is in Title Case,
-// since the label reads as a sentence. "" if only codes are left ("NUR-210-01 [A05]").
-export function planTitle(raw) {
+// since the label reads as a sentence (lowerLast: false keeps the title's own case). "" if only codes are left ("NUR-210-01 [A05]").
+export function planTitle(raw, { lowerLast = true } = {}) {
   let title = String(raw || '')
     .replace(/\s*\[[^\]]*\]\s*$/, '')
     .replace(/\s*\(\s*\d+\s*(?:of|\/)\s*\d+\s*\)/gi, '')
@@ -125,7 +181,7 @@ export function planTitle(raw) {
     .replace(/\s+/g, ' ')
     .replace(/^[\s:,;.–—-]+|[\s:,;.–—-]+$/g, '');
   const last = title.match(/[A-Za-z]+$/)?.[0];
-  if (last && WORK_NOUNS.has(last.toLowerCase()) && last !== last.toUpperCase() && isTitleCase(title)) title = title.slice(0, -last.length) + last.toLowerCase();
+  if (lowerLast && last && WORK_NOUNS.has(last.toLowerCase()) && last !== last.toUpperCase() && isTitleCase(title)) title = title.slice(0, -last.length) + last.toLowerCase();
   return title;
 }
 

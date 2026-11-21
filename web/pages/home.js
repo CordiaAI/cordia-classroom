@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -6,7 +6,9 @@ import { CalendarCheck, FolderInput, GraduationCap, Layers, PenLine, Trash2 } fr
 import { useRequireAuth } from '../lib/auth';
 import { useCachedPage } from '../lib/pageCache';
 import { loadHome } from '../lib/homeData';
-import { homeHeadline, homeSuggestions } from '../lib/homeText.mjs';
+import { homeSuggestions } from '../lib/homeText.mjs';
+import { firstName, homeHeadlineFor, nextHeadlineChange } from '../lib/homeHeadline.mjs';
+import { getUserId, getUserName } from '../lib/api';
 import { useTutorChat } from '../lib/useTutorChat';
 import { refreshShell, shellActive, shellFlag, useNewShell } from '../lib/useNewShell';
 import { invalidateFolders, latestFolders, loadFolders, onFoldersChanged } from '../lib/folders';
@@ -24,6 +26,7 @@ import { sidebarClasses } from '../components/Sidebar';
 import { LoadGate } from '../components/CordiaLoader';
 import Composer, { buildGuideFrom } from '../components/Composer';
 import ClassPicker from '../components/ClassPicker';
+import HomeHero from '../components/HomeHero';
 import Menu from '../components/Menu';
 import TutorMessages from '../components/TutorMessages';
 import AssignmentSheet from '../components/AssignmentSheet';
@@ -448,7 +451,30 @@ function ChatScreen({ routeId, goTo, progress }) {
   // After a notice's button goes away, focus goes back to the message box.
   const focusComposer = () => requestAnimationFrame(() => tutor.rootRef.current?.querySelector('.composer-box')?.focus({ preventScroll: true }));
 
-  const headline = homeHeadline(data?.exam, data?.plan, data?.className);
+  // The headline follows the class picker (lib/homeHeadline.mjs): a greeting for All classes, else
+  // the class's exam, deadline, weak idea or a plain line. Worked out from the data already loaded,
+  // so a pick asks for nothing; the same for a student, class and day.
+  const picked = classes.find(item => String(item.id) === String(classId)) || null;
+  const pickedInfo = picked ? data?.byClass?.[String(picked.id)] : null;
+  // ...and it follows the clock with the page open: worked out again at the next 5:00, noon, 5 PM, 11 PM,
+  // midnight or deadline hour, and when the tab comes back (timers sleep in a background tab). A change
+  // the clock makes swaps the words at once, with no fade (components/HomeHero.js).
+  const [clock, setClock] = useState(0);
+  useEffect(() => {
+    let timer = null;
+    const arm = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { setClock(count => count + 1); arm(); }, nextHeadlineChange(new Date(), pickedInfo));
+    };
+    const recheck = () => { if (document.visibilityState === 'visible') { setClock(count => count + 1); arm(); } };
+    arm();
+    document.addEventListener('visibilitychange', recheck);
+    return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', recheck); };
+  }, [pickedInfo]);
+  const headline = useMemo(
+    () => homeHeadlineFor({ pick: picked, info: pickedInfo, now: new Date(), name: firstName(getUserName()), studentKey: getUserId() }),
+    [picked, data, clock],
+  );
   const pills = homeSuggestions({
     learn: data?.exam ? { title: data.exam.title, guideId: data.exam.guideId, date: data.exam.date } : null,
     due: data?.due || 0,
@@ -513,10 +539,7 @@ function ChatScreen({ routeId, goTo, progress }) {
                 </div>
               </div>
             ) : (
-              <div key="hero" className="chat-home-hero">
-                <h1 className="chat-home-headline">{headline.title}</h1>
-                {headline.line && <p className="chat-home-line">{headline.line}</p>}
-              </div>
+              <HomeHero key="hero" title={headline.title} line={headline.line} clock={clock} />
             )}
 
             {notice && (

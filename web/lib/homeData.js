@@ -1,16 +1,20 @@
 import { apiFetch } from './api';
 import { loadFolders } from './folders';
-import { classLabel } from './classLabel';
 import { readCalendarCache, rememberCalendar } from './calendarCache';
 import { dueCount } from './studyQueue';
-import { counts, dayKey, restoreLevels, testPlan } from './learnEngine.mjs';
+import { counts, dayKey, restoreLevels } from './learnEngine.mjs';
 import { learnQuestions, nearestExam } from './examCountdown.mjs';
 import { deadlineCourse, deadlineTitle } from './formatters';
+import { HEADLINE_DAYS } from './homeText.mjs';
+import { classDeadlines, weakFromGuide, weakIdeas } from './homeHeadline.mjs';
 
 // Everything the chat home shows (DESIGN-SPEC 4.1), loaded together so the page appears once:
-// the soonest exam with a review set and Learn's pace for it (the Dashboard's exam countdown,
-// lib/examCountdown.mjs, and Learn's own math, lib/learnEngine.mjs), due flashcards (Study now's
-// count, lib/studyQueue.mjs) and the next Canvas deadline (the Dashboard's Course work and feed).
+// the soonest exam with a review set (the Dashboard's exam countdown, lib/examCountdown.mjs), due
+// flashcards (Study now's count, lib/studyQueue.mjs) and the next Canvas deadline (the Dashboard's
+// Course work and feed), and for each class what its headline can say (byClass, lib/homeHeadline.mjs):
+// its exam within a week with Learn's tally for it (Learn's own math, lib/learnEngine.mjs), its next
+// deadlines, and a weak idea from Learn with that guide's readiness (read from the guide, as the exam's
+// is, so it is the number Learn shows). All of it in the same load, so picking a class asks for nothing more.
 const CALENDAR_WAIT_MS = 2500;
 const safe = promise => promise.catch(() => null);
 
@@ -32,19 +36,36 @@ export async function loadHome(today = dayKey()) {
   const exams = [...upcoming, ...feed].filter(item => item?.type === 'exam');
 
   const exam = nearestExam(guides, exams, today);
-  let plan = null;
-  let className = '';
-  if (exam) {
-    const full = await safe(apiFetch('/guides/' + encodeURIComponent(exam.guideId)));
-    if (full?.guide) {
-      const questions = learnQuestions(full.guide);
-      const tally = counts(questions, restoreLevels(questions, full.guide.flashcard_progress?.learn?.levels || {}), today);
-      plan = testPlan(tally, exam.date, today);
+
+  // What each class's headline reads. A class's exam is found among its own guides; its review set
+  // is read in full only when the exam is within the headline's week.
+  const items = [...upcoming, ...feed].filter(item => item && item.type !== 'exam' && !item.done && !item.internal && item.id && item.due_at)
+    .map(item => ({ ...item, title: deadlineTitle(item), course: deadlineCourse(item) }));
+  const entries = await Promise.all(folders.map(async folder => {
+    const own = guides.filter(guide => String(guide.folder_id || '') === String(folder.id));
+    const classExam = own.length ? nearestExam(own, exams, today) : null;
+    const facts = { exam: classExam, weak: null, deadlines: classDeadlines(folder.name, items) };
+    if (classExam && classExam.daysLeft <= HEADLINE_DAYS) {
+      const full = await safe(apiFetch('/guides/' + encodeURIComponent(classExam.guideId)));
+      if (full?.guide) {
+        const questions = learnQuestions(full.guide);
+        facts.tally = counts(questions, restoreLevels(questions, full.guide.flashcard_progress?.learn?.levels || {}), today);
+      }
+    } else {
+      // A weak idea shows only without an exam this week. The list summary names the guides missed
+      // recently; the guide itself says which of those ideas are current questions, and how ready it is
+      // (a guide that cannot be read still names the idea, without a number).
+      const candidates = weakIdeas(own, today).slice(0, 3);
+      for (const candidate of candidates) {
+        const full = await safe(apiFetch('/guides/' + encodeURIComponent(candidate.guideId)));
+        if (!full?.guide) { facts.weak = facts.weak || { ...candidate, percent: null }; continue; }
+        const found = weakFromGuide(full.guide, today);
+        if (found) { facts.weak = { ...candidate, ...found }; break; }
+      }
     }
-    const folderId = guides.find(guide => guide.id === exam.guideId)?.folder_id;
-    const folder = folderId && folders.find(item => String(item.id) === String(folderId));
-    if (folder) className = classLabel(folder.name).title || classLabel(folder.name).code || folder.name;
-  }
+    return [String(folder.id), facts];
+  }));
+  const byClass = Object.fromEntries(entries.filter(([, facts]) => facts.exam || facts.weak || facts.deadlines.length));
 
   const due = guides.reduce((sum, guide) => sum + (Number(guide.flashcard_count) > 0 ? dueCount(guide) : 0), 0);
   const now = Date.now();
@@ -54,8 +75,7 @@ export async function loadHome(today = dayKey()) {
 
   return {
     exam,
-    plan,
-    className,
+    byClass,
     due,
     // The class travels with it (a feed item's is only in its title's section code) for the Plan suggestion.
     deadline: deadline ? { ...deadline, title: deadlineTitle(deadline), course: deadlineCourse(deadline) } : null,
