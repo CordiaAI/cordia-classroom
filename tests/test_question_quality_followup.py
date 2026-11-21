@@ -145,7 +145,7 @@ class FactsKeptTests(unittest.TestCase):
 
 REWRITES = {
     "As discussed in the lecture, what is the mechanism of action of furosemide?": "What is the mechanism of action of furosemide?",
-    "As explained in Chapter 3, what is the parol evidence rule?": "What is the parol evidence rule?",
+    "As explained in Chapter 3, what is the parol evidence rule?": "As explained in Chapter 3, what is the parol evidence rule?",  # narrow round: a numbered chapter may be the subject's own (Chapter 11), so it is asked as written
     "As shown on Slide 4, what is the time complexity of quicksort?": "What is the time complexity of quicksort?",
     "As noted in the reading, what is impasto?": "What is impasto?",
     "As mentioned in the textbook, what is an unreliable narrator?": "What is an unreliable narrator?",
@@ -158,7 +158,7 @@ REWRITES = {
     "From the notes: what is consideration?": "What is consideration?",
     "According to the video, which data structure is fastest?": "Which data structure is fastest?",
     # stacked attributions come off in one pass
-    "In the lecture, in Chapter 3, what is a tort?": "What is a tort?",
+    "In the lecture, in Chapter 3, what is a tort?": "In Chapter 3, what is a tort?",  # narrow round: a numbered chapter may be the subject's own (Chapter 11), so it is asked as written
     "According to Slide 5, according to the lecture, what is mitosis?": "What is mitosis?",
     "From the reading: per the notes, what is a tort?": "What is a tort?",
     "What is sfumato, according to the text, according to the slides?": "What is sfumato?",
@@ -166,13 +166,8 @@ REWRITES = {
 
 # Still need the file once the attribution is gone, or the source is the one acting.
 SOURCE_QUESTIONS = [
-    "What does the first bullet say, according to Slide 2?",
-    "What are the three examples, according to the slides?",
     "What is the second step in the list?",
     "What is the last term in the table?",
-    "What is the main idea, according to the reading?",
-    "What is the author's main argument, according to the passage?",
-    "Which painting appears first in the presentation?",
     "What is the first item in the list?",
     "Which characters does the excerpt introduce?",
     "Which three theorists does the chapter compare?",
@@ -187,6 +182,16 @@ SOURCE_QUESTIONS = [
     "Which sorting algorithms are presented in the slides?",
     "Which data are shown in this chart?",
     "What is defined in the first section?",
+]
+
+# Narrow round: only a generic noun is left once an opening that names the source comes off, so each
+# is asked as written (it was hidden before).
+GENERIC_LEFTOVERS = [
+    "What does the first bullet say, according to Slide 2?",
+    "What are the three examples, according to the slides?",
+    "What is the main idea, according to the reading?",
+    "What is the author's main argument, according to the passage?",
+    "Which painting appears first in the presentation?",
 ]
 
 # Subject questions that share words with the patterns above: asked as they are.
@@ -220,7 +225,7 @@ class AttributionTests(unittest.TestCase):
             self.assertIsNone(standalone_question(question), question)
 
     def test_subject_questions_are_asked_as_they_are(self):
-        for question in SUBJECT_QUESTIONS:
+        for question in [*SUBJECT_QUESTIONS, *GENERIC_LEFTOVERS]:
             self.assertEqual(standalone_question(question), question, question)
 
     def test_cleaning_twice_changes_nothing(self):
@@ -558,7 +563,7 @@ VERBS = ["stated", "described", "shown", "explained", "noted", "defined", "outli
          "mentioned", "presented", "covered", "taught", "introduced", "reviewed", "highlighted", "illustrated",
          "summarized", "summarised", "emphasized", "identified", "addressed", "examined", "explored", "learned",
          "studied", "depicted", "featured"]
-VERB_SOURCES = ["the lecture", "Chapter 3", "the reading", "this module", "the slides"]
+VERB_SOURCES = ["the lecture", "Lecture 3", "the reading", "this module", "the slides"]  # narrow round: "Chapter 3" is asked as written
 VERB_SUBJECTS = {"nursing": "what is the antidote for heparin?", "art history": "who painted Las Meninas?",
                  "business law": "what is promissory estoppel?", "literature": "who narrates Beloved?",
                  "computer science": "what is a hash collision?"}
@@ -617,9 +622,10 @@ FRESH = [
     ("As shown in the diagram, what is the root of the tree?", "What is the root of the tree?"),
     ("What is the page table entry used for?", "KEEP"),
     # source-only once the attribution is gone
-    ("According to the lecture, what are the four steps?", None),
-    ("Per the slides, what is the third example?", None),
-    ("What is the key takeaway, as stated in the module?", None),
+    # narrow round: trimmed to a generic noun, so asked as written
+    ("According to the lecture, what are the four steps?", "KEEP"),
+    ("Per the slides, what is the third example?", "KEEP"),
+    ("What is the key takeaway, as stated in the module?", "KEEP"),
 ]
 
 # The owner's rule: a picture, chart or table in an opening is trimmed like any other opening that

@@ -260,14 +260,14 @@ SUBJECT_TERMS = [
 # rook-f5/fresh2.py: the rest
 FRESH_SECOND = {
     "As discussed in the lecture, what is the mechanism of action of furosemide?": "What is the mechanism of action of furosemide?",
-    "As explained in Chapter 3, what is the parol evidence rule?": "What is the parol evidence rule?",
+    "As explained in Chapter 3, what is the parol evidence rule?": "SAME",  # narrow round: a numbered chapter may be the subject's own (Chapter 11), so it is asked as written
     "As shown on Slide 4, what is the time complexity of quicksort?": "What is the time complexity of quicksort?",
     "As noted in the reading, what is impasto?": "What is impasto?",
     "As mentioned in the textbook, what is an unreliable narrator?": "What is an unreliable narrator?",
-    "What is the author's main argument, according to the passage?": None,
-    "What is the main idea, according to the reading?": None,
-    "What are the three examples, according to the slides?": None,
-    "What does the first bullet say, according to Slide 2?": None,
+    "What is the author's main argument, according to the passage?": "SAME",  # narrow round: trimmed to a generic noun, so asked as written
+    "What is the main idea, according to the reading?": "SAME",  # narrow round: trimmed to a generic noun, so asked as written
+    "What are the three examples, according to the slides?": "SAME",  # narrow round: trimmed to a generic noun, so asked as written
+    "What does the first bullet say, according to Slide 2?": "SAME",  # narrow round: trimmed to a generic noun, so asked as written
     "What is the second step in the list?": None,
     "What is the last term in the table?": None,
     "What does the passage suggest about Gatsby's past?": None,
@@ -277,7 +277,7 @@ FRESH_SECOND = {
     "Which three theorists does the chapter compare?": None,
     "What example does the lecturer give for negligence?": None,
     "What does the professor say about heparin?": None,
-    "Which painting appears first in the presentation?": None,
+    "Which painting appears first in the presentation?": "SAME",  # narrow round: trimmed to a generic noun, so asked as written
     "Which drug is listed first?": None,
     "Which artists are listed?": None,
     "What is on the reading list for Week 3?": None,
@@ -289,7 +289,7 @@ FRESH_SECOND = {
 REVIEWED_FAMILY = {
     "As reviewed in the lecture, what is the antidote for heparin?": "What is the antidote for heparin?",
     "As discussed in class, what is free indirect discourse?": "What is free indirect discourse?",
-    "As covered in Chapter 3, what is promissory estoppel?": "What is promissory estoppel?",
+    "As covered in Lecture 3, what is promissory estoppel?": "What is promissory estoppel?",  # narrow round: not Chapter 3 (asked as written)
     "As highlighted in the slides, who painted Las Meninas?": "Who painted Las Meninas?",
     "As summarized in the reading, what is a fiduciary duty?": "What is a fiduciary duty?",
     "As emphasized in this module, what is a hash collision?": "What is a hash collision?",

@@ -50,7 +50,7 @@ FAMILY = {
     "As discussed in class, what is consideration in contract law?": "What is consideration in contract law?",
     "As covered in today's lecture, who painted Las Meninas?": "Who painted Las Meninas?",
     "As presented in the slides, what is the time complexity of heapsort?": "What is the time complexity of heapsort?",
-    "As explained in Chapter 4, what is a sonnet's volta?": "What is a sonnet's volta?",
+    "As explained in Lecture 4, what is a sonnet's volta?": "What is a sonnet's volta?",  # narrow round: not Chapter 4 (asked as written)
     "As noted in the reading, what triggers the release of ADH?": "What triggers the release of ADH?",
     "As emphasized in the lecture, what does the Commerce Clause allow Congress to regulate?":
         "What does the Commerce Clause allow Congress to regulate?",
@@ -75,7 +75,7 @@ FAMILY = {
     "What is the antidote for heparin according to the lecture?": "What is the antidote for heparin?",
     "What is free indirect discourse as discussed in class?": "What is free indirect discourse?",
     "What is the dose per kg according to the lecture?": "What is the dose per kg?",
-    "What is mitosis in Chapter 3?": "What is mitosis?",
+    "What is mitosis in lecture 3?": "What is mitosis?",  # narrow round: "in Chapter 3" is asked as written
     "What is the time complexity of quicksort on Slide 4?": "What is the time complexity of quicksort?",
     "In the lecture what is a tort?": "What is a tort?",
     "Slide 5: what is the normal potassium range?": "What is the normal potassium range?",
@@ -143,10 +143,12 @@ STRUCTURE = [
     "Which characters does the excerpt introduce?", "What is the second step?", "What topics are covered?",
     "What is the first item in the list?", "Which novels are on the reading list for this week?",
     # an opening never saves one, and never makes one
-    "As reviewed in the lecture, which artists are listed for Chapter 1?", "According to the slides, what is the second step?",
+    "As reviewed in the lecture, which artists are listed for Chapter 1?",
     "In the lecture, which drug is listed first?", "As discussed in the lecture on cardiac output, which drugs are listed for Chapter 1?",
-    "What is the author's main argument, according to the passage?",
 ]
+# Narrow round: these were hidden as structure, but only their opening made them generic, so each is
+# asked as written (tests/test_question_quality_narrow.py has the rest).
+GENERIC_ONCE_TRIMMED = ["According to the slides, what is the second step?", "What is the author's main argument, according to the passage?"]
 
 # rook-f5v2/falsepos.py: subject questions with source words, each asked exactly as written.
 SUBJECT = """What is the role of the text editor in early computing?
@@ -251,6 +253,9 @@ class TheOwnersRuleTests(unittest.TestCase):
         for question in STRUCTURE:
             with self.subTest(question=question):
                 self.assertIsNone(standalone_question(question))
+        for question in GENERIC_ONCE_TRIMMED:
+            with self.subTest(question=question):
+                self.assertEqual(standalone_question(question), question)
 
     def test_subject_questions_with_source_words_are_asked_as_written(self):
         self.assertGreaterEqual(len(SUBJECT), 53)

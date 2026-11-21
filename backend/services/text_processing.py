@@ -3,7 +3,6 @@ Text processing utilities for content extraction and cleaning.
 Handles LMS content, slideshows, and general educational material.
 """
 
-import bisect
 import re
 import logging
 from functools import lru_cache
@@ -572,11 +571,13 @@ _GENERIC = re.compile(
 # clause set off from what the question asks: before it ("As reviewed in the lecture, ...", "In the
 # Bill of Rights, ..."), after it ("..., according to the textbook?", "... as discussed in class?"),
 # between commas ("What, per the syllabus, is ...?") or in brackets ("(Slide 5)"). One that only
-# names the source, every word a source word ("As discussed in Lecture 4 (Renal)", "Based on the
-# graph", "As the professor explained"), is trimmed. Any other ("In week 20 of pregnancy", "In the
-# image of the Parthenon", "As discussed in the lecture on cardiac output") is asked as written. Either
-# way the checks never read an opening: only what the question itself asks decides whether it is
-# about the source.
+# names where the material came from, every word a source word ("As discussed in Lecture 4 (Renal)",
+# "Based on the graph", "As the professor explained"), is trimmed. Any other ("In week 20 of
+# pregnancy", "In the image of the Parthenon", "As discussed in the lecture on cardiac output") is
+# asked as written, and so is one that names a numbered part the subject may have ("In Chapter 11,
+# ...", "In Article III, ...", "In Part D, ..."; _SUBJECT_PART_WORDS) or one whose trimming would leave
+# only a generic noun ("In week 20, what is the first step?"). Either way the checks never read an
+# opening: only what the question itself asks decides whether it is about the source.
 _STARTER = (r"(?:according\sto|based\son|looking\sat|referring\sto|as|per|from|in|on|during|throughout|within|using|"
             r"for|at|by|after|before|across|over|under|among|of)")
 # Words that start an opening placed after the question without a comma ("What is X according to the
@@ -654,19 +655,29 @@ _LINKING = frozenset("is are was were be been being".split())
 _POINTING = frozenset("this these above below following preceding attached provided".split())
 
 
+# Words that name where the material came from unnumbered ("the chapter", "this section", "the
+# article", "the book") but, with a number or letter, as often a part of the subject: Chapter 11
+# (bankruptcy), Section 1983, Article III, Part D (Medicare), Unit 731, Book 1 (the Iliad), week 20
+# (of pregnancy). An opening that names one numbered is asked as written.
+_SUBJECT_PART_WORDS = frozenset("chapter chapters section sections part parts unit units article articles book books week weeks".split())
+
+
 def _names_only_the_source(phrase: str, nouns=_SOURCE_NOUN_WORDS) -> bool:
-    """Whether an opening only names the source: every word a source word (_FILLER_WORDS, a source
-    verb, a number) and at least one of them a source noun. Brackets inside it are left out ("As
-    discussed in Lecture 4 (Renal)")."""
+    """Whether an opening only names where the material came from: every word a source word
+    (_FILLER_WORDS, a source verb, a number) and at least one of them a source noun, and no numbered
+    part that may be the subject's own ("Chapter 11", "Article III"). Brackets inside it are left out
+    ("As discussed in Lecture 4 (Renal)")."""
     words = _PHRASE_WORD.findall(_BRACKET.sub(" ", phrase).lower())
     if not words or len(words) > 30:
         return False
-    named = False
+    named = False  # a source noun other than a numbered part
     pointed = None
-    for word in words:
+    for at, word in enumerate(words):
         if (word in _FILLER_WORDS or word.isdigit()) and word not in nouns:
             continue
         base = _base_word(word)
+        if base in _SUBJECT_PART_WORDS and at + 1 < len(words) and _NUMERAL.match(words[at + 1]):
+            continue  # "Chapter 11", "Article III", "Part D": only another noun names the source ("the week 3 handout")
         if base in ("chart", "charts") and base not in nouns:
             if pointed is None:
                 pointed = any(other in _POINTING or other[:1].isdigit() for other in words)
@@ -753,7 +764,7 @@ class _Opened:
     def __init__(self, squashed: str):
         core = squashed.rstrip(" ?.!")
         self.end = squashed[len(core):].replace(" ", "")
-        self.trimmed = False
+        self.trimmed = self.recase = False
         leads, trails = [], []
         # Stacked openings ("In the lecture, in Chapter 3, what is X?") come off one per pass; five
         # passes bound the work on hostile text, and whatever is left is still read by the checks.
@@ -767,6 +778,8 @@ class _Opened:
             if _names_only_the_source(found.group("bare") or found.group("comma") or found.group("colon")):
                 self.trimmed = True
             else:
+                # "In the lecture, in Chapter 3, what is X?": a kept opening after a trimmed one starts it
+                self.recase = self.recase or (self.trimmed and not leads)
                 leads.append(core[:found.end()])
             core = rest
         for _ in range(_MAX_PASSES):
@@ -847,7 +860,7 @@ class _Opened:
 
     def asked(self) -> str:
         text = _squash(self.lead + self.core + self.trail)
-        if not self.lead:
+        if not self.lead or self.recase:
             text = _sentence_case(text)
         return text + self.end
 
@@ -938,7 +951,10 @@ def strip_source_attribution(text: str) -> str:
         return value
     opened = _Opened(squashed)
     opened.without_bare_trail()
-    return opened.asked() if opened.trimmed else value
+    if not opened.trimmed:
+        return value
+    asked = opened.asked()
+    return value if _GENERIC.match(asked) else asked  # nothing but a generic noun left: as written
 
 
 _CACHED_CHARS = 2000  # questions this long or shorter are remembered (a quiz is read on every Learn, Study now and print)
@@ -948,12 +964,14 @@ def standalone_question(question: str):
     """The question as it is asked, or None when it is about the source itself and never asked.
 
     The owner's rule: no question is hidden or dropped because of its opening. An opening that only
-    names the source is trimmed ("According to Slide 5, what is X?" and "As discussed in the lecture,
-    what is X?" are asked "What is X?"); any other is asked as written ("In week 20 of pregnancy,
-    ..."). None only for a question that, its openings left out, asks how the source is organised or
-    what it holds ("Which artists are listed for Chapter 1?", "What is shown on Slide 7?", "What does
-    the professor say about heparin?", "Which structure is labeled B in the figure?") or is only an
-    ordinal or a generic noun ("What is the second step?"). Running it again changes nothing."""
+    names where the material came from is trimmed ("According to Slide 5, what is X?" and "As
+    discussed in the lecture, what is X?" are asked "What is X?"); any other is asked as written ("In
+    week 20 of pregnancy, ...", "In Chapter 11, ..."), as is one that trimmed would leave only a
+    generic noun ("In Lecture 4, what is the first step?"). None only for a question that, its
+    openings left out, asks how the source is organised or what it holds ("Which artists are listed
+    for Chapter 1?", "What is shown on Slide 7?", "What does the professor say about heparin?",
+    "Which structure is labeled B in the figure?") or is, as saved, only an ordinal or a generic noun
+    ("What is the second step?"). Running it again changes nothing."""
     text = str(question or "").strip()
     if not text:
         return None
@@ -977,7 +995,9 @@ def _standalone(text: str):
     if text.endswith("?") and not asked.endswith("?"):
         asked = asked.rstrip(".!") + "?"
     if _GENERIC.match(asked):
-        return None
+        # Only an ordinal or a generic noun is left: hidden when that is all it ever asked, but one whose
+        # opening was trimmed to get there ("In week 20, what is the first step?") is asked as written.
+        return text if opened.trimmed else None
     return asked if opened.trimmed else text
 
 
