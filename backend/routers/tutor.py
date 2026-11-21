@@ -15,6 +15,8 @@ from database import get_supabase
 from ids import require_uuid
 from rate_limit import limiter
 from services.saved_chats import start_chat
+from schemas import TutorStatusRequest
+from services import tutor_status
 from services.study_helper import checkin_reply, learn_href
 from services.tutor_sessions import (
     append_tutor_message,
@@ -177,3 +179,25 @@ def tutor_checkin(body: CheckinResult, request: Request, authorization: str = He
     if not row:
         raise HTTPException(status_code=409, detail="The Tutor was busy. Your check-in is saved in Learn; try again.")
     return public_tutor_session(row)
+
+
+# ---- What the Tutor shows while it works (services/tutor_status.py) ----
+
+@router.post("/status")
+@limiter.limit("30/minute")
+def tutor_status_lines(body: TutorStatusRequest, request: Request, authorization: str = Header(default="")):
+    """Lines about the question for the web app to show while the Tutor works (one light-tier call, run beside
+    /chat by the browser, so the answer never waits for it). Not counted toward any limit: no require() or
+    record(). The call is logged to usage_events as `tutor_status` by services.llm_calls. [] when it fails or is slow."""
+    get_user_id(authorization)
+    return {"lines": tutor_status.status_lines(body.question, body.title or "", body.class_name or "")}
+
+
+@router.get("/steps")
+@limiter.limit("240/minute")
+def tutor_steps(request: Request, session_id: str, authorization: str = Header(default="")):
+    """What the student's running Tutor request is really doing, step by step, oldest first (read by the web
+    app about once a second while /chat is open)."""
+    user_id = get_user_id(authorization)
+    require_uuid(session_id, "session ID")
+    return {"steps": tutor_status.steps_for(user_id, session_id)}

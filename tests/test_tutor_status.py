@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -174,13 +175,13 @@ def _headroom():
     return 2048 if models.GROQ else 0
 
 
-@patch("routers.chat.get_user_id", return_value="student-1")
+@patch("routers.tutor.get_user_id", return_value="student-1")
 class StatusRouteTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
 
     def test_it_needs_a_signed_in_student(self, _):
-        with patch("routers.chat.get_user_id", side_effect=chat.HTTPException(status_code=401, detail="Missing")):
+        with patch("routers.tutor.get_user_id", side_effect=HTTPException(status_code=401, detail="Missing")):
             self.assertEqual(self.client.post("/tutor/status", json={"question": "Explain osmosis"}).status_code, 401)
             self.assertEqual(self.client.get("/tutor/steps", params={"session_id": SESSION}).status_code, 401)
 
@@ -209,7 +210,7 @@ class StatusRouteTests(unittest.TestCase):
         tutor_status.note_step("Drawing a diagram")
         try:
             self.assertEqual(self.client.get("/tutor/steps", headers=AUTH, params={"session_id": SESSION}).json(), {"steps": ["Drawing a diagram"]})
-            with patch("routers.chat.get_user_id", return_value="student-2"):
+            with patch("routers.tutor.get_user_id", return_value="student-2"):
                 self.assertEqual(self.client.get("/tutor/steps", headers=AUTH, params={"session_id": SESSION}).json(), {"steps": []})
             self.assertEqual(self.client.get("/tutor/steps", headers=AUTH, params={"session_id": "not-an-id"}).status_code, 400)
         finally:
@@ -379,6 +380,7 @@ class RealStepTests(unittest.TestCase):
 @patch("routers.chat.learning_guidance", return_value="")
 @patch("routers.chat.record")
 @patch("routers.chat.require", return_value={"used": 0})
+@patch("routers.tutor.get_user_id", return_value="student-1")
 class NeverDelaysTheAnswerTests(unittest.TestCase):
     def test_a_slow_status_call_does_not_slow_the_answer_and_chat_never_calls_it(self, *_):
         release = threading.Event()
