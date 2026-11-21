@@ -397,6 +397,20 @@ class StatusLimitTests(unittest.TestCase):
         self.assertEqual(codes[240], 429)
         self.assertEqual(self.client.get("/tutor/steps", headers=neighbour, params=params).status_code, 200)
 
+    def test_one_address_cannot_poll_without_end_by_changing_its_token(self, _):
+        # Security review: a made-up token on every request must not get round the step poll's limit.
+        from rate_limit import limiter
+        limiter.reset()
+        self.addCleanup(limiter.reset)
+        same_address = {"Fly-Client-IP": "203.0.113.9"}
+        params = {"session_id": SESSION}
+        codes = [self.client.get("/tutor/steps", headers={**same_address, "Authorization": f"Bearer made-up-{n}"}, params=params).status_code
+                 for n in range(1201)]
+        self.assertEqual(set(codes[:1200]), {200})
+        self.assertEqual(codes[1200], 429)
+        other = {"Fly-Client-IP": "198.51.100.4", "Authorization": "Bearer other"}
+        self.assertEqual(self.client.get("/tutor/steps", headers=other, params=params).status_code, 200)
+
     def test_the_limit_answers_with_a_plain_429_the_web_app_ignores(self, _):
         mine = {"Authorization": "Bearer student-one"}
         with patch("services.tutor_status._ask", return_value=[]):

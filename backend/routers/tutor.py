@@ -195,9 +195,11 @@ def tutor_status_lines(body: TutorStatusRequest, request: Request, authorization
     return {"lines": tutor_status.status_lines(body.question, body.title or "", body.class_name or "")}
 
 
-# Per student, not per address: the browser polls about once a second while an answer is pending, and students
-# sharing an address must not run each other out of polls.
+# Per student: the browser polls about once a second while an answer is pending, and students sharing an address
+# must not run each other out of polls. The per-address ceiling is far above that (twenty students polling at once)
+# and only stops one address from sending without end, for example with a made-up token on every request.
 @router.get("/steps", dependencies=[Depends(ai_rate_limit(240, 60))])
+@limiter.limit("1200/minute")
 def tutor_steps(request: Request, session_id: str, authorization: str = Header(default="")):
     """What the student's running Tutor request is really doing, step by step, oldest first (read by the web
     app about once a second while /chat is open)."""
