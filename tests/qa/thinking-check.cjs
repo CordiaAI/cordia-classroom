@@ -271,6 +271,45 @@ async function ask(page, text, { drawer = false } = {}) {
     await context.close();
   });
 
+  // Review fix 4: the row is as tall as the lines really shown, and the mark sits on the first line's centre.
+  const alignment = page => page.evaluate(() => {
+    const row = document.querySelector('.tutor-thinking');
+    const mark = row.querySelector('.cordia-tutor-avatar, .tutor-thinking-mark').getBoundingClientRect();
+    const text = row.querySelector('.tutor-line:not(.is-out)');
+    const box = text.getBoundingClientRect();
+    const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+    return {
+      height: Math.round(row.getBoundingClientRect().height),
+      offset: Math.round((box.top + lineHeight / 2 - (mark.top + mark.height / 2)) * 10) / 10,
+      lines: Math.round(box.height / lineHeight),
+    };
+  });
+  for (const [name, open] of [['chat', page => ask(page, 'Explain the Krebs cycle')], ['Tutor page', async page => {
+    await page.goto(BASE + '/tutor');
+    await page.waitForSelector('textarea', { state: 'visible' });
+    await page.waitForTimeout(900);
+    await page.fill('textarea', 'Explain the Krebs cycle');
+    await page.keyboard.press('Enter');
+  }]]) {
+    await check(`phone 390, ${name}: a one-line status keeps the row one line tall, with the mark on the line's centre; a long step wraps below it`, async () => {
+      const { page, context } = await session(browser, { width: 390, height: 844, setup: s => { s.chatDelay = 9000; s.statusDelay = 300; s.steps = ms => (ms > 3500 ? ['Reading a study guide with a very long title that cannot fit'] : []); } });
+      await open(page);
+      await page.waitForSelector('.tutor-thinking .tutor-line', { timeout: 15000 });
+      await page.waitForTimeout(1500);
+      const short = await alignment(page);
+      expect(short.lines === 1, `one line: ${JSON.stringify(short)}`);
+      expect(Math.abs(short.offset) <= 1.5, `the mark is on the line's centre: ${JSON.stringify(short)}`);
+      if (name === 'chat') expect(short.height <= 33, `the row stays one avatar tall: ${JSON.stringify(short)}`);
+      await shot(page, `phone-${name.replace(' ', '-')}-one-line`);
+      let long = short;
+      const started = Date.now();
+      while (long.lines < 2 && Date.now() - started < 6000) { await page.waitForTimeout(150); long = await alignment(page); }
+      expect(long.lines === 2 && Math.abs(long.offset) <= 1.5 && long.height > short.height, `the long step wraps under the first line: ${JSON.stringify(long)}`);
+      await shot(page, `phone-${name.replace(' ', '-')}-two-lines`);
+      await context.close();
+    });
+  }
+
   await check('phone 390, dark: the Tutor page (where phones open the Tutor)', async () => {
     const { page, context } = await session(browser, { width: 390, height: 844, theme: 'dark', setup: s => { s.chatDelay = 7000; s.statusDelay = 300; } });
     await page.goto(BASE + '/tutor');

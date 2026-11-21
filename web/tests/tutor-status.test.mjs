@@ -161,17 +161,37 @@ test('a real step waits until the line has had 1.2 s, and steps that were waitin
   assert.equal(holdFor({ changedAt: 1000, now: 2200 }), 0, 'exactly 1.2 s after: now');
   assert.equal(holdFor({ changedAt: 1000, now: 5000 }), 0);
   // Two steps land while the first line is still held: both are still to be shown, in order.
-  assert.deepEqual(pendingSteps({ steps: ['Reading Cells', 'Drawing a diagram'], consumed: 0 }), ['Reading Cells', 'Drawing a diagram']);
-  assert.deepEqual(pendingSteps({ steps: ['Reading Cells', 'Drawing a diagram'], consumed: 1 }), ['Drawing a diagram']);
-  assert.deepEqual(pendingSteps({ steps: ['Reading Cells'], consumed: 3 }), [], 'a shorter list than was shown: nothing pending');
-  assert.deepEqual(pendingSteps({ steps: ['', 'Reading Cells'], consumed: 0 }), ['Reading Cells']);
+  assert.deepEqual(pendingSteps({ steps: ['Reading Cells', 'Drawing a diagram'], shown: [] }), ['Reading Cells', 'Drawing a diagram']);
+  assert.deepEqual(pendingSteps({ steps: ['Reading Cells', 'Drawing a diagram'], shown: ['Reading Cells'] }), ['Drawing a diagram']);
+  assert.deepEqual(pendingSteps({ steps: ['Reading Cells'], shown: ['Reading Cells', 'Drawing a diagram'] }), [], 'a shorter list than was shown: nothing pending');
+  assert.deepEqual(pendingSteps({ steps: ['', 'Reading Cells'], shown: [] }), ['Reading Cells']);
+  assert.deepEqual(pendingSteps({ steps: ['Drawing a diagram', 'Reading Cells', 'Drawing a diagram'], shown: ['Drawing a diagram'] }), ['Reading Cells', 'Drawing a diagram'], 'a text shown once is matched once');
+});
+
+// Review fix 3: the server takes a step back (retract_step: a diagram that was never drawn), so its list can shrink.
+test('a step noted after a retracted diagram is shown, and a retracted step on screen gives way at the next change', () => {
+  // On screen: "Drawing a diagram". The server takes it back, then notes the next step: same length, different text.
+  const shown = ['Drawing a diagram'];
+  assert.deepEqual(pendingSteps({ steps: [], shown }), [], 'taken back: nothing new to show');
+  assert.deepEqual(pendingSteps({ steps: ['Reading Cells'], shown }), ['Reading Cells'], 'the step after it is still shown');
+  assert.deepEqual(pendingSteps({ steps: ['Reading Krebs.pdf', 'Reading Cells'], shown: ['Reading Krebs.pdf', 'Drawing a diagram'] }), ['Reading Cells']);
+  // With no newer step, the retracted one is replaced at the next change: by the question's lines, the newest true step, or the fallback.
+  assert.equal(nextLine({ current: 'Drawing a diagram', steps: [], lines: LINES }), LINES[0]);
+  assert.equal(nextLine({ current: 'Drawing a diagram', steps: ['Reading Krebs.pdf'], lines: [] }), 'Reading Krebs.pdf');
+  assert.equal(nextLine({ current: 'Drawing a diagram', steps: [], lines: [] }), FALLBACK_LINE);
+  assert.equal(nextLine({ current: FALLBACK_LINE, steps: [], lines: [] }), FALLBACK_LINE, 'the fallback itself stays');
+  // The component waits on the steps' text, not their count, and remembers every step text it has shown.
+  const source = read('components/TutorThinking.js');
+  assert.match(source, /const stepKey = \(Array\.isArray\(steps\) \? steps : \[\]\)\.join\('\\n'\);/);
+  assert.match(source, /\}, \[stepKey\]\);/);
+  assert.ok(!/consumed/.test(source), 'no position count that assumes the list only grows');
 });
 
 test('TutorThinking holds each step for MIN_HOLD_MS and shows the waiting ones in order, with or without motion', () => {
   const source = read('components/TutorThinking.js');
   assert.match(source, /holdFor\(\{ changedAt: changedAt\.current, now: performance\.now\(\) \}\)/);
-  assert.match(source, /pendingSteps\(\{ steps: latest\.current\.steps, consumed: consumed\.current \}\)/);
-  assert.match(source, /consumed\.current \+= 1;\s*show\(next\);\s*tick\(\);/, 'each waiting step is shown in turn');
+  assert.match(source, /pendingSteps\(\{ steps: latest\.current\.steps, shown: shownSteps\.current \}\)/);
+  assert.match(source, /shownSteps\.current\.push\(next\);\s*show\(next\);\s*tick\(\);/, 'each waiting step is shown in turn');
   assert.ok(!/matchMedia|prefers-reduced-motion/.test(source.split('<style')[0]), 'the hold does not depend on motion settings: under reduced motion the swap is instant and steps still queue');
 });
 

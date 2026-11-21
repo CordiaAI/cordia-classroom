@@ -25,7 +25,8 @@ export function firstLine(steps = []) {
 
 // The line to move to after `current`, LINE_MS later. A real step is followed by the question's lines
 // (steps are not shown again: the Tutor has moved on); the question's lines go round; the fallback
-// moves to the first of them once there are some. With nothing to move to, the line stays.
+// moves to the first of them once there are some. With nothing to move to, the line stays, except a step
+// the server took back (a diagram that was never drawn): that one gives way to the newest true step or the fallback.
 export function nextLine({ current, steps = [], lines = [] }) {
   const done = cleanLines(steps);
   const topic = cleanLines(lines);
@@ -33,7 +34,7 @@ export function nextLine({ current, steps = [], lines = [] }) {
   if (step !== -1) return done[step + 1] || topic[0] || current;
   const at = topic.indexOf(current);
   if (at !== -1) return topic[(at + 1) % topic.length];
-  return topic[0] || current;
+  return topic[0] || done.at(-1) || FALLBACK_LINE;
 }
 
 // How long to wait before a new step may replace the line, given when the line last changed. 0 = now.
@@ -41,10 +42,18 @@ export function holdFor({ changedAt, now, holdMs = MIN_HOLD_MS }) {
   return Math.max(0, Math.ceil(changedAt + holdMs - now));
 }
 
-// The steps not shown yet, oldest first. `consumed` is how many of the (only ever growing) list were shown,
-// so a step is never skipped just because a newer one arrived while it waited out the hold.
-export function pendingSteps({ steps = [], consumed = 0 }) {
-  return cleanLines(steps).slice(Math.min(consumed, cleanLines(steps).length));
+// The steps not shown yet, oldest first. `shown` is every step text already on screen, in order (a text shown twice
+// is there twice). The server's list can shrink (a step it took back) as well as grow, so steps are matched by text,
+// never by position: a step is never skipped because a newer one arrived while it waited out the hold, or because an
+// earlier one was taken back.
+export function pendingSteps({ steps = [], shown = [] }) {
+  const left = new Map();
+  for (const text of cleanLines(shown)) left.set(text, (left.get(text) || 0) + 1);
+  return cleanLines(steps).filter(text => {
+    const times = left.get(text) || 0;
+    if (times) left.set(text, times - 1);
+    return !times;
+  });
 }
 
 // Asks for the question's lines. onLines(lines) runs only if they arrive before cancel(); a failed or
