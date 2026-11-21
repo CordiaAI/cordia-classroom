@@ -1,6 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import NapkinVisual from './NapkinVisual';
-import CordiaLoader from './CordiaLoader';
+import TutorThinking from './TutorThinking';
 import AcademicInfinityMark from './AcademicInfinityMark';
 import StudyPlanActions from './StudyPlanActions';
 import { inlineParts, parseTutorAnswer } from '../lib/tutorFormat.mjs';
@@ -46,7 +46,7 @@ function TutorAnswer({ text }) {
 // panel (components/AIChatWidget.js) and the chat home (pages/home.js, with `avatar`: the Tutor's
 // mark beside each reply, DESIGN-SPEC 4.3). tutor: lib/useTutorChat.js.
 export default function TutorMessages({ tutor, avatar = false }) {
-  const { router, messages, canSpeak, speakingIndex, toggleSpeech, openSource, deleteFromTutor, busy, progressLabel, localError } = tutor;
+  const { router, messages, canSpeak, speakingIndex, toggleSpeech, openSource, deleteFromTutor, busy, thinking, localError } = tutor;
   return (
     <>
     {messages.map((message, index) => (
@@ -96,9 +96,7 @@ export default function TutorMessages({ tutor, avatar = false }) {
     ))}
     {busy && messages.at(-1)?.role === 'user' && (
       <div className="cordia-tutor-message ai tutor-thinking">
-        {avatar && <span className="cordia-tutor-avatar" aria-hidden="true"><AcademicInfinityMark title="" /></span>}
-        <CordiaLoader size={20} label="Thinking" />
-        <span>{progressLabel}</span>
+        <TutorThinking steps={thinking?.steps} lines={thinking?.lines} avatar={avatar} />
       </div>
     )}
     {localError && <div className="cordia-tutor-message error">{localError}</div>}

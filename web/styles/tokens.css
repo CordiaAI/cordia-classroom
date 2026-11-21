@@ -163,6 +163,7 @@
   --dur: 180ms;                                 /* hover, press, colour */
   --dur-enter: 260ms;                           /* a sheet, toast or panel arriving */
   --dur-exit: 200ms;                            /* the same thing leaving: a quarter shorter */
+  --dur-swap: 120ms;                            /* a line of text swapping for the next: the old one leaves in this time, the new one starts when it has gone */
 
   /* Layout */
   --bar-h: 64px;

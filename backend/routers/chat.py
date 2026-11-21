@@ -26,7 +26,7 @@ from services.llm import (
     answer_question, edit_outline, explain_retain_answer, generate_practice_guide, generate_study_guide, plan_app_action, write_visual_text,
     study_guide_is_complete, study_guide_to_flashcards,
 )
-from services import study_helper
+from services import study_helper, tutor_status
 from services.text_processing import chunk_text, clean_text, html_to_text
 from services.tutor_voice import ground_general_answer, plain_opening
 from services.tutor_sessions import (
@@ -166,6 +166,7 @@ def _load_material(body: ChatRequest, user_id: str) -> Material:
     material = _load_owned_material(body, user_id)
     if not body.assignment_key:
         return material
+    tutor_status.note_step("Checking Canvas for your assignment")
     text, source = _assignment_text(user_id, body.assignment_key)
     if not text:
         return material
@@ -265,6 +266,7 @@ def _create_guide(user_id: str, material: Material, class_id: Optional[str], fea
     """Build a guide or practice set from the selected material and save it beside its source."""
     require(user_id, feature)
     suffix, saved_name, build = GUIDE_KINDS[feature]
+    tutor_status.note_step("Building your study guide" if feature == "guide" else "Building your practice set")
     study_guide, flashcards = build(user_id, material)
     source = material.source or {}
     payload = {
@@ -297,8 +299,10 @@ def _create_guide(user_id: str, material: Material, class_id: Optional[str], fea
 
 def _visual(user_id: str, question: str, material: Material) -> Optional[ChatResponse]:
     """A visual the student described: the Tutor writes its text and the app draws it (web /api/visual)."""
+    tutor_status.note_step("Drawing a diagram")
     written = write_visual_text(question, material.content)
     if not written:
+        tutor_status.retract_step("Drawing a diagram")  # nothing was drawn: the answer carries on as text
         return None
     record(user_id, "tutor")
     return ChatResponse(
@@ -579,6 +583,8 @@ def _estimated_tokens(*texts: str) -> int:
 def _tutor_reply(body: ChatRequest, user_id: str, question: str, material: Material,
                  skill: Optional[str], turn: Optional[dict]) -> ChatResponse:
     require(user_id, "tutor")
+    if material.source and material.content.strip():
+        tutor_status.note_step(f"Reading {material.title}")
     guidance = "\n".join(filter(None, [
         learning_guidance(user_id),
         style_instruction(user_id),
@@ -712,6 +718,14 @@ def _reply(body: ChatRequest, user_id: str, question: str, material: Material, c
 @limiter.limit("30/minute")
 def chat(body: ChatRequest, request: Request, authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
+    tutor_status.begin(user_id, body.session_id)
+    try:
+        return _chat(body, user_id, authorization)
+    finally:
+        tutor_status.end()
+
+
+def _chat(body: ChatRequest, user_id: str, authorization: str) -> ChatResponse:
     if body.guide_id and body.note_id:
         raise HTTPException(status_code=400, detail="Choose one study source")
     question = body.question

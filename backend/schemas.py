@@ -126,6 +126,14 @@ class ChatRequest(BaseModel):
         return value
 
 
+class TutorStatusRequest(BaseModel):
+    """What the Tutor shows while it works (services/tutor_status): the student's message and what it is about."""
+    question: str = Field(..., min_length=1, max_length=2_000)
+    # The class and the guide or file the question is about, as the student sees them.
+    class_name: Optional[str] = Field(default=None, max_length=200)
+    title: Optional[str] = Field(default=None, max_length=200)
+
+
 class ChatResponse(BaseModel):
     """Response from chat."""
     answer: str
