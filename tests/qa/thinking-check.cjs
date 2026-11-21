@@ -39,7 +39,7 @@ async function session(browser, { width = 1440, height = 900, theme = 'light', l
 
 const shot = (page, name) => (SHOTS ? page.screenshot({ path: path.join(SHOTS, `${name}.png`) }) : null);
 const line = page => page.evaluate(() => {
-  const shown = [...document.querySelectorAll('.tutor-thinking .tutor-line.is-in')];
+  const shown = [...document.querySelectorAll('.tutor-thinking .tutor-line:not(.is-out)')];
   return shown.map(item => item.textContent).join('|');
 });
 const rows = page => page.$$eval('.tutor-thinking', items => items.length);
@@ -156,7 +156,7 @@ async function ask(page, text, { drawer = false } = {}) {
       await ask(page, 'Explain the Krebs cycle', { drawer });
       await page.waitForSelector('.tutor-thinking .tutor-line', { timeout: 15000 });
       await page.waitForTimeout(2600);
-      const style = await page.$eval('.tutor-thinking .tutor-line.is-in', element => { const css = getComputedStyle(element); return [css.animationName, css.backgroundImage, css.color]; });
+      const style = await page.$eval('.tutor-thinking .tutor-line:not(.is-out)', element => { const css = getComputedStyle(element); return [css.animationName, css.backgroundImage, css.color]; });
       expect(style[0] === 'none' && style[1] === 'none', `no animation or gradient: ${JSON.stringify(style)}`);
       expect(await line(page) === LINES[0], `the next line: ${await line(page)}`);
       expect(await page.$$eval('.tutor-thinking .tutor-line', items => items.filter(item => getComputedStyle(item).display !== 'none').length) === 1, 'one line on screen, the old one gone at once');
@@ -173,7 +173,7 @@ async function ask(page, text, { drawer = false } = {}) {
         const row = document.querySelector('.tutor-thinking').getBoundingClientRect();
         const user = [...document.querySelectorAll('.cordia-tutor-message.user')].at(-1).getBoundingClientRect();
         const room = document.documentElement.scrollWidth - document.documentElement.clientWidth;
-        const clipped = [...document.querySelectorAll('.tutor-thinking .tutor-line.is-in')].some(item => item.scrollHeight > item.clientHeight + 1);
+        const clipped = [...document.querySelectorAll('.tutor-thinking .tutor-line:not(.is-out)')].some(item => item.scrollHeight > item.clientHeight + 1);
         return [Math.round(row.width), Math.round(row.height), Math.round(row.top), Math.round(user.top), room, clipped];
       });
       await page.waitForTimeout(2500); // the real step (with its long title) is in: the row is as tall as it will be
@@ -211,6 +211,21 @@ async function ask(page, text, { drawer = false } = {}) {
     });
     expect(fit[0] <= fit[1] && fit[2] <= 0, `row ${fit}`);
     await shot(page, 'phone-chat');
+    await context.close();
+  });
+
+  await check('phone 390, dark: the Tutor page (where phones open the Tutor)', async () => {
+    const { page, context } = await session(browser, { width: 390, height: 844, theme: 'dark', setup: s => { s.chatDelay = 7000; s.statusDelay = 300; } });
+    await page.goto(BASE + '/tutor');
+    await page.waitForSelector('textarea', { state: 'visible' });
+    await page.waitForTimeout(900);
+    await page.fill('textarea', 'Explain the Krebs cycle');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.tutor-thinking .tutor-line', { timeout: 15000 });
+    await page.waitForTimeout(3000);
+    const fit = await page.evaluate(() => [Math.round(document.querySelector('.tutor-thinking').getBoundingClientRect().right), window.innerWidth, document.documentElement.scrollWidth - document.documentElement.clientWidth]);
+    expect(fit[0] <= fit[1] && fit[2] <= 0, `row ${fit}`);
+    await shot(page, 'phone-tutor-dark');
     await context.close();
   });
 

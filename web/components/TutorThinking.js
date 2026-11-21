@@ -43,7 +43,7 @@ export default function TutorThinking({ steps = [], lines = [], avatar = false }
             wraps in a narrow Tutor never makes the row jump as the lines change. */}
         {[...new Set([FALLBACK_LINE, ...steps, ...lines])].map(text => <span key={`size-${text}`} className="tutor-line-size">{text}</span>)}
         {view.prev && <span key={`out-${view.prev}`} className="tutor-line is-out">{view.prev}</span>}
-        <span key={view.text} className="tutor-line is-in">{view.text}</span>
+        <span key={view.text} className={`tutor-line ${view.n ? 'is-in' : 'is-first'}`}>{view.text}</span>
       </span>
       <span className="sr-only" aria-live="polite" aria-atomic="true">{announced}</span>
       <style jsx global>{`
@@ -59,13 +59,15 @@ export default function TutorThinking({ steps = [], lines = [], avatar = false }
             -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
           }
         }
+        /* The first line is there from the first frame: it only shimmers. Each next line fades in as the old one fades out. */
+        .tutor-line.is-first { animation: tutor-line-shimmer 2.2s linear infinite; }
         .tutor-line.is-in { animation: tutor-line-in var(--dur-enter) var(--ease) both, tutor-line-shimmer 2.2s linear infinite; }
         .tutor-line.is-out { animation: tutor-line-out var(--dur-exit) var(--ease-exit) both, tutor-line-shimmer 2.2s linear infinite; pointer-events: none; }
         @keyframes tutor-line-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes tutor-line-out { from { opacity: 1; } to { opacity: 0; } }
         @keyframes tutor-line-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
         @media (prefers-reduced-motion: reduce) {
-          .tutor-line, .tutor-line.is-in { animation: none; background: none; -webkit-text-fill-color: currentColor; }
+          .tutor-line, .tutor-line.is-in, .tutor-line.is-first { animation: none; background: none; -webkit-text-fill-color: currentColor; }
           .tutor-line.is-out { display: none; }
         }
       `}</style>
