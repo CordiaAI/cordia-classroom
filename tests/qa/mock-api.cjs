@@ -383,11 +383,17 @@ async function install(context, state) {
     // The Tutor's thinking lines (backend routers/chat.py, T4b). state.statusLines: the lines about the question
     // ([] = the call failed); state.statusDelay: how long that call takes (ms); state.steps(now): the real steps so
     // far, by milliseconds since the question was sent. state.statusCalls counts the status requests.
+    // state.limited: both answer 429 "Too many requests" (the per-student limit); state.stepCalls counts the polls.
+    if (state.limited && (path === '/tutor/status' || path === '/tutor/steps')) {
+      state[path === '/tutor/status' ? 'statusCalls' : 'stepCalls'] = (state[path === '/tutor/status' ? 'statusCalls' : 'stepCalls'] || 0) + 1;
+      return route.fulfill({ status: 429, json: { detail: 'Too many requests. Wait a moment and try again.' } });
+    }
     if (path === '/tutor/status') {
       state.statusCalls = (state.statusCalls || 0) + 1;
       if (state.statusDelay) await new Promise(resolve => setTimeout(resolve, state.statusDelay));
       return json({ lines: state.statusLines || [] });
     }
+    if (path === '/tutor/steps') state.stepCalls = (state.stepCalls || 0) + 1;
     if (path === '/tutor/steps') return json({ steps: state.steps ? state.steps(Date.now() - (state.chatStartedAt || Date.now())) : [] });
     if (path === '/chat') {
       state.chatStartedAt = Date.now();

@@ -14,7 +14,7 @@ from access import Ctx
 from auth_utils import get_user_id
 from database import get_supabase
 from ids import require_uuid
-from rate_limit import limiter
+from rate_limit import ai_rate_limit, limiter
 from services.saved_chats import start_chat
 from schemas import TutorStatusRequest
 from services import tutor_speech, tutor_status
@@ -185,7 +185,9 @@ def tutor_checkin(body: CheckinResult, request: Request, authorization: str = He
 
 # ---- What the Tutor shows while it works (services/tutor_status.py) ----
 
-@router.post("/status")
+# Per student (the Authorization header), beside the per-address limit: each status call spends model tokens, and a
+# student behind a shared address (a campus, a phone network) must not use up everyone else's.
+@router.post("/status", dependencies=[Depends(ai_rate_limit(20, 60))])
 @limiter.limit("30/minute")
 def tutor_status_lines(body: TutorStatusRequest, request: Request, authorization: str = Header(default="")):
     """Lines about the question for the web app to show while the Tutor works (one light-tier call, run beside
@@ -195,8 +197,11 @@ def tutor_status_lines(body: TutorStatusRequest, request: Request, authorization
     return {"lines": tutor_status.status_lines(body.question, body.title or "", body.class_name or "")}
 
 
-@router.get("/steps")
-@limiter.limit("240/minute")
+# Per student: the browser polls about once a second while an answer is pending, and students sharing an address
+# must not run each other out of polls. The per-address ceiling is far above that (twenty students polling at once)
+# and only stops one address from sending without end, for example with a made-up token on every request.
+@router.get("/steps", dependencies=[Depends(ai_rate_limit(240, 60))])
+@limiter.limit("1200/minute")
 def tutor_steps(request: Request, session_id: str, authorization: str = Header(default="")):
     """What the student's running Tutor request is really doing, step by step, oldest first (read by the web
     app about once a second while /chat is open)."""

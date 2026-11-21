@@ -113,6 +113,63 @@ async function ask(page, text, { drawer = false } = {}) {
       await context.close();
     });
 
+    await check(`${surface}: steps that arrive together each get at least 1.2 s on screen, in order, none dropped`, async () => {
+      const { page, context } = await session(browser, { setup: s => { s.chatDelay = 9000; s.statusDelay = 200; s.steps = ms => (ms > 100 ? ['Reading Cell Biology Basics'] : []).concat(ms > 250 ? ['Drawing a diagram'] : []).concat(ms > 400 ? ['Building your study guide'] : []); } });
+      await ask(page, 'Explain the Krebs cycle', { drawer });
+      await page.waitForSelector('.tutor-thinking .tutor-line', { timeout: 15000 });
+      const started = Date.now();
+      const seen = [];
+      while (Date.now() - started < 6500) {
+        const now = await line(page);
+        if (!seen.length || seen.at(-1)[1] !== now) seen.push([Date.now() - started, now]);
+        await page.waitForTimeout(40);
+      }
+      const texts = seen.map(item => item[1]);
+      for (const step of ['Reading Cell Biology Basics', 'Drawing a diagram', 'Building your study guide']) expect(texts.includes(step), `${step} was shown: ${JSON.stringify(texts)}`);
+      expect(texts.indexOf('Reading Cell Biology Basics') < texts.indexOf('Drawing a diagram') && texts.indexOf('Drawing a diagram') < texts.indexOf('Building your study guide'), `in order: ${JSON.stringify(texts)}`);
+      const gaps = seen.slice(1).map((item, at) => item[0] - seen[at][0]);
+      expect(gaps.every(gap => gap >= 1100), `at least 1.2 s between changes (tolerance 100 ms): ${JSON.stringify(seen)}`);
+      await context.close();
+    });
+
+    await check(`${surface}: during a line change the two lines are never both near half opacity`, async () => {
+      const { page, context } = await session(browser, { setup: s => { s.chatDelay = 7000; s.statusDelay = 300; } });
+      await ask(page, 'Explain the Krebs cycle', { drawer });
+      await page.waitForSelector('.tutor-thinking .tutor-line', { timeout: 15000 });
+      await page.evaluate(() => {
+        window.__swap = [];
+        const frame = () => {
+          const out = document.querySelector('.tutor-thinking .tutor-line.is-out');
+          const incoming = document.querySelector('.tutor-thinking .tutor-line.is-in');
+          if (out && incoming) window.__swap.push([Number(getComputedStyle(out).opacity), Number(getComputedStyle(incoming).opacity)]);
+          window.__frame = requestAnimationFrame(frame);
+        };
+        frame();
+      });
+      await page.waitForTimeout(5200);
+      const swap = await page.evaluate(() => window.__swap);
+      expect(swap.length > 10, `frames sampled during a swap: ${swap.length}`);
+      const worst = Math.max(...swap.map(([out, incoming]) => Math.min(out, incoming)));
+      expect(worst < 0.35, `the dimmer of the two lines is at most ${worst.toFixed(2)}`);
+      await context.close();
+    });
+
+    await check(`${surface}: a 429 on the status call and on the step poll is silent: no console error, the fallback stays`, async () => {
+      const { page, state, context } = await session(browser, { setup: s => { s.limited = true; s.chatDelay = 7000; } });
+      const logged = [];
+      page.on('console', message => { if (message.type() === 'error') logged.push(message.text()); });
+      await ask(page, 'Explain the Krebs cycle', { drawer });
+      await page.waitForSelector('.tutor-thinking .tutor-line', { timeout: 15000 });
+      await page.waitForTimeout(6000);
+      expect(await line(page) === 'Reading your question', `still: ${await line(page)}`);
+      expect(state.stepCalls >= 1, `the poll ran (${state.stepCalls})`);
+      expect(state.stepCalls <= 4, `and backed off: ${state.stepCalls} polls in about 6 s`);
+      // The browser itself notes a 429 response, and next dev adds its own noise; the app's own log line is what must be gone.
+      const own = logged.filter(text => /API fetch error/.test(text));
+      expect(own.length === 0, `nothing logged by the app: ${JSON.stringify(own)}`);
+      await context.close();
+    });
+
     await check(`${surface}: no lines from the model: the fallback stays and nothing breaks`, async () => {
       const { page, context } = await session(browser, { setup: s => { s.chatDelay = 6000; s.statusLines = []; } });
       await ask(page, 'Explain the Krebs cycle', { drawer });
@@ -213,6 +270,45 @@ async function ask(page, text, { drawer = false } = {}) {
     await shot(page, 'phone-chat');
     await context.close();
   });
+
+  // Review fix 4: the row is as tall as the lines really shown, and the mark sits on the first line's centre.
+  const alignment = page => page.evaluate(() => {
+    const row = document.querySelector('.tutor-thinking');
+    const mark = row.querySelector('.cordia-tutor-avatar, .tutor-thinking-mark').getBoundingClientRect();
+    const text = row.querySelector('.tutor-line:not(.is-out)');
+    const box = text.getBoundingClientRect();
+    const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+    return {
+      height: Math.round(row.getBoundingClientRect().height),
+      offset: Math.round((box.top + lineHeight / 2 - (mark.top + mark.height / 2)) * 10) / 10,
+      lines: Math.round(box.height / lineHeight),
+    };
+  });
+  for (const [name, open] of [['chat', page => ask(page, 'Explain the Krebs cycle')], ['Tutor page', async page => {
+    await page.goto(BASE + '/tutor');
+    await page.waitForSelector('textarea', { state: 'visible' });
+    await page.waitForTimeout(900);
+    await page.fill('textarea', 'Explain the Krebs cycle');
+    await page.keyboard.press('Enter');
+  }]]) {
+    await check(`phone 390, ${name}: a one-line status keeps the row one line tall, with the mark on the line's centre; a long step wraps below it`, async () => {
+      const { page, context } = await session(browser, { width: 390, height: 844, setup: s => { s.chatDelay = 9000; s.statusDelay = 300; s.steps = ms => (ms > 3500 ? ['Reading a study guide with a very long title that cannot fit'] : []); } });
+      await open(page);
+      await page.waitForSelector('.tutor-thinking .tutor-line', { timeout: 15000 });
+      await page.waitForTimeout(1500);
+      const short = await alignment(page);
+      expect(short.lines === 1, `one line: ${JSON.stringify(short)}`);
+      expect(Math.abs(short.offset) <= 1.5, `the mark is on the line's centre: ${JSON.stringify(short)}`);
+      if (name === 'chat') expect(short.height <= 33, `the row stays one avatar tall: ${JSON.stringify(short)}`);
+      await shot(page, `phone-${name.replace(' ', '-')}-one-line`);
+      let long = short;
+      const started = Date.now();
+      while (long.lines < 2 && Date.now() - started < 6000) { await page.waitForTimeout(150); long = await alignment(page); }
+      expect(long.lines === 2 && Math.abs(long.offset) <= 1.5 && long.height > short.height, `the long step wraps under the first line: ${JSON.stringify(long)}`);
+      await shot(page, `phone-${name.replace(' ', '-')}-two-lines`);
+      await context.close();
+    });
+  }
 
   await check('phone 390, dark: the Tutor page (where phones open the Tutor)', async () => {
     const { page, context } = await session(browser, { width: 390, height: 844, theme: 'dark', setup: s => { s.chatDelay = 7000; s.statusDelay = 300; } });

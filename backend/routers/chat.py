@@ -302,6 +302,7 @@ def _visual(user_id: str, question: str, material: Material) -> Optional[ChatRes
     tutor_status.note_step("Drawing a diagram")
     written = write_visual_text(question, material.content)
     if not written:
+        tutor_status.retract_step("Drawing a diagram")  # nothing was drawn: the answer carries on as text
         return None
     record(user_id, "tutor")
     return ChatResponse(
