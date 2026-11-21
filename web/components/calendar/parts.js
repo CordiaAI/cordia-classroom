@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Check, Flag, GraduationCap } from 'lucide-react';
 import ProgressRing from '../ProgressRing';
 import { DAY_END_HOUR, DAY_START_HOUR, dueClock, span } from '../../lib/calendarViews.mjs';
@@ -78,21 +78,45 @@ export function DueChip({ entry, compact = false, onOpen, readiness }) {
   return <span {...common} role="note">{body}</span>;
 }
 
-// A small menu under its button: role="menu", arrow keys move, Escape closes and puts focus back.
+const useBrowserLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+const MENU_GAP = 6; // px between the button and its menu, and kept clear of the window's edge
+
+// Where a menu fits: below its button unless it doesn't and there is more room above ('auto'), or
+// always 'above' / 'below'. The floor is the window's bottom, or the Tutor button's top when the
+// menu would sit over it, so a menu is never under the Tutor button or off screen. Measured before
+// paint and before focus moves in, so the page never scrolls to a menu that is about to flip.
+function placeMenu(menu, button, placement) {
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const at = button.getBoundingClientRect();
+  const box = menu.getBoundingClientRect();
+  let floor = window.innerHeight;
+  const tutor = document.querySelector('.c-tutor-bubble');
+  const bubble = tutor?.getBoundingClientRect();
+  if (bubble && bubble.width && bubble.left < box.right && bubble.right > box.left) floor = Math.min(floor, bubble.top);
+  const below = floor - at.bottom - MENU_GAP * 2;
+  const above = at.top - MENU_GAP * 2;
+  const tall = menu.scrollHeight;
+  const up = placement === 'above' || (placement === 'auto' && tall > below && above > below);
+  menu.classList.toggle('cal-menu--up', up);
+  menu.style.maxHeight = `${Math.max(8 * rem, Math.min(20 * rem, up ? above : below))}px`;
+}
+
+// A small menu by its button: role="menu", arrow keys move, Escape closes and puts focus back.
 // items: [{ key, label, detail?, onSelect, disabled? }]
-export function MenuButton({ label, className = 'c-btn c-btn--quiet', icon = null, items, heading, empty = 'Nothing to pick', disabled = false, align = 'start', menuLabel, triggerProps = {} }) {
+export function MenuButton({ label, className = 'c-btn c-btn--quiet', icon = null, items, heading, empty = 'Nothing to pick', disabled = false, align = 'start', placement = 'auto', menuLabel, triggerProps = {} }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef(null);
   const trigger = useRef(null);
   const list = useRef(null);
-  useEffect(() => {
+  useBrowserLayoutEffect(() => {
     if (!open) return undefined;
+    if (list.current && trigger.current) placeMenu(list.current, trigger.current, placement);
     const first = list.current?.querySelector('[role="menuitem"]:not([aria-disabled="true"])');
-    first?.focus();
+    first?.focus({ preventScroll: true });
     const away = event => { if (!wrap.current?.contains(event.target)) setOpen(false); };
     document.addEventListener('pointerdown', away);
     return () => document.removeEventListener('pointerdown', away);
-  }, [open]);
+  }, [open, placement]);
   function onKeyDown(event) {
     if (event.key === 'Escape') { event.preventDefault(); setOpen(false); trigger.current?.focus(); return; }
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
@@ -131,7 +155,7 @@ export function EdgeMenu({ side, blocks, day, onOpen, align = 'start' }) {
   const Arrow = side === 'earlier' ? ArrowUp : ArrowDown;
   return (
     <MenuButton className="cal-edge-btn" align={align} icon={<Arrow size={14} strokeWidth={1.75} aria-hidden="true" />}
-      label={`${blocks.length} ${side}`} menuLabel={`Study time ${when}, ${date}`}
+      label={<><span className="cal-edge-num">{blocks.length}</span><span className="cal-edge-word">{side}</span></>} menuLabel={`Study time ${when}, ${date}`}
       triggerProps={{ 'aria-label': `${blocks.length} study ${blocks.length === 1 ? 'time' : 'times'} ${when}, ${date}` }}
       items={blocks.map(block => ({
         key: block.key, label: block.title,
@@ -173,18 +197,25 @@ export function SharedStyles() {
 :is(a, button).cal-chip:active { transform: scale(0.97); }
       .cal-menu-wrap { position: relative; display: inline-flex; min-width: 0; }
       .cal-menu { position: absolute; top: calc(100% + 0.375rem); z-index: 40; display: grid; min-width: 15rem; max-width: min(20rem, calc(100vw - 2rem)); max-height: 20rem; overflow-y: auto; padding: 0.375rem; }
+      .cal-menu--up { top: auto; bottom: calc(100% + 0.375rem); }
       .cal-menu--start { left: 0; }
       .cal-menu--end { right: 0; }
       .cal-menu [role='menuitem'] { display: grid; gap: 0.125rem; min-height: 2.75rem; padding: 0.5rem 0.75rem; text-align: left; }
       .cal-menu-label { font: 600 0.875rem/1.3 var(--font-sans); color: var(--ink); }
       .cal-menu-detail { font: 500 0.8125rem/1.3 var(--font-sans); color: var(--muted); }
       .cal-menu-head { margin: 0; padding: 0.5rem 0.75rem 0.25rem; font: 600 0.8125rem/1.3 var(--font-sans); color: var(--muted); }
+      /* "12 earlier" while it fits its column. When it doesn't (a narrow window, Larger text), the
+         word wraps onto a second line that is clipped away, so the pill keeps the arrow and the count
+         inside its own column (its label says it in full): never two pills over each other. */
       .cal-edge-btn {
-        display: inline-flex; align-items: center; gap: 0.25rem; min-height: 1.75rem; padding: 0 0.625rem; border: 0; border-radius: var(--r-pill);
+        display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; align-content: flex-start; column-gap: 0.25rem;
+        min-width: 0; max-width: 100%; height: 1.75rem; overflow: hidden; padding: 0 0.625rem; border: 0; border-radius: var(--r-pill);
         background: var(--surface-raised); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-edge);
         color: var(--ink); font: 600 0.8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer;
         transition: transform 180ms var(--ease), box-shadow 180ms var(--ease);
       }
+      .cal-edge-num, .cal-edge-word { line-height: 1.75rem; }
+      .cal-menu-wrap:has(> .cal-edge-btn) { max-width: 100%; }
       .cal-edge-btn .lucide { width: 0.875rem; height: 0.875rem; color: currentColor; }
       @media (hover: hover) { .cal-edge-btn:hover { transform: translateY(-0.0625rem); box-shadow: inset 0 0 0 0.0625rem var(--hairline), var(--glass-shadow-lift); } }
       .cal-edge-btn:active { transform: scale(0.97); }

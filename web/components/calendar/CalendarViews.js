@@ -64,18 +64,24 @@ export default function CalendarViews({ deadlines = [], blocks = [], needs = [],
   const view = pickView(chosen, wide);
   const [anchor, setAnchor] = useState(() => new Date());
   const weekStart = startOfWeek(anchor);
-  const [toast, setToast] = useState(null); // { text, undo?, error? }
+  const [toast, setToast] = useState(null); // { text, undo?, undoText?, error? }
   const toastTimer = useRef(null);
+  const toastNow = useRef(null); // the toast on screen, for say() to read without a stale closure
   const [saving, setSaving] = useState(() => new Set());
   const [finding, setFinding] = useState(false);
   const [sheet, setSheet] = useState(null);
 
   const choose = next => { setChosen(next); saveView(next); };
+  // A refusal or error while a move's Undo is still up keeps that Undo, with the move it undoes on a
+  // second line, so saying why one move stopped never takes back the chance to undo the last.
+  const show = useCallback(next => { toastNow.current = next; setToast(next); }, []);
   const say = useCallback((text, { undo = null, error = false } = {}) => {
     clearTimeout(toastTimer.current);
-    setToast({ text, undo, error, key: Date.now() });
-    toastTimer.current = setTimeout(() => setToast(null), error ? 8000 : UNDO_MS);
-  }, []);
+    const live = toastNow.current;
+    const kept = !undo && live?.undo ? { undo: live.undo, undoText: live.undoText || live.text } : { undo, undoText: '' };
+    show({ text, error, ...kept, key: Date.now() });
+    toastTimer.current = setTimeout(() => show(null), error ? 8000 : UNDO_MS);
+  }, [show]);
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   const busy = (id, on) => setSaving(current => { const next = new Set(current); if (on) next.add(id); else next.delete(id); return next; });
@@ -180,8 +186,9 @@ export default function CalendarViews({ deadlines = [], blocks = [], needs = [],
 
       {toast && (
         <div key={toast.key} className="c-toast cal-toast" role={toast.error ? 'alert' : 'status'}>
-          <span>{toast.text}</span>
-          {toast.undo && <button type="button" className="c-btn c-btn--quiet" onClick={() => { const undo = toast.undo; setToast(null); undo(); }}>Undo</button>}
+          <span className="cal-toast-text">{toast.text}{toast.undoText && <span className="cal-toast-prior">{toast.undoText}</span>}</span>
+          {toast.undo && <button type="button" className="c-btn c-btn--quiet" aria-label={toast.undoText ? `Undo: ${toast.undoText}` : undefined}
+            onClick={() => { const undo = toast.undo; clearTimeout(toastTimer.current); show(null); undo(); }}>Undo</button>}
         </div>
       )}
       {sheet && <AssignmentSheet item={sheet} onClose={() => { setSheet(null); reloadBlocks(); }} />}
@@ -202,6 +209,8 @@ export default function CalendarViews({ deadlines = [], blocks = [], needs = [],
         .cal-view { min-width: 0; }
         .cal :global(.cal-toast) { max-width: calc(100vw - 2rem); }
         .cal :global(.cal-toast > span) { min-width: 0; }
+        .cal-toast-text { display: grid; gap: 0.125rem; }
+        .cal-toast-prior { color: var(--muted); font-size: 0.875rem; }
         @media (max-width: 767px) {
           .cal-title { font-size: 1.75rem; }
           .cal-head { align-items: flex-start; }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { DAY_END_HOUR, DAY_START_HOUR, addDays, clock, dayEntries, gridBox, lanes, monthCell, monthGrid, nowLine, offGrid, sameDay, span } from '../../lib/calendarViews.mjs';
 import { dayKey } from '../../lib/learnEngine.mjs';
 import { ClassTag, DueIcon, EdgeMenu, ReadyRing, StudyIcon, toneStyle } from './parts';
@@ -7,6 +7,38 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }, (_, i) => DAY_START_HOUR + i);
 const hourLabel = hour => `${hour % 12 || 12} ${hour < 12 ? 'AM' : 'PM'}`;
 const longDay = day => day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+const useBrowserLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
+// Each cell's study count in the largest form that fits beside its date: icon, count and "study";
+// then "2 study"; then the icon and count (the smallest form); the count alone only when even that
+// doesn't fit. Measured from the cell's own date and count and a hidden "study" in the same font, in
+// px at the current text size, so Larger text and every window width get the form that really fits.
+// The grid takes one form, the largest every cell fits, so a row reads alike; a cell too narrow for
+// even the icon shows its count alone. { [dayKey]: 'full' | 'word' | 'icon' | 'count' }
+const FORMS = ['full', 'word', 'icon', 'count'];
+function studyForms(card) {
+  const forms = {};
+  const word = card?.querySelector('.mo-probe')?.getBoundingClientRect().width;
+  if (!word) return forms;
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const gap = 0.25 * rem; // between the count and "study"
+  const after = 0.1875 * rem; // between the icon and the count
+  const beside = 0.125 * rem; // the least room between the date and the count (.mo-top)
+  card.querySelectorAll('.mo-cell[data-day]').forEach(cell => {
+    const top = cell.querySelector('.mo-top');
+    const count = cell.querySelector('.mo-study-count');
+    if (!top || !count) return;
+    const room = top.getBoundingClientRect().width - cell.querySelector('.mo-num').getBoundingClientRect().width - beside - 1; // a pixel spare for rounding
+    const digits = count.getBoundingClientRect().width;
+    const icon = 0.875 * rem + after;
+    forms[cell.dataset.day] = icon + digits + gap + word <= room ? 'full'
+      : digits + gap + word <= room ? 'word'
+        : icon + digits <= room ? 'icon' : 'count';
+  });
+  const shared = FORMS[Math.max(0, ...Object.values(forms).map(form => Math.min(FORMS.indexOf(form), 2)))];
+  Object.keys(forms).forEach(key => { if (forms[key] !== 'count') forms[key] = shared; });
+  return forms;
+}
 
 function firstPick(anchor, now) {
   return anchor.getMonth() === now.getMonth() && anchor.getFullYear() === now.getFullYear() ? now : new Date(anchor.getFullYear(), anchor.getMonth(), 1);
@@ -19,7 +51,23 @@ function firstPick(anchor, now) {
 export default function MonthView({ deadlines, blocks, readiness, now, anchor, onOpen, onPickMonth }) {
   const [picked, setPicked] = useState(() => firstPick(anchor, now));
   const grid = useRef(null);
+  const card = useRef(null);
   const focusNext = useRef(false);
+  const [forms, setForms] = useState({});
+  useBrowserLayoutEffect(() => {
+    const element = card.current;
+    if (!element) return undefined;
+    const measure = () => {
+      const next = studyForms(element);
+      setForms(current => (JSON.stringify(current) === JSON.stringify(next) ? current : next));
+    };
+    measure();
+    document.fonts?.ready.then(measure).catch(() => {});
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [anchor.getFullYear(), anchor.getMonth(), blocks]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     setPicked(current => (current.getMonth() === anchor.getMonth() && current.getFullYear() === anchor.getFullYear() ? current : firstPick(anchor, now)));
   }, [anchor.getFullYear(), anchor.getMonth()]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -59,7 +107,8 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
 
   return (
     <div className="mo">
-      <section className="c-card mo-grid-card" aria-label={anchor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}>
+      <section ref={card} className="c-card mo-grid-card" aria-label={anchor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}>
+        <span className="mo-probe" aria-hidden="true">study</span>
         <div className="mo-grid" role="grid" ref={grid} aria-label="Pick a day to see it beside the month">
           <div className="mo-row mo-head" role="row">
             {WEEKDAYS.map(name => <span key={name} role="columnheader" className="mo-dow">{name}</span>)}
@@ -71,15 +120,22 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
                 const cell = monthCell(day, deadlines, blocks);
                 const isToday = sameDay(day, now);
                 const isPicked = sameDay(day, picked);
+                const form = forms[dayKey(day)] || 'full';
                 const label = `${longDay(day)}${isToday ? ', today' : ''}: ${cell.due.length + cell.more ? `${cell.due.length + cell.more} due` : 'nothing due'}${cell.study ? `, ${cell.study} study` : ''}`;
                 return (
                   <div key={dayKey(day)} role="gridcell" aria-selected={isPicked} className="mo-gridcell">
                     <button type="button" tabIndex={isPicked ? 0 : -1} aria-label={label} aria-current={isToday ? 'date' : undefined}
-                      className={`mo-cell${inMonth ? '' : ' is-out'}${isToday ? ' is-today' : ''}${isPicked ? ' is-picked' : ''}`}
+                      data-day={dayKey(day)} className={`mo-cell${inMonth ? '' : ' is-out'}${isToday ? ' is-today' : ''}${isPicked ? ' is-picked' : ''}`}
                       onClick={() => pick(day)} onKeyDown={event => onKeyDown(event, day)}>
                       <span className="mo-top" aria-hidden="true">
                         <span className="mo-num">{day.getDate()}</span>
-                        {cell.study > 0 && <span className="mo-study"><StudyIcon size={14} /><span>{cell.study}</span><span>study</span></span>}
+                        {cell.study > 0 && (
+                          <span className="mo-study">
+                            {(form === 'full' || form === 'icon') && <StudyIcon size={14} />}
+                            <span className="mo-study-count">{cell.study}</span>
+                            {(form === 'full' || form === 'word') && <span>study</span>}
+                          </span>
+                        )}
                       </span>
                       <span className="mo-chips" aria-hidden="true">
                         {cell.due.map(entry => (
@@ -159,17 +215,17 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
       <style jsx>{`
         .mo { display: grid; gap: 1rem; align-items: start; min-width: 0; }
         @media (min-width: 1200px) { .mo { grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem); } }
-        .mo-grid-card { min-width: 0; padding: 0.75rem 1rem 1rem; }
+        .mo-grid-card { position: relative; min-width: 0; padding: 0.75rem 1rem 1rem; }
+        .mo-probe { position: absolute; top: 0; left: 0; visibility: hidden; pointer-events: none; white-space: nowrap; font: 500 0.8125rem/1 var(--font-sans); }
         .mo-grid { display: grid; gap: 0.375rem; }
         .mo-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.375rem; }
         .mo-dow { display: grid; place-items: center; height: 1.75rem; color: var(--muted); font: 600 0.875rem/1 var(--font-sans); }
         .mo-gridcell { display: grid; min-width: 0; }
         .mo-cell {
-          display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; min-height: 6.5rem; padding: 0.5rem;
+          display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; min-height: 6.5rem; padding: 0.5rem 0.375rem;
           border: 0; border-radius: var(--r-input); text-align: left; color: var(--ink); cursor: pointer;
           background: var(--glass-inner); box-shadow: inset 0 0 0 0.0625rem var(--hairline);
           transition: transform 180ms var(--ease), box-shadow 180ms var(--ease);
-          container-type: inline-size;
         }
         .mo-cell.is-out { background: transparent; box-shadow: none; }
         .mo-cell.is-out .mo-num { color: var(--muted); font-weight: 500; }
@@ -178,14 +234,13 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
         .mo-cell.is-picked { background: var(--selected-glass); box-shadow: var(--selected-glass-shadow); }
         .mo-cell.is-today { box-shadow: inset 0 0 0 0.125rem var(--olive); }
         .mo-cell.is-today.is-picked { box-shadow: inset 0 0 0 0.125rem var(--olive), var(--selected-glass-shadow); }
-        .mo-top { display: flex; align-items: center; justify-content: space-between; gap: 0.25rem; min-width: 0; }
+        .mo-top { display: flex; align-items: center; justify-content: space-between; gap: 0.125rem; min-width: 0; }
         .mo-num { font: 600 1rem/1 var(--font-sans); font-variant-numeric: tabular-nums; }
         .mo-cell.is-today .mo-num { color: var(--olive-ink); }
-        /* "2 study" while the word fits beside the date. When it doesn't, the word wraps onto a second
-           line that is clipped away, so the count stands alone (the cell's label says it in full):
-           never a word cut off at the edge, at any width or text size. */
-        .mo-study { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; column-gap: 0.25rem; min-width: 0; height: 0.875rem; overflow: hidden; color: var(--muted); font: 500 0.8125rem/1 var(--font-sans); white-space: nowrap; }
-        @container (max-width: 3rem) { .mo-study :global(.lucide) { display: none; } } /* room for the count alone */
+        /* The form that fits is picked by studyForm(); should a count still overrun (three digits), the
+           rest wraps onto a clipped second line, never a word cut off at the edge. The cell's label
+           says it in full. */
+        .mo-study { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; column-gap: 0.25rem; min-width: 0; height: 0.875rem; overflow: hidden; color: var(--muted); font: 500 0.8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
         .mo-chips { display: grid; gap: 0.25rem; min-width: 0; }
         .mo-chip { display: flex; align-items: center; gap: 0.25rem; min-width: 0; min-height: 1.5rem; padding: 0.125rem 0.375rem; border-radius: 0.5rem; background: color-mix(in srgb, var(--tone, var(--glass-inner)) 78%, transparent); font: 600 0.8125rem/1.2 var(--font-sans); }
         .mo-chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -206,7 +261,7 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
         :is(a, button).mo-due-row:active { transform: scale(0.98); }
         .mo-due-icon { display: grid; color: var(--tone-ink, var(--muted)); }
         .mo-due-icon :global(.lucide), .mo-study :global(.lucide) { color: currentColor; }
-        .mo-study :global(.lucide) { width: 0.875rem; height: 0.875rem; }
+        .mo-study :global(.lucide) { flex: 0 0 auto; width: 0.875rem; height: 0.875rem; margin-right: -0.0625rem; } /* 0.1875rem to the count */
         .mo-due-main { display: grid; gap: 0.125rem; min-width: 0; }
         .mo-due-title { overflow: hidden; font: 600 1rem/1.3 var(--font-sans); text-overflow: ellipsis; }
         .mo-due-meta { display: flex; flex-wrap: wrap; gap: 0.25rem 0.625rem; align-items: center; }

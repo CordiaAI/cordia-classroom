@@ -14,7 +14,7 @@ const NARROW_REM = 6.5;
 const TINY_REM = 4; // narrower still: one line of title, ending in an ellipsis
 const useBrowserLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 const examSpan = entry => ({ start: entry.at, end: new Date(entry.at.getTime() + EXAM_MINUTES * 60000) });
-const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR - 1 }, (_, i) => DAY_START_HOUR + 1 + i);
+const HOURS = Array.from({ length: DAY_END_HOUR - DAY_START_HOUR }, (_, i) => DAY_START_HOUR + i); // 8 AM at the top line to 9 PM
 const hourLabel = hour => `${hour % 12 || 12} ${hour < 12 ? 'AM' : 'PM'}`;
 const dayName = day => day.toLocaleDateString('en-US', { weekday: 'short' });
 const longDay = day => day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });

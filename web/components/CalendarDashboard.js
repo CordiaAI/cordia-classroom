@@ -306,7 +306,7 @@ export default function CalendarDashboard({ compact = false, onOpenCalendar = ()
               <span className="cal-step-num" aria-hidden="true">{index + 1}</span>
               <step.icon size={24} strokeWidth={1.75} aria-hidden="true" />
               <span>{step.label}</span>
-              <div className="cal-step-shot">{step.shot}</div>
+              <div className="cal-step-shot" aria-hidden="true">{step.shot}</div>
               <p className="cal-step-line">{step.line}</p>
             </li>
           ))}
