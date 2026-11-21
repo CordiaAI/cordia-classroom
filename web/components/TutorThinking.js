@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import CordiaLoader from './CordiaLoader';
-import { FALLBACK_LINE, firstLine, LINE_MS, nextLine } from '../lib/tutorStatus.mjs';
+import { FALLBACK_LINE, firstLine, holdFor, LINE_MS, nextLine, pendingSteps } from '../lib/tutorStatus.mjs';
 
 // While the Tutor works: one breathing Cordia mark and one status line in the Tutor's text style, with a
 // shimmer and no second icon. The line cross-fades to the next every LINE_MS (lib/tutorStatus.mjs says which);
-// a real step shows the moment it arrives. It is on screen only until the first answer text, so nothing here
-// is read once there is an answer. Reduced motion: no shimmer, and lines swap without a fade.
+// a real step shows as soon as it arrives, but never less than MIN_HOLD_MS after the last change. It is on screen
+// only until the first answer text, so nothing here is read once there is an answer. Reduced motion: no shimmer, and lines swap without a fade.
 // A screen reader hears only the first line (the live region is set once); the changing lines are for the eyes.
 // avatar: the chat home's thinking row, where the mark sits in the Tutor's avatar place (DESIGN-SPEC 4.3).
 export default function TutorThinking({ steps = [], lines = [], avatar = false }) {
@@ -13,25 +13,51 @@ export default function TutorThinking({ steps = [], lines = [], avatar = false }
   const [announced, setAnnounced] = useState('');
   const latest = useRef({ steps, lines });
   latest.current = { steps, lines };
+  // What is on screen, when it last changed, and how many real steps have been shown (the list only ever grows).
+  const shown = useRef(view.text);
+  const changedAt = useRef(0);
+  const consumed = useRef(pendingSteps({ steps }).length);
 
-  // The first line is announced once, after the live region is on the page.
-  useEffect(() => { setAnnounced(view.text); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const show = text => {
+    const prev = shown.current;
+    shown.current = text;
+    changedAt.current = performance.now();
+    setView(current => ({ text, prev: text === prev ? '' : prev, n: current.n + 1 }));
+  };
 
-  // A real step shows the moment it arrives.
-  const newest = steps.at(-1);
+  // The first line is announced once, after the live region is on the page; the hold counts from it too.
   useEffect(() => {
-    if (!newest) return;
-    setView(current => (current.text === newest ? current : { text: newest, prev: current.text, n: current.n + 1 }));
-  }, [newest]);
+    changedAt.current = performance.now();
+    setAnnounced(view.text);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Every LINE_MS the next line; each change (or a line that stays) starts a fresh wait.
+  // A real step shows as soon as it arrives, but never less than MIN_HOLD_MS after the last change; one that
+  // arrives sooner waits its turn, and each step that was waiting is shown in order (none is dropped).
+  const stepCount = steps.length;
   useEffect(() => {
-    const timer = setTimeout(() => setView(current => {
-      const text = nextLine({ current: current.text, ...latest.current });
-      return { text, prev: text === current.text ? '' : current.text, n: current.n + 1 };
-    }), LINE_MS);
+    let timer;
+    const tick = () => {
+      const [next] = pendingSteps({ steps: latest.current.steps, consumed: consumed.current });
+      if (!next) return;
+      const wait = holdFor({ changedAt: changedAt.current, now: performance.now() });
+      if (wait > 0) { timer = setTimeout(tick, wait); return; }
+      consumed.current += 1;
+      show(next);
+      tick();
+    };
+    tick();
     return () => clearTimeout(timer);
-  }, [view.n]);
+  }, [stepCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Every LINE_MS the next line; each change (or a line that stays) starts a fresh wait. A step that is still
+  // waiting for its turn takes the place of the next line.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (pendingSteps({ steps: latest.current.steps, consumed: consumed.current }).length) return;
+      show(nextLine({ current: shown.current, ...latest.current }));
+    }, LINE_MS);
+    return () => clearTimeout(timer);
+  }, [view.n]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
@@ -59,10 +85,11 @@ export default function TutorThinking({ steps = [], lines = [], avatar = false }
             -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
           }
         }
-        /* The first line is there from the first frame: it only shimmers. Each next line fades in as the old one fades out. */
+        /* The first line is there from the first frame: it only shimmers. A next line: the old one fades out in --dur-swap and the
+           new one starts when it has gone, so the two are never on screen near half opacity together. */
         .tutor-line.is-first { animation: tutor-line-shimmer 2.2s linear infinite; }
-        .tutor-line.is-in { animation: tutor-line-in var(--dur-enter) var(--ease) both, tutor-line-shimmer 2.2s linear infinite; }
-        .tutor-line.is-out { animation: tutor-line-out var(--dur-exit) var(--ease-exit) both, tutor-line-shimmer 2.2s linear infinite; pointer-events: none; }
+        .tutor-line.is-in { animation: tutor-line-in var(--dur-enter) var(--ease) var(--dur-swap) both, tutor-line-shimmer 2.2s linear infinite; }
+        .tutor-line.is-out { animation: tutor-line-out var(--dur-swap) var(--ease-exit) both, tutor-line-shimmer 2.2s linear infinite; pointer-events: none; }
         @keyframes tutor-line-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes tutor-line-out { from { opacity: 1; } to { opacity: 0; } }
         @keyframes tutor-line-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }

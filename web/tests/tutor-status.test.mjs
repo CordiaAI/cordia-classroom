@@ -149,3 +149,117 @@ test('the shimmer line reads 4.5:1 in light, dark and Paper & Clay (light and da
     }
   }
 });
+
+// ---- Review fixes: hold between changes, a clean swap, a quiet poll that backs off ----
+
+import { holdFor, MIN_HOLD_MS, nextPollDelay, pendingSteps, STEP_POLL_MAX_MS, STEP_POLL_MS } from '../lib/tutorStatus.mjs';
+
+test('a real step waits until the line has had 1.2 s, and steps that were waiting are never dropped', () => {
+  assert.equal(MIN_HOLD_MS, 1200);
+  assert.equal(holdFor({ changedAt: 1000, now: 1000 }), 1200, 'a step the moment the line changed waits the full hold');
+  assert.equal(holdFor({ changedAt: 1000, now: 1900 }), 300);
+  assert.equal(holdFor({ changedAt: 1000, now: 2200 }), 0, 'exactly 1.2 s after: now');
+  assert.equal(holdFor({ changedAt: 1000, now: 5000 }), 0);
+  // Two steps land while the first line is still held: both are still to be shown, in order.
+  assert.deepEqual(pendingSteps({ steps: ['Reading Cells', 'Drawing a diagram'], consumed: 0 }), ['Reading Cells', 'Drawing a diagram']);
+  assert.deepEqual(pendingSteps({ steps: ['Reading Cells', 'Drawing a diagram'], consumed: 1 }), ['Drawing a diagram']);
+  assert.deepEqual(pendingSteps({ steps: ['Reading Cells'], consumed: 3 }), [], 'a shorter list than was shown: nothing pending');
+  assert.deepEqual(pendingSteps({ steps: ['', 'Reading Cells'], consumed: 0 }), ['Reading Cells']);
+});
+
+test('TutorThinking holds each step for MIN_HOLD_MS and shows the waiting ones in order, with or without motion', () => {
+  const source = read('components/TutorThinking.js');
+  assert.match(source, /holdFor\(\{ changedAt: changedAt\.current, now: performance\.now\(\) \}\)/);
+  assert.match(source, /pendingSteps\(\{ steps: latest\.current\.steps, consumed: consumed\.current \}\)/);
+  assert.match(source, /consumed\.current \+= 1;\s*show\(next\);\s*tick\(\);/, 'each waiting step is shown in turn');
+  assert.ok(!/matchMedia|prefers-reduced-motion/.test(source.split('<style')[0]), 'the hold does not depend on motion settings: under reduced motion the swap is instant and steps still queue');
+});
+
+// The two lines of a swap are never both near half opacity: evaluate the real keyframes and timing from the files.
+const bezier = (x1, y1, x2, y2) => t => {
+  let lo = 0; let hi = 1;
+  for (let i = 0; i < 50; i += 1) { const s = (lo + hi) / 2; const x = 3 * (1 - s) ** 2 * s * x1 + 3 * (1 - s) * s * s * x2 + s ** 3; if (x < t) lo = s; else hi = s; }
+  const s = (lo + hi) / 2;
+  return 3 * (1 - s) ** 2 * s * y1 + 3 * (1 - s) * s * s * y2 + s ** 3;
+};
+const timing = name => bezier(...css.match(new RegExp(`--${name}:\\s*cubic-bezier\\(([^)]+)\\)`))[1].split(',').map(Number));
+const ms = name => Number(css.match(new RegExp(`--${name}:\\s*(\\d+)ms`))[1]);
+
+test('during a line change the outgoing and incoming text are never both near half opacity', () => {
+  const component = read('components/TutorThinking.js');
+  assert.match(component, /\.tutor-line\.is-out \{ animation: tutor-line-out var\(--dur-swap\) var\(--ease-exit\)/, 'the old line leaves in --dur-swap');
+  assert.match(component, /\.tutor-line\.is-in \{ animation: tutor-line-in var\(--dur-enter\) var\(--ease\) var\(--dur-swap\) both/, 'the new one starts when it has gone');
+  const leave = ms('dur-swap');
+  const delay = ms('dur-swap');
+  const arrive = ms('dur-enter');
+  assert.ok(leave <= 120, 'the outgoing line fades in about 120 ms');
+  const easeIn = timing('ease');
+  const easeOut = timing('ease-exit');
+  let worst = 0;
+  for (let t = 0; t <= leave + delay + arrive; t += 1) {
+    const out = 1 - easeOut(Math.min(1, t / leave));
+    const incoming = t < delay ? 0 : easeIn(Math.min(1, (t - delay) / arrive));
+    worst = Math.max(worst, Math.min(out, incoming));
+  }
+  assert.ok(worst < 0.3, `at its worst the dimmer of the two is at ${worst.toFixed(2)}`);
+});
+
+test('a failed step poll backs off, is never logged, and a good one goes back to the normal pace', async () => {
+  assert.equal(nextPollDelay({ failures: 0 }), STEP_POLL_MS);
+  assert.equal(nextPollDelay({ failures: 1 }), 2 * STEP_POLL_MS);
+  assert.equal(nextPollDelay({ failures: 2 }), 4 * STEP_POLL_MS);
+  assert.equal(nextPollDelay({ failures: 30 }), STEP_POLL_MAX_MS, 'capped');
+  assert.equal(nextPollDelay({ failures: 3, everyMs: 20 }), 160);
+
+  // Polls at about 14, then waits grow 40, 80 ms after failures; a success resets to 20 ms.
+  const at = [];
+  const started = Date.now();
+  const outcomes = [null, { detail: 'Too many requests. Wait a moment and try again.' }, { steps: ['Reading Cells'] }, { steps: ['Reading Cells'] }];
+  const options = [];
+  const cancel = pollSteps({
+    call: async (path, init) => { at.push(Date.now() - started); options.push(init); return outcomes[Math.min(at.length - 1, outcomes.length - 1)]; },
+    sessionId: 's', onSteps: () => {}, everyMs: 20,
+  });
+  await wait(260);
+  cancel();
+  const gaps = at.slice(1).map((time, i) => time - at[i]);
+  assert.ok(gaps[0] >= 38, `after one failure the wait doubles (${gaps[0]} ms)`);
+  assert.ok(gaps[1] >= 78, `after two it doubles again (${gaps[1]} ms)`);
+  assert.ok(gaps[2] < 70, `after a good poll it is back to the normal pace (${gaps[2]} ms)`);
+  assert.ok(options.every(init => init.quiet === true && init.quietLimit === true), 'every poll asks to stay quiet');
+});
+
+test('a 429 on the poll or the status call is silent: nothing is shown and nothing is thrown', async () => {
+  const got = [];
+  requestStatusLines({ call: async () => ({ detail: 'Too many requests. Wait a moment and try again.' }), question: 'q', onLines: lines => got.push(lines) });
+  const cancel = pollSteps({ call: async () => ({ detail: 'Too many requests. Wait a moment and try again.' }), sessionId: 's', onSteps: steps => got.push(steps), everyMs: 10 });
+  await wait(80);
+  cancel();
+  assert.deepEqual(got, []);
+});
+
+test('apiFetch with quiet does not log a failed request; without it, it still does', async () => {
+  const logged = [];
+  const realError = console.error;
+  const realWindow = globalThis.window;
+  const realStorage = globalThis.localStorage;
+  const realFetch = globalThis.fetch;
+  console.error = (...args) => logged.push(args);
+  globalThis.window = { dispatchEvent() {}, location: {} };
+  globalThis.localStorage = { getItem: key => (key === 'authToken' ? 'token' : null), setItem() {}, removeItem() {} };
+  globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
+  try {
+    const { apiFetch } = await import('../lib/api.js');
+    assert.equal(await apiFetch('/tutor/steps?session_id=s', { quiet: true }), null);
+    assert.deepEqual(logged, [], 'quiet: nothing logged');
+    assert.equal(await apiFetch('/something-else'), null);
+    assert.equal(logged.length, 1, 'not quiet: logged as before');
+  } finally {
+    console.error = realError;
+    globalThis.window = realWindow;
+    globalThis.localStorage = realStorage;
+    globalThis.fetch = realFetch;
+    if (realWindow === undefined) delete globalThis.window;
+    if (realStorage === undefined) delete globalThis.localStorage;
+  }
+});
