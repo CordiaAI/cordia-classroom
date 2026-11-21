@@ -41,3 +41,19 @@ test('one word gives its first two letters; numbers and empty names give no stra
   assert.equal(classInitials(null, undefined), '');
   for (const name of ['Week 5', 'Fall 2025 Biology', '2025 Cohort', 'Lab 3']) assert.match(fromName(name), /^\p{Lu}{1,2}$/u, name);
 });
+
+// The folded dot draws its letters in the class's ink on its cover wash (styles/system.css): 4.5:1 or better
+// for all eight covers, in light and dark.
+test('the letters read on every class colour, light and dark', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { contrast, parseHex } = await import('../lib/accentMath.mjs');
+  const css = readFileSync(new URL('../styles/tokens.css', import.meta.url), 'utf8');
+  const dark = css.slice(css.indexOf("[data-theme='dark'] {"));
+  for (const [mode, text] of [['light', css], ['dark', dark]]) {
+    for (let tone = 1; tone <= 8; tone += 1) {
+      const wash = parseHex(text.match(new RegExp(`--cover-${tone}:\\s*(#[0-9A-Fa-f]{6})`))[1]);
+      const ink = parseHex(text.match(new RegExp(`--cover-ink-${tone}:\\s*(#[0-9A-Fa-f]{6})`))[1]);
+      assert.ok(contrast(ink, wash) >= 4.5, `${mode} cover ${tone}: ${contrast(ink, wash).toFixed(2)}`);
+    }
+  }
+});

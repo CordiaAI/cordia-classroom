@@ -1072,13 +1072,13 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 }
 .chat-home { box-sizing: border-box; display: flex; flex-direction: column; min-height: calc(100dvh - 160px); }
 .chat-home-top { flex: none; display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 8px; min-width: 0; }
-.chat-home-date { margin-left: auto; color: var(--muted-strong); font: 500 0.8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chat-home-date { min-width: 0; margin-left: auto; overflow: hidden; color: var(--muted-strong); font: 500 0.8125rem/1.3 var(--font-sans); font-variant-numeric: tabular-nums; white-space: nowrap; text-overflow: ellipsis; }
 .chat-home-top h1.chat-home-title { min-width: 0; margin: 0 0 0 4px; color: var(--ink); font: 600 1.0625rem/1.3 var(--font-sans) !important; letter-spacing: 0 !important; }
 .chat-home-chip { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: var(--r-pill); background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); color: var(--ink); font: 600 0.8125rem/1 var(--font-sans); }
 .chat-home-stage { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 20px; padding: 0 24px 72px; }
 .chat-home-hero, .chat-home-composer, .chat-home-pills { box-sizing: border-box; width: 100%; max-width: 760px; margin-inline: auto; }
 .chat-home-hero { display: grid; gap: 8px; padding: 0 8px; }
-.chat-home-hero h1.chat-home-headline { margin: 0; color: var(--ink); font-size: 2.5rem !important; line-height: 1.12 !important; }
+.chat-home-hero h1.chat-home-headline { margin: 0; color: var(--ink); font-size: 2.5rem !important; line-height: 1.12 !important; text-wrap: balance; }
 .chat-home-line { margin: 0; color: var(--muted); font: 500 1.0625rem/1.5 var(--font-sans); font-variant-numeric: tabular-nums; }
 .chat-home-pills { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 4px; }
 .chat-home-pill {
@@ -1229,7 +1229,7 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
    and its column (headline, composer, suggestions) to 860px. A chat keeps its 760px column. */
 @media (min-width: 1600px) {
   .chat-home:not(.is-chat) :is(.chat-home-hero, .chat-home-composer, .chat-home-pills) { max-width: 860px; }
-  .chat-home:not(.is-chat) .chat-home-hero h1.chat-home-headline { font-size: 3rem !important; }
+  .chat-home:not(.is-chat) .chat-home-hero h1.chat-home-headline { font-size: 3rem !important; letter-spacing: -0.02em; }
 }
 @media (max-width: 767px) {
   .chat-home-stage { padding: 0 0 24px; }
