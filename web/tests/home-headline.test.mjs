@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   DEADLINE_DAYS, WEAK_DAYS, classDeadlines, classWords, courseCode, dayDiff, dayPart, firstName, greeting, headlineSeed, homeHeadlineFor,
-  sameClass, seedOf, shortenName, topicName, weakIdea,
+  assignmentName, sameClass, seedOf, shortenName, topicName, weakIdea,
 } from '../lib/homeHeadline.mjs';
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -120,6 +120,11 @@ test('assignment names are cut near 40 characters, at a word, and read as plain 
   assert.equal(shortenName('x'.repeat(60)).length, 40, 'a name with no spaces is cut at the limit');
   const result = homeHeadlineFor({ pick: BUS, info: { deadlines: [{ title: 'A05 ' + long + ' [BUS-210-004]', due_at: at(20).toISOString() }] }, now: NOW });
   assert.equal(result.title, 'Annotated Bibliography for the Harlem… for BUS 210 is due Friday.');
+  // A long name with a colon keeps the part that stands alone, in plain words; a short one keeps all of it.
+  assert.equal(assignmentName('A05 Packback Discussion: Seven Ethical Frameworks and the Case for Stakeholder Theory [BUS-210-004]'), 'Packback discussion');
+  assert.equal(assignmentName('Quiz 4: Chapters 5 to 7'), 'Quiz 4: Chapters 5 to 7');
+  assert.equal(assignmentName(long), 'Annotated Bibliography for the Harlem…');
+  assert.ok(assignmentName('Reflection: ' + 'x'.repeat(50)).length <= 40);
   // Only an id left: the sentence still reads.
   assert.equal(homeHeadlineFor({ pick: BUS, info: { deadlines: [{ title: 'NUR-210-01 [A05]', due_at: at(20).toISOString() }] }, now: NOW }).title, 'Your next assignment for BUS 210 is due Friday.');
   assert.equal(homeHeadlineFor({ pick: BUS, info: { deadlines: [{ title: 'quiz 4', due_at: at(20).toISOString() }] }, now: NOW }).title, 'Quiz 4 for BUS 210 is due Friday.');

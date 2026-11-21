@@ -77,6 +77,17 @@ export function shortenName(text, max = NAME_MAX) {
 
 const upperFirst = text => text.charAt(0).toUpperCase() + text.slice(1);
 
+// An assignment's name for the sentence: plain words (lib/homeText.mjs planTitle), and when it is
+// longer than NAME_MAX, the part before its colon if that stands alone ("Packback Discussion: Seven
+// Ethical Frameworks and ..." -> "Packback discussion"), else cut at a word.
+export function assignmentName(raw) {
+  const title = planTitle(raw);
+  if (title.length <= NAME_MAX) return title;
+  const head = title.split(/:\s/)[0];
+  if (head !== title && head.length >= 8 && head.length <= NAME_MAX) return planTitle(head) || head;
+  return shortenName(title);
+}
+
 // A class's name as the headline says it: the picker's name, or its code when it has none or the
 // name is long and the code is short.
 export function classWords(pick) {
@@ -183,7 +194,7 @@ export function homeHeadlineFor({ pick = null, info = null, now = new Date(), na
     const days = dayDiff(today, dayKey(due));
     if (days < 0 || days > DEADLINE_DAYS || (!item.all_day && due.getTime() < now.getTime())) continue;
     const { when, line } = deadlineWords(due, days, Boolean(item.all_day));
-    const what = upperFirst(shortenName(planTitle(item.title)) || 'your next assignment');
+    const what = upperFirst(assignmentName(item.title) || 'your next assignment');
     return { title: `${what} for ${code} is due ${when}.`, line, kind: 'deadline' };
   }
 

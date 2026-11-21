@@ -19,7 +19,7 @@ export default function HomeHero({ title, line = '' }) {
     return () => clearTimeout(timer);
   }, [previous]);
   return (
-    <div className="chat-home-hero">
+    <div className="chat-home-hero chat-home-hero--headline">
       <div className="chat-home-copy-stack">
         {previous && (
           <div key={'out:' + previous.key} className="chat-home-copy is-leaving" aria-hidden="true">
