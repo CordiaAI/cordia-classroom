@@ -18,6 +18,7 @@ import { ShellTipLayer, useShellTips } from './ShellTips';
 import { loadSocialSummary, onSocialSummary } from '../lib/social';
 import { openNewSheet } from '../lib/newSheet';
 import { classLabel } from '../lib/classLabel';
+import { classInitials } from '../lib/classInitials.mjs';
 import { coverFor } from '../lib/coverDesign.mjs';
 import { latestFolders, loadFolders, onFoldersChanged } from '../lib/folders';
 import { HELP_EVENT } from '../lib/help';
@@ -49,11 +50,12 @@ const tabItems = [
   { label: 'Assistant', href: '/assistant', icon: MessageCircle, spot: 'nav-assistant' },
 ];
 
-// Classes: the first five by what the sidebar shows (course code, else name), each with its cover colour.
+// Classes: the first five by what the sidebar shows (course code, else name), each with its cover colour
+// and the two letters its dot carries in the folded sidebar (lib/classInitials.mjs).
 export function sidebarClasses(folders) {
   return (folders || []).map(folder => {
     const { title, code } = classLabel(folder.name);
-    return { id: folder.id, name: title || 'Class', code: code || title || 'Class', tone: (coverFor(folder).color % 8) + 1 };
+    return { id: folder.id, name: title || 'Class', code: code || title || 'Class', tone: (coverFor(folder).color % 8) + 1, initials: classInitials(code, title || folder.name) || 'CL' };
   }).sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
 }
 
@@ -276,12 +278,17 @@ export default function Sidebar() {
     }
   }
   const sideTips = [
+    { key: 'home', title: 'Home' },
     { key: 'toggle', title: collapsed ? 'Expand sidebar' : 'Collapse sidebar' },
     { key: 'bell', title: 'Notifications' },
     { key: 'new', title: 'New chat' },
     { key: 'search', title: `Search (${shortcut})` },
     { key: 'add', title: 'Add a class' },
-    ...shownClasses.map(item => ({ key: 'class:' + item.id, title: readiness[item.id] ? `${item.code}, ${readiness[item.id].percent}% ready` : item.code })),
+    // A class: its name, then its code and readiness on the line under it.
+    ...shownClasses.map(item => ({
+      key: 'class:' + item.id, title: item.name,
+      line: [item.code !== item.name && item.code, readiness[item.id] && `${readiness[item.id].percent}% ready`].filter(Boolean).join(' · '),
+    })),
     { key: 'chats', title: 'Recent chats' },
     { key: 'account', title: displayName || 'Account' },
   ];
@@ -291,7 +298,7 @@ export default function Sidebar() {
       <a className="workspace-skip-link" href="#classroom-main">Skip to content</a>
       <aside className={'c-side' + (collapsed ? ' is-collapsed' : '')} aria-label="Sidebar">
         <div className="c-side-head">
-          <Link className="c-side-brand" href={HOME_ROUTE} aria-label="Cordia Classroom, home">
+          <Link className="c-side-brand" href={HOME_ROUTE} aria-label="Cordia Classroom, home" {...tipFor('home')}>
             <AcademicInfinityMark className="top-navigation-mark" title="" />
             <span className="c-side-label"><BrandName /></span>
           </Link>
@@ -329,7 +336,9 @@ export default function Sidebar() {
                       <Link className="c-side-item c-side-class" href={`/folder/${item.id}`} aria-current={current === 'class:' + item.id ? 'page' : undefined}
                         aria-label={[item.code === item.name ? item.name : `${item.code}, ${item.name}`, ready && `${ready.percent}% ready for the next exam`].filter(Boolean).join(', ')}
                         {...tipFor('class:' + item.id)}>
-                        <span className="c-side-dot" style={{ '--dot': `var(--cover-ink-${item.tone})` }} aria-hidden="true" />
+                        <span className="c-side-dot" style={{ '--dot': `var(--cover-ink-${item.tone})`, '--dot-wash': `var(--cover-${item.tone})` }} aria-hidden="true">
+                          <span className="c-side-initials">{item.initials}</span>
+                        </span>
                         <span className="c-side-label">{item.code}</span>
                         {ready && (
                           <span className="c-side-ready" aria-hidden="true">

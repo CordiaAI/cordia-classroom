@@ -6,11 +6,13 @@ import { dueCount } from './studyQueue';
 import { counts, dayKey, restoreLevels, testPlan } from './learnEngine.mjs';
 import { learnQuestions, nearestExam } from './examCountdown.mjs';
 import { deadlineCourse, deadlineTitle } from './formatters';
+import { soonestExam } from './homeContext.mjs';
 
 // Everything the chat home shows (DESIGN-SPEC 4.1), loaded together so the page appears once:
 // the soonest exam with a review set and Learn's pace for it (the Dashboard's exam countdown,
 // lib/examCountdown.mjs, and Learn's own math, lib/learnEngine.mjs), due flashcards (Study now's
-// count, lib/studyQueue.mjs) and the next Canvas deadline (the Dashboard's Course work and feed).
+// count, lib/studyQueue.mjs), the next Canvas deadline (the Dashboard's Course work and feed) and the
+// nearest exam of any kind for the context line (lib/homeContext.mjs), from the same items.
 const CALENDAR_WAIT_MS = 2500;
 const safe = promise => promise.catch(() => null);
 
@@ -34,6 +36,7 @@ export async function loadHome(today = dayKey()) {
   const exam = nearestExam(guides, exams, today);
   let plan = null;
   let className = '';
+  let examFolder = '';
   if (exam) {
     const full = await safe(apiFetch('/guides/' + encodeURIComponent(exam.guideId)));
     if (full?.guide) {
@@ -44,7 +47,11 @@ export async function loadHome(today = dayKey()) {
     const folderId = guides.find(guide => guide.id === exam.guideId)?.folder_id;
     const folder = folderId && folders.find(item => String(item.id) === String(folderId));
     if (folder) className = classLabel(folder.name).title || classLabel(folder.name).code || folder.name;
+    if (folder) examFolder = folder.name;
   }
+  // The context line's exam: the nearest one, with or without a review set (a feed item's class is in its title).
+  const nextExam = soonestExam(exams.map(item => ({ ...item, title: deadlineTitle(item), course: deadlineCourse(item) })),
+    exam ? { title: exam.title, date: exam.date, course: examFolder } : null, today);
 
   const due = guides.reduce((sum, guide) => sum + (Number(guide.flashcard_count) > 0 ? dueCount(guide) : 0), 0);
   const now = Date.now();
@@ -56,6 +63,7 @@ export async function loadHome(today = dayKey()) {
     exam,
     plan,
     className,
+    nextExam,
     due,
     // The class travels with it (a feed item's is only in its title's section code) for the Plan suggestion.
     deadline: deadline ? { ...deadline, title: deadlineTitle(deadline), course: deadlineCourse(deadline) } : null,

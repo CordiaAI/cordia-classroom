@@ -858,6 +858,8 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
     .c-side-class { font-size: 0.875rem; }
     /* The class's colour dot takes an icon's 20px slot. */
     .c-side-dot { flex: none; width: 10px; height: 10px; margin: 0 5px; border-radius: 50%; background: var(--dot, var(--olive)); box-shadow: inset 0 0 0 1px var(--hairline); }
+    /* Its two letters show only when the sidebar is folded (below). */
+    .c-side-initials { display: none; }
     /* Readiness (DESIGN-SPEC 3.3): the % in tabular 13px muted, then a 16px ring. */
     .c-side-ready { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--muted); font: 500 0.8125rem/1 var(--font-sans); font-variant-numeric: tabular-nums; }
     .c-side-ready .c-ring svg { display: block; }
@@ -950,8 +952,10 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
     .app-shell:not(.is-focus) .guide-jobs { right: calc(var(--rail-w) + var(--side-gap) * 2 + 8px); }
   }
 
-  /* Folded: 72px of icons, centred. Each keeps its name as a tooltip and an accessible name; class
-     dots stay, Recent chats becomes one icon with a menu, the + stays for adding a class. */
+  /* Folded: 72px of icons, centred. Each keeps its name as a tooltip and an accessible name; a class's
+     dot grows to 32px and carries its two letters in the class's ink on its cover wash (the Library
+     cover pair, 4.5:1 or better in both themes); Recent chats becomes one icon with a menu, the +
+     stays for adding a class. */
   @media (min-width: 768px) {
     &[data-side='collapsed'] .c-side :is(.c-side-label, .c-side-kbd, .c-side-heading, .c-side-all, .c-side-dots, .c-side-ready, .c-side-chats, .c-side-empty) { display: none; }
     &[data-side='collapsed'] .c-side .c-side-head { flex-direction: column; padding: 0; gap: 6px; }
@@ -960,6 +964,8 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
     &[data-side='collapsed'] .c-side .c-side-heading-row { justify-content: center; padding: 0; }
     &[data-side='collapsed'] .c-side .c-side-chats-icon { display: flex; flex: none; height: 40px; }
     &[data-side='collapsed'] .c-side .c-side-account { height: 48px; }
+    &[data-side='collapsed'] .c-side .c-side-dot { width: 32px; height: 32px; margin: 0; display: grid; place-items: center; background: var(--dot-wash, var(--selected-glass)); color: var(--dot, var(--olive-ink)); }
+    &[data-side='collapsed'] .c-side .c-side-initials { display: block; font: 700 0.8125rem/1 var(--font-sans); letter-spacing: 0.02em; }
   }
   @media (min-width: 768px) and (max-width: 1099px) {
     .c-side :is(.c-side-label, .c-side-kbd, .c-side-heading, .c-side-all, .c-side-dots, .c-side-ready, .c-side-chats, .c-side-empty, .c-side-toggle) { display: none; }
@@ -969,6 +975,8 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
     .c-side .c-side-heading-row { justify-content: center; padding: 0; }
     .c-side .c-side-chats-icon { display: flex; flex: none; height: 40px; }
     .c-side .c-side-account { height: 48px; }
+    .c-side .c-side-dot { width: 32px; height: 32px; margin: 0; display: grid; place-items: center; background: var(--dot-wash, var(--selected-glass)); color: var(--dot, var(--olive-ink)); }
+    .c-side .c-side-initials { display: block; font: 700 0.8125rem/1 var(--font-sans); letter-spacing: 0.02em; }
   }
 }
 
@@ -1139,7 +1147,9 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 @media (prefers-reduced-motion: reduce) { :root[data-shell='new'] .app-shell:has(.chat-home, .chat-home-gate) .c-chat-toast, .c-chat-toast[data-leaving] { animation: none; } }
 .chat-home-missing .chat-home-line { color: var(--ink); }
 
-/* The composer: strong glass, 28px corners; focus rings the whole composer, not the box. */
+/* The composer: strong glass, 28px corners; focus rings the whole composer, not the box: a 2px ring of the
+   focus colour softened to --composer-focus-alpha (3:1 on its glass in every theme) with a 4px accent-tint
+   halo outside it (VISUAL-POLISH V1.2). From the keyboard, so it shows on the next frame, no transition. */
 .composer {
   position: relative; isolation: isolate; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px;
   padding: 12px 12px 10px; border-radius: var(--r-panel); background: var(--glass-sheen), var(--glass-fill-strong);
@@ -1147,7 +1157,7 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 }
 .composer::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background: var(--glass-grain) repeat; background-size: 180px 180px; opacity: var(--glass-grain-opacity); }
 .composer::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; background: var(--glass-rim); -webkit-mask: var(--glass-rim-mask-webkit); -webkit-mask-composite: xor; mask: var(--glass-rim-mask); }
-.composer:has(.composer-box:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.composer:has(.composer-box:focus-visible) { outline: 2px solid var(--composer-focus-ring); outline-offset: 0; box-shadow: var(--shadow-composer), 0 0 0 6px var(--composer-focus-halo); }
 .composer.is-drop { outline: 2px dashed var(--focus-ring); outline-offset: 2px; }
 .composer .composer-box {
   display: block; box-sizing: border-box; width: 100%; margin: 0; padding: 10px 8px 4px; resize: none; overflow-y: hidden;
@@ -1215,6 +1225,12 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 .c-class-picker.is-sm, .composer-file-remove { position: relative; }
 .c-class-picker.is-sm::after, .composer-file-remove::after { content: ''; position: absolute; top: 50%; left: 50%; width: max(100%, 40px); height: max(100%, 40px); translate: -50% -50%; }
 
+/* Wide screens (VISUAL-POLISH V1.3): from 1600px the empty home grows into the space, the headline to 48px
+   and its column (headline, composer, suggestions) to 860px. A chat keeps its 760px column. */
+@media (min-width: 1600px) {
+  .chat-home:not(.is-chat) :is(.chat-home-hero, .chat-home-composer, .chat-home-pills) { max-width: 860px; }
+  .chat-home:not(.is-chat) .chat-home-hero h1.chat-home-headline { font-size: 3rem !important; }
+}
 @media (max-width: 767px) {
   .chat-home-stage { padding: 0 0 24px; }
   .chat-home-hero h1.chat-home-headline { font-size: 1.875rem !important; }

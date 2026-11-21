@@ -7,6 +7,7 @@ import { useRequireAuth } from '../lib/auth';
 import { useCachedPage } from '../lib/pageCache';
 import { loadHome } from '../lib/homeData';
 import { homeHeadline, homeSuggestions } from '../lib/homeText.mjs';
+import { contextLine } from '../lib/homeContext.mjs';
 import { useTutorChat } from '../lib/useTutorChat';
 import { refreshShell, shellActive, shellFlag, useNewShell } from '../lib/useNewShell';
 import { invalidateFolders, latestFolders, loadFolders, onFoldersChanged } from '../lib/folders';
@@ -454,7 +455,8 @@ function ChatScreen({ routeId, goTo, progress }) {
     due: data?.due || 0,
     deadline: data?.deadline || null,
   });
-  const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  // Top right: the day, and the nearest exam when one is within a week (VISUAL-POLISH V1.4).
+  const today = contextLine(data?.nextExam);
   const shown = { ...tutor, messages, localError: notice ? '' : tutor.localError };
   const pageReady = routeId ? phase !== 'loading' : loaded;
 
