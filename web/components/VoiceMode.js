@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Mic, MicOff, X } from 'lucide-react';
 import TutorThinking from './TutorThinking';
@@ -16,7 +16,7 @@ const STATE = {
   listening: 'Listening',
   thinking: 'Thinking',
   speaking: 'Speaking',
-  blocked: 'Microphone off',
+  blocked: '', // the problem card says what is wrong
 };
 const CUE = { stopped: 'Stopped. Go ahead.', missed: "Didn't catch that. Go ahead." };
 const HINT = {
@@ -31,8 +31,17 @@ const PROBLEM = {
   failed: { title: "The microphone didn't start", text: 'Check that a microphone is connected.', steps: ['Then press Try again.'] },
 };
 
+const LEAVE_MS = 180; // the view fades out over the chat (DESIGN-SPEC 6.1: exits a quarter shorter than enters)
+
 export default function VoiceMode({ tutor, onClose }) {
-  const voice = useVoiceMode({ tutor, onClose });
+  // End turns the microphone and voice off at once (useVoiceMode end()); the view then fades out and the chat is back.
+  const [leaving, setLeaving] = useState(false);
+  const leave = () => {
+    setLeaving(true);
+    const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    setTimeout(onClose, still ? 0 : LEAVE_MS);
+  };
+  const voice = useVoiceMode({ tutor, onClose: leave });
   const { phase, heard, said, cue, note, error, problem, micOn, meterRef, start, interrupt, end } = voice;
   const rootRef = useRef(null);
 
@@ -71,14 +80,13 @@ export default function VoiceMode({ tutor, onClose }) {
 
   const help = PROBLEM[problem] || PROBLEM.failed;
   const steps = help.steps || micHelp(typeof navigator !== 'undefined' ? navigator.userAgent : '');
-  const youLine = heard || (phase === 'listening' ? CUE[cue] || '' : '');
   const stateLine = phase === 'listening' && CUE[cue] ? CUE[cue] : STATE[phase];
 
   const view = (
-    <div ref={node => { rootRef.current = node; meterRef.current = node; }} className={`voice-view is-${phase}`} role="dialog" aria-modal="true" aria-labelledby="voice-title" aria-describedby="voice-privacy"
+    <div ref={node => { rootRef.current = node; meterRef.current = node; }} className={`voice-view is-${phase}${leaving ? ' is-leaving' : ''}`} role="dialog" aria-modal="true" aria-labelledby="voice-title" aria-describedby="voice-privacy"
       tabIndex={-1} onKeyDown={onKeyDown} onClick={onClick}>
       <header className="voice-top">
-        <h2 id="voice-title" className="voice-title">Voice with the Tutor</h2>
+        <h2 id="voice-title" className="voice-title">Voice mode</h2>
         {micOn
           ? <span className="voice-mic"><Mic size={18} strokeWidth={1.75} aria-hidden="true" /><span>Microphone on</span><span className="voice-meter" aria-hidden="true" /></span>
           : <span className="voice-mic is-off"><MicOff size={18} strokeWidth={1.75} aria-hidden="true" /><span>Microphone off</span></span>}
@@ -89,7 +97,7 @@ export default function VoiceMode({ tutor, onClose }) {
           <span className="voice-ring" />
           <img className="voice-mark" src="/academic-butterfly-open-book.png" alt="" />
         </div>
-        <p className="voice-state" aria-live="polite">{stateLine}</p>
+        <p className="voice-state" aria-live="polite">{stateLine || ''}</p>
 
         {phase === 'blocked' ? (
           <div className="voice-problem" role="alert">
@@ -100,15 +108,16 @@ export default function VoiceMode({ tutor, onClose }) {
           </div>
         ) : (
           <div className="voice-captions">
+            {/* Each side is labelled only once it has something to show; the space stays reserved, so nothing moves. */}
+            <p className="voice-caption is-you">
+              {heard && <span className="voice-who">You</span>}
+              {heard && <span className="voice-heard">{heard}</span>}
+            </p>
             <p className="voice-caption is-tutor">
-              <span className="voice-who">Tutor</span>
+              {(phase === 'thinking' || said) && <span className="voice-who">Tutor</span>}
               {phase === 'thinking'
                 ? <span className="voice-thinking"><TutorThinking steps={tutor.thinking?.steps} lines={tutor.thinking?.lines} mark={false} /></span>
-                : <span className="voice-said">{said}</span>}
-            </p>
-            <p className="voice-caption is-you">
-              <span className="voice-who">You</span>
-              <span className="voice-heard">{youLine}</span>
+                : said && <span key={said} className="voice-said">{said}</span>}
             </p>
           </div>
         )}
@@ -151,7 +160,8 @@ export default function VoiceMode({ tutor, onClose }) {
         .voice-meter { position: relative; width: 22px; height: 6px; border-radius: var(--r-pill); background: var(--olive-tint); overflow: hidden; }
         .voice-meter::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--olive); transform-origin: left center; transform: scaleX(calc(0.15 + var(--voice-level, 0) * 0.85)); transition: transform 80ms linear; }
 
-        .voice-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; width: 100%; max-width: 640px; padding: 24px 0; text-align: center; }
+        /* Anchored from the top, not centred: a longer caption grows downward and the mark never moves between states. */
+        .voice-stage { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 20px; width: 100%; max-width: 640px; padding: clamp(24px, 12vh, 132px) 0 24px; text-align: center; }
         .voice-orb { position: relative; display: grid; place-items: center; width: 160px; height: 160px; }
         .voice-ring {
           position: absolute; inset: 16px; border-radius: 50%;
@@ -167,10 +177,11 @@ export default function VoiceMode({ tutor, onClose }) {
         .voice-state { margin: 0; min-height: 1.3em; color: var(--muted-strong); font: 600 var(--fs-15)/1.3 var(--font-sans); font-variant-numeric: tabular-nums; }
 
         .voice-captions { display: grid; gap: 16px; width: 100%; }
-        .voice-caption { display: grid; gap: 6px; margin: 0; min-height: 3.2em; }
+        .voice-caption { display: grid; gap: 6px; margin: 0; }
+        .voice-caption.is-you { min-height: calc(13px + 6px + 1.5em * 2); }
         .voice-who { color: var(--muted); font: 600 var(--fs-13)/1 var(--font-sans); }
-        .voice-said { color: var(--ink); font: 500 1.375rem/1.45 var(--font-reply, var(--font-sans)); overflow-wrap: anywhere; }
-        .voice-heard { color: var(--muted-strong); font: 500 var(--fs-17)/1.5 var(--font-sans); overflow-wrap: anywhere; }
+        .voice-said { color: var(--ink); font: 500 1.375rem/1.45 var(--font-reply, var(--font-sans)); overflow-wrap: anywhere; text-wrap: balance; animation: voice-said-in 150ms var(--ease) both; }
+        .voice-heard { color: var(--muted-strong); font: 500 var(--fs-17)/1.5 var(--font-sans); overflow-wrap: anywhere; text-wrap: pretty; }
         .voice-thinking { display: flex; justify-content: center; gap: 8px; min-width: 0; font: 500 1.375rem/1.45 var(--font-reply, var(--font-sans)); }
 
         .voice-problem { display: grid; justify-items: center; gap: 10px; max-width: 460px; padding: 20px 24px; border-radius: var(--r-card); background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
@@ -197,10 +208,14 @@ export default function VoiceMode({ tutor, onClose }) {
           .voice-mark { width: 60px; }
           .voice-said, .voice-thinking { font-size: var(--fs-20); }
         }
+        .voice-view.is-leaving { animation: voice-out ${LEAVE_MS}ms var(--ease-exit) both; pointer-events: none; }
         @keyframes voice-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes voice-out { from { opacity: 1; } to { opacity: 0; } }
+        /* Each new sentence fades in, so the eye sees the caption move on (live captions change every few seconds). */
+        @keyframes voice-said-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes voice-breathe { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
         @media (prefers-reduced-motion: reduce) {
-          .voice-view { animation: none; }
+          .voice-view, .voice-view.is-leaving, .voice-said { animation: none; }
           .voice-view .voice-mark { animation: none !important; opacity: 1; }
           .voice-ring, .voice-meter::after { transition: none; }
         }
