@@ -169,9 +169,9 @@ export default function VoiceMode({ tutor, onClose }) {
         .voice-captions { display: grid; gap: 16px; width: 100%; }
         .voice-caption { display: grid; gap: 6px; margin: 0; min-height: 3.2em; }
         .voice-who { color: var(--muted); font: 600 var(--fs-13)/1 var(--font-sans); }
-        .voice-said { color: var(--ink); font: 500 calc(22px * var(--text-scale, 1))/1.45 var(--font-reply, var(--font-sans)); overflow-wrap: anywhere; }
+        .voice-said { color: var(--ink); font: 500 1.375rem/1.45 var(--font-reply, var(--font-sans)); overflow-wrap: anywhere; }
         .voice-heard { color: var(--muted-strong); font: 500 var(--fs-17)/1.5 var(--font-sans); overflow-wrap: anywhere; }
-        .voice-thinking { display: flex; justify-content: center; gap: 8px; min-width: 0; font: 500 calc(22px * var(--text-scale, 1))/1.45 var(--font-reply, var(--font-sans)); }
+        .voice-thinking { display: flex; justify-content: center; gap: 8px; min-width: 0; font: 500 1.375rem/1.45 var(--font-reply, var(--font-sans)); }
 
         .voice-problem { display: grid; justify-items: center; gap: 10px; max-width: 460px; padding: 20px 24px; border-radius: var(--r-card); background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
         .voice-problem-title { margin: 0; font: 600 var(--fs-20)/1.3 var(--font-sans); color: var(--ink); }

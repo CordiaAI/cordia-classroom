@@ -97,7 +97,8 @@ assert.match(tutor, /appliedPreferred\.current = ''; \}, \[router\.asPath, prefe
 // Send shows only when there is text.
 assert.match(tutor, /\{input\.trim\(\) && \(\n\s*<button type="button" className="cordia-tutor-send"/);
 // Web Tutor: readable answers, the student's message stays visible, and a live loader bubble.
-assert.match(tutor, /rich_text: true/);
+// (Voice mode's spoken turns, F11, ask for a reply written to be heard instead: rich_text is off for them.)
+assert.match(tutor, /rich_text: !voice/);
 assert.match(tutor, /parseTutorAnswer\(text\)/);
 assert.match(tutor, /next\?\.id && !sendingRef\.current/);
 assert.match(tutor, /tutor-thinking/);
