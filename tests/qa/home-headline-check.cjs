@@ -208,6 +208,51 @@ async function contrast(page) {
     await context.close();
   });
 
+  await check('frame by frame: the two copies cross over linearly in 150ms, adding up to full strength, and the column does not move', async () => {
+    const { page, context } = await open(browser);
+    await page.locator('.chat-home-top .c-class-picker').click();
+    await page.evaluate(() => {
+      window.__frames = [];
+      const top = () => document.querySelector('.chat-home-composer').getBoundingClientRect().top;
+      const start = performance.now();
+      const tick = now => {
+        const copies = [...document.querySelectorAll('.chat-home-copy')].map(node => Number(getComputedStyle(node).opacity));
+        window.__frames.push({ t: Math.round(now - start), copies, top: top() });
+        if (now - start < 400) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await page.getByRole('menuitem', { name: /BIO 101/ }).click();
+    await page.waitForTimeout(500);
+    const frames = await page.evaluate(() => window.__frames);
+    const both = frames.filter(frame => frame.copies.length === 2);
+    expect(both.length >= 4, 'frames with both copies: ' + both.length);
+    const sums = both.map(frame => frame.copies[0] + frame.copies[1]);
+    expect(sums.every(sum => sum > 0.85 && sum < 1.15), 'opacities do not add up to one: ' + both.map(f => f.copies.map(c => c.toFixed(2)).join('+')).join(' '));
+    const span = both[both.length - 1].t - both[0].t;
+    expect(span >= 100 && span <= 220, 'the fade lasted ' + span + 'ms');
+    expect(new Set(frames.map(frame => Math.round(frame.top))).size === 1, 'the composer moved: ' + [...new Set(frames.map(frame => Math.round(frame.top)))].join(', '));
+    expect(frames[frames.length - 1].copies.length === 1 && frames[frames.length - 1].copies[0] === 1, 'settles on one copy at full strength');
+    console.log(`     ${both.length} frames in ${span}ms: ${both.map(f => f.copies.map(c => c.toFixed(2)).join('/')).join(' ')}`);
+    await context.close();
+  });
+
+  await check('a class chosen with the keyboard changes the words on the next frame, with no fade', async () => {
+    const { page, context } = await open(browser);
+    await page.locator('.chat-home-top .c-class-picker').focus();
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('[role=menuitem]');
+    const items = await page.$$eval('[role=menuitem]', nodes => nodes.map(node => node.textContent.trim()));
+    const index = items.findIndex(label => label.startsWith('ENG 220'));
+    for (let step = 0; step < Math.max(1, index - (await page.evaluate(() => [...document.querySelectorAll('[role=menuitem]')].findIndex(node => node === document.activeElement)))); step += 1) await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(40);
+    const words = await hero(page);
+    expect(words.copies === 1, 'copies ' + words.copies + ' ' + JSON.stringify(words) + ' items ' + items);
+    expect(expected.weak(words) || expected.exam(words) || expected.deadline(words) || expected.class(words), JSON.stringify(words));
+    await context.close();
+  });
+
   await check('reduced motion: the words change at once, with no second copy and no animation', async () => {
     const { page, context } = await open(browser, { reduced: true });
     await page.locator('.chat-home-top .c-class-picker').click();

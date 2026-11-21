@@ -268,6 +268,7 @@ test('the home takes the headline from the picker, with no extra load, and fades
   assert.doesNotMatch(home, /apiFetch|loadHome\([^)]*classId/);
   assert.match(hero, /HERO_FADE_MS = 150/);
   assert.match(hero, /prefers-reduced-motion: reduce/);
+  assert.match(hero, /lastInput\.keyboard \|\|/, 'a change made from the keyboard is instant');
   assert.match(hero, /aria-hidden="true"/, 'the fading copy is hidden from assistive tech');
   assert.match(css, /\.chat-home-copy\.is-entering \{[^}]*150ms/);
   assert.match(css, /\.chat-home-copy\.is-leaving \{[^}]*150ms/);

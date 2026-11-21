@@ -2,17 +2,27 @@ import { useEffect, useState } from 'react';
 
 // The chat home's headline and the line under it (DESIGN-SPEC 4.1). When the words change (a
 // different class picked, or the day's data arriving) the old ones fade out as the new ones fade in,
-// 150ms, laid over each other so the column keeps its place. Reduced motion: the words just change.
+// 150ms, laid over each other so the column keeps its place. Reduced motion, and a change made from
+// the keyboard (DESIGN-SPEC 6.1): the words just change, on the next frame.
 // Only the new words are a heading and are read out; the fading copy is hidden from assistive tech.
 export const HERO_FADE_MS = 150;
 
-const quiet = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Was the last thing the student did a key press (choosing the class with Enter) rather than a pointer?
+const lastInput = { keyboard: false };
+const quiet = () => typeof window !== 'undefined' && (lastInput.keyboard || window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
 export default function HomeHero({ title, line = '' }) {
   const key = `${title}\n${line}`;
   const [seen, setSeen] = useState({ key, title, line, previous: null });
   if (seen.key !== key) setSeen({ key, title, line, previous: quiet() ? null : { key: seen.key, title: seen.title, line: seen.line } });
   const { previous } = seen;
+  useEffect(() => {
+    const onKey = () => { lastInput.keyboard = true; };
+    const onPointer = () => { lastInput.keyboard = false; };
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('pointerdown', onPointer, true);
+    return () => { window.removeEventListener('keydown', onKey, true); window.removeEventListener('pointerdown', onPointer, true); };
+  }, []);
   useEffect(() => {
     if (!previous) return undefined;
     const timer = setTimeout(() => setSeen(current => (current.previous?.key === previous.key ? { ...current, previous: null } : current)), HERO_FADE_MS);

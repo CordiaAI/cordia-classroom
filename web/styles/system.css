@@ -1071,8 +1071,8 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 .chat-home-hero, .chat-home-composer, .chat-home-pills { box-sizing: border-box; width: 100%; max-width: 760px; margin-inline: auto; }
 .chat-home-hero { display: grid; gap: 8px; padding: 0 8px; }
 .chat-home-hero { --hero-size: 2.5rem; }
-.chat-home-hero h1.chat-home-headline { margin: 0; color: var(--ink); font-size: var(--hero-size) !important; line-height: 1.12 !important; }
-.chat-home-line { margin: 0; color: var(--muted); font: 500 1.0625rem/1.5 var(--font-sans); font-variant-numeric: tabular-nums; }
+.chat-home-hero h1.chat-home-headline { margin: 0; color: var(--ink); font-size: var(--hero-size) !important; line-height: 1.12 !important; text-wrap: balance; }
+.chat-home-line { margin: 0; color: var(--muted); font: 500 1.0625rem/1.5 var(--font-sans); font-variant-numeric: tabular-nums; text-wrap: pretty; }
 /* The headline follows the class picker (H1), and the column keeps its place whichever class is picked:
    the box is as tall as the longest headline and line we write at this width and text size (two lines
    of headline and one under it on a wide screen, three and two on a phone; one more headline line at
