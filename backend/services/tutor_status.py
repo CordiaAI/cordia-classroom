@@ -121,7 +121,16 @@ _ACTION_REPORTS = re.compile(
     r"consulted|verified|skimmed|scoured|researched|found in)\b|^going through\b",
     re.IGNORECASE,
 )
-_FIRST_PERSON = re.compile(r"\b(?:i|i'm|i’m|i'll|i’ll|i've|i’ve|me|my|mine|myself|we|we're|we’re|us|our|ours)\b", re.IGNORECASE)
+# First person, matched on exact case: "I" and its contractions are capital letters, and the rest are lowercase
+# words, so "US", "ME" (Maine) or "WE" in a name never count. A capital "I" right after a capitalised word that is
+# not the first one is a numeral or label ("World War I", "Phase I", "Act I"), not the Tutor speaking.
+_FIRST_PERSON_WORDS = {
+    "I'm", "I\u2019m", "I'll", "I\u2019ll", "I've", "I\u2019ve", "I'd", "I\u2019d",
+    "me", "my", "mine", "myself", "we", "we're", "we\u2019re", "us", "our", "ours",
+}
+_WORD = re.compile(r"[\w'\u2019]+")
+# Small words a Title Case line capitalises ("The Rise Of The Roman Empire"); a sentence-case line does not.
+_SMALL_WORDS = {"the", "of", "and", "in", "to", "a", "an", "for", "on", "at", "by", "with", "or", "from"}
 # The message is about Cordia itself, so a first-person line is allowed.
 _ABOUT_CORDIA = re.compile(
     r"\bcordia\b|\bwho (?:are|made|built|created) you\b|\bwhat are you\b|\bwhat (?:can|do|could) you (?:do|help)\b|"
@@ -149,14 +158,32 @@ def _has_forbidden_character(line: str) -> bool:
     return False
 
 
+def _is_label(words: list[str], at: int) -> bool:
+    """A capital letter standing for a numeral or label after a capitalised word ("War I", "Vitamin A"): the
+    word before it is capitalised and is not the line's first word."""
+    return at >= 2 and words[at - 1][:1].isupper()
+
+
 def _sentence_case(words: list[str]) -> bool:
-    """Capital first letter, and no Title Case: after the first word, a capitalised word must be a proper
-    noun or acronym, so at most half of the rest may start with a capital."""
+    """Capital first letter, and not Title Case. A Title Case line capitalises its small words (the, of, and,
+    in, to, a), which a sentence-case line never does, whatever proper nouns, acronyms or numerals it has."""
     if not words or not words[0][0].isupper():
         return False
-    rest = [word for word in words[1:] if word[0].isalpha()]
-    capitals = [word for word in rest if word[0].isupper()]
-    return len(capitals) <= len(rest) // 2
+    for at, word in enumerate(words[1:], start=1):
+        if word.lower() in _SMALL_WORDS and word[0].isupper() and not (word == "A" and _is_label(words, at)):
+            return False
+    return True
+
+
+def _first_person(words: list[str]) -> bool:
+    for at, raw in enumerate(words):
+        for token in _WORD.findall(raw):
+            if token == "I":
+                if not _is_label(words, at):
+                    return True
+            elif token in _FIRST_PERSON_WORDS:
+                return True
+    return False
 
 
 def valid_line(line: object, about_cordia_message: bool = False) -> Optional[str]:
@@ -177,7 +204,7 @@ def valid_line(line: object, about_cordia_message: bool = False) -> Optional[str
         return None
     if first in _ACTION_VERBS or _ACTION_REPORTS.search(text):
         return None
-    if not about_cordia_message and _FIRST_PERSON.search(text):
+    if not about_cordia_message and _first_person(words):
         return None
     return text
 

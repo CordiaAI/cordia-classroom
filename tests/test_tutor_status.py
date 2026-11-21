@@ -42,6 +42,43 @@ class LineRulesTests(unittest.TestCase):
             with self.subTest(field=field):
                 self.assertEqual(tutor_status.clean_lines({"lines": lines}, question), lines)
 
+    def test_numerals_acronyms_and_proper_nouns_are_not_first_person_or_title_case(self):
+        # Review fix: "I" and "US" matched with IGNORECASE and a capital count threw these out.
+        kept = [
+            "Tracing the causes of World War I",          # history
+            "Comparing US and UK contract law",           # law
+            "Weighing Phase I trial results",             # nursing
+            "Placing Caravaggio in the Roman Baroque",    # art history
+            "Tracing Act I of Hamlet",                    # literature
+            "Placing Beowulf in Old English poetry",      # literature
+            "Comparing Python and C++ memory models",     # computer science
+            "Explaining Big O notation for sorting",      # computer science
+            "Contrasting TCP and UDP handshakes",         # computer science
+            "Weighing Vitamin A and iron intake",         # nursing
+            "Sorting Henry I from Henry II",              # history
+        ]
+        for line in kept:
+            with self.subTest(line=line):
+                self.assertEqual(tutor_status.valid_line(line), line)
+        self.assertEqual(tutor_status.clean_lines({"lines": kept[:3]}, "q"), kept[:3])
+
+    def test_first_person_and_title_case_are_still_caught_by_exact_case(self):
+        dropped = [
+            "Working out what I know about cells",
+            "Thinking I can solve this",                  # "I" after the first word is still the Tutor
+            "Thinking about what I'm able to do",
+            "Weighing what drives us forward",
+            "Walking through our Krebs cycle",
+            "Planning my route through Hamlet",
+            "Tracing The Rise Of The Roman Empire",       # Title Case: capitalised small words
+            "Planning A Trip Through Gaul",
+            "Comparing Torts And Crimes",
+            "Mapping Cells In The Body",
+        ]
+        for line in dropped:
+            with self.subTest(line=line):
+                self.assertIsNone(tutor_status.valid_line(line), line)
+
     def test_at_most_four_lines_and_no_repeats(self):
         lines = ["Tracing the Krebs cycle", "Tracing the krebs cycle", "Comparing glycolysis and fermentation", "Linking ATP to work",
                  "Mapping electron carriers", "Naming each enzyme"]
