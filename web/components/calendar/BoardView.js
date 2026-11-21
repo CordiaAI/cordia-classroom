@@ -226,7 +226,7 @@ export default function BoardView({ deadlines, blocks, needs, readiness, readine
         .bd-cards :global(.bd-exam-title) { font: 600 1.0625rem/1.3 var(--font-sans); overflow-wrap: break-word; }
         .bd-cards :global(.bd-exam-ready) { display: flex; align-items: center; gap: 0.5rem; min-height: 2.25rem; font: 600 0.875rem/1.2 var(--font-sans); font-variant-numeric: tabular-nums; }
         .bd-cards :global(.bd-exam-ready--none) { font-weight: 500; }
-        .bd-cards :global(.bd-exam-ready-text) { display: grid; min-width: 0; }
+        .bd-cards :global(.bd-exam-ready-text) { display: grid; align-items: center; min-width: 0; } /* the words centre on the ring, whatever room is kept */
         .bd-cards :global(.bd-exam-ready-text > span) { grid-area: 1 / 1; }
         .bd-cards :global(.bd-exam-ready-room) { visibility: hidden; font-weight: 600; }
         .bd-cards :global(.bd-exam .c-ring-track) { stroke: var(--on-olive); opacity: 0.3; }

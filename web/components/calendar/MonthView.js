@@ -149,7 +149,9 @@ export default function MonthView({ deadlines, blocks, readiness, now, anchor, o
               );
             })}
           </div>
-          {!inLine.length && <p className="mo-free">{study.length ? 'No study time from 8 AM to 10 PM.' : 'No study time planned.'}</p>}
+          {/* With study time only before 8 AM or after 10 PM, the "N earlier/later" row says so; the
+              empty timeline needs no line repeating the hours it already shows. */}
+          {!study.length && <p className="mo-free">No study time planned.</p>}
         </div>
         {edge('later').length > 0 && <div className="mo-edge"><EdgeMenu side="later" blocks={edge('later')} day={picked} onOpen={onOpen} /></div>}
       </aside>
