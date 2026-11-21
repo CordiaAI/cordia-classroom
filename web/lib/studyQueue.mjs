@@ -39,10 +39,20 @@ export function studiedCards(guide) {
     .filter(card => card && !card.hidden && !byKey.get(questionKey(card.front))?.hidden);
 }
 
-// Works on a full guide or a list summary (flashcard_count plus flashcard_progress).
-export function dueCount(guide) {
-  if (!Array.isArray(guide?.flashcards)) return dueIndices(guide?.flashcard_progress, Number(guide?.flashcard_count) || 0).length;
-  return dueCards(guide).length;
+// Works on a full guide or a list summary (flashcard_count, flashcard_hidden: the places of the cards
+// studiedCards leaves out, from the backend's hidden_card_positions, and flashcard_progress).
+export function dueCount(guide, today = dayKey()) {
+  if (Array.isArray(guide?.flashcards)) return dueCards(guide, today).length;
+  const hidden = new Set(Array.isArray(guide?.flashcard_hidden) ? guide.flashcard_hidden : []);
+  return dueIndices(guide?.flashcard_progress, Number(guide?.flashcard_count) || 0, today).filter(index => !hidden.has(index)).length;
+}
+
+// How many of a guide's cards can be studied, on a full guide or a list summary (as dueCount).
+export function studiedCount(guide) {
+  if (Array.isArray(guide?.flashcards)) return studiedCards(guide).length;
+  const count = Number(guide?.flashcard_count) || 0;
+  const hidden = new Set((Array.isArray(guide?.flashcard_hidden) ? guide.flashcard_hidden : []).filter(index => Number.isInteger(index) && index >= 0 && index < count));
+  return count - hidden.size;
 }
 
 // Open practice problems: saved sets with problems not yet answered right.

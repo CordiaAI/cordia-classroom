@@ -4,7 +4,7 @@ import { apiFetch } from './api';
 import { retainMisses } from './userStore';
 import { buildStudyQueue, cardLimit, openProblems } from './studyQueue.mjs';
 
-export { buildStudyQueue, cardLimit, dueCards, dueCount, learnAfterReview, learnIdeas, openProblems, studiedCards } from './studyQueue.mjs';
+export { buildStudyQueue, cardLimit, dueCards, dueCount, learnAfterReview, learnIdeas, openProblems, studiedCards, studiedCount } from './studyQueue.mjs';
 
 // Where a round's guides come from: one guide (its Study now), a folder, a classroom (its guides, or
 // the ones picked; someone else's guide comes with your own progress and a `viewer` to save with),

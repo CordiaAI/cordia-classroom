@@ -46,7 +46,8 @@ export async function loadHome(today = dayKey()) {
     if (folder) className = classLabel(folder.name).title || classLabel(folder.name).code || folder.name;
   }
 
-  const due = guides.reduce((sum, guide) => sum + (Number(guide.flashcard_count) > 0 ? dueCount(guide) : 0), 0);
+  // Cards never studied (the summary's flashcard_hidden) are not due: the count is what Study now studies.
+  const due = guides.reduce((sum, guide) => sum + dueCount(guide, today), 0);
   const now = Date.now();
   const deadline = [...upcoming, ...feed]
     .filter(item => item && item.type !== 'exam' && !item.done && !item.internal && item.id && item.due_at && new Date(item.due_at).getTime() >= now)

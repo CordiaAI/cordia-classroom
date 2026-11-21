@@ -173,6 +173,15 @@ test('list_study_sets: newest first, pages with a cursor, never Canvas columns',
   assert.equal(bad.isError, true);
 });
 
+test('list_study_sets: card_count leaves out a card about the source, as the app counts it', async () => {
+  const set = { ...guides[2], id: U(9), flashcards: [{ front: 'Which artists are listed for Chapter 1?', back: 'Giotto' }, { front: 'ser', back: 'to be' }, { front: 'estar', back: 'to be' }] };
+  const listed = await call('list_study_sets', context({ ...tables, study_guides: [set] }), {});
+  assert.equal(listed.structuredContent.study_sets[0].card_count, 2);
+  assert.equal(listed.structuredContent.study_sets[0].status, 'ready');
+  const down = await call('list_study_sets', context({ ...tables, study_guides: [set] }, { wordingDown: true }), {});
+  assert.equal(down.isError, true, 'never a count that might hold a hidden card');
+});
+
 test('get_study_set: default sections, others on request, the same answer for missing and not yours', async () => {
   const ctx = context(tables);
   const result = await call('get_study_set', ctx, { study_set_id: U(1) });

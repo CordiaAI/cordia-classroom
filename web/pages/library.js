@@ -10,7 +10,7 @@ import {
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import useSessionTracker from '../lib/useSessionTracker';
-import { dueCount } from '../lib/studyQueue';
+import { dueCount, studiedCount } from '../lib/studyQueue';
 import { listLectures } from '../lib/lectures';
 import { useUndoDelete } from '../lib/undoDelete';
 import ProgressRing from '../components/ProgressRing';
@@ -292,8 +292,9 @@ export default function LibraryPage() {
       guides.forEach(guide => rows.push({ kind: 'practice', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/practice/' + guide.id }));
     }
     if (filter === 'flashcards') {
-      // The list summary carries each guide's card count and progress, enough for the due count.
-      guides.filter(guide => Number(guide.flashcard_count) > 0).forEach(guide => rows.push({ kind: 'cards', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/flashcards/study?guideId=' + guide.id, due: dueCount(guide), total: guide.flashcard_count }));
+      // The list summary carries each guide's card count, the cards never studied and progress, enough
+      // for both counts, which leave out the cards never studied (as Study now does).
+      guides.filter(guide => studiedCount(guide) > 0).forEach(guide => rows.push({ kind: 'cards', id: guide.id, title: guide.title || 'Untitled guide', folderId: guide.folder_id, date: guide.created_at, href: '/flashcards/study?guideId=' + guide.id, due: dueCount(guide), total: studiedCount(guide) }));
     }
     if (filter === 'all') {
       // Older notes not yet moved into a guide; opening one moves it (pages/smartnotes.js).

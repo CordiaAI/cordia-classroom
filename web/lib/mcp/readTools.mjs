@@ -4,7 +4,7 @@
 // guides built from a Canvas assignment. The logic is the app's own (lib/studyQueue.mjs,
 // lib/guideText.mjs, lib/spacedReview.mjs, lib/streak.mjs, the backend's Progress functions).
 import * as z from 'zod';
-import { buildStudyQueue } from '../studyQueue.mjs';
+import { buildStudyQueue, studiedCards } from '../studyQueue.mjs';
 import { parseQAPairs, parseStudyNotes } from '../guideText.mjs';
 import { cardDue } from '../spacedReview.mjs';
 import { itemFingerprint } from '../learningEvents.mjs';
@@ -69,7 +69,15 @@ async function listStudySets(ctx, { course_id, query, cursor, limit }) {
   if (error) return unavailable('study sets');
   const courses = await ctx.courses();
   const rows = (data || []).slice(0, limit);
-  const sets = rows.map(row => {
+  // card_count is the cards the app studies: one about the source itself is never counted (studiedCards
+  // over the cards marked as the app marks them), or null when this read couldn't ask how they read.
+  let shown;
+  try {
+    shown = await withShownQuizzes(ctx, rows);
+  } catch {
+    return unavailable('study sets');
+  }
+  const sets = rows.map((row, at) => {
     const cards = Array.isArray(row.flashcards) ? row.flashcards.length : 0;
     return {
       id: row.id,
@@ -77,7 +85,7 @@ async function listStudySets(ctx, { course_id, query, cursor, limit }) {
       course: courses.get(row.folder_id),
       created_at: zonedIso(row.created_at, ctx.timeZone),
       source_type: row.source_type || 'unknown',
-      card_count: cards,
+      card_count: shown[at]?.wording === 'unknown' ? null : studiedCards(shown[at]).length,
       has_quiz: Array.isArray(row.quiz_questions) && row.quiz_questions.length > 0,
       has_practice: Array.isArray(row.practice_state?.problems) && row.practice_state.problems.length > 0,
       // Imported pages carry only notes until they're opened in Cordia, which builds the cards.
@@ -417,7 +425,8 @@ export const READ_TOOLS = [
     },
     output: {
       study_sets: z.array(z.object({
-        id: z.string(), title: z.string(), course, created_at: z.string().nullable(), source_type: z.string(), card_count: z.number().int(),
+        id: z.string(), title: z.string(), course, created_at: z.string().nullable(), source_type: z.string(),
+        card_count: z.number().int().nullable().describe('Flashcards Cordia studies (never one about the source itself); null when it could not check them in this read.'),
         has_quiz: z.boolean(), has_practice: z.boolean(), status: z.enum(['ready', 'notes_only']), url: z.string(),
       })),
       next_cursor: z.string().nullable(),

@@ -984,6 +984,26 @@ def shown_cards(cards):
     return _marked(cards, "front", lambda card: bool(str(card.get("back") or "").strip()))
 
 
+def _question_key(text) -> str:
+    """questionKey() in web/lib/retainMisses.mjs: the key a card is matched to its quiz question by."""
+    return re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).strip()
+
+
+def hidden_card_positions(cards, questions) -> list:
+    """Places in the saved deck of the cards never studied, as studiedCards() in web/lib/studyQueue.mjs
+    leaves them out: a card shown_cards marks hidden, or one whose quiz question (the first with its
+    words) shown_questions marks hidden. A guide list sends these instead of the cards, so every count
+    of cards and of cards due (the home, the Library, Study now) skips the same ones."""
+    if not isinstance(cards, list):
+        return []
+    hidden_questions = {}
+    for question in shown_questions(questions) if isinstance(questions, list) else []:
+        if isinstance(question, dict):
+            hidden_questions.setdefault(_question_key(question.get("question")), bool(question.get("hidden")))
+    return [index for index, card in enumerate(shown_cards(cards))
+            if isinstance(card, dict) and (card.get("hidden") or hidden_questions.get(_question_key(card.get("front"))))]
+
+
 def unmarked(items):
     """Items as they are saved: without the `shown` / `hidden` marks a response adds (a client that
     sends a guide's cards back, adding one, must not save them)."""
