@@ -292,8 +292,32 @@ test('Canvas courses are matched to classes by course code, or by name for a cla
     ['Nursing Pharmacology', 'Nursing'], ['Biology Lab', 'Biology'], ['Introduction to Music Theory II', 'Introduction to Music']]) {
     assert.equal(sameClass(course, name), false, `${course} is not ${name}`);
   }
-  for (const [course, name] of [['Calculus I', 'Calculus I'], ['calculus i', 'Calculus I'], ['Adult Health II', 'SP25 Adult Health II'], ['Business Ethics', 'Business Ethics (Section 02)'], ['Art History', 'Art History: Renaissance to Modern']]) {
+  for (const [course, name] of [['Calculus I', 'Calculus I'], ['calculus i', 'Calculus I'], ['Adult Health II', 'SP25 Adult Health II'], ['Business Ethics', 'Business Ethics (Section 02)']]) {
     assert.equal(sameClass(course, name), true, `${course} is ${name}`);
+  }
+  // Round 2: what comes after a dash, a colon or a bracket is part of the name unless it is a term or
+  // a section. A wrong match puts one class's deadline under another, so when in doubt: no match.
+  const PAIRS = [
+    // Different classes that share a stem.
+    ['Biology - Lab', 'Biology - Lecture', false], ['Biology (Lab)', 'Biology (Lecture)', false], ['Biology [Lab]', 'Biology [Lecture]', false],
+    ['Art History: Renaissance', 'Art History: Modern', false], ['Art History', 'Art History: Renaissance to Modern', false],
+    ['Nursing - Pharmacology', 'Nursing - Fundamentals', false], ['Nursing', 'Nursing - Pharmacology', false], ['Nursing: Pharmacology', 'Nursing', false],
+    ['Business Law - Contracts', 'Business Law - Torts', false], ['English Literature: Victorian', 'English Literature: Modern', false],
+    ['Computer Science - Data Structures', 'Computer Science - Algorithms', false], ['Chemistry (Organic)', 'Chemistry (Inorganic)', false],
+    ['Spanish - 1', 'Spanish - 2', false], ['Anatomy and Physiology I - Lab', 'Anatomy and Physiology I - Lecture', false],
+    ['Psychology - Section 2: Abnormal', 'Psychology - Section 2: Social', false], ['Calculus I', 'Calculus II', false],
+    ['Nursing - Lab 101', 'Nursing', false], ['Biology Lab 101', 'Biology Lab 102', false], ['Biology - 101', 'Biology - 102', false], ['Biology - 2035', 'Biology - 2036', false], ['Biology - Fall 2026 - Lab', 'Biology - Fall 2026 - Lecture', false],
+    // The same class, with a term or a section the other leaves out.
+    ['Calculus II: Section 2', 'Calculus II', true], ['Business Ethics (Section 02)', 'Business Ethics', true], ['Business Ethics', 'Business Ethics (Sec 2)', true],
+    ['SP25 Adult Health II', 'Adult Health II', true], ['Adult Health II - Fall 2026', 'Adult Health II', true], ['Biology 2026FA', 'Biology', true],
+    ['Biology - Lab (Section 3)', 'Biology - Lab', true], ['Art History: Fall 2026, Section 2', 'Art History', true], ['Nursing Pharmacology - 02', 'Nursing Pharmacology', true],
+    ['Calculus II: Section 2 - Fall 2026', 'Calculus II (SP25)', true], ['Biology - Lab - Section 2', 'Biology - Lab', true],
+    ['Art History: Renaissance', 'Art History: Renaissance (Spring 2026)', true], ['Introduction to Music', 'MUL 101 MUL-101-102: Introduction to Music', true],
+  ];
+  assert.ok(PAIRS.length >= 15);
+  for (const [course, name, same] of PAIRS) {
+    assert.equal(sameClass(course, name), same, `${course} / ${name} should be ${same}`);
+    assert.equal(sameClass(name, course), same, `${name} / ${course} should be ${same}`);
   }
   // A code on one side only: the words left once the code is out must be the same.
   assert.equal(sameClass('Calculus I', 'MATH 101 Calculus I'), true);
@@ -423,4 +447,36 @@ test('the home takes the headline from the picker, with no extra load, and fades
   assert.match(css, /\.chat-home-copy\.is-entering \{[^}]*150ms/);
   assert.match(css, /\.chat-home-copy\.is-leaving \{[^}]*150ms/);
   assert.match(css, /prefers-reduced-motion: reduce\) \{[\s\S]*?\.chat-home-copy\.is-entering, \.chat-home-copy\.is-leaving \{ animation: none; \}/);
+});
+
+test('round 2: a title and one word, or a title alone, is no first name', () => {
+  for (const bad of ['Dr. Smith', 'Dr Smith', 'Ms.', 'Dr', 'Mr. Okafor', 'Prof. Dr. Lindqvist', 'Mrs', 'Sir Ian', 'Dr. Smith Jr.', 'Prof.', 'Professor']) assert.equal(firstName(bad), '', bad);
+  assert.equal(firstName('Dr. Amara Okafor'), 'Amara');
+  assert.equal(firstName('Ms. Jane Smith'), 'Jane');
+  assert.equal(firstName('Prof. Dr. Amara Okafor'), 'Amara');
+  assert.equal(firstName('Jane Smith Jr.'), 'Jane');
+  assert.equal(firstName('Drew Carter'), 'Drew', 'a name that only starts like a title');
+  assert.equal(firstName('Mia'), 'Mia');
+});
+
+test('round 2: a cut treats "[" like "(", and a bracket never leaves a stub', () => {
+  assert.equal(shortenName('Dynamic Programming [Knapsack, LCS, Edit Distance]'), 'Dynamic Programming…');
+  assert.equal(shortenName('Dynamic Programming (Knapsack, LCS, Edit Distance)'), 'Dynamic Programming…');
+  for (const text of ['Lab (Something very long and detailed that goes on and on)', 'Lab [Something very long and detailed that goes on and on]', 'Quiz (Chapters one through five and the appendix)']) {
+    const cut = shortenName(text);
+    assert.notEqual(cut, 'Lab…', text);
+    assert.notEqual(cut, 'Quiz…', text);
+    assert.ok(cut.length > 12 && cut.length <= 40, `${text} -> ${cut}`);
+    assert.ok(cut.startsWith(text.slice(0, 8)) && cut.endsWith('…'), cut);
+  }
+  assert.equal(shortenName('Lab (Short)'), 'Lab (Short)');
+});
+
+test('round 2: the old copy leaves when its animation ends, with a timer only as a fallback', () => {
+  const hero = read('components/HomeHero.js');
+  assert.match(hero, /onAnimationEnd=\{\(\) => dropPrevious\(previous\.key\)\}/, 'removed on animationend');
+  assert.match(hero, /HERO_FALLBACK_MS = HERO_FADE_MS \+ 50/, 'a fallback a little longer than the fade');
+  assert.match(hero, /setTimeout\(\(\) => dropPrevious\(previous\.key\), HERO_FALLBACK_MS\)/);
+  assert.doesNotMatch(hero, /setTimeout\([^;]*HERO_FADE_MS\)/, 'no timer as short as the fade itself');
+  assert.match(hero, /fade = [^;]*!quiet\(\)/, 'reduced motion: no old copy at all');
 });

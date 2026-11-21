@@ -14,6 +14,7 @@ export const WEAK_DAYS = 7;
 // Assignment names and topics are cut near this many characters, at a word.
 export const NAME_MAX = 40;
 const NAME_MIN = 24;
+const BRACKET_MIN = 12;
 const DAY = 86400000;
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -36,12 +37,18 @@ export const headlineSeed = (studentKey, classId, today) => seedOf(`${studentKey
 // "Jane Q. Smith" -> "Jane"; "" when there is no usable name (nothing, an email or phone, initials, a
 // username like "jane.doe", or a placeholder like "User" or "Student").
 const TITLES = /^(?:dr|mr|mrs|ms|mx|prof|professor|sr|rev|fr|sir)\.?$/i;
+const SUFFIXES = /^(?:jr|ii|iii|iv|md|phd|rn|np|dnp|dds)\.?$/i;
 const PLACEHOLDERS = new Set(['user', 'student', 'anonymous', 'guest', 'test', 'me', 'null', 'undefined', 'unknown', 'name']);
 export function firstName(full) {
   const words = String(full || '').trim().split(/\s+/).filter(Boolean);
   if (words.some(word => PLACEHOLDERS.has(word.toLowerCase().replace(/[^\p{L}]/gu, '')))) return '';
-  while (words.length > 1 && TITLES.test(words[0])) words.shift();
-  const word = words[0] || '';
+  // Titles come off the front. Nothing left, or one word that only a title put in front of it ("Dr.
+  // Smith", "Ms."), is a surname or a title, not a first name.
+  let titled = 0;
+  while (words.length && TITLES.test(words[0])) { words.shift(); titled += 1; }
+  while (titled && words.length > 1 && SUFFIXES.test(words[words.length - 1])) words.pop();
+  if (!words.length || (titled && words.length === 1)) return '';
+  const word = words[0];
   if (/[@\d]/.test(word) || String(full || '').includes(',')) return '';
   const name = word.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '');
   if (/[._]/.test(name) || (name.match(/\p{L}/gu) || []).length < 2 || name.length > 24) return '';
@@ -77,8 +84,11 @@ export function shortenName(text, max = NAME_MAX) {
   let cut = clean.slice(0, max - 1);
   const space = cut.lastIndexOf(' ');
   if (space >= NAME_MIN) cut = cut.slice(0, space);
-  const open = cut.lastIndexOf('(');
-  if (open > 0 && open > cut.lastIndexOf(')')) cut = cut.slice(0, open);
+  // Inside an open bracket, "(" or "[": cut before it, when what is left still says something. When
+  // it is only a word or two (under BRACKET_MIN), the cut at the last word stands, bracket and all:
+  // "Lab (Something very long..." is not "Lab…".
+  const open = Math.max(cut.lastIndexOf('('), cut.lastIndexOf('['));
+  if (open >= BRACKET_MIN && open > Math.max(cut.lastIndexOf(')'), cut.lastIndexOf(']'))) cut = cut.slice(0, open);
   for (;;) {
     const trimmed = cut.replace(/[\s,;:.–—-]+$/, '');
     const last = trimmed.match(/\s(\S+)$/);

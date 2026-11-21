@@ -7,7 +7,10 @@ import { useEffect, useState } from 'react';
 // changes (a new time of day, a deadline passing) while the page sits open: nobody asked for them, so
 // nothing moves.
 // Only the new words are a heading and are read out; the fading copy is hidden from assistive tech.
+// The old copy is taken away when its animation ends; the timer is only a fallback (the animation
+// starts a frame or two after the copy is drawn, so it is given a little more than its own length).
 export const HERO_FADE_MS = 150;
+export const HERO_FALLBACK_MS = HERO_FADE_MS + 50;
 
 // Was the last thing the student did a key press (choosing the class with Enter) rather than a pointer?
 const lastInput = { keyboard: false };
@@ -29,16 +32,17 @@ export default function HomeHero({ title, line = '', clock = 0 }) {
     window.addEventListener('pointerdown', onPointer, true);
     return () => { window.removeEventListener('keydown', onKey, true); window.removeEventListener('pointerdown', onPointer, true); };
   }, []);
+  const dropPrevious = leavingKey => setSeen(current => (current.previous?.key === leavingKey ? { ...current, previous: null } : current));
   useEffect(() => {
     if (!previous) return undefined;
-    const timer = setTimeout(() => setSeen(current => (current.previous?.key === previous.key ? { ...current, previous: null } : current)), HERO_FADE_MS);
+    const timer = setTimeout(() => dropPrevious(previous.key), HERO_FALLBACK_MS);
     return () => clearTimeout(timer);
   }, [previous]);
   return (
     <div className="chat-home-hero chat-home-hero--headline">
       <div className="chat-home-copy-stack">
         {previous && (
-          <div key={'out:' + previous.key} className="chat-home-copy is-leaving" aria-hidden="true">
+          <div key={'out:' + previous.key} className="chat-home-copy is-leaving" aria-hidden="true" onAnimationEnd={() => dropPrevious(previous.key)}>
             <h1 className="chat-home-headline">{previous.title}</h1>
             {previous.line && <p className="chat-home-line">{previous.line}</p>}
           </div>

@@ -96,12 +96,52 @@ function wordsName(value) {
   return { name, named };
 }
 
+// A term or a section, and nothing else: "Fall 2026", "Spring '26", "SP25", "2026FA", "Section 02",
+// "Sec 2", "Section B", or a section number with a leading zero ("02", "001"). A bare year ("2035") or
+// number ("2", "101") is a course level, not a section ("Spanish - 2", "Biology - 101"), and a short
+// code ("L1") could be anything, so none of those is one.
+const TERM_WORD = String.raw`(?:spring|summer|fall|winter|spr|sum|fal|win|sp|su|fa|wi)`;
+const TERM = String.raw`(?:${TERM_WORD}\s*['\u2019]?\s*(?:19|20)?\d{2}|(?:19|20)\d{2}\s*${TERM_WORD})`;
+const SECTION = String.raw`(?:sec|sect|section)\.?\s*#?\s*(?:\d{1,3}[a-z]?|[a-z])`;
+const ONLY_TERM_OR_SECTION = new RegExp(String.raw`^(?:${TERM}|${SECTION}|0\d{1,2})$`, 'i');
+const isTermOrSection = text => text.split(/\s*[,;/&]\s*|\s+and\s+/i).every(part => ONLY_TERM_OR_SECTION.test(part.trim()));
+const LEADING_TERM = new RegExp(String.raw`^(?:${TERM}|${SECTION})\b[\s,.:\u2013\u2014-]*`, 'i');
+// What can end a name, with the part to look at: a bracket, a dash or a colon, or just a space.
+const TAILS = [
+  /\s*[(\[]\s*([^()\[\]]*?)\s*[)\]]\s*$/,
+  /(?:\s[\u2013\u2014-]\s|\s*:\s*)((?:(?!\s[\u2013\u2014-]\s|:)[^()\[\]])*?)\s*$/,
+  new RegExp(String.raw`\s+((?:${SECTION}|${TERM}))$`, 'i'),
+];
+
+// Takes a term or a section off the end of a name, one at a time, and off the front: "Calculus II:
+// Section 2" -> "Calculus II", "Business Ethics (Section 02)" -> "Business Ethics", "SP25 Adult Health
+// II" -> "Adult Health II". Only those: anything else after a dash, colon or bracket ("Biology - Lab",
+// "Art History: Renaissance", "Nursing (Pharmacology)") is part of the name and stays.
+function withoutTerms(text) {
+  let name = text.replace(/\s+/g, ' ').trim();
+  for (let round = 0; round < 8; round += 1) {
+    const before = name;
+    name = name.replace(LEADING_TERM, '').replace(/^[\s:\u2013\u2014,.-]+/, '').replace(/\(\s*\)|\[\s*\]/g, ' ').replace(/\s+/g, ' ').replace(/[\s,;:\u2013\u2014-]+$/, '').trim();
+    for (const pattern of TAILS) {
+      const match = name.match(pattern);
+      if (match && (!match[1] || isTermOrSection(match[1]))) { name = name.slice(0, match.index).replace(/[\s,;:\u2013\u2014-]+$/, ''); break; }
+    }
+    if (name === before) break;
+  }
+  return name;
+}
+
 // A class's name in words alone, whole (not cut for a label), for telling two classes apart: "Calculus
-// I" is not "Calculus II". A course code in the text is left out ("MATH 101 Calculus I" -> "Calculus I");
-// '' when nothing in it reads as a name.
+// I" is not "Calculus II", "Biology - Lab" is not "Biology - Lecture", "Nursing" is not "Nursing -
+// Pharmacology". A course code in the text is left out ("MATH 101 Calculus I" -> "Calculus I"); a
+// term or a section ("Section 02", "SP25", "Fall 2026") is left out and nothing else is; '' when
+// nothing in it reads as a name.
 export function classNameWords(value) {
-  const bare = String(value || '').replace(/\b[A-Za-z]{2,5}[\s_-]*\d{3,4}[A-Za-z]?(?:[-_]\d{1,3})?\b/g, ' ').replace(/^[\s:–—,.-]+/, '');
-  const { name, named } = wordsName(bare);
+  // Only a real course code goes: "Lab 101" and "Week 5" are words of the name, not a department.
+  const bare = String(value || '').replace(/\b([A-Za-z]{2,5})[\s_-]*\d{3,4}[A-Za-z]?(?:[-_]\d{1,3})?\b/g, (code, dept) => (NOT_DEPARTMENTS.has(dept.toUpperCase()) ? code : ' ')).replace(/^[\s:\u2013\u2014,.-]+/, '');
+  const name = withoutTerms(bare);
+  const words = name.split(/\s+/).filter(Boolean);
+  const named = /[a-z]/i.test(name) && !/\b(?:19|20)\d\d\b/.test(name) && !NOT_DEPARTMENTS.has(words[0]?.toUpperCase()) && (words.length > 1 || /^[A-Za-z]{5,}$/.test(name));
   return named ? name : '';
 }
 
