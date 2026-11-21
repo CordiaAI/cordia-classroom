@@ -7,7 +7,7 @@ import {
   PRIVACY_NOTE, PUT_IN_CHAT, SILENCE_MS, cloudVoiceAllowed, createBargeIn, createTurnDetector, fallbackNote, levelFrom,
   micHelp, micProblem, pickBrowserVoice, recordingType, speakableReply, splitSentences,
 } from '../lib/voiceMode.mjs';
-import { createLectureService } from '../lib/server/lectures.mjs';
+import { VOICE_FEATURE, VOICE_TURN_LIMITS, VOICE_TURN_RATE, createLectureService, resetVoiceTurns } from '../lib/server/lectures.mjs';
 
 const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -155,22 +155,39 @@ const b64 = value => Buffer.from(JSON.stringify(value)).toString('base64url');
 const AUTH = `Bearer ${b64({ alg: 'HS256' })}.${b64({ sub: USER })}.sig`;
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-function transcriber({ env = { GROQ_API_KEY: 'gsk-test' }, tutorLeft = 5 } = {}) {
-  const state = { calls: [] };
+function transcriber({ env = { GROQ_API_KEY: 'gsk-test' }, tutorLeft = 5, plan = 'free', tier, unlimited = false, used = 0, countFails = false, whisperFails = false, clock = { at: Date.UTC(2026, 10, 21, 12) } } = {}) {
+  resetVoiceTurns();
+  const state = { calls: [], rows: [], clock };
   const fetch = async (url, init = {}) => {
     state.calls.push(url);
-    if (url.endsWith('/billing/status')) return init.headers.Authorization === AUTH ? json({ plan: 'free', features: { tutor: { remaining: tutorLeft, limit: 10 } } }) : json({}, 401);
+    if (url.endsWith('/billing/status')) {
+      return init.headers.Authorization === 'Bearer nope' ? json({}, 401) : json({ plan, tier, unlimited, features: { tutor: { remaining: tutorLeft, limit: 10 } } });
+    }
     if (url.endsWith('/audio/transcriptions')) {
+      state.whisper = (state.whisper || 0) + 1;
+      if (whisperFails) return json({}, 400);
       state.model = init.body.get('model');
       state.file = init.body.get('file');
       return json({ text: ' Why does water follow salt? ', segments: [{ text: ' Why does water follow salt? ', avg_logprob: -0.2, no_speech_prob: 0.01, compression_ratio: 1.2 }] });
     }
-    if (url.includes('/storage/') || url.includes('/rpc/')) throw new Error(`voice audio must never be stored or metered: ${url}`);
+    if (url.includes('/rest/v1/usage_events')) {
+      if (init.method === 'POST') { state.rows.push(JSON.parse(init.body)); return new Response(null, { status: 201 }); }
+      state.count = url;
+      state.countHeaders = init.headers;
+      if (countFails) return json({ message: 'boom' }, 500);
+      return new Response('[]', { status: 206, headers: { 'content-range': used ? `0-0/${used}` : '*/0' } });
+    }
+    if (url.includes('/storage/') || url.includes('/rpc/')) throw new Error(`voice audio must never be stored or metered as lecture minutes: ${url}`);
     throw new Error(`unexpected ${url}`);
   };
-  const service = createLectureService({ env: { NEXT_PUBLIC_API_URL: 'https://api.example.com', NEXT_PUBLIC_SUPABASE_URL: 'https://db.example.co', SUPABASE_SERVICE_ROLE_KEY: 'svc', ...env }, fetch, sleep: async () => {} });
+  const service = createLectureService({
+    env: { NEXT_PUBLIC_API_URL: 'https://api.example.com', NEXT_PUBLIC_SUPABASE_URL: 'https://db.example.co', SUPABASE_SERVICE_ROLE_KEY: 'svc', ...env },
+    fetch, sleep: async () => {}, now: () => new Date(clock.at),
+  });
   return { service, state };
 }
+const turn = (service, auth = AUTH) => service.transcribe(auth, { audio: Buffer.alloc(4000), contentType: 'audio/webm' });
+const tokenFor = sub => `Bearer ${b64({ alg: 'HS256' })}.${b64({ sub })}.sig`;
 
 test('a spoken turn is written down by the same Whisper call, never stored and never lecture minutes', async () => {
   const { service, state } = transcriber();
@@ -192,6 +209,82 @@ test('the transcribe action needs a sign-in, Tutor messages left, a real recordi
   const off = await transcriber({ env: {} }).service.transcribe(AUTH, { audio: Buffer.alloc(4000), contentType: 'audio/webm' });
   assert.equal(off.status, 503);
   assert.equal(off.body.code, 'not_configured');
+});
+
+// ---- Review fixes: the transcribe action is limited (a rate, and a monthly cap per plan) ----
+
+test('a loop of transcribe calls gets a 429 with Retry-After after 20 in a minute, and every try counts', async () => {
+  assert.equal(VOICE_TURN_RATE.max, 20);
+  const { service, state } = transcriber();
+  const codes = [];
+  for (let i = 0; i < 25; i += 1) codes.push((await turn(service)).status);
+  assert.deepEqual(codes.slice(0, 20), Array(20).fill(200));
+  assert.deepEqual(codes.slice(20), Array(5).fill(429));
+  assert.equal(state.whisper, 20, 'a limited call never reaches Whisper');
+  const limited = await turn(service);
+  assert.equal(limited.body.detail.code, 'rate_limited');
+  assert.match(limited.headers['Retry-After'], /^\d+$/);
+  assert.ok(Number(limited.headers['Retry-After']) >= 1 && Number(limited.headers['Retry-After']) <= 60);
+  // Bad recordings spend a Whisper call's worth of attention too, so they count (and are still refused as before).
+  const bad = transcriber();
+  const results = [];
+  for (let i = 0; i < 21; i += 1) results.push((await bad.service.transcribe(AUTH, { audio: Buffer.alloc(4000), contentType: 'text/html' })).status);
+  assert.deepEqual([results[0], results[20]], [415, 429]);
+});
+
+test('the rate is per student and a minute later they can talk again', async () => {
+  const { service, state } = transcriber();
+  for (let i = 0; i < 20; i += 1) await turn(service);
+  assert.equal((await turn(service)).status, 429);
+  assert.equal((await turn(service, tokenFor('99999999-2222-4333-8444-555555555555'))).status, 200);
+  state.clock.at += 61_000;
+  assert.equal((await turn(service)).status, 200);
+});
+
+test('each turn written down is one usage_events row for the student, with no audio or words in it', async () => {
+  const { service, state } = transcriber();
+  await turn(service);
+  assert.equal(state.rows.length, 1);
+  assert.deepEqual(state.rows[0], { user_id: USER, feature: VOICE_FEATURE, model: 'whisper-large-v3-turbo', prompt_tokens: 1, completion_tokens: 0, cached_tokens: 0 });
+  assert.equal(VOICE_FEATURE, 'tutor_voice_turn');
+  assert.doesNotMatch(JSON.stringify(state.rows), /water|salt/i);
+  // A turn that fails at Whisper is not counted against the month.
+  const failing = transcriber({ whisperFails: true });
+  assert.equal((await turn(failing.service)).status, 502);
+  assert.equal(failing.state.rows.length, 0);
+});
+
+test('the monthly cap: Free 40, Pro 600, Academic Weapon 2000 turns; at the cap the answer is a 402 before Whisper', async () => {
+  assert.deepEqual(VOICE_TURN_LIMITS, { free: 40, pro: 600, weapon: 2000 });
+  for (const [plan, tier, cap] of [['free', 'free', 40], ['classroom_plus', 'pro', 600], ['classroom_plus', 'weapon', 2000]]) {
+    const under = transcriber({ plan, tier, used: cap - 1 });
+    assert.equal((await turn(under.service)).status, 200, `${tier} one under the cap`);
+    const at = transcriber({ plan, tier, used: cap });
+    const stopped = await turn(at.service);
+    assert.equal(stopped.status, 402, `${tier} at the cap`);
+    assert.equal(stopped.body.detail.code, 'limit_reached');
+    assert.equal(stopped.body.detail.feature, 'voice_turns');
+    assert.equal(stopped.body.detail.limit, cap);
+    assert.equal(at.state.whisper, undefined, 'no Whisper call at the cap');
+    assert.equal(at.state.rows.length, 0);
+  }
+  // Counted for this student, this feature and this month.
+  const { service, state } = transcriber({ used: 3 });
+  await turn(service);
+  assert.match(state.count, new RegExp(`user_id=eq\\.${USER}&feature=eq\\.tutor_voice_turn&created_at=gte\\.2026-11-01T00:00:00Z`));
+  assert.equal(state.countHeaders.Prefer, 'count=exact');
+});
+
+test('Free can still use voice mode at a modest level, and the cap never blocks on a counting problem, an unlimited account or no metering', async () => {
+  assert.ok(VOICE_TURN_LIMITS.free >= 30, 'Free keeps a modest level of voice');
+  assert.equal((await turn(transcriber({ used: 39 }).service)).status, 200);
+  assert.equal((await turn(transcriber({ countFails: true }).service)).status, 200);
+  assert.equal((await turn(transcriber({ unlimited: true, used: 99999 }).service)).status, 200);
+  const unmetered = transcriber({ env: { GROQ_API_KEY: 'gsk-test', SUPABASE_SERVICE_ROLE_KEY: '' } });
+  assert.equal((await turn(unmetered.service)).status, 200);
+  assert.equal(unmetered.state.rows.length, 0);
+  // Tutor messages left are still checked first, as before.
+  assert.equal((await turn(transcriber({ tutorLeft: 0, used: 99 }).service)).body.detail.feature, 'tutor');
 });
 
 // ---- What the view and its engine promise ----

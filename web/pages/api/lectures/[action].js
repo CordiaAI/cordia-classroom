@@ -3,7 +3,8 @@
 //   POST /api/lectures/chunk?recording_id=&seq=&start_ms=&duration_ms=&keep=  (body: raw audio; header X-Prompt: base64 text)
 //   POST /api/lectures/notes  { segments, classes }
 //   POST /api/lectures/title  { text }
-//   POST /api/lectures/transcribe  (body: raw audio) one spoken turn in the Tutor's voice mode; never stored
+//   POST /api/lectures/transcribe  (body: raw audio) one spoken turn in the Tutor's voice mode; never stored.
+//        Limited to 20 a minute per student (429 + Retry-After) and a monthly cap per plan (402, feature voice_turns).
 // The Lectures section (lib/server/lectureLibrary.mjs):
 //   GET  /api/lectures/list            GET /api/lectures/get?id=       GET /api/lectures/todos
 //   POST /api/lectures/save            POST /api/lectures/update       POST /api/lectures/delete
@@ -74,6 +75,7 @@ async function handler(req, res) {
     } else {
       return res.status(404).json({ detail: 'Not found' });
     }
+    for (const [name, value] of Object.entries(result.headers || {})) res.setHeader(name, value);
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('[lectures]', action, error?.message || error);
