@@ -3,13 +3,14 @@
 //   POST /api/lectures/chunk?recording_id=&seq=&start_ms=&duration_ms=&keep=  (body: raw audio; header X-Prompt: base64 text)
 //   POST /api/lectures/notes  { segments, classes }
 //   POST /api/lectures/title  { text }
+//   POST /api/lectures/transcribe  (body: raw audio) one spoken turn in the Tutor's voice mode; never stored
 // The Lectures section (lib/server/lectureLibrary.mjs):
 //   GET  /api/lectures/list            GET /api/lectures/get?id=       GET /api/lectures/todos
 //   POST /api/lectures/save            POST /api/lectures/update       POST /api/lectures/delete
 //   POST /api/lectures/todo            POST /api/lectures/analyze { id }  (AI notes for a lecture saved without them)
 //   POST /api/lectures/merge { ids }   (a lecture recorded in parts, joined into one)
 // Server env: GROQ_API_KEY or OPENAI_API_KEY (transcription, analysis; lib/server/aiProvider.mjs), SUPABASE_SERVICE_ROLE_KEY (storage, metering).
-import { MAX_CHUNK_BYTES, createLectureService } from '../../../lib/server/lectures.mjs';
+import { MAX_CHUNK_BYTES, MAX_TURN_BYTES, createLectureService } from '../../../lib/server/lectures.mjs';
 import { createLectureLibrary } from '../../../lib/server/lectureLibrary.mjs';
 import { withAppTokensOnly } from '../../../lib/server/connectedApps.mjs';
 
@@ -53,6 +54,10 @@ async function handler(req, res) {
         keep: req.query.keep === '1',
         prompt,
       });
+    } else if (action === 'transcribe' && req.method === 'POST') {
+      const audio = await readBody(req, MAX_TURN_BYTES);
+      if (!audio) return res.status(413).json({ detail: 'That was too long to send at once.' });
+      result = await service.transcribe(authorization, { audio, contentType: req.headers['content-type'] || '' });
     } else if (LIBRARY_GET[action] && req.method === 'GET') {
       const library = createLectureLibrary();
       result = action === 'get' ? await library.get(authorization, String(req.query.id || '')) : await library[LIBRARY_GET[action]](authorization);

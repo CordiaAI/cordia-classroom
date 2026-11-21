@@ -236,12 +236,13 @@ async function _doRefresh() {
 }
 
 // For binary responses (e.g. rendered PDFs) and uploads: same 401 refresh as apiFetch,
-// returns the raw Response, and applies no short timeout.
-export async function authorizedFetch(path, options = {}) {
+// returns the raw Response, and applies no short timeout. quietLimit: a 402 goes back to the caller
+// without opening the upgrade dialog (voice mode falls back to the browser's voice instead).
+export async function authorizedFetch(path, { quietLimit = false, ...options } = {}) {
   const request = () => fetch(API + path, { ...options, headers: { ...authOnlyHeaders(), ...options.headers } });
   let response = await request();
   if (response.status === 401 && await tryRefreshToken()) response = await request();
-  if (response.status === 402) {
+  if (response.status === 402 && !quietLimit) {
     response.clone().json().then(data => announceLimit(response, data)).catch(() => { /* no readable limit details: the caller still gets the 402 */ });
   }
   return response;

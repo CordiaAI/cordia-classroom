@@ -1,8 +1,9 @@
-import { useId, useLayoutEffect, useRef } from 'react';
-import { ArrowUp, FileText, Mic, Paperclip, X } from 'lucide-react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { ArrowUp, AudioLines, FileText, Mic, Paperclip, X } from 'lucide-react';
 import ClassPicker from './ClassPicker';
 import CordiaLoader from './CordiaLoader';
 import DictationLine from './DictationLine';
+import VoiceMode from './VoiceMode';
 import { UPLOAD_ACCEPT } from '../lib/uploadTypes.mjs';
 import { MAX_ATTACHMENTS } from '../lib/useTutorChat';
 import { openNewSheet } from '../lib/newSheet';
@@ -21,7 +22,8 @@ export function buildGuideFrom(action, { files = [], folderId = '' } = {}) {
   else if (action.mode === 'paste') openNewSheet('paste', { ...options, text: action.text });
 }
 
-// The composer (DESIGN-SPEC 4.2): the message box, then attach, voice, the class picker and Send.
+// The composer (DESIGN-SPEC 4.2): the message box, then attach, voice (dictation into the box, and voice
+// mode: a hands-free conversation in a full-screen view, components/VoiceMode.js), the class picker and Send.
 // No tool chips: the Tutor reads intent from the message, and "make a guide" with files, a link or
 // pasted notes goes to the New sheet. Talks to the Tutor through tutor (lib/useTutorChat.js).
 // variant: 'home' (88px box) or 'chat' (52px box, at the bottom of a chat).
@@ -33,8 +35,24 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
   const touchedRef = useRef(false); // the student has been in the box, so its caret is theirs
   const {
     input, setInput, attachments, setAttachments, removeAttachment, attachFiles, extracting, attachDropActive, fileRef, combinedAttachments, contextKey,
-    sendMessage, session, busy, canSubmit, remaining, Recognition, listening, interim, dictationError, toggleMic, localError,
+    sendMessage, session, busy, canSubmit, remaining, Recognition, listening, interim, dictationError, toggleMic, stopDictation, localError,
   } = tutor;
+  // Voice mode: offered where the browser can record or recognize speech (read after mount, like the mic).
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [canVoice, setCanVoice] = useState(false);
+  const voiceButtonRef = useRef(null);
+  useEffect(() => {
+    const recognizes = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+    setCanVoice(Boolean(navigator.mediaDevices?.getUserMedia) && (typeof MediaRecorder !== 'undefined' || recognizes));
+  }, []);
+  function openVoice() {
+    stopDictation();
+    setVoiceOpen(true);
+  }
+  function closeVoice() {
+    setVoiceOpen(false);
+    requestAnimationFrame(() => voiceButtonRef.current?.focus({ preventScroll: true }));
+  }
   const minHeight = variant === 'home' ? 88 : 52;
   const hasSomething = Boolean(input.trim()) || attachments.length > 0;
   const blocked = extracting || busy || !session || remaining <= 0;
@@ -129,6 +147,12 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
             <Mic size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
         )}
+        {canVoice && (
+          <button type="button" ref={voiceButtonRef} className="composer-icon" onClick={openVoice} disabled={blocked}
+            aria-label="Start voice mode" aria-haspopup="dialog" title="Talk with the Tutor out loud">
+            <AudioLines size={20} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        )}
         <ClassPicker classes={classes} value={classId} onChange={onClassChange} size="sm" />
         <span className="composer-spacer" />
         <button type="submit" className={'composer-send' + (hasSomething && !blocked ? ' is-ready' : '')} aria-label="Send" aria-disabled={!hasSomething || blocked}>
@@ -141,6 +165,7 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
       )}
       {showError && localError && <p className="composer-note is-error" role="alert">{localError}</p>}
       {hint && <p className="composer-note" role="status">{hint}</p>}
+      {voiceOpen && <VoiceMode tutor={tutor} onClose={closeVoice} />}
     </form>
   );
 }

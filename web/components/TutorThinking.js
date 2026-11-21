@@ -8,7 +8,8 @@ import { FALLBACK_LINE, firstLine, LINE_MS, nextLine } from '../lib/tutorStatus.
 // is read once there is an answer. Reduced motion: no shimmer, and lines swap without a fade.
 // A screen reader hears only the first line (the live region is set once); the changing lines are for the eyes.
 // avatar: the chat home's thinking row, where the mark sits in the Tutor's avatar place (DESIGN-SPEC 4.3).
-export default function TutorThinking({ steps = [], lines = [], avatar = false }) {
+// mark: false where the page already shows the breathing mark (voice mode, where the line is a caption).
+export default function TutorThinking({ steps = [], lines = [], avatar = false, mark = true }) {
   const [view, setView] = useState(() => ({ text: firstLine(steps), prev: '', n: 0 }));
   const [announced, setAnnounced] = useState('');
   const latest = useRef({ steps, lines });
@@ -35,9 +36,9 @@ export default function TutorThinking({ steps = [], lines = [], avatar = false }
 
   return (
     <>
-      {avatar
+      {mark && (avatar
         ? <span className="cordia-tutor-avatar"><CordiaLoader size={22} silent /></span>
-        : <CordiaLoader size={20} silent />}
+        : <CordiaLoader size={20} silent />)}
       <span className="tutor-line-stack" aria-hidden="true">
         {/* Every line this row can show, unseen and stacked in one place: the row is as tall as the tallest, so a line that
             wraps in a narrow Tutor never makes the row jump as the lines change. */}
