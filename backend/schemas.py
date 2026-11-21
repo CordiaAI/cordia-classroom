@@ -109,6 +109,9 @@ class ChatRequest(BaseModel):
     rich_text: bool = False
     # The student's own calendar day, so "tomorrow" and "Friday" mean their days, not the server's.
     local_date: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    # The web app's voice mode: the reply is written to be heard (routers/chat.py VOICE_REPLY_STYLE).
+    # The same endpoint, models, skills and limits; the extension never sends it.
+    voice: bool = False
 
     @field_validator("mode")
     @classmethod

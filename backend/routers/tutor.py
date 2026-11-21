@@ -6,6 +6,7 @@ from typing import Optional
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 import access
@@ -16,7 +17,8 @@ from ids import require_uuid
 from rate_limit import limiter
 from services.saved_chats import start_chat
 from schemas import TutorStatusRequest
-from services import tutor_status
+from services import tutor_speech, tutor_status
+from services.entitlements import record, require
 from services.study_helper import checkin_reply, learn_href
 from services.tutor_sessions import (
     append_tutor_message,
@@ -201,3 +203,50 @@ def tutor_steps(request: Request, session_id: str, authorization: str = Header(d
     user_id = get_user_id(authorization)
     require_uuid(session_id, "session ID")
     return {"steps": tutor_status.steps_for(user_id, session_id)}
+
+
+# ---- Voice mode's cloud voice (services/tutor_speech.py) ----
+
+VOICE_UNAVAILABLE = {"code": "voice_unavailable", "message": "The Tutor's voice isn't available right now."}
+
+
+class SpeakRequest(BaseModel):
+    """One sentence of the Tutor's latest reply to speak, or the fixed sample for Settings › Tutor."""
+    session_id: Optional[str] = Field(default=None, max_length=36)
+    text: str = Field(default="", max_length=tutor_speech.MAX_CHARS * 2)
+    voice: Optional[str] = Field(default=None, max_length=40)
+    sample: bool = False
+
+
+@router.post("/speak")
+@limiter.limit("120/minute")
+def tutor_speak(body: SpeakRequest, request: Request, authorization: str = Header(default="")):
+    """Speak one sentence in the student's chosen voice (ElevenLabs, streamed as mp3). Only words from the latest
+    replies in the student's own Tutor session, or the fixed sample. Charged to the monthly `voice_characters`
+    limit (Free 0: the web app uses the browser's voice) and logged to usage_events as `tutor_voice`.
+    503 voice_unavailable when ElevenLabs isn't set up or can't speak; the web app then uses the browser's voice."""
+    user_id = get_user_id(authorization)
+    if not tutor_speech.api_key():
+        raise HTTPException(status_code=503, detail=VOICE_UNAVAILABLE)
+    text = tutor_speech.SAMPLE_TEXT if body.sample else tutor_speech.spoken_text(body.text)
+    if not text:
+        raise HTTPException(status_code=400, detail="Nothing to say.")
+    if not body.sample:
+        require_uuid(body.session_id or "", "session ID")
+        rows = get_supabase().table("tutor_sessions").select("messages").eq("id", body.session_id) \
+            .eq("user_id", user_id).limit(1).execute().data
+        if not rows:
+            raise HTTPException(status_code=404, detail="Tutor session not found")
+        if not tutor_speech.spoken_from_replies(text, rows[0].get("messages") or []):
+            raise HTTPException(status_code=403, detail="Only the Tutor's own replies can be spoken.")
+    require(user_id, "voice_characters", amount=len(text))
+    try:
+        audio = tutor_speech.open_stream(text, body.voice)
+    except tutor_speech.SpeechUnavailable:
+        raise HTTPException(status_code=503, detail=VOICE_UNAVAILABLE) from None
+    try:
+        record(user_id, "voice_characters", amount=len(text), model=tutor_speech.MODEL)
+    except Exception:
+        audio.close()
+        raise
+    return StreamingResponse(iter(audio), media_type="audio/mpeg", headers={"Cache-Control": "no-store"})

@@ -46,6 +46,7 @@ export const FEATURE_COPY = {
   retain_types: { label: 'Pro quiz sessions', title: 'Matching and fill in the blank are paid features', pro: 'Quiz yourself with matching and fill in the blank, not just multiple choice' },
   lecture_minute: { label: 'recording minutes', title: "You've used this month's recording minutes", pro: 'Record more of your lectures every month' },
   visual: { label: 'visuals', title: "You've used this month's visuals", pro: 'Make up to 200 visuals a month with Academic Weapon' },
+  voice_characters: { label: 'Tutor voice characters', title: "You've used this month's Tutor voice", pro: 'Talk with the Tutor in a natural voice' },
   light: { label: 'AI reading actions', title: "You've reached this month's AI reading limit", pro: 'Read up to 500 photos, scans and diagrams a month' },
 };
 
@@ -56,6 +57,8 @@ export const METERED = ['guide', 'tutor', 'learn_my_way'];
 export const FREE_LIMITS = {
   guide: 3, tutor: 10, learn_my_way: 5, practice: 1, ai_quiz: 1, nclex: 1,
   retain_types: 1, light: 30, lecture_minute: 30, visual: 10,
+  // Tutor voice mode's cloud voice, in characters; Free hears the browser's own voice instead.
+  voice_characters: 0,
 };
 
 // The free trial: TRIAL_DAYS and TRIAL_TIER in entitlements.py, started by /billing/start-trial

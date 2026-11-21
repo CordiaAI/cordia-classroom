@@ -575,6 +575,16 @@ def _verified_retain_context(body: ChatRequest, content: str):
     return retain
 
 
+# Voice mode (the web app's voice view): the reply is spoken sentence by sentence, so it is written to be heard.
+# Presentation only; the facts and grounding rules are the same. The web app leaves links and code out of what
+# it speaks (web/lib/voiceMode.mjs), so the reply keeps them for the chat and says where they are.
+VOICE_REPLY_STYLE = (
+    "This reply is spoken aloud in a voice conversation, so write it to be heard: short, plain sentences; no markdown, "
+    "headings, bullet symbols, numbered lines or tables; say a list or a table as ordinary sentences (first, next, "
+    "finally). Never read out a link or code: keep it in the reply and say \"I've put that in the chat.\""
+)
+
+
 def _estimated_tokens(*texts: str) -> int:
     return int(sum(len(text or "") for text in texts) / 3.5) + 1
 
@@ -589,6 +599,7 @@ def _tutor_reply(body: ChatRequest, user_id: str, question: str, material: Mater
         style_instruction(user_id),
         tutor_skill_instruction(skill),
         TUTOR_SAFETY_POLICY,
+        VOICE_REPLY_STYLE if body.voice else "",
     ]))
     # The session's last message is the question being answered now.
     earlier = ((turn or {}).get("messages") or [])[:-1]
@@ -617,7 +628,7 @@ def _tutor_reply(body: ChatRequest, user_id: str, question: str, material: Mater
             learning_guidance=guidance,
             conversation=history or earlier,
             allow_clarification=skill in {"explain", "retain", None},
-            rich_text=body.rich_text,
+            rich_text=body.rich_text and not body.voice,
             full_history=bool(history),
         )
     record(user_id, "tutor")
