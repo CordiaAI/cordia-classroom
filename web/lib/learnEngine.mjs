@@ -5,7 +5,7 @@
 // and a miss drops it back to Learning and asks it again later in the same round.
 // Mastered ideas fade after FADE_DAYS without practice and come back for a quick recall.
 
-import { canChoose, conceptAnswer } from './retainEngine.mjs';
+import { conceptAnswer } from './retainEngine.mjs';
 
 export const LEVELS = ['New', 'Learning', 'Familiar', 'Mastered'];
 export const NEW = 0;
@@ -113,10 +113,9 @@ export function makeCloze(answer) {
   };
 }
 
-// The card a way asks for this question. An idea with fewer than three choices has no multiple choice
-// card: its Choose way is asked as Type it.
+// The card a way asks for this question.
 export function cardFor(way, question) {
-  if (way === 'type' || (way === 'mc' && !canChoose(question))) return isTerm(question) ? 'fill' : 'written';
+  if (way === 'type') return isTerm(question) ? 'fill' : 'written';
   if (way === 'cloze') return makeCloze(conceptAnswer(question)) ? 'cloze' : 'fill';
   return way;
 }
@@ -128,11 +127,7 @@ export function askCard(question, entry, today = dayKey(), types = DEFAULT_TYPES
   const recall = entry.l >= FAMILIAR || isFading(entry, today);
   const order = recall ? ['type', 'cloze', 'self', 'mc'] : ['mc', 'cloze', 'self', 'type'];
   const way = order.find(option => picked.includes(option));
-  if (way === 'mc' && !canChoose(question)) {
-    // Too few related choices for multiple choice: a short answer is typed, a long one is a flashcard.
-    return { type: isTerm(question) ? 'fill' : 'self', recall, noChoice: true };
-  }
-  return { type: cardFor(way, question), recall, ...(canChoose(question) ? {} : { noChoice: true }) };
+  return { type: cardFor(way, question), recall };
 }
 
 // Why askCard chose what it did, for the decision log: every card, the ones ruled out and why,
@@ -148,8 +143,7 @@ export function formatDecision(question, entry, today = dayKey(), types = DEFAUL
   const wayOf = { mc: 'mc', fill: 'type', written: 'type', cloze: 'cloze', self: 'self' };
   const mask = {};
   CARD_TYPES.forEach(option => {
-    if (option === 'mc' && !canChoose(question)) mask[option] = 'few_choices';
-    else if (!picked.includes(wayOf[option]) && !(option === 'fill' && picked.includes('cloze') && !blankable)) mask[option] = 'turned_off';
+    if (!picked.includes(wayOf[option]) && !(option === 'fill' && picked.includes('cloze') && !blankable)) mask[option] = 'turned_off';
     else if (option === 'fill' && !term) mask[option] = 'long_answer';
     else if (option === 'written' && term) mask[option] = 'short_answer';
     else if (option === 'cloze' && !blankable) mask[option] = 'short_answer';
@@ -223,7 +217,7 @@ export function answer(levels, round, card, credit, { confidence = '', today = d
   // the student learns with choices.
   if (credit !== 1 && !card.again) {
     const queue = [...next.queue];
-    const easier = recall && credit === 0 && !card.noChoice && cleanTypes(round.types).includes('mc') ? 'mc' : card.type;
+    const easier = recall && credit === 0 && cleanTypes(round.types).includes('mc') ? 'mc' : card.type;
     queue.push({ id: next.nextId, concept: card.concept, type: easier, recall: easier === card.type ? recall : false, again: true });
     next.queue = queue;
     next.nextId += 1;

@@ -50,6 +50,8 @@ a { color: var(--olive-ink); }
 .c-btn--quiet { background: transparent; color: var(--olive-ink); border-color: transparent; padding: 0 12px; }
 @media (hover: hover) { .c-btn--quiet:hover:not(:disabled) { background: var(--lift-pane); } }
 .c-btn--danger { color: var(--error); }
+/* refine.css sets every quiet button to ink, after this file: a quiet destructive action keeps its red. */
+.c-btn--quiet.c-btn--danger:not(:disabled) { color: var(--error); }
 .c-btn--block { width: 100%; }
 .c-btn--lg { height: 52px; min-height: 52px; padding: 0 32px; font-size: 1.0625rem; }
 .c-btn kbd {
@@ -696,6 +698,35 @@ html.is-restyling :not(.miy-sheet, .miy-sheet *), html.is-restyling :not(.miy-sh
 .c-toggle input:checked + .c-toggle-track span { transform: translateX(18px); }
 .c-toggle input:focus-visible + .c-toggle-track { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .c-toggle-track, .c-toggle-track span { transition: none; } }
+/* A setting row: the label and what it does on the left, the switch on the right. */
+.c-toggle-text { display: grid; gap: 0.125rem; min-width: 0; }
+.c-toggle-desc { margin: 0; font-weight: 500; }
+.c-toggle--row { display: flex; width: 100%; justify-content: space-between; gap: var(--space-4); }
+
+/* ---------- Settings: cards and rows ---------- */
+/* Every Settings card pads the same on all four sides (--settings-pad: 1.5rem, 1.25rem on a phone). */
+.settings-card { display: grid; gap: 0.75rem; min-width: 0; padding: var(--settings-pad); box-sizing: border-box; }
+/* A card that is one setting: what it is on the left (an icon, a title, a line on what it does),
+   its control on the right. */
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.setting-text { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 0.625rem; row-gap: 0.125rem; align-items: center; flex: 1 1 14rem; min-width: 0; }
+.setting-text > .lucide { grid-row: 1; grid-column: 1; color: var(--meter-ink); }
+.setting-text > .c-section-title { margin: 0; grid-column: 2; grid-row: 1; }
+.setting-text > .c-meta { margin: 0; grid-column: 2; grid-row: 2; }
+@media (max-width: 767px) { .settings-row > .c-btn { width: 100%; } }
+/* A sub-setting under a card's main one: its line on the left and a quiet action on the right. */
+.settings-sub { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem 1rem; flex-wrap: wrap; margin-top: 0.5rem; }
+/* A lone button in a card sits at its start, not stretched across it. */
+.settings-card > .c-btn { justify-self: start; }
+.settings-sub > .c-meta { margin: 0; flex: 1 1 12rem; }
+/* A card's title with one quiet action on its right. */
+.settings-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: 2.75rem; }
+.settings-head > .c-section-title { margin: 0; }
+.settings-card .c-btn--quiet { padding-inline: var(--space-4); }
+/* A quiet action at a card's right edge lines its text up with the switches and icons above and below it. */
+.settings-head > .c-btn--quiet, .settings-sub > .c-btn--quiet { margin-inline-end: calc(var(--space-4) * -1); }
+/* On a phone the action wraps under its line: pull its start in too, so the words line up with the line above. */
+@media (max-width: 767px) { .settings-sub > .c-btn--quiet { margin-inline-start: calc(var(--space-4) * -1); } }
 
 /* ---------- Numbered steps (Canvas connect, Chrome extension) ---------- */
 .c-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
@@ -1151,6 +1182,21 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 @media (hover: hover) { .composer-file-remove:hover { background: var(--glass-inner); } }
 .composer-note { margin: 0 8px 2px; color: var(--muted); font: 500 0.8125rem/1.4 var(--font-sans); }
 .composer-note.is-error { color: var(--error); }
+/* Dictation (components/DictationLine.js): the slot holds one line whenever the browser can dictate, so the box
+   never moves. While the mic is on, the words still being recognized show in it, apart from the box, in
+   italics on one line with the newest in view (a plain "Listening…" before any are heard); once they run past
+   the left edge they fade out there. An error from the recognizer is one plain line in the same slot, in the
+   error colour. The line's own width is 0 with a floor of the slot's: a long phrase never counts toward the
+   width of whatever holds the slot (a panel, the drawer), it only scrolls inside it. */
+.dictation-slot { margin: 0 0.5rem; min-height: 1.225rem; }
+.dictation-interim { width: 0; min-width: 100%; margin: 0; color: var(--muted-strong); font: 500 0.875rem/1.4 var(--font-sans); white-space: nowrap; overflow: hidden; }
+.dictation-interim.is-heard { font-style: italic; }
+.dictation-interim[data-clipped='true'] { -webkit-mask-image: var(--fade-edge-left); mask-image: var(--fade-edge-left); }
+.dictation-interim.is-error { color: var(--error); font-style: normal; text-overflow: ellipsis; }
+/* The slot's line has its own leading under the text, so with it showing the composer's bottom padding is
+   11px: the words end 12px from the edge (DESIGN-SPEC 4.2; it was 10px plus the slot's 2px margin). */
+.composer:has(> .dictation-slot) { padding-bottom: 11px; }
+.cordia-tutor > .dictation-slot { margin: -0.25rem 1.5rem 0.5rem; }
 
 /* The class picker (components/ClassPicker.js): a quiet button with the class's dot and code. */
 .c-class-picker {

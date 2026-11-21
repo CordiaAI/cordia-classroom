@@ -46,6 +46,8 @@
 
   /* Spacing: a 4 px scale for gaps and padding */
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  /* Settings cards: the same inner padding on all four sides, in rem so Larger text grows it. */
+  --settings-pad: 1.5rem;
 
   /* Neutrals: ink, muted (ink at 64%), and three surface levels */
   --ink: #171B18;
@@ -219,6 +221,8 @@
      1px border carries it: the rim's stops on the top, right, bottom and left edges. */
   --glass-rim-border: rgba(255, 255, 255, 0.80) rgba(255, 255, 255, 0.30) rgba(255, 255, 255, 0.42) rgba(255, 255, 255, 0.72);
   --glass-rim-mask-webkit: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  /* A line of text that runs on past its left edge fades out there (alpha only, no colour). */
+  --fade-edge-left: linear-gradient(to right, transparent, #000 1.5rem);
 
   /* The backdrop (DESIGN-SPEC 2.1): the cloud photo, blurred a little, under a white light from
      the top left and a faint olive tint from the bottom right. Dark lays the clouds at 18% over
@@ -402,6 +406,7 @@
   /* The arrow on dropdowns (select.c-select), drawn in the muted ink. */
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235F655F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
+@media (max-width: 767px) { :root { --settings-pad: 1.25rem; } }
 
 [data-theme='dark'] {
   color-scheme: dark;
