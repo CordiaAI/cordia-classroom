@@ -313,6 +313,17 @@ def _event_window(event: dict) -> tuple[Optional[datetime], Optional[datetime]]:
     return _time((event.get("start") or {}).get("dateTime")), _time((event.get("end") or {}).get("dateTime"))
 
 
+def _fetch_event(account: str, user_id: str, calendar: str, event_id: str) -> Optional[dict]:
+    """One event by id (Google still returns a deleted one, marked cancelled), or None when the
+    lookup failed and nothing is known about it."""
+    try:
+        data = composio.run(account, user_id, "GOOGLECALENDAR_EVENTS_GET", {"calendar_id": calendar, "event_id": event_id})
+    except HTTPException:
+        return None
+    event = data.get("event") or data.get("response_data") or data
+    return event if isinstance(event, dict) and (event.get("id") or event.get("status")) else None
+
+
 def sync_calendar(user_id: str) -> dict:
     return _one_at_a_time(user_id, "gcal", _sync_calendar)
 
@@ -370,6 +381,14 @@ def _sync_calendar(user_id: str) -> dict:
         if not link or link.get("removed_by_student") or _pending(link):
             continue
         event = remote.get(link["external_id"])
+        mine_start, mine_end = _time(block["starts_at"]), _time(block["ends_at"])
+        if event is None and link.get("synced_hash") not in _span_hashes(mine_start, mine_end):
+            # The block's time isn't the one Cordia last sent, so the student moved it here, and its
+            # event may still sit at the old time, outside the window listed above (a block moved from
+            # more than a day ago into the future). Ask Google for that event by id before deciding.
+            event = _fetch_event(account, user_id, calendar, link["external_id"])
+            if event is None:
+                continue  # Couldn't tell: leave the block alone and try again on the next sync.
         if event is None or event.get("status") == "cancelled":
             db.table("study_blocks").update({"status": "removed", "updated_at": now.isoformat()}).eq("id", block["id"]).execute()
             save_link(user_id, "gcal", "event", f"block:{block['id']}", link["external_id"], calendar, link.get("synced_hash") or "", removed=True)
@@ -377,7 +396,6 @@ def _sync_calendar(user_id: str) -> dict:
             removed += 1
             continue
         start, end = _event_window(event)
-        mine_start, mine_end = _time(block["starts_at"]), _time(block["ends_at"])
         if start and end and (start != mine_start or end != mine_end) and link.get("synced_hash") in _span_hashes(start, end):
             # Google still holds the time Cordia last sent, so the change is the student's, made on
             # Cordia's Calendar page: it goes to Google instead of being read back as a Google move.

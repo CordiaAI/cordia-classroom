@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
 os.environ.setdefault("SUPABASE_KEY", "test-key")
 
+from fastapi import HTTPException  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 import main  # noqa: E402
@@ -341,7 +342,13 @@ class CordiaMovesReachGoogle(unittest.TestCase):
         self.calls.append((slug, args))
         offset = "-06:00"
         if slug == "GOOGLECALENDAR_EVENTS_LIST":
-            return {"items": list(self.remote.values())}
+            # Like Google: only events that end after timeMin come back.
+            floor = datetime.fromisoformat(args["timeMin"])
+            return {"items": [e for e in self.remote.values() if datetime.fromisoformat(e["end"]["dateTime"]) >= floor]}
+        if slug == "GOOGLECALENDAR_EVENTS_GET":
+            if args["event_id"] not in self.remote:
+                raise HTTPException(status_code=502, detail="The app didn't respond.")
+            return dict(self.remote[args["event_id"]])
         if slug in ("GOOGLECALENDAR_CREATE_EVENT", "GOOGLECALENDAR_UPDATE_EVENT"):
             event_id = args.get("event_id") or f"e{len(self.remote) + 1}"
             self.remote[event_id] = {"id": event_id, "status": "confirmed", "summary": args.get("summary"),
@@ -387,6 +394,67 @@ class CordiaMovesReachGoogle(unittest.TestCase):
         row.update({"starts_at": again.astimezone(timezone.utc).isoformat(), "ends_at": (again + timedelta(minutes=60)).astimezone(timezone.utc).isoformat()})
         google_sync.sync_calendar(ANA)
         self.assertEqual(len([c for c in self.calls if c[0] == "GOOGLECALENDAR_UPDATE_EVENT"]), 1)
+
+    # ---- Review round (PR 284): a block moved from the distant past into the future ----
+
+    def seed_synced_block(self, days_ago):
+        """A block (and its Google event, already synced) that sits more than a day in the past."""
+        from services import google_sync
+        old = (datetime.now(timezone.utc) - timedelta(days=days_ago)).replace(minute=0, second=0, microsecond=0)
+        end = old + timedelta(minutes=60)
+        self.db.rows("study_blocks").append({"id": B1, "user_id": ANA, "item_key": "canvas-1", "kind": "work", "status": "planned",
+                                             "starts_at": old.isoformat(), "ends_at": end.isoformat()})
+        self.remote["e1"] = {"id": "e1", "status": "confirmed", "summary": "Work on Argument essay draft",
+                             "start": {"dateTime": old.astimezone(ZONE).isoformat()}, "end": {"dateTime": end.astimezone(ZONE).isoformat()}}
+        google_sync.save_link(ANA, "gcal", "event", f"block:{B1}", "e1", "cal-cordia", google_sync._span_hash(old, end))
+        return self.db.rows("study_blocks")[0]
+
+    def test_a_block_moved_from_the_past_into_the_future_updates_its_google_event(self):
+        from services import google_sync
+        row = self.seed_synced_block(days_ago=5)
+        later = (datetime.now(timezone.utc) + timedelta(days=2)).replace(minute=0, second=0, microsecond=0)
+        row.update({"starts_at": later.isoformat(), "ends_at": (later + timedelta(minutes=60)).isoformat(), "status": "moved"})
+        result = google_sync.sync_calendar(ANA)
+        self.assertEqual((result["sent"], result["removed"]), (1, 0))
+        self.assertEqual(row["status"], "moved")  # Never marked removed.
+        self.assertEqual(datetime.fromisoformat(row["starts_at"]), later)
+        updates = [args for slug, args in self.calls if slug == "GOOGLECALENDAR_UPDATE_EVENT"]
+        self.assertEqual([u["event_id"] for u in updates], ["e1"])  # The existing event, not a new one.
+        self.assertEqual(updates[0]["start_datetime"], later.astimezone(ZONE).strftime("%Y-%m-%dT%H:%M:%S"))
+        self.assertFalse([c for c in self.calls if c[0] == "GOOGLECALENDAR_CREATE_EVENT"])
+        link = next(r for r in self.db.rows("connector_links") if r["cordia_id"] == f"block:{B1}")
+        self.assertFalse(link["removed_by_student"])
+
+    def test_a_moved_block_whose_event_was_deleted_in_google_is_still_removed(self):
+        from services import google_sync
+        row = self.seed_synced_block(days_ago=5)
+        later = (datetime.now(timezone.utc) + timedelta(days=2)).replace(minute=0, second=0, microsecond=0)
+        row.update({"starts_at": later.isoformat(), "ends_at": (later + timedelta(minutes=60)).isoformat(), "status": "moved"})
+        self.remote["e1"]["status"] = "cancelled"  # The student deleted it in Google.
+        result = google_sync.sync_calendar(ANA)
+        self.assertEqual((result["removed"], row["status"]), (1, "removed"))
+        self.assertFalse([c for c in self.calls if c[0] == "GOOGLECALENDAR_UPDATE_EVENT"])
+
+    def test_an_unmoved_block_whose_event_is_gone_is_still_removed(self):
+        from services import google_sync
+        row = self.seed_synced_block(days_ago=0)  # Inside the window; Google no longer lists the event.
+        row.update({"starts_at": (datetime.now(timezone.utc) + timedelta(hours=3)).replace(minute=0, second=0, microsecond=0).isoformat()})
+        start = google_sync._time(row["starts_at"])
+        row["ends_at"] = (start + timedelta(minutes=60)).isoformat()
+        google_sync.save_link(ANA, "gcal", "event", f"block:{B1}", "e1", "cal-cordia", google_sync._span_hash(start, start + timedelta(minutes=60)))
+        self.remote.clear()
+        result = google_sync.sync_calendar(ANA)
+        self.assertEqual((result["removed"], row["status"]), (1, "removed"))
+        self.assertFalse([c for c in self.calls if c[0] == "GOOGLECALENDAR_EVENTS_GET"])  # Nothing to look up: it was never moved.
+
+    def test_a_failed_lookup_leaves_a_moved_block_alone(self):
+        from services import google_sync
+        row = self.seed_synced_block(days_ago=5)
+        later = (datetime.now(timezone.utc) + timedelta(days=2)).replace(minute=0, second=0, microsecond=0)
+        row.update({"starts_at": later.isoformat(), "ends_at": (later + timedelta(minutes=60)).isoformat(), "status": "moved"})
+        self.remote.pop("e1")  # Google can't give the event back (a hiccup, or purged).
+        result = google_sync.sync_calendar(ANA)
+        self.assertEqual((result["removed"], row["status"]), (0, "moved"))
 
     # ---- Review round (PR 284): two quick adds must not make two Google events for one block ----
 

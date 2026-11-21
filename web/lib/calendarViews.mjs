@@ -267,6 +267,15 @@ export function needsStudyTime(deadlines, blocks, now = new Date()) {
   return dueSoon(deadlines, now).filter(entry => !hasStudyTime(entry, blocks));
 }
 
+// The Agenda's next-exam card: the nearest exam still ahead within 14 days, whether or not it has
+// readiness yet (a later exam with a review set never takes its place), or null.
+export function nextExam(deadlines, now = new Date()) {
+  const from = now.getTime();
+  return (deadlines || [])
+    .filter(entry => entry.exam && !entry.done && dueBy(entry).getTime() >= from && entry.at.getTime() - from <= 14 * DAY)
+    .sort((a, b) => a.at.getTime() - b.at.getTime())[0] || null;
+}
+
 // The one action an Agenda row offers.
 export function rowAction(entry, blocks, now = new Date()) {
   if (entry.kind === 'study') return entry.done || entry.end < now ? null : 'start';

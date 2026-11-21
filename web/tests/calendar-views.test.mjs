@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   agendaDays, blockLabel, blockTitle, buildBlocks, cleanTitle, dueBy, dueSoon, buildDeadlines, classFor, classIndex, courseKey, dayEntries,
-  endsInTime, examGuides, examProgress, examReviewGuide, gridBox, hasStudyTime, lanes, monthCell, monthGrid, needsStudyTime, nowLine, offGrid,
+  endsInTime, examGuides, examProgress, examReviewGuide, gridBox, hasStudyTime, lanes, monthCell, monthGrid, needsStudyTime, nextExam, nowLine, offGrid,
   pickView, plannedHours, roomOn, rowAction, shiftBlock, span, startOfWeek, startsInGrid, weekRangeLabel,
 } from '../lib/calendarViews.mjs';
 import { classExams, examReadiness, learnQuestions } from '../lib/examCountdown.mjs';
@@ -281,4 +281,25 @@ test('a guide dated weeks before an exam is not that exam\'s readiness', () => {
   assert.equal(examGuides([final, friday], [quiz], '2026-11-19')['canvas-f'], undefined);
   const dec18 = { id: 'g-dec18', title: 'Final review notes', folder_id: 'f-ma', flashcard_progress: { learn: { test_date: '2026-12-18' } } };
   assert.equal(examGuides([final], [quiz, dec18], '2026-11-19')['canvas-f'].id, 'g-dec18', 'falls back to the exact-day guide');
+});
+
+// ---- Round 5 (PR 284) ----
+
+test('the Agenda\'s next-exam card is always the nearest exam, never a later one that has readiness', () => {
+  const exams = buildDeadlines([
+    { id: 'late', title: 'Exam 4 [MA-125-001]', due_at: at(25, 9), type: 'exam' },
+    { id: 'near', title: 'Exam 3 [MA-125-001]', due_at: at(19, 9, 30), type: 'exam' },
+  ], index);
+  // Only the later exam has readiness; the card still names the nearer one (its review-set prompt shows).
+  const readiness = { late: { percent: 60, left: 4, perDay: 1 } };
+  const card = nextExam(exams, NOW);
+  assert.equal(card.id, 'near');
+  assert.equal(readiness[card.id], undefined, 'no readiness yet: the card offers "Make a review set"');
+  // Readiness on the nearer exam changes nothing about which exam it is.
+  assert.equal(nextExam(exams, NOW).id, 'near');
+  // Done, past and too-far exams are skipped; with none left there is no card.
+  assert.equal(nextExam(exams.map(e => (e.id === 'near' ? { ...e, done: true } : e)), NOW).id, 'late');
+  assert.equal(nextExam(exams, new Date(2026, 10, 20)).id, 'late');
+  assert.equal(nextExam(buildDeadlines([{ id: 'far', title: 'Final [MA-125-001]', due_at: new Date(2026, 11, 10, 9).toISOString(), type: 'exam' }], index), NOW), null);
+  assert.equal(nextExam([], NOW), null);
 });

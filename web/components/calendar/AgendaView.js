@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, CalendarCheck, GraduationCap } from 'lucide-react';
-import { agendaDays, clock, dueBy, dueSoon, dueWhen, monthGrid, rowAction, sameDay, span, startOfWeek } from '../../lib/calendarViews.mjs';
+import { agendaDays, clock, dueBy, dueSoon, dueWhen, monthGrid, nextExam, rowAction, sameDay, span, startOfWeek } from '../../lib/calendarViews.mjs';
 import { dayKey } from '../../lib/learnEngine.mjs';
 import { ClassTag, DueIcon, EmptyRing, ICON, ReadyRing, SMALL_ICON, StudyIcon, toneStyle } from './parts';
 
@@ -18,18 +18,12 @@ function kindText(entry) {
   return entry.exam ? 'Exam' : 'Due';
 }
 
-// The nearest exam still ahead with its readiness (or none yet), for the card at the top.
-function nextExam(deadlines, readiness, now) {
-  const exams = deadlines.filter(entry => entry.exam && !entry.done && dueBy(entry) >= now && entry.at - now <= 14 * 86400000);
-  return exams.find(entry => readiness[entry.id]) || exams[0] || null;
-}
-
 // Agenda (B): Yesterday, Today, Tomorrow and later as one list, each row with one action; beside
 // it the next exam's readiness, a mini month and Needs study time. On a phone, the only view.
 export default function AgendaView({ deadlines, blocks, needs, readiness, readinessIn, now, weekStart, saving, onOpen, onFind, finding, wide, onJump }) {
   const days = agendaDays(weekStart, deadlines, blocks, now);
   const empty = !days.some(({ entries }) => entries.length);
-  const exam = nextExam(deadlines, readiness, now);
+  const exam = nextExam(deadlines, now);
   const ready = exam && readiness[exam.id];
 
   function action(entry) {
