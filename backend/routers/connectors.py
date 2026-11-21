@@ -20,7 +20,7 @@ from ids import is_uuid
 from rate_limit import limiter
 from routers.calendar import calendar_for
 from services import composio
-from services import connector_settings, google_sync, notion_text, sync_state
+from services import connector_settings, google_sync, notion_text, sync_state, tutor_status
 from services import file_extraction as files
 
 router = APIRouter(tags=["connectors"])
@@ -347,10 +347,13 @@ def tutor_material(user_id: str, question: str) -> Optional[dict]:
         return {**found, "problem": f"{name} is switched off for the Tutor. Turn it on in Settings › Connectors › {name}."}
     if connector in {"gcal", "gtasks"}:
         title = "Your next 14 days" if connector == "gcal" else "Your open tasks"
+        tutor_status.note_step(f"Checking {name} for {title[0].lower()}{title[1:]}")
         return {**found, "title": f"{name}: {title}", "text": _upcoming_from_app(account, user_id, connector)}
     # One budget for the whole message: the searches and the page read together (notion_text.TUTOR_*).
     deadline, searches = time.monotonic() + notion_text.TUTOR_TIME_BUDGET, 0
-    for terms in _search_terms(question, connector):
+    wanted = _search_terms(question, connector)
+    tutor_status.note_step(f"Checking {name} for {wanted[0][:40].strip()}" if wanted else f"Checking {name}")
+    for terms in wanted:
         if connector == "notion" and time.monotonic() >= deadline:
             break
         if connector == "gdrive":
