@@ -1072,6 +1072,15 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 .chat-home-hero { display: grid; gap: 8px; padding: 0 8px; }
 .chat-home-hero h1.chat-home-headline { margin: 0; color: var(--ink); font-size: 2.5rem !important; line-height: 1.12 !important; }
 .chat-home-line { margin: 0; color: var(--muted); font: 500 1.0625rem/1.5 var(--font-sans); font-variant-numeric: tabular-nums; }
+/* The headline follows the class picker (H1): the old words and the new are laid over each other in
+   one cell and cross-fade for 150ms, so the column keeps its place. Linear, so the two add up to
+   full strength all the way through. */
+.chat-home-copy-stack { display: grid; }
+.chat-home-copy { grid-area: 1 / 1; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.chat-home-copy.is-entering { animation: c-hero-in 150ms linear both; }
+.chat-home-copy.is-leaving { animation: c-hero-out 150ms linear both; pointer-events: none; }
+@keyframes c-hero-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes c-hero-out { from { opacity: 1; } to { opacity: 0; } }
 .chat-home-pills { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 4px; }
 .chat-home-pill {
   display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 11px; border: 0; border-radius: var(--r-pill);
@@ -1222,6 +1231,7 @@ body:has(.app-shell.is-focus) .rec-pill { top: 12px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .chat-home .chat-home-thread { animation: none; }
+  .chat-home-copy.is-entering, .chat-home-copy.is-leaving { animation: none; }
   .chat-home-pill:hover, .chat-home-pill:active, .composer-send.is-ready:hover, .composer-send.is-ready:active { transform: none; }
 }
 @media (prefers-reduced-transparency: reduce) {

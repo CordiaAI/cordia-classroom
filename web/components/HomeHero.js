@@ -1,0 +1,37 @@
+import { useEffect, useState } from 'react';
+
+// The chat home's headline and the line under it (DESIGN-SPEC 4.1). When the words change (a
+// different class picked, or the day's data arriving) the old ones fade out as the new ones fade in,
+// 150ms, laid over each other so the column keeps its place. Reduced motion: the words just change.
+// Only the new words are a heading and are read out; the fading copy is hidden from assistive tech.
+export const HERO_FADE_MS = 150;
+
+const quiet = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+export default function HomeHero({ title, line = '' }) {
+  const key = `${title}\n${line}`;
+  const [seen, setSeen] = useState({ key, title, line, previous: null });
+  if (seen.key !== key) setSeen({ key, title, line, previous: quiet() ? null : { key: seen.key, title: seen.title, line: seen.line } });
+  const { previous } = seen;
+  useEffect(() => {
+    if (!previous) return undefined;
+    const timer = setTimeout(() => setSeen(current => (current.previous?.key === previous.key ? { ...current, previous: null } : current)), HERO_FADE_MS);
+    return () => clearTimeout(timer);
+  }, [previous]);
+  return (
+    <div className="chat-home-hero">
+      <div className="chat-home-copy-stack">
+        {previous && (
+          <div key={'out:' + previous.key} className="chat-home-copy is-leaving" aria-hidden="true">
+            <h1 className="chat-home-headline">{previous.title}</h1>
+            {previous.line && <p className="chat-home-line">{previous.line}</p>}
+          </div>
+        )}
+        <div key={key} className={'chat-home-copy' + (previous ? ' is-entering' : '')}>
+          <h1 className="chat-home-headline">{title}</h1>
+          {line && <p className="chat-home-line">{line}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
