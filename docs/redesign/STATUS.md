@@ -26,6 +26,7 @@ States: waiting, building, checking, fixing, merged, blocked.
 
 Newest first. One entry per hand-off, check, verdict, fix request, merge or block.
 
+- 2026-11-21 F5 STOPPED per Jude's rule; #287 left as a DRAFT. Narrow check (Rook, a2567a6e55c5e0d97) at de8e081: item 3 (split sets) PASSES; item 4 (openings) PASSES (38 fresh inputs, 0 wrong; subject parts kept; note: "In the lecture, what topics were covered?" is now asked as written); item 1 FAILS only in the Claude connector (record_answer's remaining count and get_due_cards/get_study_set can include cards the app hides; app side agrees on 2,500 random guides) plus the Knowledge map totals; item 2 FAILS on new shapes ("on unit 7 in" 262-286 ms vs the 0.2 s limit). Nothing started. A possible later option for Jude: ship F5 with the Claude-connector paths left on today's behaviour and the wording route removed, since the app side passed.
 - 2026-11-21 #284 round 3 (Sage, a5e61778b905cbbea) pushed 3e27439 (1cfdf93, 3e27439), web only, all CI green incl. Vercel Security Review: edge pills fit their column, Month cell forms measured per cell, menus open upward clear of the Tutor button, ±1 day ring rule, refusals keep Undo, 8 AM label, aria-hidden pictures. Focused check (Rook) in `../cordia-review2` at 3e27439. H1 fix round (Wren) started. Builders: T4b and H1 fix. Reviews: F5 narrow check and #284.
 - 2026-11-21 #288 (H1) review (Rook, a187844a9dbcde4e7): NOT FINISHED, 1 High (a word-only class name matches another class containing it: "Calculus I" shows Calculus II's deadline), 3 Medium (weak-idea readiness can differ a lot from Learn's; the line doesn't follow the clock with the page open; nursing titles repeat the course code), 5 Low. Passed: branches and order, greeting windows and weighting, determinism, no request on a pick, copy rules, crossfade and reduced motion, no layout shift, contrast. Out of scope but noted: the suggestion pills don't follow the class picker (possible follow-up). Fix card `cards/H1-fix.txt` (Sonnet), queued.
 - 2026-11-21 H1 built (Wren, ad00b4489c0f52a7d): DRAFT CordiaAI/cordia-classroom#288 (bbd5334, 90b5f4c, ac71a22), web only, all checks green incl. Vercel Security Review; 17 headline unit tests, 19/19 browser checks; no extra request on a class pick; weak-idea readiness from summary data (may differ slightly from Learn's). Review (Rook) in `../cordia-review2` at ac71a22. T4b (Juno, Sonnet) started in `../cordia-T4b` on `feedback/T4b-thinking-lines` from 2f856ba. Builders: #284 round 3 and T4b. Reviews: F5 narrow check (#287) and H1 (#288).
@@ -206,6 +207,9 @@ Findings logged instead of blocking a merge, under fast mode. Clear each one or 
 - Builder cards must say: open the pull request as a DRAFT and never mark it ready (only the director does, after review), and never set the `director-review` status.
 
 ## Blocked
+
+- **F5** stopped again 2026-11-21 (Jude's rule after the narrow check). App side passes; failures are in the Claude connector paths and the wording route's CPU on new shapes. #287 stays a draft until Jude decides.
+
 
 Each blocked task: the failures word for word, what was tried, and what Jude needs to decide.
 
