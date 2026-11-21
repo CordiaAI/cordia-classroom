@@ -36,17 +36,27 @@ const LEAVE_MS = 180; // the view fades out over the chat (DESIGN-SPEC 6.1: exit
 export default function VoiceMode({ tutor, onClose }) {
   // End turns the microphone and voice off at once (useVoiceMode end()); the view then fades out and the chat is back.
   const [leaving, setLeaving] = useState(false);
+  // The view fades in by a transition (not a keyframe animation), so End during the fade-in turns it around from
+  // wherever its opacity is now instead of jumping to full first.
+  const [open, setOpen] = useState(false);
   const leave = () => {
     setLeaving(true);
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     setTimeout(onClose, still ? 0 : LEAVE_MS);
   };
   const voice = useVoiceMode({ tutor, onClose: leave });
-  const { phase, heard, said, cue, note, error, problem, micOn, meterRef, start, interrupt, end } = voice;
+  const { phase, heard, sent, said, cue, note, error, problem, micOn, meterRef, start, interrupt, end } = voice;
   const rootRef = useRef(null);
 
   // The microphone goes on now, after the student opened voice mode, and off when it closes.
   useEffect(() => { start(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Two frames after it is on the page at opacity 0, so the browser has drawn the start of the fade.
+  useEffect(() => {
+    let inner = 0;
+    const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => setOpen(true)); });
+    return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); };
+  }, []);
 
   // The view holds focus (so Space interrupts), keeps Tab inside it, and stops the page under it scrolling.
   useEffect(() => {
@@ -83,7 +93,7 @@ export default function VoiceMode({ tutor, onClose }) {
   const stateLine = phase === 'listening' && CUE[cue] ? CUE[cue] : STATE[phase];
 
   const view = (
-    <div ref={node => { rootRef.current = node; meterRef.current = node; }} className={`voice-view is-${phase}${leaving ? ' is-leaving' : ''}`} role="dialog" aria-modal="true" aria-labelledby="voice-title" aria-describedby="voice-privacy"
+    <div ref={node => { rootRef.current = node; meterRef.current = node; }} className={`voice-view is-${phase}${open && !leaving ? ' is-open' : ''}${leaving ? ' is-leaving' : ''}`} role="dialog" aria-modal="true" aria-labelledby="voice-title" aria-describedby="voice-privacy"
       tabIndex={-1} onKeyDown={onKeyDown} onClick={onClick}>
       <header className="voice-top">
         <h2 id="voice-title" className="voice-title">Voice mode</h2>
@@ -98,6 +108,8 @@ export default function VoiceMode({ tutor, onClose }) {
           <img className="voice-mark" src="/academic-butterfly-open-book.png" alt="" />
         </div>
         <p className="voice-state" aria-live="polite">{stateLine || ''}</p>
+        {/* What was heard, read out once when Thinking starts (the captions below change too often to be live). */}
+        <p className="sr-only" aria-live="polite" aria-atomic="true">{sent ? `You said: ${sent}` : ''}</p>
 
         {phase === 'blocked' ? (
           <div className="voice-problem" role="alert">
@@ -141,8 +153,9 @@ export default function VoiceMode({ tutor, onClose }) {
           background: var(--glass-sheen), var(--glass-fill-strong);
           -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
           color: var(--ink); font-family: var(--font-sans); cursor: default; overflow-y: auto;
-          animation: voice-in var(--dur-enter) var(--ease) both;
+          opacity: 0; transition: opacity var(--dur-enter) var(--ease);
         }
+        .voice-view.is-open { opacity: 1; }
         .voice-view::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: var(--glass-grain) repeat; background-size: 180px 180px; opacity: var(--glass-grain-opacity); }
         .voice-view.voice-view:focus-visible { outline: none !important; }
         @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .voice-view { background: var(--surface-raised); } }
@@ -208,14 +221,15 @@ export default function VoiceMode({ tutor, onClose }) {
           .voice-mark { width: 60px; }
           .voice-said, .voice-thinking { font-size: var(--fs-20); }
         }
-        .voice-view.is-leaving { animation: voice-out ${LEAVE_MS}ms var(--ease-exit) both; pointer-events: none; }
-        @keyframes voice-in { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes voice-out { from { opacity: 1; } to { opacity: 0; } }
+        .voice-view.is-leaving { opacity: 0; transition: opacity ${LEAVE_MS}ms var(--ease-exit); pointer-events: none; }
         /* Each new sentence fades in, so the eye sees the caption move on (live captions change every few seconds). */
         @keyframes voice-said-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes voice-breathe { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
         @media (prefers-reduced-motion: reduce) {
-          .voice-view, .voice-view.is-leaving, .voice-said { animation: none; }
+          .voice-view, .voice-view.is-leaving { transition: none; }
+          .voice-view { opacity: 1; }
+          .voice-view.is-leaving { opacity: 0; }
+          .voice-said { animation: none; }
           .voice-view .voice-mark { animation: none !important; opacity: 1; }
           .voice-ring, .voice-meter::after { transition: none; }
         }

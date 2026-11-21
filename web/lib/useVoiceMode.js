@@ -4,7 +4,7 @@ import { applyResults, dictationInterim, dictationText, finishDictation, startDi
 import { tutorVoice } from './tutorPrefs';
 import {
   cloudVoiceAllowed, createBargeIn, createTurnDetector, fallbackNote, levelFrom, micProblem, pickBrowserVoice,
-  recordingType, speakableReply, splitSentences,
+  listenFallback, recordingType, speakableReply, splitSentences,
 } from './voiceMode.mjs';
 
 // Tutor voice mode's engine (components/VoiceMode.js draws it; the rules are in lib/voiceMode.mjs).
@@ -18,7 +18,8 @@ import {
 //     Pro and trial accounts (POST /tutor/speak), the browser's voice otherwise or when the cloud voice can't;
 //   talking over the Tutor, a tap or Space stops the voice at once and listens again.
 // Nothing is kept: audio goes to the Whisper path and is dropped; sentences are fetched and played, never cached.
-// Returns { phase, heard, said, cue, note, error, problem, micOn, meterRef, start, interrupt, end }.
+// Returns { phase, heard, sent, said, cue, note, error, problem, micOn, meterRef, start, interrupt, end }.
+//   sent: the words that went to the Tutor this turn, set once when Thinking starts (the view announces them to screen readers).
 //   phase: starting | listening | thinking | speaking | blocked; cue: '' | 'stopped' | 'missed'.
 
 const FRAME_MS = 50;
@@ -30,6 +31,7 @@ const MIN_AUDIO_BYTES = 1200;
 export default function useVoiceMode({ tutor, onClose }) {
   const [phase, setPhase] = useState('starting');
   const [heard, setHeard] = useState('');
+  const [sent, setSent] = useState('');
   const [said, setSaid] = useState('');
   const [cue, setCue] = useState('');
   const [note, setNote] = useState('');
@@ -177,6 +179,7 @@ export default function useVoiceMode({ tutor, onClose }) {
     go('listening');
     setCue(nextCue);
     setHeard('');
+    setSent('');
     setSaid('');
     s.vad?.reset();
     s.turnStart = Date.now();
@@ -195,6 +198,10 @@ export default function useVoiceMode({ tutor, onClose }) {
       });
       const data = await response.json().catch(() => null);
       if (response.status === 503 || response.status === 415) { s.whisper = false; return ''; }
+      // Voice listening is limited (a rate and a monthly cap): the browser's speech recognition takes over, or the
+      // student is told why. The cap stays for the session; the rate is only for the minute.
+      if (response.status === 429) return { fallback: 'rate' };
+      if (response.status === 402 && data?.detail?.feature === 'voice_turns') { s.whisper = false; s.whisperLimited = true; return { fallback: 'limit' }; }
       if (response.status === 402) return { limit: data?.detail };
       return response.ok ? String(data?.text || '').trim() : '';
     } catch {
@@ -272,9 +279,20 @@ export default function useVoiceMode({ tutor, onClose }) {
       end();
       return;
     }
-    const text = (written || recognized || '').trim();
-    if (!text) { listen('missed'); return; }
+    // When the Whisper path can't write this turn down, the browser's own recognition did (or nothing did, and
+    // the student is told why in one line).
+    let fallback = written?.fallback ? listenFallback(written.fallback, Boolean(recognized)) : null;
+    if (fallback?.note) setNote(fallback.note);
+    // Over this month's cap with no browser recognition to take over: every turn would say nothing, so say why.
+    if (!fallback && s.whisperLimited && !recognized) fallback = listenFallback('limit', false);
+    const text = (typeof written === 'string' ? written || recognized : recognized || '').trim();
+    if (!text) {
+      if (fallback?.error) { setError(fallback.error); listen(); return; }
+      listen('missed');
+      return;
+    }
     setHeard(text);
+    setSent(text);
     const result = await tutorRef.current.sendVoice(text);
     if (s.turn !== turn) return;
     if (!result?.ok) {
@@ -380,5 +398,5 @@ export default function useVoiceMode({ tutor, onClose }) {
     s.context?.close().catch(() => {});
   }, [stopSpeaking]);
 
-  return { phase, heard, said, cue, note, error, problem, micOn, meterRef, start, interrupt, end };
+  return { phase, heard, sent, said, cue, note, error, problem, micOn, meterRef, start, interrupt, end };
 }

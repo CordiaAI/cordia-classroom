@@ -205,4 +205,18 @@ export function fallbackNote(reason) {
   return '';
 }
 
+// When the Whisper path stops writing the student's turns down: 'limit' (this month's voice listening is used up,
+// a 402 with feature voice_turns) or 'rate' (too many turns in a minute, a 429). One line each.
+// note: the browser's own speech recognition wrote this turn down. error: nothing could, so the student is told why.
+export function listenFallback(reason, heardByBrowser) {
+  if (reason === 'limit') {
+    return heardByBrowser
+      ? { note: "You've used this month's voice listening, so your browser is writing down what you say." }
+      : { error: "You've used this month's voice listening. Type your message instead." };
+  }
+  return heardByBrowser
+    ? { note: 'That was a lot of voice turns in a minute, so your browser wrote this one down.' }
+    : { error: 'That was a lot of voice turns in a minute. Wait a moment and try again, or type instead.' };
+}
+
 export const PRIVACY_NOTE = 'Voice audio is transcribed and not stored.';

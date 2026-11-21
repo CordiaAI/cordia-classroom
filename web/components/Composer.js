@@ -46,12 +46,15 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
     setCanVoice(Boolean(navigator.mediaDevices?.getUserMedia) && (typeof MediaRecorder !== 'undefined' || recognizes));
   }, []);
   function openVoice() {
+    if (blocked) return; // aria-disabled, not disabled: the button keeps focus (and can take it back), so it must not act
     stopDictation();
     setVoiceOpen(true);
   }
   function closeVoice() {
     setVoiceOpen(false);
-    requestAnimationFrame(() => voiceButtonRef.current?.focus({ preventScroll: true }));
+    // Focus goes back to the voice button, which stays focusable while the Tutor is busy (aria-disabled, never disabled),
+    // or to the message box if it is gone: ending voice mode during Thinking never drops focus on the page.
+    requestAnimationFrame(() => (voiceButtonRef.current || boxRef.current)?.focus({ preventScroll: true }));
   }
   const minHeight = variant === 'home' ? 88 : 52;
   const hasSomething = Boolean(input.trim()) || attachments.length > 0;
@@ -148,7 +151,7 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
           </button>
         )}
         {canVoice && (
-          <button type="button" ref={voiceButtonRef} className="composer-icon" onClick={openVoice} disabled={blocked}
+          <button type="button" ref={voiceButtonRef} className="composer-icon" onClick={openVoice} aria-disabled={blocked || undefined}
             aria-label="Start voice mode" aria-haspopup="dialog" title="Talk with the Tutor out loud">
             <AudioLines size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>

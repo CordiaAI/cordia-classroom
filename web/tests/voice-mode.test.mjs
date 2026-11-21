@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  PRIVACY_NOTE, PUT_IN_CHAT, SILENCE_MS, cloudVoiceAllowed, createBargeIn, createTurnDetector, fallbackNote, levelFrom,
+  PRIVACY_NOTE, PUT_IN_CHAT, SILENCE_MS, cloudVoiceAllowed, createBargeIn, createTurnDetector, fallbackNote, levelFrom, listenFallback,
   micHelp, micProblem, pickBrowserVoice, recordingType, speakableReply, splitSentences,
 } from '../lib/voiceMode.mjs';
 import { VOICE_FEATURE, VOICE_TURN_LIMITS, VOICE_TURN_RATE, createLectureService, resetVoiceTurns } from '../lib/server/lectures.mjs';
@@ -335,4 +335,67 @@ test('voice copy is sentence case with no exclamation marks, and every colour is
     assert.doesNotMatch(source, /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/);
     assert.doesNotMatch(source, /transition:\s*all/);
   }
+});
+
+// ---- Review fixes: what the view does when listening is limited, focus, the fade, the announcement, Free's picker ----
+
+test('a limited transcribe call falls back to the browser listening, or says why in one line', () => {
+  for (const reason of ['limit', 'rate']) {
+    const heard = listenFallback(reason, true);
+    const silent = listenFallback(reason, false);
+    assert.ok(heard.note && !heard.error && silent.error && !silent.note, reason);
+    for (const line of [heard.note, silent.error]) assert.ok(!line.includes('\n') && !line.includes('!') && /^[A-Z]/.test(line), line);
+  }
+  assert.match(listenFallback('limit', false).error, /Type your message instead\.$/);
+  // The engine: 429 and the voice_turns 402 fall back; the Tutor's own 402 still closes voice mode with the upgrade window.
+  assert.match(engine, /response\.status === 429\) return \{ fallback: 'rate' \}/);
+  assert.match(engine, /response\.status === 402 && data\?\.detail\?\.feature === 'voice_turns'\) \{ s\.whisper = false;[^}]*return \{ fallback: 'limit' \}/);
+  assert.match(engine, /if \(response\.status === 402\) return \{ limit: data\?\.detail \}/);
+  assert.match(engine, /listenFallback\(written\.fallback, Boolean\(recognized\)\)/);
+  assert.match(engine, /if \(fallback\?\.error\) \{ setError\(fallback\.error\); listen\(\); return; \}/);
+  // The cap stays for the session: no more audio is sent once it is reached.
+  assert.match(engine, /if \(!s\.whisper \|\| !blob/);
+});
+
+test('ending voice mode while the Tutor is busy never loses focus: the voice button is aria-disabled, never disabled', () => {
+  const button = composer.slice(composer.indexOf('ref={voiceButtonRef}'));
+  const tag = button.slice(0, button.indexOf('>\n'));
+  assert.match(tag, /aria-disabled=\{blocked \|\| undefined\}/);
+  assert.doesNotMatch(tag, /(?<![-\w])disabled=/);
+  assert.match(composer, /function openVoice\(\) \{\s*if \(blocked\) return;/);
+  assert.match(composer, /\(voiceButtonRef\.current \|\| boxRef\.current\)\?\.focus\(/);
+  const css = read('../styles/system.css');
+  assert.match(css, /\.composer-icon:disabled, \.composer-icon\[aria-disabled='true'\] \{ cursor: default; opacity: \.5; \}/);
+  assert.match(css, /\.composer-icon:not\(:disabled\):not\(\[aria-disabled='true'\]\):not\(\.is-on\):hover/);
+});
+
+test('the view fades by an opacity transition both ways, so End during the entrance reverses from where it is', () => {
+  assert.doesNotMatch(view, /@keyframes voice-in|@keyframes voice-out|animation: voice-in|animation: voice-out/);
+  assert.match(view, /opacity: 0; transition: opacity var\(--dur-enter\) var\(--ease\);/);
+  assert.match(view, /\.voice-view\.is-open \{ opacity: 1; \}/);
+  assert.match(view, /\.voice-view\.is-leaving \{ opacity: 0; transition: opacity \$\{LEAVE_MS\}ms var\(--ease-exit\)/);
+  assert.match(view, /\$\{open && !leaving \? ' is-open' : ''\}/);
+  // Reduced motion: no transition at all, and the view is simply there (or gone).
+  const reduced = view.slice(view.indexOf('@media (prefers-reduced-motion: reduce) {\n          .voice-view, .voice-view.is-leaving'));
+  assert.match(reduced, /\.voice-view, \.voice-view\.is-leaving \{ transition: none; \}/);
+  assert.match(reduced, /\.voice-view \{ opacity: 1; \}/);
+  assert.match(view, /setTimeout\(onClose, still \? 0 : LEAVE_MS\)/);
+});
+
+test('what was heard is read to screen readers once, when Thinking starts', () => {
+  assert.match(engine, /setHeard\(text\);\s*setSent\(text\);\s*const result = await tutorRef\.current\.sendVoice\(text\)/);
+  assert.equal((engine.match(/setSent\(text\)/g) || []).length, 1);
+  assert.match(engine, /setSent\(''\);/); // cleared when listening starts again
+  assert.match(view, /<p className="sr-only" aria-live="polite" aria-atomic="true">\{sent \? `You said: \$\{sent\}` : ''\}<\/p>/);
+  // The live captions themselves are not live regions.
+  assert.doesNotMatch(view.slice(view.indexOf('className="voice-captions"'), view.indexOf('<footer')), /aria-live/);
+});
+
+test("Settings > Tutor: on Free the voice picker is preview-only, and at 390px it is two rows of two", () => {
+  assert.match(settings, /const previewOnly = Boolean\(status\) && !paid;/);
+  assert.match(settings, /aria-disabled=\{previewOnly \|\| undefined\}/);
+  assert.match(settings, /if \(previewOnly\) return;/);
+  assert.match(settings, /aria-describedby=\{previewOnly \? 'tutor-voice-note' : undefined\}/);
+  assert.match(settings, /id="tutor-voice-note"/);
+  assert.match(settings, /@media \(max-width: 520px\) \{\s*:global\(\.c-seg\.tutor-voice-picker\) \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
 });
