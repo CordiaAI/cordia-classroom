@@ -10,7 +10,7 @@
 import { applyResults, cardDue, scheduleChanges } from './spacedReview.mjs';
 import { LEVELS, answer, askCard, changedLevels, restoreLevels, saveableLevels } from './learnEngine.mjs';
 import { mergeRetainMisses, questionKey } from './retainMisses.mjs';
-import { conceptAnswer } from './retainEngine.mjs';
+import { askable, conceptAnswer } from './retainEngine.mjs';
 import { buildStudyQueue } from './studyQueue.mjs';
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
@@ -53,7 +53,7 @@ export function sourcesFor(guide, misses, parsed) {
     ({ front, back } = cards[parsed.ref]);
     found.index = parsed.ref;
   } else if (parsed.kind === 'idea') {
-    if (!questions[parsed.ref]) return null;
+    if (!questions[parsed.ref] || questions[parsed.ref].hidden) return null; // about the source: never asked
     front = questions[parsed.ref].question;
     back = conceptAnswer(questions[parsed.ref]);
     found.concept = parsed.ref;
@@ -70,7 +70,7 @@ export function sourcesFor(guide, misses, parsed) {
       if (index >= 0) found.index = index;
     }
     if (found.concept === undefined) {
-      const concept = questions.findIndex(question => questionKey(question?.question) === key && conceptAnswer(question));
+      const concept = questions.findIndex(question => questionKey(question?.question) === key && askable(question));
       if (concept >= 0) found.concept = concept;
     }
     const miss = (misses || []).find(item => questionKey(item.question) === key);

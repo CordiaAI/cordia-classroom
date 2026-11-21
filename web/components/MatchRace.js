@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { conceptAnswer, shuffled } from '../lib/retainEngine.mjs';
+import { askable, conceptAnswer, questionText, shuffled } from '../lib/retainEngine.mjs';
 import { readUserValue, writeUserValue } from '../lib/userStore';
 import { logAnswer } from '../lib/learningEvents';
 import { answerTimer } from '../lib/learningEvents.mjs';
@@ -40,7 +40,8 @@ const RING = { size: 44, stroke: 4 };
 
 // Match: pair each question with its answer before 60 seconds run out.
 export default function MatchRace({ questions, guideId, onRestart, onDone }) {
-  const pool = useMemo(() => questions.map((question, index) => ({ id: index, q: question.question, a: conceptAnswer(question) })).filter(item => item.q && item.a), [questions]);
+  // q (the saved text) keys the answer log; shown is what the tile says.
+  const pool = useMemo(() => questions.map((question, index) => ({ id: index, q: question.question, shown: questionText(question), a: conceptAnswer(question), ok: askable(question) })).filter(item => item.ok && item.q && item.a), [questions]);
   const [round, setRound] = useState(0);
   const [left, setLeft] = useState(SECONDS);
   const [picked, setPicked] = useState(null);
@@ -128,7 +129,7 @@ export default function MatchRace({ questions, guideId, onRestart, onDone }) {
       <div className="race-grid">
         <div className="race-col" role="group" aria-label="Questions">
           {batch.map(item => (
-            <button key={'q' + item.id} type="button" className={'race-tile' + (picked === item.id ? ' is-picked' : '') + (cleared.has(item.id) ? ' is-cleared' : '') + (merging === item.id ? ' is-merging is-q' : '')} aria-pressed={picked === item.id} disabled={cleared.has(item.id)} onClick={() => choose('q', item)}>{item.q}</button>
+            <button key={'q' + item.id} type="button" className={'race-tile' + (picked === item.id ? ' is-picked' : '') + (cleared.has(item.id) ? ' is-cleared' : '') + (merging === item.id ? ' is-merging is-q' : '')} aria-pressed={picked === item.id} disabled={cleared.has(item.id)} onClick={() => choose('q', item)}>{item.shown}</button>
           ))}
         </div>
         <div className="race-col" role="group" aria-label="Answers">

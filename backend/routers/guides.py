@@ -13,6 +13,7 @@ from services.llm import guide_title
 from services.sharing import on_guide_changed
 from routers.quiz import start_quiz_warmup
 from services import guide_versions, ideas
+from services.text_processing import hidden_card_positions, shown_guide, unmarked
 from auth_utils import get_user_id
 from ids import is_uuid, require_uuid
 from rate_limit import ai_rate_limit
@@ -66,15 +67,18 @@ class SaveGuideRequest(BaseModel):
         return v
 
 
-# Columns for list screens: everything except the large text and question sets.
-SUMMARY_COLUMNS = "id,folder_id,title,source_url,created_at,is_bookmarked,read_progress,source_type,source_title,flashcards,flashcard_progress"
+# Columns for list screens: everything except the large text. The cards and quiz are read only to
+# count the cards and say which are never studied; neither is sent.
+SUMMARY_COLUMNS = ("id,folder_id,title,source_url,created_at,is_bookmarked,read_progress,source_type,source_title,"
+                   "flashcards,flashcard_progress,quiz_questions")
 
 
 @router.get("")
 def list_guides(folder_id: Optional[str] = None, limit: int = 50, offset: int = 0, fields: str = "", authorization: str = Header(default="")):
     """List guides, optionally filtered by folder. Paginated.
-    fields=summary returns list metadata plus flashcard_count and flashcard_progress (for the
-    Dashboard's cards-due count), without guide text."""
+    fields=summary returns list metadata plus flashcard_count, flashcard_hidden (the places of the
+    cards never studied, hidden_card_positions) and flashcard_progress (for the cards-due counts),
+    without guide text, cards or quiz."""
     user_id = get_user_id(authorization)
     supabase = get_supabase()
     summary = fields == "summary"
@@ -99,11 +103,13 @@ def list_guides(folder_id: Optional[str] = None, limit: int = 50, offset: int = 
     if summary:
         for guide in guides:
             cards = guide.pop("flashcards", None)
+            questions = guide.pop("quiz_questions", None)
             guide["flashcard_count"] = len(cards) if isinstance(cards, list) else 0
+            guide["flashcard_hidden"] = hidden_card_positions(cards, questions)
             learned = flashcard_learn_levels(cards, guide.get("flashcard_progress"))
             if learned:
                 guide["flashcard_learn"] = learned
-    return {"guides": guides}
+    return {"guides": [shown_guide(guide) for guide in guides]}
 
 
 def _learn_fingerprint(question) -> str:
@@ -160,7 +166,7 @@ def create_guide(user_id: str, request: SaveGuideRequest, extra: Optional[dict] 
         data["folder_id"] = request.folder_id
 
     if request.flashcards:
-        data["flashcards"] = request.flashcards
+        data["flashcards"] = unmarked(request.flashcards)
 
     if request.external_source_id:
         data["external_source_id"] = request.external_source_id
@@ -180,7 +186,7 @@ def create_guide(user_id: str, request: SaveGuideRequest, extra: Optional[dict] 
     if result.data:
         row = result.data[0]
         start_quiz_warmup(row, user_id)
-        return row
+        return shown_guide(row)
     raise HTTPException(status_code=500, detail="Failed to save guide")
 
 
@@ -302,6 +308,8 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
     update_data = request.model_dump(exclude_unset=True)
     update_data.pop("keep_title", None)
     update_data.pop("share_default", None)
+    if "flashcards" in update_data:
+        update_data["flashcards"] = unmarked(update_data["flashcards"])  # a response's marks are never saved
     require_own_folder(supabase, user_id, update_data.get("folder_id"))
     if {"study_guide", "flashcards"} & set(update_data):
         update_data.update(_follow_ideas(supabase, user_id, guide_id, update_data))
@@ -321,7 +329,7 @@ def update_guide(guide_id: str, request: SaveGuideRequest, authorization: str = 
     guide = result.data[0]
     if {"title", "notes", "study_guide", "flashcards"} & set(update_data):
         guide = {**guide, **(_new_version(supabase, user_id, guide_id) or {})}
-    return {"guide": guide}
+    return {"guide": shown_guide(guide)}
 
 
 def _follow_ideas(db, user_id: str, guide_id: str, update: dict) -> dict:
@@ -408,7 +416,7 @@ def get_guide(guide_id: str, fields: str = "", authorization: str = Header(defau
     if not result.data:
         raise HTTPException(status_code=404, detail="Guide not found")
 
-    return {"guide": result.data[0]}
+    return {"guide": shown_guide(result.data[0])}
 
 
 @router.delete("/{guide_id}")

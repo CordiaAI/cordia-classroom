@@ -11,6 +11,7 @@ import { confidenceFor, itemFingerprint } from '../learningEvents.mjs';
 import { markdownToOutline } from '../markdownOutline.mjs';
 import { failure, notFound, ok, unavailable } from './output.mjs';
 import { registerTools } from './register.mjs';
+import { withShownQuizzes } from './wording.mjs';
 import { localDate, localDay, zonedIso } from './zoned.mjs';
 
 const id = z.uuid();
@@ -31,10 +32,22 @@ async function recordAnswer(ctx, { item_type, item_id, correct, confidence, resp
   if (!parsed || (item_type === 'practice') !== (parsed.kind === 'practice')) {
     return failure('That item_id is not one Cordia gave. Use a card_id from get_due_cards, or a question_id, problem_id or card_id from get_study_set.', 'invalid_input');
   }
-  const { data: guide, error } = await ctx.db.from('study_guides')
+  const { data: row, error } = await ctx.db.from('study_guides')
     .select('id, title, flashcards, flashcard_progress, quiz_questions, practice_state').eq('id', parsed.guideId).maybeSingle();
   if (error) return unavailable('study set');
-  if (!guide) return notFound('study set');
+  if (!row) return notFound('study set');
+  // An idea or a miss is marked as the app asks it, so a hidden one (about the source) is never
+  // answered here; a card or a practice problem doesn't depend on its wording, so it isn't looked up.
+  // If the backend can't say, the answer is still saved, against the saved text.
+  let guide = row;
+  if (parsed.kind === 'idea' || parsed.kind === 'miss') {
+    try {
+      const [marked] = await withShownQuizzes(ctx, [row]);
+      if (marked && marked.wording !== 'unknown') guide = marked;
+    } catch {
+      guide = row;
+    }
+  }
   const today = localDay(new Date(), ctx.timeZone);
   const [{ data: missRow }, { data: dayRow }] = await Promise.all([
     ctx.db.from('retain_misses').select('items').eq('guide_id', guide.id).maybeSingle(),

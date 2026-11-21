@@ -9,8 +9,12 @@
   short answer     the guide's own why / how / describe questions, with the stored answer as key
 
 Each item names its source question (`source`, the Q/A index) so one printout never asks the same
-idea twice. Matching, short answer and fill-in are cached on the guide (study_guides.print_items)
-under a hash of the Q/A they came from.
+idea twice. Pairs come as text_processing.shown_pairs gives them: each in its place (so `source` is
+the same index in the saved pairs, the shown pairs and the saved quiz), reworded, and `hidden` on one
+about the source. Hidden pairs keep their index and are never removed from the list; every type, its
+candidates and its writer read only open_indexes(pairs), so none is printed or sent to be written up.
+Matching, short answer and fill-in are cached on the guide (study_guides.print_items) under a hash of
+the Q/A they came from.
 """
 
 import hashlib
@@ -32,6 +36,11 @@ _STOP = {
 _EXPLAIN = re.compile(
     r"^\s*(why|how|describe|explain|compare|contrast|discuss|in what ways?|what (role|effect|impact|characterizes|are the (musical |main |key )?(characteristics|features|effects|causes)))\b",
     re.I)
+
+
+def open_indexes(pairs: list) -> list:
+    """The one list of Q/A indexes a printout may use: every pair but one about the source (hidden)."""
+    return [index for index, pair in enumerate(pairs) if not pair.get("hidden")]
 
 
 def source_hash(pairs: list) -> str:
@@ -109,12 +118,13 @@ def strip_stem(question: str, options: list) -> list:
 def multiple_choice(quiz: list, pairs: list) -> tuple:
     """(items, flagged): printable multiple-choice questions from the cached quiz. A question whose
     choices fail the distractor check is left out (flagged counts them) until the student refreshes
-    the answer choices; the saved quiz itself is never changed here."""
+    the answer choices; the saved quiz itself is never changed here. A question shown_questions
+    hid (about the source) is left out, and one it reworded is printed in its shown wording."""
     index_of = {normalize(pair["question"]): i for i, pair in enumerate(pairs)}
     others = [(str(q.get("question") or ""), concept_answer(q)) for q in quiz if isinstance(q, dict)]
     items, flagged = [], 0
     for position, question in enumerate(quiz):
-        if not isinstance(question, dict) or not isinstance(question.get("options"), list):
+        if not isinstance(question, dict) or not isinstance(question.get("options"), list) or question.get("hidden"):
             continue
         text, answer = str(question.get("question") or ""), concept_answer(question)
         options = [_plain(option) for option in question["options"]]
@@ -126,8 +136,9 @@ def multiple_choice(quiz: list, pairs: list) -> tuple:
             flagged += 1
             continue
         source = index_of.get(normalize(text), f"quiz:{position}")
-        items.append({"id": f"mc{position}", "source": source, "question": text,
-                      "options": strip_stem(text, options), "answer": correct})
+        shown = str(question.get("shown") or text)
+        items.append({"id": f"mc{position}", "source": source, "question": shown,
+                      "options": strip_stem(shown, options), "answer": correct})
     return items, flagged
 
 
@@ -149,7 +160,8 @@ def matching(pairs: list) -> list:
     """Term / definition pairs from short "What is X?" questions: the term is X as the question
     writes it, the definition the answer's first sentence without its "X is" / "It is" opening."""
     items, seen = [], set()
-    for index, pair in enumerate(pairs):
+    for index in open_indexes(pairs):
+        pair = pairs[index]
         term = (_defined_term(pair["question"]) or "").strip("'‘’\"")
         if not term or len(term.split()) > 4 or len(term) > 40:
             continue
@@ -174,7 +186,8 @@ def short_answer(pairs: list) -> list:
     """The guide's own why / how / describe questions with an answer long enough to explain,
     keyed with the stored answer."""
     items = []
-    for index, pair in enumerate(pairs):
+    for index in open_indexes(pairs):
+        pair = pairs[index]
         if _EXPLAIN.search(pair["question"]) and len(pair["answer"].split()) >= 8:
             items.append({"id": f"s{index}", "source": index, "question": pair["question"].strip(),
                           "key": pair["answer"].strip(), "points": SHORT_POINTS})
@@ -188,7 +201,7 @@ def fill_candidates(pairs: list, limit: int = 40) -> list:
     but short enough for one sentence. Ideas matching and short answer can't use come first, so a
     mixed printout covers more of the guide."""
     used = {item["source"] for item in matching(pairs) + short_answer(pairs)}
-    fits = [index for index, pair in enumerate(pairs) if 1 <= len(pair["answer"].split()) <= 35]
+    fits = [index for index in open_indexes(pairs) if 1 <= len(pairs[index]["answer"].split()) <= 35]
     ordered = [index for index in fits if index not in used] + [index for index in fits if index in used]
     return sorted(ordered[:limit])
 
@@ -245,7 +258,7 @@ def check_fill(sentence: str, question: str, answer: str) -> Optional[dict]:
 
 def fill_items(pairs: list, indexes: list, generated: list) -> list:
     """Checked fill-in items from Haiku's reply ({"id", "sentence"} per item); failures are dropped."""
-    items, seen = [], set()
+    items, seen, allowed = [], set(), set(open_indexes(pairs))
     for item in generated if isinstance(generated, list) else []:
         if not isinstance(item, dict):
             continue
@@ -256,6 +269,8 @@ def fill_items(pairs: list, indexes: list, generated: list) -> list:
         if not 0 <= n < len(indexes) or n in seen:
             continue
         index = indexes[n]
+        if index not in allowed:
+            continue  # about the source: never printed, whatever the model wrote
         checked = check_fill(item.get("sentence"), pairs[index]["question"], pairs[index]["answer"])
         if checked:
             seen.add(n)

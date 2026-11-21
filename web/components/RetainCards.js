@@ -4,7 +4,7 @@ import { BookOpen, Check, CircleDot, Lightbulb, Link2, MessageCircle, X } from '
 import { dismissTip, requestTip } from '../lib/tips';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { noteView, useAnswerTiming } from '../lib/learningEvents';
-import { choiceText, conceptAnswer, fillVerdict, normalize, shuffled } from '../lib/retainEngine.mjs';
+import { canChoose, choiceText, conceptAnswer, fillVerdict, gradeFailure, normalize, questionText, shuffled } from '../lib/retainEngine.mjs';
 import { makeCloze } from '../lib/learnEngine.mjs';
 
 // Learn's format ladder (LEARN_LADDER_V2) wraps a round in <QuietLimits.Provider value>: a plan limit
@@ -107,7 +107,7 @@ export function MemoryHook({ guideId, concept, question }) {
   return (
     <div className="retain-hook" role="status">
       <span className="retain-hook-title"><Lightbulb size={18} strokeWidth={1.75} aria-hidden="true" />Help me remember</span>
-      {question?.question && <p className="retain-hook-cue">{question.question}</p>}
+      {question?.question && <p className="retain-hook-cue">{questionText(question)}</p>}
       {hook === null && <p className="c-meta">Thinking of a way to remember it…</p>}
       {hook && <p>{hook}</p>}
       {hook && linked && (linkedHref(linked)
@@ -251,7 +251,7 @@ export function McCard({ card, question, guideId, onResult, onNext, askSure = tr
 
   return (
     <>
-      <div className="quiz-question-text">{question.question}</div>
+      <div className="quiz-question-text">{questionText(question)}</div>
       {options.map(option => (
         <button key={option} type="button" className={optionClass(option)} aria-pressed={selected === null ? pending === option : option === selected} onClick={() => choose(option)}>
           <span className="quiz-option-text">{option}</span>{optionMark(option)}
@@ -352,7 +352,7 @@ export function FillCard({ card, question, guideId, onResult, onNext, askSure = 
 
   return (
     <form onSubmit={check}>
-      <div className="quiz-question-text">{question.question}</div>
+      <div className="quiz-question-text">{questionText(question)}</div>
       <div className="retain-fill-row">
         <input
           className={'retain-fill-input' + verdictClass(typed.verdict)}
@@ -402,7 +402,7 @@ export function ClozeCard({ card, question, guideId, onResult, onNext, askSure =
 
   return (
     <form onSubmit={check}>
-      <div className="quiz-question-text">{question.question}</div>
+      <div className="quiz-question-text">{questionText(question)}</div>
       <p className="retain-cloze">
         {cloze.before}
         <span className={'retain-cloze-blank' + verdictClass(typed.verdict)}>{typed.verdict === null ? <span aria-label="missing word">______</span> : cloze.missing}</span>
@@ -497,7 +497,7 @@ export function MatchingCard({ card, questions, guideId, onResult, onNext }) {
           const state = !checked ? '' : normalize(value) === normalize(row.answer) ? ' right' : ' wrong';
           return (
             <li key={row.index} className={'retain-match-row' + state}>
-              <span>{row.question.question}</span>
+              <span>{questionText(row.question)}</span>
               <button
                 type="button"
                 className={'retain-slot' + (value ? ' filled' : '') + (picked ? ' ready' : '')}
@@ -527,13 +527,21 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
   const [busy, setBusy] = useState(false);
   const [grade, setGrade] = useState(null);
   const [error, setError] = useState('');
+  // The AI check didn't come back: the student sees the model answer and marks it themselves,
+  // recorded like a self-checked flashcard (selfMarked, no token). Nothing here needs the AI.
+  const [selfCheck, setSelfCheck] = useState(false);
   const [remembering, setRemembering] = useState(false);
   const timing = useAnswerTiming();
+  const time = useRef(null);
+  const answerRef = useRef(null);
+  const modelAnswer = conceptAnswer(question);
+  // The self-check opens on the model answer (read first, then judged), never on a button that gives credit.
+  useEffect(() => { if (selfCheck && !grade) answerRef.current?.focus(); }, [selfCheck, grade]);
 
   async function check(event) {
     event.preventDefault();
-    if (busy || grade || !value.trim()) return;
-    const time = timing.done(); // the answer, not the grading round trip
+    if (busy || grade || selfCheck || !value.trim()) return;
+    time.current = timing.done(); // the answer, not the grading round trip
     setBusy(true);
     setError('');
     const data = await apiFetch(`/quiz/${guideId}/grade`, {
@@ -548,18 +556,30 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
       return;
     }
     if (typeof data?.credit !== 'number') {
-      setError(data?.detail || 'Cordia could not check this answer right now.');
+      const failure = gradeFailure(data);
+      setError(failure.message);
+      // No AI checks left: asking again can't help, so the answer shows now. A failed try (network,
+      // server) can be tried again, or the student can check it themselves.
+      if (failure.limit) setSelfCheck(true);
       return;
     }
     setGrade(data);
     if (data.credit !== 1) askTutorAboutMiss(guideId, question, value.trim());
-    onResult([{ concept, credit: data.credit, response: value.trim(), token: data.token, timing: time, answerChars: value.trim().length }]);
+    onResult([{ concept, credit: data.credit, response: value.trim(), token: data.token, timing: time.current, answerChars: value.trim().length }]);
+  }
+
+  function mark(credit) {
+    if (grade) return;
+    const response = value.trim();
+    setGrade({ credit, answer: modelAnswer, explanation: 'You checked this one yourself.', self: true });
+    if (credit !== 1) askTutorAboutMiss(guideId, question, response);
+    onResult([{ concept, credit, response, timing: time.current ?? timing.done(), answerChars: response.length, selfMarked: true }]);
   }
 
   const [tone, label] = grade ? VERDICTS[grade.credit] : [];
   return (
     <form onSubmit={check}>
-      <div className="quiz-question-text">{question.question}</div>
+      <div className="quiz-question-text">{questionText(question)}</div>
       <textarea
         className="retain-written-input"
         value={value}
@@ -568,20 +588,33 @@ export function WrittenCard({ card, question, guideId, onResult, onNext, onSwitc
         placeholder="Your answer"
         aria-label="Your answer"
         rows={4}
-        readOnly={Boolean(grade) || busy}
+        readOnly={Boolean(grade) || busy || selfCheck}
         maxLength={4000}
         autoFocus
       />
-      {!grade && (
+      {!grade && !selfCheck && (
         <div className="retain-written-actions">
           <button type="submit" className="c-btn c-btn--primary" disabled={busy || !value.trim()}>{busy ? 'Checking…' : 'Check'}</button>
           {error && (
             <>
               <span className="retain-action-error" role="alert">{error}</span>
-              <button type="button" className="c-btn c-btn--secondary" onClick={() => onSwitch('mc')}>Use choices</button>
+              <button type="button" className="c-btn c-btn--secondary" onClick={() => setSelfCheck(true)}>Check it myself</button>
+              {canChoose(question) && <button type="button" className="c-btn c-btn--secondary" onClick={() => onSwitch?.('mc')}>Use choices</button>}
             </>
           )}
         </div>
+      )}
+      {!grade && selfCheck && (
+        <>
+          <div className="retain-feedback partial" role="status" ref={answerRef} tabIndex={-1}>
+            <strong>{error || 'Check this one yourself.'}</strong> Here is the answer. Compare it with yours.
+            <p className="retain-guide-answer"><span>Answer</span>{modelAnswer}</p>
+          </div>
+          <div className="quiz-next-row">
+            <button type="button" className="c-btn c-btn--secondary" onClick={() => mark(0)}>I missed it</button>
+            <button type="button" className="c-btn c-btn--primary quiz-next" onClick={() => mark(1)}>I got it</button>
+          </div>
+        </>
       )}
       {grade && (
         <div className={'retain-feedback ' + tone} role="status">

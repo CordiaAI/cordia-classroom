@@ -1,0 +1,361 @@
+{
+ "today": "2026-11-21",
+ "rows": [
+  {
+   "id": "g1",
+   "title": "Renal",
+   "folder_id": null,
+   "created_at": "2026-11-04",
+   "flashcards": [
+    {
+     "front": "What does Slide 4 show?",
+     "back": "Nephron"
+    },
+    {
+     "front": "Which topics are covered in Chapter 1?",
+     "back": "Renal anatomy"
+    },
+    {
+     "front": "According to the slides, what is renin?",
+     "back": "An enzyme"
+    }
+   ],
+   "flashcard_progress": {
+    "schedule": {
+     "2": {
+      "box": 1,
+      "due": "2026-11-20"
+     }
+    }
+   },
+   "quiz_questions": []
+  },
+  {
+   "id": "g4",
+   "title": "Renal (reviewed)",
+   "folder_id": null,
+   "created_at": "2026-11-03",
+   "flashcards": [
+    {
+     "front": "What does Slide 4 show?",
+     "back": "Nephron"
+    },
+    {
+     "front": "Which topics are covered in Chapter 1?",
+     "back": "Renal anatomy"
+    },
+    {
+     "front": "According to the slides, what is renin?",
+     "back": "An enzyme"
+    }
+   ],
+   "flashcard_progress": {
+    "schedule": {
+     "2": {
+      "box": 3,
+      "due": "2099-01-01"
+     }
+    }
+   }
+  },
+  {
+   "id": "g2",
+   "title": "Pharmacology",
+   "folder_id": null,
+   "created_at": "2026-11-02",
+   "flashcards": [
+    {
+     "front": "What is shown on Slide 0?",
+     "back": "A table"
+    },
+    {
+     "front": "What is the role of term 1 in renal physiology?",
+     "back": "Role 1"
+    },
+    {
+     "front": "What is the role of term 2 in renal physiology?",
+     "back": "Role 2"
+    },
+    {
+     "front": "What is the role of term 3 in renal physiology?",
+     "back": "Role 3"
+    },
+    {
+     "front": "What is the role of term 4 in renal physiology?",
+     "back": "Role 4"
+    },
+    {
+     "front": "What is the role of term 5 in renal physiology?",
+     "back": "Role 5"
+    },
+    {
+     "front": "What is shown on Slide 6?",
+     "back": "A table"
+    },
+    {
+     "front": "What is the role of term 7 in renal physiology?",
+     "back": "Role 7"
+    },
+    {
+     "front": "What is the role of term 8 in renal physiology?",
+     "back": "Role 8"
+    },
+    {
+     "front": "What is the role of term 9 in renal physiology?",
+     "back": "Role 9"
+    },
+    {
+     "front": "What is the role of term 10 in renal physiology?",
+     "back": "Role 10"
+    },
+    {
+     "front": "What is the role of term 11 in renal physiology?",
+     "back": "Role 11"
+    },
+    {
+     "front": "What is shown on Slide 12?",
+     "back": "A table"
+    },
+    {
+     "front": "What is the role of term 13 in renal physiology?",
+     "back": "Role 13"
+    },
+    {
+     "front": "What is the role of term 14 in renal physiology?",
+     "back": "Role 14"
+    },
+    {
+     "front": "What is the role of term 15 in renal physiology?",
+     "back": "Role 15"
+    },
+    {
+     "front": "What is the role of term 16 in renal physiology?",
+     "back": "Role 16"
+    },
+    {
+     "front": "What is the role of term 17 in renal physiology?",
+     "back": "Role 17"
+    },
+    {
+     "front": "What is shown on Slide 18?",
+     "back": "A table"
+    },
+    {
+     "front": "What is the role of term 19 in renal physiology?",
+     "back": "Role 19"
+    },
+    {
+     "front": "What is the role of term 20 in renal physiology?",
+     "back": "Role 20"
+    },
+    {
+     "front": "What is the role of term 21 in renal physiology?",
+     "back": "Role 21"
+    },
+    {
+     "front": "What is the role of term 22 in renal physiology?",
+     "back": "Role 22"
+    },
+    {
+     "front": "What is the role of term 23 in renal physiology?",
+     "back": "Role 23"
+    },
+    {
+     "front": "What is shown on Slide 24?",
+     "back": "A table"
+    },
+    {
+     "front": "What is the role of term 25 in renal physiology?",
+     "back": "Role 25"
+    },
+    {
+     "front": "What is the role of term 26 in renal physiology?",
+     "back": "Role 26"
+    },
+    {
+     "front": "What is the role of term 27 in renal physiology?",
+     "back": "Role 27"
+    },
+    {
+     "front": "What is the role of term 28 in renal physiology?",
+     "back": "Role 28"
+    },
+    {
+     "front": "What is the role of term 29 in renal physiology?",
+     "back": "Role 29"
+    },
+    {
+     "front": "What is shown on Slide 30?",
+     "back": "A table"
+    },
+    {
+     "front": "What is the role of term 31 in renal physiology?",
+     "back": "Role 31"
+    },
+    {
+     "front": "What is the role of term 32 in renal physiology?",
+     "back": "Role 32"
+    },
+    {
+     "front": "What is the role of term 33 in renal physiology?",
+     "back": "Role 33"
+    },
+    {
+     "front": "What is the role of term 34 in renal physiology?",
+     "back": "Role 34"
+    },
+    {
+     "front": "What is the role of term 35 in renal physiology?",
+     "back": "Role 35"
+    },
+    {
+     "front": "What is shown on Slide 36?",
+     "back": "A table"
+    },
+    {
+     "front": "What is the role of term 37 in renal physiology?",
+     "back": "Role 37"
+    },
+    {
+     "front": "What is the role of term 38 in renal physiology?",
+     "back": "Role 38"
+    },
+    {
+     "front": "What is the role of term 39 in renal physiology?",
+     "back": "Role 39"
+    },
+    {
+     "front": "What is the role of term 40 in renal physiology?",
+     "back": "Role 40"
+    },
+    {
+     "front": "What is the role of term 41 in renal physiology?",
+     "back": "Role 41"
+    },
+    {
+     "front": "What is shown on Slide 42?",
+     "back": "A table"
+    },
+    {
+     "front": "What is the role of term 43 in renal physiology?",
+     "back": "Role 43"
+    },
+    {
+     "front": "What is the role of term 44 in renal physiology?",
+     "back": "Role 44"
+    },
+    {
+     "front": "What is the role of term 45 in renal physiology?",
+     "back": "Role 45"
+    },
+    {
+     "front": "What is the role of term 46 in renal physiology?",
+     "back": "Role 46"
+    },
+    {
+     "front": "What is the role of term 47 in renal physiology?",
+     "back": "Role 47"
+    },
+    {
+     "front": "What is shown on Slide 48?",
+     "back": "A table"
+    },
+    {
+     "front": "What is the role of term 49 in renal physiology?",
+     "back": "Role 49"
+    },
+    {
+     "front": "What is the role of term 50 in renal physiology?",
+     "back": "Role 50"
+    },
+    {
+     "front": "What is the role of term 51 in renal physiology?",
+     "back": "Role 51"
+    },
+    {
+     "front": "What is the role of term 52 in renal physiology?",
+     "back": "Role 52"
+    },
+    {
+     "front": "What is the role of term 53 in renal physiology?",
+     "back": "Role 53"
+    },
+    {
+     "front": "What is shown on Slide 54?",
+     "back": "A table"
+    },
+    {
+     "front": "What is the role of term 55 in renal physiology?",
+     "back": "Role 55"
+    },
+    {
+     "front": "What is the role of term 56 in renal physiology?",
+     "back": "Role 56"
+    },
+    {
+     "front": "What is the role of term 57 in renal physiology?",
+     "back": "Role 57"
+    },
+    {
+     "front": "What is the role of term 58 in renal physiology?",
+     "back": "Role 58"
+    },
+    {
+     "front": "What is the role of term 59 in renal physiology?",
+     "back": "Role 59"
+    }
+   ],
+   "flashcard_progress": {},
+   "quiz_questions": null
+  },
+  {
+   "id": "g3",
+   "title": "Art",
+   "folder_id": null,
+   "created_at": "2026-11-01",
+   "flashcards": [
+    {
+     "front": "Which artists are listed for Chapter 1?",
+     "back": "Giotto"
+    },
+    {
+     "front": "What is shown on Slide 7?",
+     "back": "A fresco"
+    }
+   ],
+   "flashcard_progress": {},
+   "quiz_questions": [
+    {
+     "question": "Which artists are listed for Chapter 1?",
+     "options": [
+      "Giotto",
+      "x",
+      "y",
+      "z"
+     ],
+     "correct_index": 0
+    },
+    {
+     "question": "What is shown on Slide 7?",
+     "options": [
+      "A fresco",
+      "x",
+      "y",
+      "z"
+     ],
+     "correct_index": 0
+    },
+    {
+     "question": "Who painted the Mona Lisa?",
+     "options": [
+      "Leonardo",
+      "x",
+      "y",
+      "z"
+     ],
+     "correct_index": 0
+    }
+   ]
+  }
+ ]
+}

@@ -17,6 +17,7 @@ import StudyAidPanel from '../../components/StudyAidPanel';
 import StudyDocument from '../../components/StudyDocument';
 import OutlineEditor from '../../components/OutlineEditor';
 import { fileNamesOnly, makesStudySetOnOpen, needsStudySet } from '../../lib/studySet.mjs';
+import { studiedCards } from '../../lib/studyQueue.mjs';
 import { makeStudySet as makeStudySetFor } from '../../lib/autoStudySet';
 import { classLabel } from '../../lib/classLabel';
 import Menu from '../../components/Menu';
@@ -497,7 +498,8 @@ export default function GuidePage() {
   // Notes not yet in outline form are about to be rewritten: show the loader from the first paint,
   // never the old notes first.
   const outlinePending = outlineDue(guide) && notesTriedFor !== guide.id;
-  const cardCount = guide.flashcards?.length || 0;
+  // The cards the deck studies: one about the source itself is never shown (studiedCards).
+  const cardCount = studiedCards(guide).length;
   // Printing and refreshing answer choices both work from the guide's questions and answers.
   const hasQuestions = pairs.length >= 2;
   // A guide with no material is the student's own notes until they make cards and a quiz from it.

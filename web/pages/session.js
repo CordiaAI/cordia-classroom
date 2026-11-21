@@ -75,7 +75,7 @@ export default function StudySession() {
       const entry = byGuide.get(card.guideId) || { known: [], unknown: [], learn: [], cleared: [] };
       if (card.index !== undefined) (right ? entry.known : entry.unknown).push(card.index);
       if (card.concept !== undefined) entry.learn.push({ concept: card.concept, known: right });
-      if (card.miss && right) entry.cleared.push(card.front);
+      if (card.miss && right) entry.cleared.push(card.question ?? card.front); // the saved text, not the shown wording
       byGuide.set(card.guideId, entry);
     });
     const requests = [...byGuide.entries()].map(async ([guideId, entry]) => {

@@ -5,7 +5,7 @@
 // and a miss drops it back to Learning and asks it again later in the same round.
 // Mastered ideas fade after FADE_DAYS without practice and come back for a quick recall.
 
-import { conceptAnswer } from './retainEngine.mjs';
+import { askable, canChoose, conceptAnswer } from './retainEngine.mjs';
 
 export const LEVELS = ['New', 'Learning', 'Familiar', 'Mastered'];
 export const NEW = 0;
@@ -113,9 +113,10 @@ export function makeCloze(answer) {
   };
 }
 
-// The card a way asks for this question.
+// The card a way asks for this question. An idea with fewer than three choices has no multiple choice
+// card: its Choose way is asked as Type it.
 export function cardFor(way, question) {
-  if (way === 'type') return isTerm(question) ? 'fill' : 'written';
+  if (way === 'type' || (way === 'mc' && !canChoose(question))) return isTerm(question) ? 'fill' : 'written';
   if (way === 'cloze') return makeCloze(conceptAnswer(question)) ? 'cloze' : 'fill';
   return way;
 }
@@ -127,7 +128,11 @@ export function askCard(question, entry, today = dayKey(), types = DEFAULT_TYPES
   const recall = entry.l >= FAMILIAR || isFading(entry, today);
   const order = recall ? ['type', 'cloze', 'self', 'mc'] : ['mc', 'cloze', 'self', 'type'];
   const way = order.find(option => picked.includes(option));
-  return { type: cardFor(way, question), recall };
+  if (way === 'mc' && !canChoose(question)) {
+    // Too few related choices for multiple choice: a short answer is typed, a long one is a flashcard.
+    return { type: isTerm(question) ? 'fill' : 'self', recall, noChoice: true };
+  }
+  return { type: cardFor(way, question), recall, ...(canChoose(question) ? {} : { noChoice: true }) };
 }
 
 // Why askCard chose what it did, for the decision log: every card, the ones ruled out and why,
@@ -143,7 +148,8 @@ export function formatDecision(question, entry, today = dayKey(), types = DEFAUL
   const wayOf = { mc: 'mc', fill: 'type', written: 'type', cloze: 'cloze', self: 'self' };
   const mask = {};
   CARD_TYPES.forEach(option => {
-    if (!picked.includes(wayOf[option]) && !(option === 'fill' && picked.includes('cloze') && !blankable)) mask[option] = 'turned_off';
+    if (option === 'mc' && !canChoose(question)) mask[option] = 'few_choices';
+    else if (!picked.includes(wayOf[option]) && !(option === 'fill' && picked.includes('cloze') && !blankable)) mask[option] = 'turned_off';
     else if (option === 'fill' && !term) mask[option] = 'long_answer';
     else if (option === 'written' && term) mask[option] = 'short_answer';
     else if (option === 'cloze' && !blankable) mask[option] = 'short_answer';
@@ -163,7 +169,7 @@ export function askType(question, entry, today = dayKey(), types = DEFAULT_TYPES
 // Next round: ideas the student got wrong while sure come first, then ones in progress (highest
 // first, so they finish), then new ones, then mastered ones that are fading.
 export function pickRound(questions, levels, today = dayKey(), size = ROUND_SIZE) {
-  const indexes = questions.map((_, index) => index).filter(index => conceptAnswer(questions[index]));
+  const indexes = questions.map((_, index) => index).filter(index => askable(questions[index]));
   const rank = index => {
     const entry = levels[index];
     if (entry.l === MASTERED) return isFading(entry, today) ? 4 : 99;
@@ -217,7 +223,7 @@ export function answer(levels, round, card, credit, { confidence = '', today = d
   // the student learns with choices.
   if (credit !== 1 && !card.again) {
     const queue = [...next.queue];
-    const easier = recall && credit === 0 && cleanTypes(round.types).includes('mc') ? 'mc' : card.type;
+    const easier = recall && credit === 0 && !card.noChoice && cleanTypes(round.types).includes('mc') ? 'mc' : card.type;
     queue.push({ id: next.nextId, concept: card.concept, type: easier, recall: easier === card.type ? recall : false, again: true });
     next.queue = queue;
     next.nextId += 1;
@@ -236,7 +242,7 @@ export function advance(round) {
 export function counts(questions, levels, today = dayKey()) {
   const tally = { total: 0, new: 0, learning: 0, familiar: 0, mastered: 0, fading: 0 };
   questions.forEach((question, index) => {
-    if (!conceptAnswer(question)) return;
+    if (!askable(question)) return;
     const entry = levels[index];
     tally.total += 1;
     if (isFading(entry, today)) { tally.fading += 1; tally.familiar += 1; return; }

@@ -27,6 +27,7 @@ from services import guide_access
 from services import social_graph as graph
 from services.blocks import hidden_from, is_blocked
 from services.class_db import is_member
+from services.text_processing import shown_guide
 
 router = APIRouter(prefix="/classrooms", tags=["classrooms"])
 join_router = APIRouter(prefix="/join", tags=["classrooms"])
@@ -661,7 +662,7 @@ def study_payload(guide_ids: str = "", ctx: Ctx = Depends(MEMBER)):
         if guide["user_id"] == user_id:
             own = (db.table("study_guides").select("id,title,flashcards,quiz_questions,flashcard_progress").eq("id", guide["id"]).limit(1).execute().data or [None])[0]
             if own:
-                out.append({**own, "viewer": None})
+                out.append(shown_guide({**own, "viewer": None}))
             continue
         if not versions.enabled():
             skipped += 1
@@ -674,9 +675,9 @@ def study_payload(guide_ids: str = "", ctx: Ctx = Depends(MEMBER)):
         if ctx["row"] is None:
             viewer_study.pin(db, user_id, guide["id"], ctx["current"])
         content = ctx["content"]
-        out.append({"id": guide["id"], "title": content.get("title") or guide.get("title"), "flashcards": content["cards"],
-                    "quiz_questions": ctx["questions"], "flashcard_progress": viewer_study.progress_view(ctx),
-                    "viewer": {"version": content["version"], "current_version": ctx["current"]}})
+        out.append(shown_guide({"id": guide["id"], "title": content.get("title") or guide.get("title"), "flashcards": content["cards"],
+                                "quiz_questions": ctx["questions"], "flashcard_progress": viewer_study.progress_view(ctx),
+                                "viewer": {"version": content["version"], "current_version": ctx["current"]}}))
     today = cstudy.today_iso()
     return {"classroom": {"id": room["id"], "name": room["name"]}, "guides": out, "skipped": skipped,
             "test_date": me.get("study_test_date"), "milestone": cstudy.nearest_milestone(db, room["id"], today)}
