@@ -10,8 +10,9 @@
 // 200,000 characters, a text at most 2,001 characters. A longer question is sent as its first and last
 // 1,000 characters, where its openings are: its `hidden` mark is used, its `shown` wording is not (that
 // would lose its middle), so it is asked as saved. A bigger read is split into requests, at most
-// MAX_REQUESTS of them; a set they don't reach is marked `wording: 'unknown'`, and callers leave it out
-// rather than ask a question the app would never ask.
+// MAX_REQUESTS of them, never splitting a set's quiz (packed); a set they don't reach, or whose quiz
+// fits no one request, is marked `wording: 'unknown'`, and callers leave it out rather than ask a
+// question the app would never ask.
 import { conceptAnswer } from '../retainEngine.mjs';
 
 export const MAX_SETS = 100;
@@ -42,27 +43,40 @@ function textsOf(guides) {
 }
 
 // The texts packed into requests within the backend's bounds. Each request lists, per set it covers
-// (a part), which quiz positions and cards it carries, so the marks go back in place.
+// (a part), which quiz positions and cards it carries, so the marks go back in place. A set's whole
+// quiz goes in one request: the backend applies the quiz-wide rule (none hidden when nothing would be
+// left to ask) to what it is sent, so a quiz split in two could show a question the whole quiz hides.
+// A quiz too big for any one request is not sent, and its set is marked unknown. Cards are marked
+// each on its own (the deck-wide rule is applied here), so they may go in any request.
 export function packed(sets) {
   const requests = [];
   let current = null;
   const open = () => { current = { parts: [], texts: 0, chars: 0 }; requests.push(current); };
+  const fits = (texts, chars) => current.texts + texts <= MAX_TEXTS && current.chars + chars <= MAX_CHARS;
   open();
   sets.forEach((set, at) => {
+    const quizChars = set.quiz.reduce((sum, item) => sum + item.text.length, 0);
+    if (set.quiz.length > MAX_TEXTS || quizChars > MAX_CHARS) return;
     let part = null;
-    for (const kind of ['quiz', 'cards']) {
-      set[kind].forEach((item, position) => {
-        if (current.texts + 1 > MAX_TEXTS || current.chars + item.text.length > MAX_CHARS) open();
-        if (!part || !current.parts.includes(part)) {
-          if (current.parts.length >= MAX_SETS) open();
-          part = { at, quiz: [], cards: [] };
-          current.parts.push(part);
-        }
-        part[kind].push({ ...item, position });
-        current.texts += 1;
-        current.chars += item.text.length;
-      });
+    const start = () => {
+      if (current.parts.length >= MAX_SETS) open();
+      part = { at, quiz: [], cards: [] };
+      current.parts.push(part);
+    };
+    if (set.quiz.length) {
+      if (!fits(set.quiz.length, quizChars)) open();
+      start();
+      set.quiz.forEach((item, position) => part.quiz.push({ ...item, position }));
+      current.texts += set.quiz.length;
+      current.chars += quizChars;
     }
+    set.cards.forEach((item, position) => {
+      if (!fits(1, item.text.length)) open();
+      if (!part || !current.parts.includes(part)) start();
+      part.cards.push({ ...item, position });
+      current.texts += 1;
+      current.chars += item.text.length;
+    });
   });
   return requests.filter(request => request.parts.length);
 }

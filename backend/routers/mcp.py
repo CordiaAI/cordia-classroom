@@ -195,7 +195,8 @@ async def log_answers(body: AnswerEvents, request: Request, authorization: str =
 # 2,000 texts and 200,000 characters in all, and a text of at most 2,001 characters (a longer question
 # is sent as its first and last 1,000, where its openings are; web/lib/mcp/wording.mjs). The worst
 # request allowed takes well under 200 ms of CPU (tests/test_question_quality_final.py); the app splits
-# a bigger read into several requests. Limited per connection (its token), not per address.
+# a bigger read into several requests, never a quiz (each quiz sent is one whole quiz, so the quiz-wide
+# rule below holds). Limited per connection (its token), not per address.
 WORDING_MAX_SETS = 100
 WORDING_MAX_TEXTS = 2_000
 WORDING_MAX_CHARS = 200_000
