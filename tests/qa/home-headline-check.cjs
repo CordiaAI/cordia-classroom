@@ -236,6 +236,10 @@ async function contrast(page) {
     expect(both.length >= 4, 'frames with both copies: ' + both.length);
     const sums = both.map(frame => frame.copies[0] + frame.copies[1]);
     expect(sums.every(sum => sum > 0.85 && sum < 1.15), 'opacities do not add up to one: ' + both.map(f => f.copies.map(c => c.toFixed(2)).join('+')).join(' '));
+    // The old copy stays until its animation has run to the end: the last frame with two copies is
+    // all but finished (the new copy at 0.95 or more, the old at 0.05 or less), not cut at the halfway.
+    const lastBoth = both[both.length - 1].copies.slice().sort((a, b) => a - b);
+    expect(lastBoth[0] <= 0.05 && lastBoth[1] >= 0.95, 'the last frame with two copies is ' + lastBoth.map(c => c.toFixed(2)).join('/'));
     const span = both[both.length - 1].t - both[0].t;
     expect(span >= 100 && span <= 220, 'the fade lasted ' + span + 'ms');
     expect(new Set(frames.map(frame => Math.round(frame.top))).size === 1, 'the composer moved: ' + [...new Set(frames.map(frame => Math.round(frame.top)))].join(', '));
