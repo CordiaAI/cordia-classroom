@@ -121,3 +121,152 @@ test('a format survives the print link', () => {
   assert.equal(back.versions, true);
   assert.deepEqual(decodeFormat('garbage').on, DEFAULT_FORMAT.on);
 });
+
+// ---- The most each type can supply (feedback b24fe320) and the types the guide has to write (298f5965) ----
+import { aboutTypes, availableFormat, clampToSupply, estimatePools, listTypes, setCount, supplyLimits, writeNeeds } from '../lib/printQuiz.mjs';
+import { readFileSync } from 'node:fs';
+
+const ready = (type, count) => range(0, count).map(i => ({ id: `${type}${i}`, source: `${type}${i}`, term: `Term ${i}`, definition: `Definition ${i}`, question: `Why ${i}?`, key: 'Because.', parts: [], blanks: ['x'], options: ['a', 'b', 'c'], answer: 0, points: 1 }));
+const SMALL = { mc: ready('mc', 5), matching: ready('m', 3), short: ready('s', 2), fill: null, fill_possible: 0, matching_possible: 0, short_possible: 0, can_write: true };
+
+test('the maximum per type is what the guide can supply', () => {
+  assert.deepEqual(supplyLimits(SMALL), { mc: 5, matching: 2, fill: 0, short: 2 }); // 3 ideas hold 2 terms and the spare definition
+  assert.equal(supplyLimits({ ...SMALL, matching: ready('m', 17) }).matching, 15); // 15 terms in 2 blocks need 17 ideas
+  assert.equal(supplyLimits({ ...SMALL, matching: ready('m', 16) }).matching, 14); // 15 would need 17
+  assert.equal(supplyLimits({ ...SMALL, mc: ready('mc', 80) }).mc, 50);
+});
+
+test('ideas the guide could still write raise the maximum only while an AI quiz is left', () => {
+  const more = { ...SMALL, matching_possible: 10, short_possible: 6, fill_possible: 12 };
+  assert.deepEqual(supplyLimits(more), { mc: 5, matching: 11, fill: 12, short: 8 }); // 13 ideas: 11 terms + 2 blocks
+  assert.deepEqual(supplyLimits({ ...more, can_write: false }), { mc: 5, matching: 2, fill: 0, short: 2 });
+  assert.equal(supplyLimits({ ...more, fill: ready('f', 7) }).fill, 7); // written fill-in: the exact count
+});
+
+test('a count stops at the maximum, whatever was saved or chosen', () => {
+  const limits = supplyLimits(SMALL);
+  const saved = cleanFormat({ counts: { mc: 12, matching: 16, fill: 6, short: 9 }, on: { mc: true, matching: true, fill: false, short: true } });
+  const clamped = clampToSupply(saved, limits);
+  assert.deepEqual(clamped.counts, { mc: 5, matching: 2, fill: 6, short: 2 }); // fill has no supply: it keeps its count so the printout can say so
+  assert.equal(setCount(saved, 'matching', 9, limits.matching).counts.matching, 2);
+  assert.equal(setCount(saved, 'matching', 0, limits.matching).counts.matching, 1);
+  assert.equal(setCount(saved, 'mc', 60).counts.mc, 50);
+  const print = buildPrint(estimatePools(SMALL), clamped);
+  assert.deepEqual(print.capped, {}); // nothing was asked beyond the supply, so there is nothing to apologise for
+});
+
+test('only the types short of ready items are written, and only when the guide could write more', () => {
+  const more = { ...SMALL, matching_possible: 10, short_possible: 6, fill_possible: 12 };
+  const wanted = cleanFormat({ counts: { mc: 4, matching: 8, fill: 6, short: 2 }, on: { mc: true, matching: true, fill: true, short: true } });
+  assert.deepEqual(writeNeeds(more, wanted), { write: ['matching', 'fill'], locked: [] }); // short: 2 wanted, 2 ready
+  assert.deepEqual(writeNeeds(more, cleanFormat({ ...wanted, on: { mc: true, matching: false, fill: false, short: false } })), { write: [], locked: [] });
+  assert.deepEqual(writeNeeds({ ...more, matching_possible: 0 }, wanted).write, ['fill']); // nothing more to write: no request
+  assert.deepEqual(writeNeeds({ ...more, can_write: false }, wanted), { write: [], locked: ['matching', 'fill'] }); // no AI quiz left
+});
+
+test('the estimate counts each idea the guide could write once, and totals follow the clamped counts', () => {
+  const more = { ...SMALL, matching_possible: 10, short_possible: 6, fill_possible: 12 };
+  const pools = estimatePools(more);
+  assert.equal(pools.matching.length, 13);
+  assert.equal(pools.short.length, 8);
+  assert.equal(pools.fill.length, 12);
+  const format = cleanFormat({ counts: { mc: 4, matching: 8, fill: 6, short: 8 }, on: { mc: true, matching: true, fill: true, short: true } });
+  const print = buildPrint(pools, clampToSupply(format, supplyLimits(more)));
+  assert.equal(print.questions, 4 + 8 + 6 + 8);
+  assert.deepEqual(print.capped, {});
+});
+
+test('types are listed for the notes', () => {
+  assert.equal(listTypes(['fill']), 'fill-in-the-blank sentences');
+  assert.equal(listTypes(['matching', 'short']), 'extra matching terms and extra short-answer questions');
+  assert.equal(listTypes(['fill', 'matching', 'short']), 'fill-in-the-blank sentences, extra matching terms and extra short-answer questions');
+});
+
+// ---- Review fixes: a shortfall never prints silently, "about" for what is still to be written ----
+
+test('a printout asked for more than the guide has says how many it has', () => {
+  const pools = { mc: ready('mc', 6), matching: [], short: [], fill: [] };
+  const format = cleanFormat({ counts: { mc: 12, matching: 0, fill: 0, short: 0 }, on: { mc: true, matching: false, fill: false, short: false } });
+  const print = buildPrint(pools, format);
+  assert.equal(print.questions, 6);
+  assert.deepEqual(print.notes, ['This guide has enough for 6 multiple-choice questions.']);
+  assert.deepEqual(print.capped, { mc: 6 });
+});
+
+test('the print page lays out the linked format as it is, never trimmed to what the guide has', () => {
+  const page = readFileSync(new URL('../pages/print/quiz/[id].js', import.meta.url), 'utf8');
+  assert.doesNotMatch(page, /clampToSupply/);
+  assert.match(page, /buildPrint\([^\n]*, format, /);
+});
+
+test('the sheet sends counts within what the guide has and leaves out a type it has nothing for', () => {
+  const limits = supplyLimits(SMALL); // fill: 0
+  const format = cleanFormat({ counts: { mc: 12, matching: 16, fill: 6, short: 9 }, on: { mc: true, matching: true, fill: true, short: true } });
+  const sent = availableFormat(format, limits);
+  assert.deepEqual(sent.counts, { mc: 5, matching: 2, fill: 6, short: 2 });
+  assert.deepEqual(sent.on, { mc: true, matching: true, fill: false, short: true });
+  const print = buildPrint(estimatePools(SMALL), sent);
+  assert.deepEqual(print.notes, []);
+  // Nothing on would be nothing to print: the format stays as it was.
+  const none = availableFormat(cleanFormat({ counts: { mc: 4, matching: 4, fill: 4, short: 4 }, on: { mc: false, matching: false, fill: true, short: false } }), limits);
+  assert.equal(none.on.fill, true);
+});
+
+test('only the types whose maximum counts ideas still to be written read "about"', () => {
+  const more = { ...SMALL, matching_possible: 10, short_possible: 0, fill_possible: 12 };
+  assert.deepEqual(aboutTypes(more), ['matching', 'fill']);
+  assert.deepEqual(aboutTypes({ ...more, fill: ready('f', 7) }), ['matching']); // written fill-in: the exact count
+  assert.deepEqual(aboutTypes({ ...more, can_write: false }), []);
+  assert.deepEqual(aboutTypes(SMALL), []);
+});
+
+// ---- Review fixes, round 2: what a used-up allowance says ----
+import { couldWrite, lockedTypes } from '../lib/printQuiz.mjs';
+import { nextReset, resetLabel } from '../lib/plans.js';
+
+test('with no AI quiz left, the note names only the rows the sheet shows as needing one', () => {
+  const used = { ...SMALL, matching_possible: 10, short_possible: 0, fill_possible: 12, can_write: false };
+  const limits = supplyLimits(used); // fill 0 (could be written), matching 2 (ready only), short 2
+  const format = cleanFormat({ counts: { mc: 4, matching: 8, fill: 6, short: 2 }, on: { mc: true, matching: true, fill: true, short: true } });
+  const shown = availableFormat(format, limits);
+  assert.equal(shown.on.fill, false); // the row is off...
+  assert.ok(couldWrite(used, 'fill')); // ...but the guide could write it, so it reads "Needs an AI quiz", not "None in guide"
+  assert.deepEqual(lockedTypes(used, shown, limits), ['matching', 'fill']);
+  // Short has nothing more to write; matching turned off leaves only the row that reads "Needs an AI quiz".
+  assert.deepEqual(lockedTypes(used, { ...shown, on: { ...shown.on, matching: false } }, limits), ['fill']);
+  // A guide with nothing to write, or an allowance left: no note.
+  assert.deepEqual(lockedTypes({ ...SMALL, can_write: false }, shown, supplyLimits(SMALL)), []);
+  assert.deepEqual(lockedTypes({ ...used, can_write: true }, shown, limits), []);
+  assert.equal(couldWrite(SMALL, 'fill'), false); // "None in guide"
+});
+
+test('the sheet labels a locked type and builds its notes from what it shows', () => {
+  const sheet = readFileSync(new URL('../components/PrintQuizSheet.js', import.meta.url), 'utf8');
+  assert.match(sheet, /'Needs an AI quiz' : 'None in guide'/);
+  assert.match(sheet, /writeNeeds\(pools, shown\)/);
+  assert.match(sheet, /lockedTypes\(pools, shown, limits\)/);
+  assert.doesNotMatch(sheet, /writeNeeds\(pools, format\)/);
+});
+
+test('the reset date is the UTC first of the month, whatever the time zone', () => {
+  assert.equal(resetLabel('2026-12-01T00:00:00+00:00'), new Date(Date.UTC(2026, 11, 1)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }));
+  assert.match(resetLabel('2026-12-01T00:00:00+00:00'), /1/);
+  assert.doesNotMatch(resetLabel('2026-12-01T00:00:00+00:00'), /30/);
+  assert.equal(resetLabel(''), '');
+  assert.equal(resetLabel('garbage'), '');
+  assert.equal(nextReset(new Date(Date.UTC(2026, 10, 21, 23, 30))), '2026-12-01T00:00:00.000Z');
+  assert.equal(nextReset(new Date(Date.UTC(2026, 11, 31))), '2027-01-01T00:00:00.000Z');
+});
+
+test('a refused write keeps the 402 details and Upgrade is left out on the top plan', async () => {
+  const { responseJson } = await import('../lib/api.js');
+  const body = { detail: { code: 'limit_reached', feature: 'ai_quiz', resets_at: '2026-12-01T00:00:00+00:00', upgrade_tier: null, message: 'No AI quizzes left.' } };
+  const data = await responseJson(new Response(JSON.stringify(body), { status: 402 }));
+  assert.equal(data.detail, 'No AI quizzes left.');
+  assert.equal(data.limit.resets_at, '2026-12-01T00:00:00+00:00');
+  assert.equal(data.limit.upgrade_tier, null);
+  const note = readFileSync(new URL('../components/UsedUpNote.js', import.meta.url), 'utf8');
+  assert.match(note, /upgradeTier !== null &&/);
+  const page = readFileSync(new URL('../pages/print/quiz/[id].js', import.meta.url), 'utf8');
+  assert.match(page, /written\?\.limit\?\.resets_at \|\| free\.resets_at \|\| nextReset\(\)/);
+});

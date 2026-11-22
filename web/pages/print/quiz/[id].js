@@ -4,7 +4,9 @@ import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch } from '../../../lib/api';
 import { useRequireAuth } from '../../../lib/auth';
 import { classLabel } from '../../../lib/classLabel';
-import { TYPE_NAMES, buildPrint, decodeFormat } from '../../../lib/printQuiz.mjs';
+import { nextReset } from '../../../lib/plans';
+import UsedUpNote from '../../../components/UsedUpNote';
+import { TYPE_NAMES, buildPrint, decodeFormat, listTypes, writeNeeds } from '../../../lib/printQuiz.mjs';
 
 // A printable quiz: the student's format (?f=, lib/printQuiz.mjs) laid out on Letter paper, then
 // the browser's print dialog. No server-side PDF: "Save as PDF" in that dialog makes one.
@@ -181,18 +183,56 @@ export default function PrintQuizPage() {
   const { ready } = useRequireAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [problems, setProblems] = useState([]);
+  const [held, setHeld] = useState([]); // types a write could not supply: their own note says why, so no "enough for N" on top
+  const [usedUp, setUsedUp] = useState({ types: [], resetsAt: '' }); // types refused because no AI quiz is left, and when they come back
   const [seed] = useState(() => Number(router.query.seed) || (Date.now() % 100000) + 1);
   const format = useMemo(() => decodeFormat(router.query.f), [router.query.f]);
 
+  // The guide's free items first. Then, only for the types the format needs beyond what is ready and the
+  // guide could supply, one request writes them (one AI quiz). A refusal (402, no AI quiz left) or a failed
+  // write leaves the free items in place with a note, and nothing is asked for beyond what the guide can supply.
   useEffect(() => {
-    if (!ready || !id || !router.isReady) return;
-    apiFetch(`/quiz/${id}/print-items`, { method: 'POST', timeoutMs: 90000, body: JSON.stringify({ fill: Boolean(format.on.fill) }) }).then(result => {
-      if (Array.isArray(result?.mc)) setData(result);
-      else setError(apiErrorMessage(result?.detail, 'This quiz could not be prepared for printing.'));
-    });
+    if (!ready || !id || !router.isReady) return undefined;
+    let alive = true;
+    (async () => {
+      let result = await apiFetch(`/quiz/${id}/print-items`, { method: 'POST', timeoutMs: 90000, body: JSON.stringify({ write: [] }) });
+      if (!alive) return;
+      if (!Array.isArray(result?.mc)) { setError(apiErrorMessage(result?.detail, 'This quiz could not be prepared for printing.')); return; }
+      const free = result;
+      const { write } = writeNeeds(free, format);
+      const problems = [];
+      const heldBack = [];
+      let refused = { types: [], resetsAt: '' };
+      if (write.length) {
+        const written = await apiFetch(`/quiz/${id}/print-items`, { method: 'POST', timeoutMs: 90000, quietLimit: true, body: JSON.stringify({ write }) });
+        if (!alive) return;
+        if (Array.isArray(written?.mc)) {
+          result = written;
+          const failed = (written.write_failed || []).filter(type => write.includes(type));
+          heldBack.push(...failed);
+          if (failed.length) problems.push(`${listTypes(failed).replace(/^./, letter => letter.toUpperCase())} could not be written just now, so they are left out. Print again in a minute.`);
+        } else if (written?.limit_reached || written?.limit) {
+          heldBack.push(...write);
+          // The 402's own details (responseJson keeps them as `limit`); the next reset if it had none.
+          refused = { types: write, resetsAt: written?.limit?.resets_at || free.resets_at || nextReset(), upgradeTier: written?.limit?.upgrade_tier };
+        } else {
+          heldBack.push(...write);
+          problems.push(`${listTypes(write).replace(/^./, letter => letter.toUpperCase())} could not be written just now, so they are left out.`);
+        }
+      }
+      setProblems(problems);
+      setUsedUp(refused);
+      setHeld(heldBack);
+      setData(result);
+    })();
+    return () => { alive = false; };
   }, [ready, id, router.isReady, format]);
 
-  const print = useMemo(() => (data ? buildPrint({ mc: data.mc, matching: data.matching, fill: data.fill || [], short: data.short }, format, Number(router.query.seed) || seed) : null), [data, format, seed, router.query.seed]);
+  const needs = useMemo(() => (data ? writeNeeds(data, format) : { write: [], locked: [] }), [data, format]);
+  // The format as linked, never trimmed to what the guide has: a type that comes up short says so in a note
+  // ("This guide has enough for N ..."), so a shortfall never prints silently.
+  const print = useMemo(() => (data ? buildPrint({ mc: data.mc, matching: data.matching, fill: data.fill || [], short: data.short }, format, Number(router.query.seed) || seed, { locked: [...needs.locked, ...held] }) : null), [data, format, needs, held, seed, router.query.seed]);
 
   // The print dialog opens once the fonts are in, so the page breaks are the real ones.
   useEffect(() => {
@@ -208,7 +248,7 @@ export default function PrintQuizPage() {
   const notes = print ? [
     ...print.notes,
     ...(data.mc_flagged && format.on.mc ? [`${data.mc_flagged === 1 ? '1 multiple-choice question is' : `${data.mc_flagged} multiple-choice questions are`} left out because an answer choice is another question's answer. Use Refresh answer choices on the guide to fix them.`] : []),
-    ...(data.fill_locked && format.on.fill ? ["Fill in the blank needs an AI quiz, and this month's are used up."] : []),
+    ...problems,
   ] : [];
 
   return (
@@ -220,6 +260,8 @@ export default function PrintQuizPage() {
         {print && <button type="button" className="c-btn c-btn--primary" onClick={() => window.print()} disabled={!print.questions}>Print</button>}
         {print && <span>{print.questions} questions · {print.points} points{print.versions.length > 1 ? ' · Versions A and B' : ''}</span>}
         {notes.map(note => <span key={note} className="pq-note" role="status">{note}</span>)}
+        <UsedUpNote className="pq-note" types={[...new Set([...needs.locked, ...usedUp.types])]} resetsAt={usedUp.resetsAt || data?.resets_at}
+          upgradeTier={usedUp.upgradeTier !== undefined ? usedUp.upgradeTier : data?.upgrade_tier} />
       </div>
       {print && print.questions > 0 && (
         <div className="pq-paper">
@@ -231,7 +273,8 @@ export default function PrintQuizPage() {
         body::before { display: none !important; }
         .pq { min-height: 100vh; color: var(--print-ink); }
         .pq-toolbar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 24px; background: var(--print-paper); border-bottom: 1px solid var(--print-edge); font: 500 0.875rem/1.4 var(--font-sans); }
-        .pq-note { flex-basis: 100%; color: var(--print-muted); }
+        .pq-toolbar { --upgrade-link: var(--print-ink); }
+        .pq-note { flex-basis: 100%; margin: 0; color: var(--print-muted); }
         .pq-paper { width: 8.5in; margin: 24px auto; padding: 0.8in 0.85in 0.85in; background: var(--print-paper); box-sizing: border-box; page: quiz; }
         .pq-paper p, .pq-paper h1, .pq-paper h2, .pq-paper h3, .pq-paper ol { margin: 0; padding: 0; }
         .pq-paper ol { list-style: none; }

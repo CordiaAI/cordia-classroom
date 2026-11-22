@@ -217,9 +217,15 @@ def entitlement(user_id: str) -> dict:
     }
 
 
+def upgrade_tier(tier: str, feature: str, limit: Optional[int] = None) -> Optional[str]:
+    """The cheapest tier above `tier` that raises this feature's limit, or None at the top."""
+    limit = LIMITS[tier][feature] if limit is None else limit
+    higher = [t for t in TIERS[TIERS.index(tier) + 1:] if LIMITS[t][feature] > limit]
+    return higher[0] if higher else None
+
+
 class LimitReached(HTTPException):
     def __init__(self, feature: str, used: int, limit: int, tier: str):
-        higher = [t for t in TIERS[TIERS.index(tier) + 1:] if LIMITS[t][feature] > limit]
         super().__init__(
             status_code=402,
             detail={
@@ -231,7 +237,7 @@ class LimitReached(HTTPException):
                 "plan": "free" if tier == "free" else PRO,
                 "tier": tier,
                 # The cheapest tier that raises this limit, or None at the top.
-                "upgrade_tier": higher[0] if higher else None,
+                "upgrade_tier": upgrade_tier(tier, feature, limit),
                 "resets_at": next_reset(),
                 "message": limit_message(feature, limit),
                 "upgrade_url": "/settings?section=subscription",

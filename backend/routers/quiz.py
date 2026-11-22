@@ -22,7 +22,7 @@ from services import print_items, retain
 from services import blanks
 from services.choice_shapes import conform, is_value, repair, shape
 from services.distractor_check import keep_valid
-from services.entitlements import LIMITS, plan_for, record, remaining, require, subscription_row
+from services.entitlements import LIMITS, next_reset, plan_for, record, remaining, require, subscription_row, tier_for, upgrade_tier
 
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,12 @@ class MissRequest(BaseModel):
 
 
 class PrintRequest(BaseModel):
-    fill: bool = False  # write the fill-in sentences now if they aren't cached (one AI quiz)
+    # The first printable-quiz clients' field: the same as write=["fill"], except that with none left it
+    # answers 200 with fill_locked instead of a 402. A request with `write` is always the 402 kind.
+    fill: bool = False
+    # Types to write now when they aren't cached: the guide had too few ready matching terms or
+    # short-answer questions, or fill-in sentences are wanted. All of it is one AI quiz.
+    write: List[Literal["fill", "matching", "short"]] = Field(default_factory=list, max_length=3)
 
 
 class RememberRequest(BaseModel):
@@ -689,30 +694,75 @@ def refresh_choices(guide_id: str, authorization: str = Header(default="")):
     return {"changed": changed, "flagged": len(flagged), "questions": updated}
 
 
-def _print_fill(client, pairs: list) -> Optional[list]:
-    """Checked fill-in items written by Haiku from the guide's Q/A, or None when the call fails."""
-    indexes = print_items.fill_candidates(pairs)
+def _print_write(client, pairs: list, indexes: list, prompt: str, build) -> Optional[list]:
+    """Checked items written by Haiku (task print_fill) from the guide's Q/A, or None when the call fails."""
     if not indexes:
         return []
     try:
         response = chat(client, "print_fill",
-                        messages=[{"role": "system", "content": "Write fill-in-the-blank test sentences. Return valid JSON only."},
-                                  {"role": "user", "content": print_items.fill_prompt(pairs, indexes)}],
+                        messages=[{"role": "system", "content": "Write printed-test items. Return valid JSON only."},
+                                  {"role": "user", "content": prompt}],
                         temperature=0.3, response_format={"type": "json_object"})
         generated = json.loads(response.choices[0].message.content or "{}").get("items", [])
     except Exception:
-        logger.warning("Fill-in sentences unavailable", exc_info=True)
+        logger.warning("Printed-test items unavailable", exc_info=True)
         return None
-    return print_items.fill_items(pairs, indexes, generated)
+    return build(pairs, indexes, generated)
+
+
+def _print_fill(client, pairs: list) -> Optional[list]:
+    """Checked fill-in items written by Haiku from the guide's Q/A, or None when the call fails."""
+    indexes = print_items.fill_candidates(pairs)
+    return _print_write(client, pairs, indexes, print_items.fill_prompt(pairs, indexes) if indexes else "", print_items.fill_items)
+
+
+def _print_matching(client, pairs: list) -> Optional[list]:
+    indexes = print_items.matching_candidates(pairs)
+    return _print_write(client, pairs, indexes, print_items.matching_prompt(pairs, indexes) if indexes else "", print_items.matching_items)
+
+
+def _print_short(client, pairs: list) -> Optional[list]:
+    indexes = print_items.short_candidates(pairs)
+    return _print_write(client, pairs, indexes, print_items.short_prompt(pairs, indexes) if indexes else "", print_items.short_items)
+
+
+# What each writable type is cached under, and what writes it.
+_PRINT_WRITERS = {
+    "fill": ("fill", lambda client, pairs: _print_fill(client, pairs)),
+    "matching": ("ai_matching", lambda client, pairs: _print_matching(client, pairs)),
+    "short": ("ai_short", lambda client, pairs: _print_short(client, pairs)),
+}
+
+
+def _can_write(user_id: str) -> bool:
+    """Whether the student has an AI quiz left. Only a count we could read and found at zero says no:
+    if the plan lookup hiccups the sheet still offers to write, and the write itself checks again."""
+    try:
+        return remaining(user_id, "ai_quiz") > 0
+    except Exception:
+        logger.warning("Could not read AI quiz allowance for print items", exc_info=True)
+        return True
+
+
+def _print_upgrade(user_id: str) -> dict:
+    """With no AI quiz left: the plan that gives more ({"upgrade_tier": None} on the top plan, so the
+    sheet leaves Upgrade out). Nothing when the plan can't be read: the sheet then offers Upgrade."""
+    try:
+        return {"upgrade_tier": upgrade_tier(tier_for(subscription_row(user_id)), "ai_quiz")}
+    except Exception:
+        logger.warning("Could not read the plan for print items", exc_info=True)
+        return {}
 
 
 @router.post("/{guide_id}/print-items", dependencies=[Depends(ai_rate_limit())])
 def printable_items(guide_id: str, body: PrintRequest, authorization: str = Header(default="")):
     """Everything a printable quiz can use, per type, from the guide's own questions and answers.
-    Multiple choice comes from the saved quiz (built first if the guide has none yet); matching and
-    short answer are picked without AI; fill-in sentences are written by Haiku only when asked for
-    and not cached yet, which counts as one AI quiz. Matching, short answer and fill-in are cached
-    on the guide, so reprinting or changing the format reuses them."""
+    Multiple choice comes from the saved quiz (built first if the guide has none yet); ready matching
+    terms and short-answer questions are picked without AI. Fill-in sentences, and matching terms and
+    short-answer questions beyond the ready ones, are written by Haiku only when asked for (write) and
+    not cached yet. Everything written in one request counts as one AI quiz, and with none left that
+    request is a 402 before any AI spend (the free types come from a request without write). Written
+    items are cached on the guide, so reprinting or changing the format reuses them."""
     require_uuid(guide_id, "guide ID")
     user_id = get_user_id(authorization)
     supabase = get_supabase()
@@ -724,18 +774,34 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
     cache = print_items.cached(row.get("print_items"), pairs)
     items = {"v": print_items.VERSION, "source": print_items.source_hash(pairs),
              "matching": print_items.matching(pairs), "short": print_items.short_answer(pairs)}
-    if "fill" in cache:
-        items["fill"] = cache["fill"]
+    for key, _writer in _PRINT_WRITERS.values():
+        if cache.get(key):  # a cached empty list is no result: the next print may try again
+            items[key] = cache[key]
+    wanted = set(body.write) | ({"fill"} if body.fill else set())
+    candidates = {"fill": print_items.fill_candidates(pairs), "matching": print_items.matching_candidates(pairs),
+                  "short": print_items.short_candidates(pairs)}
+    to_write = [kind for kind in _PRINT_WRITERS if kind in wanted and _PRINT_WRITERS[kind][0] not in items and candidates[kind]]
     fill_locked = False
-    if body.fill and "fill" not in items:
-        if remaining(user_id, "ai_quiz") <= 0:
-            fill_locked = True
-        else:
-            require(user_id, "ai_quiz")
-            fill = _print_fill(get_openai_client(), pairs)
-            if fill is not None:
-                items["fill"] = fill
-                record(user_id, "ai_quiz")
+    if body.fill and not body.write and "fill" in to_write and not _can_write(user_id):
+        to_write.remove("fill")  # an old client asking only for fill-in sentences gets a 200 and fill_locked
+        fill_locked = True
+    write_failed = []
+    if to_write:
+        require(user_id, "ai_quiz")  # a 402 with the plan's limit details, like a Quiz refresh, before any AI spend
+        client = get_openai_client()
+        wrote = False
+        for kind in to_write:
+            key, writer = _PRINT_WRITERS[kind]
+            written = writer(client, pairs)
+            if not written:
+                # The call failed (None) or nothing it wrote passed the checks ([]): nothing is saved,
+                # so the next print can try again, and nothing is charged for it.
+                write_failed.append(kind)
+            else:
+                items[key] = written
+                wrote = True
+        if wrote:
+            record(user_id, "ai_quiz")
     if items != cache:
         try:
             supabase.table("study_guides").update({"print_items": items}).eq("id", guide_id).eq("user_id", user_id).execute()
@@ -745,16 +811,26 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
     if row.get("folder_id"):
         folder = supabase.table("folders").select("name").eq("id", row["folder_id"]).eq("user_id", user_id).execute().data or []
         class_name = (folder[0].get("name") if folder else "") or ""
+    can_write = _can_write(user_id)
     return {
         "title": row.get("title") or "",
         "class_name": class_name,
         "mc": mc,
         "mc_flagged": flagged,
-        "matching": items["matching"],
-        "short": items["short"],
+        "matching": [*items["matching"], *items.get("ai_matching", [])],
+        "short": [*items["short"], *items.get("ai_short", [])],
         "fill": items.get("fill"),
-        "fill_possible": len(print_items.fill_candidates(pairs)),
+        "fill_possible": len(candidates["fill"]),
+        # How many more the guide could have written, while not yet written: 0 once they are.
+        "matching_possible": 0 if "ai_matching" in items else len(candidates["matching"]),
+        "short_possible": 0 if "ai_short" in items else len(candidates["short"]),
+        # Whether a write would go ahead, so the sheet can say so before anything is requested.
+        "can_write": can_write,
+        # When it can't: the date the plan's AI quizzes come back, for the sheet's "Resets Dec 1".
+        "resets_at": None if can_write else next_reset(),
+        **({} if can_write else _print_upgrade(user_id)),
         "fill_locked": fill_locked,
+        "write_failed": write_failed,
     }
 
 

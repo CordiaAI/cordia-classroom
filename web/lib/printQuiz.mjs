@@ -76,9 +76,109 @@ export function toggleType(format, type, value) {
   return { ...format, on, counts };
 }
 
-export function setCount(format, type, count) {
-  const value = Math.max(1, Math.min(MAX_COUNT, Math.round(Number(count) || 0)));
+// A count is 1 up to the type's maximum (what the guide can supply, see supplyLimits), never above 50.
+export function setCount(format, type, count, max = MAX_COUNT) {
+  const top = Math.max(1, Math.min(MAX_COUNT, Math.round(Number(max)) || 0));
+  const value = Math.max(1, Math.min(top, Math.round(Number(count) || 0)));
   return { ...format, counts: { ...format.counts, [type]: value } };
+}
+
+// The most of each type one printout of this guide can hold, so the Print quiz sheet stops at it:
+// ready multiple choice, matching terms and short-answer questions, plus the ones the guide could
+// still have written (an AI quiz, only while the student has one left), and fill-in sentences
+// (written when printed, so every candidate counts until they are). Each is the type's own most:
+// an idea is asked once per printout, so a mix of types can still run short, and capNotes says so.
+export function supplyLimits(pools) {
+  const canWrite = pools?.can_write !== false;
+  const more = key => (canWrite ? Math.max(0, Number(pools?.[key]) || 0) : 0);
+  const matchingPool = (pools?.matching?.length || 0) + more('matching_possible');
+  let terms = Math.min(MAX_COUNT, matchingPool);
+  while (terms > 0 && terms + matchingBlocks(terms).length > matchingPool) terms -= 1;
+  return {
+    mc: Math.min(MAX_COUNT, pools?.mc?.length || 0),
+    matching: terms,
+    fill: Math.min(MAX_COUNT, pools?.fill ? pools.fill.length : more('fill_possible')),
+    short: Math.min(MAX_COUNT, (pools?.short?.length || 0) + more('short_possible')),
+  };
+}
+
+// The format with each chosen count held to its maximum. A type the guide can't supply at all keeps
+// its count, so the printout still says it has no material for it.
+export function clampToSupply(format, limits) {
+  const counts = { ...format.counts };
+  TYPES.forEach(type => { if (limits[type] > 0) counts[type] = Math.min(counts[type], limits[type]); });
+  return { ...format, counts };
+}
+
+// The format as the sheet shows and sends it: counts held to each maximum, and a type the guide has no
+// material for at all turned off (unless that would leave nothing on), so the printout never has to
+// say "no material" for a row the sheet already showed as none.
+export function availableFormat(format, limits) {
+  const clamped = clampToSupply(format, limits);
+  const on = { ...clamped.on };
+  TYPES.forEach(type => { if (!(limits[type] > 0)) on[type] = false; });
+  return TYPES.some(type => on[type]) ? { ...clamped, on } : clamped;
+}
+
+// Whether the guide has ideas for this type that could still be written (fill-in sentences, extra
+// matching terms, extra short-answer questions), whether or not an AI quiz is left to write them.
+export function couldWrite(pools, type) {
+  if (type === 'fill') return !pools?.fill && Number(pools?.fill_possible) > 0;
+  if (type === 'matching') return Number(pools?.matching_possible) > 0;
+  if (type === 'short') return Number(pools?.short_possible) > 0;
+  return false;
+}
+
+// The types whose maximum counts ideas not written yet, so the sheet says "about" for them. Once the
+// student has no AI quiz left nothing is counted that way.
+export function aboutTypes(pools) {
+  if (pools?.can_write === false) return [];
+  return TYPES.filter(type => couldWrite(pools, type));
+}
+
+// With no AI quiz left, the types the sheet shows as held back by it, so its note names exactly those:
+// a row with nothing ready that the guide could write ("Needs an AI quiz"), and a type that is on
+// whose maximum stops at the ready items while the guide could write more. `shown` is the format as
+// the sheet shows it (availableFormat), never the saved one.
+export function lockedTypes(pools, shown, limits) {
+  if (pools?.can_write !== false) return [];
+  return TYPES.filter(type => couldWrite(pools, type) && (!(limits[type] > 0) || shown.on[type]));
+}
+
+// What the guide can't supply ready, in the chosen formats: the types that need writing and, when the
+// student has no AI quiz left (pools.can_write false), the ones that could have been written.
+export function writeNeeds(pools, format) {
+  const canWrite = pools?.can_write !== false;
+  const gaps = TYPES.filter(type => {
+    if (!format.on[type]) return false;
+    if (type === 'fill') return !pools.fill && Number(pools.fill_possible) > 0;
+    if (type === 'matching') return Number(pools.matching_possible) > 0 && (pools.matching?.length || 0) < format.counts.matching;
+    if (type === 'short') return Number(pools.short_possible) > 0 && (pools.short?.length || 0) < format.counts.short;
+    return false;
+  });
+  return canWrite ? { write: gaps, locked: [] } : { write: [], locked: gaps };
+}
+
+// The pools a preview can count before anything is written: each type that will be written gets one
+// stand-in per idea the guide could write, so the totals read "about".
+export function estimatePools(pools) {
+  const stand = (type, count, make) => Array.from({ length: count }, (_, i) => make(`est-${type}${i}`));
+  const canWrite = pools.can_write !== false;
+  const more = key => (canWrite ? Math.max(0, Number(pools[key]) || 0) : 0);
+  return {
+    mc: pools.mc,
+    matching: [...pools.matching, ...stand('m', more('matching_possible'), id => ({ id, source: id, term: '', definition: '' }))],
+    fill: pools.fill || stand('f', more('fill_possible'), id => ({ id, source: id, parts: [], blanks: ['_'], points: 1 })),
+    short: [...pools.short, ...stand('s', more('short_possible'), id => ({ id, source: id, question: '', key: '', points: SHORT_POINTS }))],
+  };
+}
+
+export const WRITE_NAMES = { fill: 'fill-in-the-blank sentences', matching: 'extra matching terms', short: 'extra short-answer questions' };
+
+// "fill-in-the-blank sentences, extra matching terms and extra short-answer questions"
+export function listTypes(types) {
+  const names = types.map(type => WRITE_NAMES[type]);
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0] || '';
 }
 
 // Even blocks of at most 8 terms: 16 -> 8 + 8, 17 -> 6 + 6 + 5.
@@ -195,7 +295,7 @@ function layoutVersion(allocation, format, seed, shuffle) {
 }
 
 // The whole printout: one or two versions, the header tag, part cards and instructions.
-export function buildPrint(pools, format, seed = 1) {
+export function buildPrint(pools, format, seed = 1, { locked = [] } = {}) {
   const clean = cleanFormat(format);
   const allocation = allocate(pools, clean);
   const chosen = TYPES.filter(type => allocation.picked[type].length);
@@ -220,7 +320,8 @@ export function buildPrint(pools, format, seed = 1) {
     instructions,
     answerKey: clean.answerKey,
     shortLines: chosen.length === 1 && chosen[0] === 'short' ? 6 : 5,
-    notes: capNotes(allocation.capped),
+    // A type held back only because the student has no AI quiz left is explained by its own note.
+    notes: capNotes(Object.fromEntries(Object.entries(allocation.capped).filter(([type]) => !locked.includes(type)))),
     capped: allocation.capped,
   };
 }

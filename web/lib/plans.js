@@ -69,7 +69,15 @@ export const FREE_SUMMARY = [
   'One free try of each paid study tool',
 ];
 
+// Allowances reset at midnight UTC on the 1st (entitlements.next_reset), so the date is read in UTC:
+// "Dec 1" everywhere, never "Nov 30" west of Greenwich.
 export function resetLabel(iso) {
   if (!iso) return '';
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+// The next reset (midnight UTC on the 1st of next month), for when a reply didn't say.
+export function nextReset(now = new Date()) {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
 }
