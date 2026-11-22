@@ -441,7 +441,7 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
         /* Sky follows the time: a switch row under the background tiles. While it can't apply, only the switch dims;
            the line saying why stays at full contrast. */
         .miy-bg-controls { gap: 10px; }
-        .miy-sky { max-width: 452px; }
+        .miy-sky { max-width: calc(4 * 92px + 3 * 10px); } /* as wide as the four background tiles, so the switch lines up with Meadow */
         .miy-sky .c-toggle.is-disabled { opacity: 1; cursor: default; }
         .miy-sky .c-toggle.is-disabled .c-toggle-track { opacity: .5; }
 
@@ -469,6 +469,7 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
           .miy-label { padding-top: 0; }
           .miy-themes { grid-auto-flow: row; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; }
           .miy-small { width: calc((100% - 20px) / 3); min-width: 92px; }
+          .miy-sky { max-width: none; }
           /* Nine 44px choices are wider than a phone: five and four, not eight and a lone custom colour. */
           .miy-dots { display: grid; grid-template-columns: repeat(5, 44px); }
           .miy-seg { max-width: 100%; }

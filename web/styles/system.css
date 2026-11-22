@@ -648,7 +648,8 @@ body:has(.about) .c-fab { display: none; }
 
 /* While a look changes (lib/theme.js saveLook), nothing outside the Make it yours sheet transitions, so every
    colour changes on the same frame. */
-html.is-restyling :not(.miy-sheet, .miy-sheet *), html.is-restyling :not(.miy-sheet *)::before, html.is-restyling :not(.miy-sheet *)::after { transition: none !important; }
+html.is-restyling :not(.miy-sheet, .miy-sheet *), html.is-restyling :not(.miy-sheet *)::before, html.is-restyling :not(.miy-sheet *, body)::after { transition: none !important; }
+/* body::after is the backdrop's top layer: its time-of-day sky keeps its own slow crossfade through a restyle (styles/tokens.css). */
 
 /* Keyboard focus, everywhere: a solid 2px ring in --focus-ring, 2px out (3:1 or better on every
    surface in both themes). !important so no component's own outline, or outline: none, can hide it.

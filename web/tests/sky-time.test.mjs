@@ -252,21 +252,20 @@ const SKY_TOKENS = ['--sky-morning-top', '--sky-morning-bottom', '--sky-evening'
 
 test('every sky colour is a token, in light and in dark, and the layer is drawn only from them', () => {
   for (const name of SKY_TOKENS) { rgba(token(LIGHT, name)); rgba(token(DARK, name)); }
-  const layer = block(':root[data-sky]::after');
+  const layer = block(':root[data-sky] body::after');
   assert.doesNotMatch(layer, /#[0-9a-f]{3,8}\b|rgba?\(/i, 'no colour literal in the layer itself');
   assert.doesNotMatch(layer, /url\(/, 'no image: the stars are drawn');
   const stars = layer.match(/var\(--sky-star\)/g) || [];
   assert.ok(stars.length >= 8 && stars.length <= 20, `a few stars (${stars.length})`);
-  assert.match(layer, /pointer-events: none/);
-  assert.match(layer, /position: fixed/);
+  assert.match(layer, /var\(--backdrop-wash\);\s*$/, 'laid over the light washes, in the backdrop\'s top layer');
   for (const name of ['--sky-m', '--sky-e', '--sky-n']) assert.match(css, new RegExp(`@property ${name} \\{ syntax: '<number>'; inherits: false; initial-value: 0; \\}`));
 });
 
 test('the crossfade is 3 seconds on named properties only, and instant under reduced motion', () => {
   assert.equal(token(LIGHT, '--dur-sky'), '3000ms');
-  const fade = block(':root[data-sky-fade]::after');
+  const fade = block(':root[data-sky-fade] body::after');
   assert.match(fade, /transition: --sky-m var\(--dur-sky\) var\(--ease-sky\), --sky-e var\(--dur-sky\) var\(--ease-sky\), --sky-n var\(--dur-sky\) var\(--ease-sky\);/);
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ :root\[data-sky-fade\]::after \{ transition: none; \} \}/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ :root\[data-sky-fade\] body::after \{ transition: none; \} \}/);
   assert.doesNotMatch(css, /transition:\s*all/);
 });
 

@@ -233,7 +233,7 @@
   --backdrop-wash: radial-gradient(900px 620px at 6% -10%, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0) 64%), radial-gradient(1100px 760px at 104% 112%, rgba(var(--accent-wash-rgb), 0.20), rgba(var(--accent-wash-rgb), 0) 62%);
   --backdrop-field: none;
   /* The time-of-day sky ("Sky follows the time", VISUAL-POLISH V3; lib/skyTime.mjs sets <html data-sky>): washes
-     over the Clouds backdrop, drawn by html::after at the end of this file. Morning brightens the sky a little,
+     over the Clouds backdrop, drawn in body::after at the end of this file. Morning brightens the sky a little,
      evening is a soft peach rising from the bottom (8%), night is a blue-grey veil with a few faint, static stars.
      Light keeps its night pale enough that dark text straight on the sky holds 4.5:1 (its glass thickens a little
      at night, below); dark's night is the deep blue-grey one. Measured in tests/sky-time.test.mjs. */
@@ -928,17 +928,17 @@ body::before {
 body::after { inset: 0; background: var(--backdrop-wash); }
 [data-theme='dark']::before { inset: -120px; background: var(--backdrop-field); filter: blur(80px); }
 
-/* The time-of-day sky (VISUAL-POLISH V3): one more fixed layer, after body in the tree, so it lies over the cloud
-   photo and its washes and under everything else. It exists only while <html data-sky> is set (lib/skyTime.mjs:
-   Clouds, the option on, not Solid glass, not reduced transparency, not Paper & Clay). Each period's wash is scaled
-   by its own registered number, 0 or 1, so a period change crossfades by easing the numbers over --dur-sky while
-   lib/theme.js holds <html data-sky-fade> (only when the period moves on with the page open; never on first paint
-   or a pick in Make it yours). A browser without @property simply changes at once. The stars are static dots. */
+/* The time-of-day sky (VISUAL-POLISH V3): its washes and stars are laid on top of the light washes in body::after,
+   the top layer of the backdrop (body isolates its own stacking, so a layer outside it would sit under the photo).
+   They exist only while <html data-sky> is set (lib/skyTime.mjs: Clouds, the option on, not Solid glass, not reduced
+   transparency, not Paper & Clay). Each period's wash is scaled by its own registered number, 0 or 1, so a period
+   change crossfades by easing the numbers over --dur-sky while lib/theme.js holds <html data-sky-fade> (only when
+   the period moves on with the page open; never on first paint or a pick in Make it yours). A browser without
+   @property simply changes at once. The stars are static dots. */
 @property --sky-m { syntax: '<number>'; inherits: false; initial-value: 0; }
 @property --sky-e { syntax: '<number>'; inherits: false; initial-value: 0; }
 @property --sky-n { syntax: '<number>'; inherits: false; initial-value: 0; }
-:root[data-sky]::after {
-  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; user-select: none;
+:root[data-sky] body::after {
   --sky-m: 0; --sky-e: 0; --sky-n: 0;
   background:
     radial-gradient(circle at 7% 9%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 1.1px, transparent 1.7px),
@@ -958,13 +958,14 @@ body::after { inset: 0; background: var(--backdrop-wash); }
     radial-gradient(70% 55% at 16% 0%, color-mix(in srgb, var(--sky-night-glow) calc(var(--sky-n) * 100%), transparent), transparent 70%),
     linear-gradient(180deg, color-mix(in srgb, var(--sky-night-top) calc(var(--sky-n) * 100%), transparent), color-mix(in srgb, var(--sky-night-bottom) calc(var(--sky-n) * 100%), transparent)),
     linear-gradient(0deg, color-mix(in srgb, var(--sky-evening) calc(var(--sky-e) * 100%), transparent), transparent 60%),
-    linear-gradient(180deg, color-mix(in srgb, var(--sky-morning-top) calc(var(--sky-m) * 100%), transparent), color-mix(in srgb, var(--sky-morning-bottom) calc(var(--sky-m) * 100%), transparent));
+    linear-gradient(180deg, color-mix(in srgb, var(--sky-morning-top) calc(var(--sky-m) * 100%), transparent), color-mix(in srgb, var(--sky-morning-bottom) calc(var(--sky-m) * 100%), transparent)),
+    var(--backdrop-wash);
 }
-:root[data-sky='morning']::after { --sky-m: 1; }
-:root[data-sky='evening']::after { --sky-e: 1; }
-:root[data-sky='night']::after { --sky-n: 1; }
-:root[data-sky-fade]::after { transition: --sky-m var(--dur-sky) var(--ease-sky), --sky-e var(--dur-sky) var(--ease-sky), --sky-n var(--dur-sky) var(--ease-sky); }
-@media (prefers-reduced-motion: reduce) { :root[data-sky-fade]::after { transition: none; } }
+:root[data-sky='morning'] body::after { --sky-m: 1; }
+:root[data-sky='evening'] body::after { --sky-e: 1; }
+:root[data-sky='night'] body::after { --sky-n: 1; }
+:root[data-sky-fade] body::after { transition: --sky-m var(--dur-sky) var(--ease-sky), --sky-e var(--dur-sky) var(--ease-sky), --sky-n var(--dur-sky) var(--ease-sky); }
+@media (prefers-reduced-motion: reduce) { :root[data-sky-fade] body::after { transition: none; } }
 
 /* Note paper (cream in both themes): its text always uses the paper ink. */
 .sn-paper, .sn-card-paper {
