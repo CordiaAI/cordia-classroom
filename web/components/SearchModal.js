@@ -202,7 +202,8 @@ export default function SearchModal({ onClose, instant = false }) {
 
   const ICON = { setting: Palette, guide: BookOpen, card: Layers, note: NotebookPen, lecture: Mic, recent: BookOpen, jump: ArrowRight, public: Globe, explore: Compass };
   const GROUP = { setting: 'Settings', guide: 'Guides', card: 'Cards', note: 'Notes', lecture: 'Lectures', recent: 'Recent', jump: 'Go to', public: 'Public sets', explore: '' };
-  const ownCount = results.filter(result => !['explore', 'setting'].includes(result.kind)).length;
+  // Public sets are other people's: only the student's own rows (and the recent list) mean something was found.
+  const ownCount = results.filter(result => !['explore', 'setting', 'public'].includes(result.kind)).length;
   const status = unreachable ? "Search isn't reachable. Try again." : q && !ownCount ? (searching ? 'Searching' : 'Nothing of yours matches') : '';
   // Rows sit in groups by kind; "See all in Discover" belongs with the public sets above it.
   const groups = [];
@@ -239,7 +240,7 @@ export default function SearchModal({ onClose, instant = false }) {
         </div>
         <div className="search-bubble" hidden={!results.length && !status}>
           {status && (
-            <div className="c-meta c-search-none">
+            <div className={'c-meta c-search-none' + (unreachable ? ' has-retry' : '')}>
               <span role="status">{status}</span>
               {unreachable && <button type="button" className="c-btn c-btn--quiet search-retry" onClick={retry}>Retry</button>}
             </div>
@@ -315,6 +316,7 @@ export default function SearchModal({ onClose, instant = false }) {
         .c-search-hit > :global(.c-truncate:not(.c-meta)) { flex: 0 1 auto; min-width: 0; }
         .c-search-hit :global(.c-meta) { flex: none; margin-left: auto; max-width: 45%; }
         .c-search-none { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: 16px 20px; }
+        .c-search-none.has-retry { padding: 6px 8px 6px 20px; }
         .search-retry { flex: none; }
         .c-search-none + .search-list { padding-top: 0; }
         @media (max-width: 767px) {
