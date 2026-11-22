@@ -287,8 +287,9 @@ const SIZES = [
             document.querySelector('button[aria-label="Start voice mode"]').click();
             let view = null;
             while (!view) { await frame(); view = document.querySelector('.voice-view'); }
-            await new Promise(resolve => setTimeout(resolve, 90));
-            const before = Number(getComputedStyle(view).opacity);
+            // Mid fade-in: after the first frame that shows the view part way up (a cold page can be slow to start it).
+            let before = 0;
+            for (let i = 0; i < 60 && before <= 0.2; i += 1) { await frame(); before = Number(getComputedStyle(view).opacity); }
             document.querySelector('.voice-end').click();
             const after = [];
             for (let i = 0; i < 8 && document.querySelector('.voice-view'); i += 1) { await frame(); after.push(Number(getComputedStyle(view).opacity)); }
