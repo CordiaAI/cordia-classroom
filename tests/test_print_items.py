@@ -452,6 +452,15 @@ class PrintRouteTests(unittest.TestCase):
         self.assertEqual(len(run.result["fill"]), 1)
         self.assertIsNone(run.result["resets_at"])
 
+    def test_with_none_left_the_reply_names_the_plan_that_gives_more(self):
+        with patch.object(quiz, "subscription_row", return_value={}), patch.object(quiz, "tier_for", return_value="free"):
+            self.assertEqual(self._run(remaining_quizzes=0).result["upgrade_tier"], "pro")
+        with patch.object(quiz, "subscription_row", return_value={}), patch.object(quiz, "tier_for", return_value="weapon"):
+            self.assertIsNone(self._run(remaining_quizzes=0).result["upgrade_tier"])  # the top plan: no Upgrade
+        with patch.object(quiz, "subscription_row", side_effect=RuntimeError("supabase down")):
+            self.assertNotIn("upgrade_tier", self._run(remaining_quizzes=0).result)  # unknown: the sheet offers Upgrade
+        self.assertNotIn("upgrade_tier", self._run().result)
+
     def test_a_hiccup_reading_the_allowance_says_can_write_and_never_a_500(self):
         with patch.object(quiz, "remaining", side_effect=RuntimeError("supabase down")):
             self.assertTrue(quiz._can_write("student-1"))

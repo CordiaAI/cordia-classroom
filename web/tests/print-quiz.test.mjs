@@ -219,3 +219,54 @@ test('only the types whose maximum counts ideas still to be written read "about"
   assert.deepEqual(aboutTypes({ ...more, can_write: false }), []);
   assert.deepEqual(aboutTypes(SMALL), []);
 });
+
+// ---- Review fixes, round 2: what a used-up allowance says ----
+import { couldWrite, lockedTypes } from '../lib/printQuiz.mjs';
+import { nextReset, resetLabel } from '../lib/plans.js';
+
+test('with no AI quiz left, the note names only the rows the sheet shows as needing one', () => {
+  const used = { ...SMALL, matching_possible: 10, short_possible: 0, fill_possible: 12, can_write: false };
+  const limits = supplyLimits(used); // fill 0 (could be written), matching 2 (ready only), short 2
+  const format = cleanFormat({ counts: { mc: 4, matching: 8, fill: 6, short: 2 }, on: { mc: true, matching: true, fill: true, short: true } });
+  const shown = availableFormat(format, limits);
+  assert.equal(shown.on.fill, false); // the row is off...
+  assert.ok(couldWrite(used, 'fill')); // ...but the guide could write it, so it reads "Needs an AI quiz", not "None in guide"
+  assert.deepEqual(lockedTypes(used, shown, limits), ['matching', 'fill']);
+  // Short has nothing more to write; matching turned off leaves only the row that reads "Needs an AI quiz".
+  assert.deepEqual(lockedTypes(used, { ...shown, on: { ...shown.on, matching: false } }, limits), ['fill']);
+  // A guide with nothing to write, or an allowance left: no note.
+  assert.deepEqual(lockedTypes({ ...SMALL, can_write: false }, shown, supplyLimits(SMALL)), []);
+  assert.deepEqual(lockedTypes({ ...used, can_write: true }, shown, limits), []);
+  assert.equal(couldWrite(SMALL, 'fill'), false); // "None in guide"
+});
+
+test('the sheet labels a locked type and builds its notes from what it shows', () => {
+  const sheet = readFileSync(new URL('../components/PrintQuizSheet.js', import.meta.url), 'utf8');
+  assert.match(sheet, /'Needs an AI quiz' : 'None in guide'/);
+  assert.match(sheet, /writeNeeds\(pools, shown\)/);
+  assert.match(sheet, /lockedTypes\(pools, shown, limits\)/);
+  assert.doesNotMatch(sheet, /writeNeeds\(pools, format\)/);
+});
+
+test('the reset date is the UTC first of the month, whatever the time zone', () => {
+  assert.equal(resetLabel('2026-12-01T00:00:00+00:00'), new Date(Date.UTC(2026, 11, 1)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' }));
+  assert.match(resetLabel('2026-12-01T00:00:00+00:00'), /1/);
+  assert.doesNotMatch(resetLabel('2026-12-01T00:00:00+00:00'), /30/);
+  assert.equal(resetLabel(''), '');
+  assert.equal(resetLabel('garbage'), '');
+  assert.equal(nextReset(new Date(Date.UTC(2026, 10, 21, 23, 30))), '2026-12-01T00:00:00.000Z');
+  assert.equal(nextReset(new Date(Date.UTC(2026, 11, 31))), '2027-01-01T00:00:00.000Z');
+});
+
+test('a refused write keeps the 402 details and Upgrade is left out on the top plan', async () => {
+  const { responseJson } = await import('../lib/api.js');
+  const body = { detail: { code: 'limit_reached', feature: 'ai_quiz', resets_at: '2026-12-01T00:00:00+00:00', upgrade_tier: null, message: 'No AI quizzes left.' } };
+  const data = await responseJson(new Response(JSON.stringify(body), { status: 402 }));
+  assert.equal(data.detail, 'No AI quizzes left.');
+  assert.equal(data.limit.resets_at, '2026-12-01T00:00:00+00:00');
+  assert.equal(data.limit.upgrade_tier, null);
+  const note = readFileSync(new URL('../components/UsedUpNote.js', import.meta.url), 'utf8');
+  assert.match(note, /upgradeTier !== null &&/);
+  const page = readFileSync(new URL('../pages/print/quiz/[id].js', import.meta.url), 'utf8');
+  assert.match(page, /written\?\.limit\?\.resets_at \|\| free\.resets_at \|\| nextReset\(\)/);
+});

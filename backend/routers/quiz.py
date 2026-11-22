@@ -22,7 +22,7 @@ from services import print_items, retain
 from services import blanks
 from services.choice_shapes import conform, is_value, repair, shape
 from services.distractor_check import keep_valid
-from services.entitlements import LIMITS, next_reset, plan_for, record, remaining, require, subscription_row
+from services.entitlements import LIMITS, next_reset, plan_for, record, remaining, require, subscription_row, tier_for, upgrade_tier
 
 
 logger = logging.getLogger(__name__)
@@ -744,6 +744,16 @@ def _can_write(user_id: str) -> bool:
         return True
 
 
+def _print_upgrade(user_id: str) -> dict:
+    """With no AI quiz left: the plan that gives more ({"upgrade_tier": None} on the top plan, so the
+    sheet leaves Upgrade out). Nothing when the plan can't be read: the sheet then offers Upgrade."""
+    try:
+        return {"upgrade_tier": upgrade_tier(tier_for(subscription_row(user_id)), "ai_quiz")}
+    except Exception:
+        logger.warning("Could not read the plan for print items", exc_info=True)
+        return {}
+
+
 @router.post("/{guide_id}/print-items", dependencies=[Depends(ai_rate_limit())])
 def printable_items(guide_id: str, body: PrintRequest, authorization: str = Header(default="")):
     """Everything a printable quiz can use, per type, from the guide's own questions and answers.
@@ -818,6 +828,7 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
         "can_write": can_write,
         # When it can't: the date the plan's AI quizzes come back, for the sheet's "Resets Dec 1".
         "resets_at": None if can_write else next_reset(),
+        **({} if can_write else _print_upgrade(user_id)),
         "fill_locked": fill_locked,
         "write_failed": write_failed,
     }

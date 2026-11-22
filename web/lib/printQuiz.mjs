@@ -120,17 +120,29 @@ export function availableFormat(format, limits) {
   return TYPES.some(type => on[type]) ? { ...clamped, on } : clamped;
 }
 
-// The types whose maximum counts ideas not written yet (fill-in sentences, extra matching terms and
-// short-answer questions the guide could still have written), so the sheet says "about" for them.
-// Once the student has no AI quiz left nothing is counted that way.
+// Whether the guide has ideas for this type that could still be written (fill-in sentences, extra
+// matching terms, extra short-answer questions), whether or not an AI quiz is left to write them.
+export function couldWrite(pools, type) {
+  if (type === 'fill') return !pools?.fill && Number(pools?.fill_possible) > 0;
+  if (type === 'matching') return Number(pools?.matching_possible) > 0;
+  if (type === 'short') return Number(pools?.short_possible) > 0;
+  return false;
+}
+
+// The types whose maximum counts ideas not written yet, so the sheet says "about" for them. Once the
+// student has no AI quiz left nothing is counted that way.
 export function aboutTypes(pools) {
   if (pools?.can_write === false) return [];
-  return TYPES.filter(type => {
-    if (type === 'fill') return !pools?.fill && Number(pools?.fill_possible) > 0;
-    if (type === 'matching') return Number(pools?.matching_possible) > 0;
-    if (type === 'short') return Number(pools?.short_possible) > 0;
-    return false;
-  });
+  return TYPES.filter(type => couldWrite(pools, type));
+}
+
+// With no AI quiz left, the types the sheet shows as held back by it, so its note names exactly those:
+// a row with nothing ready that the guide could write ("Needs an AI quiz"), and a type that is on
+// whose maximum stops at the ready items while the guide could write more. `shown` is the format as
+// the sheet shows it (availableFormat), never the saved one.
+export function lockedTypes(pools, shown, limits) {
+  if (pools?.can_write !== false) return [];
+  return TYPES.filter(type => couldWrite(pools, type) && (!(limits[type] > 0) || shown.on[type]));
 }
 
 // What the guide can't supply ready, in the chosen formats: the types that need writing and, when the

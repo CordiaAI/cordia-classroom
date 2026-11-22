@@ -6,7 +6,7 @@ import UsedUpNote from './UsedUpNote';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { getPref, setPref } from '../lib/progress';
 import {
-  DEFAULT_FORMAT, PRESETS, TYPES, TYPE_NAMES, aboutTypes, applyPreset, availableFormat, buildPrint, cleanFormat, encodeFormat, estimatePools, listTypes, matchingPreset, setCount, supplyLimits, toggleType, writeNeeds,
+  DEFAULT_FORMAT, PRESETS, TYPES, TYPE_NAMES, aboutTypes, applyPreset, availableFormat, buildPrint, cleanFormat, couldWrite, encodeFormat, estimatePools, listTypes, lockedTypes, matchingPreset, setCount, supplyLimits, toggleType, writeNeeds,
 } from '../lib/printQuiz.mjs';
 
 // The "Print quiz" button on a finish screen: opens the sheet below.
@@ -50,14 +50,16 @@ export default function PrintQuizSheet({ guideId, onClose }) {
   // sentences, and matching terms and short-answer questions beyond the ready ones, are written when the
   // quiz is printed; until then each idea the guide could write counts as one, so the totals read "about".
   const limits = useMemo(() => (pools ? supplyLimits(pools) : null), [pools]);
-  const needs = useMemo(() => (pools ? writeNeeds(pools, format) : { write: [], locked: [] }), [pools, format]);
   const about = useMemo(() => (pools ? aboutTypes(pools) : []), [pools]);
   // What is shown and sent: counts held to each maximum, a type with no material at all left off.
+  // The notes are built from it too, so they only ever talk about what the rows show.
   const shown = useMemo(() => (limits ? availableFormat(format, limits) : format), [format, limits]);
+  const needs = useMemo(() => (pools ? writeNeeds(pools, shown) : { write: [], locked: [] }), [pools, shown]);
+  const locked = useMemo(() => (pools ? lockedTypes(pools, shown, limits) : []), [pools, shown, limits]);
   const preview = useMemo(() => {
     if (!pools) return null;
-    return buildPrint(estimatePools(pools), shown, 1, { locked: needs.locked });
-  }, [pools, shown, needs]);
+    return buildPrint(estimatePools(pools), shown, 1, { locked });
+  }, [pools, shown, locked]);
   const preset = matchingPreset(format);
   const onCount = TYPES.filter(type => shown.on[type]).length;
 
@@ -85,7 +87,10 @@ export default function PrintQuizSheet({ guideId, onClose }) {
               <ul className="pqs-types">
                 {TYPES.map(type => {
                   const max = limits[type];
-                  const none = max <= 0; // the guide has nothing for this type: the row is off and says so
+                  const none = max <= 0; // nothing for this type: the row is off and says why
+                  // "None in guide" only when the guide has nothing to make it from; with no AI quiz left, a type
+                  // it could still write needs one, as the note below says.
+                  const noneLabel = pools.can_write === false && couldWrite(pools, type) ? 'Needs an AI quiz' : 'None in guide';
                   const on = format.on[type] && !none;
                   const count = none ? 0 : Math.min(format.counts[type], max);
                   const atMin = count <= 1;
@@ -99,7 +104,7 @@ export default function PrintQuizSheet({ guideId, onClose }) {
                       <div className="pqs-stepper" role="group" aria-label={`${TYPE_NAMES[type]} count`}>
                         <button type="button" className="c-icon-btn pqs-step" onClick={() => step(atMin, count - 1)} aria-disabled={!on || atMin} aria-label={`Fewer ${name}`}><Minus size={16} strokeWidth={2} aria-hidden="true" /></button>
                         {none
-                          ? <span className="pqs-count pqs-count--none">None in guide</span>
+                          ? <span className="pqs-count pqs-count--none">{noneLabel}</span>
                           : <span className="pqs-count" aria-live="polite"><b>{count}</b>{' '}<span className="pqs-max">of {about.includes(type) ? 'about ' : ''}{max}</span></span>}
                         <button type="button" className="c-icon-btn pqs-step" onClick={() => step(atMax, count + 1)} aria-disabled={!on || atMax}
                           aria-label={atMax ? `More ${name}: ${about.includes(type) ? 'about ' : ''}${max} is the most this guide has` : `More ${name}`}><Plus size={16} strokeWidth={2} aria-hidden="true" /></button>
@@ -116,7 +121,7 @@ export default function PrintQuizSheet({ guideId, onClose }) {
                 <p className="pqs-note">{pools.mc_flagged === 1 ? '1 multiple-choice question is' : `${pools.mc_flagged} multiple-choice questions are`} left out because an answer choice is another question&rsquo;s answer. Refresh answer choices on the guide to include {pools.mc_flagged === 1 ? 'it' : 'them'}.</p>
               )}
               {needs.write.length > 0 && <p className="pqs-note">{listTypes(needs.write).replace(/^./, letter => letter.toUpperCase())} are written from your guide when you print. The first time counts as one AI quiz.</p>}
-              <UsedUpNote className="pqs-note" types={needs.locked} resetsAt={pools.resets_at} />
+              <UsedUpNote className="pqs-note" types={locked} resetsAt={pools.resets_at} upgradeTier={pools.upgrade_tier} />
               <div className="pqs-options">
                 <Toggle checked={format.shuffleQuestions || format.versions} disabled={format.versions} onChange={value => setFormat(current => ({ ...current, shuffleQuestions: value }))} label="Shuffle questions" />
                 <Toggle checked={format.shuffleOptions || format.versions} disabled={format.versions} onChange={value => setFormat(current => ({ ...current, shuffleOptions: value }))} label="Shuffle answer choices" />

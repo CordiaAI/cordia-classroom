@@ -179,6 +179,8 @@ export async function responseJson(response) {
   } catch {
     data = { detail: response.ok ? '' : 'Classroom received an unreadable response. Please try again.' };
   }
+  // A plan limit's details (resets_at, upgrade_tier...) stay readable as `limit`; `detail` becomes its message.
+  if (data?.detail?.code === 'limit_reached') data = { ...data, limit: data.detail };
   if (data?.detail) data = { ...data, detail: apiErrorMessage(data.detail) };
   return addRequestReference(data, response);
 }

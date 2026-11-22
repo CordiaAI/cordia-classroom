@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch } from '../../../lib/api';
 import { useRequireAuth } from '../../../lib/auth';
 import { classLabel } from '../../../lib/classLabel';
+import { nextReset } from '../../../lib/plans';
 import UsedUpNote from '../../../components/UsedUpNote';
 import { TYPE_NAMES, buildPrint, decodeFormat, listTypes, writeNeeds } from '../../../lib/printQuiz.mjs';
 
@@ -211,9 +212,10 @@ export default function PrintQuizPage() {
           const failed = (written.write_failed || []).filter(type => write.includes(type));
           heldBack.push(...failed);
           if (failed.length) problems.push(`${listTypes(failed).replace(/^./, letter => letter.toUpperCase())} could not be written just now, so they are left out. Print again in a minute.`);
-        } else if (written?.limit_reached || written?.detail?.code === 'limit_reached') {
+        } else if (written?.limit_reached || written?.limit) {
           heldBack.push(...write);
-          refused = { types: write, resetsAt: written?.detail?.resets_at || '' };
+          // The 402's own details (responseJson keeps them as `limit`); the next reset if it had none.
+          refused = { types: write, resetsAt: written?.limit?.resets_at || free.resets_at || nextReset(), upgradeTier: written?.limit?.upgrade_tier };
         } else {
           heldBack.push(...write);
           problems.push(`${listTypes(write).replace(/^./, letter => letter.toUpperCase())} could not be written just now, so they are left out.`);
@@ -258,7 +260,8 @@ export default function PrintQuizPage() {
         {print && <button type="button" className="c-btn c-btn--primary" onClick={() => window.print()} disabled={!print.questions}>Print</button>}
         {print && <span>{print.questions} questions · {print.points} points{print.versions.length > 1 ? ' · Versions A and B' : ''}</span>}
         {notes.map(note => <span key={note} className="pq-note" role="status">{note}</span>)}
-        <UsedUpNote className="pq-note" types={[...new Set([...needs.locked, ...usedUp.types])]} resetsAt={usedUp.resetsAt || data?.resets_at} />
+        <UsedUpNote className="pq-note" types={[...new Set([...needs.locked, ...usedUp.types])]} resetsAt={usedUp.resetsAt || data?.resets_at}
+          upgradeTier={usedUp.upgradeTier !== undefined ? usedUp.upgradeTier : data?.upgrade_tier} />
       </div>
       {print && print.questions > 0 && (
         <div className="pq-paper">

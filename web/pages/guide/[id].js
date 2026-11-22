@@ -740,7 +740,9 @@ export default function GuidePage() {
         .guide-tabs-row .c-pills :global(.c-pill) { flex: 0 0 auto; }
         .guide-tabs-row, .guide-head { min-width: 0; max-width: 100%; }
         :global(.guide-view) { justify-self: start; }
-        .guide-title-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing:-0.015em; text-align: left; cursor: text; border-radius:var(--r-input); width: fit-content; text-wrap: balance; }
+        /* min-width 0 and overflow-wrap anywhere: a title with no break points (a file name, a URL) breaks
+           inside the row instead of pushing the pencil off a phone screen; normal titles still wrap at spaces. */
+        .guide-title-btn { min-width: 0; overflow-wrap: anywhere; max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing:-0.015em; text-align: left; cursor: text; border-radius:var(--r-input); width: fit-content; text-wrap: balance; }
         .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
         .guide-rename { flex: 1 1 auto; min-width: 0; }
         .guide-title-input { font:600 1.75rem/1.15 var(--font-display); height: 52px; }

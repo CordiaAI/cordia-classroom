@@ -17,16 +17,20 @@ export default function useShrinkWrap(ref, deps) {
     const fit = () => {
       if (!alive) return;
       el.style.width = '';
-      const box = el.getBoundingClientRect();
       const range = document.createRange();
       range.selectNodeContents(el);
-      const rects = Array.from(range.getClientRects()).filter(rect => rect.width > 0);
-      const widest = rects.length ? Math.max(...rects.map(rect => rect.right)) - box.left : 0;
+      const lines = () => Array.from(range.getClientRects()).filter(rect => rect.width > 0);
+      const box = el.getBoundingClientRect();
+      const widest = Math.max(0, ...lines().map(rect => rect.right - box.left));
       // A whole pixel more than the widest line, so a fractional width never pushes a word down a line.
       if (widest > 0 && widest + 1 < box.width) el.style.width = `${Math.ceil(widest) + 1}px`;
+      // The lines are read again once the box is narrowed (balanced lines can re-wrap in the narrower box),
+      // and the slack is from the first line's end to the box's edge, where the neighbour starts.
+      const rects = lines();
+      const edge = el.getBoundingClientRect().right;
       const top = rects.length ? Math.min(...rects.map(rect => rect.top)) : 0;
       const first = rects.filter(rect => Math.abs(rect.top - top) < 2);
-      const slack = first.length ? Math.max(0, Math.round((widest - (Math.max(...first.map(rect => rect.right)) - box.left)) * 100) / 100) : 0;
+      const slack = first.length ? Math.max(0, Math.round((edge - Math.max(...first.map(rect => rect.right))) * 100) / 100) : 0;
       el.parentElement?.style.setProperty('--first-line-slack', `${slack}px`);
     };
     fit();
