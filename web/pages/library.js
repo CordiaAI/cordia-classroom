@@ -13,6 +13,7 @@ import useSessionTracker from '../lib/useSessionTracker';
 import { dueCount } from '../lib/studyQueue';
 import { listLectures } from '../lib/lectures';
 import { useUndoDelete } from '../lib/undoDelete';
+import { GUIDES_ORGANIZED, createLocalChanges, moveGuide, removeClass } from '../lib/guideActions';
 import ProgressRing from '../components/ProgressRing';
 import Menu from '../components/Menu';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -21,7 +22,7 @@ import LectureList from '../components/LectureList';
 import { openNewSheet } from '../lib/newSheet';
 import { walkthroughEvent } from '../lib/walkthrough';
 import { classLabel } from '../lib/classLabel';
-import { invalidateFolders, loadFolders } from '../lib/folders';
+import { loadFolders } from '../lib/folders';
 import { handOffUpload, readPracticeFile } from '../lib/practiceUpload';
 import { UPLOAD_ACCEPT } from '../lib/uploadTypes.mjs';
 import ClassCard from '../components/ClassCard';
@@ -106,7 +107,20 @@ export default function LibraryPage() {
   const [coverFor, setCoverFor] = useState(null); // the folder whose cover is being changed
   const [designingId, setDesigningId] = useState(null);
   const triedCovers = useRef(new Set());
-  const { pending, remove, undo } = useUndoDelete();
+  // Moves and deletes made while the list was loading must survive that load's answer (see loadData).
+  const local = useRef(createLocalChanges());
+  const loadSeq = useRef(0);
+  const { pending, hidden, remove, undo } = useUndoDelete({
+    // The server deleted it: it leaves this page's lists too (they are not read again), with its note if it took one.
+    onDeleted: item => {
+      const ids = [item.id, ...(item.also || []).map(path => path.split('/').pop())];
+      local.current.removed(ids);
+      setGuides(current => current.filter(guide => !ids.includes(guide.id)));
+      setNotes(current => current.filter(note => !ids.includes(note.id)));
+    },
+    // It did not go through (or only part did): say so, and read the lists again so they show what is really there.
+    onFailed: (_item, message) => { setToast(message); loadData({ quiet: true }); },
+  });
   // Practice from a file that isn't in Library: read it here, then open the workspace on it.
   const practiceFileRef = useRef(null);
   const [readingFile, setReadingFile] = useState(false);
@@ -176,19 +190,33 @@ export default function LibraryPage() {
     return () => window.removeEventListener(GUIDES_CHANGED, reload);
   }, []);
 
-  async function loadData() {
-    setLoading(true);
+  // A guide was moved or deleted from the Tutor or another page: read the lists again behind this one.
+  // (Moves and deletes made here are already in the lists; the answer keeps them, see createLocalChanges.)
+  useEffect(() => {
+    const reload = () => loadData({ quiet: true });
+    window.addEventListener(GUIDES_ORGANIZED, reload);
+    return () => window.removeEventListener(GUIDES_ORGANIZED, reload);
+  }, []);
+
+  async function loadData({ quiet = false } = {}) {
+    // quiet: read again behind the page that is showing (no loader), after something failed or changed.
+    if (!quiet) setLoading(true);
     setLoadError('');
+    const mine = ++loadSeq.current;
+    local.current.begin();
     const [foldersData, guidesData, notesData, lectureData, classData] = await Promise.all([
       loadFolders(), apiFetch('/guides?fields=summary&limit=500'), apiFetch('/smart_notes'), listLectures().catch(() => null), apiFetch('/classes'),
     ]);
+    // A newer load was started while this one was out: its answer is the one to show.
+    if (mine !== loadSeq.current) return;
     const failure = [foldersData, guidesData].find(data => !data || data.detail);
     if (failure) setLoadError(apiErrorMessage(failure?.detail, 'Your library could not be loaded.'));
     if (Array.isArray(foldersData?.folders)) setFolders(foldersData.folders);
-    if (Array.isArray(guidesData?.guides)) setGuides(guidesData.guides);
+    // What was moved or deleted here since this load began is newer than its answer.
+    if (Array.isArray(guidesData?.guides)) setGuides(local.current.apply(guidesData.guides));
     // Notes already moved into a guide show as that guide.
     const moved = new Set((guidesData?.guides || []).map(guide => guide.source_type).filter(type => String(type || '').startsWith('note:')).map(type => type.slice(5)));
-    setNotes(Array.isArray(notesData?.notes) ? notesData.notes.filter(note => !moved.has(note.id)) : []);
+    setNotes(Array.isArray(notesData?.notes) ? local.current.apply(notesData.notes.filter(note => !moved.has(note.id))) : []);
     setLectures(Array.isArray(lectureData?.lectures) ? lectureData.lectures : []);
     setSharedClasses(Array.isArray(classData?.classes) ? classData.classes : []);
     setLoading(false);
@@ -237,10 +265,10 @@ export default function LibraryPage() {
     setConfirm({
       title: `Delete ${folder.name}?`,
       onConfirm: async () => {
-        await Promise.all([apiFetch('/folders/' + folder.id, { method: 'DELETE' }), folder.class_id && apiFetch('/classes/' + folder.class_id, { method: 'DELETE' })]);
-        invalidateFolders();
+        const result = await removeClass(folder);
         setConfirm(null);
-        loadData();
+        if (!result.ok) setToast(result.message);
+        loadData({ quiet: true });
       },
     });
   }
@@ -257,12 +285,19 @@ export default function LibraryPage() {
     if ((item.folderId || null) === folderId) return;
     const label = folderId ? `Moved to ${classLabel(folders.find(folder => folder.id === folderId)?.name).title || 'class'}` : 'Moved to Miscellaneous';
     if (item.kind === 'guide') {
-      const data = await apiFetch('/guides/' + item.id + '/move', { method: 'PATCH', body: JSON.stringify({ folder_id: folderId }) });
-      if (!data?.updated) return;
+      const result = await moveGuide(item.id, folderId);
+      if (!result.ok) {
+        setToast(result.message);
+        // Gone, or into a class that is gone: the lists on this page are out of date.
+        if (result.gone || result.folderMissing) loadData({ quiet: true });
+        return;
+      }
+      local.current.moved(item.id, folderId);
       setGuides(current => current.map(guide => (guide.id === item.id ? { ...guide, folder_id: folderId } : guide)));
     } else if (item.kind === 'note') {
       const data = await apiFetch('/smart_notes/' + item.id, { method: 'PUT', body: JSON.stringify({ folder_id: folderId || '' }) });
       if (!data?.updated) { setToast(apiErrorMessage(data?.detail, 'Note not moved.')); return; }
+      local.current.moved(item.id, folderId);
       setNotes(current => current.map(note => (note.id === item.id ? { ...note, folder_id: folderId } : note)));
     } else return;
     setToast(label);
@@ -302,14 +337,14 @@ export default function LibraryPage() {
     if (['all', 'lectures'].includes(filter)) {
       lectures.forEach(lecture => rows.push({ kind: 'lecture', id: lecture.id, title: lecture.title || 'Lecture', folderId: lecture.folder_id, date: lecture.lecture_date ? `${lecture.lecture_date}T12:00:00` : lecture.created_at, href: '/lecture/' + lecture.id }));
     }
-    let list = rows.filter(row => row.id !== pending?.id);
+    let list = rows.filter(row => !hidden.has(row.id));
     if (filter === 'starred') list = list.filter(row => row.starred);
     if (q) list = list.filter(row => row.title.toLowerCase().includes(q));
     if (sort === 'title') list.sort((a, b) => a.title.localeCompare(b.title));
     else if (sort === 'progress') list.sort((a, b) => (b.progress || 0) - (a.progress || 0));
     else list.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     return list;
-  }, [guides, notes, lectures, filter, query, sort, pending?.id]);
+  }, [guides, notes, lectures, filter, query, sort, hidden]);
 
   if (!ready) return null;
 
@@ -540,13 +575,13 @@ export default function LibraryPage() {
       </div>
       )}
 
-      {pending && (
+      {/* A message (a move or delete that did not go through) shows over the Undo toast; Undo returns after it. */}
+      {toast ? <div className="c-toast" role="status"><span>{toast}</span></div> : pending && (
         <div className="c-toast" role="status">
           <span>Deleted</span>
           <button type="button" className="c-btn c-btn--quiet" onClick={undo}>Undo</button>
         </div>
       )}
-      {!pending && toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
       {coverFor && (
         <ClassCoverSheet folder={coverFor} titles={classTitles(coverFor.id)} onClose={() => setCoverFor(null)}
           onSaved={folder => { setFolders(current => current.map(item => (item.id === folder.id ? { ...item, ...folder } : item))); setCoverFor(null); setToast('Cover saved'); }} />

@@ -237,6 +237,15 @@ export function createChatStore({ request: send, identify = () => '', onTutorCha
     return classMap;
   }
 
+  // A guide was moved to another class or deleted: which class each guide's chats belong to is read again,
+  // and whoever shows a class's chats (its Chats tab, on onChatsChanged) asks again.
+  function guidesChanged() {
+    check();
+    classMap = null;
+    classMapAt = 0;
+    emit();
+  }
+
   async function fetchList(classId = '') {
     if (mode !== 'tutor') {
       // A class's Chats tab lists as many as the backend allows; the sidebar starts with 30.
@@ -547,7 +556,7 @@ export function createChatStore({ request: send, identify = () => '', onTutorCha
 
   return {
     subscribe, snapshot, load, refreshSoon, classChats, getChat, start, openChat, rename, move, remove, restore,
-    keepOpen, say, dismiss, showMore, check,
+    keepOpen, say, dismiss, showMore, check, guidesChanged,
     get editable() { return editable; },
   };
 }

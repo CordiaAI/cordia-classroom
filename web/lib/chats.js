@@ -62,6 +62,8 @@ export const showChatMessage = text => store.say(text);
 export const showMoreChats = () => store.showMore();
 export const dismissChatToast = id => store.dismiss(id);
 export const onChatsChanged = listener => store.subscribe(listener);
+// A guide moved to another class or was deleted (lib/guideActions.js): chats are filed by their guide's class.
+export const guidesChanged = () => store.guidesChanged();
 
 // Where a chat opens without the new shell (switch off, or a phone): the Tutor page with that chat.
 // The live conversation reopens as it is; a saved one through the Tutor page's own resume

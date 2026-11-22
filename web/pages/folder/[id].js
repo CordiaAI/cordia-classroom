@@ -15,6 +15,7 @@ import AddClass from '../../components/AddClass';
 import { ClassDeadlines, ClassSets } from '../../components/ClassSets';
 import { openNewSheet } from '../../lib/newSheet';
 import { invalidateFolders, loadFolders } from '../../lib/folders';
+import { moveGuide, removeClass } from '../../lib/guideActions';
 import { canvasStatus } from '../../lib/canvas';
 import { CourseFiles } from '../../components/CanvasClasses';
 import ClassGrades from '../../components/ClassGrades';
@@ -122,8 +123,13 @@ export default function ClassPage() {
   }
 
   async function moveGuide(item, folderId) {
-    const data = await apiFetch('/guides/' + item.id + '/move', { method: 'PATCH', body: JSON.stringify({ folder_id: folderId }) });
-    if (!data?.updated) return;
+    const result = await moveGuide(item.id, folderId);
+    if (!result.ok) {
+      setToast(result.message);
+      // Gone, or into a class that is gone: what this page lists is out of date.
+      if (result.gone || result.folderMissing) loadData();
+      return;
+    }
     setItems(current => current.filter(row => row.id !== item.id));
     setToast('Moved to ' + (folderId ? folders.find(f => f.id === folderId)?.name : 'Unfiled'));
   }
@@ -145,8 +151,9 @@ export default function ClassPage() {
       title: `Delete ${folder.name}?`,
       onConfirm: async () => {
         // Deleting the class also leaves its shared class, so it doesn't come back as a link.
-        await Promise.all([apiFetch('/folders/' + id, { method: 'DELETE' }), folder.class_id && apiFetch('/classes/' + folder.class_id, { method: 'DELETE' })]);
-        invalidateFolders();
+        const result = await removeClass(folder);
+        setConfirm(null);
+        if (!result.ok) { setToast(result.message); return; }
         router.push('/library');
       },
     });
