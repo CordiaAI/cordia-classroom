@@ -4,7 +4,8 @@ import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch } from '../../../lib/api';
 import { useRequireAuth } from '../../../lib/auth';
 import { classLabel } from '../../../lib/classLabel';
-import { TYPE_NAMES, buildPrint, clampToSupply, decodeFormat, listTypes, supplyLimits, writeNeeds } from '../../../lib/printQuiz.mjs';
+import UsedUpNote from '../../../components/UsedUpNote';
+import { TYPE_NAMES, buildPrint, decodeFormat, listTypes, writeNeeds } from '../../../lib/printQuiz.mjs';
 
 // A printable quiz: the student's format (?f=, lib/printQuiz.mjs) laid out on Letter paper, then
 // the browser's print dialog. No server-side PDF: "Save as PDF" in that dialog makes one.
@@ -183,6 +184,7 @@ export default function PrintQuizPage() {
   const [error, setError] = useState('');
   const [problems, setProblems] = useState([]);
   const [held, setHeld] = useState([]); // types a write could not supply: their own note says why, so no "enough for N" on top
+  const [usedUp, setUsedUp] = useState({ types: [], resetsAt: '' }); // types refused because no AI quiz is left, and when they come back
   const [seed] = useState(() => Number(router.query.seed) || (Date.now() % 100000) + 1);
   const format = useMemo(() => decodeFormat(router.query.f), [router.query.f]);
 
@@ -200,6 +202,7 @@ export default function PrintQuizPage() {
       const { write } = writeNeeds(free, format);
       const problems = [];
       const heldBack = [];
+      let refused = { types: [], resetsAt: '' };
       if (write.length) {
         const written = await apiFetch(`/quiz/${id}/print-items`, { method: 'POST', timeoutMs: 90000, quietLimit: true, body: JSON.stringify({ write }) });
         if (!alive) return;
@@ -210,22 +213,24 @@ export default function PrintQuizPage() {
           if (failed.length) problems.push(`${listTypes(failed).replace(/^./, letter => letter.toUpperCase())} could not be written just now, so they are left out. Print again in a minute.`);
         } else if (written?.limit_reached || written?.detail?.code === 'limit_reached') {
           heldBack.push(...write);
-          problems.push(`${listTypes(write).replace(/^./, letter => letter.toUpperCase())} need an AI quiz, and this month's are used up.`);
+          refused = { types: write, resetsAt: written?.detail?.resets_at || '' };
         } else {
           heldBack.push(...write);
           problems.push(`${listTypes(write).replace(/^./, letter => letter.toUpperCase())} could not be written just now, so they are left out.`);
         }
       }
       setProblems(problems);
+      setUsedUp(refused);
       setHeld(heldBack);
       setData(result);
     })();
     return () => { alive = false; };
   }, [ready, id, router.isReady, format]);
 
-  const limits = useMemo(() => (data ? supplyLimits(data) : null), [data]);
   const needs = useMemo(() => (data ? writeNeeds(data, format) : { write: [], locked: [] }), [data, format]);
-  const print = useMemo(() => (data ? buildPrint({ mc: data.mc, matching: data.matching, fill: data.fill || [], short: data.short }, clampToSupply(format, limits), Number(router.query.seed) || seed, { locked: [...needs.locked, ...held] }) : null), [data, format, limits, needs, held, seed, router.query.seed]);
+  // The format as linked, never trimmed to what the guide has: a type that comes up short says so in a note
+  // ("This guide has enough for N ..."), so a shortfall never prints silently.
+  const print = useMemo(() => (data ? buildPrint({ mc: data.mc, matching: data.matching, fill: data.fill || [], short: data.short }, format, Number(router.query.seed) || seed, { locked: [...needs.locked, ...held] }) : null), [data, format, needs, held, seed, router.query.seed]);
 
   // The print dialog opens once the fonts are in, so the page breaks are the real ones.
   useEffect(() => {
@@ -241,7 +246,6 @@ export default function PrintQuizPage() {
   const notes = print ? [
     ...print.notes,
     ...(data.mc_flagged && format.on.mc ? [`${data.mc_flagged === 1 ? '1 multiple-choice question is' : `${data.mc_flagged} multiple-choice questions are`} left out because an answer choice is another question's answer. Use Refresh answer choices on the guide to fix them.`] : []),
-    ...(needs.locked.length ? [`${listTypes(needs.locked).replace(/^./, letter => letter.toUpperCase())} need an AI quiz, and this month's are used up.`] : []),
     ...problems,
   ] : [];
 
@@ -254,6 +258,7 @@ export default function PrintQuizPage() {
         {print && <button type="button" className="c-btn c-btn--primary" onClick={() => window.print()} disabled={!print.questions}>Print</button>}
         {print && <span>{print.questions} questions · {print.points} points{print.versions.length > 1 ? ' · Versions A and B' : ''}</span>}
         {notes.map(note => <span key={note} className="pq-note" role="status">{note}</span>)}
+        <UsedUpNote className="pq-note" types={[...new Set([...needs.locked, ...usedUp.types])]} resetsAt={usedUp.resetsAt || data?.resets_at} />
       </div>
       {print && print.questions > 0 && (
         <div className="pq-paper">
@@ -265,7 +270,8 @@ export default function PrintQuizPage() {
         body::before { display: none !important; }
         .pq { min-height: 100vh; color: var(--print-ink); }
         .pq-toolbar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 24px; background: var(--print-paper); border-bottom: 1px solid var(--print-edge); font: 500 0.875rem/1.4 var(--font-sans); }
-        .pq-note { flex-basis: 100%; color: var(--print-muted); }
+        .pq-toolbar { --upgrade-link: var(--print-ink); }
+        .pq-note { flex-basis: 100%; margin: 0; color: var(--print-muted); }
         .pq-paper { width: 8.5in; margin: 24px auto; padding: 0.8in 0.85in 0.85in; background: var(--print-paper); box-sizing: border-box; page: quiz; }
         .pq-paper p, .pq-paper h1, .pq-paper h2, .pq-paper h3, .pq-paper ol { margin: 0; padding: 0; }
         .pq-paper ol { list-style: none; }

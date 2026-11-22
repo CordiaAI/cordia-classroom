@@ -46,6 +46,9 @@
 
   /* Spacing: a 4 px scale for gaps and padding */
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  /* The smallest tap target (44 px) and the quiet 36 px icon button that grows to it with an invisible
+     ::after sized from the padding box (calc((var(--hit) - 100%) / -2)), so a border never shortens it. */
+  --hit: 44px; --icon-btn-s: 36px;
   /* Settings cards: the same inner padding on all four sides, in rem so Larger text grows it. */
   --settings-pad: 1.5rem;
 

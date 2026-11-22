@@ -110,6 +110,29 @@ export function clampToSupply(format, limits) {
   return { ...format, counts };
 }
 
+// The format as the sheet shows and sends it: counts held to each maximum, and a type the guide has no
+// material for at all turned off (unless that would leave nothing on), so the printout never has to
+// say "no material" for a row the sheet already showed as none.
+export function availableFormat(format, limits) {
+  const clamped = clampToSupply(format, limits);
+  const on = { ...clamped.on };
+  TYPES.forEach(type => { if (!(limits[type] > 0)) on[type] = false; });
+  return TYPES.some(type => on[type]) ? { ...clamped, on } : clamped;
+}
+
+// The types whose maximum counts ideas not written yet (fill-in sentences, extra matching terms and
+// short-answer questions the guide could still have written), so the sheet says "about" for them.
+// Once the student has no AI quiz left nothing is counted that way.
+export function aboutTypes(pools) {
+  if (pools?.can_write === false) return [];
+  return TYPES.filter(type => {
+    if (type === 'fill') return !pools?.fill && Number(pools?.fill_possible) > 0;
+    if (type === 'matching') return Number(pools?.matching_possible) > 0;
+    if (type === 'short') return Number(pools?.short_possible) > 0;
+    return false;
+  });
+}
+
 // What the guide can't supply ready, in the chosen formats: the types that need writing and, when the
 // student has no AI quiz left (pools.can_write false), the ones that could have been written.
 export function writeNeeds(pools, format) {

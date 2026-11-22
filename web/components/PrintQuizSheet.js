@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus, Printer } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import Toggle from './Toggle';
+import UsedUpNote from './UsedUpNote';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { getPref, setPref } from '../lib/progress';
 import {
-  DEFAULT_FORMAT, PRESETS, TYPES, TYPE_NAMES, applyPreset, buildPrint, clampToSupply, cleanFormat, encodeFormat, estimatePools, listTypes, matchingPreset, setCount, supplyLimits, toggleType, writeNeeds,
+  DEFAULT_FORMAT, PRESETS, TYPES, TYPE_NAMES, aboutTypes, applyPreset, availableFormat, buildPrint, cleanFormat, encodeFormat, estimatePools, listTypes, matchingPreset, setCount, supplyLimits, toggleType, writeNeeds,
 } from '../lib/printQuiz.mjs';
 
 // The "Print quiz" button on a finish screen: opens the sheet below.
@@ -50,16 +51,19 @@ export default function PrintQuizSheet({ guideId, onClose }) {
   // quiz is printed; until then each idea the guide could write counts as one, so the totals read "about".
   const limits = useMemo(() => (pools ? supplyLimits(pools) : null), [pools]);
   const needs = useMemo(() => (pools ? writeNeeds(pools, format) : { write: [], locked: [] }), [pools, format]);
+  const about = useMemo(() => (pools ? aboutTypes(pools) : []), [pools]);
+  // What is shown and sent: counts held to each maximum, a type with no material at all left off.
+  const shown = useMemo(() => (limits ? availableFormat(format, limits) : format), [format, limits]);
   const preview = useMemo(() => {
     if (!pools) return null;
-    return buildPrint(estimatePools(pools), clampToSupply(format, limits), 1, { locked: needs.locked });
-  }, [pools, format, limits, needs]);
+    return buildPrint(estimatePools(pools), shown, 1, { locked: needs.locked });
+  }, [pools, shown, needs]);
   const preset = matchingPreset(format);
-  const onCount = TYPES.filter(type => format.on[type]).length;
+  const onCount = TYPES.filter(type => shown.on[type]).length;
 
   function print() {
     setPref('print', format);
-    window.open(`/print/quiz/${guideId}?f=${encodeFormat(format)}`, '_blank', 'noopener');
+    window.open(`/print/quiz/${guideId}?f=${encodeFormat(shown)}`, '_blank', 'noopener');
     onClose();
   }
 
@@ -80,22 +84,25 @@ export default function PrintQuizSheet({ guideId, onClose }) {
               </div>
               <ul className="pqs-types">
                 {TYPES.map(type => {
-                  const on = format.on[type];
                   const max = limits[type];
-                  const count = max > 0 ? Math.min(format.counts[type], max) : 0;
+                  const none = max <= 0; // the guide has nothing for this type: the row is off and says so
+                  const on = format.on[type] && !none;
+                  const count = none ? 0 : Math.min(format.counts[type], max);
                   const atMin = count <= 1;
                   const atMax = count >= max;
                   const name = TYPE_NAMES[type].toLowerCase();
                   // aria-disabled, not disabled: a button that disables itself under the keyboard drops the focus.
                   const step = (blocked, to) => { if (on && !blocked) setFormat(current => setCount(current, type, to, max)); };
                   return (
-                    <li key={type} className={'pqs-type' + (on ? '' : ' is-off')}>
-                      <Toggle checked={on} onChange={value => setFormat(current => toggleType(current, type, value))} label={TYPE_NAMES[type]} disabled={on && onCount === 1} />
+                    <li key={type} className={'pqs-type' + (on ? '' : ' is-off') + (none ? ' is-none' : '')}>
+                      <Toggle checked={on} onChange={value => setFormat(current => toggleType(current, type, value))} label={TYPE_NAMES[type]} disabled={none || (on && onCount === 1)} />
                       <div className="pqs-stepper" role="group" aria-label={`${TYPE_NAMES[type]} count`}>
                         <button type="button" className="c-icon-btn pqs-step" onClick={() => step(atMin, count - 1)} aria-disabled={!on || atMin} aria-label={`Fewer ${name}`}><Minus size={16} strokeWidth={2} aria-hidden="true" /></button>
-                        <span className="pqs-count" aria-live="polite"><b>{count}</b>{' '}<span className="pqs-max">of {max}</span></span>
+                        {none
+                          ? <span className="pqs-count pqs-count--none">None in this guide</span>
+                          : <span className="pqs-count" aria-live="polite"><b>{count}</b>{' '}<span className="pqs-max">of {about.includes(type) ? 'about ' : ''}{max}</span></span>}
                         <button type="button" className="c-icon-btn pqs-step" onClick={() => step(atMax, count + 1)} aria-disabled={!on || atMax}
-                          aria-label={atMax ? `More ${name}: ${max} is the most this guide has` : `More ${name}`}><Plus size={16} strokeWidth={2} aria-hidden="true" /></button>
+                          aria-label={atMax ? `More ${name}: ${about.includes(type) ? 'about ' : ''}${max} is the most this guide has` : `More ${name}`}><Plus size={16} strokeWidth={2} aria-hidden="true" /></button>
                       </div>
                     </li>
                   );
@@ -109,7 +116,7 @@ export default function PrintQuizSheet({ guideId, onClose }) {
                 <p className="pqs-note">{pools.mc_flagged === 1 ? '1 multiple-choice question is' : `${pools.mc_flagged} multiple-choice questions are`} left out because an answer choice is another question&rsquo;s answer. Refresh answer choices on the guide to include {pools.mc_flagged === 1 ? 'it' : 'them'}.</p>
               )}
               {needs.write.length > 0 && <p className="pqs-note">{listTypes(needs.write).replace(/^./, letter => letter.toUpperCase())} are written from your guide when you print. The first time counts as one AI quiz.</p>}
-              {needs.locked.length > 0 && <p className="pqs-note">{listTypes(needs.locked).replace(/^./, letter => letter.toUpperCase())} need an AI quiz, and this month&rsquo;s are used up.</p>}
+              <UsedUpNote className="pqs-note" types={needs.locked} resetsAt={pools.resets_at} />
               <div className="pqs-options">
                 <Toggle checked={format.shuffleQuestions || format.versions} disabled={format.versions} onChange={value => setFormat(current => ({ ...current, shuffleQuestions: value }))} label="Shuffle questions" />
                 <Toggle checked={format.shuffleOptions || format.versions} disabled={format.versions} onChange={value => setFormat(current => ({ ...current, shuffleOptions: value }))} label="Shuffle answer choices" />
@@ -133,12 +140,15 @@ export default function PrintQuizSheet({ guideId, onClose }) {
         .pqs-type { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--hairline); }
         .pqs-type .c-toggle { flex: 1; }
         .pqs-type.is-off .pqs-count { color: var(--muted); }
+        .pqs-count--none { font: 500 var(--fs-13)/1.2 var(--font-sans); text-align: right; }
         .pqs-stepper { display: inline-flex; align-items: center; gap: 4px; }
-        .pqs .pqs-step[aria-disabled='true'] { opacity: .4; cursor: default; background: transparent; box-shadow: none; }
+        /* At its limit only the icon fades; the button keeps full strength so its focus ring stays at 3:1. */
+        .pqs .pqs-step[aria-disabled='true'] { cursor: default; background: transparent; box-shadow: none; }
+        .pqs .pqs-step[aria-disabled='true'] :global(svg) { opacity: .4; }
         .pqs .pqs-step[aria-disabled='true']:active { transform: none; }
-        /* A finger needs 44px: the 40px button keeps its look, its target grows. */
+        /* A finger needs 44px: the 40px button keeps its look, its target grows (sized from the padding box, so its border doesn't shorten it). */
         .pqs-step { position: relative; }
-        @media (pointer: coarse) { .pqs-step::after { content: ''; position: absolute; inset: -2px; } }
+        @media (pointer: coarse) { .pqs-step::after { content: ''; position: absolute; inset: calc((var(--hit) - 100%) / -2); } }
         .pqs-count { min-width: 4.5rem; display: inline-flex; align-items: baseline; justify-content: center; gap: 4px; font: 600 1rem/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink); }
         .pqs-count b { font-weight: 600; }
         .pqs-max { font: 500 var(--fs-13)/1 var(--font-sans); color: var(--muted); }

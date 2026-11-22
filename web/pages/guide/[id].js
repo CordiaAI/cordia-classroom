@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import useShrinkWrap from '../../lib/useShrinkWrap';
 import Head from 'next/head';
 import { pageTitle } from '../../lib/pageTitle';
 import CordiaLoader, { LoadingArea, Reveal, SectionLoader, useLoadGate } from '../../components/CordiaLoader';
@@ -167,6 +168,8 @@ export default function GuidePage() {
   const prevRevealed = useRef(0);
   const { learningStyle } = useLearningStyle();
   const gate = useLoadGate(Boolean(guide) || Boolean(loadError));
+  const titleRef = useRef(null);
+  useShrinkWrap(titleRef, [guide?.title, renaming === null, gate]);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -535,7 +538,7 @@ export default function GuidePage() {
           </form>
         ) : (
           <h1 className="c-title guide-title">
-            <button type="button" className="guide-title-btn" onClick={() => setRenaming(guide.title)}>{guide.title}</button>
+            <button type="button" ref={titleRef} className="guide-title-btn" onClick={() => setRenaming(guide.title)}>{guide.title}</button>
             <span className="guide-rename-slot"><button type="button" className="c-icon-btn guide-rename-btn" onClick={() => setRenaming(guide.title)} aria-label="Rename guide"><Pencil size={18} strokeWidth={1.75} aria-hidden="true" /></button></span>
           </h1>
         )}
@@ -716,13 +719,14 @@ export default function GuidePage() {
         .guide-dup span { min-width: 0; overflow-wrap: anywhere; }
         .guide-dup-review { min-height: 32px; padding: 0 4px; border: 0; background: none; color: var(--olive-ink); font: 600 0.9375rem/1 var(--font-sans); cursor: pointer; }
         .guide-dup-review:hover { text-decoration: underline; }
-        /* The pencil sits 12px after the title and is centred on the title's first line, however many
-           lines the title wraps to: its slot is exactly one title line tall and the row aligns to the top. */
-        .guide-title { --guide-title-size: var(--fs-40); flex: 1 1 0; min-width: 0; display: flex; align-items: flex-start; gap: 12px; overflow-wrap: anywhere; }
+        /* The pencil sits one gap after the end of the title's first line and is centred on it, however many
+           lines the title wraps to: the title button is narrowed to its widest line (useShrinkWrap, with
+           balanced lines so the first is about as wide), and the pencil's slot is exactly one title line tall. */
+        .guide-title { --guide-title-size: var(--fs-40); flex: 1 1 0; min-width: 0; display: flex; align-items: flex-start; gap: var(--space-3); overflow-wrap: anywhere; }
         .guide-rename-slot { --guide-title-line: calc(var(--guide-title-size) * var(--lh-title)); flex: 0 0 auto; display: flex; align-items: flex-start; height: var(--guide-title-line); }
-        .guide-title :global(.guide-rename-btn) { position: relative; width: 36px; height: 36px; margin-block: calc((var(--guide-title-line) - 36px) / 2); color: var(--muted); }
-        /* A finger needs 44px: the same quiet 36px circle with a larger target around it. */
-        @media (pointer: coarse) { .guide-title :global(.guide-rename-btn)::after { content: ''; position: absolute; inset: -4px; } }
+        .guide-title :global(.guide-rename-btn) { position: relative; width: var(--icon-btn-s); height: var(--icon-btn-s); margin-block: calc((var(--guide-title-line) - var(--icon-btn-s)) / 2); color: var(--muted); }
+        /* A finger needs 44px: the same quiet circle with a larger target around it, measured from the padding box so its border doesn't shorten it. */
+        @media (pointer: coarse) { .guide-title :global(.guide-rename-btn)::after { content: ''; position: absolute; inset: calc((var(--hit) - 100%) / -2); } }
         .guide-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: -8px 0 0 48px; }
         .guide-nclex { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; border-radius: var(--r-row); background: var(--olive-tint); font: 600 0.9375rem/1.4 var(--font-sans); }
         .guide-nclex :global(.lucide) { color: var(--olive-ink); flex: 0 0 auto; }
@@ -736,7 +740,7 @@ export default function GuidePage() {
         .guide-tabs-row .c-pills :global(.c-pill) { flex: 0 0 auto; }
         .guide-tabs-row, .guide-head { min-width: 0; max-width: 100%; }
         :global(.guide-view) { justify-self: start; }
-        .guide-title-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing:-0.015em; text-align: left; cursor: text; border-radius:var(--r-input); text-wrap: pretty; /* lines fill the box, so the pencil stays 12px from the first line's end */ }
+        .guide-title-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing:-0.015em; text-align: left; cursor: text; border-radius:var(--r-input); width: fit-content; text-wrap: balance; }
         .guide-title-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
         .guide-rename { flex: 1 1 auto; min-width: 0; }
         .guide-title-input { font:600 1.75rem/1.15 var(--font-display); height: 52px; }
