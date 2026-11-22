@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { BadgeCheck, ChevronDown, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { useRequireAuth } from '../lib/auth';
 import { pageTitle } from '../lib/pageTitle';
 import { CLASSROOMS_ON } from '../lib/featureFlags';
-import { SectionLoader } from '../components/CordiaLoader';
 import UserChip from '../components/UserChip';
-import { FILTERS, discoverClassrooms, discoverGuides, discoverPeople, explorePath, studiedBy } from '../lib/discover';
+import { DiscoverEmpty, DiscoverLoading, DiscoverRetry, SetCard, SetGroup } from '../components/DiscoverParts';
+import { FILTERS, SUGGESTION_LIMIT, discoverClassrooms, discoverGuides, discoverPeople, emptySetsCopy, explorePath, isSetList, narrowing, suggestionGroups } from '../lib/discover';
 import { KIND_LABELS, joinMessage, requestJoin } from '../lib/classrooms';
 import SegmentedControl from '../components/SegmentedControl';
 
@@ -41,6 +41,13 @@ export default function Explore() {
     router.replace(explorePath(next.q ?? q, merged), undefined, { shallow: true, scroll: false });
   }
 
+  // Back to the plain tab: no search, no filters.
+  function clear() {
+    clearTimeout(debounceRef.current);
+    setDraft('');
+    router.replace(explorePath('', { tab }), undefined, { shallow: true, scroll: false });
+  }
+
   function onType(value) {
     setDraft(value);
     clearTimeout(debounceRef.current);
@@ -64,31 +71,34 @@ export default function Explore() {
       <header className="c-page-head ex-head">
         <h1 className="c-title">Discover</h1>
       </header>
-      <form className="c-search ex-search" role="search" onSubmit={event => { event.preventDefault(); clearTimeout(debounceRef.current); update({ q: draft }); }}>
-        <Search {...ICON} />
-        <label className="sr-only" htmlFor="ex-q">Search everyone's public sets, classrooms and people</label>
-        <input id="ex-q" className="c-input" type="search" value={draft} maxLength={200} autoComplete="off" spellCheck={false}
-          placeholder="Search public sets, classrooms and people" onChange={event => onType(event.target.value)} />
-        {draft && <button type="button" className="c-search-clear" aria-label="Clear search" onClick={() => { setDraft(''); update({ q: '' }); }}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>}
-      </form>
-      <SegmentedControl kind="tabs" label="Discover" className="ex-tabs" scroller onKeyDown={onTabKey}>
-        {TABS.map(item => (
-          <button key={item.key} id={`extab-${item.key}`} type="button" role="tab" aria-selected={tab === item.key} aria-controls={`expanel-${item.key}`}
-            tabIndex={tab === item.key ? 0 : -1} className={tab === item.key ? 'is-active' : ''} onClick={() => update({ tab: item.key })}>{item.label}</button>
-        ))}
-      </SegmentedControl>
+      <div className="ex-controls">
+        <form className="c-search ex-search" role="search" onSubmit={event => { event.preventDefault(); clearTimeout(debounceRef.current); update({ q: draft }); }}>
+          <Search {...ICON} />
+          <label className="sr-only" htmlFor="ex-q">Search everyone's public sets, classrooms and people</label>
+          <input id="ex-q" className="c-input" type="search" value={draft} maxLength={200} autoComplete="off" spellCheck={false}
+            placeholder="Search public sets, classrooms and people" onChange={event => onType(event.target.value)} />
+          {draft && <button type="button" className="c-search-clear" aria-label="Clear search" onClick={() => { setDraft(''); update({ q: '' }); }}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>}
+        </form>
+        <SegmentedControl kind="tabs" label="Discover" className="ex-tabs" scroller onKeyDown={onTabKey}>
+          {TABS.map(item => (
+            <button key={item.key} id={`extab-${item.key}`} type="button" role="tab" aria-selected={tab === item.key} aria-controls={`expanel-${item.key}`}
+              tabIndex={tab === item.key ? 0 : -1} className={tab === item.key ? 'is-active' : ''} onClick={() => update({ tab: item.key })}>{item.label}</button>
+          ))}
+        </SegmentedControl>
+      </div>
       <div id={`expanel-${tab}`} role="tabpanel" aria-labelledby={`extab-${tab}`} className="ex-panel">
-        {tab === 'guides' && <GuidesPanel q={q} filters={filters} onFilter={update} />}
-        {tab === 'classrooms' && <ClassroomsPanel q={q} />}
-        {tab === 'people' && <PeoplePanel q={q} />}
+        {tab === 'guides' && <GuidesPanel q={q} filters={filters} onFilter={update} onClear={clear} />}
+        {tab === 'classrooms' && <ClassroomsPanel q={q} onClear={clear} onBrowse={() => update({ tab: 'guides' })} />}
+        {tab === 'people' && <PeoplePanel q={q} onClear={clear} />}
       </div>
       <style jsx>{`
-        .ex { display: grid; gap: 14px; width: min(860px, 100%); margin: 0 auto; }
+        .ex { width: min(var(--page-max), 100%); margin: 0 auto; }
         .ex-head { margin: 0; }
+        .ex-controls { display: grid; gap: 14px; min-width: 0; }
         .ex-search { width: 100%; }
         :global(.ex-tabs) { justify-self: start; max-width: 100%; }
         :global(.ex-tabs) button { white-space: nowrap; }
-        .ex-panel { display: grid; gap: 12px; min-width: 0; }
+        .ex-panel { display: grid; gap: 16px; min-width: 0; }
       `}</style>
     </div>
   );
@@ -109,20 +119,45 @@ function Select({ label, value, options, onChange }) {
   );
 }
 
-function GuidesPanel({ q, filters, onFilter }) {
+// What fills a search with no results: the most popular public sets, then sets from the student's own
+// classmates (classrooms they are in). Both come from /discover/guides, so the backend's rules on
+// who may be listed, named or shown at all still apply. Null until they arrive, [] when there are none.
+function useSuggestions(enabled) {
+  const [groups, setGroups] = useState(null);
+  useEffect(() => {
+    if (!enabled) { setGroups(null); return undefined; }
+    let live = true;
+    Promise.all([
+      discoverGuides({ limit: SUGGESTION_LIMIT }),
+      CLASSROOMS_ON ? discoverGuides({ from_my_classrooms: true, limit: SUGGESTION_LIMIT * 2 }) : null,
+    ]).then(([popular, classmates]) => {
+      if (live) setGroups(suggestionGroups({ popular: popular?.guides, classmates: classmates?.guides }));
+    });
+    return () => { live = false; };
+  }, [enabled]);
+  return groups || [];
+}
+
+function GuidesPanel({ q, filters, onFilter, onClear }) {
   const [data, setData] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const [tries, setTries] = useState(0);
+  const [facets, setFacets] = useState({});
   const [extra, setExtra] = useState([]);
-  const [open, setOpen] = useState({});
   const [loadingMore, setLoadingMore] = useState(false);
   const key = JSON.stringify([q, filters]);
 
   useEffect(() => {
     let live = true;
     setData(null);
+    setFailed(false);
     setExtra([]);
-    discoverGuides({ q, ...filters }).then(result => { if (live) setData(result?.guides ? result : { guides: [], total: 0, facets: {} }); });
+    discoverGuides({ q, ...filters }).then(result => {
+      if (!live) return;
+      if (isSetList(result)) { setData(result); setFacets(result.facets || {}); } else setFailed(true);
+    });
     return () => { live = false; };
-  }, [key]);
+  }, [key, tries]);
 
   async function more() {
     setLoadingMore(true);
@@ -131,7 +166,6 @@ function GuidesPanel({ q, filters, onFilter }) {
     setLoadingMore(false);
   }
 
-  const facets = data?.facets || {};
   const pick = (list, current, empty) => {
     const options = (list || []).map(item => [item.id || item.name, item.name]);
     if (current && !options.some(([value]) => value === current)) options.unshift([current, 'Selected']);
@@ -139,6 +173,11 @@ function GuidesPanel({ q, filters, onFilter }) {
   };
   const set = (name, value) => onFilter({ [name]: value, ...(name === 'course' ? { term: '' } : {}) });
   const guides = data ? [...data.guides, ...extra] : [];
+  const narrowed = narrowing(q, filters);
+  const empty = Boolean(data) && !guides.length;
+  const suggestions = useSuggestions(empty && narrowed);
+  const copy = emptySetsCopy(q, filters);
+  const action = copy.action === 'library' ? { label: copy.label, href: '/library' } : { label: copy.label, onClick: onClear };
   return (
     <>
       <div className="exg-filters" aria-label="Filters" role="group">
@@ -152,37 +191,14 @@ function GuidesPanel({ q, filters, onFilter }) {
           <label className="exg-check"><input type="checkbox" checked={filters.from_my_classrooms === 'true'} onChange={event => set('from_my_classrooms', event.target.checked ? 'true' : '')} /><span>From my classrooms</span></label>
         )}
       </div>
-      {data === null && <SectionLoader label="Finding sets" />}
-      {data && !guides.length && <p className="c-card exg-empty">{q ? `No public sets match “${q}”.` : 'No public sets match these filters.'}</p>}
+      {failed && <DiscoverRetry what="public sets" onRetry={() => setTries(count => count + 1)} />}
+      {!failed && data === null && <DiscoverLoading label="Finding sets" />}
+      {empty && <DiscoverEmpty message={copy.message} action={action} />}
+      {empty && suggestions.map(group => <SetGroup key={group.key} id={`exs-${group.key}`} title={group.title} sets={group.sets} compact />)}
+      {guides.length > 0 && !narrowed && <h2 className="exg-heading">Popular public sets</h2>}
       {guides.length > 0 && (
         <ul className="exg-list" aria-label="Public sets">
-          {guides.map(guide => (
-            <li key={guide.id} className="c-card exg-card">
-              <Link href={'/sets/' + guide.id} className="exg-title">{guide.title}</Link>
-              {guide.outline?.[0] && <p className="exg-outline">{guide.outline[0]}</p>}
-              <div className="exg-meta">
-                {guide.author ? <UserChip person={guide.author} /> : <span className="c-meta">Anonymous</span>}
-                {guide.verified && <span className="exg-badge"><BadgeCheck size={16} strokeWidth={1.75} aria-hidden="true" />Verified instructor</span>}
-              </div>
-              <p className="c-meta exg-facts">
-                {[guide.course ? [guide.course.code, guide.course.school].filter(Boolean).join(', ') : '', guide.term,
-                  `${guide.question_count} ${guide.question_count === 1 ? 'question' : 'questions'}`, studiedBy(guide.studied_by)].filter(Boolean).join(' · ')}
-              </p>
-              {guide.similar?.length > 0 && (
-                <div className="exg-similar">
-                  <button type="button" className="c-btn c-btn--quiet c-btn--sm" aria-expanded={Boolean(open[guide.id])}
-                    onClick={() => setOpen(current => ({ ...current, [guide.id]: !current[guide.id] }))}>
-                    +{guide.similar.length} similar<ChevronDown size={16} strokeWidth={1.75} aria-hidden="true" className={open[guide.id] ? 'exg-flip' : ''} />
-                  </button>
-                  {open[guide.id] && (
-                    <ul className="exg-similar-list">
-                      {guide.similar.map(item => <li key={item.id}><Link href={'/sets/' + item.id}>{item.title}</Link></li>)}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </li>
-          ))}
+          {guides.map(guide => <SetCard key={guide.id} guide={guide} />)}
         </ul>
       )}
       {data && data.total > guides.length && (
@@ -192,34 +208,25 @@ function GuidesPanel({ q, filters, onFilter }) {
         .exg-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; align-items: center; }
         .exg-check { display: flex; align-items: center; gap: 10px; min-height: 44px; color: var(--ink); cursor: pointer; }
         .exg-check input { width: 18px; height: 18px; accent-color: var(--olive); flex: none; }
-        .exg-empty { margin: 0; padding: 16px; color: var(--muted-ink); }
+        .exg-heading { margin: 8px 0 -6px; color: var(--ink); font: 600 var(--fs-15)/1.3 var(--font-sans); }
         .exg-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
-        .exg-card { display: grid; gap: 8px; padding: 16px; min-width: 0; }
-        .exg-card :global(.exg-title) { font: 600 1.0625rem/1.3 var(--font-sans); color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
-        .exg-card :global(.exg-title:hover) { text-decoration: underline; text-underline-offset: 3px; }
-        .exg-outline { margin: 0; color: var(--muted-ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .exg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
-        .exg-badge { display: inline-flex; align-items: center; gap: 4px; font: 600 0.8125rem/1.3 var(--font-sans); color: var(--meter-ink); }
-        .exg-facts { margin: 0; overflow-wrap: anywhere; }
-        .exg-similar { display: grid; gap: 4px; justify-items: start; }
-        .exg-similar :global(.exg-flip) { transform: rotate(180deg); }
-        .exg-similar-list { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
-        .exg-similar-list :global(a) { color: var(--ink); overflow-wrap: anywhere; }
         .exg-more { justify-self: center; }
       `}</style>
     </>
   );
 }
 
-function ClassroomsPanel({ q }) {
+function ClassroomsPanel({ q, onClear, onBrowse }) {
   const router = useRouter();
   const [list, setList] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const [tries, setTries] = useState(0);
   const [note, setNote] = useState('');
   async function load() {
     const data = await discoverClassrooms({ q });
-    setList(Array.isArray(data?.classrooms) ? data.classrooms : []);
+    if (Array.isArray(data?.classrooms)) { setList(data.classrooms); setFailed(false); } else setFailed(true);
   }
-  useEffect(() => { setList(null); load(); }, [q]);
+  useEffect(() => { setList(null); setFailed(false); load(); }, [q, tries]);
 
   async function join(room) {
     const result = await requestJoin(room.id, {});
@@ -229,8 +236,13 @@ function ClassroomsPanel({ q }) {
     load();
   }
 
-  if (list === null) return <SectionLoader label="Finding classrooms" />;
-  if (!list.length) return <p className="c-card exc-empty">{q ? `No public classrooms match “${q}”.` : 'No public classrooms yet. Classrooms listed on a course page show up here.'}</p>;
+  if (failed) return <DiscoverRetry what="public classrooms" onRetry={() => setTries(count => count + 1)} />;
+  if (list === null) return <DiscoverLoading label="Finding classrooms" />;
+  if (!list.length) {
+    return q.trim()
+      ? <DiscoverEmpty message={`No public classrooms match “${q.trim()}”.`} action={{ label: 'Clear search', onClick: onClear }} />
+      : <DiscoverEmpty message="No public classrooms yet." action={{ label: 'Browse public sets', onClick: onBrowse }} />;
+  }
   return (
     <>
       {note && <p className="c-meta" role="status">{note}</p>}
@@ -249,34 +261,40 @@ function ClassroomsPanel({ q }) {
         ))}
       </ul>
       <style jsx>{`
-        .exc-empty { margin: 0; padding: 16px; color: var(--muted-ink); }
         .exc-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
         .exc-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; min-width: 0; }
         .exc-main { display: grid; gap: 6px; min-width: 0; }
-        .exc-name { font: 600 1rem/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+        .exc-name { font: 600 var(--fs-17)/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
       `}</style>
     </>
   );
 }
 
-function PeoplePanel({ q }) {
+function PeoplePanel({ q, onClear }) {
   const [list, setList] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const [tries, setTries] = useState(0);
+  const searching = q.trim().length >= 2;
   useEffect(() => {
-    if (q.trim().length < 2) { setList([]); return undefined; }
+    if (!searching) { setList([]); setFailed(false); return undefined; }
     let live = true;
     setList(null);
-    discoverPeople(q).then(data => { if (live) setList(Array.isArray(data?.people) ? data.people : []); });
+    setFailed(false);
+    discoverPeople(q).then(data => {
+      if (!live) return;
+      if (Array.isArray(data?.people)) setList(data.people); else setFailed(true);
+    });
     return () => { live = false; };
-  }, [q]);
-  if (q.trim().length < 2) return <p className="c-card exp-empty">Type a name or username to find people with public profiles.</p>;
-  if (list === null) return <SectionLoader label="Finding people" />;
-  if (!list.length) return <p className="c-card exp-empty">No public profiles match “{q}”.</p>;
+  }, [q, tries]);
+  if (!searching) return <DiscoverEmpty message="Search by name or username to find people with public profiles." action={{ label: 'Search people', onClick: () => document.getElementById('ex-q')?.focus() }} />;
+  if (failed) return <DiscoverRetry what="people" onRetry={() => setTries(count => count + 1)} />;
+  if (list === null) return <DiscoverLoading label="Finding people" />;
+  if (!list.length) return <DiscoverEmpty message={`No public profiles match “${q.trim()}”.`} action={{ label: 'Clear search', onClick: onClear }} />;
   return (
     <ul className="c-card exp-list" aria-label="People">
       {list.map(person => <li key={person.username}><UserChip person={person} meta={person.school || ''} /></li>)}
       <style jsx>{`
         .exp-list { margin: 0; padding: 12px 16px; list-style: none; display: grid; gap: 10px; }
-        .exp-empty { margin: 0; padding: 16px; color: var(--muted-ink); }
       `}</style>
     </ul>
   );

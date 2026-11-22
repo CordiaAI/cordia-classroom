@@ -3,7 +3,7 @@
 import { apiFetch } from './api';
 import { FILTERS } from './discover.mjs';
 
-export { explorePath, publicSetRows, studiedBy, FILTERS } from './discover.mjs';
+export { explorePath, publicSetRows, studiedBy, FILTERS, narrowing, emptySetsCopy, suggestionGroups, isSetList, SUGGESTION_LIMIT } from './discover.mjs';
 
 function query(params) {
   const search = new URLSearchParams();
