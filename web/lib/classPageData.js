@@ -6,14 +6,15 @@ import { readCalendarCache, rememberCalendar } from './calendarCache';
 import { dayKey, readiness, testPlan } from './learnEngine.mjs';
 import { guideTally } from './examCountdown.mjs';
 import { classExam } from './classPage.mjs';
-import { loadClassChats } from './classChats';
+import { classChats } from './chats';
 import { readShareDefault } from './classShare';
 
 // Everything the class page in the new shell shows (components/ClassProject.js), loaded together so
 // the page appears once: the class and its guides, notes and lectures; Learn's tally for each guide
 // (lib/examCountdown.mjs guideTally, Learn's own counts); for a class with a course code, its
 // Canvas course, deadlines, sharing and the class sets; the next exam with Learn's readiness and
-// pace for its review set; the grade estimate; and the class's chats (lib/classChats.js).
+// pace for its review set; the grade estimate; and the class's chats (lib/chats.js classChats, the
+// saved chats Recent chats shows).
 const CALENDAR_WAIT_MS = 2500; // the Canvas feed is slow: this device's copy first, else a short wait
 const GRADES_WAIT_MS = 4000;
 const MAX_TALLIES = 40; // Learn's tally needs each guide's questions; a very large class shows the first 40
@@ -67,7 +68,7 @@ export async function loadClassPage(folderId, today = dayKey()) {
     guides.length || classId ? safe(apiFetch('/calendar/coursework')) : null,
     guides.length ? within(calendarFeed(), CALENDAR_WAIT_MS) : null,
     eachLimited(guides.slice(0, MAX_TALLIES), 6, guide => safe(apiFetch('/guides/' + enc(guide.id)))),
-    safe(loadClassChats(folderId, { guideIds: guides.map(guide => guide.id) })),
+    safe(classChats(folderId)),
     statusRequest.then(status => (courseOf(status) ? within(apiFetch(`/canvas/courses/${enc(courseOf(status).id)}/grades`), GRADES_WAIT_MS) : null)),
   ]);
 
@@ -114,6 +115,7 @@ export async function loadClassPage(folderId, today = dayKey()) {
     lastSynced: status?.last_synced_at || '',
     grades: grades && Array.isArray(grades.upcoming) ? grades : null,
     exam,
-    chats: Array.isArray(chats) ? chats : [],
+    chats: Array.isArray(chats?.chats) ? chats.chats : [],
+    chatsEditable: Boolean(chats?.editable),
   };
 }

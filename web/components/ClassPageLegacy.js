@@ -4,7 +4,7 @@ import { pageTitle } from '../lib/pageTitle';
 import { LoadingArea, Reveal, useLoadGate } from './CordiaLoader';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, AudioLines, BookOpen, FolderInput, Hash, NotebookPen, Pencil, Play, Plus, Trash2, UserRound } from 'lucide-react';
+import { ArrowLeft, AudioLines, BookOpen, FileText, FolderInput, Hash, NotebookPen, Pencil, Play, Plus, Trash2, UserRound } from 'lucide-react';
 import { apiErrorMessage, apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
 import { listLectures } from '../lib/lectures';
@@ -231,7 +231,8 @@ export default function ClassPageLegacy() {
           <div className={view === 'cards' ? 'item-grid' : 'c-card c-list'}>
             {items.map(item => (
               <div key={item.kind + item.id} className="c-list-row">
-                {item.kind === 'guide' ? <ProgressRing value={item.progress} size={36} label={false} />
+                {/* A guide shows how far it's been read; one not opened yet shows its page icon, not an empty ring (F3). */}
+                {item.kind === 'guide' ? (item.progress > 0 ? <ProgressRing value={item.progress} size={36} label={false} /> : <FileText {...ICON} />)
                   : item.kind === 'note' ? <NotebookPen {...ICON} /> : <AudioLines {...ICON} />}
                 <Link href={item.href} className="c-grow folder-row-link ig-main">
                   <span className="folder-row-title c-truncate ig-title">{item.title}</span>

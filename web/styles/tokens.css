@@ -295,9 +295,9 @@
   --chart-mark: rgb(var(--accent-rgb)); --chart-mark-soft: rgba(var(--accent-rgb), 0.32); --chart-grid: rgba(23, 27, 24, 0.08); --chart-surface: #F6F7F4;
   /* The readiness ring's track (DESIGN-SPEC 3.3): ink at 12%. */
   --ring-track: rgba(23, 27, 24, 0.12);
-  /* A guide's mastery bar on the class page (DESIGN-SPEC 4.4): mastered olive, familiar olive 45%,
-     learning olive 16%, new ink 8%. */
-  --mastery-mastered: #536149; --mastery-familiar: rgba(83, 97, 73, 0.45); --mastery-learning: rgba(83, 97, 73, 0.16); --mastery-new: rgba(23, 27, 24, 0.08);
+  /* A guide's mastery bar on the class page (DESIGN-SPEC 4.4): mastered accent, familiar accent 45%,
+     learning accent 16%, new ink 8%. */
+  --mastery-mastered: rgb(var(--accent-rgb)); --mastery-familiar: rgba(var(--accent-rgb), 0.45); --mastery-learning: rgba(var(--accent-rgb), 0.16); --mastery-new: rgba(23, 27, 24, 0.08);
   --send-quiet: rgba(23, 27, 24, 0.07);                  /* the composer's Send with nothing to send (DESIGN-SPEC 4.2) */
   --heat-0: rgba(23, 27, 24, 0.06);
   --heat-1: rgba(var(--accent-rgb), 0.30); --heat-2: rgba(var(--accent-rgb), 0.50); --heat-3: rgba(var(--accent-rgb), 0.75); --heat-4: rgb(var(--accent-rgb));
@@ -542,7 +542,7 @@
   --scroll-thumb: rgba(255, 255, 255, 0.18); --scroll-thumb-hover: rgba(255, 255, 255, 0.30);
   --chart-mark: rgb(var(--accent-tint-rgb)); --chart-mark-soft: rgba(var(--accent-tint-rgb), 0.32); --chart-grid: rgba(255, 255, 255, 0.08); --chart-surface: #2B2F34;
   --ring-track: rgba(236, 236, 234, 0.12);
-  --mastery-mastered: #C3CFB6; --mastery-familiar: rgba(195, 207, 182, 0.45); --mastery-learning: rgba(195, 207, 182, 0.16); --mastery-new: rgba(236, 236, 234, 0.08);
+  --mastery-mastered: rgb(var(--accent-tint-rgb)); --mastery-familiar: rgba(var(--accent-tint-rgb), 0.45); --mastery-learning: rgba(var(--accent-tint-rgb), 0.16); --mastery-new: rgba(236, 236, 234, 0.08);
   --send-quiet: rgba(236, 236, 234, 0.08);
   --heat-0: rgba(255, 255, 255, 0.06);
   --heat-1: rgba(var(--accent-tint-rgb), 0.30); --heat-2: rgba(var(--accent-tint-rgb), 0.50); --heat-3: rgba(var(--accent-tint-rgb), 0.75); --heat-4: rgb(var(--accent-tint-rgb));

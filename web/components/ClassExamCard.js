@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { BookOpenCheck, GraduationCap, Timer } from 'lucide-react';
+import { ArrowUpRight, BookOpenCheck, CalendarCheck, GraduationCap, Timer } from 'lucide-react';
 import ProgressRing from './ProgressRing';
+import Menu from './Menu';
 import { buildExamReview, buildReview } from '../lib/studyPlans';
 import { dayKey } from '../lib/learnEngine.mjs';
 import { examPace } from '../lib/homeText.mjs';
@@ -16,7 +17,8 @@ const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
 // as its assignment sheet does; with no exam coming up, a class with guides can still build a review
 // set from them. A class with neither shows no card.
 // exam: lib/classPage.mjs classExam, plus { percent, plan } from Learn when it has a review set.
-export default function ClassExamCard({ exam, folderId, className, hasGuides }) {
+// The card's ⋯ (top right, F3) opens the review set and the exam's assignment sheet (onPlan).
+export default function ClassExamCard({ exam, folderId, className, hasGuides, onPlan }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -58,11 +60,16 @@ export default function ClassExamCard({ exam, folderId, className, hasGuides }) 
   const learnHref = ready ? `/learn/${encodeURIComponent(exam.guideId)}?test=${exam.date}` : '';
   const pace = ready ? examPace(exam.plan) : '';
   const perDay = exam.plan && !exam.plan.past ? exam.plan.perDay : 0;
+  const menu = [
+    ...(exam.guideId ? [{ label: 'Open review set', icon: ArrowUpRight, onSelect: () => router.push('/guide/' + encodeURIComponent(exam.guideId)) }] : []),
+    ...(exam.item && onPlan ? [{ label: 'Plan it', icon: CalendarCheck, onSelect: () => onPlan(exam.item) }] : []),
+  ];
   return (
     <section className="cls-exam" aria-labelledby="cls-exam-title">
       <div className="cls-exam-head">
         <h2 id="cls-exam-title" className="cls-exam-title">{exam.title}</h2>
         <span className="c-meta">{examWhen(exam)}</span>
+        {menu.length > 0 && <Menu label={`More for ${exam.title}`} items={menu} triggerClassName="c-icon-btn cls-more" />}
       </div>
       {ready ? (
         <>
@@ -104,16 +111,18 @@ function ExamStyles() {
       .cls-exam::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background: var(--glass-grain) repeat; background-size: 180px 180px; opacity: var(--glass-grain-opacity); }
       .cls-exam::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; background: var(--glass-rim); -webkit-mask: var(--glass-rim-mask-webkit); -webkit-mask-composite: xor; mask: var(--glass-rim-mask); }
       .cls-exam :is(.c-btn, .c-icon-btn) { -webkit-backdrop-filter: none; backdrop-filter: none; }
-      .cls-exam-head { display: grid; gap: 4px; }
-      .cls-exam h2.cls-exam-title { margin: 0; color: var(--ink); font: 600 28px/1.15 var(--font-display) !important; letter-spacing: -0.015em !important; overflow-wrap: anywhere; }
+      .cls-exam-head { position: relative; display: grid; gap: 4px; }
+      .cls-exam-head:has(.cls-more) { padding-right: 44px; }
+      .cls-exam-head > .c-menu-wrap { position: absolute; top: -8px; right: -8px; }
+      .cls-exam h2.cls-exam-title { margin: 0; color: var(--ink); font: 600 1.75rem/1.15 var(--font-display) !important; letter-spacing: -0.015em !important; overflow-wrap: anywhere; }
       .cls-exam-ready { display: flex; align-items: center; gap: 20px; }
       .cls-exam-ring { position: relative; flex: none; width: 112px; height: 112px; }
       .cls-exam-ring .c-ring-track { stroke: var(--ring-track); }
-      .cls-exam-pct { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink); font: 600 34px/1 var(--font-display); letter-spacing: -0.015em; font-variant-numeric: tabular-nums; pointer-events: none; }
-      .cls-exam-line { margin: 0; color: var(--ink); font: 500 15px/1.5 var(--font-sans); font-variant-numeric: tabular-nums; }
+      .cls-exam-pct { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink); font: 600 2.125rem/1 var(--font-display); letter-spacing: -0.015em; font-variant-numeric: tabular-nums; pointer-events: none; }
+      .cls-exam-line { margin: 0; color: var(--ink); font: 500 0.9375rem/1.5 var(--font-sans); font-variant-numeric: tabular-nums; }
       .cls-exam-actions { display: grid; gap: 8px; }
       .cls-exam .cls-exam-btn { width: 100%; height: 44px; min-height: 44px; }
-      .cls-exam-error { margin: 0; color: var(--error); font: 600 14px/1.4 var(--font-sans); }
+      .cls-exam-error { margin: 0; color: var(--error); font: 600 0.875rem/1.4 var(--font-sans); }
       @media (prefers-reduced-transparency: reduce) { .cls-exam { background: var(--surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; } }
     `}</style>
   );

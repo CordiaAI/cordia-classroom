@@ -1,11 +1,10 @@
 // The class page in the new shell (docs/redesign/PLAN.md T7, DESIGN-SPEC 4.4): its tabs, the words
-// on its rows and cards, which exam its card shows and which chats belong to the class. Pure, so it
+// on its rows and cards and which exam its card shows. Pure, so it
 // can be tested in Node (web/tests/class-page.test.mjs); components/ClassProject.js renders it.
 // Readiness, ideas left and the pace are Learn's own numbers (lib/examCountdown.mjs and
 // lib/learnEngine.mjs); nothing here works them out a second way.
 import { dayKey } from './learnEngine.mjs';
 import { nearestExam, reviewSetFor } from './examCountdown.mjs';
-import { chatTitle } from './shellTools.mjs';
 import { deadlineTitle } from './formatters.js';
 
 const DAY = 86400000;
@@ -174,23 +173,4 @@ export function syncAgo(iso, now = Date.now(), locale) {
 // The header's line for a Canvas class: "MA 125 · synced from Canvas 12 min ago".
 export function syncLine(code, ago) {
   return [code, ago ? `synced from Canvas ${ago}` : ''].filter(Boolean).join(' · ');
-}
-
-// The class's chats, from what exists before saved chats get their own pages (T5): the saved Tutor
-// chats about one of this class's guides (GET /tutor/chats), and the Tutor's open conversation when
-// it is about this class or one of its guides (GET /tutor/session). Newest first.
-// Returns [{ key, id, title, href, updatedAt, live }].
-export function classChatsFrom({ saved = [], session = null, folderId = '', guideIds = [] } = {}) {
-  const guides = new Set([...guideIds].map(String));
-  const chats = [];
-  const messages = Array.isArray(session?.messages) ? session.messages : [];
-  const ours = String(session?.active_class_id || '') === String(folderId) || guides.has(String(session?.active_guide_id || ''));
-  if (folderId && ours && messages.some(message => message?.role === 'user')) {
-    chats.push({ key: 'chat:live', id: '', title: chatTitle(messages), href: '/tutor', updatedAt: session.updated_at || '', live: true });
-  }
-  (Array.isArray(saved) ? saved : []).forEach(chat => {
-    if (!chat?.id || !guides.has(String(chat.guide_id || ''))) return;
-    chats.push({ key: 'chat:' + chat.id, id: String(chat.id), title: String(chat.title || '').trim() || 'Tutor chat', href: '/tutor?chat=' + encodeURIComponent(chat.id), updatedAt: chat.updated_at || '', live: false });
-  });
-  return chats;
 }
