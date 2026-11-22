@@ -38,8 +38,8 @@ export function bootScript(lightSignedOut) {
     // default, on), and not when the device asks for less transparency or cannot frost. Set here, before first paint,
     // so the right sky is the first one drawn; at night it turns a Match device page dark.
     + "var sky=null,s=c&&c.s||{};"
-    + "var k=c?(typeof c.k==='number'?c.k===1:(s.bg||'clouds')==='clouds'&&(s.look||'none')==='none'&&s.glass!=='solid'&&s.skyTime!==false):true;"
-    + "if(!light&&k){var rt=!!window.matchMedia&&matchMedia('(prefers-reduced-transparency: reduce)').matches;"
+    + "var sk=c?(typeof c.k==='number'?c.k===1:(s.bg||'clouds')==='clouds'&&(s.look||'none')==='none'&&s.glass!=='solid'&&s.skyTime!==false):true;"
+    + "if(!light&&sk){var rt=!!window.matchMedia&&matchMedia('(prefers-reduced-transparency: reduce)').matches;"
     + "var fr=!window.CSS||!CSS.supports||CSS.supports('backdrop-filter','blur(1px)')||CSS.supports('-webkit-backdrop-filter','blur(1px)');"
     + "if(!rt&&fr){var h=new Date().getHours();sky=h>=20||h<6?'night':h>=17?'evening':h>=11?'day':'morning';d.setAttribute('data-sky',sky)}}"
     + "var dark=!light&&(ap==='dark'||(ap==='system'&&(sky==='night'||!!window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)));"
