@@ -61,7 +61,7 @@ export default function NotionHome() {
       ) : picking ? (
         <>
           <p className="c-meta">Pick a page you shared with Cordia. Don't see it? In Notion, open the page, then ••• › Connections and add Cordia.</p>
-          <label className="cn-search">
+          <label className="c-search">
             <Search size={20} strokeWidth={1.75} aria-hidden="true" />
             <input className="c-input" type="search" autoFocus placeholder="Search your shared pages" aria-label="Search your shared Notion pages" value={query} onChange={event => setQuery(event.target.value)} />
           </label>
@@ -88,7 +88,7 @@ export default function NotionHome() {
       {error && <p className="cn-error" role="alert">{error}</p>}
       <style jsx>{`
         .nh { display: grid; gap: 10px; width: 100%; padding-top: 12px; border-top: 1px solid var(--hairline); text-align: left; }
-        .nh-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .nh-title { margin: 0; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); }
         .nh .c-meta { margin: 0; }
         .nh-actions { display: flex; flex-wrap: wrap; gap: 8px; }
         .nh .nh-start, .nh .nh-cancel { justify-self: start; }

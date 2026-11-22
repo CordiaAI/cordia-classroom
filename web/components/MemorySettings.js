@@ -41,25 +41,27 @@ export default function MemorySettings() {
   const fromAssistant = memories.some(memory => memory.source === 'assistant');
   return (
     <div className="c-card settings-card mem">
-      <h2 className="c-section-title">What Cordia remembers</h2>
-      <p className="c-meta settings-note">Things you’ve told the Tutor or your Assistant about yourself, like your goals and interests. Help me remember uses them to make tricks that stick. Cordia is told not to keep health, contact details or other private things.</p>
+      <div className="settings-head">
+        <h2 className="c-section-title">What Cordia remembers</h2>
+        {memories.length > 0 && (
+          <button type="button" className="c-btn c-btn--quiet c-btn--danger mem-clear" disabled={Boolean(busy)} onClick={() => setClearing(true)}>Clear all</button>
+        )}
+      </div>
+      <p className="c-meta mem-note">Things you’ve told the Tutor or your Assistant about yourself, like your goals and interests. Help me remember uses them to make tricks that stick. Cordia is told not to keep health, contact details or other private things.</p>
       {memories.length ? (
         <ul className="mem-list">
           {memories.map(memory => {
             const from = FROM[memory.source] || FROM.tutor;
             return (
               <li key={memory.id} className="mem-row">
-                <from.icon size={16} strokeWidth={1.75} aria-hidden="true" />
+                <span className="mem-icon" aria-hidden="true"><from.icon size={20} strokeWidth={1.75} /></span>
                 <span className="mem-text">{memory.value}<span className="c-meta mem-from">{from.label}</span></span>
-                <button type="button" className="c-icon-btn mem-forget" disabled={busy === memory.id} onClick={() => forget(memory)} aria-label={`Forget: ${memory.value}`}><X size={16} strokeWidth={1.75} aria-hidden="true" /></button>
+                <button type="button" className="c-icon-btn mem-forget" disabled={busy === memory.id} onClick={() => forget(memory)} aria-label={`Forget: ${memory.value}`}><X size={20} strokeWidth={1.75} aria-hidden="true" /></button>
               </li>
             );
           })}
         </ul>
-      ) : <p className="c-meta">Nothing yet. Tell the Tutor what you’re studying for or what you’re into, and it’ll remember.</p>}
-      {memories.length > 0 && (
-        <button type="button" className="c-btn c-btn--secondary mem-clear" disabled={Boolean(busy)} onClick={() => setClearing(true)}>Clear all</button>
-      )}
+      ) : <p className="c-meta mem-note">Nothing yet. Tell the Tutor what you’re studying for or what you’re into, and it’ll remember.</p>}
       {error && <p className="retain-action-error" role="alert">{error}</p>}
       {clearing && (
         <ConfirmDialog
@@ -71,13 +73,15 @@ export default function MemorySettings() {
         />
       )}
       <style jsx>{`
-        .mem { display: grid; gap: var(--space-3); }
-        .mem-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
-        .mem-row { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
-        .mem-row :global(.lucide) { flex: none; color: var(--olive-ink); }
-        .mem-text { flex: 1; min-width: 0; display: grid; gap: 2px; overflow-wrap: anywhere; }
-        .mem-from { font-size: 12px; }
-        .mem-clear { justify-self: start; }
+        .mem-note { margin: 0; }
+        .mem-list { list-style: none; margin: 0; padding: 0; display: grid; }
+        /* Icon, text and Forget share one centre line; every row is the same height at least. */
+        .mem-row { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) 2.75rem; align-items: center; column-gap: 0.75rem; min-height: 3.5rem; padding: 0.375rem 0; }
+        .mem-icon { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%; background: var(--glass-inner); color: var(--olive-ink); }
+        .mem-text { display: grid; gap: 0.125rem; min-width: 0; overflow-wrap: anywhere; }
+        .mem-from { font-size: 0.8125rem; }
+        /* A touch target of 44 px (2.75rem) at the default text size, growing with it. */
+        .mem :global(.mem-forget) { justify-self: end; width: 2.75rem; height: 2.75rem; }
       `}</style>
     </div>
   );

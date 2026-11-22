@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { MessageCircle } from 'lucide-react';
 import { walkthroughEvent } from '../lib/walkthrough';
+import { useNewShell } from '../lib/useNewShell';
 
 // The Tutor, one tap away on every page: a glass bubble in the bottom-right corner.
 // Wide screens open it beside the page; phones open the full Tutor page.
-// ownedBy: pages that show the Tutor themselves besides the Tutor page and the home (the new shell's
-// class page, whose composer is the Tutor there: components/Sidebar.js passes it).
-export default function TutorBubble({ ownedBy = [] }) {
+export default function TutorBubble() {
   const router = useRouter();
+  // In the new shell the class page's own composer is the Tutor there (components/ClassProject.js).
+  const shell = useNewShell();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -17,8 +18,8 @@ export default function TutorBubble({ ownedBy = [] }) {
     return () => window.removeEventListener('cordia:tutor-visibility', onVisibility);
   }, []);
 
-  // The Tutor page and the chat home show the Tutor themselves.
-  if (router.pathname === '/tutor' || router.pathname === '/home' || ownedBy.includes(router.pathname) || open) return null;
+  // The Tutor page, the chat home and a chat show the Tutor themselves.
+  if (['/tutor', '/home', '/chat/[id]'].includes(router.pathname) || (shell && router.pathname === '/folder/[id]') || open) return null;
 
   function show() {
     walkthroughEvent('ask');

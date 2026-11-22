@@ -16,16 +16,43 @@
   --font-sans: 'Quicksand', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-display: 'Newsreader', Georgia, serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
-  --fs-13: 13px; --fs-15: 15px; --fs-17: 17px; --fs-20: 20px; --fs-28: 28px; --fs-40: 40px;
+  --font-code-block: ui-monospace, SFMono-Regular, Consolas, monospace;  /* practice code blocks, their stack before T10; the paper pair replaces it */
+  --font-code-note: 'Courier New', monospace;  /* code on the note paper; a font pair with its own code font replaces it */
+  /* The five font pairs (<html data-font>, end of this file): a display font for headings and a UI
+     font for everything else. The sheet previews each pair from these. */
+  --font-cordia-display: 'Newsreader', Georgia, serif;
+  --font-cordia-ui: 'Quicksand', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-clean-display: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-clean-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-bookish-display: 'Fraunces', Georgia, serif;
+  --font-bookish-ui: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-friendly-display: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-friendly-ui: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-readable-display: 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-readable-ui: 'Atkinson Hyperlegible', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* The sixth pair, which only the Paper & Clay look selects by default (<html data-font="paper">). */
+  --font-paper-display: 'Source Serif 4', 'Iowan Old Style', Georgia, serif;
+  --font-paper-ui: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-paper-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Tutor reply text (.cordia-tutor-message.ai, system.css). The UI font unless a look says otherwise. */
+  --font-reply: var(--font-sans);
+  /* Text size (<html data-size>, end of this file): --text-scale is 1 unless the student chose
+     another size, and the type scale follows it. */
+  --text-scale: 1;
+  --fs-13: calc(13px * var(--text-scale)); --fs-15: calc(15px * var(--text-scale)); --fs-17: calc(17px * var(--text-scale));
+  --fs-20: calc(20px * var(--text-scale)); --fs-28: calc(28px * var(--text-scale)); --fs-40: calc(40px * var(--text-scale));
   --lh-title: 1.15; --lh-body: 1.5;
   --track-title: -0.015em;
 
   /* Spacing: a 4 px scale for gaps and padding */
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+  /* Settings cards: the same inner padding on all four sides, in rem so Larger text grows it. */
+  --settings-pad: 1.5rem;
 
   /* Neutrals: ink, muted (ink at 64%), and three surface levels */
   --ink: #171B18;
   --muted: rgba(23, 27, 24, 0.64);
+  --muted-strong: rgba(23, 27, 24, 0.74);   /* small text straight on the bright clouds (the chat's footnote): 4.5:1 there */
   --canvas: #EDF2F4;                       /* 1 backdrop */
   --surface-card: rgba(255, 255, 252, 0.55); /* 2 glass card */
   --surface-raised: rgba(255, 255, 252, 0.86); /* 3 raised glass: nav, sheets, menus, Tutor */
@@ -35,13 +62,40 @@
   --scrim: rgba(23, 27, 24, 0.28);
   --scrim-strong: rgba(15, 18, 16, 0.38); /* search: dims the page more than a sheet does */
   --spot-dim: rgba(23, 27, 24, 0.4);         /* onboarding spotlight dims the app to 40% */
+  /* Levels the Paper & Clay look needs that Cordia's glass never named. Nothing reads them until a
+     look sets them (docs/redesign/T10-engine-notes.md): disabled text, the stronger hairline (hover
+     and button edges), the edge of an input, checkbox or switch, the composer's own shadow, and the
+     sidebar's fill (it is a pane like any other until the look gives it its own paper tone). */
+  --text-disabled: rgba(23, 27, 24, 0.38);
+  --line-strong: rgba(23, 27, 24, 0.16);
+  --control-edge: rgba(23, 27, 24, 0.34);
+  --surface-sidebar: var(--glass-fill);
+  --shadow-composer: var(--glass-shadow);
+  /* Hooks the components read so a look can reach them (decision F). Each defaults to what that component used
+     before, so Cordia is unchanged; Paper & Clay points the three edges at --control-edge and --lg-border goes
+     back to the hairline. --r-pane: the sidebar, the tool rail and the toast. */
+  --field-edge: var(--lg-edge);      /* inputs, selects, text boxes */
+  --check-edge: var(--muted);        /* checkboxes (the done check) */
+  --toggle-edge: var(--line);        /* switches and the quiet checkboxes */
+  --r-pane: 24px;
 
-  /* Accent and states */
+  /* Accent and states. The accent is olive unless <html data-accent> says otherwise (end of this
+     file). Everything that is olive today is built from these tokens: the fill and its text, press
+     and ink colours, and the channels (R, G, B) the tints and shadows are mixed from. */
+  --accent-rgb: 83, 97, 73;                /* the fill, as channels */
+  --accent-deep-rgb: 61, 73, 55;           /* the press shade, for light-mode shadows */
+  --accent-edge-rgb: 38, 48, 32;           /* the darkest edge of olive glass, light mode */
+  --accent-wash-rgb: 122, 140, 107;        /* the faint tint at the bottom right of the backdrop */
   --olive: #536149;
   --olive-press: #3D4937;
   --olive-ink: #536149;                    /* olive used as text or icon */
-  --olive-tint: rgba(83, 97, 73, 0.12);
+  --olive-tint: rgba(var(--accent-rgb), 0.12);
   --on-olive: #FFFFFF;
+  /* Rings, bars, stars and badges read these, not the accent directly, so a look can keep the accent for primary
+     actions only (the owner's decision B): the accent everywhere, ink under Paper & Clay. */
+  --meter: var(--olive);
+  --meter-ink: var(--olive-ink);
+  --on-meter: var(--on-olive);
   --on-error: #FFFFFF;                     /* label on a filled red button, both themes */
   --success: #2F6B3F;
   --success-bg: rgba(57, 114, 75, 0.12);
@@ -50,11 +104,11 @@
   --error: #B42318;
   --error-bg: rgba(180, 35, 24, 0.08);
   --error-solid: #B42318;
-  --selection: rgba(83, 97, 73, 0.30);
+  --selection: rgba(var(--accent-rgb), 0.30);
   /* Answer states as tinted glass (feedback 9): neutral when picked, green right, red wrong.
      Fills sit under the glass sheen; the edge is a soft same-hue line, never an outline ring. */
-  --state-select-fill: rgba(83, 97, 73, 0.16);
-  --state-select-edge: rgba(83, 97, 73, 0.38);
+  --state-select-fill: rgba(var(--accent-rgb), 0.16);
+  --state-select-edge: rgba(var(--accent-rgb), 0.38);
   --state-right-fill: rgba(57, 114, 75, 0.18);
   --state-right-edge: rgba(47, 107, 63, 0.42);
   --state-wrong-fill: rgba(180, 35, 24, 0.12);
@@ -113,6 +167,9 @@
   /* Layout */
   --bar-h: 64px;
   --tabbar-h: 68px;
+  /* The toast: its height, its gap to the window's bottom edge, and the gap kept around it when it is placed over
+     something (components/MakeItYours.js puts it in the sheet's footer, or just above it on a phone). */
+  --toast-h: 62px; --toast-bottom: 24px; --toast-gap: 16px;
   --page-max: 1080px;
   --sidebar-width: 240px;
   --streak-width: 220px;
@@ -150,12 +207,12 @@
   --glass-control-shadow-hover: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 0 0 0.5px rgba(23, 27, 24, 0.12), 0 10px 24px -12px rgba(34, 48, 30, 0.38);
   /* Primary buttons: olive glass. */
   --olive-glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 55%);
-  --olive-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), inset 0 -1px 0 rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(38, 48, 32, 0.40), 0 8px 20px -8px rgba(61, 73, 55, 0.65);
-  --olive-glass-shadow-hover: var(--olive-glass-shadow), 0 0 0 4px rgba(83, 97, 73, 0.14), 0 12px 26px -8px rgba(61, 73, 55, 0.70);
+  --olive-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), inset 0 -1px 0 rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(var(--accent-edge-rgb), 0.40), 0 8px 20px -8px rgba(var(--accent-deep-rgb), 0.65);
+  --olive-glass-shadow-hover: var(--olive-glass-shadow), 0 0 0 4px rgba(var(--accent-rgb), 0.14), 0 12px 26px -8px rgba(var(--accent-deep-rgb), 0.70);
   /* Selected items (the current place, a pressed chip, the chosen segment): olive tint over raised glass. */
-  --selected-glass: linear-gradient(rgba(83, 97, 73, 0.13), rgba(83, 97, 73, 0.13)), rgba(250, 251, 249, 0.74);
+  --selected-glass: linear-gradient(rgba(var(--accent-rgb), 0.13), rgba(var(--accent-rgb), 0.13)), rgba(250, 251, 249, 0.74);
   --selected-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 0 0 0.5px rgba(23, 27, 24, 0.07), 0 4px 12px -6px rgba(34, 48, 30, 0.25);
-  --selected-glass-ring: 0 0 0 0.5px rgba(83, 97, 73, 0.35);
+  --selected-glass-ring: 0 0 0 0.5px rgba(var(--accent-rgb), 0.35);
   /* Press darkens primary buttons to olive-press (dark mode below keeps its dark label at 4.5:1). */
   --olive-glass-press: var(--olive-press);
   /* The rim's mask: only the 1px padding ring of the ::after layer shows (alpha only, no colour). */
@@ -164,6 +221,8 @@
      1px border carries it: the rim's stops on the top, right, bottom and left edges. */
   --glass-rim-border: rgba(255, 255, 255, 0.80) rgba(255, 255, 255, 0.30) rgba(255, 255, 255, 0.42) rgba(255, 255, 255, 0.72);
   --glass-rim-mask-webkit: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  /* A line of text that runs on past its left edge fades out there (alpha only, no colour). */
+  --fade-edge-left: linear-gradient(to right, transparent, #000 1.5rem);
 
   /* The backdrop (DESIGN-SPEC 2.1): the cloud photo, blurred a little, under a white light from
      the top left and a faint olive tint from the bottom right. Dark lays the clouds at 18% over
@@ -171,8 +230,43 @@
   --backdrop-sky: url('/classroom-clouds.webp');
   --backdrop-sky-opacity: 0.92;
   --backdrop-sky-filter: blur(4px) saturate(110%);
-  --backdrop-wash: radial-gradient(900px 620px at 6% -10%, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0) 64%), radial-gradient(1100px 760px at 104% 112%, rgba(122, 140, 107, 0.20), rgba(122, 140, 107, 0) 62%);
+  --backdrop-wash: radial-gradient(900px 620px at 6% -10%, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0) 64%), radial-gradient(1100px 760px at 104% 112%, rgba(var(--accent-wash-rgb), 0.20), rgba(var(--accent-wash-rgb), 0) 62%);
   --backdrop-field: none;
+  /* Swatches for the Make it yours sheet (they never change with the student's picks): the eight
+     accents as the light-mode fill, and each background as the tile art shows it. */
+  --swatch-accent-olive: #536149; --swatch-accent-ocean: #2F5F86; --swatch-accent-indigo: #4A55A2; --swatch-accent-clay: #865122;
+  --swatch-accent-rose: #8E3E62; --swatch-accent-plum: #6A4A7E; --swatch-accent-graphite: #3F4650; --swatch-accent-teal: #2A685B;
+  --swatch-bg-clouds: linear-gradient(170deg, #CFDDE4 0%, #E9EEEA 60%, #E3E7DC 100%);
+  --swatch-bg-dusk: linear-gradient(170deg, #C9C3DA 0%, #E9DCE0 55%, #F1E3D3 100%);
+  --swatch-bg-paper: #F3F1EA;
+  --swatch-bg-meadow: linear-gradient(170deg, #D6E3DA, #EDF1EA 55%, #DCE5D6);
+  /* The Paper & Clay theme tile (the sheet draws it from these): a paper swatch with a small clay dot
+     and a serif "Aa". Recipe: tile background --swatch-look-paper-clay with a 1px --swatch-look-paper-clay-edge
+     border; an 8px round dot of --swatch-look-paper-clay-dot at the bottom right; "Aa" in
+     --swatch-look-paper-clay-ink, font-family --swatch-look-paper-clay-font, 600, centred. The paperclay
+     accent's own fill is --swatch-accent-paperclay (not one of the eight accent dots). */
+  --swatch-look-paper-clay: #FAF9F5;
+  --swatch-look-paper-clay-edge: rgba(31, 30, 29, 0.14);
+  --swatch-look-paper-clay-dot: #D97757;
+  --swatch-look-paper-clay-ink: #141413;
+  --swatch-look-paper-clay-font: var(--font-paper-display);
+  --swatch-accent-paperclay: #AE5630;
+  /* The sheet itself (DESIGN-SPEC 3.5): a 22% ink scrim with a 3px blur; the theme tiles' mini window (a
+     sidebar strip and a line of text on the background); the Custom swatch's colour wheel; the chosen
+     ring (2px accent with a 5px soft halo) and the accent dots' gap ring (2px of the sheet, then 2px accent). */
+  --scrim-sheet: rgba(23, 27, 24, 0.22);
+  --scrim-sheet-blur: blur(3px);
+  --swatch-tile-side: rgba(255, 255, 255, 0.62);
+  --swatch-tile-line: rgba(255, 255, 255, 0.70);
+  --swatch-dot-edge: inset 0 0 0 1px rgba(23, 27, 24, 0.10);
+  --swatch-custom-wheel: conic-gradient(from 0deg, #8E3E62, #8A5426, #536149, #2E6B5E, #2F5F86, #6A4A7E, #8E3E62);
+  --swatch-custom-icon: #FFFFFF;
+  --swatch-custom-icon-shadow: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+  --tile-ring: 0 0 0 2px var(--olive), 0 0 0 5px rgba(var(--accent-rgb), 0.18);
+  --dot-ring: 0 0 0 2px var(--lg-fill-menu), 0 0 0 4px var(--olive);
+  /* Panes that float over the page (sheets, dialogs, toasts): the glass shadow on Cordia's glass; a look
+     that flattens resting panes gives them a real float shadow instead. */
+  --pane-float-shadow: var(--glass-shadow);
 
   /* Older glass names, kept so every screen resolves to the v2 values above. */
   --lg-filter: var(--glass-blur);
@@ -198,7 +292,7 @@
   --google-blue: #4285F4; --google-green: #34A853; --google-yellow: #FBBC05; --google-red: #EA4335;
   /* Charts (Progress): one olive series; the soft step is the de-emphasis for context marks. */
   --scroll-thumb: rgba(23, 27, 24, 0.20); --scroll-thumb-hover: rgba(23, 27, 24, 0.34);
-  --chart-mark: #536149; --chart-mark-soft: rgba(83, 97, 73, 0.32); --chart-grid: rgba(23, 27, 24, 0.08); --chart-surface: #F6F7F4;
+  --chart-mark: rgb(var(--accent-rgb)); --chart-mark-soft: rgba(var(--accent-rgb), 0.32); --chart-grid: rgba(23, 27, 24, 0.08); --chart-surface: #F6F7F4;
   /* The readiness ring's track (DESIGN-SPEC 3.3): ink at 12%. */
   --ring-track: rgba(23, 27, 24, 0.12);
   /* A guide's mastery bar on the class page (DESIGN-SPEC 4.4): mastered olive, familiar olive 45%,
@@ -206,7 +300,7 @@
   --mastery-mastered: #536149; --mastery-familiar: rgba(83, 97, 73, 0.45); --mastery-learning: rgba(83, 97, 73, 0.16); --mastery-new: rgba(23, 27, 24, 0.08);
   --send-quiet: rgba(23, 27, 24, 0.07);                  /* the composer's Send with nothing to send (DESIGN-SPEC 4.2) */
   --heat-0: rgba(23, 27, 24, 0.06);
-  --heat-1: rgba(83, 97, 73, 0.30); --heat-2: rgba(83, 97, 73, 0.50); --heat-3: rgba(83, 97, 73, 0.75); --heat-4: #536149;
+  --heat-1: rgba(var(--accent-rgb), 0.30); --heat-2: rgba(var(--accent-rgb), 0.50); --heat-3: rgba(var(--accent-rgb), 0.75); --heat-4: rgb(var(--accent-rgb));
 
   /* Older names map onto the system (kept so every screen resolves to these tokens). */
   --card: var(--surface-card);
@@ -263,7 +357,7 @@
      a faint olive tint, the pane sheen on top, and the olive ring pressed chips wear. */
   --seg-pill-base: rgba(255, 255, 255, 0.97);
   --seg-pill-base-solid: #FFFFFF;          /* --seg-pill-base when glass turns solid */
-  --seg-pill-tint: rgba(83, 97, 73, 0.03);
+  --seg-pill-tint: rgba(var(--accent-rgb), 0.03);
   --seg-pill-bg: var(--glass-sheen), linear-gradient(var(--seg-pill-tint), var(--seg-pill-tint)), var(--seg-pill-base);
   --seg-pill-shadow: var(--selected-glass-shadow), var(--selected-glass-ring);
   /* The current view pill (.c-pill[aria-current], the guide's Outline / Learn / Flashcards row): its
@@ -300,7 +394,7 @@
   --lift-pane: var(--glass-inner);
   --lift-shadow: var(--glass-control-shadow-hover);
   --lift-shadow-card: var(--glass-shadow-edge), var(--hover-shadow);
-  --primary-glow: 0 0 0 4px rgba(83, 97, 73, 0.14), 0 12px 26px -8px rgba(61, 73, 55, 0.70);
+  --primary-glow: 0 0 0 4px rgba(var(--accent-rgb), 0.14), 0 12px 26px -8px rgba(var(--accent-deep-rgb), 0.70);
   --public-backdrop: var(--canvas);
   --login-backdrop: none;
   /* Motion: card sheen, streak flame, celebration colours. */
@@ -315,10 +409,12 @@
   /* The arrow on dropdowns (select.c-select), drawn in the muted ink. */
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235F655F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
+@media (max-width: 767px) { :root { --settings-pad: 1.25rem; } }
 
 [data-theme='dark'] {
   color-scheme: dark;
   --ink: #ECECEA;                          /* 12.2:1 on the dark card; pure white glared */
+  --muted-strong: rgba(255, 255, 255, 0.82);
   --muted: rgba(255, 255, 255, 0.75);      /* 4.5:1 or better on dark glass over the clouds, under the sheen and a hover pane too */
   --canvas: #1A1D20;
   --surface-card: rgba(39, 42, 48, 0.55);
@@ -328,21 +424,25 @@
   --photo-veil: rgba(26, 29, 32, 0.80);
   --scrim: rgba(0, 0, 0, 0.45);
   --scrim-strong: rgba(0, 0, 0, 0.55); /* search: dims the page more than a sheet does */
+  --text-disabled: rgba(255, 255, 255, 0.40);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --control-edge: rgba(255, 255, 255, 0.38);
   /* Lighter olive so filled buttons and their edges stand out from the dark glass (3.96:1 on the
      card, was 2.17), with a dark label on it (5.05:1). Olive as text stays --olive-ink. */
   --olive: #7A8C6B;
   --olive-press: #3D4937;
   --olive-ink: #CFDAC3;
   --on-olive: #12160F;
-  --olive-tint: rgba(195, 207, 182, 0.12);
+  --accent-tint-rgb: 195, 207, 182;        /* the pale accent glass is tinted with on dark panes */
+  --olive-tint: rgba(var(--accent-tint-rgb), 0.12);
   --success: #8FD1A0;
   --success-bg: rgba(143, 209, 160, 0.14);
   --warning: #F2C14E;
   --warning-bg: rgba(242, 193, 78, 0.14);
   --error: #FFB4AB;                        /* 4.5:1 or better on dark glass over the clouds (was #FF8A80) */
   --error-bg: #3A2222;
-  --state-select-fill: rgba(195, 207, 182, 0.17);
-  --state-select-edge: rgba(195, 207, 182, 0.38);
+  --state-select-fill: rgba(var(--accent-tint-rgb), 0.17);
+  --state-select-edge: rgba(var(--accent-tint-rgb), 0.38);
   --state-right-fill: rgba(143, 209, 160, 0.19);
   --state-right-edge: rgba(143, 209, 160, 0.44);
   --state-wrong-fill: rgba(255, 138, 128, 0.17);
@@ -385,7 +485,7 @@
   --seg-hover: rgba(255, 255, 255, 0.04);
   --seg-pill-base: rgba(60, 64, 71, 0.92);
   --seg-pill-base-solid: #3A3E45;
-  --seg-pill-tint: rgba(195, 207, 182, 0.10);
+  --seg-pill-tint: rgba(var(--accent-tint-rgb), 0.10);
   /* Dark selected glass lands on the glass controls' own tone over the backdrop, so the current
      view pill takes the chosen segment's treatment instead: a brighter base, the faint olive tint,
      the sheen and the olive ring. */
@@ -401,13 +501,25 @@
   --glass-control-shadow-hover: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 0 0 0.5px rgba(0, 0, 0, 0.45), 0 10px 24px -12px rgba(0, 0, 0, 0.60);
   --olive-glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 55%);
   --olive-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 0 0 0.5px rgba(0, 0, 0, 0.4), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
-  --olive-glass-shadow-hover: var(--olive-glass-shadow), 0 0 0 4px rgba(195, 207, 182, 0.14), 0 12px 26px -8px rgba(0, 0, 0, 0.65);
-  --selected-glass: linear-gradient(rgba(195, 207, 182, 0.12), rgba(195, 207, 182, 0.12)), rgba(42, 46, 51, 0.84);
+  --olive-glass-shadow-hover: var(--olive-glass-shadow), 0 0 0 4px rgba(var(--accent-tint-rgb), 0.14), 0 12px 26px -8px rgba(0, 0, 0, 0.65);
+  --selected-glass: linear-gradient(rgba(var(--accent-tint-rgb), 0.12), rgba(var(--accent-tint-rgb), 0.12)), rgba(42, 46, 51, 0.84);
   --selected-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 0.5px rgba(0, 0, 0, 0.35), 0 4px 12px -6px rgba(0, 0, 0, 0.45);
-  --selected-glass-ring: 0 0 0 0.5px rgba(195, 207, 182, 0.35);
+  --selected-glass-ring: 0 0 0 0.5px rgba(var(--accent-tint-rgb), 0.35);
   --olive-glass-press: #73846A;            /* darker than olive, dark label still 4.5:1 */
   --glass-rim-border: rgba(255, 255, 255, 0.22) rgba(255, 255, 255, 0.06) rgba(255, 255, 255, 0.12) rgba(255, 255, 255, 0.18);
   --backdrop-sky-opacity: 0.18;
+  --swatch-bg-clouds: linear-gradient(170deg, #26303A 0%, #1F2A26 60%, #232B22 100%);
+  --swatch-bg-dusk: linear-gradient(170deg, #2E2A3D 0%, #2A2530 55%, #2F2927 100%);
+  --swatch-bg-paper: #1E1D1A;
+  --swatch-bg-meadow: linear-gradient(170deg, #25332B, #1F2A23 55%, #28332A);
+  --swatch-look-paper-clay: #262624;
+  --swatch-look-paper-clay-edge: rgba(250, 249, 245, 0.16);
+  --swatch-look-paper-clay-ink: #FAF9F5;
+  --scrim-sheet: rgba(0, 0, 0, 0.45);
+  --swatch-tile-side: rgba(255, 255, 255, 0.10);
+  --swatch-tile-line: rgba(255, 255, 255, 0.16);
+  --swatch-dot-edge: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  --tile-ring: 0 0 0 2px var(--olive), 0 0 0 5px rgba(var(--accent-tint-rgb), 0.22);
   --backdrop-wash: none;
   --backdrop-field:
     radial-gradient(55% 48% at 16% 20%, #2B3327 0%, #2B3327 35%, transparent 75%),
@@ -428,14 +540,14 @@
   --shot-frame: #2F3238; --shot-edge: rgba(255, 255, 255, 0.16); --shot-chrome: #24272C; --shot-line: rgba(255, 255, 255, 0.22);
   --shot-soft: #3A3E45; --shot-nav: #1E2A33; --shot-text: #FFFFFF; --shot-link: #8CC4FF; --shot-mark: #C3CFB6;
   --scroll-thumb: rgba(255, 255, 255, 0.18); --scroll-thumb-hover: rgba(255, 255, 255, 0.30);
-  --chart-mark: #C3CFB6; --chart-mark-soft: rgba(195, 207, 182, 0.32); --chart-grid: rgba(255, 255, 255, 0.08); --chart-surface: #2B2F34;
+  --chart-mark: rgb(var(--accent-tint-rgb)); --chart-mark-soft: rgba(var(--accent-tint-rgb), 0.32); --chart-grid: rgba(255, 255, 255, 0.08); --chart-surface: #2B2F34;
   --ring-track: rgba(236, 236, 234, 0.12);
   --mastery-mastered: #C3CFB6; --mastery-familiar: rgba(195, 207, 182, 0.45); --mastery-learning: rgba(195, 207, 182, 0.16); --mastery-new: rgba(236, 236, 234, 0.08);
   --send-quiet: rgba(236, 236, 234, 0.08);
   --heat-0: rgba(255, 255, 255, 0.06);
-  --heat-1: rgba(195, 207, 182, 0.30); --heat-2: rgba(195, 207, 182, 0.50); --heat-3: rgba(195, 207, 182, 0.75); --heat-4: #C3CFB6;
+  --heat-1: rgba(var(--accent-tint-rgb), 0.30); --heat-2: rgba(var(--accent-tint-rgb), 0.50); --heat-3: rgba(var(--accent-tint-rgb), 0.75); --heat-4: rgb(var(--accent-tint-rgb));
   --hover-edge: rgba(255, 255, 255, 0.18);
-  --primary-glow: 0 0 0 4px rgba(195, 207, 182, 0.14), 0 12px 26px -8px rgba(0, 0, 0, 0.65);
+  --primary-glow: 0 0 0 4px rgba(var(--accent-tint-rgb), 0.14), 0 12px 26px -8px rgba(0, 0, 0, 0.65);
   /* Olive used as text must be the light olive on dark surfaces. */
   --accent: var(--olive-ink);
   --accent-secondary: var(--olive-ink);
@@ -447,11 +559,170 @@
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23B9BEB6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
+/* ================= Make it yours (DESIGN-SPEC 3.5) =================
+   Personal themes are attributes on <html>, set by lib/themeSettings.mjs (and before first paint by
+   the script in pages/_document.js). With none of them set, nothing below applies and the app is
+   exactly Cordia. Public pages never get them. */
+
+/* ---- Glass: <html data-glass="clearer|solid|frosted">. No attribute follows the device: frosted,
+   or solid when it asks for less transparency (the media query below). "frosted" asks for the
+   frost even then. ---- */
+:root[data-glass='clearer'] {
+  --glass-fill: rgba(248, 250, 247, 0.34); --glass-fill-strong: rgba(250, 251, 249, 0.62);
+  --surface-card: rgba(255, 255, 252, 0.43); --lg-fill-field: rgba(250, 251, 249, 0.50);
+  --glass-control: linear-gradient(180deg, rgba(255, 255, 255, 0.50), rgba(255, 255, 255, 0) 60%), rgba(250, 251, 249, 0.44);
+  --glass-blur: blur(28px) saturate(140%);
+}
+[data-theme='dark'][data-glass='clearer'] {
+  --glass-fill: rgba(42, 46, 51, 0.40); --glass-fill-strong: rgba(42, 46, 51, 0.70);
+  --surface-card: rgba(39, 42, 48, 0.43); --lg-fill-field: rgba(32, 35, 39, 0.48);
+  --glass-control: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 60%), rgba(52, 56, 62, 0.50);
+  --glass-blur: blur(28px) saturate(115%);
+}
+:root[data-glass='solid'] {
+  --glass-fill: var(--glass-solid); --glass-fill-strong: var(--glass-solid); --glass-control: var(--glass-solid);
+  --surface-raised: var(--glass-solid); --lg-fill-field: var(--glass-solid);
+  --glass-inner: var(--glass-inner-solid); --seg-track: var(--seg-track-solid); --seg-pill-base: var(--seg-pill-base-solid);
+  --selected-glass: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--glass-solid);
+  --glass-blur: none;
+}
+
+/* ---- Text size: <html data-size="small|large|larger"> scales the root size, so every rem size
+   follows, and --text-scale, so the type scale does. ---- */
+html[data-size='small'] { font-size: 90%; --text-scale: 0.9; }
+html[data-size='large'] { font-size: 112.5%; --text-scale: 1.125; }
+html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
+
+/* ---- Font pair: <html data-font="clean|bookish|friendly|readable|paper">. The sixth, paper (Source Serif 4,
+   Instrument Sans, JetBrains Mono), is the Paper & Clay look's own: it is that look's pair unless a data-font
+   is set over it, and the only pair that also sets the code font. The pair's files load only when
+   a page uses them. Each file covers Latin; other scripts fall back to the system font. Atkinson
+   Hyperlegible has regular and bold only, so the 500 and 600 weights land on 400 and 700. ---- */
+@font-face { font-family: Inter; src: url('/fonts/inter-latin.woff2') format('woff2'); font-style: normal; font-weight: 100 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: Fraunces; src: url('/fonts/fraunces-latin.woff2') format('woff2'); font-style: normal; font-weight: 100 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Source Sans 3'; src: url('/fonts/source-sans-3-latin.woff2') format('woff2'); font-style: normal; font-weight: 200 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: Nunito; src: url('/fonts/nunito-latin.woff2') format('woff2'); font-style: normal; font-weight: 200 1000; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Atkinson Hyperlegible'; src: url('/fonts/atkinson-hyperlegible-latin-400.woff2') format('woff2'); font-style: normal; font-weight: 400; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Atkinson Hyperlegible'; src: url('/fonts/atkinson-hyperlegible-latin-700.woff2') format('woff2'); font-style: normal; font-weight: 700; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+:root[data-font='clean'] { --font-sans: var(--font-clean-ui); --font-display: var(--font-clean-display); }
+:root[data-font='bookish'] { --font-sans: var(--font-bookish-ui); --font-display: var(--font-bookish-display); }
+:root[data-font='friendly'] { --font-sans: var(--font-friendly-ui); --font-display: var(--font-friendly-display); }
+@font-face { font-family: 'Source Serif 4'; src: url('/fonts/source-serif-4-latin.woff2') format('woff2'); font-style: normal; font-weight: 200 900; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Instrument Sans'; src: url('/fonts/instrument-sans-latin.woff2') format('woff2'); font-style: normal; font-weight: 400 700; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'JetBrains Mono'; src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2'); font-style: normal; font-weight: 100 800; font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+:root[data-font='readable'] { --font-sans: var(--font-readable-ui); --font-display: var(--font-readable-display); }
+:root[data-font='paper'], :root[data-look='paper-clay']:not([data-font]) { --font-sans: var(--font-paper-ui); --font-display: var(--font-paper-display); --font-mono: var(--font-paper-mono); --font-code-note: var(--font-paper-mono); --font-code-block: var(--font-paper-mono); }
+
+/* ---- Accent: <html data-accent="ocean|indigo|clay|rose|plum|graphite|teal|custom">. Olive is the
+   default and needs no attribute. Each accent is a set of seeds (channels, R, G, B): --ca-l-* for
+   light mode (fill, press, ink, the label on it, shadow edge, backdrop tint), --ca-d-* for dark
+   mode (lighter fill, light ink, dark label, pressed fill, pale tint). The curated accents are
+   written here; "custom" takes the same seeds as inline variables from lib/accentMath.mjs, derived
+   from the student's pick. The two rules after them map the seeds onto the olive tokens. ---- */
+:root[data-accent='ocean'] {  /* #2F5F86 */
+  --ca-l-fill: 47, 95, 134; --ca-l-press: 23, 72, 110; --ca-l-ink: 47, 95, 134; --ca-l-on: 255, 255, 255; --ca-l-edge: 2, 48, 80; --ca-l-wash: 108, 158, 200;
+  --ca-d-fill: 108, 158, 200; --ca-d-ink: 194, 219, 242; --ca-d-on: 18, 22, 15; --ca-d-glass-press: 95, 144, 186; --ca-d-tint: 179, 206, 231;
+}
+:root[data-accent='indigo'] {  /* #4A55A2 */
+  --ca-l-fill: 74, 85, 162; --ca-l-press: 54, 62, 137; --ca-l-ink: 74, 85, 162; --ca-l-on: 255, 255, 255; --ca-l-edge: 34, 39, 103; --ca-l-wash: 130, 145, 228;
+  --ca-d-fill: 130, 145, 228; --ca-d-ink: 203, 213, 255; --ca-d-on: 18, 22, 15; --ca-d-glass-press: 117, 131, 213; --ca-d-tint: 189, 200, 248;
+}
+:root[data-accent='clay'] {  /* #865122 */
+  --ca-l-fill: 134, 81, 34; --ca-l-press: 110, 59, 4; --ca-l-ink: 134, 81, 34; --ca-l-on: 255, 255, 255; --ca-l-edge: 78, 38, 0; --ca-l-wash: 195, 138, 92;
+  --ca-d-fill: 195, 138, 92; --ca-d-ink: 240, 209, 185; --ca-d-on: 18, 22, 15; --ca-d-glass-press: 181, 124, 78; --ca-d-tint: 229, 195, 170;
+}
+:root[data-accent='rose'] {  /* #8E3E62 */
+  --ca-l-fill: 142, 62, 98; --ca-l-press: 117, 39, 76; --ca-l-ink: 142, 62, 98; --ca-l-on: 255, 255, 255; --ca-l-edge: 85, 18, 52; --ca-l-wash: 208, 121, 157;
+  --ca-d-fill: 208, 121, 157; --ca-d-ink: 248, 200, 218; --ca-d-on: 18, 22, 15; --ca-d-glass-press: 192, 107, 143; --ca-d-tint: 237, 186, 205;
+}
+:root[data-accent='plum'] {  /* #6A4A7E */
+  --ca-l-fill: 106, 74, 126; --ca-l-press: 83, 52, 102; --ca-l-ink: 106, 74, 126; --ca-l-on: 255, 255, 255; --ca-l-edge: 58, 31, 74; --ca-l-wash: 171, 136, 193;
+  --ca-d-fill: 171, 136, 193; --ca-d-ink: 225, 208, 238; --ca-d-on: 18, 22, 15; --ca-d-glass-press: 157, 123, 179; --ca-d-tint: 213, 194, 227;
+}
+:root[data-accent='graphite'] {  /* #3F4650 */
+  --ca-l-fill: 63, 70, 80; --ca-l-press: 43, 49, 59; --ca-l-ink: 63, 70, 80; --ca-l-on: 255, 255, 255; --ca-l-edge: 22, 27, 35; --ca-l-wash: 145, 153, 164;
+  --ca-d-fill: 145, 153, 164; --ca-d-ink: 211, 216, 222; --ca-d-on: 18, 22, 15; --ca-d-glass-press: 131, 139, 151; --ca-d-tint: 198, 203, 210;
+}
+:root[data-accent='teal'] {  /* #2A685B */
+  --ca-l-fill: 42, 104, 91; --ca-l-press: 13, 81, 69; --ca-l-ink: 42, 104, 91; --ca-l-on: 255, 255, 255; --ca-l-edge: 0, 56, 46; --ca-l-wash: 105, 166, 152;
+  --ca-d-fill: 105, 166, 152; --ca-d-ink: 193, 223, 215; --ca-d-on: 18, 22, 15; --ca-d-glass-press: 91, 152, 138; --ca-d-tint: 178, 211, 202;
+}
+/* An accent without its seeds (a custom accent whose variables are missing) is just olive: the
+   olive tokens fall back to the file's own values through these var() fallbacks. */
+/* The Paper & Clay look is an accent of its own (its seeds are set with the look, below), so the same
+   mapping runs for it when no accent was picked over it. */
+:root:is([data-accent], [data-look='paper-clay']) {
+  --accent-rgb: var(--ca-l-fill, 83, 97, 73);
+  --accent-deep-rgb: var(--ca-l-press, 61, 73, 55);
+  --accent-edge-rgb: var(--ca-l-edge, 38, 48, 32);
+  --accent-wash-rgb: var(--ca-l-wash, 122, 140, 107);
+  --olive: rgb(var(--accent-rgb));
+  --olive-press: rgb(var(--accent-deep-rgb));
+  --olive-ink: rgb(var(--ca-l-ink, 83, 97, 73));
+  --on-olive: rgb(var(--ca-l-on, 255, 255, 255));
+  --focus-ring: rgb(var(--ca-l-ink, 83, 97, 73));
+}
+[data-theme='dark']:is([data-accent], [data-look='paper-clay']) {
+  --accent-tint-rgb: var(--ca-d-tint, 195, 207, 182);
+  --olive: rgb(var(--ca-d-fill, 122, 140, 107));
+  --olive-ink: rgb(var(--ca-d-ink, 207, 218, 195));
+  --on-olive: rgb(var(--ca-d-on, 18, 22, 15));
+  --olive-glass-press: rgb(var(--ca-d-glass-press, 115, 132, 106));
+  --focus-ring: rgb(var(--ca-d-ink, 207, 218, 195));
+}
+
+/* ---- Background: <html data-bg="dusk|paper|meadow">. Clouds is the default and needs no
+   attribute. Each has a light and a dark version, built from the same tokens the clouds use: the
+   canvas, the layer behind the panes (--backdrop-sky), the washes over it and the dark field.
+   Dusk and Meadow are colour gradients for now; a photograph goes in --backdrop-sky as
+   url('/backgrounds/<name>.webp') with the opacity and filter the clouds use. Paper has no photo. ---- */
+:root[data-bg='dusk'] {
+  --canvas: #E8E2EA;
+  --backdrop-sky: linear-gradient(170deg, #C9C3DA 0%, #E9DCE0 55%, #F1E3D3 100%);
+  --backdrop-sky-opacity: 1; --backdrop-sky-filter: none;
+}
+/* Dusk's violet top is darker than the clouds: in light, muted text on the page itself needs a little more ink to
+   hold 4.5:1. */
+:root[data-bg='dusk']:not([data-theme='dark']) { --muted: rgba(23, 27, 24, 0.72); --muted-strong: rgba(23, 27, 24, 0.8); }
+:root[data-bg='paper'] {
+  --canvas: #F3F1EA;
+  --backdrop-sky: none;
+}
+:root[data-bg='meadow'] {
+  --canvas: #E4ECE5;
+  --backdrop-sky: linear-gradient(170deg, #D6E3DA, #EDF1EA 55%, #DCE5D6);
+  --backdrop-sky-opacity: 1; --backdrop-sky-filter: none;
+}
+[data-theme='dark'][data-bg='dusk'] {
+  --canvas: #1B1A24;
+  --backdrop-sky-opacity: 0.22;
+  --backdrop-field:
+    radial-gradient(55% 48% at 16% 20%, #2E2A3D 0%, #2E2A3D 35%, transparent 75%),
+    radial-gradient(44% 40% at 84% 28%, #211F2B 0%, #211F2B 40%, transparent 78%),
+    radial-gradient(58% 50% at 66% 84%, #33293A 0%, #33293A 35%, transparent 75%),
+    radial-gradient(40% 34% at 10% 88%, #211F2B 0%, transparent 72%),
+    #1B1A24;
+}
+[data-theme='dark'][data-bg='paper'] {
+  --canvas: #1E1D1A;
+  --backdrop-field: none;
+}
+[data-theme='dark'][data-bg='meadow'] {
+  --canvas: #1A201C;
+  --backdrop-sky-opacity: 0.20;
+  --backdrop-field:
+    radial-gradient(55% 48% at 16% 20%, #25362B 0%, #25362B 35%, transparent 75%),
+    radial-gradient(44% 40% at 84% 28%, #1C2420 0%, #1C2420 40%, transparent 78%),
+    radial-gradient(58% 50% at 66% 84%, #2A3A2B 0%, #2A3A2B 35%, transparent 75%),
+    radial-gradient(40% 34% at 10% 88%, #1C2420 0%, transparent 72%),
+    #1A201C;
+}
+
 /* Without a frost (older browsers) or when the device asks for less transparency, glass turns
    solid: panes, raised panes, controls, selected glass and fields all fill with the opaque
    --glass-solid, so the backdrop never shows through; the rim stays (DESIGN-SPEC 2.3). */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root, [data-theme='dark'] {
+  :root, :root[data-glass], [data-theme='dark'], [data-theme='dark'][data-glass] {
     --glass-fill: var(--glass-solid); --glass-fill-strong: var(--glass-solid); --glass-control: var(--glass-solid);
     --surface-raised: var(--glass-solid); --lg-fill-field: var(--glass-solid);
     --glass-inner: var(--glass-inner-solid); --seg-track: var(--seg-track-solid); --seg-pill-base: var(--seg-pill-base-solid);
@@ -460,7 +731,7 @@
   }
 }
 @media (prefers-reduced-transparency: reduce) {
-  :root, [data-theme='dark'] {
+  :root:not([data-glass]), [data-theme='dark']:not([data-glass]) {
     --glass-fill: var(--glass-solid); --glass-fill-strong: var(--glass-solid); --glass-control: var(--glass-solid);
     --surface-raised: var(--glass-solid); --lg-fill-field: var(--glass-solid);
     --glass-inner: var(--glass-inner-solid); --seg-track: var(--seg-track-solid); --seg-pill-base: var(--seg-pill-base-solid);
@@ -469,6 +740,138 @@
     --glass-blur: none;
   }
 }
+/* ---- Look: <html data-look="paper-clay">, the Paper & Clay full-look preset (DESIGN-SPEC 3.5). Unlike
+   the accent, background, font and glass attributes it switches the whole surface system at once, so it
+   has its own attribute: plain paper surfaces (no photo, no grain, no frost), hairline borders before
+   shadows, the paper text, the 8 / 12-16 / 20 corners and the serif Tutor replies. It only overrides
+   tokens that exist above, so no component has theme code.
+   The look carries its own accent and font pair as defaults: they apply while no <html data-accent> or
+   data-font is set over them (the engine, lib/themeSettings.mjs, writes one whenever the student picks
+   another). Every token set in the light block is
+   set again in the dark block (a test holds the two lists equal), because [data-theme='dark'] alone
+   is less specific than the look's selector. Placed after the glass fallbacks so the look wins them.
+   The accent shows as the primary fill (the send button, New chat, checked controls, progress) and as
+   clay-coloured text (--olive-ink) for active labels and links; washes and selected rows are neutral. ---- */
+:root[data-look='paper-clay']:not([data-accent]) {  /* the clay accent: #AE5630 on paper, #D97757 on dark (not one of the eight swatches) */
+  --ca-l-fill: 174, 86, 48; --ca-l-press: 156, 74, 39; --ca-l-ink: 162, 74, 41; --ca-l-on: 255, 255, 255; --ca-l-edge: 112, 50, 24; --ca-l-wash: 217, 119, 87;
+  --ca-d-fill: 217, 119, 87; --ca-d-ink: 232, 145, 111; --ca-d-on: 26, 25, 24; --ca-d-glass-press: 227, 138, 107; --ca-d-tint: 232, 145, 111;
+}
+:root[data-look='paper-clay'] {
+  --ink: #141413; --text-secondary: #3D3D3A; --muted: #6B6A64; --muted-strong: #55544E; --text-disabled: #9C9A92;
+  --hairline: rgba(31, 30, 29, 0.10); --line-strong: rgba(31, 30, 29, 0.20);
+  /* Control borders: the spec's #8F8C82 moved the smallest step (9 per channel, darker) that holds 3:1 on the
+     hover and pressed fills too (the owner's decision A): 3.03 on pressed #E8E6DC, 3.27 on hover #F0EEE6. */
+  --control-edge: #868379;
+  --scrim: rgba(20, 20, 19, 0.40);
+  --wash: rgba(31, 30, 29, 0.04);
+  --olive-tint: rgba(31, 30, 29, 0.06);
+  /* Surfaces: canvas (below), sidebar, raised (composer, cards, menus), hover and pressed. */
+  --surface-card: #FFFFFF; --surface-raised: #FFFFFF; --surface-sidebar: #F5F4ED;
+  --glass-fill: #FFFFFF; --glass-fill-strong: #FFFFFF; --glass-solid: #FFFFFF; --glass-control: #FFFFFF;
+  --lg-fill-menu: #FFFFFF; --lg-fill-field: #FFFFFF;
+  --glass-inner: #F0EEE6; --glass-inner-solid: #F0EEE6; --lg-press: #E8E6DC;
+  --seg-track: #F0EEE6; --seg-track-solid: #F0EEE6; --seg-track-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  --seg-hover: rgba(255, 255, 255, 0.60);
+  --seg-pill-base: #FFFFFF; --seg-pill-base-solid: #FFFFFF; --seg-pill-tint: rgba(0, 0, 0, 0);
+  --pill-current-base: #FFFFFF; --pill-current-base-solid: #FFFFFF;
+  --selected-glass: linear-gradient(#F0EEE6, #F0EEE6);
+  --state-select-fill: #F0EEE6; --state-select-edge: var(--control-edge);  /* chosen tiles: neutral, never a clay wash */
+  --selected-glass-shadow: 0 0 0 1px var(--hairline); --selected-glass-ring: 0 0 0 0 rgba(0, 0, 0, 0);
+  /* Solid, flat glass: no frost, no sheen, no grain. The rim becomes the 1px hairline border. */
+  --glass-blur: none;
+  --glass-sheen: none; --olive-glass-sheen: none;
+  --glass-grain: none; --lg-grain: none; --glass-grain-opacity: 0;
+  --glass-rim: var(--hairline);
+  --glass-rim-border: var(--hairline) var(--hairline) var(--hairline) var(--hairline);
+  --lg-rim: var(--hairline); --lg-rim-low: rgba(0, 0, 0, 0); --lg-inner-stroke: rgba(0, 0, 0, 0);
+  --lg-border: var(--hairline); --lg-border-shade: rgba(0, 0, 0, 0);
+  /* Borders before shadows: resting panes, cards and controls have no drop shadow. Only what floats
+     (menus, popovers and the composer) keeps one. */
+  --glass-shadow-edge: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-shadow-depth: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-inner-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-control-shadow: 0 0 0 1px var(--line-strong);
+  --glass-control-shadow-hover: 0 0 0 1px var(--control-edge);
+  --olive-glass-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  --olive-glass-shadow-hover: var(--olive-glass-shadow), 0 0 0 3px rgba(var(--accent-rgb), 0.16);
+  --primary-glow: 0 0 0 3px rgba(var(--accent-rgb), 0.16);
+  --shadow-card: 0 0 0 0 rgba(0, 0, 0, 0);
+  --hover-edge: var(--line-strong); --hover-shadow: 0 0 0 1px var(--line-strong);
+  --shadow-float: 0 8px 28px rgba(20, 20, 19, 0.12), 0 2px 6px rgba(20, 20, 19, 0.06);
+  --lg-depth-float: 0 8px 28px rgba(20, 20, 19, 0.12), 0 2px 6px rgba(20, 20, 19, 0.06);
+  --glass-shadow-lift: var(--glass-shadow-edge), var(--lg-depth-float);
+  --shadow-composer: 0 4px 20px rgba(20, 20, 19, 0.06), 0 0 0 0.5px rgba(31, 30, 29, 0.15);
+  /* Corners: controls 8, cards 12 to 16, the composer and panels 20; chips stay pills. */
+  --r-input: 8px; --r-row: 12px; --r-card: 16px; --r-panel: 20px;
+  /* Tutor replies speak in the display font (the serif); everything else stays in the UI font. */
+  --font-reply: var(--font-display);
+  /* The accent only on primary actions (send, New chat, checked controls): rings, bars, stars and badges are ink. */
+  --meter: var(--ink); --meter-ink: var(--ink); --on-meter: var(--surface-raised);
+  /* Inputs, checkboxes and switches take the control edge; every other edge is the hairline. Sheets, dialogs and
+     toasts float with the menu shadow; the sidebar, rail and toast take the card corner. (Decision F.) */
+  --field-edge: var(--control-edge); --check-edge: var(--control-edge); --toggle-edge: var(--control-edge);
+  --pane-float-shadow: var(--lg-depth-float);
+  --r-pane: 16px;
+}
+[data-theme='dark'][data-look='paper-clay'] {
+  --ink: #FAF9F5; --text-secondary: #C2C0B6; --muted: #A6A39A; --muted-strong: #BDBAB1; --text-disabled: #85837B;
+  --hairline: rgba(250, 249, 245, 0.12); --line-strong: rgba(250, 249, 245, 0.20);
+  /* Control borders: the spec's #8A877E moved the smallest step that passes (8 per channel; lighter, the passing
+     direction on dark): 3.02 on pressed #45443F, 3.57 on hover #3A3936 (decision A). */
+  --control-edge: #928F86;
+  --scrim: rgba(0, 0, 0, 0.65);
+  --wash: rgba(250, 249, 245, 0.05);
+  --olive-tint: rgba(250, 249, 245, 0.04);  /* no lighter than the hover fill, so muted text on a tinted block holds 4.5:1 */
+  --surface-card: #30302E; --surface-raised: #30302E; --surface-sidebar: #1F1E1D;
+  --glass-fill: #30302E; --glass-fill-strong: #30302E; --glass-solid: #30302E; --glass-control: #30302E;
+  --lg-fill-menu: #30302E; --lg-fill-field: #30302E;
+  --glass-inner: #3A3936; --glass-inner-solid: #3A3936; --lg-press: #45443F;
+  --seg-track: #262624; --seg-track-solid: #262624; --seg-track-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  --seg-hover: rgba(250, 249, 245, 0.06);
+  --seg-pill-base: #45443F; --seg-pill-base-solid: #45443F; --seg-pill-tint: rgba(0, 0, 0, 0);
+  --pill-current-base: #45443F; --pill-current-base-solid: #45443F;
+  --selected-glass: linear-gradient(#3A3936, #3A3936);
+  --state-select-fill: #3A3936; --state-select-edge: var(--control-edge);
+  --selected-glass-shadow: 0 0 0 1px var(--hairline); --selected-glass-ring: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-blur: none;
+  --glass-sheen: none; --olive-glass-sheen: none;
+  --glass-grain: none; --lg-grain: none; --glass-grain-opacity: 0;
+  --glass-rim: var(--hairline);
+  --glass-rim-border: var(--hairline) var(--hairline) var(--hairline) var(--hairline);
+  --lg-rim: var(--hairline); --lg-rim-low: rgba(0, 0, 0, 0); --lg-inner-stroke: rgba(0, 0, 0, 0);
+  --lg-border: var(--hairline); --lg-border-shade: rgba(0, 0, 0, 0);
+  --glass-shadow-edge: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-shadow-depth: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-inner-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  --glass-control-shadow: 0 0 0 1px var(--line-strong);
+  --glass-control-shadow-hover: 0 0 0 1px var(--control-edge);
+  --olive-glass-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  --olive-glass-shadow-hover: var(--olive-glass-shadow), 0 0 0 3px rgba(var(--accent-tint-rgb), 0.18);
+  --primary-glow: 0 0 0 3px rgba(var(--accent-tint-rgb), 0.18);
+  --shadow-card: 0 0 0 0 rgba(0, 0, 0, 0);
+  --hover-edge: var(--line-strong); --hover-shadow: 0 0 0 1px var(--line-strong);
+  --shadow-float: 0 8px 28px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --lg-depth-float: 0 8px 28px rgba(0, 0, 0, 0.50), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --glass-shadow-lift: var(--glass-shadow-edge), var(--lg-depth-float);
+  --shadow-composer: 0 4px 20px rgba(0, 0, 0, 0.25), 0 0 0 0.5px rgba(250, 249, 245, 0.15);
+  --r-input: 8px; --r-row: 12px; --r-card: 16px; --r-panel: 20px;
+  --font-reply: var(--font-display);
+  --meter: var(--ink); --meter-ink: var(--ink); --on-meter: var(--surface-raised);
+  /* Inputs, checkboxes and switches take the control edge; every other edge is the hairline. Sheets, dialogs and
+     toasts float with the menu shadow; the sidebar, rail and toast take the card corner. (Decision F.) */
+  --field-edge: var(--control-edge); --check-edge: var(--control-edge); --toggle-edge: var(--control-edge);
+  --pane-float-shadow: var(--lg-depth-float);
+  --r-pane: 16px;
+}
+/* The look's backdrop is plain paper: no photo, no washes, no dark field. A background the student then
+   picks (the engine writes data-bg for Clouds, Dusk and Meadow while the look is on) brings its own back. */
+:root[data-look='paper-clay']:not([data-bg='clouds'], [data-bg='dusk'], [data-bg='meadow']) {
+  --canvas: #FAF9F5; --backdrop-sky: none; --backdrop-wash: none; --backdrop-field: none;
+}
+[data-theme='dark'][data-look='paper-clay']:not([data-bg='clouds'], [data-bg='dusk'], [data-bg='meadow']) {
+  --canvas: #262624; --backdrop-sky: none; --backdrop-wash: none; --backdrop-field: none;
+}
+
 /* Less motion: nothing lifts or scales. */
 @media (prefers-reduced-motion: reduce) {
   :root { --lift: none; --lift-card: none; --press: none; }

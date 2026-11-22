@@ -199,13 +199,13 @@ export default function PrivacySettings() {
           .pv-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
           .pv-card h2 { margin: 0; }
           .pv-field { display: grid; gap: 8px; margin: 0; }
-          .pv-label { margin: 0; color: var(--ink); font: 600 15px/1.3 var(--font-sans); }
-          .pv-static { margin: 0; color: var(--ink); font: 600 16px/1.5 var(--font-sans); }
+          .pv-label { margin: 0; color: var(--ink); font: 600 0.9375rem/1.3 var(--font-sans); }
+          .pv-static { margin: 0; color: var(--ink); font: 600 1rem/1.5 var(--font-sans); }
           .pv-static span { display: block; font-weight: 500; }
           .pv-help { margin: 0; }
           .pv-error { margin: 0; color: var(--error); font-weight: 600; }
           .pv-save { justify-self: start; }
-          .pv-link { display: inline-flex; align-items: center; gap: 6px; color: var(--olive-ink); font: 600 15px/1 var(--font-sans); }
+          .pv-link { display: inline-flex; align-items: center; gap: 6px; color: var(--olive-ink); font: 600 0.9375rem/1 var(--font-sans); }
           .pv-blocks { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
           .pv-blocks li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
           .pv-block-name { display: grid; min-width: 0; }

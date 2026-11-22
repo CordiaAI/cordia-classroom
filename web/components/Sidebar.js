@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { CalendarDays, ChartNoAxesColumn, CircleHelp, CreditCard, Ellipsis, House, Library, Link2, LogOut, MessageCircle, MessagesSquare, Megaphone, Moon, PanelLeftClose, PanelLeftOpen, Palette, Plus, Search, Settings, SquarePen, Sun, User, Users } from 'lucide-react';
+import { CalendarDays, ChartNoAxesColumn, CircleHelp, CreditCard, Ellipsis, House, Library, Link2, LogOut, MessageCircle, MessagesSquare, Megaphone, PanelLeftClose, PanelLeftOpen, Palette, Plus, Search, Settings, SquarePen, User, Users } from 'lucide-react';
 import { apiFetch, cacheUserIdentity, clearAuth, getUserEmail, getUserName } from '../lib/api';
 import FeedbackModal from './FeedbackModal';
 import AcademicInfinityMark from './AcademicInfinityMark';
@@ -21,11 +21,14 @@ import { classLabel } from '../lib/classLabel';
 import { coverFor } from '../lib/coverDesign.mjs';
 import { latestFolders, loadFolders, onFoldersChanged } from '../lib/folders';
 import { HELP_EVENT } from '../lib/help';
-import { setThemePreference, themePreference } from '../lib/theme';
+import { openMakeItYours } from '../lib/makeItYours.mjs';
 import { tierName } from '../lib/plans';
 import { loadClassReadiness } from '../lib/classReadiness';
-import { liveMessages, loadSavedChats, onTutorChats } from '../lib/tutorChats';
+import { useChats } from '../lib/chats';
+import { MAX_LIMIT } from '../lib/chatStore.mjs';
 import { MAX_CLASSES, recentChats, sidebarCurrent } from '../lib/shellTools.mjs';
+import SidebarChats from './SidebarChats';
+import ChatToast from './ChatToast';
 import { HOME_ROUTE } from '../lib/newShell.mjs';
 
 // Phones (under 768px) keep the top bar and tab bar until the phone layout (T9). The top bar's
@@ -91,7 +94,6 @@ export default function Sidebar() {
   const countRequests = summary => setRequests((summary?.incoming_friend_requests || 0) + (summary?.incoming_follow_requests || 0));
   useEffect(() => onSocialSummary(countRequests), []);
   useEffect(() => { loadSocialSummary().then(countRequests); }, [router.pathname]);
-  const [dark, setDark] = useState(false);
   const [shortcut, setShortcut] = useState('Ctrl K');
   const avatarRef = useRef(null);
   const sideAvatarRef = useRef(null);
@@ -154,22 +156,14 @@ export default function Sidebar() {
     return () => { live = false; router.events.off('routeChangeComplete', onRoute); };
   }, [classKey, router.events]);
 
-  // Recent chats: the Tutor's open conversation and its saved chats (until saved chats get their
-  // own pages, T5).
-  const [saved, setSaved] = useState([]);
-  const [live, setLive] = useState(() => liveMessages());
-  useEffect(() => {
-    let alive = true;
-    const reload = () => loadSavedChats().then(chats => { if (alive) setSaved(chats); });
-    reload();
-    const off = onTutorChats(({ saved: changed }) => { setLive(liveMessages()); if (changed) reload(); });
-    return () => { alive = false; off(); };
-  }, []);
-  const chats = recentChats(live, saved);
+  // Recent chats: every chat, newest first, from the saved-chats store the chat page shares
+  // (lib/chats.js). Each opens at /chat/<id>; the open one is current.
+  const saved = useChats();
+  const chats = recentChats(saved.chats, MAX_LIMIT);
   const query = router.query || {};
   const current = sidebarCurrent(router.pathname, query, {
     classIds: shownClasses.map(item => String(item.id)),
-    liveChat: chats.some(chat => chat.key === 'chat:live'),
+    liveChatId: chats.find(chat => chat.live)?.id || '',
   });
 
   useEffect(() => {
@@ -221,7 +215,6 @@ export default function Sidebar() {
   }, [menuFrom]);
   function toggleMenu(from) {
     hide();
-    setDark(themePreference() === 'dark');
     setMenuFrom(from);
     setMenuOpen(open => !open);
   }
@@ -237,19 +230,20 @@ export default function Sidebar() {
   }, [router.events]);
 
   // The phone top bar's menu has everything; the sidebar's has Settings, Plan, Friends, Help,
-  // Send feedback, the theme and Sign out (Progress is in the rail).
+  // Send feedback, Make it yours and Sign out (Progress is in the rail).
   const accountItems = [
     { key: 'progress', label: 'Progress', icon: ChartNoAxesColumn, onSelect: () => router.push('/progress') },
     { key: 'friends', label: 'Friends', icon: Users, badge: requests || null, badgeLabel: `${requests} ${requests === 1 ? 'request' : 'requests'}`, onSelect: () => router.push('/friends') },
     { key: 'profile', label: 'Settings', icon: Settings, onSelect: () => router.push('/settings') },
-    { key: 'appearance', label: 'Appearance', icon: Palette, onSelect: () => router.push('/settings?section=account') },
+    { key: 'appearance', label: 'Make it yours', icon: Palette, onSelect: () => openMakeItYours() },
     { key: 'plan', label: 'Plan', icon: CreditCard, onSelect: () => router.push('/settings?section=plan') },
     { key: 'connectors', label: 'Connectors', icon: Link2, onSelect: () => router.push('/settings?section=connectors') },
     { key: 'help', label: 'Help', icon: CircleHelp, onSelect: () => setShowHelp(true) },
     { key: 'feedback', label: 'Send feedback', icon: Megaphone, onSelect: () => setShowFeedback(true) },
     { key: 'signout', label: 'Sign out', icon: LogOut, separated: true, onSelect: () => signOut() },
   ];
-  const themeItem = { key: 'theme', label: dark ? 'Light theme' : 'Dark theme', icon: dark ? Sun : Moon, onSelect: () => setThemePreference(dark ? 'light' : 'dark') };
+  // Make it yours holds the light/dark choice now (with the theme, accent, background, font, text size and glass).
+  const themeItem = accountItems.find(item => item.key === 'appearance');
   const sideMenuItems = [
     ...['profile', 'plan', 'friends', 'help', 'feedback'].map(key => accountItems.find(item => item.key === key))
       .map(item => (item.key === 'plan' && plan === 'Free' ? { ...item, label: 'Upgrade' } : item)),
@@ -281,11 +275,6 @@ export default function Sidebar() {
       window.dispatchEvent(new Event('cordia:tutor-new'));
     }
   }
-  // The open conversation reopens as it is; a saved chat reopens from /tutor?chat=<id>.
-  function openChat(chat) {
-    if (chat.key === 'chat:live') try { sessionStorage.setItem('cordiaTutorKeep', '1'); } catch { /* storage blocked */ }
-  }
-
   const sideTips = [
     { key: 'toggle', title: collapsed ? 'Expand sidebar' : 'Collapse sidebar' },
     { key: 'bell', title: 'Notifications' },
@@ -358,20 +347,7 @@ export default function Sidebar() {
             {classes && classes.length === 0 && <p className="c-side-empty c-side-label">No classes yet</p>}
           </div>
 
-          <div className="c-side-section c-side-chats" role="group" aria-labelledby="c-side-chats">
-            <h2 id="c-side-chats" className="c-side-heading c-side-heading-row">Recent chats</h2>
-            {chats.length > 0 ? (
-              <ul className="c-side-list c-side-chat-list">
-                {chats.map(chat => (
-                  <li key={chat.key}>
-                    <Link className="c-side-item c-side-chat" href={chat.href} onClick={() => openChat(chat)} aria-current={current === chat.key ? 'page' : undefined}>
-                      <span className="c-side-label">{chat.title}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="c-side-empty">Chats with the Tutor show up here.</p>}
-          </div>
+          <SidebarChats chats={chats} current={current} editable={saved.editable} classes={classes || []} failed={saved.failed} loaded={saved.loaded} more={saved.more} limited={saved.limited} />
           {/* Folded, the chats open from one icon, in a menu beside the sidebar. */}
           <button ref={chatsRef} type="button" className="c-side-item c-side-chats-icon" aria-label="Recent chats" aria-haspopup="menu" aria-expanded={chatsOpen}
             aria-current={folded && current.startsWith('chat:') ? 'page' : undefined} {...tipFor('chats')} onClick={() => { hide(); setChatsOpen(open => !open); }}>
@@ -390,7 +366,8 @@ export default function Sidebar() {
       </aside>
       <ShellTipLayer tip={menuOpen || chatsOpen ? null : tip} items={sideTips} side="right" />
       <ShellMenu open={chatsOpen && folded} onClose={closeChats} anchorRef={chatsRef} side="right" label="Recent chats"
-        items={chats.slice(0, 12).map(chat => ({ key: chat.key, label: chat.title, href: chat.href, current: current === chat.key, onSelect: () => openChat(chat) }))} />
+        items={chats.slice(0, 12).map(chat => ({ key: chat.key, label: chat.title, href: chat.href, current: current === chat.key }))} />
+      <ChatToast />
 
 
       {/* Phones: brand, search and account on top; the tab bar below. */}
@@ -446,7 +423,7 @@ export default function Sidebar() {
           </Link>
         ))}
       </nav>
-      <TutorBubble ownedBy={['/folder/[id]']} />
+      <TutorBubble />
 
       {search && <SearchModal instant={search.instant} onClose={() => setSearch(null)} />}
       {showHelp && (

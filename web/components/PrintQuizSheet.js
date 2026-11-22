@@ -117,7 +117,7 @@ export default function PrintQuizSheet({ guideId, onClose }) {
       </div>
       <style jsx global>{`
         .pqs { width: min(520px, 100%); display: grid; gap: 14px; max-height: calc(100vh - 48px); overflow-y: auto; }
-        .pqs-title { margin: 0; font: 500 28px/1.15 var(--font-display); color: var(--ink); }
+        .pqs-title { margin: 0; font: 500 1.75rem/1.15 var(--font-display); color: var(--ink); }
         .pqs-presets { display: flex; flex-wrap: wrap; gap: 8px; }
         .pqs-chip.is-on { background: var(--olive-tint); border-color: var(--olive); color: var(--olive-ink); }
         .pqs-types { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
@@ -125,8 +125,8 @@ export default function PrintQuizSheet({ guideId, onClose }) {
         .pqs-type .c-toggle { flex: 1; }
         .pqs-type.is-off .pqs-count { color: var(--muted); }
         .pqs-stepper { display: inline-flex; align-items: center; gap: 4px; }
-        .pqs-count { min-width: 28px; text-align: center; font: 600 16px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink); }
-        .pqs-total { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
+        .pqs-count { min-width: 28px; text-align: center; font: 600 1rem/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink); }
+        .pqs-total { margin: 0; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); font-variant-numeric: tabular-nums; }
         .pqs-note { margin: 0; color: var(--muted); font: 500 var(--fs-13)/1.45 var(--font-sans); }
         .pqs-options { display: grid; gap: 10px; padding-top: 4px; }
         .pqs-actions { display: flex; flex-wrap: wrap; gap: 8px; }

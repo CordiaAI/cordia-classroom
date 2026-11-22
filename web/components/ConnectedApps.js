@@ -47,7 +47,7 @@ export default function ConnectedApps() {
   }
 
   return (
-    <section className="c-card ca" aria-labelledby="ca-title">
+    <section className="c-card settings-card ca" aria-labelledby="ca-title">
       <div className="ca-head">
         <span className="ca-title"><Bot {...ICON} /><h2 id="ca-title" className="c-section-title">Connected AI apps</h2></span>
         <p className="c-meta">Apps like Claude that you let read your study material and add to your Library. They can't see your Canvas data, texts or other connected accounts.</p>
@@ -76,7 +76,6 @@ export default function ConnectedApps() {
         />
       )}
       <style jsx>{`
-        .ca { display: grid; gap: 14px; padding: 20px 24px; }
         .ca-head { display: grid; gap: 6px; }
         .ca-title { display: inline-flex; align-items: center; gap: 10px; }
         .ca-title h2 { margin: 0; }
@@ -84,7 +83,7 @@ export default function ConnectedApps() {
         .ca-head .c-meta { margin: 0; }
         .ca-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
         .ca-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'name action' 'meta action'; align-items: center; column-gap: 12px; row-gap: 2px; padding: 12px 0; border-top: 1px solid var(--hairline); }
-        .ca-name { grid-area: name; font: 600 15px/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+        .ca-name { grid-area: name; font: 600 0.9375rem/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
         .ca-row .c-meta { grid-area: meta; }
         .ca-disconnect { grid-area: action; }
         .ca-status:empty { display: none; }

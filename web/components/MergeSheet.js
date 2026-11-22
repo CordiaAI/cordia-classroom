@@ -117,15 +117,15 @@ export default function MergeSheet({ pair, onClose, onMerged }) {
             .ms-title { margin: 0; }
             .ms-lead { margin: 0; }
             .ms-pick { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
-            .ms-legend { margin-bottom: 6px; padding: 0; font: 600 13px/1.3 var(--font-sans); color: var(--muted-ink); }
+            .ms-legend { margin-bottom: 6px; padding: 0; font: 600 0.8125rem/1.3 var(--font-sans); color: var(--muted-ink); }
             .ms-option { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-input); cursor: pointer; min-width: 0; }
             .ms-option.is-on { border-color: var(--olive); background: var(--olive-tint); }
             .ms-option input { margin-top: 3px; accent-color: var(--olive); flex: none; }
             .ms-option-main { display: grid; gap: 2px; min-width: 0; }
-            .ms-option-title { font: 600 16px/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
-            .ms-what { display: grid; gap: 8px; margin: 0; padding-left: 20px; color: var(--ink); font: 500 15px/1.45 var(--font-sans); }
+            .ms-option-title { font: 600 1rem/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+            .ms-what { display: grid; gap: 8px; margin: 0; padding-left: 20px; color: var(--ink); font: 500 0.9375rem/1.45 var(--font-sans); }
             .ms-what li { overflow-wrap: anywhere; }
-            .ms-error { margin: 0; color: var(--error); font: 600 14px/1.4 var(--font-sans); }
+            .ms-error { margin: 0; color: var(--error); font: 600 0.875rem/1.4 var(--font-sans); }
             .ms-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
             .ms-done { display: grid; gap: 10px; justify-items: start; }
             .ms-done p { margin: 0; overflow-wrap: anywhere; }

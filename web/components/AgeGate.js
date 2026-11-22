@@ -52,7 +52,7 @@ export default function AgeGate() {
           <style jsx>{`
             .ag { width: min(420px, 100%); display: grid; gap: 14px; }
             .ag-title, .ag-lead { margin: 0; }
-            .ag-error { margin: 0; color: var(--error); font: 600 14px/1.4 var(--font-sans); }
+            .ag-error { margin: 0; color: var(--error); font: 600 0.875rem/1.4 var(--font-sans); }
             .ag-save { justify-self: end; }
           `}</style>
         </form>

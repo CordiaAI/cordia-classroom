@@ -69,7 +69,7 @@ export default function PublicPage({ path = '/', faq = null, faqInPage = false, 
         .public--photo .auth, .public--photo .c-card { -webkit-backdrop-filter: blur(20px) saturate(140%); backdrop-filter: blur(20px) saturate(140%); }
         .public-nav { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; padding: 0 24px; background: var(--surface-card); border-bottom: 1px solid var(--hairline); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%); }
         .public-brand { display: inline-flex; align-items: center; gap: 14px; color: var(--ink); text-decoration: none; }
-        .public-brand > span { display: inline-flex; align-items: center; height: 28px; padding-left: 14px; border-left: 1px solid var(--line); font: 400 22px/1 var(--font-sans); letter-spacing: 0.02em; }
+        .public-brand > span { display: inline-flex; align-items: center; height: 28px; padding-left: 14px; border-left: 1px solid var(--line); font: 400 1.375rem/1 var(--font-sans); letter-spacing: 0.02em; }
         .public-brand:hover { text-decoration: none; }
         .public-mark { width: 30px; height: 26px; object-fit: contain; }
         .public-nav nav { display: flex; align-items: center; gap: 4px; }

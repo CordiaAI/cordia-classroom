@@ -28,7 +28,7 @@ export default function FeedbackChoice({ value, onChange, id = 'feedback-choice'
       </SegmentedControl>
       <style jsx>{`
         .fb-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
-        .fb-label { font: 600 15px/1.3 var(--font-sans); color: var(--ink); }
+        .fb-label { font: 600 0.9375rem/1.3 var(--font-sans); color: var(--ink); }
       `}</style>
     </div>
   );

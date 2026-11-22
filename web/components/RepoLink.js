@@ -97,7 +97,7 @@ export default function RepoLink({ item, repo: initial }) {
         </>
       ) : picking ? (
         <>
-          <label className="cn-search">
+          <label className="c-search">
             <Search size={20} strokeWidth={1.75} aria-hidden="true" />
             <input className="c-input" type="search" autoFocus placeholder="Search your GitHub repos" aria-label="Search your GitHub repos" value={query} onChange={event => setQuery(event.target.value)} />
           </label>
@@ -120,10 +120,10 @@ export default function RepoLink({ item, repo: initial }) {
       {error && <p className="cn-error" role="alert">{error}{/Connect GitHub/.test(error) && <> <Link href="/settings?section=connectors&open=github">Connect it</Link></>}</p>}
       <style jsx>{`
         .rl { display: grid; gap: 8px; }
-        .rl-title { margin: 0; font: 600 14px/1.4 var(--font-sans); color: var(--muted); }
+        .rl-title { margin: 0; font: 600 0.875rem/1.4 var(--font-sans); color: var(--muted); }
         .rl .c-meta { margin: 0; }
         .rl-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
-        .rl-name { flex: 1 1 auto; min-width: 0; color: var(--ink); font: 600 15px/1.4 var(--font-sans); }
+        .rl-name { flex: 1 1 auto; min-width: 0; color: var(--ink); font: 600 0.9375rem/1.4 var(--font-sans); }
         .rl-last { font-style: italic; }
         .rl :global(.rl-review), .rl .rl-link, .rl .rl-cancel { justify-self: start; }
         .rl-results { max-height: 220px; overflow: auto; }

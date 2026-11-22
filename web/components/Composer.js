@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useRef } from 'react';
 import { ArrowUp, FileText, Mic, Paperclip, X } from 'lucide-react';
 import ClassPicker from './ClassPicker';
 import CordiaLoader from './CordiaLoader';
+import DictationLine from './DictationLine';
 import { UPLOAD_ACCEPT } from '../lib/uploadTypes.mjs';
 import { MAX_ATTACHMENTS } from '../lib/useTutorChat';
 import { openNewSheet } from '../lib/newSheet';
@@ -25,12 +26,14 @@ export function buildGuideFrom(action, { files = [], folderId = '' } = {}) {
 // pasted notes goes to the New sheet. Talks to the Tutor through tutor (lib/useTutorChat.js).
 // variant: 'home' (88px box) or 'chat' (52px box, at the bottom of a chat).
 // showError: the Tutor's last error shows here (the home before it has a chat to show it in).
-export default function Composer({ tutor, classes = [], classId = '', onClassChange, variant = 'home', autoFocus = false, showError = false }) {
+// quietBusy: the page already says the Tutor is busy (a notice), so this doesn't say it again.
+export default function Composer({ tutor, classes = [], classId = '', onClassChange, variant = 'home', autoFocus = false, showError = false, quietBusy = false }) {
   const id = useId();
   const boxRef = useRef(null);
+  const touchedRef = useRef(false); // the student has been in the box, so its caret is theirs
   const {
     input, setInput, attachments, setAttachments, removeAttachment, attachFiles, extracting, attachDropActive, fileRef, combinedAttachments, contextKey,
-    sendMessage, session, busy, canSubmit, remaining, Recognition, listening, toggleMic, localError,
+    sendMessage, session, busy, canSubmit, remaining, Recognition, listening, interim, dictationError, toggleMic, localError,
   } = tutor;
   const minHeight = variant === 'home' ? 88 : 52;
   const hasSomething = Boolean(input.trim()) || attachments.length > 0;
@@ -84,7 +87,7 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
   const hint = !session ? 'Connecting to the Tutor. If this stays, refresh the page.'
     : remaining <= 0 ? 'This chat is full. Start a new chat from the sidebar.'
       : input.trim() && !canSubmit && !attachments.length ? 'This Tutor mode needs material. Attach a file or pick a class.'
-        : busy && input.trim() ? 'The Tutor is still answering your last message.'
+        : busy && input.trim() && !quietBusy ? 'The Tutor is still answering your last message.'
           : '';
 
   return (
@@ -110,6 +113,7 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
         onChange={event => setInput(event.target.value)}
         onKeyDown={onKeyDown}
         onPaste={onPaste}
+        onFocus={() => { touchedRef.current = true; }}
         placeholder="Ask the Tutor, or drop in slides, a PDF or a lecture"
         rows={1}
         style={{ height: minHeight }}
@@ -120,7 +124,7 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
           {extracting ? <CordiaLoader size={20} label="Reading files" /> : <Paperclip size={20} strokeWidth={1.75} aria-hidden="true" />}
         </button>
         {Recognition && (
-          <button type="button" className={'composer-icon' + (listening ? ' is-on' : '')} onClick={toggleMic} disabled={blocked && !listening}
+          <button type="button" className={'composer-icon' + (listening ? ' is-on' : '')} onClick={() => toggleMic(touchedRef.current && boxRef.current ? { start: boxRef.current.selectionStart, end: boxRef.current.selectionEnd } : {})} disabled={blocked && !listening}
             aria-label={listening ? 'Stop listening' : 'Talk to the Tutor'} aria-pressed={listening}>
             <Mic size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
@@ -131,6 +135,7 @@ export default function Composer({ tutor, classes = [], classId = '', onClassCha
           <ArrowUp size={18} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </div>
+      <DictationLine available={Boolean(Recognition)} listening={listening} interim={interim} error={dictationError} />
       {contextKey === 'attachment' && combinedAttachments.trimmed.length > 0 && (
         <p className="composer-note" role="status">Too long to read whole, so the Tutor reads part of: {combinedAttachments.trimmed.join(', ')}</p>
       )}

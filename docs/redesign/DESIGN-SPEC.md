@@ -181,7 +181,7 @@ The home is an empty chat, like ChatGPT and Claude: nothing but a headline, the 
 
 - Header: "Make it yours" in Newsreader 30/600, then 15px muted "Changes show up everywhere as you pick them, on every device you sign in to." A 40px close button at the right.
 - Rows split by hairlines: a 184px label column (15/700, with an optional 13px muted hint under it) and the controls.
-- Theme tiles: 6 across, each a mini window (sidebar strip, accent bar, a line) on its background, name under it. Background and font tiles are 92px wide. Chosen tiles get a 2px accent ring with a 5px soft halo. Hover lifts unchosen tiles 1px.
+- Theme tiles: seven across on one row (4 + 3 on phones), each a mini window (sidebar strip, accent bar, a line) on its background, name under it. Background and font tiles are 92px wide. Chosen tiles get a 2px accent ring with a 5px soft halo. Hover lifts unchosen tiles 1px.
 - Text size, Appearance and Glass use the segmented control.
 - Footer above a hairline: "Reset to Cordia" (quiet) at the left, Done (accent glass) at the right.
 

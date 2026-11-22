@@ -24,11 +24,11 @@
       display: flex; flex-direction: column; gap: 2px; padding: 14px 12px 12px;
       overflow: hidden;
       border: 1px solid var(--glass-edge);
-      border-radius: 24px; /* Fill, blur and shadow: the liquid glass recipe in glass.css. */
+      border-radius: var(--r-pane); /* Fill, blur and shadow: the liquid glass recipe in glass.css. */
       transition: width 200ms var(--ease);
     }
     .c-side-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 4px 0 8px; margin-bottom: 8px; }
-    .c-side-brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; font: 600 20px/1.15 var(--font-display); white-space: nowrap; }
+    .c-side-brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); text-decoration: none; font: 600 1.25rem/1.15 var(--font-display); white-space: nowrap; }
     @media (hover: hover) { .c-side-brand:hover { text-decoration: none; } }
     .c-side-brand .top-navigation-mark { width: 30px; height: 26px; flex: none; }
     .c-side-brand .c-side-label { display: inline-flex; align-items: center; align-self: stretch; } /* centre the wordmark on the mark, not on a text baseline */
@@ -40,7 +40,7 @@
     .c-side-item {
       position: relative; display: flex; align-items: center; gap: 12px; width: 100%; height: 40px; padding: 0 12px;
       border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink);
-      font: 600 15px/1.3 var(--font-sans); text-align: left; text-decoration: none; white-space: nowrap; cursor: pointer;
+      font: 600 0.9375rem/1.3 var(--font-sans); text-align: left; text-decoration: none; white-space: nowrap; cursor: pointer;
     }
     .c-side-item .lucide { flex: none; }
     .c-side-item { transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
@@ -49,7 +49,7 @@
     /* Line height above 1, so the ellipsis clip never cuts off descenders (y, g, p). */
     .c-side-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; padding-block: 1px; }
     /* The ⌘K keycap: 12px/600 muted on a 1px hairline ring, no fill (DESIGN-SPEC 3.2). */
-    .c-side-kbd { margin-left: auto; padding: 4px 7px; border-radius: var(--r-pill); background: transparent; box-shadow: 0 0 0 1px var(--hairline); color: var(--muted); font: 600 12px/1 var(--font-sans); }
+    .c-side-kbd { margin-left: auto; padding: 4px 7px; border-radius: var(--r-pill); background: transparent; box-shadow: 0 0 0 1px var(--hairline); color: var(--muted); font: 600 0.75rem/1 var(--font-sans); }
     /* The middle scrolls on short screens; New and Search stay on top and the account at the bottom. */
     .c-side-nav {
       flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 1px;
@@ -60,23 +60,23 @@
     /* Classes: a label with its + (add a class), then up to five classes as colour dot + course code. */
     .c-side-section { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; margin: 12px 0 6px; }
     .c-side-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 28px; padding: 0 4px 0 12px; }
-    .c-side-heading { margin: 0; color: var(--muted); font: 600 13px/1.6 var(--font-sans); }
+    .c-side-heading { margin: 0; color: var(--muted); font: 600 0.8125rem/1.6 var(--font-sans); }
     .c-side-add { display: grid; place-items: center; width: 26px; height: 26px; border-radius: var(--r-pill); color: var(--muted); text-decoration: none; }
     @media (hover: hover) { .c-side-add:hover { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); text-decoration: none; } }
     .c-side-classes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; }
-    .c-side-class { font-size: 14px; }
+    .c-side-class { font-size: 0.875rem; }
     /* The dot takes the icon's 20px slot, so codes line up with the labels above. */
     .c-side-dot { flex: none; width: 10px; height: 10px; margin: 0 5px; border-radius: 50%; background: var(--dot, var(--olive)); box-shadow: inset 0 0 0 1px var(--hairline); }
-    .c-side-all { display: flex; align-items: center; height: 30px; padding: 0 12px 0 44px; border-radius: var(--r-input); color: var(--muted); font: 600 13px/1.3 var(--font-sans); text-decoration: none; }
+    .c-side-all { display: flex; align-items: center; height: 30px; padding: 0 12px 0 44px; border-radius: var(--r-input); color: var(--muted); font: 600 0.8125rem/1.3 var(--font-sans); text-decoration: none; }
     @media (hover: hover) { .c-side-all:hover { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); text-decoration: none; } }
     /* "Add a class" is a .c-side-item, so its hover is the item's inner pane; the label stays muted. */
-    .c-side-empty { color: var(--muted); font-size: 14px; }
+    .c-side-empty { color: var(--muted); font-size: 0.875rem; }
     /* The one divider, then the account row. */
     .c-side-foot { flex: none; display: grid; gap: 2px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
     .c-side-head, .c-side-new, .c-side > .c-side-item { flex: none; }
     .c-side-account { height: 56px; padding: 0 8px; }
     .c-side-account[aria-expanded='true'] { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); }
-    .c-side-account.is-active .c-side-avatar { box-shadow: 0 0 0 2px var(--olive); }
+    .c-side-account.is-active .c-side-avatar { box-shadow: 0 0 0 2px var(--meter); }
     .c-side-avatar { flex: none; width: 36px; height: 36px; }
     .c-side-who { display: grid; gap: 3px; min-width: 0; flex: 1 1 auto; }
     .c-side-who strong { font: 600 var(--fs-15)/1.2 var(--font-sans); }
@@ -116,7 +116,7 @@
   :root[data-shell='new'] .c-legacy-nav .c-side { display: none; }
   :root[data-shell='new'] .app-shell:not(.is-focus) .c-shell-ghost {
     display: block; position: fixed; top: var(--side-gap); bottom: var(--side-gap); z-index: 95;
-    border-radius: 24px; pointer-events: none;
+    border-radius: var(--r-pane); pointer-events: none;
   }
   :root[data-shell='new'] .c-shell-ghost.is-side { left: var(--side-gap); width: var(--side-w); }
   :root[data-shell='new'] .c-shell-ghost.is-rail { right: var(--side-gap); width: var(--rail-w); }

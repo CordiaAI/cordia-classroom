@@ -1,7 +1,9 @@
+import { useRef } from 'react';
 import { BookOpen, Layers, ListTree, MessageCircle, MessagesSquare, Paperclip, PencilRuler, Plus, Trash2, X as CloseIcon, ArrowUp } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import TutorSelect from './TutorSelect';
 import CordiaLoader from './CordiaLoader';
+import DictationLine from './DictationLine';
 import TutorMessages from './TutorMessages';
 import { UPLOAD_ACCEPT } from '../lib/uploadTypes.mjs';
 import { MAX_ATTACHMENTS, useTutorChat } from '../lib/useTutorChat';
@@ -12,13 +14,15 @@ import { MAX_ATTACHMENTS, useTutorChat } from '../lib/useTutorChat';
 // resumeChatId: the full Tutor page opens that saved chat instead (the sidebar's Recent chats).
 export default function AIChatWidget(props) {
   const tutor = useTutorChat(props);
+  const boxRef = useRef(null);
+  const touchedRef = useRef(false); // the student has been in the box, so its caret is theirs
   const {
     rootRef, endRef, fileRef, working, setWorking, guides, notes, classes, material, general,
     contextKey, setContextKey, attachments, combinedAttachments, removeAttachment, attachFiles, extracting, attachDropActive,
     browserMaterial, session, messages, input, setInput, sendMessage, setSkillOverride, selectedSkillId,
     needsTargetClass, targetClassId, setTargetClassId, hasRequiredContext, canSubmit, remaining, busy,
     chatsOpen, setChatsOpen, savedChats, chatsError, deletingChat, setDeletingChat, deleteSavedChat, startChat,
-    Recognition, listening, toggleMic,
+    Recognition, listening, interim, dictationError, toggleMic,
   } = tutor;
 
   return (
@@ -143,8 +147,10 @@ export default function AIChatWidget(props) {
           {extracting ? <CordiaLoader size={16} label="Reading" /> : <Paperclip size={18} strokeWidth={1.75} aria-hidden="true" />}
         </button>
         <textarea
+          ref={boxRef}
           value={input}
           onChange={event => setInput(event.target.value)}
+          onFocus={() => { touchedRef.current = true; }}
           onKeyDown={event => {
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault();
@@ -160,7 +166,7 @@ export default function AIChatWidget(props) {
           <button
             type="button"
             className={`cordia-tutor-mic${listening ? ' is-listening' : ''}`}
-            onClick={toggleMic}
+            onClick={() => toggleMic(touchedRef.current && boxRef.current ? { start: boxRef.current.selectionStart, end: boxRef.current.selectionEnd } : {})}
             disabled={!canSubmit || busy || remaining <= 0 || !session}
             aria-label={listening ? 'Stop listening' : 'Ask by voice'}
             aria-pressed={listening}
@@ -174,6 +180,7 @@ export default function AIChatWidget(props) {
           </button>
         )}
       </div>
+      <DictationLine available={Boolean(Recognition)} listening={listening} interim={interim} error={dictationError} />
       {remaining <= 3 && <small className="c-meta cordia-tutor-limit">{Math.max(remaining, 0)} left</small>}
       {input.trim() && !(canSubmit && !busy && remaining > 0 && session) && (
         <small className="c-meta cordia-tutor-limit" role="status">

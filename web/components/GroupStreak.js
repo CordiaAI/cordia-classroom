@@ -25,7 +25,7 @@ export default function GroupStreak({ classroomId }) {
         .gs { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
         .gs-icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
         .gs-main { display: grid; gap: 2px; min-width: 0; }
-        .gs-main strong { font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .gs-main strong { font: 600 1rem/1.3 var(--font-sans); color: var(--ink); }
         .gs-main .c-meta { overflow-wrap: anywhere; }
       `}</style>
     </section>

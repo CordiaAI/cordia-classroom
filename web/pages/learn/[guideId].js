@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Brain, CalendarClock, Check, GraduationCap, Layers, ListChecks, NotebookPen, PenLine, Play, Repeat, Shuffle, Target, TextCursorInput, Timer } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Brain, CalendarClock, Check, GraduationCap, Layers, ListChecks, MessageCircle, NotebookPen, PenLine, Play, Repeat, Shuffle, Target, TextCursorInput, Timer } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import { saveLearnLevels } from '../../lib/progressSave';
 import { useRequireAuth } from '../../lib/auth';
@@ -26,7 +26,7 @@ import { LEARN_LADDER_V2 } from '../../lib/featureFlags';
 import {
   LADDER_TYPES, TEST_FORMATS, TEST_FORMAT_LABELS, answerLadder, blankFor, cleanTestFormat, createLadderRound, daysUntil, finalCheckTypes, ladderDecision, ladderTypes, onlyRecognition,
 } from '../../lib/learnLadder.mjs';
-import CordiaLoader, { LoadingArea, Reveal, useLoadGate } from '../../components/CordiaLoader';
+import CordiaLoader, { LoadingArea, Reveal, useLoadGate, useWorkingMark } from '../../components/CordiaLoader';
 import Toggle from '../../components/Toggle';
 
 const ICON = { size: 20, strokeWidth: 1.75, 'aria-hidden': true };
@@ -191,6 +191,15 @@ export default function LearnPage() {
   // Each card's logged format decision, by card id; its answer points at it.
   const decisions = useRef({});
   const today = dayKey();
+  // The Tutor's check-in (?checkin=1, from a study plan): the first round starts by itself, and when it
+  // ends the score goes back to the Tutor, which posts what to do next and when.
+  // '' | 'pending' (start it) | 'running' | 'sending' | 'sent' | 'failed'
+  const [checkin, setCheckin] = useState('');
+  const checkinSeen = useRef(false);
+  const checkinResult = useRef(null);
+  const checkinShown = ['sending', 'sent', 'failed'].includes(checkin);
+  // "Back to the Tutor" shows its working mark after 300ms, for at least 500ms (useWorkingMark).
+  const backMarked = useWorkingMark(checkin === 'sending');
 
   useEffect(() => {
     try {
@@ -277,6 +286,12 @@ export default function LearnPage() {
       setScreen('timed');
     }
     if (linked || resumable) save(restored, linked || saved.test_date || '', list, format);
+    if (router.query.checkin === '1' && list.length && !guide?.viewer && !checkinSeen.current) {
+      checkinSeen.current = true;
+      // A round resumed after a refresh is the check-in only if it started as one; an ordinary round left
+      // mid-way finishes as itself, and the check-in is the next round.
+      setCheckin(resumable && pending.checkin ? 'running' : 'pending');
+    }
     if (!list.length) setError(session?.detail || (guide?.viewer ? 'This guide has no questions to learn from yet.' : guide && !String(guide.notes || '').trim()
       ? 'This guide has no notes or questions to learn from yet.'
       : 'Learn needs questions and answers. Open the guide and make its study set first.'));
@@ -287,6 +302,16 @@ export default function LearnPage() {
   useEffect(() => {
     if (ready && guideId) load();
   }, [ready, guideId]);
+  // The check-in starts by itself once: the first time the questions load, if it's waiting and the overview
+  // is showing then. Back on the overview later (after a resumed round), it waits for its button.
+  const checkinAuto = useRef(false);
+  useEffect(() => {
+    if (checkinAuto.current || !questions?.length) return;
+    checkinAuto.current = true;
+    if (checkin !== 'pending' || screen !== 'home') return;
+    setCheckin('running');
+    startRound();
+  }, [checkin, questions, screen]);
   const gate = useLoadGate(questions !== null || making);
   // Only recognition tiles on: the first mastery step explains once why it asks for recall.
   const noteCard = screen === 'round' ? currentCard(round) : null;
@@ -303,8 +328,8 @@ export default function LearnPage() {
     const resumeAt = answered ? advance(round) : round;
     if (!currentCard(resumeAt)) return; // the round's last answer: finishing it saves the levels
     const fps = Object.fromEntries(resumeAt.queue.map(item => [item.concept, fingerprint(questions[item.concept])]));
-    writeResume('learn', guideId, { round: resumeAt, roundNumber, levels: saveableLevels(questions, levels), fps });
-  }, [guideId, questions, screen, round, answered, levels, roundNumber]);
+    writeResume('learn', guideId, { round: resumeAt, roundNumber, levels: saveableLevels(questions, levels), fps, checkin: checkin === 'running' });
+  }, [guideId, questions, screen, round, answered, levels, roundNumber, checkin]);
 
   function save(nextLevels, nextDate = testDate, list = questions, nextFormat = testFormat) {
     const body = { levels: saveableLevels(list, nextLevels), test_date: nextDate || null, ...(LEARN_LADDER_V2 && nextDate ? { test_format: nextFormat } : {}) };
@@ -359,6 +384,8 @@ export default function LearnPage() {
   function startRound() {
     const next = LEARN_LADDER_V2 ? createLadderRound(questions, levels, { ...ladderContext(), carry: carry.current }) : createRound(questions, levels, today, types);
     if (!next.queue.length) return;
+    if (['sent', 'failed'].includes(checkin)) setCheckin(''); // later rounds are ordinary rounds
+    if (checkin === 'pending') setCheckin('running'); // after a resumed ordinary round, this one is the check-in
     carry.current = [];
     decide(currentCard(next));
     setRound(next);
@@ -414,7 +441,33 @@ export default function LearnPage() {
     const cleared = results.filter(([, item]) => !item.missed).map(([concept]) => questions[concept]?.question).filter(Boolean);
     rememberRetainMisses(guideId, missed.map(question => ({ question: question.question, answer: conceptAnswer(question) })).filter(item => item.question && item.answer), { cleared });
     recordStudy({ guideId, guideTitle: title, minutes: (Date.now() - roundStart.current) / 60000, cards: results.length, right: results.length - missed.length, total: results.length, kind: 'quiz' });
+    if (checkin === 'running') {
+      const after = counts(questions, levels, today);
+      checkinResult.current = {
+        checkin_id: `${guideId}:${roundStart.current}`, guide_id: guideId, right: results.length - missed.length, total: results.length,
+        remaining: after.total - after.mastered, test_date: testDate || null, local_date: today,
+      };
+      sendCheckin();
+    }
     setScreen('checkpoint');
+  }
+
+  // The check-in's score goes to the Tutor's conversation (POST /tutor/session/checkin, posted once per check-in).
+  async function sendCheckin() {
+    if (!checkinResult.current) return;
+    setCheckin('sending');
+    const sent = await apiFetch('/tutor/session/checkin', { method: 'POST', body: JSON.stringify(checkinResult.current) });
+    setCheckin(sent?.id ? 'sent' : 'failed');
+    if (sent?.id) {
+      const query = { ...router.query };
+      delete query.checkin; // a refresh doesn't start another check-in
+      router.replace({ pathname: router.pathname, query }, undefined, { shallow: true });
+    }
+  }
+
+  function backToTutor() {
+    try { sessionStorage.setItem('cordiaTutorKeep', '1'); } catch { /* opens on a new chat instead */ }
+    router.push('/tutor');
   }
 
   // A timed test is marked: what it missed drops back to Learning for the next rounds.
@@ -541,7 +594,7 @@ export default function LearnPage() {
           <div className="learn-actions">
             {!allMastered || tally.fading > 0 ? (
               <button type="button" className="c-btn c-btn--primary c-btn--lg" onClick={startRound}>
-                <Play {...ICON} />{tally.new === tally.total ? 'Start learning' : 'Next round'}
+                <Play {...ICON} />{checkin === 'pending' ? 'Start the check-in quiz' : tally.new === tally.total ? 'Start learning' : 'Next round'}
               </button>
             ) : null}
             {allMastered && (
@@ -575,6 +628,7 @@ export default function LearnPage() {
           </div>
           <div className="c-bar" role="progressbar" aria-label="Round" aria-valuemin={0} aria-valuemax={round.queue.length} aria-valuenow={round.position}><span style={{ width: Math.round((round.position / round.queue.length) * 100) + '%' }} /></div>
           {recallNoteNow && <p className="learn-recall-note" role="status">{RECALL_NOTE}</p>}
+          {checkin === 'running' && <p className="learn-recall-note">Check-in quiz: one short round to see where you stand. Your Tutor plans the rest from your score.</p>}
           <QuietLimits.Provider value={LEARN_LADDER_V2}>
           {card.type === 'mc' && <McCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
           {card.type === 'fill' && <FillCard key={card.id} askSure={askSure} card={retainCard} question={question} guideId={guideId} onResult={onResult} onNext={onNext} />}
@@ -592,7 +646,7 @@ export default function LearnPage() {
       {screen === 'checkpoint' && round && (
         <div className="learn-home">
           <section className="c-card learn-panel">
-            <h2 className="c-section-title">Round {roundNumber} done</h2>
+            <h2 className="c-section-title">{checkinShown ? 'Check-in done' : `Round ${roundNumber} done`}</h2>
             <div className="learn-ready"><span className="learn-ready-num">{ready_}%</span><span className="c-meta">ready</span></div>
             <LadderBar tally={tally} />
             <ul className="learn-moves">
@@ -605,12 +659,28 @@ export default function LearnPage() {
             </ul>
             {plan && !plan.past && <p className="c-meta">{whenLabel(plan)}</p>}
             {LEARN_LADDER_V2 && round.fallbackUsed && <p className="c-meta learn-fallback">{FALLBACK_LINE}</p>}
+            {/* On the card, not the bare backdrop, so the line keeps its contrast. */}
+            {checkinShown && (
+              <p className={'c-meta learn-checkin-status' + (checkin === 'failed' ? ' is-failed' : '')} role="status">
+                {checkin === 'sending' ? 'Sending your score to the Tutor…'
+                  : checkin === 'sent' ? 'Your Tutor has your next steps and when to do them.'
+                  : "The Tutor didn't get your score. Your progress is saved here."}
+                {checkin === 'failed' && <button type="button" className="c-btn c-btn--quiet c-btn--sm learn-checkin-again" onClick={sendCheckin}>Send it again</button>}
+              </p>
+            )}
           </section>
           <div className="learn-actions">
+            {checkinShown && (
+              <button type="button" className={'c-btn c-btn--primary c-btn--lg learn-back-tutor' + (checkin === 'sending' ? ' is-busy' : '') + (backMarked ? ' is-marked' : '')}
+                onClick={() => { if (checkin !== 'sending') backToTutor(); }} aria-disabled={checkin === 'sending' || undefined} aria-busy={checkin === 'sending' || undefined}>
+                <span className="learn-back-face"><MessageCircle {...ICON} />Back to the Tutor</span>
+                {(checkin === 'sending' || backMarked) && <span className="learn-back-spinner"><CordiaLoader size={22} label="Sending your score" /></span>}
+              </button>
+            )}
             {allMastered && !tally.fading
-              ? <Link href={finalHref} className="c-btn c-btn--primary c-btn--lg"><Target {...ICON} />Final check</Link>
-              : <button type="button" className="c-btn c-btn--primary c-btn--lg" onClick={startRound}>Next round<ArrowRight {...ICON} /></button>}
-            <button type="button" className="c-btn c-btn--secondary c-btn--lg" onClick={() => setScreen('home')}>Overview</button>
+              ? <Link href={finalHref} className={'c-btn c-btn--lg ' + (checkinShown ? 'c-btn--secondary' : 'c-btn--primary')}><Target {...ICON} />Final check</Link>
+              : <button type="button" className={'c-btn c-btn--lg ' + (checkinShown ? 'c-btn--secondary' : 'c-btn--primary')} onClick={startRound}>{checkin === 'pending' ? 'Start the check-in quiz' : 'Next round'}<ArrowRight {...ICON} /></button>}
+            <button type="button" className={'c-btn c-btn--lg ' + (checkinShown ? 'c-btn--quiet' : 'c-btn--secondary')} onClick={() => setScreen('home')}>Overview</button>
           </div>
         </div>
       )}
@@ -623,11 +693,11 @@ export default function LearnPage() {
         .learn-panel { display: grid; gap: 14px; padding: 22px; }
         .learn-panel h2 { margin: 0; }
         .learn-ready { display: flex; align-items: baseline; gap: 8px; }
-        .learn-ready-num { font: 600 44px/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink); }
+        .learn-ready-num { font: 600 2.75rem/1 var(--font-sans); font-variant-numeric: tabular-nums; color: var(--ink); }
         .learn-ladder { display: grid; gap: 10px; }
         .learn-bar { display: flex; gap: 2px; height: 12px; overflow: hidden; border-radius: var(--r-pill); background: var(--hairline); }
         .learn-seg { min-width: 6px; border-radius: var(--r-pill); }
-        .learn-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; list-style: none; color: var(--muted); font: 500 14px/1.3 var(--font-sans); }
+        .learn-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; list-style: none; color: var(--muted); font: 500 0.875rem/1.3 var(--font-sans); }
         .learn-legend li { display: inline-flex; align-items: center; gap: 6px; }
         .learn-legend strong { color: var(--ink); font-variant-numeric: tabular-nums; }
         .learn-dot { width: 10px; height: 10px; border-radius: var(--r-pill); }
@@ -650,43 +720,56 @@ export default function LearnPage() {
         .learn-flip-face { grid-area: 1 / 1; display: grid; align-content: center; justify-items: center; gap: 14px; padding: 28px 24px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
         .learn-flip-back { transform: rotateY(180deg); background: linear-gradient(var(--olive-tint), var(--olive-tint)), var(--card); }
         .learn-flip-face small { color: var(--muted); font: 600 var(--fs-13)/1 var(--font-sans); }
-        .learn-flip-text { max-width: 36ch; color: var(--ink); font: 500 22px/1.4 var(--font-sans); }
+        .learn-flip-text { max-width: 36ch; color: var(--ink); font: 500 1.375rem/1.4 var(--font-sans); }
         .learn-flip:not(:disabled):hover .learn-flip-face { border-color: var(--olive); }
         .learn-flip-marks { align-items: center; }
         .learn-flip-marks .c-meta { margin-right: auto; }
         @media (prefers-reduced-motion: reduce) { .learn-flip-inner { transition: none; } }
-        .learn-way { display: grid; justify-items: center; align-content: center; gap: 6px; min-height: 112px; padding: 12px 8px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 15px/1.2 var(--font-sans); text-align: center; cursor: pointer; }
+        .learn-way { display: grid; justify-items: center; align-content: center; gap: 6px; min-height: 112px; padding: 12px 8px; border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--ink); font: 600 0.9375rem/1.2 var(--font-sans); text-align: center; cursor: pointer; }
         .learn-way .lucide { color: var(--olive-ink); }
-        .learn-way small { color: var(--muted); font: 500 12px/1.3 var(--font-sans); }
+        .learn-way small { color: var(--muted); font: 500 0.75rem/1.3 var(--font-sans); }
         .learn-way.is-on { border-color: var(--state-select-edge); background: var(--state-select-fill); }
         .learn-way:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
-        .learn-date { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font: 600 16px/1.3 var(--font-sans); }
+        .learn-date { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font: 600 1rem/1.3 var(--font-sans); }
         .learn-date span { display: inline-flex; align-items: center; gap: 8px; }
         .learn-date input { width: auto; min-width: 170px; }
         .learn-date select { width: auto; min-width: 170px; }
-        .learn-recall-note { margin: 0; padding: 10px 14px; border-radius: var(--r-row); background: var(--olive-tint); color: var(--ink); font: 600 14px/1.45 var(--font-sans); }
+        .learn-recall-note { margin: 0; padding: 10px 14px; border-radius: var(--r-row); background: var(--olive-tint); color: var(--ink); font: 600 0.875rem/1.45 var(--font-sans); }
         .learn-fallback { margin: 0; }
+        .learn-checkin-status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) 0.625rem; margin: 0; min-height: 2.25rem; }
+        .learn-checkin-status.is-failed { justify-content: space-between; padding: 0.375rem 0.375rem 0.375rem 0.875rem; border-radius: var(--r-input); background: var(--error-bg); color: var(--error); font-weight: 600; }
+        @media (max-width: 767px), (pointer: coarse) { .learn-checkin-again { height: 2.75rem !important; min-height: 2.75rem !important; } }
+        .learn-back-tutor { position: relative; }
+        .learn-back-tutor.is-busy { cursor: progress; }
+        .learn-back-face { display: inline-flex; align-items: center; gap: var(--space-2); }
+        /* The label keeps its width while the mark shows, so the row doesn't move. is-marked comes from a
+           300ms timer (backMarked), so the mark also shows with reduced motion, just without the fade. */
+        .learn-back-tutor.is-marked .learn-back-face { visibility: hidden; }
+        .learn-back-spinner { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; }
+        .learn-back-tutor.is-marked .learn-back-spinner { opacity: 1; animation: learn-back-show 150ms var(--ease); }
+        @keyframes learn-back-show { from { opacity: 0; } to { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) { .learn-back-tutor.is-marked .learn-back-spinner { animation: none; } }
         .learn-actions { display: flex; flex-wrap: wrap; gap: 10px; }
         .learn-test-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         a.learn-way { text-decoration: none; }
         .learn-retry { margin-left: 8px; }
         .learn-how { display: grid; gap: 12px; margin: 4px 0 0; padding: 0; list-style: none; }
-        .learn-how li { display: flex; gap: 12px; color: var(--muted); font: 500 15px/1.45 var(--font-sans); }
+        .learn-how li { display: flex; gap: 12px; color: var(--muted); font: 500 0.9375rem/1.45 var(--font-sans); }
         .learn-how li .lucide { flex: none; margin-top: 2px; color: var(--olive-ink); }
         .learn-how strong { color: var(--ink); }
         .learn-card { width: min(720px, 100%); justify-self: center; }
         .learn-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
         .learn-type { margin-left: auto; }
-        .learn-chip { padding: 3px 10px; border-radius: var(--r-pill); font: 600 12px/1.3 var(--font-sans); white-space: nowrap; }
+        .learn-chip { padding: 3px 10px; border-radius: var(--r-pill); font: 600 0.75rem/1.3 var(--font-sans); white-space: nowrap; }
         .learn-chip.is-new { background: var(--surface-raised); color: var(--muted); }
         .learn-chip.is-learning { background: var(--warning-bg); color: var(--warning); }
         .learn-chip.is-familiar { background: var(--olive-tint); color: var(--olive-ink); }
         .learn-chip.is-mastered { background: var(--success-bg); color: var(--success); }
         .learn-moves { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-        .learn-moves li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 8px 0; border-top: 1px solid var(--border-subtle); font: 500 15px/1.35 var(--font-sans); }
+        .learn-moves li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 8px 0; border-top: 1px solid var(--border-subtle); font: 500 0.9375rem/1.35 var(--font-sans); }
         @media (max-width: 520px) {
           .learn-actions .c-btn { flex: 1; justify-content: center; }
-          .learn-ready-num { font-size: 36px; }
+          .learn-ready-num { font-size: 2.25rem; }
           .learn-way-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .learn-test-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         }

@@ -43,7 +43,7 @@ export default function ShortcutsSheet({ onClose }) {
         dl div { display: flex; align-items: center; gap: 12px; }
         dt { flex: 0 0 150px; }
         dd { margin: 0; }
-        kbd { font: 600 13px/1 var(--font-sans); background: var(--olive-tint); border-radius: var(--r-pill); padding: 5px 8px; }
+        kbd { font: 600 0.8125rem/1 var(--font-sans); background: var(--olive-tint); border-radius: var(--r-pill); padding: 5px 8px; }
       `}</style>
     </BodyPortal>
   );

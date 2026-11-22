@@ -94,8 +94,8 @@ export function WhatsNewCard() {
         .wn-card { position: relative; display: flex; gap: 14px; align-items: flex-start; padding: 16px 48px 16px 16px; min-width: 0; }
         .wn-icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--olive-tint); color: var(--olive-ink); }
         .wn-main { display: grid; gap: 4px; min-width: 0; }
-        .wn-kicker { margin: 0; font: 600 13px/1.3 var(--font-sans); color: var(--olive-ink); }
-        .wn-title { margin: 0; font: 500 22px/1.2 var(--font-display); color: var(--ink); overflow-wrap: anywhere; }
+        .wn-kicker { margin: 0; font: 600 0.8125rem/1.3 var(--font-sans); color: var(--olive-ink); }
+        .wn-title { margin: 0; font: 500 1.375rem/1.2 var(--font-display); color: var(--ink); overflow-wrap: anywhere; }
         .wn-text { margin: 0; color: var(--muted-ink); overflow-wrap: anywhere; }
         .wn-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
         .wn-card :global(.wn-close) { position: absolute; top: 8px; right: 8px; }

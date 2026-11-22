@@ -267,7 +267,7 @@ export default function ClassPageLegacy() {
         .cls-title :global(.c-title) { overflow-wrap: anywhere; }
         .cls-name-btn { max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; cursor: text; }
         .cls-name-btn:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 6px; }
-        :global(.cls-name-input) { font: 600 28px/1.15 var(--font-display); height: 52px; width: min(640px, 70vw); }
+        :global(.cls-name-input) { font: 600 1.75rem/1.15 var(--font-display); height: 52px; width: min(640px, 70vw); }
         .cls-files { padding: 8px; }
         :global(.cls-tabs) button { flex: 0 0 auto; white-space: nowrap; }
         :global(.cls-tabs) { justify-self: start; max-width: 100%; overflow-x: auto; }
@@ -275,7 +275,7 @@ export default function ClassPageLegacy() {
         .cls-needs-code { display: grid; gap: 12px; padding: 20px; justify-items: start; }
         .cls-needs-code :global(.cls-add) { width: 100%; box-shadow: none; padding: 0; background: none; border: 0; }
         :global(.folder-row-link) { display: flex; align-items: baseline; gap: 12px; min-width: 0; color: var(--ink); text-decoration: none; }
-        .folder-row-title { font:600 17px/1.15 var(--font-sans); min-width: 0; }
+        .folder-row-title { font:600 1.0625rem/1.15 var(--font-sans); min-width: 0; }
         @media (max-width: 767px) {
           :global(.folder-row-link) { flex-direction: column; align-items: stretch; gap: 2px; }
           .folder-row-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; overflow-wrap: anywhere; }

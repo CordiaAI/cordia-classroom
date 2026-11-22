@@ -161,9 +161,9 @@ export default function AssignmentSheet({ item, onClose }) {
         .as-steps { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
         .as-step { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; }
         .as-step .c-grow { display: grid; gap: 2px; }
-        .as-step-title { font: 600 15px/1.4 var(--font-sans); color: var(--ink); }
+        .as-step-title { font: 600 0.9375rem/1.4 var(--font-sans); color: var(--ink); }
         .as-step.is-done .as-step-title { color: var(--muted); text-decoration: line-through; }
-        .as-subtitle { margin: 0 0 4px; font: 600 14px/1.4 var(--font-sans); color: var(--muted); }
+        .as-subtitle { margin: 0 0 4px; font: 600 0.875rem/1.4 var(--font-sans); color: var(--muted); }
         .as-blocks ul, .as-rubric ol { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
         .as-rubric ol { margin-top: 8px; gap: 10px; }
         .as-rubric p { margin: 2px 0 0; }

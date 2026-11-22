@@ -60,12 +60,12 @@ export default function CourseClassrooms({ classId, onToast }) {
       <style jsx>{`
         .ccr { display: grid; gap: 10px; padding: 16px; }
         .ccr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-        .ccr-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .ccr-title { margin: 0; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); }
         .ccr :global(p) { margin: 0; }
         .ccr-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
         .ccr-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
         .ccr-main { display: grid; gap: 2px; min-width: 0; flex: 1 1 200px; }
-        .ccr-name { font: 600 15px/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
+        .ccr-name { font: 600 0.9375rem/1.3 var(--font-sans); color: var(--ink); overflow-wrap: anywhere; }
         .ccr-consent { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
       `}</style>
     </section>

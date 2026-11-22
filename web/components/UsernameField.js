@@ -61,10 +61,10 @@ export default function UsernameField({ id = 'username', value, onChange, onStat
         .uname-input, .uname-input:focus { border: 0; box-shadow: none; background: transparent; padding: 0; }
         .uname-input:focus-visible { outline: none !important; }
         .uname-box.is-bad { border-color: var(--error); }
-        .uname-at { color: var(--muted); font: 600 16px/1 var(--font-sans); }
-        .uname-input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--ink); font: 500 16px/1 var(--font-sans); }
+        .uname-at { color: var(--muted); font: 600 1rem/1 var(--font-sans); }
+        .uname-input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--ink); font: 500 1rem/1 var(--font-sans); }
         .uname-box :global(.uname-ok) { color: var(--olive-ink); flex: none; }
-        .uname-status { margin: 0; color: var(--muted); font: 500 13px/1.4 var(--font-sans); }
+        .uname-status { margin: 0; color: var(--muted); font: 500 0.8125rem/1.4 var(--font-sans); }
         .uname-status.is-bad { color: var(--error); }
       `}</style>
     </div>

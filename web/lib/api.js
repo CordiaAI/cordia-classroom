@@ -1,4 +1,5 @@
 import { formatPhone } from './phone.mjs';
+import { LOOK_KEY } from './themeBoot.mjs';
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export const REQUEST_TIMEOUT_MS = 15000;
 // AI generation routinely takes 20-60s. Aborting early charged students for guides they
@@ -75,6 +76,16 @@ export function setToken(token, email, refreshToken, name = '') {
   notifyAuthChanged();
 }
 
+function clearLook() {
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const key = localStorage.key(i);
+      if (key && (key === LOOK_KEY || key.startsWith(`${LOOK_KEY}:`))) localStorage.removeItem(key);
+    }
+    localStorage.removeItem('theme');
+  } catch { /* storage blocked */ }
+}
+
 export function clearAuth() {
   localStorage.removeItem('authToken');
   localStorage.removeItem('userEmail');
@@ -83,6 +94,9 @@ export function clearAuth() {
   localStorage.removeItem('refreshToken');
   // The new shell's answer for this account (lib/newShell.mjs SHELL_CACHE).
   localStorage.removeItem('cordiaShell');
+  // The look kept on this device for the account (lib/theme.js, one key per account) and the old light/dark key
+  // that goes with it: the next account to sign in starts from the Cordia default, never this one's look.
+  clearLook();
   notifyAuthChanged();
 }
 
@@ -237,7 +251,8 @@ export async function authorizedFetch(path, options = {}) {
 // request returns { detail, failed: 'timeout' | 'network' } instead, so the caller can say which.
 // quietLimit: a plan limit (402) returns its error to the caller without opening the upgrade dialog
 // (Learn's format ladder falls back quietly instead of interrupting a round).
-export async function apiFetch(path, { reportFailure = false, quietLimit = false, ...options } = {}) {
+// withStatus: the answer also carries its HTTP status (saved chats tell 404 from 409, lib/chats.js).
+export async function apiFetch(path, { reportFailure = false, quietLimit = false, withStatus = false, ...options } = {}) {
   if (typeof window === 'undefined' || !getToken()) return null;
   try {
     let resp = await fetchWithTimeout(API + path, {
@@ -263,6 +278,7 @@ export async function apiFetch(path, { reportFailure = false, quietLimit = false
     const data = await responseJson(resp);
     if (!quietLimit) announceLimit(resp, data);
     else if (resp.status === 402 && data && typeof data === 'object') data.limit_reached = true;
+    if (withStatus && data && typeof data === 'object' && !Array.isArray(data)) data.httpStatus = resp.status;
     return data;
   } catch (e) {
     console.error('API fetch error:', path, e);

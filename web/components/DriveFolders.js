@@ -108,7 +108,7 @@ export default function DriveFolders({ app = 'drive' }) {
           </label>
           {classId && (
             <>
-              <label className="cn-search">
+              <label className="c-search">
                 <Search size={20} strokeWidth={1.75} aria-hidden="true" />
                 <input className="c-input" type="search" placeholder={`Search your ${appName} folders`} aria-label={`Search your ${appName} folders`} value={query} onChange={event => setQuery(event.target.value)} />
               </label>
@@ -139,7 +139,7 @@ export default function DriveFolders({ app = 'drive' }) {
       {error && <p className="cn-error" role="alert">{error}</p>}
       <style jsx>{`
         .df { display: grid; gap: 10px; width: 100%; padding-top: 12px; border-top: 1px solid var(--hairline); text-align: left; }
-        .df-title { margin: 0; font: 600 16px/1.3 var(--font-sans); color: var(--ink); }
+        .df-title { margin: 0; font: 600 1rem/1.3 var(--font-sans); color: var(--ink); }
         .df .c-meta { margin: 0; }
         .df-list { list-style: none; margin: 0; padding: 0; display: grid; }
         .df-row { display: flex; align-items: center; gap: 12px; min-height: 52px; }

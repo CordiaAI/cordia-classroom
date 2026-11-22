@@ -43,7 +43,7 @@ body { font: 500 var(--fs-15)/var(--lh-body) var(--font-sans); color: var(--ink)
 .fc-face p { font-size: var(--fs-28) !important; font-variant-numeric: tabular-nums; }
 /* Wordmark: light geometric lowercase, set off from the mark by a hairline. */
 .c-brand { gap: 14px; }
-.c-brand > span { display: inline-flex; align-items: center; height: 28px; padding-left: 14px; border-left: 1px solid var(--line); font: 400 22px/1 var(--font-sans) !important; letter-spacing: 0.02em; color: var(--ink); }
+.c-brand > span { display: inline-flex; align-items: center; height: 28px; padding-left: 14px; border-left: 1px solid var(--line); font: 400 1.375rem/1 var(--font-sans) !important; letter-spacing: 0.02em; color: var(--ink); }
 /* Reading text is body text: Quicksand 17 at 1.55, at 500 so its thin strokes stay legible. */
 .c-study, .reader-a, .reader-prose, .reader-notes { font: 500 var(--fs-17)/1.55 var(--font-sans) !important; letter-spacing: 0; }
 .c-meta { font: 500 var(--fs-13)/var(--lh-body) var(--font-sans); color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -114,7 +114,7 @@ svg.lucide { width: 20px; height: 20px; stroke-width: 1.75; color: var(--muted);
 strong, b { font-weight: 600; }
 
 /* Card padding: 20px (rows 16px 20px; the reading page keeps its 40px page margins). */
-.grove-card, .plan-card, .pricing-card, .focus-card, .insights-card, .learn, .me-card, .recap, .grove-grid, .heat { padding: 20px !important; }
+.grove-card, .pricing-card, .focus-card, .insights-card, .learn, .recap, .grove-grid, .heat { padding: 20px !important; }
 .today-continue { padding: 16px 20px !important; border-radius: var(--r-row) !important; }
 
 

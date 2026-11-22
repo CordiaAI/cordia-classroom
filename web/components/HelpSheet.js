@@ -56,7 +56,7 @@ export default function HelpSheet({ onClose, onFeedback, onShortcuts, canReviewF
         .help-sheet :global(.learn) { box-shadow: none; }
         .help-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
         .help-installed { cursor: default; }
-        .help-links { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 24px; font:600 13px/1 var(--font-sans); }
+        .help-links { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 24px; font:600 0.8125rem/1 var(--font-sans); }
       `}</style>
     </div>
     </BodyPortal>

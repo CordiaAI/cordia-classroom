@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import BodyPortal from './BodyPortal';
 import { useRouter } from 'next/router';
-import { ArrowRight, BookOpen, CalendarDays, Compass, Globe, Layers, Library, Mic, NotebookPen, Search, Settings, X } from 'lucide-react';
+import { ArrowRight, BookOpen, CalendarDays, Compass, Globe, Layers, Library, Mic, NotebookPen, Palette, Search, Settings, X } from 'lucide-react';
+import { matchesMakeItYours, openMakeItYours } from '../lib/makeItYours.mjs';
 import { apiFetch } from '../lib/api';
 import { supabaseRest } from '../lib/serverCopies';
 import { searchRows } from '../lib/searchResults.mjs';
@@ -19,6 +20,9 @@ const JUMPS = [
   { key: 'j-calendar', kind: 'jump', icon: CalendarDays, title: 'Calendar', href: '/calendar' },
   { key: 'j-settings', kind: 'jump', icon: Settings, title: 'Settings', href: '/settings' },
 ];
+// "theme", "make it yours", "dark mode", "appearance" and the like open the Make it yours sheet. It is listed after the
+// student's own matches (and before public sets), so a class word that is also a setting word never pushes them down.
+const MAKE_IT_YOURS = { key: 's-make-it-yours', kind: 'setting', icon: Palette, title: 'Make it yours', meta: 'Theme, colours, font, text size, light or dark', sheet: true };
 
 // ⌘K / Ctrl K: one search over study guides, flashcards, notes and lectures, then the top public
 // sets from everyone (Discover) and a link to see them all on /explore.
@@ -35,6 +39,8 @@ export default function SearchModal({ onClose, instant = false }) {
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
+  // What Search was opened from, so a sheet opened from here hands focus back there.
+  const openerRef = useRef(typeof document !== 'undefined' ? document.activeElement : null);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -69,7 +75,8 @@ export default function SearchModal({ onClose, instant = false }) {
       return [...recent, ...notes, ...JUMPS];
     }
     const more = publicSetRows(publicHits, query);
-    if (found) return [...found, ...more];
+    const settings = matchesMakeItYours(q) ? [MAKE_IT_YOURS] : [];
+    if (found) return [...found, ...settings, ...more];
     const guides = guideHits.slice(0, 6).map(hit => ({ key: 'g' + hit.id, kind: 'guide', title: hit.title, href: '/guide/' + hit.id }));
     const cards = [];
     for (const guide of library?.guides || []) {
@@ -83,13 +90,14 @@ export default function SearchModal({ onClose, instant = false }) {
       .filter(note => `${note.title} ${plain(note.content)}`.toLowerCase().includes(q))
       .slice(0, 6)
       .map(note => ({ key: 'n' + note.id, kind: 'note', title: note.title || 'Untitled', href: '/smartnotes?id=' + note.id }));
-    return [...guides, ...cards, ...notes, ...more];
+    return [...guides, ...cards, ...notes, ...settings, ...more];
   }, [query, guideHits, library, found, publicHits]);
 
   useEffect(() => setActive(0), [results.length]);
 
   function go(result) {
     onClose();
+    if (result.sheet) { openMakeItYours(openerRef.current); return; }
     router.push(result.href);
   }
 
@@ -100,8 +108,8 @@ export default function SearchModal({ onClose, instant = false }) {
     if (event.key === 'Enter' && results[active]) go(results[active]);
   }
 
-  const ICON = { guide: BookOpen, card: Layers, note: NotebookPen, lecture: Mic, recent: BookOpen, jump: ArrowRight, public: Globe, explore: Compass };
-  const GROUP = { guide: 'Guides', card: 'Cards', note: 'Notes', lecture: 'Lectures', recent: 'Recent', jump: 'Go to', public: 'Public sets', explore: '' };
+  const ICON = { setting: Palette, guide: BookOpen, card: Layers, note: NotebookPen, lecture: Mic, recent: BookOpen, jump: ArrowRight, public: Globe, explore: Compass };
+  const GROUP = { setting: 'Settings', guide: 'Guides', card: 'Cards', note: 'Notes', lecture: 'Lectures', recent: 'Recent', jump: 'Go to', public: 'Public sets', explore: '' };
 
   return (
     <BodyPortal>
@@ -132,7 +140,7 @@ export default function SearchModal({ onClose, instant = false }) {
               </li>
             );
           })}
-          {query.trim() && !results.some(result => result.kind !== 'explore') && <li className="c-meta c-search-none">Nothing of yours matches</li>}
+          {query.trim() && !results.some(result => !['explore', 'setting'].includes(result.kind)) && <li className="c-meta c-search-none">Nothing of yours matches</li>}
         </ul>
       </div>
       <style jsx>{`
@@ -140,7 +148,7 @@ export default function SearchModal({ onClose, instant = false }) {
         .c-search-scrim { place-items: start center; padding-top: 14vh; background: var(--scrim-strong); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
         .c-search-sheet { width: min(640px, 100%); padding: 0; overflow: hidden; background: var(--lg-menu, var(--card)) !important; }
         .search-bar { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0 12px 0 20px; color: var(--muted); }
-        .search-input { flex: 1; min-width: 0; height: 60px; padding: 0; border: 0; background: transparent; color: var(--ink); font:500 17px/1.4 var(--font-sans); outline: none; box-shadow: none; -webkit-appearance: none; appearance: none; }
+        .search-input { flex: 1; min-width: 0; height: 60px; padding: 0; border: 0; background: transparent; color: var(--ink); font:500 1.0625rem/1.4 var(--font-sans); outline: none; box-shadow: none; -webkit-appearance: none; appearance: none; }
         .search-input:focus, .search-input:focus-visible { outline: none; box-shadow: none; }
         /* The bar is the field's box, flush with the panel's top edge, so its focus ring sits just inside it. */
         .search-bar:has(.search-input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: -2px; border-radius: inherit; }
@@ -150,12 +158,12 @@ export default function SearchModal({ onClose, instant = false }) {
         @media (hover: hover) { .search-close:hover { background: var(--lift-pane); box-shadow: var(--glass-inner-shadow); } }
         .search-close:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -4px; }
         .c-search-scrim.is-instant, .c-search-scrim.is-instant .c-search-sheet { animation: none; }
-        .search-esc { font:600 12px/1 var(--font-sans); padding: 6px 8px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--muted); }
+        .search-esc { font:600 0.75rem/1 var(--font-sans); padding: 6px 8px; border-radius: var(--r-pill); background: var(--olive-tint); color: var(--muted); }
         .search-close :global(.search-x) { display: none; }
         .search-list { list-style: none; margin: 0; padding: 0 8px; max-height: 60vh; overflow: auto; }
         .search-list:not(:empty) { border-top: 1px solid var(--line); padding: 8px; }
         .c-search-group { padding: 10px 12px 4px; }
-        .c-search-hit { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius:var(--r-input); background: transparent; color: var(--ink); font:600 15px/1.5 var(--font-sans); text-align: left; cursor: pointer; }
+        .c-search-hit { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius:var(--r-input); background: transparent; color: var(--ink); font:600 0.9375rem/1.5 var(--font-sans); text-align: left; cursor: pointer; }
         .c-search-hit.is-active { background: var(--olive-tint); }
         .c-search-hit :global(.c-meta) { margin-left: auto; max-width: 40%; }
         .c-search-none { padding: 16px 12px; }

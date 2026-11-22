@@ -5,7 +5,7 @@ import { readCalendarCache, rememberCalendar } from './calendarCache';
 import { dueCount } from './studyQueue';
 import { dayKey } from './learnEngine.mjs';
 import { examPlan, nearestExam } from './examCountdown.mjs';
-import { deadlineTitle } from './formatters';
+import { deadlineCourse, deadlineTitle } from './formatters';
 
 // Everything the chat home shows (DESIGN-SPEC 4.1), loaded together so the page appears once:
 // the soonest exam with a review set and Learn's pace for it (the Dashboard's exam countdown,
@@ -53,7 +53,8 @@ export async function loadHome(today = dayKey()) {
     plan,
     className,
     due,
-    deadline: deadline ? { ...deadline, title: deadlineTitle(deadline) } : null,
+    // The class travels with it (a feed item's is only in its title's section code) for the Plan suggestion.
+    deadline: deadline ? { ...deadline, title: deadlineTitle(deadline), course: deadlineCourse(deadline) } : null,
     guideCount: guides.length,
   };
 }

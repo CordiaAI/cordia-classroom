@@ -251,7 +251,7 @@ export default function BlockGame({ guide, onResults, onDone }) {
       <SessionFinish guideId={guide.id} guideTitle={guide.title} cards={total} accuracy={total ? (known.length / total) * 100 : 0} minutes={played.current / 60} kind="blocks" onRestart={onDone ? () => onDone('again') : undefined} onDone={() => onDone?.('done')}>
         <p className="bg-final"><strong>{score}</strong> points · {lines} line{lines === 1 ? '' : 's'}{score >= best && score > 0 ? ' · New best' : best ? ` · Best ${best}` : ''}</p>
         <style jsx>{`
-          .bg-final { margin: 0; font: 500 17px/1.4 var(--font-sans); color: var(--ink); }
+          .bg-final { margin: 0; font: 500 1.0625rem/1.4 var(--font-sans); color: var(--ink); }
           .bg-final strong { font-weight: 700; }
         `}</style>
       </SessionFinish>
@@ -351,7 +351,7 @@ export default function BlockGame({ guide, onResults, onDone }) {
 
       <style jsx>{`
         .bg { display: grid; gap: 16px; justify-items: center; width: 100%; max-width: 520px; margin: 0 auto; user-select: none; -webkit-user-select: none; }
-        .bg-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; font: 500 15px/1.4 var(--font-sans); color: var(--muted); }
+        .bg-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; font: 500 0.9375rem/1.4 var(--font-sans); color: var(--muted); }
         .bg-stats strong { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
         .bg-stats .is-hot { color: var(--flame); font-weight: 600; }
         .bg-stage { position: relative; width: 100%; }
@@ -360,9 +360,9 @@ export default function BlockGame({ guide, onResults, onDone }) {
         .bg-ask { position: absolute; inset: 0; display: grid; align-content: center; gap: 12px; padding: 20px; border-radius: var(--r-card); background: var(--surface-raised); border: 1px solid var(--line); box-shadow: var(--shadow-float); text-align: center; overflow: auto; }
         .bg-ask-label { margin: 0; }
         .bg-ask-img { max-height: 120px; max-width: 100%; justify-self: center; object-fit: contain; border-radius: 12px; }
-        .bg-question { margin: 0; font: 600 20px/1.3 var(--font-sans); color: var(--ink); }
+        .bg-question { margin: 0; font: 600 1.25rem/1.3 var(--font-sans); color: var(--ink); }
         .bg-options { display: grid; gap: 8px; }
-        .bg-option { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-input); background: var(--card); color: var(--ink); font: 500 15px/1.35 var(--font-sans); text-align: center; cursor: pointer; }
+        .bg-option { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--r-input); background: var(--card); color: var(--ink); font: 500 0.9375rem/1.35 var(--font-sans); text-align: center; cursor: pointer; }
         .bg-option:hover:not(:disabled) { border-color: var(--olive); }
         .bg-option:disabled { cursor: default; }
         .bg-option.is-right { border-color: var(--success); color: var(--success); font-weight: 600; }
@@ -378,7 +378,7 @@ export default function BlockGame({ guide, onResults, onDone }) {
         .bg-tray-piece.is-lifted { opacity: 0.25; }
         .bg-tray-piece.is-stuck { opacity: 0.45; }
         .bg-hint { width: 100%; margin: 0; text-align: center; }
-        .bg-combo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 8px 16px; border-radius: var(--r-pill); background: var(--surface-raised); box-shadow: var(--shadow-float); font: 700 20px/1 var(--font-sans); color: var(--ink); pointer-events: none; animation: bg-pop 900ms ease forwards; }
+        .bg-combo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 8px 16px; border-radius: var(--r-pill); background: var(--surface-raised); box-shadow: var(--shadow-float); font: 700 1.25rem/1 var(--font-sans); color: var(--ink); pointer-events: none; animation: bg-pop 900ms ease forwards; }
         @keyframes bg-pop { 0% { opacity: 0; } 15% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
         :global(.bg-piece) { display: grid; }
         :global(.bg-cell) { display: block; border-radius: 5px; background: var(--hairline); }

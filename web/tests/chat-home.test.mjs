@@ -38,13 +38,13 @@ test('up to three pills in the spec\'s order, leaving out any with nothing behin
   const all = homeSuggestions({
     learn: { title: 'Exam 3', guideId: 'g-calc-review', date: '2026-11-19' },
     due: 14,
-    deadline: { title: 'Career portfolio' },
+    deadline: { title: 'Career portfolio', course: 'BUS-210-004' },
   });
-  assert.deepEqual(all.map(pill => pill.label), ['Start Learn for Exam 3', 'Review 14 due flashcards', 'Plan the Career portfolio']);
+  assert.deepEqual(all.map(pill => pill.label), ['Start Learn for Exam 3', 'Review flashcards (14 due)', "Plan BUS 210's Career portfolio"]);
   assert.equal(all[0].href, '/learn/g-calc-review?test=2026-11-19');
-  assert.equal(all[1].href, '/session');
+  assert.equal(all[1].href, '/session?cards=50');
   assert.equal(all[2].href, undefined);
-  assert.deepEqual(homeSuggestions({ due: 1 }).map(pill => pill.label), ['Review 1 due flashcard']);
+  assert.deepEqual(homeSuggestions({ due: 1 }).map(pill => pill.label), ['Review flashcards (1 due)']);
   assert.deepEqual(homeSuggestions({}), []);
   assert.ok(homeSuggestions({ deadline: { title: 'Annotated bibliography for the Harlem Renaissance research paper' } })[0].label.endsWith('…'));
 });

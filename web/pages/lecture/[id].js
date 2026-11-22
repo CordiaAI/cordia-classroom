@@ -353,7 +353,7 @@ export default function LecturePage() {
         /* The class reads as a small chip on the meta line, not a form field. */
         .lecture-class { position: relative; display: inline-flex; align-items: center; min-width: 0; max-width: min(100%, 320px); }
         .lecture-class :global(.lucide) { position: absolute; left: 12px; color: var(--muted); pointer-events: none; }
-        .lecture-class select.c-select.c-select { width: auto; max-width: 100%; height: 34px; padding: 0 34px 0 34px; border-radius: 999px; font: 600 14px/1.3 var(--font-sans); color: var(--ink); background: var(--select-chevron) no-repeat right 12px center / 14px 14px, var(--lg-sheen), var(--lg-fill-field); box-shadow: var(--lg-highlight); cursor: pointer; }
+        .lecture-class select.c-select.c-select { width: auto; max-width: 100%; height: 34px; padding: 0 34px 0 34px; border-radius: 999px; font: 600 0.875rem/1.3 var(--font-sans); color: var(--ink); background: var(--select-chevron) no-repeat right 12px center / 14px 14px, var(--lg-sheen), var(--lg-fill-field); box-shadow: var(--lg-highlight); cursor: pointer; }
         .lecture-class select.c-select.c-select:hover { border-color: var(--olive); }
         .lecture-notes-empty { display: grid; justify-items: start; gap: 12px; }
         .lecture-notes-empty .c-meta { margin: 0; }

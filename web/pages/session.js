@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { PencilRuler } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { useRequireAuth } from '../lib/auth';
-import { learnAfterReview, loadStudyQueue } from '../lib/studyQueue';
+import { cardLimit, learnAfterReview, loadStudyQueue } from '../lib/studyQueue';
 import { clearRetainMisses } from '../lib/userStore';
 import { saveStudyResults } from '../lib/progressSave';
 import { loadFolders } from '../lib/folders';
@@ -52,7 +52,7 @@ export default function StudySession() {
     const folderName = scope === 'folder'
       ? loadFolders().then(data => (data?.folders || []).find(folder => folder.id === scopeId)?.name || '').catch(() => '')
       : Promise.resolve('');
-    Promise.all([loadStudyQueue({ guideId, scope, id: scopeId, guideIds }), folderName])
+    Promise.all([loadStudyQueue({ guideId, scope, id: scopeId, guideIds, cards: cardLimit(router.query.cards) }), folderName])
       .then(([loaded, name]) => setQueue({ ...loaded, folderName: name }));
   }, [ready, router.isReady]);
 
@@ -125,7 +125,7 @@ export default function StudySession() {
           : <button type="button" className="c-btn c-btn--secondary" onClick={() => router.push(backTo)}>{scope === 'classroom' ? 'Back to the classroom' : scope === 'folder' ? 'Back to the folder' : 'Dashboard'}</button>}
         <style jsx>{`
           .session-empty { width: min(760px, 100%); margin: 0 auto; justify-items: start; }
-          .session-empty-why { margin: 0; max-width: 60ch; font-size: 16px; }
+          .session-empty-why { margin: 0; max-width: 60ch; font-size: 1rem; }
         `}</style>
       </div>
     );
