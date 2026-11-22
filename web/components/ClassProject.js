@@ -113,7 +113,8 @@ export default function ClassProject() {
   const [toast, setToast] = useState('');
   useEffect(() => {
     if (!toast) return undefined;
-    const timer = setTimeout(() => setToast(''), 2500);
+    // A toast with Undo stays long enough to use it (lib/undoDelete.js UNDO_MS).
+    const timer = setTimeout(() => setToast(''), toast.undo ? 6000 : 2500);
     return () => clearTimeout(timer);
   }, [toast]);
   const [confirm, setConfirm] = useState(null);
@@ -380,10 +381,12 @@ export default function ClassProject() {
   }
 
   // ---- Deadlines ----
-  async function markDone(item) {
-    update(current => ({ deadlines: (current.deadlines || []).map(row => (row.id === item.id ? { ...row, done: true } : row)) }));
-    if (await setDeadlineDone(item.id, true)) { setToast('Marked done'); return; }
-    update(current => ({ deadlines: (current.deadlines || []).map(row => (row.id === item.id ? { ...row, done: false } : row)) }));
+  // Done leaves Due soon at once; Undo in the toast puts it back (the Deadlines tab's box does too).
+  async function markDone(item, done = true) {
+    const mark = value => update(current => ({ deadlines: (current.deadlines || []).map(row => (row.id === item.id ? { ...row, done: value } : row)) }));
+    mark(done);
+    if (await setDeadlineDone(item.id, done)) { if (done) setToast({ text: 'Marked done', undo: () => { setToast(''); markDone(item, false); } }); return; }
+    mark(!done);
     setToast('That didn’t save. Try again.');
   }
 
@@ -436,7 +439,7 @@ export default function ClassProject() {
           : <span className="cls-tile"><FileText {...ICON} /></span>}
         {renamingRow?.kind === 'guide' && renamingRow.id === guide.id ? renameField('Guide title') : (
           <Link href={'/guide/' + guide.id} className="cls-row-main">
-            <span className="cls-row-title c-truncate">{guide.title || 'Untitled guide'}</span>
+            <span className="cls-row-title">{guide.title || 'Untitled guide'}</span>
             <span className="c-meta c-truncate">{guideMeta(guide, tally)}</span>
           </Link>
         )}
@@ -462,7 +465,7 @@ export default function ClassProject() {
       <li key={item.kind + item.id} className="cls-row">
         <span className="cls-tile"><Icon {...ICON} /></span>
         <Link href={item.href} className="cls-row-main">
-          <span className="cls-row-title c-truncate">{item.title}</span>
+          <span className="cls-row-title">{item.title}</span>
           <span className="c-meta">{[item.kind === 'note' ? 'Note' : 'Lecture', shortDay(item.date)].filter(Boolean).join(' · ')}</span>
         </Link>
         <Menu label={`More for ${item.title}`} items={otherMenu(item)} triggerClassName={MORE} />
@@ -477,7 +480,7 @@ export default function ClassProject() {
         <span className="cls-tile"><MessageCircle {...ICON} /></span>
         {renamingRow?.kind === 'chat' && renamingRow.id === row.id ? renameField('Chat title') : (
           <Link href={chatHref(row.id)} className="cls-row-main">
-            <span className="cls-row-title c-truncate">{title}</span>
+            <span className="cls-row-title">{title}</span>
             <span className="c-meta">{shortDay(row.updated_at || row.created_at)}</span>
           </Link>
         )}
@@ -565,7 +568,12 @@ export default function ClassProject() {
           <span>Deleted</span>
           <button type="button" className="c-btn c-btn--quiet" onClick={undo}>Undo</button>
         </div>
-      ) : toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
+      ) : toast && (
+        <div className="c-toast" role="status">
+          <span>{toast.text || toast}</span>
+          {toast.undo && <button type="button" className="c-btn c-btn--quiet" onClick={toast.undo}>Undo</button>}
+        </div>
+      )}
     </>
   );
 
@@ -750,7 +758,7 @@ function ClassProjectStyles() {
       .cls-v2 .cls-row-main { flex: 1 1 auto; display: grid; gap: 2px; min-width: 0; color: var(--ink); text-decoration: none; }
       .cls-v2 a.cls-row-main:hover { text-decoration: none; }
       .cls-v2 a.cls-row-main:hover .cls-row-title { text-decoration: underline; text-decoration-color: var(--hairline); text-underline-offset: 4px; }
-      .cls-row-title { font: 600 1.0625rem/1.3 var(--font-sans); }
+      .cls-row-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font: 600 1.0625rem/1.3 var(--font-sans); }
       .cls-row-main .c-input { height: 40px; }
       .cls-mastery { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
       .cls-bar { display: flex; gap: 2px; width: 120px; height: 6px; }
@@ -760,6 +768,20 @@ function ClassProjectStyles() {
       .cls-bar > .is-learning { background: var(--mastery-learning); }
       .cls-bar > .is-new { background: var(--mastery-new); }
       .cls-v2 .cls-learn { flex: none; height: 36px; min-height: 36px; padding: 0 14px; }
+      /* A narrow list (the sidebar folded, a small window): the mastery bar moves under the title, so
+         the title keeps the room to be read. */
+      .cls-main { container: cls-main / inline-size; }
+      @container cls-main (max-width: 600px) {
+        .cls-row:has(.cls-mastery) {
+          display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; grid-template-areas: 'tile main learn more' 'tile bar learn more';
+          column-gap: 16px; row-gap: 8px;
+        }
+        .cls-row:has(.cls-mastery) > :is(.cls-tile, .cls-row-ring) { grid-area: tile; }
+        .cls-row:has(.cls-mastery) > .cls-row-main { grid-area: main; }
+        .cls-row:has(.cls-mastery) > .cls-mastery { grid-area: bar; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; }
+        .cls-row:has(.cls-mastery) > .cls-learn { grid-area: learn; }
+        .cls-row:has(.cls-mastery) > .c-menu-wrap { grid-area: more; }
+      }
 
       /* Every row's ⋯ (F3) sits at its right end: shown on hover, on keyboard focus anywhere in the row
          and while its menu is open; always on touch screens. It keeps its room, so nothing shifts. */
@@ -767,7 +789,10 @@ function ClassProjectStyles() {
       .cls-v2 :is(.cls-row, .cp-row, .cls-due-item, .cls-exam):focus-within .cls-more, .cls-v2 .cls-more[aria-expanded='true'] { opacity: 1; }
       .cls-v2 .cls-more[aria-expanded='true'] { background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); }
       @media (hover: hover) { .cls-v2 :is(.cls-row, .cp-row, .cls-due-item, .cls-exam):hover .cls-more { opacity: 1; } }
-      @media (hover: none) { .cls-v2 .cls-more { opacity: 1; } }
+      @media (hover: none) {
+        .cls-v2 .cls-more { position: relative; opacity: 1; }
+        .cls-v2 .cls-more::after { content: ''; position: absolute; inset: -2px; }
+      }
 
       .cls-empty { display: grid; justify-items: center; gap: 6px; padding: 32px 24px; text-align: center; color: var(--muted); }
       .cls-empty .cls-line { margin-top: 4px; }
@@ -818,6 +843,7 @@ function ClassProjectStyles() {
       .cls-grade { flex: none; font: 600 0.9375rem/1 var(--font-sans); font-variant-numeric: tabular-nums; }
 
       .cls-v2 :is(.cls-due-row, .cls-sets-toggle, .cls-cover):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+      .cls-v2 .cp-open:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 10px; }
       .cls-chat .chat-home-top .c-icon-btn { flex: none; }
 
       @media (prefers-reduced-motion: reduce) {

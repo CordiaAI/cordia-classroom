@@ -119,7 +119,7 @@ function ExamStyles() {
       .cls-exam-ring { position: relative; flex: none; width: 112px; height: 112px; }
       .cls-exam-ring .c-ring-track { stroke: var(--ring-track); }
       .cls-exam-pct { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink); font: 600 2.125rem/1 var(--font-display); letter-spacing: -0.015em; font-variant-numeric: tabular-nums; pointer-events: none; }
-      .cls-exam-line { margin: 0; color: var(--ink); font: 500 0.9375rem/1.5 var(--font-sans); font-variant-numeric: tabular-nums; }
+      .cls-exam-line { margin: 0; color: var(--ink); font: 500 0.9375rem/1.5 var(--font-sans); font-variant-numeric: tabular-nums; text-wrap: pretty; }
       .cls-exam-actions { display: grid; gap: 8px; }
       .cls-exam .cls-exam-btn { width: 100%; height: 44px; min-height: 44px; }
       .cls-exam-error { margin: 0; color: var(--error); font: 600 0.875rem/1.4 var(--font-sans); }

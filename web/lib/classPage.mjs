@@ -151,26 +151,27 @@ export function dueSoon(deadlines, now = Date.now(), limit = 3) {
 }
 
 // The grade estimate the Grades tab shows (GET /canvas/courses/{id}/grades, components/ClassGrades.js):
-// Canvas's own score and letter when it has them. { percent: '88%', letter: 'B' } or null.
+// Canvas's own score and letter when it has them. { percent: '88.0%', letter: 'B' } or null.
 export function gradeEstimate(grades) {
   const score = grades?.canvas_score ?? grades?.score;
   if (score === null || score === undefined || !Number.isFinite(Number(score))) return null;
   const value = Number(score);
-  return { percent: `${Number.isInteger(value) ? value : value.toFixed(1)}%`, letter: String(grades.canvas_letter || grades.letter || '').trim() };
+  // One decimal, as the Grades tab shows it (components/ClassGrades.js), so the page reads one way.
+  return { percent: `${value.toFixed(1)}%`, letter: String(grades.canvas_letter || grades.letter || '').trim() };
 }
 
-// How long ago Canvas last synced: "just now", "12 min ago", "3 h ago", or "on Thu, Nov 19".
+// How long ago Canvas last synced: "just now", "12 minutes ago", "3 hours ago", or "on Thu, Nov 19".
 export function syncAgo(iso, now = Date.now(), locale) {
   const time = new Date(iso || '').getTime();
   if (Number.isNaN(time)) return '';
   const minutes = Math.max(0, Math.round((now - time) / 60000));
   if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} min ago`;
-  if (minutes < 24 * 60) return `${Math.round(minutes / 60)} h ago`;
+  if (minutes < 60) return `${plural(minutes, 'minute', 'minutes')} ago`;
+  if (minutes < 24 * 60) return `${plural(Math.round(minutes / 60), 'hour', 'hours')} ago`;
   return `on ${shortDay(new Date(time).toISOString(), locale)}`;
 }
 
-// The header's line for a Canvas class: "MA 125 · synced from Canvas 12 min ago".
+// The header's line for a Canvas class: "MA 125 · synced from Canvas 12 minutes ago".
 export function syncLine(code, ago) {
   return [code, ago ? `synced from Canvas ${ago}` : ''].filter(Boolean).join(' · ');
 }
