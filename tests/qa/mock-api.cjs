@@ -227,7 +227,7 @@ async function install(context, state) {
       const g = state.guides.find(x => x.id === m[1]);
       if (m[2] === 'bookmark') { g.is_bookmarked = !g.is_bookmarked; return json({ is_bookmarked: g.is_bookmarked }); }
       if (m[2] === 'rename') { g.title = body.title; return json({ title: g.title }); }
-      if (m[2] === 'move') { g.folder_id = body.folder_id; return json({ updated: true }); }
+      if (m[2] === 'move') { g.folder_id = body.folder_id; return json({ updated: true, folder_id: body.folder_id }); }
       if (m[2] === 'flashcard-progress') { g.flashcard_progress = body; return json({ updated: true }); }
       return json({ updated: true });
     }

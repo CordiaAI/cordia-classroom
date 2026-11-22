@@ -57,6 +57,7 @@ test('Dashboard: Continue, Due soon (Canvas when empty), progress strip; tools l
 test('Library: one list grouped by class, kind filters (no Notes: notes live in guides), Undo on delete', async () => {
   const library = await source('pages/library.js');
   const undo = await source('lib/undoDelete.js');
+  const actions = await source('lib/guideActions.mjs');
 
   assert.match(library, /<h1 className="c-title">Library<\/h1>/);
   assert.match(library, /\{ key: 'recent', label: 'Newest' \}/);
@@ -68,7 +69,7 @@ test('Library: one list grouped by class, kind filters (no Notes: notes live in 
   assert.doesNotMatch(library, /Unfiled'/);
   assert.match(library, /href=\{'\/folder\/' \+ folder\.id\} className="lib-group-name/);
   assert.match(library, /path: '\/smart_notes\/' \+ item\.id/);
-  assert.match(undo, /item\.path \|\| '\/guides\/' \+ item\.id/);
+  assert.match(actions, /item\.path \|\| `\/guides\/\$\{item\.id\}`/);
   assert.match(library, /`\$\{item.due\} due`/);
   assert.match(undo, /export const UNDO_MS = 6000/);
 });
