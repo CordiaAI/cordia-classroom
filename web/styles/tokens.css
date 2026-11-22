@@ -526,8 +526,8 @@
   --sky-morning-top: rgba(255, 255, 255, 0.02);
   --sky-morning-bottom: rgba(255, 255, 255, 0.01);
   --sky-evening: rgba(150, 92, 66, 0.10);
-  --sky-night-top: rgba(18, 24, 34, 0.88);
-  --sky-night-bottom: rgba(24, 31, 43, 0.84);
+  --sky-night-top: rgba(18, 24, 34, 0.80);
+  --sky-night-bottom: rgba(24, 31, 43, 0.76);
   --sky-night-glow: rgba(52, 66, 90, 0.32);
   --sky-star: rgba(226, 232, 242, 0.55);
   --swatch-bg-clouds: linear-gradient(170deg, #26303A 0%, #1F2A26 60%, #232B22 100%);
