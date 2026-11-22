@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -19,7 +19,7 @@ const TABS = [
   { key: 'people', label: 'People' },
 ];
 const MADE_BY = [['', 'Anyone'], ['instructor', 'Verified instructors'], ['student', 'Students']];
-const LENGTHS = [['', 'Any length'], ['short', 'Under 20 questions'], ['medium', '20 to 60 questions'], ['long', 'Over 60 questions']];
+const LENGTHS = [['', 'Any length'], ['short', 'Under 20 questions'], ['medium', '20 to 60 questions'], ['long', '60+ questions']];
 const UPDATED = [['', 'Any time'], ['7', 'Past week'], ['30', 'Past month'], ['365', 'Past year']];
 const text = value => (typeof value === 'string' ? value : '');
 
@@ -100,14 +100,16 @@ export default function Explore() {
         :global(.ex-tabs) { justify-self: start; max-width: 100%; }
         :global(.ex-tabs) button { white-space: nowrap; }
         .ex-panel { display: grid; gap: 16px; min-width: 0; }
+        .ex-panel:focus-visible { border-radius: var(--r-card); }
       `}</style>
     </div>
   );
 }
 
-function Select({ label, value, options, onChange }) {
+// wide: on a phone this one takes the whole row, so the longest of its choices is not cut off once picked.
+function Select({ label, value, options, onChange, wide = false }) {
   return (
-    <label className="exf">
+    <label className={wide ? 'exf exf-wide' : 'exf'}>
       <span className="sr-only">{label}</span>
       <select className="c-select exf-select" value={value} onChange={event => onChange(event.target.value)} aria-label={label}>
         {options.map(([key, name]) => <option key={key} value={key}>{name}</option>)}
@@ -115,6 +117,7 @@ function Select({ label, value, options, onChange }) {
       <style jsx>{`
         .exf { display: block; min-width: 0; }
         .exf-select { width: 100%; height: 44px; }
+        @media (max-width: 640px) { .exf-wide { grid-column: 1 / -1; } }
       `}</style>
     </label>
   );
@@ -122,22 +125,34 @@ function Select({ label, value, options, onChange }) {
 
 // What fills a search with no results: the most popular public sets, then sets from the student's own
 // classmates (classrooms they are in). Both come from /discover/guides, so the backend's rules on
-// who may be listed, named or shown at all still apply. Fetched the first time a search finds nothing
-// and kept while the page is open, so a second empty search shows them at once and asks for nothing.
+// who may be listed, named or shown at all still apply. Each list is fetched the first time a search
+// finds nothing and kept while the page is open, so a second empty search shows them at once and asks
+// for nothing. A list that failed is not kept: the next empty search asks for that one again, and only
+// that one.
 function useSuggestions() {
-  const [groups, setGroups] = useState([]);
-  const started = useRef(false);
+  const [lists, setLists] = useState({});
+  const got = useRef({});
+  const busy = useRef(false);
   const load = useCallback(() => {
-    if (started.current) return;
-    started.current = true;
-    Promise.all([
-      discoverGuides({ limit: SUGGESTION_LIMIT }),
-      CLASSROOMS_ON ? discoverGuides({ from_my_classrooms: true, limit: SUGGESTION_LIMIT * 2 }) : null,
-    ]).then(([popular, classmates]) => {
-      if (!isSetList(popular) && !isSetList(classmates)) { started.current = false; return; } // a failure is asked again next time, never kept
-      setGroups(suggestionGroups({ popular: popular?.guides, classmates: classmates?.guides }));
+    if (busy.current) return;
+    const wanted = [
+      ['popular', { limit: SUGGESTION_LIMIT }],
+      ...(CLASSROOMS_ON ? [['classmates', { from_my_classrooms: true, limit: SUGGESTION_LIMIT * 2 }]] : []),
+    ].filter(([name]) => !got.current[name]);
+    if (!wanted.length) return;
+    busy.current = true;
+    Promise.all(wanted.map(([, ask]) => discoverGuides(ask))).then(results => {
+      busy.current = false;
+      const fresh = {};
+      wanted.forEach(([name], index) => {
+        if (!isSetList(results[index])) return;
+        got.current[name] = true;
+        fresh[name] = results[index].guides;
+      });
+      if (Object.keys(fresh).length) setLists(current => ({ ...current, ...fresh }));
     });
   }, []);
+  const groups = useMemo(() => suggestionGroups({ popular: lists.popular, classmates: lists.classmates }), [lists]);
   return [groups, load];
 }
 
@@ -146,7 +161,6 @@ function GuidesPanel({ q, filters, onFilter, onClear, suggestions, loadSuggestio
   const [failed, setFailed] = useState(false);
   const [tries, setTries] = useState(0);
   const [facets, setFacets] = useState({});
-  const [filtersOn, setFiltersOn] = useState(false);
   const [extra, setExtra] = useState([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const key = JSON.stringify([q, filters]);
@@ -158,7 +172,7 @@ function GuidesPanel({ q, filters, onFilter, onClear, suggestions, loadSuggestio
     setExtra([]);
     discoverGuides({ q, ...filters }).then(result => {
       if (!live) return;
-      if (isSetList(result)) { setData(result); setFacets(result.facets || {}); setFiltersOn(!(!result.guides.length && !narrowing(q, filters))); } else setFailed(true);
+      if (isSetList(result)) { setData(result); setFacets(result.facets || {}); } else setFailed(true);
     });
     return () => { live = false; };
   }, [key, tries]);
@@ -184,17 +198,17 @@ function GuidesPanel({ q, filters, onFilter, onClear, suggestions, loadSuggestio
   const action = copy.action === 'library' ? { label: copy.label, href: '/library' } : { label: copy.label, onClick: onClear };
   return (
     <>
-      {filtersOn && <div className="exg-filters" aria-label="Filters" role="group">
+      <div className="exg-filters" aria-label="Filters" role="group">
         <Select label="School" value={filters.school} options={pick(facets.schools, filters.school, 'Any school')} onChange={value => set('school', value)} />
         <Select label="Course" value={filters.course} options={pick(facets.courses, filters.course, 'Any course')} onChange={value => set('course', value)} />
         <Select label="Term" value={filters.term} options={pick(facets.terms, filters.term, 'Any term')} onChange={value => set('term', value)} />
-        <Select label="Made by" value={filters.creator_type} options={MADE_BY} onChange={value => set('creator_type', value)} />
-        <Select label="Length" value={filters.size} options={LENGTHS} onChange={value => set('size', value)} />
         <Select label="Updated" value={filters.updated_within} options={UPDATED} onChange={value => set('updated_within', value)} />
+        <Select label="Made by" value={filters.creator_type} options={MADE_BY} onChange={value => set('creator_type', value)} wide />
+        <Select label="Length" value={filters.size} options={LENGTHS} onChange={value => set('size', value)} wide />
         {CLASSROOMS_ON && (
           <label className="exg-check"><input type="checkbox" checked={filters.from_my_classrooms === 'true'} onChange={event => set('from_my_classrooms', event.target.checked ? 'true' : '')} /><span>From my classrooms</span></label>
         )}
-      </div>}
+      </div>
       {failed && <DiscoverRetry what="public sets" onRetry={() => setTries(count => count + 1)} />}
       {!failed && data === null && <DiscoverLoading label="Finding sets" />}
       {empty && <DiscoverEmpty message={copy.message} action={action} />}

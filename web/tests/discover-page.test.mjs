@@ -39,16 +39,20 @@ test('copy is sentence case with no exclamation marks, "Lorem" or "Acme"', () =>
   }
 });
 
-test('review fixes: filters wait for data, the clear button and the panel keep focus visibly, titles underline on hover', () => {
-  assert.match(files.page, /setFiltersOn\(/);
-  assert.match(files.page, /\{filtersOn && <div className="exg-filters"/);
+test('review fixes: the filter row is always there, the clear button and the panel keep focus visibly, titles underline on hover', () => {
+  assert.doesNotMatch(files.page, /filtersOn|FiltersOn/, 'the row never depends on what loaded');
+  assert.match(files.page, /^\s*<div className="exg-filters" aria-label="Filters" role="group">/m);
+  assert.match(files.page, /\.ex-panel:focus-visible \{ border-radius: var\(--r-card\); \}/);
+  assert.match(files.page, /\['long', '60\+ questions'\]/);
+  assert.match(files.page, /\.exf-wide \{ grid-column: 1 \/ -1; \}/, 'Made by and Length take the whole row on a phone');
   assert.match(files.page, /className="c-search-clear"[^>]*onClick=\{\(\) => \{.*getElementById\('ex-q'\)\?\.focus\(\)/);
   assert.doesNotMatch(files.page, /\.ex-panel \{[^}]*outline/, 'the panel keeps the shared keyboard focus ring');
   assert.match(files.parts, /@media \(hover: hover\) \{ \.exg-card :global\(\.exg-title\):hover \{ text-decoration: underline;/);
 });
 
 test('review fixes: suggestions are fetched once for the open page, and "Verified instructor" is said once per card', () => {
-  assert.match(files.page, /const started = useRef\(false\)/);
+  assert.match(files.page, /const got = useRef\(\{\}\)/);
+  assert.match(files.page, /\.filter\(\(\[name\]\) => !got\.current\[name\]\)/, 'a list that failed is asked for again, one that arrived is not');
   assert.doesNotMatch(files.page, /useSuggestions\(empty/);
   assert.doesNotMatch(files.parts, /exg-badge|BadgeCheck/);
   assert.match(files.parts, /\{ \.\.\.guide\.author, verified: true \}/);

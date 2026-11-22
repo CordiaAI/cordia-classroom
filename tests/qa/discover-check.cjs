@@ -91,7 +91,7 @@ async function main() {
         const padding = await page.locator('.dp-empty').evaluate(node => parseFloat(getComputedStyle(node).paddingTop));
         expect(padding >= 36, 'padded, is ' + padding);
         expect(await page.locator('.dp-group').count() === 0, 'nothing to suggest, so nothing shown');
-        expect(await page.locator('.exg-filters').count() === 0, 'no filters when there is nothing to filter');
+        expect(await page.locator('.exg-filters').count() === 1, 'the filter row is there in every state, so it never comes and goes');
         await shot(page, `${tag}-empty-catalogue`);
         await context.close();
       });
@@ -151,26 +151,82 @@ async function main() {
     await context.close();
   });
 
-  await check('the first content stays put from loading to loaded, in every state', async () => {
-    const states = [
-      ['with sets', data, '/explore'],
-      ['empty catalogue', { guides: [], classmates: [], classrooms: [], people: [] }, '/explore'],
-      ['empty search', data, '/explore?q=zebra'],
-      ['filtered', data, '/explore?school=s1'],
-    ];
-    for (const size of ['desktop', 'phone']) {
-      for (const [name, discover, url] of states) {
-        const { context, page } = await open(browser, { size, discover: { ...discover, delay: 1500 }, url });
-        await page.waitForSelector('.dp-loading');
+  // The filter row is there whenever the Sets tab is, so nothing below the search moves between loading
+  // and loaded. Every state is opened, then every way of getting out of it is taken with the answer held
+  // for a moment; the row's top and the first content under it are read in the wait and again when it ends.
+  const EMPTY = { guides: [], classmates: [], classrooms: [], people: [] };
+  const TRANSITIONS = [
+    ['with sets', 'first load', data, '/explore', null],
+    ['with sets', 'search finds nothing', data, '/explore', page => page.fill('#ex-q', 'zebra')],
+    ['with sets', 'filter finds nothing', data, '/explore', page => page.locator('select[aria-label="School"]').selectOption('s1')],
+    ['with sets', 'tick From my classrooms', data, '/explore', page => page.getByLabel('From my classrooms').click()],
+    ['empty search', 'clear search (x)', data, '/explore?q=zebra', page => page.getByRole('button', { name: 'Clear search' }).first().click()],
+    ['empty search', 'clear search (button)', data, '/explore?q=zebra', page => page.locator('.dp-empty .c-btn').click()],
+    ['filtered', 'filter to Any', data, '/explore?school=s1', page => page.locator('select[aria-label="School"]').selectOption('')],
+    ['filtered', 'clear filters (button)', data, '/explore?school=s1', page => page.locator('.dp-empty .c-btn').click()],
+    ['from my classrooms', 'untick', data, '/explore?from_my_classrooms=true', page => page.getByLabel('From my classrooms').click()],
+    ['failed', 'Try again', { ...data, fail: 'guides' }, '/explore', (page, state) => { state.discover.fail = false; return page.getByRole('button', { name: 'Try again' }).click(); }],
+    ['empty catalogue', 'first load', EMPTY, '/explore', null],
+    ['empty catalogue', 'search then nothing', EMPTY, '/explore', page => page.fill('#ex-q', 'zebra')],
+    ['empty catalogue', 'clear search (x)', EMPTY, '/explore?q=zebra', page => page.getByRole('button', { name: 'Clear search' }).first().click()],
+    ['empty catalogue', 'clear search (button)', EMPTY, '/explore?q=zebra', page => page.locator('.dp-empty .c-btn').click()],
+    ['empty catalogue', 'filter to Any', EMPTY, '/explore?school=s1', page => page.locator('select[aria-label="School"]').selectOption('')],
+    ['empty catalogue', 'clear filters (button)', EMPTY, '/explore?school=s1', page => page.locator('.dp-empty .c-btn').click()],
+    ['empty catalogue', 'untick From my classrooms', EMPTY, '/explore?from_my_classrooms=true', page => page.getByLabel('From my classrooms').click()],
+    ['empty catalogue', 'Try again', { ...EMPTY, fail: 'guides' }, '/explore', (page, state) => { state.discover.fail = false; return page.getByRole('button', { name: 'Try again' }).click(); }],
+  ];
+  const table = [];
+  for (const size of ['desktop', 'phone']) {
+    for (const [name, move, discover, url, act] of TRANSITIONS) {
+      await check(`nothing below the search moves: ${size}, ${name}, ${move}`, async () => {
+        const { context, page, state } = await open(browser, { size, discover: { ...discover, delay: act ? 0 : 1500 }, url });
         // Measured from the page title, so the page's own entrance settling (a fraction of a pixel) is not counted.
-        const top = selector => page.evaluate(sel => Math.round(document.querySelector(sel).getBoundingClientRect().top - document.querySelector('h1.c-title').getBoundingClientRect().top), selector);
-        const loading = await top('.dp-loading'); // where the wait is drawn
-        await page.waitForSelector('.dp-loading', { state: 'detached', timeout: 8000 });
-        const loaded = await top('.ex-panel > :first-child'); // where the first thing that arrived is drawn
-        expect(loading === loaded, `${size} ${name}: the first content moved from ${loading} to ${loaded}`);
+        const read = () => page.evaluate(() => {
+          const title = document.querySelector('h1.c-title').getBoundingClientRect().top;
+          const row = document.querySelector('.exg-filters');
+          const after = row?.nextElementSibling;
+          return { row: row ? Math.round(row.getBoundingClientRect().top - title) : null, content: after ? Math.round(after.getBoundingClientRect().top - title) : null, kind: after?.className || '' };
+        });
+        if (act) {
+          await page.waitForSelector(discover.fail ? '.dp-empty [role="alert"]' : '.exg-filters', { timeout: 20000 });
+          await page.waitForTimeout(400); // the first load settles, then the transition starts from rest
+          state.discover.delay = 1500;
+          await act(page, state);
+        }
+        await page.waitForSelector('.dp-loading', { timeout: 4000 });
+        const loading = await read();
+        await page.waitForSelector('.dp-loading', { state: 'detached', timeout: 10000 });
+        await page.waitForTimeout(150);
+        const loaded = await read();
+        table.push(`${size.padEnd(7)} ${name.padEnd(19)} ${move.padEnd(26)} row ${loading.row}/${loaded.row}  content ${loading.content}/${loaded.content}`);
+        expect(loading.row !== null && loaded.row !== null, `the filter row must be there while loading (${loading.row}) and when loaded (${loaded.row})`);
+        expect(loading.row === loaded.row, `the filter row moved from ${loading.row} to ${loaded.row}`);
+        expect(loading.content === loaded.content, `the first content moved from ${loading.content} to ${loaded.content}`);
         await context.close();
-      }
+      });
     }
+  }
+  console.log('\n     size    state               transition                 y of filter row and of first content, loading/loaded (px below the title)\n' + table.map(row => '     ' + row).join('\n') + '\n');
+
+  await check('a filter change on an empty catalogue keeps focus on the control that changed', async () => {
+    const { context, page, state } = await open(browser, { discover: { ...EMPTY }, url: '/explore?school=s1&from_my_classrooms=true' });
+    await page.waitForSelector('.dp-empty');
+    state.discover.delay = 600;
+    const school = page.locator('select[aria-label="School"]');
+    await school.focus(); // as a person would have, picking from it
+    await school.selectOption('');
+    expect(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')) === 'School', 'focus should stay on School right after the change');
+    await page.waitForSelector('.dp-loading');
+    await page.waitForSelector('.dp-loading', { state: 'detached' });
+    expect(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')) === 'School', 'and after the answer: ' + await page.evaluate(() => document.activeElement?.tagName));
+    const box = page.getByLabel('From my classrooms');
+    await box.focus();
+    await page.keyboard.press('Space');
+    await page.waitForSelector('.dp-loading');
+    await page.waitForSelector('.dp-loading', { state: 'detached' });
+    expect(await page.evaluate(() => document.activeElement?.closest('.exg-check') !== null), 'focus should stay on the From my classrooms box');
+    expect(await page.locator('.exg-filters').count() === 1, 'the row is still there with nothing narrowing');
+    await context.close();
   });
 
   await check('the clear button in the search field hands focus to the field', async () => {
@@ -241,6 +297,65 @@ async function main() {
     expect(said === 1, 'said once, said ' + said);
     expect(await card.locator('svg.lucide-badge-check').count() === 1, 'one check icon');
     await context.close();
+  });
+
+  await check('if one suggestion request fails the other group stays and the missing one is asked for next time', async () => {
+    const { context, page } = await open(browser, { discover: data, url: '/explore' });
+    let classmatesFail = true;
+    const asked = [];
+    await page.route(/\/discover\/guides\?.*limit=/, async route => {
+      const url = route.request().url();
+      const which = /from_my_classrooms/.test(url) ? 'classmates' : 'popular';
+      asked.push(which);
+      if (which === 'classmates' && classmatesFail) return route.fulfill({ status: 500, json: { detail: 'Internal Server Error' } });
+      return route.fallback();
+    });
+    await page.fill('#ex-q', 'giraffe');
+    await page.waitForSelector('.dp-empty:has-text("giraffe")');
+    while (asked.length < 2) await page.waitForTimeout(50); // both suggestion requests have been answered
+    await page.waitForTimeout(300);
+    expect(await page.locator('h2:has-text("Popular public sets")').count() === 1, 'the good group shows');
+    expect(await page.locator('h2:has-text("From your classmates")').count() === 0, 'classmates failed, so not shown yet');
+    classmatesFail = false;
+    await page.fill('#ex-q', 'walrus');
+    await page.waitForSelector('.dp-empty:has-text("walrus")');
+    await page.waitForSelector('h2:has-text("From your classmates")');
+    expect(await page.locator('h2:has-text("Popular public sets")').count() === 1, 'the good group is kept');
+    expect(asked.join() === 'popular,classmates,classmates', 'popular once, classmates twice: ' + asked.join());
+    await context.close();
+  });
+
+  await check('the panel ring follows the card radius', async () => {
+    const { context, page } = await open(browser, { discover: data, url: '/explore?q=zebra' });
+    await page.waitForSelector('.dp-empty .c-btn');
+    await page.locator('.dp-empty .c-btn').focus();
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.activeElement?.getAttribute('role') === 'tabpanel', null, { timeout: 2000 });
+    const radius = await page.evaluate(() => ({ panel: getComputedStyle(document.activeElement).borderTopLeftRadius, card: getComputedStyle(document.documentElement).getPropertyValue('--r-card').trim() }));
+    expect(radius.panel === radius.card && parseFloat(radius.panel) > 0, 'panel radius ' + JSON.stringify(radius));
+    await context.close();
+  });
+
+  await check('no fixed choice (Updated, Made by, Length) is cut off in the filter row, at 390 and at desktop', async () => {
+    for (const size of ['phone', 'desktop']) {
+      const { context, page } = await open(browser, { size, discover: data, url: '/explore' });
+      await page.waitForSelector('.exg-card');
+      const cut = await page.evaluate(() => {
+        const out = [];
+        const canvas = document.createElement('canvas').getContext('2d');
+        // School, Course and Term list the catalogue's own names, which can be any length and are cut with an ellipsis by design.
+        document.querySelectorAll('.exg-filters select').forEach(select => {
+          if (['School', 'Course', 'Term'].includes(select.getAttribute('aria-label'))) return;
+          const style = getComputedStyle(select);
+          canvas.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+          const room = select.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+          [...select.options].forEach(option => { const need = canvas.measureText(option.textContent).width; if (need > room) out.push(`${select.getAttribute('aria-label')}: "${option.textContent}" needs ${Math.ceil(need)} of ${Math.floor(room)}`); });
+        });
+        return out;
+      });
+      expect(cut.length === 0, `${size}: ` + cut.join(' | '));
+      await context.close();
+    }
   });
 
   await browser.close();
