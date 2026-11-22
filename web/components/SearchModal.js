@@ -13,7 +13,7 @@ function plain(html) {
   return String(html || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-let cache = null; // { guides, notes } loaded once per page session
+let cache = null; // { guides, notes }: the last copy loaded, shown while Search loads a fresh one
 
 const JUMPS = [
   { key: 'j-library', kind: 'jump', icon: Library, title: 'Library', href: '/library' },
@@ -38,11 +38,20 @@ export default function SearchModal({ onClose, instant = false }) {
   // migration that adds it hasn't been applied yet.
   const [found, setFound] = useState(null);
   const [library, setLibrary] = useState(cache);
-  const [publicHits, setPublicHits] = useState([]);
+  // Public sets come with the query they were asked for: another query's sets never show under this one.
+  const [publicHits, setPublicHits] = useState({ q: '', guides: [] });
   // The query whose own results are on screen, so "Nothing of yours matches" waits for the answer.
   const [settled, setSettled] = useState('');
+  // The query whose own search could not be reached. "Nothing of yours matches" is only said after an answer.
+  const [failed, setFailed] = useState('');
+  const [retries, setRetries] = useState(0);
   const [active, setActive] = useState(0);
+  // The active row came from the arrow keys (it gets the full-strength icon); a hover only moves it.
+  const [viaKeys, setViaKeys] = useState(false);
   const inputRef = useRef(null);
+  const paletteRef = useRef(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   const debounceRef = useRef(null);
   const askRef = useRef(0); // the newest search; an older one that answers late is dropped
   // What Search was opened from: focus goes back there when it closes, and a sheet opened from here hands focus back there.
@@ -55,12 +64,12 @@ export default function SearchModal({ onClose, instant = false }) {
 
   useEffect(() => {
     inputRef.current?.focus();
-    if (!cache) {
-      Promise.all([apiFetch('/guides?limit=100'), apiFetch('/smart_notes')]).then(([guides, notes]) => {
-        cache = { guides: guides?.guides || [], notes: notes?.notes || [] };
-        setLibrary(cache);
-      });
-    }
+    // Loaded again each time Search opens (the last copy shows meanwhile); a failed load keeps what it had.
+    Promise.all([apiFetch('/guides?limit=100'), apiFetch('/smart_notes')]).then(([guides, notes]) => {
+      if (!Array.isArray(guides?.guides) && !Array.isArray(notes?.notes)) return;
+      cache = { guides: guides?.guides || cache?.guides || [], notes: notes?.notes || cache?.notes || [] };
+      setLibrary(cache);
+    });
     return () => {
       const opener = openerRef.current;
       if (handedOffRef.current || !opener || opener === document.body || !opener.isConnected || typeof opener.focus !== 'function') return;
@@ -69,28 +78,55 @@ export default function SearchModal({ onClose, instant = false }) {
     };
   }, []);
 
+  // Escape closes from anywhere in the dialog, and Tab stays between the field and the buttons: the
+  // dialog is modal, so focus never reaches the page behind it. A mouse press clears the keyboard ring.
+  useEffect(() => {
+    function onKey(event) {
+      tabbedRef.current = event.key === 'Tab';
+      if (event.key === 'Escape' && !event.isComposing) { event.stopPropagation(); closeRef.current(); return; }
+      if (event.key !== 'Tab') return;
+      const box = paletteRef.current;
+      const stops = box ? [...box.querySelectorAll('input, button')].filter(el => !el.disabled && el.getClientRects().length) : [];
+      if (!stops.length) return;
+      const first = stops[0];
+      const last = stops[stops.length - 1];
+      const at = document.activeElement;
+      if (!box.contains(at)) { event.preventDefault(); (event.shiftKey ? last : first).focus(); }
+      else if (event.shiftKey && at === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && at === last) { event.preventDefault(); first.focus(); }
+    }
+    const onPointer = () => { tabbedRef.current = false; };
+    document.addEventListener('keydown', onKey, true);
+    document.addEventListener('pointerdown', onPointer, true);
+    return () => { document.removeEventListener('keydown', onKey, true); document.removeEventListener('pointerdown', onPointer, true); };
+  }, []);
+
   useEffect(() => {
     clearTimeout(debounceRef.current);
     const q = query.trim();
     const ask = ++askRef.current;
     const current = () => ask === askRef.current;
-    if (!q) { setGuideHits([]); setFound(null); setPublicHits([]); setSettled(''); return; }
+    setFailed('');
+    if (!q) { setGuideHits([]); setFound(null); setPublicHits({ q: '', guides: [] }); setSettled(''); return; }
     debounceRef.current = setTimeout(async () => {
+      // Public sets are a bonus: if Discover can't be reached they are left out, and nothing else changes.
       if (q.length >= 2) {
         discoverGuides({ q, limit: PUBLIC_ASK })
-          .then(data => { if (current()) setPublicHits(Array.isArray(data?.guides) ? data.guides : []); })
-          .catch(() => { if (current()) setPublicHits([]); });
-      } else setPublicHits([]);
+          .then(data => { if (current()) setPublicHits({ q, guides: Array.isArray(data?.guides) ? data.guides : [] }); })
+          .catch(() => { if (current()) setPublicHits({ q, guides: [] }); });
+      } else setPublicHits({ q, guides: [] });
       const shared = await supabaseRest()('/rest/v1/rpc/search_my_materials', { method: 'POST', body: { search: q.slice(0, 500), max_results: 24 } }).catch(() => null);
       if (!current()) return;
       if (shared?.ok && Array.isArray(shared.data)) { setFound(searchRows(shared.data)); setSettled(q); return; }
-      setFound(null);
       const data = await apiFetch('/search?q=' + encodeURIComponent(q)).catch(() => null);
       if (!current()) return;
-      setGuideHits(data?.results || []);
+      // No answer at all is not "no matches": the last list stays and Search says it could not be reached.
+      if (!Array.isArray(data?.results)) { setFailed(q); return; }
+      setFound(null);
+      setGuideHits(data.results);
       setSettled(q);
     }, 200);
-  }, [query]);
+  }, [query, retries]);
 
   const live = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -101,8 +137,9 @@ export default function SearchModal({ onClose, instant = false }) {
       return uniqueRows([...recent, ...notes, ...JUMPS]);
     }
     const settings = matchesMakeItYours(q) ? [MAKE_IT_YOURS] : [];
+    const publicGuides = publicHits.q === query.trim() ? publicHits.guides : [];
     if (found) {
-      const more = publicSetRows(publicHits, query, ownedGuideIds(library?.guides, found));
+      const more = publicSetRows(publicGuides, query, ownedGuideIds(library?.guides, found));
       return uniqueRows([...found, ...settings, ...more]);
     }
     const guides = guideHits.slice(0, 6).map(hit => ({ key: 'g' + hit.id, kind: 'guide', id: hit.id, title: hit.title, href: '/guide/' + hit.id }));
@@ -118,19 +155,26 @@ export default function SearchModal({ onClose, instant = false }) {
       .filter(note => `${note.title} ${plain(note.content)}`.toLowerCase().includes(q))
       .slice(0, 6)
       .map(note => ({ key: 'n' + note.id, kind: 'note', title: note.title || 'Untitled', href: '/smartnotes?id=' + note.id }));
-    const more = publicSetRows(publicHits, query, ownedGuideIds(library?.guides, [...guides, ...cards]));
+    const more = publicSetRows(publicGuides, query, ownedGuideIds(library?.guides, [...guides, ...cards]));
     return uniqueRows([...guides, ...cards, ...notes, ...settings, ...more]);
   }, [query, guideHits, library, found, publicHits]);
 
   // While a search is out, the last answered list stays as it is (nothing shuffles under the pointer or
   // the arrow keys) and the new one replaces it whole when it lands.
   const q = query.trim();
-  const searching = Boolean(q) && settled !== q;
+  // Before the first answer that is the recent list, so it does not collapse and regrow. A search that
+  // could not be reached keeps the last list too.
+  const unreachable = Boolean(q) && failed === q;
+  const searching = Boolean(q) && settled !== q && !unreachable;
   const shownRef = useRef({ query: '', rows: [] });
-  if (!searching) shownRef.current = { query: q, rows: live };
-  const results = searching ? (shownRef.current.query ? shownRef.current.rows : []) : live;
+  if (!searching && !unreachable) shownRef.current = { query: q, rows: live };
+  const results = searching || unreachable ? shownRef.current.rows : live;
+  const optionId = index => `c-search-option-${index}`;
 
   useEffect(() => setActive(0), [results.length]);
+  useEffect(() => {
+    if (viaKeys) document.getElementById(optionId(active))?.scrollIntoView?.({ block: 'nearest' });
+  }, [active, viaKeys]);
 
   function go(result) {
     if (result.sheet) handedOffRef.current = true;
@@ -139,22 +183,45 @@ export default function SearchModal({ onClose, instant = false }) {
     router.push(result.href);
   }
 
+  function retry() {
+    setFailed('');
+    setRetries(count => count + 1);
+    inputRef.current?.focus();
+  }
+
   function onKeyDown(event) {
-    if (event.key === 'ArrowDown') { event.preventDefault(); setActive(index => Math.min(results.length - 1, index + 1)); }
-    if (event.key === 'ArrowUp') { event.preventDefault(); setActive(index => Math.max(0, index - 1)); }
-    if (event.key === 'Enter' && results[active]) go(results[active]);
+    if (event.nativeEvent?.isComposing) return;
+    if (event.key === 'ArrowDown') { event.preventDefault(); setViaKeys(true); setActive(index => Math.min(results.length - 1, index + 1)); }
+    if (event.key === 'ArrowUp') { event.preventDefault(); setViaKeys(true); setActive(index => Math.max(0, index - 1)); }
+    if (event.key === 'Enter' && results[active]) {
+      // Typed but not answered yet, with the recent list still showing: Enter must not open a recent item.
+      if (searching && !shownRef.current.query) return;
+      go(results[active]);
+    }
   }
 
   const ICON = { setting: Palette, guide: BookOpen, card: Layers, note: NotebookPen, lecture: Mic, recent: BookOpen, jump: ArrowRight, public: Globe, explore: Compass };
   const GROUP = { setting: 'Settings', guide: 'Guides', card: 'Cards', note: 'Notes', lecture: 'Lectures', recent: 'Recent', jump: 'Go to', public: 'Public sets', explore: '' };
   const ownCount = results.filter(result => !['explore', 'setting'].includes(result.kind)).length;
-  const status = q && !ownCount ? (searching ? 'Searching' : 'Nothing of yours matches') : '';
-  const optionId = index => `c-search-option-${index}`;
+  const status = unreachable ? "Search isn't reachable. Try again." : q && !ownCount ? (searching ? 'Searching' : 'Nothing of yours matches') : '';
+  // Rows sit in groups by kind; "See all in Discover" belongs with the public sets above it.
+  const groups = [];
+  results.forEach((result, index) => {
+    const last = groups[groups.length - 1];
+    const key = result.kind === 'explore' && last?.key === 'public' ? 'public' : result.kind;
+    if (last?.key === key) last.items.push({ result, index });
+    else groups.push({ key, items: [{ result, index }] });
+  });
 
   return (
     <BodyPortal>
     <div className={'c-scrim c-search-scrim' + (instant ? ' is-instant' : '')} onClick={onClose}>
-      <div className="c-search-palette" role="dialog" aria-modal="true" aria-label="Search" onClick={event => event.stopPropagation()} onKeyDown={event => { tabbedRef.current = event.key === 'Tab'; if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }}>
+      <div
+        ref={paletteRef} className="c-search-palette" role="dialog" aria-modal="true" aria-label="Search" onClick={event => event.stopPropagation()}
+        // A press on anything that is not the field or a button (a group heading, the gap between rows) must not
+        // move focus to the page; the field keeps it.
+        onMouseDown={event => { if (!event.target.closest('input, button')) event.preventDefault(); }}
+      >
         <div className={'search-pill' + (ringed ? ' is-ringed' : '')}>
           <Search size={20} strokeWidth={1.75} aria-hidden="true" />
           <label className="sr-only" htmlFor="c-search-input">Search</label>
@@ -171,24 +238,38 @@ export default function SearchModal({ onClose, instant = false }) {
           </button>
         </div>
         <div className="search-bubble" hidden={!results.length && !status}>
-          {status && <p className="c-meta c-search-none" role="status">{status}</p>}
-          <ul id="c-search-results" className="search-list" role="listbox" aria-label="Results">
-            {results.map((result, index) => {
-              const Icon = result.icon || ICON[result.kind];
-              const groupStart = index === 0 || results[index - 1].kind !== result.kind;
-              return [
-                groupStart && GROUP[result.kind] ? <li key={result.key + ':group'} role="presentation" className="c-meta c-search-group">{GROUP[result.kind]}</li> : null,
-                <li key={result.key} id={optionId(index)} role="option" aria-selected={index === active}>
-                  <button type="button" tabIndex={-1} className={'c-search-hit' + (index === active ? ' is-active' : '')} onClick={() => go(result)} onMouseEnter={() => setActive(index)}>
-                    <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
-                    <span className="c-truncate">{result.title}</span>
-                    {result.verified && <VerifiedBadge />}
-                    {result.meta && <span className="c-meta c-truncate">{result.meta}</span>}
-                  </button>
-                </li>,
-              ];
+          {status && (
+            <div className="c-meta c-search-none">
+              <span role="status">{status}</span>
+              {unreachable && <button type="button" className="c-btn c-btn--quiet search-retry" onClick={retry}>Retry</button>}
+            </div>
+          )}
+          <div id="c-search-results" className="search-list" role="listbox" aria-label="Results">
+            {groups.map((group, groupIndex) => {
+              const label = GROUP[group.key];
+              const labelId = `c-search-group-${groupIndex}`;
+              return (
+                <div key={group.key + ':' + group.items[0].result.key} role="group" aria-labelledby={label ? labelId : undefined} aria-label={label ? undefined : 'More'}>
+                  {label && <div id={labelId} className="c-meta c-search-group">{label}</div>}
+                  {group.items.map(({ result, index }) => {
+                    const Icon = result.icon || ICON[result.kind];
+                    return (
+                      <div
+                        key={result.key} id={optionId(index)} role="option" aria-selected={index === active}
+                        className={'c-search-hit' + (index === active ? ' is-active' : '') + (index === active && viaKeys ? ' is-keys' : '')}
+                        onClick={() => go(result)} onMouseMove={() => { if (index !== active || viaKeys) { setActive(index); setViaKeys(false); } }}
+                      >
+                        <Icon size={20} strokeWidth={1.75} aria-hidden="true" />
+                        <span className="c-truncate">{result.title}</span>
+                        {result.verified && <VerifiedBadge />}
+                        {result.meta && <span className="c-meta c-truncate">{result.meta}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
             })}
-          </ul>
+          </div>
         </div>
       </div>
       <style jsx>{`
@@ -223,11 +304,18 @@ export default function SearchModal({ onClose, instant = false }) {
         .search-list { list-style: none; margin: 0; padding: 8px; max-height: min(60vh, 520px); overflow: auto; overscroll-behavior: contain; }
         .search-list:empty { display: none; }
         .c-search-group { padding: 10px 12px 4px; }
-        .c-search-hit { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink); font: 600 0.9375rem/1.5 var(--font-sans); text-align: left; cursor: pointer; }
+        .c-search-hit { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border-radius: var(--r-input); background: transparent; color: var(--ink); font: 600 0.9375rem/1.5 var(--font-sans); text-align: left; cursor: pointer; }
+        /* The icon rests muted; a hover only moves the active row and leaves it so, the arrow keys bring it to full ink. */
+        .c-search-hit > :global(svg) { flex: none; color: var(--muted); }
+        .c-search-hit.is-keys > :global(svg) { color: var(--ink); }
+        /* The active row (the one Enter opens): the app's focus ring, 2px inside the row, 3:1 or better on the glass in
+           every look. */
+        .c-search-hit.is-active { box-shadow: inset 0 0 0 2px var(--focus-ring); }
         /* The title gives way first; a short meta ("Studied by 7") stays whole. */
         .c-search-hit > :global(.c-truncate:not(.c-meta)) { flex: 0 1 auto; min-width: 0; }
         .c-search-hit :global(.c-meta) { flex: none; margin-left: auto; max-width: 45%; }
-        .c-search-none { margin: 0; padding: 16px 20px; }
+        .c-search-none { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; padding: 16px 20px; }
+        .search-retry { flex: none; }
         .c-search-none + .search-list { padding-top: 0; }
         @media (max-width: 767px) {
           .c-search-scrim { place-items: start stretch; padding: calc(12px + env(safe-area-inset-top, 0px)) 12px 12px; }

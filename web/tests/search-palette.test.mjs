@@ -12,6 +12,7 @@ test('a guide the student owns, or copied, never shows again under Public sets',
   const own = searchRows([
     { kind: 'study_guide', id: 'mine', title: 'Cell biology' },
     { kind: 'flashcard', id: 'carded', title: 'Osmosis', snippet: 'What moves water? — Osmosis', card_index: 2 },
+    { kind: 'study_guide', id: 'copy', title: 'Membranes' },
   ]);
   const library = [
     { id: 'mine', title: 'Cell biology' },
@@ -33,10 +34,16 @@ test('a guide the student owns, or copied, never shows again under Public sets',
   assert.equal(rows.filter(row => row.kind === 'public').length, 3);
 });
 
-test('owned ids come from the library, the sets it was copied from and the own rows', () => {
-  const ids = ownedGuideIds([{ id: 'a' }, { id: 'b', forked_from_guide_id: 'c' }, null], [{ kind: 'guide', id: 'd' }, { kind: 'card', id: 'e' }, { kind: 'note', id: 'n' }]);
-  assert.deepEqual([...ids].sort(), ['a', 'b', 'c', 'd', 'e']);
+test('an id is dropped only when its row is listed: the listed rows, and the sets listed guides were copied from', () => {
+  const ids = ownedGuideIds(
+    [{ id: 'a' }, { id: 'b', forked_from_guide_id: 'c' }, { id: 'f', forked_from_guide_id: 'g' }, null],
+    [{ kind: 'guide', id: 'b' }, { kind: 'guide', id: 'd' }, { kind: 'card', id: 'e' }, { kind: 'note', id: 'n' }],
+  );
+  // 'a' is in the library but not listed, and 'f' (a copy of 'g') did not match: neither hides a public set.
+  assert.deepEqual([...ids].sort(), ['b', 'c', 'd', 'e']);
   assert.equal(ownedGuideIds(undefined, undefined).size, 0);
+  const rows = publicSetRows([{ id: 'a', title: 'Mine, not matched' }, { id: 'g', title: 'The original' }], 'x', ids);
+  assert.deepEqual(rows.map(row => row.id || row.kind), ['a', 'g', 'explore']);
 });
 
 test('each row shows once, by its stable key, in order', () => {
@@ -67,7 +74,114 @@ test('the palette is a glass pill over a separate glass results bubble 8px below
   assert.match(search, /role="option"/);
   assert.match(search, /aria-activedescendant=/);
   // Public sets are asked for with the student's own ids, and every list goes through uniqueRows.
-  assert.match(search, /publicSetRows\(publicHits, query, ownedGuideIds\(/);
+  assert.match(search, /publicSetRows\(publicGuides, query, ownedGuideIds\(/);
   assert.doesNotMatch(search, /transition: all/);
   assert.doesNotMatch(search, /#[0-9a-fA-F]{3,8}\b|rgba?\(/, 'colours come from tokens.css');
+});
+
+const css = async () => (await source('components/SearchModal.js')).match(/<style jsx>\{`([\s\S]*?)`\}<\/style>/)[1];
+
+test('a search that cannot be reached says so with a Retry, keeps the last list, and never claims nothing matches', async () => {
+  const search = await source('components/SearchModal.js');
+  // No answer at all (not an empty one) is a failure: the shared search and the older search both came back without results.
+  assert.match(search, /if \(!Array\.isArray\(data\?\.results\)\) \{ setFailed\(q\); return; \}/);
+  assert.match(search, /"Search isn't reachable\. Try again\."/);
+  assert.match(search, /className="c-btn c-btn--quiet search-retry" onClick=\{retry\}>Retry</);
+  // The last answered list stays on screen while it is unreachable, and the "Nothing of yours" line needs an answer.
+  assert.match(search, /const results = searching \|\| unreachable \? shownRef\.current\.rows : live;/);
+  assert.match(search, /if \(!searching && !unreachable\) shownRef\.current/);
+  assert.match(search, /status = unreachable \? .* : q && !ownCount \? \(searching \? 'Searching' : 'Nothing of yours matches'\)/);
+  // Retry asks again and hands focus back to the field (its button goes away).
+  assert.match(search, /setRetries\(count => count \+ 1\);\s*inputRef\.current\?\.focus\(\)/);
+  assert.match(search, /\}, \[query, retries\]\);/);
+});
+
+test('public sets show only under the query they were asked for', async () => {
+  const search = await source('components/SearchModal.js');
+  assert.match(search, /setPublicHits\(\{ q, guides: Array\.isArray\(data\?\.guides\) \? data\.guides : \[\] \}\)/);
+  assert.match(search, /const publicGuides = publicHits\.q === query\.trim\(\) \? publicHits\.guides : \[\];/);
+  assert.doesNotMatch(search, /publicSetRows\(publicHits,/);
+});
+
+test('Escape works from anywhere, Tab stays inside the dialog, and a press on a heading keeps focus in the field', async () => {
+  const search = await source('components/SearchModal.js');
+  assert.match(search, /document\.addEventListener\('keydown', onKey, true\)/);
+  assert.match(search, /event\.key === 'Escape' && !event\.isComposing\) \{ event\.stopPropagation\(\); closeRef\.current\(\)/);
+  assert.match(search, /!box\.contains\(at\)/);
+  assert.match(search, /event\.shiftKey && at === first\) \{ event\.preventDefault\(\); last\.focus\(\)/);
+  assert.match(search, /!event\.shiftKey && at === last\) \{ event\.preventDefault\(\); first\.focus\(\)/);
+  assert.match(search, /onMouseDown=\{event => \{ if \(!event\.target\.closest\('input, button'\)\) event\.preventDefault\(\); \}\}/);
+  // The ring from the keyboard is cleared by any mouse press.
+  assert.match(search, /addEventListener\('pointerdown', onPointer, true\)/);
+  assert.match(search, /const onPointer = \(\) => \{ tabbedRef\.current = false; \};/);
+});
+
+test('the listbox holds labelled groups of options, and the click is on the option itself', async () => {
+  const search = await source('components/SearchModal.js');
+  assert.match(search, /role="group" aria-labelledby=\{label \? labelId : undefined\}/);
+  assert.match(search, /id=\{labelId\} className="c-meta c-search-group"/);
+  assert.match(search, /role="option" aria-selected=\{index === active\}/);
+  assert.match(search, /onClick=\{\(\) => go\(result\)\}/);
+  assert.doesNotMatch(search, /<button[^>]*c-search-hit/, 'no focusable button inside an option');
+  assert.doesNotMatch(search, /<li\b/);
+  // The field still points at an option id that exists.
+  assert.match(search, /aria-activedescendant=\{results\[active\] \? optionId\(active\) : undefined\}/);
+  assert.match(search, /id=\{optionId\(index\)\}/);
+});
+
+test('recent items stay on screen until the first answer arrives', async () => {
+  const search = await source('components/SearchModal.js');
+  assert.doesNotMatch(search, /shownRef\.current\.query \? shownRef\.current\.rows : \[\]/);
+  // Enter does not open one of them while a typed query is still out.
+  assert.match(search, /if \(searching && !shownRef\.current\.query\) return;/);
+});
+
+test('the library is loaded again each time Search opens, and a failed load keeps the last copy', async () => {
+  const search = await source('components/SearchModal.js');
+  assert.doesNotMatch(search, /if \(!cache\) \{/);
+  assert.match(search, /if \(!Array\.isArray\(guides\?\.guides\) && !Array\.isArray\(notes\?\.notes\)\) return;/);
+});
+
+// Contrast of two colours the way WCAG states it.
+function channels(value) {
+  const hex = value.match(/^#([0-9a-f]{6})$/i);
+  if (hex) return [0, 2, 4].map(i => parseInt(hex[1].slice(i, i + 2), 16));
+  return value.match(/rgba?\(([^)]+)\)/)[1].split(',').map(Number);
+}
+const over = ([r, g, b, a = 1], under) => [r, g, b].map((c, i) => c * a + under[i] * (1 - a));
+const lum = color => { const [r, g, b] = color.map(v => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+const ratio = (a, b) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+
+test('the active row ring is 3:1 or better on the results glass in light, dark and Paper & Clay', async () => {
+  const styles = await css();
+  assert.match(styles, /\.c-search-hit\.is-active \{ box-shadow: inset 0 0 0 2px var\(--focus-ring\); \}/);
+  const tokens = await source('styles/tokens.css');
+  const get = (block, name) => { const m = block.match(new RegExp(`${name}:\\s*([^;]+);`)); assert.ok(m, `missing ${name}`); return m[1].trim(); };
+  const dark = tokens.indexOf("[data-theme='dark'] {");
+  const light = tokens.slice(tokens.indexOf(':root {'), dark);
+  const night = tokens.slice(dark, tokens.indexOf('}', dark));
+  const clay = tokens.slice(tokens.indexOf(":root[data-look='paper-clay'] {"));
+  const clayNight = tokens.slice(tokens.indexOf("[data-theme='dark'][data-look='paper-clay'] {"));
+  const accent = (name, block) => `rgb(${get(block, name)})`;
+  const looks = {
+    light: { ring: channels(get(light, '--focus-ring')), canvas: channels(get(light, '--canvas')), fill: channels(get(light, '--glass-fill-strong')) },
+    dark: { ring: channels(get(night, '--focus-ring')), canvas: channels(get(night, '--canvas')), fill: channels(get(night, '--glass-fill-strong')) },
+    'paper and clay': {
+      ring: channels(accent('--ca-l-ink', tokens.slice(tokens.indexOf(":root[data-look='paper-clay']:not([data-accent])")))),
+      canvas: [255, 255, 255], fill: channels(get(clay, '--glass-fill-strong')),
+    },
+    'paper and clay dark': {
+      ring: channels(accent('--ca-d-ink', tokens.slice(tokens.indexOf(":root[data-look='paper-clay']:not([data-accent])")))),
+      canvas: [48, 48, 46], fill: channels(get(clayNight, '--glass-fill-strong')),
+    },
+  };
+  for (const [name, { ring, canvas, fill }] of Object.entries(looks)) {
+    assert.ok(ratio(ring, over(fill, canvas)) >= 3, `${name}: ring on the results glass`);
+  }
+});
+
+test('the tour ring is not animated, so it never trails the cut-out', async () => {
+  const spotlight = await source('components/Spotlight.js');
+  const ring = spotlight.match(/\.spot-ring \{[^}]*\}/)[0];
+  assert.doesNotMatch(ring, /transition/);
 });

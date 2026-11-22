@@ -16,19 +16,20 @@ export function searchRows(hits) {
   return uniqueRows(order.flatMap(kind => rows.filter(row => row.kind === kind).slice(0, 6)));
 }
 
-// The guide ids a student already has: every guide in their library, the set each one was copied
-// from (forked_from_guide_id: a saved class set or a copied public set), and every guide or card
-// row their own search found. Discover lists public sets from everyone, the student included, so
-// without this their own published guide, or the set they copied, shows twice: once under Guides
-// and again under Public sets. Ids only, never titles: two different sets can share a name.
+// The guide ids already on the list: every guide or card row their own search found, and the set each
+// listed guide was copied from (forked_from_guide_id: a saved class set or a copied public set).
+// Discover lists public sets from everyone, the student included, so a guide they own, or the set they
+// copied, shows twice (under Guides, then again under Public sets) unless it is dropped from Public sets.
+// An id is dropped only when its row is really listed: a guide that is in the library but did not match,
+// or was left out of the list, is still a public set the student can open from Public sets.
+// Ids only, never titles: two different sets can share a name.
 export function ownedGuideIds(guides, rows) {
   const ids = new Set();
-  for (const guide of Array.isArray(guides) ? guides : []) {
-    if (guide?.id) ids.add(String(guide.id));
-    if (guide?.forked_from_guide_id) ids.add(String(guide.forked_from_guide_id));
-  }
   for (const row of Array.isArray(rows) ? rows : []) {
     if ((row?.kind === 'guide' || row?.kind === 'card') && row.id) ids.add(String(row.id));
+  }
+  for (const guide of Array.isArray(guides) ? guides : []) {
+    if (guide?.id && guide.forked_from_guide_id && ids.has(String(guide.id))) ids.add(String(guide.forked_from_guide_id));
   }
   return ids;
 }

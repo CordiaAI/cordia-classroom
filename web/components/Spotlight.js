@@ -155,7 +155,8 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
       <style jsx>{`
         .spot { position: fixed; inset: 0; z-index: 400; pointer-events: none; }
         .spot-dim { position: fixed; background: var(--spot-dim); pointer-events: auto; }
-        .spot-ring { position: fixed; box-shadow: 0 0 0 2px var(--olive), 0 0 0 8px var(--olive-tint); pointer-events: none; transition: top var(--dur) var(--ease), left var(--dur) var(--ease), width var(--dur) var(--ease), height var(--dur) var(--ease), border-radius var(--dur) var(--ease); }
+        /* The cut-out in the dim layer is not animated, so the ring is not either: it sits on the hole at every frame. */
+        .spot-ring { position: fixed; box-shadow: 0 0 0 2px var(--olive), 0 0 0 8px var(--olive-tint); pointer-events: none; }
         .spot-label {
           position: fixed; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 16px; max-width: calc(100vw - 32px); box-sizing: border-box;
           border-radius:22px; pointer-events: auto;
@@ -184,7 +185,7 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
         .spot-finish { height: 36px; min-height: 36px; }
         @keyframes spot-in { from { opacity: 0; } to { opacity: 1; } }
         @media (max-width: 767px) { .spot :global(.spot-dots i) { display: none; } .spot :global(.spot-dots .c-meta) { margin-left: 0; } .spot-label { font-size: 0.9375rem; } }
-        @media (prefers-reduced-motion: reduce) { .spot-ring { transition: none; } .spot-label { animation: none; } }
+        @media (prefers-reduced-motion: reduce) { .spot-label { animation: none; } }
       `}</style>
     </div>,
     document.body,
