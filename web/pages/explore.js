@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -33,6 +33,7 @@ export default function Explore() {
   const filters = Object.fromEntries(FILTERS.map(key => [key, text(router.query[key])]));
   const [draft, setDraft] = useState(q);
   const debounceRef = useRef(null);
+  const [suggestions, loadSuggestions] = useSuggestions();
 
   useEffect(() => { setDraft(q); }, [q]);
 
@@ -77,7 +78,7 @@ export default function Explore() {
           <label className="sr-only" htmlFor="ex-q">Search everyone's public sets, classrooms and people</label>
           <input id="ex-q" className="c-input" type="search" value={draft} maxLength={200} autoComplete="off" spellCheck={false}
             placeholder="Search sets, classrooms, people" onChange={event => onType(event.target.value)} />
-          {draft && <button type="button" className="c-search-clear" aria-label="Clear search" onClick={() => { setDraft(''); update({ q: '' }); }}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>}
+          {draft && <button type="button" className="c-search-clear" aria-label="Clear search" onClick={() => { clearTimeout(debounceRef.current); setDraft(''); update({ q: '' }); document.getElementById('ex-q')?.focus(); }}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>}
         </form>
         <SegmentedControl kind="tabs" label="Discover" className="ex-tabs" scroller onKeyDown={onTabKey}>
           {TABS.map(item => (
@@ -87,7 +88,7 @@ export default function Explore() {
         </SegmentedControl>
       </div>
       <div id={`expanel-${tab}`} role="tabpanel" aria-labelledby={`extab-${tab}`} className="ex-panel" tabIndex={-1}>
-        {tab === 'guides' && <GuidesPanel q={q} filters={filters} onFilter={update} onClear={clear} />}
+        {tab === 'guides' && <GuidesPanel q={q} filters={filters} onFilter={update} onClear={clear} suggestions={suggestions} loadSuggestions={loadSuggestions} />}
         {tab === 'classrooms' && <ClassroomsPanel q={q} onClear={clear} onBrowse={() => update({ tab: 'guides' })} />}
         {tab === 'people' && <PeoplePanel q={q} onClear={clear} />}
       </div>
@@ -98,7 +99,7 @@ export default function Explore() {
         .ex-search { width: 100%; }
         :global(.ex-tabs) { justify-self: start; max-width: 100%; }
         :global(.ex-tabs) button { white-space: nowrap; }
-        .ex-panel { display: grid; gap: 16px; min-width: 0; outline: none; }
+        .ex-panel { display: grid; gap: 16px; min-width: 0; }
       `}</style>
     </div>
   );
@@ -121,28 +122,31 @@ function Select({ label, value, options, onChange }) {
 
 // What fills a search with no results: the most popular public sets, then sets from the student's own
 // classmates (classrooms they are in). Both come from /discover/guides, so the backend's rules on
-// who may be listed, named or shown at all still apply. Null until they arrive, [] when there are none.
-function useSuggestions(enabled) {
-  const [groups, setGroups] = useState(null);
-  useEffect(() => {
-    if (!enabled) { setGroups(null); return undefined; }
-    let live = true;
+// who may be listed, named or shown at all still apply. Fetched the first time a search finds nothing
+// and kept while the page is open, so a second empty search shows them at once and asks for nothing.
+function useSuggestions() {
+  const [groups, setGroups] = useState([]);
+  const started = useRef(false);
+  const load = useCallback(() => {
+    if (started.current) return;
+    started.current = true;
     Promise.all([
       discoverGuides({ limit: SUGGESTION_LIMIT }),
       CLASSROOMS_ON ? discoverGuides({ from_my_classrooms: true, limit: SUGGESTION_LIMIT * 2 }) : null,
     ]).then(([popular, classmates]) => {
-      if (live) setGroups(suggestionGroups({ popular: popular?.guides, classmates: classmates?.guides }));
+      if (!isSetList(popular) && !isSetList(classmates)) { started.current = false; return; } // a failure is asked again next time, never kept
+      setGroups(suggestionGroups({ popular: popular?.guides, classmates: classmates?.guides }));
     });
-    return () => { live = false; };
-  }, [enabled]);
-  return groups || [];
+  }, []);
+  return [groups, load];
 }
 
-function GuidesPanel({ q, filters, onFilter, onClear }) {
+function GuidesPanel({ q, filters, onFilter, onClear, suggestions, loadSuggestions }) {
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
   const [tries, setTries] = useState(0);
   const [facets, setFacets] = useState({});
+  const [filtersOn, setFiltersOn] = useState(false);
   const [extra, setExtra] = useState([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const key = JSON.stringify([q, filters]);
@@ -154,7 +158,7 @@ function GuidesPanel({ q, filters, onFilter, onClear }) {
     setExtra([]);
     discoverGuides({ q, ...filters }).then(result => {
       if (!live) return;
-      if (isSetList(result)) { setData(result); setFacets(result.facets || {}); } else setFailed(true);
+      if (isSetList(result)) { setData(result); setFacets(result.facets || {}); setFiltersOn(!(!result.guides.length && !narrowing(q, filters))); } else setFailed(true);
     });
     return () => { live = false; };
   }, [key, tries]);
@@ -175,12 +179,12 @@ function GuidesPanel({ q, filters, onFilter, onClear }) {
   const guides = data ? [...data.guides, ...extra] : [];
   const narrowed = narrowing(q, filters);
   const empty = Boolean(data) && !guides.length;
-  const suggestions = useSuggestions(empty && narrowed);
+  useEffect(() => { if (empty && narrowed) loadSuggestions(); }, [empty, narrowed, loadSuggestions]);
   const copy = emptySetsCopy(q, filters);
   const action = copy.action === 'library' ? { label: copy.label, href: '/library' } : { label: copy.label, onClick: onClear };
   return (
     <>
-      {!(empty && !narrowed) && <div className="exg-filters" aria-label="Filters" role="group">
+      {filtersOn && <div className="exg-filters" aria-label="Filters" role="group">
         <Select label="School" value={filters.school} options={pick(facets.schools, filters.school, 'Any school')} onChange={value => set('school', value)} />
         <Select label="Course" value={filters.course} options={pick(facets.courses, filters.course, 'Any course')} onChange={value => set('course', value)} />
         <Select label="Term" value={filters.term} options={pick(facets.terms, filters.term, 'Any term')} onChange={value => set('term', value)} />
@@ -194,7 +198,7 @@ function GuidesPanel({ q, filters, onFilter, onClear }) {
       {failed && <DiscoverRetry what="public sets" onRetry={() => setTries(count => count + 1)} />}
       {!failed && data === null && <DiscoverLoading label="Finding sets" />}
       {empty && <DiscoverEmpty message={copy.message} action={action} />}
-      {empty && suggestions.map(group => <SetGroup key={group.key} id={`exs-${group.key}`} title={group.title} sets={group.sets} compact />)}
+      {empty && narrowed && suggestions.map(group => <SetGroup key={group.key} id={`exs-${group.key}`} title={group.title} sets={group.sets} compact />)}
       {guides.length > 0 && !narrowed && <SetGroup id="exs-listed" title="Popular public sets" sets={guides} />}
       {guides.length > 0 && narrowed && (
         <ul className="exg-list" aria-label="Public sets">

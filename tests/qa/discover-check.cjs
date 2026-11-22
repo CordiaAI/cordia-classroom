@@ -151,6 +151,98 @@ async function main() {
     await context.close();
   });
 
+  await check('the first content stays put from loading to loaded, in every state', async () => {
+    const states = [
+      ['with sets', data, '/explore'],
+      ['empty catalogue', { guides: [], classmates: [], classrooms: [], people: [] }, '/explore'],
+      ['empty search', data, '/explore?q=zebra'],
+      ['filtered', data, '/explore?school=s1'],
+    ];
+    for (const size of ['desktop', 'phone']) {
+      for (const [name, discover, url] of states) {
+        const { context, page } = await open(browser, { size, discover: { ...discover, delay: 1500 }, url });
+        await page.waitForSelector('.dp-loading');
+        // Measured from the page title, so the page's own entrance settling (a fraction of a pixel) is not counted.
+        const top = selector => page.evaluate(sel => Math.round(document.querySelector(sel).getBoundingClientRect().top - document.querySelector('h1.c-title').getBoundingClientRect().top), selector);
+        const loading = await top('.dp-loading'); // where the wait is drawn
+        await page.waitForSelector('.dp-loading', { state: 'detached', timeout: 8000 });
+        const loaded = await top('.ex-panel > :first-child'); // where the first thing that arrived is drawn
+        expect(loading === loaded, `${size} ${name}: the first content moved from ${loading} to ${loaded}`);
+        await context.close();
+      }
+    }
+  });
+
+  await check('the clear button in the search field hands focus to the field', async () => {
+    const { context, page } = await open(browser, { discover: data, url: '/explore?q=cell' });
+    await page.waitForSelector('.exg-card');
+    await page.getByRole('button', { name: 'Clear search' }).click();
+    expect(await page.evaluate(() => document.activeElement?.id) === 'ex-q', 'focus should be on the search field, is ' + await page.evaluate(() => document.activeElement?.tagName));
+    expect((await page.inputValue('#ex-q')) === '', 'field emptied');
+    await context.close();
+  });
+
+  await check('a set title underlines on hover, with no colour or weight change', async () => {
+    const { context, page } = await open(browser, { discover: data });
+    await page.waitForSelector('.exg-title');
+    const title = page.locator('.exg-title').first();
+    const read = () => title.evaluate(node => { const s = getComputedStyle(node); return { line: s.textDecorationLine, tint: s.color + s.fontWeight }; });
+    const before = await read();
+    await title.hover();
+    const after = await read();
+    expect(before.line === 'none' && after.line === 'underline', `underline on hover: ${before.line} -> ${after.line}`);
+    expect(before.tint === after.tint, 'colour and weight unchanged');
+    await context.close();
+  });
+
+  await check('suggestions are fetched once while the page is open', async () => {
+    const { context, page } = await open(browser, { discover: data, url: '/explore?q=zebra' });
+    const suggestionRequests = [];
+    page.on('request', request => { if (/\/discover\/guides\?/.test(request.url()) && /[?&]limit=/.test(request.url())) suggestionRequests.push(request.url()); });
+    await page.waitForSelector('h2:has-text("Popular public sets")');
+    await page.fill('#ex-q', 'giraffe');
+    await page.waitForSelector('.dp-empty:has-text("giraffe")');
+    await page.fill('#ex-q', 'walrus');
+    await page.waitForSelector('.dp-empty:has-text("walrus")');
+    await page.waitForTimeout(500);
+    expect(await page.locator('h2:has-text("Popular public sets")').count() === 1, 'suggestions still shown');
+    expect(suggestionRequests.length === 0, 'no new suggestion requests after the first search: ' + suggestionRequests.length);
+    await context.close();
+    const fresh = await open(browser, { discover: data, url: '/explore' });
+    const total = [];
+    fresh.page.on('request', request => { if (/\/discover\/guides\?/.test(request.url()) && /[?&]limit=/.test(request.url())) total.push(request.url()); });
+    await fresh.page.fill('#ex-q', 'giraffe');
+    await fresh.page.waitForSelector('h2:has-text("From your classmates")');
+    await fresh.page.fill('#ex-q', 'walrus');
+    await fresh.page.waitForSelector('.dp-empty:has-text("walrus")');
+    await fresh.page.fill('#ex-q', 'okapi');
+    await fresh.page.waitForSelector('.dp-empty:has-text("okapi")');
+    await fresh.page.waitForTimeout(500);
+    expect(total.length <= 2, 'at most 2 suggestion requests across three empty searches, got ' + total.length);
+    await fresh.context.close();
+  });
+
+  await check('the panel shows the shared focus ring when keyboard actions give it focus', async () => {
+    const { context, page } = await open(browser, { discover: data, url: '/explore?q=zebra' });
+    await page.waitForSelector('.dp-empty .c-btn');
+    await page.locator('.dp-empty .c-btn').focus();
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.activeElement?.getAttribute('role') === 'tabpanel', null, { timeout: 2000 });
+    const ring = await page.evaluate(() => { const s = getComputedStyle(document.activeElement); return { style: s.outlineStyle, width: s.outlineWidth, focusVisible: document.activeElement.matches(':focus-visible') }; });
+    expect(ring.focusVisible && ring.style === 'solid' && ring.width === '2px', 'ring: ' + JSON.stringify(ring));
+    await context.close();
+  });
+
+  await check('a verified instructor is marked once on a set', async () => {
+    const { context, page } = await open(browser, { discover: data });
+    await page.waitForSelector('.exg-card');
+    const card = page.locator('.exg-card', { hasText: 'Due process' });
+    const said = await card.evaluate(node => (node.textContent.match(/Verified instructor/g) || []).length);
+    expect(said === 1, 'said once, said ' + said);
+    expect(await card.locator('svg.lucide-badge-check').count() === 1, 'one check icon');
+    await context.close();
+  });
+
   await browser.close();
   const failed = results.filter(ok => !ok).length;
   console.log(`\n${results.length - failed} of ${results.length} passed`);

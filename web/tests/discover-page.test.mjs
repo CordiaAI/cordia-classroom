@@ -38,3 +38,18 @@ test('copy is sentence case with no exclamation marks, "Lorem" or "Acme"', () =>
     for (const copy of strings) assert.ok(!copy.includes('!'), `${name}: ${copy}`);
   }
 });
+
+test('review fixes: filters wait for data, the clear button and the panel keep focus visibly, titles underline on hover', () => {
+  assert.match(files.page, /setFiltersOn\(/);
+  assert.match(files.page, /\{filtersOn && <div className="exg-filters"/);
+  assert.match(files.page, /className="c-search-clear"[^>]*onClick=\{\(\) => \{.*getElementById\('ex-q'\)\?\.focus\(\)/);
+  assert.doesNotMatch(files.page, /\.ex-panel \{[^}]*outline/, 'the panel keeps the shared keyboard focus ring');
+  assert.match(files.parts, /@media \(hover: hover\) \{ \.exg-card :global\(\.exg-title\):hover \{ text-decoration: underline;/);
+});
+
+test('review fixes: suggestions are fetched once for the open page, and "Verified instructor" is said once per card', () => {
+  assert.match(files.page, /const started = useRef\(false\)/);
+  assert.doesNotMatch(files.page, /useSuggestions\(empty/);
+  assert.doesNotMatch(files.parts, /exg-badge|BadgeCheck/);
+  assert.match(files.parts, /\{ \.\.\.guide\.author, verified: true \}/);
+});

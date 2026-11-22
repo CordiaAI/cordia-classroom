@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BadgeCheck, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import CordiaLoader from './CordiaLoader';
 import UserChip from './UserChip';
 import { studiedBy } from '../lib/discover.mjs';
@@ -72,8 +72,7 @@ export function SetCard({ guide, compact = false }) {
       <Link href={'/sets/' + guide.id} className="exg-title">{guide.title}</Link>
       {!compact && guide.outline?.[0] && <p className="exg-outline">{guide.outline[0]}</p>}
       <div className="exg-meta">
-        {guide.author ? <UserChip person={guide.author} /> : <span className="c-meta">Anonymous</span>}
-        {guide.verified && <span className="exg-badge"><BadgeCheck size={16} strokeWidth={1.75} aria-hidden="true" />Verified instructor</span>}
+        {guide.author ? <UserChip person={guide.verified ? { ...guide.author, verified: true } : guide.author} /> : <span className="c-meta">Anonymous</span>}
       </div>
       <p className="c-meta exg-facts">{facts}</p>
       {!compact && guide.similar?.length > 0 && (
@@ -91,9 +90,9 @@ export function SetCard({ guide, compact = false }) {
       <style jsx>{`
         .exg-card { display: grid; gap: 8px; padding: 16px; min-width: 0; }
         .exg-card :global(.exg-title) { font: 600 var(--fs-17)/1.3 var(--font-sans); color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+        @media (hover: hover) { .exg-card :global(.exg-title):hover { text-decoration: underline; text-underline-offset: 3px; } }
         .exg-outline { margin: 0; color: var(--muted-ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .exg-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
-        .exg-badge { display: inline-flex; align-items: center; gap: 4px; font: 600 var(--fs-13)/1.3 var(--font-sans); color: var(--meter-ink); }
         .exg-facts { margin: 0; overflow-wrap: anywhere; }
         .exg-similar { display: grid; gap: 4px; justify-items: start; }
         .exg-similar :global(.c-btn) { margin-left: -12px; }
